@@ -1600,7 +1600,7 @@ func TestImageQueryQ_Details(t *testing.T) {
 	withTxn(func(ctx context.Context) error {
 		const imageIdx = 3
 
-		q := getImageStringValue(imageIdx, detailsField)
+		q := getImageStringValue(imageIdx, "Details")
 
 		sqb := db.Image
 

@@ -1124,7 +1124,9 @@ func (qb *ImageStore) FindDuplicates(ctx context.Context, distance int) ([][]*mo
 	var result [][]*models.Image
 	for _, comp := range dupeIds {
 		if images, err := qb.FindMany(ctx, comp); err == nil {
-			result = append(result, images)
+			if len(images) > 1 {
+				result = append(result, images)
+			}
 		}
 	}
 

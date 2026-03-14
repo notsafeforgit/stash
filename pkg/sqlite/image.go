@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"slices"
 
-
 	"github.com/jmoiron/sqlx"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/sliceutil"
@@ -1132,4 +1131,3 @@ func (qb *ImageStore) FindDuplicates(ctx context.Context, distance int) ([][]*mo
 
 	return result, nil
 }
-

@@ -297,7 +297,7 @@ const ImageDuplicateChecker: React.FC = () => {
             <Pagination
               currentPage={currentPage}
               totalItems={allGroups.length}
-              pageSize={pageSize}
+              itemsPerPage={pageSize}
               onChangePage={(page) => {
                 query.set("page", page.toString());
                 history.push({ search: query.toString() });

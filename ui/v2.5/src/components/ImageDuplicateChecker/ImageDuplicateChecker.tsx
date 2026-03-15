@@ -2,28 +2,30 @@ import React, { useMemo, useState } from "react";
 import {
   Button,
   Form,
-  Spinner,
   Table,
   Row,
   Col,
   Card,
+  Dropdown,
   ButtonGroup,
   OverlayTrigger,
   Tooltip,
 } from "react-bootstrap";
 import { FormattedMessage, useIntl } from "react-intl";
+import { Link , useHistory } from "react-router-dom";
+import TextUtils from "src/utils/text";
+import { HoverPopover } from "../Shared/HoverPopover";
+import { TagLink, GalleryLink } from "../Shared/TagLink";
+import { PerformerPopoverButton } from "../Shared/PerformerPopoverButton";
+import { faFileAlt, faImages, faTag, faBox, faExclamationTriangle , faPencilAlt, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { useFindDuplicateImagesQuery } from "src/core/generated-graphql";
 import * as GQL from "src/core/generated-graphql";
 import { PatchContainerComponent } from "src/patch";
-import { LoadingIndicator } from "../Shared/LoadingIndicator";
-import { ErrorMessage } from "../Shared/ErrorMessage";
 import { FileSize } from "../Shared/FileSize";
 import { Pagination } from "src/components/List/Pagination";
-import { useHistory } from "react-router-dom";
 import { DeleteImagesDialog } from "../Images/DeleteImagesDialog";
 import { EditImagesDialog } from "../Images/EditImagesDialog";
 import { Icon } from "../Shared/Icon";
-import { faPencilAlt, faTrash } from "@fortawesome/free-solid-svg-icons";
 
 const ImageDuplicateCheckerSection = PatchContainerComponent(
   "ImageDuplicateCheckerSection"
@@ -37,8 +39,6 @@ const ImageDuplicateChecker: React.FC = () => {
   const pageSize = Number.parseInt(query.get("size") ?? "20", 10);
   const hashDistance = Number.parseInt(query.get("distance") ?? "0", 10);
 
-  const [isSearching, setIsSearching] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
   const [checkedImages, setCheckedImages] = useState<Record<string, boolean>>(
     {}
   );
@@ -72,18 +72,12 @@ const ImageDuplicateChecker: React.FC = () => {
     }
   }
 
-  const { data, loading, error, refetch } = useFindDuplicateImagesQuery({
+  const { data, refetch } = useFindDuplicateImagesQuery({
     variables: { distance: hashDistance },
     skip: !hasSearched,
     fetchPolicy: "network-only",
   });
 
-  const handleSearch = () => {
-    setIsSearching(true);
-    setHasSearched(true);
-    setCheckedImages({});
-    refetch({ distance: hashDistance }).finally(() => setIsSearching(false));
-  };
 
   const getGroupTotalSize = (group: GQL.ImageDataFragment[]) => {
     return group.reduce((groupTotal, img) => {

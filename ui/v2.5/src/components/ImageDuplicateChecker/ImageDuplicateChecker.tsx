@@ -47,6 +47,31 @@ const ImageDuplicateChecker: React.FC = () => {
   const [deletingImages, setDeletingImages] = useState(false);
   const [editingImages, setEditingImages] = useState(false);
 
+
+  const { data: missingPhash } = GQL.useFindImagesQuery({
+    variables: {
+      filter: {
+        per_page: 0,
+      },
+      image_filter: {
+        is_missing: "phash",
+      },
+    },
+  });
+
+  function maybeRenderMissingPhashWarning() {
+    const missingPhashes = missingPhash?.findImages.count ?? 0;
+    if (missingPhashes > 0) {
+      return (
+        <p className="lead">
+          <Icon icon={faExclamationTriangle} className="text-warning" />
+          Missing phashes for {missingPhashes} images. Please run the phash
+          generation task.
+        </p>
+      );
+    }
+  }
+
   const { data, loading, error, refetch } = useFindDuplicateImagesQuery({
     variables: { distance: hashDistance },
     skip: !hasSearched,
@@ -118,208 +143,336 @@ const ImageDuplicateChecker: React.FC = () => {
     }
   };
 
-  if (error) return <ErrorMessage error={error.message} />;
 
-  const renderGroup = (group: GQL.ImageDataFragment[], index: number) => {
-    const groupIndex = (currentPage - 1) * pageSize + index + 1;
+  function renderPagination() {
     return (
-      <Card key={groupIndex} className="mb-4">
-        <Card.Header className="d-flex justify-content-between align-items-center">
-          <h5>Group {groupIndex}</h5>
-          <span className="text-muted">
-            Total Size: <FileSize size={getGroupTotalSize(group)} />
-          </span>
-        </Card.Header>
-        <Card.Body>
-          <Table striped bordered hover responsive size="sm">
+      <div className="d-flex mt-2 mb-2">
+        <h6 className="mr-auto align-self-center">
+          <FormattedMessage
+            id="dupe_check.found_sets"
+            values={{ setCount: allGroups.length }}
+          />
+        </h6>
+        {checkCount > 0 && (
+          <ButtonGroup>
+            <OverlayTrigger
+              overlay={
+                <Tooltip id="edit">
+                  {intl.formatMessage({ id: "actions.edit" })}
+                </Tooltip>
+              }
+            >
+              <Button variant="secondary" onClick={onEdit}>
+                <Icon icon={faPencilAlt} />
+              </Button>
+            </OverlayTrigger>
+            <OverlayTrigger
+              overlay={
+                <Tooltip id="delete">
+                  {intl.formatMessage({ id: "actions.delete" })}
+                </Tooltip>
+              }
+            >
+              <Button variant="danger" onClick={handleDeleteChecked}>
+                <Icon icon={faTrash} />
+              </Button>
+            </OverlayTrigger>
+          </ButtonGroup>
+        )}
+        <Pagination
+          itemsPerPage={pageSize}
+          currentPage={currentPage}
+          totalItems={allGroups.length}
+          metadataByline={[]}
+          onChangePage={(newPage) => {
+            setQuery({ page: newPage === 1 ? undefined : newPage });
+            resetCheckboxSelection();
+          }}
+        />
+        <Form.Control
+          as="select"
+          className="w-auto ml-2 btn-secondary"
+          defaultValue={pageSize}
+          value={currentPageSize}
+          onChange={(e) => {
+            setCurrentPageSize(parseInt(e.currentTarget.value, 10));
+            setQuery({
+              size:
+                e.currentTarget.value === "20"
+                  ? undefined
+                  : e.currentTarget.value,
+            });
+            resetCheckboxSelection();
+          }}
+        >
+          {pageOptions}
+        </Form.Control>
+      </div>
+    );
+  }
+
+  function maybeRenderPopoverButtonGroup(image: GQL.ImageDataFragment) {
+    if (
+      image.tags.length > 0 ||
+      image.performers.length > 0 ||
+      image.galleries.length > 0 ||
+      image.visual_files.length > 1 ||
+      image.organized
+    ) {
+      return (
+        <ButtonGroup className="flex-wrap">
+          {image.tags.length > 0 && (
+            <HoverPopover placement="bottom" content={image.tags.map((tag) => <TagLink key={tag.id} tag={tag} />)}>
+              <Button className="minimal"><Icon icon={faTag} /><span>{image.tags.length}</span></Button>
+            </HoverPopover>
+          )}
+          {image.performers.length > 0 && <PerformerPopoverButton performers={image.performers} />}
+          {image.galleries.length > 0 && (
+            <HoverPopover placement="bottom" content={image.galleries.map((g) => <GalleryLink key={g.id} gallery={g} />)}>
+              <Button className="minimal"><Icon icon={faImages} /><span>{image.galleries.length}</span></Button>
+            </HoverPopover>
+          )}
+          {image.visual_files.length > 1 && (
+            <HoverPopover placement="bottom" content={<FormattedMessage id="files_amount" values={{ value: intl.formatNumber(image.visual_files.length) }} />}>
+              <Button className="minimal"><Icon icon={faFileAlt} /><span>{image.visual_files.length}</span></Button>
+            </HoverPopover>
+          )}
+          {image.organized && (
+            <div><Button className="minimal"><Icon icon={faBox} /></Button></div>
+          )}
+        </ButtonGroup>
+      );
+    }
+  }
+
+  return (
+    <Card id="image-duplicate-checker" className="col col-xl-12 mx-auto">
+      <div className={CLASSNAME}>
+        <ImageDuplicateCheckerSection>
+          {deletingImages && selectedImages && (
+            <DeleteImagesDialog
+              selected={selectedImages}
+              onClose={onDeleteDialogClosed}
+            />
+          )}
+          {editingImages && selectedImages && (
+            <EditImagesDialog
+              selected={selectedImages}
+              onClose={onEditDialogClosed}
+            />
+          )}
+
+          <h4>
+            <FormattedMessage id="config.tools.image_duplicate_checker" />
+          </h4>
+
+          <Form>
+            <Form.Group>
+              <Row noGutters>
+                <Form.Label>
+                  <FormattedMessage id="dupe_check.search_accuracy_label" />
+                </Form.Label>
+                <Col xs="auto">
+                  <Form.Control
+                    as="select"
+                    onChange={(e) =>
+                      setQuery({
+                        distance:
+                          e.currentTarget.value === "0"
+                            ? undefined
+                            : e.currentTarget.value,
+                        page: undefined,
+                      })
+                    }
+                    defaultValue={hashDistance}
+                    className="input-control ml-4"
+                  >
+                    <option value={0}>
+                      {intl.formatMessage({ id: "dupe_check.options.exact" })}
+                    </option>
+                    <option value={4}>
+                      {intl.formatMessage({ id: "dupe_check.options.high" })}
+                    </option>
+                    <option value={8}>
+                      {intl.formatMessage({ id: "dupe_check.options.medium" })}
+                    </option>
+                    <option value={10}>
+                      {intl.formatMessage({ id: "dupe_check.options.low" })}
+                    </option>
+                  </Form.Control>
+                </Col>
+              </Row>
+              <Form.Text>
+                <FormattedMessage id="dupe_check.description" />
+              </Form.Text>
+            </Form.Group>
+
+            <Form.Group>
+              <Row noGutters>
+                <Col xs="12">
+                  <Dropdown className="">
+                    <Dropdown.Toggle variant="secondary">
+                      <FormattedMessage id="dupe_check.select_options" />
+                    </Dropdown.Toggle>
+                    <Dropdown.Menu className="bg-secondary text-white">
+                      <Dropdown.Item onClick={() => resetCheckboxSelection()}>
+                        {intl.formatMessage({ id: "dupe_check.select_none" })}
+                      </Dropdown.Item>
+
+                      <Dropdown.Item
+                        onClick={() => onSelectLargestResolutionClick()}
+                      >
+                        {intl.formatMessage({
+                          id: "dupe_check.select_all_but_largest_resolution",
+                        })}
+                      </Dropdown.Item>
+
+                      <Dropdown.Item onClick={() => onSelectLargestClick()}>
+                        {intl.formatMessage({
+                          id: "dupe_check.select_all_but_largest_file",
+                        })}
+                      </Dropdown.Item>
+
+                      <Dropdown.Item onClick={() => onSelectByAge(true)}>
+                        {intl.formatMessage({
+                          id: "dupe_check.select_oldest",
+                        })}
+                      </Dropdown.Item>
+
+                      <Dropdown.Item onClick={() => onSelectByAge(false)}>
+                        {intl.formatMessage({
+                          id: "dupe_check.select_youngest",
+                        })}
+                      </Dropdown.Item>
+                    </Dropdown.Menu>
+                  </Dropdown>
+                </Col>
+              </Row>
+            </Form.Group>
+          </Form>
+
+          {maybeRenderMissingPhashWarning()}
+          {renderPagination()}
+
+          <Table responsive striped className={`${CLASSNAME}-table`}>
+            <colgroup>
+              <col className={`${CLASSNAME}-checkbox`} />
+              <col className={`${CLASSNAME}-sprite`} />
+              <col className={`${CLASSNAME}-title`} />
+              <col className={`${CLASSNAME}-details`} />
+              <col className={`${CLASSNAME}-filesize`} />
+              <col className={`${CLASSNAME}-resolution`} />
+              <col className={`${CLASSNAME}-operations`} />
+            </colgroup>
             <thead>
               <tr>
-                <th style={{ width: "40px" }}></th>
-                <th style={{ width: "150px" }}>Image</th>
-                <th>Details</th>
-                <th style={{ width: "120px" }}>Size</th>
-                <th style={{ width: "150px" }}>Dimensions</th>
+                <th> </th>
+                <th> </th>
+                <th>{intl.formatMessage({ id: "details" })}</th>
+                <th> </th>
+                <th>{intl.formatMessage({ id: "filesize" })}</th>
+                <th>{intl.formatMessage({ id: "resolution" })}</th>
+                <th>{intl.formatMessage({ id: "actions.delete" })}</th>
               </tr>
             </thead>
             <tbody>
-              {group.map((img) => {
-                const file = img.visual_files[0];
-                return (
-                  <tr key={img.id}>
-                    <td className="text-center align-middle">
-                      <Form.Check
-                        checked={checkedImages[img.id] || false}
-                        onChange={(e) =>
-                          handleCheck(e.currentTarget.checked, img.id)
-                        }
-                      />
-                    </td>
-                    <td>
-                      <img
-                        src={img.paths.thumbnail || ""}
-                        alt={img.title || img.id}
-                        style={{
-                          maxWidth: "120px",
-                          maxHeight: "120px",
-                          objectFit: "contain",
-                        }}
-                      />
-                    </td>
-                    <td>
-                      <div className="fw-bold">{img.title || "(No Title)"}</div>
-                      <div
-                        className="text-muted small text-truncate"
-                        style={{ maxWidth: "400px" }}
+              {pagedGroups.map((group, groupIndex) =>
+                group.map((image, i) => {
+                  const file = image.visual_files[0];
+
+                  return (
+                    <React.Fragment key={image.id}>
+                      {i === 0 && groupIndex !== 0 ? (
+                        <tr className="separator" />
+                      ) : undefined}
+                      <tr
+                        className={i === 0 ? "duplicate-group" : ""}
+                        key={image.id}
                       >
-                        {img.visual_files[0]?.path}
-                      </div>
-                      <div className="mt-1 small">ID: {img.id}</div>
-                    </td>
-                    <td>
-                      <FileSize size={file?.size ?? 0} />
-                    </td>
-                    <td>
-                      {file?.__typename === "ImageFile" ||
-                      file?.__typename === "VideoFile" ? (
-                        <>
-                          {file.width} x {file.height}
-                        </>
-                      ) : (
-                        "N/A"
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+                        <td>
+                          <Form.Check
+                            checked={checkedImages[image.id] || false}
+                            onChange={(e) =>
+                              handleCheck(e.currentTarget.checked, image.id)
+                            }
+                          />
+                        </td>
+                        <td>
+                          <HoverPopover
+                            content={
+                              <img
+                                src={image.paths.thumbnail || ""}
+                                alt=""
+                                style={{ maxWidth: 600, maxHeight: 600, objectFit: "contain" }}
+                              />
+                            }
+                            placement="right"
+                          >
+                            <img
+                              src={image.paths.thumbnail || ""}
+                              alt=""
+                              style={{
+                                maxWidth: "120px",
+                                maxHeight: "120px",
+                                objectFit: "contain",
+                                border: checkedImages[image.id] ? "2px solid red" : "",
+                              }}
+                            />
+                          </HoverPopover>
+                        </td>
+                        <td className="text-left">
+                          <p>
+                            <Link
+                              to={`/images/${image.id}`}
+                              style={{
+                                fontWeight: checkedImages[image.id] ? "bold" : "inherit",
+                                textDecoration: checkedImages[image.id] ? "line-through 3px" : "inherit",
+                                textDecorationColor: checkedImages[image.id] ? "red" : "inherit",
+                              }}
+                            >
+                              {image.title || TextUtils.fileNameFromPath(file?.path ?? "")}
+                            </Link>
+                          </p>
+                          <p className="scene-path">{file?.path ?? ""}</p>
+                        </td>
+                        <td className="scene-details">
+                          {maybeRenderPopoverButtonGroup(image)}
+                        </td>
+                        <td>
+                          <FileSize size={file?.size ?? 0} />
+                        </td>
+                        <td>
+                          {file?.__typename === "ImageFile" || file?.__typename === "VideoFile" ? (
+                            <>{file.width ?? 0}x{file.height ?? 0}</>
+                          ) : (
+                            "N/A"
+                          )}
+                        </td>
+                        <td>
+                          <Button
+                            className="edit-button"
+                            variant="danger"
+                            onClick={() => handleDeleteImage(image)}
+                          >
+                            <FormattedMessage id="actions.delete" />
+                          </Button>
+                        </td>
+                      </tr>
+                    </React.Fragment>
+                  );
+                })
+              )}
             </tbody>
           </Table>
-        </Card.Body>
-      </Card>
-    );
-  };
 
-  return (
-    <div className="container-fluid py-4">
-      <ImageDuplicateCheckerSection>
-        {deletingImages && selectedImages && (
-          <DeleteImagesDialog
-            selected={selectedImages}
-            onClose={onDeleteDialogClosed}
-          />
-        )}
-        {editingImages && selectedImages && (
-          <EditImagesDialog
-            selected={selectedImages}
-            onClose={onEditDialogClosed}
-          />
-        )}
-        <Row className="mb-4">
-          <Col>
-            <h3>
-              <FormattedMessage id="config.tools.image_duplicate_checker" />
-            </h3>
-          </Col>
-        </Row>
+          {allGroups.length === 0 && (
+            <h4 className="text-center mt-4">No duplicates found.</h4>
+          )}
 
-        <Form className="bg-light p-3 rounded mb-4 shadow-sm">
-          <Row className="align-items-end">
-            <Col md={3}>
-              <Form.Group controlId="distanceInput">
-                <Form.Label>PHash Distance</Form.Label>
-                <Form.Control
-                  type="number"
-                  value={hashDistance}
-                  min={0}
-                  max={10}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value) || 0;
-                    query.set("distance", val.toString());
-                    history.push({ search: query.toString() });
-                  }}
-                />
-                <Form.Text className="text-muted small">
-                  0 = exact matches.
-                </Form.Text>
-              </Form.Group>
-            </Col>
-            <Col md={2}>
-              <Button
-                variant="primary"
-                className="w-100"
-                onClick={handleSearch}
-                disabled={isSearching || loading}
-              >
-                {isSearching || loading ? (
-                  <Spinner animation="border" size="sm" />
-                ) : (
-                  "Search"
-                )}
-              </Button>
-            </Col>
-          </Row>
-        </Form>
-
-        {loading && <LoadingIndicator />}
-
-        {hasSearched && !loading && !error && allGroups.length === 0 && (
-          <div className="text-center py-5 border rounded bg-light">
-            <p className="mb-0">
-              No duplicates found with the current distance.
-            </p>
-          </div>
-        )}
-
-        {hasSearched && !loading && !error && allGroups.length > 0 && (
-          <div className="d-flex mb-3 align-items-center">
-            <h6 className="me-auto mb-0">
-              Found {allGroups.length} duplicate groups
-            </h6>
-            {checkCount > 0 && (
-              <ButtonGroup>
-                <OverlayTrigger
-                  overlay={
-                    <Tooltip id="edit">
-                      {intl.formatMessage({ id: "actions.edit" })}
-                    </Tooltip>
-                  }
-                >
-                  <Button variant="secondary" onClick={onEdit}>
-                    <Icon icon={faPencilAlt} />
-                  </Button>
-                </OverlayTrigger>
-                <OverlayTrigger
-                  overlay={
-                    <Tooltip id="delete">
-                      {intl.formatMessage({ id: "actions.delete" })}
-                    </Tooltip>
-                  }
-                >
-                  <Button variant="danger" onClick={handleDeleteChecked}>
-                    <Icon icon={faTrash} />
-                  </Button>
-                </OverlayTrigger>
-              </ButtonGroup>
-            )}
-          </div>
-        )}
-
-        {pagedGroups.map((group, index) => renderGroup(group, index))}
-
-        {allGroups.length > pageSize && (
-          <div className="d-flex justify-content-center mt-4">
-            <Pagination
-              currentPage={currentPage}
-              totalItems={allGroups.length}
-              itemsPerPage={pageSize}
-              onChangePage={(page) => {
-                query.set("page", page.toString());
-                history.push({ search: query.toString() });
-              }}
-            />
-          </div>
-        )}
-      </ImageDuplicateCheckerSection>
-    </div>
+          {renderPagination()}
+        </ImageDuplicateCheckerSection>
+      </div>
+    </Card>
   );
 };
 

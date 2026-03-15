@@ -6,7 +6,6 @@ package sqlite_test
 import (
 	"context"
 	"reflect"
-	"strconv"
 	"testing"
 	"time"
 
@@ -1630,6 +1629,28 @@ func queryImagesWithCount(ctx context.Context, sqb models.ImageReader, imageFilt
 	return images, result.Count, nil
 }
 
+func queryImages(ctx context.Context, t *testing.T, sqb models.ImageReader, imageFilter *models.ImageFilterType, findFilter *models.FindFilterType) []*models.Image {
+	t.Helper()
+
+	result, err := sqb.Query(ctx, models.ImageQueryOptions{
+		QueryOptions: models.QueryOptions{
+			FindFilter: findFilter,
+		},
+		ImageFilter: imageFilter,
+	})
+
+	if err != nil {
+		t.Fatalf("Error querying images: %s", err.Error())
+	}
+
+	images, err := result.Resolve(ctx)
+	if err != nil {
+		t.Fatalf("Error resolving image result: %s", err.Error())
+	}
+
+	return images
+}
+
 func imageQueryQ(ctx context.Context, t *testing.T, sqb models.ImageReader, q string, expectedImageIdx int) {
 	filter := models.FindFilterType{
 		Q: &q,
@@ -1983,7 +2004,7 @@ func verifyImagesOCounter(t *testing.T, oCounterCriterion models.IntCriterionInp
 		}
 
 		for _, image := range images {
-			verifyIntPtr(t, image.OCounter, oCounterCriterion)
+			verifyIntPtr(t, &image.OCounter, oCounterCriterion)
 		}
 
 		return nil

@@ -209,7 +209,7 @@ const ImageDuplicateChecker: React.FC = () => {
     oldest: boolean,
     compareImages: GQL.ImageDataFragment[]
   ) => {
-    let selectedFile: GQL.ImageFileFragment | GQL.VideoFileFragment;
+    let selectedFile: GQL.ImageFileDataFragment | GQL.VideoFileDataFragment;
     let oldestTimestamp: Date | undefined = undefined;
 
     for (const file of compareImages.flatMap((s) => s.visual_files)) {

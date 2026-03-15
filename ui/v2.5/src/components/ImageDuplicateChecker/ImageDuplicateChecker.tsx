@@ -27,6 +27,8 @@ import { DeleteImagesDialog } from "../Images/DeleteImagesDialog";
 import { EditImagesDialog } from "../Images/EditImagesDialog";
 import { Icon } from "../Shared/Icon";
 
+const CLASSNAME = "duplicate-checker";
+
 const ImageDuplicateCheckerSection = PatchContainerComponent(
   "ImageDuplicateCheckerSection"
 );
@@ -39,6 +41,7 @@ const ImageDuplicateChecker: React.FC = () => {
   const pageSize = Number.parseInt(query.get("size") ?? "20", 10);
   const hashDistance = Number.parseInt(query.get("distance") ?? "0", 10);
 
+  const [currentPageSize, setCurrentPageSize] = useState(pageSize);
   const [checkedImages, setCheckedImages] = useState<Record<string, boolean>>(
     {}
   );
@@ -74,7 +77,6 @@ const ImageDuplicateChecker: React.FC = () => {
 
   const { data, refetch } = useFindDuplicateImagesQuery({
     variables: { distance: hashDistance },
-    skip: !hasSearched,
     fetchPolicy: "network-only",
   });
 
@@ -137,6 +139,160 @@ const ImageDuplicateChecker: React.FC = () => {
     }
   };
 
+
+
+  const pageOptions = useMemo(() => {
+    const pageSizes = [
+      10, 20, 30, 40, 50, 100, 150, 200, 250, 500, 750, 1000, 1250, 1500,
+    ];
+
+    const filteredSizes = pageSizes.filter((s, i) => {
+      return allGroups.length > s || i == 0 || allGroups.length > pageSizes[i - 1];
+    });
+
+    return filteredSizes.map((size) => {
+      return (
+        <option key={size} value={size}>
+          {size}
+        </option>
+      );
+    });
+  }, [allGroups.length]);
+
+  const setQuery = (q: Record<string, string | number | undefined>) => {
+    const newQuery = new URLSearchParams(query);
+    for (const key of Object.keys(q)) {
+      const value = q[key];
+      if (value !== undefined) {
+        newQuery.set(key, String(value));
+      } else {
+        newQuery.delete(key);
+      }
+    }
+    history.push({ search: newQuery.toString() });
+  };
+
+  const resetCheckboxSelection = () => {
+    const updatedImages: Record<string, boolean> = {};
+    Object.keys(checkedImages).forEach((imageKey) => {
+      updatedImages[imageKey] = false;
+    });
+    setCheckedImages(updatedImages);
+  };
+
+  const findLargestImage = (group: GQL.ImageDataFragment[]) => {
+    const totalSize = (image: GQL.ImageDataFragment) => {
+      return image.visual_files.reduce((prev: number, f) => Math.max(prev, f.size ?? 0), 0);
+    };
+    return group.reduce((largest, image) => {
+      const largestSize = totalSize(largest);
+      const currentSize = totalSize(image);
+      return currentSize > largestSize ? image : largest;
+    });
+  };
+
+  const findLargestResolutionImage = (group: GQL.ImageDataFragment[]) => {
+    const imgResolution = (image: GQL.ImageDataFragment) => {
+      return image.visual_files.reduce(
+        (prev: number, f) => Math.max(prev, (f.height ?? 0) * (f.width ?? 0)),
+        0
+      );
+    };
+    return group.reduce((largest, image) => {
+      const largestSize = imgResolution(largest);
+      const currentSize = imgResolution(image);
+      return currentSize > largestSize ? image : largest;
+    });
+  };
+
+  const findFirstFileByAge = (
+    oldest: boolean,
+    compareImages: GQL.ImageDataFragment[]
+  ) => {
+    let selectedFile: GQL.ImageFileFragment | GQL.VideoFileFragment;
+    let oldestTimestamp: Date | undefined = undefined;
+
+    for (const file of compareImages.flatMap((s) => s.visual_files)) {
+      const timestamp: Date = new Date(file.mod_time);
+      if (oldest) {
+        if (oldestTimestamp === undefined || timestamp < oldestTimestamp) {
+          oldestTimestamp = timestamp;
+          selectedFile = file;
+        }
+      } else {
+        if (oldestTimestamp === undefined || timestamp > oldestTimestamp) {
+          oldestTimestamp = timestamp;
+          selectedFile = file;
+        }
+      }
+    }
+
+    return compareImages.find((s) =>
+      s.visual_files.some((f) => f.id === selectedFile?.id)
+    );
+  };
+
+  function checkSameResolution(dataGroup: GQL.ImageDataFragment[]) {
+    const resolutions = dataGroup.map(
+      (s) => (s.visual_files[0]?.width ?? 0) * (s.visual_files[0]?.height ?? 0)
+    );
+    return new Set(resolutions).size === 1;
+  }
+
+  const onSelectLargestClick = () => {
+    setSelectedImages([]);
+    const checkedArray: Record<string, boolean> = {};
+
+    pagedGroups.forEach((group) => {
+      const largest = findLargestImage(group);
+      group.forEach((image) => {
+        if (image !== largest) {
+          checkedArray[image.id] = true;
+        }
+      });
+    });
+
+    setCheckedImages(checkedArray);
+  };
+
+  const onSelectLargestResolutionClick = () => {
+    setSelectedImages([]);
+    const checkedArray: Record<string, boolean> = {};
+
+    pagedGroups.forEach((group) => {
+      if (checkSameResolution(group)) return;
+
+      const highest = findLargestResolutionImage(group);
+      group.forEach((image) => {
+        if (image !== highest) {
+          checkedArray[image.id] = true;
+        }
+      });
+    });
+
+    setCheckedImages(checkedArray);
+  };
+
+  const onSelectByAge = (oldest: boolean) => {
+    setSelectedImages([]);
+    const checkedArray: Record<string, boolean> = {};
+
+    pagedGroups.forEach((group) => {
+      const oldestScene = findFirstFileByAge(oldest, group);
+      group.forEach((image) => {
+        if (image !== oldestScene) {
+          checkedArray[image.id] = true;
+        }
+      });
+    });
+
+    setCheckedImages(checkedArray);
+  };
+
+  const handleDeleteImage = (image: GQL.ImageDataFragment) => {
+    setSelectedImages([image]);
+    setDeletingImages(true);
+  };
 
   function renderPagination() {
     return (

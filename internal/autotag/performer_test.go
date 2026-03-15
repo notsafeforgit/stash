@@ -40,11 +40,12 @@ func TestPerformerScenes(t *testing.T) {
 	}
 
 	for _, p := range performerNames {
-		testPerformerScenes(t, p.performerName, p.expectedRegex)
+		testPerformerScenes(t, p.performerName, p.expectedRegex, true)
+		testPerformerScenes(t, p.performerName, p.expectedRegex, false)
 	}
 }
 
-func testPerformerScenes(t *testing.T, performerName, expectedRegex string) {
+func testPerformerScenes(t *testing.T, performerName, expectedRegex string, matchAlias bool) {
 	db := mocks.NewDatabase()
 
 	const performerID = 2
@@ -107,7 +108,7 @@ func testPerformerScenes(t *testing.T, performerName, expectedRegex string) {
 		TxnManager: db,
 	}
 
-	err := tagger.PerformerScenes(testCtx, &performer, nil, db.Scene, true)
+	err := tagger.PerformerScenes(testCtx, &performer, nil, db.Scene, matchAlias)
 
 	assert := assert.New(t)
 
@@ -135,11 +136,12 @@ func TestPerformerImages(t *testing.T) {
 	}
 
 	for _, p := range performerNames {
-		testPerformerImages(t, p.performerName, p.expectedRegex)
+		testPerformerImages(t, p.performerName, p.expectedRegex, true)
+		testPerformerImages(t, p.performerName, p.expectedRegex, false)
 	}
 }
 
-func testPerformerImages(t *testing.T, performerName, expectedRegex string) {
+func testPerformerImages(t *testing.T, performerName, expectedRegex string, matchAlias bool) {
 	db := mocks.NewDatabase()
 
 	const performerID = 2
@@ -202,7 +204,7 @@ func testPerformerImages(t *testing.T, performerName, expectedRegex string) {
 		TxnManager: db,
 	}
 
-	err := tagger.PerformerImages(testCtx, &performer, nil, db.Image, true)
+	err := tagger.PerformerImages(testCtx, &performer, nil, db.Image, matchAlias)
 
 	assert := assert.New(t)
 
@@ -230,11 +232,12 @@ func TestPerformerGalleries(t *testing.T) {
 	}
 
 	for _, p := range performerNames {
-		testPerformerGalleries(t, p.performerName, p.expectedRegex)
+		testPerformerGalleries(t, p.performerName, p.expectedRegex, true)
+		testPerformerGalleries(t, p.performerName, p.expectedRegex, false)
 	}
 }
 
-func testPerformerGalleries(t *testing.T, performerName, expectedRegex string) {
+func testPerformerGalleries(t *testing.T, performerName, expectedRegex string, matchAlias bool) {
 	db := mocks.NewDatabase()
 
 	const performerID = 2
@@ -297,7 +300,7 @@ func testPerformerGalleries(t *testing.T, performerName, expectedRegex string) {
 		TxnManager: db,
 	}
 
-	err := tagger.PerformerGalleries(testCtx, &performer, nil, db.Gallery, true)
+	err := tagger.PerformerGalleries(testCtx, &performer, nil, db.Gallery, matchAlias)
 
 	assert := assert.New(t)
 

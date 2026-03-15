@@ -16,18 +16,24 @@ func TestPerformerScenes(t *testing.T) {
 	t.Parallel()
 
 	type test struct {
-		performerName string
-		expectedRegex string
+		performerName        string
+		expectedRegex        string
+		aliases              []string
+		expectedAliasRegexes []string
 	}
 
 	performerNames := []test{
 		{
 			"performer name",
 			`(?i)(?:^|_|[^\p{L}\d])performer[.\-_ ]*name(?:$|_|[^\p{L}\d])`,
+			nil,
+			nil,
 		},
 		{
 			"performer + name",
 			`(?i)(?:^|_|[^\p{L}\d])performer[.\-_ ]*\+[.\-_ ]*name(?:$|_|[^\p{L}\d])`,
+			[]string{"alias name"},
+			[]string{`(?i)(?:^|_|[^\p{L}\d])alias[.\-_ ]*name(?:$|_|[^\p{L}\d])`},
 		},
 	}
 
@@ -36,16 +42,18 @@ func TestPerformerScenes(t *testing.T) {
 		performerNames = append(performerNames, test{
 			`performer + name\`,
 			`(?i)(?:^|_|[^\p{L}\d])performer[.\-_ ]*\+[.\-_ ]*name\\(?:$|_|[^\p{L}\d])`,
+			nil,
+			nil,
 		})
 	}
 
 	for _, p := range performerNames {
-		testPerformerScenes(t, p.performerName, p.expectedRegex, true)
-		testPerformerScenes(t, p.performerName, p.expectedRegex, false)
+		testPerformerScenes(t, p.performerName, p.expectedRegex, p.aliases, p.expectedAliasRegexes, true)
+		testPerformerScenes(t, p.performerName, p.expectedRegex, p.aliases, p.expectedAliasRegexes, false)
 	}
 }
 
-func testPerformerScenes(t *testing.T, performerName, expectedRegex string, matchAlias bool) {
+func testPerformerScenes(t *testing.T, performerName, expectedRegex string, aliases []string, expectedAliasRegexes []string, matchAlias bool) {
 	db := mocks.NewDatabase()
 
 	const performerID = 2
@@ -60,10 +68,14 @@ func testPerformerScenes(t *testing.T, performerName, expectedRegex string, matc
 		})
 	}
 
+	if aliases == nil {
+		aliases = []string{}
+	}
+
 	performer := models.Performer{
 		ID:      performerID,
 		Name:    performerName,
-		Aliases: models.NewRelatedStrings([]string{}),
+		Aliases: models.NewRelatedStrings(aliases),
 	}
 
 	organized := false
@@ -87,6 +99,20 @@ func testPerformerScenes(t *testing.T, performerName, expectedRegex string, matc
 
 	db.Scene.On("Query", mock.Anything, scene.QueryOptions(expectedSceneFilter, expectedFindFilter, false)).
 		Return(mocks.SceneQueryResult(scenes, len(scenes)), nil).Once()
+
+	if matchAlias {
+		for _, aliasRegex := range expectedAliasRegexes {
+			expectedAliasFilter := &models.SceneFilterType{
+				Organized: &organized,
+				Path: &models.StringCriterionInput{
+					Value:    aliasRegex,
+					Modifier: models.CriterionModifierMatchesRegex,
+				},
+			}
+			db.Scene.On("Query", mock.Anything, scene.QueryOptions(expectedAliasFilter, expectedFindFilter, false)).
+				Return(mocks.SceneQueryResult([]*models.Scene{}, 0), nil).Once()
+		}
+	}
 
 	for i := range matchingPaths {
 		sceneID := i + 1
@@ -120,28 +146,34 @@ func TestPerformerImages(t *testing.T) {
 	t.Parallel()
 
 	type test struct {
-		performerName string
-		expectedRegex string
+		performerName        string
+		expectedRegex        string
+		aliases              []string
+		expectedAliasRegexes []string
 	}
 
 	performerNames := []test{
 		{
 			"performer name",
 			`(?i)(?:^|_|[^\p{L}\d])performer[.\-_ ]*name(?:$|_|[^\p{L}\d])`,
+			nil,
+			nil,
 		},
 		{
 			"performer + name",
 			`(?i)(?:^|_|[^\p{L}\d])performer[.\-_ ]*\+[.\-_ ]*name(?:$|_|[^\p{L}\d])`,
+			[]string{"alias name"},
+			[]string{`(?i)(?:^|_|[^\p{L}\d])alias[.\-_ ]*name(?:$|_|[^\p{L}\d])`},
 		},
 	}
 
 	for _, p := range performerNames {
-		testPerformerImages(t, p.performerName, p.expectedRegex, true)
-		testPerformerImages(t, p.performerName, p.expectedRegex, false)
+		testPerformerImages(t, p.performerName, p.expectedRegex, p.aliases, p.expectedAliasRegexes, true)
+		testPerformerImages(t, p.performerName, p.expectedRegex, p.aliases, p.expectedAliasRegexes, false)
 	}
 }
 
-func testPerformerImages(t *testing.T, performerName, expectedRegex string, matchAlias bool) {
+func testPerformerImages(t *testing.T, performerName, expectedRegex string, aliases []string, expectedAliasRegexes []string, matchAlias bool) {
 	db := mocks.NewDatabase()
 
 	const performerID = 2
@@ -156,10 +188,14 @@ func testPerformerImages(t *testing.T, performerName, expectedRegex string, matc
 		})
 	}
 
+	if aliases == nil {
+		aliases = []string{}
+	}
+
 	performer := models.Performer{
 		ID:      performerID,
 		Name:    performerName,
-		Aliases: models.NewRelatedStrings([]string{}),
+		Aliases: models.NewRelatedStrings(aliases),
 	}
 
 	organized := false
@@ -183,6 +219,20 @@ func testPerformerImages(t *testing.T, performerName, expectedRegex string, matc
 
 	db.Image.On("Query", mock.Anything, image.QueryOptions(expectedImageFilter, expectedFindFilter, false)).
 		Return(mocks.ImageQueryResult(images, len(images)), nil).Once()
+
+	if matchAlias {
+		for _, aliasRegex := range expectedAliasRegexes {
+			expectedAliasFilter := &models.ImageFilterType{
+				Organized: &organized,
+				Path: &models.StringCriterionInput{
+					Value:    aliasRegex,
+					Modifier: models.CriterionModifierMatchesRegex,
+				},
+			}
+			db.Image.On("Query", mock.Anything, image.QueryOptions(expectedAliasFilter, expectedFindFilter, false)).
+				Return(mocks.ImageQueryResult([]*models.Image{}, 0), nil).Once()
+		}
+	}
 
 	for i := range matchingPaths {
 		imageID := i + 1
@@ -216,28 +266,34 @@ func TestPerformerGalleries(t *testing.T) {
 	t.Parallel()
 
 	type test struct {
-		performerName string
-		expectedRegex string
+		performerName        string
+		expectedRegex        string
+		aliases              []string
+		expectedAliasRegexes []string
 	}
 
 	performerNames := []test{
 		{
 			"performer name",
 			`(?i)(?:^|_|[^\p{L}\d])performer[.\-_ ]*name(?:$|_|[^\p{L}\d])`,
+			nil,
+			nil,
 		},
 		{
 			"performer + name",
 			`(?i)(?:^|_|[^\p{L}\d])performer[.\-_ ]*\+[.\-_ ]*name(?:$|_|[^\p{L}\d])`,
+			[]string{"alias name"},
+			[]string{`(?i)(?:^|_|[^\p{L}\d])alias[.\-_ ]*name(?:$|_|[^\p{L}\d])`},
 		},
 	}
 
 	for _, p := range performerNames {
-		testPerformerGalleries(t, p.performerName, p.expectedRegex, true)
-		testPerformerGalleries(t, p.performerName, p.expectedRegex, false)
+		testPerformerGalleries(t, p.performerName, p.expectedRegex, p.aliases, p.expectedAliasRegexes, true)
+		testPerformerGalleries(t, p.performerName, p.expectedRegex, p.aliases, p.expectedAliasRegexes, false)
 	}
 }
 
-func testPerformerGalleries(t *testing.T, performerName, expectedRegex string, matchAlias bool) {
+func testPerformerGalleries(t *testing.T, performerName, expectedRegex string, aliases []string, expectedAliasRegexes []string, matchAlias bool) {
 	db := mocks.NewDatabase()
 
 	const performerID = 2
@@ -253,10 +309,14 @@ func testPerformerGalleries(t *testing.T, performerName, expectedRegex string, m
 		})
 	}
 
+	if aliases == nil {
+		aliases = []string{}
+	}
+
 	performer := models.Performer{
 		ID:      performerID,
 		Name:    performerName,
-		Aliases: models.NewRelatedStrings([]string{}),
+		Aliases: models.NewRelatedStrings(aliases),
 	}
 
 	organized := false
@@ -279,6 +339,20 @@ func testPerformerGalleries(t *testing.T, performerName, expectedRegex string, m
 	}
 
 	db.Gallery.On("Query", mock.Anything, expectedGalleryFilter, expectedFindFilter).Return(galleries, len(galleries), nil).Once()
+
+	if matchAlias {
+		for _, aliasRegex := range expectedAliasRegexes {
+			expectedAliasFilter := &models.GalleryFilterType{
+				Organized: &organized,
+				Path: &models.StringCriterionInput{
+					Value:    aliasRegex,
+					Modifier: models.CriterionModifierMatchesRegex,
+				},
+			}
+			db.Gallery.On("Query", mock.Anything, expectedAliasFilter, expectedFindFilter).
+				Return([]*models.Gallery{}, 0, nil).Once()
+		}
+	}
 
 	for i := range matchingPaths {
 		galleryID := i + 1

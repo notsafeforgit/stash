@@ -22,7 +22,6 @@ import {
   faImages,
   faTag,
   faBox,
-  faExclamationTriangle,
   faPencilAlt,
   faTrash,
 } from "@fortawesome/free-solid-svg-icons";
@@ -57,32 +56,6 @@ const ImageDuplicateChecker: React.FC = () => {
     useState<GQL.ImageDataFragment[]>();
   const [deletingImages, setDeletingImages] = useState(false);
   const [editingImages, setEditingImages] = useState(false);
-
-  const { data: missingPhash } = GQL.useFindImagesQuery({
-    variables: {
-      filter: {
-        per_page: 0,
-      },
-      image_filter: {
-        is_missing: "phash",
-      },
-    },
-  });
-
-  function maybeRenderMissingPhashWarning() {
-    const missingPhashes = missingPhash?.findImages.count ?? 0;
-    if (missingPhashes > 0) {
-      return (
-        <p className="lead">
-          <Icon icon={faExclamationTriangle} className="text-warning" />
-          <FormattedMessage
-            id="dupe_check.missing_phash_warning"
-            values={{ count: missingPhashes }}
-          />
-        </p>
-      );
-    }
-  }
 
   const { data, loading, refetch } = useFindDuplicateImagesQuery({
     variables: { distance: hashDistance },
@@ -547,7 +520,6 @@ const ImageDuplicateChecker: React.FC = () => {
             </Form.Group>
           </Form>
 
-          {maybeRenderMissingPhashWarning()}
           {renderPagination()}
 
           <Table responsive striped className={`${CLASSNAME}-table`}>

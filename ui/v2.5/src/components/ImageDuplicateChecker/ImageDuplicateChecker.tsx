@@ -12,12 +12,20 @@ import {
   Tooltip,
 } from "react-bootstrap";
 import { FormattedMessage, useIntl } from "react-intl";
-import { Link , useHistory } from "react-router-dom";
+import { Link, useHistory } from "react-router-dom";
 import TextUtils from "src/utils/text";
 import { HoverPopover } from "../Shared/HoverPopover";
 import { TagLink, GalleryLink } from "../Shared/TagLink";
 import { PerformerPopoverButton } from "../Shared/PerformerPopoverButton";
-import { faFileAlt, faImages, faTag, faBox, faExclamationTriangle , faPencilAlt, faTrash } from "@fortawesome/free-solid-svg-icons";
+import {
+  faFileAlt,
+  faImages,
+  faTag,
+  faBox,
+  faExclamationTriangle,
+  faPencilAlt,
+  faTrash,
+} from "@fortawesome/free-solid-svg-icons";
 import { useFindDuplicateImagesQuery } from "src/core/generated-graphql";
 import * as GQL from "src/core/generated-graphql";
 import { PatchContainerComponent } from "src/patch";
@@ -50,7 +58,6 @@ const ImageDuplicateChecker: React.FC = () => {
   const [deletingImages, setDeletingImages] = useState(false);
   const [editingImages, setEditingImages] = useState(false);
 
-
   const { data: missingPhash } = GQL.useFindImagesQuery({
     variables: {
       filter: {
@@ -79,7 +86,6 @@ const ImageDuplicateChecker: React.FC = () => {
     variables: { distance: hashDistance },
     fetchPolicy: "network-only",
   });
-
 
   const getGroupTotalSize = (group: GQL.ImageDataFragment[]) => {
     return group.reduce((groupTotal, img) => {
@@ -139,15 +145,15 @@ const ImageDuplicateChecker: React.FC = () => {
     }
   };
 
-
-
   const pageOptions = useMemo(() => {
     const pageSizes = [
       10, 20, 30, 40, 50, 100, 150, 200, 250, 500, 750, 1000, 1250, 1500,
     ];
 
     const filteredSizes = pageSizes.filter((s, i) => {
-      return allGroups.length > s || i == 0 || allGroups.length > pageSizes[i - 1];
+      return (
+        allGroups.length > s || i == 0 || allGroups.length > pageSizes[i - 1]
+      );
     });
 
     return filteredSizes.map((size) => {
@@ -182,7 +188,10 @@ const ImageDuplicateChecker: React.FC = () => {
 
   const findLargestImage = (group: GQL.ImageDataFragment[]) => {
     const totalSize = (image: GQL.ImageDataFragment) => {
-      return image.visual_files.reduce((prev: number, f) => Math.max(prev, f.size ?? 0), 0);
+      return image.visual_files.reduce(
+        (prev: number, f) => Math.max(prev, f.size ?? 0),
+        0
+      );
     };
     return group.reduce((largest, image) => {
       const largestSize = totalSize(largest);
@@ -372,23 +381,58 @@ const ImageDuplicateChecker: React.FC = () => {
       return (
         <ButtonGroup className="flex-wrap">
           {image.tags.length > 0 && (
-            <HoverPopover placement="bottom" content={image.tags.map((tag) => <TagLink key={tag.id} tag={tag} />)}>
-              <Button className="minimal"><Icon icon={faTag} /><span>{image.tags.length}</span></Button>
+            <HoverPopover
+              placement="bottom"
+              content={image.tags.map((tag) => (
+                <TagLink key={tag.id} tag={tag} />
+              ))}
+            >
+              <Button className="minimal">
+                <Icon icon={faTag} />
+                <span>{image.tags.length}</span>
+              </Button>
             </HoverPopover>
           )}
-          {image.performers.length > 0 && <PerformerPopoverButton performers={image.performers} />}
+          {image.performers.length > 0 && (
+            <PerformerPopoverButton performers={image.performers} />
+          )}
           {image.galleries.length > 0 && (
-            <HoverPopover placement="bottom" content={image.galleries.map((g) => <GalleryLink key={g.id} gallery={g} />)}>
-              <Button className="minimal"><Icon icon={faImages} /><span>{image.galleries.length}</span></Button>
+            <HoverPopover
+              placement="bottom"
+              content={image.galleries.map((g) => (
+                <GalleryLink key={g.id} gallery={g} />
+              ))}
+            >
+              <Button className="minimal">
+                <Icon icon={faImages} />
+                <span>{image.galleries.length}</span>
+              </Button>
             </HoverPopover>
           )}
           {image.visual_files.length > 1 && (
-            <HoverPopover placement="bottom" content={<FormattedMessage id="files_amount" values={{ value: intl.formatNumber(image.visual_files.length) }} />}>
-              <Button className="minimal"><Icon icon={faFileAlt} /><span>{image.visual_files.length}</span></Button>
+            <HoverPopover
+              placement="bottom"
+              content={
+                <FormattedMessage
+                  id="files_amount"
+                  values={{
+                    value: intl.formatNumber(image.visual_files.length),
+                  }}
+                />
+              }
+            >
+              <Button className="minimal">
+                <Icon icon={faFileAlt} />
+                <span>{image.visual_files.length}</span>
+              </Button>
             </HoverPopover>
           )}
           {image.organized && (
-            <div><Button className="minimal"><Icon icon={faBox} /></Button></div>
+            <div>
+              <Button className="minimal">
+                <Icon icon={faBox} />
+              </Button>
+            </div>
           )}
         </ButtonGroup>
       );
@@ -553,7 +597,11 @@ const ImageDuplicateChecker: React.FC = () => {
                               <img
                                 src={image.paths.thumbnail || ""}
                                 alt=""
-                                style={{ maxWidth: 600, maxHeight: 600, objectFit: "contain" }}
+                                style={{
+                                  maxWidth: 600,
+                                  maxHeight: 600,
+                                  objectFit: "contain",
+                                }}
                               />
                             }
                             placement="right"
@@ -565,7 +613,9 @@ const ImageDuplicateChecker: React.FC = () => {
                                 maxWidth: "120px",
                                 maxHeight: "120px",
                                 objectFit: "contain",
-                                border: checkedImages[image.id] ? "2px solid red" : "",
+                                border: checkedImages[image.id]
+                                  ? "2px solid red"
+                                  : "",
                               }}
                             />
                           </HoverPopover>
@@ -575,12 +625,19 @@ const ImageDuplicateChecker: React.FC = () => {
                             <Link
                               to={`/images/${image.id}`}
                               style={{
-                                fontWeight: checkedImages[image.id] ? "bold" : "inherit",
-                                textDecoration: checkedImages[image.id] ? "line-through 3px" : "inherit",
-                                textDecorationColor: checkedImages[image.id] ? "red" : "inherit",
+                                fontWeight: checkedImages[image.id]
+                                  ? "bold"
+                                  : "inherit",
+                                textDecoration: checkedImages[image.id]
+                                  ? "line-through 3px"
+                                  : "inherit",
+                                textDecorationColor: checkedImages[image.id]
+                                  ? "red"
+                                  : "inherit",
                               }}
                             >
-                              {image.title || TextUtils.fileNameFromPath(file?.path ?? "")}
+                              {image.title ||
+                                TextUtils.fileNameFromPath(file?.path ?? "")}
                             </Link>
                           </p>
                           <p className="scene-path">{file?.path ?? ""}</p>
@@ -592,8 +649,11 @@ const ImageDuplicateChecker: React.FC = () => {
                           <FileSize size={file?.size ?? 0} />
                         </td>
                         <td>
-                          {file?.__typename === "ImageFile" || file?.__typename === "VideoFile" ? (
-                            <>{file.width ?? 0}x{file.height ?? 0}</>
+                          {file?.__typename === "ImageFile" ||
+                          file?.__typename === "VideoFile" ? (
+                            <>
+                              {file.width ?? 0}x{file.height ?? 0}
+                            </>
                           ) : (
                             "N/A"
                           )}

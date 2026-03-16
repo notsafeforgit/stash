@@ -5,11 +5,18 @@
         "customise": "Customize",
         "optimise_database": "Optimize Database"
     },
+    "dupe_check": {
+        "missing_phash_warning": "Missing phashes for {count} images. Please run the phash generation task."
+    },
     "config": {
         "tools": {
+            "scene_duplicate_checker": "Scene Duplicate Checker",
             "scene_filename_parser": {
-                "ignore_organized": "Ignore organized scenes"
-            }
+                "ignore_organized": "Ignore organized scenes",
+                "title": "Scene Filename Parser"
+            },
+            "image_duplicate_checker": "Image Duplicate Checker",
+            "graphql_playground": "GraphQL Playground"
         },
         "ui": {
             "custom_locales": {

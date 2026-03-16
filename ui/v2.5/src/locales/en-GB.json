@@ -1099,6 +1099,7 @@
   "distance": "Distance",
   "donate": "Donate",
   "dupe_check": {
+    "missing_phash_warning": "Missing phashes for {count} images. Please run the phash generation task.",
     "description": "Levels below 'Exact' can take longer to calculate. False positives might also be returned on lower accuracy levels.",
     "duration_diff": "Maximum Duration Difference",
     "duration_options": {

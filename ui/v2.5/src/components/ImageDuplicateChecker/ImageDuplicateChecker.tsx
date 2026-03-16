@@ -75,14 +75,16 @@ const ImageDuplicateChecker: React.FC = () => {
       return (
         <p className="lead">
           <Icon icon={faExclamationTriangle} className="text-warning" />
-          Missing phashes for {missingPhashes} images. Please run the phash
-          generation task.
+          <FormattedMessage
+            id="dupe_check.missing_phash_warning"
+            values={{ count: missingPhashes }}
+          />
         </p>
       );
     }
   }
 
-  const { data, refetch } = useFindDuplicateImagesQuery({
+  const { data, loading, refetch } = useFindDuplicateImagesQuery({
     variables: { distance: hashDistance },
     fetchPolicy: "network-only",
   });
@@ -675,8 +677,15 @@ const ImageDuplicateChecker: React.FC = () => {
             </tbody>
           </Table>
 
-          {allGroups.length === 0 && (
+          {allGroups.length === 0 && !loading && (
             <h4 className="text-center mt-4">No duplicates found.</h4>
+          )}
+
+          {loading && (
+            <div className="text-center mt-4">
+              <Icon icon={faBox} spin className="fa-3x" />
+              <h4 className="mt-2">Loading...</h4>
+            </div>
           )}
 
           {renderPagination()}

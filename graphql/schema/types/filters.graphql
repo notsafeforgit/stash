@@ -1015,7 +1015,6 @@ input SetDefaultFilterInput {
   ui_options: Map
 }
 
-
 type LabelMappingType {
   tags: Map
   scene_tags: Map

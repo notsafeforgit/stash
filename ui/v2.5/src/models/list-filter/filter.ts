@@ -317,8 +317,9 @@ export class ListFilterModel {
         const criterion = this.makeCriterion(k as CriterionType);
         if (labelMapping) {
           if (typeof v === "object" && v !== null) {
-            (v as unknown as Record<string, unknown>)._labelMapping =
-              (labelMapping as Record<string, Record<string, string>>)[k];
+            (v as unknown as Record<string, unknown>)._labelMapping = (
+              labelMapping as Record<string, Record<string, string>>
+            )[k];
           }
         }
         criterion.setFromSavedCriterion(v);

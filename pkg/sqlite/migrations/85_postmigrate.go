@@ -144,8 +144,6 @@ func (m *schema85Migrator) convertObjectFilter(data []byte) ([]byte, error) {
 					criterion["depth"] = depth
 				}
 			}
-		} else {
-			// Primitive values, no action needed
 		}
 	}
 

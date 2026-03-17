@@ -2,8 +2,8 @@ package api
 
 import (
 	"context"
-	"testing"
 	"github.com/stashapp/stash/pkg/models"
+	"testing"
 )
 
 func TestMergeFindFilter(t *testing.T) {

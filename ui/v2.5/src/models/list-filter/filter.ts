@@ -292,6 +292,7 @@ export class ListFilterModel {
       find_filter: findFilter,
       object_filter: objectFilter,
       ui_options: uiOptions,
+      label_mapping: labelMapping,
     } = savedFilter;
 
     this.itemsPerPage = findFilter?.per_page ?? this.itemsPerPage;
@@ -314,6 +315,9 @@ export class ListFilterModel {
     if (objectFilter) {
       for (const [k, v] of Object.entries(objectFilter)) {
         const criterion = this.makeCriterion(k as CriterionType);
+        if (labelMapping) {
+          if (typeof v === "object" && v !== null) { (v as unknown as Record<string, unknown>)._labelMapping = labelMapping; }
+        }
         criterion.setFromSavedCriterion(v);
         this.criteria.push(criterion);
       }

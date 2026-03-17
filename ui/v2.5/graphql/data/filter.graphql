@@ -11,4 +11,5 @@ fragment SavedFilterData on SavedFilter {
   }
   object_filter
   ui_options
+  label_mapping
 }

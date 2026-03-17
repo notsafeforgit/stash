@@ -874,7 +874,7 @@ func (qb *PerformerStore) destroyImage(ctx context.Context, performerID int) err
 	return qb.blobJoinQueryBuilder.DestroyImage(ctx, performerID, performerImageBlobColumn)
 }
 
-func (qb *PerformerStore) GetAliases(ctx context.Context, performerID int) ([]string, error) {
+func (qb *PerformerStore) GetPerformerAliases(ctx context.Context, performerID int) ([]models.PerformerAlias, error) {
 	return performersAliasesTableMgr.get(ctx, performerID)
 }
 

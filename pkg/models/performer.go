@@ -215,6 +215,16 @@ type PerformerFilterType struct {
 	CustomFields []CustomFieldCriterionInput `json:"custom_fields"`
 }
 
+type PerformerAliasInput struct {
+	Alias         string `json:"alias"`
+	IgnoreAutoTag bool   `json:"ignore_auto_tag"`
+}
+
+type UpdatePerformerAliasesInput struct {
+	Values []*PerformerAliasInput `json:"values"`
+	Mode   RelationshipUpdateMode `json:"mode"`
+}
+
 type PerformerCreateInput struct {
 	Name           string          `json:"name"`
 	Disambiguation *string         `json:"disambiguation"`
@@ -236,7 +246,7 @@ type PerformerCreateInput struct {
 	CareerEnd      *int            `json:"career_end"`
 	Tattoos        *string         `json:"tattoos"`
 	Piercings      *string         `json:"piercings"`
-	Aliases        *string         `json:"aliases"`
+	Aliases        []*PerformerAliasInput `json:"aliases"`
 	AliasList      []string        `json:"alias_list"`
 	Twitter        *string         `json:"twitter"`   // deprecated
 	Instagram      *string         `json:"instagram"` // deprecated
@@ -277,7 +287,7 @@ type PerformerUpdateInput struct {
 	CareerEnd      *int            `json:"career_end"`
 	Tattoos        *string         `json:"tattoos"`
 	Piercings      *string         `json:"piercings"`
-	Aliases        *string         `json:"aliases"`
+	Aliases        *UpdatePerformerAliasesInput `json:"aliases"`
 	AliasList      []string        `json:"alias_list"`
 	Twitter        *string         `json:"twitter"`   // deprecated
 	Instagram      *string         `json:"instagram"` // deprecated

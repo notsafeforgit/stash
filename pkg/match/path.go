@@ -162,7 +162,7 @@ func PathToPerformers(ctx context.Context, path string, reader models.PerformerA
 			}
 
 			for _, alias := range p.Aliases.List() {
-				if nameMatchesPath(alias, path) != -1 {
+				if !alias.IgnoreAutoTag && nameMatchesPath(alias.Alias, path) != -1 {
 					matches = true
 					break
 				}

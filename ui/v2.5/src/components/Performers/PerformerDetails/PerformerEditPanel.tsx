@@ -133,7 +133,7 @@ export const PerformerEditPanel: React.FC<IPerformerDetails> = ({
   const initialValues = {
     name: performer.name ?? "",
     disambiguation: performer.disambiguation ?? "",
-    alias_list: performer.alias_list ?? [],
+    alias_models: performer.alias_models ?? [],
     gender: performer.gender ?? null,
     birthdate: performer.birthdate ?? "",
     death_date: performer.death_date ?? "",
@@ -164,10 +164,34 @@ export const PerformerEditPanel: React.FC<IPerformerDetails> = ({
   const [customFieldsError, setCustomFieldsError] = useState<string>();
 
   function submit(values: InputValues) {
+    const { alias_list, alias_models, ...rest } = values;
+
+    // Convert alias_models to the aliases array expected by the API
+    // deduplicate aliases
+    const aliasesMap = new Map<string, boolean>();
+    (alias_models || []).forEach((a) => {
+      const existing = aliasesMap.get(a.alias);
+      if (existing !== undefined) {
+        // If duplicates exist, and their ignore_auto_tag differs, we default to true (ignore auto tag)
+        if (existing !== a.ignore_auto_tag) {
+          aliasesMap.set(a.alias, true);
+        }
+      } else {
+        aliasesMap.set(a.alias, a.ignore_auto_tag);
+      }
+    });
+
+    const aliases = Array.from(aliasesMap.entries()).map(([alias, ignore_auto_tag]) => ({
+      alias,
+      ignore_auto_tag,
+    }));
+
     const input = {
-      ...schema.cast(values),
+      ...schema.cast(rest),
+      aliases,
       custom_fields: formatCustomFieldInput(isNew, values.custom_fields),
-    };
+    } as any;
+
     onSave(input);
   }
 
@@ -225,10 +249,20 @@ export const PerformerEditPanel: React.FC<IPerformerDetails> = ({
       formik.setFieldValue("disambiguation", state.disambiguation);
     }
     if (state.aliases) {
-      formik.setFieldValue(
-        "alias_list",
-        state.aliases.split(",").map((a) => a.trim())
-      );
+      const existingMap = new Map<string, boolean>();
+      formik.values.alias_models?.forEach((a) => {
+        existingMap.set(a.alias, a.ignore_auto_tag);
+      });
+
+      const aliasModels = state.aliases.split(",").map((a) => {
+        const trimmed = a.trim();
+        const existing = existingMap.get(trimmed);
+        return {
+          alias: trimmed,
+          ignore_auto_tag: existing !== undefined ? existing : true,
+        };
+      });
+      formik.setFieldValue("alias_models", aliasModels);
     }
     if (state.birthdate) {
       formik.setFieldValue("birthdate", state.birthdate);
@@ -359,10 +393,35 @@ export const PerformerEditPanel: React.FC<IPerformerDetails> = ({
 
   async function onSaveAndNewClick() {
     const { values } = formik;
+
+    const { alias_list, alias_models, ...rest } = values;
+
+    // Convert alias_models to the aliases array expected by the API
+    // deduplicate aliases
+    const aliasesMap = new Map<string, boolean>();
+    (alias_models || []).forEach((a) => {
+      const existing = aliasesMap.get(a.alias);
+      if (existing !== undefined) {
+        // If duplicates exist, and their ignore_auto_tag differs, we default to true (ignore auto tag)
+        if (existing !== a.ignore_auto_tag) {
+          aliasesMap.set(a.alias, true);
+        }
+      } else {
+        aliasesMap.set(a.alias, a.ignore_auto_tag);
+      }
+    });
+
+    const aliases = Array.from(aliasesMap.entries()).map(([alias, ignore_auto_tag]) => ({
+      alias,
+      ignore_auto_tag,
+    }));
+
     const input = {
-      ...schema.cast(values),
+      ...schema.cast(rest),
+      aliases,
       custom_fields: formatCustomFieldInput(isNew, values.custom_fields),
-    };
+    } as any;
+
     onSave(input, true);
   }
 
@@ -672,6 +731,7 @@ export const PerformerEditPanel: React.FC<IPerformerDetails> = ({
     renderStringListField,
     renderStashIDsField,
     renderURLListField,
+    renderPerformerAliasListField,
   } = formikUtils(intl, formik);
 
   function renderCountryField() {
@@ -721,7 +781,7 @@ export const PerformerEditPanel: React.FC<IPerformerDetails> = ({
         {renderInputField("name")}
         {renderInputField("disambiguation")}
 
-        {renderStringListField("alias_list", "aliases", { orderable: false })}
+        {renderPerformerAliasListField("alias_models", "aliases")}
 
         {renderSelectField("gender", stringGenderMap)}
 

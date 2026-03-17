@@ -36,7 +36,7 @@ func TestGalleryPerformers(t *testing.T) {
 	performer := models.Performer{
 		ID:      performerID,
 		Name:    performerName,
-		Aliases: models.NewRelatedStrings([]string{}),
+		Aliases: models.NewRelatedPerformerAliases([]models.PerformerAlias{}),
 	}
 
 	const reversedPerformerName = "name performer"
@@ -44,7 +44,7 @@ func TestGalleryPerformers(t *testing.T) {
 	reversedPerformer := models.Performer{
 		ID:      reversedPerformerID,
 		Name:    reversedPerformerName,
-		Aliases: models.NewRelatedStrings([]string{}),
+		Aliases: models.NewRelatedPerformerAliases([]models.PerformerAlias{}),
 	}
 
 	testTables := generateTestTable(performerName, galleryExt)
@@ -84,7 +84,7 @@ func TestGalleryPerformers(t *testing.T) {
 
 	// test against aliases
 	performer.Name = "unmatched"
-	performer.Aliases = models.NewRelatedStrings([]string{performerName})
+	performer.Aliases = models.NewRelatedPerformerAliases([]models.PerformerAlias{{Alias: performerName, IgnoreAutoTag: false}})
 
 	for _, test := range testTables {
 		db := mocks.NewDatabase()

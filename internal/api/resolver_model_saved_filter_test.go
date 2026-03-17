@@ -2,8 +2,8 @@ package api
 
 import (
 	"context"
-	"testing"
 	"github.com/stashapp/stash/pkg/models"
+	"testing"
 )
 
 // We verify the `LabelMapping` function handles parsing the interface mapping without panic and extracts correct lists.

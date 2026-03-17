@@ -36,11 +36,21 @@ func TestConvertObjectFilter(t *testing.T) {
 	}
 
 	var outMap, expMap map[string]interface{}
-	json.Unmarshal(output, &outMap)
-	json.Unmarshal([]byte(expected), &expMap)
+	if err := json.Unmarshal(output, &outMap); err != nil {
+		t.Fatalf("unexpected unmarshal error: %v", err)
+	}
+	if err := json.Unmarshal([]byte(expected), &expMap); err != nil {
+		t.Fatalf("unexpected unmarshal error: %v", err)
+	}
 
-	outJSON, _ := json.Marshal(outMap)
-	expJSON, _ := json.Marshal(expMap)
+	outJSON, err := json.Marshal(outMap)
+	if err != nil {
+		t.Fatalf("unexpected marshal error: %v", err)
+	}
+	expJSON, err := json.Marshal(expMap)
+	if err != nil {
+		t.Fatalf("unexpected marshal error: %v", err)
+	}
 
 	if string(outJSON) != string(expJSON) {
 		t.Errorf("expected %s, got %s", string(expJSON), string(outJSON))
@@ -76,11 +86,21 @@ func TestConvertObjectFilterPrimitive(t *testing.T) {
 	}
 
 	var outMap, expMap map[string]interface{}
-	json.Unmarshal(output, &outMap)
-	json.Unmarshal([]byte(expected), &expMap)
+	if err := json.Unmarshal(output, &outMap); err != nil {
+		t.Fatalf("unexpected unmarshal error: %v", err)
+	}
+	if err := json.Unmarshal([]byte(expected), &expMap); err != nil {
+		t.Fatalf("unexpected unmarshal error: %v", err)
+	}
 
-	outJSON, _ := json.Marshal(outMap)
-	expJSON, _ := json.Marshal(expMap)
+	outJSON, err := json.Marshal(outMap)
+	if err != nil {
+		t.Fatalf("unexpected marshal error: %v", err)
+	}
+	expJSON, err := json.Marshal(expMap)
+	if err != nil {
+		t.Fatalf("unexpected marshal error: %v", err)
+	}
 
 	if string(outJSON) != string(expJSON) {
 		t.Errorf("expected %s, got %s", string(expJSON), string(outJSON))

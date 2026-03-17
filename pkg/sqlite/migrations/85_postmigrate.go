@@ -144,7 +144,7 @@ func (m *schema85Migrator) convertObjectFilter(data []byte) ([]byte, error) {
 					criterion["depth"] = depth
 				}
 			}
-		} else if _, isArray := v.([]interface{}); !isArray {
+		} else {
 			// Primitive values, no action needed
 		}
 	}

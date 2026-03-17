@@ -176,7 +176,7 @@ input BulkPerformerUpdateInput {
   tattoos: String
   piercings: String
   "Duplicate aliases and those equal to name will result in an error (case-insensitive)"
-  alias_list: BulkUpdateStrings
+  alias_list: BulkUpdateStrings @deprecated(reason: "Use aliases")
   aliases: BulkUpdatePerformerAliases
   twitter: String @deprecated(reason: "Use urls")
   instagram: String @deprecated(reason: "Use urls")

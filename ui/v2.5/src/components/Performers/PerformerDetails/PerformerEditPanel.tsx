@@ -133,7 +133,7 @@ export const PerformerEditPanel: React.FC<IPerformerDetails> = ({
   const initialValues = {
     name: performer.name ?? "",
     disambiguation: performer.disambiguation ?? "",
-    alias_models: performer.alias_models ?? [],
+    aliases: performer.aliases ?? [],
     gender: performer.gender ?? null,
     birthdate: performer.birthdate ?? "",
     death_date: performer.death_date ?? "",
@@ -164,12 +164,11 @@ export const PerformerEditPanel: React.FC<IPerformerDetails> = ({
   const [customFieldsError, setCustomFieldsError] = useState<string>();
 
   function submit(values: InputValues) {
-    const { alias_list, alias_models, ...rest } = values;
+    const { alias_list, aliases, ...rest } = values;
 
-    // Convert alias_models to the aliases array expected by the API
     // deduplicate aliases
     const aliasesMap = new Map<string, boolean>();
-    (alias_models || []).forEach((a) => {
+    (aliases || []).forEach((a) => {
       const existing = aliasesMap.get(a.alias);
       if (existing !== undefined) {
         // If duplicates exist, and their ignore_auto_tag differs, we default to true (ignore auto tag)
@@ -181,14 +180,14 @@ export const PerformerEditPanel: React.FC<IPerformerDetails> = ({
       }
     });
 
-    const aliases = Array.from(aliasesMap.entries()).map(([alias, ignore_auto_tag]) => ({
+    const finalAliases = Array.from(aliasesMap.entries()).map(([alias, ignore_auto_tag]) => ({
       alias,
       ignore_auto_tag,
     }));
 
     const input = {
       ...schema.cast(rest),
-      aliases,
+      aliases: finalAliases,
       custom_fields: formatCustomFieldInput(isNew, values.custom_fields),
     } as any;
 
@@ -250,7 +249,7 @@ export const PerformerEditPanel: React.FC<IPerformerDetails> = ({
     }
     if (state.aliases) {
       const existingMap = new Map<string, boolean>();
-      formik.values.alias_models?.forEach((a) => {
+      formik.values.aliases?.forEach((a) => {
         existingMap.set(a.alias, a.ignore_auto_tag);
       });
 
@@ -262,7 +261,7 @@ export const PerformerEditPanel: React.FC<IPerformerDetails> = ({
           ignore_auto_tag: existing !== undefined ? existing : true,
         };
       });
-      formik.setFieldValue("alias_models", aliasModels);
+      formik.setFieldValue("aliases", aliasModels);
     }
     if (state.birthdate) {
       formik.setFieldValue("birthdate", state.birthdate);
@@ -394,12 +393,11 @@ export const PerformerEditPanel: React.FC<IPerformerDetails> = ({
   async function onSaveAndNewClick() {
     const { values } = formik;
 
-    const { alias_list, alias_models, ...rest } = values;
+    const { alias_list, aliases, ...rest } = values;
 
-    // Convert alias_models to the aliases array expected by the API
     // deduplicate aliases
     const aliasesMap = new Map<string, boolean>();
-    (alias_models || []).forEach((a) => {
+    (aliases || []).forEach((a) => {
       const existing = aliasesMap.get(a.alias);
       if (existing !== undefined) {
         // If duplicates exist, and their ignore_auto_tag differs, we default to true (ignore auto tag)
@@ -411,14 +409,14 @@ export const PerformerEditPanel: React.FC<IPerformerDetails> = ({
       }
     });
 
-    const aliases = Array.from(aliasesMap.entries()).map(([alias, ignore_auto_tag]) => ({
+    const finalAliases = Array.from(aliasesMap.entries()).map(([alias, ignore_auto_tag]) => ({
       alias,
       ignore_auto_tag,
     }));
 
     const input = {
       ...schema.cast(rest),
-      aliases,
+      aliases: finalAliases,
       custom_fields: formatCustomFieldInput(isNew, values.custom_fields),
     } as any;
 
@@ -781,7 +779,7 @@ export const PerformerEditPanel: React.FC<IPerformerDetails> = ({
         {renderInputField("name")}
         {renderInputField("disambiguation")}
 
-        {renderPerformerAliasListField("alias_models", "aliases")}
+        {renderPerformerAliasListField("aliases", "aliases")}
 
         {renderSelectField("gender", stringGenderMap)}
 

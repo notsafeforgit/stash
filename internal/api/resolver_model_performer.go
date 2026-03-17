@@ -296,7 +296,7 @@ func (r *performerResolver) Movies(ctx context.Context, obj *models.Performer) (
 	return r.Groups(ctx, obj)
 }
 
-func (r *performerResolver) AliasModels(ctx context.Context, obj *models.Performer) ([]*models.PerformerAlias, error) {
+func (r *performerResolver) Aliases(ctx context.Context, obj *models.Performer) ([]*models.PerformerAlias, error) {
 	if !obj.Aliases.Loaded() {
 		if err := r.withReadTxn(ctx, func(ctx context.Context) error {
 			qb := r.repository.Performer

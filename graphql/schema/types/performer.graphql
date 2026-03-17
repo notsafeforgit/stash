@@ -35,9 +35,9 @@ type Performer {
   career_end: Int
   tattoos: String
   piercings: String
-  alias_list: [String!]
+  alias_list: [String!] @deprecated(reason: "Use aliases")
 
-  alias_models: [PerformerAlias!]!
+  aliases: [PerformerAlias!]!
   favorite: Boolean!
   tags: [Tag!]!
   ignore_auto_tag: Boolean!

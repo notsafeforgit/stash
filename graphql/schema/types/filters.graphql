@@ -1015,14 +1015,18 @@ input SetDefaultFilterInput {
   ui_options: Map
 }
 
+type LabelMappingEntry {
+  id: ID!
+  label: String!
+}
+
 type LabelMappingType {
-  tags: Map
-  scene_tags: Map
-  performer_tags: Map
-  studios: Map
-  performers: Map
-  groups: Map
-  galleries: Map
-  folders: Map
-  parent_folder: Map
+  tags: [LabelMappingEntry!]!
+  studios: [LabelMappingEntry!]!
+  performers: [LabelMappingEntry!]!
+  groups: [LabelMappingEntry!]!
+  galleries: [LabelMappingEntry!]!
+  folders: [LabelMappingEntry!]!
+  scenes: [LabelMappingEntry!]!
+  movies: [LabelMappingEntry!]!
 }

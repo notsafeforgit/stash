@@ -988,7 +988,7 @@ type SavedFilter {
   # generic map for ui options
   ui_options: Map
   # mapping of object IDs to labels for criteria in object_filter (e.g. tag IDs to names)
-  label_mapping: Map
+  label_mapping: LabelMappingType
 }
 
 input SaveFilterInput {
@@ -1013,4 +1013,17 @@ input SetDefaultFilterInput {
   object_filter: Map
   # generic map for ui options
   ui_options: Map
+}
+
+
+type LabelMappingType {
+  tags: Map
+  scene_tags: Map
+  performer_tags: Map
+  studios: Map
+  performers: Map
+  groups: Map
+  galleries: Map
+  folders: Map
+  parent_folder: Map
 }

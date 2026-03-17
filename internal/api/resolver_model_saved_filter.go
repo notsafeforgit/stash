@@ -11,8 +11,8 @@ func (r *savedFilterResolver) Filter(ctx context.Context, obj *models.SavedFilte
 	return "", nil
 }
 
-func (r *savedFilterResolver) LabelMapping(ctx context.Context, obj *models.SavedFilter) (map[string]interface{}, error) {
-	mapping := make(map[string]interface{})
+func (r *savedFilterResolver) LabelMapping(ctx context.Context, obj *models.SavedFilter) (*LabelMappingType, error) {
+	mapping := &LabelMappingType{}
 	if obj.ObjectFilter == nil {
 		return mapping, nil
 	}
@@ -33,7 +33,7 @@ func (r *savedFilterResolver) LabelMapping(ctx context.Context, obj *models.Save
 	}
 
 	// Helper to fetch and populate mapping
-	populateMapping := func(criteriaKey string, fetchLabels func([]int) map[string]string) {
+	populateMapping := func(criteriaKey string, fetchLabels func([]int) map[string]interface{}) {
 		criterion, ok := obj.ObjectFilter[criteriaKey].(map[string]interface{})
 		if !ok {
 			return
@@ -49,16 +49,35 @@ func (r *savedFilterResolver) LabelMapping(ctx context.Context, obj *models.Save
 
 		if len(allIDs) > 0 {
 			labels := fetchLabels(allIDs)
-			for id, label := range labels {
-				mapping[id] = label
+			// Assign directly to the proper field via reflection or switch statement.
+			// Instead of reflection, just assign the returned map to the respective field on LabelMappingType
+			switch criteriaKey {
+			case "tags":
+				mapping.Tags = labels
+			case "scene_tags":
+				mapping.SceneTags = labels
+			case "performer_tags":
+				mapping.PerformerTags = labels
+			case "performers":
+				mapping.Performers = labels
+			case "studios":
+				mapping.Studios = labels
+			case "groups":
+				mapping.Groups = labels
+			case "galleries":
+				mapping.Galleries = labels
+			case "folders":
+				mapping.Folders = labels
+			case "parent_folder":
+				mapping.ParentFolder = labels
 			}
 		}
 	}
 
 	err := r.withReadTxn(ctx, func(ctx context.Context) error {
 		// Tags
-		populateMapping("tags", func(ids []int) map[string]string {
-			res := make(map[string]string)
+		populateMapping("tags", func(ids []int) map[string]interface{} {
+			res := make(map[string]interface{})
 			tags, _ := r.repository.Tag.FindMany(ctx, ids)
 			for _, t := range tags {
 				res[strconv.Itoa(t.ID)] = t.Name
@@ -66,8 +85,8 @@ func (r *savedFilterResolver) LabelMapping(ctx context.Context, obj *models.Save
 			return res
 		})
 
-		populateMapping("scene_tags", func(ids []int) map[string]string {
-			res := make(map[string]string)
+		populateMapping("scene_tags", func(ids []int) map[string]interface{} {
+			res := make(map[string]interface{})
 			tags, _ := r.repository.Tag.FindMany(ctx, ids)
 			for _, t := range tags {
 				res[strconv.Itoa(t.ID)] = t.Name
@@ -75,8 +94,8 @@ func (r *savedFilterResolver) LabelMapping(ctx context.Context, obj *models.Save
 			return res
 		})
 
-		populateMapping("performer_tags", func(ids []int) map[string]string {
-			res := make(map[string]string)
+		populateMapping("performer_tags", func(ids []int) map[string]interface{} {
+			res := make(map[string]interface{})
 			tags, _ := r.repository.Tag.FindMany(ctx, ids)
 			for _, t := range tags {
 				res[strconv.Itoa(t.ID)] = t.Name
@@ -85,8 +104,8 @@ func (r *savedFilterResolver) LabelMapping(ctx context.Context, obj *models.Save
 		})
 
 		// Performers
-		populateMapping("performers", func(ids []int) map[string]string {
-			res := make(map[string]string)
+		populateMapping("performers", func(ids []int) map[string]interface{} {
+			res := make(map[string]interface{})
 			performers, _ := r.repository.Performer.FindMany(ctx, ids)
 			for _, p := range performers {
 				res[strconv.Itoa(p.ID)] = p.Name
@@ -95,8 +114,8 @@ func (r *savedFilterResolver) LabelMapping(ctx context.Context, obj *models.Save
 		})
 
 		// Studios
-		populateMapping("studios", func(ids []int) map[string]string {
-			res := make(map[string]string)
+		populateMapping("studios", func(ids []int) map[string]interface{} {
+			res := make(map[string]interface{})
 			studios, _ := r.repository.Studio.FindMany(ctx, ids)
 			for _, s := range studios {
 				res[strconv.Itoa(s.ID)] = s.Name
@@ -105,8 +124,8 @@ func (r *savedFilterResolver) LabelMapping(ctx context.Context, obj *models.Save
 		})
 
 		// Groups
-		populateMapping("groups", func(ids []int) map[string]string {
-			res := make(map[string]string)
+		populateMapping("groups", func(ids []int) map[string]interface{} {
+			res := make(map[string]interface{})
 			groups, _ := r.repository.Group.FindMany(ctx, ids)
 			for _, g := range groups {
 				res[strconv.Itoa(g.ID)] = g.Name
@@ -115,8 +134,8 @@ func (r *savedFilterResolver) LabelMapping(ctx context.Context, obj *models.Save
 		})
 
 		// Galleries
-		populateMapping("galleries", func(ids []int) map[string]string {
-			res := make(map[string]string)
+		populateMapping("galleries", func(ids []int) map[string]interface{} {
+			res := make(map[string]interface{})
 			galleries, _ := r.repository.Gallery.FindMany(ctx, ids)
 			for _, g := range galleries {
 				res[strconv.Itoa(g.ID)] = g.Title
@@ -125,8 +144,8 @@ func (r *savedFilterResolver) LabelMapping(ctx context.Context, obj *models.Save
 		})
 
 		// Folders
-		populateMapping("folders", func(ids []int) map[string]string {
-			res := make(map[string]string)
+		populateMapping("folders", func(ids []int) map[string]interface{} {
+			res := make(map[string]interface{})
 			folderIDs := make([]models.FolderID, len(ids))
 			for i, id := range ids {
 				folderIDs[i] = models.FolderID(id)
@@ -139,8 +158,8 @@ func (r *savedFilterResolver) LabelMapping(ctx context.Context, obj *models.Save
 		})
 
 		// Parent Folders
-		populateMapping("parent_folder", func(ids []int) map[string]string {
-			res := make(map[string]string)
+		populateMapping("parent_folder", func(ids []int) map[string]interface{} {
+			res := make(map[string]interface{})
 			folderIDs := make([]models.FolderID, len(ids))
 			for i, id := range ids {
 				folderIDs[i] = models.FolderID(id)

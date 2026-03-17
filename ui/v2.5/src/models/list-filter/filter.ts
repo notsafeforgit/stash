@@ -318,7 +318,7 @@ export class ListFilterModel {
         if (labelMapping) {
           if (typeof v === "object" && v !== null) {
             (v as unknown as Record<string, unknown>)._labelMapping =
-              labelMapping;
+              (labelMapping as Record<string, Record<string, string>>)[k];
           }
         }
         criterion.setFromSavedCriterion(v);

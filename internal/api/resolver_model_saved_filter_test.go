@@ -19,7 +19,7 @@ func TestSavedFilterLabelMappingEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(mapping) != 0 {
+	if mapping == nil || mapping.Tags != nil {
 		t.Errorf("expected empty mapping, got %v", mapping)
 	}
 }

@@ -168,7 +168,7 @@ func (db *Database) Open(dbPath string) error {
 		if databaseSchemaVersion > appSchemaVersion && databaseSchemaVersion < 900 {
 			return &MismatchedSchemaVersionError{
 				CurrentSchemaVersion:  databaseSchemaVersion,
-				RequiredSchemaVersion: appSchemaVersion,
+				RequiredSchemaVersion: GetRequiredSchemaVersion(),
 			}
 		}
 
@@ -176,7 +176,7 @@ func (db *Database) Open(dbPath string) error {
 		if db.needsMigration() {
 			return &MigrationNeededError{
 				CurrentSchemaVersion:  databaseSchemaVersion,
-				RequiredSchemaVersion: appSchemaVersion,
+				RequiredSchemaVersion: GetRequiredSchemaVersion(),
 			}
 		}
 	}

@@ -3,6 +3,9 @@ package sqlite
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/golang-migrate/migrate/v4"
 	sqlite3mig "github.com/golang-migrate/migrate/v4/database/sqlite3"
@@ -11,8 +14,39 @@ import (
 	"github.com/stashapp/stash/pkg/logger"
 )
 
+func getAvailableMigrations() []uint {
+	entries, err := migrationsBox.ReadDir("migrations")
+	if err != nil {
+		return nil
+	}
+	var versions []uint
+	for _, entry := range entries {
+		if strings.HasSuffix(entry.Name(), ".up.sql") {
+			parts := strings.SplitN(entry.Name(), "_", 2)
+			if len(parts) == 2 {
+				if v, err := strconv.ParseUint(parts[0], 10, 32); err == nil {
+					versions = append(versions, uint(v))
+				}
+			}
+		}
+	}
+	sort.Slice(versions, func(i, j int) bool { return versions[i] < versions[j] })
+	return versions
+}
+
+func GetRequiredSchemaVersion() uint {
+	versions := getAvailableMigrations()
+	max := appSchemaVersion
+	for _, v := range versions {
+		if v >= 900 && v > max {
+			max = v
+		}
+	}
+	return max
+}
+
 func (db *Database) needsMigration() bool {
-	return db.schemaVersion != appSchemaVersion
+	return db.schemaVersion != GetRequiredSchemaVersion()
 }
 
 type Migrator struct {
@@ -61,7 +95,17 @@ func (m *Migrator) CurrentSchemaVersion() uint {
 }
 
 func (m *Migrator) RequiredSchemaVersion() uint {
-	return appSchemaVersion
+	return GetRequiredSchemaVersion()
+}
+
+func (m *Migrator) GetNextMigrationVersion(current uint) uint {
+	versions := getAvailableMigrations()
+	for _, v := range versions {
+		if v > current {
+			return v
+		}
+	}
+	return current
 }
 
 func (m *Migrator) getMigrate() (*migrate.Migrate, error) {
@@ -87,8 +131,9 @@ func (m *Migrator) getMigrate() (*migrate.Migrate, error) {
 func (m *Migrator) RunMigration(ctx context.Context, newVersion uint) error {
 	databaseSchemaVersion, _, _ := m.m.Version()
 
-	if newVersion != databaseSchemaVersion+1 {
-		return fmt.Errorf("invalid migration version %d, expected %d", newVersion, databaseSchemaVersion+1)
+	expectedNext := m.GetNextMigrationVersion(databaseSchemaVersion)
+	if newVersion != expectedNext {
+		return fmt.Errorf("invalid migration version %d, expected %d", newVersion, expectedNext)
 	}
 
 	// run pre migrations as needed
@@ -177,15 +222,23 @@ func (db *Database) RunAllMigrations() error {
 	defer m.Close()
 
 	databaseSchemaVersion, _, _ := m.m.Version()
-	stepNumber := appSchemaVersion - databaseSchemaVersion
-	if stepNumber != 0 {
-		logger.Infof("Migrating database from version %d to %d", databaseSchemaVersion, appSchemaVersion)
+	requiredVersion := m.RequiredSchemaVersion()
 
-		// run each migration individually, and run custom migrations as needed
-		var i uint = 1
-		for ; i <= stepNumber; i++ {
-			newVersion := databaseSchemaVersion + i
-			if err := m.RunMigration(ctx, newVersion); err != nil {
+	if databaseSchemaVersion < requiredVersion {
+		logger.Infof("Migrating database from version %d to %d", databaseSchemaVersion, requiredVersion)
+
+		for {
+			databaseSchemaVersion, _, _ = m.m.Version()
+			if databaseSchemaVersion >= requiredVersion {
+				break
+			}
+
+			nextVersion := m.GetNextMigrationVersion(databaseSchemaVersion)
+			if nextVersion == databaseSchemaVersion {
+				break
+			}
+
+			if err := m.RunMigration(ctx, nextVersion); err != nil {
 				return err
 			}
 		}

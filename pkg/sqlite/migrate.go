@@ -36,13 +36,13 @@ func getAvailableMigrations() []uint {
 
 func GetRequiredSchemaVersion() uint {
 	versions := getAvailableMigrations()
-	max := appSchemaVersion
+	maxVersion := appSchemaVersion
 	for _, v := range versions {
-		if v >= 900 && v > max {
-			max = v
+		if v >= 900 && v > maxVersion {
+			maxVersion = v
 		}
 	}
-	return max
+	return maxVersion
 }
 
 func (db *Database) needsMigration() bool {

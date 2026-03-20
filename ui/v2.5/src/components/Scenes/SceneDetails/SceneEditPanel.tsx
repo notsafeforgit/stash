@@ -507,7 +507,7 @@ export const SceneEditPanel: React.FC<IProps> = ({
             return {
               id: p.stored_id!,
               name: p.name ?? "",
-              alias_list: [],
+              aliases: [],
             };
           })
         );

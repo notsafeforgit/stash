@@ -1,3 +1,8 @@
+fragment PerformerAliasData on PerformerAlias {
+  alias
+  ignore_auto_tag
+}
+
 fragment PerformerData on Performer {
   id
   name
@@ -17,7 +22,9 @@ fragment PerformerData on Performer {
   career_end
   tattoos
   piercings
-  alias_list
+  aliases {
+    ...PerformerAliasData
+  }
   favorite
   ignore_auto_tag
   image_path

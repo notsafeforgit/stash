@@ -43,7 +43,20 @@ func (r *mutationResolver) PerformerCreate(ctx context.Context, input models.Per
 
 	newPerformer.Name = strings.TrimSpace(input.Name)
 	newPerformer.Disambiguation = translator.string(input.Disambiguation)
-	newPerformer.Aliases = models.NewRelatedStrings(stringslice.UniqueExcludeFold(stringslice.TrimSpace(input.AliasList), newPerformer.Name))
+	var aliases []models.PerformerAlias
+	if input.Aliases != nil {
+		for _, a := range input.Aliases {
+			aliases = append(aliases, models.PerformerAlias{
+				Alias:         a.Alias,
+				IgnoreAutoTag: a.IgnoreAutoTag,
+			})
+		}
+	} else if input.AliasList != nil {
+		for _, a := range input.AliasList {
+			aliases = append(aliases, models.PerformerAlias{Alias: a, IgnoreAutoTag: true})
+		}
+	}
+	newPerformer.Aliases = models.NewRelatedPerformerAliases(performer.NormalizeAliases(newPerformer.Name, aliases))
 	newPerformer.Gender = input.Gender
 	newPerformer.Ethnicity = translator.string(input.Ethnicity)
 	newPerformer.Country = translator.string(input.Country)
@@ -337,9 +350,28 @@ func performerPartialFromInput(input models.PerformerUpdateInput, translator cha
 		updatedPerformer.Height = translator.optionalInt(input.HeightCm, "height_cm")
 	}
 
-	// prefer alias_list over aliases
-	if translator.hasField("alias_list") {
-		updatedPerformer.Aliases = translator.updateStrings(input.AliasList, "alias_list")
+	// prefer aliases over alias_list
+	if translator.hasField("aliases") {
+		var aliases []models.PerformerAlias
+		for _, a := range input.Aliases.Values {
+			aliases = append(aliases, models.PerformerAlias{
+				Alias:         strings.TrimSpace(a.Alias),
+				IgnoreAutoTag: a.IgnoreAutoTag,
+			})
+		}
+		updatedPerformer.Aliases = &models.UpdatePerformerAliases{
+			Values: aliases,
+			Mode:   input.Aliases.Mode,
+		}
+	} else if translator.hasField("alias_list") {
+		var aliases []models.PerformerAlias
+		for _, a := range input.AliasList {
+			aliases = append(aliases, models.PerformerAlias{Alias: a, IgnoreAutoTag: true})
+		}
+		updatedPerformer.Aliases = &models.UpdatePerformerAliases{
+			Values: aliases,
+			Mode:   models.RelationshipUpdateModeSet,
+		}
 	}
 
 	updatedPerformer.TagIDs, err = translator.updateIds(input.TagIds, "tag_ids")
@@ -350,6 +382,20 @@ func performerPartialFromInput(input models.PerformerUpdateInput, translator cha
 	updatedPerformer.CustomFields = handleUpdateCustomFields(input.CustomFields)
 
 	return &updatedPerformer, nil
+}
+
+type performerUpdateInputResolver struct{ *Resolver }
+
+func (r *performerUpdateInputResolver) Aliases(ctx context.Context, obj *models.PerformerUpdateInput, data []*models.PerformerAliasInput) error {
+	obj.Aliases = &models.UpdatePerformerAliasesInput{
+		Values: data,
+		Mode:   models.RelationshipUpdateModeSet, // Use Set mode for simple aliases property, though client can also use AliasList
+	}
+	return nil
+}
+
+func (r *Resolver) PerformerUpdateInput() PerformerUpdateInputResolver {
+	return &performerUpdateInputResolver{r}
 }
 
 func (r *mutationResolver) PerformerUpdate(ctx context.Context, input models.PerformerUpdateInput) (*models.Performer, error) {
@@ -398,14 +444,17 @@ func (r *mutationResolver) PerformerUpdate(ctx context.Context, input models.Per
 					return err
 				}
 
-				effectiveAliases := updatedPerformer.Aliases.Apply(p.Aliases.List())
+				// Preserve IgnoreAutoTag state when updating aliases via AliasList (which sets them to true by default)
+				// if they already existed.
+				preserveIgnore := translator.hasField("alias_list") && !translator.hasField("aliases")
+				effectiveAliases := performer.GetEffectiveAliases(p.Aliases.List(), updatedPerformer.Aliases.Values, updatedPerformer.Aliases.Mode, preserveIgnore)
+
 				name := p.Name
 				if updatedPerformer.Name.Set {
 					name = updatedPerformer.Name.Value
 				}
 
-				sanitized := stringslice.UniqueExcludeFold(effectiveAliases, name)
-				updatedPerformer.Aliases.Values = sanitized
+				updatedPerformer.Aliases.Values = performer.NormalizeAliases(name, effectiveAliases)
 				updatedPerformer.Aliases.Mode = models.RelationshipUpdateModeSet
 			}
 		}
@@ -518,9 +567,28 @@ func (r *mutationResolver) BulkPerformerUpdate(ctx context.Context, input BulkPe
 		updatedPerformer.Height = translator.optionalInt(input.HeightCm, "height_cm")
 	}
 
-	// prefer alias_list over aliases
-	if translator.hasField("alias_list") {
-		updatedPerformer.Aliases = translator.updateStringsBulk(input.AliasList, "alias_list")
+	// prefer aliases over alias_list
+	if translator.hasField("aliases") {
+		var aliases []models.PerformerAlias
+		for _, a := range input.Aliases.Values {
+			aliases = append(aliases, models.PerformerAlias{
+				Alias:         strings.TrimSpace(a.Alias),
+				IgnoreAutoTag: a.IgnoreAutoTag,
+			})
+		}
+		updatedPerformer.Aliases = &models.UpdatePerformerAliases{
+			Values: aliases,
+			Mode:   input.Aliases.Mode,
+		}
+	} else if translator.hasField("alias_list") {
+		var aliases []models.PerformerAlias
+		for _, a := range input.AliasList.Values {
+			aliases = append(aliases, models.PerformerAlias{Alias: a, IgnoreAutoTag: true})
+		}
+		updatedPerformer.Aliases = &models.UpdatePerformerAliases{
+			Values: aliases,
+			Mode:   input.AliasList.Mode,
+		}
 	}
 
 	updatedPerformer.TagIDs, err = translator.updateIdsBulk(input.TagIds, "tag_ids")

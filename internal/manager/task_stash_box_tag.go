@@ -9,7 +9,6 @@ import (
 	"github.com/stashapp/stash/pkg/match"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/performer"
-	"github.com/stashapp/stash/pkg/sliceutil"
 	"github.com/stashapp/stash/pkg/stashbox"
 	"github.com/stashapp/stash/pkg/studio"
 	"github.com/stashapp/stash/pkg/tag"
@@ -177,17 +176,22 @@ func (t *stashBoxBatchPerformerTagTask) processMatchedPerformer(ctx context.Cont
 
 			partial := p.ToPartial(t.box.Endpoint, excluded, existingStashIDs)
 
+			// Preserving existing aliases' IgnoreAutoTag state
+			if partial.Aliases != nil {
+				if err := t.performer.LoadAliases(ctx, qb); err == nil {
+					partial.Aliases.Values = performer.GetEffectiveAliases(t.performer.Aliases.List(), partial.Aliases.Values, partial.Aliases.Mode, true)
+				}
+			}
+
 			// if we're setting the performer's aliases, and not the name, then filter out the name
 			// from the aliases to avoid duplicates
 			// add the name to the aliases if it's not already there
 			if partial.Aliases != nil && !partial.Name.Set {
-				partial.Aliases.Values = sliceutil.Filter(partial.Aliases.Values, func(s string) bool {
-					return s != t.performer.Name
-				})
-
 				if p.Name != nil && t.performer.Name != *p.Name {
-					partial.Aliases.Values = sliceutil.AppendUnique(partial.Aliases.Values, *p.Name)
+					partial.Aliases.Values = append(partial.Aliases.Values, models.PerformerAlias{Alias: *p.Name, IgnoreAutoTag: true})
 				}
+
+				partial.Aliases.Values = performer.NormalizeAliases(t.performer.Name, partial.Aliases.Values)
 			}
 
 			if err := performer.ValidateUpdate(ctx, t.performer.ID, partial, qb); err != nil {

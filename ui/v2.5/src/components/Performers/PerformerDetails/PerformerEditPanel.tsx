@@ -44,7 +44,6 @@ import {
   yupInputNumber,
   yupInputEnum,
   yupDateString,
-  yupRequiredStringArray,
   yupUniqueStringList,
 } from "src/utils/yup";
 import { useTagsEdit } from "src/hooks/tagsEdit";
@@ -53,6 +52,7 @@ import {
   formatCustomFieldInput,
 } from "src/components/Shared/CustomFields";
 import { cloneDeep } from "@apollo/client/utilities";
+import { normalizeAliases, mergeScrapedAliases } from "src/core/performers";
 
 const isScraper = (
   scraper: GQL.Scraper | GQL.StashBox
@@ -103,7 +103,16 @@ export const PerformerEditPanel: React.FC<IPerformerDetails> = ({
   const schema = yup.object({
     name: yup.string().required(),
     disambiguation: yup.string().ensure(),
-    alias_list: yupRequiredStringArray(intl).defined(),
+    aliases: yup
+      .array(
+        yup
+          .object({
+            alias: yup.string().required(),
+            ignore_auto_tag: yup.boolean().required(),
+          })
+          .required()
+      )
+      .defined(),
     gender: yupInputEnum(GQL.GenderEnum).nullable().defined(),
     birthdate: yupDateString(intl),
     death_date: yupDateString(intl),
@@ -133,7 +142,7 @@ export const PerformerEditPanel: React.FC<IPerformerDetails> = ({
   const initialValues = {
     name: performer.name ?? "",
     disambiguation: performer.disambiguation ?? "",
-    alias_list: performer.alias_list ?? [],
+    aliases: performer.aliases ?? [],
     gender: performer.gender ?? null,
     birthdate: performer.birthdate ?? "",
     death_date: performer.death_date ?? "",
@@ -163,19 +172,23 @@ export const PerformerEditPanel: React.FC<IPerformerDetails> = ({
 
   const [customFieldsError, setCustomFieldsError] = useState<string>();
 
-  function submit(values: InputValues) {
+  function submit(values: InputValues, andNew?: boolean) {
+    const { aliases, ...rest } = values;
+
     const input = {
-      ...schema.cast(values),
+      ...schema.cast(rest),
+      aliases: normalizeAliases(aliases),
       custom_fields: formatCustomFieldInput(isNew, values.custom_fields),
     };
-    onSave(input);
+
+    onSave(input, andNew);
   }
 
   const formik = useFormik<InputValues>({
     initialValues,
     enableReinitialize: true,
     validate: yupFormikValidate(schema),
-    onSubmit: submit,
+    onSubmit: (values) => submit(values),
   });
 
   const { tags, updateTagsStateFromScraper, tagsControl } = useTagsEdit(
@@ -226,8 +239,8 @@ export const PerformerEditPanel: React.FC<IPerformerDetails> = ({
     }
     if (state.aliases) {
       formik.setFieldValue(
-        "alias_list",
-        state.aliases.split(",").map((a) => a.trim())
+        "aliases",
+        mergeScrapedAliases(state.aliases, formik.values.aliases)
       );
     }
     if (state.birthdate) {
@@ -346,7 +359,7 @@ export const PerformerEditPanel: React.FC<IPerformerDetails> = ({
     ImageUtils.onImageChange(event, onImageLoad);
   }
 
-  async function onSave(input: InputValues, andNew?: boolean) {
+  async function onSave(input: GQL.PerformerCreateInput, andNew?: boolean) {
     setIsLoading(true);
     try {
       await onSubmit(input, andNew);
@@ -357,13 +370,8 @@ export const PerformerEditPanel: React.FC<IPerformerDetails> = ({
     setIsLoading(false);
   }
 
-  async function onSaveAndNewClick() {
-    const { values } = formik;
-    const input = {
-      ...schema.cast(values),
-      custom_fields: formatCustomFieldInput(isNew, values.custom_fields),
-    };
-    onSave(input, true);
+  function onSaveAndNewClick() {
+    submit(formik.values, true);
   }
 
   // set up hotkeys
@@ -669,9 +677,9 @@ export const PerformerEditPanel: React.FC<IPerformerDetails> = ({
     renderInputField,
     renderSelectField,
     renderDateField,
-    renderStringListField,
     renderStashIDsField,
     renderURLListField,
+    renderPerformerAliasListField,
   } = formikUtils(intl, formik);
 
   function renderCountryField() {
@@ -721,7 +729,7 @@ export const PerformerEditPanel: React.FC<IPerformerDetails> = ({
         {renderInputField("name")}
         {renderInputField("disambiguation")}
 
-        {renderStringListField("alias_list", "aliases", { orderable: false })}
+        {renderPerformerAliasListField("aliases", "aliases")}
 
         {renderSelectField("gender", stringGenderMap)}
 

@@ -46,7 +46,7 @@ export type Performer = Pick<
   GQL.Performer,
   | "id"
   | "name"
-  | "alias_list"
+  | "aliases"
   | "disambiguation"
   | "image_path"
   | "birthdate"
@@ -66,7 +66,7 @@ function sortPerformersByRelevance(
     input,
     performers,
     (p) => p.name,
-    (p) => p.alias_list
+    (p) => p.aliases.map((a) => a.alias)
   );
 }
 
@@ -135,9 +135,9 @@ const _PerformerSelect: React.FC<
     const { inputValue } = optionProps.selectProps;
     let alias: string | undefined = "";
     if (!name.toLowerCase().includes(inputValue.toLowerCase())) {
-      alias = object.alias_list?.find((a) =>
-        a.toLowerCase().includes(inputValue.toLowerCase())
-      );
+      alias = object.aliases.find((a) =>
+        a.alias.toLowerCase().includes(inputValue.toLowerCase())
+      )?.alias;
     }
 
     const sceneAge = TextUtils.age(object.birthdate, props.ageFromDate);
@@ -278,7 +278,7 @@ const _PerformerSelect: React.FC<
     return {
       id,
       name,
-      alias_list: [],
+      aliases: [],
     };
   };
 
@@ -291,8 +291,8 @@ const _PerformerSelect: React.FC<
       options.some((o) => {
         return (
           o.name.toLowerCase() === inputValue.toLowerCase() ||
-          o.alias_list?.some(
-            (a) => a.toLowerCase() === inputValue.toLowerCase()
+          o.aliases.some(
+            (a) => a.alias.toLowerCase() === inputValue.toLowerCase()
           )
         );
       })

@@ -20,7 +20,9 @@ fragment SlimPerformerData on Performer {
   career_end
   tattoos
   piercings
-  alias_list
+  aliases {
+    ...PerformerAliasData
+  }
   tags {
     id
     name
@@ -39,7 +41,9 @@ fragment SelectPerformerData on Performer {
   id
   name
   disambiguation
-  alias_list
+  aliases {
+    ...PerformerAliasData
+  }
   image_path
   birthdate
   death_date

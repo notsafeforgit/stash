@@ -16,6 +16,8 @@ import { Icon } from "../Icon";
 import { faLink, faPlus } from "@fortawesome/free-solid-svg-icons";
 import { useIntl } from "react-intl";
 
+import { mergeScrapedAliases } from "src/core/performers";
+
 interface INewScrapedObjects<T> {
   newValues: T[];
   onCreateNew: (value: T) => void;
@@ -252,11 +254,10 @@ export const ScrapedPerformersRow: React.FC<
     const value = resultValue ?? [];
 
     const selectValue = value.map((p) => {
-      const alias_list: string[] = [];
       return {
         id: p.stored_id ?? "",
         name: p.name ?? "",
-        alias_list,
+        aliases: mergeScrapedAliases(p.aliases),
       };
     });
 
@@ -268,7 +269,12 @@ export const ScrapedPerformersRow: React.FC<
         onSelect={(items) => {
           if (onChangeFn) {
             // map the id back to stored_id
-            onChangeFn(items.map((p) => ({ ...p, stored_id: p.id })));
+            onChangeFn(
+              items.map((p) => {
+                const aliases = p.aliases.map((a) => a.alias).join(", ");
+                return { ...p, aliases, stored_id: p.id };
+              })
+            );
           }
         }}
         values={selectValue}
@@ -323,11 +329,10 @@ export const ScrapedGroupsRow: React.FC<
     const value = resultValue ?? [];
 
     const selectValue = value.map((p) => {
-      const aliases: string = "";
       return {
         id: p.stored_id ?? "",
         name: p.name ?? "",
-        aliases,
+        aliases: p.aliases ?? "",
       };
     });
 
@@ -339,7 +344,11 @@ export const ScrapedGroupsRow: React.FC<
         onSelect={(items) => {
           if (onChangeFn) {
             // map the id back to stored_id
-            onChangeFn(items.map((p) => ({ ...p, stored_id: p.id })));
+            onChangeFn(
+              items.map((p) => {
+                return { ...p, stored_id: p.id };
+              })
+            );
           }
         }}
         values={selectValue}

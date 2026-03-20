@@ -11,6 +11,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/sliceutil"
+	"github.com/stashapp/stash/pkg/utils"
 	"gopkg.in/guregu/null.v4"
 	"gopkg.in/guregu/null.v4/zero"
 
@@ -1092,4 +1093,58 @@ func (qb *ImageStore) UpdateTags(ctx context.Context, imageID int, tagIDs []int)
 
 func (qb *ImageStore) GetURLs(ctx context.Context, imageID int) ([]string, error) {
 	return imagesURLsTableMgr.get(ctx, imageID)
+}
+
+func (qb *ImageStore) FindDuplicates(ctx context.Context, distance int) ([][]*models.Image, error) {
+	query := `
+        SELECT images.id, files_fingerprints.fingerprint as phash
+        FROM images
+        JOIN images_files ON images.id = images_files.image_id
+        JOIN files_fingerprints ON images_files.file_id = files_fingerprints.file_id
+        WHERE files_fingerprints.type = 'phash'`
+
+	var hashes []*utils.Phash
+	if err := imageRepository.queryFunc(ctx, query, nil, false, func(rows *sqlx.Rows) error {
+		var sq struct {
+			ID    int     `db:"id"`
+			Phash *string `db:"phash"`
+		}
+		if err := rows.StructScan(&sq); err != nil {
+			return err
+		}
+
+		if sq.Phash == nil {
+			return nil
+		}
+
+		hashInt, err := utils.StringToPhash(*sq.Phash)
+		if err != nil {
+			return nil
+		}
+
+		phash := utils.Phash{
+			ID:       sq.ID,
+			Hash:     hashInt,
+			Bucket:   -1,
+			Duration: -1,
+		}
+
+		hashes = append(hashes, &phash)
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	dupeIds := utils.FindDuplicates(hashes, distance, -1)
+
+	var result [][]*models.Image
+	for _, comp := range dupeIds {
+		if images, err := qb.FindMany(ctx, comp); err == nil {
+			if len(images) > 1 {
+				result = append(result, images)
+			}
+		}
+	}
+
+	return result, nil
 }

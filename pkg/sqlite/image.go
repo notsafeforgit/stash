@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -412,6 +411,11 @@ func (qb *ImageStore) Find(ctx context.Context, id int) (*models.Image, error) {
 func (qb *ImageStore) FindMany(ctx context.Context, ids []int) ([]*models.Image, error) {
 	images := make([]*models.Image, len(ids))
 
+	idToIndex := make(map[int]int, len(ids))
+	for i, id := range ids {
+		idToIndex[id] = i
+	}
+
 	if err := batchExec(ids, defaultBatchSize, func(batch []int) error {
 		q := qb.selectDataset().Prepared(true).Where(qb.table().Col(idColumn).In(batch))
 		unsorted, err := qb.getMany(ctx, q)
@@ -420,8 +424,9 @@ func (qb *ImageStore) FindMany(ctx context.Context, ids []int) ([]*models.Image,
 		}
 
 		for _, s := range unsorted {
-			i := slices.Index(ids, s.ID)
-			images[i] = s
+			if i, ok := idToIndex[s.ID]; ok {
+				images[i] = s
+			}
 		}
 
 		return nil
@@ -1100,16 +1105,19 @@ func (qb *ImageStore) GetURLs(ctx context.Context, imageID int) ([]string, error
 var findExactImageDuplicateQuery = `
 SELECT GROUP_CONCAT(DISTINCT image_id) as ids
 FROM (
-	SELECT images.id as image_id
+	SELECT images_files.image_id
+		 , files.size as file_size
 		 , files_fingerprints.fingerprint as phash
-	FROM images
-	JOIN images_files ON images.id = images_files.image_id
+	FROM images_files
+	JOIN files ON images_files.file_id = files.id
 	JOIN files_fingerprints ON images_files.file_id = files_fingerprints.file_id
-	WHERE files_fingerprints.type = 'phash'
+	WHERE files_fingerprints.type = 'phash' 
+	  AND files_fingerprints.fingerprint != zeroblob(8)
+	  AND files_fingerprints.fingerprint != ''
 )
 GROUP BY phash
-HAVING COUNT(phash) > 1
-   AND COUNT(DISTINCT image_id) > 1;
+HAVING COUNT(DISTINCT image_id) > 1
+ORDER BY SUM(file_size) DESC;
 `
 
 func (qb *ImageStore) FindDuplicates(ctx context.Context, distance int) ([][]*models.Image, error) {
@@ -1160,13 +1168,26 @@ func (qb *ImageStore) FindDuplicates(ctx context.Context, distance int) ([][]*mo
 		dupeIds = utils.FindDuplicates(hashes, distance, -1)
 	}
 
-	var result [][]*models.Image
+	var allIds []int
 	for _, comp := range dupeIds {
-		if images, err := qb.FindMany(ctx, comp); err == nil {
-			if len(images) > 1 {
-				result = append(result, images)
-			}
-		}
+		allIds = append(allIds, comp...)
+	}
+
+	if len(allIds) == 0 {
+		return nil, nil
+	}
+
+	allImages, err := qb.FindMany(ctx, allIds)
+	if err != nil {
+		return nil, err
+	}
+
+	var result [][]*models.Image
+	offset := 0
+	for _, comp := range dupeIds {
+		group := allImages[offset : offset+len(comp)]
+		result = append(result, group)
+		offset += len(comp)
 	}
 
 	return result, nil

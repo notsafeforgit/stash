@@ -173,7 +173,7 @@ func (db *Database) Open(dbPath string) error {
 		}
 
 		// if migration is needed, then don't open the connection
-		if db.needsMigration() {
+		if db.NeedsMigration() {
 			return &MigrationNeededError{
 				CurrentSchemaVersion:  databaseSchemaVersion,
 				RequiredSchemaVersion: GetRequiredSchemaVersion(),

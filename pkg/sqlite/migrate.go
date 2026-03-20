@@ -45,7 +45,7 @@ func GetRequiredSchemaVersion() uint {
 	return maxVersion
 }
 
-func (db *Database) needsMigration() bool {
+func (db *Database) NeedsMigration() bool {
 	return db.schemaVersion != GetRequiredSchemaVersion()
 }
 

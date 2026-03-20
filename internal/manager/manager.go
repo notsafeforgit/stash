@@ -360,7 +360,7 @@ func (s *Manager) GetSystemStatus() *SystemStatus {
 	status := SystemStatusEnumOk
 	if s.Config.IsNewSystem() {
 		status = SystemStatusEnumSetup
-	} else if dbSchema < appSchema {
+	} else if database.NeedsMigration() {
 		status = SystemStatusEnumNeedsMigration
 	}
 

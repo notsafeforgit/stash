@@ -34,7 +34,7 @@ const (
 	cacheSizeEnv = "STASH_SQLITE_CACHE_SIZE"
 )
 
-var appSchemaVersion uint = 86
+var appSchemaVersion uint = 85
 
 //go:embed migrations/*.sql
 var migrationsBox embed.FS
@@ -165,7 +165,7 @@ func (db *Database) Open(dbPath string) error {
 			return fmt.Errorf("error running initial schema migrations: %w", err)
 		}
 	} else {
-		if databaseSchemaVersion > appSchemaVersion {
+		if databaseSchemaVersion > appSchemaVersion && databaseSchemaVersion < 900 {
 			return &MismatchedSchemaVersionError{
 				CurrentSchemaVersion:  databaseSchemaVersion,
 				RequiredSchemaVersion: appSchemaVersion,

@@ -93,7 +93,7 @@ const PerformerModal: React.FC<IPerformerModalProps> = ({
 
     return (
       <div className="row no-gutters">
-        <div className="col-5 performer-create-modal-field" key={name}>
+        <div className="col-5 create-modal-field" key={name}>
           {!create && (
             <Button
               onClick={() => toggleField(name)}
@@ -108,11 +108,11 @@ const PerformerModal: React.FC<IPerformerModalProps> = ({
           </strong>
         </div>
         {truncate ? (
-          <div className="col-7 performer-create-modal-value">
+          <div className="col-7 create-modal-value">
             <TruncatedText text={text} />
           </div>
         ) : (
-          <span className="col-7 performer-create-modal-value">{text}</span>
+          <span className="col-7 create-modal-value">{text}</span>
         )}
       </div>
     );
@@ -127,7 +127,7 @@ const PerformerModal: React.FC<IPerformerModalProps> = ({
 
     return (
       <div className="row no-gutters">
-        <div className="col-5 performer-create-modal-field" key={name}>
+        <div className="col-5 create-modal-field" key={name}>
           {!create && (
             <Button
               onClick={() => toggleField(name)}
@@ -141,7 +141,7 @@ const PerformerModal: React.FC<IPerformerModalProps> = ({
             <FormattedMessage id={name} />:
           </strong>
         </div>
-        <div className="col-7 performer-create-modal-value">
+        <div className="col-7 create-modal-value">
           <ul>
             {text.map((t, i) => (
               <li key={i}>

@@ -1,19 +1,15 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 import { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 
 import * as GQL from "src/core/generated-graphql";
 import { Icon } from "src/components/Shared/Icon";
 import { ModalComponent } from "src/components/Shared/Modal";
-import {
-  faCheck,
-  faExternalLinkAlt,
-  faTimes,
-} from "@fortawesome/free-solid-svg-icons";
+import { faCheck, faTimes } from "@fortawesome/free-solid-svg-icons";
 import { Button, Form } from "react-bootstrap";
 import { TruncatedText } from "src/components/Shared/TruncatedText";
 import { excludeFields } from "src/utils/data";
-import { ExternalLink } from "src/components/Shared/ExternalLink";
+import { StashIDPill } from "src/components/Shared/StashID";
 
 interface ITagModalProps {
   tag: GQL.ScrapedSceneTagDataFragment;
@@ -51,6 +47,10 @@ const TagModal: React.FC<ITagModalProps> = ({
     !!tag.parent && !tag.parent.stored_id
   );
 
+  useEffect(() => {
+    setCreateParentTag(!excluded.parent_ids && !!tag.parent);
+  }, [excluded.parent_ids, tag.parent]);
+
   // Check if a tag with the parent name already exists locally.
   // Categories don't have stash IDs, so stored_id may be null even when the
   // parent tag has already been created (e.g. by tagging a sibling tag first).
@@ -74,6 +74,7 @@ const TagModal: React.FC<ITagModalProps> = ({
   const [parentExcluded, setParentExcluded] = useState<Record<string, boolean>>(
     excludedTagFields.reduce((dict, field) => ({ ...dict, [field]: true }), {})
   );
+
   const toggleParentField = (name: string) =>
     setParentExcluded({
       ...parentExcluded,
@@ -83,13 +84,15 @@ const TagModal: React.FC<ITagModalProps> = ({
   function maybeRenderField(
     id: string,
     text: string | null | undefined,
-    isSelectable: boolean = true
+    isSelectable: boolean = true,
+    messageId?: string
   ) {
     if (!text) return;
+    if (!messageId) messageId = id;
 
     return (
       <div className="row no-gutters">
-        <div className="col-5 studio-create-modal-field" key={id}>
+        <div className="col-5 create-modal-field" key={id}>
           {isSelectable && (
             <Button
               onClick={() => toggleField(id)}
@@ -100,27 +103,23 @@ const TagModal: React.FC<ITagModalProps> = ({
             </Button>
           )}
           <strong>
-            <FormattedMessage id={id} />:
+            <FormattedMessage id={messageId} />:
           </strong>
         </div>
-        <TruncatedText className="col-7" text={text} />
+        <TruncatedText className="col-7" text={text} lineCount={3} />
       </div>
     );
   }
 
   function maybeRenderStashBoxLink() {
     const base = endpoint?.match(/https?:\/\/.*?\//)?.[0];
-    const link = base ? `${base}tags/${tag.remote_site_id}` : undefined;
-
-    if (!link) return;
+    if (!base || !tag.remote_site_id) return;
 
     return (
-      <h6 className="mt-2">
-        <ExternalLink href={link}>
-          <FormattedMessage id="stashbox.source" />
-          <Icon icon={faExternalLinkAlt} className="ml-2" />
-        </ExternalLink>
-      </h6>
+      <StashIDPill
+        linkType="tags"
+        stashID={{ endpoint: endpoint, stash_id: tag.remote_site_id }}
+      />
     );
   }
 
@@ -133,7 +132,7 @@ const TagModal: React.FC<ITagModalProps> = ({
 
     return (
       <div className="row no-gutters">
-        <div className="col-5 studio-create-modal-field" key={id}>
+        <div className="col-5 create-modal-field" key={id}>
           {isSelectable && (
             <Button
               onClick={() => toggleParentField(id)}
@@ -147,7 +146,7 @@ const TagModal: React.FC<ITagModalProps> = ({
             <FormattedMessage id={id} />:
           </strong>
         </div>
-        <TruncatedText className="col-7" text={text} />
+        <TruncatedText className="col-7" text={text} lineCount={3} />
       </div>
     );
   }
@@ -167,9 +166,17 @@ const TagModal: React.FC<ITagModalProps> = ({
 
   function maybeRenderParentTag() {
     // No parent tag, or parent already exists locally
-    if (!tag.parent || tag.parent.stored_id || !sendParentTag) {
+    if (
+      !tag.parent ||
+      tag.parent.stored_id ||
+      !sendParentTag ||
+      excluded.parent_ids
+    ) {
       return;
     }
+
+    // force create if there is no current parent tag and parent tag is not excluded
+    const mustCreateParent = true;
 
     return (
       <div>
@@ -180,6 +187,7 @@ const TagModal: React.FC<ITagModalProps> = ({
             label={intl.formatMessage({
               id: "actions.create_parent_tag",
             })}
+            disabled={mustCreateParent}
             onChange={() => setCreateParentTag(!createParentTag)}
           />
         </div>
@@ -249,7 +257,7 @@ const TagModal: React.FC<ITagModalProps> = ({
       }}
       cancel={{ onClick: () => closeModal(), variant: "secondary" }}
       onHide={() => closeModal()}
-      dialogClassName="studio-create-modal"
+      dialogClassName="tag-create-modal"
       icon={icon}
       header={header}
     >
@@ -259,7 +267,12 @@ const TagModal: React.FC<ITagModalProps> = ({
             {maybeRenderField("name", tag.name)}
             {maybeRenderField("description", tag.description)}
             {maybeRenderField("aliases", tag.alias_list?.join(", "))}
-            {maybeRenderField("parent_tags", tag.parent?.name, false)}
+            {maybeRenderField(
+              "parent_ids",
+              tag.parent?.name,
+              true,
+              "parent_tags"
+            )}
             {maybeRenderStashBoxLink()}
           </div>
         </div>

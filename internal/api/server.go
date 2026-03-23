@@ -117,6 +117,10 @@ func Initialize() (*Server, error) {
 			// the connection/request. This is necessary to stop running
 			// streams when deleting a scene file.
 			TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
+			// Set high MaxHeaderBytes (8MB) to support the frontend's scene queue feature,
+			// which encodes potentially massive filter states into URL query parameters
+			// to allow "next/previous scene" navigation from filtered lists.
+			MaxHeaderBytes: 8 << 20,
 		},
 		displayAddress: displayAddress,
 		manager:        mgr,

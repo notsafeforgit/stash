@@ -25,6 +25,9 @@ import { getDateError } from "src/utils/yup";
 interface IListOperationProps {
   selected: GQL.SlimImageDataFragment[];
   onClose: (applied: boolean) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  filter?: any;
+  selectAllItemCount?: number;
 }
 
 const imageFields = [
@@ -47,6 +50,8 @@ export const EditImagesDialog: React.FC<IListOperationProps> = (
       return image.id;
     }),
   });
+
+  const [applyToAll, setApplyToAll] = useState<boolean>(false);
 
   const [performerIds, setPerformerIds] = useState<GQL.BulkUpdateIds>({
     mode: GQL.BulkUpdateIdMode.Add,
@@ -163,6 +168,24 @@ export const EditImagesDialog: React.FC<IListOperationProps> = (
         isRunning={isUpdating}
       >
         <Form>
+          {props.filter && (
+            <Form.Group controlId="apply-to-all" className="form-group row">
+              <Form.Label className="col-4 col-sm-3 col-form-label">
+                {intl.formatMessage({
+                  id: "actions.apply_to_all_matching_items",
+                })}
+              </Form.Label>
+              <div className="col-8 col-sm-9 col-form-control">
+                <Form.Check
+                  type="checkbox"
+                  id="apply-to-all-checkbox"
+                  checked={applyToAll}
+                  onChange={(e) => setApplyToAll(e.currentTarget.checked)}
+                />
+              </div>
+            </Form.Group>
+          )}
+
           <BulkUpdateFormGroup name="rating">
             <RatingSystem
               value={updateInput.rating100}
@@ -273,6 +296,24 @@ export const EditImagesDialog: React.FC<IListOperationProps> = (
           </BulkUpdateFormGroup>
 
           <Form.Group controlId="organized">
+            {props.filter && (
+              <Form.Group controlId="apply-to-all" className="form-group row">
+                <Form.Label className="col-4 col-sm-3 col-form-label">
+                  {intl.formatMessage({
+                    id: "actions.apply_to_all_matching_items",
+                  })}
+                </Form.Label>
+                <div className="col-8 col-sm-9 col-form-control">
+                  <Form.Check
+                    type="checkbox"
+                    id="apply-to-all-checkbox"
+                    checked={applyToAll}
+                    onChange={(e) => setApplyToAll(e.currentTarget.checked)}
+                  />
+                </div>
+              </Form.Group>
+            )}
+
             <IndeterminateCheckbox
               label={intl.formatMessage({ id: "organized" })}
               setChecked={(checked) => setUpdateField({ organized: checked })}

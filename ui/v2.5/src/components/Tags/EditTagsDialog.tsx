@@ -57,6 +57,9 @@ function Tags(props: {
 interface IListOperationProps {
   selected: (GQL.TagDataFragment | GQL.TagListDataFragment)[];
   onClose: (applied: boolean) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  filter?: any;
+  selectAllItemCount?: number;
 }
 
 const tagFields = ["favorite", "description", "ignore_auto_tag"];
@@ -84,6 +87,7 @@ export const EditTagsDialog: React.FC<IListOperationProps> = (
   const [existingChildTagIds, setExistingChildTagIds] = useState<string[]>();
 
   const [updateInput, setUpdateInput] = useState<GQL.BulkTagUpdateInput>({});
+  const [applyToAll, setApplyToAll] = useState<boolean>(false);
 
   const unsetDisabled = props.selected.length < 2;
 
@@ -180,6 +184,26 @@ export const EditTagsDialog: React.FC<IListOperationProps> = (
       isRunning={isUpdating}
     >
       <Form>
+        {props.filter &&
+          props.selected.length > 0 &&
+          (props.selectAllItemCount ?? 0) > props.selected.length && (
+            <Form.Group controlId="apply-to-all" className="form-group row">
+              <Form.Label className="col-4 col-sm-3 col-form-label">
+                {intl.formatMessage({
+                  id: "actions.apply_to_all_matching_items",
+                })}
+              </Form.Label>
+              <div className="col-8 col-sm-9 col-form-control">
+                <Form.Check
+                  type="checkbox"
+                  id="apply-to-all-checkbox"
+                  checked={applyToAll}
+                  onChange={(e) => setApplyToAll(e.currentTarget.checked)}
+                />
+              </div>
+            </Form.Group>
+          )}
+
         <Form.Group controlId="favorite">
           <IndeterminateCheckbox
             setChecked={(checked) => setUpdateField({ favorite: checked })}

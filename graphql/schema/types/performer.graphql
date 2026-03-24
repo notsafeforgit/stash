@@ -157,6 +157,8 @@ input BulkUpdateStrings {
 input BulkPerformerUpdateInput {
   clientMutationId: String
   ids: [ID!]
+  find_filter: FindFilterType
+  performer_filter: PerformerFilterType
   disambiguation: String
   url: String @deprecated(reason: "Use urls")
   urls: BulkUpdateStrings

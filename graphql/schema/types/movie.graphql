@@ -65,8 +65,6 @@ input MovieUpdateInput {
 input BulkMovieUpdateInput {
   clientMutationId: String
   ids: [ID!]
-  find_filter: FindFilterType
-  movie_filter: MovieFilterType
   # rating expressed as 1-100
   rating100: Int
   studio_id: ID

@@ -63,8 +63,6 @@ input ImageUpdateInput {
 input BulkImageUpdateInput {
   clientMutationId: String
   ids: [ID!]
-  find_filter: FindFilterType
-  image_filter: ImageFilterType
   title: String
   code: String
   # rating expressed as 1-100

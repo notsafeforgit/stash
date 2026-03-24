@@ -180,8 +180,6 @@ input BulkUpdateIds {
 input BulkSceneUpdateInput {
   clientMutationId: String
   ids: [ID!]
-  find_filter: FindFilterType
-  scene_filter: SceneFilterType
   title: String
   code: String
   details: String

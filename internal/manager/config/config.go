@@ -2016,13 +2016,3 @@ func (i *Config) FinalizeSetup() {
 	i.isNewSystem = false
 	// i.configUpdates <- 0
 }
-
-func GetBulkUpdateHooks() bool {
-	return instance.GetBulkUpdateHooks()
-}
-
-func (c *Config) GetBulkUpdateHooks() bool {
-	c.RLock()
-	defer c.RUnlock()
-	return c.forKey("general.bulkUpdateHooks").Bool("general.bulkUpdateHooks")
-}

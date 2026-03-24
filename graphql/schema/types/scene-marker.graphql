@@ -44,8 +44,6 @@ input SceneMarkerUpdateInput {
 
 input BulkSceneMarkerUpdateInput {
   ids: [ID!]
-  find_filter: FindFilterType
-  scene_marker_filter: SceneMarkerFilterType
   title: String
   primary_tag_id: ID
   tag_ids: BulkUpdateIds

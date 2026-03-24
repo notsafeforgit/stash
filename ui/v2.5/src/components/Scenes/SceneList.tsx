@@ -436,11 +436,9 @@ export const FilteredSceneList = PatchComponent(
         <EditScenesDialog
           selected={selectedItems}
           onClose={onCloseEditDelete}
-          filter={true}
-          selectAllItemCount={999}
         />
       );
-    }, [showModal, selectedItems, onCloseEditDelete, filter, totalCount]);
+    }, [showModal, selectedItems, onCloseEditDelete]);
 
     const onDelete = useCallback(() => {
       showModal(

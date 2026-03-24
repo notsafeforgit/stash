@@ -17,6 +17,9 @@ import { TagSelect } from "../Shared/Select";
 interface IListOperationProps {
   selected: GQL.SceneMarkerDataFragment[];
   onClose: (applied: boolean) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  filter?: any;
+  selectAllItemCount?: number;
 }
 
 const scenemarkerFields = ["title"];

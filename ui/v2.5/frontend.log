@@ -1,0 +1,11 @@
+
+> stash@ start /app/ui/v2.5
+> vite
+
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+Port 3000 is in use, trying another one...
+
+  VITE v5.4.21  ready in 691 ms
+
+  ➜  Local:   http://localhost:3001/
+  ➜  Network: use --host to expose

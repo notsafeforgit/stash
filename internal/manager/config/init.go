@@ -43,6 +43,7 @@ var (
 		"cache":         Cache,
 		"stash":         Stash,
 		"ui":            UILocation,
+		"enable_v3_ui":  EnableV3UI,
 	}
 )
 

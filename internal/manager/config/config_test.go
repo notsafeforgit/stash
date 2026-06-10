@@ -32,3 +32,13 @@ func TestConfig_GetAllPluginConfiguration(t *testing.T) {
 		"plugin2": {"key3": "value3"},
 	}, i.GetAllPluginConfiguration())
 }
+
+func TestConfig_LoadFromEnv_EnableV3UI(t *testing.T) {
+	i := InitializeEmpty()
+	t.Setenv("STASH_ENABLE_V3_UI", "true")
+
+	i.loadFromEnv()
+
+	assert.True(t, i.GetEnableV3UI())
+	assert.True(t, i.HasOverride(EnableV3UI))
+}

@@ -47,13 +47,13 @@ jobs:
           -w /stash $COMPILER_IMAGE tail -f /dev/null
 
     - name: Pre-install
-      run: docker exec -t build /bin/bash -c "make CI=1 pre-ui"
+      run: docker exec -t build /bin/bash -c "make CI=1 pre-ui && make CI=1 pre-ui-v3"
 
     - name: Generate
       run: docker exec -t build /bin/bash -c "make generate"
 
     - name: Build UI
-      run: docker exec -t build /bin/bash -c "make ui"
+      run: docker exec -t build /bin/bash -c "make ui && make ui-v3-only"
 
     - name: Compile linux amd64
       run: docker exec -t build /bin/bash -c "make build-cc-linux"
@@ -62,17 +62,17 @@ jobs:
       run: docker rm -f -v build
 
     - name: Log in to the Container registry
-      uses: docker/login-action@v3
+      uses: docker/login-action@v4
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@v4
 
     - name: Build and push Docker image
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v7
       with:
         context: .
         file: docker/ghcr/Dockerfile

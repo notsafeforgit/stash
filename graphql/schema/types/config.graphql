@@ -56,6 +56,16 @@ enum HashAlgorithm {
   OSHASH
 }
 
+"Idle preview state for list cards (grid and wall layouts)."
+enum PreviewDefaultType {
+  "Show the static screenshot/thumbnail."
+  IMAGE
+  "Show the animated WebP preview if available, otherwise fall back to IMAGE."
+  ANIMATED
+  "Autoplay the video preview if available, otherwise fall back to IMAGE."
+  VIDEO
+}
+
 enum BlobsStorageType {
   # blobs are stored in the database
   "Database"
@@ -150,6 +160,8 @@ input ConfigGeneralInput {
   writeImageThumbnails: Boolean
   "Create Image Clips from Video extensions when Videos are disabled in Library"
   createImageClipsFromVideos: Boolean
+  "Run hooks after each item updated by a bulk update job"
+  bulkUpdateHooks: Boolean
   "Username"
   username: String
   "Password"
@@ -292,6 +304,8 @@ type ConfigGeneralResult {
   writeImageThumbnails: Boolean!
   "Create Image Clips from Video extensions when Videos are disabled in Library"
   createImageClipsFromVideos: Boolean!
+  "Run hooks after each item updated by a bulk update job"
+  bulkUpdateHooks: Boolean!
   "API Key"
   apiKey: String!
   "Username"
@@ -398,8 +412,12 @@ input ConfigInterfaceInput {
 
   "Show title and tags in wall view"
   wallShowTitle: Boolean
-  "Wall playback type"
+  "DEPRECATED: replaced by previewDefault + playVideoOnHover. Still accepted for v2.5 back-compat."
   wallPlayback: String
+  "Idle preview state for list cards in grid and wall layouts."
+  previewDefault: PreviewDefaultType
+  "If true, hovering a list card swaps the preview to its video (when a video preview exists)."
+  playVideoOnHover: Boolean
 
   "Show scene scrubber by default"
   showScrubber: Boolean
@@ -471,8 +489,12 @@ type ConfigInterfaceResult {
 
   "Show title and tags in wall view"
   wallShowTitle: Boolean
-  "Wall playback type"
+  "DEPRECATED: replaced by previewDefault + playVideoOnHover. Still returned for v2.5 back-compat."
   wallPlayback: String
+  "Idle preview state for list cards in grid and wall layouts."
+  previewDefault: PreviewDefaultType
+  "If true, hovering a list card swaps the preview to its video (when a video preview exists)."
+  playVideoOnHover: Boolean
 
   "Show scene scrubber by default"
   showScrubber: Boolean

@@ -72,7 +72,14 @@ func (rs galleryRoutes) Cover(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if i == nil {
-		// fallback to default image
+		// Fallback to the default placeholder. The URL builder includes
+		// `?t=<gallery.UpdatedAt>`, which would normally trigger an
+		// immutable max-age=1y response — but the placeholder is here
+		// *because* no cover image was found yet, and that can change as
+		// soon as a child image is associated (without bumping
+		// gallery.UpdatedAt). Force no-cache so the browser revalidates
+		// and picks up the real cover the next time it's requested.
+		w.Header().Set("Cache-Control", "no-cache")
 		image := static.ReadAll(static.DefaultGalleryImage)
 		utils.ServeImage(w, r, image)
 		return

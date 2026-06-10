@@ -31,6 +31,16 @@ func (r *mutationResolver) getGallery(ctx context.Context, id int) (ret *models.
 	return ret, nil
 }
 
+type galleryBulkUpdateOperation struct {
+	repository     models.GalleryReaderWriter
+	updatedGallery models.GalleryPartial
+}
+
+func (o galleryBulkUpdateOperation) Update(ctx context.Context, id int) error {
+	_, err := o.repository.UpdatePartial(ctx, id, o.updatedGallery)
+	return err
+}
+
 func (r *mutationResolver) GalleryCreate(ctx context.Context, input GalleryCreateInput) (*models.Gallery, error) {
 	// name must be provided
 	if input.Title == "" {
@@ -266,6 +276,45 @@ func (r *mutationResolver) BulkGalleryUpdate(ctx context.Context, input BulkGall
 		return nil, fmt.Errorf("converting ids: %w", err)
 	}
 
+	compatInput := input
+	compatInput.ApplyToItemsMatchingFilters = nil
+	compatInput.FindFilter = nil
+	compatInput.GalleryFilter = nil
+
+	if _, err := r.BulkGalleryUpdateJob(ctx, compatInput); err != nil {
+		return nil, err
+	}
+
+	return refetchBulkUpdateResults(ctx, galleryIDs, r.getGallery)
+}
+
+func (r *mutationResolver) BulkGalleryUpdateJob(ctx context.Context, input BulkGalleryUpdateInput) (string, error) {
+	galleryIDs, err := stringslice.StringSliceToIntSlice(input.Ids)
+	if err != nil {
+		return "", fmt.Errorf("converting ids: %w", err)
+	}
+
+	useBackgroundJob := (input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters) ||
+		(len(input.Ids) == 0 && (input.FindFilter != nil || input.GalleryFilter != nil))
+	if useBackgroundJob {
+		findFilter := sanitizeBulkUpdateFindFilter(input.FindFilter)
+		err = r.withReadTxn(ctx, func(ctx context.Context) error {
+			result, _, qErr := r.repository.Gallery.Query(ctx, input.GalleryFilter, findFilter)
+			if qErr != nil {
+				return qErr
+			}
+			var fetchedIds []int
+			for _, item := range result {
+				fetchedIds = append(fetchedIds, item.ID)
+			}
+			galleryIDs = fetchedIds
+			return nil
+		})
+		if err != nil {
+			return "", err
+		}
+	}
+
 	translator := changesetTranslator{
 		inputMap: getUpdateInputMap(ctx),
 	}
@@ -282,64 +331,57 @@ func (r *mutationResolver) BulkGalleryUpdate(ctx context.Context, input BulkGall
 
 	updatedGallery.Date, err = translator.optionalDate(input.Date, "date")
 	if err != nil {
-		return nil, fmt.Errorf("converting date: %w", err)
+		return "", fmt.Errorf("converting date: %w", err)
 	}
 	updatedGallery.StudioID, err = translator.optionalIntFromString(input.StudioID, "studio_id")
 	if err != nil {
-		return nil, fmt.Errorf("converting studio id: %w", err)
+		return "", fmt.Errorf("converting studio id: %w", err)
 	}
 
 	updatedGallery.PerformerIDs, err = translator.updateIdsBulk(input.PerformerIds, "performer_ids")
 	if err != nil {
-		return nil, fmt.Errorf("converting performer ids: %w", err)
+		return "", fmt.Errorf("converting performer ids: %w", err)
 	}
 	updatedGallery.TagIDs, err = translator.updateIdsBulk(input.TagIds, "tag_ids")
 	if err != nil {
-		return nil, fmt.Errorf("converting tag ids: %w", err)
+		return "", fmt.Errorf("converting tag ids: %w", err)
 	}
 	updatedGallery.SceneIDs, err = translator.updateIdsBulk(input.SceneIds, "scene_ids")
 	if err != nil {
-		return nil, fmt.Errorf("converting scene ids: %w", err)
+		return "", fmt.Errorf("converting scene ids: %w", err)
 	}
 
 	if input.CustomFields != nil {
 		updatedGallery.CustomFields = handleUpdateCustomFields(*input.CustomFields)
 	}
 
-	ret := []*models.Gallery{}
+	operation := galleryBulkUpdateOperation{
+		repository:     r.repository.Gallery,
+		updatedGallery: updatedGallery,
+	}
 
-	// Start the transaction and save the galleries
-	if err := r.withTxn(ctx, func(ctx context.Context) error {
-		qb := r.repository.Gallery
+	if !useBackgroundJob {
+		if err := r.withTxn(ctx, func(ctx context.Context) error {
+			for _, galleryID := range galleryIDs {
+				if err := operation.Update(ctx, galleryID); err != nil {
+					return err
+				}
+			}
+			return nil
+		}); err != nil {
+			return "", err
+		}
 
 		for _, galleryID := range galleryIDs {
-			gallery, err := qb.UpdatePartial(ctx, galleryID, updatedGallery)
-			if err != nil {
-				return err
-			}
-
-			ret = append(ret, gallery)
+			r.hookExecutor.ExecutePostHooks(ctx, galleryID, hook.GalleryUpdatePost, input, translator.getFields())
 		}
 
-		return nil
-	}); err != nil {
-		return nil, err
+		return "sync", nil
 	}
 
-	// execute post hooks outside of txn
-	var newRet []*models.Gallery
-	for _, gallery := range ret {
-		r.hookExecutor.ExecutePostHooks(ctx, gallery.ID, hook.GalleryUpdatePost, input, translator.getFields())
+	jobID := r.enqueueBulkUpdate(ctx, "Bulk Gallery Update", galleryIDs, operation, hook.GalleryUpdatePost, input, translator.getFields())
 
-		gallery, err := r.getGallery(ctx, gallery.ID)
-		if err != nil {
-			return nil, err
-		}
-
-		newRet = append(newRet, gallery)
-	}
-
-	return newRet, nil
+	return strconv.Itoa(jobID), nil
 }
 
 func (r *mutationResolver) GalleryDestroy(ctx context.Context, input models.GalleryDestroyInput) (bool, error) {

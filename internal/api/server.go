@@ -164,12 +164,14 @@ func Initialize() (*Server, error) {
 	galleryService := mgr.GalleryService
 	groupService := mgr.GroupService
 	resolver := &Resolver{
-		repository:     repo,
-		sceneService:   sceneService,
-		imageService:   imageService,
-		galleryService: galleryService,
-		groupService:   groupService,
-		hookExecutor:   pluginCache,
+		scraperCacheStore: mgr.ScraperCache,
+		repository:        repo,
+		sceneService:      sceneService,
+		imageService:      imageService,
+		galleryService:    galleryService,
+		groupService:      groupService,
+		bulkUpdater:       mgr,
+		hookExecutor:      pluginCache,
 	}
 
 	gqlSrv := gqlHandler.New(NewExecutableSchema(Config{Resolvers: resolver}))
@@ -252,9 +254,10 @@ func Initialize() (*Server, error) {
 		uiFS = osFS(customUILocation)
 		staticUI = statigz.FileServer(uiFS.(fs.ReadDirFS))
 	} else {
-		logger.Debug("Serving embedded UI")
-		uiFS = ui.UIBox
-		staticUI = statigz.FileServer(ui.UIBox.(fs.ReadDirFS))
+		enableV3UI := cfg.GetEnableV3UI()
+		logger.Debugf("Serving embedded UI v3=%t", enableV3UI)
+		uiFS = ui.Box(enableV3UI)
+		staticUI = statigz.FileServer(uiFS.(fs.ReadDirFS))
 	}
 
 	// handle favicon override

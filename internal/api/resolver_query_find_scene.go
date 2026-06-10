@@ -77,6 +77,7 @@ func (r *queryResolver) FindSceneByHash(ctx context.Context, input SceneHashInpu
 func (r *queryResolver) FindScenes(
 	ctx context.Context,
 	sceneFilter *models.SceneFilterType,
+	sceneFilterAST *models.FilterAST,
 	sceneIDs []int,
 	ids []string,
 	filter *models.FindFilterType,
@@ -95,7 +96,8 @@ func (r *queryResolver) FindScenes(
 		fields := graphql.CollectAllFields(ctx)
 		result := &models.SceneQueryResult{}
 
-		if len(sceneIDs) > 0 {
+		switch {
+		case len(sceneIDs) > 0:
 			scenes, err = r.repository.Scene.FindMany(ctx, sceneIDs)
 			if err == nil {
 				result.Count = len(scenes)
@@ -114,7 +116,34 @@ func (r *queryResolver) FindScenes(
 					result.TotalSize += float64(f.Size)
 				}
 			}
-		} else {
+		case sceneFilterAST != nil:
+			var total int
+			scenes, total, err = r.repository.Scene.QueryAST(ctx, sceneFilterAST, filter)
+			if err != nil {
+				return err
+			}
+
+			result.Count = total
+			result.IDs = make([]int, 0, len(scenes))
+			for _, s := range scenes {
+				result.IDs = append(result.IDs, s.ID)
+			}
+			if slices.Contains(fields, "duration") || slices.Contains(fields, "filesize") {
+				for _, s := range scenes {
+					if err = s.LoadPrimaryFile(ctx, r.repository.File); err != nil {
+						return err
+					}
+
+					f := s.Files.Primary()
+					if f == nil {
+						continue
+					}
+
+					result.TotalDuration += f.Duration
+					result.TotalSize += float64(f.Size)
+				}
+			}
+		default:
 			result, err = r.repository.Scene.Query(ctx, models.SceneQueryOptions{
 				QueryOptions: models.QueryOptions{
 					FindFilter: filter,

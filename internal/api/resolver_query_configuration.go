@@ -114,6 +114,7 @@ func makeConfigGeneralResult() *ConfigGeneralResult {
 		MaxStreamingTranscodeSize:     &maxStreamingTranscodeSize,
 		WriteImageThumbnails:          config.IsWriteImageThumbnails(),
 		CreateImageClipsFromVideos:    config.IsCreateImageClipsFromVideos(),
+		BulkUpdateHooks:               config.GetBulkUpdateHooks(),
 		GalleryCoverRegex:             config.GetGalleryCoverRegex(),
 		APIKey:                        config.GetAPIKey(),
 		Username:                      config.GetUsername(),
@@ -143,6 +144,19 @@ func makeConfigGeneralResult() *ConfigGeneralResult {
 	}
 }
 
+// previewDefaultStrToEnum maps the config's lowercase string into the
+// GraphQL enum, defaulting to VIDEO if the string is unrecognised.
+func previewDefaultStrToEnum(s string) PreviewDefaultType {
+	switch strings.ToLower(s) {
+	case "image":
+		return PreviewDefaultTypeImage
+	case "animated":
+		return PreviewDefaultTypeAnimated
+	default:
+		return PreviewDefaultTypeVideo
+	}
+}
+
 func makeConfigInterfaceResult() *ConfigInterfaceResult {
 	config := config.GetInstance()
 	menuItems := config.GetMenuItems()
@@ -150,6 +164,9 @@ func makeConfigInterfaceResult() *ConfigInterfaceResult {
 	wallShowTitle := config.GetWallShowTitle()
 	showScrubber := config.GetShowScrubber()
 	wallPlayback := config.GetWallPlayback()
+	previewDefaultStr := config.GetPreviewDefault()
+	previewDefault := previewDefaultStrToEnum(previewDefaultStr)
+	playVideoOnHover := config.GetPlayVideoOnHover()
 	noBrowser := config.GetNoBrowser()
 	notificationsEnabled := config.GetNotificationsEnabled()
 	maximumLoopDuration := config.GetMaximumLoopDuration()
@@ -177,6 +194,8 @@ func makeConfigInterfaceResult() *ConfigInterfaceResult {
 		SoundOnPreview:               &soundOnPreview,
 		WallShowTitle:                &wallShowTitle,
 		WallPlayback:                 &wallPlayback,
+		PreviewDefault:               &previewDefault,
+		PlayVideoOnHover:             &playVideoOnHover,
 		ShowScrubber:                 &showScrubber,
 		MaximumLoopDuration:          &maximumLoopDuration,
 		NoBrowser:                    &noBrowser,

@@ -111,3 +111,14 @@ func (r *mutationResolver) SetPluginsEnabled(ctx context.Context, enabledMap map
 
 	return true, nil
 }
+
+func (r *mutationResolver) SetPluginHookOrder(ctx context.Context, input PluginHookOrderInput) ([]*PluginHookOrder, error) {
+	c := config.GetInstance()
+	c.SetPluginHookOrderForHook(input.Hook, input.PluginIds)
+
+	if err := c.Write(); err != nil {
+		return nil, err
+	}
+
+	return r.Query().PluginHookOrder(ctx)
+}

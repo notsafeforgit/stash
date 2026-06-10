@@ -76,6 +76,8 @@ models:
     model: github.com/stashapp/stash/internal/manager.SystemStatus
   SystemStatusEnum:
     model: github.com/stashapp/stash/internal/manager.SystemStatusEnum
+  ServerCapabilities:
+    model: github.com/stashapp/stash/internal/manager.ServerCapabilities
   ImportDuplicateEnum:
     model: github.com/stashapp/stash/internal/manager.ImportDuplicateEnum
   SetupInput:
@@ -135,10 +137,26 @@ models:
     model: github.com/stashapp/stash/pkg/scraper.Source
   SavedFindFilterType:
     model: github.com/stashapp/stash/pkg/models.FindFilterType
+  FilterASTInput:
+    model: github.com/stashapp/stash/pkg/models.FilterAST
+  FilterASTNodeInput:
+    model: github.com/stashapp/stash/pkg/models.FilterASTNode
+  FilterASTGroupInput:
+    model: github.com/stashapp/stash/pkg/models.FilterASTGroup
+  FilterASTConditionInput:
+    model: github.com/stashapp/stash/pkg/models.FilterASTCondition
   # force resolvers
   ConfigResult:
     fields:
       plugins:
+        resolver: true
+  SavedFilter:
+    fields:
+      # v2.5 compatibility view flattened from FilterAST
+      object_filter:
+        resolver: true
+      # *models.FilterAST -> generic Map
+      filter_ast:
         resolver: true
   Performer:
     fields:

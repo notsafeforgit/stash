@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -33,6 +34,39 @@ func (r *mutationResolver) getPerformer(ctx context.Context, id int) (ret *model
 	return ret, nil
 }
 
+type performerBulkUpdateOperation struct {
+	repository       models.PerformerReaderWriter
+	updatedPerformer models.PerformerPartial
+	legacyURLs       legacyPerformerURLs
+}
+
+func (o performerBulkUpdateOperation) Update(ctx context.Context, id int) error {
+	if o.legacyURLs.AnySet() {
+		if err := handleLegacyPerformerURLs(ctx, o.repository, id, o.legacyURLs, &o.updatedPerformer); err != nil {
+			return err
+		}
+	}
+
+	if err := performer.ValidateUpdate(ctx, id, o.updatedPerformer, o.repository); err != nil {
+		return err
+	}
+
+	_, err := o.repository.UpdatePartial(ctx, id, o.updatedPerformer)
+	return err
+}
+
+func handleLegacyPerformerURLs(ctx context.Context, repository models.PerformerReaderWriter, performerID int, legacyURLs legacyPerformerURLs, updatedPerformer *models.PerformerPartial) error {
+	performer, err := repository.Find(ctx, performerID)
+	if err != nil {
+		return err
+	}
+	if performer == nil {
+		return fmt.Errorf("performer with id %d not found", performerID)
+	}
+
+	return applyLegacyPerformerURLs(performer, legacyURLs, updatedPerformer)
+}
+
 func (r *mutationResolver) PerformerCreate(ctx context.Context, input models.PerformerCreateInput) (*models.Performer, error) {
 	translator := changesetTranslator{
 		inputMap: getUpdateInputMap(ctx),
@@ -43,7 +77,20 @@ func (r *mutationResolver) PerformerCreate(ctx context.Context, input models.Per
 
 	newPerformer.Name = strings.TrimSpace(input.Name)
 	newPerformer.Disambiguation = translator.string(input.Disambiguation)
-	newPerformer.Aliases = models.NewRelatedStrings(stringslice.UniqueExcludeFold(stringslice.TrimSpace(input.AliasList), newPerformer.Name))
+	var aliases []models.PerformerAlias
+	if input.Aliases != nil {
+		for _, a := range input.Aliases {
+			aliases = append(aliases, models.PerformerAlias{
+				Alias:         a.Alias,
+				IgnoreAutoTag: a.IgnoreAutoTag,
+			})
+		}
+	} else if input.AliasList != nil {
+		for _, a := range input.AliasList {
+			aliases = append(aliases, models.PerformerAlias{Alias: a, IgnoreAutoTag: true})
+		}
+	}
+	newPerformer.Aliases = models.NewRelatedPerformerAliases(performer.NormalizeAliases(newPerformer.Name, aliases))
 	newPerformer.Gender = input.Gender
 	newPerformer.Ethnicity = translator.string(input.Ethnicity)
 	newPerformer.Country = translator.string(input.Country)
@@ -188,6 +235,10 @@ func (r *mutationResolver) handleLegacyURLs(ctx context.Context, performerID int
 		return fmt.Errorf("loading performer URLs: %w", err)
 	}
 
+	return applyLegacyPerformerURLs(p, legacyURLs, updatedPerformer)
+}
+
+func applyLegacyPerformerURLs(p *models.Performer, legacyURLs legacyPerformerURLs, updatedPerformer *models.PerformerPartial) error {
 	existingURLs := p.URLs.List()
 
 	// performer partial URLs should be empty
@@ -337,9 +388,28 @@ func performerPartialFromInput(input models.PerformerUpdateInput, translator cha
 		updatedPerformer.Height = translator.optionalInt(input.HeightCm, "height_cm")
 	}
 
-	// prefer alias_list over aliases
-	if translator.hasField("alias_list") {
-		updatedPerformer.Aliases = translator.updateStrings(input.AliasList, "alias_list")
+	// prefer aliases over alias_list
+	if translator.hasField("aliases") {
+		var aliases []models.PerformerAlias
+		for _, a := range input.Aliases.Values {
+			aliases = append(aliases, models.PerformerAlias{
+				Alias:         strings.TrimSpace(a.Alias),
+				IgnoreAutoTag: a.IgnoreAutoTag,
+			})
+		}
+		updatedPerformer.Aliases = &models.UpdatePerformerAliases{
+			Values: aliases,
+			Mode:   input.Aliases.Mode,
+		}
+	} else if translator.hasField("alias_list") {
+		var aliases []models.PerformerAlias
+		for _, a := range input.AliasList {
+			aliases = append(aliases, models.PerformerAlias{Alias: a, IgnoreAutoTag: true})
+		}
+		updatedPerformer.Aliases = &models.UpdatePerformerAliases{
+			Values: aliases,
+			Mode:   models.RelationshipUpdateModeSet,
+		}
 	}
 
 	updatedPerformer.TagIDs, err = translator.updateIds(input.TagIds, "tag_ids")
@@ -350,6 +420,24 @@ func performerPartialFromInput(input models.PerformerUpdateInput, translator cha
 	updatedPerformer.CustomFields = handleUpdateCustomFields(input.CustomFields)
 
 	return &updatedPerformer, nil
+}
+
+type performerUpdateInputResolver struct{ *Resolver }
+
+func (r *performerUpdateInputResolver) ImageFromImageID(_ context.Context, _ *models.PerformerUpdateInput, _ *string) error {
+	return nil
+}
+
+func (r *performerUpdateInputResolver) Aliases(ctx context.Context, obj *models.PerformerUpdateInput, data []*models.PerformerAliasInput) error {
+	obj.Aliases = &models.UpdatePerformerAliasesInput{
+		Values: data,
+		Mode:   models.RelationshipUpdateModeSet, // Use Set mode for simple aliases property, though client can also use AliasList
+	}
+	return nil
+}
+
+func (r *Resolver) PerformerUpdateInput() PerformerUpdateInputResolver {
+	return &performerUpdateInputResolver{r}
 }
 
 func (r *mutationResolver) PerformerUpdate(ctx context.Context, input models.PerformerUpdateInput) (*models.Performer, error) {
@@ -378,6 +466,34 @@ func (r *mutationResolver) PerformerUpdate(ctx context.Context, input models.Per
 		}
 	}
 
+	if !imageIncluded && input.ImageFromImageID != nil {
+		srcImageID, err := strconv.Atoi(*input.ImageFromImageID)
+		if err != nil {
+			return nil, fmt.Errorf("converting image_from_image_id: %w", err)
+		}
+		if err := r.withReadTxn(ctx, func(ctx context.Context) error {
+			img, err := r.repository.Image.Find(ctx, srcImageID)
+			if err != nil {
+				return fmt.Errorf("finding source image: %w", err)
+			}
+			if img != nil {
+				if err := img.LoadPrimaryFile(ctx, r.repository.File); err != nil {
+					return fmt.Errorf("loading image file: %w", err)
+				}
+				if f := img.Files.Primary(); f != nil {
+					imageData, err = os.ReadFile(f.Base().Path)
+					if err != nil {
+						return fmt.Errorf("reading image file: %w", err)
+					}
+					imageIncluded = true
+				}
+			}
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+	}
+
 	// Start the transaction and save the performer
 	if err := r.withTxn(ctx, func(ctx context.Context) error {
 		qb := r.repository.Performer
@@ -398,14 +514,17 @@ func (r *mutationResolver) PerformerUpdate(ctx context.Context, input models.Per
 					return err
 				}
 
-				effectiveAliases := updatedPerformer.Aliases.Apply(p.Aliases.List())
+				// Preserve IgnoreAutoTag state when updating aliases via AliasList (which sets them to true by default)
+				// if they already existed.
+				preserveIgnore := translator.hasField("alias_list") && !translator.hasField("aliases")
+				effectiveAliases := performer.GetEffectiveAliases(p.Aliases.List(), updatedPerformer.Aliases.Values, updatedPerformer.Aliases.Mode, preserveIgnore)
+
 				name := p.Name
 				if updatedPerformer.Name.Set {
 					name = updatedPerformer.Name.Value
 				}
 
-				sanitized := stringslice.UniqueExcludeFold(effectiveAliases, name)
-				updatedPerformer.Aliases.Values = sanitized
+				updatedPerformer.Aliases.Values = performer.NormalizeAliases(name, effectiveAliases)
 				updatedPerformer.Aliases.Mode = models.RelationshipUpdateModeSet
 			}
 		}
@@ -440,6 +559,45 @@ func (r *mutationResolver) BulkPerformerUpdate(ctx context.Context, input BulkPe
 		return nil, fmt.Errorf("converting ids: %w", err)
 	}
 
+	compatInput := input
+	compatInput.ApplyToItemsMatchingFilters = nil
+	compatInput.FindFilter = nil
+	compatInput.PerformerFilter = nil
+
+	if _, err := r.BulkPerformerUpdateJob(ctx, compatInput); err != nil {
+		return nil, err
+	}
+
+	return refetchBulkUpdateResults(ctx, performerIDs, r.getPerformer)
+}
+
+func (r *mutationResolver) BulkPerformerUpdateJob(ctx context.Context, input BulkPerformerUpdateInput) (string, error) {
+	performerIDs, err := stringslice.StringSliceToIntSlice(input.Ids)
+	if err != nil {
+		return "", fmt.Errorf("converting ids: %w", err)
+	}
+
+	useBackgroundJob := (input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters) ||
+		(len(input.Ids) == 0 && (input.FindFilter != nil || input.PerformerFilter != nil))
+	if useBackgroundJob {
+		findFilter := sanitizeBulkUpdateFindFilter(input.FindFilter)
+		err = r.withReadTxn(ctx, func(ctx context.Context) error {
+			result, _, qErr := r.repository.Performer.Query(ctx, input.PerformerFilter, findFilter)
+			if qErr != nil {
+				return qErr
+			}
+			var fetchedIds []int
+			for _, item := range result {
+				fetchedIds = append(fetchedIds, item.ID)
+			}
+			performerIDs = fetchedIds
+			return nil
+		})
+		if err != nil {
+			return "", err
+		}
+	}
+
 	translator := changesetTranslator{
 		inputMap: getUpdateInputMap(ctx),
 	}
@@ -461,16 +619,16 @@ func (r *mutationResolver) BulkPerformerUpdate(ctx context.Context, input BulkPe
 	if translator.hasField("career_start") || translator.hasField("career_end") {
 		updatedPerformer.CareerStart, err = translator.optionalDate(input.CareerStart, "career_start")
 		if err != nil {
-			return nil, fmt.Errorf("converting career start: %w", err)
+			return "", fmt.Errorf("converting career start: %w", err)
 		}
 		updatedPerformer.CareerEnd, err = translator.optionalDate(input.CareerEnd, "career_end")
 		if err != nil {
-			return nil, fmt.Errorf("converting career end: %w", err)
+			return "", fmt.Errorf("converting career end: %w", err)
 		}
 	} else if translator.hasField("career_length") && input.CareerLength != nil {
 		start, end, err := models.ParseYearRangeString(*input.CareerLength)
 		if err != nil {
-			return nil, fmt.Errorf("could not parse career_length %q: %w", *input.CareerLength, err)
+			return "", fmt.Errorf("could not parse career_length %q: %w", *input.CareerLength, err)
 		}
 		if start != nil {
 			updatedPerformer.CareerStart = models.NewOptionalDate(*start)
@@ -492,7 +650,7 @@ func (r *mutationResolver) BulkPerformerUpdate(ctx context.Context, input BulkPe
 	if translator.hasField("urls") {
 		// ensure url/twitter/instagram are not included in the input
 		if err := validateNoLegacyURLs(translator); err != nil {
-			return nil, err
+			return "", err
 		}
 
 		updatedPerformer.URLs = translator.updateStringsBulk(input.Urls, "urls")
@@ -506,11 +664,11 @@ func (r *mutationResolver) BulkPerformerUpdate(ctx context.Context, input BulkPe
 
 	updatedPerformer.Birthdate, err = translator.optionalDate(input.Birthdate, "birthdate")
 	if err != nil {
-		return nil, fmt.Errorf("converting birthdate: %w", err)
+		return "", fmt.Errorf("converting birthdate: %w", err)
 	}
 	updatedPerformer.DeathDate, err = translator.optionalDate(input.DeathDate, "death_date")
 	if err != nil {
-		return nil, fmt.Errorf("converting death date: %w", err)
+		return "", fmt.Errorf("converting death date: %w", err)
 	}
 
 	// prefer height_cm over height
@@ -518,64 +676,67 @@ func (r *mutationResolver) BulkPerformerUpdate(ctx context.Context, input BulkPe
 		updatedPerformer.Height = translator.optionalInt(input.HeightCm, "height_cm")
 	}
 
-	// prefer alias_list over aliases
-	if translator.hasField("alias_list") {
-		updatedPerformer.Aliases = translator.updateStringsBulk(input.AliasList, "alias_list")
+	// prefer aliases over alias_list
+	if translator.hasField("aliases") {
+		var aliases []models.PerformerAlias
+		for _, a := range input.Aliases.Values {
+			aliases = append(aliases, models.PerformerAlias{
+				Alias:         strings.TrimSpace(a.Alias),
+				IgnoreAutoTag: a.IgnoreAutoTag,
+			})
+		}
+		updatedPerformer.Aliases = &models.UpdatePerformerAliases{
+			Values: aliases,
+			Mode:   input.Aliases.Mode,
+		}
+	} else if translator.hasField("alias_list") {
+		var aliases []models.PerformerAlias
+		for _, a := range input.AliasList.Values {
+			aliases = append(aliases, models.PerformerAlias{Alias: a, IgnoreAutoTag: true})
+		}
+		updatedPerformer.Aliases = &models.UpdatePerformerAliases{
+			Values: aliases,
+			Mode:   input.AliasList.Mode,
+		}
 	}
 
 	updatedPerformer.TagIDs, err = translator.updateIdsBulk(input.TagIds, "tag_ids")
 	if err != nil {
-		return nil, fmt.Errorf("converting tag ids: %w", err)
+		return "", fmt.Errorf("converting tag ids: %w", err)
 	}
 
 	if input.CustomFields != nil {
 		updatedPerformer.CustomFields = handleUpdateCustomFields(*input.CustomFields)
 	}
 
-	ret := []*models.Performer{}
+	operation := performerBulkUpdateOperation{
+		repository:       r.repository.Performer,
+		updatedPerformer: updatedPerformer,
+		legacyURLs:       legacyURLs,
+	}
 
-	// Start the transaction and save the performers
-	if err := r.withTxn(ctx, func(ctx context.Context) error {
-		qb := r.repository.Performer
-
-		for _, performerID := range performerIDs {
-			if legacyURLs.AnySet() {
-				if err := r.handleLegacyURLs(ctx, performerID, legacyURLs, &updatedPerformer); err != nil {
+	if !useBackgroundJob {
+		if err := r.withTxn(ctx, func(ctx context.Context) error {
+			for _, performerID := range performerIDs {
+				if err := operation.Update(ctx, performerID); err != nil {
 					return err
 				}
 			}
-
-			if err := performer.ValidateUpdate(ctx, performerID, updatedPerformer, qb); err != nil {
-				return err
-			}
-
-			performer, err := qb.UpdatePartial(ctx, performerID, updatedPerformer)
-			if err != nil {
-				return err
-			}
-
-			ret = append(ret, performer)
+			return nil
+		}); err != nil {
+			return "", err
 		}
 
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-
-	// execute post hooks outside of txn
-	var newRet []*models.Performer
-	for _, performer := range ret {
-		r.hookExecutor.ExecutePostHooks(ctx, performer.ID, hook.PerformerUpdatePost, input, translator.getFields())
-
-		performer, err = r.getPerformer(ctx, performer.ID)
-		if err != nil {
-			return nil, err
+		for _, performerID := range performerIDs {
+			r.hookExecutor.ExecutePostHooks(ctx, performerID, hook.PerformerUpdatePost, input, translator.getFields())
 		}
 
-		newRet = append(newRet, performer)
+		return "sync", nil
 	}
 
-	return newRet, nil
+	jobID := r.enqueueBulkUpdate(ctx, "Bulk Performer Update", performerIDs, operation, hook.PerformerUpdatePost, input, translator.getFields())
+
+	return strconv.Itoa(jobID), nil
 }
 
 func (r *mutationResolver) PerformerDestroy(ctx context.Context, input PerformerDestroyInput) (bool, error) {

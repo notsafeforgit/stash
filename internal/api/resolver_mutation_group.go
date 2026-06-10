@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/stashapp/stash/internal/manager"
+	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/internal/static"
 	"github.com/stashapp/stash/pkg/group"
 	"github.com/stashapp/stash/pkg/models"
@@ -88,6 +90,27 @@ func groupFromGroupCreateInput(ctx context.Context, input GroupCreateInput) (*mo
 	}
 
 	return newGroupInput, nil
+}
+
+type groupBulkUpdateOperation struct {
+	groupService   manager.GroupService
+	updatedGroup   models.GroupPartial
+	hookExecutor   hookExecutor
+	input          interface{}
+	inputFields    []string
+	runCompatHooks bool
+}
+
+func (o groupBulkUpdateOperation) Update(ctx context.Context, id int) error {
+	_, err := o.groupService.UpdatePartial(ctx, id, o.updatedGroup, group.ImageInput{}, group.ImageInput{})
+
+	// for backwards compatibility - run both movie and group hooks
+	// BulkUpdate will run the GroupUpdatePost hook, we manually run MovieUpdatePost
+	if err == nil && o.runCompatHooks && o.hookExecutor != nil {
+		o.hookExecutor.ExecutePostHooks(ctx, id, hook.MovieUpdatePost, o.input, o.inputFields)
+	}
+
+	return err
 }
 
 func (r *mutationResolver) GroupCreate(ctx context.Context, input GroupCreateInput) (*models.Group, error) {
@@ -278,6 +301,45 @@ func (r *mutationResolver) BulkGroupUpdate(ctx context.Context, input BulkGroupU
 		return nil, fmt.Errorf("converting ids: %w", err)
 	}
 
+	compatInput := input
+	compatInput.ApplyToItemsMatchingFilters = nil
+	compatInput.FindFilter = nil
+	compatInput.GroupFilter = nil
+
+	if _, err := r.BulkGroupUpdateJob(ctx, compatInput); err != nil {
+		return nil, err
+	}
+
+	return refetchBulkUpdateResults(ctx, groupIDs, r.getGroup)
+}
+
+func (r *mutationResolver) BulkGroupUpdateJob(ctx context.Context, input BulkGroupUpdateInput) (string, error) {
+	groupIDs, err := stringslice.StringSliceToIntSlice(input.Ids)
+	if err != nil {
+		return "", fmt.Errorf("converting ids: %w", err)
+	}
+
+	useBackgroundJob := (input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters) ||
+		(len(input.Ids) == 0 && (input.FindFilter != nil || input.GroupFilter != nil))
+	if useBackgroundJob {
+		findFilter := sanitizeBulkUpdateFindFilter(input.FindFilter)
+		err = r.withReadTxn(ctx, func(ctx context.Context) error {
+			result, _, qErr := r.repository.Group.Query(ctx, input.GroupFilter, findFilter)
+			if qErr != nil {
+				return qErr
+			}
+			var fetchedIds []int
+			for _, item := range result {
+				fetchedIds = append(fetchedIds, item.ID)
+			}
+			groupIDs = fetchedIds
+			return nil
+		})
+		if err != nil {
+			return "", err
+		}
+	}
+
 	translator := changesetTranslator{
 		inputMap: getUpdateInputMap(ctx),
 	}
@@ -285,41 +347,45 @@ func (r *mutationResolver) BulkGroupUpdate(ctx context.Context, input BulkGroupU
 	// Populate group from the input
 	updatedGroup, err := groupPartialFromBulkGroupUpdateInput(translator, input)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	ret := []*models.Group{}
+	operation := groupBulkUpdateOperation{
+		groupService:   r.groupService,
+		updatedGroup:   updatedGroup,
+		hookExecutor:   r.hookExecutor,
+		input:          input,
+		inputFields:    translator.getFields(),
+		runCompatHooks: true,
+	}
+	if useBackgroundJob {
+		operation.runCompatHooks = config.GetBulkUpdateHooks()
+	}
 
-	if err := r.withTxn(ctx, func(ctx context.Context) error {
-		for _, groupID := range groupIDs {
-			group, err := r.groupService.UpdatePartial(ctx, groupID, updatedGroup, group.ImageInput{}, group.ImageInput{})
-			if err != nil {
-				return err
+	if !useBackgroundJob {
+		operation.runCompatHooks = false
+		if err := r.withTxn(ctx, func(ctx context.Context) error {
+			for _, groupID := range groupIDs {
+				if err := operation.Update(ctx, groupID); err != nil {
+					return err
+				}
 			}
-
-			ret = append(ret, group)
+			return nil
+		}); err != nil {
+			return "", err
 		}
 
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-
-	var newRet []*models.Group
-	for _, group := range ret {
-		// for backwards compatibility - run both movie and group hooks
-		r.hookExecutor.ExecutePostHooks(ctx, group.ID, hook.GroupUpdatePost, input, translator.getFields())
-		r.hookExecutor.ExecutePostHooks(ctx, group.ID, hook.MovieUpdatePost, input, translator.getFields())
-
-		group, err = r.getGroup(ctx, group.ID)
-		if err != nil {
-			return nil, err
+		for _, groupID := range groupIDs {
+			r.hookExecutor.ExecutePostHooks(ctx, groupID, hook.GroupUpdatePost, input, translator.getFields())
+			r.hookExecutor.ExecutePostHooks(ctx, groupID, hook.MovieUpdatePost, input, translator.getFields())
 		}
 
-		newRet = append(newRet, group)
+		return "sync", nil
 	}
 
-	return newRet, nil
+	jobID := r.enqueueBulkUpdate(ctx, "Bulk Group Update", groupIDs, operation, hook.GroupUpdatePost, input, translator.getFields())
+
+	return strconv.Itoa(jobID), nil
 }
 
 func (r *mutationResolver) GroupDestroy(ctx context.Context, input GroupDestroyInput) (bool, error) {

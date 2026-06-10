@@ -49,6 +49,7 @@ func (r *queryResolver) FindImage(ctx context.Context, id *string, checksum *str
 func (r *queryResolver) FindImages(
 	ctx context.Context,
 	imageFilter *models.ImageFilterType,
+	imageFilterAST *models.FilterAST,
 	imageIds []int,
 	ids []string,
 	filter *models.FindFilterType,
@@ -67,7 +68,8 @@ func (r *queryResolver) FindImages(
 		fields := graphql.CollectAllFields(ctx)
 		result := &models.ImageQueryResult{}
 
-		if len(imageIds) > 0 {
+		switch {
+		case len(imageIds) > 0:
 			images, err = r.repository.Image.FindMany(ctx, imageIds)
 			if err == nil {
 				result.Count = len(images)
@@ -90,7 +92,13 @@ func (r *queryResolver) FindImages(
 					result.TotalSize += float64(f.Base().Size)
 				}
 			}
-		} else {
+		case imageFilterAST != nil:
+			var total int
+			images, total, err = r.repository.Image.QueryAST(ctx, imageFilterAST, filter)
+			if err == nil {
+				result.Count = total
+			}
+		default:
 			result, err = qb.Query(ctx, models.ImageQueryOptions{
 				QueryOptions: models.QueryOptions{
 					FindFilter: filter,
@@ -127,6 +135,17 @@ func (r *queryResolver) FindImages(
 func (r *queryResolver) AllImages(ctx context.Context) (ret []*models.Image, err error) {
 	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
 		ret, err = r.repository.Image.All(ctx)
+		return err
+	}); err != nil {
+		return nil, err
+	}
+
+	return ret, nil
+}
+
+func (r *queryResolver) FindDuplicateImages(ctx context.Context, distance int) (ret [][]*models.Image, err error) {
+	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
+		ret, err = r.repository.Image.FindDuplicates(ctx, distance)
 		return err
 	}); err != nil {
 		return nil, err

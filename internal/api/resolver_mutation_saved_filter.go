@@ -9,6 +9,7 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/stashapp/stash/internal/manager/config"
+	"github.com/stashapp/stash/pkg/logger"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/utils"
 )
@@ -31,11 +32,42 @@ func (r *mutationResolver) SaveFilter(ctx context.Context, input SaveFilterInput
 		qb := r.repository.SavedFilter
 
 		f := models.SavedFilter{
-			Mode:         input.Mode,
-			Name:         strings.TrimSpace(input.Name),
-			FindFilter:   input.FindFilter,
-			ObjectFilter: input.ObjectFilter,
-			UIOptions:    input.UIOptions,
+			Mode:       input.Mode,
+			Name:       strings.TrimSpace(input.Name),
+			FindFilter: input.FindFilter,
+			UIOptions:  input.UIOptions,
+		}
+
+		switch {
+		case input.FilterAst != nil:
+			normalized, err := input.FilterAst.Normalize()
+			if err != nil {
+				return fmt.Errorf("invalid filter AST: %w", err)
+			}
+			f.FilterAST = normalized
+
+		case input.ObjectFilter != nil:
+			// legacy v2.5 client write path. If the save targets an existing
+			// filter whose AST cannot round-trip through the flat v2.5 shape,
+			// persisting would destroy the parts the client never saw —
+			// silently drop the save and return the filter unchanged.
+			if id != nil {
+				existing, err := qb.Find(ctx, *id)
+				if err != nil {
+					return fmt.Errorf("finding existing filter: %w", err)
+				}
+				if existing != nil && existing.FilterAST != nil && !existing.FilterAST.IsFlatRepresentable() {
+					logger.Infof("ignoring legacy saveFilter for filter %d (%q): filter is too complex for the v2.5 representation", *id, existing.Name)
+					ret = existing
+					return nil
+				}
+			}
+
+			ast, err := models.FilterASTFromLegacySavedFilter(input.ObjectFilter)
+			if err != nil {
+				return fmt.Errorf("converting legacy object filter: %w", err)
+			}
+			f.FilterAST = ast
 		}
 
 		if id == nil {

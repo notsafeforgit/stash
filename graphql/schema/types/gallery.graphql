@@ -81,6 +81,9 @@ input GalleryUpdateInput {
 input BulkGalleryUpdateInput {
   clientMutationId: String
   ids: [ID!]
+  apply_to_items_matching_filters: Boolean
+  find_filter: FindFilterType
+  gallery_filter: GalleryFilterType
   code: String
   url: String @deprecated(reason: "Use urls")
   urls: BulkUpdateStrings

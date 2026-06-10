@@ -97,6 +97,9 @@ input BulkUpdateGroupDescriptionsInput {
 input BulkGroupUpdateInput {
   clientMutationId: String
   ids: [ID!]
+  apply_to_items_matching_filters: Boolean
+  find_filter: FindFilterType
+  group_filter: GroupFilterType
   # rating expressed as 1-100
   rating100: Int
   date: String

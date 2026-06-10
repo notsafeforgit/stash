@@ -323,6 +323,7 @@ func (r *mutationResolver) ConfigureGeneral(ctx context.Context, input ConfigGen
 	}
 	r.setConfigBool(config.WriteImageThumbnails, input.WriteImageThumbnails)
 	r.setConfigBool(config.CreateImageClipsFromVideos, input.CreateImageClipsFromVideos)
+	r.setConfigBool(config.BulkUpdateHooks, input.BulkUpdateHooks)
 
 	if input.GalleryCoverRegex != nil {
 		_, err := regexp.Compile(*input.GalleryCoverRegex)
@@ -499,6 +500,10 @@ func (r *mutationResolver) ConfigureInterface(ctx context.Context, input ConfigI
 	r.setConfigBool(config.ShowScrubber, input.ShowScrubber)
 
 	r.setConfigString(config.WallPlayback, input.WallPlayback)
+	if input.PreviewDefault != nil {
+		c.SetString(config.PreviewDefault, strings.ToLower(input.PreviewDefault.String()))
+	}
+	r.setConfigBool(config.PlayVideoOnHover, input.PlayVideoOnHover)
 	r.setConfigInt(config.MaximumLoopDuration, input.MaximumLoopDuration)
 	r.setConfigBool(config.AutostartVideo, input.AutostartVideo)
 	r.setConfigBool(config.ShowStudioAsText, input.ShowStudioAsText)

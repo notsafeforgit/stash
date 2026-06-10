@@ -88,7 +88,7 @@ type FFProbeStream struct {
 	ColorPrimaries string `json:"color_primaries,omitempty"`
 	StartPts       int64  `json:"start_pts"`
 	StartTime      string `json:"start_time"`
-	Tags              struct {
+	Tags           struct {
 		CreationTime json.JSONTime `json:"creation_time"`
 		HandlerName  string        `json:"handler_name"`
 		Language     string        `json:"language"`

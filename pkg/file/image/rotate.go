@@ -48,7 +48,7 @@ func applyOrientationRotation(current uint16, dir RotateDirection) (uint16, erro
 		return 0, fmt.Errorf("invalid current orientation %d", current)
 	}
 
-	steps := 1
+	var steps int
 	switch dir {
 	case RotateCW:
 		steps = 1

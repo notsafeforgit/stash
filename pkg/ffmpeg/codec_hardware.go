@@ -523,8 +523,7 @@ func (f *FFMpeg) hwCodecMP4Compatible() *VideoCodec {
 // `GetTranscodeHardwareAcceleration` like every other HW path.
 func (f *FFMpeg) hwCodecHEVCCompatible() *VideoCodec {
 	for _, element := range f.getHWCodecSupport() {
-		switch element {
-		case VideoCodecV265:
+		if element == VideoCodecV265 {
 			return &element
 		}
 	}

@@ -405,6 +405,30 @@ fmt-ui:
 validate-ui:
 	cd ui/v2.5 && pnpm run validate
 
+.PHONY: pre-ui-v3
+pre-ui-v3:
+ifdef CI
+	cd ui/v3 && pnpm config set store-dir ~/.pnpm-store && pnpm install --frozen-lockfile
+else
+	cd ui/v3 && pnpm install --frozen-lockfile
+endif
+
+.PHONY: ui-v3-only
+ui-v3-only: ui-env
+	cd ui/v3 && pnpm run build
+
+.PHONY: ui-v3-start
+ui-v3-start: ui-env
+	cd ui/v3 && pnpm run dev -- --host
+
+.PHONY: fmt-ui-v3
+fmt-ui-v3:
+	cd ui/v3 && pnpm run format
+
+.PHONY: validate-ui-v3
+validate-ui-v3:
+	cd ui/v3 && pnpm run validate
+
 # these targets run the same steps as fmt-ui and validate-ui, but only on files that have changed
 fmt-ui-quick:
 	cd ui/v2.5 && \

@@ -1,0 +1,87 @@
+name: Publish Docker Image to GHCR
+
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.ref }}-ghcr
+  cancel-in-progress: true
+
+env:
+  COMPILER_IMAGE: ghcr.io/stashapp/compiler:13
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-24.04
+    # Optional: Give workflow permissions to write to GHCR
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+
+    - name: Pull compiler image
+      run: docker pull $COMPILER_IMAGE
+
+    - name: Set lower case owner name
+      id: repository_owner
+      run: |
+        echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_OUTPUT
+        echo "short_sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+    - name: Start build container
+      run: |
+        mkdir -p .go-cache
+        docker run -d --name build \
+          --mount type=bind,source="$(pwd)",target=/stash,consistency=delegated \
+          --mount type=bind,source="$(pwd)/.go-cache",target=/root/.cache/go-build,consistency=delegated \
+          --env OFFICIAL_BUILD=false \
+          -w /stash $COMPILER_IMAGE tail -f /dev/null
+
+    - name: Pre-install
+      run: docker exec -t build /bin/bash -c "make CI=1 pre-ui"
+
+    - name: Generate
+      run: docker exec -t build /bin/bash -c "make generate"
+
+    - name: Build UI
+      run: docker exec -t build /bin/bash -c "make ui"
+
+    - name: Compile linux amd64
+      run: docker exec -t build /bin/bash -c "make build-cc-linux"
+
+    - name: Cleanup build container
+      run: docker rm -f -v build
+
+    - name: Log in to the Container registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: docker/ghcr/Dockerfile
+        push: true
+        pull: true
+        platforms: linux/amd64
+        labels: |
+          org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          org.opencontainers.image.revision=${{ github.sha }}
+          org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
+        tags: |
+          ghcr.io/${{ steps.repository_owner.outputs.owner }}/stash:develop
+          ghcr.io/${{ steps.repository_owner.outputs.owner }}/stash:develop-${{ steps.repository_owner.outputs.short_sha }}

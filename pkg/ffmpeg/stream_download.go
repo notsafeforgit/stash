@@ -397,7 +397,8 @@ func (sm *StreamManager) downloadArgs(vf *models.VideoFile, enc encDownload, res
 	var maxResolution int
 	var fullhw bool
 
-	if enc == encDownloadH264 {
+	switch enc {
+	case encDownloadH264:
 		codec = VideoCodecLibX264
 		if hwcodec := sm.encoder.hwCodecHLSCompatible(); hwcodec != nil && sm.config.GetTranscodeHardwareAcceleration() {
 			codec = *hwcodec
@@ -405,7 +406,7 @@ func (sm *StreamManager) downloadArgs(vf *models.VideoFile, enc encDownload, res
 		maxResolution = resolution.GetMaxResolution()
 		fullhw = sm.config.GetTranscodeHardwareAcceleration() && sm.encoder.hwCanFullHWTranscode(sm.context, codec, vf, maxResolution)
 		args = sm.encoder.hwDeviceInit(args, codec, fullhw)
-	} else if enc == encDownloadHEVC {
+	case encDownloadHEVC:
 		// HW HEVC if available (VAAPI for now), libx265 otherwise.
 		// VAAPI HEVC on modern Intel iGPUs (Tiger Lake+) and AMD VCN
 		// (Vega+) preserves HDR10 metadata correctly: input p010 +
@@ -422,7 +423,7 @@ func (sm *StreamManager) downloadArgs(vf *models.VideoFile, enc encDownload, res
 			fullhw = sm.config.GetTranscodeHardwareAcceleration() && sm.encoder.hwCanFullHWTranscode(sm.context, codec, vf, maxResolution)
 			args = sm.encoder.hwDeviceInit(args, codec, fullhw)
 		}
-	} else if enc == encDownloadAV1 {
+	case encDownloadAV1:
 		// HW AV1 only. The server caller (mode=av1) only reaches this
 		// branch when ServerCapabilities advertises AV1, which only
 		// happens when an HW encoder is present — there's no libsvtav1

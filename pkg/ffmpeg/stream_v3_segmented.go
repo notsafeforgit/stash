@@ -390,13 +390,14 @@ func hlsSegmentArgs(segment int, videoOnly bool, outputDir string, frameRate flo
 	// HLS players (iOS Safari) stall the seek at `readyState=1` because
 	// the fMP4 `baseMediaDecodeTime` doesn't match the playlist time.
 	tsOffset := fmt.Sprintf("%g", float64(segment)*segDur)
-	if videoNeedsOffset && (audioNeedsOffset || videoOnly) {
+	switch {
+	case videoNeedsOffset && (audioNeedsOffset || videoOnly):
 		// Both tracks (or video-only) — apply the un-qualified flag for
 		// brevity.
 		args = append(args, "-output_ts_offset", tsOffset)
-	} else if videoNeedsOffset {
+	case videoNeedsOffset:
 		args = append(args, "-output_ts_offset:v", tsOffset)
-	} else if audioNeedsOffset && !videoOnly {
+	case audioNeedsOffset && !videoOnly:
 		args = append(args, "-output_ts_offset:a", tsOffset)
 	}
 	args = append(args,
@@ -542,13 +543,13 @@ var (
 // past the current ffmpeg run's working set + maxSegmentGap, which
 // triggers a restart at the requested segment.
 func (tp *v3TranscodeProcess) maxProgress() int {
-	max := tp.start
+	maxSegment := tp.start
 	for _, t := range tp.tracks {
-		if p, ok := tp.progress[t]; ok && p > max {
-			max = p
+		if p, ok := tp.progress[t]; ok && p > maxSegment {
+			maxSegment = p
 		}
 	}
-	return max
+	return maxSegment
 }
 
 type v3WaitingSegment struct {
@@ -1028,18 +1029,18 @@ func scaledResolution(vf *models.VideoFile, resolution string) (int, int) {
 	if resolution == "" {
 		return w, h
 	}
-	max := models.StreamingResolutionEnum(resolution).GetMaxResolution()
-	if max == 0 || w == 0 || h == 0 {
+	maxResolution := models.StreamingResolutionEnum(resolution).GetMaxResolution()
+	if maxResolution == 0 || w == 0 || h == 0 {
 		return w, h
 	}
 	short := h
 	if w < short {
 		short = w
 	}
-	if max >= short {
+	if maxResolution >= short {
 		return w, h
 	}
-	scale := float64(max) / float64(short)
+	scale := float64(maxResolution) / float64(short)
 	return int(float64(w) * scale), int(float64(h) * scale)
 }
 

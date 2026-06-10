@@ -98,16 +98,16 @@ func buildExifJPEG(byteOrder binary.ByteOrder, orientation uint16) []byte {
 	} else {
 		tiff.WriteString("MM")
 	}
-	binary.Write(tiff, byteOrder, uint16(0x002A))
-	binary.Write(tiff, byteOrder, uint32(8)) // IFD0 starts immediately after the 8-byte header
+	mustWriteBinary(tiff, byteOrder, uint16(0x002A))
+	mustWriteBinary(tiff, byteOrder, uint32(8)) // IFD0 starts immediately after the 8-byte header
 
-	binary.Write(tiff, byteOrder, uint16(1))      // 1 entry
-	binary.Write(tiff, byteOrder, uint16(0x0112)) // tag = Orientation
-	binary.Write(tiff, byteOrder, uint16(3))      // type = SHORT
-	binary.Write(tiff, byteOrder, uint32(1))      // count = 1
-	binary.Write(tiff, byteOrder, orientation)    // value (2 bytes)
-	binary.Write(tiff, byteOrder, uint16(0))      // padding to fill 4-byte value slot
-	binary.Write(tiff, byteOrder, uint32(0))      // next IFD offset (none)
+	mustWriteBinary(tiff, byteOrder, uint16(1))      // 1 entry
+	mustWriteBinary(tiff, byteOrder, uint16(0x0112)) // tag = Orientation
+	mustWriteBinary(tiff, byteOrder, uint16(3))      // type = SHORT
+	mustWriteBinary(tiff, byteOrder, uint32(1))      // count = 1
+	mustWriteBinary(tiff, byteOrder, orientation)    // value (2 bytes)
+	mustWriteBinary(tiff, byteOrder, uint16(0))      // padding to fill 4-byte value slot
+	mustWriteBinary(tiff, byteOrder, uint32(0))      // next IFD offset (none)
 
 	app1 := new(bytes.Buffer)
 	app1.WriteString("Exif")
@@ -117,12 +117,18 @@ func buildExifJPEG(byteOrder binary.ByteOrder, orientation uint16) []byte {
 	out := new(bytes.Buffer)
 	out.Write([]byte{0xFF, 0xD8}) // SOI
 	out.Write([]byte{0xFF, 0xE1}) // APP1 marker
-	binary.Write(out, binary.BigEndian, uint16(2+app1.Len()))
+	mustWriteBinary(out, binary.BigEndian, uint16(2+app1.Len()))
 	out.Write(app1.Bytes())
 	out.Write([]byte{0xFF, 0xDA, 0x00, 0x02}) // SOS marker + 2-byte length (empty payload)
 	out.Write([]byte{0x00})                   // 1 byte of "compressed" data so the scanner sees scan content
 	out.Write([]byte{0xFF, 0xD9})             // EOI
 	return out.Bytes()
+}
+
+func mustWriteBinary(buf *bytes.Buffer, order binary.ByteOrder, data any) {
+	if err := binary.Write(buf, order, data); err != nil {
+		panic(err)
+	}
 }
 
 // buildBareJPEG builds a JPEG with no APP1/Exif segment — just SOI, SOS
@@ -234,10 +240,10 @@ func TestPatchJPEGOrientation_NoExifSegmentAddsExif(t *testing.T) {
 func TestPatchJPEGOrientation_NoOrientationTagAddsTag(t *testing.T) {
 	tiff := new(bytes.Buffer)
 	tiff.WriteString("II")
-	binary.Write(tiff, binary.LittleEndian, uint16(0x002A))
-	binary.Write(tiff, binary.LittleEndian, uint32(8))
-	binary.Write(tiff, binary.LittleEndian, uint16(0)) // 0 entries
-	binary.Write(tiff, binary.LittleEndian, uint32(0)) // next IFD = 0
+	mustWriteBinary(tiff, binary.LittleEndian, uint16(0x002A))
+	mustWriteBinary(tiff, binary.LittleEndian, uint32(8))
+	mustWriteBinary(tiff, binary.LittleEndian, uint16(0)) // 0 entries
+	mustWriteBinary(tiff, binary.LittleEndian, uint32(0)) // next IFD = 0
 
 	app1 := new(bytes.Buffer)
 	app1.WriteString("Exif")
@@ -247,7 +253,7 @@ func TestPatchJPEGOrientation_NoOrientationTagAddsTag(t *testing.T) {
 	out := new(bytes.Buffer)
 	out.Write([]byte{0xFF, 0xD8})
 	out.Write([]byte{0xFF, 0xE1})
-	binary.Write(out, binary.BigEndian, uint16(2+app1.Len()))
+	mustWriteBinary(out, binary.BigEndian, uint16(2+app1.Len()))
 	out.Write(app1.Bytes())
 	out.Write([]byte{0xFF, 0xDA, 0x00, 0x02})
 	out.Write([]byte{0x00})

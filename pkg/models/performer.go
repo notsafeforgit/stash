@@ -299,11 +299,11 @@ type PerformerUpdateInput struct {
 	ImageFromImageID *string        `json:"image_from_image_id"`
 	StashIds         []StashIDInput `json:"stash_ids"`
 	Rating100        *int           `json:"rating100"`
-	Details       *string        `json:"details"`
-	DeathDate     *string        `json:"death_date"`
-	HairColor     *string        `json:"hair_color"`
-	Weight        *int           `json:"weight"`
-	IgnoreAutoTag *bool          `json:"ignore_auto_tag"`
+	Details          *string        `json:"details"`
+	DeathDate        *string        `json:"death_date"`
+	HairColor        *string        `json:"hair_color"`
+	Weight           *int           `json:"weight"`
+	IgnoreAutoTag    *bool          `json:"ignore_auto_tag"`
 
 	CustomFields CustomFieldsInput `json:"custom_fields"`
 }

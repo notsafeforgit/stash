@@ -126,7 +126,11 @@ func (qb *imageFilterHandler) criterionHandler() criterionHandler {
 			relatedRepo:    performerRepository.repository,
 			relatedHandler: &performerFilterHandler{imageFilter.PerformersFilter},
 			joinFn: func(f *filterBuilder) {
-				imageRepository.performers.innerJoin(f, "performers_join", "images.id")
+				joinType := joinTypeInner
+				if relatedFilterIncludesMissingRelation(imageFilter.PerformersFilter) {
+					joinType = joinTypeLeft
+				}
+				imageRepository.performers.join(f, joinType, "performers_join", "images.id")
 			},
 			includeMissingRelated: relatedFilterIncludesMissingRelation(imageFilter.PerformersFilter),
 		},

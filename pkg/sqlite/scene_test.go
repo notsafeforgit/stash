@@ -2759,7 +2759,7 @@ func TestSceneQueryASTStudioTagsExcludeAncestorsDescendants(t *testing.T) {
 }
 
 func TestSceneQueryASTStudioTagsDescendantsIncludesChildStudioContent(t *testing.T) {
-	withTxn(func(ctx context.Context) error {
+	runWithRollbackTxn(t, "descendant studio tags include child studio content", func(t *testing.T, ctx context.Context) {
 		taggedStudio := models.NewStudioPartial()
 		taggedStudio.ID = studioIDs[studioIdxWithTag]
 		taggedStudio.ParentID = models.NewOptionalInt(studioIDs[studioIdxWithParentStudio])
@@ -2794,8 +2794,6 @@ func TestSceneQueryASTStudioTagsDescendantsIncludesChildStudioContent(t *testing
 
 		ids := sliceutil.Map(result, func(s *models.Scene) int { return s.ID })
 		assert.Contains(t, ids, sceneIDs[sceneIdxWithStudio])
-
-		return nil
 	})
 }
 
@@ -2912,14 +2910,8 @@ func TestSceneQueryASTRejectsUnsupportedCondition(t *testing.T) {
 		ast := &models.FilterAST{
 			Root: &models.FilterASTNode{
 				Condition: &models.FilterASTCondition{
-					Field: "custom_fields",
-					Value: []models.CustomFieldCriterionInput{
-						{
-							Field:    "test",
-							Modifier: models.CriterionModifierEquals,
-							Value:    []any{"value"},
-						},
-					},
+					Field: "unsupported_field",
+					Value: "value",
 				},
 			},
 		}
@@ -4374,6 +4366,49 @@ func TestSceneQueryStudioAncestorTagsIncludesChildStudioContent(t *testing.T) {
 		}
 
 		results, err := db.Scene.Query(ctx, models.SceneQueryOptions{
+			SceneFilter: &models.SceneFilterType{
+				StudiosFilter: &models.StudioFilterType{
+					AncestorTags: &tagFilter,
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		assert.Contains(results.IDs, indexToID(sceneIDs, sceneIdxWithStudio))
+	})
+}
+
+func TestSceneQueryStudioAncestorTagsHandlesStudioParentCycle(t *testing.T) {
+	runWithRollbackTxn(t, "ancestor studio tags handles studio parent cycle", func(t *testing.T, ctx context.Context) {
+		assert := assert.New(t)
+
+		childStudio := models.NewStudioPartial()
+		childStudio.ID = studioIDs[studioIdxWithChildStudio]
+		childStudio.ParentID = models.NewOptionalInt(studioIDs[studioIdxWithTag])
+		_, err := db.Studio.UpdatePartial(ctx, childStudio)
+		require.NoError(t, err)
+
+		taggedStudio := models.NewStudioPartial()
+		taggedStudio.ID = studioIDs[studioIdxWithTag]
+		taggedStudio.ParentID = models.NewOptionalInt(studioIDs[studioIdxWithChildStudio])
+		_, err = db.Studio.UpdatePartial(ctx, taggedStudio)
+		require.NoError(t, err)
+
+		scene, err := db.Scene.Find(ctx, sceneIDs[sceneIdxWithStudio])
+		require.NoError(t, err)
+		childStudioID := studioIDs[studioIdxWithChildStudio]
+		scene.StudioID = &childStudioID
+		require.NoError(t, db.Scene.Update(ctx, scene))
+
+		tagFilter := models.HierarchicalMultiCriterionInput{
+			Modifier: models.CriterionModifierIncludes,
+			Value:    []string{strconv.Itoa(tagIDs[tagIdxWithStudio])},
+		}
+
+		queryCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		defer cancel()
+
+		results, err := db.Scene.Query(queryCtx, models.SceneQueryOptions{
 			SceneFilter: &models.SceneFilterType{
 				StudiosFilter: &models.StudioFilterType{
 					AncestorTags: &tagFilter,

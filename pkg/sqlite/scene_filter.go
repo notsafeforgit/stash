@@ -217,7 +217,11 @@ func (qb *sceneFilterHandler) criterionHandler() criterionHandler {
 			relatedRepo:    performerRepository.repository,
 			relatedHandler: &performerFilterHandler{sceneFilter.PerformersFilter},
 			joinFn: func(f *filterBuilder) {
-				sceneRepository.performers.innerJoin(f, "performers_join", "scenes.id")
+				joinType := joinTypeInner
+				if relatedFilterIncludesMissingRelation(sceneFilter.PerformersFilter) {
+					joinType = joinTypeLeft
+				}
+				sceneRepository.performers.join(f, joinType, "performers_join", "scenes.id")
 			},
 			includeMissingRelated: relatedFilterIncludesMissingRelation(sceneFilter.PerformersFilter),
 		},

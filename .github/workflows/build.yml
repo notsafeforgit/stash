@@ -56,10 +56,14 @@ jobs:
       with:
         node-version: '20'
         cache: 'pnpm'
-        cache-dependency-path: ui/v2.5/pnpm-lock.yaml
+        cache-dependency-path: |
+          ui/v2.5/pnpm-lock.yaml
+          ui/v3/pnpm-lock.yaml
 
     - name: Install UI dependencies
-      run: make pre-ui
+      run: |
+        make pre-ui
+        make pre-ui-v3
 
     - name: Generate
       run: make generate
@@ -68,18 +72,24 @@ jobs:
       uses: actions/cache@v5
       id: cache-ui
       with:
-        path: ui/v2.5/build
-        key: ${{ runner.os }}-ui-build-${{ hashFiles('ui/v2.5/pnpm-lock.yaml', 'ui/v2.5/public/**', 'ui/v2.5/src/**', 'graphql/**/*.graphql') }}
+        path: |
+          ui/v2.5/build
+          ui/v3/build
+        key: ${{ runner.os }}-ui-build-${{ hashFiles('ui/v2.5/pnpm-lock.yaml', 'ui/v2.5/public/**', 'ui/v2.5/src/**', 'ui/v3/pnpm-lock.yaml', 'ui/v3/public/**', 'ui/v3/src/**', 'ui/v3/graphql/**', 'graphql/**/*.graphql') }}
 
     - name: Validate UI
       # skip UI validation for pull requests if UI is unchanged
       if: ${{ github.event_name != 'pull_request' || steps.cache-ui.outputs.cache-hit != 'true' }}
-      run: make validate-ui
+      run: |
+        make validate-ui
+        make validate-ui-v3
 
     - name: Build UI
       # skip UI build for pull requests if UI is unchanged (UI was cached)
       if: ${{ github.event_name != 'pull_request' || steps.cache-ui.outputs.cache-hit != 'true' }}
-      run: make ui
+      run: |
+        make ui
+        make ui-v3-only
 
     # Bundle generated Go files + UI build for downstream jobs (test + build)
     - name: Upload generated artifacts
@@ -91,6 +101,7 @@ jobs:
           internal/api/generated_exec.go
           internal/api/generated_models.go
           ui/v2.5/build/
+          ui/v3/build/
           ui/login/locales/
 
   # Job 2: Integration tests

@@ -282,10 +282,12 @@ build-cc-all:
 touch-ui:
 ifdef IS_WIN_SHELL
 	@if not exist "ui\\v2.5\\build" mkdir ui\\v2.5\\build
+	@if not exist "ui\\v3\\build" mkdir ui\\v3\\build
 	@type nul >> ui/v2.5/build/index.html
+	@type nul >> ui/v3/build/index.html
 else
-	@mkdir -p ui/v2.5/build
-	@touch ui/v2.5/build/index.html
+	@mkdir -p ui/v2.5/build ui/v3/build
+	@touch ui/v2.5/build/index.html ui/v3/build/index.html
 endif
 
 # Regenerates GraphQL files

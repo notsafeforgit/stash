@@ -1,0 +1,6 @@
+input EntityImageInput {
+  "URL or base64 encoded data URL. Empty string clears the stored entity image."
+  data: String
+  "Existing image ID to copy into the stored entity image."
+  image_id: ID
+}

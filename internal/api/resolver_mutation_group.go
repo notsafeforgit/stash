@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/stashapp/stash/internal/entityimage"
 	"github.com/stashapp/stash/internal/manager"
 	"github.com/stashapp/stash/internal/manager/config"
-	"github.com/stashapp/stash/internal/static"
 	"github.com/stashapp/stash/pkg/group"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/plugin/hook"
@@ -16,7 +16,7 @@ import (
 	"github.com/stashapp/stash/pkg/utils"
 )
 
-func groupFromGroupCreateInput(ctx context.Context, input GroupCreateInput) (*models.CreateGroupInput, error) {
+func (r *mutationResolver) groupFromGroupCreateInput(ctx context.Context, input GroupCreateInput) (*models.CreateGroupInput, error) {
 	translator := changesetTranslator{
 		inputMap: getUpdateInputMap(ctx),
 	}
@@ -67,17 +67,15 @@ func groupFromGroupCreateInput(ctx context.Context, input GroupCreateInput) (*mo
 
 	newGroupInput.CustomFields = convertMapJSONNumbers(input.CustomFields)
 
-	// Process the base 64 encoded image string
-	if input.FrontImage != nil {
-		newGroupInput.FrontImageData, err = utils.ProcessImageInput(ctx, *input.FrontImage)
+	if input.FrontImage != nil || input.FrontImageInput != nil {
+		newGroupInput.FrontImageData, _, err = r.processEntityImageFields(ctx, input.FrontImage, input.FrontImageInput)
 		if err != nil {
 			return nil, fmt.Errorf("processing front image: %w", err)
 		}
 	}
 
-	// Process the base 64 encoded image string
-	if input.BackImage != nil {
-		newGroupInput.BackImageData, err = utils.ProcessImageInput(ctx, *input.BackImage)
+	if input.BackImage != nil || input.BackImageInput != nil {
+		newGroupInput.BackImageData, _, err = r.processEntityImageFields(ctx, input.BackImage, input.BackImageInput)
 		if err != nil {
 			return nil, fmt.Errorf("processing back image: %w", err)
 		}
@@ -86,7 +84,7 @@ func groupFromGroupCreateInput(ctx context.Context, input GroupCreateInput) (*mo
 	// HACK: if back image is being set, set the front image to the default.
 	// This is because we can't have a null front image with a non-null back image.
 	if len(newGroupInput.FrontImageData) == 0 && len(newGroupInput.BackImageData) != 0 {
-		newGroupInput.FrontImageData = static.ReadAll(static.DefaultGroupImage)
+		newGroupInput.FrontImageData = entityimage.DefaultGroupFrontImage
 	}
 
 	return newGroupInput, nil
@@ -114,7 +112,7 @@ func (o groupBulkUpdateOperation) Update(ctx context.Context, id int) error {
 }
 
 func (r *mutationResolver) GroupCreate(ctx context.Context, input GroupCreateInput) (*models.Group, error) {
-	createGroupInput, err := groupFromGroupCreateInput(ctx, input)
+	createGroupInput, err := r.groupFromGroupCreateInput(ctx, input)
 	if err != nil {
 		return nil, err
 	}
@@ -203,21 +201,21 @@ func (r *mutationResolver) GroupUpdate(ctx context.Context, input GroupUpdateInp
 	}
 
 	var frontimageData []byte
-	frontImageIncluded := translator.hasField("front_image")
-	if input.FrontImage != nil {
-		frontimageData, err = utils.ProcessImageInput(ctx, *input.FrontImage)
-		if err != nil {
-			return nil, fmt.Errorf("processing front image: %w", err)
-		}
+	frontimageData, frontImageIncluded, err := r.processEntityImageFields(ctx, input.FrontImage, input.FrontImageInput)
+	if err != nil {
+		return nil, fmt.Errorf("processing front image: %w", err)
+	}
+	if !frontImageIncluded && (translator.hasField("front_image") || translator.hasField("front_image_input")) {
+		frontImageIncluded = true
 	}
 
 	var backimageData []byte
-	backImageIncluded := translator.hasField("back_image")
-	if input.BackImage != nil {
-		backimageData, err = utils.ProcessImageInput(ctx, *input.BackImage)
-		if err != nil {
-			return nil, fmt.Errorf("processing back image: %w", err)
-		}
+	backimageData, backImageIncluded, err := r.processEntityImageFields(ctx, input.BackImage, input.BackImageInput)
+	if err != nil {
+		return nil, fmt.Errorf("processing back image: %w", err)
+	}
+	if !backImageIncluded && (translator.hasField("back_image") || translator.hasField("back_image_input")) {
+		backImageIncluded = true
 	}
 
 	if err := r.withTxn(ctx, func(ctx context.Context) error {

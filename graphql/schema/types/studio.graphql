@@ -41,6 +41,8 @@ input StudioCreateInput {
   child_ids: [ID!]
   "This should be a URL or a base64 encoded data URL"
   image: String
+  "Normalized entity image input. Rejects HEIC/HEIF and stores as WebP."
+  image_input: EntityImageInput
   stash_ids: [StashIDInput!]
   # rating expressed as 1-100
   rating100: Int
@@ -64,6 +66,8 @@ input StudioUpdateInput {
   child_ids: [ID!]
   "This should be a URL or a base64 encoded data URL"
   image: String
+  "Normalized entity image input. Rejects HEIC/HEIF and stores as WebP."
+  image_input: EntityImageInput
   stash_ids: [StashIDInput!]
   # rating expressed as 1-100
   rating100: Int

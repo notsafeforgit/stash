@@ -38,6 +38,8 @@ input TagCreateInput {
   favorite: Boolean
   "This should be a URL or a base64 encoded data URL"
   image: String
+  "Normalized entity image input. Rejects HEIC/HEIF and stores as WebP."
+  image_input: EntityImageInput
   stash_ids: [StashIDInput!]
 
   parent_ids: [ID!]
@@ -58,8 +60,8 @@ input TagUpdateInput {
   favorite: Boolean
   "This should be a URL or a base64 encoded data URL"
   image: String
-  "Set the image from an existing image in the library by its ID"
-  image_from_image_id: ID
+  "Normalized entity image input. Rejects HEIC/HEIF and stores as WebP."
+  image_input: EntityImageInput
   stash_ids: [StashIDInput!]
 
   parent_ids: [ID!]

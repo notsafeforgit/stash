@@ -5,17 +5,17 @@
   "type": "module",
   "homepage": "./",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "dev": "pnpm run gqlgen && vite",
+    "build": "pnpm run gqlgen && tsc --noEmit && vite build",
     "preview": "vite preview",
     "lint": "biome lint",
     "lint:fix": "biome lint --write",
-    "check": "tsc --noEmit",
+    "check": "pnpm run gqlgen && tsc --noEmit",
     "format": "biome format --write",
     "format-check": "biome format",
     "check-i18n": "node scripts/check-i18n.mjs",
     "validate": "pnpm run lint && pnpm run check && pnpm run format-check && pnpm run check-i18n",
-    "test": "vitest",
+    "test": "pnpm run gqlgen && vitest",
     "gqlgen": "graphql-codegen --config codegen.ts"
   },
   "dependencies": {

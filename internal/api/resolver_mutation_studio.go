@@ -10,7 +10,6 @@ import (
 	"github.com/stashapp/stash/pkg/plugin/hook"
 	"github.com/stashapp/stash/pkg/sliceutil/stringslice"
 	"github.com/stashapp/stash/pkg/studio"
-	"github.com/stashapp/stash/pkg/utils"
 )
 
 // used to refetch studio after hooks run
@@ -142,13 +141,11 @@ func (r *mutationResolver) StudioCreate(ctx context.Context, input models.Studio
 	}
 	newStudio.CustomFields = convertMapJSONNumbers(input.CustomFields)
 
-	// Process the base 64 encoded image string
 	var imageData []byte
-	if input.Image != nil {
-		var err error
-		imageData, err = utils.ProcessImageInput(ctx, *input.Image)
+	if input.Image != nil || input.ImageInput != nil {
+		imageData, _, err = r.processEntityImageFields(ctx, input.Image, input.ImageInput)
 		if err != nil {
-			return nil, fmt.Errorf("processing image: %w", err)
+			return nil, err
 		}
 	}
 
@@ -249,15 +246,13 @@ func (r *mutationResolver) StudioUpdate(ctx context.Context, input models.Studio
 	updatedStudio.CustomFields.Full = convertMapJSONNumbers(updatedStudio.CustomFields.Full)
 	updatedStudio.CustomFields.Partial = convertMapJSONNumbers(updatedStudio.CustomFields.Partial)
 
-	// Process the base 64 encoded image string
 	var imageData []byte
-	imageIncluded := translator.hasField("image")
-	if input.Image != nil {
-		var err error
-		imageData, err = utils.ProcessImageInput(ctx, *input.Image)
-		if err != nil {
-			return nil, fmt.Errorf("processing image: %w", err)
-		}
+	imageData, imageIncluded, err := r.processEntityImageFields(ctx, input.Image, input.ImageInput)
+	if err != nil {
+		return nil, err
+	}
+	if !imageIncluded && (translator.hasField("image") || translator.hasField("image_input")) {
+		imageIncluded = true
 	}
 
 	// Start the transaction and update the studio

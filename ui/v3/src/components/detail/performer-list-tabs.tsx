@@ -146,7 +146,7 @@ export function PerformerImagesTab({
         try {
           await updatePerformer({
             variables: {
-              input: { id: performer.id, image_from_image_id: image.id },
+              input: { id: performer.id, image_input: { image_id: image.id } },
             },
           });
           toast.success(

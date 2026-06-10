@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -160,12 +159,11 @@ func (r *mutationResolver) PerformerCreate(ctx context.Context, input models.Per
 		return nil, fmt.Errorf("converting tag ids: %w", err)
 	}
 
-	// Process the base 64 encoded image string
 	var imageData []byte
-	if input.Image != nil {
-		imageData, err = utils.ProcessImageInput(ctx, *input.Image)
+	if input.Image != nil || input.ImageInput != nil {
+		imageData, _, err = r.processEntityImageFields(ctx, input.Image, input.ImageInput)
 		if err != nil {
-			return nil, fmt.Errorf("processing image: %w", err)
+			return nil, err
 		}
 	}
 
@@ -424,10 +422,6 @@ func performerPartialFromInput(input models.PerformerUpdateInput, translator cha
 
 type performerUpdateInputResolver struct{ *Resolver }
 
-func (r *performerUpdateInputResolver) ImageFromImageID(_ context.Context, _ *models.PerformerUpdateInput, _ *string) error {
-	return nil
-}
-
 func (r *performerUpdateInputResolver) Aliases(ctx context.Context, obj *models.PerformerUpdateInput, data []*models.PerformerAliasInput) error {
 	obj.Aliases = &models.UpdatePerformerAliasesInput{
 		Values: data,
@@ -458,40 +452,12 @@ func (r *mutationResolver) PerformerUpdate(ctx context.Context, input models.Per
 	legacyURLs := legacyPerformerURLsFromInput(input, translator)
 
 	var imageData []byte
-	imageIncluded := translator.hasField("image")
-	if input.Image != nil {
-		imageData, err = utils.ProcessImageInput(ctx, *input.Image)
-		if err != nil {
-			return nil, fmt.Errorf("processing image: %w", err)
-		}
+	imageData, imageIncluded, err := r.processEntityImageFields(ctx, input.Image, input.ImageInput)
+	if err != nil {
+		return nil, err
 	}
-
-	if !imageIncluded && input.ImageFromImageID != nil {
-		srcImageID, err := strconv.Atoi(*input.ImageFromImageID)
-		if err != nil {
-			return nil, fmt.Errorf("converting image_from_image_id: %w", err)
-		}
-		if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-			img, err := r.repository.Image.Find(ctx, srcImageID)
-			if err != nil {
-				return fmt.Errorf("finding source image: %w", err)
-			}
-			if img != nil {
-				if err := img.LoadPrimaryFile(ctx, r.repository.File); err != nil {
-					return fmt.Errorf("loading image file: %w", err)
-				}
-				if f := img.Files.Primary(); f != nil {
-					imageData, err = os.ReadFile(f.Base().Path)
-					if err != nil {
-						return fmt.Errorf("reading image file: %w", err)
-					}
-					imageIncluded = true
-				}
-			}
-			return nil
-		}); err != nil {
-			return nil, err
-		}
+	if !imageIncluded && (translator.hasField("image") || translator.hasField("image_input")) {
+		imageIncluded = true
 	}
 
 	// Start the transaction and save the performer
@@ -820,7 +786,7 @@ func (r *mutationResolver) PerformerMerge(ctx context.Context, input PerformerMe
 
 		if input.Values.Image != nil {
 			var err error
-			imageData, err = utils.ProcessImageInput(ctx, *input.Values.Image)
+			imageData, err = r.processEntityImageInput(ctx, *input.Values.Image, true)
 			if err != nil {
 				return nil, fmt.Errorf("processing cover image: %w", err)
 			}

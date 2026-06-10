@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 
@@ -11,7 +10,6 @@ import (
 	"github.com/stashapp/stash/pkg/plugin/hook"
 	"github.com/stashapp/stash/pkg/sliceutil/stringslice"
 	"github.com/stashapp/stash/pkg/tag"
-	"github.com/stashapp/stash/pkg/utils"
 )
 
 func (r *mutationResolver) getTag(ctx context.Context, id int) (ret *models.Tag, err error) {
@@ -79,12 +77,11 @@ func (r *mutationResolver) TagCreate(ctx context.Context, input TagCreateInput) 
 
 	newTag.CustomFields = convertMapJSONNumbers(input.CustomFields)
 
-	// Process the base 64 encoded image string
 	var imageData []byte
-	if input.Image != nil {
-		imageData, err = utils.ProcessImageInput(ctx, *input.Image)
+	if input.Image != nil || input.ImageInput != nil {
+		imageData, _, err = r.processEntityImageFields(ctx, input.Image, input.ImageInput)
 		if err != nil {
-			return nil, fmt.Errorf("processing image: %w", err)
+			return nil, err
 		}
 	}
 
@@ -174,40 +171,12 @@ func (r *mutationResolver) TagUpdate(ctx context.Context, input TagUpdateInput) 
 	}
 
 	var imageData []byte
-	imageIncluded := translator.hasField("image")
-	if input.Image != nil {
-		imageData, err = utils.ProcessImageInput(ctx, *input.Image)
-		if err != nil {
-			return nil, fmt.Errorf("processing image: %w", err)
-		}
+	imageData, imageIncluded, err := r.processEntityImageFields(ctx, input.Image, input.ImageInput)
+	if err != nil {
+		return nil, err
 	}
-
-	if !imageIncluded && input.ImageFromImageID != nil {
-		srcImageID, err := strconv.Atoi(*input.ImageFromImageID)
-		if err != nil {
-			return nil, fmt.Errorf("converting image_from_image_id: %w", err)
-		}
-		if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-			img, err := r.repository.Image.Find(ctx, srcImageID)
-			if err != nil {
-				return fmt.Errorf("finding source image: %w", err)
-			}
-			if img != nil {
-				if err := img.LoadPrimaryFile(ctx, r.repository.File); err != nil {
-					return fmt.Errorf("loading image file: %w", err)
-				}
-				if f := img.Files.Primary(); f != nil {
-					imageData, err = os.ReadFile(f.Base().Path)
-					if err != nil {
-						return fmt.Errorf("reading image file: %w", err)
-					}
-					imageIncluded = true
-				}
-			}
-			return nil
-		}); err != nil {
-			return nil, err
-		}
+	if !imageIncluded && (translator.hasField("image") || translator.hasField("image_input")) {
+		imageIncluded = true
 	}
 
 	// Start the transaction and save the tag
@@ -432,7 +401,7 @@ func (r *mutationResolver) TagsMerge(ctx context.Context, input TagsMergeInput) 
 
 		if input.Values.Image != nil {
 			var err error
-			imageData, err = utils.ProcessImageInput(ctx, *input.Values.Image)
+			imageData, err = r.processEntityImageInput(ctx, *input.Values.Image, true)
 			if err != nil {
 				return nil, fmt.Errorf("processing cover image: %w", err)
 			}

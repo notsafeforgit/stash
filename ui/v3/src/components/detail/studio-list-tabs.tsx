@@ -110,7 +110,7 @@ export function StudioImagesTab({ studio }: { studio: StudioData }) {
           variables: {
             input: {
               id: studio.id,
-              image: image.paths.image ?? image.paths.thumbnail ?? undefined,
+              image_input: { image_id: image.id },
             },
           },
         }),

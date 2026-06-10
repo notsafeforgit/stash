@@ -107,6 +107,29 @@ func (_m *PerformerReaderWriter) Destroy(ctx context.Context, id int) error {
 	return r0
 }
 
+// DistinctCustomFieldNames provides a mock function with given fields: ctx
+func (_m *PerformerReaderWriter) DistinctCustomFieldNames(ctx context.Context) ([]string, error) {
+	ret := _m.Called(ctx)
+
+	var r0 []string
+	if rf, ok := ret.Get(0).(func(context.Context) []string); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Find provides a mock function with given fields: ctx, id
 func (_m *PerformerReaderWriter) Find(ctx context.Context, id int) (*models.Performer, error) {
 	ret := _m.Called(ctx, id)
@@ -291,29 +314,6 @@ func (_m *PerformerReaderWriter) FindMany(ctx context.Context, ids []int) ([]*mo
 	return r0, r1
 }
 
-// GetAliases provides a mock function with given fields: ctx, relatedID
-func (_m *PerformerReaderWriter) GetAliases(ctx context.Context, relatedID int) ([]string, error) {
-	ret := _m.Called(ctx, relatedID)
-
-	var r0 []string
-	if rf, ok := ret.Get(0).(func(context.Context, int) []string); ok {
-		r0 = rf(ctx, relatedID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]string)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, int) error); ok {
-		r1 = rf(ctx, relatedID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetCustomFields provides a mock function with given fields: ctx, id
 func (_m *PerformerReaderWriter) GetCustomFields(ctx context.Context, id int) (map[string]interface{}, error) {
 	ret := _m.Called(ctx, id)
@@ -376,6 +376,29 @@ func (_m *PerformerReaderWriter) GetImage(ctx context.Context, performerID int) 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, int) error); ok {
 		r1 = rf(ctx, performerID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetPerformerAliases provides a mock function with given fields: ctx, relatedID
+func (_m *PerformerReaderWriter) GetPerformerAliases(ctx context.Context, relatedID int) ([]models.PerformerAlias, error) {
+	ret := _m.Called(ctx, relatedID)
+
+	var r0 []models.PerformerAlias
+	if rf, ok := ret.Get(0).(func(context.Context, int) []models.PerformerAlias); ok {
+		r0 = rf(ctx, relatedID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]models.PerformerAlias)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, int) error); ok {
+		r1 = rf(ctx, relatedID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -510,6 +533,36 @@ func (_m *PerformerReaderWriter) Query(ctx context.Context, performerFilter *mod
 	var r2 error
 	if rf, ok := ret.Get(2).(func(context.Context, *models.PerformerFilterType, *models.FindFilterType) error); ok {
 		r2 = rf(ctx, performerFilter, findFilter)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// QueryAST provides a mock function with given fields: ctx, filterAST, findFilter
+func (_m *PerformerReaderWriter) QueryAST(ctx context.Context, filterAST *models.FilterAST, findFilter *models.FindFilterType) ([]*models.Performer, int, error) {
+	ret := _m.Called(ctx, filterAST, findFilter)
+
+	var r0 []*models.Performer
+	if rf, ok := ret.Get(0).(func(context.Context, *models.FilterAST, *models.FindFilterType) []*models.Performer); ok {
+		r0 = rf(ctx, filterAST, findFilter)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*models.Performer)
+		}
+	}
+
+	var r1 int
+	if rf, ok := ret.Get(1).(func(context.Context, *models.FilterAST, *models.FindFilterType) int); ok {
+		r1 = rf(ctx, filterAST, findFilter)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	var r2 error
+	if rf, ok := ret.Get(2).(func(context.Context, *models.FilterAST, *models.FindFilterType) error); ok {
+		r2 = rf(ctx, filterAST, findFilter)
 	} else {
 		r2 = ret.Error(2)
 	}

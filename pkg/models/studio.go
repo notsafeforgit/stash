@@ -18,6 +18,10 @@ type StudioFilterType struct {
 	Rating100 *IntCriterionInput `json:"rating100"`
 	// Filter to only include studios with these tags
 	Tags *HierarchicalMultiCriterionInput `json:"tags"`
+	// Filter to only include studios whose ancestor studios have these tags
+	AncestorTags *HierarchicalMultiCriterionInput `json:"ancestor_tags"`
+	// Filter to only include studios whose descendant studios have these tags
+	DescendantTags *HierarchicalMultiCriterionInput `json:"descendant_tags"`
 	// Filter by tag count
 	TagCount *IntCriterionInput `json:"tag_count"`
 	// Filter by favorite

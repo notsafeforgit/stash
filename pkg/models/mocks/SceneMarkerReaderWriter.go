@@ -252,6 +252,36 @@ func (_m *SceneMarkerReaderWriter) Query(ctx context.Context, sceneMarkerFilter 
 	return r0, r1, r2
 }
 
+// QueryAST provides a mock function with given fields: ctx, filterAST, findFilter
+func (_m *SceneMarkerReaderWriter) QueryAST(ctx context.Context, filterAST *models.FilterAST, findFilter *models.FindFilterType) ([]*models.SceneMarker, int, error) {
+	ret := _m.Called(ctx, filterAST, findFilter)
+
+	var r0 []*models.SceneMarker
+	if rf, ok := ret.Get(0).(func(context.Context, *models.FilterAST, *models.FindFilterType) []*models.SceneMarker); ok {
+		r0 = rf(ctx, filterAST, findFilter)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*models.SceneMarker)
+		}
+	}
+
+	var r1 int
+	if rf, ok := ret.Get(1).(func(context.Context, *models.FilterAST, *models.FindFilterType) int); ok {
+		r1 = rf(ctx, filterAST, findFilter)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	var r2 error
+	if rf, ok := ret.Get(2).(func(context.Context, *models.FilterAST, *models.FindFilterType) error); ok {
+		r2 = rf(ctx, filterAST, findFilter)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
 // QueryCount provides a mock function with given fields: ctx, sceneMarkerFilter, findFilter
 func (_m *SceneMarkerReaderWriter) QueryCount(ctx context.Context, sceneMarkerFilter *models.SceneMarkerFilterType, findFilter *models.FindFilterType) (int, error) {
 	ret := _m.Called(ctx, sceneMarkerFilter, findFilter)

@@ -128,6 +128,29 @@ func (_m *GroupReaderWriter) Destroy(ctx context.Context, id int) error {
 	return r0
 }
 
+// DistinctCustomFieldNames provides a mock function with given fields: ctx
+func (_m *GroupReaderWriter) DistinctCustomFieldNames(ctx context.Context) ([]string, error) {
+	ret := _m.Called(ctx)
+
+	var r0 []string
+	if rf, ok := ret.Get(0).(func(context.Context) []string); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Find provides a mock function with given fields: ctx, id
 func (_m *GroupReaderWriter) Find(ctx context.Context, id int) (*models.Group, error) {
 	ret := _m.Called(ctx, id)
@@ -515,6 +538,36 @@ func (_m *GroupReaderWriter) Query(ctx context.Context, groupFilter *models.Grou
 	var r2 error
 	if rf, ok := ret.Get(2).(func(context.Context, *models.GroupFilterType, *models.FindFilterType) error); ok {
 		r2 = rf(ctx, groupFilter, findFilter)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// QueryAST provides a mock function with given fields: ctx, filterAST, findFilter
+func (_m *GroupReaderWriter) QueryAST(ctx context.Context, filterAST *models.FilterAST, findFilter *models.FindFilterType) ([]*models.Group, int, error) {
+	ret := _m.Called(ctx, filterAST, findFilter)
+
+	var r0 []*models.Group
+	if rf, ok := ret.Get(0).(func(context.Context, *models.FilterAST, *models.FindFilterType) []*models.Group); ok {
+		r0 = rf(ctx, filterAST, findFilter)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*models.Group)
+		}
+	}
+
+	var r1 int
+	if rf, ok := ret.Get(1).(func(context.Context, *models.FilterAST, *models.FindFilterType) int); ok {
+		r1 = rf(ctx, filterAST, findFilter)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	var r2 error
+	if rf, ok := ret.Get(2).(func(context.Context, *models.FilterAST, *models.FindFilterType) error); ok {
+		r2 = rf(ctx, filterAST, findFilter)
 	} else {
 		r2 = ret.Error(2)
 	}

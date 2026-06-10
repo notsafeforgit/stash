@@ -22,11 +22,20 @@ type Importer struct {
 
 func (i *Importer) PreImport(ctx context.Context) error {
 	i.savedFilter = models.SavedFilter{
-		Name:         i.Input.Name,
-		Mode:         i.Input.Mode,
-		FindFilter:   i.Input.FindFilter,
-		ObjectFilter: i.Input.ObjectFilter,
-		UIOptions:    i.Input.UIOptions,
+		Name:       i.Input.Name,
+		Mode:       i.Input.Mode,
+		FindFilter: i.Input.FindFilter,
+		FilterAST:  i.Input.FilterAST,
+		UIOptions:  i.Input.UIOptions,
+	}
+
+	// older export files carry only the legacy criteria map
+	if i.savedFilter.FilterAST == nil && len(i.Input.ObjectFilter) > 0 {
+		ast, err := models.FilterASTFromLegacySavedFilter(i.Input.ObjectFilter)
+		if err != nil {
+			return fmt.Errorf("converting legacy object filter: %w", err)
+		}
+		i.savedFilter.FilterAST = ast
 	}
 
 	return nil

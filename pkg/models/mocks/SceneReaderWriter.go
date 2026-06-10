@@ -390,6 +390,29 @@ func (_m *SceneReaderWriter) Destroy(ctx context.Context, id int) error {
 	return r0
 }
 
+// DistinctCustomFieldNames provides a mock function with given fields: ctx
+func (_m *SceneReaderWriter) DistinctCustomFieldNames(ctx context.Context) ([]string, error) {
+	ret := _m.Called(ctx)
+
+	var r0 []string
+	if rf, ok := ret.Get(0).(func(context.Context) []string); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Duration provides a mock function with given fields: ctx
 func (_m *SceneReaderWriter) Duration(ctx context.Context) (float64, error) {
 	ret := _m.Called(ctx)
@@ -915,6 +938,29 @@ func (_m *SceneReaderWriter) GetManyIDsByFileIDs(ctx context.Context, fileIDs []
 	return r0, r1
 }
 
+// GetManyHasCover provides a mock function with given fields: ctx, ids
+func (_m *SceneReaderWriter) GetManyHasCover(ctx context.Context, ids []int) ([]bool, error) {
+	ret := _m.Called(ctx, ids)
+
+	var r0 []bool
+	if rf, ok := ret.Get(0).(func(context.Context, []int) []bool); ok {
+		r0 = rf(ctx, ids)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]bool)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, []int) error); ok {
+		r1 = rf(ctx, ids)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetManyLastViewed provides a mock function with given fields: ctx, ids
 func (_m *SceneReaderWriter) GetManyLastViewed(ctx context.Context, ids []int) ([]*time.Time, error) {
 	ret := _m.Called(ctx, ids)
@@ -1315,6 +1361,36 @@ func (_m *SceneReaderWriter) Query(ctx context.Context, options models.SceneQuer
 	}
 
 	return r0, r1
+}
+
+// QueryAST provides a mock function with given fields: ctx, filterAST, findFilter
+func (_m *SceneReaderWriter) QueryAST(ctx context.Context, filterAST *models.FilterAST, findFilter *models.FindFilterType) ([]*models.Scene, int, error) {
+	ret := _m.Called(ctx, filterAST, findFilter)
+
+	var r0 []*models.Scene
+	if rf, ok := ret.Get(0).(func(context.Context, *models.FilterAST, *models.FindFilterType) []*models.Scene); ok {
+		r0 = rf(ctx, filterAST, findFilter)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*models.Scene)
+		}
+	}
+
+	var r1 int
+	if rf, ok := ret.Get(1).(func(context.Context, *models.FilterAST, *models.FindFilterType) int); ok {
+		r1 = rf(ctx, filterAST, findFilter)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	var r2 error
+	if rf, ok := ret.Get(2).(func(context.Context, *models.FilterAST, *models.FindFilterType) error); ok {
+		r2 = rf(ctx, filterAST, findFilter)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // QueryCount provides a mock function with given fields: ctx, sceneFilter, findFilter

@@ -37,6 +37,7 @@ type TagFinder interface {
 // TagQueryer provides methods to query tags.
 type TagQueryer interface {
 	Query(ctx context.Context, tagFilter *TagFilterType, findFilter *FindFilterType) ([]*Tag, int, error)
+	QueryAST(ctx context.Context, filterAST *FilterAST, findFilter *FindFilterType) ([]*Tag, int, error)
 }
 
 type TagAutoTagQueryer interface {

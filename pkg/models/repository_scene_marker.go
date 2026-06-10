@@ -18,6 +18,7 @@ type SceneMarkerFinder interface {
 // SceneMarkerQueryer provides methods to query scene markers.
 type SceneMarkerQueryer interface {
 	Query(ctx context.Context, sceneMarkerFilter *SceneMarkerFilterType, findFilter *FindFilterType) ([]*SceneMarker, int, error)
+	QueryAST(ctx context.Context, filterAST *FilterAST, findFilter *FindFilterType) ([]*SceneMarker, int, error)
 	QueryCount(ctx context.Context, sceneMarkerFilter *SceneMarkerFilterType, findFilter *FindFilterType) (int, error)
 }
 

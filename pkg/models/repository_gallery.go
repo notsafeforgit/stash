@@ -27,6 +27,7 @@ type GalleryFinder interface {
 // GalleryQueryer provides methods to query galleries.
 type GalleryQueryer interface {
 	Query(ctx context.Context, galleryFilter *GalleryFilterType, findFilter *FindFilterType) ([]*Gallery, int, error)
+	QueryAST(ctx context.Context, filterAST *FilterAST, findFilter *FindFilterType) ([]*Gallery, int, error)
 	QueryCount(ctx context.Context, galleryFilter *GalleryFilterType, findFilter *FindFilterType) (int, error)
 }
 

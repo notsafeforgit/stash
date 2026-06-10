@@ -14,6 +14,7 @@ func ToJSON(ctx context.Context, filter *models.SavedFilter) (*jsonschema.SavedF
 		Mode:         filter.Mode,
 		FindFilter:   filter.FindFilter,
 		ObjectFilter: filter.ObjectFilter,
+		FilterAST:    filter.FilterAST,
 		UIOptions:    filter.UIOptions,
 	}, nil
 }

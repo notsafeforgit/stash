@@ -21,6 +21,7 @@ type GroupFinder interface {
 // GroupQueryer provides methods to query groups.
 type GroupQueryer interface {
 	Query(ctx context.Context, groupFilter *GroupFilterType, findFilter *FindFilterType) ([]*Group, int, error)
+	QueryAST(ctx context.Context, filterAST *FilterAST, findFilter *FindFilterType) ([]*Group, int, error)
 	QueryCount(ctx context.Context, groupFilter *GroupFilterType, findFilter *FindFilterType) (int, error)
 }
 

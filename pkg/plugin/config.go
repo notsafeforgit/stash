@@ -82,6 +82,18 @@ type UIConfig struct {
 	// Content Security Policy configuration for the plugin.
 	CSP PluginCSP `yaml:"csp"`
 
+	// Entry is the path to the ESM module that the v3 UI host will
+	// dynamic-import at boot to register routes, nav items, etc. The
+	// module must default-export `register(host)`. Path is relative to
+	// the plugin's directory and resolved through the plugin's assets
+	// route, so the file must be reachable beneath one of the assets
+	// mappings (typically `assets: { "/": "./dist" }` exposes a built
+	// `index.js` at `/plugin/{id}/assets/index.js`).
+	//
+	// Plugins targeting v2.5 (DOM-patcher pattern) leave this unset and
+	// continue to use Javascript[] / CSS[]; v3 ignores them.
+	Entry string `yaml:"entry"`
+
 	// Javascript files that will be injected into the stash UI.
 	// These may be URLs or paths to files relative to the plugin configuration file.
 	Javascript []string `yaml:"javascript"`
@@ -255,6 +267,7 @@ func (c Config) toPlugin() *Plugin {
 		Hooks:       c.getPluginHooks(false),
 		UI: PluginUI{
 			Requires:       c.UI.Requires,
+			Entry:          c.UI.Entry,
 			ExternalScript: c.UI.getExternalScripts(),
 			ExternalCSS:    c.UI.getExternalCSS(),
 			Javascript:     c.UI.getJavascriptFiles(c),

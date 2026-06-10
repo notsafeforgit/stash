@@ -60,8 +60,10 @@ endif
 .PHONY: release
 release: 
 	$(MAKE) pre-ui
+	$(MAKE) pre-ui-v3
 	$(MAKE) generate
 	$(MAKE) ui
+	$(MAKE) ui-v3-only
 	$(MAKE) build-release
 
 # targets to set various build flags

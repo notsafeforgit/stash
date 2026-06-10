@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <base href="/" />
+    <meta charset="utf-8" />
+    <link rel="shortcut icon" href="favicon.ico" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="%COLOR%" />
+    <link rel="manifest" crossorigin="use-credentials" href="manifest.json" />
+    <title>Stash</title>
+    <link rel="stylesheet" href="/css" />
+    <script>
+      (() => {
+        try {
+          const t = localStorage.getItem("theme") || "system";
+          if (t === "dark" || (t === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+            document.documentElement.classList.add("dark");
+          }
+        } catch (_e) {}
+      })();
+    </script>
+    <style>
+      /* Paint the page background in the head so a hard refresh doesn't
+         flash white before the Vite/Tailwind-bundled stylesheet loads.
+         The inline script above adds `.dark` to <html> synchronously
+         from localStorage / prefers-color-scheme, so this rule is in
+         effect before <body> first renders. The colour mirrors
+         `--color-background` in src/styles/globals.css. Light mode
+         keeps the browser default (white) and so needs no rule here.
+         `color-scheme: dark` also flips UA-styled scrollbars and form
+         controls to their dark variant on the same frame. */
+      html.dark { color-scheme: dark; background-color: oklch(0.145 0 0); }
+    </style>
+    <script type="module" crossorigin src="./assets/index-DA8iQMQW.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-Zs2y4Rc1.css">
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root" class="root"></div>
+    <script defer src="/javascript"></script>
+  </body>
+</html>

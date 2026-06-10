@@ -343,3 +343,54 @@ func TestSubscribe(t *testing.T) {
 
 	cancel()
 }
+
+func TestAddSyncFollowsNormalLifecycle(t *testing.T) {
+	m := NewManager()
+	m.SetSync(true)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	s := m.Subscribe(ctx)
+
+	const jobName = "sync job"
+	exec := newTestExec(nil)
+	jobID := m.Add(context.Background(), jobName, exec)
+
+	assert := assert.New(t)
+	assert.Equal(1, jobID)
+
+	select {
+	case newJob := <-s.NewJob:
+		assert.Equal(jobID, newJob.ID)
+		assert.Equal(jobName, newJob.Description)
+		assert.Equal(StatusReady, newJob.Status)
+	case <-time.After(time.Second):
+		t.Fatal("new job was not received")
+	}
+
+	select {
+	case updatedJob := <-s.UpdatedJob:
+		assert.Equal(jobID, updatedJob.ID)
+		assert.Equal(jobName, updatedJob.Description)
+		assert.Equal(StatusRunning, updatedJob.Status)
+	case <-time.After(time.Second):
+		t.Fatal("updated job was not received")
+	}
+
+	select {
+	case removedJob := <-s.RemovedJob:
+		assert.Equal(jobID, removedJob.ID)
+		assert.Equal(jobName, removedJob.Description)
+		assert.Equal(StatusFinished, removedJob.Status)
+	case <-time.After(time.Second):
+		t.Fatal("removed job was not received")
+	}
+
+	j := m.GetJob(jobID)
+	assert.NotNil(j)
+	assert.Equal(StatusFinished, j.Status)
+	assert.NotNil(j.StartTime)
+	assert.NotNil(j.EndTime)
+	assert.Len(m.GetQueue(), 0)
+}

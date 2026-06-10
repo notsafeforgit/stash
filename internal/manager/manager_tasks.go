@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -17,6 +18,18 @@ import (
 	"github.com/stashapp/stash/pkg/logger"
 	"github.com/stashapp/stash/pkg/models"
 )
+
+// TaskDescWithPaths formats a queued-job description that includes any
+// selected paths. Job subtasks are only populated once a job starts
+// running, so without this a queued selective scan/auto-tag/etc shows up
+// as a generic "Scanning..." line in the queue UI with no indication of
+// what it will operate on.
+func TaskDescWithPaths(label string, paths []string) string {
+	if len(paths) == 0 {
+		return label + "..."
+	}
+	return label + ": " + strings.Join(paths, ", ")
+}
 
 func useAsVideo(pathname string) bool {
 	stash := config.StashConfigs.GetStashFromDirPath(instance.Config.GetStashPaths(), pathname)
@@ -156,7 +169,7 @@ func (s *Manager) Scan(ctx context.Context, input ScanMetadataInput) (int, error
 		subscriptions: s.scanSubs,
 	}
 
-	return s.JobManager.Add(ctx, "Scanning...", &scanJob), nil
+	return s.JobManager.Add(ctx, TaskDescWithPaths("Scanning", input.Paths), &scanJob), nil
 }
 
 func (s *Manager) Import(ctx context.Context) (int, error) {
@@ -235,7 +248,7 @@ func (s *Manager) Generate(ctx context.Context, input GenerateMetadataInput) (in
 		input:      input,
 	}
 
-	return s.JobManager.Add(ctx, "Generating...", j), nil
+	return s.JobManager.Add(ctx, TaskDescWithPaths("Generating", input.Paths), j), nil
 }
 
 func (s *Manager) GenerateDefaultScreenshot(ctx context.Context, sceneId string) int {
@@ -308,7 +321,7 @@ func (s *Manager) AutoTag(ctx context.Context, input AutoTagMetadataInput) int {
 		input:      input,
 	}
 
-	return s.JobManager.Add(ctx, "Auto-tagging...", &j)
+	return s.JobManager.Add(ctx, TaskDescWithPaths("Auto-tagging", input.Paths), &j)
 }
 
 type CleanMetadataInput struct {
@@ -338,7 +351,7 @@ func (s *Manager) Clean(ctx context.Context, input CleanMetadataInput) int {
 		scanSubs:     s.scanSubs,
 	}
 
-	return s.JobManager.Add(ctx, "Cleaning...", &j)
+	return s.JobManager.Add(ctx, TaskDescWithPaths("Cleaning", input.Paths), &j)
 }
 
 func (s *Manager) OptimiseDatabase(ctx context.Context) int {

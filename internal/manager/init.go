@@ -94,6 +94,7 @@ func Initialize(cfg *config.Config, l *log.Logger) (*Manager, error) {
 		DownloadStore: NewDownloadStore(),
 
 		PluginCache:  pluginCache,
+		HookExecutor: pluginCache,
 		ScraperCache: scraperCache,
 
 		DLNAService: dlnaService,

@@ -25,6 +25,8 @@ type Manager struct {
 
 	subscriptions       []*ManagerSubscription
 	updateThrottleLimit time.Duration
+
+	isSync bool
 }
 
 // NewManager initialises and returns a new Manager.
@@ -51,6 +53,27 @@ func (m *Manager) Stop() {
 // Add queues a job.
 func (m *Manager) Add(ctx context.Context, description string, e JobExec) int {
 	m.mutex.Lock()
+
+	if m.isSync {
+		j := &Job{
+			ID:          m.nextID(),
+			Status:      StatusReady,
+			Description: description,
+			AddTime:     time.Now(),
+			exec:        e,
+			outerCtx:    ctx,
+		}
+		m.queue = append(m.queue, j)
+		m.notifyNewJob(j)
+		done := m.dispatch(j.outerCtx, j)
+		m.mutex.Unlock()
+		<-done
+		m.mutex.Lock()
+		m.removeJob(j)
+		m.mutex.Unlock()
+		return j.ID
+	}
+
 	defer m.mutex.Unlock()
 
 	t := time.Now()
@@ -376,6 +399,12 @@ func (m *Manager) notifyJobUpdate(j *Job) {
 		default:
 		}
 	}
+}
+
+func (m *Manager) SetSync(isSync bool) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.isSync = isSync
 }
 
 type updater struct {

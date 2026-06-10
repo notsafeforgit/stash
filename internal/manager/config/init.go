@@ -53,6 +53,7 @@ func init() {
 	pflag.Int("port", 9999, "port to serve from")
 	pflag.StringVarP(&flags.configFilePath, "config", "c", "", "config file to use")
 	pflag.BoolVar(&flags.nobrowser, "nobrowser", false, "Don't open a browser window after launch")
+	pflag.Bool("enable-v3-ui", false, "serve the experimental v3 web UI and v3-only streaming endpoints")
 	pflag.StringP("ui-location", "u", "", "path to the webui")
 }
 

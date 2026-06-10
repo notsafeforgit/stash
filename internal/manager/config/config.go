@@ -139,6 +139,9 @@ const (
 	CreateImageClipsFromVideos        = "create_image_clip_from_videos"
 	createImageClipsFromVideosDefault = false
 
+	BulkUpdateHooks        = "bulk_update_hooks"
+	bulkUpdateHooksDefault = true
+
 	Host        = "host"
 	hostDefault = "0.0.0.0"
 
@@ -183,6 +186,7 @@ const (
 	PluginsSetting       = "plugins.settings"
 	PluginsSettingPrefix = PluginsSetting + "."
 	DisabledPlugins      = "plugins.disabled"
+	PluginHookOrder      = "plugins.hook_order"
 
 	sourceDefaultPath = "community"
 	sourceDefaultName = "Community (stable)"
@@ -234,8 +238,19 @@ const (
 	ShowScrubber        = "show_scrubber"
 	showScrubberDefault = true
 
+	// WallPlayback is the legacy v2.5 string setting ("video" | "animation" | "static")
+	// that conflated "idle preview state" with "play video on hover". It is preserved
+	// only so existing config.yml files migrate cleanly. New code reads/writes
+	// PreviewDefault + PlayVideoOnHover instead.
 	WallPlayback        = "wall_playback"
 	defaultWallPlayback = "video"
+
+	// PreviewDefault selects the idle preview state ("image" | "animated" | "video").
+	PreviewDefault = "preview_default"
+	// PlayVideoOnHover, when true, swaps the idle preview for the video on hover
+	// (no effect when PreviewDefault is already "video").
+	PlayVideoOnHover        = "play_video_on_hover"
+	defaultPlayVideoOnHover = true
 
 	// Image lightbox options
 	legacyImageLightboxSlideshowDelay       = "slideshow_delay"
@@ -303,6 +318,10 @@ const (
 	DeleteFileDefault             = "defaults.delete_file"
 	DeleteGeneratedDefault        = "defaults.delete_generated"
 	deleteGeneratedDefaultDefault = true
+
+	// Image rotation options
+	PreserveMtimeOnRotate        = "image.preserve_mtime_on_rotate"
+	preserveMtimeOnRotateDefault = true
 
 	// Trash/Recycle Bin options
 	DeleteTrashPath = "delete_trash_path"
@@ -987,6 +1006,44 @@ func (i *Config) GetDisabledPlugins() []string {
 	return i.getStringSlice(DisabledPlugins)
 }
 
+// GetPluginHookOrder returns the user-configured plugin order for each
+// hook event. The map key is the hook name (e.g. "Scene.Create.Post"),
+// and the value is the ordered list of plugin IDs that should run for
+// that hook. Plugin IDs not present in the list run after the listed
+// ones in alphabetical order; unknown IDs are silently ignored at
+// dispatch time.
+func (i *Config) GetPluginHookOrder() map[string][]string {
+	ret := make(map[string][]string)
+	if err := i.unmarshalKey(PluginHookOrder, &ret); err != nil {
+		logger.Warnf("error unmarshalling plugin hook order: %v", err)
+		return nil
+	}
+	if len(ret) == 0 {
+		return nil
+	}
+	return ret
+}
+
+// SetPluginHookOrderForHook replaces the configured plugin order for a
+// single hook event. Passing an empty slice removes the entry.
+func (i *Config) SetPluginHookOrderForHook(hookName string, pluginIDs []string) {
+	i.Lock()
+	defer i.Unlock()
+
+	current := make(map[string][]string)
+	if err := i.main.Unmarshal(PluginHookOrder, &current); err != nil {
+		logger.Warnf("error unmarshalling plugin hook order: %v", err)
+	}
+
+	if len(pluginIDs) == 0 {
+		delete(current, hookName)
+	} else {
+		current[hookName] = pluginIDs
+	}
+
+	i.set(PluginHookOrder, current)
+}
+
 func (i *Config) GetPythonPath() string {
 	return i.getString(PythonPath)
 }
@@ -1364,6 +1421,55 @@ func (i *Config) GetWallPlayback() string {
 	return ret
 }
 
+// GetPreviewDefault returns the idle preview state for list cards: "image",
+// "animated", or "video". If preview_default is unset, it is derived from the
+// legacy wall_playback string so existing configs keep working.
+func (i *Config) GetPreviewDefault() string {
+	i.RLock()
+	defer i.RUnlock()
+
+	v := i.forKey(PreviewDefault)
+	if v.Exists(PreviewDefault) {
+		s := strings.ToLower(v.String(PreviewDefault))
+		switch s {
+		case "image", "animated", "video":
+			return s
+		}
+	}
+
+	// Legacy migration from wall_playback. v2.5 understood three values:
+	// "video" (autoplay), "animation" (animated webp), and anything else
+	// (static screenshot — but still play video on hover).
+	wp := i.forKey(WallPlayback)
+	if wp.Exists(WallPlayback) {
+		switch strings.ToLower(wp.String(WallPlayback)) {
+		case "video":
+			return "video"
+		case "animation":
+			return "animated"
+		default:
+			return "image"
+		}
+	}
+	return "video"
+}
+
+// GetPlayVideoOnHover reports whether hovering a list card should swap to its
+// video preview. Defaults to true and is independent of GetPreviewDefault
+// (except that it is a no-op when previewDefault is already "video").
+func (i *Config) GetPlayVideoOnHover() bool {
+	i.RLock()
+	defer i.RUnlock()
+
+	v := i.forKey(PlayVideoOnHover)
+	if v.Exists(PlayVideoOnHover) {
+		return v.Bool(PlayVideoOnHover)
+	}
+	// Legacy v2.5 wall behaviour played the video on hover in every mode,
+	// so default to true regardless of wall_playback.
+	return defaultPlayVideoOnHover
+}
+
 func (i *Config) GetShowScrubber() bool {
 	return i.getBoolDefault(ShowScrubber, showScrubberDefault)
 }
@@ -1641,6 +1747,14 @@ func (i *Config) GetDeleteFileDefault() bool {
 
 func (i *Config) GetDeleteGeneratedDefault() bool {
 	return i.getBoolDefault(DeleteGeneratedDefault, deleteGeneratedDefaultDefault)
+}
+
+// GetPreserveMtimeOnRotate returns whether the original file mtime should be
+// preserved when the user rotates an image via EXIF orientation. Defaults to
+// true: scraped images often carry meaningful upload-time mtimes that
+// shouldn't be lost just because the user fixed the displayed orientation.
+func (i *Config) GetPreserveMtimeOnRotate() bool {
+	return i.getBoolDefault(PreserveMtimeOnRotate, preserveMtimeOnRotateDefault)
 }
 
 func (i *Config) GetDeleteTrashPath() string {
@@ -1992,6 +2106,7 @@ func (i *Config) setDefaultValues() {
 
 	i.setDefault(WriteImageThumbnails, writeImageThumbnailsDefault)
 	i.setDefault(CreateImageClipsFromVideos, createImageClipsFromVideosDefault)
+	i.setDefault(BulkUpdateHooks, bulkUpdateHooksDefault)
 
 	i.setDefault(Database, defaultDatabaseFilePath)
 
@@ -2074,4 +2189,27 @@ func (i *Config) SetInitialConfig() error {
 func (i *Config) FinalizeSetup() {
 	i.isNewSystem = false
 	// i.configUpdates <- 0
+}
+
+func GetBulkUpdateHooks() bool {
+	return instance.GetBulkUpdateHooks()
+}
+
+func (i *Config) GetBulkUpdateHooks() bool {
+	i.RLock()
+	defer i.RUnlock()
+
+	v := i.forKey(BulkUpdateHooks)
+	if v.Exists(BulkUpdateHooks) {
+		return v.Bool(BulkUpdateHooks)
+	}
+
+	// Legacy fallback for the earlier nested setting shape.
+	legacyKey := "general.bulkUpdateHooks"
+	legacy := i.forKey(legacyKey)
+	if legacy.Exists(legacyKey) {
+		return legacy.Bool(legacyKey)
+	}
+
+	return bulkUpdateHooksDefault
 }

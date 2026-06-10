@@ -26,9 +26,12 @@ type MigrateJob struct {
 }
 
 type databaseSchemaInfo struct {
-	CurrentSchemaVersion  uint
-	RequiredSchemaVersion uint
-	StepsRequired         uint
+	CurrentSchemaVersion      uint
+	RequiredSchemaVersion     uint
+	CurrentForkSchemaVersion  uint
+	RequiredForkSchemaVersion uint
+	LegacyForkSchemaVersion   uint
+	StepsRequired             uint
 }
 
 // PreExecute validates the environment before executing the migration.
@@ -57,7 +60,13 @@ func (s *MigrateJob) Execute(ctx context.Context, progress *job.Progress) error 
 		return nil
 	}
 
-	logger.Infof("Migrating database from %d to %d", schemaInfo.CurrentSchemaVersion, schemaInfo.RequiredSchemaVersion)
+	logger.Infof(
+		"Migrating database from upstream schema %d to %d and fork schema %d to %d",
+		schemaInfo.CurrentSchemaVersion,
+		schemaInfo.RequiredSchemaVersion,
+		schemaInfo.CurrentForkSchemaVersion,
+		schemaInfo.RequiredForkSchemaVersion,
+	)
 
 	// set the number of tasks = backup + required steps + optimise
 	progress.SetTotal(int(schemaInfo.StepsRequired + 2))
@@ -134,13 +143,52 @@ func (s *MigrateJob) required() (ret databaseSchemaInfo, err error) {
 
 	ret.CurrentSchemaVersion = m.CurrentSchemaVersion()
 	ret.RequiredSchemaVersion = m.RequiredSchemaVersion()
+	ret.CurrentForkSchemaVersion, err = m.CurrentForkSchemaVersion(context.Background())
+	if err != nil {
+		return
+	}
+	ret.RequiredForkSchemaVersion = m.RequiredForkSchemaVersion()
 
-	if ret.RequiredSchemaVersion < ret.CurrentSchemaVersion {
-		// shouldn't happen
+	if upstreamVersion, forkVersion, isLegacy, err := sqlite.LegacyForkSchemaState(ret.CurrentSchemaVersion); err != nil {
+		return ret, err
+	} else if isLegacy {
+		ret.LegacyForkSchemaVersion = ret.CurrentSchemaVersion
+		ret.CurrentSchemaVersion = upstreamVersion
+		ret.CurrentForkSchemaVersion = forkVersion
+	}
+
+	if ret.CurrentSchemaVersion > ret.RequiredSchemaVersion {
+		err = fmt.Errorf("database schema version %d is newer than required schema version %d", ret.CurrentSchemaVersion, ret.RequiredSchemaVersion)
 		return
 	}
 
-	ret.StepsRequired = ret.RequiredSchemaVersion - ret.CurrentSchemaVersion
+	// count upstream steps
+	current := ret.CurrentSchemaVersion
+	var steps uint
+	if ret.LegacyForkSchemaVersion != 0 {
+		steps++
+	}
+	for {
+		next := m.GetNextMigrationVersion(current)
+		if next == current || next > ret.RequiredSchemaVersion {
+			break
+		}
+		steps++
+		current = next
+	}
+
+	// count fork steps
+	current = ret.CurrentForkSchemaVersion
+	for {
+		next := m.GetNextForkMigrationVersion(current)
+		if next == current || next > ret.RequiredForkSchemaVersion {
+			break
+		}
+		steps++
+		current = next
+	}
+	ret.StepsRequired = steps
+
 	return
 }
 
@@ -156,6 +204,22 @@ func (s *MigrateJob) runMigrations(ctx context.Context, progress *job.Progress) 
 
 	logger.Info("Running migrations")
 
+	currentSchemaVersion := m.CurrentSchemaVersion()
+	if _, _, isLegacy, err := sqlite.LegacyForkSchemaState(currentSchemaVersion); err != nil {
+		return err
+	} else if isLegacy {
+		var migrationErr error
+		progress.ExecuteTask(fmt.Sprintf("Adopting legacy fork schema version %d", currentSchemaVersion), func() {
+			_, migrationErr = m.AdoptLegacyForkSchemaVersion(ctx, currentSchemaVersion)
+		})
+
+		if migrationErr != nil {
+			return fmt.Errorf("error adopting legacy fork schema %d: %s", currentSchemaVersion, migrationErr)
+		}
+
+		progress.Increment()
+	}
+
 	for {
 		currentSchemaVersion := m.CurrentSchemaVersion()
 		targetSchemaVersion := m.RequiredSchemaVersion()
@@ -164,13 +228,46 @@ func (s *MigrateJob) runMigrations(ctx context.Context, progress *job.Progress) 
 			break
 		}
 
+		nextVersion := m.GetNextMigrationVersion(currentSchemaVersion)
+		if nextVersion == currentSchemaVersion || nextVersion > targetSchemaVersion {
+			break
+		}
+
 		var err error
-		progress.ExecuteTask(fmt.Sprintf("Migrating database to schema version %d", currentSchemaVersion+1), func() {
-			err = m.RunMigration(ctx, currentSchemaVersion+1)
+		progress.ExecuteTask(fmt.Sprintf("Migrating database to schema version %d", nextVersion), func() {
+			err = m.RunMigration(ctx, nextVersion)
 		})
 
 		if err != nil {
-			return fmt.Errorf("error running migration for schema %d: %s", currentSchemaVersion+1, err)
+			return fmt.Errorf("error running migration for schema %d: %s", nextVersion, err)
+		}
+
+		progress.Increment()
+	}
+
+	for {
+		currentSchemaVersion, err := m.CurrentForkSchemaVersion(ctx)
+		if err != nil {
+			return err
+		}
+		targetSchemaVersion := m.RequiredForkSchemaVersion()
+
+		if currentSchemaVersion >= targetSchemaVersion {
+			break
+		}
+
+		nextVersion := m.GetNextForkMigrationVersion(currentSchemaVersion)
+		if nextVersion == currentSchemaVersion || nextVersion > targetSchemaVersion {
+			break
+		}
+
+		var migrationErr error
+		progress.ExecuteTask(fmt.Sprintf("Migrating database to fork schema version %d", nextVersion), func() {
+			migrationErr = m.RunForkMigration(ctx, nextVersion)
+		})
+
+		if migrationErr != nil {
+			return fmt.Errorf("error running fork migration for schema %d: %s", nextVersion, migrationErr)
 		}
 
 		progress.Increment()

@@ -24,6 +24,7 @@ import (
 	"github.com/stashapp/stash/pkg/models/paths"
 	"github.com/stashapp/stash/pkg/pkg"
 	"github.com/stashapp/stash/pkg/plugin"
+	"github.com/stashapp/stash/pkg/plugin/hook"
 	"github.com/stashapp/stash/pkg/scraper"
 	"github.com/stashapp/stash/pkg/session"
 	"github.com/stashapp/stash/pkg/sqlite"
@@ -31,6 +32,19 @@ import (
 	// register custom migrations
 	_ "github.com/stashapp/stash/pkg/sqlite/migrations"
 )
+
+type HookExecutor interface {
+	ExecutePostHooks(ctx context.Context, id int, hookType hook.TriggerEnum, input interface{}, inputFields []string)
+}
+
+type JobManager interface {
+	Add(ctx context.Context, description string, e job.JobExec) int
+	CancelJob(id int)
+	CancelAll()
+	GetQueue() []job.Job
+	GetJob(id int) *job.Job
+	Subscribe(ctx context.Context) *job.ManagerSubscription
+}
 
 type Manager struct {
 	Config *config.Config
@@ -46,7 +60,7 @@ type Manager struct {
 	FFProbe       *ffmpeg.FFProbe
 	StreamManager *ffmpeg.StreamManager
 
-	JobManager      *job.Manager
+	JobManager      JobManager
 	ReadLockManager *fsutil.ReadLockManager
 
 	DownloadStore *DownloadStore
@@ -59,6 +73,8 @@ type Manager struct {
 	ScraperPackageManager *pkg.Manager
 
 	DLNAService *dlna.Service
+
+	HookExecutor HookExecutor
 
 	Database   *sqlite.Database
 	Repository models.Repository
@@ -78,6 +94,10 @@ func GetInstance() *Manager {
 		panic("manager not initialized")
 	}
 	return instance
+}
+
+func SetInstance(m *Manager) {
+	instance = m
 }
 
 func (s *Manager) SetBlobStoreOptions() {
@@ -365,7 +385,7 @@ func (s *Manager) GetSystemStatus() *SystemStatus {
 	status := SystemStatusEnumOk
 	if s.Config.IsNewSystem() {
 		status = SystemStatusEnumSetup
-	} else if dbSchema < appSchema {
+	} else if database.NeedsMigration() {
 		status = SystemStatusEnumNeedsMigration
 	}
 

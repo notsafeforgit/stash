@@ -7,8 +7,6 @@ on:
     types:
       - completed
   workflow_dispatch:
-  schedule:
-    - cron: "23 7 * * *"
 
 concurrency:
   group: ghcr-cleanup-${{ github.repository }}

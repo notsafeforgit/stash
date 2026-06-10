@@ -199,6 +199,30 @@ func (s *customFieldsStore) GetCustomFields(ctx context.Context, id int) (map[st
 	return ret, nil
 }
 
+// DistinctCustomFieldNames returns the set of field names present in this
+// entity type's custom_fields table, sorted ascending. Backs the name picker
+// in the filter UI — there is no schema for custom fields, so the only source
+// of truth for "which names exist" is the row data itself.
+func (s *customFieldsStore) DistinctCustomFieldNames(ctx context.Context) ([]string, error) {
+	q := dialect.Select(goqu.I("field")).Distinct().From(s.table).Order(goqu.I("field").Asc())
+
+	const single = false
+	var ret []string
+	err := queryFunc(ctx, q, single, func(rows *sqlx.Rows) error {
+		var field string
+		if err := rows.Scan(&field); err != nil {
+			return fmt.Errorf("scanning custom field name: %w", err)
+		}
+		ret = append(ret, field)
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("getting distinct custom field names from %s: %w", s.table.GetTable(), err)
+	}
+
+	return ret, nil
+}
+
 func (s *customFieldsStore) GetCustomFieldsBulk(ctx context.Context, ids []int) ([]models.CustomFieldMap, error) {
 	q := dialect.Select(s.fk.As("id"), "field", "value").From(s.table).Where(s.fk.In(ids))
 

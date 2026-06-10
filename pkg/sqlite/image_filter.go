@@ -118,6 +118,7 @@ func (qb *imageFilterHandler) criterionHandler() criterionHandler {
 			joinFn: func(f *filterBuilder) {
 				imageRepository.galleries.innerJoin(f, "", "images.id")
 			},
+			includeMissingRelated: relatedFilterIncludesMissingRelation(imageFilter.GalleriesFilter),
 		},
 
 		&relatedFilterHandler{
@@ -127,12 +128,14 @@ func (qb *imageFilterHandler) criterionHandler() criterionHandler {
 			joinFn: func(f *filterBuilder) {
 				imageRepository.performers.innerJoin(f, "performers_join", "images.id")
 			},
+			includeMissingRelated: relatedFilterIncludesMissingRelation(imageFilter.PerformersFilter),
 		},
 
 		&relatedFilterHandler{
-			relatedIDCol:   "images.studio_id",
-			relatedRepo:    studioRepository.repository,
-			relatedHandler: &studioFilterHandler{imageFilter.StudiosFilter},
+			relatedIDCol:          "images.studio_id",
+			relatedRepo:           studioRepository.repository,
+			relatedHandler:        &studioFilterHandler{imageFilter.StudiosFilter},
+			includeMissingRelated: relatedFilterIncludesMissingRelation(imageFilter.StudiosFilter),
 		},
 
 		&relatedFilterHandler{
@@ -142,6 +145,7 @@ func (qb *imageFilterHandler) criterionHandler() criterionHandler {
 			joinFn: func(f *filterBuilder) {
 				imageRepository.tags.innerJoin(f, "image_tag", "images.id")
 			},
+			includeMissingRelated: relatedFilterIncludesMissingRelation(imageFilter.TagsFilter),
 		},
 
 		&relatedFilterHandler{
@@ -189,6 +193,10 @@ func (qb *imageFilterHandler) missingCriterionHandler(isMissing *string) criteri
 			case "tags":
 				imageRepository.tags.leftJoin(f, "tags_join", "images.id")
 				f.addWhere("tags_join.image_id IS NULL")
+			case "phash":
+				f.addInnerJoin("images_files", "", "images_files.image_id = images.id")
+				f.addLeftJoin(fingerprintTable, "fingerprints_phash", "images_files.file_id = fingerprints_phash.file_id AND fingerprints_phash.type = 'phash'")
+				f.addWhere("fingerprints_phash.fingerprint IS NULL")
 			default:
 				if err := validateIsMissing(*isMissing, []string{
 					"title", "details", "photographer", "date", "code", "rating",

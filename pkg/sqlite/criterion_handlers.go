@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -1175,6 +1176,8 @@ type relatedFilterHandler struct {
 	joinFn func(f *filterBuilder)
 	// if true, related filter handler will be run using the existing filterBuilder instead of a subquery.
 	directJoin bool
+	// if true, rows with a NULL relatedIDCol are also matched.
+	includeMissingRelated bool
 }
 
 func (h *relatedFilterHandler) handle(ctx context.Context, f *filterBuilder) {
@@ -1205,7 +1208,176 @@ func (h *relatedFilterHandler) handle(ctx context.Context, f *filterBuilder) {
 		return
 	}
 
-	f.addWhere(fmt.Sprintf("%s IN ("+subQuery.toSQL(false)+")", h.relatedIDCol), subQuery.allArgs()...)
+	clause := makeClause(fmt.Sprintf("%s IN ("+subQuery.toSQL(false)+")", h.relatedIDCol), subQuery.allArgs()...)
+	if h.includeMissingRelated {
+		clause = orClauses(makeClause(fmt.Sprintf("%s IS NULL", h.relatedIDCol)), clause)
+	}
+
+	f.whereClauses = append(f.whereClauses, clause)
+}
+
+func relatedFilterIncludesMissingRelation(filter any) bool {
+	active, excludeOnly := filterIsExcludeOnly(reflect.ValueOf(filter))
+	return active && excludeOnly
+}
+
+func filterIsExcludeOnly(v reflect.Value) (bool, bool) {
+	if !v.IsValid() {
+		return false, false
+	}
+	if v.Kind() == reflect.Pointer {
+		if v.IsNil() {
+			return false, false
+		}
+		return filterIsExcludeOnly(v.Elem())
+	}
+
+	switch v.Kind() {
+	case reflect.Struct:
+		typeName := v.Type().Name()
+		if active, excludeOnly, ok := criterionIsExcludeOnly(typeName, v); ok {
+			return active, excludeOnly
+		}
+
+		active := false
+		excludeOnly := true
+		for i := range v.NumField() {
+			field := v.Type().Field(i)
+			if !field.IsExported() {
+				continue
+			}
+
+			fieldValue := v.Field(i)
+			if isZeroValue(fieldValue) {
+				continue
+			}
+
+			fieldActive, fieldExcludeOnly := false, false
+			switch field.Name {
+			case "And", "Or":
+				fieldActive, fieldExcludeOnly = filterIsExcludeOnly(fieldValue)
+			case "Not":
+				fieldActive, _ = filterIsExcludeOnly(fieldValue)
+				fieldExcludeOnly = false
+			default:
+				fieldActive, fieldExcludeOnly = filterFieldIsExcludeOnly(fieldValue)
+			}
+
+			if fieldActive {
+				active = true
+				excludeOnly = excludeOnly && fieldExcludeOnly
+			}
+		}
+
+		return active, active && excludeOnly
+	case reflect.Slice, reflect.Array:
+		if v.Len() == 0 {
+			return false, false
+		}
+		return true, false
+	default:
+		if v.IsZero() {
+			return false, false
+		}
+		return true, false
+	}
+}
+
+func filterFieldIsExcludeOnly(v reflect.Value) (bool, bool) {
+	if !v.IsValid() {
+		return false, false
+	}
+	if v.Kind() == reflect.Pointer {
+		if v.IsNil() {
+			return false, false
+		}
+		return filterFieldIsExcludeOnly(v.Elem())
+	}
+
+	switch v.Kind() {
+	case reflect.Struct:
+		return filterIsExcludeOnly(v)
+	case reflect.Slice, reflect.Array:
+		if v.Len() == 0 {
+			return false, false
+		}
+		return true, false
+	default:
+		if v.IsZero() {
+			return false, false
+		}
+		return true, false
+	}
+}
+
+func criterionIsExcludeOnly(typeName string, v reflect.Value) (bool, bool, bool) {
+	modifierField := v.FieldByName("Modifier")
+	if !modifierField.IsValid() || modifierField.Kind() != reflect.String {
+		return false, false, false
+	}
+
+	modifier := models.CriterionModifier(modifierField.String())
+	active := criterionHasValue(v, modifier)
+	if !active {
+		return false, false, true
+	}
+
+	switch typeName {
+	case "StringCriterionInput":
+		return true, modifier == models.CriterionModifierExcludes ||
+			modifier == models.CriterionModifierNotEquals ||
+			modifier == models.CriterionModifierNotMatchesRegex, true
+	case "IntCriterionInput", "FloatCriterionInput", "DateCriterionInput", "TimestampCriterionInput":
+		return true, modifier == models.CriterionModifierNotEquals ||
+			modifier == models.CriterionModifierNotBetween, true
+	case "MultiCriterionInput", "HierarchicalMultiCriterionInput":
+		hasIncludes := false
+		if valueField := v.FieldByName("Value"); valueField.IsValid() {
+			hasIncludes = !isZeroValue(valueField)
+		}
+		hasExcludes := false
+		if excludesField := v.FieldByName("Excludes"); excludesField.IsValid() {
+			hasExcludes = excludesField.Len() > 0
+		}
+		return true, modifier == models.CriterionModifierExcludes ||
+			modifier == models.CriterionModifierNotEquals ||
+			(hasExcludes && !hasIncludes), true
+	default:
+		return true, false, true
+	}
+}
+
+func criterionHasValue(v reflect.Value, modifier models.CriterionModifier) bool {
+	switch modifier {
+	case models.CriterionModifierIsNull, models.CriterionModifierNotNull:
+		return true
+	}
+
+	if valueField := v.FieldByName("Value"); valueField.IsValid() {
+		if !isZeroValue(valueField) {
+			return true
+		}
+	}
+	if excludesField := v.FieldByName("Excludes"); excludesField.IsValid() {
+		if excludesField.Len() > 0 {
+			return true
+		}
+	}
+	if value2Field := v.FieldByName("Value2"); value2Field.IsValid() && !isZeroValue(value2Field) {
+		return true
+	}
+	return false
+}
+
+func isZeroValue(v reflect.Value) bool {
+	switch v.Kind() {
+	case reflect.Pointer, reflect.Interface, reflect.Map, reflect.Slice:
+		return v.IsNil() || (v.Kind() == reflect.Slice && v.Len() == 0)
+	case reflect.Array:
+		return v.Len() == 0
+	default:
+		return v.IsZero()
+	}
 }
 
 type phashDistanceCriterionHandler struct {

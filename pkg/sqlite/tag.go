@@ -789,6 +789,54 @@ func (qb *TagStore) Query(ctx context.Context, tagFilter *models.TagFilterType, 
 	return tags, countResult, nil
 }
 
+func (qb *TagStore) makeASTQuery(ctx context.Context, filterAST *models.FilterAST, findFilter *models.FindFilterType) (*queryBuilder, error) {
+	if findFilter == nil {
+		findFilter = &models.FindFilterType{}
+	}
+
+	query := tagRepository.newQuery()
+	distinctIDs(&query, tagTable)
+
+	if q := findFilter.Q; q != nil && *q != "" {
+		query.join(tagAliasesTable, "", "tag_aliases.tag_id = tags.id")
+		searchColumns := []string{"tags.name", "tag_aliases.alias", "tags.sort_name"}
+		query.parseQueryString(searchColumns, *q)
+	}
+
+	filter := filterBuilderFromHandler(ctx, &tagASTFilterHandler{ast: filterAST})
+	if err := query.addFilter(filter); err != nil {
+		return nil, err
+	}
+
+	var err error
+	query.sortAndPagination, err = qb.getTagSort(&query, findFilter)
+	if err != nil {
+		return nil, err
+	}
+	query.sortAndPagination += getPagination(findFilter)
+
+	return &query, nil
+}
+
+func (qb *TagStore) QueryAST(ctx context.Context, filterAST *models.FilterAST, findFilter *models.FindFilterType) ([]*models.Tag, int, error) {
+	query, err := qb.makeASTQuery(ctx, filterAST, findFilter)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	ids, total, err := query.executeFind(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	tags, err := qb.FindMany(ctx, ids)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return tags, total, nil
+}
+
 var tagSortOptions = sortOptions{
 	"created_at",
 	"galleries_count",

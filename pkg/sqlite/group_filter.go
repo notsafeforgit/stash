@@ -98,12 +98,14 @@ func (qb *groupFilterHandler) criterionHandler() criterionHandler {
 			joinFn: func(f *filterBuilder) {
 				groupRepository.scenes.innerJoin(f, "", "groups.id")
 			},
+			includeMissingRelated: relatedFilterIncludesMissingRelation(groupFilter.ScenesFilter),
 		},
 
 		&relatedFilterHandler{
-			relatedIDCol:   "groups.studio_id",
-			relatedRepo:    studioRepository.repository,
-			relatedHandler: &studioFilterHandler{groupFilter.StudiosFilter},
+			relatedIDCol:          "groups.studio_id",
+			relatedRepo:           studioRepository.repository,
+			relatedHandler:        &studioFilterHandler{groupFilter.StudiosFilter},
+			includeMissingRelated: relatedFilterIncludesMissingRelation(groupFilter.StudiosFilter),
 		},
 	}
 }

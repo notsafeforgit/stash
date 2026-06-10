@@ -27,6 +27,7 @@ type savedFilterRow struct {
 	Name         string            `db:"name"`
 	FindFilter   string            `db:"find_filter"`
 	ObjectFilter string            `db:"object_filter"`
+	FilterAST    string            `db:"filter_ast"`
 	UIOptions    string            `db:"ui_options"`
 }
 
@@ -61,6 +62,9 @@ func (r *savedFilterRow) fromSavedFilter(o models.SavedFilter) {
 	// encode the filters as json
 	r.FindFilter = encodeJSONOrEmpty(o.FindFilter)
 	r.ObjectFilter = encodeJSONOrEmpty(o.ObjectFilter)
+	if o.FilterAST != nil {
+		r.FilterAST = encodeJSONOrEmpty(o.FilterAST)
+	}
 	r.UIOptions = encodeJSONOrEmpty(o.UIOptions)
 }
 
@@ -79,6 +83,10 @@ func (r *savedFilterRow) resolve() *models.SavedFilter {
 	if r.ObjectFilter != "" {
 		ret.ObjectFilter = make(map[string]interface{})
 		decodeJSON(r.ObjectFilter, &ret.ObjectFilter)
+	}
+	if r.FilterAST != "" {
+		ret.FilterAST = &models.FilterAST{}
+		decodeJSON(r.FilterAST, ret.FilterAST)
 	}
 	if r.UIOptions != "" {
 		ret.UIOptions = make(map[string]interface{})

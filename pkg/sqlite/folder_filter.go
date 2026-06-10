@@ -83,6 +83,7 @@ func (qb *folderFilterHandler) criterionHandler() criterionHandler {
 			joinFn: func(f *filterBuilder) {
 				folderRepository.galleries.innerJoin(f, "", qb.table.Col("id"))
 			},
+			includeMissingRelated: relatedFilterIncludesMissingRelation(folderFilter.GalleriesFilter),
 		},
 	}
 }

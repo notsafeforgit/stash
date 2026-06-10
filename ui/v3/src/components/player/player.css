@@ -1,0 +1,110 @@
+/* ── Mobile player container ──────────────────────────────────────────────────
+   Cap height so a landscape-orientation phone (short viewport) never pushes
+   the player controls behind the fixed h-12 tab bar (3rem). Skipped when
+   the player is in `fill` mode (lightbox) — there's no tab bar visible
+   inside the lightbox modal, and the cap also breaks vertical alignment
+   between the touch-overlay buttons and the lightbox prev/next buttons
+   (which sit at viewport-center).                                        */
+@media (max-width: 1023px) {
+  [data-scene-player]:not([data-fill]) .vjs-player-container {
+    max-height: calc(100vh - 3rem); /* fallback for browsers without svh */
+  }
+
+  /* svh = visual viewport, excludes browser chrome */
+  @supports (height: 100svh) {
+    [data-scene-player]:not([data-fill]) .vjs-player-container {
+      max-height: calc(100svh - 3rem);
+    }
+  }
+}
+
+/* ── Fullscreen layout override ───────────────────────────────────────────────
+   Fullscreen is requested on [data-scene-player] (stable across MediaPlayer
+   remounts). Neutralise the mobile `aspect-video` + max-height caps on the
+   inner container so the video fills the viewport.                        */
+[data-scene-player]:fullscreen .vjs-player-container {
+  max-height: none;
+  height: 100%;
+  aspect-ratio: auto;
+}
+
+/* ── Portrait / non-16:9 video containment ────────────────────────────────────
+   base.css sets video { height: auto } inside :where() (0 specificity).
+   Without an explicit width the video element sizes to its intrinsic aspect-
+   ratio width given the constrained height, producing a narrow element that
+   left-aligns in the container.  Force both dimensions to 100% so the element
+   fills [data-media-provider], then let object-fit:contain (re-declared here
+   for safety — base.css also sets it) letterbox/pillarbox the content and
+   object-position:center keep it centred within that box.                    */
+[data-media-provider] video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+}
+
+/* ── Focus outlines ───────────────────────────────────────────────────────────
+   Suppress focus rings on player control buttons entirely. Default browser
+   behaviour leaves a button focused after a mouse click, and the next
+   keystroke (often Space, which we hotkey globally to toggle play) flips the
+   button into :focus-visible mode and paints an outline around a control the
+   user never intended to navigate to.
+
+   `:focus-visible` exceptions don't help because the keystroke itself is what
+   triggers focus-visible. Since all user operations are reachable via global
+   keyboard shortcuts (`useHotkeys` in player-controls.tsx), there's no a11y
+   regression from removing per-button focus indicators here.
+
+   Extended beyond `button` so the Controls.Group div used for
+   tap-to-unmute on mobile doesn't paint a focus outline either. iOS
+   Safari can park focus on a non-button element with an onClick handler
+   after a tap, which leaves a thin coloured line tracing its bounds —
+   visible as "a blue line under the control bar" because the group's
+   bottom edge sits just above the bar.                                       */
+[data-scene-player] *:focus,
+[data-scene-player] *:focus-visible {
+  outline: none;
+}
+
+/* ── Tap highlight ────────────────────────────────────────────────────────────
+   iOS Safari paints a translucent fill over any tappable element on
+   touchstart. Distracting on full-screen video; suppress it on every
+   surface inside the player.                                              */
+[data-scene-player] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Marker overlays ──────────────────────────────────────────────────────────
+   Both dot and range markers render inside a wrapper positioned just above
+   the slider track (see PositionSlider). Markers stack upward from the
+   wrapper's bottom edge: dots / range layer 0 sit at bottom:0, additional
+   range layers at multiples of LAYER_HEIGHT_PX. pointer-events:auto opts
+   each marker back in for tooltip hover (the wrapper itself is none so
+   gaps between markers remain scrubbable).                               */
+
+.player-marker-dot {
+  position: absolute;
+  bottom: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: hsl(var(--primary));
+  cursor: pointer;
+  z-index: 1;
+  pointer-events: auto;
+  transition: transform 0.1s ease;
+}
+
+.player-marker-dot:hover {
+  transform: scale(1.4);
+}
+
+.player-marker-range {
+  position: absolute;
+  height: 7px;
+  border-radius: 2px;
+  background-color: hsl(var(--primary) / 0.6);
+  cursor: pointer;
+  z-index: 1;
+  pointer-events: auto;
+}

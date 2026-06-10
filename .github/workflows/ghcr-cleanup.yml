@@ -1,0 +1,119 @@
+name: Clean Old GHCR Develop Builds
+
+on:
+  workflow_run:
+    workflows:
+      - Publish Docker Image to GHCR
+    types:
+      - completed
+  workflow_dispatch:
+  schedule:
+    - cron: "23 7 * * *"
+
+concurrency:
+  group: ghcr-cleanup-${{ github.repository }}
+  cancel-in-progress: true
+
+jobs:
+  cleanup-images:
+    if: >-
+      ${{
+        github.event_name != 'workflow_run' ||
+        github.event.workflow_run.conclusion == 'success'
+      }}
+    runs-on: ubuntu-24.04
+    permissions:
+      packages: write
+    env:
+      RETENTION_DAYS: 14
+
+    steps:
+    - name: Delete expired develop build tags
+      uses: actions/github-script@v8
+      with:
+        script: |
+          const owner = context.repo.owner;
+          const packageName = "stash";
+          const ownerType = context.payload.repository.owner.type;
+          const retentionDays = Number(process.env.RETENTION_DAYS ?? "14");
+          const cutoff = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
+
+          const listPackageVersions =
+            ownerType === "Organization"
+              ? github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg
+              : github.rest.packages.getAllPackageVersionsForPackageOwnedByUser;
+
+          const listPackageVersionParams =
+            ownerType === "Organization"
+              ? {
+                  org: owner,
+                  package_type: "container",
+                  package_name: packageName,
+                  per_page: 100,
+                }
+              : {
+                  username: owner,
+                  package_type: "container",
+                  package_name: packageName,
+                  per_page: 100,
+                };
+
+          const deletePackageVersion =
+            ownerType === "Organization"
+              ? (packageVersionId) =>
+                  github.rest.packages.deletePackageVersionForOrg({
+                    org: owner,
+                    package_type: "container",
+                    package_name: packageName,
+                    package_version_id: packageVersionId,
+                  })
+              : (packageVersionId) =>
+                  github.rest.packages.deletePackageVersionForUser({
+                    username: owner,
+                    package_type: "container",
+                    package_name: packageName,
+                    package_version_id: packageVersionId,
+                  });
+
+          const versions = await github.paginate(
+            listPackageVersions,
+            listPackageVersionParams
+          );
+
+          const versionsToDelete = versions.filter((version) => {
+            const tags = version.metadata?.container?.tags ?? [];
+            if (tags.length === 0) {
+              return false;
+            }
+
+            const updatedAt = version.updated_at ?? version.created_at;
+            if (!updatedAt) {
+              return false;
+            }
+
+            const isExpired = Date.parse(updatedAt) < cutoff;
+            const hasOnlyDevelopBuildTags = tags.every((tag) =>
+              /^develop-[0-9a-f]{7,}$/i.test(tag)
+            );
+
+            return isExpired && hasOnlyDevelopBuildTags;
+          });
+
+          if (versionsToDelete.length === 0) {
+            core.info(
+              `No expired develop build ${packageName} image versions found.`
+            );
+            return;
+          }
+
+          for (const version of versionsToDelete) {
+            const tags = version.metadata?.container?.tags ?? [];
+            core.info(
+              `Deleting tagged [${tags.join(", ")}] ${packageName} image version ${version.id}`
+            );
+            await deletePackageVersion(version.id);
+          }
+
+          core.info(
+            `Deleted ${versionsToDelete.length} ${packageName} image version(s).`
+          );

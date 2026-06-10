@@ -53,5 +53,6 @@ ui/v2.5/build
 
 stash
 dist
+!dist/stash-linux
 
 docker

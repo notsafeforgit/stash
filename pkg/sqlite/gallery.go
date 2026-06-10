@@ -821,6 +821,80 @@ func (qb *GalleryStore) QueryCount(ctx context.Context, galleryFilter *models.Ga
 	return query.executeCount(ctx)
 }
 
+func (qb *GalleryStore) makeASTQuery(ctx context.Context, filterAST *models.FilterAST, findFilter *models.FindFilterType) (*queryBuilder, error) {
+	if findFilter == nil {
+		findFilter = &models.FindFilterType{}
+	}
+
+	query := galleryRepository.newQuery()
+	distinctIDs(&query, galleryTable)
+
+	if q := findFilter.Q; q != nil && *q != "" {
+		query.addJoins(
+			join{
+				table:    galleriesFilesTable,
+				onClause: "galleries_files.gallery_id = galleries.id",
+			},
+			join{
+				table:    fileTable,
+				onClause: "galleries_files.file_id = files.id",
+			},
+			join{
+				table:    folderTable,
+				onClause: "files.parent_folder_id = folders.id",
+			},
+			join{
+				table:    fingerprintTable,
+				onClause: "files_fingerprints.file_id = galleries_files.file_id",
+			},
+			join{
+				table:    folderTable,
+				as:       "gallery_folder",
+				onClause: "galleries.folder_id = gallery_folder.id",
+			},
+			join{
+				table:    galleriesChaptersTable,
+				onClause: "galleries_chapters.gallery_id = galleries.id",
+			},
+		)
+
+		filepathColumn := "folders.path || '" + string(filepath.Separator) + "' || files.basename"
+		searchColumns := []string{"galleries.title", "gallery_folder.path", filepathColumn, "files_fingerprints.fingerprint", "galleries_chapters.title"}
+		query.parseQueryString(searchColumns, *q)
+	}
+
+	filter := filterBuilderFromHandler(ctx, &galleryASTFilterHandler{ast: filterAST})
+	if err := query.addFilter(filter); err != nil {
+		return nil, err
+	}
+
+	if err := qb.setGallerySort(&query, findFilter); err != nil {
+		return nil, err
+	}
+	query.sortAndPagination += getPagination(findFilter)
+
+	return &query, nil
+}
+
+func (qb *GalleryStore) QueryAST(ctx context.Context, filterAST *models.FilterAST, findFilter *models.FindFilterType) ([]*models.Gallery, int, error) {
+	query, err := qb.makeASTQuery(ctx, filterAST, findFilter)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	ids, total, err := query.executeFind(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	galleries, err := qb.FindMany(ctx, ids)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return galleries, total, nil
+}
+
 var gallerySortOptions = sortOptions{
 	"created_at",
 	"date",

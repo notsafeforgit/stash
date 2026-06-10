@@ -12,6 +12,7 @@ import (
 
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func loadImageRelationships(ctx context.Context, expected models.Image, actual *models.Image) error {
@@ -2700,6 +2701,269 @@ func TestImageQueryStudio(t *testing.T) {
 			assert.ElementsMatch(t, imagesToIDs(images), tt.expectedIDs)
 		})
 	}
+}
+
+func TestImageQueryStudioTagsExcludeIncludesImagesWithoutStudio(t *testing.T) {
+	runWithRollbackTxn(t, "studio tags exclude keeps images without studio", func(t *testing.T, ctx context.Context) {
+		assert := assert.New(t)
+
+		image, err := db.Image.Find(ctx, imageIDs[imageIdxWithStudio])
+		require.NoError(t, err)
+		taggedStudioID := studioIDs[studioIdxWithTag]
+		image.StudioID = &taggedStudioID
+		require.NoError(t, db.Image.Update(ctx, image))
+
+		tagFilter := models.HierarchicalMultiCriterionInput{
+			Modifier: models.CriterionModifierExcludes,
+			Value:    []string{strconv.Itoa(tagIDs[tagIdxWithStudio])},
+		}
+
+		results, err := db.Image.Query(ctx, models.ImageQueryOptions{
+			ImageFilter: &models.ImageFilterType{
+				StudiosFilter: &models.StudioFilterType{
+					Tags: &tagFilter,
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		assert.Contains(results.IDs, indexToID(imageIDs, imageIdxWithTag))
+		assert.Contains(results.IDs, indexToID(imageIDs, imageIdx1WithStudio))
+		assert.NotContains(results.IDs, indexToID(imageIDs, imageIdxWithStudio))
+	})
+}
+
+func TestImageQueryStudioTagsExcludeWithUIEncodingIncludesImagesWithoutStudio(t *testing.T) {
+	runWithRollbackTxn(t, "studio tags exclude with UI encoding keeps images without studio", func(t *testing.T, ctx context.Context) {
+		assert := assert.New(t)
+
+		image, err := db.Image.Find(ctx, imageIDs[imageIdxWithStudio])
+		require.NoError(t, err)
+		taggedStudioID := studioIDs[studioIdxWithTag]
+		image.StudioID = &taggedStudioID
+		require.NoError(t, db.Image.Update(ctx, image))
+
+		tagFilter := models.HierarchicalMultiCriterionInput{
+			Modifier: models.CriterionModifierIncludesAll,
+			Excludes: []string{strconv.Itoa(tagIDs[tagIdxWithStudio])},
+		}
+
+		results, err := db.Image.Query(ctx, models.ImageQueryOptions{
+			ImageFilter: &models.ImageFilterType{
+				StudiosFilter: &models.StudioFilterType{
+					Tags: &tagFilter,
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		assert.Contains(results.IDs, indexToID(imageIDs, imageIdxWithTag))
+		assert.Contains(results.IDs, indexToID(imageIDs, imageIdx1WithStudio))
+		assert.NotContains(results.IDs, indexToID(imageIDs, imageIdxWithStudio))
+	})
+}
+
+func TestImageQueryPerformersFilterTagsExcludeIncludesImagesWithoutPerformers(t *testing.T) {
+	runWithRollbackTxn(t, "performers_filter.tags exclude keeps images without performers", func(t *testing.T, ctx context.Context) {
+		assert := assert.New(t)
+
+		tagFilter := models.HierarchicalMultiCriterionInput{
+			Modifier: models.CriterionModifierExcludes,
+			Value:    []string{strconv.Itoa(tagIDs[tagIdxWithPerformer])},
+		}
+
+		results, err := db.Image.Query(ctx, models.ImageQueryOptions{
+			ImageFilter: &models.ImageFilterType{
+				PerformersFilter: &models.PerformerFilterType{
+					Tags: &tagFilter,
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		assert.Contains(results.IDs, indexToID(imageIDs, imageIdxWithStudio))
+		assert.NotContains(results.IDs, indexToID(imageIDs, imageIdxWithPerformerTag))
+	})
+}
+
+func TestImageQueryStudioDescendantTagsIncludesParentStudioContent(t *testing.T) {
+	runWithRollbackTxn(t, "descendant studio tags include parent studio content", func(t *testing.T, ctx context.Context) {
+		assert := assert.New(t)
+
+		taggedStudio := models.NewStudioPartial()
+		taggedStudio.ID = studioIDs[studioIdxWithTag]
+		taggedStudio.ParentID = models.NewOptionalInt(studioIDs[studioIdxWithParentStudio])
+		_, err := db.Studio.UpdatePartial(ctx, taggedStudio)
+		require.NoError(t, err)
+
+		image, err := db.Image.Find(ctx, imageIDs[imageIdxWithStudio])
+		require.NoError(t, err)
+		parentStudioID := studioIDs[studioIdxWithParentStudio]
+		image.StudioID = &parentStudioID
+		require.NoError(t, db.Image.Update(ctx, image))
+
+		tagFilter := models.HierarchicalMultiCriterionInput{
+			Modifier: models.CriterionModifierIncludes,
+			Value:    []string{strconv.Itoa(tagIDs[tagIdxWithStudio])},
+		}
+
+		results, err := db.Image.Query(ctx, models.ImageQueryOptions{
+			ImageFilter: &models.ImageFilterType{
+				StudiosFilter: &models.StudioFilterType{
+					DescendantTags: &tagFilter,
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		assert.Contains(results.IDs, indexToID(imageIDs, imageIdxWithStudio))
+	})
+}
+
+func TestImageQueryStudioTagsAndAncestorTagsExcludeRemovesDirectAndAncestorMatches(t *testing.T) {
+	runWithRollbackTxn(t, "studio tags and ancestor tags exclude removes direct and ancestor image matches", func(t *testing.T, ctx context.Context) {
+		assert := assert.New(t)
+
+		childStudio := models.NewStudioPartial()
+		childStudio.ID = studioIDs[studioIdxWithChildStudio]
+		childStudio.ParentID = models.NewOptionalInt(studioIDs[studioIdxWithTag])
+		_, err := db.Studio.UpdatePartial(ctx, childStudio)
+		require.NoError(t, err)
+
+		directImage, err := db.Image.Find(ctx, imageIDs[imageIdxWithStudio])
+		require.NoError(t, err)
+		taggedStudioID := studioIDs[studioIdxWithTag]
+		directImage.StudioID = &taggedStudioID
+		require.NoError(t, db.Image.Update(ctx, directImage))
+
+		ancestorImage, err := db.Image.Find(ctx, imageIDs[imageIdx1WithStudio])
+		require.NoError(t, err)
+		childStudioID := studioIDs[studioIdxWithChildStudio]
+		ancestorImage.StudioID = &childStudioID
+		require.NoError(t, db.Image.Update(ctx, ancestorImage))
+
+		tagFilter := models.HierarchicalMultiCriterionInput{
+			Modifier: models.CriterionModifierExcludes,
+			Value:    []string{strconv.Itoa(tagIDs[tagIdxWithStudio])},
+		}
+
+		results, err := db.Image.Query(ctx, models.ImageQueryOptions{
+			ImageFilter: &models.ImageFilterType{
+				StudiosFilter: &models.StudioFilterType{
+					Tags: &tagFilter,
+					OperatorFilter: models.OperatorFilter[models.StudioFilterType]{
+						And: &models.StudioFilterType{
+							AncestorTags: &tagFilter,
+						},
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		assert.NotContains(results.IDs, indexToID(imageIDs, imageIdxWithStudio))
+		assert.NotContains(results.IDs, indexToID(imageIDs, imageIdx1WithStudio))
+		assert.Contains(results.IDs, indexToID(imageIDs, imageIdxWithTag))
+	})
+}
+
+func TestImageQueryStudioTagsAndAncestorTagsExcludeWithUIEncodingRemovesDirectAndAncestorMatches(t *testing.T) {
+	runWithRollbackTxn(t, "studio tags and ancestor tags exclude with UI encoding removes direct and ancestor image matches", func(t *testing.T, ctx context.Context) {
+		assert := assert.New(t)
+
+		childStudio := models.NewStudioPartial()
+		childStudio.ID = studioIDs[studioIdxWithChildStudio]
+		childStudio.ParentID = models.NewOptionalInt(studioIDs[studioIdxWithTag])
+		_, err := db.Studio.UpdatePartial(ctx, childStudio)
+		require.NoError(t, err)
+
+		directImage, err := db.Image.Find(ctx, imageIDs[imageIdxWithStudio])
+		require.NoError(t, err)
+		taggedStudioID := studioIDs[studioIdxWithTag]
+		directImage.StudioID = &taggedStudioID
+		require.NoError(t, db.Image.Update(ctx, directImage))
+
+		ancestorImage, err := db.Image.Find(ctx, imageIDs[imageIdx1WithStudio])
+		require.NoError(t, err)
+		childStudioID := studioIDs[studioIdxWithChildStudio]
+		ancestorImage.StudioID = &childStudioID
+		require.NoError(t, db.Image.Update(ctx, ancestorImage))
+
+		tagFilter := models.HierarchicalMultiCriterionInput{
+			Modifier: models.CriterionModifierIncludesAll,
+			Excludes: []string{strconv.Itoa(tagIDs[tagIdxWithStudio])},
+		}
+
+		results, err := db.Image.Query(ctx, models.ImageQueryOptions{
+			ImageFilter: &models.ImageFilterType{
+				StudiosFilter: &models.StudioFilterType{
+					Tags: &tagFilter,
+					OperatorFilter: models.OperatorFilter[models.StudioFilterType]{
+						And: &models.StudioFilterType{
+							AncestorTags: &tagFilter,
+						},
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		assert.NotContains(results.IDs, indexToID(imageIDs, imageIdxWithStudio))
+		assert.NotContains(results.IDs, indexToID(imageIDs, imageIdx1WithStudio))
+		assert.Contains(results.IDs, indexToID(imageIDs, imageIdxWithTag))
+	})
+}
+
+func TestImageQueryStudioTagsAncestorAndDescendantExcludeWithUIEncodingRemovesDirectAndAncestorMatches(t *testing.T) {
+	runWithRollbackTxn(t, "studio tags, ancestor tags, and descendant tags exclude with UI encoding removes direct and ancestor image matches", func(t *testing.T, ctx context.Context) {
+		assert := assert.New(t)
+
+		childStudio := models.NewStudioPartial()
+		childStudio.ID = studioIDs[studioIdxWithChildStudio]
+		childStudio.ParentID = models.NewOptionalInt(studioIDs[studioIdxWithTag])
+		_, err := db.Studio.UpdatePartial(ctx, childStudio)
+		require.NoError(t, err)
+
+		directImage, err := db.Image.Find(ctx, imageIDs[imageIdxWithStudio])
+		require.NoError(t, err)
+		taggedStudioID := studioIDs[studioIdxWithTag]
+		directImage.StudioID = &taggedStudioID
+		require.NoError(t, db.Image.Update(ctx, directImage))
+
+		ancestorImage, err := db.Image.Find(ctx, imageIDs[imageIdx1WithStudio])
+		require.NoError(t, err)
+		childStudioID := studioIDs[studioIdxWithChildStudio]
+		ancestorImage.StudioID = &childStudioID
+		require.NoError(t, db.Image.Update(ctx, ancestorImage))
+
+		tagFilter := models.HierarchicalMultiCriterionInput{
+			Modifier: models.CriterionModifierIncludesAll,
+			Excludes: []string{strconv.Itoa(tagIDs[tagIdxWithStudio])},
+		}
+
+		results, err := db.Image.Query(ctx, models.ImageQueryOptions{
+			ImageFilter: &models.ImageFilterType{
+				StudiosFilter: &models.StudioFilterType{
+					Tags: &tagFilter,
+					OperatorFilter: models.OperatorFilter[models.StudioFilterType]{
+						And: &models.StudioFilterType{
+							AncestorTags: &tagFilter,
+							OperatorFilter: models.OperatorFilter[models.StudioFilterType]{
+								And: &models.StudioFilterType{
+									DescendantTags: &tagFilter,
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		assert.NotContains(results.IDs, indexToID(imageIDs, imageIdxWithStudio))
+		assert.NotContains(results.IDs, indexToID(imageIDs, imageIdx1WithStudio))
+		assert.Contains(results.IDs, indexToID(imageIDs, imageIdxWithTag))
+	})
 }
 
 func TestImageQueryStudioDepth(t *testing.T) {

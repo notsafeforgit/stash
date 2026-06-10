@@ -120,6 +120,7 @@ func (qb *galleryFilterHandler) criterionHandler() criterionHandler {
 			joinFn: func(f *filterBuilder) {
 				galleryRepository.scenes.innerJoin(f, "", "galleries.id")
 			},
+			includeMissingRelated: relatedFilterIncludesMissingRelation(filter.ScenesFilter),
 		},
 
 		&relatedFilterHandler{
@@ -129,6 +130,7 @@ func (qb *galleryFilterHandler) criterionHandler() criterionHandler {
 			joinFn: func(f *filterBuilder) {
 				galleryRepository.images.innerJoin(f, "", "galleries.id")
 			},
+			includeMissingRelated: relatedFilterIncludesMissingRelation(filter.ImagesFilter),
 		},
 
 		&relatedFilterHandler{
@@ -138,12 +140,14 @@ func (qb *galleryFilterHandler) criterionHandler() criterionHandler {
 			joinFn: func(f *filterBuilder) {
 				galleryRepository.performers.innerJoin(f, "performers_join", "galleries.id")
 			},
+			includeMissingRelated: relatedFilterIncludesMissingRelation(filter.PerformersFilter),
 		},
 
 		&relatedFilterHandler{
-			relatedIDCol:   "galleries.studio_id",
-			relatedRepo:    studioRepository.repository,
-			relatedHandler: &studioFilterHandler{filter.StudiosFilter},
+			relatedIDCol:          "galleries.studio_id",
+			relatedRepo:           studioRepository.repository,
+			relatedHandler:        &studioFilterHandler{filter.StudiosFilter},
+			includeMissingRelated: relatedFilterIncludesMissingRelation(filter.StudiosFilter),
 		},
 
 		&relatedFilterHandler{
@@ -153,6 +157,7 @@ func (qb *galleryFilterHandler) criterionHandler() criterionHandler {
 			joinFn: func(f *filterBuilder) {
 				galleryRepository.tags.innerJoin(f, "gallery_tag", "galleries.id")
 			},
+			includeMissingRelated: relatedFilterIncludesMissingRelation(filter.TagsFilter),
 		},
 
 		&relatedFilterHandler{

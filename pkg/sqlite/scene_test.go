@@ -20,6 +20,7 @@ import (
 	"github.com/stashapp/stash/pkg/sliceutil"
 	"github.com/stashapp/stash/pkg/sliceutil/intslice"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func loadSceneRelationships(ctx context.Context, expected models.Scene, actual *models.Scene) error {
@@ -2630,6 +2631,306 @@ func TestSceneQueryPathAndRating(t *testing.T) {
 	})
 }
 
+func TestSceneQueryASTNestedOrAnd(t *testing.T) {
+	runWithRollbackTxn(t, "scene AST nested OR and", func(t *testing.T, ctx context.Context) {
+		assert := assert.New(t)
+
+		sceneOne, err := db.Scene.Find(ctx, sceneIDs[sceneIdxWithTwoTags])
+		require.NoError(t, err)
+		sceneOneStudioID := studioIDs[studioIdxWithScene]
+		sceneOne.StudioID = &sceneOneStudioID
+		require.NoError(t, db.Scene.Update(ctx, sceneOne))
+
+		sceneTwo, err := db.Scene.Find(ctx, sceneIDs[sceneIdxWithThreeTags])
+		require.NoError(t, err)
+		sceneTwoStudioID := studioIDs[studioIdxWithGallery]
+		sceneTwo.StudioID = &sceneTwoStudioID
+		require.NoError(t, db.Scene.Update(ctx, sceneTwo))
+
+		ast := &models.FilterAST{
+			Root: &models.FilterASTNode{
+				Group: &models.FilterASTGroup{
+					Operator: models.FilterGroupOperatorAnd,
+					Children: []*models.FilterASTNode{
+						{
+							Group: &models.FilterASTGroup{
+								Operator: models.FilterGroupOperatorOr,
+								Children: []*models.FilterASTNode{
+									{
+										Condition: &models.FilterASTCondition{
+											Field: "tags",
+											Value: models.HierarchicalMultiCriterionInput{
+												Value:    []string{strconv.Itoa(tagIDs[tagIdx1WithScene])},
+												Modifier: models.CriterionModifierIncludes,
+											},
+										},
+									},
+									{
+										Condition: &models.FilterASTCondition{
+											Field: "tags",
+											Value: models.HierarchicalMultiCriterionInput{
+												Value:    []string{strconv.Itoa(tagIDs[tagIdx2WithScene])},
+												Modifier: models.CriterionModifierIncludes,
+											},
+										},
+									},
+								},
+							},
+						},
+						{
+							Group: &models.FilterASTGroup{
+								Operator: models.FilterGroupOperatorOr,
+								Children: []*models.FilterASTNode{
+									{
+										Condition: &models.FilterASTCondition{
+											Field: "studios",
+											Value: models.HierarchicalMultiCriterionInput{
+												Value:    []string{strconv.Itoa(studioIDs[studioIdxWithScene])},
+												Modifier: models.CriterionModifierIncludes,
+											},
+										},
+									},
+									{
+										Condition: &models.FilterASTCondition{
+											Field: "studios",
+											Value: models.HierarchicalMultiCriterionInput{
+												Value:    []string{strconv.Itoa(studioIDs[studioIdxWithGallery])},
+												Modifier: models.CriterionModifierIncludes,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		result, total, err := db.Scene.QueryAST(ctx, ast, nil)
+		require.NoError(t, err)
+		require.Equal(t, len(result), total)
+		ids := sliceutil.Map(result, func(s *models.Scene) int { return s.ID })
+		assert.Contains(ids, sceneIDs[sceneIdxWithTwoTags])
+		assert.Contains(ids, sceneIDs[sceneIdxWithThreeTags])
+		assert.NotContains(ids, sceneIDs[sceneIdxWithTag])
+	})
+}
+
+func TestSceneQueryASTStudioTagsExcludeAncestorsDescendants(t *testing.T) {
+	withTxn(func(ctx context.Context) error {
+		depth := 0
+		tagFilter := models.StudioTagFilterInput{
+			HierarchicalMultiCriterionInput: models.HierarchicalMultiCriterionInput{
+				Modifier: models.CriterionModifierIncludesAll,
+				Excludes: []string{strconv.Itoa(tagIDs[tagIdx1WithScene])},
+				Depth:    &depth,
+			},
+			HierarchyMode: models.StudioTagHierarchyModeAncestorsDescendants,
+		}
+
+		ast := &models.FilterAST{
+			Root: &models.FilterASTNode{
+				Condition: &models.FilterASTCondition{
+					Field: "studio_tags",
+					Value: tagFilter,
+				},
+			},
+		}
+
+		result, _, err := db.Scene.QueryAST(ctx, ast, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, result)
+
+		for _, scene := range result {
+			if scene.StudioID == nil {
+				continue
+			}
+
+			studio, err := db.Studio.Find(ctx, *scene.StudioID)
+			require.NoError(t, err)
+			require.NotNil(t, studio)
+			require.NotEqual(t, studioIDs[studioIdxWithParentStudio], studio.ID)
+			require.NotEqual(t, studioIDs[studioIdxWithParentAndChild], studio.ID)
+		}
+
+		return nil
+	})
+}
+
+func TestSceneQueryASTStudioTagsDescendantsIncludesChildStudioContent(t *testing.T) {
+	withTxn(func(ctx context.Context) error {
+		taggedStudio := models.NewStudioPartial()
+		taggedStudio.ID = studioIDs[studioIdxWithTag]
+		taggedStudio.ParentID = models.NewOptionalInt(studioIDs[studioIdxWithParentStudio])
+		_, err := db.Studio.UpdatePartial(ctx, taggedStudio)
+		require.NoError(t, err)
+
+		scene, err := db.Scene.Find(ctx, sceneIDs[sceneIdxWithStudio])
+		require.NoError(t, err)
+		parentStudioID := studioIDs[studioIdxWithParentStudio]
+		scene.StudioID = &parentStudioID
+		require.NoError(t, db.Scene.Update(ctx, scene))
+
+		tagFilter := models.StudioTagFilterInput{
+			HierarchicalMultiCriterionInput: models.HierarchicalMultiCriterionInput{
+				Modifier: models.CriterionModifierIncludes,
+				Value:    []string{strconv.Itoa(tagIDs[tagIdxWithStudio])},
+			},
+			HierarchyMode: models.StudioTagHierarchyModeDescendants,
+		}
+
+		ast := &models.FilterAST{
+			Root: &models.FilterASTNode{
+				Condition: &models.FilterASTCondition{
+					Field: "studio_tags",
+					Value: tagFilter,
+				},
+			},
+		}
+
+		result, _, err := db.Scene.QueryAST(ctx, ast, nil)
+		require.NoError(t, err)
+
+		ids := sliceutil.Map(result, func(s *models.Scene) int { return s.ID })
+		assert.Contains(t, ids, sceneIDs[sceneIdxWithStudio])
+
+		return nil
+	})
+}
+
+func TestSceneQueryASTTitleIncludesWithListSortReturnsRows(t *testing.T) {
+	withTxn(func(ctx context.Context) error {
+		q := getSceneStringValue(sceneIdxWithGallery, titleField)
+		sort := "file_mod_time"
+		direction := models.SortDirectionEnumDesc
+		filter := &models.FindFilterType{
+			Sort:      &sort,
+			Direction: &direction,
+		}
+
+		ast := &models.FilterAST{
+			Root: &models.FilterASTNode{
+				Condition: &models.FilterASTCondition{
+					Field: "title",
+					Value: models.StringCriterionInput{
+						Modifier: models.CriterionModifierIncludes,
+						Value:    q,
+					},
+				},
+			},
+		}
+
+		result, total, err := db.Scene.QueryAST(ctx, ast, filter)
+		require.NoError(t, err)
+		require.NotEmpty(t, result)
+		require.GreaterOrEqual(t, total, len(result))
+
+		ids := sliceutil.Map(result, func(s *models.Scene) int { return s.ID })
+		assert.Contains(t, ids, sceneIDs[sceneIdxWithGallery])
+
+		return nil
+	})
+}
+
+func TestSceneQueryASTGroupedTitleIncludesWithListSortReturnsRows(t *testing.T) {
+	withTxn(func(ctx context.Context) error {
+		q := getSceneStringValue(sceneIdxWithGallery, titleField)
+		sort := "file_mod_time"
+		direction := models.SortDirectionEnumDesc
+		filter := &models.FindFilterType{
+			Sort:      &sort,
+			Direction: &direction,
+		}
+
+		ast := &models.FilterAST{
+			Root: &models.FilterASTNode{
+				Group: &models.FilterASTGroup{
+					Operator: models.FilterGroupOperatorAnd,
+					Children: []*models.FilterASTNode{
+						{
+							Condition: &models.FilterASTCondition{
+								Field: "title",
+								Value: models.StringCriterionInput{
+									Modifier: models.CriterionModifierIncludes,
+									Value:    q,
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		result, total, err := db.Scene.QueryAST(ctx, ast, filter)
+		require.NoError(t, err)
+		require.NotEmpty(t, result)
+		require.GreaterOrEqual(t, total, len(result))
+
+		ids := sliceutil.Map(result, func(s *models.Scene) int { return s.ID })
+		assert.Contains(t, ids, sceneIDs[sceneIdxWithGallery])
+
+		return nil
+	})
+}
+
+func TestSceneQueryASTFolderIncludesWithListSortReturnsRows(t *testing.T) {
+	withTxn(func(ctx context.Context) error {
+		sort := "file_mod_time"
+		direction := models.SortDirectionEnumDesc
+		filter := &models.FindFilterType{
+			Sort:      &sort,
+			Direction: &direction,
+		}
+
+		ast := &models.FilterAST{
+			Root: &models.FilterASTNode{
+				Condition: &models.FilterASTCondition{
+					Field: "folder",
+					Value: models.HierarchicalMultiCriterionInput{
+						Value:    []string{strconv.Itoa(int(folderIDs[folderIdxWithSceneFiles]))},
+						Modifier: models.CriterionModifierIncludes,
+					},
+				},
+			},
+		}
+
+		result, total, err := db.Scene.QueryAST(ctx, ast, filter)
+		require.NoError(t, err)
+		require.NotEmpty(t, result)
+		require.GreaterOrEqual(t, total, len(result))
+
+		ids := sliceutil.Map(result, func(s *models.Scene) int { return s.ID })
+		assert.Contains(t, ids, sceneIDs[sceneIdxWithGallery])
+
+		return nil
+	})
+}
+
+func TestSceneQueryASTRejectsUnsupportedCondition(t *testing.T) {
+	withTxn(func(ctx context.Context) error {
+		ast := &models.FilterAST{
+			Root: &models.FilterASTNode{
+				Condition: &models.FilterASTCondition{
+					Field: "custom_fields",
+					Value: []models.CustomFieldCriterionInput{
+						{
+							Field:    "test",
+							Modifier: models.CriterionModifierEquals,
+							Value:    []any{"value"},
+						},
+					},
+				},
+			},
+		}
+
+		_, _, err := db.Scene.QueryAST(ctx, ast, nil)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "not supported yet")
+		return nil
+	})
+}
+
 func TestSceneQueryPathNotRating(t *testing.T) {
 	const sceneIdx = 1
 
@@ -3966,6 +4267,269 @@ func TestSceneQueryPerformerTags(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSceneQueryStudioTagsExcludeIncludesScenesWithoutStudio(t *testing.T) {
+	runWithRollbackTxn(t, "studio tags exclude keeps scenes without studio", func(t *testing.T, ctx context.Context) {
+		assert := assert.New(t)
+
+		scene, err := db.Scene.Find(ctx, sceneIDs[sceneIdxWithStudio])
+		require.NoError(t, err)
+		taggedStudioID := studioIDs[studioIdxWithTag]
+		scene.StudioID = &taggedStudioID
+		require.NoError(t, db.Scene.Update(ctx, scene))
+
+		tagFilter := models.HierarchicalMultiCriterionInput{
+			Modifier: models.CriterionModifierExcludes,
+			Value:    []string{strconv.Itoa(tagIDs[tagIdxWithStudio])},
+		}
+
+		results, err := db.Scene.Query(ctx, models.SceneQueryOptions{
+			SceneFilter: &models.SceneFilterType{
+				StudiosFilter: &models.StudioFilterType{
+					Tags: &tagFilter,
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		assert.Contains(results.IDs, indexToID(sceneIDs, sceneIdxWithTag))
+		assert.Contains(results.IDs, indexToID(sceneIDs, sceneIdx1WithStudio))
+		assert.NotContains(results.IDs, indexToID(sceneIDs, sceneIdxWithStudio))
+	})
+}
+
+func TestSceneQueryStudioTagsExcludeWithUIEncodingIncludesScenesWithoutStudio(t *testing.T) {
+	runWithRollbackTxn(t, "studio tags exclude with UI encoding keeps scenes without studio", func(t *testing.T, ctx context.Context) {
+		assert := assert.New(t)
+
+		scene, err := db.Scene.Find(ctx, sceneIDs[sceneIdxWithStudio])
+		require.NoError(t, err)
+		taggedStudioID := studioIDs[studioIdxWithTag]
+		scene.StudioID = &taggedStudioID
+		require.NoError(t, db.Scene.Update(ctx, scene))
+
+		tagFilter := models.HierarchicalMultiCriterionInput{
+			Modifier: models.CriterionModifierIncludesAll,
+			Excludes: []string{strconv.Itoa(tagIDs[tagIdxWithStudio])},
+		}
+
+		results, err := db.Scene.Query(ctx, models.SceneQueryOptions{
+			SceneFilter: &models.SceneFilterType{
+				StudiosFilter: &models.StudioFilterType{
+					Tags: &tagFilter,
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		assert.Contains(results.IDs, indexToID(sceneIDs, sceneIdxWithTag))
+		assert.Contains(results.IDs, indexToID(sceneIDs, sceneIdx1WithStudio))
+		assert.NotContains(results.IDs, indexToID(sceneIDs, sceneIdxWithStudio))
+	})
+}
+
+func TestSceneQueryPerformersFilterTagsExcludeIncludesScenesWithoutPerformers(t *testing.T) {
+	runWithRollbackTxn(t, "performers_filter.tags exclude keeps scenes without performers", func(t *testing.T, ctx context.Context) {
+		assert := assert.New(t)
+
+		tagFilter := models.HierarchicalMultiCriterionInput{
+			Modifier: models.CriterionModifierExcludes,
+			Value:    []string{strconv.Itoa(tagIDs[tagIdxWithPerformer])},
+		}
+
+		results, err := db.Scene.Query(ctx, models.SceneQueryOptions{
+			SceneFilter: &models.SceneFilterType{
+				PerformersFilter: &models.PerformerFilterType{
+					Tags: &tagFilter,
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		assert.Contains(results.IDs, indexToID(sceneIDs, sceneIdxWithStudio))
+		assert.NotContains(results.IDs, indexToID(sceneIDs, sceneIdxWithPerformerTag))
+	})
+}
+
+func TestSceneQueryStudioAncestorTagsIncludesChildStudioContent(t *testing.T) {
+	runWithRollbackTxn(t, "ancestor studio tags include child studio content", func(t *testing.T, ctx context.Context) {
+		assert := assert.New(t)
+
+		childStudio := models.NewStudioPartial()
+		childStudio.ID = studioIDs[studioIdxWithChildStudio]
+		childStudio.ParentID = models.NewOptionalInt(studioIDs[studioIdxWithTag])
+		_, err := db.Studio.UpdatePartial(ctx, childStudio)
+		require.NoError(t, err)
+
+		scene, err := db.Scene.Find(ctx, sceneIDs[sceneIdxWithStudio])
+		require.NoError(t, err)
+		childStudioID := studioIDs[studioIdxWithChildStudio]
+		scene.StudioID = &childStudioID
+		require.NoError(t, db.Scene.Update(ctx, scene))
+
+		tagFilter := models.HierarchicalMultiCriterionInput{
+			Modifier: models.CriterionModifierIncludes,
+			Value:    []string{strconv.Itoa(tagIDs[tagIdxWithStudio])},
+		}
+
+		results, err := db.Scene.Query(ctx, models.SceneQueryOptions{
+			SceneFilter: &models.SceneFilterType{
+				StudiosFilter: &models.StudioFilterType{
+					AncestorTags: &tagFilter,
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		assert.Contains(results.IDs, indexToID(sceneIDs, sceneIdxWithStudio))
+	})
+}
+
+func TestSceneQueryStudioTagsAndAncestorTagsExcludeRemovesDirectAndAncestorMatches(t *testing.T) {
+	runWithRollbackTxn(t, "studio tags and ancestor tags exclude removes direct and ancestor matches", func(t *testing.T, ctx context.Context) {
+		assert := assert.New(t)
+
+		childStudio := models.NewStudioPartial()
+		childStudio.ID = studioIDs[studioIdxWithChildStudio]
+		childStudio.ParentID = models.NewOptionalInt(studioIDs[studioIdxWithTag])
+		_, err := db.Studio.UpdatePartial(ctx, childStudio)
+		require.NoError(t, err)
+
+		directScene, err := db.Scene.Find(ctx, sceneIDs[sceneIdxWithStudio])
+		require.NoError(t, err)
+		taggedStudioID := studioIDs[studioIdxWithTag]
+		directScene.StudioID = &taggedStudioID
+		require.NoError(t, db.Scene.Update(ctx, directScene))
+
+		ancestorScene, err := db.Scene.Find(ctx, sceneIDs[sceneIdx1WithStudio])
+		require.NoError(t, err)
+		childStudioID := studioIDs[studioIdxWithChildStudio]
+		ancestorScene.StudioID = &childStudioID
+		require.NoError(t, db.Scene.Update(ctx, ancestorScene))
+
+		tagFilter := models.HierarchicalMultiCriterionInput{
+			Modifier: models.CriterionModifierExcludes,
+			Value:    []string{strconv.Itoa(tagIDs[tagIdxWithStudio])},
+		}
+
+		results, err := db.Scene.Query(ctx, models.SceneQueryOptions{
+			SceneFilter: &models.SceneFilterType{
+				StudiosFilter: &models.StudioFilterType{
+					Tags: &tagFilter,
+					OperatorFilter: models.OperatorFilter[models.StudioFilterType]{
+						And: &models.StudioFilterType{
+							AncestorTags: &tagFilter,
+						},
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		assert.NotContains(results.IDs, indexToID(sceneIDs, sceneIdxWithStudio))
+		assert.NotContains(results.IDs, indexToID(sceneIDs, sceneIdx1WithStudio))
+		assert.Contains(results.IDs, indexToID(sceneIDs, sceneIdxWithTag))
+	})
+}
+
+func TestSceneQueryStudioTagsAndAncestorTagsExcludeWithUIEncodingRemovesDirectAndAncestorMatches(t *testing.T) {
+	runWithRollbackTxn(t, "studio tags and ancestor tags exclude with UI encoding removes direct and ancestor matches", func(t *testing.T, ctx context.Context) {
+		assert := assert.New(t)
+
+		childStudio := models.NewStudioPartial()
+		childStudio.ID = studioIDs[studioIdxWithChildStudio]
+		childStudio.ParentID = models.NewOptionalInt(studioIDs[studioIdxWithTag])
+		_, err := db.Studio.UpdatePartial(ctx, childStudio)
+		require.NoError(t, err)
+
+		directScene, err := db.Scene.Find(ctx, sceneIDs[sceneIdxWithStudio])
+		require.NoError(t, err)
+		taggedStudioID := studioIDs[studioIdxWithTag]
+		directScene.StudioID = &taggedStudioID
+		require.NoError(t, db.Scene.Update(ctx, directScene))
+
+		ancestorScene, err := db.Scene.Find(ctx, sceneIDs[sceneIdx1WithStudio])
+		require.NoError(t, err)
+		childStudioID := studioIDs[studioIdxWithChildStudio]
+		ancestorScene.StudioID = &childStudioID
+		require.NoError(t, db.Scene.Update(ctx, ancestorScene))
+
+		tagFilter := models.HierarchicalMultiCriterionInput{
+			Modifier: models.CriterionModifierIncludesAll,
+			Excludes: []string{strconv.Itoa(tagIDs[tagIdxWithStudio])},
+		}
+
+		results, err := db.Scene.Query(ctx, models.SceneQueryOptions{
+			SceneFilter: &models.SceneFilterType{
+				StudiosFilter: &models.StudioFilterType{
+					Tags: &tagFilter,
+					OperatorFilter: models.OperatorFilter[models.StudioFilterType]{
+						And: &models.StudioFilterType{
+							AncestorTags: &tagFilter,
+						},
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		assert.NotContains(results.IDs, indexToID(sceneIDs, sceneIdxWithStudio))
+		assert.NotContains(results.IDs, indexToID(sceneIDs, sceneIdx1WithStudio))
+		assert.Contains(results.IDs, indexToID(sceneIDs, sceneIdxWithTag))
+	})
+}
+
+func TestSceneQueryStudioTagsAncestorAndDescendantExcludeWithUIEncodingRemovesDirectAndAncestorMatches(t *testing.T) {
+	runWithRollbackTxn(t, "studio tags, ancestor tags, and descendant tags exclude with UI encoding removes direct and ancestor matches", func(t *testing.T, ctx context.Context) {
+		assert := assert.New(t)
+
+		childStudio := models.NewStudioPartial()
+		childStudio.ID = studioIDs[studioIdxWithChildStudio]
+		childStudio.ParentID = models.NewOptionalInt(studioIDs[studioIdxWithTag])
+		_, err := db.Studio.UpdatePartial(ctx, childStudio)
+		require.NoError(t, err)
+
+		directScene, err := db.Scene.Find(ctx, sceneIDs[sceneIdxWithStudio])
+		require.NoError(t, err)
+		taggedStudioID := studioIDs[studioIdxWithTag]
+		directScene.StudioID = &taggedStudioID
+		require.NoError(t, db.Scene.Update(ctx, directScene))
+
+		ancestorScene, err := db.Scene.Find(ctx, sceneIDs[sceneIdx1WithStudio])
+		require.NoError(t, err)
+		childStudioID := studioIDs[studioIdxWithChildStudio]
+		ancestorScene.StudioID = &childStudioID
+		require.NoError(t, db.Scene.Update(ctx, ancestorScene))
+
+		tagFilter := models.HierarchicalMultiCriterionInput{
+			Modifier: models.CriterionModifierIncludesAll,
+			Excludes: []string{strconv.Itoa(tagIDs[tagIdxWithStudio])},
+		}
+
+		results, err := db.Scene.Query(ctx, models.SceneQueryOptions{
+			SceneFilter: &models.SceneFilterType{
+				StudiosFilter: &models.StudioFilterType{
+					Tags: &tagFilter,
+					OperatorFilter: models.OperatorFilter[models.StudioFilterType]{
+						And: &models.StudioFilterType{
+							AncestorTags: &tagFilter,
+							OperatorFilter: models.OperatorFilter[models.StudioFilterType]{
+								And: &models.StudioFilterType{
+									DescendantTags: &tagFilter,
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		assert.NotContains(results.IDs, indexToID(sceneIDs, sceneIdxWithStudio))
+		assert.NotContains(results.IDs, indexToID(sceneIDs, sceneIdx1WithStudio))
+		assert.Contains(results.IDs, indexToID(sceneIDs, sceneIdxWithTag))
+	})
 }
 
 func TestSceneQueryStudio(t *testing.T) {

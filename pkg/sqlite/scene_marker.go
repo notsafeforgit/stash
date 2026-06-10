@@ -368,6 +368,53 @@ func (qb *SceneMarkerStore) QueryCount(ctx context.Context, sceneMarkerFilter *m
 	return query.executeCount(ctx)
 }
 
+func (qb *SceneMarkerStore) makeASTQuery(ctx context.Context, filterAST *models.FilterAST, findFilter *models.FindFilterType) (*queryBuilder, error) {
+	if findFilter == nil {
+		findFilter = &models.FindFilterType{}
+	}
+
+	query := sceneMarkerRepository.newQuery()
+	distinctIDs(&query, sceneMarkerTable)
+
+	if q := findFilter.Q; q != nil && *q != "" {
+		query.join(sceneTable, "", "scenes.id = scene_markers.scene_id")
+		query.join(tagTable, "", "scene_markers.primary_tag_id = tags.id")
+		searchColumns := []string{"scene_markers.title", "scenes.title", "tags.name"}
+		query.parseQueryString(searchColumns, *q)
+	}
+
+	filter := filterBuilderFromHandler(ctx, &sceneMarkerASTFilterHandler{ast: filterAST})
+	if err := query.addFilter(filter); err != nil {
+		return nil, err
+	}
+
+	if err := qb.setSceneMarkerSort(&query, findFilter); err != nil {
+		return nil, err
+	}
+	query.sortAndPagination += getPagination(findFilter)
+
+	return &query, nil
+}
+
+func (qb *SceneMarkerStore) QueryAST(ctx context.Context, filterAST *models.FilterAST, findFilter *models.FindFilterType) ([]*models.SceneMarker, int, error) {
+	query, err := qb.makeASTQuery(ctx, filterAST, findFilter)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	ids, total, err := query.executeFind(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	sceneMarkers, err := qb.FindMany(ctx, ids)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return sceneMarkers, total, nil
+}
+
 var sceneMarkerSortOptions = sortOptions{
 	"created_at",
 	"id",

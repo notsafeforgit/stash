@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/stashapp/stash/pkg/models"
 )
@@ -89,6 +90,8 @@ func (qb *studioFilterHandler) criterionHandler() criterionHandler {
 		qb.parentCriterionHandler(studioFilter.Parents),
 		qb.aliasCriterionHandler(studioFilter.Aliases),
 		qb.tagsCriterionHandler(studioFilter.Tags),
+		qb.ancestorTagsCriterionHandler(studioFilter.AncestorTags),
+		qb.descendantTagsCriterionHandler(studioFilter.DescendantTags),
 		qb.childCountCriterionHandler(studioFilter.ChildCount),
 		&timestampCriterionHandler{studioFilter.CreatedAt, studioTable + ".created_at", nil},
 		&timestampCriterionHandler{studioFilter.UpdatedAt, studioTable + ".updated_at", nil},
@@ -290,4 +293,129 @@ func (qb *studioFilterHandler) tagsCriterionHandler(tags *models.HierarchicalMul
 	}
 
 	return h.handler(tags)
+}
+
+func (qb *studioFilterHandler) ancestorTagsCriterionHandler(tags *models.HierarchicalMultiCriterionInput) criterionHandlerFunc {
+	return studioHierarchyTagsCriterionHandler(tags, "ancestor")
+}
+
+func (qb *studioFilterHandler) descendantTagsCriterionHandler(tags *models.HierarchicalMultiCriterionInput) criterionHandlerFunc {
+	return studioHierarchyTagsCriterionHandler(tags, "descendant")
+}
+
+func studioHierarchyTagsCriterionHandler(tags *models.HierarchicalMultiCriterionInput, direction string) criterionHandlerFunc {
+	return func(ctx context.Context, f *filterBuilder) {
+		if tags == nil {
+			return
+		}
+
+		criterion := *tags
+		if criterion.Modifier == models.CriterionModifierEquals && criterion.Depth != nil && *criterion.Depth != 0 {
+			f.setError(fmt.Errorf("depth is not supported for equals modifier in hierarchical multi criterion input"))
+			return
+		}
+
+		if criterion.Modifier == models.CriterionModifierExcludes {
+			criterion.Modifier = models.CriterionModifierIncludesAll
+			criterion.Excludes = append(criterion.Excludes, criterion.Value...)
+			criterion.Value = nil
+		}
+
+		if criterion.Modifier == models.CriterionModifierIsNull || criterion.Modifier == models.CriterionModifierNotNull {
+			var notClause string
+			if criterion.Modifier == models.CriterionModifierNotNull {
+				notClause = "NOT"
+			}
+
+			joinTable := studioHierarchyTagsJoinTable(direction, "")
+			joinAlias := fmt.Sprintf("%s_studio_tag", direction)
+			f.addLeftJoin(joinTable, joinAlias, fmt.Sprintf("%s.studio_id = studios.id", joinAlias))
+			f.addWhere(fmt.Sprintf("%s.studio_id IS %s NULL", joinAlias, notClause))
+			return
+		}
+
+		if len(criterion.Value) == 0 && len(criterion.Excludes) == 0 {
+			return
+		}
+
+		if len(criterion.Value) > 0 {
+			valuesClause, err := getHierarchicalValues(ctx, criterion.Value, tagTable, "tags_relations", "", "", criterion.Depth)
+			if err != nil {
+				f.setError(err)
+				return
+			}
+
+			joinAlias := fmt.Sprintf("%s_studio_tag", direction)
+			f.addLeftJoin(
+				studioHierarchyTagsJoinTable(direction, valuesClause),
+				joinAlias,
+				fmt.Sprintf("%s.studio_id = studios.id", joinAlias),
+			)
+			addHierarchicalConditionClauses(f, criterion, joinAlias, "root_id")
+		}
+
+		if len(criterion.Excludes) > 0 {
+			valuesClause, err := getHierarchicalValues(ctx, criterion.Excludes, tagTable, "tags_relations", "", "", criterion.Depth)
+			if err != nil {
+				f.setError(err)
+				return
+			}
+
+			joinAlias := fmt.Sprintf("%s_studio_tag_exclude", direction)
+			f.addLeftJoin(
+				studioHierarchyTagsJoinTable(direction, valuesClause),
+				joinAlias,
+				fmt.Sprintf("%s.studio_id = studios.id", joinAlias),
+			)
+
+			criterionCopy := criterion
+			criterionCopy.Modifier = models.CriterionModifierExcludes
+			criterionCopy.Value = criterion.Excludes
+			addHierarchicalConditionClauses(f, criterionCopy, joinAlias, "root_id")
+		}
+	}
+}
+
+func studioHierarchyTagsJoinTable(direction, valuesClause string) string {
+	var hierarchyCTE string
+	switch direction {
+	case "ancestor":
+		hierarchyCTE = `WITH RECURSIVE studio_hierarchy(studio_id, related_id) AS (
+SELECT id AS studio_id, parent_id AS related_id FROM studios WHERE parent_id IS NOT NULL
+UNION ALL
+SELECT h.studio_id, s.parent_id
+FROM studio_hierarchy h
+INNER JOIN studios s ON s.id = h.related_id
+WHERE s.parent_id IS NOT NULL
+)`
+	case "descendant":
+		hierarchyCTE = `WITH RECURSIVE studio_hierarchy(studio_id, related_id) AS (
+SELECT p.id AS studio_id, c.id AS related_id
+FROM studios p
+INNER JOIN studios c ON c.parent_id = p.id
+UNION ALL
+SELECT h.studio_id, c.id
+FROM studio_hierarchy h
+INNER JOIN studios c ON c.parent_id = h.related_id
+)`
+	default:
+		panic("unsupported studio hierarchy direction")
+	}
+
+	if valuesClause == "" {
+		return fmt.Sprintf(`(
+%s
+SELECT DISTINCT h.studio_id
+FROM studio_hierarchy h
+INNER JOIN studios_tags st ON st.studio_id = h.related_id
+)`, hierarchyCTE)
+	}
+
+	return fmt.Sprintf(`(
+%s
+SELECT h.studio_id, t.column1 AS root_id, t.column2 AS item_id
+FROM studio_hierarchy h
+INNER JOIN studios_tags st ON st.studio_id = h.related_id
+INNER JOIN (%s) t ON t.column2 = st.tag_id
+)`, hierarchyCTE, valuesClause)
 }

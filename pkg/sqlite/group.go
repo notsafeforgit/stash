@@ -490,6 +490,51 @@ func (qb *GroupStore) QueryCount(ctx context.Context, groupFilter *models.GroupF
 	return query.executeCount(ctx)
 }
 
+func (qb *GroupStore) makeASTQuery(ctx context.Context, filterAST *models.FilterAST, findFilter *models.FindFilterType) (*queryBuilder, error) {
+	if findFilter == nil {
+		findFilter = &models.FindFilterType{}
+	}
+
+	query := groupRepository.newQuery()
+	distinctIDs(&query, groupTable)
+
+	if q := findFilter.Q; q != nil && *q != "" {
+		searchColumns := []string{"groups.name", "groups.aliases"}
+		query.parseQueryString(searchColumns, *q)
+	}
+
+	filter := filterBuilderFromHandler(ctx, &groupASTFilterHandler{ast: filterAST})
+	if err := query.addFilter(filter); err != nil {
+		return nil, err
+	}
+
+	if err := qb.setGroupSort(&query, findFilter); err != nil {
+		return nil, err
+	}
+	query.sortAndPagination += getPagination(findFilter)
+
+	return &query, nil
+}
+
+func (qb *GroupStore) QueryAST(ctx context.Context, filterAST *models.FilterAST, findFilter *models.FindFilterType) ([]*models.Group, int, error) {
+	query, err := qb.makeASTQuery(ctx, filterAST, findFilter)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	ids, total, err := query.executeFind(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	groups, err := qb.FindMany(ctx, ids)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return groups, total, nil
+}
+
 var groupSortOptions = sortOptions{
 	"created_at",
 	"date",

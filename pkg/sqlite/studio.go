@@ -530,7 +530,9 @@ func (qb *StudioStore) QueryForAutoTag(ctx context.Context, words []string) ([]*
 	// TODO - Query needs to be changed to support queries of this type, and
 	// this method should be removed
 	table := qb.table()
-	sq := dialect.From(table).Select(table.Col(idColumn)).LeftJoin(
+	sq := dialect.From(table).Select(table.Col(idColumn))
+
+	sq = sq.LeftJoin(
 		studiosAliasesJoinTable,
 		goqu.On(studiosAliasesJoinTable.Col(studioIDColumn).Eq(table.Col(idColumn))),
 	)
@@ -617,6 +619,54 @@ func (qb *StudioStore) QueryCount(ctx context.Context, studioFilter *models.Stud
 	}
 
 	return query.executeCount(ctx)
+}
+
+func (qb *StudioStore) makeASTQuery(ctx context.Context, filterAST *models.FilterAST, findFilter *models.FindFilterType) (*queryBuilder, error) {
+	if findFilter == nil {
+		findFilter = &models.FindFilterType{}
+	}
+
+	query := studioRepository.newQuery()
+	distinctIDs(&query, studioTable)
+
+	if q := findFilter.Q; q != nil && *q != "" {
+		query.join(studioAliasesTable, "", "studio_aliases.studio_id = studios.id")
+		searchColumns := []string{"studios.name", "studio_aliases.alias"}
+		query.parseQueryString(searchColumns, *q)
+	}
+
+	filter := filterBuilderFromHandler(ctx, &studioASTFilterHandler{ast: filterAST})
+	if err := query.addFilter(filter); err != nil {
+		return nil, err
+	}
+
+	var err error
+	query.sortAndPagination, err = qb.getStudioSort(findFilter)
+	if err != nil {
+		return nil, err
+	}
+	query.sortAndPagination += getPagination(findFilter)
+
+	return &query, nil
+}
+
+func (qb *StudioStore) QueryAST(ctx context.Context, filterAST *models.FilterAST, findFilter *models.FindFilterType) ([]*models.Studio, int, error) {
+	query, err := qb.makeASTQuery(ctx, filterAST, findFilter)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	ids, total, err := query.executeFind(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	studios, err := qb.FindMany(ctx, ids)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return studios, total, nil
 }
 
 func (qb *StudioStore) sortByScenesDuration(direction string) string {

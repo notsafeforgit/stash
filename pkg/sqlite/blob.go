@@ -435,6 +435,33 @@ func (qb *blobJoinQueryBuilder) DestroyImage(ctx context.Context, id int, blobCo
 	return qb.blobStore.Delete(ctx, *checksum)
 }
 
+func (qb *blobJoinQueryBuilder) GetManyHasImage(ctx context.Context, ids []int, blobCol string) ([]bool, error) {
+	table := goqu.T(qb.joinTable)
+	q := dialect.Select(goqu.I("id")).From(table).Where(
+		table.Col(idColumn).In(ids),
+		table.Col(blobCol).IsNotNull(),
+	)
+
+	ret := make([]bool, len(ids))
+	idToIndex := idToIndexMap(ids)
+
+	const single = false
+	if err := queryFunc(ctx, q, single, func(rows *sqlx.Rows) error {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return err
+		}
+		if idx, ok := idToIndex[id]; ok {
+			ret[idx] = true
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return ret, nil
+}
+
 func (qb *blobJoinQueryBuilder) HasImage(ctx context.Context, id int, blobCol string) (bool, error) {
 	stmt := utils.StrFormat("SELECT COUNT(*) as count FROM (SELECT {joinCol} FROM {joinTable} WHERE id = ? AND {joinCol} IS NOT NULL LIMIT 1)", utils.StrFormatMap{
 		"joinTable": qb.joinTable,

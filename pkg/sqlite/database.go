@@ -48,11 +48,16 @@ var (
 // ErrMigrationNeeded indicates that a database migration is needed
 // before the database can be initialized
 type MigrationNeededError struct {
-	CurrentSchemaVersion  uint
-	RequiredSchemaVersion uint
+	CurrentSchemaVersion      uint
+	RequiredSchemaVersion     uint
+	CurrentForkSchemaVersion  uint
+	RequiredForkSchemaVersion uint
 }
 
 func (e *MigrationNeededError) Error() string {
+	if e.CurrentSchemaVersion == e.RequiredSchemaVersion && e.CurrentForkSchemaVersion != e.RequiredForkSchemaVersion {
+		return fmt.Sprintf("fork database schema version %d does not match required fork schema version %d", e.CurrentForkSchemaVersion, e.RequiredForkSchemaVersion)
+	}
 	return fmt.Sprintf("database schema version %d does not match required schema version %d", e.CurrentSchemaVersion, e.RequiredSchemaVersion)
 }
 
@@ -88,7 +93,9 @@ type Database struct {
 	writeDB *sqlx.DB
 	dbPath  string
 
-	schemaVersion uint
+	schemaVersion           uint
+	forkSchemaVersion       uint
+	legacyForkSchemaVersion uint
 
 	lockChan chan struct{}
 }
@@ -155,7 +162,22 @@ func (db *Database) Open(dbPath string) error {
 		return fmt.Errorf("getting database schema version: %w", err)
 	}
 
+	forkSchemaVersion, err := db.getForkSchemaVersion()
+	if err != nil {
+		return fmt.Errorf("getting fork database schema version: %w", err)
+	}
+
+	db.legacyForkSchemaVersion = 0
+	if upstreamVersion, legacyForkVersion, isLegacy, err := legacyForkSchemaState(databaseSchemaVersion); err != nil {
+		return err
+	} else if isLegacy {
+		db.legacyForkSchemaVersion = databaseSchemaVersion
+		databaseSchemaVersion = upstreamVersion
+		forkSchemaVersion = legacyForkVersion
+	}
+
 	db.schemaVersion = databaseSchemaVersion
+	db.forkSchemaVersion = forkSchemaVersion
 
 	isNew := databaseSchemaVersion == 0
 
@@ -165,18 +187,22 @@ func (db *Database) Open(dbPath string) error {
 			return fmt.Errorf("error running initial schema migrations: %w", err)
 		}
 	} else {
-		if databaseSchemaVersion > appSchemaVersion {
+		requiredSchemaVersion := GetRequiredSchemaVersion()
+
+		if databaseSchemaVersion > requiredSchemaVersion {
 			return &MismatchedSchemaVersionError{
 				CurrentSchemaVersion:  databaseSchemaVersion,
-				RequiredSchemaVersion: appSchemaVersion,
+				RequiredSchemaVersion: requiredSchemaVersion,
 			}
 		}
 
 		// if migration is needed, then don't open the connection
-		if db.needsMigration() {
+		if db.NeedsMigration() {
 			return &MigrationNeededError{
-				CurrentSchemaVersion:  databaseSchemaVersion,
-				RequiredSchemaVersion: appSchemaVersion,
+				CurrentSchemaVersion:      databaseSchemaVersion,
+				RequiredSchemaVersion:     requiredSchemaVersion,
+				CurrentForkSchemaVersion:  db.forkSchemaVersion,
+				RequiredForkSchemaVersion: GetRequiredForkSchemaVersion(),
 			}
 		}
 	}
@@ -394,6 +420,14 @@ func (db *Database) RestoreFromBackup(backupPath string) error {
 
 func (db *Database) AppSchemaVersion() uint {
 	return appSchemaVersion
+}
+
+func (db *Database) ForkSchemaVersion() uint {
+	return db.forkSchemaVersion
+}
+
+func (db *Database) RequiredForkSchemaVersion() uint {
+	return GetRequiredForkSchemaVersion()
 }
 
 func (db *Database) DatabasePath() string {

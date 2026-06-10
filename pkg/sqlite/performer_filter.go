@@ -233,8 +233,9 @@ func (qb *performerFilterHandler) criterionHandler() criterionHandler {
 			relatedHandler: &sceneMarkerFilterHandler{filter.MarkersFilter},
 			joinFn: func(f *filterBuilder) {
 				performerRepository.scenes.innerJoin(f, "", "performers.id")
-				f.addInnerJoin(sceneMarkerTable, "", "scene_markers.scene_id = performers_scenes.scene_id")
+				f.addLeftJoin(sceneMarkerTable, "", "scene_markers.scene_id = performers_scenes.scene_id")
 			},
+			includeMissingRelated: relatedFilterIncludesMissingRelation(filter.MarkersFilter),
 		},
 
 		&relatedFilterHandler{
@@ -244,6 +245,7 @@ func (qb *performerFilterHandler) criterionHandler() criterionHandler {
 			joinFn: func(f *filterBuilder) {
 				performerRepository.scenes.innerJoin(f, "", "performers.id")
 			},
+			includeMissingRelated: relatedFilterIncludesMissingRelation(filter.ScenesFilter),
 		},
 
 		&relatedFilterHandler{
@@ -253,6 +255,7 @@ func (qb *performerFilterHandler) criterionHandler() criterionHandler {
 			joinFn: func(f *filterBuilder) {
 				performerRepository.images.innerJoin(f, "", "performers.id")
 			},
+			includeMissingRelated: relatedFilterIncludesMissingRelation(filter.ImagesFilter),
 		},
 
 		&relatedFilterHandler{
@@ -262,6 +265,7 @@ func (qb *performerFilterHandler) criterionHandler() criterionHandler {
 			joinFn: func(f *filterBuilder) {
 				performerRepository.galleries.innerJoin(f, "", "performers.id")
 			},
+			includeMissingRelated: relatedFilterIncludesMissingRelation(filter.GalleriesFilter),
 		},
 
 		&relatedFilterHandler{
@@ -271,6 +275,7 @@ func (qb *performerFilterHandler) criterionHandler() criterionHandler {
 			joinFn: func(f *filterBuilder) {
 				performerRepository.tags.innerJoin(f, "performer_tag", "performers.id")
 			},
+			includeMissingRelated: relatedFilterIncludesMissingRelation(filter.TagsFilter),
 		},
 
 		&customFieldsFilterHandler{

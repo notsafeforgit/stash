@@ -589,18 +589,17 @@ func (qb *PerformerStore) QueryForAutoTag(ctx context.Context, words []string) (
 	// this method should be removed
 	table := qb.table()
 	sq := dialect.From(table).Select(table.Col(idColumn))
-	// TODO - disabled alias matching until we get finer control over it
-	// .LeftJoin(
-	// 	performersAliasesJoinTable,
-	// 	goqu.On(performersAliasesJoinTable.Col(performerIDColumn).Eq(table.Col(idColumn))),
-	// )
+
+	sq = sq.LeftJoin(
+		performersAliasesJoinTable,
+		goqu.On(performersAliasesJoinTable.Col(performerIDColumn).Eq(table.Col(idColumn))),
+	)
 
 	var whereClauses []exp.Expression
 
 	for _, w := range words {
 		whereClauses = append(whereClauses, table.Col("name").Like(w+"%"))
-		// TODO - see above
-		// whereClauses = append(whereClauses, performersAliasesJoinTable.Col("alias").Like(w+"%"))
+		whereClauses = append(whereClauses, performersAliasesJoinTable.Col("alias").Like(w+"%"))
 	}
 
 	sq = sq.Where(
@@ -678,6 +677,54 @@ func (qb *PerformerStore) QueryCount(ctx context.Context, performerFilter *model
 	}
 
 	return query.executeCount(ctx)
+}
+
+func (qb *PerformerStore) makeASTQuery(ctx context.Context, filterAST *models.FilterAST, findFilter *models.FindFilterType) (*queryBuilder, error) {
+	if findFilter == nil {
+		findFilter = &models.FindFilterType{}
+	}
+
+	query := performerRepository.newQuery()
+	distinctIDs(&query, performerTable)
+
+	if q := findFilter.Q; q != nil && *q != "" {
+		query.join(performersAliasesTable, "", "performer_aliases.performer_id = performers.id")
+		searchColumns := []string{"performers.name", "performer_aliases.alias"}
+		query.parseQueryString(searchColumns, *q)
+	}
+
+	filter := filterBuilderFromHandler(ctx, &performerASTFilterHandler{ast: filterAST})
+	if err := query.addFilter(filter); err != nil {
+		return nil, err
+	}
+
+	var err error
+	query.sortAndPagination, err = qb.getPerformerSort(findFilter)
+	if err != nil {
+		return nil, err
+	}
+	query.sortAndPagination += getPagination(findFilter)
+
+	return &query, nil
+}
+
+func (qb *PerformerStore) QueryAST(ctx context.Context, filterAST *models.FilterAST, findFilter *models.FindFilterType) ([]*models.Performer, int, error) {
+	query, err := qb.makeASTQuery(ctx, filterAST, findFilter)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	ids, total, err := query.executeFind(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	performers, err := qb.FindMany(ctx, ids)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return performers, total, nil
 }
 
 func (qb *PerformerStore) sortByOCounter(direction string) string {
@@ -809,6 +856,7 @@ var performerSortOptions = sortOptions{
 	"career_start",
 	"career_end",
 	"created_at",
+	"favorite",
 	"galleries_count",
 	"height",
 	"id",
@@ -900,7 +948,7 @@ func (qb *PerformerStore) destroyImage(ctx context.Context, performerID int) err
 	return qb.blobJoinQueryBuilder.DestroyImage(ctx, performerID, performerImageBlobColumn)
 }
 
-func (qb *PerformerStore) GetAliases(ctx context.Context, performerID int) ([]string, error) {
+func (qb *PerformerStore) GetPerformerAliases(ctx context.Context, performerID int) ([]models.PerformerAlias, error) {
 	return performersAliasesTableMgr.get(ctx, performerID)
 }
 

@@ -93,6 +93,7 @@ func (qb *fileFilterHandler) criterionHandler() criterionHandler {
 			joinFn: func(f *filterBuilder) {
 				fileRepository.scenes.innerJoin(f, "", "files.id")
 			},
+			includeMissingRelated: relatedFilterIncludesMissingRelation(fileFilter.ScenesFilter),
 		},
 		&relatedFilterHandler{
 			relatedIDCol:   "images_files.image_id",
@@ -101,6 +102,7 @@ func (qb *fileFilterHandler) criterionHandler() criterionHandler {
 			joinFn: func(f *filterBuilder) {
 				fileRepository.images.innerJoin(f, "", "files.id")
 			},
+			includeMissingRelated: relatedFilterIncludesMissingRelation(fileFilter.ImagesFilter),
 		},
 		&relatedFilterHandler{
 			relatedIDCol:   "galleries_files.gallery_id",
@@ -109,6 +111,7 @@ func (qb *fileFilterHandler) criterionHandler() criterionHandler {
 			joinFn: func(f *filterBuilder) {
 				fileRepository.galleries.innerJoin(f, "", "files.id")
 			},
+			includeMissingRelated: relatedFilterIncludesMissingRelation(fileFilter.GalleriesFilter),
 		},
 	}
 }

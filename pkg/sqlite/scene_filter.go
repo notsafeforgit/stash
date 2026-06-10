@@ -209,6 +209,7 @@ func (qb *sceneFilterHandler) criterionHandler() criterionHandler {
 			joinFn: func(f *filterBuilder) {
 				sceneRepository.galleries.innerJoin(f, "", "scenes.id")
 			},
+			includeMissingRelated: relatedFilterIncludesMissingRelation(sceneFilter.GalleriesFilter),
 		},
 
 		&relatedFilterHandler{
@@ -218,12 +219,14 @@ func (qb *sceneFilterHandler) criterionHandler() criterionHandler {
 			joinFn: func(f *filterBuilder) {
 				sceneRepository.performers.innerJoin(f, "performers_join", "scenes.id")
 			},
+			includeMissingRelated: relatedFilterIncludesMissingRelation(sceneFilter.PerformersFilter),
 		},
 
 		&relatedFilterHandler{
-			relatedIDCol:   "scenes.studio_id",
-			relatedRepo:    studioRepository.repository,
-			relatedHandler: &studioFilterHandler{sceneFilter.StudiosFilter},
+			relatedIDCol:          "scenes.studio_id",
+			relatedRepo:           studioRepository.repository,
+			relatedHandler:        &studioFilterHandler{sceneFilter.StudiosFilter},
+			includeMissingRelated: relatedFilterIncludesMissingRelation(sceneFilter.StudiosFilter),
 		},
 
 		&relatedFilterHandler{
@@ -233,6 +236,7 @@ func (qb *sceneFilterHandler) criterionHandler() criterionHandler {
 			joinFn: func(f *filterBuilder) {
 				sceneRepository.tags.innerJoin(f, "scene_tag", "scenes.id")
 			},
+			includeMissingRelated: relatedFilterIncludesMissingRelation(sceneFilter.TagsFilter),
 		},
 
 		&relatedFilterHandler{
@@ -242,6 +246,7 @@ func (qb *sceneFilterHandler) criterionHandler() criterionHandler {
 			joinFn: func(f *filterBuilder) {
 				sceneRepository.groups.innerJoin(f, "", "scenes.id")
 			},
+			includeMissingRelated: relatedFilterIncludesMissingRelation(sceneFilter.MoviesFilter),
 		},
 
 		&relatedFilterHandler{
@@ -264,8 +269,9 @@ func (qb *sceneFilterHandler) criterionHandler() criterionHandler {
 			relatedRepo:    sceneMarkerRepository.repository,
 			relatedHandler: &sceneMarkerFilterHandler{sceneFilter.MarkersFilter},
 			joinFn: func(f *filterBuilder) {
-				f.addInnerJoin("scene_markers", "", "scenes.id")
+				f.addLeftJoin("scene_markers", "", "scene_markers.scene_id = scenes.id")
 			},
+			includeMissingRelated: relatedFilterIncludesMissingRelation(sceneFilter.MarkersFilter),
 		},
 	}
 }

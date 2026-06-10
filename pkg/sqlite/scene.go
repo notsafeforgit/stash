@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -498,9 +497,15 @@ func (qb *SceneStore) FindMany(ctx context.Context, ids []int) ([]*models.Scene,
 		return nil, err
 	}
 
+	idToIndex := make(map[int]int, len(ids))
+	for i, id := range ids {
+		idToIndex[id] = i
+	}
+
 	for _, s := range unsorted {
-		i := slices.Index(ids, s.ID)
-		scenes[i] = s
+		if i, ok := idToIndex[s.ID]; ok {
+			scenes[i] = s
+		}
 	}
 
 	for i := range scenes {
@@ -1065,6 +1070,56 @@ func (qb *SceneStore) makeQuery(ctx context.Context, sceneFilter *models.SceneFi
 	return &query, nil
 }
 
+func (qb *SceneStore) makeASTQuery(ctx context.Context, filterAST *models.FilterAST, findFilter *models.FindFilterType) (*queryBuilder, error) {
+	if findFilter == nil {
+		findFilter = &models.FindFilterType{}
+	}
+
+	query := sceneRepository.newQuery()
+	distinctIDs(&query, sceneTable)
+
+	if q := findFilter.Q; q != nil && *q != "" {
+		query.addJoins(
+			join{
+				table:    scenesFilesTable,
+				onClause: "scenes_files.scene_id = scenes.id",
+			},
+			join{
+				table:    fileTable,
+				onClause: "scenes_files.file_id = files.id",
+			},
+			join{
+				table:    folderTable,
+				onClause: "files.parent_folder_id = folders.id",
+			},
+			join{
+				table:    fingerprintTable,
+				onClause: "files_fingerprints.file_id = scenes_files.file_id",
+			},
+			join{
+				table:    sceneMarkerTable,
+				onClause: "scene_markers.scene_id = scenes.id",
+			},
+		)
+
+		filepathColumn := "folders.path || '" + string(filepath.Separator) + "' || files.basename"
+		searchColumns := []string{"scenes.title", "scenes.details", filepathColumn, "files_fingerprints.fingerprint", "scene_markers.title"}
+		query.parseQueryString(searchColumns, *q)
+	}
+
+	filter := filterBuilderFromHandler(ctx, &sceneASTFilterHandler{ast: filterAST})
+	if err := query.addFilter(filter); err != nil {
+		return nil, err
+	}
+
+	if err := qb.setSceneSort(&query, findFilter); err != nil {
+		return nil, err
+	}
+	query.sortAndPagination += getPagination(findFilter)
+
+	return &query, nil
+}
+
 func (qb *SceneStore) Query(ctx context.Context, options models.SceneQueryOptions) (*models.SceneQueryResult, error) {
 	query, err := qb.makeQuery(ctx, options.SceneFilter, options.FindFilter)
 	if err != nil {
@@ -1083,6 +1138,25 @@ func (qb *SceneStore) Query(ctx context.Context, options models.SceneQueryOption
 
 	result.IDs = idsResult
 	return result, nil
+}
+
+func (qb *SceneStore) QueryAST(ctx context.Context, filterAST *models.FilterAST, findFilter *models.FindFilterType) ([]*models.Scene, int, error) {
+	query, err := qb.makeASTQuery(ctx, filterAST, findFilter)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	ids, total, err := query.executeFind(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	scenes, err := qb.FindMany(ctx, ids)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return scenes, total, nil
 }
 
 func (qb *SceneStore) queryGroupedFields(ctx context.Context, options models.SceneQueryOptions, query queryBuilder) (*models.SceneQueryResult, error) {
@@ -1406,6 +1480,10 @@ func (qb *SceneStore) HasCover(ctx context.Context, sceneID int) (bool, error) {
 	return qb.HasImage(ctx, sceneID, sceneCoverBlobColumn)
 }
 
+func (qb *SceneStore) GetManyHasCover(ctx context.Context, ids []int) ([]bool, error) {
+	return qb.GetManyHasImage(ctx, ids, sceneCoverBlobColumn)
+}
+
 func (qb *SceneStore) UpdateCover(ctx context.Context, sceneID int, image []byte) error {
 	return qb.UpdateImage(ctx, sceneID, sceneCoverBlobColumn, image)
 }
@@ -1575,11 +1653,26 @@ ORDER BY SUM(file_size) DESC;
 		dupeIds = utils.FindDuplicates(hashes, distance, durationDiff)
 	}
 
+	var allIds []int
+	for _, comp := range dupeIds {
+		allIds = append(allIds, comp...)
+	}
+
+	if len(allIds) == 0 {
+		return nil, nil
+	}
+
+	allScenes, err := qb.FindMany(ctx, allIds)
+	if err != nil {
+		return nil, err
+	}
+
 	var duplicates [][]*models.Scene
-	for _, sceneIds := range dupeIds {
-		if scenes, err := qb.FindMany(ctx, sceneIds); err == nil {
-			duplicates = append(duplicates, scenes)
-		}
+	offset := 0
+	for _, comp := range dupeIds {
+		group := allScenes[offset : offset+len(comp)]
+		duplicates = append(duplicates, group)
+		offset += len(comp)
 	}
 
 	sortByPath(duplicates)

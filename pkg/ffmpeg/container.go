@@ -32,6 +32,7 @@ const (
 	H264           string = "h264"
 	H265           string = "h265" // found in rare cases from a faulty encoder
 	Hevc           string = "hevc"
+	Av1            string = "av1"
 	Vp8            string = "vp8"
 	Vp9            string = "vp9"
 	Mkv            string = "mkv" // only used from the browser to indicate mkv support

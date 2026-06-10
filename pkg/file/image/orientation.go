@@ -53,10 +53,10 @@ func areDimensionsFlipped(fs models.FS, path string) (bool, error) {
 		return false, fmt.Errorf("decoding orientation: %w", err)
 	}
 
-	return isOrientationDimensionsFlipped(oo), nil
+	return IsOrientationDimensionsFlipped(oo), nil
 }
 
-// isOrientationDimensionsFlipped returns true if the image orientation is flipped based on the input orientation EXIF value.
+// IsOrientationDimensionsFlipped returns true if the image orientation is flipped based on the input orientation EXIF value.
 // From https://sirv.com/help/articles/rotate-photos-to-be-upright/
 // 1 = 0 degrees: the correct orientation, no adjustment is required.
 // 2 = 0 degrees, mirrored: image has been flipped back-to-front.
@@ -66,7 +66,7 @@ func areDimensionsFlipped(fs models.FS, path string) (bool, error) {
 // 6 = 90 degrees, mirrored: image is on its side.
 // 7 = 270 degrees: image has been flipped back-to-front and is on its far side.
 // 8 = 270 degrees, mirrored: image is on its far side.
-func isOrientationDimensionsFlipped(o int) bool {
+func IsOrientationDimensionsFlipped(o int) bool {
 	switch o {
 	case 5, 6, 7, 8:
 		return true

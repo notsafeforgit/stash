@@ -245,6 +245,85 @@ func (f *FFProbe) NewVideoFile(videoPath string) (*VideoFile, error) {
 	return parse(videoPath, probeJSON)
 }
 
+// MaxGOPSeconds returns the largest gap between consecutive video
+// keyframes within `withinSeconds` of the file's start, measured in
+// seconds. Read-bounded so it stays cheap even on multi-GB sources —
+// scanning the first ~30 s of packets is enough to characterise a
+// source's GOP cadence; encoders don't typically vary IDR spacing
+// mid-stream.
+//
+// Used by `GetSceneStreamPaths` to gate the codec-copy HLS variants:
+// our hand-rolled `.fmp4.master.m3u8` playlist declares 2 s segments,
+// but `-c copy` HLS muxer can only end segments at source keyframes,
+// so a source whose GOPs are much longer than `segmentLength` ends up
+// with EXTINFs that lie about per-segment duration — hls.js then loses
+// playback timeline coherence and the user sees judder. Above the
+// threshold the codec-copy paths are skipped and the H.264 transcode
+// (which forces its own 2 s GOPs via `-g`/`-keyint_min`) is used
+// instead.
+//
+// Returns 0 if no keyframe information could be extracted (e.g. the
+// stream is empty or the first packet isn't a keyframe — both treated
+// as "unknown, conservatively assume long").
+func (f *FFProbe) MaxGOPSeconds(videoPath string, withinSeconds float64) (float64, error) {
+	if withinSeconds <= 0 {
+		withinSeconds = 30
+	}
+	args := []string{
+		"-v", "error",
+		"-select_streams", "v:0",
+		"-read_intervals", fmt.Sprintf("%%+%g", withinSeconds),
+		"-show_entries", "packet=pts_time,flags",
+		"-of", "csv=p=0",
+		videoPath,
+	}
+	out, err := stashExec.Command(f.path, args...).Output()
+	if err != nil {
+		return 0, fmt.Errorf("ffprobe keyframe scan failed for <%s>: %w", videoPath, err)
+	}
+
+	var keyframes []float64
+	for _, line := range strings.Split(string(out), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		// Each line: `<pts_time>,<flags>` where flags includes 'K' for
+		// keyframes (e.g. `0.007000,K__`). N/A pts_time is possible
+		// for the very first packet of some containers — skip it.
+		fields := strings.SplitN(line, ",", 2)
+		if len(fields) != 2 {
+			continue
+		}
+		if !strings.Contains(fields[1], "K") {
+			continue
+		}
+		pts, err := strconv.ParseFloat(fields[0], 64)
+		if err != nil {
+			continue
+		}
+		keyframes = append(keyframes, pts)
+	}
+
+	if len(keyframes) < 2 {
+		// Fewer than two keyframes inside the read window means we can't
+		// measure a GOP at all. Could mean very long GOPs (single
+		// keyframe at start) or a malformed file — either way, return
+		// `withinSeconds` as the inferred minimum so the caller treats
+		// it as "GOP at least this long" and conservatively skips the
+		// codec-copy fast path.
+		return withinSeconds, nil
+	}
+
+	var maxGap float64
+	for i := 1; i < len(keyframes); i++ {
+		if gap := keyframes[i] - keyframes[i-1]; gap > maxGap {
+			maxGap = gap
+		}
+	}
+	return maxGap, nil
+}
+
 // GetReadFrameCount counts the actual frames of the video file.
 // Used when the frame count is missing or incorrect.
 func (f *FFProbe) GetReadFrameCount(path string) (int64, error) {

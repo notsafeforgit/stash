@@ -19,79 +19,6 @@ type StreamFormat struct {
 	Args     func(codec VideoCodec, videoFilter VideoFilter, videoOnly bool) Args
 }
 
-func CodecInit(codec VideoCodec) (args Args) {
-	args = args.VideoCodec(codec)
-
-	switch codec {
-	// CPU Codecs
-	case VideoCodecLibX264:
-		args = append(args,
-			"-pix_fmt", "yuv420p",
-			"-preset", "veryfast",
-			"-crf", "25",
-			"-sc_threshold", "0",
-		)
-	case VideoCodecVP9:
-		args = append(args,
-			"-pix_fmt", "yuv420p",
-			"-deadline", "realtime",
-			"-cpu-used", "5",
-			"-row-mt", "1",
-			"-crf", "30",
-			"-b:v", "0",
-		)
-	// HW Codecs
-	case VideoCodecN264:
-		args = append(args,
-			"-rc", "vbr",
-			"-cq", "15",
-		)
-	case VideoCodecN264H:
-		args = append(args,
-			"-profile", "p7",
-			"-tune", "hq",
-			"-profile", "high",
-			"-rc", "vbr",
-			"-rc-lookahead", "60",
-			"-surfaces", "64",
-			"-spatial-aq", "1",
-			"-aq-strength", "15",
-			"-cq", "15",
-			"-coder", "cabac",
-			"-b_ref_mode", "middle",
-		)
-	case VideoCodecI264, VideoCodecIVP9:
-		args = append(args,
-			"-global_quality", "20",
-			"-preset", "faster",
-		)
-	case VideoCodecI264C:
-		args = append(args,
-			"-q", "20",
-			"-preset", "faster",
-		)
-	case VideoCodecV264, VideoCodecVVP9:
-		args = append(args,
-			"-qp", "20",
-		)
-	case VideoCodecA264:
-		args = append(args,
-			"-quality", "speed",
-		)
-	case VideoCodecM264:
-		args = append(args,
-			"-realtime", "1",
-		)
-	case VideoCodecO264:
-		args = append(args,
-			"-preset", "superfast",
-			"-crf", "25",
-		)
-	}
-
-	return args
-}
-
 var (
 	StreamTypeMP4 = StreamFormat{
 		MimeType: MimeMp4Video,
@@ -228,14 +155,8 @@ func (sm *StreamManager) ServeTranscode(w http.ResponseWriter, r *http.Request, 
 	streamRequestCtx := NewStreamRequestContext(w, r)
 	lockCtx := sm.lockManager.ReadLock(streamRequestCtx, options.VideoFile.Path)
 
-	// hijacking and closing the connection here causes video playback to hang in Chrome
-	// due to ERR_INCOMPLETE_CHUNKED_ENCODING
-	// We trust that the request context will be closed, so we don't need to call Cancel on the returned context here.
-
 	handler, err := sm.getTranscodeStream(lockCtx, options)
-
 	if err != nil {
-		// don't log context canceled errors
 		if !errors.Is(err, context.Canceled) {
 			logger.Errorf("[transcode] error transcoding video file: %v", err)
 		}
@@ -270,14 +191,11 @@ func (sm *StreamManager) getTranscodeStream(ctx *fsutil.LockContext, options Tra
 	}
 	ctx.AttachCommand(cmd)
 
-	// stderr must be consumed or the process deadlocks
 	go func() {
 		errStr, _ := io.ReadAll(stderr)
-
 		errCmd := cmd.Wait()
 
 		var err error
-
 		e := string(errStr)
 		if e != "" {
 			err = errors.New(e)
@@ -285,7 +203,6 @@ func (sm *StreamManager) getTranscodeStream(ctx *fsutil.LockContext, options Tra
 			err = errCmd
 		}
 
-		// ignore ExitErrors, the process is always forcibly killed
 		var exitError *exec.ExitError
 		if err != nil && !errors.As(err, &exitError) {
 			logger.Errorf("[transcode] ffmpeg error when running command <%s>: %v", strings.Join(cmd.Args, " "), err)
@@ -297,8 +214,6 @@ func (sm *StreamManager) getTranscodeStream(ctx *fsutil.LockContext, options Tra
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Content-Type", mimeType)
 		w.WriteHeader(http.StatusOK)
-
-		// process killing should be handled by command context
 
 		_, err := io.Copy(w, stdout)
 		if err != nil && !errors.Is(err, syscall.EPIPE) && !errors.Is(err, syscall.ECONNRESET) {

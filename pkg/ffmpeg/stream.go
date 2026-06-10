@@ -31,8 +31,9 @@ type StreamManager struct {
 	context    context.Context
 	cancelFunc context.CancelFunc
 
-	runningStreams map[string]*runningStream
-	streamsMutex   sync.Mutex
+	runningStreams   map[string]*runningStream
+	v3RunningStreams map[string]*v3RunningStream
+	streamsMutex     sync.Mutex
 }
 
 type StreamManagerConfig interface {
@@ -50,14 +51,15 @@ func NewStreamManager(cacheDir string, encoder *FFMpeg, ffprobe *FFProbe, config
 	ctx, cancel := context.WithCancel(context.Background())
 
 	ret := &StreamManager{
-		cacheDir:       cacheDir,
-		encoder:        encoder,
-		ffprobe:        ffprobe,
-		config:         config,
-		lockManager:    lockManager,
-		context:        ctx,
-		cancelFunc:     cancel,
-		runningStreams: make(map[string]*runningStream),
+		cacheDir:         cacheDir,
+		encoder:          encoder,
+		ffprobe:          ffprobe,
+		config:           config,
+		lockManager:      lockManager,
+		context:          ctx,
+		cancelFunc:       cancel,
+		runningStreams:   make(map[string]*runningStream),
+		v3RunningStreams: make(map[string]*v3RunningStream),
 	}
 
 	go func() {
@@ -65,6 +67,7 @@ func NewStreamManager(cacheDir string, encoder *FFMpeg, ffprobe *FFProbe, config
 			select {
 			case <-time.After(monitorInterval):
 				ret.monitorStreams()
+				ret.monitorV3Streams()
 			case <-ctx.Done():
 				return
 			}
@@ -78,6 +81,7 @@ func NewStreamManager(cacheDir string, encoder *FFMpeg, ffprobe *FFProbe, config
 func (sm *StreamManager) Shutdown() {
 	sm.cancelFunc()
 	sm.stopAndRemoveAll()
+	sm.stopAndRemoveAllV3()
 }
 
 type StreamRequestContext struct {

@@ -30,6 +30,22 @@ var (
 	VideoCodecVVP9  = makeVideoCodec("VP9 VAAPI", "vp9_vaapi")
 	VideoCodecVVPX  = makeVideoCodec("VP8 VAAPI", "vp8_vaapi")
 	VideoCodecRK264 = makeVideoCodec("H264 Rockchip MPP (rkmpp)", "h264_rkmpp")
+	// HEVC HW encoders. Currently used only by the download endpoint
+	// (mode=hevc) to encode at GPU speed instead of waiting on libx265.
+	// HDR10 metadata passes through the encoder when the input is
+	// 10-bit and the output profile is `main10`; the download path
+	// branches on srcIsHDR to pick `p010`/`main10` vs `nv12`/`main`.
+	VideoCodecV265 = makeVideoCodec("HEVC VAAPI", "hevc_vaapi")
+	// AV1 HW encoders. Used only by the download endpoint
+	// (mode=av1). AV1 is more efficient than HEVC at the same visual
+	// quality (~30% smaller bitstreams), but encode hardware is rare
+	// — Intel Arc / Meteor Lake+ for QSV, RTX 40-series+ for NVENC,
+	// and the corresponding VAAPI driver for the same Intel hardware.
+	// HDR (HDR10 / HLG) passes through when the input is 10-bit; the
+	// download path branches on srcIsHDR for pix_fmt + profile.
+	VideoCodecVAV1 = makeVideoCodec("AV1 VAAPI", "av1_vaapi")
+	VideoCodecIAV1 = makeVideoCodec("AV1 Intel Quick Sync Video (QSV)", "av1_qsv")
+	VideoCodecNAV1 = makeVideoCodec("AV1 NVENC", "av1_nvenc")
 )
 
 const minHeight int = 480
@@ -71,6 +87,10 @@ func (f *FFMpeg) initHWSupport(ctx context.Context) {
 		VideoCodecI264,
 		VideoCodecI264C,
 		VideoCodecV264,
+		VideoCodecV265,
+		VideoCodecVAV1,
+		VideoCodecIAV1,
+		VideoCodecNAV1,
 		VideoCodecR264,
 		VideoCodecRK264,
 		VideoCodecIVP9,
@@ -193,7 +213,8 @@ func (f *FFMpeg) hwDeviceInit(args Args, toCodec VideoCodec, fullhw bool) Args {
 
 	switch toCodec {
 	case VideoCodecN264,
-		VideoCodecN264H:
+		VideoCodecN264H,
+		VideoCodecNAV1:
 		args = append(args, "-hwaccel_device")
 		args = append(args, "0")
 		if fullhw {
@@ -205,6 +226,8 @@ func (f *FFMpeg) hwDeviceInit(args Args, toCodec VideoCodec, fullhw bool) Args {
 			args = append(args, "cuda")
 		}
 	case VideoCodecV264,
+		VideoCodecV265,
+		VideoCodecVAV1,
 		VideoCodecVVP9:
 		args = append(args, "-vaapi_device")
 		args = append(args, driDevice)
@@ -216,6 +239,7 @@ func (f *FFMpeg) hwDeviceInit(args Args, toCodec VideoCodec, fullhw bool) Args {
 		}
 	case VideoCodecI264,
 		VideoCodecI264C,
+		VideoCodecIAV1,
 		VideoCodecIVP9:
 		if fullhw {
 			args = append(args, "-hwaccel")
@@ -266,13 +290,23 @@ func (f *FFMpeg) hwFilterInit(toCodec VideoCodec, fullhw bool) VideoFilter {
 			videoFilter = videoFilter.Append("format=nv12")
 			videoFilter = videoFilter.Append("hwupload")
 		}
-	case VideoCodecN264, VideoCodecN264H:
+	case VideoCodecV265,
+		VideoCodecVAV1:
+		// 8-bit default; the download HEVC/AV1 paths override to p010
+		// for HDR sources by building their own filter chain instead of
+		// going through hwMaxResFilter.
+		if !fullhw {
+			videoFilter = videoFilter.Append("format=nv12")
+			videoFilter = videoFilter.Append("hwupload")
+		}
+	case VideoCodecN264, VideoCodecN264H, VideoCodecNAV1:
 		if !fullhw {
 			videoFilter = videoFilter.Append("format=nv12")
 			videoFilter = videoFilter.Append("hwupload_cuda")
 		}
 	case VideoCodecI264,
 		VideoCodecI264C,
+		VideoCodecIAV1,
 		VideoCodecIVP9:
 		if !fullhw {
 			videoFilter = videoFilter.Append("hwupload=extra_hw_frames=64")
@@ -356,15 +390,15 @@ func (f *FFMpeg) hwCodecFilter(args VideoFilter, codec VideoCodec, vf *models.Vi
 // Apply format switching if applicable
 func (f *FFMpeg) hwApplyFullHWFilter(args VideoFilter, codec VideoCodec, fullhw bool) VideoFilter {
 	switch codec {
-	case VideoCodecN264, VideoCodecN264H:
+	case VideoCodecN264, VideoCodecN264H, VideoCodecNAV1:
 		if fullhw && f.version.Gteq(Version{major: 5}) { // Added in FFMpeg 5
 			args = args.Append("scale_cuda=format=yuv420p")
 		}
-	case VideoCodecV264, VideoCodecVVP9:
+	case VideoCodecV264, VideoCodecVVP9, VideoCodecV265, VideoCodecVAV1:
 		if fullhw && f.version.Gteq(Version{major: 3, minor: 1}) { // Added in FFMpeg 3.1
 			args = args.Append("scale_vaapi=format=nv12")
 		}
-	case VideoCodecI264, VideoCodecI264C, VideoCodecIVP9:
+	case VideoCodecI264, VideoCodecI264C, VideoCodecIAV1, VideoCodecIVP9:
 		if fullhw && f.version.Gteq(Version{major: 3, minor: 3}) { // Added in FFMpeg 3.3
 			args = args.Append("scale_qsv=format=nv12")
 		}
@@ -384,17 +418,17 @@ func (f *FFMpeg) hwApplyScaleTemplate(sargs string, codec VideoCodec, match []in
 	var template string
 
 	switch codec {
-	case VideoCodecN264, VideoCodecN264H:
+	case VideoCodecN264, VideoCodecN264H, VideoCodecNAV1:
 		template = "scale_cuda=$value"
 		if fullhw && f.version.Gteq(Version{major: 5}) { // Added in FFMpeg 5
 			template += ":format=yuv420p"
 		}
-	case VideoCodecV264, VideoCodecVVP9:
+	case VideoCodecV264, VideoCodecVVP9, VideoCodecV265, VideoCodecVAV1:
 		template = "scale_vaapi=$value"
 		if fullhw && f.version.Gteq(Version{major: 3, minor: 1}) { // Added in FFMpeg 3.1
 			template += ":format=nv12"
 		}
-	case VideoCodecI264, VideoCodecI264C, VideoCodecIVP9:
+	case VideoCodecI264, VideoCodecI264C, VideoCodecIAV1, VideoCodecIVP9:
 		template = "scale_qsv=$value"
 		if fullhw && f.version.Gteq(Version{major: 3, minor: 3}) { // Added in FFMpeg 3.3
 			template += ":format=nv12"
@@ -414,7 +448,7 @@ func (f *FFMpeg) hwApplyScaleTemplate(sargs string, codec VideoCodec, match []in
 	}
 
 	// BUG: [scale_qsv]: Size values less than -1 are not acceptable.
-	isIntel := codec == VideoCodecI264 || codec == VideoCodecI264C || codec == VideoCodecIVP9
+	isIntel := codec == VideoCodecI264 || codec == VideoCodecI264C || codec == VideoCodecIAV1 || codec == VideoCodecIVP9
 	// BUG: scale_vt doesn't call ff_scale_adjust_dimensions, thus cant accept negative size values
 	isApple := codec == VideoCodecM264
 	// Rockchip's scale_rkrga supports -1/-2; don't apply minus-one hack here.
@@ -479,6 +513,62 @@ func (f *FFMpeg) hwCodecMP4Compatible() *VideoCodec {
 		}
 	}
 	return nil
+}
+
+// hwCodecHEVCCompatible returns the first available HW HEVC encoder.
+// Currently only VAAPI HEVC is wired in; NVENC / QSV / VideoToolbox /
+// AMF HEVC encoders can be added to the list once their HDR
+// passthrough behaviour is verified per vendor. The download endpoint
+// uses this for `mode=hevc`; HW HEVC is gated behind
+// `GetTranscodeHardwareAcceleration` like every other HW path.
+func (f *FFMpeg) hwCodecHEVCCompatible() *VideoCodec {
+	for _, element := range f.getHWCodecSupport() {
+		switch element {
+		case VideoCodecV265:
+			return &element
+		}
+	}
+	return nil
+}
+
+// HasHWHEVCEncoder is the public counterpart to `hwCodecHEVCCompatible`,
+// used by the manager's capability probe (`ServerCapabilities`) to
+// decide whether to advertise the `hevc` download mode to the v3
+// client. Conservative: we don't advertise HEVC unless HW encoding is
+// available, because libx265 at 4K is too slow to be a sensible auto-
+// pick for download UX. Callers that want HEVC anyway can still
+// request it explicitly via `?mode=hevc` on the download URL — that
+// path falls through to libx265.
+func (f *FFMpeg) HasHWHEVCEncoder() bool {
+	return f.hwCodecHEVCCompatible() != nil
+}
+
+// hwCodecAV1Compatible returns the first available HW AV1 encoder
+// across vendors. Used by the download endpoint (mode=av1) to encode
+// at GPU speed; without HW AV1 the server doesn't advertise the AV1
+// download mode and the client never picks it. Encode hardware is
+// rare — Intel Arc / Meteor Lake+ for QSV/VAAPI, RTX 40-series+ for
+// NVENC.
+func (f *FFMpeg) hwCodecAV1Compatible() *VideoCodec {
+	for _, element := range f.getHWCodecSupport() {
+		switch element {
+		case VideoCodecIAV1,
+			VideoCodecVAV1,
+			VideoCodecNAV1:
+			return &element
+		}
+	}
+	return nil
+}
+
+// HasHWAV1Encoder is the public counterpart to `hwCodecAV1Compatible`,
+// used by the manager's capability probe (`ServerCapabilities`) to
+// decide whether to advertise the `av1` download mode. We don't fall
+// back to libsvtav1 / libaom-av1 because CPU AV1 encode is too slow
+// to be a sensible default at typical scene resolutions; AV1 download
+// is opt-in and only available when HW encoding is.
+func (f *FFMpeg) HasHWAV1Encoder() bool {
+	return f.hwCodecAV1Compatible() != nil
 }
 
 // Return if a hardware accelerated codec for WebM is available

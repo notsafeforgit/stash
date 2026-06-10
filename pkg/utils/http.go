@@ -19,6 +19,15 @@ func GenerateETag(data []byte) string {
 }
 
 func setStaticContentCacheControl(w http.ResponseWriter, r *http.Request) {
+	// Honour an explicit Cache-Control set by the caller. Used by routes
+	// that conditionally serve placeholder content (e.g. the default
+	// gallery / image SVG when no real cover is available yet) which
+	// must not be cached as immutable just because the URL happens to
+	// carry a `?t=` token — the token reflects the parent's UpdatedAt,
+	// not the placeholder fallback's lifetime.
+	if w.Header().Get("Cache-Control") != "" {
+		return
+	}
 	if r.URL.Query().Has("t") {
 		w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
 	} else {

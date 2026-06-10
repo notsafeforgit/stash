@@ -1,0 +1,35 @@
+query FindGroups(
+  $filter: FindFilterType
+  $group_filter: GroupFilterType
+  $group_filter_ast: FilterASTInput
+) {
+  findGroups(
+    filter: $filter
+    group_filter: $group_filter
+    group_filter_ast: $group_filter_ast
+  ) {
+    count
+    groups {
+      ...ListGroupData
+    }
+  }
+}
+
+query FindGroup($id: ID!) {
+  findGroup(id: $id) {
+    ...GroupData
+  }
+}
+
+query FindGroupsForSelect(
+  $filter: FindFilterType
+  $group_filter: GroupFilterType
+  $ids: [ID!]
+) {
+  findGroups(filter: $filter, group_filter: $group_filter, ids: $ids) {
+    count
+    groups {
+      ...SelectGroupData
+    }
+  }
+}

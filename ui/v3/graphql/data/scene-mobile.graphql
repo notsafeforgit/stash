@@ -1,0 +1,27 @@
+fragment MobileSceneData on Scene {
+  id
+  title
+  date
+  details
+  rating100
+  resume_time
+
+  files {
+    id
+    path
+    duration
+    width
+    height
+  }
+
+  paths {
+    screenshot
+    webp
+  }
+
+  studio {
+    id
+    name
+    image_path
+  }
+}

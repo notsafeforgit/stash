@@ -78,8 +78,16 @@ type FFProbeStream struct {
 	RFrameRate        string `json:"r_frame_rate"`
 	Refs              int    `json:"refs,omitempty"`
 	SampleAspectRatio string `json:"sample_aspect_ratio,omitempty"`
-	StartPts          int64  `json:"start_pts"`
-	StartTime         string `json:"start_time"`
+	// Color metadata. Present on most modern files; absent or blank on
+	// older files where ffprobe falls back to bt709-equivalent. Used by
+	// the download endpoint to detect HDR sources (transfer of
+	// "smpte2084" = HDR10/HDR10+/DV; "arib-std-b67" = HLG).
+	ColorRange     string `json:"color_range,omitempty"`
+	ColorSpace     string `json:"color_space,omitempty"`
+	ColorTransfer  string `json:"color_transfer,omitempty"`
+	ColorPrimaries string `json:"color_primaries,omitempty"`
+	StartPts       int64  `json:"start_pts"`
+	StartTime      string `json:"start_time"`
 	Tags              struct {
 		CreationTime json.JSONTime `json:"creation_time"`
 		HandlerName  string        `json:"handler_name"`

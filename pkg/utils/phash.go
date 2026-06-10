@@ -2,14 +2,16 @@ package utils
 
 import (
 	"math"
+	"math/bits"
+	"runtime"
 	"strconv"
+	"sync"
 
-	"github.com/corona10/goimagehash"
 	"github.com/stashapp/stash/pkg/sliceutil"
 )
 
 type Phash struct {
-	SceneID   int     `db:"id"`
+	ID        int     `db:"id"`
 	Hash      int64   `db:"phash"`
 	Duration  float64 `db:"duration"`
 	Neighbors []int
@@ -17,35 +19,65 @@ type Phash struct {
 }
 
 func FindDuplicates(hashes []*Phash, distance int, durationDiff float64) [][]int {
-	for i, scene := range hashes {
-		sceneHash := goimagehash.NewImageHash(uint64(scene.Hash), goimagehash.PHash)
-		for j, neighbor := range hashes {
-			if i != j && scene.SceneID != neighbor.SceneID {
-				neighbourDurationDistance := 0.
-				if scene.Duration > 0 && neighbor.Duration > 0 {
-					neighbourDurationDistance = math.Abs(scene.Duration - neighbor.Duration)
-				}
-				if (neighbourDurationDistance <= durationDiff) || (durationDiff < 0) {
-					neighborHash := goimagehash.NewImageHash(uint64(neighbor.Hash), goimagehash.PHash)
-					neighborDistance, _ := sceneHash.Distance(neighborHash)
-					if neighborDistance <= distance {
-						scene.Neighbors = append(scene.Neighbors, j)
+	// Pre-calculate hash values to avoid allocations and method calls in the inner loop
+	uintHashes := make([]uint64, len(hashes))
+	for i, h := range hashes {
+		uintHashes[i] = uint64(h.Hash)
+	}
+
+	numHashes := len(hashes)
+	numWorkers := runtime.GOMAXPROCS(0)
+	var wg sync.WaitGroup
+	wg.Add(numWorkers)
+
+	// Distribute work among workers
+	for w := 0; w < numWorkers; w++ {
+		go func(workerID int) {
+			defer wg.Done()
+			for i := workerID; i < numHashes; i += numWorkers {
+				subject := hashes[i]
+				subjectHash := uintHashes[i]
+
+				for j := 0; j < numHashes; j++ {
+					if i == j {
+						continue
+					}
+					neighbor := hashes[j]
+					if subject.ID == neighbor.ID {
+						continue
+					}
+
+					// Check duration if applicable (for scenes)
+					if durationDiff >= 0 {
+						if subject.Duration > 0 && neighbor.Duration > 0 {
+							if math.Abs(subject.Duration-neighbor.Duration) > durationDiff {
+								continue
+							}
+						}
+					}
+
+					neighborHash := uintHashes[j]
+					// Hamming distance using native bit counting
+					if bits.OnesCount64(subjectHash^neighborHash) <= distance {
+						subject.Neighbors = append(subject.Neighbors, j)
 					}
 				}
 			}
-		}
+		}(w)
 	}
 
-	var buckets [][]int
-	for _, scene := range hashes {
-		if len(scene.Neighbors) > 0 && scene.Bucket == -1 {
-			bucket := len(buckets)
-			scenes := []int{scene.SceneID}
-			scene.Bucket = bucket
-			findNeighbors(bucket, scene.Neighbors, hashes, &scenes)
+	wg.Wait()
 
-			if len(scenes) > 1 {
-				buckets = append(buckets, scenes)
+	var buckets [][]int
+	for _, subject := range hashes {
+		if len(subject.Neighbors) > 0 && subject.Bucket == -1 {
+			bucket := len(buckets)
+			ids := []int{subject.ID}
+			subject.Bucket = bucket
+			findNeighbors(bucket, subject.Neighbors, hashes, &ids)
+
+			if len(ids) > 1 {
+				buckets = append(buckets, ids)
 			}
 		}
 	}
@@ -53,13 +85,13 @@ func FindDuplicates(hashes []*Phash, distance int, durationDiff float64) [][]int
 	return buckets
 }
 
-func findNeighbors(bucket int, neighbors []int, hashes []*Phash, scenes *[]int) {
+func findNeighbors(bucket int, neighbors []int, hashes []*Phash, ids *[]int) {
 	for _, id := range neighbors {
 		hash := hashes[id]
 		if hash.Bucket == -1 {
 			hash.Bucket = bucket
-			*scenes = sliceutil.AppendUnique(*scenes, hash.SceneID)
-			findNeighbors(bucket, hash.Neighbors, hashes, scenes)
+			*ids = sliceutil.AppendUnique(*ids, hash.ID)
+			findNeighbors(bucket, hash.Neighbors, hashes, ids)
 		}
 	}
 }

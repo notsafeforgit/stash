@@ -292,9 +292,14 @@ func (s *Scanner) handleFolderRename(ctx context.Context, file ScannedFile) (*mo
 func (s *Scanner) onExistingFolder(ctx context.Context, f ScannedFile, existing *models.Folder) (*models.Folder, error) {
 	update := false
 
-	// update if mod time is changed
+	// update if mod time is changed. Compare at second precision because
+	// that is what we persist (pkg/sqlite/timestamp.go formats with
+	// RFC3339, which drops sub-second components on write). Without
+	// truncation, a filesystem mtime with nanoseconds would never
+	// re-equal the value we round-tripped through SQLite, and every scan
+	// would think every folder had changed.
 	entryModTime := f.ModTime
-	if !entryModTime.Equal(existing.ModTime) {
+	if !entryModTime.Truncate(time.Second).Equal(existing.ModTime.Truncate(time.Second)) {
 		existing.Path = f.Path
 		existing.ModTime = entryModTime
 		update = true
@@ -774,8 +779,16 @@ func (s *Scanner) onExistingFile(ctx context.Context, f ScannedFile, existing mo
 	path := base.Path
 
 	fileModTime := f.ModTime
-	// #6326 - also force a rescan if the basename changed
-	updated := !fileModTime.Equal(base.ModTime) || base.Basename != f.Basename
+	// #6326 - also force a rescan if the basename changed.
+	//
+	// Truncate both sides to second precision because the persisted
+	// mod_time is RFC3339-formatted (pkg/sqlite/timestamp.go), which
+	// strips sub-second components on write. Without this, a filesystem
+	// mtime carrying nanoseconds (most modern FSes) would never re-equal
+	// the round-tripped DB value, every scan would mark every file as
+	// updated, and downstream consumers ("Calculating fingerprints …",
+	// "Generating phash for …" subtasks) would all run unnecessarily.
+	updated := !fileModTime.Truncate(time.Second).Equal(base.ModTime.Truncate(time.Second)) || base.Basename != f.Basename
 	forceRescan := s.Rescan
 
 	if !updated && !forceRescan {

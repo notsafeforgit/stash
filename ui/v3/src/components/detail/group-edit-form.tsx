@@ -110,8 +110,10 @@ function formValuesToInput(
     id,
     name: v.name || undefined,
     // null = no change (omit), "" = clear, non-empty = new image data
-    front_image: v.front_image === null ? undefined : v.front_image,
-    back_image: v.back_image === null ? undefined : v.back_image,
+    front_image_input:
+      v.front_image === null ? undefined : { data: v.front_image },
+    back_image_input:
+      v.back_image === null ? undefined : { data: v.back_image },
     aliases: v.aliases.filter(Boolean).join(", ") || null,
     date: v.date || null,
     director: v.director || null,
@@ -127,8 +129,8 @@ function formValuesToInput(
 function formValuesToCreateInput(v: GroupFormValues): GQL.GroupCreateInput {
   return {
     name: v.name,
-    front_image: v.front_image || undefined,
-    back_image: v.back_image || undefined,
+    front_image_input: v.front_image ? { data: v.front_image } : undefined,
+    back_image_input: v.back_image ? { data: v.back_image } : undefined,
     aliases: v.aliases.filter(Boolean).join(", ") || undefined,
     date: v.date || undefined,
     director: v.director || undefined,

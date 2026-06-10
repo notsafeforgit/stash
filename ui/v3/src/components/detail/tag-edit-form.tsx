@@ -104,7 +104,7 @@ function formValuesToInput(id: string, v: TagFormValues): GQL.TagUpdateInput {
     id,
     name: v.name || undefined,
     // null = no change (omit), "" = clear, non-empty = new image data
-    image: v.image === null ? undefined : v.image,
+    image_input: v.image === null ? undefined : { data: v.image },
     sort_name: v.sort_name || null,
     description: v.description || null,
     aliases: v.aliases.filter(Boolean),
@@ -122,7 +122,7 @@ function formValuesToInput(id: string, v: TagFormValues): GQL.TagUpdateInput {
 function formValuesToCreateInput(v: TagFormValues): GQL.TagCreateInput {
   return {
     name: v.name,
-    image: v.image || undefined,
+    image_input: v.image ? { data: v.image } : undefined,
     sort_name: v.sort_name || undefined,
     description: v.description || undefined,
     aliases: v.aliases.filter(Boolean),

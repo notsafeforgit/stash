@@ -194,7 +194,7 @@ function formValuesToInput(
     id,
     name: v.name || undefined,
     // null = unchanged, "" = clear, non-empty = new image data
-    image: v.image === null ? undefined : v.image,
+    image_input: v.image === null ? undefined : { data: v.image },
     disambiguation: v.disambiguation || null,
     aliases: v.aliases
       .filter((a) => a.alias.trim())
@@ -237,7 +237,7 @@ function formValuesToCreateInput(
 ): GQL.PerformerCreateInput {
   return {
     name: v.name,
-    image: v.image || undefined,
+    image_input: v.image ? { data: v.image } : undefined,
     disambiguation: v.disambiguation || undefined,
     aliases: v.aliases
       .filter((a) => a.alias.trim())

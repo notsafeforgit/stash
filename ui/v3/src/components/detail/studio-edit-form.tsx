@@ -118,7 +118,7 @@ function formValuesToInput(
     id,
     name: v.name || undefined,
     // null = no change (omit), "" = clear, non-empty = new image data
-    image: v.image === null ? undefined : v.image,
+    image_input: v.image === null ? undefined : { data: v.image },
     aliases: v.aliases.filter(Boolean),
     details: v.details || null,
     urls: v.urls.filter(Boolean),
@@ -138,7 +138,7 @@ function formValuesToInput(
 function formValuesToCreateInput(v: StudioFormValues): GQL.StudioCreateInput {
   return {
     name: v.name,
-    image: v.image || undefined,
+    image_input: v.image ? { data: v.image } : undefined,
     aliases: v.aliases.filter(Boolean),
     details: v.details || undefined,
     urls: v.urls.filter(Boolean),

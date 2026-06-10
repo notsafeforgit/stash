@@ -9,11 +9,56 @@ const blobToDataURL = (blob: Blob): Promise<string> =>
     reader.readAsDataURL(blob);
   });
 
-const readImage = (file: File, onLoadEnd: (imageData: string) => void) => {
-  // only proceed if no error encountered
-  blobToDataURL(file)
-    .then(onLoadEnd)
-    .catch(() => {});
+const entityImageAccept =
+  "image/jpeg,image/png,image/webp,image/gif,image/avif";
+
+const heicBrands = new Set([
+  "heic",
+  "heix",
+  "hevc",
+  "hevx",
+  "heim",
+  "heis",
+  "hevm",
+  "hevs",
+]);
+
+async function isHEICBlob(blob: Blob, fileName?: string): Promise<boolean> {
+  const type = blob.type.toLowerCase();
+  if (type === "image/heic" || type === "image/heif") return true;
+  if (fileName && /\.(heic|heif)$/i.test(fileName)) return true;
+
+  const header = new Uint8Array(await blob.slice(0, 64).arrayBuffer());
+  if (header.length < 12) return false;
+  const brandHeader = String.fromCharCode(...header.slice(4, 8));
+  if (brandHeader !== "ftyp") return false;
+
+  for (let i = 8; i + 4 <= header.length; i += 4) {
+    const brand = String.fromCharCode(...header.slice(i, i + 4));
+    if (heicBrands.has(brand)) return true;
+  }
+
+  return false;
+}
+
+async function entityImageBlobToDataURL(
+  blob: Blob,
+  fileName?: string,
+): Promise<string> {
+  if (await isHEICBlob(blob, fileName)) {
+    throw new Error(
+      "HEIC/HEIF images are not supported for entity images. Use JPEG, PNG, WebP, GIF, or AVIF.",
+    );
+  }
+
+  return blobToDataURL(blob);
+}
+
+const readImage = async (
+  file: File,
+  onLoadEnd: (imageData: string) => void,
+) => {
+  onLoadEnd(await entityImageBlobToDataURL(file, file.name));
 };
 
 const onImageChange = (
@@ -21,13 +66,14 @@ const onImageChange = (
   onLoadEnd: (imageData: string) => void,
 ) => {
   const file = event?.currentTarget?.files?.[0];
-  if (file) readImage(file, onLoadEnd);
+  if (file) return readImage(file, onLoadEnd);
+  return Promise.resolve();
 };
 
 const imageToDataURL = async (url: string) => {
   const response = await fetch(url);
   const blob = await response.blob();
-  return blobToDataURL(blob);
+  return entityImageBlobToDataURL(blob, url);
 };
 
 // uses event.clipboardData which works in all contexts including insecure HTTP
@@ -44,7 +90,7 @@ const pasteImage = (
   }
 
   const file = Array.from(files).find((f) => f.type.startsWith("image/"));
-  if (file) readImage(file, onLoadEnd);
+  if (file) void readImage(file, onLoadEnd).catch(() => {});
 };
 
 // uses Clipboard API which requires secure context (HTTPS or localhost)
@@ -58,7 +104,7 @@ const readClipboardImage = async (): Promise<string | null> => {
     const imageType = item.types.find((t) => t.startsWith("image/"));
     if (imageType) {
       const blob = await item.getType(imageType);
-      return blobToDataURL(blob);
+      return entityImageBlobToDataURL(blob);
     }
   }
   return null;
@@ -88,6 +134,7 @@ const usePasteImage = (
 };
 
 const ImageUtils = {
+  entityImageAccept,
   onImageChange,
   usePasteImage,
   imageToDataURL,

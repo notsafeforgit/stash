@@ -43,10 +43,15 @@ export function ImageInput({
   const [urlMode, setUrlMode] = useState(false);
   const [urlValue, setUrlValue] = useState("");
 
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    ImageUtils.onImageChange(e, (data) => onChange(data));
-    // reset so the same file can be re-selected if needed
-    if (fileRef.current) (fileRef.current as HTMLInputElement).value = "";
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    try {
+      await ImageUtils.onImageChange(e, (data) => onChange(data));
+    } catch (err) {
+      toast.error(errorToString(err));
+    } finally {
+      // reset so the same file can be re-selected if needed
+      if (fileRef.current) (fileRef.current as HTMLInputElement).value = "";
+    }
   }
 
   async function handleClipboard() {
@@ -230,7 +235,7 @@ export function ImageInput({
       <Input
         ref={fileRef}
         type="file"
-        accept="image/*"
+        accept={ImageUtils.entityImageAccept}
         className="sr-only"
         onChange={handleFile}
         disabled={disabled}

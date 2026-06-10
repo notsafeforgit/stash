@@ -38,8 +38,12 @@ input MovieCreateInput {
   tag_ids: [ID!]
   "This should be a URL or a base64 encoded data URL"
   front_image: String
+  "Normalized front image input. Rejects HEIC/HEIF and stores as WebP."
+  front_image_input: EntityImageInput
   "This should be a URL or a base64 encoded data URL"
   back_image: String
+  "Normalized back image input. Rejects HEIC/HEIF and stores as WebP."
+  back_image_input: EntityImageInput
 }
 
 input MovieUpdateInput {
@@ -58,8 +62,12 @@ input MovieUpdateInput {
   tag_ids: [ID!]
   "This should be a URL or a base64 encoded data URL"
   front_image: String
+  "Normalized front image input. Rejects HEIC/HEIF and stores as WebP."
+  front_image_input: EntityImageInput
   "This should be a URL or a base64 encoded data URL"
   back_image: String
+  "Normalized back image input. Rejects HEIC/HEIF and stores as WebP."
+  back_image_input: EntityImageInput
 }
 
 input BulkMovieUpdateInput {

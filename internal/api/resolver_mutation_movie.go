@@ -6,12 +6,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/stashapp/stash/internal/entityimage"
 	"github.com/stashapp/stash/internal/manager/config"
-	"github.com/stashapp/stash/internal/static"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/plugin/hook"
 	"github.com/stashapp/stash/pkg/sliceutil/stringslice"
-	"github.com/stashapp/stash/pkg/utils"
 )
 
 // used to refetch group after hooks run
@@ -83,19 +82,17 @@ func (r *mutationResolver) MovieCreate(ctx context.Context, input MovieCreateInp
 		newGroup.URLs = models.NewRelatedStrings([]string{strings.TrimSpace(*input.URL)})
 	}
 
-	// Process the base 64 encoded image string
 	var frontimageData []byte
-	if input.FrontImage != nil {
-		frontimageData, err = utils.ProcessImageInput(ctx, *input.FrontImage)
+	if input.FrontImage != nil || input.FrontImageInput != nil {
+		frontimageData, _, err = r.processEntityImageFields(ctx, input.FrontImage, input.FrontImageInput)
 		if err != nil {
 			return nil, fmt.Errorf("processing front image: %w", err)
 		}
 	}
 
-	// Process the base 64 encoded image string
 	var backimageData []byte
-	if input.BackImage != nil {
-		backimageData, err = utils.ProcessImageInput(ctx, *input.BackImage)
+	if input.BackImage != nil || input.BackImageInput != nil {
+		backimageData, _, err = r.processEntityImageFields(ctx, input.BackImage, input.BackImageInput)
 		if err != nil {
 			return nil, fmt.Errorf("processing back image: %w", err)
 		}
@@ -104,7 +101,7 @@ func (r *mutationResolver) MovieCreate(ctx context.Context, input MovieCreateInp
 	// HACK: if back image is being set, set the front image to the default.
 	// This is because we can't have a null front image with a non-null back image.
 	if len(frontimageData) == 0 && len(backimageData) != 0 {
-		frontimageData = static.ReadAll(static.DefaultGroupImage)
+		frontimageData = entityimage.DefaultGroupFrontImage
 	}
 
 	// Start the transaction and save the group
@@ -177,21 +174,21 @@ func (r *mutationResolver) MovieUpdate(ctx context.Context, input MovieUpdateInp
 	updatedGroup.URLs = translator.optionalURLs(input.Urls, input.URL)
 
 	var frontimageData []byte
-	frontImageIncluded := translator.hasField("front_image")
-	if input.FrontImage != nil {
-		frontimageData, err = utils.ProcessImageInput(ctx, *input.FrontImage)
-		if err != nil {
-			return nil, fmt.Errorf("processing front image: %w", err)
-		}
+	frontimageData, frontImageIncluded, err := r.processEntityImageFields(ctx, input.FrontImage, input.FrontImageInput)
+	if err != nil {
+		return nil, fmt.Errorf("processing front image: %w", err)
+	}
+	if !frontImageIncluded && (translator.hasField("front_image") || translator.hasField("front_image_input")) {
+		frontImageIncluded = true
 	}
 
 	var backimageData []byte
-	backImageIncluded := translator.hasField("back_image")
-	if input.BackImage != nil {
-		backimageData, err = utils.ProcessImageInput(ctx, *input.BackImage)
-		if err != nil {
-			return nil, fmt.Errorf("processing back image: %w", err)
-		}
+	backimageData, backImageIncluded, err := r.processEntityImageFields(ctx, input.BackImage, input.BackImageInput)
+	if err != nil {
+		return nil, fmt.Errorf("processing back image: %w", err)
+	}
+	if !backImageIncluded && (translator.hasField("back_image") || translator.hasField("back_image_input")) {
+		backImageIncluded = true
 	}
 
 	// Start the transaction and save the group

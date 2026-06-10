@@ -124,7 +124,9 @@ export function TagImagesTab({ tag }: { tag: TagData }) {
       onSetTagImage: async () => {
         try {
           await updateTag({
-            variables: { input: { id: tag.id, image_from_image_id: image.id } },
+            variables: {
+              input: { id: tag.id, image_input: { image_id: image.id } },
+            },
           });
           toast.success(
             intl.formatMessage({

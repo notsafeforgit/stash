@@ -1,7 +1,11 @@
 # Dependencies
 /node_modules
 
+# Generated
+/src/core/generated-graphql.ts
+
 # Build output
+/build
 /dist
 
 # Local tool caches

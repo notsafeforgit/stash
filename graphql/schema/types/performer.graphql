@@ -95,6 +95,8 @@ input PerformerCreateInput {
   tag_ids: [ID!]
   "This should be a URL or a base64 encoded data URL"
   image: String
+  "Normalized entity image input. Rejects HEIC/HEIF and stores as WebP."
+  image_input: EntityImageInput
   stash_ids: [StashIDInput!]
   # rating expressed as 1-100
   rating100: Int
@@ -137,8 +139,8 @@ input PerformerUpdateInput {
   tag_ids: [ID!]
   "This should be a URL or a base64 encoded data URL"
   image: String
-  "Set the image from an existing image in the library by its ID"
-  image_from_image_id: ID
+  "Normalized entity image input. Rejects HEIC/HEIF and stores as WebP."
+  image_input: EntityImageInput
   stash_ids: [StashIDInput!]
   # rating expressed as 1-100
   rating100: Int

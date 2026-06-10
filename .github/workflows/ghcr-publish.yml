@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  COMPILER_IMAGE: ghcr.io/stashapp/compiler:13
+  COMPILER_IMAGE: ghcr.io/stashapp/compiler:14
 
 jobs:
   build-and-push:

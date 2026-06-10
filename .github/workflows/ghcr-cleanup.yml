@@ -1,4 +1,4 @@
-name: Clean Old GHCR Develop Builds
+name: Clean Old GHCR Branch Builds
 
 on:
   workflow_run:
@@ -28,7 +28,7 @@ jobs:
       RETENTION_DAYS: 14
 
     steps:
-    - name: Delete expired develop build tags
+    - name: Delete expired branch build tags
       uses: actions/github-script@v8
       with:
         script: |
@@ -37,6 +37,7 @@ jobs:
           const ownerType = context.payload.repository.owner.type;
           const retentionDays = Number(process.env.RETENTION_DAYS ?? "14");
           const cutoff = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
+          const branchBuildTagPattern = /^(develop|v3-rewrite)-[0-9a-f]{7,}$/i;
 
           const listPackageVersions =
             ownerType === "Organization"
@@ -92,16 +93,16 @@ jobs:
             }
 
             const isExpired = Date.parse(updatedAt) < cutoff;
-            const hasOnlyDevelopBuildTags = tags.every((tag) =>
-              /^develop-[0-9a-f]{7,}$/i.test(tag)
+            const hasOnlyBranchBuildTags = tags.every((tag) =>
+              branchBuildTagPattern.test(tag)
             );
 
-            return isExpired && hasOnlyDevelopBuildTags;
+            return isExpired && hasOnlyBranchBuildTags;
           });
 
           if (versionsToDelete.length === 0) {
             core.info(
-              `No expired develop build ${packageName} image versions found.`
+              `No expired branch build ${packageName} image versions found.`
             );
             return;
           }

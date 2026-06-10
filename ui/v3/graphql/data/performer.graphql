@@ -1,0 +1,54 @@
+fragment PerformerAliasData on PerformerAlias {
+  alias
+  ignore_auto_tag
+}
+
+fragment PerformerData on Performer {
+  id
+  name
+  disambiguation
+  urls
+  gender
+  birthdate
+  ethnicity
+  country
+  eye_color
+  height_cm
+  measurements
+  fake_tits
+  penis_length
+  circumcised
+  career_start
+  career_end
+  tattoos
+  piercings
+  aliases {
+    ...PerformerAliasData
+  }
+  favorite
+  ignore_auto_tag
+  image_path
+  scene_count
+  image_count
+  gallery_count
+  group_count
+  performer_count
+  o_counter
+
+  tags {
+    ...SlimTagData
+  }
+
+  stash_ids {
+    stash_id
+    endpoint
+    updated_at
+  }
+  rating100
+  details
+  death_date
+  hair_color
+  weight
+
+  custom_fields
+}

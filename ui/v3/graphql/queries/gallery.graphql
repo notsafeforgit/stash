@@ -1,0 +1,49 @@
+query FindGalleries(
+  $filter: FindFilterType
+  $gallery_filter: GalleryFilterType
+  $gallery_filter_ast: FilterASTInput
+) {
+  findGalleries(
+    gallery_filter: $gallery_filter
+    gallery_filter_ast: $gallery_filter_ast
+    filter: $filter
+  ) {
+    count
+    galleries {
+      ...SlimGalleryData
+    }
+  }
+}
+
+query FindGallery($id: ID!) {
+  findGallery(id: $id) {
+    ...GalleryData
+  }
+}
+
+query FindGalleriesForSelect(
+  $filter: FindFilterType
+  $gallery_filter: GalleryFilterType
+  $ids: [ID!]
+) {
+  findGalleries(filter: $filter, gallery_filter: $gallery_filter, ids: $ids) {
+    count
+    galleries {
+      ...SelectGalleryData
+    }
+  }
+}
+
+query FindGalleryImageID($id: ID!, $index: Int!) {
+  findGallery(id: $id) {
+    # Select the gallery's own `id` so Apollo can normalise the
+    # result into the shared `Gallery:N` entity. Without it the
+    # response stores inline under `Query.findGallery` and a later
+    # normalised `FindGallery` write triggers a "Cache data may be
+    # lost" merge warning when the cached shapes don't match.
+    id
+    image(index: $index) {
+      id
+    }
+  }
+}

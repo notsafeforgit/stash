@@ -1,0 +1,61 @@
+subscription JobsSubscribe {
+  jobsSubscribe {
+    type
+    job {
+      id
+      status
+      subTasks
+      description
+      progress
+      error
+      startTime
+    }
+  }
+}
+
+# Lifecycle-only subscription — never drops ADD/REMOVE events. Use this in
+# any UI that needs to track jobs by id (the task queue, the per-job
+# progress watcher, etc.). Pair with JobsProgressSubscribe for live
+# percentage / subtask updates.
+subscription JobsLifecycleSubscribe {
+  jobsLifecycleSubscribe {
+    type
+    job {
+      id
+      status
+      subTasks
+      description
+      progress
+      error
+      startTime
+    }
+  }
+}
+
+# Progress-only subscription — lossy under load by design. Each UPDATE
+# carries the latest known state of the job; if the consumer misses a
+# tick the next one supersedes it.
+subscription JobsProgressSubscribe {
+  jobsProgressSubscribe {
+    type
+    job {
+      id
+      status
+      subTasks
+      description
+      progress
+      error
+      startTime
+    }
+  }
+}
+
+subscription LoggingSubscribe {
+  loggingSubscribe {
+    ...LogEntryData
+  }
+}
+
+subscription ScanCompleteSubscribe {
+  scanCompleteSubscribe
+}

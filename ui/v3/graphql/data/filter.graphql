@@ -1,0 +1,18 @@
+fragment SavedFilterData on SavedFilter {
+  id
+  mode
+  name
+  find_filter {
+    q
+    page
+    per_page
+    sort
+    direction
+  }
+  filter_ast
+  ui_options
+}
+
+query CustomFieldNames($mode: FilterMode!) {
+  customFieldNames(mode: $mode)
+}

@@ -25,9 +25,7 @@ jobs:
       - name: Generate Backend
         run: make generate-backend
 
-      ## WARN
-      ## using v1, update in a later PR
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v8
+        uses: golangci/golangci-lint-action@v9
         with:
           version: v2.11.4

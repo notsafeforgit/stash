@@ -17,7 +17,6 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-24.04
-    # Optional: Give workflow permissions to write to GHCR
     permissions:
       contents: read
       packages: write
@@ -87,3 +86,105 @@ jobs:
         tags: |
           ghcr.io/${{ steps.repository_owner.outputs.owner }}/stash:${{ steps.repository_owner.outputs.branch }}
           ghcr.io/${{ steps.repository_owner.outputs.owner }}/stash:${{ steps.repository_owner.outputs.branch }}-${{ steps.repository_owner.outputs.short_sha }}
+
+  cleanup-images:
+    needs: build-and-push
+    if: ${{ needs.build-and-push.result == 'success' }}
+    continue-on-error: true
+    runs-on: ubuntu-24.04
+    permissions:
+      packages: write
+    env:
+      RETENTION_DAYS: 14
+
+    steps:
+    - name: Delete expired branch build tags
+      uses: actions/github-script@v8
+      with:
+        script: |
+          const owner = context.repo.owner;
+          const packageName = "stash";
+          const ownerType = context.payload.repository.owner.type;
+          const retentionDays = Number(process.env.RETENTION_DAYS ?? "14");
+          const cutoff = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
+          const branchBuildTagPattern = /^(develop|v3-rewrite)-[0-9a-f]{7,}$/i;
+
+          const listPackageVersions =
+            ownerType === "Organization"
+              ? github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg
+              : github.rest.packages.getAllPackageVersionsForPackageOwnedByUser;
+
+          const listPackageVersionParams =
+            ownerType === "Organization"
+              ? {
+                  org: owner,
+                  package_type: "container",
+                  package_name: packageName,
+                  per_page: 100,
+                }
+              : {
+                  username: owner,
+                  package_type: "container",
+                  package_name: packageName,
+                  per_page: 100,
+                };
+
+          const deletePackageVersion =
+            ownerType === "Organization"
+              ? (packageVersionId) =>
+                  github.rest.packages.deletePackageVersionForOrg({
+                    org: owner,
+                    package_type: "container",
+                    package_name: packageName,
+                    package_version_id: packageVersionId,
+                  })
+              : (packageVersionId) =>
+                  github.rest.packages.deletePackageVersionForUser({
+                    username: owner,
+                    package_type: "container",
+                    package_name: packageName,
+                    package_version_id: packageVersionId,
+                  });
+
+          const versions = await github.paginate(
+            listPackageVersions,
+            listPackageVersionParams
+          );
+
+          const versionsToDelete = versions.filter((version) => {
+            const tags = version.metadata?.container?.tags ?? [];
+            if (tags.length === 0) {
+              return false;
+            }
+
+            const updatedAt = version.updated_at ?? version.created_at;
+            if (!updatedAt) {
+              return false;
+            }
+
+            const isExpired = Date.parse(updatedAt) < cutoff;
+            const hasOnlyBranchBuildTags = tags.every((tag) =>
+              branchBuildTagPattern.test(tag)
+            );
+
+            return isExpired && hasOnlyBranchBuildTags;
+          });
+
+          if (versionsToDelete.length === 0) {
+            core.info(
+              `No expired branch build ${packageName} image versions found.`
+            );
+            return;
+          }
+
+          for (const version of versionsToDelete) {
+            const tags = version.metadata?.container?.tags ?? [];
+            core.info(
+              `Deleting tagged [${tags.join(", ")}] ${packageName} image version ${version.id}`
+            );
+            await deletePackageVersion(version.id);
+          }
+
+          core.info(
+            `Deleted ${versionsToDelete.length} ${packageName} image version(s).`
+          );

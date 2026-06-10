@@ -180,6 +180,9 @@ input BulkUpdateIds {
 input BulkSceneUpdateInput {
   clientMutationId: String
   ids: [ID!]
+  apply_to_items_matching_filters: Boolean
+  find_filter: FindFilterType
+  scene_filter: SceneFilterType
   title: String
   code: String
   details: String
@@ -198,6 +201,20 @@ input BulkSceneUpdateInput {
   movie_ids: BulkUpdateIds @deprecated(reason: "Use group_ids")
 
   custom_fields: CustomFieldsInput
+}
+
+"""
+Set each scene's date to the mtime of its primary file. Mirrors the dual-mode
+contract of BulkSceneUpdateInput: pass an explicit `ids` list, or set
+`apply_to_items_matching_filters: true` and supply `find_filter` /
+`scene_filter` to operate on every match.
+"""
+input ScenesSetDateFromFileMTimeInput {
+  clientMutationId: String
+  ids: [ID!]
+  apply_to_items_matching_filters: Boolean
+  find_filter: FindFilterType
+  scene_filter: SceneFilterType
 }
 
 input SceneDestroyInput {

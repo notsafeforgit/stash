@@ -16,7 +16,13 @@ const updateInputField = "input"
 
 func getArgumentMap(ctx context.Context) map[string]interface{} {
 	rctx := graphql.GetFieldContext(ctx)
+	if rctx == nil {
+		return nil
+	}
 	reqCtx := graphql.GetOperationContext(ctx)
+	if reqCtx == nil {
+		return nil
+	}
 	return rctx.Field.ArgumentMap(reqCtx.Variables)
 }
 

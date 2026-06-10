@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -22,6 +23,20 @@ func (r *mutationResolver) getTag(ctx context.Context, id int) (ret *models.Tag,
 	}
 
 	return ret, nil
+}
+
+type tagBulkUpdateOperation struct {
+	repository models.TagReaderWriter
+	updatedTag models.TagPartial
+}
+
+func (o tagBulkUpdateOperation) Update(ctx context.Context, id int) error {
+	if err := tag.ValidateUpdate(ctx, id, o.updatedTag, o.repository); err != nil {
+		return err
+	}
+
+	_, err := o.repository.UpdatePartial(ctx, id, o.updatedTag)
+	return err
 }
 
 func (r *mutationResolver) TagCreate(ctx context.Context, input TagCreateInput) (*models.Tag, error) {
@@ -167,6 +182,34 @@ func (r *mutationResolver) TagUpdate(ctx context.Context, input TagUpdateInput) 
 		}
 	}
 
+	if !imageIncluded && input.ImageFromImageID != nil {
+		srcImageID, err := strconv.Atoi(*input.ImageFromImageID)
+		if err != nil {
+			return nil, fmt.Errorf("converting image_from_image_id: %w", err)
+		}
+		if err := r.withReadTxn(ctx, func(ctx context.Context) error {
+			img, err := r.repository.Image.Find(ctx, srcImageID)
+			if err != nil {
+				return fmt.Errorf("finding source image: %w", err)
+			}
+			if img != nil {
+				if err := img.LoadPrimaryFile(ctx, r.repository.File); err != nil {
+					return fmt.Errorf("loading image file: %w", err)
+				}
+				if f := img.Files.Primary(); f != nil {
+					imageData, err = os.ReadFile(f.Base().Path)
+					if err != nil {
+						return fmt.Errorf("reading image file: %w", err)
+					}
+					imageIncluded = true
+				}
+			}
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+	}
+
 	// Start the transaction and save the tag
 	var t *models.Tag
 	if err := r.withTxn(ctx, func(ctx context.Context) error {
@@ -225,6 +268,45 @@ func (r *mutationResolver) BulkTagUpdate(ctx context.Context, input BulkTagUpdat
 		return nil, fmt.Errorf("converting ids: %w", err)
 	}
 
+	compatInput := input
+	compatInput.ApplyToItemsMatchingFilters = nil
+	compatInput.FindFilter = nil
+	compatInput.TagFilter = nil
+
+	if _, err := r.BulkTagUpdateJob(ctx, compatInput); err != nil {
+		return nil, err
+	}
+
+	return refetchBulkUpdateResults(ctx, tagIDs, r.getTag)
+}
+
+func (r *mutationResolver) BulkTagUpdateJob(ctx context.Context, input BulkTagUpdateInput) (string, error) {
+	tagIDs, err := stringslice.StringSliceToIntSlice(input.Ids)
+	if err != nil {
+		return "", fmt.Errorf("converting ids: %w", err)
+	}
+
+	useBackgroundJob := (input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters) ||
+		(len(input.Ids) == 0 && (input.FindFilter != nil || input.TagFilter != nil))
+	if useBackgroundJob {
+		findFilter := sanitizeBulkUpdateFindFilter(input.FindFilter)
+		err = r.withReadTxn(ctx, func(ctx context.Context) error {
+			result, _, qErr := r.repository.Tag.Query(ctx, input.TagFilter, findFilter)
+			if qErr != nil {
+				return qErr
+			}
+			var fetchedIds []int
+			for _, item := range result {
+				fetchedIds = append(fetchedIds, item.ID)
+			}
+			tagIDs = fetchedIds
+			return nil
+		})
+		if err != nil {
+			return "", err
+		}
+	}
+
 	translator := changesetTranslator{
 		inputMap: getUpdateInputMap(ctx),
 	}
@@ -240,52 +322,41 @@ func (r *mutationResolver) BulkTagUpdate(ctx context.Context, input BulkTagUpdat
 
 	updatedTag.ParentIDs, err = translator.updateIdsBulk(input.ParentIds, "parent_ids")
 	if err != nil {
-		return nil, fmt.Errorf("converting parent tag ids: %w", err)
+		return "", fmt.Errorf("converting parent tag ids: %w", err)
 	}
 
 	updatedTag.ChildIDs, err = translator.updateIdsBulk(input.ChildIds, "child_ids")
 	if err != nil {
-		return nil, fmt.Errorf("converting child tag ids: %w", err)
+		return "", fmt.Errorf("converting child tag ids: %w", err)
 	}
 
-	ret := []*models.Tag{}
+	operation := tagBulkUpdateOperation{
+		repository: r.repository.Tag,
+		updatedTag: updatedTag,
+	}
 
-	// Start the transaction and save the scenes
-	if err := r.withTxn(ctx, func(ctx context.Context) error {
-		qb := r.repository.Tag
+	if !useBackgroundJob {
+		if err := r.withTxn(ctx, func(ctx context.Context) error {
+			for _, tagID := range tagIDs {
+				if err := operation.Update(ctx, tagID); err != nil {
+					return err
+				}
+			}
+			return nil
+		}); err != nil {
+			return "", err
+		}
 
 		for _, tagID := range tagIDs {
-			if err := tag.ValidateUpdate(ctx, tagID, updatedTag, qb); err != nil {
-				return err
-			}
-
-			tag, err := qb.UpdatePartial(ctx, tagID, updatedTag)
-			if err != nil {
-				return err
-			}
-
-			ret = append(ret, tag)
+			r.hookExecutor.ExecutePostHooks(ctx, tagID, hook.TagUpdatePost, input, translator.getFields())
 		}
 
-		return nil
-	}); err != nil {
-		return nil, err
+		return "sync", nil
 	}
 
-	// execute post hooks outside of txn
-	var newRet []*models.Tag
-	for _, tag := range ret {
-		r.hookExecutor.ExecutePostHooks(ctx, tag.ID, hook.TagUpdatePost, input, translator.getFields())
+	jobID := r.enqueueBulkUpdate(ctx, "Bulk Tag Update", tagIDs, operation, hook.TagUpdatePost, input, translator.getFields())
 
-		tag, err = r.getTag(ctx, tag.ID)
-		if err != nil {
-			return nil, err
-		}
-
-		newRet = append(newRet, tag)
-	}
-
-	return newRet, nil
+	return strconv.Itoa(jobID), nil
 }
 
 func (r *mutationResolver) TagDestroy(ctx context.Context, input TagDestroyInput) (bool, error) {

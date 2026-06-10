@@ -63,6 +63,9 @@ input ImageUpdateInput {
 input BulkImageUpdateInput {
   clientMutationId: String
   ids: [ID!]
+  apply_to_items_matching_filters: Boolean
+  find_filter: FindFilterType
+  image_filter: ImageFilterType
   title: String
   code: String
   # rating expressed as 1-100
@@ -81,6 +84,20 @@ input BulkImageUpdateInput {
   custom_fields: CustomFieldsInput
 }
 
+"""
+Set each image's date to the mtime of its primary file. Mirrors the dual-mode
+contract of BulkImageUpdateInput: pass an explicit `ids` list, or set
+`apply_to_items_matching_filters: true` and supply `find_filter` /
+`image_filter` to operate on every match.
+"""
+input ImagesSetDateFromFileMTimeInput {
+  clientMutationId: String
+  ids: [ID!]
+  apply_to_items_matching_filters: Boolean
+  find_filter: FindFilterType
+  image_filter: ImageFilterType
+}
+
 input ImageDestroyInput {
   id: ID!
   delete_file: Boolean
@@ -95,6 +112,21 @@ input ImagesDestroyInput {
   delete_generated: Boolean
   "If true, delete the file entry from the database if the file is not assigned to any other objects"
   destroy_file_entry: Boolean
+}
+
+"Direction of an in-place EXIF orientation rotation."
+enum ImageRotateDirection {
+  "Rotate the displayed image 90° clockwise."
+  CW
+  "Rotate the displayed image 90° counter-clockwise."
+  CCW
+  "Flip the displayed image upside-down (180°)."
+  FLIP
+}
+
+input ImageRotateInput {
+  id: ID!
+  direction: ImageRotateDirection!
 }
 
 type FindImagesResultType {

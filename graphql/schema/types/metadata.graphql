@@ -362,6 +362,24 @@ type SystemStatus {
   ffprobePath: String
 }
 
+"""
+Static, server-determined capability flags for the v3 client. Probed
+at server startup and cached for the process lifetime — restart the
+server to re-probe (e.g. after installing a new ffmpeg build with HW
+encoder support).
+"""
+type ServerCapabilities {
+  """
+  Modes accepted by the `mode` query parameter on
+  `GET /scene/{id}/download.mp4`. Always includes the universal modes
+  ("auto", "copy", "copy-aac", "h264"); includes "hevc" when the
+  server has at least one HEVC encoder available (HW preferred:
+  hevc_qsv / hevc_nvenc / hevc_vaapi / hevc_videotoolbox; libx265 as
+  the slow CPU fallback).
+  """
+  downloadFormats: [String!]!
+}
+
 input MigrateInput {
   backupPath: String!
 }

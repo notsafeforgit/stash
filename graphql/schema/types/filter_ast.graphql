@@ -1,0 +1,23 @@
+enum FilterGroupOperator {
+  AND
+  OR
+}
+
+input FilterASTConditionInput {
+  field: String!
+  value: Any
+}
+
+input FilterASTGroupInput {
+  operator: FilterGroupOperator!
+  children: [FilterASTNodeInput!]!
+}
+
+input FilterASTNodeInput {
+  group: FilterASTGroupInput
+  condition: FilterASTConditionInput
+}
+
+input FilterASTInput {
+  root: FilterASTNodeInput!
+}

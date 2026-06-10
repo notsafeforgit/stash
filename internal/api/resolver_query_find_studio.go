@@ -24,7 +24,7 @@ func (r *queryResolver) FindStudio(ctx context.Context, id string) (ret *models.
 	return ret, nil
 }
 
-func (r *queryResolver) FindStudios(ctx context.Context, studioFilter *models.StudioFilterType, filter *models.FindFilterType, ids []string) (ret *FindStudiosResultType, err error) {
+func (r *queryResolver) FindStudios(ctx context.Context, studioFilter *models.StudioFilterType, studioFilterAST *models.FilterAST, filter *models.FindFilterType, ids []string) (ret *FindStudiosResultType, err error) {
 	idInts, err := handleIDList(ids, "ids")
 	if err != nil {
 		return nil, err
@@ -35,10 +35,13 @@ func (r *queryResolver) FindStudios(ctx context.Context, studioFilter *models.St
 		var err error
 		var total int
 
-		if len(idInts) > 0 {
+		switch {
+		case len(idInts) > 0:
 			studios, err = r.repository.Studio.FindMany(ctx, idInts)
 			total = len(studios)
-		} else {
+		case studioFilterAST != nil:
+			studios, total, err = r.repository.Studio.QueryAST(ctx, studioFilterAST, filter)
+		default:
 			studios, total, err = r.repository.Studio.Query(ctx, studioFilter, filter)
 		}
 		if err != nil {

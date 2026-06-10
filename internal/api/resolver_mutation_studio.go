@@ -82,6 +82,22 @@ func (r *mutationResolver) getStudio(ctx context.Context, id int) (ret *models.S
 	return ret, nil
 }
 
+type studioBulkUpdateOperation struct {
+	repository models.StudioReaderWriter
+	partial    models.StudioPartial
+}
+
+func (o studioBulkUpdateOperation) Update(ctx context.Context, id int) error {
+	local := o.partial
+	local.ID = id
+	if err := studio.ValidateModify(ctx, local, o.repository); err != nil {
+		return err
+	}
+
+	_, err := o.repository.UpdatePartial(ctx, local)
+	return err
+}
+
 func (r *mutationResolver) StudioCreate(ctx context.Context, input models.StudioCreateInput) (*models.Studio, error) {
 	translator := changesetTranslator{
 		inputMap: getUpdateInputMap(ctx),
@@ -312,6 +328,45 @@ func (r *mutationResolver) BulkStudioUpdate(ctx context.Context, input BulkStudi
 		return nil, fmt.Errorf("converting ids: %w", err)
 	}
 
+	compatInput := input
+	compatInput.ApplyToItemsMatchingFilters = nil
+	compatInput.FindFilter = nil
+	compatInput.StudioFilter = nil
+
+	if _, err := r.BulkStudioUpdateJob(ctx, compatInput); err != nil {
+		return nil, err
+	}
+
+	return refetchBulkUpdateResults(ctx, ids, r.getStudio)
+}
+
+func (r *mutationResolver) BulkStudioUpdateJob(ctx context.Context, input BulkStudioUpdateInput) (string, error) {
+	ids, err := stringslice.StringSliceToIntSlice(input.Ids)
+	if err != nil {
+		return "", fmt.Errorf("converting ids: %w", err)
+	}
+
+	useBackgroundJob := (input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters) ||
+		(len(input.Ids) == 0 && (input.FindFilter != nil || input.StudioFilter != nil))
+	if useBackgroundJob {
+		findFilter := sanitizeBulkUpdateFindFilter(input.FindFilter)
+		err = r.withReadTxn(ctx, func(ctx context.Context) error {
+			result, _, qErr := r.repository.Studio.Query(ctx, input.StudioFilter, findFilter)
+			if qErr != nil {
+				return qErr
+			}
+			var fetchedIds []int
+			for _, item := range result {
+				fetchedIds = append(fetchedIds, item.ID)
+			}
+			ids = fetchedIds
+			return nil
+		})
+		if err != nil {
+			return "", err
+		}
+	}
+
 	translator := changesetTranslator{
 		inputMap: getUpdateInputMap(ctx),
 	}
@@ -321,13 +376,13 @@ func (r *mutationResolver) BulkStudioUpdate(ctx context.Context, input BulkStudi
 
 	partial.ParentID, err = translator.optionalIntFromString(input.ParentID, "parent_id")
 	if err != nil {
-		return nil, fmt.Errorf("converting parent id: %w", err)
+		return "", fmt.Errorf("converting parent id: %w", err)
 	}
 
 	if translator.hasField("urls") {
 		// ensure url/twitter/instagram are not included in the input
 		if err := validateNoLegacyURLs(translator); err != nil {
-			return nil, err
+			return "", err
 		}
 
 		partial.URLs = translator.updateStringsBulk(input.Urls, "urls")
@@ -352,49 +407,36 @@ func (r *mutationResolver) BulkStudioUpdate(ctx context.Context, input BulkStudi
 
 	partial.TagIDs, err = translator.updateIdsBulk(input.TagIds, "tag_ids")
 	if err != nil {
-		return nil, fmt.Errorf("converting tag ids: %w", err)
+		return "", fmt.Errorf("converting tag ids: %w", err)
 	}
 
-	ret := []*models.Studio{}
+	operation := studioBulkUpdateOperation{
+		repository: r.repository.Studio,
+		partial:    partial,
+	}
 
-	// Start the transaction and save the performers
-	if err := r.withTxn(ctx, func(ctx context.Context) error {
-		qb := r.repository.Studio
+	if !useBackgroundJob {
+		if err := r.withTxn(ctx, func(ctx context.Context) error {
+			for _, id := range ids {
+				if err := operation.Update(ctx, id); err != nil {
+					return err
+				}
+			}
+			return nil
+		}); err != nil {
+			return "", err
+		}
 
 		for _, id := range ids {
-			local := partial
-			local.ID = id
-			if err := studio.ValidateModify(ctx, local, qb); err != nil {
-				return err
-			}
-
-			updated, err := qb.UpdatePartial(ctx, local)
-			if err != nil {
-				return err
-			}
-
-			ret = append(ret, updated)
+			r.hookExecutor.ExecutePostHooks(ctx, id, hook.StudioUpdatePost, input, translator.getFields())
 		}
 
-		return nil
-	}); err != nil {
-		return nil, err
+		return "sync", nil
 	}
 
-	// execute post hooks outside of txn
-	var newRet []*models.Studio
-	for _, studio := range ret {
-		r.hookExecutor.ExecutePostHooks(ctx, studio.ID, hook.StudioUpdatePost, input, translator.getFields())
+	jobID := r.enqueueBulkUpdate(ctx, "Bulk Studio Update", ids, operation, hook.StudioUpdatePost, input, translator.getFields())
 
-		studio, err = r.getStudio(ctx, studio.ID)
-		if err != nil {
-			return nil, err
-		}
-
-		newRet = append(newRet, studio)
-	}
-
-	return newRet, nil
+	return strconv.Itoa(jobID), nil
 }
 
 func (r *mutationResolver) StudioDestroy(ctx context.Context, input StudioDestroyInput) (bool, error) {

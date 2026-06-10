@@ -23,7 +23,7 @@ func (r *queryResolver) FindTag(ctx context.Context, id string) (ret *models.Tag
 	return ret, nil
 }
 
-func (r *queryResolver) FindTags(ctx context.Context, tagFilter *models.TagFilterType, filter *models.FindFilterType, ids []string) (ret *FindTagsResultType, err error) {
+func (r *queryResolver) FindTags(ctx context.Context, tagFilter *models.TagFilterType, tagFilterAST *models.FilterAST, filter *models.FindFilterType, ids []string) (ret *FindTagsResultType, err error) {
 	idInts, err := handleIDList(ids, "ids")
 	if err != nil {
 		return nil, err
@@ -34,10 +34,13 @@ func (r *queryResolver) FindTags(ctx context.Context, tagFilter *models.TagFilte
 		var err error
 		var total int
 
-		if len(idInts) > 0 {
+		switch {
+		case len(idInts) > 0:
 			tags, err = r.repository.Tag.FindMany(ctx, idInts)
 			total = len(tags)
-		} else {
+		case tagFilterAST != nil:
+			tags, total, err = r.repository.Tag.QueryAST(ctx, tagFilterAST, filter)
+		default:
 			tags, total, err = r.repository.Tag.Query(ctx, tagFilter, filter)
 		}
 

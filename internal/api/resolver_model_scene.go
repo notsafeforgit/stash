@@ -8,6 +8,7 @@ import (
 	"github.com/stashapp/stash/internal/api/loaders"
 	"github.com/stashapp/stash/internal/api/urlbuilders"
 	"github.com/stashapp/stash/internal/manager"
+	"github.com/stashapp/stash/pkg/fsutil"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/session"
 	"github.com/stashapp/stash/pkg/signedurl"
@@ -143,13 +144,45 @@ func (r *sceneResolver) Paths(ctx context.Context, obj *models.Scene) (*ScenePat
 	funscriptPath := builder.GetFunscriptURL(config.GetAPIKey()).String()
 	interactiveHeatmap := builder.GetInteractiveHeatmapURL()
 
+	scenePaths := manager.GetInstance().Paths.Scene
+
+	hasCover, err := loaders.From(ctx).SceneHasCover.Load(obj.ID)
+	if err != nil {
+		return nil, err
+	}
+	// Also check the legacy screenshot file as a fallback
+	if !hasCover && obj.Path != "" {
+		hasCover, _ = fsutil.FileExists(scenePaths.GetLegacyScreenshotPath(objHash))
+	}
+	var screenshotPathPtr *string
+	if hasCover {
+		screenshotPathPtr = &screenshotPath
+	}
+
+	var vttPathPtr *string
+	if exists, _ := fsutil.FileExists(scenePaths.GetSpriteVttFilePath(objHash)); exists {
+		vttPathPtr = &vttPath
+	}
+	var spritePathPtr *string
+	if exists, _ := fsutil.FileExists(scenePaths.GetSpriteImageFilePath(objHash)); exists {
+		spritePathPtr = &spritePath
+	}
+	var previewPathPtr *string
+	if exists, _ := fsutil.FileExists(scenePaths.GetVideoPreviewPath(objHash)); exists {
+		previewPathPtr = &previewPath
+	}
+	var webpPathPtr *string
+	if exists, _ := fsutil.FileExists(scenePaths.GetWebpPreviewPath(objHash)); exists {
+		webpPathPtr = &webpPath
+	}
+
 	return &ScenePathsType{
-		Screenshot:         &screenshotPath,
-		Preview:            &previewPath,
+		Screenshot:         screenshotPathPtr,
+		Preview:            previewPathPtr,
 		Stream:             &streamPath,
-		Webp:               &webpPath,
-		Vtt:                &vttPath,
-		Sprite:             &spritePath,
+		Webp:               webpPathPtr,
+		Vtt:                vttPathPtr,
+		Sprite:             spritePathPtr,
 		Funscript:          &funscriptPath,
 		InteractiveHeatmap: &interactiveHeatmap,
 		Caption:            &captionBasePath,

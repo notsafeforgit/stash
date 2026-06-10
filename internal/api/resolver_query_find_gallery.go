@@ -23,7 +23,7 @@ func (r *queryResolver) FindGallery(ctx context.Context, id string) (ret *models
 	return ret, nil
 }
 
-func (r *queryResolver) FindGalleries(ctx context.Context, galleryFilter *models.GalleryFilterType, filter *models.FindFilterType, ids []string) (ret *FindGalleriesResultType, err error) {
+func (r *queryResolver) FindGalleries(ctx context.Context, galleryFilter *models.GalleryFilterType, galleryFilterAST *models.FilterAST, filter *models.FindFilterType, ids []string) (ret *FindGalleriesResultType, err error) {
 	idInts, err := handleIDList(ids, "ids")
 	if err != nil {
 		return nil, err
@@ -34,10 +34,13 @@ func (r *queryResolver) FindGalleries(ctx context.Context, galleryFilter *models
 		var err error
 		var total int
 
-		if len(idInts) > 0 {
+		switch {
+		case len(idInts) > 0:
 			galleries, err = r.repository.Gallery.FindMany(ctx, idInts)
 			total = len(galleries)
-		} else {
+		case galleryFilterAST != nil:
+			galleries, total, err = r.repository.Gallery.QueryAST(ctx, galleryFilterAST, filter)
+		default:
 			galleries, total, err = r.repository.Gallery.Query(ctx, galleryFilter, filter)
 		}
 

@@ -32,18 +32,55 @@ type hookExecutor interface {
 	ExecutePostHooks(ctx context.Context, id int, hookType hook.TriggerEnum, input interface{}, inputFields []string)
 }
 
-type Resolver struct {
-	repository     models.Repository
-	sceneService   manager.SceneService
-	imageService   manager.ImageService
-	galleryService manager.GalleryService
-	groupService   manager.GroupService
+type bulkUpdater interface {
+	BulkUpdate(ctx context.Context, description string, ids []int, operation manager.BulkUpdateOperation, hookType hook.TriggerEnum, input interface{}, inputFields []string) int
+}
 
+type Resolver struct {
+	scraperCacheStore *scraper.Cache
+	repository        models.Repository
+	sceneService      manager.SceneService
+	imageService      manager.ImageService
+	galleryService    manager.GalleryService
+	groupService      manager.GroupService
+
+	bulkUpdater  bulkUpdater
 	hookExecutor hookExecutor
 }
 
 func (r *Resolver) scraperCache() *scraper.Cache {
-	return manager.GetInstance().ScraperCache
+	return r.scraperCacheStore
+}
+
+func (r *Resolver) enqueueBulkUpdate(ctx context.Context, description string, ids []int, operation manager.BulkUpdateOperation, hookType hook.TriggerEnum, input interface{}, inputFields []string) int {
+	return r.bulkUpdater.BulkUpdate(ctx, description, ids, operation, hookType, input, inputFields)
+}
+
+func sanitizeBulkUpdateFindFilter(findFilter *models.FindFilterType) *models.FindFilterType {
+	if findFilter == nil {
+		return nil
+	}
+
+	sanitized := *findFilter
+	sanitized.Page = nil
+	perPageAll := models.PerPageAll
+	sanitized.PerPage = &perPageAll
+
+	return &sanitized
+}
+
+func refetchBulkUpdateResults[T any](ctx context.Context, ids []int, get func(context.Context, int) (*T, error)) ([]*T, error) {
+	ret := make([]*T, 0, len(ids))
+	for _, id := range ids {
+		item, err := get(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+
+		ret = append(ret, item)
+	}
+
+	return ret, nil
 }
 
 func (r *Resolver) Gallery() GalleryResolver {

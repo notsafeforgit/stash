@@ -487,6 +487,10 @@ input StudioFilterType {
   stash_ids_endpoint: StashIDsCriterionInput
   "Filter to only include studios with these tags"
   tags: HierarchicalMultiCriterionInput
+  "Filter to only include studios whose ancestor studios have these tags"
+  ancestor_tags: HierarchicalMultiCriterionInput
+  "Filter to only include studios whose descendant studios have these tags"
+  descendant_tags: HierarchicalMultiCriterionInput
   "Filter to only include studios missing this property"
   is_missing: String
   # rating expressed as 1-100
@@ -993,6 +997,15 @@ type SavedFilter {
   # maps to any of the AnyFilterInput types
   # using a generic Map instead of creating and maintaining match types for inputs
   object_filter: Map
+    @deprecated(
+      reason: "compatibility view derived from filter_ast; may be lossy for complex filters"
+    )
+  """
+  Canonical criteria representation: a FilterAST node tree
+  (`{group: {operator, children}} | {condition: {field, value}}`) as a
+  generic map. Condition values use the labeled saved-criterion shape.
+  """
+  filter_ast: Map
   # generic map for ui options
   ui_options: Map
 }
@@ -1003,7 +1016,10 @@ input SaveFilterInput {
   mode: FilterMode!
   name: String!
   find_filter: FindFilterType
+  "Legacy v2.5 criteria map; converted to filter_ast when filter_ast is not provided"
   object_filter: Map
+  "Canonical criteria representation; takes precedence over object_filter"
+  filter_ast: FilterASTInput
   # generic map for ui options
   ui_options: Map
 }

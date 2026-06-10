@@ -6,6 +6,13 @@ type Query {
   findDefaultFilter(mode: FilterMode!): SavedFilter
     @deprecated(reason: "default filter now stored in UI config")
 
+  """
+  Returns the distinct custom-field names that exist on at least one row of
+  the entity type identified by `mode`. Sorted alphabetically. Used to
+  populate the field-name picker in the filter UI.
+  """
+  customFieldNames(mode: FilterMode!): [String!]!
+
   "Find a file by its id or path"
   findFile(id: ID, path: String): BaseFile!
 
@@ -33,6 +40,7 @@ type Query {
   "A function which queries Scene objects"
   findScenes(
     scene_filter: SceneFilterType
+    scene_filter_ast: FilterASTInput
     scene_ids: [Int!] @deprecated(reason: "use ids")
     ids: [ID!]
     filter: FindFilterType
@@ -54,6 +62,9 @@ type Query {
     scene_filter: SceneFilterType
   ): [[Scene!]!]!
 
+  "Find duplicate images"
+  findDuplicateImages(distance: Int! = 0): [[Image!]!]!
+
   "Return valid stream paths"
   sceneStreams(id: ID): [SceneStreamEndpoint!]!
 
@@ -65,6 +76,7 @@ type Query {
   "A function which queries SceneMarker objects"
   findSceneMarkers(
     scene_marker_filter: SceneMarkerFilterType
+    scene_marker_filter_ast: FilterASTInput
     filter: FindFilterType
     ids: [ID!]
   ): FindSceneMarkersResultType!
@@ -74,6 +86,7 @@ type Query {
   "A function which queries Scene objects"
   findImages(
     image_filter: ImageFilterType
+    image_filter_ast: FilterASTInput
     image_ids: [Int!] @deprecated(reason: "use ids")
     ids: [ID!]
     filter: FindFilterType
@@ -84,6 +97,7 @@ type Query {
   "A function which queries Performer objects"
   findPerformers(
     performer_filter: PerformerFilterType
+    performer_filter_ast: FilterASTInput
     filter: FindFilterType
     performer_ids: [Int!] @deprecated(reason: "use ids")
     ids: [ID!]
@@ -94,6 +108,7 @@ type Query {
   "A function which queries Studio objects"
   findStudios(
     studio_filter: StudioFilterType
+    studio_filter_ast: FilterASTInput
     filter: FindFilterType
     ids: [ID!]
   ): FindStudiosResultType!
@@ -112,6 +127,7 @@ type Query {
   "A function which queries Group objects"
   findGroups(
     group_filter: GroupFilterType
+    group_filter_ast: FilterASTInput
     filter: FindFilterType
     ids: [ID!]
   ): FindGroupsResultType!
@@ -119,6 +135,7 @@ type Query {
   findGallery(id: ID!): Gallery
   findGalleries(
     gallery_filter: GalleryFilterType
+    gallery_filter_ast: FilterASTInput
     filter: FindFilterType
     ids: [ID!]
   ): FindGalleriesResultType!
@@ -126,6 +143,7 @@ type Query {
   findTag(id: ID!): Tag
   findTags(
     tag_filter: TagFilterType
+    tag_filter_ast: FilterASTInput
     filter: FindFilterType
     ids: [ID!]
   ): FindTagsResultType!
@@ -229,6 +247,8 @@ type Query {
   plugins: [Plugin!]
   "List available plugin operations"
   pluginTasks: [PluginTask!]
+  "User-configured invocation order for plugins per hook event"
+  pluginHookOrder: [PluginHookOrder!]!
 
   # Packages
   "List installed packages"
@@ -250,6 +270,7 @@ type Query {
 
   # System status
   systemStatus: SystemStatus!
+  serverCapabilities: ServerCapabilities!
 
   # Job status
   jobQueue: [Job!]
@@ -292,6 +313,13 @@ type Mutation {
   sceneUpdate(input: SceneUpdateInput!): Scene
   sceneMerge(input: SceneMergeInput!): Scene
   bulkSceneUpdate(input: BulkSceneUpdateInput!): [Scene!]
+  "Runs a bulk scene update as a background job. Returns \"sync\" for an inline run or a job ID."
+  bulkSceneUpdateJob(input: BulkSceneUpdateInput!): String!
+  """
+  Sets each scene's date to the mtime of its primary file. Returns "sync"
+  for an inline run or a job ID when running in the background.
+  """
+  scenesSetDateFromFileMTime(input: ScenesSetDateFromFileMTimeInput!): String!
   sceneDestroy(input: SceneDestroyInput!): Boolean!
   scenesDestroy(input: ScenesDestroyInput!): Boolean!
   scenesUpdate(input: [SceneUpdateInput!]!): [Scene]
@@ -336,6 +364,8 @@ type Mutation {
   sceneMarkerCreate(input: SceneMarkerCreateInput!): SceneMarker
   sceneMarkerUpdate(input: SceneMarkerUpdateInput!): SceneMarker
   bulkSceneMarkerUpdate(input: BulkSceneMarkerUpdateInput!): [SceneMarker!]
+  "Runs a bulk scene marker update as a background job. Returns \"sync\" for an inline run or a job ID."
+  bulkSceneMarkerUpdateJob(input: BulkSceneMarkerUpdateInput!): String!
   sceneMarkerDestroy(id: ID!): Boolean!
   sceneMarkersDestroy(ids: [ID!]!): Boolean!
 
@@ -343,6 +373,13 @@ type Mutation {
 
   imageUpdate(input: ImageUpdateInput!): Image
   bulkImageUpdate(input: BulkImageUpdateInput!): [Image!]
+  "Runs a bulk image update as a background job. Returns \"sync\" for an inline run or a job ID."
+  bulkImageUpdateJob(input: BulkImageUpdateInput!): String!
+  """
+  Sets each image's date to the mtime of its primary file. Returns "sync"
+  for an inline run or a job ID when running in the background.
+  """
+  imagesSetDateFromFileMTime(input: ImagesSetDateFromFileMTimeInput!): String!
   imageDestroy(input: ImageDestroyInput!): Boolean!
   imagesDestroy(input: ImagesDestroyInput!): Boolean!
   imagesUpdate(input: [ImageUpdateInput!]!): [Image]
@@ -354,9 +391,20 @@ type Mutation {
   "Resets the o-counter for a image to 0. Returns the new value"
   imageResetO(id: ID!): Int!
 
+  """
+  Rotates the image in-place by rewriting its EXIF Orientation tag.
+  Only supported on images whose primary file is a JPEG with an existing
+  EXIF Orientation tag — others return an error. Pixel data is not touched;
+  this is a metadata-only update. The file is re-fingerprinted afterwards
+  and the database row is updated with the new fingerprints / dimensions.
+  """
+  imageRotate(input: ImageRotateInput!): Image
+
   galleryCreate(input: GalleryCreateInput!): Gallery
   galleryUpdate(input: GalleryUpdateInput!): Gallery
   bulkGalleryUpdate(input: BulkGalleryUpdateInput!): [Gallery!]
+  "Runs a bulk gallery update as a background job. Returns \"sync\" for an inline run or a job ID."
+  bulkGalleryUpdateJob(input: BulkGalleryUpdateInput!): String!
   galleryDestroy(input: GalleryDestroyInput!): Boolean!
   galleriesUpdate(input: [GalleryUpdateInput!]!): [Gallery]
 
@@ -374,6 +422,8 @@ type Mutation {
   performerDestroy(input: PerformerDestroyInput!): Boolean!
   performersDestroy(ids: [ID!]!): Boolean!
   bulkPerformerUpdate(input: BulkPerformerUpdateInput!): [Performer!]
+  "Runs a bulk performer update as a background job. Returns \"sync\" for an inline run or a job ID."
+  bulkPerformerUpdateJob(input: BulkPerformerUpdateInput!): String!
   performerMerge(input: PerformerMergeInput!): Performer!
 
   studioCreate(input: StudioCreateInput!): Studio
@@ -381,6 +431,8 @@ type Mutation {
   studioDestroy(input: StudioDestroyInput!): Boolean!
   studiosDestroy(ids: [ID!]!): Boolean!
   bulkStudioUpdate(input: BulkStudioUpdateInput!): [Studio!]
+  "Runs a bulk studio update as a background job. Returns \"sync\" for an inline run or a job ID."
+  bulkStudioUpdateJob(input: BulkStudioUpdateInput!): String!
 
   movieCreate(input: MovieCreateInput!): Movie
     @deprecated(reason: "Use groupCreate instead")
@@ -392,12 +444,17 @@ type Mutation {
     @deprecated(reason: "Use groupsDestroy instead")
   bulkMovieUpdate(input: BulkMovieUpdateInput!): [Movie!]
     @deprecated(reason: "Use bulkGroupUpdate instead")
+  "Runs a bulk movie update as a background job. Returns \"sync\" for an inline run or a job ID."
+  bulkMovieUpdateJob(input: BulkMovieUpdateInput!): String!
+    @deprecated(reason: "Use bulkGroupUpdateJob instead")
 
   groupCreate(input: GroupCreateInput!): Group
   groupUpdate(input: GroupUpdateInput!): Group
   groupDestroy(input: GroupDestroyInput!): Boolean!
   groupsDestroy(ids: [ID!]!): Boolean!
   bulkGroupUpdate(input: BulkGroupUpdateInput!): [Group!]
+  "Runs a bulk group update as a background job. Returns \"sync\" for an inline run or a job ID."
+  bulkGroupUpdateJob(input: BulkGroupUpdateInput!): String!
 
   addGroupSubGroups(input: GroupSubGroupAddInput!): Boolean!
   removeGroupSubGroups(input: GroupSubGroupRemoveInput!): Boolean!
@@ -411,6 +468,8 @@ type Mutation {
   tagsDestroy(ids: [ID!]!): Boolean!
   tagsMerge(input: TagsMergeInput!): Tag
   bulkTagUpdate(input: BulkTagUpdateInput!): [Tag!]
+  "Runs a bulk tag update as a background job. Returns \"sync\" for an inline run or a job ID."
+  bulkTagUpdateJob(input: BulkTagUpdateInput!): String!
 
   """
   Moves the given files to the given destination. Returns true if successful.
@@ -511,6 +570,15 @@ type Mutation {
   setPluginsEnabled(enabledMap: BoolMap!): Boolean!
 
   """
+  Replace the configured plugin invocation order for a single hook event.
+  Pass an empty plugin_ids list to clear the override and fall back to
+  alphabetic dispatch. Returns the full updated hook order map.
+  Configured IDs that no longer resolve to a loaded plugin are silently
+  skipped at dispatch time.
+  """
+  setPluginHookOrder(input: PluginHookOrderInput!): [PluginHookOrder!]!
+
+  """
   Run a plugin task.
   If task_name is provided, then the task must exist in the plugin config and the tasks configuration
   will be used to run the plugin.
@@ -598,8 +666,31 @@ type Mutation {
 }
 
 type Subscription {
-  "Update from the metadata manager"
+  """
+  Combined stream of all job-manager events. Retained for backwards
+  compatibility with existing clients; new clients should subscribe to
+  `jobsLifecycleSubscribe` and `jobsProgressSubscribe` separately so a
+  burst of progress UPDATEs cannot crowd out (and cause the server to
+  drop) the rarer-but-correctness-critical ADD / REMOVE events.
+  """
   jobsSubscribe: JobStatusUpdate!
+
+  """
+  Job lifecycle events only — ADD (queued) and REMOVE (finished /
+  cancelled / failed). Delivered through a dedicated server-side pipeline
+  with a large buffer, so a client that subscribes to this never misses
+  an ADD even if it's concurrently slow to drain a separate
+  `jobsProgressSubscribe`.
+  """
+  jobsLifecycleSubscribe: JobStatusUpdate!
+
+  """
+  Job progress events only — UPDATE (status / progress / subtasks /
+  error). Lossy under backpressure by design: each UPDATE supersedes the
+  prior one, so the server prefers dropping an outdated tick over
+  blocking new lifecycle events behind it.
+  """
+  jobsProgressSubscribe: JobStatusUpdate!
 
   loggingSubscribe: [LogEntry!]!
 

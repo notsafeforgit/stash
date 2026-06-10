@@ -20,6 +20,7 @@
 //go:generate go run github.com/vektah/dataloaden SceneOHistoryLoader int []time.Time
 //go:generate go run github.com/vektah/dataloaden ScenePlayHistoryLoader int []time.Time
 //go:generate go run github.com/vektah/dataloaden SceneLastPlayedLoader int *time.Time
+//go:generate go run github.com/vektah/dataloaden SceneHasCoverLoader int bool
 package loaders
 
 import (
@@ -51,6 +52,7 @@ type Loaders struct {
 	SceneOHistory     *SceneOHistoryLoader
 	SceneLastPlayed   *SceneLastPlayedLoader
 	SceneCustomFields *CustomFieldsLoader
+	SceneHasCover     *SceneHasCoverLoader
 
 	ImageFiles   *RelatedFileIDsLoader
 	GalleryFiles *RelatedFileIDsLoader
@@ -148,6 +150,11 @@ func (m Middleware) Middleware(next http.Handler) http.Handler {
 				wait:     wait,
 				maxBatch: maxBatch,
 				fetch:    m.fetchSceneCustomFields(ctx),
+			},
+			SceneHasCover: &SceneHasCoverLoader{
+				wait:     wait,
+				maxBatch: maxBatch,
+				fetch:    m.fetchScenesHasCover(ctx),
 			},
 			StudioByID: &StudioLoader{
 				wait:     wait,
@@ -576,6 +583,17 @@ func (m Middleware) fetchScenesLastPlayed(ctx context.Context) func(keys []int) 
 		err := m.Repository.WithDB(ctx, func(ctx context.Context) error {
 			var err error
 			ret, err = m.Repository.Scene.GetManyLastViewed(ctx, keys)
+			return err
+		})
+		return ret, toErrorSlice(err)
+	}
+}
+
+func (m Middleware) fetchScenesHasCover(ctx context.Context) func(keys []int) ([]bool, []error) {
+	return func(keys []int) (ret []bool, errs []error) {
+		err := m.Repository.WithDB(ctx, func(ctx context.Context) error {
+			var err error
+			ret, err = m.Repository.Scene.GetManyHasCover(ctx, keys)
 			return err
 		})
 		return ret, toErrorSlice(err)

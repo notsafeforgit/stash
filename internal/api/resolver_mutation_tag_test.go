@@ -1,25 +1,15 @@
 package api
 
 import (
-	"context"
 	"errors"
 	"testing"
 
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/models/mocks"
-	"github.com/stashapp/stash/pkg/plugin/hook"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
-
-// TODO - move this into a common area
-func newResolver(db *mocks.Database) *Resolver {
-	return &Resolver{
-		repository:   db.Repository(),
-		hookExecutor: &mockHookExecutor{},
-	}
-}
 
 const (
 	tagName    = "tagName"
@@ -31,16 +21,9 @@ const (
 	newTagID = 2
 )
 
-var testCtx = context.Background()
-
-type mockHookExecutor struct{}
-
-func (*mockHookExecutor) ExecutePostHooks(ctx context.Context, id int, hookType hook.TriggerEnum, input interface{}, inputFields []string) {
-}
-
 func TestTagCreate(t *testing.T) {
 	db := mocks.NewDatabase()
-	r := newResolver(db)
+	r, _ := newResolver(db)
 
 	pp := 1
 	findFilter := &models.FindFilterType{
@@ -97,7 +80,7 @@ func TestTagCreate(t *testing.T) {
 	db.AssertExpectations(t)
 
 	db = mocks.NewDatabase()
-	r = newResolver(db)
+	r, _ = newResolver(db)
 
 	db.Tag.On("Query", mock.Anything, tagFilterForName(tagName), findFilter).Return(nil, 0, nil).Once()
 	db.Tag.On("Query", mock.Anything, tagFilterForAlias(tagName), findFilter).Return(nil, 0, nil).Once()
@@ -117,5 +100,55 @@ func TestTagCreate(t *testing.T) {
 
 	assert.Nil(t, err)
 	assert.NotNil(t, tag)
+	db.AssertExpectations(t)
+}
+
+func TestBulkTagUpdate_ApplyToAll(t *testing.T) {
+	db := mocks.NewDatabase()
+	r, bulkUpdater := newResolver(db)
+
+	tagIDs := []int{1, 2, 3}
+	tagFilter := &models.TagFilterType{
+		Name: &models.StringCriterionInput{
+			Value:    "test",
+			Modifier: models.CriterionModifierIncludes,
+		},
+	}
+	findFilter := &models.FindFilterType{
+		Sort:      PtrString("name"),
+		Direction: PtrSortDirectionEnum(models.SortDirectionEnumAsc),
+	}
+
+	// Mock the query call that fetches all IDs
+	db.Tag.On("Query", mock.Anything, tagFilter, mock.MatchedBy(func(ff *models.FindFilterType) bool {
+		return ff.Page == nil && ff.PerPage != nil && *ff.PerPage == models.PerPageAll
+	})).Return([]*models.Tag{
+		{ID: 1}, {ID: 2}, {ID: 3},
+	}, 3, nil).Once()
+
+	input := BulkTagUpdateInput{
+		Ids:                         []string{}, // Empty IDs, rely on filter
+		ApplyToItemsMatchingFilters: PtrBool(true),
+		TagFilter:                   tagFilter,
+		FindFilter:                  findFilter,
+		Favorite:                    PtrBool(true),
+	}
+
+	// Wrap in a context that has the input map and gql context
+	inputMap := map[string]interface{}{
+		"input": map[string]interface{}{
+			"apply_to_items_matching_filters": true,
+			"favorite":                        true,
+		},
+	}
+	ctx := withGqlContext(testCtx, inputMap)
+
+	jobID, err := r.Mutation().BulkTagUpdateJob(ctx, input)
+
+	assert.Nil(t, err)
+	assert.Equal(t, "1", jobID)
+	assert.Len(t, bulkUpdater.calls, 1)
+	assert.Equal(t, "Bulk Tag Update", bulkUpdater.calls[0].description)
+	assert.Equal(t, tagIDs, bulkUpdater.calls[0].ids)
 	db.AssertExpectations(t)
 }

@@ -58,6 +58,8 @@ input TagUpdateInput {
   favorite: Boolean
   "This should be a URL or a base64 encoded data URL"
   image: String
+  "Set the image from an existing image in the library by its ID"
+  image_from_image_id: ID
   stash_ids: [StashIDInput!]
 
   parent_ids: [ID!]
@@ -84,6 +86,9 @@ input TagsMergeInput {
 
 input BulkTagUpdateInput {
   ids: [ID!]
+  apply_to_items_matching_filters: Boolean
+  find_filter: FindFilterType
+  tag_filter: TagFilterType
   description: String
   "Duplicate aliases and those equal to name will result in an error (case-insensitive)"
   aliases: BulkUpdateStrings

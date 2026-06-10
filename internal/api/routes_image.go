@@ -151,7 +151,11 @@ func (rs imageRoutes) serveImage(w http.ResponseWriter, r *http.Request, i *mode
 		return
 	}
 
-	// fallback to default image
+	// Fallback to the default placeholder. Force no-cache for the same
+	// reason as in routes_gallery.go: the URL's `?t=<image.UpdatedAt>`
+	// token would otherwise pin the placeholder as immutable for a year,
+	// even after the underlying file becomes serveable.
+	w.Header().Set("Cache-Control", "no-cache")
 	image := static.ReadAll(static.DefaultImageImage)
 	utils.ServeImage(w, r, image)
 }

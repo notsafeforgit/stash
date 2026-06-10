@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/internal/static"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/plugin/hook"
@@ -23,6 +24,26 @@ func (r *mutationResolver) getGroup(ctx context.Context, id int) (ret *models.Gr
 	}
 
 	return ret, nil
+}
+
+type movieBulkUpdateOperation struct {
+	repository   models.GroupReaderWriter
+	updatedGroup models.GroupPartial
+	hookExecutor hookExecutor
+	input        interface{}
+	inputFields  []string
+}
+
+func (o movieBulkUpdateOperation) Update(ctx context.Context, id int) error {
+	_, err := o.repository.UpdatePartial(ctx, id, o.updatedGroup)
+
+	// for backwards compatibility - run both movie and group hooks
+	if err == nil && config.GetBulkUpdateHooks() && o.hookExecutor != nil {
+		o.hookExecutor.ExecutePostHooks(ctx, id, hook.GroupUpdatePost, o.input, o.inputFields)
+		o.hookExecutor.ExecutePostHooks(ctx, id, hook.MovieUpdatePost, o.input, o.inputFields)
+	}
+
+	return err
 }
 
 func (r *mutationResolver) MovieCreate(ctx context.Context, input MovieCreateInput) (*models.Group, error) {
@@ -212,6 +233,45 @@ func (r *mutationResolver) BulkMovieUpdate(ctx context.Context, input BulkMovieU
 		return nil, fmt.Errorf("converting ids: %w", err)
 	}
 
+	compatInput := input
+	compatInput.ApplyToItemsMatchingFilters = nil
+	compatInput.FindFilter = nil
+	compatInput.MovieFilter = nil
+
+	if _, err := r.BulkMovieUpdateJob(ctx, compatInput); err != nil {
+		return nil, err
+	}
+
+	return refetchBulkUpdateResults(ctx, groupIDs, r.getGroup)
+}
+
+func (r *mutationResolver) BulkMovieUpdateJob(ctx context.Context, input BulkMovieUpdateInput) (string, error) {
+	groupIDs, err := stringslice.StringSliceToIntSlice(input.Ids)
+	if err != nil {
+		return "", fmt.Errorf("converting ids: %w", err)
+	}
+
+	useBackgroundJob := (input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters) ||
+		(len(input.Ids) == 0 && (input.FindFilter != nil || input.MovieFilter != nil))
+	if useBackgroundJob && input.MovieFilter != nil {
+		findFilter := sanitizeBulkUpdateFindFilter(input.FindFilter)
+		err = r.withReadTxn(ctx, func(ctx context.Context) error {
+			result, _, qErr := r.repository.Group.Query(ctx, input.MovieFilter, findFilter)
+			if qErr != nil {
+				return qErr
+			}
+			var fetchedIds []int
+			for _, item := range result {
+				fetchedIds = append(fetchedIds, item.ID)
+			}
+			groupIDs = fetchedIds
+			return nil
+		})
+		if err != nil {
+			return "", err
+		}
+	}
+
 	translator := changesetTranslator{
 		inputMap: getUpdateInputMap(ctx),
 	}
@@ -224,50 +284,49 @@ func (r *mutationResolver) BulkMovieUpdate(ctx context.Context, input BulkMovieU
 
 	updatedGroup.StudioID, err = translator.optionalIntFromString(input.StudioID, "studio_id")
 	if err != nil {
-		return nil, fmt.Errorf("converting studio id: %w", err)
+		return "", fmt.Errorf("converting studio id: %w", err)
 	}
 
 	updatedGroup.TagIDs, err = translator.updateIdsBulk(input.TagIds, "tag_ids")
 	if err != nil {
-		return nil, fmt.Errorf("converting tag ids: %w", err)
+		return "", fmt.Errorf("converting tag ids: %w", err)
 	}
 
 	updatedGroup.URLs = translator.optionalURLsBulk(input.Urls, nil)
 
-	ret := []*models.Group{}
+	operation := movieBulkUpdateOperation{
+		repository:   r.repository.Group,
+		updatedGroup: updatedGroup,
+		hookExecutor: r.hookExecutor,
+		input:        input,
+		inputFields:  translator.getFields(),
+	}
 
-	if err := r.withTxn(ctx, func(ctx context.Context) error {
-		qb := r.repository.Group
+	if !useBackgroundJob {
+		syncOperation := operation
+		syncOperation.hookExecutor = nil
+		if err := r.withTxn(ctx, func(ctx context.Context) error {
+			for _, groupID := range groupIDs {
+				if err := syncOperation.Update(ctx, groupID); err != nil {
+					return err
+				}
+			}
+			return nil
+		}); err != nil {
+			return "", err
+		}
 
 		for _, groupID := range groupIDs {
-			group, err := qb.UpdatePartial(ctx, groupID, updatedGroup)
-			if err != nil {
-				return err
-			}
-
-			ret = append(ret, group)
+			r.hookExecutor.ExecutePostHooks(ctx, groupID, hook.GroupUpdatePost, input, translator.getFields())
+			r.hookExecutor.ExecutePostHooks(ctx, groupID, hook.MovieUpdatePost, input, translator.getFields())
 		}
 
-		return nil
-	}); err != nil {
-		return nil, err
+		return "sync", nil
 	}
 
-	var newRet []*models.Group
-	for _, group := range ret {
-		// for backwards compatibility - run both movie and group hooks
-		r.hookExecutor.ExecutePostHooks(ctx, group.ID, hook.GroupUpdatePost, input, translator.getFields())
-		r.hookExecutor.ExecutePostHooks(ctx, group.ID, hook.MovieUpdatePost, input, translator.getFields())
+	jobID := r.enqueueBulkUpdate(ctx, "Bulk Movie Update", groupIDs, operation, hook.MovieUpdatePost, input, translator.getFields())
 
-		group, err = r.getGroup(ctx, group.ID)
-		if err != nil {
-			return nil, err
-		}
-
-		newRet = append(newRet, group)
-	}
-
-	return newRet, nil
+	return strconv.Itoa(jobID), nil
 }
 
 func (r *mutationResolver) MovieDestroy(ctx context.Context, input MovieDestroyInput) (bool, error) {

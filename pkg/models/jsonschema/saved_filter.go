@@ -6,10 +6,12 @@ import (
 )
 
 type SavedFilter struct {
-	Mode         models.FilterMode      `db:"mode" json:"mode"`
-	Name         string                 `db:"name" json:"name"`
-	FindFilter   *models.FindFilterType `json:"find_filter"`
-	ObjectFilter map[string]interface{} `json:"object_filter"`
+	Mode       models.FilterMode      `db:"mode" json:"mode"`
+	Name       string                 `db:"name" json:"name"`
+	FindFilter *models.FindFilterType `json:"find_filter"`
+	// legacy v2.5 criteria map; read for older export files
+	ObjectFilter map[string]interface{} `json:"object_filter,omitempty"`
+	FilterAST    *models.FilterAST      `json:"filter_ast,omitempty"`
 	UIOptions    map[string]interface{} `json:"ui_options"`
 }
 

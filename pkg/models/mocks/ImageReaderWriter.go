@@ -186,6 +186,29 @@ func (_m *ImageReaderWriter) Destroy(ctx context.Context, id int) error {
 	return r0
 }
 
+// DistinctCustomFieldNames provides a mock function with given fields: ctx
+func (_m *ImageReaderWriter) DistinctCustomFieldNames(ctx context.Context) ([]string, error) {
+	ret := _m.Called(ctx)
+
+	var r0 []string
+	if rf, ok := ret.Get(0).(func(context.Context) []string); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Find provides a mock function with given fields: ctx, id
 func (_m *ImageReaderWriter) Find(ctx context.Context, id int) (*models.Image, error) {
 	ret := _m.Called(ctx, id)
@@ -363,6 +386,29 @@ func (_m *ImageReaderWriter) FindByZipFileID(ctx context.Context, zipFileID mode
 	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, models.FileID) error); ok {
 		r1 = rf(ctx, zipFileID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// FindDuplicates provides a mock function with given fields: ctx, distance
+func (_m *ImageReaderWriter) FindDuplicates(ctx context.Context, distance int) ([][]*models.Image, error) {
+	ret := _m.Called(ctx, distance)
+
+	var r0 [][]*models.Image
+	if rf, ok := ret.Get(0).(func(context.Context, int) [][]*models.Image); ok {
+		r0 = rf(ctx, distance)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([][]*models.Image)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, int) error); ok {
+		r1 = rf(ctx, distance)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -705,6 +751,36 @@ func (_m *ImageReaderWriter) Query(ctx context.Context, options models.ImageQuer
 	}
 
 	return r0, r1
+}
+
+// QueryAST provides a mock function with given fields: ctx, filterAST, findFilter
+func (_m *ImageReaderWriter) QueryAST(ctx context.Context, filterAST *models.FilterAST, findFilter *models.FindFilterType) ([]*models.Image, int, error) {
+	ret := _m.Called(ctx, filterAST, findFilter)
+
+	var r0 []*models.Image
+	if rf, ok := ret.Get(0).(func(context.Context, *models.FilterAST, *models.FindFilterType) []*models.Image); ok {
+		r0 = rf(ctx, filterAST, findFilter)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*models.Image)
+		}
+	}
+
+	var r1 int
+	if rf, ok := ret.Get(1).(func(context.Context, *models.FilterAST, *models.FindFilterType) int); ok {
+		r1 = rf(ctx, filterAST, findFilter)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	var r2 error
+	if rf, ok := ret.Get(2).(func(context.Context, *models.FilterAST, *models.FindFilterType) error); ok {
+		r2 = rf(ctx, filterAST, findFilter)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // QueryCount provides a mock function with given fields: ctx, imageFilter, findFilter

@@ -34,6 +34,7 @@ type SceneFinder interface {
 // SceneQueryer provides methods to query scenes.
 type SceneQueryer interface {
 	Query(ctx context.Context, options SceneQueryOptions) (*SceneQueryResult, error)
+	QueryAST(ctx context.Context, filterAST *FilterAST, findFilter *FindFilterType) ([]*Scene, int, error)
 	QueryCount(ctx context.Context, sceneFilter *SceneFilterType, findFilter *FindFilterType) (int, error)
 }
 
@@ -114,6 +115,7 @@ type SceneReader interface {
 	PlayDuration(ctx context.Context) (float64, error)
 	GetCover(ctx context.Context, sceneID int) ([]byte, error)
 	HasCover(ctx context.Context, sceneID int) (bool, error)
+	GetManyHasCover(ctx context.Context, ids []int) ([]bool, error)
 }
 
 type OHistoryWriter interface {

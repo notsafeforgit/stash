@@ -22,6 +22,7 @@ type StudioFinder interface {
 // StudioQueryer provides methods to query studios.
 type StudioQueryer interface {
 	Query(ctx context.Context, studioFilter *StudioFilterType, findFilter *FindFilterType) ([]*Studio, int, error)
+	QueryAST(ctx context.Context, filterAST *FilterAST, findFilter *FindFilterType) ([]*Studio, int, error)
 	QueryCount(ctx context.Context, studioFilter *StudioFilterType, findFilter *FindFilterType) (int, error)
 }
 

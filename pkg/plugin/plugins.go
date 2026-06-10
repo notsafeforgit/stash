@@ -53,6 +53,11 @@ type PluginUI struct {
 	// Content Security Policy configuration for the plugin.
 	CSP PluginCSP `json:"csp"`
 
+	// Entry is the relative path to the v3 ESM entry module within the
+	// plugin's assets. See UIConfig.Entry for details. Empty for
+	// v2.5-style plugins.
+	Entry string `json:"entry"`
+
 	// External Javascript files that will be injected into the stash UI.
 	ExternalScript []string `json:"external_script"`
 
@@ -95,6 +100,7 @@ type ServerConfig interface {
 	HasTLSConfig() bool
 	GetPluginsPath() string
 	GetDisabledPlugins() []string
+	GetPluginHookOrder() map[string][]string
 	GetPythonPath() string
 }
 
@@ -176,6 +182,53 @@ func (c Cache) enabledPlugins() []Config {
 	}
 
 	return ret
+}
+
+// enabledPluginsForHook returns the enabled plugins ordered for a specific
+// hook event. Plugins explicitly listed in the user-configured order for
+// the hook run first in the listed order. Remaining plugins follow,
+// sorted by id for determinism. Configured plugin IDs that no longer
+// resolve to a loaded plugin are silently skipped, so the config is
+// tolerant of plugin churn.
+func (c Cache) enabledPluginsForHook(hookType hook.TriggerEnum) []Config {
+	plugins := c.enabledPlugins()
+	hookOrder := c.config.GetPluginHookOrder()
+	configured, ok := hookOrder[hookType.String()]
+	if !ok || len(configured) == 0 {
+		// no override: stable alphabetic order
+		slices.SortFunc(plugins, func(a, b Config) int {
+			return strings.Compare(a.id, b.id)
+		})
+		return plugins
+	}
+
+	byID := make(map[string]Config, len(plugins))
+	for _, p := range plugins {
+		byID[p.id] = p
+	}
+
+	ordered := make([]Config, 0, len(plugins))
+	used := make(map[string]bool, len(plugins))
+	for _, id := range configured {
+		if p, ok := byID[id]; ok && !used[id] {
+			ordered = append(ordered, p)
+			used[id] = true
+		}
+	}
+
+	// remainder: plugins enabled but not listed in the user override —
+	// run after configured plugins, alphabetic order
+	var remainder []Config
+	for _, p := range plugins {
+		if !used[p.id] {
+			remainder = append(remainder, p)
+		}
+	}
+	slices.SortFunc(remainder, func(a, b Config) int {
+		return strings.Compare(a.id, b.id)
+	})
+
+	return append(ordered, remainder...)
 }
 
 func (c Cache) pluginDisabled(id string) bool {
@@ -391,7 +444,7 @@ const maxCyclicLoopDepth = 10
 func (c Cache) executePostHooks(ctx context.Context, hookType hook.TriggerEnum, hookContext common.HookContext) error {
 	visitedPluginHookCounts := getVisitedPluginHookCounts(ctx)
 
-	for _, p := range c.enabledPlugins() {
+	for _, p := range c.enabledPluginsForHook(hookType) {
 		hooks := p.getHooks(hookType)
 		// don't revisit a plugin we've already visited
 		// only log if there's hooks that we're skipping

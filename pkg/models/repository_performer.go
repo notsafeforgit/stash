@@ -23,12 +23,13 @@ type PerformerFinder interface {
 // PerformerQueryer provides methods to query performers.
 type PerformerQueryer interface {
 	Query(ctx context.Context, performerFilter *PerformerFilterType, findFilter *FindFilterType) ([]*Performer, int, error)
+	QueryAST(ctx context.Context, filterAST *FilterAST, findFilter *FindFilterType) ([]*Performer, int, error)
 	QueryCount(ctx context.Context, performerFilter *PerformerFilterType, findFilter *FindFilterType) (int, error)
 }
 
 type PerformerAutoTagQueryer interface {
 	PerformerQueryer
-	AliasLoader
+	PerformerAliasLoader
 
 	// TODO - this interface is temporary until the filter schema can fully
 	// support the query needed
@@ -75,7 +76,7 @@ type PerformerReader interface {
 	PerformerAutoTagQueryer
 	PerformerCounter
 
-	AliasLoader
+	PerformerAliasLoader
 	StashIDLoader
 	TagIDLoader
 	URLLoader

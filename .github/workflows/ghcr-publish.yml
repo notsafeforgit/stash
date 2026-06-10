@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - develop
+      - v3-rewrite
   workflow_dispatch:
 
 concurrency:
@@ -34,6 +35,7 @@ jobs:
       id: repository_owner
       run: |
         echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_OUTPUT
+        echo "branch=${GITHUB_REF_NAME//\//-}" >> $GITHUB_OUTPUT
         echo "short_sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
 
     - name: Start build container
@@ -83,5 +85,5 @@ jobs:
           org.opencontainers.image.revision=${{ github.sha }}
           org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
         tags: |
-          ghcr.io/${{ steps.repository_owner.outputs.owner }}/stash:develop
-          ghcr.io/${{ steps.repository_owner.outputs.owner }}/stash:develop-${{ steps.repository_owner.outputs.short_sha }}
+          ghcr.io/${{ steps.repository_owner.outputs.owner }}/stash:${{ steps.repository_owner.outputs.branch }}
+          ghcr.io/${{ steps.repository_owner.outputs.owner }}/stash:${{ steps.repository_owner.outputs.branch }}-${{ steps.repository_owner.outputs.short_sha }}

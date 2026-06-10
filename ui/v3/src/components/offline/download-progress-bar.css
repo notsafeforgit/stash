@@ -1,0 +1,28 @@
+/**
+ * Indeterminate progress sweep — a 35% wide bar slides full-width
+ * left-to-right on a 1.4 s loop. Standard pattern for unknown-total
+ * progress (mirrors Material Design's linear indeterminate spec).
+ *
+ * Lives in CSS not Tailwind because keyframes don't have a clean
+ * Tailwind primitive yet. Kept tiny so the rest of the offline
+ * feature has no global stylesheet footprint.
+ */
+
+@keyframes download-progress-sweep {
+  0% {
+    transform: translateX(-100%);
+    width: 35%;
+  }
+  60% {
+    transform: translateX(280%);
+    width: 35%;
+  }
+  100% {
+    transform: translateX(280%);
+    width: 35%;
+  }
+}
+
+.download-progress-indeterminate {
+  animation: download-progress-sweep 1.4s ease-in-out infinite;
+}

@@ -1,0 +1,925 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --color-background: oklch(1 0 0);
+  --color-foreground: oklch(0.145 0 0);
+  --color-card: oklch(1 0 0);
+  --color-card-foreground: oklch(0.145 0 0);
+  --color-popover: oklch(1 0 0);
+  --color-popover-foreground: oklch(0.145 0 0);
+  --color-primary: oklch(0.205 0 0);
+  --color-primary-foreground: oklch(0.985 0 0);
+  --color-secondary: oklch(0.97 0 0);
+  --color-secondary-foreground: oklch(0.205 0 0);
+  --color-muted: oklch(0.97 0 0);
+  --color-muted-foreground: oklch(0.556 0 0);
+  --color-accent: oklch(0.97 0 0);
+  --color-accent-foreground: oklch(0.205 0 0);
+  --color-destructive: oklch(0.577 0.245 27.325);
+  --color-destructive-foreground: oklch(0.577 0.245 27.325);
+  --color-border: oklch(0.922 0 0);
+  --color-input: oklch(0.922 0 0);
+  --color-ring: oklch(0.708 0 0);
+  --color-chart-1: oklch(0.646 0.222 41.116);
+  --color-chart-2: oklch(0.6 0.118 184.704);
+  --color-chart-3: oklch(0.398 0.07 227.392);
+  --color-chart-4: oklch(0.828 0.189 84.429);
+  --color-chart-5: oklch(0.769 0.188 70.08);
+  --color-sidebar: oklch(0.985 0 0);
+  --color-sidebar-foreground: oklch(0.145 0 0);
+  --color-sidebar-primary: oklch(0.205 0 0);
+  --color-sidebar-primary-foreground: oklch(0.985 0 0);
+  --color-sidebar-accent: oklch(0.97 0 0);
+  --color-sidebar-accent-foreground: oklch(0.205 0 0);
+  --color-sidebar-border: oklch(0.922 0 0);
+  --color-sidebar-ring: oklch(0.708 0 0);
+  --radius: 0.625rem;
+  --sidebar-width: 16rem;
+  --sidebar-width-icon: 3rem;
+}
+
+.dark {
+  color-scheme: dark;
+  --color-background: oklch(0.145 0 0);
+  --color-foreground: oklch(0.985 0 0);
+  --color-card: oklch(0.145 0 0);
+  --color-card-foreground: oklch(0.985 0 0);
+  --color-popover: oklch(0.145 0 0);
+  --color-popover-foreground: oklch(0.985 0 0);
+  --color-primary: oklch(0.985 0 0);
+  --color-primary-foreground: oklch(0.205 0 0);
+  --color-secondary: oklch(0.269 0 0);
+  --color-secondary-foreground: oklch(0.985 0 0);
+  --color-muted: oklch(0.269 0 0);
+  --color-muted-foreground: oklch(0.708 0 0);
+  --color-accent: oklch(0.269 0 0);
+  --color-accent-foreground: oklch(0.985 0 0);
+  --color-destructive: oklch(0.396 0.141 25.723);
+  --color-destructive-foreground: oklch(0.637 0.237 25.331);
+  --color-border: oklch(0.269 0 0);
+  --color-input: oklch(0.269 0 0);
+  --color-ring: oklch(0.439 0 0);
+  --color-chart-1: oklch(0.488 0.243 264.376);
+  --color-chart-2: oklch(0.696 0.17 162.48);
+  --color-chart-3: oklch(0.769 0.188 70.08);
+  --color-chart-4: oklch(0.627 0.265 303.9);
+  --color-chart-5: oklch(0.645 0.246 16.439);
+  --color-sidebar: oklch(0.205 0 0);
+  --color-sidebar-foreground: oklch(0.985 0 0);
+  --color-sidebar-primary: oklch(0.488 0.243 264.376);
+  --color-sidebar-primary-foreground: oklch(0.985 0 0);
+  --color-sidebar-accent: oklch(0.269 0 0);
+  --color-sidebar-accent-foreground: oklch(0.985 0 0);
+  --color-sidebar-border: oklch(0.269 0 0);
+  --color-sidebar-ring: oklch(0.439 0 0);
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    /* position: fixed; inset: 0 anchors the body to the visual viewport,
+       giving it zero document scroll height so iOS Safari has nothing to
+       rubber-band at the window level. position: fixed is still a positioned
+       ancestor, so position: absolute children (e.g. backdrops) work correctly. */
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    /* PWA-style chrome: no long-press text selection / iOS callout
+       menu on labels, badges, button text, etc. Inherits to all
+       children; inputs / textareas / contenteditable opt back in
+       below. */
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    /* `manipulation` is the only `touch-action` value that explicitly
+       disables iOS Safari's double-tap-to-zoom (pan-x pan-y leaves it
+       on — Safari doesn't infer "no double-tap-zoom" from a pan-only
+       value). Without this, rapid double-taps on disabled buttons
+       (e.g. the View Options drawer's `+`/`−` zoom controls once
+       they hit their limit and `pointer-events: none` lets the second
+       tap fall through to the drawer body) trigger Safari's viewport
+       zoom-in — and `installPagePinchZoomGuard` then blocks the user
+       from pinch-zooming back out, leaving the viewport stranded.
+
+       Pinch-to-zoom is the side-effect of `manipulation` — it permits
+       pinch by default. We block pinch elsewhere: the JS
+       `installPagePinchZoomGuard` preventDefaults on multi-touch
+       touchstart/move + the `gesture*` events, so the CSS permission
+       never gets to take effect on pinch.
+
+       Custom pinch zoom inside the yarl image lightbox and the
+       scene-slide lightbox player is driven by pointer events on
+       wrappers with `touch-action: none`, which override this here. */
+    touch-action: manipulation;
+    @apply bg-background text-foreground;
+  }
+
+  /* Create an isolated stacking context so Base UI portaled popups (Dialog,
+     Popover, Menu) always render above page content regardless of z-index.
+     height: 100% propagates the non-scrollable body height into the app tree. */
+  .root {
+    isolation: isolate;
+    height: 100%;
+  }
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+/* Apply `touch-action: manipulation` to every element unconditionally,
+   *outside* `@layer base` so it can't be silently demoted by Tailwind's
+   layer cascade. On Chrome / Firefox the body-level rule is enough —
+   they walk up the DOM to find a non-auto `touch-action` per spec —
+   but Safari (iOS + macOS) doesn't reliably do that walk. Setting it
+   on every element forces gesture resolution to stop at the touched
+   element, so disabled buttons / drawer bodies / portaled popups
+   can't fall back to `auto` and re-enable double-tap-zoom. Specific
+   surfaces that need `touch-action: none` (the video-frame zoom
+   inner, marker handles, filter-drag overlay) explicitly set it
+   inline / via class, which beats the `*` selector's specificity
+   here. */
+*,
+::before,
+::after {
+  touch-action: manipulation;
+}
+
+/* Re-enable text selection on input surfaces. The body-level
+   `user-select: none` inherits to every descendant, so without this
+   typing in a text field couldn't long-press to position the caret /
+   select-word, and contenteditable regions wouldn't be usable. */
+input,
+textarea,
+[contenteditable="true"],
+[contenteditable="true"] *,
+[contenteditable="plaintext-only"],
+[contenteditable="plaintext-only"] * {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
+/* ── Mobile list view — hide global chrome that the list bar replaces ─── */
+
+/* Hide the global bottom tab bar; MobileListBar sits in flow below the list */
+body.mobile-list-view .bottom-tab-bar {
+  display: none;
+}
+
+/* Remove the bottom padding reserved for the tab bar on the main element */
+body.mobile-list-view main {
+  padding-bottom: 0;
+}
+
+/* ── Entity card ─────────────────────────────────────────────────────────── */
+
+/* Rating ribbon — diagonal corner strip in the top-right of the preview */
+.entity-card-rating-ribbon {
+  height: 3.5rem;
+  overflow: hidden;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 3.5rem;
+  z-index: 2;
+}
+
+.entity-card-rating-ribbon::after {
+  color: white;
+  content: attr(data-rating) "★";
+  display: block;
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0.2rem 0;
+  position: absolute;
+  right: -1rem;
+  text-align: center;
+  top: 0.75rem;
+  transform: rotate(45deg);
+  width: 3.5rem;
+}
+
+.entity-card-rating-ribbon[data-rating="5"]::after {
+  background: oklch(0.769 0.188 70.08); /* amber */
+}
+
+.entity-card-rating-ribbon[data-rating="4"]::after {
+  background: oklch(0.648 0.2 145); /* green */
+}
+
+.entity-card-rating-ribbon[data-rating="3"]::after {
+  background: oklch(0.6 0.15 240); /* blue */
+}
+
+.entity-card-rating-ribbon[data-rating="2"]::after {
+  background: oklch(0.556 0 0); /* muted */
+}
+
+.entity-card-rating-ribbon[data-rating="1"]::after {
+  background: oklch(0.577 0.245 27.325); /* destructive/red */
+}
+
+/* ── Entity card checkboxes / selection overlays ────────────────────────── */
+
+/* Details-view checkbox (absolute, top-left of card) */
+.entity-card-checkbox {
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  top: 0.35rem;
+  left: 0.35rem;
+  z-index: 2;
+}
+
+/* Visible when the item is selected */
+.entity-card-checkbox.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Visible when the list container is in selecting mode */
+[data-selecting] .entity-card-checkbox {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Suppress on mobile unless selected or in selecting mode */
+.entity-card.mobile
+.entity-card-checkbox:not(.visible):not([data-selecting] *) {
+  display: none;
+}
+
+/* Grid-view selection overlay (circle in top-left of preview area) */
+/* Hidden by default; shown when selected or when list is in selecting mode */
+.entity-card-select-overlay {
+  display: none;
+  position: absolute;
+  top: 0.35rem;
+  left: 0.35rem;
+  z-index: 3;
+  cursor: pointer;
+}
+
+[data-selecting] .entity-card-select-overlay,
+[data-selected="true"] .entity-card-select-overlay {
+  display: block;
+}
+
+/* In selecting mode the preview's primary action is toggling selection, not
+   opening a lightbox/detail page — so override `cursor-zoom-in` on the
+   preview area to the regular interactive pointer. */
+[data-selecting] .entity-card-preview {
+  cursor: pointer;
+}
+
+/* Wall-mode selection overlay — fully CSS-driven, no React re-renders on selection change.
+   Circle colour and check mark visibility respond to [data-selected="true"] on the article,
+   set imperatively by PhotoAlbumWall's useLayoutEffect. */
+.entity-card-wall-circle {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 9999px;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.3);
+  transition:
+    background-color 150ms,
+    border-color 150ms;
+}
+
+[data-selected="true"] .entity-card-wall-circle {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.entity-card-wall-check {
+  display: none;
+}
+
+[data-selected="true"] .entity-card-wall-check {
+  display: block;
+}
+
+/* ── Filter Builder ─────────────────────────────────────────────────────── */
+
+/* Depth-tint custom property – applied to each group/condition shell */
+.filter-depth-0 {
+  --filter-depth-color: #77c3ff;
+}
+.filter-depth-1 {
+  --filter-depth-color: #7dd8a8;
+}
+.filter-depth-2 {
+  --filter-depth-color: #f2c66d;
+}
+.filter-depth-3 {
+  --filter-depth-color: #f28f8f;
+}
+.filter-depth-4 {
+  --filter-depth-color: #b39df5;
+}
+.filter-depth-5 {
+  --filter-depth-color: #8fd7d3;
+}
+
+/* Group / condition shells — overflow must stay visible so the card's ring
+   (box-shadow) isn't clipped on straight edges; the card itself has
+   overflow:hidden which clips the depth strip ::before. */
+.filter-group-shell {
+  position: relative;
+}
+
+.filter-condition-shell {
+  position: relative;
+}
+
+/* Drag transition — applied while a drag is active (FilterBuilder toggles
+   `filter-dragging` on its root). Ignoring dnd-kit's per-item `transition`
+   value because it returns `transform 0ms linear` for each item's first
+   transform change, making the first sibling shift snap rather than slide.
+   This rule is single, uniform, and only active during a drag, so the
+   post-drop transform reset (when `filter-dragging` is removed) snaps
+   without an unwanted animation. */
+.filter-builder.filter-dragging .filter-condition-shell,
+.filter-builder.filter-dragging .filter-group-shell {
+  transition: transform 200ms ease;
+}
+
+/* Drag rail — narrow clickable strip anchored to the left of each card */
+.filter-drag-rail {
+  align-items: center;
+  align-self: stretch;
+  background: color-mix(in oklch, var(--color-secondary), white 8%);
+  border-bottom-left-radius: 0.75rem;
+  border-left: 1px solid color-mix(in oklch, var(--color-secondary), white 16%);
+  border-right: 1px solid color-mix(in oklch, var(--color-secondary), white 18%);
+  border-top-left-radius: 0.75rem;
+  bottom: 0;
+  color: color-mix(in oklch, var(--color-foreground), transparent 28%);
+  cursor: grab;
+  display: inline-flex;
+  height: auto;
+  justify-content: center;
+  left: 0;
+  overflow: hidden;
+  position: absolute;
+  top: 0;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+  width: 0.8rem;
+  z-index: 3;
+}
+
+.filter-drag-rail:hover,
+.filter-drag-rail:focus,
+.filter-drag-rail:active {
+  background: color-mix(in oklch, var(--color-secondary), white 12%);
+  color: color-mix(in oklch, var(--color-foreground), transparent 10%);
+  text-decoration: none;
+}
+
+.filter-drag-rail:active {
+  cursor: grabbing;
+}
+
+/* ::before is off by default; group shells enable it for the depth color strip */
+.filter-drag-rail::before {
+  content: none;
+}
+
+.filter-group-shell > .filter-drag-rail {
+  background: color-mix(in oklch, var(--filter-depth-color), transparent 70%);
+  border-color: color-mix(in oklch, var(--filter-depth-color), transparent 50%);
+}
+
+.filter-group-shell > .filter-drag-rail:hover,
+.filter-group-shell > .filter-drag-rail:focus,
+.filter-group-shell > .filter-drag-rail:active {
+  background: color-mix(in oklch, var(--filter-depth-color), transparent 45%);
+  border-color: color-mix(in oklch, var(--filter-depth-color), transparent 25%);
+}
+
+.filter-group-shell > .filter-drag-rail::before {
+  content: none;
+}
+
+/* Mobile depth rail — replaced by filter-group-card::before; hidden */
+.filter-depth-rail {
+  display: none;
+}
+
+/* Group card — ::before draws a left-edge depth-color stroke */
+/* Override ring color: default ring-foreground/10 is near-invisible in dark mode */
+.filter-group-card,
+.filter-condition-card {
+  --tw-ring-color: color-mix(
+    in oklch,
+    var(--color-foreground),
+    transparent 90%
+  );
+}
+
+.filter-group-card {
+  /* clip instead of hidden so sticky descendants can see past this to the scroll container */
+  overflow: clip;
+  position: relative;
+}
+
+.filter-group-card::before {
+  background: var(--filter-depth-color);
+  bottom: 0;
+  content: "";
+  left: 0;
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  width: 0.22rem;
+  z-index: 4;
+}
+
+/* Group header — vertical rhythm from card's default py-3/gap-3 */
+
+/* Group body — force px-0: group-data-[size=sm]/card:px-3 has higher specificity
+   than p-0 so tailwind-merge can't strip it; override here beats it */
+.filter-group-body {
+  display: flex;
+  flex-direction: row;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* Drop zone — animated droppable gap between items */
+.filter-drop-zone {
+  background: transparent;
+  border: 1px dashed transparent;
+  border-radius: 0.75rem;
+  box-shadow: inset 0.22rem 0 0 transparent;
+  height: 0.4rem;
+  margin: -0.04rem 0;
+  opacity: 0;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease,
+    box-shadow 0.12s ease,
+    opacity 0.12s ease;
+}
+
+.filter-drop-zone-active {
+  background: color-mix(in oklch, var(--color-primary), transparent 84%);
+  border-color: color-mix(in oklch, var(--color-primary), transparent 45%);
+  box-shadow:
+    inset 0.22rem 0 0 var(--filter-depth-color),
+    0 0 0 1px color-mix(in oklch, var(--color-primary), transparent 82%),
+    0 0 22px color-mix(in oklch, var(--color-primary), transparent 82%);
+  opacity: 1;
+}
+
+/* Keep drop zones invisible while not actively dragging */
+.filter-builder:not(.filter-dragging) .filter-drop-zone {
+  opacity: 0;
+}
+
+/* Drop indicator — horizontal insertion line with leading dot */
+.filter-drop-indicator {
+  background-color: var(--color-primary);
+  border-radius: 1px;
+  height: 2px;
+  margin: 1px 0;
+  pointer-events: none;
+  position: relative;
+}
+
+.filter-drop-indicator::before {
+  background-color: var(--color-primary);
+  border-radius: 50%;
+  content: "";
+  height: 10px;
+  left: -1px;
+  position: absolute;
+  top: -4px;
+  width: 10px;
+}
+
+/* Group start hit — covers the entire empty band above a group's first
+   child (body padding-top + the gap that separates the first child from
+   anything above). Absolutely positioned so it consumes no flex space when
+   idle (no layout grow) and never shifts the layout when a drag begins.
+   Same escape semantics as the header wrapper: dropping on it places the
+   item in the parent before this group. Sits inside the body-inner
+   (which has position: relative), spans the full width, and sits behind
+   children of the SortableContext via z-index lower than the placeholder
+   so a placeholder rendered at index 0 still receives hits in its
+   non-overlapping region. */
+.filter-group-start-hit {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.filter-builder.filter-dragging .filter-group-start-hit {
+  /* 0.75rem body-inner padding-top + 0.5rem flex gap-2 + 0.5rem of slack
+     into the first child so the cursor can drift slightly without leaving
+     the zone. */
+  height: 1.75rem;
+  pointer-events: auto;
+  z-index: 1;
+}
+
+/* Cross-group drop placeholder — sized slot inside the target group that
+   matches the dragged item's height, so the subgroup expands to "hold" the
+   incoming item. Height is set from --filter-drag-height (captured at
+   drag start in filter-builder.tsx). */
+.filter-cross-group-placeholder {
+  background: color-mix(in oklch, var(--color-primary), transparent 90%);
+  border: 1.5px dashed
+    color-mix(in oklch, var(--color-primary), transparent 50%);
+  border-radius: 0.75rem;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklch, var(--color-primary), transparent 80%),
+    inset 0 0 24px color-mix(in oklch, var(--color-primary), transparent 88%);
+  height: var(--filter-drag-height, 3.5rem);
+  /* Hit-testable so the cursor stays parked on the placeholder after its
+     insertion shifts the layout — otherwise the original drop target moves
+     out from under the cursor and the over-state oscillates. */
+  pointer-events: auto;
+  animation: filter-cross-group-placeholder-in 140ms ease-out;
+}
+
+.filter-cross-group-placeholder-group {
+  background: color-mix(in oklch, var(--color-primary), transparent 86%);
+  border-color: color-mix(in oklch, var(--color-primary), transparent 40%);
+}
+
+@keyframes filter-cross-group-placeholder-in {
+  from {
+    opacity: 0;
+    transform: scaleY(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+/* Drag overlay — floating ghost card that follows the cursor */
+.filter-drag-overlay {
+  background: color-mix(in oklch, var(--color-secondary), black 2%);
+  border: 1px solid color-mix(in oklch, var(--color-secondary), white 18%);
+  border-radius: 0.75rem;
+  box-shadow:
+    0 4px 8px rgb(0 0 0 / 18%),
+    0 16px 36px rgb(0 0 0 / 36%),
+    0 0 0 1.5px color-mix(in oklch, var(--color-primary), transparent 65%);
+  color: var(--color-foreground);
+  cursor: grabbing;
+  min-width: 12rem;
+  padding: 0.5rem 0.75rem;
+  touch-action: none;
+  user-select: none;
+}
+
+.filter-drag-overlay-group {
+  background: color-mix(
+    in oklch,
+    var(--color-primary) 18%,
+    color-mix(in oklch, var(--color-secondary), black 4%)
+  );
+  border-color: color-mix(
+    in oklch,
+    var(--color-primary) 18%,
+    color-mix(in oklch, var(--color-secondary), white 8%)
+  );
+}
+
+/* Dragging state — ghost appearance for the card being dragged.
+   (The rail/mobile-actions part of this state lives further down, after
+   the base `.filter-drag-rail` / `.filter-mobile-actions` rules, to keep
+   selector specificity ascending.) */
+.filter-item-dragging .filter-condition-card,
+.filter-item-dragging .filter-group-card {
+  background: color-mix(in oklch, var(--color-primary), transparent 93%);
+  border-color: color-mix(in oklch, var(--color-primary), transparent 65%);
+  box-shadow:
+    0 0 0 1.5px color-mix(in oklch, var(--color-primary), transparent 80%),
+    inset 0 0 16px color-mix(in oklch, var(--color-primary), transparent 93%);
+}
+
+/* Body cursor while a drag is active */
+body.filter-dragging {
+  cursor: grabbing;
+}
+
+/* Mobile action buttons — hidden on desktop, visible on narrow screens */
+.filter-mobile-actions {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .filter-drag-rail,
+  .filter-drop-zone,
+  .filter-drag-handle {
+    display: none;
+  }
+
+  .filter-mobile-actions {
+    align-items: center;
+    align-self: flex-start;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    gap: 0.5rem;
+    justify-content: flex-start;
+    padding: 0.5rem 0.5rem 0.5rem 0;
+    position: sticky;
+    top: 0.5rem;
+  }
+
+  .filter-inline-delete {
+    display: none;
+  }
+
+  /* Zero out horizontal padding on narrow screens — nesting compounds left/right
+     offset at every depth level; removing h-padding recovers ~16 px per depth
+     (~80 px at depth 4). Depth identity is communicated by the ::before left-edge
+     stripe, so indentation is not needed. */
+  .filter-builder {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  .filter-group-card {
+    gap: 0;
+    padding-bottom: 0;
+    padding-top: 0.5rem;
+  }
+
+  .filter-group-header {
+    padding-bottom: 0.5rem;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  .filter-group-body-inner {
+    padding: 0.5rem 0 0.5rem 0.5rem;
+  }
+
+  /* No separator column sibling (depth 0) — restore right padding for symmetry */
+  .filter-group-body-inner:only-child {
+    padding-right: 0.5rem;
+  }
+
+  .filter-condition-card {
+    padding-bottom: 0.5rem;
+    padding-top: 0.5rem;
+  }
+
+  .filter-condition-card [data-slot="card-content"] {
+    padding-left: 0.5rem;
+    padding-right: 0;
+  }
+
+  /* card py already provides the 0.5rem — strip redundant vertical padding */
+  .filter-condition-card .filter-mobile-actions {
+    padding-bottom: 0;
+    padding-top: 0;
+  }
+}
+
+/* Dragging state — ghost appearance for the rail / mobile actions of the
+   card being dragged. Placed after the base `.filter-drag-rail` /
+   `.filter-mobile-actions` rules above so specificity stays ascending. */
+.filter-item-dragging .filter-drag-rail,
+.filter-item-dragging .filter-mobile-actions {
+  opacity: 0;
+}
+
+/* Pill summary — collapsed multi-value display */
+.filter-pill-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-top: 0.5rem;
+}
+
+.filter-pill {
+  background: color-mix(in oklch, var(--color-secondary), white 10%);
+  border: 1px solid color-mix(in oklch, var(--color-secondary), white 18%);
+  border-radius: 999px;
+  color: color-mix(in oklch, var(--color-foreground), transparent 8%);
+  display: inline-flex;
+  font-size: 0.78rem;
+  line-height: 1;
+  padding: 0.3rem 0.55rem;
+}
+
+.filter-pill-muted {
+  background: color-mix(in oklch, var(--color-secondary), white 6%);
+  color: color-mix(in oklch, var(--color-foreground), transparent 28%);
+}
+
+.filter-pill-success {
+  background: color-mix(in oklch, #28a745, transparent 82%);
+  border-color: color-mix(in oklch, #28a745, transparent 66%);
+  color: color-mix(in oklch, #28a745, white 20%);
+}
+
+.filter-pill-danger {
+  background: color-mix(in oklch, #d9534f, transparent 82%);
+  border-color: color-mix(in oklch, #d9534f, transparent 66%);
+  color: color-mix(in oklch, #d9534f, white 18%);
+}
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: "Geist Variable", sans-serif;
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  color-scheme: light;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+/* Override Sonner's hardcoded colors to match our design tokens.
+   Sonner injects its CSS via a runtime <style> tag that lands after
+   globals.css in the DOM; the `html` ancestor lifts these selectors to
+   (0,2,1) over Sonner's (0,2,0) so they win the cascade without
+   !important. Use --color-* (Tailwind v4 @theme tokens) not the legacy
+   un-prefixed vars — the un-prefixed vars are always overridden by
+   :root below. */
+html [data-sonner-toaster][data-sonner-theme="light"],
+html [data-sonner-toaster][data-sonner-theme="dark"],
+html [data-sonner-toaster][data-sonner-theme="system"] {
+  --normal-bg: var(--color-popover);
+  --normal-border: var(--color-border);
+  --normal-text: var(--color-popover-foreground);
+}
+
+/* Image lightboxes (single-image detail + multi-image list): on mobile,
+   move the toolbar (close + zoom) to the bottom of the viewport for
+   easier thumb reach, and hide the thumbnail strip — phones swipe-
+   navigate well, and the strip otherwise collides with the relocated
+   toolbar. env(safe-area-inset-bottom) clears the iOS home indicator.
+   Larger screens keep YARL's default top-right toolbar + bottom strip. */
+@media (max-width: 767px) {
+  /* Generic toolbar-at-bottom — applied to image and scene lightboxes
+     alike. env(safe-area-inset-bottom) clears the iOS home indicator. */
+  .lightbox-mobile-toolbar-bottom .yarl__toolbar {
+    top: auto;
+    bottom: env(safe-area-inset-bottom, 0);
+  }
+  /* Image-specific: thumbnails are tiny on phones — swipe is more useful. */
+  .image-lightbox .yarl__thumbnails_container {
+    display: none;
+  }
+}
+
+/* Lean YARL's toolbar / nav icons toward our standard icon-button sizing
+   (16px) instead of YARL's stock 32px so they read alongside our own
+   Lucide-iconned buttons (e.g. the sidebar expand button on the image
+   detail page) without towering over them. The button paddings are
+   trimmed in tandem so the chrome stays proportional. */
+.yarl__container {
+  --yarl__icon_size: 16px;
+  --yarl__button_padding: 6px;
+  --yarl__navigation_button_padding: 18px 12px;
+}
+
+/* Tap-to-reveal slide overlays on touch devices: the title, galleries,
+   performers, rating, and o-counter that overlap the image are hidden by
+   default so the image is the focus, then a tap on the slide toggles
+   them. The YARL toolbar (close + zoom) stays visible regardless so
+   there's always an exit affordance. Hover-capable devices ignore this
+   rule and always show the overlays. */
+@media (hover: none) {
+  .image-lightbox .lightbox-overlay-top,
+  .image-lightbox .lightbox-overlay-bottom {
+    transition: opacity 200ms ease;
+  }
+  .image-lightbox.chrome-hidden .lightbox-overlay-top,
+  .image-lightbox.chrome-hidden .lightbox-overlay-bottom {
+    opacity: 0;
+    pointer-events: none;
+  }
+  /* Children inside the overlay (e.g. `LightboxDetails`) opt back into
+     `pointer-events: auto` so the user can scroll / select text while
+     the chrome is visible. CSS `pointer-events: none` on a parent does
+     not cascade — each child re-asserts its own value — so when the
+     chrome is hidden the descendants still capture touches and block
+     pinch-zoom panning in the overlay's vacated area. Force descendants
+     non-interactive too so a tap-to-hide → pan flow can pan from
+     anywhere on the image. */
+  .image-lightbox.chrome-hidden .lightbox-overlay-top *,
+  .image-lightbox.chrome-hidden .lightbox-overlay-bottom * {
+    pointer-events: none;
+  }
+}
+
+/* Card-grid zoom uses View Transitions with no per-element naming —
+   just the root crossfade. One pair of whole-page bitmaps composited
+   on the GPU, regardless of card count, so it stays smooth on dense
+   grids. The default duration (~250ms) feels sluggish for what's
+   essentially a layout shift; 140ms ease-out reads as crisp without
+   being abrupt. */
+@supports (view-transition-name: a) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 140ms;
+    animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+  }
+}

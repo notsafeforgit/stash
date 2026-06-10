@@ -117,7 +117,7 @@ jobs:
       run: make it
 
   # Job 3: Cross-compile for all platforms
-  # Each platform gets its own runner and Docker container (ghcr.io/stashapp/compiler:13).
+  # Each platform gets its own runner and Docker container.
   # Each build-cc-* make target is self-contained (sets its own GOOS/GOARCH/CC),
   # so running them in separate containers is functionally identical to one container.
   # Runs in parallel with the test job.

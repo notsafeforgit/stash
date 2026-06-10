@@ -2191,6 +2191,28 @@ func TestGalleryQueryPerformers(t *testing.T) {
 	}
 }
 
+func TestGalleryQueryPerformersFilterTagsExcludeIncludesGalleriesWithoutPerformers(t *testing.T) {
+	runWithRollbackTxn(t, "performers_filter.tags exclude keeps galleries without performers", func(t *testing.T, ctx context.Context) {
+		assert := assert.New(t)
+
+		tagFilter := models.HierarchicalMultiCriterionInput{
+			Modifier: models.CriterionModifierExcludes,
+			Value:    []string{strconv.Itoa(tagIDs[tagIdxWithPerformer])},
+		}
+
+		galleries, _, err := db.Gallery.Query(ctx, &models.GalleryFilterType{
+			PerformersFilter: &models.PerformerFilterType{
+				Tags: &tagFilter,
+			},
+		}, nil)
+		require.NoError(t, err)
+
+		ids := galleriesToIDs(galleries)
+		assert.Contains(ids, indexToID(galleryIDs, galleryIdxWithStudio))
+		assert.NotContains(ids, indexToID(galleryIDs, galleryIdxWithPerformerTag))
+	})
+}
+
 func TestGalleryQueryTags(t *testing.T) {
 	tests := []struct {
 		name        string

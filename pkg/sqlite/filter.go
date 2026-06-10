@@ -348,6 +348,12 @@ func (f *filterBuilder) addWith(sql string, args ...interface{}) {
 		return
 	}
 
+	for _, existing := range f.withClauses {
+		if existing.sql == sql {
+			return
+		}
+	}
+
 	f.withClauses = append(f.withClauses, makeClause(sql, args...))
 }
 
@@ -426,11 +432,27 @@ func (f *filterBuilder) generateWithClauses() (string, []interface{}) {
 		args = append(args, w.args...)
 	}
 
+	if f.subFilter != nil {
+		c, a := f.subFilter.generateWithClauses()
+		if c != "" {
+			clauses = append(clauses, c)
+			args = append(args, a...)
+		}
+	}
+
 	if len(clauses) > 0 {
 		return strings.Join(clauses, ", "), args
 	}
 
 	return "", nil
+}
+
+func (f *filterBuilder) hasRecursiveWith() bool {
+	if f.recursiveWith {
+		return true
+	}
+
+	return f.subFilter != nil && f.subFilter.hasRecursiveWith()
 }
 
 // getAllJoins returns all of the joins in this filter and any sub-filter(s).

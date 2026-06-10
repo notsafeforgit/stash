@@ -7,6 +7,10 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
+// Limits traversal of malformed cyclic studio parent graphs. This is separate
+// from the user-facing FilterAST group nesting limit.
+const maxStudioHierarchyTraversalDepth = 100
+
 type studioFilterHandler struct {
 	studioFilter *models.StudioFilterType
 }
@@ -329,6 +333,7 @@ func studioHierarchyTagsCriterionHandler(tags *models.HierarchicalMultiCriterion
 
 			joinTable := studioHierarchyTagsJoinTable(direction, "")
 			joinAlias := fmt.Sprintf("%s_studio_tag", direction)
+			f.addRecursiveWith(studioHierarchyCTE(direction), maxStudioHierarchyTraversalDepth)
 			f.addLeftJoin(joinTable, joinAlias, fmt.Sprintf("%s.studio_id = studios.id", joinAlias))
 			f.addWhere(fmt.Sprintf("%s.studio_id IS %s NULL", joinAlias, notClause))
 			return
@@ -346,6 +351,7 @@ func studioHierarchyTagsCriterionHandler(tags *models.HierarchicalMultiCriterion
 			}
 
 			joinAlias := fmt.Sprintf("%s_studio_tag", direction)
+			f.addRecursiveWith(studioHierarchyCTE(direction), maxStudioHierarchyTraversalDepth)
 			f.addLeftJoin(
 				studioHierarchyTagsJoinTable(direction, valuesClause),
 				joinAlias,
@@ -362,6 +368,7 @@ func studioHierarchyTagsCriterionHandler(tags *models.HierarchicalMultiCriterion
 			}
 
 			joinAlias := fmt.Sprintf("%s_studio_tag_exclude", direction)
+			f.addRecursiveWith(studioHierarchyCTE(direction), maxStudioHierarchyTraversalDepth)
 			f.addLeftJoin(
 				studioHierarchyTagsJoinTable(direction, valuesClause),
 				joinAlias,
@@ -376,46 +383,51 @@ func studioHierarchyTagsCriterionHandler(tags *models.HierarchicalMultiCriterion
 	}
 }
 
-func studioHierarchyTagsJoinTable(direction, valuesClause string) string {
-	var hierarchyCTE string
+func studioHierarchyCTE(direction string) string {
 	switch direction {
 	case "ancestor":
-		hierarchyCTE = `WITH RECURSIVE studio_hierarchy(studio_id, related_id) AS (
-SELECT id AS studio_id, parent_id AS related_id FROM studios WHERE parent_id IS NOT NULL
+		return `studio_ancestor_hierarchy(studio_id, related_id, depth, path) AS (
+SELECT id AS studio_id, parent_id AS related_id, 0 AS depth, ',' || id || ',' AS path FROM studios WHERE parent_id IS NOT NULL
 UNION ALL
-SELECT h.studio_id, s.parent_id
-FROM studio_hierarchy h
+SELECT h.studio_id, s.parent_id, h.depth + 1, h.path || s.id || ','
+FROM studio_ancestor_hierarchy h
 INNER JOIN studios s ON s.id = h.related_id
 WHERE s.parent_id IS NOT NULL
+  AND h.depth < ?
+  AND instr(h.path, ',' || s.id || ',') = 0
 )`
 	case "descendant":
-		hierarchyCTE = `WITH RECURSIVE studio_hierarchy(studio_id, related_id) AS (
-SELECT p.id AS studio_id, c.id AS related_id
+		return `studio_descendant_hierarchy(studio_id, related_id, depth, path) AS (
+SELECT p.id AS studio_id, c.id AS related_id, 0 AS depth, ',' || p.id || ',' AS path
 FROM studios p
 INNER JOIN studios c ON c.parent_id = p.id
 UNION ALL
-SELECT h.studio_id, c.id
-FROM studio_hierarchy h
+SELECT h.studio_id, c.id, h.depth + 1, h.path || c.id || ','
+FROM studio_descendant_hierarchy h
 INNER JOIN studios c ON c.parent_id = h.related_id
+WHERE h.depth < ?
+  AND instr(h.path, ',' || c.id || ',') = 0
 )`
 	default:
 		panic("unsupported studio hierarchy direction")
 	}
+}
+
+func studioHierarchyTagsJoinTable(direction, valuesClause string) string {
+	hierarchyTable := fmt.Sprintf("studio_%s_hierarchy", direction)
 
 	if valuesClause == "" {
 		return fmt.Sprintf(`(
-%s
 SELECT DISTINCT h.studio_id
-FROM studio_hierarchy h
+FROM %s h
 INNER JOIN studios_tags st ON st.studio_id = h.related_id
-)`, hierarchyCTE)
+)`, hierarchyTable)
 	}
 
 	return fmt.Sprintf(`(
-%s
 SELECT h.studio_id, t.column1 AS root_id, t.column2 AS item_id
-FROM studio_hierarchy h
+FROM %s h
 INNER JOIN studios_tags st ON st.studio_id = h.related_id
 INNER JOIN (%s) t ON t.column2 = st.tag_id
-)`, hierarchyCTE, valuesClause)
+)`, hierarchyTable, valuesClause)
 }

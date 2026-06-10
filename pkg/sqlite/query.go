@@ -178,7 +178,7 @@ func (qb *queryBuilder) addFilter(f *filterBuilder) error {
 
 	clause, args := f.generateWithClauses()
 	if len(clause) > 0 {
-		qb.addWith(f.recursiveWith, clause)
+		qb.addWith(f.hasRecursiveWith(), clause)
 	}
 	if len(args) > 0 {
 		qb.withArgs = append(qb.withArgs, args...)

@@ -129,6 +129,7 @@ func (qb *sceneFilterHandler) criterionHandler() criterionHandler {
 		orientationCriterionHandler(sceneFilter.Orientation, "video_files.height", "video_files.width", qb.addVideoFilesTable),
 		floatIntCriterionHandler(sceneFilter.Framerate, "ROUND(video_files.frame_rate)", qb.addVideoFilesTable),
 		intCriterionHandler(sceneFilter.Bitrate, "video_files.bit_rate", qb.addVideoFilesTable),
+		intCriterionHandler(sceneFilter.BitDepth, "video_files.bit_depth", qb.addVideoFilesTable),
 		qb.codecCriterionHandler(sceneFilter.VideoCodec, "video_files.video_codec", qb.addVideoFilesTable),
 		qb.codecCriterionHandler(sceneFilter.AudioCodec, "video_files.audio_codec", qb.addVideoFilesTable),
 

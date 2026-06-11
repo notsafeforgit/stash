@@ -40,8 +40,32 @@ query FindImage($id: ID!, $checksum: String) {
   }
 }
 
-query FindDuplicateImages($distance: Int!) {
-  findDuplicateImages(distance: $distance) {
-    ...SlimImageData
+query FindDuplicateImages($distance: Int!, $filter: FindFilterType) {
+  findDuplicateImageGroups(distance: $distance, filter: $filter) {
+    count
+    groups {
+      ...SlimImageData
+    }
+  }
+}
+
+query FindDuplicateImagesFiltered(
+  $distance: Int!
+  $filter: FindFilterType
+  $image_filter: ImageFilterType
+  $image_filter_ast: FilterASTInput
+  $filter_mode: DuplicateFilterMode!
+) {
+  findDuplicateImageGroups(
+    distance: $distance
+    filter: $filter
+    image_filter: $image_filter
+    image_filter_ast: $image_filter_ast
+    filter_mode: $filter_mode
+  ) {
+    count
+    groups {
+      ...SlimImageData
+    }
   }
 }

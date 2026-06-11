@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/doug-martin/goqu/v9"
@@ -17,7 +16,6 @@ import (
 	"gopkg.in/guregu/null.v4/zero"
 
 	"github.com/stashapp/stash/pkg/models"
-	"github.com/stashapp/stash/pkg/sliceutil"
 	"github.com/stashapp/stash/pkg/utils"
 )
 
@@ -1551,15 +1549,62 @@ func (qb *SceneStore) GetStashIDs(ctx context.Context, sceneID int) ([]models.St
 	return sceneRepository.stashIDs.get(ctx, sceneID)
 }
 
-func (qb *SceneStore) FindDuplicates(ctx context.Context, distance int, durationDiff float64, filter *models.SceneFilterType) ([][]*models.Scene, error) {
-	var dupeIds [][]int
+const findExactSceneDuplicateQuery = `
+SELECT GROUP_CONCAT(DISTINCT scene_id) as ids
+FROM (
+	SELECT scenes_files.scene_id
+		 , video_files.duration as file_duration
+		 , files.size as file_size
+		 , files_fingerprints.fingerprint as phash
+		 , abs(max(video_files.duration) OVER (PARTITION by files_fingerprints.fingerprint) - video_files.duration) as durationDiff
+	FROM scenes_files
+	JOIN files ON scenes_files.file_id = files.id
+	JOIN files_fingerprints ON scenes_files.file_id = files_fingerprints.file_id AND files_fingerprints.type = 'phash'
+	JOIN video_files ON files.id = video_files.file_id
+)
+WHERE phash IS NOT NULL
+    AND (durationDiff <= ?
+    OR ? < 0)
+GROUP BY phash
+HAVING COUNT(phash) > 1
+	AND COUNT(DISTINCT scene_id) > 1
+ORDER BY SUM(file_size) DESC;
+`
 
+const findSceneDuplicatePhashesQuery = `
+SELECT scenes_files.scene_id as id, files_fingerprints.fingerprint as phash, video_files.duration as duration
+FROM scenes_files
+JOIN files_fingerprints ON scenes_files.file_id = files_fingerprints.file_id AND files_fingerprints.type = 'phash'
+JOIN video_files ON scenes_files.file_id = video_files.file_id
+JOIN files ON scenes_files.file_id = files.id
+WHERE files_fingerprints.fingerprint IS NOT NULL
+ORDER BY files.size DESC
+`
+
+func sceneDuplicateFilterApplied(filter *models.SceneFilterType, filterAST *models.FilterAST) bool {
+	return filter != nil || filterAST != nil
+}
+
+func addSceneFilterAST(ctx context.Context, query *queryBuilder, filterAST *models.FilterAST) error {
+	if filterAST == nil {
+		return nil
+	}
+
+	astFilter := filterBuilderFromHandler(ctx, &sceneASTFilterHandler{ast: filterAST})
+	return query.addFilter(astFilter)
+}
+
+func (qb *SceneStore) makeSceneDuplicateQuery(ctx context.Context, filter *models.SceneFilterType, filterAST *models.FilterAST) (*queryBuilder, error) {
 	query, err := qb.makeQuery(ctx, filter, nil)
 	if err != nil {
 		return nil, err
 	}
+	query.sortAndPagination = ""
 
-	// Add necessary joins for duplicate checking
+	if err := addSceneFilterAST(ctx, query, filterAST); err != nil {
+		return nil, err
+	}
+
 	query.addJoins(
 		join{
 			table:    scenesFilesTable,
@@ -1579,18 +1624,66 @@ func (qb *SceneStore) FindDuplicates(ctx context.Context, distance int, duration
 		},
 	)
 
-	if distance == 0 {
-		query.columns = []string{
-			"scenes.id as scene_id",
-			"video_files.duration as file_duration",
-			"files.size as file_size",
-			"files_fingerprints.fingerprint as phash",
-			"abs(max(video_files.duration) OVER (PARTITION by files_fingerprints.fingerprint) - video_files.duration) as durationDiff",
+	return query, nil
+}
+
+func (qb *SceneStore) makeSceneFilterIDQuery(ctx context.Context, filter *models.SceneFilterType, filterAST *models.FilterAST) (*queryBuilder, error) {
+	query, err := qb.makeQuery(ctx, filter, nil)
+	if err != nil {
+		return nil, err
+	}
+	query.columns = []string{"DISTINCT scenes.id as scene_id"}
+	query.sortAndPagination = ""
+
+	if err := addSceneFilterAST(ctx, query, filterAST); err != nil {
+		return nil, err
+	}
+
+	return query, nil
+}
+
+func (qb *SceneStore) findSceneFilterIDs(ctx context.Context, filter *models.SceneFilterType, filterAST *models.FilterAST) (map[int]struct{}, error) {
+	query, err := qb.makeSceneFilterIDQuery(ctx, filter, filterAST)
+	if err != nil {
+		return nil, err
+	}
+
+	var ids []int
+	if err := dbWrapper.Select(ctx, &ids, query.toSQL(false), query.allArgs()...); err != nil {
+		return nil, err
+	}
+
+	ret := make(map[int]struct{}, len(ids))
+	for _, id := range ids {
+		ret[id] = struct{}{}
+	}
+	return ret, nil
+}
+
+func (qb *SceneStore) findExactSceneDuplicatesAll(ctx context.Context, durationDiff float64, filter *models.SceneFilterType, filterAST *models.FilterAST) ([][]int, error) {
+	if !sceneDuplicateFilterApplied(filter, filterAST) {
+		var ids []string
+		if err := dbWrapper.Select(ctx, &ids, findExactSceneDuplicateQuery, durationDiff, durationDiff); err != nil {
+			return nil, err
 		}
 
-		sqlStr := query.toSQL(false)
+		return parseDuplicateIDGroups(ids), nil
+	}
 
-		finalQuery := `
+	query, err := qb.makeSceneDuplicateQuery(ctx, filter, filterAST)
+	if err != nil {
+		return nil, err
+	}
+	query.columns = []string{
+		"scenes.id as scene_id",
+		"video_files.duration as file_duration",
+		"files.size as file_size",
+		"files_fingerprints.fingerprint as phash",
+		"abs(max(video_files.duration) OVER (PARTITION by files_fingerprints.fingerprint) - video_files.duration) as durationDiff",
+	}
+
+	sqlStr := query.toSQL(false)
+	finalQuery := `
 SELECT GROUP_CONCAT(DISTINCT scene_id) as ids
 FROM (` + sqlStr + `)
 WHERE phash IS NOT NULL
@@ -1603,26 +1696,70 @@ HAVING COUNT(phash) > 1
 ORDER BY SUM(file_size) DESC;
 `
 
-		var ids []string
-		args := append(query.allArgs(), durationDiff, durationDiff)
-		if err := dbWrapper.Select(ctx, &ids, finalQuery, args...); err != nil {
+	var ids []string
+	args := append(query.allArgs(), durationDiff, durationDiff)
+	if err := dbWrapper.Select(ctx, &ids, finalQuery, args...); err != nil {
+		return nil, err
+	}
+
+	return parseDuplicateIDGroups(ids), nil
+}
+
+func (qb *SceneStore) findExactSceneDuplicatesAny(ctx context.Context, durationDiff float64, filter *models.SceneFilterType, filterAST *models.FilterAST) ([][]int, error) {
+	duplicateQuery, err := qb.makeSceneDuplicateQuery(ctx, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	duplicateQuery.columns = []string{
+		"scenes.id as scene_id",
+		"video_files.duration as file_duration",
+		"files.size as file_size",
+		"files_fingerprints.fingerprint as phash",
+		"abs(max(video_files.duration) OVER (PARTITION by files_fingerprints.fingerprint) - video_files.duration) as durationDiff",
+	}
+
+	filterQuery, err := qb.makeSceneFilterIDQuery(ctx, filter, filterAST)
+	if err != nil {
+		return nil, err
+	}
+
+	finalQuery := `
+WITH duplicate_candidates AS (
+` + duplicateQuery.toSQL(false) + `
+),
+filtered_matches AS (
+` + filterQuery.toSQL(false) + `
+)
+SELECT GROUP_CONCAT(DISTINCT duplicate_candidates.scene_id) as ids
+FROM duplicate_candidates
+LEFT JOIN filtered_matches ON filtered_matches.scene_id = duplicate_candidates.scene_id
+WHERE phash IS NOT NULL
+    AND (durationDiff <= ?
+    OR ? < 0)
+GROUP BY phash
+HAVING COUNT(phash) > 1
+	AND COUNT(DISTINCT duplicate_candidates.scene_id) > 1
+	AND COUNT(DISTINCT filtered_matches.scene_id) > 0
+ORDER BY SUM(file_size) DESC;
+`
+
+	var ids []string
+	args := append(filterQuery.allArgs(), durationDiff, durationDiff)
+	if err := dbWrapper.Select(ctx, &ids, finalQuery, args...); err != nil {
+		return nil, err
+	}
+
+	return parseDuplicateIDGroups(ids), nil
+}
+
+func (qb *SceneStore) findSceneDuplicatePhashes(ctx context.Context, filter *models.SceneFilterType, filterAST *models.FilterAST) ([]*utils.Phash, error) {
+	var hashes []*utils.Phash
+
+	if sceneDuplicateFilterApplied(filter, filterAST) {
+		query, err := qb.makeSceneDuplicateQuery(ctx, filter, filterAST)
+		if err != nil {
 			return nil, err
 		}
-
-		for _, id := range ids {
-			strIds := strings.Split(id, ",")
-			var sceneIds []int
-			for _, strId := range strIds {
-				if intId, err := strconv.Atoi(strId); err == nil {
-					sceneIds = sliceutil.AppendUnique(sceneIds, intId)
-				}
-			}
-			// filter out
-			if len(sceneIds) > 1 {
-				dupeIds = append(dupeIds, sceneIds)
-			}
-		}
-	} else {
 		query.columns = []string{
 			"scenes.id as id",
 			"files_fingerprints.fingerprint as phash",
@@ -1633,43 +1770,95 @@ ORDER BY SUM(file_size) DESC;
 
 		sqlStr := query.toSQL(true)
 
-		var hashes []*utils.Phash
-
-		if err := sceneRepository.queryFunc(ctx, sqlStr, query.allArgs(), false, func(rows *sqlx.Rows) error {
-			phash := utils.Phash{
-				Bucket:   -1,
-				Duration: -1,
-			}
-			if err := rows.StructScan(&phash); err != nil {
-				return err
-			}
-
-			hashes = append(hashes, &phash)
-			return nil
-		}); err != nil {
+		if err := qb.readSceneDuplicatePhashes(ctx, sqlStr, query.allArgs(), &hashes); err != nil {
 			return nil, err
 		}
-
-		dupeIds = utils.FindDuplicates(hashes, distance, durationDiff)
+	} else if err := qb.readSceneDuplicatePhashes(ctx, findSceneDuplicatePhashesQuery, nil, &hashes); err != nil {
+		return nil, err
 	}
 
-	var allIds []int
-	for _, comp := range dupeIds {
-		allIds = append(allIds, comp...)
+	return hashes, nil
+}
+
+func (qb *SceneStore) readSceneDuplicatePhashes(ctx context.Context, query string, args []interface{}, hashes *[]*utils.Phash) error {
+	return sceneRepository.queryFunc(ctx, query, args, false, func(rows *sqlx.Rows) error {
+		phash := utils.Phash{
+			Bucket:   -1,
+			Duration: -1,
+		}
+		if err := rows.StructScan(&phash); err != nil {
+			return err
+		}
+
+		*hashes = append(*hashes, &phash)
+		return nil
+	})
+}
+
+func (qb *SceneStore) FindDuplicates(ctx context.Context, distance int, durationDiff float64, filter *models.SceneFilterType, filterAST *models.FilterAST, filterMode models.DuplicateFilterMode) ([][]*models.Scene, error) {
+	ret, _, err := qb.FindDuplicateGroups(ctx, distance, durationDiff, filter, filterAST, filterMode, duplicateFindFilterAll())
+	return ret, err
+}
+
+func (qb *SceneStore) FindDuplicateGroups(ctx context.Context, distance int, durationDiff float64, filter *models.SceneFilterType, filterAST *models.FilterAST, filterMode models.DuplicateFilterMode, findFilter *models.FindFilterType) ([][]*models.Scene, int, error) {
+	if !filterMode.IsValid() {
+		filterMode = models.DuplicateFilterModeAll
+	}
+	hasFilter := sceneDuplicateFilterApplied(filter, filterAST)
+	if !hasFilter {
+		filterMode = models.DuplicateFilterModeAll
 	}
 
+	var dupeIds [][]int
+	var err error
+
+	if distance == 0 {
+		if filterMode == models.DuplicateFilterModeAny {
+			dupeIds, err = qb.findExactSceneDuplicatesAny(ctx, durationDiff, filter, filterAST)
+		} else {
+			dupeIds, err = qb.findExactSceneDuplicatesAll(ctx, durationDiff, filter, filterAST)
+		}
+		if err != nil {
+			return nil, 0, err
+		}
+	} else {
+		dupeFilter := filter
+		dupeFilterAST := filterAST
+		if filterMode == models.DuplicateFilterModeAny {
+			dupeFilter = nil
+			dupeFilterAST = nil
+		}
+
+		hashes, err := qb.findSceneDuplicatePhashes(ctx, dupeFilter, dupeFilterAST)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		if filterMode == models.DuplicateFilterModeAny {
+			matchingIDs, err := qb.findSceneFilterIDs(ctx, filter, filterAST)
+			if err != nil {
+				return nil, 0, err
+			}
+			dupeIds = utils.FindDuplicatesContaining(hashes, matchingIDs, distance, durationDiff)
+		} else {
+			dupeIds = utils.FindDuplicates(hashes, distance, durationDiff)
+		}
+	}
+
+	pagedDupeIds, count := paginateDuplicateIDGroups(dupeIds, findFilter)
+	allIds := duplicateIDs(pagedDupeIds)
 	if len(allIds) == 0 {
-		return nil, nil
+		return nil, count, nil
 	}
 
 	allScenes, err := qb.FindMany(ctx, allIds)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	var duplicates [][]*models.Scene
 	offset := 0
-	for _, comp := range dupeIds {
+	for _, comp := range pagedDupeIds {
 		group := allScenes[offset : offset+len(comp)]
 		duplicates = append(duplicates, group)
 		offset += len(comp)
@@ -1677,7 +1866,7 @@ ORDER BY SUM(file_size) DESC;
 
 	sortByPath(duplicates)
 
-	return duplicates, nil
+	return duplicates, count, nil
 }
 
 func sortByPath(scenes [][]*models.Scene) {

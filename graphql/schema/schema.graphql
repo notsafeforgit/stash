@@ -60,10 +60,38 @@ type Query {
     """
     duration_diff: Float
     scene_filter: SceneFilterType
+    scene_filter_ast: FilterASTInput
+    filter_mode: DuplicateFilterMode! = ALL
   ): [[Scene!]!]!
 
+  findDuplicateSceneGroups(
+    distance: Int
+    """
+    Max difference in seconds between files in order to be considered for similarity matching.
+    Fractional seconds are ok: 0.5 will mean only files that have durations within 0.5 seconds between them will be matched based on PHash distance.
+    """
+    duration_diff: Float
+    scene_filter: SceneFilterType
+    scene_filter_ast: FilterASTInput
+    filter_mode: DuplicateFilterMode! = ALL
+    filter: FindFilterType
+  ): FindDuplicateScenesResultType!
+
   "Find duplicate images"
-  findDuplicateImages(distance: Int! = 0): [[Image!]!]!
+  findDuplicateImages(
+    distance: Int! = 0
+    image_filter: ImageFilterType
+    image_filter_ast: FilterASTInput
+    filter_mode: DuplicateFilterMode! = ALL
+  ): [[Image!]!]!
+
+  findDuplicateImageGroups(
+    distance: Int! = 0
+    image_filter: ImageFilterType
+    image_filter_ast: FilterASTInput
+    filter_mode: DuplicateFilterMode! = ALL
+    filter: FindFilterType
+  ): FindDuplicateImagesResultType!
 
   "Return valid stream paths"
   sceneStreams(id: ID): [SceneStreamEndpoint!]!

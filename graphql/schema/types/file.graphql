@@ -87,6 +87,11 @@ type VideoFile implements BaseFile {
   format: String!
   width: Int!
   height: Int!
+  bit_depth: Int
+  color_range: String
+  color_space: String
+  color_transfer: String
+  color_primaries: String
   duration: Float!
   video_codec: String!
   audio_codec: String!
@@ -119,6 +124,11 @@ type ImageFile implements BaseFile {
   format: String!
   width: Int!
   height: Int!
+  bit_depth: Int
+  color_range: String
+  color_space: String
+  color_transfer: String
+  color_primaries: String
 
   images: [Image!]!
 

@@ -143,10 +143,31 @@ func (r *queryResolver) AllImages(ctx context.Context) (ret []*models.Image, err
 	return ret, nil
 }
 
-func (r *queryResolver) FindDuplicateImages(ctx context.Context, distance int) (ret [][]*models.Image, err error) {
+func (r *queryResolver) FindDuplicateImages(ctx context.Context, distance int, imageFilter *models.ImageFilterType, imageFilterAST *models.FilterAST, filterMode models.DuplicateFilterMode) (ret [][]*models.Image, err error) {
 	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-		ret, err = r.repository.Image.FindDuplicates(ctx, distance)
+		ret, err = r.repository.Image.FindDuplicates(ctx, distance, imageFilter, imageFilterAST, filterMode)
 		return err
+	}); err != nil {
+		return nil, err
+	}
+
+	return ret, nil
+}
+
+func (r *queryResolver) FindDuplicateImageGroups(ctx context.Context, distance int, imageFilter *models.ImageFilterType, imageFilterAST *models.FilterAST, filterMode models.DuplicateFilterMode, filter *models.FindFilterType) (ret *FindDuplicateImagesResultType, err error) {
+	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
+		var groups [][]*models.Image
+		var count int
+		groups, count, err = r.repository.Image.FindDuplicateGroups(ctx, distance, imageFilter, imageFilterAST, filterMode, filter)
+		if err != nil {
+			return err
+		}
+
+		ret = &FindDuplicateImagesResultType{
+			Count:  count,
+			Groups: groups,
+		}
+		return nil
 	}); err != nil {
 		return nil, err
 	}

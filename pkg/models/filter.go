@@ -229,6 +229,7 @@ type VideoFileFilterInput struct {
 	Orientation *OrientationCriterionInput `json:"orientation,omitempty"`
 	Framerate   *IntCriterionInput         `json:"framerate,omitempty"`
 	Bitrate     *IntCriterionInput         `json:"bitrate,omitempty"`
+	BitDepth    *IntCriterionInput         `json:"bit_depth,omitempty"`
 	VideoCodec  *StringCriterionInput      `json:"video_codec,omitempty"`
 	AudioCodec  *StringCriterionInput      `json:"audio_codec,omitempty"`
 	// in seconds
@@ -241,5 +242,6 @@ type VideoFileFilterInput struct {
 type ImageFileFilterInput struct {
 	Format      *StringCriterionInput      `json:"format,omitempty"`
 	Resolution  *ResolutionCriterionInput  `json:"resolution,omitempty"`
+	BitDepth    *IntCriterionInput         `json:"bit_depth,omitempty"`
 	Orientation *OrientationCriterionInput `json:"orientation,omitempty"`
 }

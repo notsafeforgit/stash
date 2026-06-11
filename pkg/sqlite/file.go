@@ -60,6 +60,11 @@ type videoFileRow struct {
 	AudioCodec       string        `db:"audio_codec"`
 	FrameRate        float64       `db:"frame_rate"`
 	BitRate          int64         `db:"bit_rate"`
+	BitDepth         null.Int      `db:"bit_depth"`
+	ColorRange       null.String   `db:"color_range"`
+	ColorSpace       null.String   `db:"color_space"`
+	ColorTransfer    null.String   `db:"color_transfer"`
+	ColorPrimaries   null.String   `db:"color_primaries"`
 	Interactive      bool          `db:"interactive"`
 	InteractiveSpeed null.Int      `db:"interactive_speed"`
 }
@@ -74,15 +79,25 @@ func (f *videoFileRow) fromVideoFile(ff models.VideoFile) {
 	f.AudioCodec = ff.AudioCodec
 	f.FrameRate = ff.FrameRate
 	f.BitRate = ff.BitRate
+	f.BitDepth = intFromPtr(ff.BitDepth)
+	f.ColorRange = stringFromPtr(ff.ColorRange)
+	f.ColorSpace = stringFromPtr(ff.ColorSpace)
+	f.ColorTransfer = stringFromPtr(ff.ColorTransfer)
+	f.ColorPrimaries = stringFromPtr(ff.ColorPrimaries)
 	f.Interactive = ff.Interactive
 	f.InteractiveSpeed = intFromPtr(ff.InteractiveSpeed)
 }
 
 type imageFileRow struct {
-	FileID models.FileID `db:"file_id"`
-	Format string        `db:"format"`
-	Width  int           `db:"width"`
-	Height int           `db:"height"`
+	FileID         models.FileID `db:"file_id"`
+	Format         string        `db:"format"`
+	Width          int           `db:"width"`
+	Height         int           `db:"height"`
+	BitDepth       null.Int      `db:"bit_depth"`
+	ColorRange     null.String   `db:"color_range"`
+	ColorSpace     null.String   `db:"color_space"`
+	ColorTransfer  null.String   `db:"color_transfer"`
+	ColorPrimaries null.String   `db:"color_primaries"`
 }
 
 func (f *imageFileRow) fromImageFile(ff models.ImageFile) {
@@ -90,6 +105,11 @@ func (f *imageFileRow) fromImageFile(ff models.ImageFile) {
 	f.Format = ff.Format
 	f.Width = ff.Width
 	f.Height = ff.Height
+	f.BitDepth = intFromPtr(ff.BitDepth)
+	f.ColorRange = stringFromPtr(ff.ColorRange)
+	f.ColorSpace = stringFromPtr(ff.ColorSpace)
+	f.ColorTransfer = stringFromPtr(ff.ColorTransfer)
+	f.ColorPrimaries = stringFromPtr(ff.ColorPrimaries)
 }
 
 // we redefine this to change the columns around
@@ -104,6 +124,11 @@ type videoFileQueryRow struct {
 	AudioCodec       null.String `db:"audio_codec"`
 	FrameRate        null.Float  `db:"frame_rate"`
 	BitRate          null.Int    `db:"bit_rate"`
+	BitDepth         null.Int    `db:"video_bit_depth"`
+	ColorRange       null.String `db:"video_color_range"`
+	ColorSpace       null.String `db:"video_color_space"`
+	ColorTransfer    null.String `db:"video_color_transfer"`
+	ColorPrimaries   null.String `db:"video_color_primaries"`
 	Interactive      null.Bool   `db:"interactive"`
 	InteractiveSpeed null.Int    `db:"interactive_speed"`
 }
@@ -118,6 +143,11 @@ func (f *videoFileQueryRow) resolve() *models.VideoFile {
 		AudioCodec:       f.AudioCodec.String,
 		FrameRate:        f.FrameRate.Float64,
 		BitRate:          f.BitRate.Int64,
+		BitDepth:         nullIntPtr(f.BitDepth),
+		ColorRange:       nullStringPtr(f.ColorRange),
+		ColorSpace:       nullStringPtr(f.ColorSpace),
+		ColorTransfer:    nullStringPtr(f.ColorTransfer),
+		ColorPrimaries:   nullStringPtr(f.ColorPrimaries),
 		Interactive:      f.Interactive.Bool,
 		InteractiveSpeed: nullIntPtr(f.InteractiveSpeed),
 	}
@@ -135,6 +165,11 @@ func videoFileQueryColumns() []interface{} {
 		table.Col("audio_codec"),
 		table.Col("frame_rate"),
 		table.Col("bit_rate"),
+		table.Col("bit_depth").As("video_bit_depth"),
+		table.Col("color_range").As("video_color_range"),
+		table.Col("color_space").As("video_color_space"),
+		table.Col("color_transfer").As("video_color_transfer"),
+		table.Col("color_primaries").As("video_color_primaries"),
 		table.Col("interactive"),
 		table.Col("interactive_speed"),
 	}
@@ -143,9 +178,14 @@ func videoFileQueryColumns() []interface{} {
 // we redefine this to change the columns around
 // otherwise, we collide with the video file columns
 type imageFileQueryRow struct {
-	Format null.String `db:"image_format"`
-	Width  null.Int    `db:"image_width"`
-	Height null.Int    `db:"image_height"`
+	Format         null.String `db:"image_format"`
+	Width          null.Int    `db:"image_width"`
+	Height         null.Int    `db:"image_height"`
+	BitDepth       null.Int    `db:"image_bit_depth"`
+	ColorRange     null.String `db:"image_color_range"`
+	ColorSpace     null.String `db:"image_color_space"`
+	ColorTransfer  null.String `db:"image_color_transfer"`
+	ColorPrimaries null.String `db:"image_color_primaries"`
 }
 
 func (imageFileQueryRow) columns(table *table) []interface{} {
@@ -154,14 +194,24 @@ func (imageFileQueryRow) columns(table *table) []interface{} {
 		ex.Col("format").As("image_format"),
 		ex.Col("width").As("image_width"),
 		ex.Col("height").As("image_height"),
+		ex.Col("bit_depth").As("image_bit_depth"),
+		ex.Col("color_range").As("image_color_range"),
+		ex.Col("color_space").As("image_color_space"),
+		ex.Col("color_transfer").As("image_color_transfer"),
+		ex.Col("color_primaries").As("image_color_primaries"),
 	}
 }
 
 func (f *imageFileQueryRow) resolve() *models.ImageFile {
 	return &models.ImageFile{
-		Format: f.Format.String,
-		Width:  int(f.Width.Int64),
-		Height: int(f.Height.Int64),
+		Format:         f.Format.String,
+		Width:          int(f.Width.Int64),
+		Height:         int(f.Height.Int64),
+		BitDepth:       nullIntPtr(f.BitDepth),
+		ColorRange:     nullStringPtr(f.ColorRange),
+		ColorSpace:     nullStringPtr(f.ColorSpace),
+		ColorTransfer:  nullStringPtr(f.ColorTransfer),
+		ColorPrimaries: nullStringPtr(f.ColorPrimaries),
 	}
 }
 

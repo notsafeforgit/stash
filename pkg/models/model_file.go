@@ -247,9 +247,14 @@ func GetMinResolution(f VisualFile) int {
 // ImageFile is an extension of BaseFile to represent image files.
 type ImageFile struct {
 	*BaseFile
-	Format string `json:"format"`
-	Width  int    `json:"width"`
-	Height int    `json:"height"`
+	Format         string  `json:"format"`
+	Width          int     `json:"width"`
+	Height         int     `json:"height"`
+	BitDepth       *int    `json:"bit_depth,omitempty"`
+	ColorRange     *string `json:"color_range,omitempty"`
+	ColorSpace     *string `json:"color_space,omitempty"`
+	ColorTransfer  *string `json:"color_transfer,omitempty"`
+	ColorPrimaries *string `json:"color_primaries,omitempty"`
 }
 
 func (f ImageFile) GetWidth() int {
@@ -278,14 +283,19 @@ func (f ImageFile) Clone() (ret File) {
 // VideoFile is an extension of BaseFile to represent video files.
 type VideoFile struct {
 	*BaseFile
-	Format     string  `json:"format"`
-	Width      int     `json:"width"`
-	Height     int     `json:"height"`
-	Duration   float64 `json:"duration"`
-	VideoCodec string  `json:"video_codec"`
-	AudioCodec string  `json:"audio_codec"`
-	FrameRate  float64 `json:"frame_rate"`
-	BitRate    int64   `json:"bitrate"`
+	Format         string  `json:"format"`
+	Width          int     `json:"width"`
+	Height         int     `json:"height"`
+	Duration       float64 `json:"duration"`
+	VideoCodec     string  `json:"video_codec"`
+	AudioCodec     string  `json:"audio_codec"`
+	FrameRate      float64 `json:"frame_rate"`
+	BitRate        int64   `json:"bitrate"`
+	BitDepth       *int    `json:"bit_depth,omitempty"`
+	ColorRange     *string `json:"color_range,omitempty"`
+	ColorSpace     *string `json:"color_space,omitempty"`
+	ColorTransfer  *string `json:"color_transfer,omitempty"`
+	ColorPrimaries *string `json:"color_primaries,omitempty"`
 
 	Interactive      bool `json:"interactive"`
 	InteractiveSpeed *int `json:"interactive_speed"`

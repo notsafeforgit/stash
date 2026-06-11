@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"image/color"
 	"io"
 	"os"
 	"path/filepath"
@@ -60,10 +61,15 @@ func (d *Decorator) Decorate(ctx context.Context, fs models.FS, f models.File) (
 	// Fallback to catch non-animated avif images that FFProbe detects as video files
 	if probe.Bitrate == 0 && probe.VideoCodec == "av1" {
 		return &models.ImageFile{
-			BaseFile: base,
-			Format:   "avif",
-			Width:    probe.Width,
-			Height:   probe.Height,
+			BaseFile:       base,
+			Format:         "avif",
+			Width:          probe.Width,
+			Height:         probe.Height,
+			BitDepth:       intPtrIfPositive(probe.BitDepth),
+			ColorRange:     stringPtrIfNotEmpty(probe.ColorRange),
+			ColorSpace:     stringPtrIfNotEmpty(probe.ColorSpace),
+			ColorTransfer:  stringPtrIfNotEmpty(probe.ColorTransfer),
+			ColorPrimaries: stringPtrIfNotEmpty(probe.ColorPrimaries),
 		}, nil
 	}
 
@@ -80,10 +86,15 @@ func (d *Decorator) Decorate(ctx context.Context, fs models.FS, f models.File) (
 	}
 
 	ret := &models.ImageFile{
-		BaseFile: base,
-		Format:   probe.VideoCodec,
-		Width:    probe.Width,
-		Height:   probe.Height,
+		BaseFile:       base,
+		Format:         probe.VideoCodec,
+		Width:          probe.Width,
+		Height:         probe.Height,
+		BitDepth:       intPtrIfPositive(probe.BitDepth),
+		ColorRange:     stringPtrIfNotEmpty(probe.ColorRange),
+		ColorSpace:     stringPtrIfNotEmpty(probe.ColorSpace),
+		ColorTransfer:  stringPtrIfNotEmpty(probe.ColorTransfer),
+		ColorPrimaries: stringPtrIfNotEmpty(probe.ColorPrimaries),
 	}
 
 	// FFprobe has a known bug where it returns 0x0 dimensions for some animated WebP files
@@ -101,6 +112,9 @@ func (d *Decorator) Decorate(ctx context.Context, fs models.FS, f models.File) (
 			if format != "" && format != ret.Format {
 				logger.Debugf("Updating format from %q to %q for %q", ret.Format, format, base.Path)
 				ret.Format = format
+			}
+			if ret.BitDepth == nil {
+				ret.BitDepth = bitDepthFromImageConfig(c)
 			}
 		}
 	}
@@ -140,6 +154,7 @@ func decorateFallback(fs models.FS, f models.File) (models.File, error) {
 		Format:   format,
 		Width:    c.Width,
 		Height:   c.Height,
+		BitDepth: bitDepthFromImageConfig(c),
 	}
 
 	adjustForOrientation(fs, path, ret)
@@ -176,10 +191,15 @@ func (d *Decorator) decorateViaTempFile(fs models.FS, f models.File) (models.Fil
 	}
 
 	ret := &models.ImageFile{
-		BaseFile: base,
-		Format:   probe.VideoCodec,
-		Width:    probe.Width,
-		Height:   probe.Height,
+		BaseFile:       base,
+		Format:         probe.VideoCodec,
+		Width:          probe.Width,
+		Height:         probe.Height,
+		BitDepth:       intPtrIfPositive(probe.BitDepth),
+		ColorRange:     stringPtrIfNotEmpty(probe.ColorRange),
+		ColorSpace:     stringPtrIfNotEmpty(probe.ColorSpace),
+		ColorTransfer:  stringPtrIfNotEmpty(probe.ColorTransfer),
+		ColorPrimaries: stringPtrIfNotEmpty(probe.ColorPrimaries),
 	}
 
 	adjustForOrientation(fs, base.Path, ret)
@@ -187,6 +207,39 @@ func (d *Decorator) decorateViaTempFile(fs models.FS, f models.File) (models.Fil
 	return ret, nil
 }
 
+func intPtrIfPositive(v int) *int {
+	if v <= 0 {
+		return nil
+	}
+
+	return &v
+}
+
+func stringPtrIfNotEmpty(v string) *string {
+	if v == "" {
+		return nil
+	}
+
+	return &v
+}
+
+func bitDepthFromImageConfig(config image.Config) *int {
+	switch config.ColorModel {
+	case color.RGBA64Model, color.NRGBA64Model, color.Gray16Model, color.Alpha16Model:
+		v := 16
+		return &v
+	case color.RGBAModel, color.NRGBAModel, color.GrayModel, color.AlphaModel, color.CMYKModel, color.YCbCrModel:
+		v := 8
+		return &v
+	default:
+		if _, ok := config.ColorModel.(color.Palette); ok {
+			v := 8
+			return &v
+		}
+	}
+
+	return nil
+}
 func (d *Decorator) IsMissingMetadata(ctx context.Context, fs models.FS, f models.File) bool {
 	const (
 		unsetString = "unset"

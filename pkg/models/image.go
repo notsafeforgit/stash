@@ -31,6 +31,8 @@ type ImageFilterType struct {
 	OCounter *IntCriterionInput `json:"o_counter"`
 	// Filter by resolution
 	Resolution *ResolutionCriterionInput `json:"resolution"`
+	// Filter by bit depth
+	BitDepth *IntCriterionInput `json:"bit_depth"`
 	// Filter by landscape/portrait
 	Orientation *OrientationCriterionInput `json:"orientation"`
 	// Filter to only include images missing this property

@@ -27,6 +27,23 @@ function SettingsToolsPage() {
         />
       </SettingsSection>
 
+      <SettingsSection title={msg("config.tools.scene_tools", "Scene tools")}>
+        <SettingDisplay
+          label={msg(
+            "config.tools.scene_duplicate_checker",
+            "Scene duplicate checker",
+          )}
+          description="Find visually duplicate scenes by perceptual hash."
+          actions={
+            <Link to="/scene-duplicate-checker">
+              <Button type="button" variant="outline">
+                {msg("actions.open", "Open")}
+              </Button>
+            </Link>
+          }
+        />
+      </SettingsSection>
+
       <SettingsSection title={msg("config.tools.image_tools", "Image tools")}>
         <SettingDisplay
           label={msg(

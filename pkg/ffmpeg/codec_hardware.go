@@ -34,7 +34,8 @@ var (
 	// (mode=hevc) to encode at GPU speed instead of waiting on libx265.
 	// HDR10 metadata passes through the encoder when the input is
 	// 10-bit and the output profile is `main10`; the download path
-	// branches on srcIsHDR to pick `p010`/`main10` vs `nv12`/`main`.
+	// branches on source color metadata to pick `p010`/`main10` vs
+	// `nv12`/`main`.
 	VideoCodecV265 = makeVideoCodec("HEVC VAAPI", "hevc_vaapi")
 	// AV1 HW encoders. Used only by the download endpoint
 	// (mode=av1). AV1 is more efficient than HEVC at the same visual
@@ -42,7 +43,8 @@ var (
 	// — Intel Arc / Meteor Lake+ for QSV, RTX 40-series+ for NVENC,
 	// and the corresponding VAAPI driver for the same Intel hardware.
 	// HDR (HDR10 / HLG) passes through when the input is 10-bit; the
-	// download path branches on srcIsHDR for pix_fmt + profile.
+	// download path branches on source color metadata for pixel format
+	// and profile.
 	VideoCodecVAV1 = makeVideoCodec("AV1 VAAPI", "av1_vaapi")
 	VideoCodecIAV1 = makeVideoCodec("AV1 Intel Quick Sync Video (QSV)", "av1_qsv")
 	VideoCodecNAV1 = makeVideoCodec("AV1 NVENC", "av1_nvenc")

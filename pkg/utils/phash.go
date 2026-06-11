@@ -47,18 +47,9 @@ func FindDuplicates(hashes []*Phash, distance int, durationDiff float64) [][]int
 						continue
 					}
 
-					// Check duration if applicable (for scenes)
-					if durationDiff >= 0 {
-						if subject.Duration > 0 && neighbor.Duration > 0 {
-							if math.Abs(subject.Duration-neighbor.Duration) > durationDiff {
-								continue
-							}
-						}
-					}
-
 					neighborHash := uintHashes[j]
 					// Hamming distance using native bit counting
-					if bits.OnesCount64(subjectHash^neighborHash) <= distance {
+					if phashMatches(subject, neighbor, subjectHash, neighborHash, distance, durationDiff) {
 						subject.Neighbors = append(subject.Neighbors, j)
 					}
 				}
@@ -83,6 +74,79 @@ func FindDuplicates(hashes []*Phash, distance int, durationDiff float64) [][]int
 	}
 
 	return buckets
+}
+
+func FindDuplicatesContaining(hashes []*Phash, matchingIDs map[int]struct{}, distance int, durationDiff float64) [][]int {
+	if len(hashes) == 0 || len(matchingIDs) == 0 {
+		return nil
+	}
+
+	uintHashes := make([]uint64, len(hashes))
+	for i, h := range hashes {
+		uintHashes[i] = uint64(h.Hash)
+	}
+
+	visited := make([]bool, len(hashes))
+	var buckets [][]int
+	for i, hash := range hashes {
+		if visited[i] {
+			continue
+		}
+		if _, ok := matchingIDs[hash.ID]; !ok {
+			continue
+		}
+
+		ids, indexes := findDuplicateComponent(i, hashes, uintHashes, distance, durationDiff)
+		for _, idx := range indexes {
+			visited[idx] = true
+		}
+		if len(ids) > 1 {
+			buckets = append(buckets, ids)
+		}
+	}
+
+	return buckets
+}
+
+func findDuplicateComponent(seed int, hashes []*Phash, uintHashes []uint64, distance int, durationDiff float64) ([]int, []int) {
+	queued := make([]bool, len(hashes))
+	queue := []int{seed}
+	queued[seed] = true
+
+	for head := 0; head < len(queue); head++ {
+		subjectIndex := queue[head]
+		subject := hashes[subjectIndex]
+		subjectHash := uintHashes[subjectIndex]
+
+		for i, candidate := range hashes {
+			if queued[i] || subjectIndex == i || subject.ID == candidate.ID {
+				continue
+			}
+			if !phashMatches(subject, candidate, subjectHash, uintHashes[i], distance, durationDiff) {
+				continue
+			}
+
+			queued[i] = true
+			queue = append(queue, i)
+		}
+	}
+
+	var ids []int
+	for _, idx := range queue {
+		ids = sliceutil.AppendUnique(ids, hashes[idx].ID)
+	}
+
+	return ids, queue
+}
+
+func phashMatches(subject *Phash, candidate *Phash, subjectHash uint64, candidateHash uint64, distance int, durationDiff float64) bool {
+	if durationDiff >= 0 && subject.Duration > 0 && candidate.Duration > 0 {
+		if math.Abs(subject.Duration-candidate.Duration) > durationDiff {
+			return false
+		}
+	}
+
+	return bits.OnesCount64(subjectHash^candidateHash) <= distance
 }
 
 func findNeighbors(bucket int, neighbors []int, hashes []*Phash, ids *[]int) {

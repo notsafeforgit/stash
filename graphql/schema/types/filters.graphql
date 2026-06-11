@@ -296,6 +296,8 @@ input SceneFilterType {
   framerate: IntCriterionInput
   "Filter by bit rate"
   bitrate: IntCriterionInput
+  "Filter by bit depth"
+  bit_depth: IntCriterionInput
   "Filter by video codec"
   video_codec: StringCriterionInput
   "Filter by audio codec"
@@ -736,6 +738,8 @@ input ImageFilterType {
   o_counter: IntCriterionInput
   "Filter by resolution"
   resolution: ResolutionCriterionInput
+  "Filter by bit depth"
+  bit_depth: IntCriterionInput
   "Filter by orientation"
   orientation: OrientationCriterionInput
   "Filter to only include images missing this property"
@@ -854,6 +858,7 @@ input VideoFileFilterInput {
   orientation: OrientationCriterionInput
   framerate: IntCriterionInput
   bitrate: IntCriterionInput
+  bit_depth: IntCriterionInput
   format: StringCriterionInput
   video_codec: StringCriterionInput
   audio_codec: StringCriterionInput
@@ -870,6 +875,7 @@ input VideoFileFilterInput {
 input ImageFileFilterInput {
   format: StringCriterionInput
   resolution: ResolutionCriterionInput
+  bit_depth: IntCriterionInput
   orientation: OrientationCriterionInput
 }
 
@@ -984,6 +990,11 @@ enum FilterMode {
   GROUPS
   TAGS
   IMAGES
+}
+
+enum DuplicateFilterMode {
+  ALL
+  ANY
 }
 
 type SavedFilter {

@@ -37,14 +37,19 @@ func Test_fileFileStore_Create(t *testing.T) {
 		updatedAt              = time.Date(2001, 1, 1, 0, 0, 0, 0, time.UTC)
 		size             int64 = 1234
 
-		duration         = 1.234
-		width            = 640
-		height           = 480
-		framerate        = 2.345
-		bitrate    int64 = 234
-		videoCodec       = "videoCodec"
-		audioCodec       = "audioCodec"
-		format           = "format"
+		duration             = 1.234
+		width                = 640
+		height               = 480
+		framerate            = 2.345
+		bitrate        int64 = 234
+		videoCodec           = "videoCodec"
+		audioCodec           = "audioCodec"
+		format               = "format"
+		bitDepth             = 10
+		colorRange           = "tv"
+		colorSpace           = "bt2020nc"
+		colorTransfer        = "smpte2084"
+		colorPrimaries       = "bt2020"
 	)
 
 	tests := []struct {
@@ -97,14 +102,19 @@ func Test_fileFileStore_Create(t *testing.T) {
 					CreatedAt: createdAt,
 					UpdatedAt: updatedAt,
 				},
-				Duration:   duration,
-				VideoCodec: videoCodec,
-				AudioCodec: audioCodec,
-				Format:     format,
-				Width:      width,
-				Height:     height,
-				FrameRate:  framerate,
-				BitRate:    bitrate,
+				Duration:       duration,
+				VideoCodec:     videoCodec,
+				AudioCodec:     audioCodec,
+				Format:         format,
+				Width:          width,
+				Height:         height,
+				FrameRate:      framerate,
+				BitRate:        bitrate,
+				BitDepth:       &bitDepth,
+				ColorRange:     &colorRange,
+				ColorSpace:     &colorSpace,
+				ColorTransfer:  &colorTransfer,
+				ColorPrimaries: &colorPrimaries,
 			},
 			false,
 		},
@@ -130,9 +140,14 @@ func Test_fileFileStore_Create(t *testing.T) {
 					CreatedAt: createdAt,
 					UpdatedAt: updatedAt,
 				},
-				Format: format,
-				Width:  width,
-				Height: height,
+				Format:         format,
+				Width:          width,
+				Height:         height,
+				BitDepth:       &bitDepth,
+				ColorRange:     &colorRange,
+				ColorSpace:     &colorSpace,
+				ColorTransfer:  &colorTransfer,
+				ColorPrimaries: &colorPrimaries,
 			},
 			false,
 		},
@@ -254,14 +269,19 @@ func Test_fileStore_Update(t *testing.T) {
 		updatedAt              = time.Date(2001, 1, 1, 0, 0, 0, 0, time.UTC)
 		size             int64 = 1234
 
-		duration         = 1.234
-		width            = 640
-		height           = 480
-		framerate        = 2.345
-		bitrate    int64 = 234
-		videoCodec       = "videoCodec"
-		audioCodec       = "audioCodec"
-		format           = "format"
+		duration             = 1.234
+		width                = 640
+		height               = 480
+		framerate            = 2.345
+		bitrate        int64 = 234
+		videoCodec           = "videoCodec"
+		audioCodec           = "audioCodec"
+		format               = "format"
+		bitDepth             = 10
+		colorRange           = "tv"
+		colorSpace           = "bt2020nc"
+		colorTransfer        = "smpte2084"
+		colorPrimaries       = "bt2020"
 	)
 
 	tests := []struct {
@@ -316,14 +336,19 @@ func Test_fileStore_Update(t *testing.T) {
 					CreatedAt: createdAt,
 					UpdatedAt: updatedAt,
 				},
-				Duration:   duration,
-				VideoCodec: videoCodec,
-				AudioCodec: audioCodec,
-				Format:     format,
-				Width:      width,
-				Height:     height,
-				FrameRate:  framerate,
-				BitRate:    bitrate,
+				Duration:       duration,
+				VideoCodec:     videoCodec,
+				AudioCodec:     audioCodec,
+				Format:         format,
+				Width:          width,
+				Height:         height,
+				FrameRate:      framerate,
+				BitRate:        bitrate,
+				BitDepth:       &bitDepth,
+				ColorRange:     &colorRange,
+				ColorSpace:     &colorSpace,
+				ColorTransfer:  &colorTransfer,
+				ColorPrimaries: &colorPrimaries,
 			},
 			false,
 		},
@@ -350,9 +375,14 @@ func Test_fileStore_Update(t *testing.T) {
 					CreatedAt: createdAt,
 					UpdatedAt: updatedAt,
 				},
-				Format: format,
-				Width:  width,
-				Height: height,
+				Format:         format,
+				Width:          width,
+				Height:         height,
+				BitDepth:       &bitDepth,
+				ColorRange:     &colorRange,
+				ColorSpace:     &colorSpace,
+				ColorTransfer:  &colorTransfer,
+				ColorPrimaries: &colorPrimaries,
 			},
 			false,
 		},

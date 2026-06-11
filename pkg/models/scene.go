@@ -61,6 +61,8 @@ type SceneFilterType struct {
 	Framerate *IntCriterionInput `json:"framerate"`
 	// Filter by bitrate
 	Bitrate *IntCriterionInput `json:"bitrate"`
+	// Filter by bit depth
+	BitDepth *IntCriterionInput `json:"bit_depth"`
 	// Filter by video codec
 	VideoCodec *StringCriterionInput `json:"video_codec"`
 	// Filter by audio codec

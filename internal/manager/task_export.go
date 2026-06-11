@@ -460,16 +460,26 @@ func fileToJSON(f models.File) jsonschema.DirEntry {
 			AudioCodec:       ff.AudioCodec,
 			FrameRate:        ff.FrameRate,
 			BitRate:          ff.BitRate,
+			BitDepth:         ff.BitDepth,
+			ColorRange:       ff.ColorRange,
+			ColorSpace:       ff.ColorSpace,
+			ColorTransfer:    ff.ColorTransfer,
+			ColorPrimaries:   ff.ColorPrimaries,
 			Interactive:      ff.Interactive,
 			InteractiveSpeed: ff.InteractiveSpeed,
 		}
 	case *models.ImageFile:
 		base.Type = jsonschema.DirEntryTypeImage
 		return jsonschema.ImageFile{
-			BaseFile: &base,
-			Format:   ff.Format,
-			Width:    ff.Width,
-			Height:   ff.Height,
+			BaseFile:       &base,
+			Format:         ff.Format,
+			Width:          ff.Width,
+			Height:         ff.Height,
+			BitDepth:       ff.BitDepth,
+			ColorRange:     ff.ColorRange,
+			ColorSpace:     ff.ColorSpace,
+			ColorTransfer:  ff.ColorTransfer,
+			ColorPrimaries: ff.ColorPrimaries,
 		}
 	}
 

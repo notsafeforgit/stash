@@ -293,6 +293,7 @@ func (qb *videoFileFilterHandler) criterionHandler() criterionHandler {
 		orientationCriterionHandler(videoFileFilter.Orientation, "video_files.height", "video_files.width", qb.addVideoFilesTable),
 		floatIntCriterionHandler(videoFileFilter.Framerate, "ROUND(video_files.frame_rate)", qb.addVideoFilesTable),
 		intCriterionHandler(videoFileFilter.Bitrate, "video_files.bit_rate", qb.addVideoFilesTable),
+		intCriterionHandler(videoFileFilter.BitDepth, "video_files.bit_depth", qb.addVideoFilesTable),
 		qb.codecCriterionHandler(videoFileFilter.VideoCodec, "video_files.video_codec", qb.addVideoFilesTable),
 		qb.codecCriterionHandler(videoFileFilter.AudioCodec, "video_files.audio_codec", qb.addVideoFilesTable),
 
@@ -364,6 +365,7 @@ func (qb *imageFileFilterHandler) criterionHandler() criterionHandler {
 	return compoundHandler{
 		joinedStringCriterionHandler(ff.Format, "image_files.format", qb.addImageFilesTable),
 		resolutionCriterionHandler(ff.Resolution, "image_files.height", "image_files.width", qb.addImageFilesTable),
+		intCriterionHandler(ff.BitDepth, "image_files.bit_depth", qb.addImageFilesTable),
 		orientationCriterionHandler(ff.Orientation, "image_files.height", "image_files.width", qb.addImageFilesTable),
 	}
 }

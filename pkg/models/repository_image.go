@@ -20,7 +20,8 @@ type ImageFinder interface {
 	FindByZipFileID(ctx context.Context, zipFileID FileID) ([]*Image, error)
 	FindByGalleryID(ctx context.Context, galleryID int) ([]*Image, error)
 	FindByGalleryIDIndex(ctx context.Context, galleryID int, index uint) (*Image, error)
-	FindDuplicates(ctx context.Context, distance int) ([][]*Image, error)
+	FindDuplicates(ctx context.Context, distance int, filter *ImageFilterType, filterAST *FilterAST, filterMode DuplicateFilterMode) ([][]*Image, error)
+	FindDuplicateGroups(ctx context.Context, distance int, filter *ImageFilterType, filterAST *FilterAST, filterMode DuplicateFilterMode, findFilter *FindFilterType) ([][]*Image, int, error)
 }
 
 // ImageQueryer provides methods to query images.

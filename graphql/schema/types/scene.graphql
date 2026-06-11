@@ -242,6 +242,11 @@ type FindScenesResultType {
   scenes: [Scene!]!
 }
 
+type FindDuplicateScenesResultType {
+  count: Int!
+  groups: [[Scene!]!]!
+}
+
 input SceneParserInput {
   ignoreWords: [String!]
   whitespaceCharacters: String

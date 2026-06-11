@@ -28,7 +28,8 @@ type SceneFinder interface {
 	FindByPerformerID(ctx context.Context, performerID int) ([]*Scene, error)
 	FindByGalleryID(ctx context.Context, performerID int) ([]*Scene, error)
 	FindByGroupID(ctx context.Context, groupID int) ([]*Scene, error)
-	FindDuplicates(ctx context.Context, distance int, durationDiff float64, filter *SceneFilterType) ([][]*Scene, error)
+	FindDuplicates(ctx context.Context, distance int, durationDiff float64, filter *SceneFilterType, filterAST *FilterAST, filterMode DuplicateFilterMode) ([][]*Scene, error)
+	FindDuplicateGroups(ctx context.Context, distance int, durationDiff float64, filter *SceneFilterType, filterAST *FilterAST, filterMode DuplicateFilterMode, findFilter *FindFilterType) ([][]*Scene, int, error)
 }
 
 // SceneQueryer provides methods to query scenes.

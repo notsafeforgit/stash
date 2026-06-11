@@ -2905,6 +2905,37 @@ func TestSceneQueryASTFolderIncludesWithListSortReturnsRows(t *testing.T) {
 	})
 }
 
+func TestSceneQueryASTBitDepth(t *testing.T) {
+	runWithRollbackTxn(t, "scene AST bit depth", func(t *testing.T, ctx context.Context) {
+		const sceneIdx = sceneIdxWithGallery
+		bitDepth := 10
+
+		file := makeSceneFileWithID(sceneIdx)
+		file.BitDepth = &bitDepth
+		require.NoError(t, db.File.Update(ctx, file))
+
+		ast := &models.FilterAST{
+			Root: &models.FilterASTNode{
+				Condition: &models.FilterASTCondition{
+					Field: "bit_depth",
+					Value: models.IntCriterionInput{
+						Value:    bitDepth,
+						Modifier: models.CriterionModifierEquals,
+					},
+				},
+			},
+		}
+
+		result, total, err := db.Scene.QueryAST(ctx, ast, nil)
+		require.NoError(t, err)
+		require.Equal(t, len(result), total)
+
+		ids := sliceutil.Map(result, func(s *models.Scene) int { return s.ID })
+		assert.Contains(t, ids, sceneIDs[sceneIdx])
+		assert.NotContains(t, ids, sceneIDs[sceneIdxWithPerformer])
+	})
+}
+
 func TestSceneQueryASTRejectsUnsupportedCondition(t *testing.T) {
 	withTxn(func(ctx context.Context) error {
 		ast := &models.FilterAST{
@@ -5345,7 +5376,7 @@ func TestSceneStore_FindDuplicates(t *testing.T) {
 	withRollbackTxn(func(ctx context.Context) error {
 		distance := 0
 		durationDiff := -1.
-		got, err := qb.FindDuplicates(ctx, distance, durationDiff, nil)
+		got, err := qb.FindDuplicates(ctx, distance, durationDiff, nil, nil, models.DuplicateFilterModeAll)
 		if err != nil {
 			t.Errorf("SceneStore.FindDuplicates() error = %v", err)
 			return nil
@@ -5355,13 +5386,27 @@ func TestSceneStore_FindDuplicates(t *testing.T) {
 
 		distance = 1
 		durationDiff = -1.
-		got, err = qb.FindDuplicates(ctx, distance, durationDiff, nil)
+		got, err = qb.FindDuplicates(ctx, distance, durationDiff, nil, nil, models.DuplicateFilterModeAll)
 		if err != nil {
 			t.Errorf("SceneStore.FindDuplicates() error = %v", err)
 			return nil
 		}
 
 		assert.Len(t, got, dupeScenePhashes)
+
+		page := 2
+		perPage := 1
+		paged, count, err := qb.FindDuplicateGroups(ctx, distance, durationDiff, nil, nil, models.DuplicateFilterModeAll, &models.FindFilterType{
+			Page:    &page,
+			PerPage: &perPage,
+		})
+		if err != nil {
+			t.Errorf("SceneStore.FindDuplicateGroups() error = %v", err)
+			return nil
+		}
+
+		assert.Equal(t, dupeScenePhashes, count, "paged duplicate query should return the total duplicate group count")
+		assert.Len(t, paged, 1, "paged duplicate query should only hydrate the requested page")
 
 		return nil
 	})
@@ -5441,9 +5486,10 @@ func TestSceneStore_FindDuplicatesWithFilter(t *testing.T) {
 		}
 		testTagID := tags[0].ID
 
-		// Create two pairs of duplicate scenes:
+		// Create three pairs of duplicate scenes:
 		// Pair A: sceneA1 and sceneA2 have the same phash and share a tag
 		// Pair B: sceneB1 and sceneB2 have the same phash but no tag
+		// Pair C: only sceneC1 has the tag
 
 		const sharedPhash int64 = 999999
 
@@ -5471,6 +5517,19 @@ func TestSceneStore_FindDuplicatesWithFilter(t *testing.T) {
 			return nil
 		}
 
+		const partiallyTaggedPhash int64 = 777777
+
+		sceneC1, err := createDupeScene(ctx, "FilterTest_C1", partiallyTaggedPhash)
+		if err != nil {
+			t.Errorf("failed to create sceneC1: %v", err)
+			return nil
+		}
+		sceneC2, err := createDupeScene(ctx, "FilterTest_C2", partiallyTaggedPhash)
+		if err != nil {
+			t.Errorf("failed to create sceneC2: %v", err)
+			return nil
+		}
+
 		// Add tag only to pair A
 		if err := addSceneTags(ctx, sceneA1.ID, []int{testTagID}); err != nil {
 			t.Errorf("failed to add tag to sceneA1: %v", err)
@@ -5480,25 +5539,30 @@ func TestSceneStore_FindDuplicatesWithFilter(t *testing.T) {
 			t.Errorf("failed to add tag to sceneA2: %v", err)
 			return nil
 		}
+		if err := addSceneTags(ctx, sceneC1.ID, []int{testTagID}); err != nil {
+			t.Errorf("failed to add tag to sceneC1: %v", err)
+			return nil
+		}
 
-		// Test 1: No filter - should find all duplicates (2 pairs: original + our new ones)
+		// Test 1: No filter - should find all duplicates
 		distance := 0
 		durationDiff := -1.0
-		got, err := qb.FindDuplicates(ctx, distance, durationDiff, nil)
+		got, err := qb.FindDuplicates(ctx, distance, durationDiff, nil, nil, models.DuplicateFilterModeAll)
 		if err != nil {
 			t.Errorf("FindDuplicates(nil filter) error = %v", err)
 			return nil
 		}
-		// Should find at least our 2 new pairs (may find more from pre-populated data)
-		assert.GreaterOrEqual(t, len(got), 2, "nil filter should find at least our 2 new duplicate pairs")
+		// Should find at least our 3 new pairs (may find more from pre-populated data)
+		assert.GreaterOrEqual(t, len(got), 3, "nil filter should find at least our 3 new duplicate pairs")
 
 		// Test 2: Filter by tag - should only find pair A (the tagged pair)
-		got, err = qb.FindDuplicates(ctx, distance, durationDiff, &models.SceneFilterType{
+		tagFilter := &models.SceneFilterType{
 			Tags: &models.HierarchicalMultiCriterionInput{
 				Value:    []string{strconv.Itoa(testTagID)},
 				Modifier: models.CriterionModifierIncludes,
 			},
-		})
+		}
+		got, err = qb.FindDuplicates(ctx, distance, durationDiff, tagFilter, nil, models.DuplicateFilterModeAll)
 		if err != nil {
 			t.Errorf("FindDuplicates(tag filter) error = %v", err)
 			return nil
@@ -5517,7 +5581,30 @@ func TestSceneStore_FindDuplicatesWithFilter(t *testing.T) {
 			// Pair B (untagged) should NOT be in the results
 			assert.False(t, foundIDs[sceneB1.ID], "pair B scene 1 should NOT be in tag-filtered results")
 			assert.False(t, foundIDs[sceneB2.ID], "pair B scene 2 should NOT be in tag-filtered results")
+			assert.False(t, foundIDs[sceneC1.ID], "partially tagged pair C should NOT be in all-filtered results")
+			assert.False(t, foundIDs[sceneC2.ID], "partially tagged pair C should NOT be in all-filtered results")
 		}
+
+		got, err = qb.FindDuplicates(ctx, distance, durationDiff, tagFilter, nil, models.DuplicateFilterModeAny)
+		if err != nil {
+			t.Errorf("FindDuplicates(any tag filter) error = %v", err)
+			return nil
+		}
+		assert.Len(t, got, 2, "any tag filter should include fully and partially tagged duplicate pairs")
+
+		var foundPartialGroup bool
+		for _, group := range got {
+			foundIDs := map[int]bool{}
+			for _, scene := range group {
+				foundIDs[scene.ID] = true
+			}
+			if foundIDs[sceneC1.ID] || foundIDs[sceneC2.ID] {
+				assert.True(t, foundIDs[sceneC1.ID], "pair C scene 1 should be in any-filtered results")
+				assert.True(t, foundIDs[sceneC2.ID], "pair C scene 2 should be in any-filtered results")
+				foundPartialGroup = true
+			}
+		}
+		assert.True(t, foundPartialGroup, "any tag filter should keep the full partially tagged pair")
 
 		// Test 3: Filter by tag that no duplicate scene has - should find nothing
 		err = db.Tag.Create(ctx, &models.CreateTagInput{
@@ -5549,7 +5636,7 @@ func TestSceneStore_FindDuplicatesWithFilter(t *testing.T) {
 				Value:    []string{strconv.Itoa(nonExistentTagID)},
 				Modifier: models.CriterionModifierIncludes,
 			},
-		})
+		}, nil, models.DuplicateFilterModeAny)
 		if err != nil {
 			t.Errorf("FindDuplicates(non-existent tag filter) error = %v", err)
 			return nil
@@ -5558,18 +5645,20 @@ func TestSceneStore_FindDuplicatesWithFilter(t *testing.T) {
 
 		// Test 4: Fuzzy match (distance=1) with filter
 		distance = 1
-		got, err = qb.FindDuplicates(ctx, distance, durationDiff, &models.SceneFilterType{
-			Tags: &models.HierarchicalMultiCriterionInput{
-				Value:    []string{strconv.Itoa(testTagID)},
-				Modifier: models.CriterionModifierIncludes,
-			},
-		})
+		got, err = qb.FindDuplicates(ctx, distance, durationDiff, tagFilter, nil, models.DuplicateFilterModeAll)
 		if err != nil {
 			t.Errorf("FindDuplicates(fuzzy + tag filter) error = %v", err)
 			return nil
 		}
 		// Should still find pair A with fuzzy matching
 		assert.Len(t, got, 1, "fuzzy + tag filter should find exactly 1 duplicate pair")
+
+		got, err = qb.FindDuplicates(ctx, distance, durationDiff, tagFilter, nil, models.DuplicateFilterModeAny)
+		if err != nil {
+			t.Errorf("FindDuplicates(fuzzy + any tag filter) error = %v", err)
+			return nil
+		}
+		assert.Len(t, got, 2, "fuzzy + any tag filter should include fully and partially tagged duplicate pairs")
 
 		return nil
 	})

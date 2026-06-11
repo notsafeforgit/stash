@@ -9,7 +9,6 @@ import (
 	"image/color"
 	"image/png"
 	"math"
-	"os"
 	"strings"
 
 	"github.com/corona10/goimagehash"
@@ -182,7 +181,7 @@ func generateSprite(encoder *ffmpeg.FFMpeg, videoFile *models.VideoFile) (image.
 			return input, true
 		}
 
-		fixedInput, cleanup, err := createColorMetadataFixedInput(encoder, videoFile)
+		fixedInput, cleanup, err := encoder.CreateColorMetadataFixedInput(context.Background(), videoFile.Path, videoFile.VideoCodec)
 		if err != nil {
 			logger.Debugf("[generator] color metadata rewrite fallback unavailable for %s: %s", videoFile.Path, compactError(err))
 			return "", false
@@ -227,7 +226,7 @@ func generateSprite(encoder *ffmpeg.FFMpeg, videoFile *models.VideoFile) (image.
 			setBT709ColorParameters = true
 			img, err = generateSpriteScreenshot(encoder, input, time, slowSeek, setBT709ColorParameters)
 		}
-		if err != nil && isInvalidColorSpaceError(err) {
+		if err != nil && ffmpeg.IsInvalidColorSpaceError(err) {
 			if fixedInput, ok := ensureFixedInput(); ok {
 				logger.Warnf("[generator] phash screenshot failed for %s at %.3fs due to invalid color metadata, retrying with rewritten stream metadata", videoFile.Path, time)
 				setBT709ColorParameters = false
@@ -316,58 +315,6 @@ func frameBackoffIndexes(frame int) []int {
 	return ret
 }
 
-func createColorMetadataFixedInput(encoder *ffmpeg.FFMpeg, videoFile *models.VideoFile) (string, func(), error) {
-	bitstreamFilter, ok := colorMetadataBitstreamFilter(videoFile.VideoCodec)
-	if !ok {
-		return "", nil, fmt.Errorf("unsupported video codec %q", videoFile.VideoCodec)
-	}
-
-	tmp, err := os.CreateTemp("", "stash-phash-color-*.mp4")
-	if err != nil {
-		return "", nil, fmt.Errorf("creating temporary color metadata file: %w", err)
-	}
-
-	tmpPath := tmp.Name()
-	cleanup := func() {
-		_ = os.Remove(tmpPath)
-	}
-	if err := tmp.Close(); err != nil {
-		cleanup()
-		return "", nil, fmt.Errorf("closing temporary color metadata file: %w", err)
-	}
-
-	args := []string{
-		"-v", "error",
-		"-y",
-		"-i", videoFile.Path,
-		"-map", "0:v:0",
-		"-c:v", "copy",
-		"-an",
-		"-bsf:v", bitstreamFilter,
-		"-f", "mp4",
-		tmpPath,
-	}
-	cmd := encoder.Command(context.Background(), args)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		cleanup()
-		return "", nil, fmt.Errorf("rewriting video color metadata with ffmpeg: %w: %s", err, strings.TrimSpace(string(output)))
-	}
-
-	return tmpPath, cleanup, nil
-}
-
-func colorMetadataBitstreamFilter(codec string) (string, bool) {
-	switch strings.ToLower(codec) {
-	case "h264", "avc", "avc1":
-		return "h264_metadata=colour_primaries=1:transfer_characteristics=1:matrix_coefficients=1", true
-	case "h265", "hevc", "hev1", "hvc1":
-		return "hevc_metadata=colour_primaries=1:transfer_characteristics=1:matrix_coefficients=1", true
-	default:
-		return "", false
-	}
-}
-
 func generateFrameSprite(encoder *ffmpeg.FFMpeg, videoFile *models.VideoFile, frameCount int) (image.Image, bool, error) {
 	chunkCount := columns * rows
 	images := make([]image.Image, 0, chunkCount)
@@ -389,7 +336,7 @@ func generateFrameSprite(encoder *ffmpeg.FFMpeg, videoFile *models.VideoFile, fr
 			return input, true
 		}
 
-		fixedInput, cleanup, err := createColorMetadataFixedInput(encoder, videoFile)
+		fixedInput, cleanup, err := encoder.CreateColorMetadataFixedInput(context.Background(), videoFile.Path, videoFile.VideoCodec)
 		if err != nil {
 			logger.Debugf("[generator] color metadata rewrite fallback unavailable for %s: %s", videoFile.Path, compactError(err))
 			return "", false
@@ -414,7 +361,7 @@ func generateFrameSprite(encoder *ffmpeg.FFMpeg, videoFile *models.VideoFile, fr
 			setBT709ColorParameters = true
 			img, err = generateSpriteFrameScreenshot(encoder, input, frame, setBT709ColorParameters)
 		}
-		if err != nil && isInvalidColorSpaceError(err) {
+		if err != nil && ffmpeg.IsInvalidColorSpaceError(err) {
 			if fixedInput, ok := ensureFixedInput(); ok {
 				logger.Warnf("[generator] frame-based phash screenshot failed for %s at frame %d due to invalid color metadata, retrying with rewritten stream metadata", videoFile.Path, frame)
 				setBT709ColorParameters = false
@@ -499,10 +446,6 @@ func compactError(err error) string {
 	}
 
 	return strings.ReplaceAll(err.Error(), "\n", "; ")
-}
-
-func isInvalidColorSpaceError(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "Invalid color space")
 }
 
 func spriteFrameIndex(spriteIndex int, frameCount int) int {

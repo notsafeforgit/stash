@@ -49,7 +49,17 @@ func (g Generator) SpriteScreenshot(ctx context.Context, input string, seconds f
 
 			ssOptions.SetBT709ColorParameters = true
 			args = transcoder.ScreenshotTime(input, seconds, ssOptions)
-			return g.generateImage(lockCtx, args)
+			img, err = g.generateImage(lockCtx, args)
+			if err != nil {
+				err = g.retryWithColorMetadataFixedInput(lockCtx, input, err, func(fixedInput string) error {
+					ssOptions.SetBT709ColorParameters = false
+					args = transcoder.ScreenshotTime(fixedInput, seconds, ssOptions)
+					var retryErr error
+					img, retryErr = g.generateImage(lockCtx, args)
+					return retryErr
+				})
+				return img, err
+			}
 		}
 	}
 
@@ -74,7 +84,17 @@ func (g Generator) SpriteScreenshotSlow(ctx context.Context, input string, frame
 
 		ssOptions.SetBT709ColorParameters = true
 		args = transcoder.ScreenshotFrame(input, frame, ssOptions)
-		return g.generateImage(lockCtx, args)
+		img, err = g.generateImage(lockCtx, args)
+		if err != nil {
+			err = g.retryWithColorMetadataFixedInput(lockCtx, input, err, func(fixedInput string) error {
+				ssOptions.SetBT709ColorParameters = false
+				args = transcoder.ScreenshotFrame(fixedInput, frame, ssOptions)
+				var retryErr error
+				img, retryErr = g.generateImage(lockCtx, args)
+				return retryErr
+			})
+			return img, err
+		}
 	}
 
 	return img, nil

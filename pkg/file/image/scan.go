@@ -54,8 +54,13 @@ func (d *Decorator) Decorate(ctx context.Context, fs models.FS, f models.File) (
 
 	probe, err := d.FFProbe.NewVideoFile(base.Path)
 	if err != nil {
-		logger.Warnf("File %q could not be read with ffprobe: %s, assuming ImageFile", base.Path, err)
-		return decorateFallback(fs, f)
+		ret, fallbackErr := decorateFallback(fs, f)
+		if fallbackErr != nil {
+			logger.Warnf("File %q could not be read with ffprobe: %s. Fallback image decoder failed: %s", base.Path, err, fallbackErr)
+			return f, fallbackErr
+		}
+		logger.Debugf("File %q could not be read with ffprobe: %s, assuming ImageFile", base.Path, err)
+		return ret, nil
 	}
 
 	// Fallback to catch non-animated avif images that FFProbe detects as video files

@@ -991,6 +991,12 @@ export interface PlayerControlsProps {
    *  so the seek + play has to happen inside the click-handler call
    *  stack). */
   onTogglePaused?: () => void;
+  /** Notifies the parent that the user explicitly initiated playback
+   *  outside the `onTogglePaused` path (the pre-start big-play-button
+   *  click calls `store.play()` directly). The scene player feeds this
+   *  into the play-delay gate so a quick click right after the lightbox
+   *  opens isn't swallowed as suppressed autoplay. */
+  onUserPlaybackGesture?: () => void;
   /** When set, replaces the player's built-in fullscreen logic and
    *  hides the in-bar fullscreen button on hover-capable devices.
    *  Touch devices keep the in-bar button (the alternative — typically
@@ -1049,6 +1055,7 @@ export function PlayerControls({
   canAdvance,
   onCyclePlaybackMode,
   onTogglePaused,
+  onUserPlaybackGesture,
   onToggleFullscreenOverride,
   clipBoundsEdit,
   cancelPendingTapToggleRef,
@@ -1456,6 +1463,7 @@ export function PlayerControls({
               if (mode === "reloading") return;
               if (isMenuActive()) return;
               if (mode === "pre-start") {
+                onUserPlaybackGesture?.();
                 setPendingPlay(true);
                 void store.play();
               } else {

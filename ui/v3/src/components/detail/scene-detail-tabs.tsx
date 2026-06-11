@@ -49,6 +49,9 @@ import { DateInput } from "src/components/ui/date-input";
 import { useMutation } from "@apollo/client/react";
 import { SceneFileActionsMenu } from "src/components/detail/scene-file-actions";
 import { MetaRow } from "src/components/detail/meta-row";
+import { FingerprintMetaRows } from "src/components/detail/fingerprint-meta-rows";
+import { FilterUrlLink } from "src/components/shared/filter-url-link";
+import NavUtils from "src/utils/navigation";
 import { CustomFieldsRows } from "src/components/detail/custom-fields-rows";
 
 // ── Shared helpers ─────────────────────────────────────────────────────────────
@@ -119,7 +122,9 @@ export function SceneDetailsTab({ scene }: { scene: SceneData }) {
             defaultMessage: "Director",
           })}
         >
-          {scene.director}
+          <FilterUrlLink href={NavUtils.makeDirectorScenesUrl(scene.director)}>
+            {scene.director}
+          </FilterUrlLink>
         </MetaRow>
       )}
       {scene.rating100 != null && (
@@ -372,6 +377,10 @@ export function SceneFileInfoTab({ scene }: { scene: SceneData }) {
               >
                 {(file.bit_rate / 1000).toFixed(0)} kbps
               </MetaRow>
+              <FingerprintMetaRows
+                fingerprints={file.fingerprints}
+                mode="scenes"
+              />
             </dl>
           </div>
         );

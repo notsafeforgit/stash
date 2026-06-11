@@ -8,6 +8,8 @@ import type * as GQL from "src/core/generated-graphql";
 import { Badge } from "src/components/ui/badge";
 import { MetaRow } from "src/components/detail/meta-row";
 import { CustomFieldsRows } from "src/components/detail/custom-fields-rows";
+import { FilterUrlLink } from "src/components/shared/filter-url-link";
+import NavUtils from "src/utils/navigation";
 
 type GalleryData = NonNullable<GQL.FindGalleryQuery["findGallery"]>;
 
@@ -53,7 +55,11 @@ export function GalleryDetailsTab({ gallery }: { gallery: GalleryData }) {
             defaultMessage: "Photographer",
           })}
         >
-          {gallery.photographer}
+          <FilterUrlLink
+            href={NavUtils.makePhotographerGalleriesUrl(gallery.photographer)}
+          >
+            {gallery.photographer}
+          </FilterUrlLink>
         </MetaRow>
       )}
 

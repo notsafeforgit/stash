@@ -8,6 +8,8 @@ import type * as GQL from "src/core/generated-graphql";
 import { Badge } from "src/components/ui/badge";
 import { MetaRow } from "src/components/detail/meta-row";
 import { CustomFieldsRows } from "src/components/detail/custom-fields-rows";
+import { FilterUrlLink } from "src/components/shared/filter-url-link";
+import NavUtils from "src/utils/navigation";
 
 type GroupData = NonNullable<GQL.FindGroupQuery["findGroup"]>;
 
@@ -51,7 +53,9 @@ export function GroupDetailsTab({ group }: { group: GroupData }) {
             defaultMessage: "Director",
           })}
         >
-          {group.director}
+          <FilterUrlLink href={NavUtils.makeDirectorGroupsUrl(group.director)}>
+            {group.director}
+          </FilterUrlLink>
         </MetaRow>
       )}
 

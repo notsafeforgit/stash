@@ -44,17 +44,38 @@ func (d *Decorator) Decorate(ctx context.Context, fs models.FS, f models.File) (
 	}
 
 	return &models.VideoFile{
-		BaseFile:    base,
-		Format:      string(container),
-		VideoCodec:  videoFile.VideoCodec,
-		AudioCodec:  videoFile.AudioCodec,
-		Width:       videoFile.Width,
-		Height:      videoFile.Height,
-		Duration:    videoFile.FileDuration,
-		FrameRate:   videoFile.FrameRate,
-		BitRate:     videoFile.Bitrate,
-		Interactive: interactive,
+		BaseFile:       base,
+		Format:         string(container),
+		VideoCodec:     videoFile.VideoCodec,
+		AudioCodec:     videoFile.AudioCodec,
+		Width:          videoFile.Width,
+		Height:         videoFile.Height,
+		Duration:       videoFile.FileDuration,
+		FrameRate:      videoFile.FrameRate,
+		BitRate:        videoFile.Bitrate,
+		BitDepth:       intPtrIfPositive(videoFile.BitDepth),
+		ColorRange:     stringPtrIfNotEmpty(videoFile.ColorRange),
+		ColorSpace:     stringPtrIfNotEmpty(videoFile.ColorSpace),
+		ColorTransfer:  stringPtrIfNotEmpty(videoFile.ColorTransfer),
+		ColorPrimaries: stringPtrIfNotEmpty(videoFile.ColorPrimaries),
+		Interactive:    interactive,
 	}, nil
+}
+
+func intPtrIfPositive(v int) *int {
+	if v <= 0 {
+		return nil
+	}
+
+	return &v
+}
+
+func stringPtrIfNotEmpty(v string) *string {
+	if v == "" {
+		return nil
+	}
+
+	return &v
 }
 
 func (d *Decorator) IsMissingMetadata(ctx context.Context, fs models.FS, f models.File) bool {

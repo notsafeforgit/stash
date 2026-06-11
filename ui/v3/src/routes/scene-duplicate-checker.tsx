@@ -3,7 +3,7 @@ import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { zodValidator } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { useMutation, useQuery } from "@apollo/client/react";
-import { FormattedMessage, useIntl } from "react-intl";
+import { FormattedMessage, FormattedNumber, useIntl } from "react-intl";
 import {
   AlertTriangle,
   ArrowDown,
@@ -12,15 +12,17 @@ import {
   CalendarArrowDown,
   CalendarArrowUp,
   CheckSquare,
+  Clapperboard,
+  FileVideo,
   Filter,
-  ImageIcon,
+  GitMerge,
   Pencil,
   Ruler,
   Trash2,
   XSquare,
 } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
-import { imageTitle, objectTitle } from "src/core/files";
+import { objectTitle } from "src/core/files";
 import { ListFilterModel } from "src/models/list-filter/filter";
 import { ToolFilterSidebar } from "src/components/filters/tool-filter-sidebar";
 import {
@@ -34,12 +36,13 @@ import {
   DuplicateFilterScopeToggle,
   type DuplicateFilterScope,
 } from "src/components/filters/duplicate-filter-scope-toggle";
-import { Lightbox, type LightboxSlide } from "src/components/lightbox";
+import { SceneLightbox, type SceneSlide } from "src/components/lightbox";
 import {
   fileSize,
   fileSizeFractionalDigits,
   formatFileSizeUnit,
 } from "src/utils/file";
+import { secondsToTimestamp } from "src/utils/duration";
 import { cn } from "src/lib/utils";
 import { Button } from "src/components/ui/button";
 import {
@@ -56,6 +59,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "src/components/ui/dropdown-menu";
+import { Label } from "src/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -73,11 +77,6 @@ import {
 } from "src/components/ui/table";
 import { Badge } from "src/components/ui/badge";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "src/components/ui/tooltip";
-import {
   Empty,
   EmptyDescription,
   EmptyHeader,
@@ -86,16 +85,23 @@ import {
 } from "src/components/ui/empty";
 import { Skeleton } from "src/components/ui/skeleton";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "src/components/ui/tooltip";
+import {
   DeleteDialog,
   DeleteFilesList,
   type DeleteOptions,
 } from "src/components/detail/delete-dialog";
-import { ImageBulkEditSheet } from "src/components/detail/image-bulk-edit-sheet";
+import { SceneBulkEditSheet } from "src/components/detail/scene-bulk-edit-sheet";
+import { SceneMergeDialog } from "src/components/detail/scene-merge-dialog";
 import { useToast } from "src/hooks/toast";
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 20;
 const DEFAULT_DISTANCE = 0;
+const DEFAULT_DURATION_DIFF = 1;
 
 const PAGE_SIZES = [
   10, 20, 30, 40, 50, 100, 150, 200, 250, 500, 750, 1000, 1250, 1500,
@@ -114,34 +120,51 @@ const SORT_VALUE_TINT_CLASSES = [
   "bg-teal-500/10 dark:bg-teal-400/15",
 ];
 
-const IMAGE_ACCURACY_OPTIONS = [
+const SCENE_ACCURACY_OPTIONS = [
   { value: 0, id: "dupe_check.options.exact", defaultMessage: "Exact" },
   { value: 4, id: "dupe_check.options.high", defaultMessage: "High" },
   { value: 8, id: "dupe_check.options.medium", defaultMessage: "Medium" },
   { value: 10, id: "dupe_check.options.low", defaultMessage: "Low" },
 ] as const;
 
+const SCENE_DURATION_OPTIONS = [
+  { value: -1, id: "dupe_check.duration_options.any", defaultMessage: "Any" },
+  {
+    value: 0,
+    id: "dupe_check.duration_options.equal",
+    defaultMessage: "Equal",
+  },
+  { value: 1 },
+  { value: 5 },
+  { value: 10 },
+] as const;
+
 const searchSchema = z.object({
   page: z.coerce.number().int().positive().optional(),
   size: z.coerce.number().int().positive().optional(),
   distance: z.coerce.number().int().min(0).optional(),
+  durationDiff: z.coerce.number().min(-1).optional(),
   fa: z.string().optional(),
   filterScope: z.enum(DUPLICATE_FILTER_SCOPES).optional().catch(undefined),
 });
 
-type ImageDuplicate =
-  GQL.FindDuplicateImagesQuery["findDuplicateImageGroups"]["groups"][number][number];
-type ImageGroup = ImageDuplicate[];
-type ImageDuplicateFile = ImageDuplicate["visual_files"][number];
-type ImageSortColumn =
+type SceneDuplicate =
+  GQL.FindDuplicateScenesQuery["findDuplicateSceneGroups"]["groups"][number][number];
+type SceneGroup = SceneDuplicate[];
+type SceneDuplicateFile = SceneDuplicate["files"][number];
+type SceneSortColumn =
   | "details"
   | "metadata"
+  | "duration"
   | "filesize"
   | "resolution"
-  | "color";
+  | "bitrate"
+  | "color"
+  | "videoCodec"
+  | "audioCodec";
 type SortDirection = "asc" | "desc";
-type ImageSortState = {
-  column: ImageSortColumn;
+type SceneSortState = {
+  column: SceneSortColumn;
   direction: SortDirection;
 };
 
@@ -177,10 +200,10 @@ function MetadataBadge({
   );
 }
 
-function nextImageSort(
-  current: ImageSortState | undefined,
-  column: ImageSortColumn,
-): ImageSortState {
+function nextSceneSort(
+  current: SceneSortState | undefined,
+  column: SceneSortColumn,
+): SceneSortState {
   return {
     column,
     direction:
@@ -197,40 +220,59 @@ function compareText(a: string, b: string, locale: string): number {
   });
 }
 
-function imageMetadataScore(image: ImageDuplicate): number {
+function sceneMetadataScore(scene: SceneDuplicate): number {
   return (
-    image.tags.length +
-    image.performers.length +
-    image.galleries.length +
-    (image.visual_files.length > 1 ? image.visual_files.length : 0) +
-    (image.organized ? 1 : 0)
+    scene.tags.length +
+    scene.performers.length +
+    scene.groups.length +
+    scene.scene_markers.length +
+    scene.galleries.length +
+    (scene.o_counter && scene.o_counter > 0 ? 1 : 0) +
+    (scene.files.length > 1 ? scene.files.length : 0) +
+    (scene.organized ? 1 : 0)
   );
 }
 
-function compareImages(
-  a: ImageDuplicate,
-  b: ImageDuplicate,
-  column: ImageSortColumn,
+function compareScenes(
+  a: SceneDuplicate,
+  b: SceneDuplicate,
+  column: SceneSortColumn,
   locale: string,
 ): number {
+  const aFile = primaryFile(a);
+  const bFile = primaryFile(b);
+
   switch (column) {
-    case "details": {
-      const aFile = primaryFile(a);
-      const bFile = primaryFile(b);
+    case "details":
       return compareText(
-        `${imageTitle(a)} ${aFile?.path ?? ""}`,
-        `${imageTitle(b)} ${bFile?.path ?? ""}`,
+        `${objectTitle(a)} ${aFile?.path ?? ""}`,
+        `${objectTitle(b)} ${bFile?.path ?? ""}`,
         locale,
       );
-    }
     case "metadata":
-      return imageMetadataScore(a) - imageMetadataScore(b);
+      return sceneMetadataScore(a) - sceneMetadataScore(b);
+    case "duration":
+      return (aFile?.duration ?? 0) - (bFile?.duration ?? 0);
     case "filesize":
-      return imageFileSize(a) - imageFileSize(b);
+      return sceneFileSize(a) - sceneFileSize(b);
     case "resolution":
-      return imageResolution(a) - imageResolution(b);
+      return sceneResolution(a) - sceneResolution(b);
+    case "bitrate":
+      return (aFile?.bit_rate ?? 0) - (bFile?.bit_rate ?? 0);
     case "color":
-      return compareMediaColor(primaryFile(a), primaryFile(b), locale);
+      return compareMediaColor(aFile, bFile, locale);
+    case "videoCodec":
+      return compareText(
+        aFile?.video_codec ?? "",
+        bFile?.video_codec ?? "",
+        locale,
+      );
+    case "audioCodec":
+      return compareText(
+        aFile?.audio_codec ?? "",
+        bFile?.audio_codec ?? "",
+        locale,
+      );
   }
 }
 
@@ -242,46 +284,54 @@ function stableHash(value: string): number {
   return hash;
 }
 
-function imageSortValueKey(
-  image: ImageDuplicate,
-  column: ImageSortColumn,
+function sceneSortValueKey(
+  scene: SceneDuplicate,
+  column: SceneSortColumn,
 ): string {
-  const file = primaryFile(image);
+  const file = primaryFile(scene);
 
   switch (column) {
     case "details":
-      return `${imageTitle(image).trim().toLocaleLowerCase()}\u0000${(file?.path ?? "").trim().toLocaleLowerCase()}`;
+      return `${objectTitle(scene).trim().toLocaleLowerCase()}\u0000${(file?.path ?? "").trim().toLocaleLowerCase()}`;
     case "metadata":
-      return String(imageMetadataScore(image));
+      return String(sceneMetadataScore(scene));
+    case "duration":
+      return String(file?.duration ?? 0);
     case "filesize":
-      return String(imageFileSize(image));
+      return String(sceneFileSize(scene));
     case "resolution":
-      return String(imageResolution(image));
+      return String(sceneResolution(scene));
+    case "bitrate":
+      return String(file?.bit_rate ?? 0);
     case "color":
       return mediaColorValueKey(file);
+    case "videoCodec":
+      return (file?.video_codec ?? "").trim().toLocaleLowerCase();
+    case "audioCodec":
+      return (file?.audio_codec ?? "").trim().toLocaleLowerCase();
   }
 }
 
-function imageSortTintClasses(
-  groups: ImageGroup[],
-  column: ImageSortColumn,
+function sceneSortTintClasses(
+  groups: SceneGroup[],
+  column: SceneSortColumn,
 ): Map<string, string> {
-  const tintByImageId = new Map<string, string>();
+  const tintBySceneId = new Map<string, string>();
 
   for (const group of groups) {
     const counts = new Map<string, number>();
-    for (const image of group) {
-      const key = imageSortValueKey(image, column);
+    for (const scene of group) {
+      const key = sceneSortValueKey(scene, column);
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
 
     if (![...counts.values()].some((count) => count > 1)) continue;
 
-    const groupSeed = group.map((image) => image.id).join(":");
+    const groupSeed = group.map((scene) => scene.id).join(":");
     const tintByValue = new Map<string, string>();
 
-    for (const image of group) {
-      const key = imageSortValueKey(image, column);
+    for (const scene of group) {
+      const key = sceneSortValueKey(scene, column);
       let tint = tintByValue.get(key);
       if (!tint) {
         tint =
@@ -291,11 +341,11 @@ function imageSortTintClasses(
           ];
         tintByValue.set(key, tint);
       }
-      tintByImageId.set(image.id, tint);
+      tintBySceneId.set(scene.id, tint);
     }
   }
 
-  return tintByImageId;
+  return tintBySceneId;
 }
 
 function formatBytes(bytes: number | undefined): string {
@@ -303,52 +353,46 @@ function formatBytes(bytes: number | undefined): string {
   return `${size.size.toFixed(fileSizeFractionalDigits(size.unit))} ${formatFileSizeUnit(size.unit)}`;
 }
 
-function primaryFile(image: ImageDuplicate): ImageDuplicateFile | undefined {
-  return image.visual_files[0];
+function primaryFile(scene: SceneDuplicate): SceneDuplicateFile | undefined {
+  return scene.files[0];
 }
 
-function imageFileSize(image: ImageDuplicate): number {
-  return image.visual_files.reduce(
-    (max, file) => Math.max(max, file.size ?? 0),
-    0,
-  );
+function sceneFileSize(scene: SceneDuplicate): number {
+  return scene.files.reduce((max, file) => Math.max(max, file.size ?? 0), 0);
 }
 
-function imageResolution(image: ImageDuplicate): number {
-  return image.visual_files.reduce(
+function sceneResolution(scene: SceneDuplicate): number {
+  return scene.files.reduce(
     (max, file) => Math.max(max, (file.width ?? 0) * (file.height ?? 0)),
     0,
   );
 }
 
-function imageGroupSize(group: ImageGroup): number {
+function sceneGroupSize(group: SceneGroup): number {
   return group.reduce(
-    (total, image) =>
+    (total, scene) =>
       total +
-      image.visual_files.reduce(
-        (fileTotal, file) => fileTotal + (file.size ?? 0),
-        0,
-      ),
+      scene.files.reduce((fileTotal, file) => fileTotal + (file.size ?? 0), 0),
     0,
   );
 }
 
-function newestOrOldestImage(
-  group: ImageGroup,
+function newestOrOldestScene(
+  group: SceneGroup,
   oldest: boolean,
-): ImageDuplicate | undefined {
-  let selected: ImageDuplicate | undefined;
+): SceneDuplicate | undefined {
+  let selected: SceneDuplicate | undefined;
   let selectedTime: number | undefined;
 
-  for (const image of group) {
-    for (const file of image.visual_files) {
+  for (const scene of group) {
+    for (const file of scene.files) {
       const time = new Date(file.mod_time).getTime();
       if (!Number.isFinite(time)) continue;
       if (
         selectedTime === undefined ||
         (oldest ? time < selectedTime : time > selectedTime)
       ) {
-        selected = image;
+        selected = scene;
         selectedTime = time;
       }
     }
@@ -357,8 +401,19 @@ function newestOrOldestImage(
   return selected;
 }
 
-function sameResolution(group: ImageGroup): boolean {
-  return new Set(group.map(imageResolution)).size === 1;
+function sameResolution(group: SceneGroup): boolean {
+  return new Set(group.map(sceneResolution)).size === 1;
+}
+
+function sameCodec(group: SceneGroup): boolean {
+  return (
+    new Set(
+      group.map((scene) => {
+        const file = primaryFile(scene);
+        return `${file?.video_codec ?? ""}:${file?.audio_codec ?? ""}`;
+      }),
+    ).size === 1
+  );
 }
 
 function pageCount(total: number, pageSize: number): number {
@@ -380,7 +435,7 @@ function accuracyLabel(
   value: number,
   formatMessage: ReturnType<typeof useIntl>["formatMessage"],
 ): string {
-  const option = IMAGE_ACCURACY_OPTIONS.find((item) => item.value === value);
+  const option = SCENE_ACCURACY_OPTIONS.find((item) => item.value === value);
   if (!option) return String(value);
 
   return formatMessage({
@@ -389,7 +444,30 @@ function accuracyLabel(
   });
 }
 
-function ImageDuplicateCheckerPage() {
+function durationLabel(
+  value: number,
+  formatMessage: ReturnType<typeof useIntl>["formatMessage"],
+): string {
+  const option = SCENE_DURATION_OPTIONS.find((item) => item.value === value);
+  if (!option) return String(value);
+
+  if ("id" in option) {
+    return formatMessage({
+      id: option.id,
+      defaultMessage: option.defaultMessage,
+    });
+  }
+
+  return formatMessage(
+    {
+      id: "seconds_count",
+      defaultMessage: "{count, plural, one {# second} other {# seconds}}",
+    },
+    { count: option.value },
+  );
+}
+
+function SceneDuplicateCheckerPage() {
   const intl = useIntl();
   const navigate = useNavigate({ from: Route.fullPath });
   const toast = useToast();
@@ -398,31 +476,34 @@ function ImageDuplicateCheckerPage() {
   const currentPage = search.page ?? DEFAULT_PAGE;
   const pageSize = search.size ?? DEFAULT_PAGE_SIZE;
   const hashDistance = search.distance ?? DEFAULT_DISTANCE;
+  const durationDiff = search.durationDiff ?? DEFAULT_DURATION_DIFF;
   const filterScope = search.filterScope ?? DEFAULT_DUPLICATE_FILTER_SCOPE;
 
-  const [checkedImages, setCheckedImages] = useState<Record<string, boolean>>(
+  const [checkedScenes, setCheckedScenes] = useState<Record<string, boolean>>(
     {},
   );
+  const [safeSelect, setSafeSelect] = useState(true);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleteTargetImages, setDeleteTargetImages] = useState<
-    ImageDuplicate[]
+  const [deleteTargetScenes, setDeleteTargetScenes] = useState<
+    SceneDuplicate[]
   >([]);
+  const [mergeGroup, setMergeGroup] = useState<SceneGroup | null>(null);
   const [filterOpen, setFilterOpen] = useState(() => Boolean(search.fa));
   const [lightbox, setLightbox] = useState<{
-    slides: LightboxSlide[];
+    slides: SceneSlide[];
     index: number;
   } | null>(null);
 
   const [filterModel, setFilterModel] = useState(() => {
-    const model = new ListFilterModel(GQL.FilterMode.Images);
+    const model = new ListFilterModel(GQL.FilterMode.Scenes);
     if (search.fa) model.configureFromDecodedParams({ fa: search.fa });
     return model;
   });
 
   function setFilter(next: ListFilterModel) {
     setFilterModel(next);
-    setCheckedImages({});
+    setCheckedScenes({});
     void navigate({
       search: (prev) => ({
         ...prev,
@@ -435,8 +516,8 @@ function ImageDuplicateCheckerPage() {
 
   const filterVariables = useMemo(
     () => ({
-      image_filter: filterModel.makeFilter() as GQL.ImageFilterType,
-      image_filter_ast: filterModel.makeFilterAST(),
+      scene_filter: filterModel.makeFilter() as GQL.SceneFilterType,
+      scene_filter_ast: filterModel.makeFilterAST(),
     }),
     [filterModel],
   );
@@ -445,16 +526,18 @@ function ImageDuplicateCheckerPage() {
   const duplicateVariables = useMemo(
     () => ({
       distance: hashDistance,
+      duration_diff: durationDiff,
       filter: {
         page: currentPage,
         per_page: pageSize,
       },
     }),
-    [currentPage, hashDistance, pageSize],
+    [currentPage, durationDiff, hashDistance, pageSize],
   );
   const filteredDuplicateVariables = useMemo(
     () => ({
       distance: hashDistance,
+      duration_diff: durationDiff,
       filter: {
         page: currentPage,
         per_page: pageSize,
@@ -462,20 +545,27 @@ function ImageDuplicateCheckerPage() {
       filter_mode: duplicateFilterMode(filterScope),
       ...filterVariables,
     }),
-    [currentPage, filterScope, filterVariables, hashDistance, pageSize],
+    [
+      currentPage,
+      durationDiff,
+      filterScope,
+      filterVariables,
+      hashDistance,
+      pageSize,
+    ],
   );
 
   // cache-first: revisiting the page within a session reuses the previous
   // result instead of recomputing all duplicates; the Refresh button
   // refetches explicitly.
-  const unfilteredDuplicateQuery = useQuery(GQL.FindDuplicateImagesDocument, {
+  const unfilteredDuplicateQuery = useQuery(GQL.FindDuplicateScenesDocument, {
     variables: duplicateVariables,
     fetchPolicy: "cache-first",
     notifyOnNetworkStatusChange: true,
     skip: shouldFilterDuplicateQuery,
   });
   const filteredDuplicateQuery = useQuery(
-    GQL.FindDuplicateImagesFilteredDocument,
+    GQL.FindDuplicateScenesFilteredDocument,
     {
       variables: filteredDuplicateVariables,
       fetchPolicy: "cache-first",
@@ -484,11 +574,11 @@ function ImageDuplicateCheckerPage() {
     },
   );
   const duplicateResult = shouldFilterDuplicateQuery
-    ? filteredDuplicateQuery.data?.findDuplicateImageGroups
-    : unfilteredDuplicateQuery.data?.findDuplicateImageGroups;
+    ? filteredDuplicateQuery.data?.findDuplicateSceneGroups
+    : unfilteredDuplicateQuery.data?.findDuplicateSceneGroups;
   const previousDuplicateResult = shouldFilterDuplicateQuery
-    ? filteredDuplicateQuery.previousData?.findDuplicateImageGroups
-    : unfilteredDuplicateQuery.previousData?.findDuplicateImageGroups;
+    ? filteredDuplicateQuery.previousData?.findDuplicateSceneGroups
+    : unfilteredDuplicateQuery.previousData?.findDuplicateSceneGroups;
   const displayDuplicateResult = duplicateResult ?? previousDuplicateResult;
   const duplicateGroups = duplicateResult?.groups;
   const duplicateCount = displayDuplicateResult?.count ?? 0;
@@ -501,44 +591,51 @@ function ImageDuplicateCheckerPage() {
   const hasDuplicateData = duplicateResult !== undefined;
   const tableLoading = duplicateLoading && !hasDuplicateData;
 
-  const missingPhashQuery = useQuery(GQL.FindImagesDocument, {
+  const missingPhashQuery = useQuery(GQL.FindScenesDocument, {
     variables: {
       filter: { per_page: 0 },
-      image_filter: { is_missing: "phash" },
+      scene_filter: {
+        is_missing: "phash",
+        file_count: {
+          modifier: GQL.CriterionModifier.GreaterThan,
+          value: 0,
+        },
+      },
     },
   });
 
-  const [destroyImage] = useMutation(GQL.ImageDestroyDocument);
+  const [destroyScenes] = useMutation(GQL.ScenesDestroyDocument);
 
   const allGroups = useMemo(() => {
     const groups = duplicateGroups ?? [];
     return [...groups]
       .map((group) => [...group])
-      .sort((a, b) => imageGroupSize(b) - imageGroupSize(a));
+      .sort((a, b) => sceneGroupSize(b) - sceneGroupSize(a));
   }, [duplicateGroups]);
 
   const totalPages = pageCount(duplicateCount, pageSize);
   const page = Math.min(currentPage, totalPages);
   const pagedGroups = allGroups;
 
-  const selectedImages = useMemo(
-    () => allGroups.flat().filter((image) => checkedImages[image.id]),
-    [allGroups, checkedImages],
+  const selectedScenes = useMemo(
+    () => allGroups.flat().filter((scene) => checkedScenes[scene.id]),
+    [allGroups, checkedScenes],
   );
 
-  const deleteDialogImages =
-    deleteTargetImages.length > 0 ? deleteTargetImages : selectedImages;
+  const deleteDialogScenes =
+    deleteTargetScenes.length > 0 ? deleteTargetScenes : selectedScenes;
 
-  const selectedPaths = deleteDialogImages.flatMap((image) =>
-    image.visual_files.map((file) => file.path),
+  const selectedPaths = deleteDialogScenes.flatMap((scene) =>
+    scene.files.map((file) => file.path),
   );
 
-  const missingPhashes = missingPhashQuery.data?.findImages.count ?? 0;
+  const missingPhashes = missingPhashQuery.data?.findScenes.count ?? 0;
 
   function setSearch(next: {
     page?: number;
     size?: number;
     distance?: number;
+    durationDiff?: number;
     filterScope?: DuplicateFilterScope;
   }) {
     void navigate({
@@ -556,6 +653,11 @@ function ImageDuplicateCheckerPage() {
           next.distance === undefined || next.distance === DEFAULT_DISTANCE
             ? undefined
             : next.distance,
+        durationDiff:
+          next.durationDiff === undefined ||
+          next.durationDiff === DEFAULT_DURATION_DIFF
+            ? undefined
+            : next.durationDiff,
         filterScope:
           next.filterScope === undefined
             ? prev.filterScope
@@ -567,18 +669,38 @@ function ImageDuplicateCheckerPage() {
   }
 
   function setPage(newPage: number) {
-    setSearch({ page: newPage, size: pageSize, distance: hashDistance });
-    setCheckedImages({});
+    setSearch({
+      page: newPage,
+      size: pageSize,
+      distance: hashDistance,
+      durationDiff,
+    });
+    setCheckedScenes({});
   }
 
   function setDistance(distance: number) {
-    setSearch({ page: DEFAULT_PAGE, size: pageSize, distance });
-    setCheckedImages({});
+    setSearch({ page: DEFAULT_PAGE, size: pageSize, distance, durationDiff });
+    setCheckedScenes({});
+  }
+
+  function setDurationDiff(diff: number) {
+    setSearch({
+      page: DEFAULT_PAGE,
+      size: pageSize,
+      distance: hashDistance,
+      durationDiff: diff,
+    });
+    setCheckedScenes({});
   }
 
   function setSize(size: number) {
-    setSearch({ page: DEFAULT_PAGE, size, distance: hashDistance });
-    setCheckedImages({});
+    setSearch({
+      page: DEFAULT_PAGE,
+      size,
+      distance: hashDistance,
+      durationDiff,
+    });
+    setCheckedScenes({});
   }
 
   function setFilterScope(scope: DuplicateFilterScope) {
@@ -586,15 +708,16 @@ function ImageDuplicateCheckerPage() {
       page: DEFAULT_PAGE,
       size: pageSize,
       distance: hashDistance,
+      durationDiff,
       filterScope: scope,
     });
-    setCheckedImages({});
+    setCheckedScenes({});
   }
 
   useEffect(() => {
     if (!hasDuplicateData || currentPage <= totalPages) return;
 
-    setCheckedImages({});
+    setCheckedScenes({});
     void navigate({
       search: (prev) => ({
         ...prev,
@@ -604,53 +727,50 @@ function ImageDuplicateCheckerPage() {
     });
   }, [currentPage, hasDuplicateData, navigate, totalPages]);
 
-  function checkImages(images: ImageDuplicate[]) {
-    setCheckedImages(
-      Object.fromEntries(images.map((image) => [image.id, true])),
+  function checkScenes(scenes: SceneDuplicate[]) {
+    setCheckedScenes(
+      Object.fromEntries(scenes.map((scene) => [scene.id, true])),
     );
   }
 
   function selectAllButByGroup(
-    keep: (group: ImageGroup) => ImageDuplicate | undefined,
+    keep: (group: SceneGroup) => SceneDuplicate | undefined,
   ) {
-    const images: ImageDuplicate[] = [];
+    const scenes: SceneDuplicate[] = [];
     for (const group of pagedGroups) {
+      if (safeSelect && !sameCodec(group)) continue;
       const retained = keep(group);
       if (!retained) continue;
-      for (const image of group) {
-        if (image !== retained) images.push(image);
+      for (const scene of group) {
+        if (scene !== retained) scenes.push(scene);
       }
     }
-    checkImages(images);
+    checkScenes(scenes);
   }
 
   function openDeleteDialog() {
-    setDeleteTargetImages(selectedImages);
+    setDeleteTargetScenes(selectedScenes);
     setDeleteOpen(true);
   }
 
   function setDeleteDialogOpen(open: boolean) {
     setDeleteOpen(open);
-    if (!open) setDeleteTargetImages([]);
+    if (!open) setDeleteTargetScenes([]);
   }
 
   async function handleDelete(options: DeleteOptions) {
-    const imagesToDelete =
-      deleteTargetImages.length > 0 ? deleteTargetImages : selectedImages;
+    const scenesToDelete =
+      deleteTargetScenes.length > 0 ? deleteTargetScenes : selectedScenes;
 
     try {
-      await Promise.all(
-        imagesToDelete.map((image) =>
-          destroyImage({
-            variables: {
-              id: image.id,
-              delete_file: options.deleteFile,
-              delete_generated: options.deleteGenerated,
-            },
-          }),
-        ),
-      );
-      setCheckedImages({});
+      await destroyScenes({
+        variables: {
+          ids: scenesToDelete.map((scene) => scene.id),
+          delete_file: options.deleteFile,
+          delete_generated: options.deleteGenerated,
+        },
+      });
+      setCheckedScenes({});
       await refetchDuplicateResults();
       toast.success(
         intl.formatMessage(
@@ -660,9 +780,9 @@ function ImageDuplicateCheckerPage() {
               "Deleted {count, plural, one {{singularEntity}} other {{pluralEntity}}}",
           },
           {
-            count: imagesToDelete.length,
-            singularEntity: "image",
-            pluralEntity: "images",
+            count: scenesToDelete.length,
+            singularEntity: "scene",
+            pluralEntity: "scenes",
           },
         ),
       );
@@ -696,7 +816,7 @@ function ImageDuplicateCheckerPage() {
             </EmptyTitle>
             <EmptyDescription>
               {duplicateError?.message ??
-                "Error searching for duplicate images."}
+                "Error searching for duplicate scenes."}
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
@@ -709,7 +829,7 @@ function ImageDuplicateCheckerPage() {
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3 lg:p-4">
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row lg:items-stretch">
           <ToolFilterSidebar
-            mode={GQL.FilterMode.Images}
+            mode={GQL.FilterMode.Scenes}
             open={filterOpen}
             filter={filterModel}
             setFilter={setFilter}
@@ -722,8 +842,8 @@ function ImageDuplicateCheckerPage() {
               <div>
                 <CardTitle>
                   <FormattedMessage
-                    id="dupe_check.image_title"
-                    defaultMessage="Duplicate images"
+                    id="dupe_check.title"
+                    defaultMessage="Duplicate scenes"
                   />
                 </CardTitle>
                 <CardDescription className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -738,8 +858,8 @@ function ImageDuplicateCheckerPage() {
                     <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-300">
                       <AlertTriangle className="size-3.5 shrink-0" />
                       <FormattedMessage
-                        id="dupe_check.missing_phash_warning"
-                        defaultMessage="{count, plural, one {# image is missing a perceptual hash.} other {# images are missing perceptual hashes.}}"
+                        id="dupe_check.scene_missing_phash_warning"
+                        defaultMessage="{count, plural, one {# scene is missing a perceptual hash.} other {# scenes are missing perceptual hashes.}} Please run the phash generation task."
                         values={{ count: missingPhashes }}
                       />
                     </span>
@@ -748,7 +868,7 @@ function ImageDuplicateCheckerPage() {
               </div>
               <div className="flex flex-col items-end gap-2">
                 <div className="flex flex-wrap items-center justify-end gap-2">
-                  {selectedImages.length > 0 && (
+                  {selectedScenes.length > 0 && (
                     <>
                       <span className="text-sm text-muted-foreground">
                         {intl.formatMessage(
@@ -757,7 +877,7 @@ function ImageDuplicateCheckerPage() {
                             defaultMessage:
                               "{count, plural, one {# selected} other {# selected}}",
                           },
-                          { count: selectedImages.length },
+                          { count: selectedScenes.length },
                         )}
                       </span>
                       <Button
@@ -878,7 +998,7 @@ function ImageDuplicateCheckerPage() {
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        {IMAGE_ACCURACY_OPTIONS.map((option) => (
+                        {SCENE_ACCURACY_OPTIONS.map((option) => (
                           <SelectItem
                             key={option.value}
                             value={String(option.value)}
@@ -887,6 +1007,35 @@ function ImageDuplicateCheckerPage() {
                               id: option.id,
                               defaultMessage: option.defaultMessage,
                             })}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </label>
+
+                  <label className="flex items-center gap-2 text-sm">
+                    <span className="text-muted-foreground">
+                      <FormattedMessage
+                        id="dupe_check.duration_diff"
+                        defaultMessage="Maximum duration difference"
+                      />
+                    </span>
+                    <Select
+                      value={String(durationDiff)}
+                      onValueChange={(value) => setDurationDiff(Number(value))}
+                    >
+                      <SelectTrigger size="sm" className="min-w-24">
+                        <SelectValue>
+                          {durationLabel(durationDiff, intl.formatMessage)}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SCENE_DURATION_OPTIONS.map((option) => (
+                          <SelectItem
+                            key={option.value}
+                            value={String(option.value)}
+                          >
+                            {durationLabel(option.value, intl.formatMessage)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -904,7 +1053,7 @@ function ImageDuplicateCheckerPage() {
                       />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="min-w-56">
-                      <DropdownMenuItem onClick={() => setCheckedImages({})}>
+                      <DropdownMenuItem onClick={() => setCheckedScenes({})}>
                         <XSquare />
                         <FormattedMessage
                           id="dupe_check.select_none"
@@ -916,9 +1065,9 @@ function ImageDuplicateCheckerPage() {
                           selectAllButByGroup((group) =>
                             sameResolution(group)
                               ? undefined
-                              : group.reduce((best, image) =>
-                                  imageResolution(image) > imageResolution(best)
-                                    ? image
+                              : group.reduce((best, scene) =>
+                                  sceneResolution(scene) > sceneResolution(best)
+                                    ? scene
                                     : best,
                                 ),
                           )
@@ -933,15 +1082,15 @@ function ImageDuplicateCheckerPage() {
                       <DropdownMenuItem
                         onClick={() =>
                           selectAllButByGroup((group) =>
-                            group.reduce((best, image) =>
-                              imageFileSize(image) > imageFileSize(best)
-                                ? image
+                            group.reduce((best, scene) =>
+                              sceneFileSize(scene) > sceneFileSize(best)
+                                ? scene
                                 : best,
                             ),
                           )
                         }
                       >
-                        <ImageIcon />
+                        <FileVideo />
                         <FormattedMessage
                           id="dupe_check.select_all_but_largest_file"
                           defaultMessage="All but largest file"
@@ -950,7 +1099,7 @@ function ImageDuplicateCheckerPage() {
                       <DropdownMenuItem
                         onClick={() =>
                           selectAllButByGroup((group) =>
-                            newestOrOldestImage(group, true),
+                            newestOrOldestScene(group, true),
                           )
                         }
                       >
@@ -963,7 +1112,7 @@ function ImageDuplicateCheckerPage() {
                       <DropdownMenuItem
                         onClick={() =>
                           selectAllButByGroup((group) =>
-                            newestOrOldestImage(group, false),
+                            newestOrOldestScene(group, false),
                           )
                         }
                       >
@@ -976,6 +1125,20 @@ function ImageDuplicateCheckerPage() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
+
+                <Label className="flex items-center gap-2 text-sm font-normal text-muted-foreground">
+                  <Checkbox
+                    checked={safeSelect}
+                    onCheckedChange={(v) => {
+                      setSafeSelect(v === true);
+                      setCheckedScenes({});
+                    }}
+                  />
+                  <FormattedMessage
+                    id="dupe_check.only_select_matching_codecs"
+                    defaultMessage="Only select if all codecs match in the duplicate group"
+                  />
+                </Label>
               </div>
             </CardHeader>
 
@@ -984,17 +1147,18 @@ function ImageDuplicateCheckerPage() {
                 <DuplicateTable
                   groups={[]}
                   loading
-                  checkedImages={checkedImages}
+                  checkedScenes={checkedScenes}
                   onCheckedChange={(id, checked) =>
-                    setCheckedImages((prev) => ({ ...prev, [id]: checked }))
+                    setCheckedScenes((prev) => ({ ...prev, [id]: checked }))
                   }
+                  onMergeGroup={setMergeGroup}
                   onPreviewClick={(group, index) =>
                     setLightbox({
-                      slides: group.map((image) => ({
-                        src: image.paths.image ?? "",
-                        alt: imageTitle(image),
-                        imageId: image.id,
-                        imageTitle: imageTitle(image),
+                      slides: group.map((scene) => ({
+                        type: "scene" as const,
+                        sceneId: scene.id,
+                        title: objectTitle(scene) || undefined,
+                        posterSrc: scene.paths.screenshot ?? undefined,
                       })),
                       index,
                     })
@@ -1004,12 +1168,12 @@ function ImageDuplicateCheckerPage() {
                 <Empty className="h-full min-h-64">
                   <EmptyHeader>
                     <EmptyMedia variant="icon">
-                      <ImageIcon />
+                      <Clapperboard />
                     </EmptyMedia>
                     <EmptyTitle>
                       <FormattedMessage
-                        id="dupe_check.no_images_found"
-                        defaultMessage="No duplicate images found."
+                        id="dupe_check.no_scenes_found"
+                        defaultMessage="No duplicate scenes found."
                       />
                     </EmptyTitle>
                   </EmptyHeader>
@@ -1017,17 +1181,18 @@ function ImageDuplicateCheckerPage() {
               ) : (
                 <DuplicateTable
                   groups={pagedGroups}
-                  checkedImages={checkedImages}
+                  checkedScenes={checkedScenes}
                   onCheckedChange={(id, checked) =>
-                    setCheckedImages((prev) => ({ ...prev, [id]: checked }))
+                    setCheckedScenes((prev) => ({ ...prev, [id]: checked }))
                   }
+                  onMergeGroup={setMergeGroup}
                   onPreviewClick={(group, index) =>
                     setLightbox({
-                      slides: group.map((image) => ({
-                        src: image.paths.image ?? "",
-                        alt: imageTitle(image),
-                        imageId: image.id,
-                        imageTitle: imageTitle(image),
+                      slides: group.map((scene) => ({
+                        type: "scene" as const,
+                        sceneId: scene.id,
+                        title: objectTitle(scene) || undefined,
+                        posterSrc: scene.paths.screenshot ?? undefined,
                       })),
                       index,
                     })
@@ -1039,21 +1204,29 @@ function ImageDuplicateCheckerPage() {
         </div>
       </div>
 
-      <Lightbox
+      <SceneLightbox
         open={lightbox !== null}
         onClose={() => setLightbox(null)}
         slides={lightbox?.slides ?? []}
         index={lightbox?.index ?? 0}
       />
 
-      <ImageBulkEditSheet
+      <SceneBulkEditSheet
         open={bulkEditOpen}
         onOpenChange={setBulkEditOpen}
-        items={selectedImages}
+        items={selectedScenes}
         onSaved={() => {
-          setCheckedImages({});
+          setCheckedScenes({});
           void refetchDuplicateResults();
         }}
+      />
+
+      <SceneMergeDialog
+        open={mergeGroup !== null}
+        onOpenChange={(open) => {
+          if (!open) setMergeGroup(null);
+        }}
+        sources={mergeGroup ?? []}
       />
 
       <DeleteDialog
@@ -1061,10 +1234,10 @@ function ImageDuplicateCheckerPage() {
         onOpenChange={setDeleteDialogOpen}
         entityCountLabel={intl.formatMessage(
           {
-            id: "dialogs.delete_images_count",
-            defaultMessage: "{count, plural, one {# image} other {# images}}",
+            id: "dialogs.delete_scenes_count",
+            defaultMessage: "{count, plural, one {# scene} other {# scenes}}",
           },
-          { count: deleteDialogImages.length },
+          { count: deleteDialogScenes.length },
         )}
         showFileOptions
         details={<DeleteFilesList paths={selectedPaths} />}
@@ -1082,16 +1255,16 @@ function ImageDuplicateCheckerPage() {
   );
 }
 
-function SortableImageTableHead({
+function SortableSceneTableHead({
   column,
   sort,
   onSort,
   className,
   children,
 }: {
-  column: ImageSortColumn;
-  sort: ImageSortState | undefined;
-  onSort: (column: ImageSortColumn) => void;
+  column: SceneSortColumn;
+  sort: SceneSortState | undefined;
+  onSort: (column: SceneSortColumn) => void;
   className?: string;
   children: ReactNode;
 }) {
@@ -1135,18 +1308,20 @@ function SortableImageTableHead({
 function DuplicateTable({
   groups,
   loading = false,
-  checkedImages,
+  checkedScenes,
   onCheckedChange,
+  onMergeGroup,
   onPreviewClick,
 }: {
-  groups: ImageGroup[];
+  groups: SceneGroup[];
   loading?: boolean;
-  checkedImages: Record<string, boolean>;
+  checkedScenes: Record<string, boolean>;
   onCheckedChange: (id: string, checked: boolean) => void;
-  onPreviewClick: (group: ImageGroup, index: number) => void;
+  onMergeGroup: (group: SceneGroup) => void;
+  onPreviewClick: (group: SceneGroup, index: number) => void;
 }) {
   const intl = useIntl();
-  const [sort, setSort] = useState<ImageSortState>();
+  const [sort, setSort] = useState<SceneSortState>();
   const sortedGroups = useMemo(() => {
     if (!sort) return groups;
 
@@ -1154,15 +1329,17 @@ function DuplicateTable({
     return groups.map((group) =>
       [...group].sort((a, b) => {
         const result =
-          direction * compareImages(a, b, sort.column, intl.locale);
-        return result || compareText(imageTitle(a), imageTitle(b), intl.locale);
+          direction * compareScenes(a, b, sort.column, intl.locale);
+        return (
+          result || compareText(objectTitle(a), objectTitle(b), intl.locale)
+        );
       }),
     );
   }, [groups, intl.locale, sort]);
-  const tintByImageId = useMemo(
+  const tintBySceneId = useMemo(
     () =>
       sort && sort.column !== "details"
-        ? imageSortTintClasses(sortedGroups, sort.column)
+        ? sceneSortTintClasses(sortedGroups, sort.column)
         : undefined,
     [sort, sortedGroups],
   );
@@ -1173,68 +1350,113 @@ function DuplicateTable({
         <TableRow>
           <TableHead className="sticky top-0 z-10 w-14 bg-card px-3 text-center" />
           <TableHead className="sticky top-0 z-10 w-28 bg-card" />
-          <SortableImageTableHead
+          <SortableSceneTableHead
             column="details"
             sort={sort}
             onSort={(column) =>
-              setSort((current) => nextImageSort(current, column))
+              setSort((current) => nextSceneSort(current, column))
             }
           >
             <FormattedMessage id="details" defaultMessage="Details" />
-          </SortableImageTableHead>
-          <SortableImageTableHead
+          </SortableSceneTableHead>
+          <SortableSceneTableHead
             column="metadata"
             sort={sort}
             onSort={(column) =>
-              setSort((current) => nextImageSort(current, column))
+              setSort((current) => nextSceneSort(current, column))
             }
           >
             <FormattedMessage id="metadata" defaultMessage="Metadata" />
-          </SortableImageTableHead>
-          <SortableImageTableHead
+          </SortableSceneTableHead>
+          <SortableSceneTableHead
+            column="duration"
+            sort={sort}
+            onSort={(column) =>
+              setSort((current) => nextSceneSort(current, column))
+            }
+            className="text-right"
+          >
+            <FormattedMessage id="duration" defaultMessage="Duration" />
+          </SortableSceneTableHead>
+          <SortableSceneTableHead
             column="filesize"
             sort={sort}
             onSort={(column) =>
-              setSort((current) => nextImageSort(current, column))
+              setSort((current) => nextSceneSort(current, column))
             }
             className="text-right"
           >
             <FormattedMessage id="filesize" defaultMessage="File Size" />
-          </SortableImageTableHead>
-          <SortableImageTableHead
+          </SortableSceneTableHead>
+          <SortableSceneTableHead
             column="resolution"
             sort={sort}
             onSort={(column) =>
-              setSort((current) => nextImageSort(current, column))
+              setSort((current) => nextSceneSort(current, column))
             }
             className="text-right"
           >
             <FormattedMessage id="resolution" defaultMessage="Resolution" />
-          </SortableImageTableHead>
-          <SortableImageTableHead
+          </SortableSceneTableHead>
+          <SortableSceneTableHead
+            column="bitrate"
+            sort={sort}
+            onSort={(column) =>
+              setSort((current) => nextSceneSort(current, column))
+            }
+            className="text-right"
+          >
+            <FormattedMessage id="bitrate" defaultMessage="Bit Rate" />
+          </SortableSceneTableHead>
+          <SortableSceneTableHead
             column="color"
             sort={sort}
             onSort={(column) =>
-              setSort((current) => nextImageSort(current, column))
+              setSort((current) => nextSceneSort(current, column))
             }
           >
             <FormattedMessage id="media_info.color" defaultMessage="Color" />
-          </SortableImageTableHead>
+          </SortableSceneTableHead>
+          <SortableSceneTableHead
+            column="videoCodec"
+            sort={sort}
+            onSort={(column) =>
+              setSort((current) => nextSceneSort(current, column))
+            }
+          >
+            <FormattedMessage
+              id="media_info.video_codec"
+              defaultMessage="Video Codec"
+            />
+          </SortableSceneTableHead>
+          <SortableSceneTableHead
+            column="audioCodec"
+            sort={sort}
+            onSort={(column) =>
+              setSort((current) => nextSceneSort(current, column))
+            }
+          >
+            <FormattedMessage
+              id="media_info.audio_codec"
+              defaultMessage="Audio Codec"
+            />
+          </SortableSceneTableHead>
+          <TableHead className="sticky top-0 z-10 w-24 bg-card" />
         </TableRow>
       </TableHeader>
       <TableBody>
         {loading ? (
-          <ImageTableSkeletonRows />
+          <SceneTableSkeletonRows />
         ) : (
           sortedGroups.map((group, groupIndex) =>
-            group.map((image, imageIndex) => {
-              const file = primaryFile(image);
-              const checked = checkedImages[image.id] ?? false;
-              const sortTint = tintByImageId?.get(image.id);
-              const groupDivider = imageIndex === 0 && groupIndex > 0;
+            group.map((scene, sceneIndex) => {
+              const file = primaryFile(scene);
+              const checked = checkedScenes[scene.id] ?? false;
+              const sortTint = tintBySceneId?.get(scene.id);
+              const groupDivider = sceneIndex === 0 && groupIndex > 0;
               return (
                 <TableRow
-                  key={image.id}
+                  key={scene.id}
                   className={cn(
                     groupDivider && "border-t-4",
                     groupDivider &&
@@ -1248,14 +1470,14 @@ function DuplicateTable({
                       <Checkbox
                         checked={checked}
                         onCheckedChange={(v) =>
-                          onCheckedChange(image.id, v === true)
+                          onCheckedChange(scene.id, v === true)
                         }
                         aria-label={intl.formatMessage(
                           {
                             id: "actions.select_entity",
                             defaultMessage: "Select {entityType}",
                           },
-                          { entityType: imageTitle(image) },
+                          { entityType: objectTitle(scene) },
                         )}
                       />
                     </div>
@@ -1265,20 +1487,20 @@ function DuplicateTable({
                       type="button"
                       variant="ghost"
                       className="h-auto p-0"
-                      onClick={() => onPreviewClick(group, imageIndex)}
+                      onClick={() => onPreviewClick(group, sceneIndex)}
                       aria-label={intl.formatMessage(
                         {
                           id: "actions.preview_entity",
                           defaultMessage: "Preview {entityType}",
                         },
-                        { entityType: imageTitle(image) },
+                        { entityType: objectTitle(scene) },
                       )}
                     >
                       <img
-                        src={image.paths.thumbnail ?? ""}
+                        src={scene.paths.screenshot ?? ""}
                         alt=""
                         className={cn(
-                          "h-24 w-24 rounded-md border object-contain",
+                          "h-16 w-28 rounded-md border object-cover",
                           checked &&
                             "border-destructive ring-2 ring-destructive",
                         )}
@@ -1287,8 +1509,8 @@ function DuplicateTable({
                   </TableCell>
                   <TableCell className="min-w-64 max-w-md whitespace-normal">
                     <Link
-                      to="/images/$imageId"
-                      params={{ imageId: image.id }}
+                      to="/scenes/$sceneId"
+                      params={{ sceneId: scene.id }}
                       target="_blank"
                       rel="noopener noreferrer"
                       className={cn(
@@ -1296,7 +1518,7 @@ function DuplicateTable({
                         checked && "text-destructive line-through decoration-2",
                       )}
                     >
-                      {imageTitle(image)}
+                      {objectTitle(scene)}
                     </Link>
                     <div className="mt-1 break-all font-mono text-xs text-muted-foreground">
                       {file?.path ?? ""}
@@ -1304,53 +1526,91 @@ function DuplicateTable({
                   </TableCell>
                   <TableCell className="whitespace-normal">
                     <div className="flex flex-wrap gap-1">
-                      {image.tags.length > 0 && (
+                      {scene.tags.length > 0 && (
                         <MetadataBadge
-                          items={image.tags.map((tag) => tag.name)}
+                          items={scene.tags.map((tag) => tag.name)}
                         >
                           <FormattedMessage
                             id="dupe_check.tags_count"
                             defaultMessage="{count, plural, one {# tag} other {# tags}}"
-                            values={{ count: image.tags.length }}
+                            values={{ count: scene.tags.length }}
                           />
                         </MetadataBadge>
                       )}
-                      {image.performers.length > 0 && (
+                      {scene.performers.length > 0 && (
                         <MetadataBadge
-                          items={image.performers.map(
-                            (performer) => performer.name,
+                          items={scene.performers.map((performer) =>
+                            performer.disambiguation
+                              ? `${performer.name} (${performer.disambiguation})`
+                              : performer.name,
                           )}
                         >
                           <FormattedMessage
                             id="dupe_check.performers_count"
                             defaultMessage="{count, plural, one {# performer} other {# performers}}"
-                            values={{ count: image.performers.length }}
+                            values={{ count: scene.performers.length }}
                           />
                         </MetadataBadge>
                       )}
-                      {image.galleries.length > 0 && (
+                      {scene.groups.length > 0 && (
                         <MetadataBadge
-                          items={image.galleries.map((gallery) =>
+                          items={scene.groups.map(
+                            (sceneGroup) => sceneGroup.group.name,
+                          )}
+                        >
+                          <FormattedMessage
+                            id="dupe_check.groups_count"
+                            defaultMessage="{count, plural, one {# group} other {# groups}}"
+                            values={{ count: scene.groups.length }}
+                          />
+                        </MetadataBadge>
+                      )}
+                      {scene.scene_markers.length > 0 && (
+                        <MetadataBadge
+                          items={scene.scene_markers.map(
+                            (marker) =>
+                              `${secondsToTimestamp(marker.seconds)} ${marker.title} (${marker.primary_tag.name})`,
+                          )}
+                        >
+                          <FormattedMessage
+                            id="dupe_check.markers_count"
+                            defaultMessage="{count, plural, one {# marker} other {# markers}}"
+                            values={{ count: scene.scene_markers.length }}
+                          />
+                        </MetadataBadge>
+                      )}
+                      {scene.galleries.length > 0 && (
+                        <MetadataBadge
+                          items={scene.galleries.map((gallery) =>
                             objectTitle(gallery),
                           )}
                         >
                           <FormattedMessage
                             id="dupe_check.galleries_count"
                             defaultMessage="{count, plural, one {# gallery} other {# galleries}}"
-                            values={{ count: image.galleries.length }}
+                            values={{ count: scene.galleries.length }}
                           />
                         </MetadataBadge>
                       )}
-                      {image.visual_files.length > 1 && (
+                      {(scene.o_counter ?? 0) > 0 && (
+                        <Badge variant="secondary">
+                          {intl.formatMessage({
+                            id: "o_count",
+                            defaultMessage: "O Count",
+                          })}
+                          : {scene.o_counter}
+                        </Badge>
+                      )}
+                      {scene.files.length > 1 && (
                         <Badge variant="outline">
                           <FormattedMessage
                             id="files_amount"
                             defaultMessage="{value} files"
-                            values={{ value: image.visual_files.length }}
+                            values={{ value: scene.files.length }}
                           />
                         </Badge>
                       )}
-                      {image.organized && (
+                      {scene.organized && (
                         <Badge variant="outline">
                           <FormattedMessage
                             id="organized"
@@ -1361,14 +1621,48 @@ function DuplicateTable({
                     </div>
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
+                    {file?.duration ? secondsToTimestamp(file.duration) : ""}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
                     {formatBytes(file?.size)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {file ? `${file.width ?? 0}x${file.height ?? 0}` : "N/A"}
                   </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    <FormattedNumber
+                      value={(file?.bit_rate ?? 0) / 1000000}
+                      maximumFractionDigits={2}
+                    />
+                    &nbsp;mbps
+                  </TableCell>
                   <TableCell>
                     <MediaColorBadge file={file} />
                   </TableCell>
+                  <TableCell>{file?.video_codec ?? ""}</TableCell>
+                  <TableCell>
+                    {file?.audio_codec ? (
+                      file.audio_codec
+                    ) : (
+                      <FormattedMessage id="none" defaultMessage="None" />
+                    )}
+                  </TableCell>
+                  {sceneIndex === 0 && (
+                    <TableCell rowSpan={group.length} className="align-middle">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onMergeGroup(group)}
+                      >
+                        <GitMerge />
+                        <FormattedMessage
+                          id="actions.merge"
+                          defaultMessage="Merge"
+                        />
+                      </Button>
+                    </TableCell>
+                  )}
                 </TableRow>
               );
             }),
@@ -1379,16 +1673,16 @@ function DuplicateTable({
   );
 }
 
-function ImageTableSkeletonRows() {
+function SceneTableSkeletonRows() {
   return Array.from({ length: TABLE_SKELETON_ROWS }, (_, index) => (
-    <TableRow key={`image-skeleton-${index}`}>
+    <TableRow key={`scene-skeleton-${index}`}>
       <TableCell className="w-14 !px-3">
         <div className="flex justify-center">
           <Skeleton className="size-4" />
         </div>
       </TableCell>
       <TableCell>
-        <Skeleton className="h-24 w-24 rounded-md" />
+        <Skeleton className="h-16 w-28 rounded-md" />
       </TableCell>
       <TableCell className="min-w-64 max-w-md">
         <div className="space-y-2">
@@ -1400,7 +1694,11 @@ function ImageTableSkeletonRows() {
         <div className="flex flex-wrap gap-1">
           <Skeleton className="h-5 w-16" />
           <Skeleton className="h-5 w-20" />
+          <Skeleton className="h-5 w-14" />
         </div>
+      </TableCell>
+      <TableCell>
+        <Skeleton className="ml-auto h-4 w-14" />
       </TableCell>
       <TableCell>
         <Skeleton className="ml-auto h-4 w-16" />
@@ -1409,13 +1707,25 @@ function ImageTableSkeletonRows() {
         <Skeleton className="ml-auto h-4 w-20" />
       </TableCell>
       <TableCell>
+        <Skeleton className="ml-auto h-4 w-16" />
+      </TableCell>
+      <TableCell>
         <Skeleton className="h-5 w-16" />
+      </TableCell>
+      <TableCell>
+        <Skeleton className="h-4 w-20" />
+      </TableCell>
+      <TableCell>
+        <Skeleton className="h-4 w-20" />
+      </TableCell>
+      <TableCell>
+        <Skeleton className="h-7 w-20" />
       </TableCell>
     </TableRow>
   ));
 }
 
-export const Route = createFileRoute("/image-duplicate-checker")({
+export const Route = createFileRoute("/scene-duplicate-checker")({
   validateSearch: zodValidator(searchSchema),
-  component: ImageDuplicateCheckerPage,
+  component: SceneDuplicateCheckerPage,
 });

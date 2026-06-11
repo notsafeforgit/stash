@@ -6,8 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"strconv"
-	"strings"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/stashapp/stash/pkg/models"
@@ -1271,7 +1269,7 @@ FROM (
 	FROM images_files
 	JOIN files ON images_files.file_id = files.id
 	JOIN files_fingerprints ON images_files.file_id = files_fingerprints.file_id
-	WHERE files_fingerprints.type = 'phash' 
+	WHERE files_fingerprints.type = 'phash'
 	  AND files_fingerprints.fingerprint != zeroblob(8)
 	  AND files_fingerprints.fingerprint != ''
 )
@@ -1280,75 +1278,280 @@ HAVING COUNT(DISTINCT image_id) > 1
 ORDER BY SUM(file_size) DESC;
 `
 
-func (qb *ImageStore) FindDuplicates(ctx context.Context, distance int) ([][]*models.Image, error) {
-	var dupeIds [][]int
-	if distance == 0 {
+const findImageDuplicatePhashesQuery = `
+SELECT images.id, files_fingerprints.fingerprint as phash
+FROM images
+JOIN images_files ON images.id = images_files.image_id
+JOIN files_fingerprints ON images_files.file_id = files_fingerprints.file_id
+WHERE files_fingerprints.type = 'phash'
+  AND files_fingerprints.fingerprint IS NOT NULL
+  AND files_fingerprints.fingerprint != zeroblob(8)
+  AND files_fingerprints.fingerprint != ''
+`
+
+func imageDuplicateFilterApplied(filter *models.ImageFilterType, filterAST *models.FilterAST) bool {
+	return filter != nil || filterAST != nil
+}
+
+func addImageFilterAST(ctx context.Context, query *queryBuilder, filterAST *models.FilterAST) error {
+	if filterAST == nil {
+		return nil
+	}
+
+	astFilter := filterBuilderFromHandler(ctx, &imageASTFilterHandler{ast: filterAST})
+	return query.addFilter(astFilter)
+}
+
+func (qb *ImageStore) makeImageDuplicateQuery(ctx context.Context, filter *models.ImageFilterType, filterAST *models.FilterAST) (*queryBuilder, error) {
+	query, err := qb.makeQuery(ctx, filter, nil)
+	if err != nil {
+		return nil, err
+	}
+	query.sortAndPagination = ""
+
+	if err := addImageFilterAST(ctx, query, filterAST); err != nil {
+		return nil, err
+	}
+
+	query.addJoins(
+		join{
+			table:    imagesFilesTable,
+			onClause: "images.id = images_files.image_id",
+		},
+		join{
+			table:    fileTable,
+			onClause: "images_files.file_id = files.id",
+		},
+		join{
+			table:    fingerprintTable,
+			onClause: "images_files.file_id = files_fingerprints.file_id AND files_fingerprints.type = 'phash'",
+		},
+	)
+
+	query.addWhere("files_fingerprints.fingerprint IS NOT NULL")
+	query.addWhere("files_fingerprints.fingerprint != zeroblob(8)")
+	query.addWhere("files_fingerprints.fingerprint != ''")
+
+	return query, nil
+}
+
+func (qb *ImageStore) makeImageFilterIDQuery(ctx context.Context, filter *models.ImageFilterType, filterAST *models.FilterAST) (*queryBuilder, error) {
+	query, err := qb.makeQuery(ctx, filter, nil)
+	if err != nil {
+		return nil, err
+	}
+	query.columns = []string{"DISTINCT images.id as image_id"}
+	query.sortAndPagination = ""
+
+	if err := addImageFilterAST(ctx, query, filterAST); err != nil {
+		return nil, err
+	}
+
+	return query, nil
+}
+
+func (qb *ImageStore) findImageFilterIDs(ctx context.Context, filter *models.ImageFilterType, filterAST *models.FilterAST) (map[int]struct{}, error) {
+	query, err := qb.makeImageFilterIDQuery(ctx, filter, filterAST)
+	if err != nil {
+		return nil, err
+	}
+
+	var ids []int
+	if err := dbWrapper.Select(ctx, &ids, query.toSQL(false), query.allArgs()...); err != nil {
+		return nil, err
+	}
+
+	ret := make(map[int]struct{}, len(ids))
+	for _, id := range ids {
+		ret[id] = struct{}{}
+	}
+	return ret, nil
+}
+
+func (qb *ImageStore) findExactImageDuplicatesAll(ctx context.Context, filter *models.ImageFilterType, filterAST *models.FilterAST) ([][]int, error) {
+	if !imageDuplicateFilterApplied(filter, filterAST) {
 		var ids []string
 		if err := dbWrapper.Select(ctx, &ids, findExactImageDuplicateQuery); err != nil {
 			return nil, err
 		}
 
-		for _, id := range ids {
-			strIds := strings.Split(id, ",")
-			var imageIds []int
-			for _, strId := range strIds {
-				if intId, err := strconv.Atoi(strId); err == nil {
-					imageIds = sliceutil.AppendUnique(imageIds, intId)
-				}
-			}
-			// filter out
-			if len(imageIds) > 1 {
-				dupeIds = append(dupeIds, imageIds)
-			}
-		}
-	} else {
-		query := `
-        SELECT images.id, files_fingerprints.fingerprint as phash
-        FROM images
-        JOIN images_files ON images.id = images_files.image_id
-        JOIN files_fingerprints ON images_files.file_id = files_fingerprints.file_id
-        WHERE files_fingerprints.type = 'phash'`
-
-		var hashes []*utils.Phash
-		if err := imageRepository.queryFunc(ctx, query, nil, false, func(rows *sqlx.Rows) error {
-			phash := utils.Phash{
-				Bucket:   -1,
-				Duration: -1,
-			}
-			if err := rows.StructScan(&phash); err != nil {
-				return err
-			}
-
-			hashes = append(hashes, &phash)
-			return nil
-		}); err != nil {
-			return nil, err
-		}
-
-		dupeIds = utils.FindDuplicates(hashes, distance, -1)
+		return parseDuplicateIDGroups(ids), nil
 	}
 
-	var allIds []int
-	for _, comp := range dupeIds {
-		allIds = append(allIds, comp...)
+	query, err := qb.makeImageDuplicateQuery(ctx, filter, filterAST)
+	if err != nil {
+		return nil, err
+	}
+	query.columns = []string{
+		"images.id as image_id",
+		"files.size as file_size",
+		"files_fingerprints.fingerprint as phash",
 	}
 
-	if len(allIds) == 0 {
-		return nil, nil
+	sqlStr := query.toSQL(false)
+	finalQuery := `
+SELECT GROUP_CONCAT(DISTINCT image_id) as ids
+FROM (` + sqlStr + `)
+GROUP BY phash
+HAVING COUNT(DISTINCT image_id) > 1
+ORDER BY SUM(file_size) DESC;
+`
+
+	var ids []string
+	if err := dbWrapper.Select(ctx, &ids, finalQuery, query.allArgs()...); err != nil {
+		return nil, err
 	}
 
-	allImages, err := qb.FindMany(ctx, allIds)
+	return parseDuplicateIDGroups(ids), nil
+}
+
+func (qb *ImageStore) findExactImageDuplicatesAny(ctx context.Context, filter *models.ImageFilterType, filterAST *models.FilterAST) ([][]int, error) {
+	duplicateQuery, err := qb.makeImageDuplicateQuery(ctx, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	duplicateQuery.columns = []string{
+		"images.id as image_id",
+		"files.size as file_size",
+		"files_fingerprints.fingerprint as phash",
+	}
+
+	filterQuery, err := qb.makeImageFilterIDQuery(ctx, filter, filterAST)
 	if err != nil {
 		return nil, err
 	}
 
+	finalQuery := `
+WITH duplicate_candidates AS (
+` + duplicateQuery.toSQL(false) + `
+),
+filtered_matches AS (
+` + filterQuery.toSQL(false) + `
+)
+SELECT GROUP_CONCAT(DISTINCT duplicate_candidates.image_id) as ids
+FROM duplicate_candidates
+LEFT JOIN filtered_matches ON filtered_matches.image_id = duplicate_candidates.image_id
+GROUP BY phash
+HAVING COUNT(DISTINCT duplicate_candidates.image_id) > 1
+	AND COUNT(DISTINCT filtered_matches.image_id) > 0
+ORDER BY SUM(file_size) DESC;
+`
+
+	var ids []string
+	if err := dbWrapper.Select(ctx, &ids, finalQuery, filterQuery.allArgs()...); err != nil {
+		return nil, err
+	}
+
+	return parseDuplicateIDGroups(ids), nil
+}
+
+func (qb *ImageStore) findImageDuplicatePhashes(ctx context.Context, filter *models.ImageFilterType, filterAST *models.FilterAST) ([]*utils.Phash, error) {
+	var hashes []*utils.Phash
+
+	if imageDuplicateFilterApplied(filter, filterAST) {
+		query, err := qb.makeImageDuplicateQuery(ctx, filter, filterAST)
+		if err != nil {
+			return nil, err
+		}
+		query.columns = []string{
+			"images.id as id",
+			"files_fingerprints.fingerprint as phash",
+		}
+		query.sortAndPagination = " ORDER BY files.size DESC"
+
+		if err := qb.readImageDuplicatePhashes(ctx, query.toSQL(true), query.allArgs(), &hashes); err != nil {
+			return nil, err
+		}
+	} else if err := qb.readImageDuplicatePhashes(ctx, findImageDuplicatePhashesQuery, nil, &hashes); err != nil {
+		return nil, err
+	}
+
+	return hashes, nil
+}
+
+func (qb *ImageStore) readImageDuplicatePhashes(ctx context.Context, query string, args []interface{}, hashes *[]*utils.Phash) error {
+	return imageRepository.queryFunc(ctx, query, args, false, func(rows *sqlx.Rows) error {
+		phash := utils.Phash{
+			Bucket:   -1,
+			Duration: -1,
+		}
+		if err := rows.StructScan(&phash); err != nil {
+			return err
+		}
+
+		*hashes = append(*hashes, &phash)
+		return nil
+	})
+}
+
+func (qb *ImageStore) FindDuplicates(ctx context.Context, distance int, filter *models.ImageFilterType, filterAST *models.FilterAST, filterMode models.DuplicateFilterMode) ([][]*models.Image, error) {
+	ret, _, err := qb.FindDuplicateGroups(ctx, distance, filter, filterAST, filterMode, duplicateFindFilterAll())
+	return ret, err
+}
+
+func (qb *ImageStore) FindDuplicateGroups(ctx context.Context, distance int, filter *models.ImageFilterType, filterAST *models.FilterAST, filterMode models.DuplicateFilterMode, findFilter *models.FindFilterType) ([][]*models.Image, int, error) {
+	if !filterMode.IsValid() {
+		filterMode = models.DuplicateFilterModeAll
+	}
+	hasFilter := imageDuplicateFilterApplied(filter, filterAST)
+	if !hasFilter {
+		filterMode = models.DuplicateFilterModeAll
+	}
+
+	var dupeIds [][]int
+	var err error
+
+	if distance == 0 {
+		if filterMode == models.DuplicateFilterModeAny {
+			dupeIds, err = qb.findExactImageDuplicatesAny(ctx, filter, filterAST)
+		} else {
+			dupeIds, err = qb.findExactImageDuplicatesAll(ctx, filter, filterAST)
+		}
+		if err != nil {
+			return nil, 0, err
+		}
+	} else {
+		dupeFilter := filter
+		dupeFilterAST := filterAST
+		if filterMode == models.DuplicateFilterModeAny {
+			dupeFilter = nil
+			dupeFilterAST = nil
+		}
+
+		hashes, err := qb.findImageDuplicatePhashes(ctx, dupeFilter, dupeFilterAST)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		if filterMode == models.DuplicateFilterModeAny {
+			matchingIDs, err := qb.findImageFilterIDs(ctx, filter, filterAST)
+			if err != nil {
+				return nil, 0, err
+			}
+			dupeIds = utils.FindDuplicatesContaining(hashes, matchingIDs, distance, -1)
+		} else {
+			dupeIds = utils.FindDuplicates(hashes, distance, -1)
+		}
+	}
+
+	pagedDupeIds, count := paginateDuplicateIDGroups(dupeIds, findFilter)
+	allIds := duplicateIDs(pagedDupeIds)
+	if len(allIds) == 0 {
+		return nil, count, nil
+	}
+
+	allImages, err := qb.FindMany(ctx, allIds)
+	if err != nil {
+		return nil, 0, err
+	}
+
 	var result [][]*models.Image
 	offset := 0
-	for _, comp := range dupeIds {
+	for _, comp := range pagedDupeIds {
 		group := allImages[offset : offset+len(comp)]
 		result = append(result, group)
 		offset += len(comp)
 	}
 
-	return result, nil
+	return result, count, nil
 }

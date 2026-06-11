@@ -49,9 +49,43 @@ query FindScenesByPathRegex($filter: FindFilterType) {
   }
 }
 
-query FindDuplicateScenes($distance: Int, $duration_diff: Float) {
-  findDuplicateScenes(distance: $distance, duration_diff: $duration_diff) {
-    ...SlimSceneData
+query FindDuplicateScenes(
+  $distance: Int
+  $duration_diff: Float
+  $filter: FindFilterType
+) {
+  findDuplicateSceneGroups(
+    distance: $distance
+    duration_diff: $duration_diff
+    filter: $filter
+  ) {
+    count
+    groups {
+      ...SlimSceneData
+    }
+  }
+}
+
+query FindDuplicateScenesFiltered(
+  $distance: Int
+  $duration_diff: Float
+  $filter: FindFilterType
+  $scene_filter: SceneFilterType
+  $scene_filter_ast: FilterASTInput
+  $filter_mode: DuplicateFilterMode!
+) {
+  findDuplicateSceneGroups(
+    distance: $distance
+    duration_diff: $duration_diff
+    filter: $filter
+    scene_filter: $scene_filter
+    scene_filter_ast: $scene_filter_ast
+    filter_mode: $filter_mode
+  ) {
+    count
+    groups {
+      ...SlimSceneData
+    }
   }
 }
 

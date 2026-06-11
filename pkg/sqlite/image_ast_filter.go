@@ -128,6 +128,12 @@ func imageASTConditionHandler(condition *models.FilterASTCondition) (criterionHa
 			return nil, err
 		}
 		return resolutionCriterionHandler(&input, "image_files.height", "image_files.width", imageRepository.addImageFilesTable), nil
+	case "bit_depth":
+		input, err := decodeASTValue[models.IntCriterionInput](condition.Value)
+		if err != nil {
+			return nil, err
+		}
+		return intCriterionHandler(&input, "image_files.bit_depth", imageRepository.addImageFilesTable), nil
 	case "orientation":
 		input, err := decodeASTValue[models.OrientationCriterionInput](condition.Value)
 		if err != nil {

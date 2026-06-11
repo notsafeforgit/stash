@@ -137,6 +137,8 @@ models:
     model: github.com/stashapp/stash/pkg/scraper.Source
   SavedFindFilterType:
     model: github.com/stashapp/stash/pkg/models.FindFilterType
+  DuplicateFilterMode:
+    model: github.com/stashapp/stash/pkg/models.DuplicateFilterMode
   FilterASTInput:
     model: github.com/stashapp/stash/pkg/models.FilterAST
   FilterASTNodeInput:

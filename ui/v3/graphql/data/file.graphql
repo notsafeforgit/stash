@@ -14,6 +14,11 @@ fragment VideoFileData on VideoFile {
   audio_codec
   width
   height
+  bit_depth
+  color_range
+  color_space
+  color_transfer
+  color_primaries
   frame_rate
   bit_rate
   fingerprints {
@@ -29,6 +34,11 @@ fragment ImageFileData on ImageFile {
   mod_time
   width
   height
+  bit_depth
+  color_range
+  color_space
+  color_transfer
+  color_primaries
   fingerprints {
     type
     value
@@ -64,6 +74,11 @@ fragment VisualFileData on VisualFile {
     mod_time
     width
     height
+    bit_depth
+    color_range
+    color_space
+    color_transfer
+    color_primaries
     fingerprints {
       type
       value
@@ -79,6 +94,11 @@ fragment VisualFileData on VisualFile {
     audio_codec
     width
     height
+    bit_depth
+    color_range
+    color_space
+    color_transfer
+    color_primaries
     frame_rate
     bit_rate
     fingerprints {

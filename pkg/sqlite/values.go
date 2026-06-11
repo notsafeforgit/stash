@@ -24,6 +24,23 @@ func nullIntPtr(i null.Int) *int {
 	return &v
 }
 
+func stringFromPtr(s *string) null.String {
+	if s == nil {
+		return null.NewString("", false)
+	}
+
+	return null.StringFrom(*s)
+}
+
+func nullStringPtr(s null.String) *string {
+	if !s.Valid {
+		return nil
+	}
+
+	v := s.String
+	return &v
+}
+
 func nullFloatPtr(i null.Float) *float64 {
 	if !i.Valid {
 		return nil

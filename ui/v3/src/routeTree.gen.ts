@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as TestRouteImport } from './routes/test'
 import { Route as StatsRouteImport } from './routes/stats'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SceneDuplicateCheckerRouteImport } from './routes/scene-duplicate-checker'
 import { Route as ImageDuplicateCheckerRouteImport } from './routes/image-duplicate-checker'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TagsIndexRouteImport } from './routes/tags/index'
@@ -56,6 +57,11 @@ const StatsRoute = StatsRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SceneDuplicateCheckerRoute = SceneDuplicateCheckerRouteImport.update({
+  id: '/scene-duplicate-checker',
+  path: '/scene-duplicate-checker',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ImageDuplicateCheckerRoute = ImageDuplicateCheckerRouteImport.update({
@@ -213,6 +219,7 @@ const GalleriesGalleryIdRoute = GalleriesGalleryIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/image-duplicate-checker': typeof ImageDuplicateCheckerRoute
+  '/scene-duplicate-checker': typeof SceneDuplicateCheckerRoute
   '/settings': typeof SettingsRouteWithChildren
   '/stats': typeof StatsRoute
   '/test': typeof TestRoute
@@ -248,6 +255,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/image-duplicate-checker': typeof ImageDuplicateCheckerRoute
+  '/scene-duplicate-checker': typeof SceneDuplicateCheckerRoute
   '/stats': typeof StatsRoute
   '/test': typeof TestRoute
   '/galleries/$galleryId': typeof GalleriesGalleryIdRoute
@@ -283,6 +291,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/image-duplicate-checker': typeof ImageDuplicateCheckerRoute
+  '/scene-duplicate-checker': typeof SceneDuplicateCheckerRoute
   '/settings': typeof SettingsRouteWithChildren
   '/stats': typeof StatsRoute
   '/test': typeof TestRoute
@@ -320,6 +329,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/image-duplicate-checker'
+    | '/scene-duplicate-checker'
     | '/settings'
     | '/stats'
     | '/test'
@@ -355,6 +365,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/image-duplicate-checker'
+    | '/scene-duplicate-checker'
     | '/stats'
     | '/test'
     | '/galleries/$galleryId'
@@ -389,6 +400,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/image-duplicate-checker'
+    | '/scene-duplicate-checker'
     | '/settings'
     | '/stats'
     | '/test'
@@ -425,6 +437,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ImageDuplicateCheckerRoute: typeof ImageDuplicateCheckerRoute
+  SceneDuplicateCheckerRoute: typeof SceneDuplicateCheckerRoute
   SettingsRoute: typeof SettingsRouteWithChildren
   StatsRoute: typeof StatsRoute
   TestRoute: typeof TestRoute
@@ -468,6 +481,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/scene-duplicate-checker': {
+      id: '/scene-duplicate-checker'
+      path: '/scene-duplicate-checker'
+      fullPath: '/scene-duplicate-checker'
+      preLoaderRoute: typeof SceneDuplicateCheckerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/image-duplicate-checker': {
@@ -718,6 +738,7 @@ const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ImageDuplicateCheckerRoute: ImageDuplicateCheckerRoute,
+  SceneDuplicateCheckerRoute: SceneDuplicateCheckerRoute,
   SettingsRoute: SettingsRouteWithChildren,
   StatsRoute: StatsRoute,
   TestRoute: TestRoute,

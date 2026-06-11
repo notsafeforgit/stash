@@ -83,17 +83,81 @@ func ParseDownloadMode(s string) DownloadMode {
 	return DownloadModeAuto
 }
 
-// isHDRTransfer reports whether the given color_transfer value
+type videoColorMetadata struct {
+	Range     string
+	Space     string
+	Transfer  string
+	Primaries string
+}
+
+const (
+	colorTransferPQ  = "smpte2084"
+	colorTransferHLG = "arib-std-b67"
+)
+
+func normalizeColorTag(value string) string {
+	value = strings.TrimSpace(strings.ToLower(value))
+	switch value {
+	case "", "unknown", "unspecified", "n/a":
+		return ""
+	default:
+		return value
+	}
+}
+
+// isHDRTransfer reports whether ffprobe's color_transfer value
 // indicates an HDR encoding. PQ (smpte2084) is the transfer used by
 // HDR10, HDR10+, and Dolby Vision; HLG (arib-std-b67) is the
 // broadcast HDR transfer also used in some streaming. Anything else
-// (bt709, bt470bg, smpte170m, …) is SDR.
+// (bt709, bt470bg, smpte170m, ...) is SDR.
 func isHDRTransfer(transfer string) bool {
-	switch transfer {
-	case "smpte2084", "arib-std-b67":
+	switch normalizeColorTag(transfer) {
+	case colorTransferPQ, colorTransferHLG:
 		return true
 	}
 	return false
+}
+
+func (m videoColorMetadata) isHDR() bool {
+	return isHDRTransfer(m.Transfer)
+}
+
+func (m videoColorMetadata) isPQ() bool {
+	return normalizeColorTag(m.Transfer) == colorTransferPQ
+}
+
+func colorMetadataFromProbe(probe *VideoFile) videoColorMetadata {
+	if probe == nil {
+		return videoColorMetadata{}
+	}
+
+	return videoColorMetadata{
+		Range:     normalizeColorTag(probe.ColorRange),
+		Space:     normalizeColorTag(probe.ColorSpace),
+		Transfer:  normalizeColorTag(probe.ColorTransfer),
+		Primaries: normalizeColorTag(probe.ColorPrimaries),
+	}
+}
+
+func colorMetadataFromModel(vf *models.VideoFile) videoColorMetadata {
+	if vf == nil {
+		return videoColorMetadata{}
+	}
+
+	ret := videoColorMetadata{}
+	if vf.ColorRange != nil {
+		ret.Range = normalizeColorTag(*vf.ColorRange)
+	}
+	if vf.ColorSpace != nil {
+		ret.Space = normalizeColorTag(*vf.ColorSpace)
+	}
+	if vf.ColorTransfer != nil {
+		ret.Transfer = normalizeColorTag(*vf.ColorTransfer)
+	}
+	if vf.ColorPrimaries != nil {
+		ret.Primaries = normalizeColorTag(*vf.ColorPrimaries)
+	}
+	return ret
 }
 
 type DownloadOptions struct {
@@ -212,14 +276,15 @@ func (sm *StreamManager) ServeDownload(w http.ResponseWriter, r *http.Request, o
 	}
 	videoOnly := audioCodec == MissingUnsupported
 
-	// HEVC and AV1 modes probe the source for HDR so the encoder can
-	// pick the 10-bit profile + colour-tag block; everything else only
-	// needs the database codec strings. Probing is cheap (single
-	// ffprobe call) but we skip it when not needed.
-	var srcIsHDR bool
+	// HEVC and AV1 modes probe the source for color tags so the
+	// encoder can pick the 10-bit profile and preserve PQ vs HLG
+	// instead of treating every HDR source as HDR10/PQ. Existing DB
+	// metadata is a fallback for older failures; the live ffprobe read
+	// wins when available.
+	srcColor := colorMetadataFromModel(vf)
 	if options.Mode == DownloadModeHEVC || options.Mode == DownloadModeAV1 {
 		if probe, err := sm.ffprobe.NewVideoFile(vf.Path); err == nil && probe.VideoStream != nil {
-			srcIsHDR = isHDRTransfer(probe.VideoStream.ColorTransfer)
+			srcColor = colorMetadataFromProbe(probe)
 		}
 	}
 
@@ -330,7 +395,7 @@ func (sm *StreamManager) ServeDownload(w http.ResponseWriter, r *http.Request, o
 	lockCtx := sm.lockManager.ReadLock(r.Context(), vf.Path)
 	defer lockCtx.Cancel()
 
-	args := sm.downloadArgs(vf, encoding, options.Resolution, videoOnly, srcIsHDR)
+	args := sm.downloadArgs(vf, encoding, options.Resolution, videoOnly, srcColor)
 	cmd := sm.encoder.Command(lockCtx, args)
 
 	stdout, err := cmd.StdoutPipe()
@@ -386,7 +451,7 @@ func (sm *StreamManager) ServeDownload(w http.ResponseWriter, r *http.Request, o
 // pre-input → input → post-input ordering in
 // `runningStream.makeStreamArgs` so the HW-accel device init lands
 // before `-i`.
-func (sm *StreamManager) downloadArgs(vf *models.VideoFile, enc encDownload, resolution models.StreamingResolutionEnum, videoOnly bool, srcIsHDR bool) Args {
+func (sm *StreamManager) downloadArgs(vf *models.VideoFile, enc encDownload, resolution models.StreamingResolutionEnum, videoOnly bool, srcColor videoColorMetadata) Args {
 	extraInputArgs := sm.config.GetLiveTranscodeInputArgs()
 	extraOutputArgs := sm.config.GetLiveTranscodeOutputArgs()
 
@@ -411,7 +476,7 @@ func (sm *StreamManager) downloadArgs(vf *models.VideoFile, enc encDownload, res
 		// VAAPI HEVC on modern Intel iGPUs (Tiger Lake+) and AMD VCN
 		// (Vega+) preserves HDR10 metadata correctly: input p010 +
 		// `-profile:v main10` keeps 10-bit through the pipeline, and
-		// `-color_*` flags below write the BT.2020 + PQ tags into the
+		// `-color_*` flags below write the source color tags into the
 		// VUI so the output container's `mdcv`/`clli` boxes carry the
 		// HDR side data.
 		codec = VideoCodecLibX265
@@ -489,7 +554,7 @@ func (sm *StreamManager) downloadArgs(vf *models.VideoFile, enc encDownload, res
 		}
 	case encDownloadHEVC:
 		if codec == VideoCodecLibX265 {
-			args = append(args, hevcDownloadEncoderArgs(srcIsHDR)...)
+			args = append(args, hevcDownloadEncoderArgs(srcColor)...)
 			if maxResolution > 0 && vf.Height > maxResolution {
 				args = args.VideoFilter(VideoFilter("").ScaleHeight(maxResolution))
 			}
@@ -499,8 +564,8 @@ func (sm *StreamManager) downloadArgs(vf *models.VideoFile, enc encDownload, res
 			// upload format is bit-depth-dependent: HDR sources need
 			// p010 surfaces + main10 profile, SDR sources stay on
 			// nv12 + main. hwMaxResFilter hardcodes nv12.
-			args = append(args, hevcHWEncoderArgs(codec, srcIsHDR)...)
-			args = args.VideoFilter(hevcHWVideoFilter(codec, vf, maxResolution, fullhw, srcIsHDR))
+			args = append(args, hevcHWEncoderArgs(codec, srcColor)...)
+			args = args.VideoFilter(hevcHWVideoFilter(codec, vf, maxResolution, fullhw, srcColor))
 		}
 		if videoOnly {
 			args = append(args, "-an")
@@ -509,10 +574,10 @@ func (sm *StreamManager) downloadArgs(vf *models.VideoFile, enc encDownload, res
 		}
 	case encDownloadAV1:
 		// HW AV1 (VAAPI / QSV / NVENC). Bit-depth-dependent like HEVC:
-		// HDR sources upload p010, SDR upload nv12. Same -color_*
-		// block as HEVC writes the BT.2020 + PQ tags into the VUI.
-		args = append(args, av1HWEncoderArgs(codec, srcIsHDR)...)
-		args = args.VideoFilter(av1HWVideoFilter(codec, vf, maxResolution, fullhw, srcIsHDR))
+		// HDR sources upload p010, SDR upload nv12. Same source color
+		// tag block as HEVC writes PQ/HLG correctly into the VUI.
+		args = append(args, av1HWEncoderArgs(codec, srcColor)...)
+		args = args.VideoFilter(av1HWVideoFilter(codec, vf, maxResolution, fullhw, srcColor))
 		if videoOnly {
 			args = append(args, "-an")
 		} else {
@@ -542,21 +607,24 @@ func (sm *StreamManager) downloadArgs(vf *models.VideoFile, enc encDownload, res
 // alongside the bitstream. We add explicit `-color_*` flags so the
 // VUI and MP4 container also carry the colour tags. `-tag:v hvc1`
 // is required for QuickTime / iOS recognition.
-func hevcDownloadEncoderArgs(srcIsHDR bool) Args {
+func hevcDownloadEncoderArgs(srcColor videoColorMetadata) Args {
 	args := Args{
 		"-c:v", "libx265",
 		"-preset", "medium",
 		"-crf", "23",
 		"-tag:v", "hvc1",
 	}
-	if srcIsHDR {
+	if srcColor.isHDR() {
 		args = append(args, "-pix_fmt", "yuv420p10le")
-		args = append(args, hevcHDRColorFlags()...)
+		args = append(args, hdrColorFlags(srcColor)...)
 		// repeat-headers: write VPS/SPS/PPS at every keyframe so
 		// each fragment of the fMP4 is independently decodable.
-		// hdr10-opt: enables x265's HDR10-specific rate control and
-		// signals proper VUI parameters.
-		args = append(args, "-x265-params", "repeat-headers=1:hdr10-opt=1")
+		// hdr10-opt is PQ/HDR10-specific; don't apply it to HLG.
+		x265Params := "repeat-headers=1"
+		if srcColor.isPQ() {
+			x265Params += ":hdr10-opt=1"
+		}
+		args = append(args, "-x265-params", x265Params)
 	} else {
 		args = append(args,
 			"-pix_fmt", "yuv420p",
@@ -579,20 +647,20 @@ func hevcDownloadEncoderArgs(srcIsHDR bool) Args {
 // HDR routing on VAAPI: `-profile:v main10` selects the 10-bit HEVC
 // profile, the input p010 surfaces (set up via the filter chain)
 // feed it 10-bit data, and the explicit `-color_*` flags below
-// write the BT.2020 + PQ tags into the bitstream VUI. The driver
+// write the source color tags into the bitstream VUI. The driver
 // passes the `mdcv`/`clli` side data through to the output bitstream
 // when present, so the MP4 muxer can write the matching container
 // boxes.
-func hevcHWEncoderArgs(codec VideoCodec, srcIsHDR bool) Args {
+func hevcHWEncoderArgs(codec VideoCodec, srcColor videoColorMetadata) Args {
 	args := codec.Args()
 	args = append(args,
 		"-rc_mode", "CQP",
 		"-qp", "23",
 		"-tag:v", "hvc1",
 	)
-	if srcIsHDR {
+	if srcColor.isHDR() {
 		args = append(args, "-profile:v", "main10")
-		args = append(args, hevcHDRColorFlags()...)
+		args = append(args, hdrColorFlags(srcColor)...)
 	} else {
 		args = append(args, "-profile:v", "main")
 	}
@@ -610,13 +678,13 @@ func hevcHWEncoderArgs(codec VideoCodec, srcIsHDR bool) Args {
 //     CPU pixels (libswscale is HDR-colorspace-aware), then `format`
 //     converts to the GPU upload layout, then `hwupload` moves the
 //     frame to a VAAPI surface for the encoder.
-func hevcHWVideoFilter(codec VideoCodec, vf *models.VideoFile, reqHeight int, fullhw bool, srcIsHDR bool) VideoFilter {
+func hevcHWVideoFilter(codec VideoCodec, vf *models.VideoFile, reqHeight int, fullhw bool, srcColor videoColorMetadata) VideoFilter {
 	if codec != VideoCodecV265 {
 		return ""
 	}
 
 	gpuFmt := "nv12"
-	if srcIsHDR {
+	if srcColor.isHDR() {
 		gpuFmt = "p010"
 	}
 	scale := reqHeight > 0 && vf.Height > reqHeight
@@ -642,15 +710,34 @@ func hevcHWVideoFilter(codec VideoCodec, vf *models.VideoFile, reqHeight int, fu
 	return f
 }
 
-// hevcHDRColorFlags is the BT.2020 + PQ color-tag block written into
-// both the bitstream VUI and the MP4 container. Shared by the libx265
-// and HW HEVC paths.
-func hevcHDRColorFlags() Args {
-	return Args{
-		"-color_primaries", "bt2020",
-		"-color_trc", "smpte2084",
-		"-colorspace", "bt2020nc",
+// hdrColorFlags writes source ffprobe color tags into both the
+// bitstream VUI and the MP4 container. HDR defaults are only used
+// when ffprobe omits an individual tag.
+func hdrColorFlags(srcColor videoColorMetadata) Args {
+	primaries := srcColor.Primaries
+	if primaries == "" {
+		primaries = "bt2020"
 	}
+
+	transfer := srcColor.Transfer
+	if transfer == "" {
+		transfer = colorTransferPQ
+	}
+
+	space := srcColor.Space
+	if space == "" {
+		space = "bt2020nc"
+	}
+
+	args := Args{
+		"-color_primaries", primaries,
+		"-color_trc", transfer,
+		"-colorspace", space,
+	}
+	if srcColor.Range != "" {
+		args = append(args, "-color_range", srcColor.Range)
+	}
+	return args
 }
 
 // av1HWEncoderArgs returns the HW AV1 encoder argument block. Per-
@@ -669,10 +756,10 @@ func hevcHDRColorFlags() Args {
 //
 // HDR routing: 10-bit `p010` surfaces flow in (set up via the filter
 // chain), the encoder's `main` profile carries 10-bit, and the
-// explicit `-color_*` block writes the BT.2020 + PQ tags. AV1's
-// HDR10 metadata travels in OBU metadata + ITU-T T.35 SEI; vendor
+// explicit `-color_*` block writes the source color tags. AV1's
+// HDR metadata travels in OBU metadata + ITU-T T.35 SEI; vendor
 // drivers pass this through when source side data is present.
-func av1HWEncoderArgs(codec VideoCodec, srcIsHDR bool) Args {
+func av1HWEncoderArgs(codec VideoCodec, srcColor videoColorMetadata) Args {
 	args := codec.Args()
 	switch codec {
 	case VideoCodecVAV1:
@@ -682,8 +769,8 @@ func av1HWEncoderArgs(codec VideoCodec, srcIsHDR bool) Args {
 	case VideoCodecNAV1:
 		args = append(args, "-rc", "vbr", "-cq", "28", "-preset", "p4")
 	}
-	if srcIsHDR {
-		args = append(args, hevcHDRColorFlags()...)
+	if srcColor.isHDR() {
+		args = append(args, hdrColorFlags(srcColor)...)
 	}
 	return args
 }
@@ -699,9 +786,9 @@ func av1HWEncoderArgs(codec VideoCodec, srcIsHDR bool) Args {
 //   - QSV: scale_qsv (HW)
 //   - NVENC: scale_cuda (HW); software-scale path for non-fullhw uses
 //     the standard scale + format + hwupload_cuda chain.
-func av1HWVideoFilter(codec VideoCodec, vf *models.VideoFile, reqHeight int, fullhw bool, srcIsHDR bool) VideoFilter {
+func av1HWVideoFilter(codec VideoCodec, vf *models.VideoFile, reqHeight int, fullhw bool, srcColor videoColorMetadata) VideoFilter {
 	gpuFmt := "nv12"
-	if srcIsHDR {
+	if srcColor.isHDR() {
 		gpuFmt = "p010"
 	}
 	scale := reqHeight > 0 && vf.Height > reqHeight

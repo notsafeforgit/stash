@@ -2,6 +2,7 @@ import {
   createMandatoryNumberCriterionOption,
   createMandatoryStringCriterionOption,
   createStringCriterionOption,
+  createNumberCriterionOption,
   createMandatoryTimestampCriterionOption,
   createDateCriterionOption,
 } from "./criteria/criterion";
@@ -72,6 +73,7 @@ const criterionOptions = [
   }),
   ResolutionCriterionOption,
   OrientationCriterionOption,
+  createNumberCriterionOption("bit_depth", "media_info.bit_depth"),
   ImageIsMissingCriterionOption,
   TagsCriterionOption,
   RatingCriterionOption,

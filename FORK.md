@@ -50,8 +50,10 @@ LLM agents performing a sync.
      **silently drops fork-added columns**. On every sync, grep the new
      upstream migrations for tables the fork has extended.
      Fork-extended tables so far: `performer_aliases` (`ignore_auto_tag`
-     column, fork migration 1) and `saved_filters` (`filter_ast` column, fork
-     migration 2).
+     column, fork migration 1), `saved_filters` (`filter_ast` column, fork
+     migration 2), and `video_files`/`image_files` (`bit_depth`,
+     `color_range`, `color_space`, `color_transfer`, `color_primaries`, fork
+     migration 3).
 4. **Expected conflict zones:** `pkg/ffmpeg` (fork's HLS/segmented-streaming
    rework overlaps upstream transcode work) and occasionally
    `internal/api/resolver_*.go`. Resolve in favour of keeping fork behaviour;
@@ -74,4 +76,5 @@ LLM agents performing a sync.
 | `pkg/sqlite/fork_migrate.go` + `pkg/sqlite/migrations/fork_*.go` | fork migration track | table-rebuild hazards |
 | `saved_filters.filter_ast` column | canonical saved-filter criteria | table-rebuild hazard |
 | `performer_aliases.ignore_auto_tag` column | alias-level auto-tag opt-out | table-rebuild hazard |
+| `video_files` / `image_files` color metadata columns | ffprobe bit depth and colour tags for HDR/depth display and filters | table-rebuild hazard |
 | `pkg/ffmpeg` HLS changes | segmented streaming, PTS normalization | **high** |

@@ -1968,6 +1968,41 @@ func TestImageIllegalQuery(t *testing.T) {
 	})
 }
 
+func TestImageQueryASTBitDepth(t *testing.T) {
+	runWithRollbackTxn(t, "image AST bit depth", func(t *testing.T, ctx context.Context) {
+		const imageIdx = imageIdx1WithGallery
+		bitDepth := 12
+
+		file := makeImageFileWithID(imageIdx)
+		file.BitDepth = &bitDepth
+		require.NoError(t, db.File.Update(ctx, file))
+
+		ast := &models.FilterAST{
+			Root: &models.FilterASTNode{
+				Condition: &models.FilterASTCondition{
+					Field: "bit_depth",
+					Value: models.IntCriterionInput{
+						Value:    bitDepth,
+						Modifier: models.CriterionModifierEquals,
+					},
+				},
+			},
+		}
+
+		result, total, err := db.Image.QueryAST(ctx, ast, nil)
+		require.NoError(t, err)
+		require.Equal(t, len(result), total)
+
+		ids := make([]int, 0, len(result))
+		for _, image := range result {
+			ids = append(ids, image.ID)
+		}
+
+		assert.Contains(t, ids, imageIDs[imageIdx])
+		assert.NotContains(t, ids, imageIDs[imageIdx2WithGallery])
+	})
+}
+
 func TestImageQueryRating100(t *testing.T) {
 	const rating = 60
 	ratingCriterion := models.IntCriterionInput{
@@ -3693,6 +3728,297 @@ func TestImageQueryCustomFields(t *testing.T) {
 			}
 		})
 	}
+}
+
+func createDupeImage(ctx context.Context, name string, phash int64) (*models.Image, error) {
+	qb := db.Image
+
+	imageFile := &models.ImageFile{
+		BaseFile: &models.BaseFile{
+			Basename:       name,
+			ParentFolderID: folderIDs[folderIdxWithImageFiles],
+			Size:           100,
+			Fingerprints: models.Fingerprints{
+				{Type: models.FingerprintTypeMD5, Fingerprint: name + "_md5"},
+				{Type: models.FingerprintTypePhash, Fingerprint: phash},
+			},
+		},
+		Width:  1920,
+		Height: 1080,
+	}
+
+	if err := db.File.Create(ctx, imageFile); err != nil {
+		return nil, err
+	}
+
+	image := &models.Image{
+		Title: name,
+	}
+
+	if err := qb.Create(ctx, &models.CreateImageInput{
+		Image:   image,
+		FileIDs: []models.FileID{imageFile.ID},
+	}); err != nil {
+		return nil, err
+	}
+
+	return image, nil
+}
+
+func TestImageStore_FindDuplicates(t *testing.T) {
+	qb := db.Image
+
+	const (
+		phashA  int64 = 0x0111111111111111
+		phashB  int64 = 0x0222222222222222
+		phashC  int64 = 0x0444444444444444
+		phashD  int64 = 0x0888888888888888
+		phashD2 int64 = 0x0888888888888889 // 1 bit away from phashD
+	)
+
+	withRollbackTxn(func(ctx context.Context) error {
+		// Pair A and pair B are exact duplicates; image C has no duplicate;
+		// pair D differs by a single phash bit (hamming distance 1)
+		for _, c := range []struct {
+			name  string
+			phash int64
+		}{
+			{"DupeTest_A1", phashA},
+			{"DupeTest_A2", phashA},
+			{"DupeTest_B1", phashB},
+			{"DupeTest_B2", phashB},
+			{"DupeTest_C1", phashC},
+			{"DupeTest_D1", phashD},
+			{"DupeTest_D2", phashD2},
+		} {
+			if _, err := createDupeImage(ctx, c.name, c.phash); err != nil {
+				t.Errorf("failed to create image %s: %v", c.name, err)
+				return nil
+			}
+		}
+
+		// exact match: pre-populated images have no phashes, so only pairs A and B match
+		got, err := qb.FindDuplicates(ctx, 0, nil, nil, models.DuplicateFilterModeAll)
+		if err != nil {
+			t.Errorf("ImageStore.FindDuplicates() error = %v", err)
+			return nil
+		}
+
+		assert.Len(t, got, 2, "exact match should find pairs A and B")
+		for _, group := range got {
+			assert.Len(t, group, 2)
+		}
+
+		// hamming distance 1: pair D matches as well
+		got, err = qb.FindDuplicates(ctx, 1, nil, nil, models.DuplicateFilterModeAll)
+		if err != nil {
+			t.Errorf("ImageStore.FindDuplicates() error = %v", err)
+			return nil
+		}
+
+		assert.Len(t, got, 3, "distance 1 should find pairs A, B and D")
+
+		page := 2
+		perPage := 1
+		paged, count, err := qb.FindDuplicateGroups(ctx, 1, nil, nil, models.DuplicateFilterModeAll, &models.FindFilterType{
+			Page:    &page,
+			PerPage: &perPage,
+		})
+		if err != nil {
+			t.Errorf("ImageStore.FindDuplicateGroups() error = %v", err)
+			return nil
+		}
+
+		assert.Equal(t, 3, count, "paged duplicate query should return the total duplicate group count")
+		assert.Len(t, paged, 1, "paged duplicate query should only hydrate the requested page")
+
+		return nil
+	})
+}
+
+func TestImageStore_FindDuplicatesWithFilter(t *testing.T) {
+	qb := db.Image
+
+	addImageTags := func(ctx context.Context, imageID int, tagIDsToAdd []int) error {
+		_, err := qb.UpdatePartial(ctx, imageID, models.ImagePartial{
+			TagIDs: &models.UpdateIDs{
+				Mode: models.RelationshipUpdateModeSet,
+				IDs:  tagIDsToAdd,
+			},
+		})
+		return err
+	}
+
+	withRollbackTxn(func(ctx context.Context) error {
+		testTag := models.Tag{
+			Name: "ImageFindDuplicatesFilterTestTag",
+		}
+		if err := db.Tag.Create(ctx, &models.CreateTagInput{Tag: &testTag}); err != nil {
+			t.Errorf("failed to create test tag: %v", err)
+			return nil
+		}
+
+		unusedTag := models.Tag{
+			Name: "ImageFindDuplicatesFilterTestTag_Unused",
+		}
+		if err := db.Tag.Create(ctx, &models.CreateTagInput{Tag: &unusedTag}); err != nil {
+			t.Errorf("failed to create unused tag: %v", err)
+			return nil
+		}
+
+		// Pair A shares a tag; pair B has none; pair C has only one tagged image.
+		const taggedPhash int64 = 0x0123456789abcdef
+		const untaggedPhash int64 = 0x0fedcba987654321
+		const partiallyTaggedPhash int64 = 0x00fedcba98765432
+
+		imageA1, err := createDupeImage(ctx, "FilterTest_A1", taggedPhash)
+		if err != nil {
+			t.Errorf("failed to create imageA1: %v", err)
+			return nil
+		}
+		imageA2, err := createDupeImage(ctx, "FilterTest_A2", taggedPhash)
+		if err != nil {
+			t.Errorf("failed to create imageA2: %v", err)
+			return nil
+		}
+		imageB1, err := createDupeImage(ctx, "FilterTest_B1", untaggedPhash)
+		if err != nil {
+			t.Errorf("failed to create imageB1: %v", err)
+			return nil
+		}
+		imageB2, err := createDupeImage(ctx, "FilterTest_B2", untaggedPhash)
+		if err != nil {
+			t.Errorf("failed to create imageB2: %v", err)
+			return nil
+		}
+		imageC1, err := createDupeImage(ctx, "FilterTest_C1", partiallyTaggedPhash)
+		if err != nil {
+			t.Errorf("failed to create imageC1: %v", err)
+			return nil
+		}
+		imageC2, err := createDupeImage(ctx, "FilterTest_C2", partiallyTaggedPhash)
+		if err != nil {
+			t.Errorf("failed to create imageC2: %v", err)
+			return nil
+		}
+
+		if err := addImageTags(ctx, imageA1.ID, []int{testTag.ID}); err != nil {
+			t.Errorf("failed to add tag to imageA1: %v", err)
+			return nil
+		}
+		if err := addImageTags(ctx, imageA2.ID, []int{testTag.ID}); err != nil {
+			t.Errorf("failed to add tag to imageA2: %v", err)
+			return nil
+		}
+		if err := addImageTags(ctx, imageC1.ID, []int{testTag.ID}); err != nil {
+			t.Errorf("failed to add tag to imageC1: %v", err)
+			return nil
+		}
+
+		// no filter: all duplicate pairs
+		got, err := qb.FindDuplicates(ctx, 0, nil, nil, models.DuplicateFilterModeAll)
+		if err != nil {
+			t.Errorf("FindDuplicates(nil filter) error = %v", err)
+			return nil
+		}
+		assert.Len(t, got, 3, "nil filter should find all duplicate pairs")
+
+		// tag filter: only the tagged pair
+		tagFilter := &models.ImageFilterType{
+			Tags: &models.HierarchicalMultiCriterionInput{
+				Value:    []string{strconv.Itoa(testTag.ID)},
+				Modifier: models.CriterionModifierIncludes,
+			},
+		}
+		got, err = qb.FindDuplicates(ctx, 0, tagFilter, nil, models.DuplicateFilterModeAll)
+		if err != nil {
+			t.Errorf("FindDuplicates(tag filter) error = %v", err)
+			return nil
+		}
+		assert.Len(t, got, 1, "tag filter should find exactly 1 duplicate pair")
+
+		if len(got) == 1 {
+			foundIDs := map[int]bool{}
+			for _, img := range got[0] {
+				foundIDs[img.ID] = true
+			}
+			assert.True(t, foundIDs[imageA1.ID], "pair A image 1 should be in results")
+			assert.True(t, foundIDs[imageA2.ID], "pair A image 2 should be in results")
+			assert.False(t, foundIDs[imageB1.ID], "pair B image 1 should NOT be in tag-filtered results")
+			assert.False(t, foundIDs[imageB2.ID], "pair B image 2 should NOT be in tag-filtered results")
+			assert.False(t, foundIDs[imageC1.ID], "partially tagged pair C should NOT be in all-filtered results")
+			assert.False(t, foundIDs[imageC2.ID], "partially tagged pair C should NOT be in all-filtered results")
+		}
+
+		got, err = qb.FindDuplicates(ctx, 0, tagFilter, nil, models.DuplicateFilterModeAny)
+		if err != nil {
+			t.Errorf("FindDuplicates(any tag filter) error = %v", err)
+			return nil
+		}
+		assert.Len(t, got, 2, "any tag filter should include fully and partially tagged duplicate pairs")
+
+		var foundPartialGroup bool
+		for _, group := range got {
+			foundIDs := map[int]bool{}
+			for _, img := range group {
+				foundIDs[img.ID] = true
+			}
+			if foundIDs[imageC1.ID] || foundIDs[imageC2.ID] {
+				assert.True(t, foundIDs[imageC1.ID], "pair C image 1 should be in any-filtered results")
+				assert.True(t, foundIDs[imageC2.ID], "pair C image 2 should be in any-filtered results")
+				foundPartialGroup = true
+			}
+		}
+		assert.True(t, foundPartialGroup, "any tag filter should keep the full partially tagged pair")
+
+		// tag no duplicate image has: nothing
+		got, err = qb.FindDuplicates(ctx, 0, &models.ImageFilterType{
+			Tags: &models.HierarchicalMultiCriterionInput{
+				Value:    []string{strconv.Itoa(unusedTag.ID)},
+				Modifier: models.CriterionModifierIncludes,
+			},
+		}, nil, models.DuplicateFilterModeAny)
+		if err != nil {
+			t.Errorf("FindDuplicates(unused tag filter) error = %v", err)
+			return nil
+		}
+		assert.Len(t, got, 0, "unused tag filter should find no duplicates")
+
+		// fuzzy matching with filter
+		got, err = qb.FindDuplicates(ctx, 1, tagFilter, nil, models.DuplicateFilterModeAll)
+		if err != nil {
+			t.Errorf("FindDuplicates(fuzzy + tag filter) error = %v", err)
+			return nil
+		}
+		assert.Len(t, got, 1, "fuzzy + tag filter should find exactly 1 duplicate pair")
+
+		got, err = qb.FindDuplicates(ctx, 1, tagFilter, nil, models.DuplicateFilterModeAny)
+		if err != nil {
+			t.Errorf("FindDuplicates(fuzzy + any tag filter) error = %v", err)
+			return nil
+		}
+		assert.Len(t, got, 2, "fuzzy + any tag filter should include fully and partially tagged duplicate pairs")
+
+		// the same tag condition expressed as a filter AST
+		got, err = qb.FindDuplicates(ctx, 0, nil, &models.FilterAST{
+			Root: &models.FilterASTNode{
+				Condition: &models.FilterASTCondition{
+					Field: "tags",
+					Value: models.HierarchicalMultiCriterionInput{
+						Value:    []string{strconv.Itoa(testTag.ID)},
+						Modifier: models.CriterionModifierIncludes,
+					},
+				},
+			},
+		}, models.DuplicateFilterModeAll)
+		if err != nil {
+			t.Errorf("FindDuplicates(AST tag filter) error = %v", err)
+			return nil
+		}
+		assert.Len(t, got, 1, "AST tag filter should find exactly 1 duplicate pair")
+
+		return nil
+	})
 }
 
 // TODO Count

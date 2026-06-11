@@ -137,3 +137,8 @@ type FindImagesResultType {
   filesize: Float!
   images: [Image!]!
 }
+
+type FindDuplicateImagesResultType {
+  count: Int!
+  groups: [[Image!]!]!
+}

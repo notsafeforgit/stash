@@ -393,13 +393,13 @@ func (_m *ImageReaderWriter) FindByZipFileID(ctx context.Context, zipFileID mode
 	return r0, r1
 }
 
-// FindDuplicates provides a mock function with given fields: ctx, distance
-func (_m *ImageReaderWriter) FindDuplicates(ctx context.Context, distance int) ([][]*models.Image, error) {
-	ret := _m.Called(ctx, distance)
+// FindDuplicates provides a mock function with given fields: ctx, distance, filter, filterAST, filterMode
+func (_m *ImageReaderWriter) FindDuplicates(ctx context.Context, distance int, filter *models.ImageFilterType, filterAST *models.FilterAST, filterMode models.DuplicateFilterMode) ([][]*models.Image, error) {
+	ret := _m.Called(ctx, distance, filter, filterAST, filterMode)
 
 	var r0 [][]*models.Image
-	if rf, ok := ret.Get(0).(func(context.Context, int) [][]*models.Image); ok {
-		r0 = rf(ctx, distance)
+	if rf, ok := ret.Get(0).(func(context.Context, int, *models.ImageFilterType, *models.FilterAST, models.DuplicateFilterMode) [][]*models.Image); ok {
+		r0 = rf(ctx, distance, filter, filterAST, filterMode)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([][]*models.Image)
@@ -407,13 +407,43 @@ func (_m *ImageReaderWriter) FindDuplicates(ctx context.Context, distance int) (
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, int) error); ok {
-		r1 = rf(ctx, distance)
+	if rf, ok := ret.Get(1).(func(context.Context, int, *models.ImageFilterType, *models.FilterAST, models.DuplicateFilterMode) error); ok {
+		r1 = rf(ctx, distance, filter, filterAST, filterMode)
 	} else {
 		r1 = ret.Error(1)
 	}
 
 	return r0, r1
+}
+
+// FindDuplicateGroups provides a mock function with given fields: ctx, distance, filter, filterAST, filterMode, findFilter
+func (_m *ImageReaderWriter) FindDuplicateGroups(ctx context.Context, distance int, filter *models.ImageFilterType, filterAST *models.FilterAST, filterMode models.DuplicateFilterMode, findFilter *models.FindFilterType) ([][]*models.Image, int, error) {
+	ret := _m.Called(ctx, distance, filter, filterAST, filterMode, findFilter)
+
+	var r0 [][]*models.Image
+	if rf, ok := ret.Get(0).(func(context.Context, int, *models.ImageFilterType, *models.FilterAST, models.DuplicateFilterMode, *models.FindFilterType) [][]*models.Image); ok {
+		r0 = rf(ctx, distance, filter, filterAST, filterMode, findFilter)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([][]*models.Image)
+		}
+	}
+
+	var r1 int
+	if rf, ok := ret.Get(1).(func(context.Context, int, *models.ImageFilterType, *models.FilterAST, models.DuplicateFilterMode, *models.FindFilterType) int); ok {
+		r1 = rf(ctx, distance, filter, filterAST, filterMode, findFilter)
+	} else {
+		r1 = ret.Int(1)
+	}
+
+	var r2 error
+	if rf, ok := ret.Get(2).(func(context.Context, int, *models.ImageFilterType, *models.FilterAST, models.DuplicateFilterMode, *models.FindFilterType) error); ok {
+		r2 = rf(ctx, distance, filter, filterAST, filterMode, findFilter)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // FindMany provides a mock function with given fields: ctx, ids

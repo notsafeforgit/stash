@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Link } from "@tanstack/react-router";
 import { FormattedMessage, useIntl } from "react-intl";
 import { useMutation } from "@apollo/client/react";
 import * as GQL from "src/core/generated-graphql";
@@ -561,35 +560,6 @@ export function LibraryTasks() {
             setOptions={setGenerateOptions}
           />
         </TaskSectionHeading>
-      </TaskGroup>
-
-      <TaskGroup
-        title={intl.formatMessage({
-          id: "config.tools.heading",
-          defaultMessage: "Tools",
-        })}
-      >
-        <TaskSectionHeading
-          title={
-            <FormattedMessage
-              id="config.tools.image_duplicate_checker"
-              defaultMessage="Image duplicate checker"
-            />
-          }
-          description={intl.formatMessage({
-            id: "dupe_check.image_description",
-            defaultMessage: "Search for perceptually similar files.",
-          })}
-          actions={
-            <Button
-              type="button"
-              variant="secondary"
-              render={<Link to="/image-duplicate-checker" />}
-            >
-              <FormattedMessage id="actions.run" defaultMessage="Run" />
-            </Button>
-          }
-        />
       </TaskGroup>
 
       <IdentifyDialog open={identifyOpen} onOpenChange={setIdentifyOpen} />

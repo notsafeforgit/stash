@@ -74,6 +74,11 @@ func (i *Importer) fileJSONToFile(ctx context.Context, fileJSON jsonschema.DirEn
 			AudioCodec:       ff.AudioCodec,
 			FrameRate:        ff.FrameRate,
 			BitRate:          ff.BitRate,
+			BitDepth:         ff.BitDepth,
+			ColorRange:       ff.ColorRange,
+			ColorSpace:       ff.ColorSpace,
+			ColorTransfer:    ff.ColorTransfer,
+			ColorPrimaries:   ff.ColorPrimaries,
 			Interactive:      ff.Interactive,
 			InteractiveSpeed: ff.InteractiveSpeed,
 		}, nil
@@ -83,10 +88,15 @@ func (i *Importer) fileJSONToFile(ctx context.Context, fileJSON jsonschema.DirEn
 			return nil, err
 		}
 		return &models.ImageFile{
-			BaseFile: baseFile,
-			Format:   ff.Format,
-			Width:    ff.Width,
-			Height:   ff.Height,
+			BaseFile:       baseFile,
+			Format:         ff.Format,
+			Width:          ff.Width,
+			Height:         ff.Height,
+			BitDepth:       ff.BitDepth,
+			ColorRange:     ff.ColorRange,
+			ColorSpace:     ff.ColorSpace,
+			ColorTransfer:  ff.ColorTransfer,
+			ColorPrimaries: ff.ColorPrimaries,
 		}, nil
 	case *jsonschema.BaseFile:
 		return i.baseFileJSONToBaseFile(ctx, ff)

@@ -111,6 +111,12 @@ type VideoFile struct {
 	FrameRate    float64
 	Rotation     int64
 	FrameCount   int64
+	BitDepth     int
+
+	ColorRange     string
+	ColorSpace     string
+	ColorTransfer  string
+	ColorPrimaries string
 
 	AudioCodec string
 }
@@ -409,6 +415,11 @@ func parse(filePath string, probeJSON *FFProbeJSON) (*VideoFile, error) {
 		result.FrameRate = math.Round(framerate*100) / 100
 		result.Width = videoStream.Width
 		result.Height = videoStream.Height
+		result.BitDepth = bitDepthFromStream(videoStream)
+		result.ColorRange = videoStream.ColorRange
+		result.ColorSpace = videoStream.ColorSpace
+		result.ColorTransfer = videoStream.ColorTransfer
+		result.ColorPrimaries = videoStream.ColorPrimaries
 
 		if isRotated(videoStream) {
 			result.Width = videoStream.Height
@@ -423,6 +434,62 @@ func parse(filePath string, probeJSON *FFProbeJSON) (*VideoFile, error) {
 	}
 
 	return result, nil
+}
+
+func bitDepthFromStream(s *FFProbeStream) int {
+	if s == nil {
+		return 0
+	}
+
+	if s.BitsPerRawSample != "" {
+		if bitDepth, err := strconv.Atoi(s.BitsPerRawSample); err == nil && bitDepth > 0 {
+			return bitDepth
+		}
+	}
+
+	pixFmt := strings.ToLower(s.PixFmt)
+	if pixFmt == "" {
+		return 0
+	}
+
+	for _, bitDepth := range []int{16, 14, 12, 10, 9} {
+		if strings.Contains(pixFmt, strconv.Itoa(bitDepth)) {
+			return bitDepth
+		}
+	}
+
+	if is16BitPixFmt(pixFmt) {
+		return 16
+	}
+
+	if is8BitPixFmt(pixFmt) {
+		return 8
+	}
+
+	return 0
+}
+
+func is16BitPixFmt(pixFmt string) bool {
+	switch {
+	case strings.HasPrefix(pixFmt, "rgb48"),
+		strings.HasPrefix(pixFmt, "rgba64"),
+		strings.HasPrefix(pixFmt, "gray16"):
+		return true
+	default:
+		return false
+	}
+}
+
+func is8BitPixFmt(pixFmt string) bool {
+	switch pixFmt {
+	case "yuv420p", "yuv422p", "yuv444p", "yuvj420p", "yuvj422p", "yuvj444p",
+		"yuva420p", "yuva422p", "yuva444p", "nv12", "nv21", "rgb24", "bgr24",
+		"rgba", "bgra", "argb", "abgr", "gray", "gbrp", "gbrap", "pal8",
+		"monow", "monob", "yuyv422", "uyvy422":
+		return true
+	default:
+		return false
+	}
 }
 
 func isRotated(s *FFProbeStream) bool {

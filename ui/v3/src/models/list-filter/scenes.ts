@@ -123,10 +123,7 @@ const criterionOptions = [
     "video_stream_duration",
     "media_info.video_stream_duration",
   ),
-  createMandatoryNumberCriterionOption(
-    "frame_count",
-    "media_info.frame_count",
-  ),
+  createMandatoryNumberCriterionOption("frame_count", "media_info.frame_count"),
   createBooleanCriterionOption(
     "duration_mismatch",
     "media_info.duration_mismatch",

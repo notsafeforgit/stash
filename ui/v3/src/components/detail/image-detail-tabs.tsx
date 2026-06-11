@@ -10,6 +10,9 @@ import { galleryLabel } from "src/lib/gallery-utils";
 import { Badge } from "src/components/ui/badge";
 import { MetaRow } from "src/components/detail/meta-row";
 import { CustomFieldsRows } from "src/components/detail/custom-fields-rows";
+import { FingerprintMetaRows } from "src/components/detail/fingerprint-meta-rows";
+import { FilterUrlLink } from "src/components/shared/filter-url-link";
+import NavUtils from "src/utils/navigation";
 
 type ImageData = NonNullable<GQL.FindImageQuery["findImage"]>;
 
@@ -58,7 +61,11 @@ export function ImageDetailsTab({ image }: { image: ImageData }) {
             defaultMessage: "Photographer",
           })}
         >
-          {image.photographer}
+          <FilterUrlLink
+            href={NavUtils.makePhotographerImagesUrl(image.photographer)}
+          >
+            {image.photographer}
+          </FilterUrlLink>
         </MetaRow>
       )}
 
@@ -223,11 +230,7 @@ export function ImageFileInfoTab({ image }: { image: ImageData }) {
           >
             {formatBytes(f.size)}
           </MetaRow>
-          {f.fingerprints.map((fp) => (
-            <MetaRow key={fp.type} label={fp.type.toUpperCase()}>
-              <span className="font-mono text-xs">{fp.value}</span>
-            </MetaRow>
-          ))}
+          <FingerprintMetaRows fingerprints={f.fingerprints} mode="images" />
         </React.Fragment>
       ))}
     </dl>

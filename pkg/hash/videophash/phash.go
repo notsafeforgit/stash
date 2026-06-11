@@ -9,6 +9,7 @@ import (
 	"image/color"
 	"image/png"
 	"math"
+	"os"
 	"strings"
 
 	"github.com/corona10/goimagehash"
@@ -168,6 +169,30 @@ func generateSprite(encoder *ffmpeg.FFMpeg, videoFile *models.VideoFile) (image.
 	logger.Infof("[generator] generating phash sprite for %s", videoFile.Path)
 
 	metadata := spriteMetadata{}
+	input := videoFile.Path
+	var cleanupFixedInput func()
+	defer func() {
+		if cleanupFixedInput != nil {
+			cleanupFixedInput()
+		}
+	}()
+
+	ensureFixedInput := func() (string, bool) {
+		if cleanupFixedInput != nil {
+			return input, true
+		}
+
+		fixedInput, cleanup, err := createColorMetadataFixedInput(encoder, videoFile)
+		if err != nil {
+			logger.Debugf("[generator] color metadata rewrite fallback unavailable for %s: %s", videoFile.Path, compactError(err))
+			return "", false
+		}
+
+		cleanupFixedInput = cleanup
+		input = fixedInput
+		return input, true
+	}
+
 	duration := videoFile.VideoStreamDurationFinite()
 	frameCount := estimateFrameCount(videoFile)
 	if frameCount > 0 && frameCount <= columns*rows {
@@ -187,22 +212,29 @@ func generateSprite(encoder *ffmpeg.FFMpeg, videoFile *models.VideoFile) (image.
 	for i := 0; i < chunkCount; i++ {
 		time := offset + (float64(i) * stepSize)
 
-		img, err := generateSpriteScreenshot(encoder, videoFile.Path, time, slowSeek, setBT709ColorParameters)
+		img, err := generateSpriteScreenshot(encoder, input, time, slowSeek, setBT709ColorParameters)
 		if err != nil && !slowSeek {
 			logger.Warnf("[generator] fast phash screenshot seek failed for %s at %.3fs, retrying with accurate seek for remaining phash screenshots: %s", videoFile.Path, time, compactError(err))
 
 			slowSeek = true
-			img, err = generateSpriteScreenshot(encoder, videoFile.Path, time, slowSeek, setBT709ColorParameters)
+			img, err = generateSpriteScreenshot(encoder, input, time, slowSeek, setBT709ColorParameters)
 		}
 		if err != nil && !setBT709ColorParameters {
 			logger.Warnf("[generator] phash screenshot failed for %s at %.3fs, retrying with BT.709 color metadata fallback for remaining phash screenshots: %s", videoFile.Path, time, compactError(err))
 
 			setBT709ColorParameters = true
-			img, err = generateSpriteScreenshot(encoder, videoFile.Path, time, slowSeek, setBT709ColorParameters)
+			img, err = generateSpriteScreenshot(encoder, input, time, slowSeek, setBT709ColorParameters)
+		}
+		if err != nil && isInvalidColorSpaceError(err) {
+			if fixedInput, ok := ensureFixedInput(); ok {
+				logger.Warnf("[generator] phash screenshot failed for %s at %.3fs due to invalid color metadata, retrying with rewritten stream metadata", videoFile.Path, time)
+				setBT709ColorParameters = false
+				img, err = generateSpriteScreenshot(encoder, fixedInput, time, slowSeek, setBT709ColorParameters)
+			}
 		}
 		if err != nil {
 			var usedTimestampBackoff bool
-			img, usedTimestampBackoff, err = generateSpriteScreenshotWithTimestampBackoff(encoder, videoFile.Path, time, stepSize, slowSeek, setBT709ColorParameters, err)
+			img, usedTimestampBackoff, err = generateSpriteScreenshotWithTimestampBackoff(encoder, input, time, stepSize, slowSeek, setBT709ColorParameters, err)
 			metadata.durationMismatch = metadata.durationMismatch || usedTimestampBackoff
 		}
 		if err != nil && len(images) > 0 {
@@ -275,25 +307,107 @@ func frameBackoffIndexes(frame int) []int {
 	return ret
 }
 
+func createColorMetadataFixedInput(encoder *ffmpeg.FFMpeg, videoFile *models.VideoFile) (string, func(), error) {
+	bitstreamFilter, ok := colorMetadataBitstreamFilter(videoFile.VideoCodec)
+	if !ok {
+		return "", nil, fmt.Errorf("unsupported video codec %q", videoFile.VideoCodec)
+	}
+
+	tmp, err := os.CreateTemp("", "stash-phash-color-*.mp4")
+	if err != nil {
+		return "", nil, fmt.Errorf("creating temporary color metadata file: %w", err)
+	}
+
+	tmpPath := tmp.Name()
+	cleanup := func() {
+		_ = os.Remove(tmpPath)
+	}
+	if err := tmp.Close(); err != nil {
+		cleanup()
+		return "", nil, fmt.Errorf("closing temporary color metadata file: %w", err)
+	}
+
+	args := []string{
+		"-v", "error",
+		"-y",
+		"-i", videoFile.Path,
+		"-map", "0:v:0",
+		"-c:v", "copy",
+		"-an",
+		"-bsf:v", bitstreamFilter,
+		"-f", "mp4",
+		tmpPath,
+	}
+	cmd := encoder.Command(context.Background(), args)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		cleanup()
+		return "", nil, fmt.Errorf("rewriting video color metadata with ffmpeg: %w: %s", err, strings.TrimSpace(string(output)))
+	}
+
+	return tmpPath, cleanup, nil
+}
+
+func colorMetadataBitstreamFilter(codec string) (string, bool) {
+	switch strings.ToLower(codec) {
+	case "h264", "avc", "avc1":
+		return "h264_metadata=colour_primaries=1:transfer_characteristics=1:matrix_coefficients=1", true
+	case "h265", "hevc", "hev1", "hvc1":
+		return "hevc_metadata=colour_primaries=1:transfer_characteristics=1:matrix_coefficients=1", true
+	default:
+		return "", false
+	}
+}
+
 func generateFrameSprite(encoder *ffmpeg.FFMpeg, videoFile *models.VideoFile, frameCount int) (image.Image, bool, error) {
 	chunkCount := columns * rows
 	images := make([]image.Image, 0, chunkCount)
 	setBT709ColorParameters := false
 	durationMismatch := false
+	input := videoFile.Path
+	var cleanupFixedInput func()
+	defer func() {
+		if cleanupFixedInput != nil {
+			cleanupFixedInput()
+		}
+	}()
+
+	ensureFixedInput := func() (string, bool) {
+		if cleanupFixedInput != nil {
+			return input, true
+		}
+
+		fixedInput, cleanup, err := createColorMetadataFixedInput(encoder, videoFile)
+		if err != nil {
+			logger.Debugf("[generator] color metadata rewrite fallback unavailable for %s: %s", videoFile.Path, compactError(err))
+			return "", false
+		}
+
+		cleanupFixedInput = cleanup
+		input = fixedInput
+		return input, true
+	}
 
 	for i := 0; i < chunkCount; i++ {
 		frame := spriteFrameIndex(i, frameCount)
 
-		img, err := generateSpriteFrameScreenshot(encoder, videoFile.Path, frame, setBT709ColorParameters)
+		img, err := generateSpriteFrameScreenshot(encoder, input, frame, setBT709ColorParameters)
 		if err != nil && !setBT709ColorParameters {
 			logger.Warnf("[generator] frame-based phash screenshot failed for %s at frame %d, retrying with BT.709 color metadata fallback for remaining phash screenshots: %s", videoFile.Path, frame, compactError(err))
 
 			setBT709ColorParameters = true
-			img, err = generateSpriteFrameScreenshot(encoder, videoFile.Path, frame, setBT709ColorParameters)
+			img, err = generateSpriteFrameScreenshot(encoder, input, frame, setBT709ColorParameters)
+		}
+		if err != nil && isInvalidColorSpaceError(err) {
+			if fixedInput, ok := ensureFixedInput(); ok {
+				logger.Warnf("[generator] frame-based phash screenshot failed for %s at frame %d due to invalid color metadata, retrying with rewritten stream metadata", videoFile.Path, frame)
+				setBT709ColorParameters = false
+				img, err = generateSpriteFrameScreenshot(encoder, fixedInput, frame, setBT709ColorParameters)
+			}
 		}
 		if err != nil {
 			var usedFrameBackoff bool
-			img, usedFrameBackoff, err = generateSpriteFrameScreenshotWithFrameBackoff(encoder, videoFile.Path, frame, setBT709ColorParameters, err)
+			img, usedFrameBackoff, err = generateSpriteFrameScreenshotWithFrameBackoff(encoder, input, frame, setBT709ColorParameters, err)
 			durationMismatch = durationMismatch || usedFrameBackoff
 		}
 		if err != nil && len(images) > 0 {
@@ -354,6 +468,10 @@ func compactError(err error) string {
 	}
 
 	return strings.ReplaceAll(err.Error(), "\n", "; ")
+}
+
+func isInvalidColorSpaceError(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "Invalid color space")
 }
 
 func spriteFrameIndex(spriteIndex int, frameCount int) int {

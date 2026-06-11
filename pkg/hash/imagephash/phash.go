@@ -8,7 +8,7 @@ import (
 	"image"
 	_ "image/gif"
 	_ "image/jpeg"
-	_ "image/png"
+	"image/png"
 	"io"
 
 	"github.com/corona10/goimagehash"
@@ -80,14 +80,34 @@ func loadImageFFmpeg(encoder ffmpegOutputGenerator, path string) (image.Image, e
 	}
 
 	args := transcoder.ScreenshotTime(path, 0, options)
+	img, err := loadImageFFmpegWithDecoder(encoder, args, func(data []byte) (image.Image, error) {
+		return bmp.Decode(bytes.NewReader(data))
+	})
+	if err == nil {
+		return img, nil
+	}
+
+	options.OutputType = transcoder.ScreenshotOutputTypePNG
+	fallbackArgs := transcoder.ScreenshotTime(path, 0, options)
+	fallbackImg, fallbackErr := loadImageFFmpegWithDecoder(encoder, fallbackArgs, func(data []byte) (image.Image, error) {
+		return png.Decode(bytes.NewReader(data))
+	})
+	if fallbackErr == nil {
+		return fallbackImg, nil
+	}
+
+	return nil, fmt.Errorf("decoding ffmpeg image output with png fallback: %w", errors.Join(err, fallbackErr))
+}
+
+func loadImageFFmpegWithDecoder(encoder ffmpegOutputGenerator, args ffmpeg.Args, decode func([]byte) (image.Image, error)) (image.Image, error) {
 	data, err := encoder.GenerateOutput(context.Background(), args, nil)
 	if err != nil {
 		return nil, fmt.Errorf("converting image with ffmpeg: %w", err)
 	}
 
-	img, err := bmp.Decode(bytes.NewReader(data))
+	img, err := decode(data)
 	if err != nil {
-		return nil, fmt.Errorf("decoding ffmpeg bmp output: %w", err)
+		return nil, fmt.Errorf("decoding ffmpeg image output: %w", err)
 	}
 
 	return img, nil

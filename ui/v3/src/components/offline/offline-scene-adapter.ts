@@ -135,6 +135,7 @@ export function offlineEntryToSceneData(
     duration: entry.duration || 0,
     video_codec: entry.source_video_codec || "",
     audio_codec: entry.source_audio_codec || "",
+    duration_mismatch: false,
     width: entry.width_actual || entry.width || 0,
     height: entry.height_actual || entry.height || 0,
     frame_rate: 0,

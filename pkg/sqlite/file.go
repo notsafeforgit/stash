@@ -51,22 +51,25 @@ func (r *basicFileRow) fromBasicFile(o models.BaseFile) {
 }
 
 type videoFileRow struct {
-	FileID           models.FileID `db:"file_id"`
-	Format           string        `db:"format"`
-	Width            int           `db:"width"`
-	Height           int           `db:"height"`
-	Duration         float64       `db:"duration"`
-	VideoCodec       string        `db:"video_codec"`
-	AudioCodec       string        `db:"audio_codec"`
-	FrameRate        float64       `db:"frame_rate"`
-	BitRate          int64         `db:"bit_rate"`
-	BitDepth         null.Int      `db:"bit_depth"`
-	ColorRange       null.String   `db:"color_range"`
-	ColorSpace       null.String   `db:"color_space"`
-	ColorTransfer    null.String   `db:"color_transfer"`
-	ColorPrimaries   null.String   `db:"color_primaries"`
-	Interactive      bool          `db:"interactive"`
-	InteractiveSpeed null.Int      `db:"interactive_speed"`
+	FileID              models.FileID `db:"file_id"`
+	Format              string        `db:"format"`
+	Width               int           `db:"width"`
+	Height              int           `db:"height"`
+	Duration            float64       `db:"duration"`
+	VideoStreamDuration null.Float    `db:"video_stream_duration"`
+	VideoCodec          string        `db:"video_codec"`
+	AudioCodec          string        `db:"audio_codec"`
+	FrameRate           float64       `db:"frame_rate"`
+	FrameCount          null.Int      `db:"frame_count"`
+	DurationMismatch    bool          `db:"duration_mismatch"`
+	BitRate             int64         `db:"bit_rate"`
+	BitDepth            null.Int      `db:"bit_depth"`
+	ColorRange          null.String   `db:"color_range"`
+	ColorSpace          null.String   `db:"color_space"`
+	ColorTransfer       null.String   `db:"color_transfer"`
+	ColorPrimaries      null.String   `db:"color_primaries"`
+	Interactive         bool          `db:"interactive"`
+	InteractiveSpeed    null.Int      `db:"interactive_speed"`
 }
 
 func (f *videoFileRow) fromVideoFile(ff models.VideoFile) {
@@ -75,9 +78,12 @@ func (f *videoFileRow) fromVideoFile(ff models.VideoFile) {
 	f.Width = ff.Width
 	f.Height = ff.Height
 	f.Duration = ff.Duration
+	f.VideoStreamDuration = floatFromPtr(ff.VideoStreamDuration)
 	f.VideoCodec = ff.VideoCodec
 	f.AudioCodec = ff.AudioCodec
 	f.FrameRate = ff.FrameRate
+	f.FrameCount = int64FromPtr(ff.FrameCount)
+	f.DurationMismatch = ff.DurationMismatch
 	f.BitRate = ff.BitRate
 	f.BitDepth = intFromPtr(ff.BitDepth)
 	f.ColorRange = stringFromPtr(ff.ColorRange)
@@ -115,41 +121,47 @@ func (f *imageFileRow) fromImageFile(ff models.ImageFile) {
 // we redefine this to change the columns around
 // otherwise, we collide with the image file columns
 type videoFileQueryRow struct {
-	FileID           null.Int    `db:"file_id_video"`
-	Format           null.String `db:"video_format"`
-	Width            null.Int    `db:"video_width"`
-	Height           null.Int    `db:"video_height"`
-	Duration         null.Float  `db:"duration"`
-	VideoCodec       null.String `db:"video_codec"`
-	AudioCodec       null.String `db:"audio_codec"`
-	FrameRate        null.Float  `db:"frame_rate"`
-	BitRate          null.Int    `db:"bit_rate"`
-	BitDepth         null.Int    `db:"video_bit_depth"`
-	ColorRange       null.String `db:"video_color_range"`
-	ColorSpace       null.String `db:"video_color_space"`
-	ColorTransfer    null.String `db:"video_color_transfer"`
-	ColorPrimaries   null.String `db:"video_color_primaries"`
-	Interactive      null.Bool   `db:"interactive"`
-	InteractiveSpeed null.Int    `db:"interactive_speed"`
+	FileID              null.Int    `db:"file_id_video"`
+	Format              null.String `db:"video_format"`
+	Width               null.Int    `db:"video_width"`
+	Height              null.Int    `db:"video_height"`
+	Duration            null.Float  `db:"duration"`
+	VideoStreamDuration null.Float  `db:"video_stream_duration"`
+	VideoCodec          null.String `db:"video_codec"`
+	AudioCodec          null.String `db:"audio_codec"`
+	FrameRate           null.Float  `db:"frame_rate"`
+	FrameCount          null.Int    `db:"frame_count"`
+	DurationMismatch    null.Bool   `db:"duration_mismatch"`
+	BitRate             null.Int    `db:"bit_rate"`
+	BitDepth            null.Int    `db:"video_bit_depth"`
+	ColorRange          null.String `db:"video_color_range"`
+	ColorSpace          null.String `db:"video_color_space"`
+	ColorTransfer       null.String `db:"video_color_transfer"`
+	ColorPrimaries      null.String `db:"video_color_primaries"`
+	Interactive         null.Bool   `db:"interactive"`
+	InteractiveSpeed    null.Int    `db:"interactive_speed"`
 }
 
 func (f *videoFileQueryRow) resolve() *models.VideoFile {
 	return &models.VideoFile{
-		Format:           f.Format.String,
-		Width:            int(f.Width.Int64),
-		Height:           int(f.Height.Int64),
-		Duration:         f.Duration.Float64,
-		VideoCodec:       f.VideoCodec.String,
-		AudioCodec:       f.AudioCodec.String,
-		FrameRate:        f.FrameRate.Float64,
-		BitRate:          f.BitRate.Int64,
-		BitDepth:         nullIntPtr(f.BitDepth),
-		ColorRange:       nullStringPtr(f.ColorRange),
-		ColorSpace:       nullStringPtr(f.ColorSpace),
-		ColorTransfer:    nullStringPtr(f.ColorTransfer),
-		ColorPrimaries:   nullStringPtr(f.ColorPrimaries),
-		Interactive:      f.Interactive.Bool,
-		InteractiveSpeed: nullIntPtr(f.InteractiveSpeed),
+		Format:              f.Format.String,
+		Width:               int(f.Width.Int64),
+		Height:              int(f.Height.Int64),
+		Duration:            f.Duration.Float64,
+		VideoStreamDuration: nullFloatPtr(f.VideoStreamDuration),
+		VideoCodec:          f.VideoCodec.String,
+		AudioCodec:          f.AudioCodec.String,
+		FrameRate:           f.FrameRate.Float64,
+		FrameCount:          nullInt64Ptr(f.FrameCount),
+		DurationMismatch:    f.DurationMismatch.Bool,
+		BitRate:             f.BitRate.Int64,
+		BitDepth:            nullIntPtr(f.BitDepth),
+		ColorRange:          nullStringPtr(f.ColorRange),
+		ColorSpace:          nullStringPtr(f.ColorSpace),
+		ColorTransfer:       nullStringPtr(f.ColorTransfer),
+		ColorPrimaries:      nullStringPtr(f.ColorPrimaries),
+		Interactive:         f.Interactive.Bool,
+		InteractiveSpeed:    nullIntPtr(f.InteractiveSpeed),
 	}
 }
 
@@ -161,9 +173,12 @@ func videoFileQueryColumns() []interface{} {
 		table.Col("width").As("video_width"),
 		table.Col("height").As("video_height"),
 		table.Col("duration"),
+		table.Col("video_stream_duration"),
 		table.Col("video_codec"),
 		table.Col("audio_codec"),
 		table.Col("frame_rate"),
+		table.Col("frame_count"),
+		table.Col("duration_mismatch"),
 		table.Col("bit_rate"),
 		table.Col("bit_depth").As("video_bit_depth"),
 		table.Col("color_range").As("video_color_range"),

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/stashapp/stash/pkg/ffmpeg"
 	"github.com/stashapp/stash/pkg/file"
@@ -44,21 +45,24 @@ func (d *Decorator) Decorate(ctx context.Context, fs models.FS, f models.File) (
 	}
 
 	return &models.VideoFile{
-		BaseFile:       base,
-		Format:         string(container),
-		VideoCodec:     videoFile.VideoCodec,
-		AudioCodec:     videoFile.AudioCodec,
-		Width:          videoFile.Width,
-		Height:         videoFile.Height,
-		Duration:       videoFile.FileDuration,
-		FrameRate:      videoFile.FrameRate,
-		BitRate:        videoFile.Bitrate,
-		BitDepth:       intPtrIfPositive(videoFile.BitDepth),
-		ColorRange:     stringPtrIfNotEmpty(videoFile.ColorRange),
-		ColorSpace:     stringPtrIfNotEmpty(videoFile.ColorSpace),
-		ColorTransfer:  stringPtrIfNotEmpty(videoFile.ColorTransfer),
-		ColorPrimaries: stringPtrIfNotEmpty(videoFile.ColorPrimaries),
-		Interactive:    interactive,
+		BaseFile:            base,
+		Format:              string(container),
+		VideoCodec:          videoFile.VideoCodec,
+		AudioCodec:          videoFile.AudioCodec,
+		Width:               videoFile.Width,
+		Height:              videoFile.Height,
+		Duration:            videoFile.FileDuration,
+		VideoStreamDuration: videoStreamDurationPtr(videoFile),
+		FrameRate:           videoFile.FrameRate,
+		FrameCount:          int64PtrIfPositive(videoFile.FrameCount),
+		DurationMismatch:    videoDurationMismatch(videoFile),
+		BitRate:             videoFile.Bitrate,
+		BitDepth:            intPtrIfPositive(videoFile.BitDepth),
+		ColorRange:          stringPtrIfNotEmpty(videoFile.ColorRange),
+		ColorSpace:          stringPtrIfNotEmpty(videoFile.ColorSpace),
+		ColorTransfer:       stringPtrIfNotEmpty(videoFile.ColorTransfer),
+		ColorPrimaries:      stringPtrIfNotEmpty(videoFile.ColorPrimaries),
+		Interactive:         interactive,
 	}, nil
 }
 
@@ -68,6 +72,34 @@ func intPtrIfPositive(v int) *int {
 	}
 
 	return &v
+}
+
+func int64PtrIfPositive(v int64) *int64 {
+	if v <= 0 {
+		return nil
+	}
+
+	return &v
+}
+
+func float64PtrIfPositive(v float64) *float64 {
+	if v <= 0 {
+		return nil
+	}
+
+	return &v
+}
+
+func videoStreamDurationPtr(v *ffmpeg.VideoFile) *float64 {
+	if !v.HasVideoStreamDuration {
+		return nil
+	}
+
+	return float64PtrIfPositive(v.VideoStreamDuration)
+}
+
+func videoDurationMismatch(v *ffmpeg.VideoFile) bool {
+	return v.HasVideoStreamDuration && math.Abs(v.FileDuration-v.VideoStreamDuration) > 0.5
 }
 
 func stringPtrIfNotEmpty(v string) *string {

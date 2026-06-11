@@ -80,19 +80,22 @@ type Fingerprint struct {
 
 type VideoFile struct {
 	*BaseFile
-	Format         string  `json:"format,omitempty"`
-	Width          int     `json:"width,omitempty"`
-	Height         int     `json:"height,omitempty"`
-	Duration       float64 `json:"duration,omitempty"`
-	VideoCodec     string  `json:"video_codec,omitempty"`
-	AudioCodec     string  `json:"audio_codec,omitempty"`
-	FrameRate      float64 `json:"frame_rate,omitempty"`
-	BitRate        int64   `json:"bitrate,omitempty"`
-	BitDepth       *int    `json:"bit_depth,omitempty"`
-	ColorRange     *string `json:"color_range,omitempty"`
-	ColorSpace     *string `json:"color_space,omitempty"`
-	ColorTransfer  *string `json:"color_transfer,omitempty"`
-	ColorPrimaries *string `json:"color_primaries,omitempty"`
+	Format              string   `json:"format,omitempty"`
+	Width               int      `json:"width,omitempty"`
+	Height              int      `json:"height,omitempty"`
+	Duration            float64  `json:"duration,omitempty"`
+	VideoStreamDuration *float64 `json:"video_stream_duration,omitempty"`
+	VideoCodec          string   `json:"video_codec,omitempty"`
+	AudioCodec          string   `json:"audio_codec,omitempty"`
+	FrameRate           float64  `json:"frame_rate,omitempty"`
+	FrameCount          *int64   `json:"frame_count,omitempty"`
+	DurationMismatch    bool     `json:"duration_mismatch,omitempty"`
+	BitRate             int64    `json:"bitrate,omitempty"`
+	BitDepth            *int     `json:"bit_depth,omitempty"`
+	ColorRange          *string  `json:"color_range,omitempty"`
+	ColorSpace          *string  `json:"color_space,omitempty"`
+	ColorTransfer       *string  `json:"color_transfer,omitempty"`
+	ColorPrimaries      *string  `json:"color_primaries,omitempty"`
 
 	Interactive      bool `json:"interactive,omitempty"`
 	InteractiveSpeed *int `json:"interactive_speed,omitempty"`

@@ -15,6 +15,14 @@ func intFromPtr(i *int) null.Int {
 	return null.IntFrom(int64(*i))
 }
 
+func int64FromPtr(i *int64) null.Int {
+	if i == nil {
+		return null.NewInt(0, false)
+	}
+
+	return null.IntFrom(*i)
+}
+
 func nullIntPtr(i null.Int) *int {
 	if !i.Valid {
 		return nil
@@ -22,6 +30,23 @@ func nullIntPtr(i null.Int) *int {
 
 	v := int(i.Int64)
 	return &v
+}
+
+func nullInt64Ptr(i null.Int) *int64 {
+	if !i.Valid {
+		return nil
+	}
+
+	v := i.Int64
+	return &v
+}
+
+func floatFromPtr(f *float64) null.Float {
+	if f == nil {
+		return null.NewFloat(0, false)
+	}
+
+	return null.FloatFrom(*f)
 }
 
 func stringFromPtr(s *string) null.String {

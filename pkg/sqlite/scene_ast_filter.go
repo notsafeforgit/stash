@@ -193,6 +193,24 @@ func sceneASTConditionHandler(condition *models.FilterASTCondition) (criterionHa
 			return nil, err
 		}
 		return intCriterionHandler(&input, "video_files.bit_depth", qb.addVideoFilesTable), nil
+	case "video_stream_duration":
+		input, err := decodeASTValue[models.IntCriterionInput](condition.Value)
+		if err != nil {
+			return nil, err
+		}
+		return floatIntCriterionHandler(&input, "video_files.video_stream_duration", qb.addVideoFilesTable), nil
+	case "frame_count":
+		input, err := decodeASTValue[models.IntCriterionInput](condition.Value)
+		if err != nil {
+			return nil, err
+		}
+		return intCriterionHandler(&input, "video_files.frame_count", qb.addVideoFilesTable), nil
+	case "duration_mismatch":
+		input, err := decodeASTValue[bool](condition.Value)
+		if err != nil {
+			return nil, err
+		}
+		return durationMismatchCriterionHandler(&input, qb.addVideoFilesTable), nil
 	case "video_codec":
 		input, err := decodeASTValue[models.StringCriterionInput](condition.Value)
 		if err != nil {

@@ -130,6 +130,9 @@ func (qb *sceneFilterHandler) criterionHandler() criterionHandler {
 		floatIntCriterionHandler(sceneFilter.Framerate, "ROUND(video_files.frame_rate)", qb.addVideoFilesTable),
 		intCriterionHandler(sceneFilter.Bitrate, "video_files.bit_rate", qb.addVideoFilesTable),
 		intCriterionHandler(sceneFilter.BitDepth, "video_files.bit_depth", qb.addVideoFilesTable),
+		floatIntCriterionHandler(sceneFilter.VideoStreamDuration, "video_files.video_stream_duration", qb.addVideoFilesTable),
+		intCriterionHandler(sceneFilter.FrameCount, "video_files.frame_count", qb.addVideoFilesTable),
+		durationMismatchCriterionHandler(sceneFilter.DurationMismatch, qb.addVideoFilesTable),
 		qb.codecCriterionHandler(sceneFilter.VideoCodec, "video_files.video_codec", qb.addVideoFilesTable),
 		qb.codecCriterionHandler(sceneFilter.AudioCodec, "video_files.audio_codec", qb.addVideoFilesTable),
 

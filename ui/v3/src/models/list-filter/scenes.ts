@@ -3,6 +3,7 @@ import {
   createMandatoryStringCriterionOption,
   createStringCriterionOption,
   createNumberCriterionOption,
+  createBooleanCriterionOption,
   createDateCriterionOption,
   createMandatoryTimestampCriterionOption,
   createDurationCriterionOption,
@@ -118,6 +119,18 @@ const criterionOptions = [
   createMandatoryNumberCriterionOption("framerate"),
   createMandatoryNumberCriterionOption("bitrate"),
   createNumberCriterionOption("bit_depth", "media_info.bit_depth"),
+  createDurationCriterionOption(
+    "video_stream_duration",
+    "media_info.video_stream_duration",
+  ),
+  createMandatoryNumberCriterionOption(
+    "frame_count",
+    "media_info.frame_count",
+  ),
+  createBooleanCriterionOption(
+    "duration_mismatch",
+    "media_info.duration_mismatch",
+  ),
   createStringCriterionOption("video_codec"),
   createStringCriterionOption("audio_codec"),
   DurationCriterionOption,

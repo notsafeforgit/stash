@@ -66,6 +66,10 @@ var (
 		codec:  &ffmpeg.VideoCodecBMP,
 		format: ffmpeg.FormatImage2Pipe,
 	}
+	ScreenshotOutputTypePNG = ScreenshotOutputType{
+		codec:  &ffmpeg.VideoCodecPNG,
+		format: ffmpeg.FormatImage2Pipe,
+	}
 )
 
 func ScreenshotTime(input string, t float64, options ScreenshotOptions) ffmpeg.Args {

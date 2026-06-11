@@ -42,14 +42,15 @@ func (t *GeneratePhashTask) Start(ctx context.Context) {
 	}
 
 	if !set {
-		generated, err := videophash.Generate(instance.FFMpeg, t.File)
+		generated, err := videophash.GenerateWithMetadata(instance.FFMpeg, t.File)
 		if err != nil {
 			logger.Errorf("Error generating phash for %q: %v", t.File.Path, err)
 			logErrorOutput(err)
 			return
 		}
 
-		hash = int64(*generated)
+		hash = int64(generated.Hash)
+		t.File.DurationMismatch = t.File.DurationMismatch || generated.DurationMismatch
 	}
 
 	r := t.repository

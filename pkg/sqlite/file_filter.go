@@ -294,6 +294,9 @@ func (qb *videoFileFilterHandler) criterionHandler() criterionHandler {
 		floatIntCriterionHandler(videoFileFilter.Framerate, "ROUND(video_files.frame_rate)", qb.addVideoFilesTable),
 		intCriterionHandler(videoFileFilter.Bitrate, "video_files.bit_rate", qb.addVideoFilesTable),
 		intCriterionHandler(videoFileFilter.BitDepth, "video_files.bit_depth", qb.addVideoFilesTable),
+		floatIntCriterionHandler(videoFileFilter.VideoStreamDuration, "video_files.video_stream_duration", qb.addVideoFilesTable),
+		intCriterionHandler(videoFileFilter.FrameCount, "video_files.frame_count", qb.addVideoFilesTable),
+		durationMismatchCriterionHandler(videoFileFilter.DurationMismatch, qb.addVideoFilesTable),
 		qb.codecCriterionHandler(videoFileFilter.VideoCodec, "video_files.video_codec", qb.addVideoFilesTable),
 		qb.codecCriterionHandler(videoFileFilter.AudioCodec, "video_files.audio_codec", qb.addVideoFilesTable),
 

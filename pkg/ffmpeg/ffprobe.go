@@ -97,12 +97,13 @@ type VideoFile struct {
 	// In most cases (sprites, previews, etc.) we actually care about the duration of the video stream specifically,
 	// because those two can differ slightly (e.g. audio stream longer than the video stream, making the whole file
 	// longer).
-	FileDuration        float64
-	VideoStreamDuration float64
-	StartTime           float64
-	Bitrate             int64
-	Size                int64
-	CreationTime        time.Time
+	FileDuration           float64
+	VideoStreamDuration    float64
+	HasVideoStreamDuration bool
+	StartTime              float64
+	Bitrate                int64
+	Size                   int64
+	CreationTime           time.Time
 
 	VideoCodec   string
 	VideoBitrate int64
@@ -430,6 +431,8 @@ func parse(filePath string, probeJSON *FFProbeJSON) (*VideoFile, error) {
 		if err != nil {
 			// Revert to the historical behaviour, which is still correct in the vast majority of cases.
 			result.VideoStreamDuration = result.FileDuration
+		} else {
+			result.HasVideoStreamDuration = true
 		}
 	}
 

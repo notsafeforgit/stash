@@ -1564,12 +1564,15 @@
     "color_range": "Range",
     "color_space": "Color Space",
     "color_transfer": "Transfer",
+    "duration_mismatch": "Duration Mismatch",
     "downloaded_from": "Downloaded From",
+    "frame_count": "Frame Count",
     "interactive_speed": "Interactive Speed",
     "md5": "MD5 Checksum",
     "o_count": "O Count",
     "oshash": "oshash",
     "oshash_meaning": "OpenSubtitles Hash",
+    "video_stream_duration": "Video Stream Duration",
     "performer_card": {
       "age": "{age} {years_old}",
       "age_context": "{age} {years_old} at production"

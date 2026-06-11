@@ -70,7 +70,13 @@ func (g Generator) screenshot(input string, options screenshotOptions) generateF
 
 				ssOptions.SetBT709ColorParameters = true
 				args = transcoder.ScreenshotTime(input, options.Time, ssOptions)
-				return g.generate(lockCtx, args)
+				if err := g.generate(lockCtx, args); err != nil {
+					return g.retryWithColorMetadataFixedInput(lockCtx, input, err, func(fixedInput string) error {
+						ssOptions.SetBT709ColorParameters = false
+						args = transcoder.ScreenshotTime(fixedInput, options.Time, ssOptions)
+						return g.generate(lockCtx, args)
+					})
+				}
 			}
 		}
 

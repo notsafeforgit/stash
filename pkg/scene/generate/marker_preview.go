@@ -226,7 +226,13 @@ func (g Generator) sceneMarkerScreenshot(input string, options SceneMarkerScreen
 
 				ssOptions.SetBT709ColorParameters = true
 				args = transcoder.ScreenshotTime(input, options.Seconds, ssOptions)
-				return g.generate(lockCtx, args)
+				if err := g.generate(lockCtx, args); err != nil {
+					return g.retryWithColorMetadataFixedInput(lockCtx, input, err, func(fixedInput string) error {
+						ssOptions.SetBT709ColorParameters = false
+						args = transcoder.ScreenshotTime(fixedInput, options.Seconds, ssOptions)
+						return g.generate(lockCtx, args)
+					})
+				}
 			}
 		}
 

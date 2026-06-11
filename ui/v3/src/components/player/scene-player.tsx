@@ -659,6 +659,11 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   // below for the synchronous replay path. Resets on scene change via
   // the parent's per-scene player remount.
   const stoppedAtEndRef = useRef(false);
+  // Latched true on the first explicit playback gesture (play/pause
+  // toggle, pre-start play click). Read by `usePlayDelay` — see the
+  // hook's header comment. Never reset: the gate only spans the first
+  // `playDelayMs` after mount, and a scene change remounts the player.
+  const userPlaybackIntentRef = useRef(false);
   const handleClipStop = useCallback(() => {
     if (!clipRange) return;
     stoppedAtEndRef.current = true;
@@ -681,6 +686,10 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   const handleTogglePaused = useCallback(() => {
     const s = storeRef.current;
     if (!s) return;
+    // Every toggle is an explicit user gesture — from here on the user
+    // owns the playback state, so the play-delay gate must neither
+    // suppress the resulting play nor auto-resume at its deadline.
+    userPlaybackIntentRef.current = true;
     // Replay-from-stop fast path: if the user is unpausing after the
     // marker auto-stop, restart from clip start. `handleRestart` keeps
     // the seek+play in the click-handler stack when the current playlist
@@ -734,7 +743,16 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   const autoplayIntentRef = useRef(effectiveAutoPlay);
   autoplayIntentRef.current = effectiveAutoPlay;
 
-  usePlayDelay(fullscreenContainerRef, playDelayMs, autoplayIntentRef);
+  usePlayDelay(
+    fullscreenContainerRef,
+    playDelayMs,
+    autoplayIntentRef,
+    userPlaybackIntentRef,
+  );
+
+  const handleUserPlaybackGesture = useCallback(() => {
+    userPlaybackIntentRef.current = true;
+  }, []);
 
   // Memoized so the array reference is stable when only an unrelated state
   // change re-renders ScenePlayer — keeps `MemoVideo`'s shallow equality
@@ -916,6 +934,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
               canAdvance={canAdvance}
               onCyclePlaybackMode={handleCyclePlaybackMode}
               onTogglePaused={handleTogglePaused}
+              onUserPlaybackGesture={handleUserPlaybackGesture}
               onToggleFullscreenOverride={onToggleFullscreenOverride}
               clipBoundsEdit={clipBoundsEdit}
               cancelPendingTapToggleRef={cancelPendingTapToggleRef}

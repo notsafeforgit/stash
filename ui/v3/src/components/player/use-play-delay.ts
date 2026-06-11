@@ -12,6 +12,20 @@
  * to resume — this is allowed because the original play was authorized
  * by the autoplay attribute.
  *
+ * The deadline resume is gated on `autoplayIntentRef`, so with autostart
+ * off the gate doubles as the lightbox's autostart enforcement: any
+ * programmatic play that slips out during the opening window is paused
+ * and stays paused.
+ *
+ * That enforcement must not swallow the user's own play: an explicit
+ * playback gesture (pre-start play click, play/pause toggle) sets
+ * `userPlaybackIntentRef`, which releases the gate — the `playing` it
+ * produces goes through, and the deadline takes no action afterwards
+ * (the user owns the playback state from then on). The signal is
+ * explicit rather than inferred from `playing` events because the gate
+ * cannot distinguish a user-initiated play from a programmatic one at
+ * the event level.
+ *
  * The `<video>` element can be replaced when the player swaps sources
  * (`key={finalSrc}` on `Player.Provider` triggers a remount). The hook
  * watches `rootRef`'s subtree with a `MutationObserver` and re-attaches
@@ -23,6 +37,7 @@ export function usePlayDelay(
   rootRef: RefObject<HTMLElement | null>,
   delayMs: number,
   autoplayIntentRef: MutableRefObject<boolean>,
+  userPlaybackIntentRef: MutableRefObject<boolean>,
 ): void {
   useEffect(() => {
     if (delayMs <= 0) return;
@@ -38,6 +53,13 @@ export function usePlayDelay(
 
     function onPlaying(e: Event) {
       if (!suppressed) return;
+      // The user pressed play — their gesture wins over the animation
+      // gate. Release rather than pause: with autostart off the deadline
+      // would never restore a swallowed user play.
+      if (userPlaybackIntentRef.current) {
+        suppressed = false;
+        return;
+      }
       const video = e.currentTarget;
       if (video instanceof HTMLVideoElement) video.pause();
     }
@@ -64,6 +86,9 @@ export function usePlayDelay(
     const t = window.setTimeout(
       () => {
         suppressed = false;
+        // The user has taken control of playback during the window —
+        // whatever state they chose (playing or paused) stands.
+        if (userPlaybackIntentRef.current) return;
         const video = findVideo();
         if (!video?.paused) return;
         if (!autoplayIntentRef.current) return;
@@ -80,5 +105,5 @@ export function usePlayDelay(
       observer.disconnect();
       if (attached) detach(attached);
     };
-  }, [rootRef, delayMs, autoplayIntentRef]);
+  }, [rootRef, delayMs, autoplayIntentRef, userPlaybackIntentRef]);
 }

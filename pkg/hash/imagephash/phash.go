@@ -6,8 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
 
 	"github.com/corona10/goimagehash"
+	"golang.org/x/image/bmp"
+	_ "golang.org/x/image/webp"
+
 	"github.com/stashapp/stash/pkg/ffmpeg"
 	"github.com/stashapp/stash/pkg/ffmpeg/transcoder"
 	"github.com/stashapp/stash/pkg/file"
@@ -70,9 +76,9 @@ func loadImageFFmpeg(encoder *ffmpeg.FFMpeg, path string) (image.Image, error) {
 		return nil, fmt.Errorf("converting image with ffmpeg: %w", err)
 	}
 
-	img, _, err := image.Decode(bytes.NewReader(data))
+	img, err := bmp.Decode(bytes.NewReader(data))
 	if err != nil {
-		return nil, fmt.Errorf("decoding ffmpeg output: %w", err)
+		return nil, fmt.Errorf("decoding ffmpeg bmp output: %w", err)
 	}
 
 	return img, nil

@@ -22,6 +22,9 @@ type ScreenshotOptions struct {
 
 	// SlowSeek uses accurate seek by placing -ss after the input.
 	SlowSeek bool
+
+	// SetBT709ColorParameters overrides invalid frame color tags before scaling.
+	SetBT709ColorParameters bool
 }
 
 func (o *ScreenshotOptions) setDefaults() {
@@ -31,14 +34,19 @@ func (o *ScreenshotOptions) setDefaults() {
 }
 
 type ScreenshotOutputType struct {
-	codec  *ffmpeg.VideoCodec
-	format ffmpeg.Format
+	codec            *ffmpeg.VideoCodec
+	format           ffmpeg.Format
+	strictCompliance *int
 }
 
 func (t ScreenshotOutputType) Args() []string {
 	var ret []string
 	if t.codec != nil {
 		ret = append(ret, t.codec.Args()...)
+	}
+	if t.strictCompliance != nil {
+		var args ffmpeg.Args
+		ret = append(ret, args.Strict(*t.strictCompliance)...)
 	}
 	if t.format != "" {
 		ret = append(ret, t.format.Args()...)
@@ -48,12 +56,15 @@ func (t ScreenshotOutputType) Args() []string {
 }
 
 var (
+	strictUnofficial = -2
+
 	ScreenshotOutputTypeImage2 = ScreenshotOutputType{
-		format: "image2",
+		format:           ffmpeg.FormatImage2,
+		strictCompliance: &strictUnofficial,
 	}
 	ScreenshotOutputTypeBMP = ScreenshotOutputType{
 		codec:  &ffmpeg.VideoCodecBMP,
-		format: "rawvideo",
+		format: ffmpeg.FormatImage2Pipe,
 	}
 )
 
@@ -67,6 +78,9 @@ func ScreenshotTime(input string, t float64, options ScreenshotOptions) ffmpeg.A
 	if !options.SlowSeek {
 		args = args.Seek(t)
 	}
+	if options.SetBT709ColorParameters {
+		args = args.SetBT709ColorParameters()
+	}
 	args = args.Input(input)
 	if options.SlowSeek {
 		args = args.Seek(t)
@@ -79,13 +93,17 @@ func ScreenshotTime(input string, t float64, options ScreenshotOptions) ffmpeg.A
 
 	var vf ffmpeg.VideoFilter
 
+	if options.SetBT709ColorParameters {
+		vf = vf.SetBT709ColorParameters()
+	}
+
 	if options.Width > 0 {
 		vf = vf.ScaleWidth(options.Width)
-		args = args.VideoFilter(vf)
 	} else if options.Height > 0 {
 		vf = vf.ScaleHeight(options.Height)
-		args = args.VideoFilter(vf)
 	}
+
+	args = args.VideoFilter(vf)
 
 	args = args.AppendArgs(options.OutputType)
 	args = args.Output(options.OutputPath)
@@ -102,12 +120,20 @@ func ScreenshotFrame(input string, frame int, options ScreenshotOptions) ffmpeg.
 	args = args.LogLevel(options.Verbosity)
 	args = args.Overwrite()
 
+	if options.SetBT709ColorParameters {
+		args = args.SetBT709ColorParameters()
+	}
 	args = args.Input(input)
 	args = args.VideoFrames(1)
 
 	args = args.VSync(ffmpeg.VSyncMethodPassthrough)
 
 	var vf ffmpeg.VideoFilter
+
+	if options.SetBT709ColorParameters {
+		vf = vf.SetBT709ColorParameters()
+	}
+
 	// keep only frame number options.Frame)
 	vf = vf.Select(frame)
 

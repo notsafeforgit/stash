@@ -52,6 +52,15 @@ func (a Args) Input(i string) Args {
 	return append(a, "-i", i)
 }
 
+// SetBT709ColorParameters sets BT.709 color metadata for the next video stream.
+func (a Args) SetBT709ColorParameters() Args {
+	return append(a,
+		"-colorspace", "bt709",
+		"-color_trc", "bt709",
+		"-color_primaries", "bt709",
+	)
+}
+
 // Output adds the output o and returns the result.
 func (a Args) Output(o string) Args {
 	return append(a, o)
@@ -78,6 +87,11 @@ func (a Args) VideoFrames(f int) Args {
 // FixedQualityScaleVideo adds the -q:v argument with q and returns the result.
 func (a Args) FixedQualityScaleVideo(q int) Args {
 	return append(a, "-q:v", fmt.Sprint(q))
+}
+
+// Strict sets the standards compliance mode and returns the result.
+func (a Args) Strict(s int) Args {
+	return append(a, "-strict", fmt.Sprint(s))
 }
 
 // VideoFilter adds the vf video filter and returns the result.

@@ -65,7 +65,13 @@ func (g Generator) screenshot(input string, options screenshotOptions) generateF
 
 			ssOptions.SlowSeek = true
 			args = transcoder.ScreenshotTime(input, options.Time, ssOptions)
-			return g.generate(lockCtx, args)
+			if err := g.generate(lockCtx, args); err != nil {
+				logger.Warnf("[generator] screenshot failed for %s at %.3fs, retrying with BT.709 color metadata fallback: %v", input, options.Time, err)
+
+				ssOptions.SetBT709ColorParameters = true
+				args = transcoder.ScreenshotTime(input, options.Time, ssOptions)
+				return g.generate(lockCtx, args)
+			}
 		}
 
 		return nil

@@ -83,6 +83,12 @@ func (f VideoFilter) ScaleMaxLM(width int, height int, reqHeight int, maxWidth i
 	}
 }
 
+// SetBT709ColorParameters overrides frame color metadata before later filters.
+// It is a fallback for files with invalid color tags that libavfilter rejects.
+func (f VideoFilter) SetBT709ColorParameters() VideoFilter {
+	return f.Append("setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709")
+}
+
 // Fps returns a VideoFilter setting the frames per second.
 func (f VideoFilter) Fps(fps int) VideoFilter {
 	return f.Append(fmt.Sprintf("fps=%v", fps))

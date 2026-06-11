@@ -10,6 +10,7 @@ import (
 
 	"github.com/corona10/goimagehash"
 	"github.com/disintegration/imaging"
+	"golang.org/x/image/bmp"
 
 	"github.com/stashapp/stash/pkg/ffmpeg"
 	"github.com/stashapp/stash/pkg/ffmpeg/transcoder"
@@ -37,12 +38,13 @@ func Generate(encoder *ffmpeg.FFMpeg, videoFile *models.VideoFile) (*uint64, err
 	return &hashValue, nil
 }
 
-func generateSpriteScreenshot(encoder *ffmpeg.FFMpeg, input string, t float64, slowSeek bool) (image.Image, error) {
+func generateSpriteScreenshot(encoder *ffmpeg.FFMpeg, input string, t float64, slowSeek bool, setBT709ColorParameters bool) (image.Image, error) {
 	options := transcoder.ScreenshotOptions{
-		Width:      screenshotSize,
-		OutputPath: "-",
-		OutputType: transcoder.ScreenshotOutputTypeBMP,
-		SlowSeek:   slowSeek,
+		Width:                   screenshotSize,
+		OutputPath:              "-",
+		OutputType:              transcoder.ScreenshotOutputTypeBMP,
+		SlowSeek:                slowSeek,
+		SetBT709ColorParameters: setBT709ColorParameters,
 	}
 
 	args := transcoder.ScreenshotTime(input, t, options)
@@ -51,11 +53,9 @@ func generateSpriteScreenshot(encoder *ffmpeg.FFMpeg, input string, t float64, s
 		return nil, err
 	}
 
-	reader := bytes.NewReader(data)
-
-	img, _, err := image.Decode(reader)
+	img, err := bmp.Decode(bytes.NewReader(data))
 	if err != nil {
-		return nil, fmt.Errorf("decoding image: %w", err)
+		return nil, fmt.Errorf("decoding bmp image: %w", err)
 	}
 
 	return img, nil
@@ -86,16 +86,23 @@ func generateSprite(encoder *ffmpeg.FFMpeg, videoFile *models.VideoFile) (image.
 	stepSize := (0.9 * videoFile.Duration) / float64(chunkCount)
 	var images []image.Image
 	slowSeek := false
+	setBT709ColorParameters := false
 
 	for i := 0; i < chunkCount; i++ {
 		time := offset + (float64(i) * stepSize)
 
-		img, err := generateSpriteScreenshot(encoder, videoFile.Path, time, slowSeek)
+		img, err := generateSpriteScreenshot(encoder, videoFile.Path, time, slowSeek, setBT709ColorParameters)
 		if err != nil && !slowSeek {
 			logger.Warnf("[generator] fast phash screenshot seek failed for %s at %.3fs, retrying with accurate seek for remaining phash screenshots: %v", videoFile.Path, time, err)
 
 			slowSeek = true
-			img, err = generateSpriteScreenshot(encoder, videoFile.Path, time, slowSeek)
+			img, err = generateSpriteScreenshot(encoder, videoFile.Path, time, slowSeek, setBT709ColorParameters)
+		}
+		if err != nil && !setBT709ColorParameters {
+			logger.Warnf("[generator] phash screenshot failed for %s at %.3fs, retrying with BT.709 color metadata fallback for remaining phash screenshots: %v", videoFile.Path, time, err)
+
+			setBT709ColorParameters = true
+			img, err = generateSpriteScreenshot(encoder, videoFile.Path, time, slowSeek, setBT709ColorParameters)
 		}
 		if err != nil {
 			return nil, fmt.Errorf("generating sprite screenshot: %w", err)

@@ -298,6 +298,12 @@ input SceneFilterType {
   bitrate: IntCriterionInput
   "Filter by bit depth"
   bit_depth: IntCriterionInput
+  "Filter by video stream duration (in seconds)"
+  video_stream_duration: IntCriterionInput
+  "Filter by video frame count"
+  frame_count: IntCriterionInput
+  "Filter by file/container duration differing from video stream duration"
+  duration_mismatch: Boolean
   "Filter by video codec"
   video_codec: StringCriterionInput
   "Filter by audio codec"
@@ -859,6 +865,9 @@ input VideoFileFilterInput {
   framerate: IntCriterionInput
   bitrate: IntCriterionInput
   bit_depth: IntCriterionInput
+  video_stream_duration: IntCriterionInput
+  frame_count: IntCriterionInput
+  duration_mismatch: Boolean
   format: StringCriterionInput
   video_codec: StringCriterionInput
   audio_codec: StringCriterionInput

@@ -306,6 +306,25 @@ func boolCriterionHandler(c *bool, column string, addJoinFn func(f *filterBuilde
 	}
 }
 
+func durationMismatchCriterionHandler(c *bool, addJoinFn func(f *filterBuilder, joinType joinType)) criterionHandlerFunc {
+	return func(ctx context.Context, f *filterBuilder) {
+		if c == nil {
+			return
+		}
+		if addJoinFn != nil {
+			addJoinFn(f, joinTypeInner)
+		}
+
+		const mismatch = "video_files.duration_mismatch OR (video_files.video_stream_duration IS NOT NULL AND ABS(video_files.duration - video_files.video_stream_duration) > 0.5)"
+		if *c {
+			f.addWhere(mismatch)
+			return
+		}
+
+		f.addWhere("NOT (" + mismatch + ")")
+	}
+}
+
 type dateCriterionHandler struct {
 	c      *models.DateCriterionInput
 	column string

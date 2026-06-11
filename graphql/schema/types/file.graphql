@@ -93,9 +93,12 @@ type VideoFile implements BaseFile {
   color_transfer: String
   color_primaries: String
   duration: Float!
+  video_stream_duration: Float
   video_codec: String!
   audio_codec: String!
   frame_rate: Float!
+  frame_count: Int64
+  duration_mismatch: Boolean!
   bit_rate: Int!
 
   scenes: [Scene!]!

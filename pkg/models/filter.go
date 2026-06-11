@@ -224,14 +224,17 @@ type FingerprintFilterInput struct {
 }
 
 type VideoFileFilterInput struct {
-	Format      *StringCriterionInput      `json:"format,omitempty"`
-	Resolution  *ResolutionCriterionInput  `json:"resolution,omitempty"`
-	Orientation *OrientationCriterionInput `json:"orientation,omitempty"`
-	Framerate   *IntCriterionInput         `json:"framerate,omitempty"`
-	Bitrate     *IntCriterionInput         `json:"bitrate,omitempty"`
-	BitDepth    *IntCriterionInput         `json:"bit_depth,omitempty"`
-	VideoCodec  *StringCriterionInput      `json:"video_codec,omitempty"`
-	AudioCodec  *StringCriterionInput      `json:"audio_codec,omitempty"`
+	Format              *StringCriterionInput      `json:"format,omitempty"`
+	Resolution          *ResolutionCriterionInput  `json:"resolution,omitempty"`
+	Orientation         *OrientationCriterionInput `json:"orientation,omitempty"`
+	Framerate           *IntCriterionInput         `json:"framerate,omitempty"`
+	Bitrate             *IntCriterionInput         `json:"bitrate,omitempty"`
+	BitDepth            *IntCriterionInput         `json:"bit_depth,omitempty"`
+	VideoStreamDuration *IntCriterionInput         `json:"video_stream_duration,omitempty"`
+	FrameCount          *IntCriterionInput         `json:"frame_count,omitempty"`
+	DurationMismatch    *bool                      `json:"duration_mismatch,omitempty"`
+	VideoCodec          *StringCriterionInput      `json:"video_codec,omitempty"`
+	AudioCodec          *StringCriterionInput      `json:"audio_codec,omitempty"`
 	// in seconds
 	Duration         *IntCriterionInput    `json:"duration,omitempty"`
 	Captions         *StringCriterionInput `json:"captions,omitempty"`

@@ -283,19 +283,22 @@ func (f ImageFile) Clone() (ret File) {
 // VideoFile is an extension of BaseFile to represent video files.
 type VideoFile struct {
 	*BaseFile
-	Format         string  `json:"format"`
-	Width          int     `json:"width"`
-	Height         int     `json:"height"`
-	Duration       float64 `json:"duration"`
-	VideoCodec     string  `json:"video_codec"`
-	AudioCodec     string  `json:"audio_codec"`
-	FrameRate      float64 `json:"frame_rate"`
-	BitRate        int64   `json:"bitrate"`
-	BitDepth       *int    `json:"bit_depth,omitempty"`
-	ColorRange     *string `json:"color_range,omitempty"`
-	ColorSpace     *string `json:"color_space,omitempty"`
-	ColorTransfer  *string `json:"color_transfer,omitempty"`
-	ColorPrimaries *string `json:"color_primaries,omitempty"`
+	Format              string   `json:"format"`
+	Width               int      `json:"width"`
+	Height              int      `json:"height"`
+	Duration            float64  `json:"duration"`
+	VideoStreamDuration *float64 `json:"video_stream_duration,omitempty"`
+	VideoCodec          string   `json:"video_codec"`
+	AudioCodec          string   `json:"audio_codec"`
+	FrameRate           float64  `json:"frame_rate"`
+	FrameCount          *int64   `json:"frame_count,omitempty"`
+	DurationMismatch    bool     `json:"duration_mismatch"`
+	BitRate             int64    `json:"bitrate"`
+	BitDepth            *int     `json:"bit_depth,omitempty"`
+	ColorRange          *string  `json:"color_range,omitempty"`
+	ColorSpace          *string  `json:"color_space,omitempty"`
+	ColorTransfer       *string  `json:"color_transfer,omitempty"`
+	ColorPrimaries      *string  `json:"color_primaries,omitempty"`
 
 	Interactive      bool `json:"interactive"`
 	InteractiveSpeed *int `json:"interactive_speed"`
@@ -329,6 +332,17 @@ func (f VideoFile) DurationFinite() float64 {
 		return 0
 	}
 	return ret
+}
+
+func (f VideoFile) VideoStreamDurationFinite() float64 {
+	if f.VideoStreamDuration != nil {
+		ret := *f.VideoStreamDuration
+		if ret > 0 && !math.IsInf(ret, 0) && !math.IsNaN(ret) {
+			return ret
+		}
+	}
+
+	return f.DurationFinite()
 }
 
 func (f VideoFile) FrameRateFinite() float64 {

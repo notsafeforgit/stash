@@ -53,7 +53,7 @@ LLM agents performing a sync.
      column, fork migration 1), `saved_filters` (`filter_ast` column, fork
      migration 2), and `video_files`/`image_files` (`bit_depth`,
      `color_range`, `color_space`, `color_transfer`, `color_primaries`, fork
-     migration 3).
+     migration 3; `video_stream_duration`, `frame_count`, fork migration 4).
 4. **Expected conflict zones:** `pkg/ffmpeg` (fork's HLS/segmented-streaming
    rework overlaps upstream transcode work) and occasionally
    `internal/api/resolver_*.go`. Resolve in favour of keeping fork behaviour;

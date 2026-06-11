@@ -10,8 +10,11 @@ fragment VideoFileData on VideoFile {
   size
   mod_time
   duration
+  video_stream_duration
   video_codec
   audio_codec
+  frame_count
+  duration_mismatch
   width
   height
   bit_depth

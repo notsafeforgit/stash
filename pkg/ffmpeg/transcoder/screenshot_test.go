@@ -106,6 +106,31 @@ func TestScreenshotTimeBMPPipe(t *testing.T) {
 	}
 }
 
+func TestScreenshotTimePNGPipe(t *testing.T) {
+	options := ScreenshotOptions{
+		OutputPath: "-",
+		OutputType: ScreenshotOutputTypePNG,
+		Width:      160,
+	}
+
+	got := ScreenshotTime("input.webm", 12.5, options)
+	want := []string{
+		"-v", "error",
+		"-y",
+		"-ss", "12.5",
+		"-i", "input.webm",
+		"-frames:v", "1",
+		"-vf", "scale=160:-2",
+		"-c:v", "png",
+		"-f", "image2pipe",
+		"-",
+	}
+
+	if !reflect.DeepEqual([]string(got), want) {
+		t.Fatalf("ScreenshotTime() = %#v, want %#v", []string(got), want)
+	}
+}
+
 func TestScreenshotFrameColorParameterFallback(t *testing.T) {
 	options := ScreenshotOptions{
 		OutputPath:              "-",

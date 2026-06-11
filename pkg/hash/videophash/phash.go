@@ -208,6 +208,8 @@ func generateSprite(encoder *ffmpeg.FFMpeg, videoFile *models.VideoFile) (image.
 	var images []image.Image
 	slowSeek := false
 	setBT709ColorParameters := false
+	timestampRecoveryCount := 0
+	previousFrameReuseCount := 0
 
 	for i := 0; i < chunkCount; i++ {
 		time := offset + (float64(i) * stepSize)
@@ -236,10 +238,14 @@ func generateSprite(encoder *ffmpeg.FFMpeg, videoFile *models.VideoFile) (image.
 			var usedTimestampBackoff bool
 			img, usedTimestampBackoff, err = generateSpriteScreenshotWithTimestampBackoff(encoder, input, time, stepSize, slowSeek, setBT709ColorParameters, err)
 			metadata.durationMismatch = metadata.durationMismatch || usedTimestampBackoff
+			if usedTimestampBackoff {
+				timestampRecoveryCount++
+			}
 		}
 		if err != nil && len(images) > 0 {
-			logger.Warnf("[generator] phash screenshot failed for %s at %.3fs after timestamp fallbacks, reusing previous sprite frame: %s", videoFile.Path, time, compactError(err))
+			logger.Debugf("[generator] phash screenshot failed for %s at %.3fs after timestamp fallbacks, reusing previous sprite frame: %s", videoFile.Path, time, compactError(err))
 			metadata.durationMismatch = true
+			previousFrameReuseCount++
 			images = append(images, images[len(images)-1])
 			continue
 		}
@@ -254,6 +260,9 @@ func generateSprite(encoder *ffmpeg.FFMpeg, videoFile *models.VideoFile) (image.
 	if len(images) == 0 {
 		return nil, metadata, fmt.Errorf("images slice is empty, failed to generate phash sprite for %s", videoFile.Path)
 	}
+	if timestampRecoveryCount > 0 || previousFrameReuseCount > 0 {
+		logger.Warnf("[generator] recovered phash sprite for %s using %d earlier timestamp(s) and %d repeated previous frame(s)", videoFile.Path, timestampRecoveryCount, previousFrameReuseCount)
+	}
 
 	return combineImages(images), metadata, nil
 }
@@ -262,7 +271,7 @@ func generateSpriteScreenshotWithTimestampBackoff(encoder *ffmpeg.FFMpeg, input 
 	for _, fallbackTime := range timestampBackoffTimes(t, stepSize) {
 		img, err := generateSpriteScreenshot(encoder, input, fallbackTime, slowSeek, setBT709ColorParameters)
 		if err == nil {
-			logger.Warnf("[generator] recovered phash screenshot for %s at %.3fs using earlier timestamp %.3fs", input, t, fallbackTime)
+			logger.Debugf("[generator] recovered phash screenshot for %s at %.3fs using earlier timestamp %.3fs", input, t, fallbackTime)
 			return img, true, nil
 		}
 		logger.Debugf("[generator] phash screenshot fallback failed for %s at %.3fs while recovering %.3fs: %s", input, fallbackTime, t, compactError(err))
@@ -362,8 +371,11 @@ func colorMetadataBitstreamFilter(codec string) (string, bool) {
 func generateFrameSprite(encoder *ffmpeg.FFMpeg, videoFile *models.VideoFile, frameCount int) (image.Image, bool, error) {
 	chunkCount := columns * rows
 	images := make([]image.Image, 0, chunkCount)
+	frameCache := make(map[int]image.Image, chunkCount)
 	setBT709ColorParameters := false
 	durationMismatch := false
+	frameRecoveryCount := 0
+	previousFrameReuseCount := 0
 	input := videoFile.Path
 	var cleanupFixedInput func()
 	defer func() {
@@ -390,6 +402,10 @@ func generateFrameSprite(encoder *ffmpeg.FFMpeg, videoFile *models.VideoFile, fr
 
 	for i := 0; i < chunkCount; i++ {
 		frame := spriteFrameIndex(i, frameCount)
+		if cached, ok := frameCache[frame]; ok {
+			images = append(images, cached)
+			continue
+		}
 
 		img, err := generateSpriteFrameScreenshot(encoder, input, frame, setBT709ColorParameters)
 		if err != nil && !setBT709ColorParameters {
@@ -407,12 +423,17 @@ func generateFrameSprite(encoder *ffmpeg.FFMpeg, videoFile *models.VideoFile, fr
 		}
 		if err != nil {
 			var usedFrameBackoff bool
-			img, usedFrameBackoff, err = generateSpriteFrameScreenshotWithFrameBackoff(encoder, input, frame, setBT709ColorParameters, err)
+			img, usedFrameBackoff, err = generateSpriteFrameScreenshotWithFrameBackoff(encoder, input, frame, setBT709ColorParameters, frameCache, err)
 			durationMismatch = durationMismatch || usedFrameBackoff
+			if usedFrameBackoff {
+				frameRecoveryCount++
+			}
 		}
 		if err != nil && len(images) > 0 {
-			logger.Warnf("[generator] frame-based phash screenshot failed for %s at frame %d after frame fallbacks, reusing previous sprite frame: %s", videoFile.Path, frame, compactError(err))
+			logger.Debugf("[generator] frame-based phash screenshot failed for %s at frame %d after frame fallbacks, reusing previous sprite frame: %s", videoFile.Path, frame, compactError(err))
 			durationMismatch = true
+			previousFrameReuseCount++
+			frameCache[frame] = images[len(images)-1]
 			images = append(images, images[len(images)-1])
 			continue
 		}
@@ -420,17 +441,27 @@ func generateFrameSprite(encoder *ffmpeg.FFMpeg, videoFile *models.VideoFile, fr
 			return nil, durationMismatch, fmt.Errorf("generating frame-based sprite screenshot: %w", err)
 		}
 
+		frameCache[frame] = img
 		images = append(images, img)
+	}
+	if frameRecoveryCount > 0 || previousFrameReuseCount > 0 {
+		logger.Warnf("[generator] recovered frame-based phash sprite for %s using %d earlier frame(s) and %d repeated previous frame(s)", videoFile.Path, frameRecoveryCount, previousFrameReuseCount)
 	}
 
 	return combineImages(images), durationMismatch, nil
 }
 
-func generateSpriteFrameScreenshotWithFrameBackoff(encoder *ffmpeg.FFMpeg, input string, frame int, setBT709ColorParameters bool, originalErr error) (image.Image, bool, error) {
+func generateSpriteFrameScreenshotWithFrameBackoff(encoder *ffmpeg.FFMpeg, input string, frame int, setBT709ColorParameters bool, frameCache map[int]image.Image, originalErr error) (image.Image, bool, error) {
 	for _, fallbackFrame := range frameBackoffIndexes(frame) {
+		if cached, ok := frameCache[fallbackFrame]; ok {
+			logger.Debugf("[generator] recovered frame-based phash screenshot for %s at frame %d using cached earlier frame %d", input, frame, fallbackFrame)
+			return cached, true, nil
+		}
+
 		img, err := generateSpriteFrameScreenshot(encoder, input, fallbackFrame, setBT709ColorParameters)
 		if err == nil {
-			logger.Warnf("[generator] recovered frame-based phash screenshot for %s at frame %d using earlier frame %d", input, frame, fallbackFrame)
+			frameCache[fallbackFrame] = img
+			logger.Debugf("[generator] recovered frame-based phash screenshot for %s at frame %d using earlier frame %d", input, frame, fallbackFrame)
 			return img, true, nil
 		}
 		logger.Debugf("[generator] frame-based phash screenshot fallback failed for %s at frame %d while recovering frame %d: %s", input, fallbackFrame, frame, compactError(err))

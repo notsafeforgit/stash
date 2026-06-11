@@ -13,13 +13,14 @@ func (f Format) Args() []string {
 }
 
 var (
-	FormatConcat   Format = "concat"
-	FormatImage2   Format = "image2"
-	FormatRawVideo Format = "rawvideo"
-	FormatMpegTS   Format = "mpegts"
-	FormatMP4      Format = "mp4"
-	FormatWebm     Format = "webm"
-	FormatMatroska Format = "matroska"
+	FormatConcat     Format = "concat"
+	FormatImage2     Format = "image2"
+	FormatImage2Pipe Format = "image2pipe"
+	FormatRawVideo   Format = "rawvideo"
+	FormatMpegTS     Format = "mpegts"
+	FormatMP4        Format = "mp4"
+	FormatWebm       Format = "webm"
+	FormatMatroska   Format = "matroska"
 )
 
 // ImageFormat represents the input format for an image for ffmpeg.

@@ -216,6 +216,20 @@ func (g Generator) sceneMarkerScreenshot(input string, options SceneMarkerScreen
 
 		args := transcoder.ScreenshotTime(input, options.Seconds, ssOptions)
 
-		return g.generate(lockCtx, args)
+		if err := g.generate(lockCtx, args); err != nil {
+			logger.Warnf("[generator] fast marker screenshot seek failed for %s at %.3fs, retrying with accurate seek: %v", input, options.Seconds, err)
+
+			ssOptions.SlowSeek = true
+			args = transcoder.ScreenshotTime(input, options.Seconds, ssOptions)
+			if err := g.generate(lockCtx, args); err != nil {
+				logger.Warnf("[generator] marker screenshot failed for %s at %.3fs, retrying with BT.709 color metadata fallback: %v", input, options.Seconds, err)
+
+				ssOptions.SetBT709ColorParameters = true
+				args = transcoder.ScreenshotTime(input, options.Seconds, ssOptions)
+				return g.generate(lockCtx, args)
+			}
+		}
+
+		return nil
 	}
 }

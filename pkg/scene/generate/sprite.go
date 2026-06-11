@@ -12,6 +12,8 @@ import (
 	"strings"
 
 	"github.com/disintegration/imaging"
+	"golang.org/x/image/bmp"
+
 	"github.com/stashapp/stash/pkg/ffmpeg"
 	"github.com/stashapp/stash/pkg/ffmpeg/transcoder"
 	"github.com/stashapp/stash/pkg/fsutil"
@@ -41,7 +43,14 @@ func (g Generator) SpriteScreenshot(ctx context.Context, input string, seconds f
 
 		ssOptions.SlowSeek = true
 		args = transcoder.ScreenshotTime(input, seconds, ssOptions)
-		return g.generateImage(lockCtx, args)
+		img, err = g.generateImage(lockCtx, args)
+		if err != nil {
+			logger.Warnf("[generator] sprite screenshot failed for %s at %.3fs, retrying with BT.709 color metadata fallback: %v", input, seconds, err)
+
+			ssOptions.SetBT709ColorParameters = true
+			args = transcoder.ScreenshotTime(input, seconds, ssOptions)
+			return g.generateImage(lockCtx, args)
+		}
 	}
 
 	return img, nil
@@ -59,7 +68,16 @@ func (g Generator) SpriteScreenshotSlow(ctx context.Context, input string, frame
 
 	args := transcoder.ScreenshotFrame(input, frame, ssOptions)
 
-	return g.generateImage(lockCtx, args)
+	img, err := g.generateImage(lockCtx, args)
+	if err != nil {
+		logger.Warnf("[generator] slow sprite screenshot failed for %s at frame %d, retrying with BT.709 color metadata fallback: %v", input, frame, err)
+
+		ssOptions.SetBT709ColorParameters = true
+		args = transcoder.ScreenshotFrame(input, frame, ssOptions)
+		return g.generateImage(lockCtx, args)
+	}
+
+	return img, nil
 }
 
 func (g Generator) generateImage(lockCtx *fsutil.LockContext, args ffmpeg.Args) (image.Image, error) {
@@ -68,9 +86,9 @@ func (g Generator) generateImage(lockCtx *fsutil.LockContext, args ffmpeg.Args) 
 		return nil, err
 	}
 
-	img, _, err := image.Decode(bytes.NewReader(out))
+	img, err := bmp.Decode(bytes.NewReader(out))
 	if err != nil {
-		return nil, fmt.Errorf("decoding image from ffmpeg: %w", err)
+		return nil, fmt.Errorf("decoding bmp image from ffmpeg: %w", err)
 	}
 
 	return img, nil

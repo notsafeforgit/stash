@@ -327,7 +327,12 @@ function sceneSortTintClasses(
 
     if (![...counts.values()].some((count) => count > 1)) continue;
 
-    const groupSeed = group.map((scene) => scene.id).join(":");
+    // Hash only varies the palette offset between groups; within a group each
+    // distinct value takes the next palette entry, so two different values
+    // can't share a tint until a group exceeds the palette size.
+    const groupOffset = stableHash(
+      `${group.map((scene) => scene.id).join(":")}:${column}`,
+    );
     const tintByValue = new Map<string, string>();
 
     for (const scene of group) {
@@ -336,8 +341,7 @@ function sceneSortTintClasses(
       if (!tint) {
         tint =
           SORT_VALUE_TINT_CLASSES[
-            stableHash(`${groupSeed}:${column}:${key}`) %
-              SORT_VALUE_TINT_CLASSES.length
+            (groupOffset + tintByValue.size) % SORT_VALUE_TINT_CLASSES.length
           ];
         tintByValue.set(key, tint);
       }

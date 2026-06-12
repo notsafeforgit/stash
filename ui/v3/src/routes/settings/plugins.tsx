@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useIntl } from "react-intl";
 import { useMutation, useQuery } from "@apollo/client/react";
 import {
   ChevronDown,
@@ -11,9 +10,11 @@ import {
 import * as GQL from "src/core/generated-graphql";
 import { useConfigurationContext, useConfigurePlugin } from "src/hooks/config";
 import { useToast } from "src/hooks/toast";
+import { useMsg } from "src/hooks/message";
 import { cn } from "src/lib/utils";
 import { Button } from "src/components/ui/button";
 import { Spinner } from "src/components/ui/spinner";
+import { Switch } from "src/components/ui/switch";
 import {
   SettingNumber,
   SettingsSection,
@@ -69,7 +70,6 @@ function PluginSettingRow({
 }
 
 function PluginCard({ plugin }: { plugin: Plugin }) {
-  const intl = useIntl();
   const Toast = useToast();
   const { configuration } = useConfigurationContext();
   const [configurePlugin] = useConfigurePlugin();
@@ -86,8 +86,7 @@ function PluginCard({ plugin }: { plugin: Plugin }) {
   >;
   const pluginSettings = pluginsConfig[plugin.id] ?? {};
 
-  const msg = (id: string, defaultMessage: string) =>
-    intl.formatMessage({ id, defaultMessage });
+  const msg = useMsg();
 
   async function onToggleEnabled() {
     try {
@@ -160,16 +159,15 @@ function PluginCard({ plugin }: { plugin: Plugin }) {
               {msg("actions.reload_ui", "Reload UI")}
             </Button>
           )}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => void onToggleEnabled()}
-          >
-            {plugin.enabled
-              ? msg("actions.disable", "Disable")
-              : msg("actions.enable", "Enable")}
-          </Button>
+          <Switch
+            checked={plugin.enabled}
+            onCheckedChange={() => void onToggleEnabled()}
+            aria-label={
+              plugin.enabled
+                ? msg("actions.disable", "Disable")
+                : msg("actions.enable", "Enable")
+            }
+          />
         </div>
       </div>
 
@@ -231,16 +229,13 @@ function PluginCard({ plugin }: { plugin: Plugin }) {
 }
 
 function SettingsPluginsPage() {
-  const intl = useIntl();
   const Toast = useToast();
-  const { configuration } = useConfigurationContext();
-  const { data, loading } = useQuery(GQL.PluginsDocument);
+  const { data, loading, refetch } = useQuery(GQL.PluginsDocument);
   const [reloadPlugins] = useMutation(GQL.ReloadPluginsDocument, {
     refetchQueries: [{ query: GQL.PluginsDocument }],
   });
 
-  const msg = (id: string, defaultMessage: string) =>
-    intl.formatMessage({ id, defaultMessage });
+  const msg = useMsg();
 
   async function onReloadPlugins() {
     try {
@@ -258,9 +253,7 @@ function SettingsPluginsPage() {
       >
         <PackageManager
           type="plugin"
-          sources={(configuration.general.pluginPackageSources ?? []).map(
-            (s) => ({ name: s.name, url: s.url }),
-          )}
+          onPackagesChanged={() => void refetch()}
         />
       </SettingsSection>
 

@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useIntl } from "react-intl";
+import { useMsg } from "src/hooks/message";
 import { Button } from "src/components/ui/button";
 import {
   SettingDisplay,
@@ -7,9 +7,7 @@ import {
 } from "src/components/settings/setting-row";
 
 function SettingsToolsPage() {
-  const intl = useIntl();
-  const msg = (id: string, defaultMessage: string) =>
-    intl.formatMessage({ id, defaultMessage });
+  const msg = useMsg();
 
   return (
     <div className="max-w-3xl space-y-8 p-6">

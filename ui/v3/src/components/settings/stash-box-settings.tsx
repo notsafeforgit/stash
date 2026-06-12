@@ -5,7 +5,7 @@
  * action backed by the ValidateStashBox query.
  */
 import { useState } from "react";
-import { useIntl } from "react-intl";
+import { useMsg } from "src/hooks/message";
 import { useLazyQuery } from "@apollo/client/react";
 import { Pencil, Trash2 } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
@@ -39,7 +39,6 @@ function StashBoxDialog({
   onCancel: () => void;
   onSave: (draft: StashBoxDraft) => void;
 }) {
-  const intl = useIntl();
   const [draft, setDraft] = useState(initial);
 
   // Re-seed the draft whenever a different box is opened for editing.
@@ -60,8 +59,7 @@ function StashBoxDialog({
     setDraft({ ...draft, ...patch });
   }
 
-  const msg = (id: string, defaultMessage: string) =>
-    intl.formatMessage({ id, defaultMessage });
+  const msg = useMsg();
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onCancel()}>
@@ -203,12 +201,10 @@ export function StashBoxSettings({
   boxes: StashBoxDraft[];
   onChange: (next: StashBoxDraft[]) => void;
 }) {
-  const intl = useIntl();
   // null = closed; -1 = adding; otherwise index being edited
   const [editIndex, setEditIndex] = useState<number | null>(null);
 
-  const msg = (id: string, defaultMessage: string) =>
-    intl.formatMessage({ id, defaultMessage });
+  const msg = useMsg();
 
   return (
     <div className="space-y-3">

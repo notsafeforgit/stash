@@ -3,6 +3,7 @@ import { useMutation } from "@apollo/client/react";
 import type { ApolloCache } from "@apollo/client/cache";
 import * as GQL from "src/core/generated-graphql";
 import { useSaveIndicator } from "./save-indicator";
+import { useToast } from "./toast";
 
 export interface IContext {
   configuration: GQL.ConfigDataFragment;
@@ -63,19 +64,36 @@ function updateUIConfig(
   });
 }
 
-export const useConfigureUISetting = () => {
+/**
+ * Wraps a config-save promise so the floating save-indicator
+ * (spinner / check / X) observes it, and toasts the error message on
+ * failure — the indicator's X only says *that* a save failed, not why.
+ * The original promise is returned, so callers that await it still
+ * observe rejection themselves; fire-and-forget (`void`) callers are
+ * covered by the side-chain handler.
+ */
+function useTrackedSave() {
   const saveIndicator = useSaveIndicator();
+  const Toast = useToast();
+  return useCallback(
+    <T,>(promise: Promise<T>): Promise<T> => {
+      const tracked = saveIndicator.track(promise);
+      tracked.catch((e: unknown) => Toast.error(e));
+      return tracked;
+    },
+    [saveIndicator, Toast],
+  );
+}
+
+export const useConfigureUISetting = () => {
+  const trackSave = useTrackedSave();
   const [mutate, result] = useMutation(GQL.ConfigureUiSettingDocument, {
     update: (cache, mutationResult) =>
       updateUIConfig(cache, mutationResult.data?.configureUISetting),
   });
-  // Route every call through the save-indicator so the floating
-  // spinner / check / X surfaces automatically. Apollo's `mutate`
-  // returns a promise; wrapping it in `track()` lets the indicator
-  // observe the outcome without changing the function signature.
   const trackedMutate = useCallback<typeof mutate>(
-    (options) => saveIndicator.track(mutate(options)),
-    [mutate, saveIndicator],
+    (options) => trackSave(mutate(options)),
+    [mutate, trackSave],
   );
   return [trackedMutate, result] as const;
 };
@@ -108,7 +126,7 @@ function writeConfigKey(
 }
 
 export const useConfigureInterface = () => {
-  const saveIndicator = useSaveIndicator();
+  const trackSave = useTrackedSave();
   const [mutate, result] = useMutation(GQL.ConfigureInterfaceDocument, {
     update: (cache, mutationResult) =>
       writeConfigKey(
@@ -118,60 +136,60 @@ export const useConfigureInterface = () => {
       ),
   });
   const trackedMutate = useCallback<typeof mutate>(
-    (options) => saveIndicator.track(mutate(options)),
-    [mutate, saveIndicator],
+    (options) => trackSave(mutate(options)),
+    [mutate, trackSave],
   );
   return [trackedMutate, result] as const;
 };
 
 export const useConfigureGeneral = () => {
-  const saveIndicator = useSaveIndicator();
+  const trackSave = useTrackedSave();
   const [mutate, result] = useMutation(GQL.ConfigureGeneralDocument, {
     update: (cache, mutationResult) =>
       writeConfigKey(cache, "general", mutationResult.data?.configureGeneral),
   });
   const trackedMutate = useCallback<typeof mutate>(
-    (options) => saveIndicator.track(mutate(options)),
-    [mutate, saveIndicator],
+    (options) => trackSave(mutate(options)),
+    [mutate, trackSave],
   );
   return [trackedMutate, result] as const;
 };
 
 export const useConfigureDefaults = () => {
-  const saveIndicator = useSaveIndicator();
+  const trackSave = useTrackedSave();
   const [mutate, result] = useMutation(GQL.ConfigureDefaultsDocument, {
     update: (cache, mutationResult) =>
       writeConfigKey(cache, "defaults", mutationResult.data?.configureDefaults),
   });
   const trackedMutate = useCallback<typeof mutate>(
-    (options) => saveIndicator.track(mutate(options)),
-    [mutate, saveIndicator],
+    (options) => trackSave(mutate(options)),
+    [mutate, trackSave],
   );
   return [trackedMutate, result] as const;
 };
 
 export const useConfigureScraping = () => {
-  const saveIndicator = useSaveIndicator();
+  const trackSave = useTrackedSave();
   const [mutate, result] = useMutation(GQL.ConfigureScrapingDocument, {
     update: (cache, mutationResult) =>
       writeConfigKey(cache, "scraping", mutationResult.data?.configureScraping),
   });
   const trackedMutate = useCallback<typeof mutate>(
-    (options) => saveIndicator.track(mutate(options)),
-    [mutate, saveIndicator],
+    (options) => trackSave(mutate(options)),
+    [mutate, trackSave],
   );
   return [trackedMutate, result] as const;
 };
 
 export const useConfigureDLNA = () => {
-  const saveIndicator = useSaveIndicator();
+  const trackSave = useTrackedSave();
   const [mutate, result] = useMutation(GQL.ConfigureDlnaDocument, {
     update: (cache, mutationResult) =>
       writeConfigKey(cache, "dlna", mutationResult.data?.configureDLNA),
   });
   const trackedMutate = useCallback<typeof mutate>(
-    (options) => saveIndicator.track(mutate(options)),
-    [mutate, saveIndicator],
+    (options) => trackSave(mutate(options)),
+    [mutate, trackSave],
   );
   return [trackedMutate, result] as const;
 };
@@ -179,14 +197,14 @@ export const useConfigureDLNA = () => {
 // Per-plugin settings (`configuration.plugins` map). The mutation returns
 // the full updated plugins map.
 export const useConfigurePlugin = () => {
-  const saveIndicator = useSaveIndicator();
+  const trackSave = useTrackedSave();
   const [mutate, result] = useMutation(GQL.ConfigurePluginDocument, {
     update: (cache, mutationResult) =>
       writeConfigKey(cache, "plugins", mutationResult.data?.configurePlugin),
   });
   const trackedMutate = useCallback<typeof mutate>(
-    (options) => saveIndicator.track(mutate(options)),
-    [mutate, saveIndicator],
+    (options) => trackSave(mutate(options)),
+    [mutate, trackSave],
   );
   return [trackedMutate, result] as const;
 };

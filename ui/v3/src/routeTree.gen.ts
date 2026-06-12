@@ -35,6 +35,7 @@ import { Route as SettingsPluginsRouteImport } from './routes/settings/plugins'
 import { Route as SettingsMetadataProvidersRouteImport } from './routes/settings/metadata-providers'
 import { Route as SettingsLogsRouteImport } from './routes/settings/logs'
 import { Route as SettingsLibraryRouteImport } from './routes/settings/library'
+import { Route as SettingsInterfaceRouteImport } from './routes/settings/interface'
 import { Route as SettingsAboutRouteImport } from './routes/settings/about'
 import { Route as ScenesMarkersRouteImport } from './routes/scenes/markers'
 import { Route as ScenesSceneIdRouteImport } from './routes/scenes/$sceneId'
@@ -175,6 +176,11 @@ const SettingsLibraryRoute = SettingsLibraryRouteImport.update({
   path: '/library',
   getParentRoute: () => SettingsRoute,
 } as any)
+const SettingsInterfaceRoute = SettingsInterfaceRouteImport.update({
+  id: '/interface',
+  path: '/interface',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const SettingsAboutRoute = SettingsAboutRouteImport.update({
   id: '/about',
   path: '/about',
@@ -231,6 +237,7 @@ export interface FileRoutesByFullPath {
   '/scenes/$sceneId': typeof ScenesSceneIdRoute
   '/scenes/markers': typeof ScenesMarkersRoute
   '/settings/about': typeof SettingsAboutRoute
+  '/settings/interface': typeof SettingsInterfaceRoute
   '/settings/library': typeof SettingsLibraryRoute
   '/settings/logs': typeof SettingsLogsRoute
   '/settings/metadata-providers': typeof SettingsMetadataProvidersRoute
@@ -266,6 +273,7 @@ export interface FileRoutesByTo {
   '/scenes/$sceneId': typeof ScenesSceneIdRoute
   '/scenes/markers': typeof ScenesMarkersRoute
   '/settings/about': typeof SettingsAboutRoute
+  '/settings/interface': typeof SettingsInterfaceRoute
   '/settings/library': typeof SettingsLibraryRoute
   '/settings/logs': typeof SettingsLogsRoute
   '/settings/metadata-providers': typeof SettingsMetadataProvidersRoute
@@ -303,6 +311,7 @@ export interface FileRoutesById {
   '/scenes/$sceneId': typeof ScenesSceneIdRoute
   '/scenes/markers': typeof ScenesMarkersRoute
   '/settings/about': typeof SettingsAboutRoute
+  '/settings/interface': typeof SettingsInterfaceRoute
   '/settings/library': typeof SettingsLibraryRoute
   '/settings/logs': typeof SettingsLogsRoute
   '/settings/metadata-providers': typeof SettingsMetadataProvidersRoute
@@ -341,6 +350,7 @@ export interface FileRouteTypes {
     | '/scenes/$sceneId'
     | '/scenes/markers'
     | '/settings/about'
+    | '/settings/interface'
     | '/settings/library'
     | '/settings/logs'
     | '/settings/metadata-providers'
@@ -376,6 +386,7 @@ export interface FileRouteTypes {
     | '/scenes/$sceneId'
     | '/scenes/markers'
     | '/settings/about'
+    | '/settings/interface'
     | '/settings/library'
     | '/settings/logs'
     | '/settings/metadata-providers'
@@ -412,6 +423,7 @@ export interface FileRouteTypes {
     | '/scenes/$sceneId'
     | '/scenes/markers'
     | '/settings/about'
+    | '/settings/interface'
     | '/settings/library'
     | '/settings/logs'
     | '/settings/metadata-providers'
@@ -644,6 +656,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsLibraryRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/settings/interface': {
+      id: '/settings/interface'
+      path: '/interface'
+      fullPath: '/settings/interface'
+      preLoaderRoute: typeof SettingsInterfaceRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/settings/about': {
       id: '/settings/about'
       path: '/about'
@@ -705,6 +724,7 @@ declare module '@tanstack/react-router' {
 
 interface SettingsRouteChildren {
   SettingsAboutRoute: typeof SettingsAboutRoute
+  SettingsInterfaceRoute: typeof SettingsInterfaceRoute
   SettingsLibraryRoute: typeof SettingsLibraryRoute
   SettingsLogsRoute: typeof SettingsLogsRoute
   SettingsMetadataProvidersRoute: typeof SettingsMetadataProvidersRoute
@@ -719,6 +739,7 @@ interface SettingsRouteChildren {
 
 const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsAboutRoute: SettingsAboutRoute,
+  SettingsInterfaceRoute: SettingsInterfaceRoute,
   SettingsLibraryRoute: SettingsLibraryRoute,
   SettingsLogsRoute: SettingsLogsRoute,
   SettingsMetadataProvidersRoute: SettingsMetadataProvidersRoute,

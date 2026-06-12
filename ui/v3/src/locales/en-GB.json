@@ -1745,9 +1745,21 @@
     "load_packages": "Load packages",
     "no_packages_installed": "No packages installed.",
     "no_packages_available": "No packages available from this source.",
-    "update_started": "Package update started",
-    "uninstall_started": "Package uninstall started",
-    "install_started": "Package install started"
+    "no_matching": "No packages match the filter.",
+    "installing": "Installing packages…",
+    "updating": "Updating packages…",
+    "uninstalling": "Uninstalling packages…",
+    "install_complete": "Package install complete",
+    "update_complete": "Package update complete",
+    "uninstall_complete": "Package uninstall complete",
+    "installed_label": "Installed",
+    "updates_available": "{count, plural, one {# update available} other {# updates available}}",
+    "select_updates": "Select updates",
+    "not_in_source": "Not found in source",
+    "up_to_date": "Everything up to date",
+    "requires": "Requires {packages}",
+    "select_package": "Select {name}",
+    "delete_source": "Delete source"
   },
   "pagination": {
     "current_total": "{current} of {total}",
@@ -2252,7 +2264,9 @@
     "date_invalid_form": "${path} must be in YYYY, YYYY-MM, or YYYY-MM-DD form",
     "end_time_before_start_time": "End time must be greater than or equal to start time",
     "required": "${path} is a required field",
-    "unique": "${path} must be unique"
+    "required_field": "Required",
+    "unique": "${path} must be unique",
+    "unique_value": "Must be unique"
   },
   "video_codec": "Video Codec",
   "videos": "Videos",

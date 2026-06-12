@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useIntl } from "react-intl";
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useApolloClient, useMutation, useQuery } from "@apollo/client/react";
 import { ChevronDown, ChevronRight, RefreshCw } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
 import {
@@ -10,10 +10,12 @@ import {
   useConfigureScraping,
 } from "src/hooks/config";
 import { useToast } from "src/hooks/toast";
+import { useMsg } from "src/hooks/message";
 import { Button } from "src/components/ui/button";
 import { Input } from "src/components/ui/input";
 import { Spinner } from "src/components/ui/spinner";
 import {
+  SettingPath,
   SettingsSection,
   SettingStringList,
   SettingSwitch,
@@ -302,15 +304,14 @@ function ScrapersSection() {
 }
 
 function SettingsMetadataProvidersPage() {
-  const intl = useIntl();
+  const apolloClient = useApolloClient();
   const { configuration } = useConfigurationContext();
   const general = configuration.general;
   const scraping = configuration.scraping;
   const [configureGeneral] = useConfigureGeneral();
   const [configureScraping] = useConfigureScraping();
 
-  const msg = (id: string, defaultMessage: string) =>
-    intl.formatMessage({ id, defaultMessage });
+  const msg = useMsg();
 
   function saveScraping(input: Partial<GQL.ConfigScrapingInput>) {
     void configureScraping({ variables: { input } });
@@ -350,7 +351,7 @@ function SettingsMetadataProvidersPage() {
           value={scraping.scraperUserAgent ?? ""}
           onChange={(v) => saveScraping({ scraperUserAgent: v })}
         />
-        <SettingText
+        <SettingPath
           label={msg("config.general.chrome_cdp_path", "Chrome CDP path")}
           description={msg(
             "config.general.chrome_cdp_path_desc",
@@ -358,6 +359,7 @@ function SettingsMetadataProvidersPage() {
           )}
           value={scraping.scraperCDPPath ?? ""}
           onChange={(v) => saveScraping({ scraperCDPPath: v })}
+          picker={false}
         />
         <SettingSwitch
           label={msg(
@@ -390,10 +392,17 @@ function SettingsMetadataProvidersPage() {
       >
         <PackageManager
           type="scraper"
-          sources={(general.scraperPackageSources ?? []).map((s) => ({
-            name: s.name,
-            url: s.url,
-          }))}
+          onPackagesChanged={() =>
+            void apolloClient.refetchQueries({
+              include: [
+                GQL.ListSceneScrapersDocument,
+                GQL.ListGalleryScrapersDocument,
+                GQL.ListImageScrapersDocument,
+                GQL.ListPerformerScrapersDocument,
+                GQL.ListGroupScrapersDocument,
+              ],
+            })
+          }
         />
       </SettingsSection>
 

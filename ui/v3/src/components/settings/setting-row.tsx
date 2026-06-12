@@ -7,10 +7,12 @@
  * the global save-indicator, so rows don't render their own spinners.
  */
 import { useId, useState } from "react";
-import { Minus, Plus } from "lucide-react";
+import { useIntl } from "react-intl";
+import { FolderSearch, Minus, Plus } from "lucide-react";
 import { Button } from "src/components/ui/button";
 import { Input } from "src/components/ui/input";
 import { Switch } from "src/components/ui/switch";
+import { FolderPickerDialog } from "src/components/shared/folder-picker-dialog";
 import {
   Field,
   FieldContent,
@@ -179,17 +181,119 @@ export function SettingText({
   );
 }
 
-/** Number setting committed on blur / Enter. Empty input commits 0. */
+/**
+ * Filesystem path setting. Unlike SettingText, the input sits on its own
+ * full-width line (long paths stay readable instead of scrolling inside a
+ * 16rem box) in a monospace face, and an optional picker button browses
+ * the server's directories via FolderPickerDialog. Commits on blur /
+ * Enter / pick, like SettingText.
+ *
+ * Set `picker={false}` for file paths (executables, database file) where
+ * a directory picker can't choose the final target.
+ */
+export function SettingPath({
+  label,
+  description,
+  disabled,
+  value,
+  onChange,
+  placeholder,
+  picker = true,
+}: RowProps & {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  picker?: boolean;
+}) {
+  const id = useId();
+  const intl = useIntl();
+  const [draft, setDraft] = useState(value);
+  const [syncedValue, setSyncedValue] = useState(value);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  if (syncedValue !== value) {
+    setSyncedValue(value);
+    setDraft(value);
+  }
+
+  function commit() {
+    if (draft !== value) onChange(draft);
+  }
+
+  return (
+    <Field>
+      <FieldContent>
+        <FieldLabel htmlFor={id}>{label}</FieldLabel>
+        {description && <FieldDescription>{description}</FieldDescription>}
+      </FieldContent>
+      <div className="flex w-full items-center gap-2">
+        <Input
+          id={id}
+          value={draft}
+          placeholder={placeholder}
+          disabled={disabled}
+          className="font-mono text-sm"
+          spellCheck={false}
+          autoComplete="off"
+          onChange={(e) => setDraft(e.currentTarget.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit();
+          }}
+        />
+        {picker && (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            disabled={disabled}
+            aria-label={intl.formatMessage({
+              id: "actions.browse",
+              defaultMessage: "Browse…",
+            })}
+            onClick={() => setPickerOpen(true)}
+          >
+            <FolderSearch className="size-4" />
+          </Button>
+        )}
+      </div>
+      {pickerOpen && (
+        <FolderPickerDialog
+          open
+          onOpenChange={setPickerOpen}
+          initialPath={draft}
+          onSelect={(p) => {
+            setDraft(p);
+            if (p !== value) onChange(p);
+          }}
+        />
+      )}
+    </Field>
+  );
+}
+
+/**
+ * Number setting committed on blur / Enter. Empty / unparsable input
+ * commits `min` (or 0). Out-of-range values are clamped into
+ * [min, max] rather than rejected, and `integer` rounds — the committed
+ * value is therefore always valid, and the input re-syncs to show what
+ * was actually saved.
+ */
 export function SettingNumber({
   label,
   description,
   disabled,
   value,
   onChange,
+  min,
+  max,
+  integer = false,
   inputClassName = "w-28",
 }: RowProps & {
   value: number;
   onChange: (v: number) => void;
+  min?: number;
+  max?: number;
+  integer?: boolean;
   inputClassName?: string;
 }) {
   const id = useId();
@@ -202,8 +306,15 @@ export function SettingNumber({
 
   function commit() {
     const parsed = Number(draft);
-    const next = Number.isFinite(parsed) ? parsed : 0;
+    let next = Number.isFinite(parsed) ? parsed : (min ?? 0);
+    if (integer) next = Math.round(next);
+    if (min !== undefined) next = Math.max(min, next);
+    if (max !== undefined) next = Math.min(max, next);
     if (next !== value) onChange(next);
+    // The clamp may leave the saved value unchanged while the draft
+    // shows something else (e.g. "-5" clamped to an already-saved 0) —
+    // re-sync the draft to the committed value either way.
+    setDraft(String(next));
   }
 
   return (
@@ -216,6 +327,9 @@ export function SettingNumber({
         id={id}
         type="number"
         inputMode="numeric"
+        min={min}
+        max={max}
+        step={integer ? 1 : undefined}
         value={draft}
         disabled={disabled}
         className={inputClassName}

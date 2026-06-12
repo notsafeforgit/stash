@@ -1,13 +1,14 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useIntl } from "react-intl";
 import { useMutation } from "@apollo/client/react";
 import * as GQL from "src/core/generated-graphql";
 import { useConfigurationContext, useConfigureGeneral } from "src/hooks/config";
 import { useToast } from "src/hooks/toast";
+import { useMsg } from "src/hooks/message";
 import { Button } from "src/components/ui/button";
 import {
   SettingDisplay,
   SettingNumber,
+  SettingPath,
   SettingsSection,
   SettingSelect,
   SettingStringList,
@@ -28,7 +29,6 @@ const TRANSCODE_RESOLUTIONS: {
 ];
 
 function SettingsSystemPage() {
-  const intl = useIntl();
   const Toast = useToast();
   const navigate = useNavigate();
   const { configuration } = useConfigurationContext();
@@ -40,8 +40,7 @@ function SettingsSystemPage() {
     void configureGeneral({ variables: { input } });
   }
 
-  const msg = (id: string, defaultMessage: string) =>
-    intl.formatMessage({ id, defaultMessage });
+  const msg = useMsg();
 
   async function onDownloadFFMpeg() {
     try {
@@ -58,7 +57,7 @@ function SettingsSystemPage() {
       <SettingsSection
         title={msg("config.application_paths.heading", "Application paths")}
       >
-        <SettingText
+        <SettingPath
           label={msg("config.general.generated_path_head", "Generated path")}
           description={msg(
             "config.general.generated_files_location",
@@ -67,7 +66,7 @@ function SettingsSystemPage() {
           value={general.generatedPath}
           onChange={(v) => save({ generatedPath: v })}
         />
-        <SettingText
+        <SettingPath
           label={msg("config.general.cache_path_head", "Cache path")}
           description={msg(
             "config.general.cache_location",
@@ -76,7 +75,7 @@ function SettingsSystemPage() {
           value={general.cachePath}
           onChange={(v) => save({ cachePath: v })}
         />
-        <SettingText
+        <SettingPath
           label={msg("config.general.scrapers_path.heading", "Scrapers path")}
           description={msg(
             "config.general.scrapers_path.description",
@@ -85,7 +84,7 @@ function SettingsSystemPage() {
           value={general.scrapersPath}
           onChange={(v) => save({ scrapersPath: v })}
         />
-        <SettingText
+        <SettingPath
           label={msg("config.general.plugins_path.heading", "Plugins path")}
           description={msg(
             "config.general.plugins_path.description",
@@ -94,7 +93,7 @@ function SettingsSystemPage() {
           value={general.pluginsPath}
           onChange={(v) => save({ pluginsPath: v })}
         />
-        <SettingText
+        <SettingPath
           label={msg("config.general.metadata_path.heading", "Metadata path")}
           description={msg(
             "config.general.metadata_path.description",
@@ -103,7 +102,7 @@ function SettingsSystemPage() {
           value={general.metadataPath}
           onChange={(v) => save({ metadataPath: v })}
         />
-        <SettingText
+        <SettingPath
           label={msg(
             "config.ui.performers.options.image_location.heading",
             "Custom performer image location",
@@ -115,7 +114,7 @@ function SettingsSystemPage() {
           value={general.customPerformerImageLocation ?? ""}
           onChange={(v) => save({ customPerformerImageLocation: v })}
         />
-        <SettingText
+        <SettingPath
           label={msg(
             "config.general.ffmpeg.ffmpeg_path.heading",
             "FFmpeg path",
@@ -126,8 +125,9 @@ function SettingsSystemPage() {
           )}
           value={general.ffmpegPath ?? ""}
           onChange={(v) => save({ ffmpegPath: v })}
+          picker={false}
         />
-        <SettingText
+        <SettingPath
           label={msg(
             "config.general.ffmpeg.ffprobe_path.heading",
             "FFprobe path",
@@ -138,6 +138,7 @@ function SettingsSystemPage() {
           )}
           value={general.ffprobePath ?? ""}
           onChange={(v) => save({ ffprobePath: v })}
+          picker={false}
         />
         <SettingDisplay
           label={msg(
@@ -161,7 +162,7 @@ function SettingsSystemPage() {
             </Button>
           }
         />
-        <SettingText
+        <SettingPath
           label={msg("config.general.python_path.heading", "Python path")}
           description={msg(
             "config.general.python_path.description",
@@ -169,8 +170,9 @@ function SettingsSystemPage() {
           )}
           value={general.pythonPath ?? ""}
           onChange={(v) => save({ pythonPath: v })}
+          picker={false}
         />
-        <SettingText
+        <SettingPath
           label={msg(
             "config.general.backup_directory_path.heading",
             "Backup directory path",
@@ -182,7 +184,7 @@ function SettingsSystemPage() {
           value={general.backupDirectoryPath ?? ""}
           onChange={(v) => save({ backupDirectoryPath: v })}
         />
-        <SettingText
+        <SettingPath
           label={msg(
             "config.general.delete_trash_path.heading",
             "Delete trash path",
@@ -197,7 +199,7 @@ function SettingsSystemPage() {
       </SettingsSection>
 
       <SettingsSection title={msg("config.general.database", "Database")}>
-        <SettingText
+        <SettingPath
           label={msg("config.general.db_path_head", "Database path")}
           description={msg(
             "config.general.sqlite_location",
@@ -205,6 +207,7 @@ function SettingsSystemPage() {
           )}
           value={general.databasePath}
           onChange={(v) => save({ databasePath: v })}
+          picker={false}
         />
         <SettingSelect
           label={msg("config.general.blobs_storage.heading", "Blobs storage")}
@@ -225,7 +228,7 @@ function SettingsSystemPage() {
           ]}
           onChange={(v) => save({ blobsStorage: v as GQL.BlobsStorageType })}
         />
-        <SettingText
+        <SettingPath
           label={msg("config.general.blobs_path.heading", "Blobs path")}
           description={msg(
             "config.general.blobs_path.description",
@@ -386,6 +389,8 @@ function SettingsSystemPage() {
           )}
           value={general.parallelTasks}
           onChange={(v) => save({ parallelTasks: v })}
+          min={0}
+          integer
         />
       </SettingsSection>
 
@@ -428,6 +433,8 @@ function SettingsSystemPage() {
           )}
           value={general.previewSegments}
           onChange={(v) => save({ previewSegments: v })}
+          min={1}
+          integer
         />
         <SettingNumber
           label={msg(
@@ -440,6 +447,7 @@ function SettingsSystemPage() {
           )}
           value={general.previewSegmentDuration}
           onChange={(v) => save({ previewSegmentDuration: v })}
+          min={0}
         />
         <SettingText
           label={msg(
@@ -486,6 +494,8 @@ function SettingsSystemPage() {
           )}
           value={general.spriteScreenshotSize ?? 160}
           onChange={(v) => save({ spriteScreenshotSize: v })}
+          min={1}
+          integer
         />
         <SettingSwitch
           label={msg(
@@ -507,6 +517,7 @@ function SettingsSystemPage() {
           )}
           value={general.spriteInterval ?? 0}
           onChange={(v) => save({ spriteInterval: v })}
+          min={0}
         />
         <SettingNumber
           label={msg("config.general.sprite_minimum_head", "Minimum sprites")}
@@ -516,6 +527,8 @@ function SettingsSystemPage() {
           )}
           value={general.minimumSprites ?? 10}
           onChange={(v) => save({ minimumSprites: v })}
+          min={1}
+          integer
         />
         <SettingNumber
           label={msg("config.general.sprite_maximum_head", "Maximum sprites")}
@@ -525,6 +538,8 @@ function SettingsSystemPage() {
           )}
           value={general.maximumSprites ?? 10}
           onChange={(v) => save({ maximumSprites: v })}
+          min={1}
+          integer
         />
       </SettingsSection>
 
@@ -546,7 +561,7 @@ function SettingsSystemPage() {
       </SettingsSection>
 
       <SettingsSection title={msg("config.general.logging", "Logging")}>
-        <SettingText
+        <SettingPath
           label={msg("config.general.auth.log_file", "Log file")}
           description={msg(
             "config.general.auth.log_file_desc",
@@ -554,6 +569,7 @@ function SettingsSystemPage() {
           )}
           value={general.logFile ?? ""}
           onChange={(v) => save({ logFile: v })}
+          picker={false}
         />
         <SettingSwitch
           label={msg("config.general.auth.log_to_terminal", "Log to terminal")}
@@ -593,6 +609,8 @@ function SettingsSystemPage() {
           )}
           value={general.logFileMaxSize ?? 10}
           onChange={(v) => save({ logFileMaxSize: v })}
+          min={0}
+          integer
         />
       </SettingsSection>
     </div>

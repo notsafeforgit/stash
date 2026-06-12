@@ -8,6 +8,7 @@ import {
   useConfigureDefaults,
   useConfigureGeneral,
 } from "src/hooks/config";
+import { useMsg } from "src/hooks/message";
 import { Button } from "src/components/ui/button";
 import { Checkbox } from "src/components/ui/checkbox";
 import { Label } from "src/components/ui/label";
@@ -149,7 +150,6 @@ function commaListToArray(value: string): string[] {
 }
 
 function SettingsLibraryPage() {
-  const intl = useIntl();
   const { configuration } = useConfigurationContext();
   const general = configuration.general;
   const defaults = configuration.defaults;
@@ -164,8 +164,7 @@ function SettingsLibraryPage() {
     void configureDefaults({ variables: { input } });
   }
 
-  const msg = (id: string, defaultMessage: string) =>
-    intl.formatMessage({ id, defaultMessage });
+  const msg = useMsg();
 
   return (
     <div className="max-w-3xl space-y-8 p-6">

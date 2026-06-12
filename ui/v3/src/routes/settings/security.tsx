@@ -5,6 +5,7 @@ import { useMutation } from "@apollo/client/react";
 import * as GQL from "src/core/generated-graphql";
 import { useConfigurationContext, useConfigureGeneral } from "src/hooks/config";
 import { useToast } from "src/hooks/toast";
+import { useMsg } from "src/hooks/message";
 import { Button } from "src/components/ui/button";
 import { Input } from "src/components/ui/input";
 import {
@@ -137,7 +138,6 @@ function CredentialsDialog({
 }
 
 function SettingsSecurityPage() {
-  const intl = useIntl();
   const Toast = useToast();
   const { configuration } = useConfigurationContext();
   const general = configuration.general;
@@ -148,8 +148,7 @@ function SettingsSecurityPage() {
 
   const [credentialsOpen, setCredentialsOpen] = useState(false);
 
-  const msg = (id: string, defaultMessage: string) =>
-    intl.formatMessage({ id, defaultMessage });
+  const msg = useMsg();
 
   async function onGenerateAPIKey(clear: boolean) {
     try {
@@ -229,6 +228,8 @@ function SettingsSecurityPage() {
               variables: { input: { maxSessionAge: v } },
             })
           }
+          min={0}
+          integer
         />
       </SettingsSection>
 

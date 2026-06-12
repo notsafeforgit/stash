@@ -5,6 +5,7 @@ import { CornerLeftUp, Folder, MoreHorizontal, X } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
 import { Input } from "src/components/ui/input";
 import { Button } from "src/components/ui/button";
+import { ScrollArea } from "src/components/ui/scroll-area";
 import { Spinner } from "src/components/ui/spinner";
 import { useDebouncedValue } from "src/hooks/debounce";
 import { cn } from "src/lib/utils";
@@ -103,10 +104,14 @@ export function FolderSelect({
             spellCheck={false}
             autoComplete="off"
           />
-          {loading && <Spinner className="size-4" />}
-          {!loading && !hideError && error && (
-            <X className="size-4 shrink-0 text-destructive" />
-          )}
+          {/* Always-rendered slot so the input width doesn't jiggle as the
+              spinner/error icon toggles on each directory load. */}
+          <span className="flex size-4 shrink-0 items-center justify-center">
+            {loading && <Spinner className="size-4" />}
+            {!loading && !hideError && error && (
+              <X className="size-4 text-destructive" />
+            )}
+          </span>
         </div>
         {appendButton}
         {collapsible && (
@@ -136,66 +141,73 @@ export function FolderSelect({
         <div className="text-sm text-destructive">{error.message}</div>
       )}
 
+      {/* Fixed height (not max-h) so the surrounding dialog doesn't resize
+          and re-centre on every directory navigation. */}
       {showBrowser && (
-        <ul className="max-h-64 w-full min-w-0 overflow-x-hidden overflow-y-auto rounded-md border bg-card">
-          {currentDirectory && parent && (
-            <li>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={goUp}
-                disabled={loading}
-                className="h-auto w-full justify-start rounded-none px-3 py-1.5 text-sm font-normal"
-              >
-                <CornerLeftUp className="size-4 text-muted-foreground" />
-                <span>
-                  {intl.formatMessage({
-                    id: "setup.folder.up_dir",
-                    defaultMessage: "Up a directory",
-                  })}
-                </span>
-              </Button>
-            </li>
-          )}
-          {selectableDirectories.length === 0 && !loading && (
-            <li className="px-3 py-2 text-sm text-muted-foreground">
-              {currentDirectory
-                ? intl.formatMessage({
-                    id: "setup.folder.empty",
-                    defaultMessage: "No directories.",
-                  })
-                : intl.formatMessage({
-                    id: "setup.folder.choose",
-                    defaultMessage: "Type a path or choose a library folder.",
-                  })}
-            </li>
-          )}
-          {selectableDirectories.map((dir) => {
-            // When we're listing children of a currentDirectory, the parent
-            // prefix is redundant (it's already shown in the input above)
-            // and truncating from the right hides the distinguishing tail —
-            // show just the basename. For root-level library defaults the
-            // full path is what disambiguates between multiple libraries.
-            const label = currentDirectory ? basename(dir) : dir;
-            return (
-              <li key={dir} className="min-w-0">
+        <ScrollArea
+          className="rounded-md border bg-card"
+          viewportClassName="h-64"
+        >
+          <ul className="w-full min-w-0">
+            {currentDirectory && parent && (
+              <li>
                 <Button
                   type="button"
                   variant="ghost"
-                  onClick={() => setInstant(dir)}
+                  onClick={goUp}
                   disabled={loading}
-                  title={dir}
-                  className="h-auto w-full min-w-0 justify-start rounded-none px-3 py-1.5 text-sm font-normal"
+                  className="h-auto w-full justify-start rounded-none px-3 py-1.5 text-sm font-normal"
                 >
-                  <Folder className="size-4 shrink-0 text-muted-foreground" />
-                  <span className="min-w-0 flex-1 truncate text-left">
-                    {label}
+                  <CornerLeftUp className="size-4 text-muted-foreground" />
+                  <span>
+                    {intl.formatMessage({
+                      id: "setup.folder.up_dir",
+                      defaultMessage: "Up a directory",
+                    })}
                   </span>
                 </Button>
               </li>
-            );
-          })}
-        </ul>
+            )}
+            {selectableDirectories.length === 0 && !loading && (
+              <li className="px-3 py-2 text-sm text-muted-foreground">
+                {currentDirectory
+                  ? intl.formatMessage({
+                      id: "setup.folder.empty",
+                      defaultMessage: "No directories.",
+                    })
+                  : intl.formatMessage({
+                      id: "setup.folder.choose",
+                      defaultMessage: "Type a path or choose a library folder.",
+                    })}
+              </li>
+            )}
+            {selectableDirectories.map((dir) => {
+              // When we're listing children of a currentDirectory, the parent
+              // prefix is redundant (it's already shown in the input above)
+              // and truncating from the right hides the distinguishing tail —
+              // show just the basename. For root-level library defaults the
+              // full path is what disambiguates between multiple libraries.
+              const label = currentDirectory ? basename(dir) : dir;
+              return (
+                <li key={dir} className="min-w-0">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setInstant(dir)}
+                    disabled={loading}
+                    title={dir}
+                    className="h-auto w-full min-w-0 justify-start rounded-none px-3 py-1.5 text-sm font-normal"
+                  >
+                    <Folder className="size-4 shrink-0 text-muted-foreground" />
+                    <span className="min-w-0 flex-1 truncate text-left">
+                      {label}
+                    </span>
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        </ScrollArea>
       )}
     </div>
   );

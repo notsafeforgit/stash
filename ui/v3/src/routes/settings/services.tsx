@@ -6,6 +6,7 @@ import { Clock, X } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
 import { useConfigurationContext, useConfigureDLNA } from "src/hooks/config";
 import { useToast } from "src/hooks/toast";
+import { useMsg } from "src/hooks/message";
 import { Button } from "src/components/ui/button";
 import { Checkbox } from "src/components/ui/checkbox";
 import { Input } from "src/components/ui/input";
@@ -162,8 +163,7 @@ function SettingsServicesPage() {
     void configureDLNA({ variables: { input } });
   }
 
-  const msg = (id: string, defaultMessage: string) =>
-    intl.formatMessage({ id, defaultMessage });
+  const msg = useMsg();
 
   function renderDeadline(until?: string | null) {
     if (!until) return "";
@@ -398,6 +398,9 @@ function SettingsServicesPage() {
           )}
           value={dlna.port}
           onChange={(v) => save({ port: v || DEFAULT_DLNA_PORT })}
+          min={1}
+          max={65535}
+          integer
         />
         <SettingSwitch
           label={msg("config.dlna.enabled_by_default", "Enabled by default")}

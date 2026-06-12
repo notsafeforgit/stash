@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useIntl } from "react-intl";
+import { useMsg } from "src/hooks/message";
 import { useQuery } from "@apollo/client/react";
 import * as GQL from "src/core/generated-graphql";
 import { Button } from "src/components/ui/button";
@@ -29,8 +29,6 @@ function ExternalLink({
 }
 
 function SettingsAboutPage() {
-  const intl = useIntl();
-
   const { data: versionData } = useQuery(GQL.VersionDocument);
   const {
     data: latestData,
@@ -42,8 +40,7 @@ function SettingsAboutPage() {
     notifyOnNetworkStatusChange: true,
   });
 
-  const msg = (id: string, defaultMessage: string) =>
-    intl.formatMessage({ id, defaultMessage });
+  const msg = useMsg();
 
   const version = versionData?.version;
   const latest = latestData?.latestversion;

@@ -20,7 +20,7 @@ const ITEMS: NavItem[] = [
     defaultLabel: "Library",
   },
   {
-    to: "/settings",
+    to: "/settings/interface",
     labelId: "config.categories.interface",
     defaultLabel: "Interface",
   },
@@ -67,9 +67,7 @@ const ITEMS: NavItem[] = [
 ];
 
 function isItemActive(item: NavItem, pathname: string) {
-  return item.to === "/settings"
-    ? pathname === "/settings"
-    : pathname === item.to || pathname.startsWith(`${item.to}/`);
+  return pathname === item.to || pathname.startsWith(`${item.to}/`);
 }
 
 export function SettingsNav() {

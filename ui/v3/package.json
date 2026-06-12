@@ -14,6 +14,7 @@
     "format": "biome format --write",
     "format-check": "biome format",
     "check-i18n": "node scripts/check-i18n.mjs",
+    "gen-settings-index": "node scripts/generate-settings-search-index.mjs && biome format --write src/components/settings/settings-search-index.gen.ts",
     "validate": "pnpm run lint && pnpm run check && pnpm run format-check && pnpm run check-i18n",
     "test": "pnpm run gqlgen && vitest",
     "gqlgen": "graphql-codegen --config codegen.ts"

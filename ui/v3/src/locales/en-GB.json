@@ -102,6 +102,7 @@
     "increment_o": "Add O",
     "invert_selection": "Invert Selection",
     "keep": "Keep",
+    "jump_to_bottom": "Jump to bottom",
     "load": "Load",
     "load_filter": "Load filter",
     "logout": "Log out",

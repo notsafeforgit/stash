@@ -289,6 +289,7 @@ function PhotoAlbumWall<TItem extends IHasID>({
         spacing={2}
         padding={0}
         targetRowHeight={targetRowHeight}
+        rowConstraints={{ singleRowMaxHeight: targetRowHeight }}
         render={{ photo: renderPhoto }}
       />
     </div>

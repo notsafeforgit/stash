@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useIntl } from "react-intl";
+import { useDocumentTitle } from "src/hooks/title";
 import { Plus } from "lucide-react";
 import { EntityListPage } from "src/components/list";
 import { useTagListConfig } from "src/components/list/entity-list-configs";
@@ -16,6 +17,7 @@ type TagItem = GQL.FindTagsQuery["findTags"]["tags"][number];
 
 function TagsPage() {
   const intl = useIntl();
+  useDocumentTitle(intl.formatMessage({ id: "tags", defaultMessage: "Tags" }));
   const navigate = useNavigate();
   const tableColumns = useTagTableColumns();
   const [editingId, setEditingId] = useState<string | null>(null);

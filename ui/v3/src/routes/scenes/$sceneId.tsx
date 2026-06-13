@@ -45,6 +45,7 @@ import { SceneVideoFilterTab } from "src/components/detail/scene-video-filter";
 import { SceneEditForm } from "src/components/detail/scene-edit-form";
 import { SceneActionsMenu } from "src/components/detail/scene-actions-menu";
 import { DetailEditTransition } from "src/components/detail/detail-edit-transition";
+import { useDocumentTitle } from "src/hooks/title";
 
 // ── Route search params ────────────────────────────────────────────────────────
 
@@ -314,6 +315,7 @@ function SceneDetailPage() {
   }, [activeTab]);
 
   const scene = data?.findScene;
+  useDocumentTitle(scene ? objectTitle(scene) || undefined : undefined);
 
   if (loading) {
     return (

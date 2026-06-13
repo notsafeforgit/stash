@@ -19,6 +19,7 @@ import { TagDetailsTab } from "src/components/detail/tag-detail-tabs";
 import { TagEditForm } from "src/components/detail/tag-edit-form";
 import { TagActionsMenu } from "src/components/detail/tag-actions-menu";
 import { DetailEditTransition } from "src/components/detail/detail-edit-transition";
+import { useDocumentTitle } from "src/hooks/title";
 import {
   TagScenesTab,
   TagImagesTab,
@@ -133,6 +134,7 @@ function TagDetailPage() {
   const [updateTag] = useMutation(GQL.TagUpdateDocument);
 
   const tag = data?.findTag;
+  useDocumentTitle(tag?.name);
 
   function handleToggleFavorite() {
     if (!tag) return;

@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useIntl } from "react-intl";
+import { useDocumentTitle } from "src/hooks/title";
 import { Plus } from "lucide-react";
 import { EntityListPage } from "src/components/list";
 import { usePerformerListConfig } from "src/components/list/entity-list-configs";
@@ -12,6 +13,9 @@ import { PerformerCreateSheet } from "src/components/detail/performer-create-she
 
 function PerformersPage() {
   const intl = useIntl();
+  useDocumentTitle(
+    intl.formatMessage({ id: "performers", defaultMessage: "Performers" }),
+  );
   const navigate = useNavigate();
   const tableColumns = usePerformerTableColumns();
   const [editingId, setEditingId] = useState<string | null>(null);

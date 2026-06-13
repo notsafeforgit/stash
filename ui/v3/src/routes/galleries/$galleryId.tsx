@@ -22,6 +22,7 @@ import { GalleryActionsMenu } from "src/components/detail/gallery-actions-menu";
 import { GalleryEditForm } from "src/components/detail/gallery-edit-form";
 import { Lightbox } from "src/components/lightbox";
 import { GalleryImagesTab } from "src/components/detail/gallery-list-tabs";
+import { useDocumentTitle } from "src/hooks/title";
 
 // ── Route search params ────────────────────────────────────────────────────────
 
@@ -102,6 +103,7 @@ function GalleryDetailPage() {
   }
 
   const gallery = data?.findGallery;
+  useDocumentTitle(gallery ? galleryLabel(gallery) : undefined);
 
   type EntityTab = { id: string; label: string; content: React.ReactNode };
   const entityTabs: EntityTab[] = gallery

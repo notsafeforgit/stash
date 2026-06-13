@@ -19,6 +19,7 @@ import { StudioDetailsTab } from "src/components/detail/studio-detail-tabs";
 import { StudioEditForm } from "src/components/detail/studio-edit-form";
 import { StudioActionsMenu } from "src/components/detail/studio-actions-menu";
 import { DetailEditTransition } from "src/components/detail/detail-edit-transition";
+import { useDocumentTitle } from "src/hooks/title";
 import {
   StudioScenesTab,
   StudioImagesTab,
@@ -140,6 +141,7 @@ function StudioDetailPage() {
   const [updateStudio] = useMutation(GQL.StudioUpdateDocument);
 
   const studio = data?.findStudio;
+  useDocumentTitle(studio?.name);
 
   function handleToggleFavorite() {
     if (!studio) return;

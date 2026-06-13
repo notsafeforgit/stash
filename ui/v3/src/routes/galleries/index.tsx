@@ -1,12 +1,18 @@
 import { useState, useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useIntl } from "react-intl";
 import { EntityListPage } from "src/components/list";
 import { useGalleryListConfig } from "src/components/list/entity-list-configs";
 import { View } from "src/components/list/views";
 import { useGalleryTableColumns } from "./-table-columns";
 import { GalleryEditSheet } from "src/components/detail/gallery-edit-sheet";
+import { useDocumentTitle } from "src/hooks/title";
 
 function GalleriesPage() {
+  const intl = useIntl();
+  useDocumentTitle(
+    intl.formatMessage({ id: "galleries", defaultMessage: "Galleries" }),
+  );
   const tableColumns = useGalleryTableColumns();
   const [editingId, setEditingId] = useState<string | null>(null);
   const galleryBase = useGalleryListConfig(setEditingId);

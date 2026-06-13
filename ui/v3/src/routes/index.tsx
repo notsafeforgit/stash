@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useIntl } from "react-intl";
+import { useDocumentTitle } from "src/hooks/title";
 import { Settings2 } from "lucide-react";
 import { Button } from "src/components/ui/button";
 import { useConfigurationContext } from "src/hooks/config";
@@ -21,6 +22,8 @@ import { CardAspectContext } from "src/components/list/card-aspect-context";
 
 function FrontPage() {
   const intl = useIntl();
+  // Home: just the app title (no page prefix).
+  useDocumentTitle();
   const { configuration } = useConfigurationContext();
   const [configOpen, setConfigOpen] = useState(false);
   const [saving, setSaving] = useState(false);

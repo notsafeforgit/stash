@@ -97,6 +97,7 @@ import {
 import { SceneBulkEditSheet } from "src/components/detail/scene-bulk-edit-sheet";
 import { SceneMergeDialog } from "src/components/detail/scene-merge-dialog";
 import { useToast } from "src/hooks/toast";
+import { useDocumentTitle } from "src/hooks/title";
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 20;
@@ -473,6 +474,12 @@ function durationLabel(
 
 function SceneDuplicateCheckerPage() {
   const intl = useIntl();
+  useDocumentTitle(
+    intl.formatMessage({
+      id: "config.tools.scene_duplicate_checker",
+      defaultMessage: "Scene duplicate checker",
+    }),
+  );
   const navigate = useNavigate({ from: Route.fullPath });
   const toast = useToast();
   const search = Route.useSearch();

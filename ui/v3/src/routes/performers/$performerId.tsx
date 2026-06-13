@@ -27,6 +27,7 @@ import {
   PerformerGroupsTab,
 } from "src/components/detail/performer-list-tabs";
 import { Lightbox } from "src/components/lightbox";
+import { useDocumentTitle } from "src/hooks/title";
 
 // ── Route search params ────────────────────────────────────────────────────────
 
@@ -188,6 +189,7 @@ function PerformerDetailPage() {
   const [updatePerformer] = useMutation(GQL.PerformerUpdateDocument);
 
   const performer = data?.findPerformer;
+  useDocumentTitle(performer?.name);
 
   function handleToggleFavorite() {
     if (!performer) return;

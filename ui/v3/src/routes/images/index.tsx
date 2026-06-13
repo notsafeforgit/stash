@@ -1,11 +1,17 @@
 import { useState, useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useIntl } from "react-intl";
 import { EntityListPage } from "src/components/list";
 import { useImageListConfig } from "src/components/list/entity-list-configs";
 import { View } from "src/components/list/views";
 import { ImageEditSheet } from "src/components/detail/image-edit-sheet";
+import { useDocumentTitle } from "src/hooks/title";
 
 function ImagesPage() {
+  const intl = useIntl();
+  useDocumentTitle(
+    intl.formatMessage({ id: "images", defaultMessage: "Images" }),
+  );
   const [editingId, setEditingId] = useState<string | null>(null);
   const {
     config: imageBase,

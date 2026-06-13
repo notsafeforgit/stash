@@ -597,8 +597,10 @@ func (qb *GroupStore) setGroupSort(query *queryBuilder, findFilter *models.FindF
 		query.sortAndPagination += getSort(sort, direction, "groups")
 	}
 
-	// Whatever the sorting, always use name/id as a final sort
-	query.sortAndPagination += ", COALESCE(groups.name, groups.id) COLLATE NATURAL_CI ASC"
+	// Whatever the sorting, use a human-readable fallback and then the
+	// primary key as the true final tie-breaker so paginated results are
+	// deterministic when names are empty or duplicated.
+	query.sortAndPagination += ", COALESCE(groups.name, '') COLLATE NATURAL_CI ASC, groups.id ASC"
 	return nil
 }
 

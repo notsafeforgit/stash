@@ -1010,8 +1010,10 @@ func (qb *GalleryStore) setGallerySort(query *queryBuilder, findFilter *models.F
 		query.sortAndPagination += getSort(sort, direction, "galleries")
 	}
 
-	// Whatever the sorting, always use title/id as a final sort
-	query.sortAndPagination += ", COALESCE(galleries.title, galleries.id) COLLATE NATURAL_CI ASC"
+	// Whatever the sorting, use a human-readable fallback and then the
+	// primary key as the true final tie-breaker so paginated results are
+	// deterministic when titles are empty or duplicated.
+	query.sortAndPagination += ", COALESCE(galleries.title, '') COLLATE NATURAL_CI ASC, galleries.id ASC"
 
 	return nil
 }

@@ -664,7 +664,8 @@ func (qb *ImageStore) FindByChecksum(ctx context.Context, checksum string) ([]*m
 
 var defaultGalleryOrder = []exp.OrderedExpression{
 	goqu.L("COALESCE(folders.path, '') || COALESCE(files.basename, '') COLLATE NATURAL_CI").Asc(),
-	goqu.L("COALESCE(images.title, images.id) COLLATE NATURAL_CI").Asc(),
+	goqu.L("COALESCE(images.title, '') COLLATE NATURAL_CI").Asc(),
+	goqu.I("images.id").Asc(),
 }
 
 func (qb *ImageStore) FindByGalleryID(ctx context.Context, galleryID int) ([]*models.Image, error) {
@@ -1200,8 +1201,10 @@ func (qb *ImageStore) setImageSortAndPagination(q *queryBuilder, findFilter *mod
 			sortClause = getSort(sort, direction, "images")
 		}
 
-		// Whatever the sorting, always use title/id as a final sort
-		sortClause += ", COALESCE(images.title, images.id) COLLATE NATURAL_CI ASC"
+		// Whatever the sorting, use a human-readable fallback and then the
+		// primary key as the true final tie-breaker so paginated results are
+		// deterministic when titles are empty or duplicated.
+		sortClause += ", COALESCE(images.title, '') COLLATE NATURAL_CI ASC, images.id ASC"
 	}
 
 	q.sortAndPagination = sortClause + getPagination(findFilter)

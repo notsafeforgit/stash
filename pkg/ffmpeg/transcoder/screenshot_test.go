@@ -81,6 +81,33 @@ func TestScreenshotTimeColorParameterFallback(t *testing.T) {
 	}
 }
 
+func TestScreenshotTimeIgnoreEditList(t *testing.T) {
+	options := ScreenshotOptions{
+		OutputPath:     "-",
+		OutputType:     ScreenshotOutputTypeBMP,
+		Width:          160,
+		IgnoreEditList: true,
+	}
+
+	got := ScreenshotTime("input.mp4", 12.5, options)
+	want := []string{
+		"-v", "error",
+		"-y",
+		"-ss", "12.5",
+		"-ignore_editlist", "1",
+		"-i", "input.mp4",
+		"-frames:v", "1",
+		"-vf", "scale=160:-2",
+		"-c:v", "bmp",
+		"-f", "image2pipe",
+		"-",
+	}
+
+	if !reflect.DeepEqual([]string(got), want) {
+		t.Fatalf("ScreenshotTime() = %#v, want %#v", []string(got), want)
+	}
+}
+
 func TestScreenshotTimeBMPPipe(t *testing.T) {
 	options := ScreenshotOptions{
 		OutputPath: "-",
@@ -128,6 +155,33 @@ func TestScreenshotTimePNGPipe(t *testing.T) {
 
 	if !reflect.DeepEqual([]string(got), want) {
 		t.Fatalf("ScreenshotTime() = %#v, want %#v", []string(got), want)
+	}
+}
+
+func TestScreenshotFrameIgnoreEditList(t *testing.T) {
+	options := ScreenshotOptions{
+		OutputPath:     "-",
+		OutputType:     ScreenshotOutputTypeBMP,
+		Width:          160,
+		IgnoreEditList: true,
+	}
+
+	got := ScreenshotFrame("input.mp4", 12, options)
+	want := []string{
+		"-v", "error",
+		"-y",
+		"-ignore_editlist", "1",
+		"-i", "input.mp4",
+		"-frames:v", "1",
+		"-vsync", "0",
+		"-vf", "select=eq(n\\,12),scale=160:-2",
+		"-c:v", "bmp",
+		"-f", "image2pipe",
+		"-",
+	}
+
+	if !reflect.DeepEqual([]string(got), want) {
+		t.Fatalf("ScreenshotFrame() = %#v, want %#v", []string(got), want)
 	}
 }
 

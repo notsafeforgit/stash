@@ -218,7 +218,14 @@ func (g Generator) previewVideoChunk(lockCtx *fsutil.LockContext, fn string, opt
 
 	args := transcoder.Transcode(fn, trimOptions)
 
-	return g.generate(lockCtx, args)
+	if err := g.generate(lockCtx, args); err != nil {
+		return g.retryWithColorMetadataFixedInput(lockCtx, fn, err, func(fixedInput string) error {
+			args = transcoder.Transcode(fixedInput, trimOptions)
+			return g.generate(lockCtx, args)
+		})
+	}
+
+	return nil
 }
 
 func (g Generator) generateConcatFile(chunkFiles []string) (fn string, err error) {

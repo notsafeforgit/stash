@@ -52,6 +52,11 @@ func (a Args) Input(i string) Args {
 	return append(a, "-i", i)
 }
 
+// IgnoreEditList ignores MOV/MP4 edit list boxes for the next input.
+func (a Args) IgnoreEditList() Args {
+	return append(a, "-ignore_editlist", "1")
+}
+
 // SetBT709ColorParameters sets BT.709 color metadata for the next video stream.
 func (a Args) SetBT709ColorParameters() Args {
 	return append(a,

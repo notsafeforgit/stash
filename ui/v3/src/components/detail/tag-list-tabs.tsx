@@ -142,7 +142,7 @@ export function TagImagesTab({ tag }: { tag: TagData }) {
     [updateTag, tag.id, toast, intl],
   );
 
-  const { config, lightboxElement } = useImageListConfig(
+  const { config, lightboxElement, lightboxOpen } = useImageListConfig(
     setEditingId,
     getExtraCardProps,
   );
@@ -155,6 +155,7 @@ export function TagImagesTab({ tag }: { tag: TagData }) {
         defaultFilter={defaultFilter}
         view={View.TagImages}
         mobileChromeFixed
+        keyboardShortcutsDisabled={lightboxOpen}
       />
       <ImageEditSheet id={editingId} onClose={() => setEditingId(null)} />
       {lightboxElement}

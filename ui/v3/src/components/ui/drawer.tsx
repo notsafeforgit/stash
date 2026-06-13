@@ -2,11 +2,34 @@ import type * as React from "react";
 import { Drawer as DrawerPrimitive } from "@base-ui/react";
 
 import { cn } from "@/lib/utils";
+import {
+  type ShortcutOverlayRootProps,
+  useOverlayOpenState,
+} from "@/components/shortcut-provider";
 
 function Drawer({
+  open,
+  defaultOpen,
+  onOpenChange,
+  blocksListShortcuts,
   ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Root>) {
-  return <DrawerPrimitive.Root data-slot="drawer" {...props} />;
+}: React.ComponentProps<typeof DrawerPrimitive.Root> & ShortcutOverlayRootProps) {
+  const overlayProps = useOverlayOpenState<
+    Parameters<
+      NonNullable<
+        React.ComponentProps<typeof DrawerPrimitive.Root>["onOpenChange"]
+      >
+    > extends [boolean, ...infer Rest]
+      ? Rest
+      : never
+  >({
+    open,
+    defaultOpen,
+    onOpenChange,
+    blocksListShortcuts,
+  });
+
+  return <DrawerPrimitive.Root data-slot="drawer" {...overlayProps} {...props} />;
 }
 
 function DrawerTrigger({

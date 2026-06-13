@@ -55,6 +55,7 @@ export const MultiSelectFilter = <
 }: MultiSelectFilterProps<T>) => {
   const intl = useIntl();
   const anchor = useComboboxAnchor();
+  const [comboboxOpen, setComboboxOpen] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [serverQuery, setServerQuery] = useState("");
   const debouncedSetServerQuery = useDebounce(setServerQuery, 100);
@@ -108,6 +109,27 @@ export const MultiSelectFilter = <
     setServerQuery("");
   }
 
+  function onInputKeyDownCapture(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (
+      e.key !== "Escape" ||
+      e.ctrlKey ||
+      e.metaKey ||
+      e.altKey ||
+      e.shiftKey
+    ) {
+      return;
+    }
+
+    e.preventDefault();
+    e.stopPropagation();
+    e.nativeEvent.stopImmediatePropagation();
+    debouncedSetServerQuery.cancel();
+    setInputValue("");
+    setServerQuery("");
+    setComboboxOpen(false);
+    e.currentTarget.blur();
+  }
+
   return (
     <div className="flex flex-col gap-2">
       {modifierOptions.length > 1 && (
@@ -131,6 +153,9 @@ export const MultiSelectFilter = <
       {!isNullOrNotNull && (
         <Combobox<string, true>
           multiple
+          open={comboboxOpen}
+          onOpenChange={setComboboxOpen}
+          inputValue={inputValue}
           autoHighlight={inputValue.length > 0}
           value={selectedIds}
           onValueChange={onValueChange}
@@ -151,6 +176,7 @@ export const MultiSelectFilter = <
             <ComboboxChipsInput
               placeholder={`${intl.formatMessage({ id: "actions.search" })}…`}
               aria-invalid={selectedIds.length === 0 ? "true" : undefined}
+              onKeyDownCapture={onInputKeyDownCapture}
             />
             {selectedIds.length > 0 && <ComboboxClear />}
           </ComboboxChips>

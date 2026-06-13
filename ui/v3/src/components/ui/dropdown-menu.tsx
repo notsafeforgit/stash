@@ -5,9 +5,35 @@ import { Menu as MenuPrimitive } from "@base-ui/react/menu";
 
 import { cn } from "@/lib/utils";
 import { ChevronRightIcon, CheckIcon } from "lucide-react";
+import {
+  type ShortcutOverlayRootProps,
+  useOverlayOpenState,
+} from "@/components/shortcut-provider";
 
-function DropdownMenu({ ...props }: MenuPrimitive.Root.Props) {
-  return <MenuPrimitive.Root data-slot="dropdown-menu" {...props} />;
+function DropdownMenu<Payload = unknown>({
+  open,
+  defaultOpen,
+  onOpenChange,
+  blocksListShortcuts,
+  ...props
+}: MenuPrimitive.Root.Props<Payload> & ShortcutOverlayRootProps) {
+  const overlayProps = useOverlayOpenState<
+    Parameters<NonNullable<MenuPrimitive.Root.Props<Payload>["onOpenChange"]>> extends [
+      boolean,
+      ...infer Rest,
+    ]
+      ? Rest
+      : never
+  >({
+    open,
+    defaultOpen,
+    onOpenChange,
+    blocksListShortcuts,
+  });
+
+  return (
+    <MenuPrimitive.Root data-slot="dropdown-menu" {...overlayProps} {...props} />
+  );
 }
 
 function DropdownMenuPortal({ ...props }: MenuPrimitive.Portal.Props) {

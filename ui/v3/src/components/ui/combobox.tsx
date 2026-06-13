@@ -10,8 +10,35 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group";
 import { ChevronDownIcon, XIcon, CheckIcon } from "lucide-react";
+import {
+  type ShortcutOverlayRootProps,
+  useOverlayOpenState,
+} from "@/components/shortcut-provider";
 
-const Combobox = ComboboxPrimitive.Root;
+function Combobox<Value, Multiple extends boolean | undefined = false>({
+  open,
+  defaultOpen,
+  onOpenChange,
+  blocksListShortcuts,
+  ...props
+}: ComboboxPrimitive.Root.Props<Value, Multiple> & ShortcutOverlayRootProps) {
+  const overlayProps = useOverlayOpenState<
+    Parameters<
+      NonNullable<
+        ComboboxPrimitive.Root.Props<Value, Multiple>["onOpenChange"]
+      >
+    > extends [boolean, ...infer Rest]
+      ? Rest
+      : never
+  >({
+    open,
+    defaultOpen,
+    onOpenChange,
+    blocksListShortcuts,
+  });
+
+  return <ComboboxPrimitive.Root {...overlayProps} {...props} />;
+}
 
 function ComboboxValue({ ...props }: ComboboxPrimitive.Value.Props) {
   return <ComboboxPrimitive.Value data-slot="combobox-value" {...props} />;

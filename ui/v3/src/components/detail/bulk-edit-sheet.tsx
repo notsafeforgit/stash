@@ -81,9 +81,11 @@ export function BulkEditSheet({
                 push gestures. */}
           <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-4 flex flex-col gap-4">
             {children}
+          </div>
 
-            {showApplyToAll && (
-              <Field orientation="horizontal" className="border-t pt-4 mt-2">
+          {showApplyToAll && (
+            <div className="shrink-0 border-t bg-popover px-4 py-3">
+              <Field orientation="horizontal">
                 <FieldTitle>
                   {intl.formatMessage(
                     {
@@ -100,8 +102,8 @@ export function BulkEditSheet({
                   size="sm"
                 />
               </Field>
-            )}
-          </div>
+            </div>
+          )}
 
           <SheetFooter className="border-t px-4 py-3 flex-row justify-end gap-2">
             <Button

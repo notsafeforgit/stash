@@ -165,7 +165,7 @@ export function PerformerImagesTab({
     [updatePerformer, performer.id, toast, intl, onImageUpdateChange],
   );
 
-  const { config, lightboxElement } = useImageListConfig(
+  const { config, lightboxElement, lightboxOpen } = useImageListConfig(
     setEditingId,
     getExtraCardProps,
     true,
@@ -179,6 +179,7 @@ export function PerformerImagesTab({
         defaultFilter={defaultFilter}
         view={View.PerformerImages}
         mobileChromeFixed
+        keyboardShortcutsDisabled={lightboxOpen}
       />
       <ImageEditSheet id={editingId} onClose={() => setEditingId(null)} />
       {lightboxElement}

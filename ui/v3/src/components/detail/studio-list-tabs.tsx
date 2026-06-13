@@ -118,7 +118,7 @@ export function StudioImagesTab({ studio }: { studio: StudioData }) {
     [updateStudio, studio.id],
   );
 
-  const { config, lightboxElement } = useImageListConfig(
+  const { config, lightboxElement, lightboxOpen } = useImageListConfig(
     setEditingId,
     getExtraCardProps,
   );
@@ -131,6 +131,7 @@ export function StudioImagesTab({ studio }: { studio: StudioData }) {
         defaultFilter={defaultFilter}
         view={View.StudioImages}
         mobileChromeFixed
+        keyboardShortcutsDisabled={lightboxOpen}
       />
       <ImageEditSheet id={editingId} onClose={() => setEditingId(null)} />
       {lightboxElement}

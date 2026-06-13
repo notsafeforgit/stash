@@ -1086,17 +1086,6 @@ export function EntityListPage<TData, TItem extends IHasID>({
 
   const listSelect = useListSelect(items);
 
-  // Escape exits multi-select mode (clears selection + deactivates selecting state)
-  const { selecting, onSelectNone } = listSelect;
-  useEffect(() => {
-    if (!selecting) return;
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onSelectNone();
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [selecting, onSelectNone]);
-
   // After a delete (or any cache modification that drops items from the
   // current page), Apollo's cache update leaves the page short — items
   // were spliced out without re-querying, so a page that used to hold
@@ -1226,6 +1215,7 @@ export function EntityListPage<TData, TItem extends IHasID>({
     onSelectAll: listSelect.onSelectAll,
     onSelectNone: listSelect.onSelectNone,
     onInvertSelection: listSelect.onInvertSelection,
+    selectModeActive: listSelect.selecting,
     disabled: keyboardShortcutsDisabled,
   });
 

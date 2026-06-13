@@ -3,9 +3,39 @@ import { ContextMenu as ContextMenuPrimitive } from "@base-ui/react/context-menu
 
 import { cn } from "@/lib/utils";
 import { ChevronRightIcon, CheckIcon } from "lucide-react";
+import {
+  type ShortcutOverlayRootProps,
+  useOverlayOpenState,
+} from "@/components/shortcut-provider";
 
-function ContextMenu({ ...props }: ContextMenuPrimitive.Root.Props) {
-  return <ContextMenuPrimitive.Root data-slot="context-menu" {...props} />;
+function ContextMenu({
+  open,
+  defaultOpen,
+  onOpenChange,
+  blocksListShortcuts,
+  ...props
+}: ContextMenuPrimitive.Root.Props & ShortcutOverlayRootProps) {
+  const overlayProps = useOverlayOpenState<
+    Parameters<NonNullable<ContextMenuPrimitive.Root.Props["onOpenChange"]>> extends [
+      boolean,
+      ...infer Rest,
+    ]
+      ? Rest
+      : never
+  >({
+    open,
+    defaultOpen,
+    onOpenChange,
+    blocksListShortcuts,
+  });
+
+  return (
+    <ContextMenuPrimitive.Root
+      data-slot="context-menu"
+      {...overlayProps}
+      {...props}
+    />
+  );
 }
 
 function ContextMenuPortal({ ...props }: ContextMenuPrimitive.Portal.Props) {

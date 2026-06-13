@@ -17,10 +17,9 @@ function Dialog<Payload = unknown>({
   ...props
 }: DialogPrimitive.Root.Props<Payload> & ShortcutOverlayRootProps) {
   const overlayProps = useOverlayOpenState<
-    Parameters<NonNullable<DialogPrimitive.Root.Props<Payload>["onOpenChange"]>> extends [
-      boolean,
-      ...infer Rest,
-    ]
+    Parameters<
+      NonNullable<DialogPrimitive.Root.Props<Payload>["onOpenChange"]>
+    > extends [boolean, ...infer Rest]
       ? Rest
       : never
   >({
@@ -30,7 +29,9 @@ function Dialog<Payload = unknown>({
     blocksListShortcuts,
   });
 
-  return <DialogPrimitive.Root data-slot="dialog" {...overlayProps} {...props} />;
+  return (
+    <DialogPrimitive.Root data-slot="dialog" {...overlayProps} {...props} />
+  );
 }
 
 function DialogTrigger({ ...props }: DialogPrimitive.Trigger.Props) {

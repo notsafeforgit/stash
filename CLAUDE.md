@@ -193,6 +193,8 @@ v3 encodes/decodes the persisted shape via `encodeFilterASTNodeToSaved`/`decodeS
 
 Running `make generate` runs both gqlgen (Go GraphQL bindings) and graphql-codegen (TypeScript types). Always run this after modifying `graphql/schema/`.
 
+Agent note for `make validate-ui-v3`: `ui/v3/src/core/generated-graphql.ts` is ignored, but `pnpm run gqlgen` still rewrites it. In a read-only sandbox, graphql-codegen can print `[SUCCESS]` for every step and then `pnpm run check` exits 1 with no TypeScript diagnostics because the hidden error is `EROFS: read-only file system, open '.../ui/v3/src/core/generated-graphql.ts'`. When validation fails with that exact shape, rerun `make validate-ui-v3` with workspace write access before chasing TypeScript, package scripts, or generated GraphQL content.
+
 ### Job system
 
 Background tasks (scan, generate, identify, etc.) run through `pkg/job`. Jobs are queued and can be monitored via the GraphQL subscription `jobsSubscribe`.

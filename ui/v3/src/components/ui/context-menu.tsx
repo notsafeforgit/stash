@@ -16,10 +16,9 @@ function ContextMenu({
   ...props
 }: ContextMenuPrimitive.Root.Props & ShortcutOverlayRootProps) {
   const overlayProps = useOverlayOpenState<
-    Parameters<NonNullable<ContextMenuPrimitive.Root.Props["onOpenChange"]>> extends [
-      boolean,
-      ...infer Rest,
-    ]
+    Parameters<
+      NonNullable<ContextMenuPrimitive.Root.Props["onOpenChange"]>
+    > extends [boolean, ...infer Rest]
       ? Rest
       : never
   >({

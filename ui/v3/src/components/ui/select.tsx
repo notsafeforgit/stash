@@ -17,9 +17,7 @@ function Select<Value, Multiple extends boolean | undefined = false>({
 }: SelectPrimitive.Root.Props<Value, Multiple> & ShortcutOverlayRootProps) {
   const overlayProps = useOverlayOpenState<
     Parameters<
-      NonNullable<
-        SelectPrimitive.Root.Props<Value, Multiple>["onOpenChange"]
-      >
+      NonNullable<SelectPrimitive.Root.Props<Value, Multiple>["onOpenChange"]>
     > extends [boolean, ...infer Rest]
       ? Rest
       : never

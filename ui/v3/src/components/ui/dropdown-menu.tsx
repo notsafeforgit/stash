@@ -18,10 +18,9 @@ function DropdownMenu<Payload = unknown>({
   ...props
 }: MenuPrimitive.Root.Props<Payload> & ShortcutOverlayRootProps) {
   const overlayProps = useOverlayOpenState<
-    Parameters<NonNullable<MenuPrimitive.Root.Props<Payload>["onOpenChange"]>> extends [
-      boolean,
-      ...infer Rest,
-    ]
+    Parameters<
+      NonNullable<MenuPrimitive.Root.Props<Payload>["onOpenChange"]>
+    > extends [boolean, ...infer Rest]
       ? Rest
       : never
   >({
@@ -32,7 +31,11 @@ function DropdownMenu<Payload = unknown>({
   });
 
   return (
-    <MenuPrimitive.Root data-slot="dropdown-menu" {...overlayProps} {...props} />
+    <MenuPrimitive.Root
+      data-slot="dropdown-menu"
+      {...overlayProps}
+      {...props}
+    />
   );
 }
 

@@ -13,7 +13,8 @@ function Drawer({
   onOpenChange,
   blocksListShortcuts,
   ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Root> & ShortcutOverlayRootProps) {
+}: React.ComponentProps<typeof DrawerPrimitive.Root> &
+  ShortcutOverlayRootProps) {
   const overlayProps = useOverlayOpenState<
     Parameters<
       NonNullable<
@@ -29,7 +30,9 @@ function Drawer({
     blocksListShortcuts,
   });
 
-  return <DrawerPrimitive.Root data-slot="drawer" {...overlayProps} {...props} />;
+  return (
+    <DrawerPrimitive.Root data-slot="drawer" {...overlayProps} {...props} />
+  );
 }
 
 function DrawerTrigger({

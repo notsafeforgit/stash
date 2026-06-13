@@ -17,10 +17,9 @@ function Sheet<Payload = unknown>({
   ...props
 }: SheetPrimitive.Root.Props<Payload> & ShortcutOverlayRootProps) {
   const overlayProps = useOverlayOpenState<
-    Parameters<NonNullable<SheetPrimitive.Root.Props<Payload>["onOpenChange"]>> extends [
-      boolean,
-      ...infer Rest,
-    ]
+    Parameters<
+      NonNullable<SheetPrimitive.Root.Props<Payload>["onOpenChange"]>
+    > extends [boolean, ...infer Rest]
       ? Rest
       : never
   >({

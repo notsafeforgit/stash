@@ -90,11 +90,7 @@ function isTypingContext(el: Element | null): boolean {
 
 function isPlainEscape(e: KeyboardEvent): boolean {
   return (
-    e.key === "Escape" &&
-    !e.ctrlKey &&
-    !e.metaKey &&
-    !e.altKey &&
-    !e.shiftKey
+    e.key === "Escape" && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey
   );
 }
 
@@ -113,11 +109,7 @@ function consumeShortcutEvent(e: KeyboardEvent) {
   e.stopImmediatePropagation();
 }
 
-export function ShortcutProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export function ShortcutProvider({ children }: { children: React.ReactNode }) {
   const listScopesRef = useRef(new Map<symbol, ListShortcutScope>());
   const overlayScopesRef = useRef(new Map<symbol, OverlayShortcutScope>());
 

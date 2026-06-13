@@ -6,13 +6,14 @@
  * list inputs commit on blur or Enter). Persistence feedback comes from
  * the global save-indicator, so rows don't render their own spinners.
  */
-import { useId, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 import { FolderSearch, Minus, Plus } from "lucide-react";
 import { Button } from "src/components/ui/button";
 import { Input } from "src/components/ui/input";
 import { Switch } from "src/components/ui/switch";
 import { FolderPickerDialog } from "src/components/shared/folder-picker-dialog";
+import { DestructiveConfirmDialog } from "src/components/shared/destructive-confirm-dialog";
 import {
   Field,
   FieldContent,
@@ -54,6 +55,49 @@ interface RowProps {
   disabled?: boolean;
 }
 
+/**
+ * Draft state for commit-on-blur/Enter inputs:
+ *  - keeps typing responsive in local state;
+ *  - re-syncs whenever the saved value changes (render-time adjustment
+ *    keyed on `value`);
+ *  - `commit()` invokes `onCommit(draft)` only when the draft differs
+ *    from the saved value;
+ *  - flushes a pending edit on unmount, so navigating away without
+ *    blurring doesn't silently drop the change. (Rows that gate commits
+ *    behind a confirm dialog pass an `onCommit` that only opens the
+ *    dialog — on unmount that's a state update on an unmounting
+ *    component, i.e. a no-op, so dangerous edits are dropped rather
+ *    than silently applied.)
+ */
+function useDraftValue(value: string, onCommit: (draft: string) => void) {
+  const [draft, setDraft] = useState(value);
+  const [syncedValue, setSyncedValue] = useState(value);
+  if (syncedValue !== value) {
+    setSyncedValue(value);
+    setDraft(value);
+  }
+
+  // Refs so commit/flush read current state without re-subscribing the
+  // unmount effect on every keystroke.
+  const latest = useRef({ draft, value, onCommit });
+  latest.current = { draft, value, onCommit };
+
+  const commit = useCallback(() => {
+    const s = latest.current;
+    if (s.draft !== s.value) s.onCommit(s.draft);
+  }, []);
+
+  useEffect(
+    () => () => {
+      const s = latest.current;
+      if (s.draft !== s.value) s.onCommit(s.draft);
+    },
+    [],
+  );
+
+  return { draft, setDraft, commit };
+}
+
 export function SettingSwitch({
   label,
   description,
@@ -81,6 +125,12 @@ export function SettingSwitch({
   );
 }
 
+/**
+ * `confirm` gates changes behind a confirmation dialog showing the given
+ * message — for selects whose change has consequences beyond the setting
+ * itself (blob storage, hash algorithm). Cancelling keeps the saved
+ * value (the select is controlled, so it snaps back by itself).
+ */
 export function SettingSelect({
   label,
   description,
@@ -89,13 +139,16 @@ export function SettingSelect({
   options,
   onChange,
   triggerClassName = "w-44",
+  confirm,
 }: RowProps & {
   value: string;
   options: { value: string; label: string }[];
   onChange: (v: string) => void;
   triggerClassName?: string;
+  confirm?: React.ReactNode;
 }) {
   const id = useId();
+  const [confirmingValue, setConfirmingValue] = useState<string | null>(null);
   const current = options.find((o) => o.value === value);
   return (
     <Field orientation="horizontal">
@@ -106,7 +159,9 @@ export function SettingSelect({
       <Select
         value={value}
         onValueChange={(v) => {
-          if (v !== null && v !== value) onChange(v);
+          if (v === null || v === value) return;
+          if (confirm) setConfirmingValue(v);
+          else onChange(v);
         }}
         disabled={disabled}
       >
@@ -121,15 +176,26 @@ export function SettingSelect({
           ))}
         </SelectContent>
       </Select>
+      {confirm && confirmingValue !== null && (
+        <DestructiveConfirmDialog
+          open
+          onOpenChange={(o) => {
+            if (!o) setConfirmingValue(null);
+          }}
+          title={label}
+          onConfirm={() => {
+            onChange(confirmingValue);
+            setConfirmingValue(null);
+          }}
+        >
+          <p className="text-sm">{confirm}</p>
+        </DestructiveConfirmDialog>
+      )}
     </Field>
   );
 }
 
-/**
- * String setting committed on blur / Enter. Local draft state keeps
- * typing responsive; the saved value re-syncs whenever the upstream
- * value changes (render-time adjustment keyed on `value`).
- */
+/** String setting committed on blur / Enter (see useDraftValue). */
 export function SettingText({
   label,
   description,
@@ -147,16 +213,7 @@ export function SettingText({
   inputClassName?: string;
 }) {
   const id = useId();
-  const [draft, setDraft] = useState(value);
-  const [syncedValue, setSyncedValue] = useState(value);
-  if (syncedValue !== value) {
-    setSyncedValue(value);
-    setDraft(value);
-  }
-
-  function commit() {
-    if (draft !== value) onChange(draft);
-  }
+  const { draft, setDraft, commit } = useDraftValue(value, onChange);
 
   return (
     <Field orientation="responsive">
@@ -190,6 +247,11 @@ export function SettingText({
  *
  * Set `picker={false}` for file paths (executables, database file) where
  * a directory picker can't choose the final target.
+ *
+ * `confirm` gates every commit behind a confirmation dialog showing the
+ * given message — for paths whose change has consequences beyond the
+ * setting itself (database file, blobs directory). Cancelling reverts
+ * the input to the saved value.
  */
 export function SettingPath({
   label,
@@ -199,25 +261,25 @@ export function SettingPath({
   onChange,
   placeholder,
   picker = true,
+  confirm,
 }: RowProps & {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   picker?: boolean;
+  confirm?: React.ReactNode;
 }) {
   const id = useId();
   const intl = useIntl();
-  const [draft, setDraft] = useState(value);
-  const [syncedValue, setSyncedValue] = useState(value);
   const [pickerOpen, setPickerOpen] = useState(false);
-  if (syncedValue !== value) {
-    setSyncedValue(value);
-    setDraft(value);
-  }
+  const [confirmingValue, setConfirmingValue] = useState<string | null>(null);
 
-  function commit() {
-    if (draft !== value) onChange(draft);
-  }
+  const requestChange = (v: string) => {
+    if (confirm) setConfirmingValue(v);
+    else onChange(v);
+  };
+
+  const { draft, setDraft, commit } = useDraftValue(value, requestChange);
 
   return (
     <Field>
@@ -263,9 +325,27 @@ export function SettingPath({
           initialPath={draft}
           onSelect={(p) => {
             setDraft(p);
-            if (p !== value) onChange(p);
+            if (p !== value) requestChange(p);
           }}
         />
+      )}
+      {confirm && confirmingValue !== null && (
+        <DestructiveConfirmDialog
+          open
+          onOpenChange={(o) => {
+            if (!o) {
+              setConfirmingValue(null);
+              setDraft(value);
+            }
+          }}
+          title={label}
+          onConfirm={() => {
+            onChange(confirmingValue);
+            setConfirmingValue(null);
+          }}
+        >
+          <p className="text-sm">{confirm}</p>
+        </DestructiveConfirmDialog>
       )}
     </Field>
   );
@@ -297,15 +377,8 @@ export function SettingNumber({
   inputClassName?: string;
 }) {
   const id = useId();
-  const [draft, setDraft] = useState(String(value));
-  const [syncedValue, setSyncedValue] = useState(value);
-  if (syncedValue !== value) {
-    setSyncedValue(value);
-    setDraft(String(value));
-  }
-
-  function commit() {
-    const parsed = Number(draft);
+  const { draft, setDraft, commit } = useDraftValue(String(value), (d) => {
+    const parsed = Number(d);
     let next = Number.isFinite(parsed) ? parsed : (min ?? 0);
     if (integer) next = Math.round(next);
     if (min !== undefined) next = Math.max(min, next);
@@ -315,7 +388,7 @@ export function SettingNumber({
     // shows something else (e.g. "-5" clamped to an already-saved 0) —
     // re-sync the draft to the committed value either way.
     setDraft(String(next));
-  }
+  });
 
   return (
     <Field orientation="horizontal">
@@ -417,16 +490,7 @@ function ListEntryInput({
   onCommit: (v: string) => void;
   onRemove: () => void;
 }) {
-  const [draft, setDraft] = useState(value);
-  const [syncedValue, setSyncedValue] = useState(value);
-  if (syncedValue !== value) {
-    setSyncedValue(value);
-    setDraft(value);
-  }
-
-  function commit() {
-    if (draft !== value) onCommit(draft);
-  }
+  const { draft, setDraft, commit } = useDraftValue(value, onCommit);
 
   return (
     <div className="flex items-center gap-2">

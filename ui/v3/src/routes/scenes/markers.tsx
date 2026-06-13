@@ -33,7 +33,6 @@ function MarkersPage() {
       query: GQL.FindSceneMarkersDocument,
       makeVariables: (filter) => ({
         filter: filter.makeFindFilter(),
-        scene_marker_filter: filter.makeFilter(),
         scene_marker_filter_ast: filter.makeFilterAST(),
       }),
       extractResult: (data) => ({

@@ -103,7 +103,7 @@ function buildMutationInput(
   if (applyToAll && applyToAllTarget) {
     base.apply_to_items_matching_filters = true;
     base.find_filter = applyToAllTarget.findFilter;
-    base.image_filter = applyToAllTarget.objectFilter as GQL.ImageFilterType;
+    base.image_filter_ast = applyToAllTarget.filterAST;
   }
   return base;
 }
@@ -237,7 +237,7 @@ export function ImageBulkEditSheet({
         ? {
             apply_to_items_matching_filters: true,
             find_filter: applyToAllTarget.findFilter,
-            image_filter: applyToAllTarget.objectFilter as GQL.ImageFilterType,
+            image_filter_ast: applyToAllTarget.filterAST,
           }
         : { ids: items.map((i) => i.id) };
     await setDateFromMTime({ variables: { input } });

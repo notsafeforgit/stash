@@ -273,7 +273,6 @@ export function SceneCarouselRow({
   const { data, loading } = useQuery(GQL.FindScenesDocument, {
     variables: {
       filter: filter.makeFindFilter(),
-      scene_filter: filter.makeFilter(),
       scene_filter_ast: filter.makeFilterAST(),
     },
   });
@@ -352,7 +351,6 @@ export function StudioCarouselRow({
   const { data, loading } = useQuery(GQL.FindStudiosDocument, {
     variables: {
       filter: filter.makeFindFilter(),
-      studio_filter: filter.makeFilter(),
       studio_filter_ast: filter.makeFilterAST(),
     },
   });
@@ -397,7 +395,6 @@ export function PerformerCarouselRow({
   const { data, loading } = useQuery(GQL.FindPerformersDocument, {
     variables: {
       filter: filter.makeFindFilter(),
-      performer_filter: filter.makeFilter(),
       performer_filter_ast: filter.makeFilterAST(),
     },
   });
@@ -441,7 +438,6 @@ export function GroupCarouselRow({
   const { data, loading } = useQuery(GQL.FindGroupsDocument, {
     variables: {
       filter: filter.makeFindFilter(),
-      group_filter: filter.makeFilter(),
       group_filter_ast: filter.makeFilterAST(),
     },
   });
@@ -486,7 +482,6 @@ export function GalleryCarouselRow({
   const { data, loading } = useQuery(GQL.FindGalleriesDocument, {
     variables: {
       filter: filter.makeFindFilter(),
-      gallery_filter: filter.makeFilter(),
       gallery_filter_ast: filter.makeFilterAST(),
     },
   });
@@ -537,7 +532,6 @@ export function ImageCarouselRow({
   const { data, loading } = useQuery(GQL.FindImagesDocument, {
     variables: {
       filter: filter.makeFindFilter(),
-      image_filter: filter.makeFilter(),
       image_filter_ast: filter.makeFilterAST(),
     },
   });
@@ -609,7 +603,6 @@ export function TagCarouselRow({
   const { data, loading } = useQuery(GQL.FindTagsDocument, {
     variables: {
       filter: filter.makeFindFilter(),
-      tag_filter: filter.makeFilter(),
       tag_filter_ast: filter.makeFilterAST(),
     },
   });
@@ -654,7 +647,6 @@ export function MarkerCarouselRow({
   const { data, loading } = useQuery(GQL.FindSceneMarkersDocument, {
     variables: {
       filter: filter.makeFindFilter(),
-      scene_marker_filter: filter.makeFilter(),
       scene_marker_filter_ast: filter.makeFilterAST(),
     },
   });

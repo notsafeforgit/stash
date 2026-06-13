@@ -46,7 +46,7 @@ input BulkSceneMarkerUpdateInput {
   ids: [ID!]
   apply_to_items_matching_filters: Boolean
   find_filter: FindFilterType
-  scene_marker_filter: SceneMarkerFilterType
+  scene_marker_filter_ast: FilterASTInput
   title: String
   primary_tag_id: ID
   tag_ids: BulkUpdateIds

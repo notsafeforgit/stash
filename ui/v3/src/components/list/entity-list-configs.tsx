@@ -265,7 +265,6 @@ export function useSceneListConfig(
       query: GQL.FindScenesDocument,
       makeVariables: (filter) => ({
         filter: filter.makeFindFilter(),
-        scene_filter: filter.makeFilter(),
         scene_filter_ast: filter.makeFilterAST(),
       }),
       extractResult: (data) => ({
@@ -421,7 +420,6 @@ export function useImageListConfig(
       query: GQL.FindImagesDocument,
       makeVariables: (filter) => ({
         filter: filter.makeFindFilter(),
-        image_filter: filter.makeFilter(),
         image_filter_ast: filter.makeFilterAST(),
       }),
       extractResult: (data) => ({
@@ -502,7 +500,6 @@ export function useGalleryListConfig(
       query: GQL.FindGalleriesDocument,
       makeVariables: (filter) => ({
         filter: filter.makeFindFilter(),
-        gallery_filter: filter.makeFilter(),
         gallery_filter_ast: filter.makeFilterAST(),
       }),
       extractResult: (data) => ({
@@ -565,7 +562,6 @@ export function usePerformerListConfig(
       query: GQL.FindPerformersDocument,
       makeVariables: (filter) => ({
         filter: filter.makeFindFilter(),
-        performer_filter: filter.makeFilter(),
         performer_filter_ast: filter.makeFilterAST(),
       }),
       extractResult: (data) => ({
@@ -676,7 +672,6 @@ export function useGroupListConfig(
       query: GQL.FindGroupsDocument,
       makeVariables: (filter) => ({
         filter: filter.makeFindFilter(),
-        group_filter: filter.makeFilter(),
         group_filter_ast: filter.makeFilterAST(),
       }),
       extractResult: (data) => ({
@@ -739,7 +734,6 @@ export function useTagListConfig(
       query: GQL.FindTagsDocument,
       makeVariables: (filter) => ({
         filter: filter.makeFindFilter(),
-        tag_filter: filter.makeFilter(),
         tag_filter_ast: filter.makeFilterAST(),
       }),
       extractResult: (data) => ({

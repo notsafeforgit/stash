@@ -302,7 +302,7 @@ func (r *mutationResolver) BulkGroupUpdate(ctx context.Context, input BulkGroupU
 	compatInput := input
 	compatInput.ApplyToItemsMatchingFilters = nil
 	compatInput.FindFilter = nil
-	compatInput.GroupFilter = nil
+	compatInput.GroupFilterAst = nil
 
 	if _, err := r.BulkGroupUpdateJob(ctx, compatInput); err != nil {
 		return nil, err
@@ -317,20 +317,22 @@ func (r *mutationResolver) BulkGroupUpdateJob(ctx context.Context, input BulkGro
 		return "", fmt.Errorf("converting ids: %w", err)
 	}
 
-	useBackgroundJob := (input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters) ||
-		(len(input.Ids) == 0 && (input.FindFilter != nil || input.GroupFilter != nil))
+	useBackgroundJob := input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters
 	if useBackgroundJob {
+		if !hasBulkUpdateFilter(input.FindFilter, input.GroupFilterAst) {
+			return "", fmt.Errorf("group_filter_ast or find_filter.q is required when apply_to_items_matching_filters is true")
+		}
+
 		findFilter := sanitizeBulkUpdateFindFilter(input.FindFilter)
 		err = r.withReadTxn(ctx, func(ctx context.Context) error {
-			result, _, qErr := r.repository.Group.Query(ctx, input.GroupFilter, findFilter)
+			result, _, qErr := r.repository.Group.QueryAST(ctx, input.GroupFilterAst, findFilter)
 			if qErr != nil {
 				return qErr
 			}
-			var fetchedIds []int
-			for _, item := range result {
-				fetchedIds = append(fetchedIds, item.ID)
-			}
-			groupIDs = fetchedIds
+
+			groupIDs = idsFromItems(result, func(item *models.Group) int {
+				return item.ID
+			})
 			return nil
 		})
 		if err != nil {

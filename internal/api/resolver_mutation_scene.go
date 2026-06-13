@@ -398,7 +398,7 @@ func (r *mutationResolver) BulkSceneUpdate(ctx context.Context, input BulkSceneU
 	compatInput := input
 	compatInput.ApplyToItemsMatchingFilters = nil
 	compatInput.FindFilter = nil
-	compatInput.SceneFilter = nil
+	compatInput.SceneFilterAst = nil
 
 	if _, err := r.BulkSceneUpdateJob(ctx, compatInput); err != nil {
 		return nil, err
@@ -410,8 +410,7 @@ func (r *mutationResolver) BulkSceneUpdate(ctx context.Context, input BulkSceneU
 func (r *mutationResolver) BulkSceneUpdateJob(ctx context.Context, input BulkSceneUpdateInput) (string, error) {
 	var sceneIDs []int
 	var err error
-	useBackgroundJob := (input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters) ||
-		(len(input.Ids) == 0 && (input.FindFilter != nil || input.SceneFilter != nil))
+	useBackgroundJob := input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters
 	if len(input.Ids) > 0 {
 		sceneIDs, err = stringslice.StringSliceToIntSlice(input.Ids)
 		if err != nil {
@@ -419,18 +418,20 @@ func (r *mutationResolver) BulkSceneUpdateJob(ctx context.Context, input BulkSce
 		}
 	}
 	if useBackgroundJob {
+		if !hasBulkUpdateFilter(input.FindFilter, input.SceneFilterAst) {
+			return "", fmt.Errorf("scene_filter_ast or find_filter.q is required when apply_to_items_matching_filters is true")
+		}
+
 		findFilter := sanitizeBulkUpdateFindFilter(input.FindFilter)
 		if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-			result, err := r.repository.Scene.Query(ctx, models.SceneQueryOptions{
-				QueryOptions: models.QueryOptions{
-					FindFilter: findFilter,
-				},
-				SceneFilter: input.SceneFilter,
-			})
+			scenes, _, err := r.repository.Scene.QueryAST(ctx, input.SceneFilterAst, findFilter)
 			if err != nil {
 				return err
 			}
-			sceneIDs = result.IDs
+
+			sceneIDs = idsFromItems(scenes, func(scene *models.Scene) int {
+				return scene.ID
+			})
 			return nil
 		}); err != nil {
 			return "", fmt.Errorf("querying ids: %w", err)
@@ -563,8 +564,7 @@ func (o sceneSetDateFromMTimeOperation) Update(ctx context.Context, id int) erro
 func (r *mutationResolver) ScenesSetDateFromFileMTime(ctx context.Context, input ScenesSetDateFromFileMTimeInput) (string, error) {
 	var sceneIDs []int
 	var err error
-	useBackgroundJob := (input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters) ||
-		(len(input.Ids) == 0 && (input.FindFilter != nil || input.SceneFilter != nil))
+	useBackgroundJob := input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters
 	if len(input.Ids) > 0 {
 		sceneIDs, err = stringslice.StringSliceToIntSlice(input.Ids)
 		if err != nil {
@@ -572,16 +572,20 @@ func (r *mutationResolver) ScenesSetDateFromFileMTime(ctx context.Context, input
 		}
 	}
 	if useBackgroundJob {
+		if !hasBulkUpdateFilter(input.FindFilter, input.SceneFilterAst) {
+			return "", fmt.Errorf("scene_filter_ast or find_filter.q is required when apply_to_items_matching_filters is true")
+		}
+
 		findFilter := sanitizeBulkUpdateFindFilter(input.FindFilter)
 		if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-			result, err := r.repository.Scene.Query(ctx, models.SceneQueryOptions{
-				QueryOptions: models.QueryOptions{FindFilter: findFilter},
-				SceneFilter:  input.SceneFilter,
-			})
+			scenes, _, err := r.repository.Scene.QueryAST(ctx, input.SceneFilterAst, findFilter)
 			if err != nil {
 				return err
 			}
-			sceneIDs = result.IDs
+
+			sceneIDs = idsFromItems(scenes, func(scene *models.Scene) int {
+				return scene.ID
+			})
 			return nil
 		}); err != nil {
 			return "", fmt.Errorf("querying ids: %w", err)
@@ -1051,7 +1055,7 @@ func (r *mutationResolver) BulkSceneMarkerUpdate(ctx context.Context, input Bulk
 	compatInput := input
 	compatInput.ApplyToItemsMatchingFilters = nil
 	compatInput.FindFilter = nil
-	compatInput.SceneMarkerFilter = nil
+	compatInput.SceneMarkerFilterAst = nil
 
 	if _, err := r.BulkSceneMarkerUpdateJob(ctx, compatInput); err != nil {
 		return nil, err
@@ -1066,20 +1070,22 @@ func (r *mutationResolver) BulkSceneMarkerUpdateJob(ctx context.Context, input B
 		return "", fmt.Errorf("converting ids: %w", err)
 	}
 
-	useBackgroundJob := (input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters) ||
-		(len(input.Ids) == 0 && (input.FindFilter != nil || input.SceneMarkerFilter != nil))
+	useBackgroundJob := input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters
 	if useBackgroundJob {
+		if !hasBulkUpdateFilter(input.FindFilter, input.SceneMarkerFilterAst) {
+			return "", fmt.Errorf("scene_marker_filter_ast or find_filter.q is required when apply_to_items_matching_filters is true")
+		}
+
 		findFilter := sanitizeBulkUpdateFindFilter(input.FindFilter)
 		err = r.withReadTxn(ctx, func(ctx context.Context) error {
-			result, _, qErr := r.repository.SceneMarker.Query(ctx, input.SceneMarkerFilter, findFilter)
+			result, _, qErr := r.repository.SceneMarker.QueryAST(ctx, input.SceneMarkerFilterAst, findFilter)
 			if qErr != nil {
 				return qErr
 			}
-			var fetchedIds []int
-			for _, item := range result {
-				fetchedIds = append(fetchedIds, item.ID)
-			}
-			ids = fetchedIds
+
+			ids = idsFromItems(result, func(item *models.SceneMarker) int {
+				return item.ID
+			})
 			return nil
 		})
 		if err != nil {

@@ -635,28 +635,60 @@ export class ListFilterModel {
     return output;
   }
 
-  public makeFilterAST() {
-    const userAst = pruneInvalidFilterASTNode(this.filterAst);
-    const locked = pruneInvalidFilterASTNode(this.lockedFilterAst);
+  private makeFilterASTNode(includeLocked: boolean) {
+    let root: FilterASTNode | undefined = pruneInvalidFilterASTNode(
+      this.filterAst ? cloneFilterASTNode(this.filterAst) : undefined,
+    );
 
-    if (!userAst && !locked) {
+    const conditions = this.criteria
+      .filter((c) => c.isValid())
+      .map((c) => createConditionNode(c));
+    if (conditions.length > 0) {
+      if (
+        root &&
+        root.kind === "group" &&
+        root.operator === FilterGroupOperator.And
+      ) {
+        root = { ...root, children: [...root.children, ...conditions] };
+      } else if (root) {
+        root = createASTGroup(this.mode, FilterGroupOperator.And, [
+          root,
+          ...conditions,
+        ]);
+      } else if (conditions.length === 1) {
+        root = conditions[0];
+      } else {
+        root = createASTGroup(this.mode, FilterGroupOperator.And, conditions);
+      }
+    }
+
+    if (includeLocked) {
+      const locked = pruneInvalidFilterASTNode(
+        this.lockedFilterAst
+          ? cloneFilterASTNode(this.lockedFilterAst)
+          : undefined,
+      );
+      if (locked && root) {
+        root = createASTGroup(this.mode, FilterGroupOperator.And, [
+          locked,
+          root,
+        ]);
+      } else if (locked) {
+        root = locked;
+      }
+    }
+
+    return root;
+  }
+
+  public makeFilterAST() {
+    const root = this.makeFilterASTNode(true);
+
+    if (!root) {
       return undefined;
     }
 
-    // If only one side exists, send it directly.
-    if (!locked) {
-      return { root: filterASTNodeToGraphQL(userAst!) };
-    }
-    if (!userAst) {
-      return { root: filterASTNodeToGraphQL(locked) };
-    }
-
-    // Both exist — AND them together in a wrapper group.
-    const combined = createASTGroup(this.mode, FilterGroupOperator.And, [
-      locked,
-      userAst,
-    ]);
-    return { root: filterASTNodeToGraphQL(combined) };
+    return { root: filterASTNodeToGraphQL(root) };
   }
 
   /**
@@ -666,33 +698,7 @@ export class ListFilterModel {
    * filter has no criteria.
    */
   public makeFilterAst(): SavedFilterAST | undefined {
-    let root: FilterASTNode | undefined = pruneInvalidFilterASTNode(
-      this.filterAst ? cloneFilterASTNode(this.filterAst) : undefined,
-    );
-
-    if (this.criteria.length > 0) {
-      const conditions = this.criteria
-        .filter((c) => c.isValid())
-        .map((c) => createConditionNode(c));
-      if (conditions.length > 0) {
-        if (
-          root &&
-          root.kind === "group" &&
-          root.operator === FilterGroupOperator.And
-        ) {
-          root = { ...root, children: [...root.children, ...conditions] };
-        } else if (root) {
-          root = createASTGroup(this.mode, FilterGroupOperator.And, [
-            root,
-            ...conditions,
-          ]);
-        } else if (conditions.length === 1) {
-          root = conditions[0];
-        } else {
-          root = createASTGroup(this.mode, FilterGroupOperator.And, conditions);
-        }
-      }
-    }
+    const root = this.makeFilterASTNode(false);
 
     if (!root) return undefined;
     return { root: encodeFilterASTNodeToSaved(root) };

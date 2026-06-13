@@ -108,10 +108,15 @@ func TestBulkTagUpdate_ApplyToAll(t *testing.T) {
 	r, bulkUpdater := newResolver(db)
 
 	tagIDs := []int{1, 2, 3}
-	tagFilter := &models.TagFilterType{
-		Name: &models.StringCriterionInput{
-			Value:    "test",
-			Modifier: models.CriterionModifierIncludes,
+	tagFilterAST := &models.FilterAST{
+		Root: &models.FilterASTNode{
+			Condition: &models.FilterASTCondition{
+				Field: "name",
+				Value: map[string]interface{}{
+					"value":    "test",
+					"modifier": models.CriterionModifierIncludes,
+				},
+			},
 		},
 	}
 	findFilter := &models.FindFilterType{
@@ -120,7 +125,7 @@ func TestBulkTagUpdate_ApplyToAll(t *testing.T) {
 	}
 
 	// Mock the query call that fetches all IDs
-	db.Tag.On("Query", mock.Anything, tagFilter, mock.MatchedBy(func(ff *models.FindFilterType) bool {
+	db.Tag.On("QueryAST", mock.Anything, tagFilterAST, mock.MatchedBy(func(ff *models.FindFilterType) bool {
 		return ff.Page == nil && ff.PerPage != nil && *ff.PerPage == models.PerPageAll
 	})).Return([]*models.Tag{
 		{ID: 1}, {ID: 2}, {ID: 3},
@@ -129,7 +134,7 @@ func TestBulkTagUpdate_ApplyToAll(t *testing.T) {
 	input := BulkTagUpdateInput{
 		Ids:                         []string{}, // Empty IDs, rely on filter
 		ApplyToItemsMatchingFilters: PtrBool(true),
-		TagFilter:                   tagFilter,
+		TagFilterAst:                tagFilterAST,
 		FindFilter:                  findFilter,
 		Favorite:                    PtrBool(true),
 	}

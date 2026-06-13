@@ -261,7 +261,6 @@ export function TagStudiosTab({ tag }: { tag: TagData }) {
       query: GQL.FindStudiosDocument,
       makeVariables: (filter) => ({
         filter: filter.makeFindFilter(),
-        studio_filter: filter.makeFilter(),
         studio_filter_ast: filter.makeFilterAST(),
       }),
       extractResult: (data) => ({
@@ -324,7 +323,6 @@ export function TagMarkersTab({ tag }: { tag: TagData }) {
       query: GQL.FindSceneMarkersDocument,
       makeVariables: (filter) => ({
         filter: filter.makeFindFilter(),
-        scene_marker_filter: filter.makeFilter(),
         scene_marker_filter_ast: filter.makeFilterAST(),
       }),
       extractResult: (data) => ({

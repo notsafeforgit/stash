@@ -65,7 +65,7 @@ input BulkImageUpdateInput {
   ids: [ID!]
   apply_to_items_matching_filters: Boolean
   find_filter: FindFilterType
-  image_filter: ImageFilterType
+  image_filter_ast: FilterASTInput
   title: String
   code: String
   # rating expressed as 1-100
@@ -88,14 +88,14 @@ input BulkImageUpdateInput {
 Set each image's date to the mtime of its primary file. Mirrors the dual-mode
 contract of BulkImageUpdateInput: pass an explicit `ids` list, or set
 `apply_to_items_matching_filters: true` and supply `find_filter` /
-`image_filter` to operate on every match.
+`image_filter_ast` to operate on every match.
 """
 input ImagesSetDateFromFileMTimeInput {
   clientMutationId: String
   ids: [ID!]
   apply_to_items_matching_filters: Boolean
   find_filter: FindFilterType
-  image_filter: ImageFilterType
+  image_filter_ast: FilterASTInput
 }
 
 input ImageDestroyInput {

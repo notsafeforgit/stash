@@ -527,7 +527,6 @@ function SceneDuplicateCheckerPage() {
 
   const filterVariables = useMemo(
     () => ({
-      scene_filter: filterModel.makeFilter() as GQL.SceneFilterType,
       scene_filter_ast: filterModel.makeFilterAST(),
     }),
     [filterModel],
@@ -605,11 +604,28 @@ function SceneDuplicateCheckerPage() {
   const missingPhashQuery = useQuery(GQL.FindScenesDocument, {
     variables: {
       filter: { per_page: 0 },
-      scene_filter: {
-        is_missing: "phash",
-        file_count: {
-          modifier: GQL.CriterionModifier.GreaterThan,
-          value: 0,
+      scene_filter_ast: {
+        root: {
+          group: {
+            operator: GQL.FilterGroupOperator.And,
+            children: [
+              {
+                condition: {
+                  field: "is_missing",
+                  value: "phash",
+                },
+              },
+              {
+                condition: {
+                  field: "file_count",
+                  value: {
+                    modifier: GQL.CriterionModifier.GreaterThan,
+                    value: 0,
+                  },
+                },
+              },
+            ],
+          },
         },
       },
     },

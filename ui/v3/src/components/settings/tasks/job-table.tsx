@@ -75,8 +75,11 @@ function Task({ job }: { job: JobFragment }) {
   ) {
     const nowMs = Date.now();
     const startMs = new Date(job.startTime).valueOf();
-    const estimatedLengthMs = (nowMs - startMs) / job.progress;
-    eta = humanizeSeconds(estimatedLengthMs / 1000);
+    if (job.progress < 1 && startMs <= nowMs) {
+      const elapsedMs = nowMs - startMs;
+      const remainingMs = (elapsedMs * (1 - job.progress)) / job.progress;
+      eta = humanizeSeconds(remainingMs / 1000);
+    }
   }
 
   const showSubtasks =

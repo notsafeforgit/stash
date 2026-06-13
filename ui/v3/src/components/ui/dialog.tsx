@@ -4,9 +4,33 @@ import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { XIcon } from "lucide-react";
+import {
+  type ShortcutOverlayRootProps,
+  useOverlayOpenState,
+} from "@/components/shortcut-provider";
 
-function Dialog({ ...props }: DialogPrimitive.Root.Props) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />;
+function Dialog<Payload = unknown>({
+  open,
+  defaultOpen,
+  onOpenChange,
+  blocksListShortcuts,
+  ...props
+}: DialogPrimitive.Root.Props<Payload> & ShortcutOverlayRootProps) {
+  const overlayProps = useOverlayOpenState<
+    Parameters<NonNullable<DialogPrimitive.Root.Props<Payload>["onOpenChange"]>> extends [
+      boolean,
+      ...infer Rest,
+    ]
+      ? Rest
+      : never
+  >({
+    open,
+    defaultOpen,
+    onOpenChange,
+    blocksListShortcuts,
+  });
+
+  return <DialogPrimitive.Root data-slot="dialog" {...overlayProps} {...props} />;
 }
 
 function DialogTrigger({ ...props }: DialogPrimitive.Trigger.Props) {

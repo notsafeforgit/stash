@@ -3,8 +3,35 @@ import { Select as SelectPrimitive } from "@base-ui/react/select";
 
 import { cn } from "@/lib/utils";
 import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react";
+import {
+  type ShortcutOverlayRootProps,
+  useOverlayOpenState,
+} from "@/components/shortcut-provider";
 
-const Select = SelectPrimitive.Root;
+function Select<Value, Multiple extends boolean | undefined = false>({
+  open,
+  defaultOpen,
+  onOpenChange,
+  blocksListShortcuts,
+  ...props
+}: SelectPrimitive.Root.Props<Value, Multiple> & ShortcutOverlayRootProps) {
+  const overlayProps = useOverlayOpenState<
+    Parameters<
+      NonNullable<
+        SelectPrimitive.Root.Props<Value, Multiple>["onOpenChange"]
+      >
+    > extends [boolean, ...infer Rest]
+      ? Rest
+      : never
+  >({
+    open,
+    defaultOpen,
+    onOpenChange,
+    blocksListShortcuts,
+  });
+
+  return <SelectPrimitive.Root {...overlayProps} {...props} />;
+}
 
 function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
   return (

@@ -176,6 +176,7 @@ export const EntityList: React.FC<EntityListProps> = ({
               open ? openFilterSidebar() : closeFilterSidebar()
             }
             className="h-[88svh] max-h-[88svh]"
+            blocksListShortcuts={false}
           >
             <BottomSheetHeader className="border-b border-border shrink-0 py-3! px-4!">
               <BottomSheetTitle className="flex items-center text-base gap-2">

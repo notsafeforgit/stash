@@ -32,6 +32,7 @@ import {
   encodeFilterASTNodeToSaved,
   filterASTNodeToGraphQL,
   astSupportsCriterionType,
+  pruneInvalidFilterASTNode,
 } from "./filter-ast";
 
 interface DecodedParams {
@@ -635,8 +636,8 @@ export class ListFilterModel {
   }
 
   public makeFilterAST() {
-    const userAst = this.filterAst;
-    const locked = this.lockedFilterAst;
+    const userAst = pruneInvalidFilterASTNode(this.filterAst);
+    const locked = pruneInvalidFilterASTNode(this.lockedFilterAst);
 
     if (!userAst && !locked) {
       return undefined;
@@ -665,27 +666,31 @@ export class ListFilterModel {
    * filter has no criteria.
    */
   public makeFilterAst(): SavedFilterAST | undefined {
-    let root: FilterASTNode | undefined = this.filterAst
-      ? cloneFilterASTNode(this.filterAst)
-      : undefined;
+    let root: FilterASTNode | undefined = pruneInvalidFilterASTNode(
+      this.filterAst ? cloneFilterASTNode(this.filterAst) : undefined,
+    );
 
     if (this.criteria.length > 0) {
-      const conditions = this.criteria.map((c) => createConditionNode(c));
-      if (
-        root &&
-        root.kind === "group" &&
-        root.operator === FilterGroupOperator.And
-      ) {
-        root = { ...root, children: [...root.children, ...conditions] };
-      } else if (root) {
-        root = createASTGroup(this.mode, FilterGroupOperator.And, [
-          root,
-          ...conditions,
-        ]);
-      } else if (conditions.length === 1) {
-        root = conditions[0];
-      } else {
-        root = createASTGroup(this.mode, FilterGroupOperator.And, conditions);
+      const conditions = this.criteria
+        .filter((c) => c.isValid())
+        .map((c) => createConditionNode(c));
+      if (conditions.length > 0) {
+        if (
+          root &&
+          root.kind === "group" &&
+          root.operator === FilterGroupOperator.And
+        ) {
+          root = { ...root, children: [...root.children, ...conditions] };
+        } else if (root) {
+          root = createASTGroup(this.mode, FilterGroupOperator.And, [
+            root,
+            ...conditions,
+          ]);
+        } else if (conditions.length === 1) {
+          root = conditions[0];
+        } else {
+          root = createASTGroup(this.mode, FilterGroupOperator.And, conditions);
+        }
       }
     }
 

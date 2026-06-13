@@ -52,6 +52,8 @@ export interface BottomSheetProps {
   children: React.ReactNode;
   /** Extra classes applied to the content panel (e.g. height constraints). */
   className?: string;
+  /** Whether this sheet should suppress background entity-list shortcuts. */
+  blocksListShortcuts?: boolean;
 }
 
 /**
@@ -63,9 +65,14 @@ export function BottomSheet({
   onOpenChange,
   children,
   className,
+  blocksListShortcuts,
 }: BottomSheetProps) {
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
+    <Drawer
+      open={open}
+      onOpenChange={onOpenChange}
+      blocksListShortcuts={blocksListShortcuts}
+    >
       <DrawerContent className={cn("bg-background outline-none", className)}>
         {children}
       </DrawerContent>

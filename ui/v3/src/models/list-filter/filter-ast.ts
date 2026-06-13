@@ -194,13 +194,35 @@ export function countFilterASTConditions(node?: FilterASTNode): number {
   }
 
   if (node.kind === "condition") {
-    return 1;
+    return node.criterion.isValid() ? 1 : 0;
   }
 
   return node.children.reduce(
     (total, child) => total + countFilterASTConditions(child),
     0,
   );
+}
+
+export function pruneInvalidFilterASTNode(
+  node?: FilterASTNode,
+): FilterASTNode | undefined {
+  if (!node) return undefined;
+
+  if (node.kind === "condition") {
+    return node.criterion.isValid() ? node : undefined;
+  }
+
+  const children = node.children.flatMap((child) => {
+    const pruned = pruneInvalidFilterASTNode(child);
+    return pruned ? [pruned] : [];
+  });
+
+  if (children.length === 0) return undefined;
+
+  return {
+    ...node,
+    children,
+  };
 }
 
 export function encodeFilterASTNode(node: FilterASTNode): CompactASTNode {
@@ -443,7 +465,7 @@ export function flattenFilterASTConditions(
   }
 
   if (node.kind === "condition") {
-    return [node];
+    return node.criterion.isValid() ? [node] : [];
   }
 
   return node.children.flatMap(flattenFilterASTConditions);

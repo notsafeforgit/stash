@@ -92,6 +92,7 @@ import {
 } from "src/components/detail/delete-dialog";
 import { ImageBulkEditSheet } from "src/components/detail/image-bulk-edit-sheet";
 import { useToast } from "src/hooks/toast";
+import { useDocumentTitle } from "src/hooks/title";
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 20;
@@ -395,6 +396,12 @@ function accuracyLabel(
 
 function ImageDuplicateCheckerPage() {
   const intl = useIntl();
+  useDocumentTitle(
+    intl.formatMessage({
+      id: "config.tools.image_duplicate_checker",
+      defaultMessage: "Image duplicate checker",
+    }),
+  );
   const navigate = useNavigate({ from: Route.fullPath });
   const toast = useToast();
   const search = Route.useSearch();

@@ -19,6 +19,7 @@ import { GroupDetailsTab } from "src/components/detail/group-detail-tabs";
 import { GroupActionsMenu } from "src/components/detail/group-actions-menu";
 import { GroupEditForm } from "src/components/detail/group-edit-form";
 import { DetailEditTransition } from "src/components/detail/detail-edit-transition";
+import { useDocumentTitle } from "src/hooks/title";
 import {
   GroupScenesTab,
   GroupPerformersTab,
@@ -84,6 +85,7 @@ function GroupDetailPage() {
   });
 
   const group = data?.findGroup;
+  useDocumentTitle(group?.name);
 
   type EntityTab = { id: string; label: string; content: React.ReactNode };
   const entityTabs: EntityTab[] = group

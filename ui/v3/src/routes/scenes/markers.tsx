@@ -1,5 +1,7 @@
 import { useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useIntl } from "react-intl";
+import { useDocumentTitle } from "src/hooks/title";
 import * as GQL from "src/core/generated-graphql";
 import { EntityListPage, type EntityListPageConfig } from "src/components/list";
 import { MarkerCard } from "src/components/cards";
@@ -12,6 +14,10 @@ type MarkerItem =
   GQL.FindSceneMarkersQuery["findSceneMarkers"]["scene_markers"][number];
 
 function MarkersPage() {
+  const intl = useIntl();
+  useDocumentTitle(
+    intl.formatMessage({ id: "markers", defaultMessage: "Markers" }),
+  );
   const {
     onCardPreviewClick,
     onItemsChanged,

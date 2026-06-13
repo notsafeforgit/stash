@@ -44,6 +44,7 @@ import {
   useAtOriginalSize,
 } from "src/components/lightbox";
 import { useImageOCounter } from "src/hooks/use-image-o-counter";
+import { useDocumentTitle } from "src/hooks/title";
 
 // ── Route search params ────────────────────────────────────────────────────────
 
@@ -368,6 +369,7 @@ function ImageDetailPage() {
   }, [activeTab]);
 
   const image = data?.findImage;
+  useDocumentTitle(image ? imageTitle(image) || undefined : undefined);
 
   if (loading) {
     return (

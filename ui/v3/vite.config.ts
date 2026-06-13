@@ -54,6 +54,10 @@ export default defineConfig({
     TanStackRouterVite({
       routesDirectory: "src/routes",
       generatedRouteTree: "src/routeTree.gen.ts",
+      // Split each route's component into its own chunk so heavy pages
+      // (package manager, identify dialog, duplicate checkers) load on
+      // demand instead of shipping in the initial bundle.
+      autoCodeSplitting: true,
     }),
     react(),
     tailwindcss(),

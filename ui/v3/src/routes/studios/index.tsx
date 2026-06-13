@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useIntl } from "react-intl";
+import { useDocumentTitle } from "src/hooks/title";
 import { Plus } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
 import { EntityListPage, type EntityListPageConfig } from "src/components/list";
@@ -17,6 +18,9 @@ type StudioItem = GQL.FindStudiosQuery["findStudios"]["studios"][number];
 
 function StudiosPage() {
   const intl = useIntl();
+  useDocumentTitle(
+    intl.formatMessage({ id: "studios", defaultMessage: "Studios" }),
+  );
   const navigate = useNavigate();
   const tableColumns = useStudioTableColumns();
   const [editingId, setEditingId] = useState<string | null>(null);

@@ -9,13 +9,13 @@ import {
   type SettingsSearchEntry,
 } from "./settings-search-index.gen";
 
-interface NavItem {
+export interface NavItem {
   to: string;
   labelId: string;
   defaultLabel: string;
 }
 
-const ITEMS: NavItem[] = [
+export const SETTINGS_NAV_ITEMS: NavItem[] = [
   {
     to: "/settings/tasks",
     labelId: "config.categories.tasks",
@@ -73,7 +73,7 @@ const ITEMS: NavItem[] = [
   },
 ];
 
-const PAGE_LABELS = new Map(ITEMS.map((i) => [i.to, i]));
+const PAGE_LABELS = new Map(SETTINGS_NAV_ITEMS.map((i) => [i.to, i]));
 
 const MAX_RESULTS = 10;
 
@@ -214,7 +214,7 @@ export function SettingsNav() {
       <div className="hidden md:flex md:w-56 md:shrink-0 md:flex-col md:gap-3 md:border-r md:pr-3">
         <SettingsSearch results={results} query={query} setQuery={setQuery} />
         <nav className="flex flex-col gap-1">
-          {ITEMS.map((item) => renderItem(item, false))}
+          {SETTINGS_NAV_ITEMS.map((item) => renderItem(item, false))}
         </nav>
       </div>
 
@@ -222,7 +222,7 @@ export function SettingsNav() {
       <div className="border-b px-4 py-2 md:hidden">
         <SettingsSearch results={results} query={query} setQuery={setQuery} />
         <nav className="mt-2 flex gap-1 overflow-x-auto">
-          {ITEMS.map((item) => renderItem(item, true))}
+          {SETTINGS_NAV_ITEMS.map((item) => renderItem(item, true))}
         </nav>
       </div>
     </>

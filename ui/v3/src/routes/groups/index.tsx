@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useIntl } from "react-intl";
+import { useDocumentTitle } from "src/hooks/title";
 import { Plus } from "lucide-react";
 import { EntityListPage } from "src/components/list";
 import { useGroupListConfig } from "src/components/list/entity-list-configs";
@@ -11,6 +12,9 @@ import { GroupCreateSheet } from "src/components/detail/group-create-sheet";
 
 function GroupsPage() {
   const intl = useIntl();
+  useDocumentTitle(
+    intl.formatMessage({ id: "groups", defaultMessage: "Groups" }),
+  );
   const navigate = useNavigate();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);

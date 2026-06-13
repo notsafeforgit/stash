@@ -1,9 +1,17 @@
 import { useEffect } from "react";
-import { createFileRoute, Outlet } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Outlet,
+  useRouterState,
+} from "@tanstack/react-router";
 import { zodValidator } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { useIntl } from "react-intl";
-import { SettingsNav } from "src/components/settings/settings-nav";
+import {
+  SettingsNav,
+  SETTINGS_NAV_ITEMS,
+} from "src/components/settings/settings-nav";
+import { useDocumentTitle } from "src/hooks/title";
 
 const searchSchema = z.object({
   /** Resolved label text of a setting row to scroll to and flash —
@@ -14,6 +22,22 @@ const searchSchema = z.object({
 function SettingsLayout() {
   const intl = useIntl();
   const { hl } = Route.useSearch();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  // "<Section> | Settings | Stash". Match the longest nav route that the
+  // current path falls under (e.g. /settings/system → System).
+  const section = SETTINGS_NAV_ITEMS.filter(
+    (i) => pathname === i.to || pathname.startsWith(`${i.to}/`),
+  ).sort((a, b) => b.to.length - a.to.length)[0];
+  useDocumentTitle(
+    section
+      ? intl.formatMessage({
+          id: section.labelId,
+          defaultMessage: section.defaultLabel,
+        })
+      : undefined,
+    intl.formatMessage({ id: "settings", defaultMessage: "Settings" }),
+  );
 
   // Find the row whose label matches the `hl` search param, scroll it
   // into view, and flash it. Text-matching against the rendered label

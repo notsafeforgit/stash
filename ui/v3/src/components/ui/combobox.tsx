@@ -24,9 +24,7 @@ function Combobox<Value, Multiple extends boolean | undefined = false>({
 }: ComboboxPrimitive.Root.Props<Value, Multiple> & ShortcutOverlayRootProps) {
   const overlayProps = useOverlayOpenState<
     Parameters<
-      NonNullable<
-        ComboboxPrimitive.Root.Props<Value, Multiple>["onOpenChange"]
-      >
+      NonNullable<ComboboxPrimitive.Root.Props<Value, Multiple>["onOpenChange"]>
     > extends [boolean, ...infer Rest]
       ? Rest
       : never

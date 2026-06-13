@@ -1,7 +1,6 @@
 import {
   createBooleanCriterionOption,
   createHierarchicalCountCriterionOption,
-  createMandatoryNumberCriterionOption,
   createMandatoryStringCriterionOption,
   createStringCriterionOption,
   MandatoryNumberCriterionOption,

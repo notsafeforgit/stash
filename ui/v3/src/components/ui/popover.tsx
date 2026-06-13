@@ -17,10 +17,9 @@ function Popover<Payload = unknown>({
   ...props
 }: PopoverPrimitive.Root.Props<Payload> & ShortcutOverlayRootProps) {
   const overlayProps = useOverlayOpenState<
-    Parameters<NonNullable<PopoverPrimitive.Root.Props<Payload>["onOpenChange"]>> extends [
-      boolean,
-      ...infer Rest,
-    ]
+    Parameters<
+      NonNullable<PopoverPrimitive.Root.Props<Payload>["onOpenChange"]>
+    > extends [boolean, ...infer Rest]
       ? Rest
       : never
   >({
@@ -30,7 +29,9 @@ function Popover<Payload = unknown>({
     blocksListShortcuts,
   });
 
-  return <PopoverPrimitive.Root data-slot="popover" {...overlayProps} {...props} />;
+  return (
+    <PopoverPrimitive.Root data-slot="popover" {...overlayProps} {...props} />
+  );
 }
 
 function PopoverTrigger({ ...props }: PopoverPrimitive.Trigger.Props) {

@@ -453,13 +453,28 @@ export class IHierarchicalLabeledIdCriterion extends ModifierCriterion<IHierarch
     };
   }
 
+  private isHierarchyMode(
+    value: unknown,
+  ): value is NonNullable<IHierarchicalLabelValue["hierarchyMode"]> {
+    return (
+      value === "exact" ||
+      value === "ancestors" ||
+      value === "descendants" ||
+      value === "ancestors_descendants"
+    );
+  }
+
   protected override decodeValue(v: unknown): void {
     if (v === undefined || v === null) return;
     const val = v as Partial<IHierarchicalLabelValue>;
+    const hierarchyMode = this.isHierarchyMode(val.hierarchyMode)
+      ? val.hierarchyMode
+      : undefined;
     this.value = {
       items: Array.isArray(val.items) ? val.items : [],
       excluded: Array.isArray(val.excluded) ? val.excluded : [],
       depth: typeof val.depth === "number" ? val.depth : 0,
+      ...(hierarchyMode !== undefined ? { hierarchyMode } : {}),
     };
   }
 
@@ -486,10 +501,14 @@ export class IHierarchicalLabeledIdCriterion extends ModifierCriterion<IHierarch
     const { modifier, value } = criterion;
 
     if (value !== undefined) {
+      const hierarchyMode = this.isHierarchyMode(value.hierarchyMode)
+        ? value.hierarchyMode
+        : undefined;
       this.value = {
         items: value.items || [],
         excluded: value.excluded || [],
         depth: value.depth || 0,
+        ...(hierarchyMode !== undefined ? { hierarchyMode } : {}),
       };
     }
 

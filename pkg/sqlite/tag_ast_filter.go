@@ -77,43 +77,49 @@ func tagASTConditionHandler(condition *models.FilterASTCondition) (criterionHand
 		}
 		return qb.isMissingCriterionHandler(&input), nil
 	case "scene_count":
-		input, err := decodeASTValue[models.IntCriterionInput](condition.Value)
+		input, err := decodeASTValue[models.HierarchicalCountInput](condition.Value)
 		if err != nil {
 			return nil, err
 		}
 		return qb.sceneCountCriterionHandler(&input), nil
 	case "image_count":
-		input, err := decodeASTValue[models.IntCriterionInput](condition.Value)
+		input, err := decodeASTValue[models.HierarchicalCountInput](condition.Value)
 		if err != nil {
 			return nil, err
 		}
 		return qb.imageCountCriterionHandler(&input), nil
 	case "gallery_count":
-		input, err := decodeASTValue[models.IntCriterionInput](condition.Value)
+		input, err := decodeASTValue[models.HierarchicalCountInput](condition.Value)
 		if err != nil {
 			return nil, err
 		}
 		return qb.galleryCountCriterionHandler(&input), nil
 	case "performer_count":
-		input, err := decodeASTValue[models.IntCriterionInput](condition.Value)
+		input, err := decodeASTValue[models.HierarchicalCountInput](condition.Value)
 		if err != nil {
 			return nil, err
 		}
 		return qb.performerCountCriterionHandler(&input), nil
 	case "studio_count":
-		input, err := decodeASTValue[models.IntCriterionInput](condition.Value)
+		input, err := decodeASTValue[models.HierarchicalCountInput](condition.Value)
 		if err != nil {
 			return nil, err
 		}
 		return qb.studioCountCriterionHandler(&input), nil
 	case "group_count":
-		input, err := decodeASTValue[models.IntCriterionInput](condition.Value)
+		input, err := decodeASTValue[models.HierarchicalCountInput](condition.Value)
+		if err != nil {
+			return nil, err
+		}
+		return qb.groupCountCriterionHandler(&input), nil
+	case "movie_count":
+		input, err := decodeASTValue[models.HierarchicalCountInput](condition.Value)
 		if err != nil {
 			return nil, err
 		}
 		return qb.groupCountCriterionHandler(&input), nil
 	case "marker_count":
-		input, err := decodeASTValue[models.IntCriterionInput](condition.Value)
+		input, err := decodeASTValue[models.HierarchicalCountInput](condition.Value)
 		if err != nil {
 			return nil, err
 		}

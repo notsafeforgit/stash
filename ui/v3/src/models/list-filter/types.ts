@@ -63,6 +63,9 @@ export interface IRangeValue<V> {
 }
 
 export type INumberValue = IRangeValue<number>;
+export interface IHierarchicalCountValue extends INumberValue {
+  depth: number;
+}
 export type IDateValue = IRangeValue<string>;
 export type ITimestampValue = IRangeValue<string>;
 export interface IDuplicationValue {

@@ -2,6 +2,7 @@
 import type { IntlShape } from "react-intl";
 import {
   CriterionModifier,
+  type HierarchicalCountInput,
   type HierarchicalMultiCriterionInput,
   type IntCriterionInput,
   type MultiCriterionInput,
@@ -13,6 +14,7 @@ import { secondsToTimestamp } from "src/utils/duration";
 import type {
   CriterionType,
   IDuplicationValue,
+  IHierarchicalCountValue,
   IHierarchicalLabelValue,
   ILabeledId,
   INumberValue,
@@ -41,6 +43,7 @@ export type CriterionValue =
   | boolean
   | string[]
   | ILabeledId[]
+  | IHierarchicalCountValue
   | IHierarchicalLabelValue
   | ILabeledValueListValue
   | INumberValue
@@ -981,6 +984,147 @@ export class NumberCriterion extends ModifierCriterion<INumberValue> {
 
     return true;
   }
+}
+
+type HierarchicalCountRawValue =
+  | number
+  | INumberValue
+  | IHierarchicalCountValue;
+
+function normalizeHierarchicalCountValue(
+  value: HierarchicalCountRawValue | undefined,
+  value2?: number,
+  depth?: number | null,
+): IHierarchicalCountValue {
+  if (typeof value === "object" && value !== null) {
+    const countValue = value as Partial<IHierarchicalCountValue>;
+    return {
+      value: countValue.value,
+      value2: countValue.value2 ?? value2,
+      depth: countValue.depth ?? depth ?? 0,
+    };
+  }
+
+  return {
+    value,
+    value2,
+    depth: depth ?? 0,
+  };
+}
+
+export class HierarchicalCountCriterion extends NumberCriterion {
+  public override get value(): IHierarchicalCountValue {
+    return this._value as IHierarchicalCountValue;
+  }
+
+  public override set value(newValue: HierarchicalCountRawValue) {
+    const currentDepth = this.value?.depth ?? 0;
+    this._value = normalizeHierarchicalCountValue(
+      newValue,
+      undefined,
+      currentDepth,
+    );
+  }
+
+  public override toCriterionInput(): HierarchicalCountInput {
+    const input: HierarchicalCountInput = {
+      modifier: this.modifier,
+      value: this.value?.value ?? 0,
+      value2: this.value?.value2,
+    };
+
+    if (this.value?.depth !== 0) {
+      input.depth = this.value.depth;
+    }
+
+    return input;
+  }
+
+  public override setFromSavedCriterion(c: {
+    modifier: CriterionModifier;
+    value: HierarchicalCountRawValue;
+    value2?: number;
+    depth?: number | null;
+  }) {
+    if (c.value !== undefined && c.value !== null) {
+      this._value = normalizeHierarchicalCountValue(c.value, c.value2, c.depth);
+    }
+    this.modifier = c.modifier;
+  }
+
+  protected override decodeValue(v: unknown): void {
+    if (v === undefined || v === null) return;
+    this._value = normalizeHierarchicalCountValue(
+      v as HierarchicalCountRawValue,
+    );
+  }
+
+  protected override encodeValue(): unknown {
+    const encoded = encodeRangeValue(this.modifier, this.value);
+    if (
+      this.value.depth === 0 ||
+      typeof encoded !== "object" ||
+      encoded === null
+    ) {
+      return encoded;
+    }
+
+    return {
+      ...(encoded as Record<string, unknown>),
+      depth: this.value.depth,
+    };
+  }
+
+  protected override getLabelValue(intl: IntlShape) {
+    const value = super.getLabelValue(intl);
+    if (this.value.depth === 0) {
+      return value;
+    }
+
+    const depth =
+      this.value.depth < 0
+        ? intl.formatMessage({ id: "all" })
+        : this.value.depth;
+
+    return `${value} (+${depth})`;
+  }
+}
+
+export class HierarchicalCountCriterionOption extends ModifierCriterionOption {
+  constructor(
+    messageID: string,
+    value: CriterionType,
+    options?: { hidden?: boolean; sfwMessageID?: string },
+  ) {
+    super({
+      messageID,
+      type: value,
+      modifierOptions: [
+        CriterionModifier.Equals,
+        CriterionModifier.NotEquals,
+        CriterionModifier.GreaterThan,
+        CriterionModifier.LessThan,
+        CriterionModifier.Between,
+        CriterionModifier.NotBetween,
+      ],
+      defaultModifier: CriterionModifier.Equals,
+      inputType: "number",
+      makeCriterion: () => new HierarchicalCountCriterion(this),
+      ...options,
+    });
+  }
+}
+
+export function createHierarchicalCountCriterionOption(
+  value: CriterionType,
+  messageID?: string,
+  options?: { hidden?: boolean; sfwMessageID?: string },
+) {
+  return new HierarchicalCountCriterionOption(
+    messageID ?? value,
+    value,
+    options,
+  );
 }
 
 export class DurationCriterionOption extends MandatoryNumberCriterionOption {

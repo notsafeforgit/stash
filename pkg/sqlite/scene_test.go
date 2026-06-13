@@ -4313,6 +4313,9 @@ func TestSceneQueryStudioTagsExcludeIncludesScenesWithoutStudio(t *testing.T) {
 					Tags: &tagFilter,
 				},
 			},
+			QueryOptions: models.QueryOptions{
+				FindFilter: &models.FindFilterType{PerPage: ptr(models.PerPageAll)},
+			},
 		})
 		require.NoError(t, err)
 
@@ -4342,6 +4345,9 @@ func TestSceneQueryStudioTagsExcludeWithUIEncodingIncludesScenesWithoutStudio(t 
 				StudiosFilter: &models.StudioFilterType{
 					Tags: &tagFilter,
 				},
+			},
+			QueryOptions: models.QueryOptions{
+				FindFilter: &models.FindFilterType{PerPage: ptr(models.PerPageAll)},
 			},
 		})
 		require.NoError(t, err)

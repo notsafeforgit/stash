@@ -6,6 +6,7 @@ import {
   type CriterionValue,
   ModifierCriterion,
   IHierarchicalLabeledIdCriterion,
+  HierarchicalCountCriterion,
   NumberCriterion,
   ILabeledIdCriterion,
   DateCriterion,
@@ -22,6 +23,7 @@ import {
   criterionIsTimestampValue,
 } from "src/models/list-filter/types";
 import { DurationFilter } from "./filters/duration-filter";
+import { HierarchicalCountFilter } from "./filters/hierarchical-count-filter";
 import { NumberFilter } from "./filters/number-filter";
 import { LabeledIdFilter } from "./filters/labeled-id-filter";
 import { HierarchicalLabelValueFilter } from "./filters/hierarchical-label-value-filter";
@@ -329,6 +331,15 @@ const GenericCriterionEditor: React.FC<GenericCriterionEditor> = ({
         <TimestampFilter
           criterion={criterion}
           onValueChanged={onValueChanged}
+        />
+      );
+    }
+    if (criterion instanceof HierarchicalCountCriterion) {
+      return (
+        <HierarchicalCountFilter
+          criterion={criterion}
+          onValueChanged={onValueChanged}
+          renderNumberInput={renderNumberInput}
         />
       );
     }

@@ -451,7 +451,7 @@ func (qb *SceneMarkerStore) setSceneMarkerSort(query *queryBuilder, findFilter *
 		query.sortAndPagination += getSort(sort, direction, sceneMarkerTable)
 	}
 
-	query.sortAndPagination += ", scene_markers.scene_id ASC, scene_markers.seconds ASC"
+	query.sortAndPagination += ", scene_markers.scene_id ASC, scene_markers.seconds ASC, scene_markers.id ASC"
 	return nil
 }
 

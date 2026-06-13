@@ -86,7 +86,9 @@ function SettingsLogsPage() {
   useEffect(() => {
     if (seededRef.current || !initialData?.logs) return;
     seededRef.current = true;
-    const initial = toEntries(initialData.logs);
+    // The backend cache is newest-first; render logs like a terminal so the
+    // oldest retained entry is at the top and new entries append at the bottom.
+    const initial = toEntries([...initialData.logs].reverse());
     setEntries((prev) => [...initial, ...prev].slice(-MAX_LOG_ENTRIES));
   });
 

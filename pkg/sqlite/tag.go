@@ -923,8 +923,10 @@ func (qb *TagStore) getTagSort(query *queryBuilder, findFilter *models.FindFilte
 		sortQuery += getSort(sort, direction, "tags")
 	}
 
-	// Whatever the sorting, always use sort_name/name/id as a final sort
-	sortQuery += ", COALESCE(tags.sort_name, tags.name, tags.id) COLLATE NATURAL_CI ASC"
+	// Whatever the sorting, use a human-readable fallback and then the
+	// primary key as the true final tie-breaker so paginated results are
+	// deterministic when names are empty or duplicated.
+	sortQuery += ", COALESCE(tags.sort_name, tags.name, '') COLLATE NATURAL_CI ASC, tags.id ASC"
 	return sortQuery, nil
 }
 

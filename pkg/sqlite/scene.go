@@ -1412,8 +1412,10 @@ func (qb *SceneStore) setSceneSort(query *queryBuilder, findFilter *models.FindF
 		query.sortAndPagination += getSort(sort, direction, "scenes")
 	}
 
-	// Whatever the sorting, always use title/id as a final sort
-	query.sortAndPagination += ", COALESCE(scenes.title, scenes.id) COLLATE NATURAL_CI ASC"
+	// Whatever the sorting, use a human-readable fallback and then the
+	// primary key as the true final tie-breaker so paginated results are
+	// deterministic when titles are empty or duplicated.
+	query.sortAndPagination += ", COALESCE(scenes.title, '') COLLATE NATURAL_CI ASC, scenes.id ASC"
 
 	return nil
 }

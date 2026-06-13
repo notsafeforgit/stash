@@ -87,7 +87,7 @@ function SettingsLogsPage() {
     if (seededRef.current || !initialData?.logs) return;
     seededRef.current = true;
     const initial = toEntries(initialData.logs);
-    setEntries((prev) => [...prev, ...initial].slice(-MAX_LOG_ENTRIES));
+    setEntries((prev) => [...initial, ...prev].slice(-MAX_LOG_ENTRIES));
   });
 
   const { error: subscriptionError } = useSubscription(

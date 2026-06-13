@@ -208,6 +208,10 @@ function SettingsSystemPage() {
           value={general.databasePath}
           onChange={(v) => save({ databasePath: v })}
           picker={false}
+          confirm={msg(
+            "config.general.sqlite_location",
+            "File location for the SQLite database (requires restart). WARNING: storing the database on a different system to where the Stash server is run from (i.e. over the network) is unsupported!",
+          )}
         />
         <SettingSelect
           label={msg("config.general.blobs_storage.heading", "Blobs storage")}
@@ -227,6 +231,10 @@ function SettingsSystemPage() {
             },
           ]}
           onChange={(v) => save({ blobsStorage: v as GQL.BlobsStorageType })}
+          confirm={msg(
+            "config.general.blobs_storage.description",
+            "Where to store binary data such as scene covers, performer, studio and tag images. After changing this value, the existing data must be migrated using the Migrate blobs tasks. See Tasks page for migration.",
+          )}
         />
         <SettingPath
           label={msg("config.general.blobs_path.heading", "Blobs path")}
@@ -236,6 +244,10 @@ function SettingsSystemPage() {
           )}
           value={general.blobsPath}
           onChange={(v) => save({ blobsPath: v })}
+          confirm={msg(
+            "config.general.blobs_path.description",
+            "Where in the filesystem to store binary data. Applicable only when using the Filesystem blob storage type. WARNING: changing this requires manually moving existing data.",
+          )}
         />
       </SettingsSection>
 
@@ -269,6 +281,10 @@ function SettingsSystemPage() {
           onChange={(v) =>
             save({ videoFileNamingAlgorithm: v as GQL.HashAlgorithm })
           }
+          confirm={msg(
+            "config.general.generated_file_naming_hash_desc",
+            "Use MD5 or oshash for generated file naming. Changing this requires that all scenes have the applicable MD5/oshash value populated. After changing this value, existing generated files will need to be migrated or regenerated. See Tasks page for migration.",
+          )}
         />
       </SettingsSection>
 

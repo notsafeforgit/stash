@@ -326,7 +326,7 @@ func (r *mutationResolver) BulkStudioUpdate(ctx context.Context, input BulkStudi
 	compatInput := input
 	compatInput.ApplyToItemsMatchingFilters = nil
 	compatInput.FindFilter = nil
-	compatInput.StudioFilter = nil
+	compatInput.StudioFilterAst = nil
 
 	if _, err := r.BulkStudioUpdateJob(ctx, compatInput); err != nil {
 		return nil, err
@@ -341,20 +341,22 @@ func (r *mutationResolver) BulkStudioUpdateJob(ctx context.Context, input BulkSt
 		return "", fmt.Errorf("converting ids: %w", err)
 	}
 
-	useBackgroundJob := (input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters) ||
-		(len(input.Ids) == 0 && (input.FindFilter != nil || input.StudioFilter != nil))
+	useBackgroundJob := input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters
 	if useBackgroundJob {
+		if !hasBulkUpdateFilter(input.FindFilter, input.StudioFilterAst) {
+			return "", fmt.Errorf("studio_filter_ast or find_filter.q is required when apply_to_items_matching_filters is true")
+		}
+
 		findFilter := sanitizeBulkUpdateFindFilter(input.FindFilter)
 		err = r.withReadTxn(ctx, func(ctx context.Context) error {
-			result, _, qErr := r.repository.Studio.Query(ctx, input.StudioFilter, findFilter)
+			result, _, qErr := r.repository.Studio.QueryAST(ctx, input.StudioFilterAst, findFilter)
 			if qErr != nil {
 				return qErr
 			}
-			var fetchedIds []int
-			for _, item := range result {
-				fetchedIds = append(fetchedIds, item.ID)
-			}
-			ids = fetchedIds
+
+			ids = idsFromItems(result, func(item *models.Studio) int {
+				return item.ID
+			})
 			return nil
 		})
 		if err != nil {

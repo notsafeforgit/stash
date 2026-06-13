@@ -279,7 +279,7 @@ func (r *mutationResolver) BulkGalleryUpdate(ctx context.Context, input BulkGall
 	compatInput := input
 	compatInput.ApplyToItemsMatchingFilters = nil
 	compatInput.FindFilter = nil
-	compatInput.GalleryFilter = nil
+	compatInput.GalleryFilterAst = nil
 
 	if _, err := r.BulkGalleryUpdateJob(ctx, compatInput); err != nil {
 		return nil, err
@@ -294,20 +294,22 @@ func (r *mutationResolver) BulkGalleryUpdateJob(ctx context.Context, input BulkG
 		return "", fmt.Errorf("converting ids: %w", err)
 	}
 
-	useBackgroundJob := (input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters) ||
-		(len(input.Ids) == 0 && (input.FindFilter != nil || input.GalleryFilter != nil))
+	useBackgroundJob := input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters
 	if useBackgroundJob {
+		if !hasBulkUpdateFilter(input.FindFilter, input.GalleryFilterAst) {
+			return "", fmt.Errorf("gallery_filter_ast or find_filter.q is required when apply_to_items_matching_filters is true")
+		}
+
 		findFilter := sanitizeBulkUpdateFindFilter(input.FindFilter)
 		err = r.withReadTxn(ctx, func(ctx context.Context) error {
-			result, _, qErr := r.repository.Gallery.Query(ctx, input.GalleryFilter, findFilter)
+			result, _, qErr := r.repository.Gallery.QueryAST(ctx, input.GalleryFilterAst, findFilter)
 			if qErr != nil {
 				return qErr
 			}
-			var fetchedIds []int
-			for _, item := range result {
-				fetchedIds = append(fetchedIds, item.ID)
-			}
-			galleryIDs = fetchedIds
+
+			galleryIDs = idsFromItems(result, func(item *models.Gallery) int {
+				return item.ID
+			})
 			return nil
 		})
 		if err != nil {

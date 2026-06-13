@@ -1131,7 +1131,7 @@ export function EntityListPage<TData, TItem extends IHasID>({
   const applyToAllTarget = useMemo<BulkApplyTarget>(
     () => ({
       findFilter: { ...filter.makeFindFilter(), page: undefined, per_page: -1 },
-      objectFilter: filter.makeFilter(),
+      filterAST: filter.makeFilterAST(),
     }),
     [filter],
   );

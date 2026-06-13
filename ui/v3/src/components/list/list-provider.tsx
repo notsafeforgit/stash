@@ -12,7 +12,7 @@ interface ListContextOptions<T extends IHasID> {
 /** Target for "apply to all items matching filter" bulk operations. */
 export type BulkApplyTarget = {
   findFilter: GQL.FindFilterType;
-  objectFilter: unknown;
+  filterAST?: GQL.FilterAstInput;
 };
 
 /**

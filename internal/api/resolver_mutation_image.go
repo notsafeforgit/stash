@@ -254,7 +254,7 @@ func (r *mutationResolver) BulkImageUpdate(ctx context.Context, input BulkImageU
 	compatInput := input
 	compatInput.ApplyToItemsMatchingFilters = nil
 	compatInput.FindFilter = nil
-	compatInput.ImageFilter = nil
+	compatInput.ImageFilterAst = nil
 
 	if _, err := r.BulkImageUpdateJob(ctx, compatInput); err != nil {
 		return nil, err
@@ -269,24 +269,22 @@ func (r *mutationResolver) BulkImageUpdateJob(ctx context.Context, input BulkIma
 		return "", fmt.Errorf("converting ids: %w", err)
 	}
 
-	useBackgroundJob := (input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters) ||
-		(len(input.Ids) == 0 && (input.FindFilter != nil || input.ImageFilter != nil))
+	useBackgroundJob := input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters
 	if useBackgroundJob {
+		if !hasBulkUpdateFilter(input.FindFilter, input.ImageFilterAst) {
+			return "", fmt.Errorf("image_filter_ast or find_filter.q is required when apply_to_items_matching_filters is true")
+		}
+
 		findFilter := sanitizeBulkUpdateFindFilter(input.FindFilter)
 		err = r.withReadTxn(ctx, func(ctx context.Context) error {
-			result, qErr := r.repository.Image.Query(ctx, models.ImageQueryOptions{
-				QueryOptions: models.QueryOptions{
-					FindFilter: findFilter,
-					Count:      false,
-				},
-				ImageFilter: input.ImageFilter,
-			})
+			result, _, qErr := r.repository.Image.QueryAST(ctx, input.ImageFilterAst, findFilter)
 			if qErr != nil {
 				return qErr
 			}
-			var fetchedIds []int
-			fetchedIds = append(fetchedIds, result.IDs...)
-			imageIDs = fetchedIds
+
+			imageIDs = idsFromItems(result, func(item *models.Image) int {
+				return item.ID
+			})
 			return nil
 		})
 		if err != nil {
@@ -407,8 +405,7 @@ func (o imageSetDateFromMTimeOperation) Update(ctx context.Context, id int) erro
 func (r *mutationResolver) ImagesSetDateFromFileMTime(ctx context.Context, input ImagesSetDateFromFileMTimeInput) (string, error) {
 	var imageIDs []int
 	var err error
-	useBackgroundJob := (input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters) ||
-		(len(input.Ids) == 0 && (input.FindFilter != nil || input.ImageFilter != nil))
+	useBackgroundJob := input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters
 	if len(input.Ids) > 0 {
 		imageIDs, err = stringslice.StringSliceToIntSlice(input.Ids)
 		if err != nil {
@@ -416,16 +413,20 @@ func (r *mutationResolver) ImagesSetDateFromFileMTime(ctx context.Context, input
 		}
 	}
 	if useBackgroundJob {
+		if !hasBulkUpdateFilter(input.FindFilter, input.ImageFilterAst) {
+			return "", fmt.Errorf("image_filter_ast or find_filter.q is required when apply_to_items_matching_filters is true")
+		}
+
 		findFilter := sanitizeBulkUpdateFindFilter(input.FindFilter)
 		if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-			result, err := r.repository.Image.Query(ctx, models.ImageQueryOptions{
-				QueryOptions: models.QueryOptions{FindFilter: findFilter},
-				ImageFilter:  input.ImageFilter,
-			})
+			images, _, err := r.repository.Image.QueryAST(ctx, input.ImageFilterAst, findFilter)
 			if err != nil {
 				return err
 			}
-			imageIDs = result.IDs
+
+			imageIDs = idsFromItems(images, func(image *models.Image) int {
+				return image.ID
+			})
 			return nil
 		}); err != nil {
 			return "", fmt.Errorf("querying ids: %w", err)

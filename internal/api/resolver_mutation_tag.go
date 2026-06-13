@@ -240,7 +240,7 @@ func (r *mutationResolver) BulkTagUpdate(ctx context.Context, input BulkTagUpdat
 	compatInput := input
 	compatInput.ApplyToItemsMatchingFilters = nil
 	compatInput.FindFilter = nil
-	compatInput.TagFilter = nil
+	compatInput.TagFilterAst = nil
 
 	if _, err := r.BulkTagUpdateJob(ctx, compatInput); err != nil {
 		return nil, err
@@ -255,20 +255,22 @@ func (r *mutationResolver) BulkTagUpdateJob(ctx context.Context, input BulkTagUp
 		return "", fmt.Errorf("converting ids: %w", err)
 	}
 
-	useBackgroundJob := (input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters) ||
-		(len(input.Ids) == 0 && (input.FindFilter != nil || input.TagFilter != nil))
+	useBackgroundJob := input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters
 	if useBackgroundJob {
+		if !hasBulkUpdateFilter(input.FindFilter, input.TagFilterAst) {
+			return "", fmt.Errorf("tag_filter_ast or find_filter.q is required when apply_to_items_matching_filters is true")
+		}
+
 		findFilter := sanitizeBulkUpdateFindFilter(input.FindFilter)
 		err = r.withReadTxn(ctx, func(ctx context.Context) error {
-			result, _, qErr := r.repository.Tag.Query(ctx, input.TagFilter, findFilter)
+			result, _, qErr := r.repository.Tag.QueryAST(ctx, input.TagFilterAst, findFilter)
 			if qErr != nil {
 				return qErr
 			}
-			var fetchedIds []int
-			for _, item := range result {
-				fetchedIds = append(fetchedIds, item.ID)
-			}
-			tagIDs = fetchedIds
+
+			tagIDs = idsFromItems(result, func(item *models.Tag) int {
+				return item.ID
+			})
 			return nil
 		})
 		if err != nil {

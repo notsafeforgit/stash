@@ -446,7 +446,6 @@ function ImageDuplicateCheckerPage() {
 
   const filterVariables = useMemo(
     () => ({
-      image_filter: filterModel.makeFilter() as GQL.ImageFilterType,
       image_filter_ast: filterModel.makeFilterAST(),
     }),
     [filterModel],
@@ -515,7 +514,14 @@ function ImageDuplicateCheckerPage() {
   const missingPhashQuery = useQuery(GQL.FindImagesDocument, {
     variables: {
       filter: { per_page: 0 },
-      image_filter: { is_missing: "phash" },
+      image_filter_ast: {
+        root: {
+          condition: {
+            field: "is_missing",
+            value: "phash",
+          },
+        },
+      },
     },
   });
 

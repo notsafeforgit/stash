@@ -69,7 +69,7 @@ function buildMutationInput(
   if (applyToAll && applyToAllTarget) {
     base.apply_to_items_matching_filters = true;
     base.find_filter = applyToAllTarget.findFilter;
-    base.tag_filter = applyToAllTarget.objectFilter as GQL.TagFilterType;
+    base.tag_filter_ast = applyToAllTarget.filterAST;
   }
   return base;
 }

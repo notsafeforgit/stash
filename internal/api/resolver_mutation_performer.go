@@ -528,7 +528,7 @@ func (r *mutationResolver) BulkPerformerUpdate(ctx context.Context, input BulkPe
 	compatInput := input
 	compatInput.ApplyToItemsMatchingFilters = nil
 	compatInput.FindFilter = nil
-	compatInput.PerformerFilter = nil
+	compatInput.PerformerFilterAst = nil
 
 	if _, err := r.BulkPerformerUpdateJob(ctx, compatInput); err != nil {
 		return nil, err
@@ -543,20 +543,22 @@ func (r *mutationResolver) BulkPerformerUpdateJob(ctx context.Context, input Bul
 		return "", fmt.Errorf("converting ids: %w", err)
 	}
 
-	useBackgroundJob := (input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters) ||
-		(len(input.Ids) == 0 && (input.FindFilter != nil || input.PerformerFilter != nil))
+	useBackgroundJob := input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters
 	if useBackgroundJob {
+		if !hasBulkUpdateFilter(input.FindFilter, input.PerformerFilterAst) {
+			return "", fmt.Errorf("performer_filter_ast or find_filter.q is required when apply_to_items_matching_filters is true")
+		}
+
 		findFilter := sanitizeBulkUpdateFindFilter(input.FindFilter)
 		err = r.withReadTxn(ctx, func(ctx context.Context) error {
-			result, _, qErr := r.repository.Performer.Query(ctx, input.PerformerFilter, findFilter)
+			result, _, qErr := r.repository.Performer.QueryAST(ctx, input.PerformerFilterAst, findFilter)
 			if qErr != nil {
 				return qErr
 			}
-			var fetchedIds []int
-			for _, item := range result {
-				fetchedIds = append(fetchedIds, item.ID)
-			}
-			performerIDs = fetchedIds
+
+			performerIDs = idsFromItems(result, func(item *models.Performer) int {
+				return item.ID
+			})
 			return nil
 		})
 		if err != nil {

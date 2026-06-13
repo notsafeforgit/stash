@@ -86,7 +86,7 @@ input BulkStudioUpdateInput {
   ids: [ID!]!
   apply_to_items_matching_filters: Boolean
   find_filter: FindFilterType
-  studio_filter: StudioFilterType
+  studio_filter_ast: FilterASTInput
   url: String @deprecated(reason: "Use urls")
   urls: BulkUpdateStrings
   parent_id: ID

@@ -15,6 +15,7 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	gqlHandler "github.com/99designs/gqlgen/graphql/handler"
@@ -76,6 +77,54 @@ func (dir osFS) ReadDir(name string) ([]os.DirEntry, error) {
 
 func (dir osFS) Open(name string) (fs.File, error) {
 	return os.DirFS(string(dir)).Open(name)
+}
+
+type reloadableStatigzServer struct {
+	fs fs.ReadDirFS
+
+	mutex        sync.Mutex
+	server       *statigz.Server
+	indexModTime time.Time
+	indexSize    int64
+}
+
+func newReloadableStatigzServer(fsys fs.ReadDirFS) *reloadableStatigzServer {
+	return &reloadableStatigzServer{
+		fs: fsys,
+	}
+}
+
+func (s *reloadableStatigzServer) indexSignature() (time.Time, int64) {
+	info, err := fs.Stat(s.fs, "index.html")
+	if err != nil {
+		return time.Time{}, -1
+	}
+
+	return info.ModTime(), info.Size()
+}
+
+func (s *reloadableStatigzServer) currentServer(forceReload bool) *statigz.Server {
+	indexModTime, indexSize := s.indexSignature()
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if s.server == nil || forceReload || !s.indexModTime.Equal(indexModTime) || s.indexSize != indexSize {
+		s.server = statigz.FileServer(s.fs)
+		s.indexModTime = indexModTime
+		s.indexSize = indexSize
+	}
+
+	return s.server
+}
+
+func (s *reloadableStatigzServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	server := s.currentServer(false)
+	if !server.Found(r) {
+		server = s.currentServer(true)
+	}
+
+	server.ServeHTTP(w, r)
 }
 
 // Initialize creates a new [Server] instance.
@@ -247,12 +296,12 @@ func Initialize() (*Server, error) {
 	}
 
 	var uiFS fs.FS
-	var staticUI *statigz.Server
+	var staticUI http.Handler
 	customUILocation := cfg.GetUILocation()
 	if customUILocation != "" {
 		logger.Debugf("Serving UI from %s", customUILocation)
 		uiFS = osFS(customUILocation)
-		staticUI = statigz.FileServer(uiFS.(fs.ReadDirFS))
+		staticUI = newReloadableStatigzServer(uiFS.(fs.ReadDirFS))
 	} else {
 		enableV3UI := cfg.GetEnableV3UI()
 		logger.Debugf("Serving embedded UI v3=%t", enableV3UI)
@@ -303,7 +352,7 @@ func Initialize() (*Server, error) {
 	return server, nil
 }
 
-func handleFavicon(staticUI *statigz.Server) func(w http.ResponseWriter, r *http.Request) {
+func handleFavicon(staticUI http.Handler) func(w http.ResponseWriter, r *http.Request) {
 	mgr := manager.GetInstance()
 	cfg := mgr.Config
 

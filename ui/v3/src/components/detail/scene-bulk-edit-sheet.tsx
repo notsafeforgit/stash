@@ -114,7 +114,7 @@ function buildMutationInput(
   if (applyToAll && applyToAllTarget) {
     base.apply_to_items_matching_filters = true;
     base.find_filter = applyToAllTarget.findFilter;
-    base.scene_filter = applyToAllTarget.objectFilter as GQL.SceneFilterType;
+    base.scene_filter_ast = applyToAllTarget.filterAST;
   }
   return base;
 }
@@ -260,7 +260,7 @@ export function SceneBulkEditSheet({
         ? {
             apply_to_items_matching_filters: true,
             find_filter: applyToAllTarget.findFilter,
-            scene_filter: applyToAllTarget.objectFilter as GQL.SceneFilterType,
+            scene_filter_ast: applyToAllTarget.filterAST,
           }
         : { ids: items.map((i) => i.id) };
     await setDateFromMTime({ variables: { input } });

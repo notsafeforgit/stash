@@ -80,7 +80,7 @@ function buildMutationInput(
   if (applyToAll && applyToAllTarget) {
     base.apply_to_items_matching_filters = true;
     base.find_filter = applyToAllTarget.findFilter;
-    base.studio_filter = applyToAllTarget.objectFilter as GQL.StudioFilterType;
+    base.studio_filter_ast = applyToAllTarget.filterAST;
   }
   return base;
 }

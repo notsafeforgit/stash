@@ -76,7 +76,7 @@ function buildMutationInput(
   if (applyToAll && applyToAllTarget) {
     base.apply_to_items_matching_filters = true;
     base.find_filter = applyToAllTarget.findFilter;
-    base.group_filter = applyToAllTarget.objectFilter as GQL.GroupFilterType;
+    base.group_filter_ast = applyToAllTarget.filterAST;
   }
   return base;
 }

@@ -33,7 +33,6 @@ function StudiosPage() {
       query: GQL.FindStudiosDocument,
       makeVariables: (filter) => ({
         filter: filter.makeFindFilter(),
-        studio_filter: filter.makeFilter(),
         studio_filter_ast: filter.makeFilterAST(),
       }),
       extractResult: (data) => ({

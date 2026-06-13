@@ -69,6 +69,14 @@ func sanitizeBulkUpdateFindFilter(findFilter *models.FindFilterType) *models.Fin
 	return &sanitized
 }
 
+func hasBulkUpdateFilter(findFilter *models.FindFilterType, filterAST *models.FilterAST) bool {
+	if filterAST != nil {
+		return true
+	}
+
+	return findFilter != nil && findFilter.Q != nil && *findFilter.Q != ""
+}
+
 func refetchBulkUpdateResults[T any](ctx context.Context, ids []int, get func(context.Context, int) (*T, error)) ([]*T, error) {
 	ret := make([]*T, 0, len(ids))
 	for _, id := range ids {
@@ -81,6 +89,19 @@ func refetchBulkUpdateResults[T any](ctx context.Context, ids []int, get func(co
 	}
 
 	return ret, nil
+}
+
+func idsFromItems[T any](items []*T, getID func(*T) int) []int {
+	ids := make([]int, 0, len(items))
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+
+		ids = append(ids, getID(item))
+	}
+
+	return ids
 }
 
 func (r *Resolver) Gallery() GalleryResolver {

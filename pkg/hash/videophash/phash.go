@@ -73,13 +73,14 @@ func GenerateWithMetadata(encoder *ffmpeg.FFMpeg, videoFile *models.VideoFile) (
 	}, nil
 }
 
-func generateSpriteScreenshot(encoder *ffmpeg.FFMpeg, input string, t float64, slowSeek bool, setBT709ColorParameters bool) (image.Image, error) {
+func generateSpriteScreenshot(encoder *ffmpeg.FFMpeg, input string, t float64, slowSeek bool, setBT709ColorParameters bool, ignoreEditList bool) (image.Image, error) {
 	options := transcoder.ScreenshotOptions{
 		Width:                   screenshotSize,
 		OutputPath:              "-",
 		OutputType:              transcoder.ScreenshotOutputTypeBMP,
 		SlowSeek:                slowSeek,
 		SetBT709ColorParameters: setBT709ColorParameters,
+		IgnoreEditList:          ignoreEditList,
 	}
 
 	bmpArgs := transcoder.ScreenshotTime(input, t, options)
@@ -89,12 +90,13 @@ func generateSpriteScreenshot(encoder *ffmpeg.FFMpeg, input string, t float64, s
 	return generateScreenshotWithFallback(encoder, bmpArgs, pngArgs)
 }
 
-func generateSpriteFrameScreenshot(encoder *ffmpeg.FFMpeg, input string, frame int, setBT709ColorParameters bool) (image.Image, error) {
+func generateSpriteFrameScreenshot(encoder *ffmpeg.FFMpeg, input string, frame int, setBT709ColorParameters bool, ignoreEditList bool) (image.Image, error) {
 	options := transcoder.ScreenshotOptions{
 		Width:                   screenshotSize,
 		OutputPath:              "-",
 		OutputType:              transcoder.ScreenshotOutputTypeBMP,
 		SetBT709ColorParameters: setBT709ColorParameters,
+		IgnoreEditList:          ignoreEditList,
 	}
 
 	bmpArgs := transcoder.ScreenshotFrame(input, frame, options)
@@ -207,35 +209,42 @@ func generateSprite(encoder *ffmpeg.FFMpeg, videoFile *models.VideoFile) (image.
 	var images []image.Image
 	slowSeek := false
 	setBT709ColorParameters := false
+	ignoreEditList := false
 	timestampRecoveryCount := 0
 	previousFrameReuseCount := 0
 
 	for i := 0; i < chunkCount; i++ {
 		time := offset + (float64(i) * stepSize)
 
-		img, err := generateSpriteScreenshot(encoder, input, time, slowSeek, setBT709ColorParameters)
+		img, err := generateSpriteScreenshot(encoder, input, time, slowSeek, setBT709ColorParameters, ignoreEditList)
 		if err != nil && !slowSeek {
 			logger.Warnf("[generator] fast phash screenshot seek failed for %s at %.3fs, retrying with accurate seek for remaining phash screenshots: %s", videoFile.Path, time, compactError(err))
 
 			slowSeek = true
-			img, err = generateSpriteScreenshot(encoder, input, time, slowSeek, setBT709ColorParameters)
+			img, err = generateSpriteScreenshot(encoder, input, time, slowSeek, setBT709ColorParameters, ignoreEditList)
 		}
 		if err != nil && !setBT709ColorParameters {
 			logger.Warnf("[generator] phash screenshot failed for %s at %.3fs, retrying with BT.709 color metadata fallback for remaining phash screenshots: %s", videoFile.Path, time, compactError(err))
 
 			setBT709ColorParameters = true
-			img, err = generateSpriteScreenshot(encoder, input, time, slowSeek, setBT709ColorParameters)
+			img, err = generateSpriteScreenshot(encoder, input, time, slowSeek, setBT709ColorParameters, ignoreEditList)
 		}
 		if err != nil && ffmpeg.IsInvalidColorSpaceError(err) {
 			if fixedInput, ok := ensureFixedInput(); ok {
 				logger.Warnf("[generator] phash screenshot failed for %s at %.3fs due to invalid color metadata, retrying with rewritten stream metadata", videoFile.Path, time)
 				setBT709ColorParameters = false
-				img, err = generateSpriteScreenshot(encoder, fixedInput, time, slowSeek, setBT709ColorParameters)
+				img, err = generateSpriteScreenshot(encoder, fixedInput, time, slowSeek, setBT709ColorParameters, ignoreEditList)
 			}
+		}
+		if err != nil && !ignoreEditList {
+			logger.Warnf("[generator] phash screenshot failed for %s at %.3fs, retrying with ignored edit list for remaining phash screenshots: %s", videoFile.Path, time, compactError(err))
+
+			ignoreEditList = true
+			img, err = generateSpriteScreenshot(encoder, input, time, slowSeek, setBT709ColorParameters, ignoreEditList)
 		}
 		if err != nil {
 			var usedTimestampBackoff bool
-			img, usedTimestampBackoff, err = generateSpriteScreenshotWithTimestampBackoff(encoder, input, time, stepSize, slowSeek, setBT709ColorParameters, err)
+			img, usedTimestampBackoff, err = generateSpriteScreenshotWithTimestampBackoff(encoder, input, time, stepSize, slowSeek, setBT709ColorParameters, ignoreEditList, err)
 			metadata.durationMismatch = metadata.durationMismatch || usedTimestampBackoff
 			if usedTimestampBackoff {
 				timestampRecoveryCount++
@@ -266,9 +275,9 @@ func generateSprite(encoder *ffmpeg.FFMpeg, videoFile *models.VideoFile) (image.
 	return combineImages(images), metadata, nil
 }
 
-func generateSpriteScreenshotWithTimestampBackoff(encoder *ffmpeg.FFMpeg, input string, t float64, stepSize float64, slowSeek bool, setBT709ColorParameters bool, originalErr error) (image.Image, bool, error) {
+func generateSpriteScreenshotWithTimestampBackoff(encoder *ffmpeg.FFMpeg, input string, t float64, stepSize float64, slowSeek bool, setBT709ColorParameters bool, ignoreEditList bool, originalErr error) (image.Image, bool, error) {
 	for _, fallbackTime := range timestampBackoffTimes(t, stepSize) {
-		img, err := generateSpriteScreenshot(encoder, input, fallbackTime, slowSeek, setBT709ColorParameters)
+		img, err := generateSpriteScreenshot(encoder, input, fallbackTime, slowSeek, setBT709ColorParameters, ignoreEditList)
 		if err == nil {
 			logger.Debugf("[generator] recovered phash screenshot for %s at %.3fs using earlier timestamp %.3fs", input, t, fallbackTime)
 			return img, true, nil
@@ -292,6 +301,9 @@ func timestampBackoffTimes(t float64, stepSize float64) []float64 {
 		}
 
 		ret = append(ret, fallbackTime)
+	}
+	if len(ret) == 0 || ret[len(ret)-1] != 0 {
+		ret = append(ret, 0)
 	}
 
 	return ret
@@ -320,6 +332,7 @@ func generateFrameSprite(encoder *ffmpeg.FFMpeg, videoFile *models.VideoFile, fr
 	images := make([]image.Image, 0, chunkCount)
 	frameCache := make(map[int]image.Image, chunkCount)
 	setBT709ColorParameters := false
+	ignoreEditList := false
 	durationMismatch := false
 	frameRecoveryCount := 0
 	previousFrameReuseCount := 0
@@ -354,23 +367,29 @@ func generateFrameSprite(encoder *ffmpeg.FFMpeg, videoFile *models.VideoFile, fr
 			continue
 		}
 
-		img, err := generateSpriteFrameScreenshot(encoder, input, frame, setBT709ColorParameters)
+		img, err := generateSpriteFrameScreenshot(encoder, input, frame, setBT709ColorParameters, ignoreEditList)
 		if err != nil && !setBT709ColorParameters {
 			logger.Warnf("[generator] frame-based phash screenshot failed for %s at frame %d, retrying with BT.709 color metadata fallback for remaining phash screenshots: %s", videoFile.Path, frame, compactError(err))
 
 			setBT709ColorParameters = true
-			img, err = generateSpriteFrameScreenshot(encoder, input, frame, setBT709ColorParameters)
+			img, err = generateSpriteFrameScreenshot(encoder, input, frame, setBT709ColorParameters, ignoreEditList)
 		}
 		if err != nil && ffmpeg.IsInvalidColorSpaceError(err) {
 			if fixedInput, ok := ensureFixedInput(); ok {
 				logger.Warnf("[generator] frame-based phash screenshot failed for %s at frame %d due to invalid color metadata, retrying with rewritten stream metadata", videoFile.Path, frame)
 				setBT709ColorParameters = false
-				img, err = generateSpriteFrameScreenshot(encoder, fixedInput, frame, setBT709ColorParameters)
+				img, err = generateSpriteFrameScreenshot(encoder, fixedInput, frame, setBT709ColorParameters, ignoreEditList)
 			}
+		}
+		if err != nil && !ignoreEditList {
+			logger.Warnf("[generator] frame-based phash screenshot failed for %s at frame %d, retrying with ignored edit list for remaining phash screenshots: %s", videoFile.Path, frame, compactError(err))
+
+			ignoreEditList = true
+			img, err = generateSpriteFrameScreenshot(encoder, input, frame, setBT709ColorParameters, ignoreEditList)
 		}
 		if err != nil {
 			var usedFrameBackoff bool
-			img, usedFrameBackoff, err = generateSpriteFrameScreenshotWithFrameBackoff(encoder, input, frame, setBT709ColorParameters, frameCache, err)
+			img, usedFrameBackoff, err = generateSpriteFrameScreenshotWithFrameBackoff(encoder, input, frame, setBT709ColorParameters, ignoreEditList, frameCache, err)
 			durationMismatch = durationMismatch || usedFrameBackoff
 			if usedFrameBackoff {
 				frameRecoveryCount++
@@ -398,14 +417,14 @@ func generateFrameSprite(encoder *ffmpeg.FFMpeg, videoFile *models.VideoFile, fr
 	return combineImages(images), durationMismatch, nil
 }
 
-func generateSpriteFrameScreenshotWithFrameBackoff(encoder *ffmpeg.FFMpeg, input string, frame int, setBT709ColorParameters bool, frameCache map[int]image.Image, originalErr error) (image.Image, bool, error) {
+func generateSpriteFrameScreenshotWithFrameBackoff(encoder *ffmpeg.FFMpeg, input string, frame int, setBT709ColorParameters bool, ignoreEditList bool, frameCache map[int]image.Image, originalErr error) (image.Image, bool, error) {
 	for _, fallbackFrame := range frameBackoffIndexes(frame) {
 		if cached, ok := frameCache[fallbackFrame]; ok {
 			logger.Debugf("[generator] recovered frame-based phash screenshot for %s at frame %d using cached earlier frame %d", input, frame, fallbackFrame)
 			return cached, true, nil
 		}
 
-		img, err := generateSpriteFrameScreenshot(encoder, input, fallbackFrame, setBT709ColorParameters)
+		img, err := generateSpriteFrameScreenshot(encoder, input, fallbackFrame, setBT709ColorParameters, ignoreEditList)
 		if err == nil {
 			frameCache[fallbackFrame] = img
 			logger.Debugf("[generator] recovered frame-based phash screenshot for %s at frame %d using earlier frame %d", input, frame, fallbackFrame)

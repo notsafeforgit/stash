@@ -2,6 +2,7 @@ package ffmpeg
 
 import (
 	"errors"
+	"os/exec"
 	"testing"
 )
 
@@ -47,5 +48,9 @@ func TestIsInvalidColorSpaceError(t *testing.T) {
 
 	if IsInvalidColorSpaceError(errors.New("ffmpeg failed: unexpected EOF")) {
 		t.Fatal("expected unrelated error not to match")
+	}
+
+	if !IsInvalidColorSpaceError(&exec.ExitError{Stderr: []byte("Invalid color space")}) {
+		t.Fatal("expected invalid color space stderr to match")
 	}
 }

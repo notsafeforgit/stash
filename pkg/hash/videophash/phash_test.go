@@ -104,7 +104,7 @@ func TestSpriteFrameIndex(t *testing.T) {
 
 func TestTimestampBackoffTimes(t *testing.T) {
 	got := timestampBackoffTimes(13.938, 0.549)
-	want := []float64{13.389, 12.84, 11.742, 9.546, 5.154}
+	want := []float64{13.389, 12.84, 11.742, 9.546, 5.154, 0}
 
 	if len(got) != len(want) {
 		t.Fatalf("timestampBackoffTimes() length = %d, want %d", len(got), len(want))
@@ -119,7 +119,7 @@ func TestTimestampBackoffTimes(t *testing.T) {
 
 func TestTimestampBackoffTimesStopsAtZero(t *testing.T) {
 	got := timestampBackoffTimes(1.0, 0.4)
-	want := []float64{0.6, 0.19999999999999996}
+	want := []float64{0.6, 0.19999999999999996, 0}
 
 	if len(got) != len(want) {
 		t.Fatalf("timestampBackoffTimes() length = %d, want %d", len(got), len(want))

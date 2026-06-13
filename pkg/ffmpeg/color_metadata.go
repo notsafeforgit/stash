@@ -2,8 +2,10 @@ package ffmpeg
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 )
 
@@ -13,7 +15,18 @@ var bt709ColorMetadataBitstreamFilters = []string{
 }
 
 func IsInvalidColorSpaceError(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "Invalid color space")
+	if err == nil {
+		return false
+	}
+
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		if strings.Contains(string(exitErr.Stderr), "Invalid color space") {
+			return true
+		}
+	}
+
+	return strings.Contains(err.Error(), "Invalid color space")
 }
 
 func ColorMetadataBitstreamFilter(codec string) (string, bool) {

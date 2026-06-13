@@ -25,6 +25,9 @@ type ScreenshotOptions struct {
 
 	// SetBT709ColorParameters overrides invalid frame color tags before scaling.
 	SetBT709ColorParameters bool
+
+	// IgnoreEditList ignores MOV/MP4 edit lists for files with broken CTTS/edit metadata.
+	IgnoreEditList bool
 }
 
 func (o *ScreenshotOptions) setDefaults() {
@@ -85,6 +88,9 @@ func ScreenshotTime(input string, t float64, options ScreenshotOptions) ffmpeg.A
 	if options.SetBT709ColorParameters {
 		args = args.SetBT709ColorParameters()
 	}
+	if options.IgnoreEditList {
+		args = args.IgnoreEditList()
+	}
 	args = args.Input(input)
 	if options.SlowSeek {
 		args = args.Seek(t)
@@ -126,6 +132,9 @@ func ScreenshotFrame(input string, frame int, options ScreenshotOptions) ffmpeg.
 
 	if options.SetBT709ColorParameters {
 		args = args.SetBT709ColorParameters()
+	}
+	if options.IgnoreEditList {
+		args = args.IgnoreEditList()
 	}
 	args = args.Input(input)
 	args = args.VideoFrames(1)

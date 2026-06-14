@@ -5,7 +5,7 @@ import (
 	"io/fs"
 )
 
-//go:embed v3/build
+//go:embed all:v3/build
 var uiV3Box embed.FS
 var UIV3Box fs.FS
 

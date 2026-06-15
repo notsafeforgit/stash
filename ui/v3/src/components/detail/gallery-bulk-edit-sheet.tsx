@@ -64,20 +64,6 @@ function buildInitialValues(_items: GalleryBulkItem[]): GalleryBulkFormValues {
   };
 }
 
-function buildEmptyValues(): GalleryBulkFormValues {
-  return {
-    code: undefined,
-    date: undefined,
-    photographer: undefined,
-    rating100: undefined,
-    organized: undefined,
-    studio_id: undefined,
-    performer_ids: makeBulkUpdateIds([], GQL.BulkUpdateIdMode.Add),
-    tag_ids: makeBulkUpdateIds([], GQL.BulkUpdateIdMode.Add),
-    scene_ids: makeBulkUpdateIds([], GQL.BulkUpdateIdMode.Add),
-  };
-}
-
 function buildMutationInput(
   ids: string[],
   v: GalleryBulkFormValues,
@@ -126,7 +112,16 @@ export function GalleryBulkEditSheet({
 }: GalleryBulkEditSheetProps) {
   const intl = useIntl();
   const [applyToAll, setApplyToAll] = useState(false);
-  const initialValuesRef = useRef(buildInitialValues(items));
+  const [sheetItems, setSheetItems] = useState(items);
+  const [sheetApplyToAllTarget, setSheetApplyToAllTarget] =
+    useState(applyToAllTarget);
+  const [sheetTotalCount, setSheetTotalCount] = useState(totalCount);
+  const applyToAllRef = useRef(applyToAll);
+  const itemsRef = useRef(items);
+  const applyToAllTargetRef = useRef(applyToAllTarget);
+  const onSavedRef = useRef(onSaved);
+  applyToAllRef.current = applyToAll;
+  onSavedRef.current = onSaved;
 
   const [bulkUpdateGalleries, { loading: savingSync }] = useEntityMutation(
     GQL.BulkGalleryUpdateDocument,
@@ -188,14 +183,16 @@ export function GalleryBulkEditSheet({
   const form = useForm({
     defaultValues: buildInitialValues(items),
     onSubmit: async ({ value }) => {
-      const ids = items.map((i) => i.id);
+      const currentApplyToAll = applyToAllRef.current;
+      const currentApplyToAllTarget = applyToAllTargetRef.current;
+      const ids = itemsRef.current.map((i) => i.id);
       const input = buildMutationInput(
         ids,
         value,
-        applyToAll,
-        applyToAllTarget,
+        currentApplyToAll,
+        currentApplyToAllTarget,
       );
-      if (applyToAll) {
+      if (currentApplyToAll) {
         await bulkUpdateGalleriesJob({ variables: { input } });
         toast.success(
           intl.formatMessage({
@@ -205,41 +202,48 @@ export function GalleryBulkEditSheet({
         );
       } else {
         await bulkUpdateGalleries({ variables: { input } });
-        onSaved?.();
+        onSavedRef.current?.();
       }
       onOpenChange(false);
     },
   });
+  const wasOpenRef = useRef(false);
 
   useEffect(() => {
-    if (open) {
+    if (open && !wasOpenRef.current) {
       const initial = buildInitialValues(items);
-      initialValuesRef.current = initial;
+      itemsRef.current = items;
+      applyToAllTargetRef.current = applyToAllTarget;
+      setSheetItems(items);
+      setSheetApplyToAllTarget(applyToAllTarget);
+      setSheetTotalCount(totalCount);
+      applyToAllRef.current = false;
       setApplyToAll(false);
       form.reset(initial);
     }
-  }, [open, form, items]);
+    wasOpenRef.current = open;
+  }, [open, form, items, applyToAllTarget, totalCount]);
 
   function handleApplyToAllChange(v: boolean) {
+    applyToAllRef.current = v;
     setApplyToAll(v);
-    form.reset(v ? buildEmptyValues() : initialValuesRef.current);
   }
 
   const existingTagNames: Record<string, string> = {};
   const existingPerformerNames: Record<string, string> = {};
   const existingSceneNames: Record<string, string> = {};
-  for (const item of items) {
+  for (const item of sheetItems) {
     for (const t of item.tags ?? []) existingTagNames[t.id] = t.name;
     for (const p of item.performers ?? [])
       existingPerformerNames[p.id] = p.name;
     for (const s of item.scenes ?? [])
       existingSceneNames[s.id] = objectTitle(s);
   }
-  const tagIdLists = items.map((i) => (i.tags ?? []).map((t) => t.id));
-  const performerIdLists = items.map((i) =>
+  const tagIdLists = sheetItems.map((i) => (i.tags ?? []).map((t) => t.id));
+  const performerIdLists = sheetItems.map((i) =>
     (i.performers ?? []).map((p) => p.id),
   );
-  const sceneIdLists = items.map((i) => (i.scenes ?? []).map((s) => s.id));
+  const sceneIdLists = sheetItems.map((i) => (i.scenes ?? []).map((s) => s.id));
 
   const tagIntersection = getIntersectionIds(tagIdLists);
   const tagUnion = getUnionIds(tagIdLists);
@@ -257,13 +261,13 @@ export function GalleryBulkEditSheet({
           id: "dialogs.edit_galleries_title",
           defaultMessage: "Edit {count} galleries",
         },
-        { count: items.length },
+        { count: sheetItems.length },
       )}
       saving={saving}
       onSubmit={form.handleSubmit}
-      applyToAllTarget={applyToAllTarget}
-      totalCount={totalCount}
-      itemCount={items.length}
+      applyToAllTarget={sheetApplyToAllTarget}
+      totalCount={sheetTotalCount}
+      itemCount={sheetItems.length}
       applyToAll={applyToAll}
       onApplyToAllChange={handleApplyToAllChange}
     >

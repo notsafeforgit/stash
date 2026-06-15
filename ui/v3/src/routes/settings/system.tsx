@@ -408,6 +408,18 @@ function SettingsSystemPage() {
           min={0}
           integer
         />
+        <SettingSwitch
+          label={msg(
+            "config.general.bulk_update_hooks_label",
+            'Run hooks during "Apply to all" updates',
+          )}
+          description={msg(
+            "config.general.bulk_update_hooks_desc",
+            'Controls only the background "Apply to all" bulk-update path. Regular edits still run hooks normally. Disable this to make large apply-to-all updates faster when you do not need hook side effects.',
+          )}
+          checked={general.bulkUpdateHooks}
+          onChange={(v) => save({ bulkUpdateHooks: v })}
+        />
       </SettingsSection>
 
       <SettingsSection

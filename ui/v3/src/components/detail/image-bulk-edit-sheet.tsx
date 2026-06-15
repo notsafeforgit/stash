@@ -67,20 +67,6 @@ function buildInitialValues(_items: ImageBulkItem[]): ImageBulkFormValues {
   };
 }
 
-function buildEmptyValues(): ImageBulkFormValues {
-  return {
-    code: undefined,
-    date: undefined,
-    photographer: undefined,
-    rating100: undefined,
-    organized: undefined,
-    studio_id: undefined,
-    performer_ids: makeBulkUpdateIds([], GQL.BulkUpdateIdMode.Add),
-    tag_ids: makeBulkUpdateIds([], GQL.BulkUpdateIdMode.Add),
-    gallery_ids: makeBulkUpdateIds([], GQL.BulkUpdateIdMode.Add),
-  };
-}
-
 function buildMutationInput(
   ids: string[],
   v: ImageBulkFormValues,
@@ -129,7 +115,16 @@ export function ImageBulkEditSheet({
 }: ImageBulkEditSheetProps) {
   const intl = useIntl();
   const [applyToAll, setApplyToAll] = useState(false);
-  const initialValuesRef = useRef(buildInitialValues(items));
+  const [sheetItems, setSheetItems] = useState(items);
+  const [sheetApplyToAllTarget, setSheetApplyToAllTarget] =
+    useState(applyToAllTarget);
+  const [sheetTotalCount, setSheetTotalCount] = useState(totalCount);
+  const applyToAllRef = useRef(applyToAll);
+  const itemsRef = useRef(items);
+  const applyToAllTargetRef = useRef(applyToAllTarget);
+  const onSavedRef = useRef(onSaved);
+  applyToAllRef.current = applyToAll;
+  onSavedRef.current = onSaved;
 
   const [bulkUpdateImages, { loading: savingSync }] = useEntityMutation(
     GQL.BulkImageUpdateDocument,
@@ -193,14 +188,16 @@ export function ImageBulkEditSheet({
   const form = useForm({
     defaultValues: buildInitialValues(items),
     onSubmit: async ({ value }) => {
-      const ids = items.map((i) => i.id);
+      const currentApplyToAll = applyToAllRef.current;
+      const currentApplyToAllTarget = applyToAllTargetRef.current;
+      const ids = itemsRef.current.map((i) => i.id);
       const input = buildMutationInput(
         ids,
         value,
-        applyToAll,
-        applyToAllTarget,
+        currentApplyToAll,
+        currentApplyToAllTarget,
       );
-      if (applyToAll) {
+      if (currentApplyToAll) {
         await bulkUpdateImagesJob({ variables: { input } });
         toast.success(
           intl.formatMessage({
@@ -210,38 +207,47 @@ export function ImageBulkEditSheet({
         );
       } else {
         await bulkUpdateImages({ variables: { input } });
-        onSaved?.();
+        onSavedRef.current?.();
       }
       onOpenChange(false);
     },
   });
+  const wasOpenRef = useRef(false);
 
   useEffect(() => {
-    if (open) {
+    if (open && !wasOpenRef.current) {
       const initial = buildInitialValues(items);
-      initialValuesRef.current = initial;
+      itemsRef.current = items;
+      applyToAllTargetRef.current = applyToAllTarget;
+      setSheetItems(items);
+      setSheetApplyToAllTarget(applyToAllTarget);
+      setSheetTotalCount(totalCount);
+      applyToAllRef.current = false;
       setApplyToAll(false);
       form.reset(initial);
     }
-  }, [open, form, items]);
+    wasOpenRef.current = open;
+  }, [open, form, items, applyToAllTarget, totalCount]);
 
   function handleApplyToAllChange(v: boolean) {
+    applyToAllRef.current = v;
     setApplyToAll(v);
-    form.reset(v ? buildEmptyValues() : initialValuesRef.current);
   }
 
   // Per-item action: each image's date is set from its primary file's mtime.
   async function handleSetDateFromFileMTime() {
+    const currentApplyToAll = applyToAllRef.current;
+    const currentApplyToAllTarget = applyToAllTargetRef.current;
     const input: GQL.ImagesSetDateFromFileMTimeInput =
-      applyToAll && applyToAllTarget
+      currentApplyToAll && currentApplyToAllTarget
         ? {
             apply_to_items_matching_filters: true,
-            find_filter: applyToAllTarget.findFilter,
-            image_filter_ast: applyToAllTarget.filterAST,
+            find_filter: currentApplyToAllTarget.findFilter,
+            image_filter_ast: currentApplyToAllTarget.filterAST,
           }
-        : { ids: items.map((i) => i.id) };
+        : { ids: itemsRef.current.map((i) => i.id) };
     await setDateFromMTime({ variables: { input } });
-    if (applyToAll) {
+    if (currentApplyToAll) {
       toast.success(
         intl.formatMessage({
           id: "toast.started_bulk_update",
@@ -249,7 +255,7 @@ export function ImageBulkEditSheet({
         }),
       );
     } else {
-      onSaved?.();
+      onSavedRef.current?.();
     }
     onOpenChange(false);
   }
@@ -257,18 +263,20 @@ export function ImageBulkEditSheet({
   const existingTagNames: Record<string, string> = {};
   const existingPerformerNames: Record<string, string> = {};
   const existingGalleryNames: Record<string, string> = {};
-  for (const item of items) {
+  for (const item of sheetItems) {
     for (const t of item.tags ?? []) existingTagNames[t.id] = t.name;
     for (const p of item.performers ?? [])
       existingPerformerNames[p.id] = p.name;
     for (const g of item.galleries ?? [])
       existingGalleryNames[g.id] = galleryLabel(g);
   }
-  const tagIdLists = items.map((i) => (i.tags ?? []).map((t) => t.id));
-  const performerIdLists = items.map((i) =>
+  const tagIdLists = sheetItems.map((i) => (i.tags ?? []).map((t) => t.id));
+  const performerIdLists = sheetItems.map((i) =>
     (i.performers ?? []).map((p) => p.id),
   );
-  const galleryIdLists = items.map((i) => (i.galleries ?? []).map((g) => g.id));
+  const galleryIdLists = sheetItems.map((i) =>
+    (i.galleries ?? []).map((g) => g.id),
+  );
 
   const tagIntersection = getIntersectionIds(tagIdLists);
   const tagUnion = getUnionIds(tagIdLists);
@@ -286,13 +294,13 @@ export function ImageBulkEditSheet({
           id: "dialogs.edit_images_title",
           defaultMessage: "Edit {count} images",
         },
-        { count: items.length },
+        { count: sheetItems.length },
       )}
       saving={saving}
       onSubmit={form.handleSubmit}
-      applyToAllTarget={applyToAllTarget}
-      totalCount={totalCount}
-      itemCount={items.length}
+      applyToAllTarget={sheetApplyToAllTarget}
+      totalCount={sheetTotalCount}
+      itemCount={sheetItems.length}
       applyToAll={applyToAll}
       onApplyToAllChange={handleApplyToAllChange}
     >

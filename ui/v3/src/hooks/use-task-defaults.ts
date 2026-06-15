@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type * as GQL from "src/core/generated-graphql";
 import { useConfigurationContext, useConfigureUISetting } from "./config";
 import { useDebounce } from "./debounce";
@@ -16,6 +16,32 @@ export interface ITaskDefaults {
 }
 
 type TaskKey = keyof ITaskDefaults;
+type PendingTaskDefaultsSave = {
+  id: number;
+  defaults: ITaskDefaults;
+};
+
+let pendingTaskDefaults: ITaskDefaults | undefined;
+let saveChain: Promise<unknown> = Promise.resolve();
+let latestSaveId = 0;
+
+function enqueueSave(
+  save: (next: ITaskDefaults) => Promise<unknown>,
+  pendingSave: PendingTaskDefaultsSave,
+) {
+  const run = saveChain
+    .catch(() => undefined)
+    .then(async () => {
+      if (pendingSave.id !== latestSaveId) return;
+
+      await save(pendingSave.defaults);
+      if (pendingTaskDefaults === pendingSave.defaults) {
+        pendingTaskDefaults = undefined;
+      }
+    });
+  saveChain = run;
+  return run;
+}
 
 /**
  * Reads/writes `ui.taskDefaults`. Saves are debounced 500ms (matches v2.5's
@@ -32,20 +58,36 @@ export function useTaskDefaults() {
   // Keep a live ref so the debounced save reads the latest merged record at
   // flush time rather than the snapshot at the moment it was scheduled.
   const taskDefaultsRef = useRef<ITaskDefaults>(taskDefaults);
-  taskDefaultsRef.current = taskDefaults;
+  taskDefaultsRef.current = pendingTaskDefaults ?? taskDefaults;
 
-  const flush = useDebounce(async (next: ITaskDefaults) => {
-    await configureUISetting({
-      variables: { key: "taskDefaults", value: next },
-    });
+  const flush = useDebounce(async (pendingSave: PendingTaskDefaultsSave) => {
+    await enqueueSave(
+      (value) =>
+        configureUISetting({
+          variables: { key: "taskDefaults", value },
+        }),
+      pendingSave,
+    );
   }, 500);
+
+  useEffect(() => {
+    return () => {
+      flush.flush();
+    };
+  }, [flush]);
 
   const save = useMemo(
     () =>
       function save<K extends TaskKey>(key: K, value: ITaskDefaults[K]) {
-        const next = { ...taskDefaultsRef.current, [key]: value };
+        const next = {
+          ...(pendingTaskDefaults ?? taskDefaultsRef.current),
+          [key]: value,
+        };
+        const id = latestSaveId + 1;
+        latestSaveId = id;
+        pendingTaskDefaults = next;
         taskDefaultsRef.current = next;
-        flush(next);
+        flush({ id, defaults: next });
       },
     [flush],
   );

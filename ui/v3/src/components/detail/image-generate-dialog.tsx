@@ -23,6 +23,7 @@ import {
 } from "src/components/ui/field";
 import { useToast } from "src/hooks/toast";
 import { useConfigurationContext } from "src/hooks/config";
+import { useGenerateTaskOptions } from "src/hooks/use-generate-task-options";
 
 interface ImageGenerateDialogProps {
   open: boolean;
@@ -44,6 +45,25 @@ const DEFAULTS: Options = {
   imagePhashes: true,
   overwrite: false,
 };
+
+function boolDefault(
+  value: GQL.InputMaybe<boolean> | undefined,
+  fallback: boolean,
+) {
+  return value ?? fallback;
+}
+
+function getImageOptions(input: GQL.GenerateMetadataInput): Options {
+  return {
+    imageThumbnails: boolDefault(
+      input.imageThumbnails,
+      DEFAULTS.imageThumbnails,
+    ),
+    clipPreviews: boolDefault(input.clipPreviews, DEFAULTS.clipPreviews),
+    imagePhashes: boolDefault(input.imagePhashes, DEFAULTS.imagePhashes),
+    overwrite: boolDefault(input.overwrite, DEFAULTS.overwrite),
+  };
+}
 
 // For single-entity generates, overwrite is forced on — running the task on
 // one item the user explicitly picked should always refresh the artifact
@@ -69,12 +89,13 @@ export function ImageGenerateDialog({
     configuration.general.createImageClipsFromVideos === true &&
     configuration.general.stashes.some((s) => s.excludeVideo);
   const isSingle = imageIds.length === 1;
-  const [options, setOptions] = useState<Options>(DEFAULTS);
+  const [generateOptions, setGenerateOptions] = useGenerateTaskOptions();
+  const options = getImageOptions(generateOptions);
   const [submitting, setSubmitting] = useState(false);
   const [generate] = useMutation(GQL.MetadataGenerateDocument);
 
   function set<K extends keyof Options>(key: K, value: Options[K]) {
-    setOptions((prev) => ({ ...prev, [key]: value }));
+    setGenerateOptions({ ...generateOptions, [key]: value });
   }
 
   async function handleGenerate() {

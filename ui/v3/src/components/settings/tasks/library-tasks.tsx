@@ -5,6 +5,7 @@ import * as GQL from "src/core/generated-graphql";
 import { Button } from "src/components/ui/button";
 import { useToast } from "src/hooks/toast";
 import { useConfigurationContext } from "src/hooks/config";
+import { useGenerateTaskOptions } from "src/hooks/use-generate-task-options";
 import { useTaskOptions } from "src/hooks/use-task-options";
 import { withoutTypename } from "src/utils/data";
 import { AutoTagWarning } from "src/components/shared/auto-tag-warning";
@@ -257,19 +258,7 @@ export function LibraryTasks() {
       : { performers: ["*"], studios: ["*"], tags: ["*"] },
   );
 
-  const [generateOptions, setGenerateOptions] = useTaskOptions(
-    "generate",
-    () =>
-      configuration.defaults.generate
-        ? withoutTypename(configuration.defaults.generate)
-        : {
-            covers: true,
-            sprites: true,
-            phashes: true,
-            previews: true,
-            markers: true,
-          },
-  );
+  const [generateOptions, setGenerateOptions] = useGenerateTaskOptions();
 
   const [autoTagConfirmOpen, setAutoTagConfirmOpen] = useState(false);
   const [identifyOpen, setIdentifyOpen] = useState(false);

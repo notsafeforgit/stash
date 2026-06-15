@@ -58,12 +58,15 @@ function Task({ job }: { job: JobFragment }) {
     await stopJob({ variables: { job_id: job.id } });
   }
 
-  const progressPct =
+  const rawProgress =
     job.status === GQL.JobStatus.Running &&
     job.progress !== undefined &&
     job.progress !== null
-      ? Math.round(job.progress * 100)
+      ? Math.max(0, Math.min(1, job.progress))
       : null;
+  const progressPct =
+    rawProgress !== null ? Math.min(99, Math.floor(rawProgress * 100)) : null;
+  const finalizing = rawProgress !== null && rawProgress >= 1;
 
   let eta: string | null = null;
   if (
@@ -116,11 +119,15 @@ function Task({ job }: { job: JobFragment }) {
         >
           {job.description}
         </span>
-        {eta && (
+        {finalizing ? (
+          <span className="shrink-0 text-xs text-muted-foreground">
+            <FormattedMessage id="job.finalizing" defaultMessage="Finalizing" />
+          </span>
+        ) : eta ? (
           <span className="shrink-0 text-xs text-muted-foreground">
             <FormattedMessage id="eta" defaultMessage="ETA" />: {eta}
           </span>
-        )}
+        ) : null}
       </div>
 
       {/* Progress + subtasks + error sit full-width below the title row.
@@ -170,7 +177,9 @@ function Task({ job }: { job: JobFragment }) {
 
 export function JobTable() {
   const intl = useIntl();
-  const { data } = useQuery(GQL.JobQueueDocument);
+  const { data } = useQuery(GQL.JobQueueDocument, {
+    fetchPolicy: "cache-and-network",
+  });
   const [queue, setQueue] = useState<JobFragment[]>([]);
 
   useEffect(() => {

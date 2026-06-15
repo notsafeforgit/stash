@@ -7,6 +7,7 @@ import * as GQL from "src/core/generated-graphql";
 import { cn } from "src/lib/utils";
 import { Button } from "src/components/ui/button";
 import { Spinner } from "src/components/ui/spinner";
+import { useConfigurationContext, useConfigureGeneral } from "src/hooks/config";
 import {
   SettingsSection,
   SettingSelect,
@@ -46,11 +47,17 @@ const LEVEL_CLASSES: Record<string, string> = {
 
 function SettingsLogsPage() {
   const intl = useIntl();
-  const [logLevel, setLogLevel] = useState("Info");
+  const { configuration } = useConfigurationContext();
+  const [configureGeneral] = useConfigureGeneral();
+  const [logLevel, setLogLevel] = useState(configuration.general.logLevel);
   const [entries, setEntries] = useState<LogEntry[]>([]);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const logViewportRef = useRef<HTMLDivElement>(null);
   const nextIdRef = useRef(0);
+
+  useEffect(() => {
+    setLogLevel(configuration.general.logLevel);
+  }, [configuration.general.logLevel]);
 
   function toEntries(raw: GQL.LogEntryDataFragment[]): LogEntry[] {
     return raw.map((e) => ({
@@ -116,6 +123,15 @@ function SettingsLogsPage() {
     defaultMessage: "Jump to bottom",
   });
 
+  function handleLogLevelChange(value: string) {
+    setLogLevel(value);
+    void configureGeneral({
+      variables: { input: { logLevel: value } },
+    }).catch(() => {
+      setLogLevel(configuration.general.logLevel);
+    });
+  }
+
   useLayoutEffect(() => {
     if (!isAtBottom || newestDisplayEntryId === undefined) return;
     const frame = window.requestAnimationFrame(() => {
@@ -142,7 +158,7 @@ function SettingsLogsPage() {
             })}
             value={logLevel}
             options={LOG_LEVELS.map((l) => ({ value: l, label: l }))}
-            onChange={setLogLevel}
+            onChange={handleLogLevelChange}
             triggerClassName="w-32"
           />
         </SettingsSection>

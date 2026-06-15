@@ -22,6 +22,7 @@ import {
   FieldSeparator,
 } from "src/components/ui/field";
 import { useToast } from "src/hooks/toast";
+import { useGenerateTaskOptions } from "src/hooks/use-generate-task-options";
 
 interface SceneGenerateDialogProps {
   open: boolean;
@@ -74,6 +75,53 @@ const DEFAULTS: Options = {
   overwrite: false,
 };
 
+function boolDefault(
+  value: GQL.InputMaybe<boolean> | undefined,
+  fallback: boolean,
+) {
+  return value ?? fallback;
+}
+
+function getMarkerOptions(input: GQL.GenerateMetadataInput) {
+  const markers = boolDefault(input.markers, DEFAULTS.markers);
+  const markerImagePreviews = boolDefault(
+    input.markerImagePreviews,
+    DEFAULTS.markers,
+  );
+  const markerScreenshots = boolDefault(
+    input.markerScreenshots,
+    DEFAULTS.markers,
+  );
+
+  return {
+    markers,
+    markerImagePreviews,
+    markerScreenshots,
+    any: markers || markerImagePreviews || markerScreenshots,
+  };
+}
+
+function getSceneOptions(input: GQL.GenerateMetadataInput): Options {
+  return {
+    covers: boolDefault(input.covers, DEFAULTS.covers),
+    previews: boolDefault(input.previews, DEFAULTS.previews),
+    imagePreviews: boolDefault(input.imagePreviews, DEFAULTS.imagePreviews),
+    sprites: boolDefault(input.sprites, DEFAULTS.sprites),
+    markers: getMarkerOptions(input).any,
+    transcodes: boolDefault(input.transcodes, DEFAULTS.transcodes),
+    forceTranscodes: boolDefault(
+      input.forceTranscodes,
+      DEFAULTS.forceTranscodes,
+    ),
+    phashes: boolDefault(input.phashes, DEFAULTS.phashes),
+    interactiveHeatmapsSpeeds: boolDefault(
+      input.interactiveHeatmapsSpeeds,
+      DEFAULTS.interactiveHeatmapsSpeeds,
+    ),
+    overwrite: boolDefault(input.overwrite, DEFAULTS.overwrite),
+  };
+}
+
 export function SceneGenerateDialog({
   open,
   onOpenChange,
@@ -89,18 +137,29 @@ export function SceneGenerateDialog({
   // deliberate one-scene click should generate unconditionally rather
   // than expose a sub-toggle that's only meaningful at bulk scale.
   const isSingle = sceneIds.length === 1;
-  const [options, setOptions] = useState<Options>(DEFAULTS);
+  const [generateOptions, setGenerateOptions] = useGenerateTaskOptions();
+  const options = getSceneOptions(generateOptions);
+  const markerOptions = getMarkerOptions(generateOptions);
   const [submitting, setSubmitting] = useState(false);
   const [generate] = useMutation(GQL.MetadataGenerateDocument);
 
   function set<K extends keyof Options>(key: K, value: Options[K]) {
-    setOptions((prev) => ({ ...prev, [key]: value }));
+    if (key === "markers") {
+      setGenerateOptions({
+        ...generateOptions,
+        markers: value,
+        markerImagePreviews: value,
+        markerScreenshots: value,
+      });
+      return;
+    }
+
+    setGenerateOptions({ ...generateOptions, [key]: value });
   }
 
   async function handleGenerate() {
     setSubmitting(true);
     try {
-      const markersOn = hasMarkers && options.markers;
       await generate({
         variables: {
           input: {
@@ -109,9 +168,10 @@ export function SceneGenerateDialog({
             previews: options.previews,
             imagePreviews: options.previews && options.imagePreviews,
             sprites: options.sprites,
-            markers: markersOn,
-            markerImagePreviews: markersOn,
-            markerScreenshots: markersOn,
+            markers: hasMarkers && markerOptions.markers,
+            markerImagePreviews:
+              hasMarkers && markerOptions.markerImagePreviews,
+            markerScreenshots: hasMarkers && markerOptions.markerScreenshots,
             transcodes: options.transcodes,
             forceTranscodes: options.transcodes && options.forceTranscodes,
             phashes: options.phashes,

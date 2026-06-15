@@ -76,21 +76,6 @@ function buildInitialValues(_items: SceneBulkItem[]): SceneBulkFormValues {
   };
 }
 
-function buildEmptyValues(): SceneBulkFormValues {
-  return {
-    code: undefined,
-    date: undefined,
-    director: undefined,
-    rating100: undefined,
-    organized: undefined,
-    studio_id: undefined,
-    performer_ids: makeBulkUpdateIds([], GQL.BulkUpdateIdMode.Add),
-    tag_ids: makeBulkUpdateIds([], GQL.BulkUpdateIdMode.Add),
-    gallery_ids: makeBulkUpdateIds([], GQL.BulkUpdateIdMode.Add),
-    group_ids: makeBulkUpdateIds([], GQL.BulkUpdateIdMode.Add),
-  };
-}
-
 function buildMutationInput(
   ids: string[],
   v: SceneBulkFormValues,
@@ -140,7 +125,16 @@ export function SceneBulkEditSheet({
 }: SceneBulkEditSheetProps) {
   const intl = useIntl();
   const [applyToAll, setApplyToAll] = useState(false);
-  const initialValuesRef = useRef(buildInitialValues(items));
+  const [sheetItems, setSheetItems] = useState(items);
+  const [sheetApplyToAllTarget, setSheetApplyToAllTarget] =
+    useState(applyToAllTarget);
+  const [sheetTotalCount, setSheetTotalCount] = useState(totalCount);
+  const applyToAllRef = useRef(applyToAll);
+  const itemsRef = useRef(items);
+  const applyToAllTargetRef = useRef(applyToAllTarget);
+  const onSavedRef = useRef(onSaved);
+  applyToAllRef.current = applyToAll;
+  onSavedRef.current = onSaved;
 
   const [bulkUpdateScenes, { loading: savingSync }] = useEntityMutation(
     GQL.BulkSceneUpdateDocument,
@@ -214,14 +208,16 @@ export function SceneBulkEditSheet({
   const form = useForm({
     defaultValues: buildInitialValues(items),
     onSubmit: async ({ value }) => {
-      const ids = items.map((i) => i.id);
+      const currentApplyToAll = applyToAllRef.current;
+      const currentApplyToAllTarget = applyToAllTargetRef.current;
+      const ids = itemsRef.current.map((i) => i.id);
       const input = buildMutationInput(
         ids,
         value,
-        applyToAll,
-        applyToAllTarget,
+        currentApplyToAll,
+        currentApplyToAllTarget,
       );
-      if (applyToAll) {
+      if (currentApplyToAll) {
         await bulkUpdateScenesJob({ variables: { input } });
         toast.success(
           intl.formatMessage({
@@ -231,40 +227,49 @@ export function SceneBulkEditSheet({
         );
       } else {
         await bulkUpdateScenes({ variables: { input } });
-        onSaved?.();
+        onSavedRef.current?.();
       }
       onOpenChange(false);
     },
   });
+  const wasOpenRef = useRef(false);
 
   useEffect(() => {
-    if (open) {
+    if (open && !wasOpenRef.current) {
       const initial = buildInitialValues(items);
-      initialValuesRef.current = initial;
+      itemsRef.current = items;
+      applyToAllTargetRef.current = applyToAllTarget;
+      setSheetItems(items);
+      setSheetApplyToAllTarget(applyToAllTarget);
+      setSheetTotalCount(totalCount);
+      applyToAllRef.current = false;
       setApplyToAll(false);
       form.reset(initial);
     }
-  }, [open, form, items]);
+    wasOpenRef.current = open;
+  }, [open, form, items, applyToAllTarget, totalCount]);
 
   function handleApplyToAllChange(v: boolean) {
+    applyToAllRef.current = v;
     setApplyToAll(v);
-    form.reset(v ? buildEmptyValues() : initialValuesRef.current);
   }
 
   // Per-item action: each scene's date is set from its primary file's mtime.
   // Honours the same "explicit ids vs apply-to-filter" toggle as the bulk
   // update form.
   async function handleSetDateFromFileMTime() {
+    const currentApplyToAll = applyToAllRef.current;
+    const currentApplyToAllTarget = applyToAllTargetRef.current;
     const input: GQL.ScenesSetDateFromFileMTimeInput =
-      applyToAll && applyToAllTarget
+      currentApplyToAll && currentApplyToAllTarget
         ? {
             apply_to_items_matching_filters: true,
-            find_filter: applyToAllTarget.findFilter,
-            scene_filter_ast: applyToAllTarget.filterAST,
+            find_filter: currentApplyToAllTarget.findFilter,
+            scene_filter_ast: currentApplyToAllTarget.filterAST,
           }
-        : { ids: items.map((i) => i.id) };
+        : { ids: itemsRef.current.map((i) => i.id) };
     await setDateFromMTime({ variables: { input } });
-    if (applyToAll) {
+    if (currentApplyToAll) {
       toast.success(
         intl.formatMessage({
           id: "toast.started_bulk_update",
@@ -272,7 +277,7 @@ export function SceneBulkEditSheet({
         }),
       );
     } else {
-      onSaved?.();
+      onSavedRef.current?.();
     }
     onOpenChange(false);
   }
@@ -281,7 +286,7 @@ export function SceneBulkEditSheet({
   const existingPerformerNames: Record<string, string> = {};
   const existingGalleryNames: Record<string, string> = {};
   const existingGroupNames: Record<string, string> = {};
-  for (const item of items) {
+  for (const item of sheetItems) {
     for (const t of item.tags ?? []) existingTagNames[t.id] = t.name;
     for (const p of item.performers ?? [])
       existingPerformerNames[p.id] = p.name;
@@ -290,12 +295,14 @@ export function SceneBulkEditSheet({
     for (const g of item.groups ?? [])
       existingGroupNames[g.group.id] = g.group.name;
   }
-  const tagIdLists = items.map((i) => (i.tags ?? []).map((t) => t.id));
-  const performerIdLists = items.map((i) =>
+  const tagIdLists = sheetItems.map((i) => (i.tags ?? []).map((t) => t.id));
+  const performerIdLists = sheetItems.map((i) =>
     (i.performers ?? []).map((p) => p.id),
   );
-  const galleryIdLists = items.map((i) => (i.galleries ?? []).map((g) => g.id));
-  const groupIdLists = items.map((i) =>
+  const galleryIdLists = sheetItems.map((i) =>
+    (i.galleries ?? []).map((g) => g.id),
+  );
+  const groupIdLists = sheetItems.map((i) =>
     (i.groups ?? []).map((g) => g.group.id),
   );
 
@@ -317,13 +324,13 @@ export function SceneBulkEditSheet({
           id: "dialogs.edit_scenes_title",
           defaultMessage: "Edit {count} scenes",
         },
-        { count: items.length },
+        { count: sheetItems.length },
       )}
       saving={saving}
       onSubmit={form.handleSubmit}
-      applyToAllTarget={applyToAllTarget}
-      totalCount={totalCount}
-      itemCount={items.length}
+      applyToAllTarget={sheetApplyToAllTarget}
+      totalCount={sheetTotalCount}
+      itemCount={sheetItems.length}
       applyToAll={applyToAll}
       onApplyToAllChange={handleApplyToAllChange}
     >

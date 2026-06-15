@@ -44,15 +44,6 @@ function buildInitialValues(_items: TagBulkItem[]): TagBulkFormValues {
   };
 }
 
-function buildEmptyValues(): TagBulkFormValues {
-  return {
-    favorite: undefined,
-    ignore_auto_tag: undefined,
-    parent_ids: makeBulkUpdateIds([], GQL.BulkUpdateIdMode.Add),
-    child_ids: makeBulkUpdateIds([], GQL.BulkUpdateIdMode.Add),
-  };
-}
-
 function buildMutationInput(
   ids: string[],
   v: TagBulkFormValues,
@@ -95,7 +86,16 @@ export function TagBulkEditSheet({
 }: TagBulkEditSheetProps) {
   const intl = useIntl();
   const [applyToAll, setApplyToAll] = useState(false);
-  const initialValuesRef = useRef(buildInitialValues(items));
+  const [sheetItems, setSheetItems] = useState(items);
+  const [sheetApplyToAllTarget, setSheetApplyToAllTarget] =
+    useState(applyToAllTarget);
+  const [sheetTotalCount, setSheetTotalCount] = useState(totalCount);
+  const applyToAllRef = useRef(applyToAll);
+  const itemsRef = useRef(items);
+  const applyToAllTargetRef = useRef(applyToAllTarget);
+  const onSavedRef = useRef(onSaved);
+  applyToAllRef.current = applyToAll;
+  onSavedRef.current = onSaved;
 
   const [bulkUpdateTags, { loading: savingSync }] = useEntityMutation(
     GQL.BulkTagUpdateDocument,
@@ -120,14 +120,16 @@ export function TagBulkEditSheet({
   const form = useForm({
     defaultValues: buildInitialValues(items),
     onSubmit: async ({ value }) => {
-      const ids = items.map((i) => i.id);
+      const currentApplyToAll = applyToAllRef.current;
+      const currentApplyToAllTarget = applyToAllTargetRef.current;
+      const ids = itemsRef.current.map((i) => i.id);
       const input = buildMutationInput(
         ids,
         value,
-        applyToAll,
-        applyToAllTarget,
+        currentApplyToAll,
+        currentApplyToAllTarget,
       );
-      if (applyToAll) {
+      if (currentApplyToAll) {
         await bulkUpdateTagsJob({ variables: { input } });
         toast.success(
           intl.formatMessage({
@@ -137,34 +139,41 @@ export function TagBulkEditSheet({
         );
       } else {
         await bulkUpdateTags({ variables: { input } });
-        onSaved?.();
+        onSavedRef.current?.();
       }
       onOpenChange(false);
     },
   });
+  const wasOpenRef = useRef(false);
 
   useEffect(() => {
-    if (open) {
+    if (open && !wasOpenRef.current) {
       const initial = buildInitialValues(items);
-      initialValuesRef.current = initial;
+      itemsRef.current = items;
+      applyToAllTargetRef.current = applyToAllTarget;
+      setSheetItems(items);
+      setSheetApplyToAllTarget(applyToAllTarget);
+      setSheetTotalCount(totalCount);
+      applyToAllRef.current = false;
       setApplyToAll(false);
       form.reset(initial);
     }
-  }, [open, form, items]);
+    wasOpenRef.current = open;
+  }, [open, form, items, applyToAllTarget, totalCount]);
 
   function handleApplyToAllChange(v: boolean) {
+    applyToAllRef.current = v;
     setApplyToAll(v);
-    form.reset(v ? buildEmptyValues() : initialValuesRef.current);
   }
 
   const existingParentNames: Record<string, string> = {};
   const existingChildNames: Record<string, string> = {};
-  for (const item of items) {
+  for (const item of sheetItems) {
     for (const p of item.parents) existingParentNames[p.id] = p.name;
     for (const c of item.children) existingChildNames[c.id] = c.name;
   }
-  const parentIdLists = items.map((i) => i.parents.map((p) => p.id));
-  const childIdLists = items.map((i) => i.children.map((c) => c.id));
+  const parentIdLists = sheetItems.map((i) => i.parents.map((p) => p.id));
+  const childIdLists = sheetItems.map((i) => i.children.map((c) => c.id));
   const parentIntersection = getIntersectionIds(parentIdLists);
   const parentUnion = getUnionIds(parentIdLists);
   const childIntersection = getIntersectionIds(childIdLists);
@@ -176,13 +185,13 @@ export function TagBulkEditSheet({
       onOpenChange={onOpenChange}
       title={intl.formatMessage(
         { id: "dialogs.edit_tags_title", defaultMessage: "Edit {count} tags" },
-        { count: items.length },
+        { count: sheetItems.length },
       )}
       saving={saving}
       onSubmit={form.handleSubmit}
-      applyToAllTarget={applyToAllTarget}
-      totalCount={totalCount}
-      itemCount={items.length}
+      applyToAllTarget={sheetApplyToAllTarget}
+      totalCount={sheetTotalCount}
+      itemCount={sheetItems.length}
       applyToAll={applyToAll}
       onApplyToAllChange={handleApplyToAllChange}
     >

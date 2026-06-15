@@ -67,22 +67,6 @@ function buildInitialValues(
   };
 }
 
-function buildEmptyValues(): PerformerBulkFormValues {
-  return {
-    gender: undefined,
-    country: undefined,
-    ethnicity: undefined,
-    hair_color: undefined,
-    eye_color: undefined,
-    circumcised: undefined,
-    fake_tits: undefined,
-    favorite: undefined,
-    ignore_auto_tag: undefined,
-    rating100: undefined,
-    tag_ids: makeBulkUpdateIds([], GQL.BulkUpdateIdMode.Add),
-  };
-}
-
 function buildMutationInput(
   ids: string[],
   v: PerformerBulkFormValues,
@@ -198,7 +182,16 @@ export function PerformerBulkEditSheet({
 }: PerformerBulkEditSheetProps) {
   const intl = useIntl();
   const [applyToAll, setApplyToAll] = useState(false);
-  const initialValuesRef = useRef(buildInitialValues(items));
+  const [sheetItems, setSheetItems] = useState(items);
+  const [sheetApplyToAllTarget, setSheetApplyToAllTarget] =
+    useState(applyToAllTarget);
+  const [sheetTotalCount, setSheetTotalCount] = useState(totalCount);
+  const applyToAllRef = useRef(applyToAll);
+  const itemsRef = useRef(items);
+  const applyToAllTargetRef = useRef(applyToAllTarget);
+  const onSavedRef = useRef(onSaved);
+  applyToAllRef.current = applyToAll;
+  onSavedRef.current = onSaved;
 
   const [bulkUpdatePerformers, { loading: savingSync }] = useEntityMutation(
     GQL.BulkPerformerUpdateDocument,
@@ -226,14 +219,16 @@ export function PerformerBulkEditSheet({
   const form = useForm({
     defaultValues: buildInitialValues(items),
     onSubmit: async ({ value }) => {
-      const ids = items.map((i) => i.id);
+      const currentApplyToAll = applyToAllRef.current;
+      const currentApplyToAllTarget = applyToAllTargetRef.current;
+      const ids = itemsRef.current.map((i) => i.id);
       const input = buildMutationInput(
         ids,
         value,
-        applyToAll,
-        applyToAllTarget,
+        currentApplyToAll,
+        currentApplyToAllTarget,
       );
-      if (applyToAll) {
+      if (currentApplyToAll) {
         await bulkUpdatePerformersJob({ variables: { input } });
         toast.success(
           intl.formatMessage({
@@ -243,31 +238,38 @@ export function PerformerBulkEditSheet({
         );
       } else {
         await bulkUpdatePerformers({ variables: { input } });
-        onSaved?.();
+        onSavedRef.current?.();
       }
       onOpenChange(false);
     },
   });
+  const wasOpenRef = useRef(false);
 
   useEffect(() => {
-    if (open) {
+    if (open && !wasOpenRef.current) {
       const initial = buildInitialValues(items);
-      initialValuesRef.current = initial;
+      itemsRef.current = items;
+      applyToAllTargetRef.current = applyToAllTarget;
+      setSheetItems(items);
+      setSheetApplyToAllTarget(applyToAllTarget);
+      setSheetTotalCount(totalCount);
+      applyToAllRef.current = false;
       setApplyToAll(false);
       form.reset(initial);
     }
-  }, [open, form, items]);
+    wasOpenRef.current = open;
+  }, [open, form, items, applyToAllTarget, totalCount]);
 
   function handleApplyToAllChange(v: boolean) {
+    applyToAllRef.current = v;
     setApplyToAll(v);
-    form.reset(v ? buildEmptyValues() : initialValuesRef.current);
   }
 
   const existingTagNames: Record<string, string> = {};
-  for (const item of items) {
+  for (const item of sheetItems) {
     for (const t of item.tags) existingTagNames[t.id] = t.name;
   }
-  const tagIdLists = items.map((i) => i.tags.map((t) => t.id));
+  const tagIdLists = sheetItems.map((i) => i.tags.map((t) => t.id));
   const tagIntersection = getIntersectionIds(tagIdLists);
   const tagUnion = getUnionIds(tagIdLists);
 
@@ -280,13 +282,13 @@ export function PerformerBulkEditSheet({
           id: "dialogs.edit_performers_title",
           defaultMessage: "Edit {count} performers",
         },
-        { count: items.length },
+        { count: sheetItems.length },
       )}
       saving={saving}
       onSubmit={form.handleSubmit}
-      applyToAllTarget={applyToAllTarget}
-      totalCount={totalCount}
-      itemCount={items.length}
+      applyToAllTarget={sheetApplyToAllTarget}
+      totalCount={sheetTotalCount}
+      itemCount={sheetItems.length}
       applyToAll={applyToAll}
       onApplyToAllChange={handleApplyToAllChange}
     >

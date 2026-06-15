@@ -83,6 +83,7 @@ export interface PinnableComboBoxProps {
 }
 
 export function PinnableComboBox({
+  currentLabel,
   options,
   selectedValue,
   searchPlaceholder = "Search…",
@@ -99,6 +100,7 @@ export function PinnableComboBox({
   onSelect,
 }: PinnableComboBoxProps) {
   const [query, setQuery] = React.useState("");
+  const [open, setOpen] = React.useState(false);
 
   // Numeric collation so "20"/"40"/"60"/"100" order numerically, while
   // regular string labels still sort alphabetically.
@@ -124,14 +126,18 @@ export function PinnableComboBox({
       }}
       onInputValueChange={(v: string) => setQuery(v)}
       onOpenChange={(open: boolean) => {
+        setOpen(open);
         if (open) setQuery("");
       }}
       itemToStringLabel={(v: string | null) =>
-        options.find((o) => o.value === v)?.label ?? String(v)
+        options.find((o) => o.value === v)?.label ??
+        (v === selectedValue ? currentLabel : String(v))
       }
     >
       <ComboboxInput
-        placeholder={searchPlaceholder}
+        placeholder={
+          open ? searchPlaceholder : currentLabel || searchPlaceholder
+        }
         showTrigger
         disabled={disabled}
         className={triggerClassName}

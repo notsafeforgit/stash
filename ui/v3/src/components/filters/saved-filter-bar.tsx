@@ -73,7 +73,7 @@ export const SavedFilterBar: React.FC<{
 }) => {
   const intl = useIntl();
   const Toast = useToast();
-  const { data, loading, refetch } = useFindSavedFilters(filter.mode);
+  const { data, previousData, refetch } = useFindSavedFilters(filter.mode);
   const saveFilter = useSaveFilter();
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -81,7 +81,10 @@ export const SavedFilterBar: React.FC<{
   const { pinnedIds, togglePinned } = usePinnedSavedFilters(filter.mode);
   const [saveUISetting] = useConfigureUISetting();
 
-  const savedFilters = useMemo(() => data?.findSavedFilters ?? [], [data]);
+  const savedFilters = useMemo(
+    () => data?.findSavedFilters ?? previousData?.findSavedFilters ?? [],
+    [data, previousData],
+  );
 
   const savedFilterOptions = useMemo(
     () => savedFilters.map((f) => ({ value: f.id, label: f.name })),
@@ -190,7 +193,6 @@ export const SavedFilterBar: React.FC<{
             pinnedValues={pinnedIds}
             pinnedSectionLabel="Pinned"
             allSectionLabel="Saved filters"
-            disabled={loading}
             onSelect={(id) => {
               const sf = savedFilters.find((f) => f.id === id);
               if (sf) loadSavedFilter(sf);

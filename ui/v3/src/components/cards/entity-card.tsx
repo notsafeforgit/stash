@@ -312,6 +312,8 @@ interface EntityCardPreviewProps extends PreviewBadges {
   isPortrait?: boolean;
   /** Pre-computed natural aspect from file dimensions — skips onLoad measurement and eliminates the crop→pillarbox flash */
   naturalIsPortrait?: boolean;
+  /** How image/video media should fit inside the fixed preview aspect. */
+  fit?: "cover" | "contain";
   children?: React.ReactNode;
 }
 
@@ -415,6 +417,7 @@ function EntityCardPreview({
   resumeTime,
   isPortrait,
   naturalIsPortrait: naturalIsPortraitProp,
+  fit = "cover",
   duration,
   resolution,
   organized,
@@ -504,10 +507,15 @@ function EntityCardPreview({
   }
   const cardAspect = useCardAspect();
   const hasMismatch =
+    fit !== "contain" &&
     !isDetails &&
     cardAspect !== "auto" &&
     naturalIsPortrait !== null &&
     naturalIsPortrait !== isPortrait;
+  const mediaFitClass =
+    fit === "contain"
+      ? "object-contain"
+      : cn("object-cover", isPortrait ? "object-top" : "object-center");
 
   const resumePercent =
     resumeTime != null && duration != null && duration > 0
@@ -522,7 +530,7 @@ function EntityCardPreview({
       <div
         data-entity-card-preview=""
         className={cn(
-          "entity-card-preview relative flex-1 min-h-0 overflow-hidden",
+          "entity-card-preview relative flex-1 min-h-0 overflow-hidden bg-muted",
           onPreviewClick && "cursor-zoom-in",
         )}
         onClick={
@@ -540,14 +548,20 @@ function EntityCardPreview({
       >
         {image && (
           <FadeInImage
-            className="absolute inset-0 w-full h-full object-cover"
+            className={cn(
+              "absolute inset-0 h-full w-full",
+              fit === "contain" ? "object-contain" : "object-cover",
+            )}
             src={image}
             alt=""
           />
         )}
         {idleMode === "animated" && animated && (
           <FadeInImage
-            className="absolute inset-0 w-full h-full object-cover"
+            className={cn(
+              "absolute inset-0 h-full w-full",
+              fit === "contain" ? "object-contain" : "object-cover",
+            )}
             src={animated}
             alt=""
           />
@@ -556,7 +570,8 @@ function EntityCardPreview({
           <video
             ref={videoRef}
             className={cn(
-              "absolute inset-0 w-full h-full object-cover transition-opacity duration-200",
+              "absolute inset-0 h-full w-full transition-opacity duration-200",
+              fit === "contain" ? "object-contain" : "object-cover",
               idleMode === "video" || isHovered ? "opacity-100" : "opacity-0",
             )}
             src={video}
@@ -622,10 +637,7 @@ function EntityCardPreview({
           </>
         ) : (
           <FadeInImage
-            className={cn(
-              "absolute inset-0 h-full w-full object-cover",
-              isPortrait ? "object-top" : "object-center",
-            )}
+            className={cn("absolute inset-0 h-full w-full", mediaFitClass)}
             src={image}
             alt=""
             onLoad={
@@ -662,9 +674,7 @@ function EntityCardPreview({
         <FadeInImage
           className={cn(
             "absolute inset-0 h-full w-full",
-            hasMismatch
-              ? "object-contain"
-              : cn("object-cover", isPortrait ? "object-top" : "object-center"),
+            hasMismatch ? "object-contain" : mediaFitClass,
           )}
           src={animated}
           alt=""
@@ -678,9 +688,7 @@ function EntityCardPreview({
         <video
           className={cn(
             "absolute inset-0 h-full w-full transition-opacity duration-200",
-            hasMismatch
-              ? "object-contain"
-              : cn("object-cover", isPortrait ? "object-top" : "object-center"),
+            hasMismatch ? "object-contain" : mediaFitClass,
             idleMode === "video" || isHovered ? "opacity-100" : "opacity-0",
           )}
           ref={videoRef}

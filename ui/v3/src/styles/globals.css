@@ -198,6 +198,8 @@
    select-word, and contenteditable regions wouldn't be usable. */
 input,
 textarea,
+[data-selectable-text],
+[data-selectable-text] *,
 [contenteditable="true"],
 [contenteditable="true"] *,
 [contenteditable="plaintext-only"],

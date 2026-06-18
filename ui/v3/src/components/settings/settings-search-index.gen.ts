@@ -65,7 +65,8 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     },
     description: {
       id: "config.ui.custom_title.description",
-      defaultMessage: "Custom title to show in the browser tab.",
+      defaultMessage:
+        "Custom app title for the navigation header and browser tab titles.",
     },
   },
   {

@@ -4,6 +4,10 @@ import { useConfigurationContextOptional } from "src/hooks/config";
 export const TITLE = "Stash";
 export const TITLE_SEPARATOR = " | ";
 
+export function getAppTitle(customTitle?: string | null) {
+  return customTitle?.trim() || TITLE;
+}
+
 /**
  * Sets `document.title` to the given parts followed by the app title
  * (the configured custom UI title, or "Stash"). Falsy parts are dropped,
@@ -19,7 +23,7 @@ export const TITLE_SEPARATOR = " | ";
  */
 export function useDocumentTitle(...parts: (string | undefined | null)[]) {
   const config = useConfigurationContextOptional();
-  const appTitle = config?.configuration.ui.title || TITLE;
+  const appTitle = getAppTitle(config?.configuration.ui.title);
 
   // Compute here (not in deps) so the effect re-runs whenever any part or
   // the app title changes, without depending on array identity.

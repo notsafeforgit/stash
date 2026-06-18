@@ -141,7 +141,7 @@ function SettingsInterfacePage() {
           label={msg("config.ui.custom_title.heading", "Custom title")}
           description={msg(
             "config.ui.custom_title.description",
-            "Custom title to show in the browser tab.",
+            "Custom app title for the navigation header and browser tab titles.",
           )}
           value={ui.title ?? ""}
           onChange={(v) => saveUI("title", v)}

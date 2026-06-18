@@ -76,7 +76,11 @@ export const StudioCard: React.FC<StudioCardProps> = ({
         className="studio-card"
       >
         <EntityCard.SelectCheckbox />
-        <EntityCard.Preview image={studio.image_path} isPortrait={isPortrait} />
+        <EntityCard.Preview
+          image={studio.image_path}
+          isPortrait={isPortrait}
+          fit="contain"
+        />
         <EntityCard.Body>
           <EntityCard.Title>{studio.name}</EntityCard.Title>
           {counts && <EntityCard.Subtitle>{counts}</EntityCard.Subtitle>}

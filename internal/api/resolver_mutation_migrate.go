@@ -39,6 +39,17 @@ func (r *mutationResolver) MigrateBlobs(ctx context.Context, input MigrateBlobsI
 	return strconv.Itoa(jobID), nil
 }
 
+func (r *mutationResolver) MigrateLegacySavedFilters(ctx context.Context) (string, error) {
+	mgr := manager.GetInstance()
+	t := &task.MigrateLegacySavedFiltersJob{
+		Repository: mgr.Repository,
+		Config:     mgr.Config,
+	}
+	jobID := mgr.JobManager.Add(ctx, "Migrating legacy saved filters...", t)
+
+	return strconv.Itoa(jobID), nil
+}
+
 func (r *mutationResolver) Migrate(ctx context.Context, input manager.MigrateInput) (string, error) {
 	mgr := manager.GetInstance()
 	t := &task.MigrateJob{

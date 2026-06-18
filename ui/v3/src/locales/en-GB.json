@@ -111,6 +111,7 @@
     "merge_count": "Merge {count} {noun} into…",
     "merge_into": "Merge into…",
     "migrate_blobs": "Migrate blobs",
+    "migrate_saved_filters": "Migrate saved filters",
     "migrate_scene_screenshots": "Migrate scene screenshots",
     "new": "New",
     "new_marker": "New marker",
@@ -720,6 +721,9 @@
         "description": "Migrate blobs to the current blob storage system. This migration should be run after changing the blob storage system. Can optionally delete the old data after migration."
       },
       "migrate_hash_files": "Used after changing the Generated file naming hash to rename existing generated files to the new hash format.",
+      "migrate_saved_filters": {
+        "description": "Convert legacy v2.5 saved filter criteria and default filters to the filter AST format."
+      },
       "migrate_scene_screenshots": {
         "delete_files": "Delete screenshot files",
         "description": "Migrate scene screenshots into the new blob storage system. This migration should be run after migrating an existing system to 0.20. Can optionally delete the old screenshots after migration.",

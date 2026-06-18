@@ -173,6 +173,7 @@ function SettingsLogsPage() {
       <div className="relative min-h-0 flex-1">
         <div
           ref={logViewportRef}
+          data-selectable-text
           onScroll={() => setIsAtBottom(isLogViewportAtBottom())}
           className="h-full overflow-y-auto rounded-lg border bg-card p-3 font-mono text-xs leading-5"
         >

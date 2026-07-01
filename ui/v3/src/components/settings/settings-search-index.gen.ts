@@ -188,6 +188,22 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
   {
     to: "/settings/interface",
     section: {
+      id: "config.ui.scene_list.heading",
+      defaultMessage: "Scene list",
+    },
+    label: {
+      id: "config.ui.autostart_gallery_slideshow.heading",
+      defaultMessage: "Auto-start gallery slideshow",
+    },
+    description: {
+      id: "config.ui.autostart_gallery_slideshow.description",
+      defaultMessage:
+        "Start slideshow playback when opening a gallery preview from the galleries list.",
+    },
+  },
+  {
+    to: "/settings/interface",
+    section: {
       id: "config.ui.editing.heading",
       defaultMessage: "Editing",
     },
@@ -991,6 +1007,38 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     description: {
       id: "config.general.include_audio_desc",
       defaultMessage: "Includes audio stream when generating previews.",
+    },
+  },
+  {
+    to: "/settings/system",
+    section: {
+      id: "config.general.preview_generation",
+      defaultMessage: "Preview generation",
+    },
+    label: {
+      id: "config.general.max_marker_preview_duration_head",
+      defaultMessage: "Max marker preview duration",
+    },
+    description: {
+      id: "config.general.max_marker_preview_duration_desc",
+      defaultMessage:
+        "Maximum duration, in seconds, for generated marker previews. 0 disables the limit.",
+    },
+  },
+  {
+    to: "/settings/system",
+    section: {
+      id: "config.general.preview_generation",
+      defaultMessage: "Preview generation",
+    },
+    label: {
+      id: "config.general.default_marker_preview_duration_head",
+      defaultMessage: "Default marker preview duration",
+    },
+    description: {
+      id: "config.general.default_marker_preview_duration_desc",
+      defaultMessage:
+        "Duration, in seconds, for marker previews without an end time. Must be greater than 0.",
     },
   },
   {

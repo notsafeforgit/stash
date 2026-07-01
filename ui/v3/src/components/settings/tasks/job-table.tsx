@@ -271,11 +271,13 @@ export function JobTable() {
           })}
         </div>
       ) : (
-        <ul className="divide-y">
-          {queue.map((j) => (
-            <Task key={j.id} job={j} />
-          ))}
-        </ul>
+        <ScrollArea viewportClassName="max-h-[60vh]">
+          <ul className="divide-y">
+            {queue.map((j) => (
+              <Task key={j.id} job={j} />
+            ))}
+          </ul>
+        </ScrollArea>
       )}
     </div>
   );

@@ -52,6 +52,7 @@ export interface IUIConfig {
   showStudioText?: boolean;
 
   previewVolume?: number;
+  autostartGallerySlideshow?: boolean;
 
   abbreviateCounters?: boolean;
 

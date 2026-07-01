@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import YARLightbox, {
   type RenderSlideProps,
   type RenderSlideFooterProps,
+  type RenderSlideHeaderProps,
   type SlideshowRef,
   type ZoomRef,
   useLightboxState,
@@ -28,6 +29,7 @@ import {
   Minimize2Icon,
   RotateCwIcon,
   RotateCcwIcon,
+  Trash2Icon,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import type { LinkProps } from "@tanstack/react-router";
@@ -40,6 +42,11 @@ import { Button } from "src/components/ui/button";
 import { Switch } from "src/components/ui/switch";
 import { NumberInput } from "src/components/filters/number-input";
 import { RatingSystem } from "src/components/ui/rating-system";
+import {
+  DeleteDialog,
+  DeleteFilesList,
+  type DeleteOptions,
+} from "src/components/detail/delete-dialog";
 import {
   Tooltip,
   TooltipContent,
@@ -71,6 +78,7 @@ export interface LightboxSlide {
   height?: number;
   imageId?: string;
   imageTitle?: string;
+  filePaths?: string[];
   /** Transient placeholder shown while the next/prev page is loading. */
   loading?: boolean;
 }
@@ -217,7 +225,100 @@ function TruncatingLink({
   );
 }
 
-function ImageEntityFooter({ imageId }: { imageId: string }) {
+interface DeleteTarget {
+  imageId: string;
+  title?: string;
+  filePaths: string[];
+}
+
+function isRealSlide(slide: LightboxSlide | undefined): boolean {
+  return !!slide && !slide.loading;
+}
+
+function LightboxCounter({
+  pageStartIndex,
+  totalCount,
+}: {
+  pageStartIndex: number;
+  totalCount?: number;
+}) {
+  const { slides, currentIndex } = useLightboxState();
+  const typedSlides = slides as LightboxSlide[];
+  const currentSlide = typedSlides[currentIndex];
+  if (!isRealSlide(currentSlide)) return null;
+
+  const leadingSentinel = typedSlides[0]?.loading ? 1 : 0;
+  const localRealIndex = currentIndex - leadingSentinel;
+  const realCount = typedSlides.filter(isRealSlide).length;
+  const displayTotal = totalCount ?? realCount;
+  if (localRealIndex < 0 || localRealIndex >= realCount || displayTotal <= 1) {
+    return null;
+  }
+
+  return (
+    <LightboxOverlay
+      position="top"
+      className="items-start gap-0 pt-3 pb-8 pointer-events-none"
+    >
+      <span className="rounded bg-black/45 px-2 py-1 text-xs font-medium tabular-nums text-white/85 backdrop-blur-sm">
+        {pageStartIndex + localRealIndex + 1} / {displayTotal}
+      </span>
+    </LightboxOverlay>
+  );
+}
+
+function LightboxDeleteShortcut({
+  disabled,
+  onRequestDelete,
+}: {
+  disabled: boolean;
+  onRequestDelete: (target: DeleteTarget) => void;
+}) {
+  const { slides, currentIndex } = useLightboxState();
+  const lastDKeyTime = useRef(0);
+
+  useEffect(() => {
+    if (disabled) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key.toLocaleLowerCase() !== "d") return;
+      if (e.defaultPrevented) return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+
+      const now = Date.now();
+      const slide = (slides as LightboxSlide[])[currentIndex];
+      if (now - lastDKeyTime.current < 1000 && slide?.imageId) {
+        e.preventDefault();
+        onRequestDelete({
+          imageId: slide.imageId,
+          title: slide.imageTitle || slide.alt,
+          filePaths: slide.filePaths ?? [],
+        });
+      }
+      lastDKeyTime.current = now;
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [currentIndex, disabled, onRequestDelete, slides]);
+
+  return null;
+}
+
+function ImageEntityFooter({
+  imageId,
+  onRequestDelete,
+}: {
+  imageId: string;
+  onRequestDelete?: (target: DeleteTarget) => void;
+}) {
   const intl = useIntl();
 
   const { data, complete } = useFragment({
@@ -239,6 +340,7 @@ function ImageEntityFooter({ imageId }: { imageId: string }) {
   const performers = image.performers ?? [];
   const title = imageTitle(image);
   const details = image.details ?? null;
+  const filePaths = image.visual_files.map((f) => f.path);
 
   return (
     <LightboxOverlay position="bottom">
@@ -256,6 +358,26 @@ function ImageEntityFooter({ imageId }: { imageId: string }) {
             {title}
           </TruncatingLink>
           <ExternalLinkIcon className="size-3 shrink-0 opacity-60" />
+          {onRequestDelete && (
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className="pointer-events-auto h-6 w-6 shrink-0 text-red-300 hover:bg-red-500/15 hover:text-red-200"
+              title={intl.formatMessage({
+                id: "actions.delete",
+                defaultMessage: "Delete",
+              })}
+              onClick={() =>
+                onRequestDelete({
+                  imageId,
+                  title,
+                  filePaths,
+                })
+              }
+            >
+              <Trash2Icon className="size-3.5" />
+            </Button>
+          )}
         </div>
       )}
 
@@ -570,6 +692,14 @@ export interface LightboxProps {
   /** Current slide index. Changing this prop navigates the lightbox to that slide. */
   index?: number;
   onView?: (index: number) => void;
+  /** Zero-based index of the first real slide within the full result set. */
+  pageStartIndex?: number;
+  /** Total real slides across the full result set. Falls back to local slides. */
+  totalCount?: number;
+  /** Optional delete action for the current image. Enables delete UI + shortcut. */
+  onDeleteImage?: (imageId: string, opts: DeleteOptions) => Promise<void>;
+  /** Start the slideshow immediately when the lightbox opens. */
+  slideshowAutoplay?: boolean;
   /**
    * When true, the carousel is finite (no wrap-around). Use when boundary sentinel
    * slides are present so the user can swipe to them but not loop around.
@@ -583,8 +713,13 @@ export function Lightbox({
   slides,
   index = 0,
   onView,
+  pageStartIndex = 0,
+  totalCount,
+  onDeleteImage,
+  slideshowAutoplay = false,
   finite = false,
 }: LightboxProps) {
+  const intl = useIntl();
   const [settings, setSettings] = useState<LightboxSettings>(loadSettings);
   const slideshowPlayingRef = useRef(false);
   const resumeSlideshowRef = useRef(false);
@@ -597,6 +732,7 @@ export function Lightbox({
   // visibility class is consumed by `globals.css` under `(hover: none)`,
   // so hover-capable devices ignore it and always show the overlays.
   const [chromeRevealed, setChromeRevealed] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   // Defer the reveal so a second tap (YARL's double-tap-to-zoom) can
   // cancel it. Without this, a double-tap that lands in the overlay
   // area would reveal the chrome on tap 1, the overlay's children
@@ -649,6 +785,14 @@ export function Lightbox({
     },
     [],
   );
+
+  useEffect(() => {
+    if (!open || !slideshowAutoplay) return;
+    const timer = window.setTimeout(() => {
+      slideshowRef.current?.play?.();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [open, slideshowAutoplay]);
 
   // Resume slideshow after a page load replaces the sentinel slides.
   const prevSlidesRef = useRef(slides);
@@ -775,117 +919,174 @@ export function Lightbox({
     [settings.displayMode],
   );
 
-  const renderSlideFooter = useCallback(({ slide }: RenderSlideFooterProps) => {
-    const s = slide as LightboxSlide;
-    if (!s.imageId) return null;
-    return <ImageEntityFooter imageId={s.imageId} />;
-  }, []);
+  const renderSlideHeader = useCallback(
+    (_props: RenderSlideHeaderProps) => (
+      <LightboxCounter
+        pageStartIndex={pageStartIndex}
+        totalCount={totalCount}
+      />
+    ),
+    [pageStartIndex, totalCount],
+  );
+
+  const renderSlideFooter = useCallback(
+    ({ slide }: RenderSlideFooterProps) => {
+      const s = slide as LightboxSlide;
+      if (!s.imageId) return null;
+      return (
+        <ImageEntityFooter
+          imageId={s.imageId}
+          onRequestDelete={onDeleteImage ? setDeleteTarget : undefined}
+        />
+      );
+    },
+    [onDeleteImage],
+  );
+
+  const renderControls = useCallback(
+    () =>
+      onDeleteImage ? (
+        <LightboxDeleteShortcut
+          disabled={!!deleteTarget}
+          onRequestDelete={setDeleteTarget}
+        />
+      ) : null,
+    [deleteTarget, onDeleteImage],
+  );
 
   return (
-    <YARLightbox
-      open={open}
-      close={onClose}
-      slides={decoratedSlides as never}
-      index={index}
-      plugins={plugins}
-      carousel={finite ? { finite: true } : undefined}
-      controller={{
-        disableSwipeNavigation: isSingleSlideMode,
-        // YARL otherwise calls preventDefault() on horizontal wheel events
-        // (via a non-passive native listener) so its swipe controller can
-        // claim them. In "original" display mode that blocks the browser
-        // from scrolling the OriginalSlide container horizontally; we want
-        // pan-first / swipe-at-edge instead, gated by our React onWheel
-        // handler that stopPropagation's while there's still room to pan.
-        preventDefaultWheelX: settings.displayMode !== "original",
-      }}
-      animation={{ zoom: 250 }}
-      className={cn(
-        "image-lightbox lightbox-mobile-toolbar-bottom",
-        chromeRevealed ? "chrome-revealed" : "chrome-hidden",
-      )}
-      zoom={{
-        ...LIGHTBOX_ZOOM_TUNING,
-        scrollToZoom: settings.scrollToZoom,
-        ref: zoomRef,
-      }}
-      slideshow={{
-        autoplay: false,
-        delay: settings.slideshowDelay * 1000,
-        ref: slideshowRef,
-      }}
-      thumbnails={{
-        position: "bottom",
-        width: 48,
-        height: 36,
-        gap: 4,
-        padding: 2,
-        border: 1,
-      }}
-      toolbar={{
-        buttons: [
-          ...(isSingleSlideMode
-            ? []
-            : [
-                <SettingsButton
-                  key="settings"
-                  settings={settings}
-                  onSettingsChange={setSettings}
-                />,
-                "slideshow" as const,
-              ]),
-          ...(settings.displayMode === "fitXY"
-            ? [
-                "zoom" as const,
-                <OriginalSizeButton
-                  key="original-size"
-                  zoomRef={zoomRef}
-                  atOriginal={atOriginalSize}
-                />,
-              ]
-            : []),
-          <LightboxRotateButton
-            key="rotate-ccw"
-            direction={GQL.ImageRotateDirection.Ccw}
-            onRotate={handleRotate}
-          />,
-          <LightboxRotateButton
-            key="rotate-cw"
-            direction={GQL.ImageRotateDirection.Cw}
-            onRotate={handleRotate}
-          />,
-          "fullscreen",
-          "close",
-        ],
-      }}
-      on={{
-        click: handleSlideClick,
-        view: ({ index: newIndex }) => {
-          const s = (slides as LightboxSlide[])[newIndex];
-          if (s?.loading && slideshowPlayingRef.current) {
-            resumeSlideshowRef.current = true;
+    <>
+      <YARLightbox
+        open={open}
+        close={onClose}
+        slides={decoratedSlides as never}
+        index={index}
+        plugins={plugins}
+        carousel={finite ? { finite: true } : undefined}
+        controller={{
+          disableSwipeNavigation: isSingleSlideMode,
+          // YARL otherwise calls preventDefault() on horizontal wheel events
+          // (via a non-passive native listener) so its swipe controller can
+          // claim them. In "original" display mode that blocks the browser
+          // from scrolling the OriginalSlide container horizontally; we want
+          // pan-first / swipe-at-edge instead, gated by our React onWheel
+          // handler that stopPropagation's while there's still room to pan.
+          preventDefaultWheelX: settings.displayMode !== "original",
+        }}
+        animation={{ zoom: 250 }}
+        className={cn(
+          "image-lightbox lightbox-mobile-toolbar-bottom",
+          chromeRevealed ? "chrome-revealed" : "chrome-hidden",
+        )}
+        zoom={{
+          ...LIGHTBOX_ZOOM_TUNING,
+          scrollToZoom: settings.scrollToZoom,
+          ref: zoomRef,
+        }}
+        slideshow={{
+          autoplay: false,
+          delay: settings.slideshowDelay * 1000,
+          ref: slideshowRef,
+        }}
+        thumbnails={{
+          position: "bottom",
+          width: 48,
+          height: 36,
+          gap: 4,
+          padding: 2,
+          border: 1,
+        }}
+        toolbar={{
+          buttons: [
+            ...(isSingleSlideMode
+              ? []
+              : [
+                  <SettingsButton
+                    key="settings"
+                    settings={settings}
+                    onSettingsChange={setSettings}
+                  />,
+                  "slideshow" as const,
+                ]),
+            ...(settings.displayMode === "fitXY"
+              ? [
+                  "zoom" as const,
+                  <OriginalSizeButton
+                    key="original-size"
+                    zoomRef={zoomRef}
+                    atOriginal={atOriginalSize}
+                  />,
+                ]
+              : []),
+            <LightboxRotateButton
+              key="rotate-ccw"
+              direction={GQL.ImageRotateDirection.Ccw}
+              onRotate={handleRotate}
+            />,
+            <LightboxRotateButton
+              key="rotate-cw"
+              direction={GQL.ImageRotateDirection.Cw}
+              onRotate={handleRotate}
+            />,
+            "fullscreen",
+            "close",
+          ],
+        }}
+        on={{
+          click: handleSlideClick,
+          view: ({ index: newIndex }) => {
+            const s = (slides as LightboxSlide[])[newIndex];
+            if (s?.loading && slideshowPlayingRef.current) {
+              resumeSlideshowRef.current = true;
+            }
+            zoomTrackerCallbacks.view();
+            onView?.(newIndex);
+          },
+          zoom: zoomTrackerCallbacks.zoom,
+          slideshowStart: () => {
+            slideshowPlayingRef.current = true;
+          },
+          slideshowStop: () => {
+            slideshowPlayingRef.current = false;
+          },
+        }}
+        render={{
+          ...lightboxIconRenders,
+          iconLoading: () => <Spinner className="size-10 text-white/70" />,
+          slide: renderSlide,
+          slideHeader: renderSlideHeader,
+          slideFooter: renderSlideFooter,
+          controls: renderControls,
+          ...(isSingleSlideMode && {
+            buttonPrev: () => null,
+            buttonNext: () => null,
+          }),
+        }}
+      />
+      {onDeleteImage && deleteTarget && (
+        <DeleteDialog
+          open
+          onOpenChange={(o) => {
+            if (!o) setDeleteTarget(null);
+          }}
+          entityName={deleteTarget.title}
+          showFileOptions
+          details={
+            deleteTarget.filePaths.length > 0 ? (
+              <DeleteFilesList paths={deleteTarget.filePaths} />
+            ) : undefined
           }
-          zoomTrackerCallbacks.view();
-          onView?.(newIndex);
-        },
-        zoom: zoomTrackerCallbacks.zoom,
-        slideshowStart: () => {
-          slideshowPlayingRef.current = true;
-        },
-        slideshowStop: () => {
-          slideshowPlayingRef.current = false;
-        },
-      }}
-      render={{
-        ...lightboxIconRenders,
-        iconLoading: () => <Spinner className="size-10 text-white/70" />,
-        slide: renderSlide,
-        slideFooter: renderSlideFooter,
-        ...(isSingleSlideMode && {
-          buttonPrev: () => null,
-          buttonNext: () => null,
-        }),
-      }}
-    />
+          detailsLabel={intl.formatMessage(
+            {
+              id: "dialogs.delete_show_files_count",
+              defaultMessage:
+                "Show {count, plural, one {# file} other {# files}}",
+            },
+            { count: deleteTarget.filePaths.length },
+          )}
+          onConfirm={(opts) => onDeleteImage(deleteTarget.imageId, opts)}
+        />
+      )}
+    </>
   );
 }

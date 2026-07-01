@@ -50,7 +50,7 @@ function makeStudioFilter(
   criterion.value = {
     items: [{ id: studioId, label: studioName }],
     excluded: [],
-    depth: 0,
+    depth: config?.ui.showChildStudioContent ? -1 : 0,
   };
 
   const conditionNode = createASTConditionFromCriterion(mode, criterion);
@@ -151,7 +151,8 @@ export function StudioGalleriesTab({ studio }: { studio: StudioData }) {
       makeStudioFilter(FilterMode.Galleries, studioId, studioName, gqlConfig),
     [studioId, studioName, gqlConfig],
   );
-  const config = useGalleryListConfig(setEditingId);
+  const { config, lightboxElement, lightboxOpen } =
+    useGalleryListConfig(setEditingId);
   return (
     <>
       <EntityListPage
@@ -160,8 +161,10 @@ export function StudioGalleriesTab({ studio }: { studio: StudioData }) {
         defaultFilter={defaultFilter}
         view={View.StudioGalleries}
         mobileChromeFixed
+        keyboardShortcutsDisabled={lightboxOpen}
       />
       <GalleryEditSheet id={editingId} onClose={() => setEditingId(null)} />
+      {lightboxElement}
     </>
   );
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 export interface UseTabStateTab {
   id: string;
@@ -45,15 +45,28 @@ export function useTabState<T extends UseTabStateTab>({
   enableShortcuts = false,
 }: UseTabStateOptions<T>): UseTabStateResult {
   const [internalTab, setInternalTab] = useState(tabs[0]?.id ?? "");
-  const activeTab = controlledTab ?? internalTab;
+  const tabIds = useMemo(() => new Set(tabs.map((tab) => tab.id)), [tabs]);
+  const defaultTab = tabs[0]?.id ?? "";
+  const requestedTab = controlledTab ?? internalTab;
+  const activeTab =
+    requestedTab && requestedTab !== "default" && tabIds.has(requestedTab)
+      ? requestedTab
+      : defaultTab;
 
   const selectTab = useCallback(
     (id: string) => {
+      if (!tabIds.has(id)) return;
       setInternalTab(id);
       onTabChange?.(id);
     },
-    [onTabChange],
+    [onTabChange, tabIds],
   );
+
+  useEffect(() => {
+    if (controlledTab === undefined || controlledTab === activeTab) return;
+    if (!activeTab) return;
+    onTabChange?.(activeTab);
+  }, [activeTab, controlledTab, onTabChange]);
 
   // Lazy keepMounted: once a tab is activated it stays mounted. Initialised
   // to include the starting tab so its panel renders on first paint.

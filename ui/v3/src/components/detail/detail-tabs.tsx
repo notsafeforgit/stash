@@ -25,7 +25,15 @@ export interface DetailTabsProps {
  * `MediaDetailLayout` instead — it owns the entire split-pane shell.
  */
 export function DetailTabs({ tabs, activeTab, onTabChange }: DetailTabsProps) {
-  const { isMounted } = useTabState({ tabs, activeTab, onTabChange });
+  const {
+    activeTab: resolvedActiveTab,
+    selectTab,
+    isMounted,
+  } = useTabState({
+    tabs,
+    activeTab,
+    onTabChange,
+  });
 
   // Tab swap intentionally does NOT scroll the page on mobile — the
   // user's complaint was that any forced scroll moves the tab bar away
@@ -60,8 +68,8 @@ export function DetailTabs({ tabs, activeTab, onTabChange }: DetailTabsProps) {
     // 40 px of empty scroll past the cards that the looser bound left
     // behind.
     <Tabs
-      value={activeTab}
-      onValueChange={onTabChange}
+      value={resolvedActiveTab}
+      onValueChange={selectTab}
       className="md:flex-1 md:min-h-0 max-md:min-h-[calc(100dvh-2.5rem)]"
     >
       <DetailTabStrip tabs={tabs} sticky />

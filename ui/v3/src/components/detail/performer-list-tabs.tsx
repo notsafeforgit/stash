@@ -208,7 +208,8 @@ export function PerformerGalleriesTab({
       ),
     [performerId, performerName, gqlConfig],
   );
-  const config = useGalleryListConfig(setEditingId);
+  const { config, lightboxElement, lightboxOpen } =
+    useGalleryListConfig(setEditingId);
   return (
     <>
       <EntityListPage
@@ -217,8 +218,10 @@ export function PerformerGalleriesTab({
         defaultFilter={defaultFilter}
         view={View.PerformerGalleries}
         mobileChromeFixed
+        keyboardShortcutsDisabled={lightboxOpen}
       />
       <GalleryEditSheet id={editingId} onClose={() => setEditingId(null)} />
+      {lightboxElement}
     </>
   );
 }

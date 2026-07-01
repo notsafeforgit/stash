@@ -944,6 +944,10 @@
         "heading": "Play video on hover",
         "description": "Swap card previews to the video when you hover them. No effect when the default is already Video."
       },
+      "autostart_gallery_slideshow": {
+        "heading": "Auto-start gallery slideshow",
+        "description": "Start slideshow playback when opening a gallery preview from the galleries list."
+      },
       "scene_list": {
         "heading": "Grid View",
         "options": {
@@ -1608,6 +1612,7 @@
   "no_results_found": "No results found",
   "none": "None",
   "o_count": "O Count",
+  "o_count_all": "O Count (All)",
   "o_count_sfw": "Likes",
   "o_counter": "O-Counter",
   "o_history": "O History",
@@ -1794,6 +1799,7 @@
   "performer_age": "Performer Age",
   "performer_alias_auto_tag_aria": "Use this alias for auto-tagging",
   "performer_count": "Performer Count",
+  "performer_count_all": "Performer Count (All)",
   "performer_favorite": "Performer Favourited",
   "performer_image": "Performer Image",
   "performer_image_will_be_removed": "Image will be removed on save.",
@@ -2141,6 +2147,8 @@
   "sub_tag_count": "Sub-Tag Count",
   "sub_tag_of": "Sub-tag of {parent}",
   "sub_tags": "Sub-Tags",
+  "scene_marker_count": "Scene Marker Count",
+  "scene_markers_count": "Scene Marker Count",
   "subsidiary_studio_count": "Subsidiary Studio Count",
   "subsidiary_studios": "Subsidiary Studios",
   "synopsis": "Synopsis",

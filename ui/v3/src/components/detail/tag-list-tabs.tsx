@@ -174,7 +174,8 @@ export function TagGalleriesTab({ tag }: { tag: TagData }) {
     () => makeTagFilter(FilterMode.Galleries, tagId, tagName, gqlConfig),
     [tagId, tagName, gqlConfig],
   );
-  const config = useGalleryListConfig(setEditingId);
+  const { config, lightboxElement, lightboxOpen } =
+    useGalleryListConfig(setEditingId);
   return (
     <>
       <EntityListPage
@@ -183,8 +184,10 @@ export function TagGalleriesTab({ tag }: { tag: TagData }) {
         defaultFilter={defaultFilter}
         view={View.TagGalleries}
         mobileChromeFixed
+        keyboardShortcutsDisabled={lightboxOpen}
       />
       <GalleryEditSheet id={editingId} onClose={() => setEditingId(null)} />
+      {lightboxElement}
     </>
   );
 }

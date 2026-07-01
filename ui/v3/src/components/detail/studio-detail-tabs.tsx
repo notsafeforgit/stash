@@ -8,6 +8,7 @@ import type * as GQL from "src/core/generated-graphql";
 import { Badge } from "src/components/ui/badge";
 import { MetaRow } from "src/components/detail/meta-row";
 import { CustomFieldsRows } from "src/components/detail/custom-fields-rows";
+import { CreatedUpdatedMetaRows } from "src/components/detail/timestamp-meta-rows";
 
 type StudioData = NonNullable<GQL.FindStudioQuery["findStudio"]>;
 
@@ -132,6 +133,22 @@ export function StudioDetailsTab({ studio }: { studio: StudioData }) {
         </MetaRow>
       )}
 
+      {studio.o_counter > 0 && (
+        <MetaRow
+          label={intl.formatMessage({
+            id: "o_count",
+            defaultMessage: "O Count",
+          })}
+        >
+          {studio.o_counter}
+          {studio.o_counter_all > studio.o_counter && (
+            <span className="text-muted-foreground ml-1">
+              ({studio.o_counter_all} total)
+            </span>
+          )}
+        </MetaRow>
+      )}
+
       <MetaRow
         label={intl.formatMessage({ id: "scenes", defaultMessage: "Scenes" })}
       >
@@ -142,6 +159,17 @@ export function StudioDetailsTab({ studio }: { studio: StudioData }) {
           </span>
         )}
       </MetaRow>
+
+      {studio.scene_marker_count > 0 && (
+        <MetaRow
+          label={intl.formatMessage({
+            id: "scene_marker_count",
+            defaultMessage: "Scene Marker Count",
+          })}
+        >
+          {studio.scene_marker_count}
+        </MetaRow>
+      )}
 
       {studio.image_count > 0 && (
         <MetaRow
@@ -200,6 +228,10 @@ export function StudioDetailsTab({ studio }: { studio: StudioData }) {
           )}
         </MetaRow>
       )}
+      <CreatedUpdatedMetaRows
+        createdAt={studio.created_at}
+        updatedAt={studio.updated_at}
+      />
       <CustomFieldsRows values={studio.custom_fields} />
     </dl>
   );

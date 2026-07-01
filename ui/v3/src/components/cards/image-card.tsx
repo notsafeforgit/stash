@@ -155,6 +155,7 @@ export const ImageCard: React.FC<ImageCardProps> = ({
               alt: imageTitle(image),
               imageId: image.id,
               imageTitle: imageTitle(image),
+              filePaths: image.visual_files.map((f) => f.path),
             },
           ]}
         />

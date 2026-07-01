@@ -6,6 +6,8 @@ fragment TagData on Tag {
   aliases
   ignore_auto_tag
   favorite
+  created_at
+  updated_at
   stash_ids {
     endpoint
     stash_id

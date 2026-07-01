@@ -13,6 +13,10 @@ import { CustomFieldsRows } from "src/components/detail/custom-fields-rows";
 import { FingerprintMetaRows } from "src/components/detail/fingerprint-meta-rows";
 import { FilterUrlLink } from "src/components/shared/filter-url-link";
 import NavUtils from "src/utils/navigation";
+import {
+  CreatedUpdatedMetaRows,
+  FileModTimeMetaRow,
+} from "src/components/detail/timestamp-meta-rows";
 
 type ImageData = NonNullable<GQL.FindImageQuery["findImage"]>;
 
@@ -195,6 +199,10 @@ export function ImageDetailsTab({ image }: { image: ImageData }) {
           </div>
         </MetaRow>
       )}
+      <CreatedUpdatedMetaRows
+        createdAt={image.created_at}
+        updatedAt={image.updated_at}
+      />
       <CustomFieldsRows values={image.custom_fields} />
     </dl>
   );
@@ -230,6 +238,7 @@ export function ImageFileInfoTab({ image }: { image: ImageData }) {
           >
             {formatBytes(f.size)}
           </MetaRow>
+          <FileModTimeMetaRow modTime={f.mod_time} />
           <FingerprintMetaRows fingerprints={f.fingerprints} mode="images" />
         </React.Fragment>
       ))}

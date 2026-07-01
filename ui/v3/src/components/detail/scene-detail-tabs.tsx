@@ -53,6 +53,10 @@ import { FingerprintMetaRows } from "src/components/detail/fingerprint-meta-rows
 import { FilterUrlLink } from "src/components/shared/filter-url-link";
 import NavUtils from "src/utils/navigation";
 import { CustomFieldsRows } from "src/components/detail/custom-fields-rows";
+import {
+  CreatedUpdatedMetaRows,
+  FileModTimeMetaRow,
+} from "src/components/detail/timestamp-meta-rows";
 
 // ── Shared helpers ─────────────────────────────────────────────────────────────
 
@@ -240,6 +244,10 @@ export function SceneDetailsTab({ scene }: { scene: SceneData }) {
           ✓
         </MetaRow>
       )}
+      <CreatedUpdatedMetaRows
+        createdAt={scene.created_at}
+        updatedAt={scene.updated_at}
+      />
       <CustomFieldsRows values={scene.custom_fields} />
     </dl>
   );
@@ -329,6 +337,7 @@ export function SceneFileInfoTab({ scene }: { scene: SceneData }) {
               >
                 {formatBytes(file.size)}
               </MetaRow>
+              <FileModTimeMetaRow modTime={file.mod_time} />
               <MetaRow
                 label={intl.formatMessage({
                   id: "duration",

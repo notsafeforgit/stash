@@ -19,6 +19,7 @@ import {
   SettingSwitch,
   SettingText,
 } from "src/components/settings/setting-row";
+import { stripQuotes } from "src/utils/text";
 
 interface StashConfig {
   path: string;
@@ -128,7 +129,7 @@ function StashesEditor({
         onConfirm={(paths) => {
           setAddOpen(false);
           const existing = new Set(stashes.map((s) => s.path));
-          const added = paths
+          const added = Array.from(new Set(paths.map(stripQuotes)))
             .filter((p) => !existing.has(p))
             .map((path) => ({
               path,

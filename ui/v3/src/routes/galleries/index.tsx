@@ -15,7 +15,11 @@ function GalleriesPage() {
   );
   const tableColumns = useGalleryTableColumns();
   const [editingId, setEditingId] = useState<string | null>(null);
-  const galleryBase = useGalleryListConfig(setEditingId);
+  const {
+    config: galleryBase,
+    lightboxElement,
+    lightboxOpen,
+  } = useGalleryListConfig(setEditingId);
 
   const config = useMemo(
     () => ({
@@ -32,8 +36,12 @@ function GalleriesPage() {
 
   return (
     <>
-      <EntityListPage config={config} />
+      <EntityListPage
+        config={config}
+        keyboardShortcutsDisabled={lightboxOpen}
+      />
       <GalleryEditSheet id={editingId} onClose={() => setEditingId(null)} />
+      {lightboxElement}
     </>
   );
 }

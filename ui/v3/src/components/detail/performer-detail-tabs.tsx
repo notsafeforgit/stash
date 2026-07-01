@@ -12,6 +12,7 @@ import { Badge } from "src/components/ui/badge";
 import { MetaRow } from "src/components/detail/meta-row";
 import { CustomFieldsRows } from "src/components/detail/custom-fields-rows";
 import { CountryDisplay } from "src/components/forms/country-select";
+import { CreatedUpdatedMetaRows } from "src/components/detail/timestamp-meta-rows";
 
 // ── Shared helpers ─────────────────────────────────────────────────────────────
 
@@ -359,6 +360,10 @@ export function PerformerDetailsTab({
           {performer.group_count}
         </MetaRow>
       )}
+      <CreatedUpdatedMetaRows
+        createdAt={performer.created_at}
+        updatedAt={performer.updated_at}
+      />
       <CustomFieldsRows values={performer.custom_fields} />
     </dl>
   );

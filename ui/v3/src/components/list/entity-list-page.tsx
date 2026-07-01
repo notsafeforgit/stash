@@ -114,6 +114,8 @@ function DefaultListEmptyState({ active }: { active: boolean }) {
 export interface PageNavHandle {
   currentPage: number;
   totalPages: number;
+  itemsPerPage: number;
+  totalCount: number;
   nextPage: () => void;
   prevPage: () => void;
 }
@@ -1176,6 +1178,8 @@ export function EntityListPage<TData, TItem extends IHasID>({
     pageNavRef.current = {
       currentPage: filter.currentPage,
       totalPages,
+      itemsPerPage: filter.itemsPerPage,
+      totalCount: count,
       nextPage: () => {
         if (filter.currentPage < totalPages)
           setFilter(filter.changePage(filter.currentPage + 1));

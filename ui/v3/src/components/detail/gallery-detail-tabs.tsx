@@ -10,6 +10,10 @@ import { MetaRow } from "src/components/detail/meta-row";
 import { CustomFieldsRows } from "src/components/detail/custom-fields-rows";
 import { FilterUrlLink } from "src/components/shared/filter-url-link";
 import NavUtils from "src/utils/navigation";
+import {
+  CreatedUpdatedMetaRows,
+  FileModTimeMetaRows,
+} from "src/components/detail/timestamp-meta-rows";
 
 type GalleryData = NonNullable<GQL.FindGalleryQuery["findGallery"]>;
 
@@ -166,6 +170,11 @@ export function GalleryDetailsTab({ gallery }: { gallery: GalleryData }) {
           {gallery.scenes.length}
         </MetaRow>
       )}
+      <FileModTimeMetaRows files={gallery.files} />
+      <CreatedUpdatedMetaRows
+        createdAt={gallery.created_at}
+        updatedAt={gallery.updated_at}
+      />
       <CustomFieldsRows values={gallery.custom_fields} />
     </dl>
   );

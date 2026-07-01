@@ -24,6 +24,7 @@ fragment StudioData on Studio {
   image_count_all: image_count(depth: -1)
   gallery_count
   gallery_count_all: gallery_count(depth: -1)
+  scene_marker_count
   performer_count
   performer_count_all: performer_count(depth: -1)
   group_count
@@ -37,10 +38,13 @@ fragment StudioData on Studio {
   rating100
   favorite
   aliases
+  created_at
+  updated_at
   tags {
     ...SlimTagData
   }
   o_counter
+  o_counter_all: o_counter(depth: -1)
   custom_fields
 }
 

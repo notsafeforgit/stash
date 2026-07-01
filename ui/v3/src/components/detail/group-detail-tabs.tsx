@@ -10,6 +10,7 @@ import { MetaRow } from "src/components/detail/meta-row";
 import { CustomFieldsRows } from "src/components/detail/custom-fields-rows";
 import { FilterUrlLink } from "src/components/shared/filter-url-link";
 import NavUtils from "src/utils/navigation";
+import { CreatedUpdatedMetaRows } from "src/components/detail/timestamp-meta-rows";
 
 type GroupData = NonNullable<GQL.FindGroupQuery["findGroup"]>;
 
@@ -217,6 +218,10 @@ export function GroupDetailsTab({ group }: { group: GroupData }) {
           )}
         </MetaRow>
       )}
+      <CreatedUpdatedMetaRows
+        createdAt={group.created_at}
+        updatedAt={group.updated_at}
+      />
       <CustomFieldsRows values={group.custom_fields} />
     </dl>
   );

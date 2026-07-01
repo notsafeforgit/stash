@@ -13,6 +13,7 @@
 import type React from "react";
 import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { useIntl } from "react-intl";
+import { useLazyQuery } from "@apollo/client/react";
 import * as GQL from "src/core/generated-graphql";
 import { imageTitle } from "src/core/files";
 import type { EntityListPageConfig, PageNavHandle } from "src/components/list";
@@ -36,6 +37,9 @@ import {
   type LightboxSlide,
   useSceneLightbox,
 } from "src/components/lightbox";
+import type { DeleteOptions } from "src/components/detail/delete-dialog";
+import { removeEntitiesFromCache, useEntityMutation } from "src/core/client";
+import { useConfigurationContextOptional } from "src/hooks/config";
 import {
   selectionColumn,
   thumbnailColumn,
@@ -63,7 +67,13 @@ export function imageToSlide(image: ImageItem): LightboxSlide {
   const src =
     image.paths.image ?? image.paths.preview ?? image.paths.thumbnail ?? "";
   const title = imageTitle(image);
-  return { src, alt: title, imageId: image.id, imageTitle: title };
+  return {
+    src,
+    alt: title,
+    imageId: image.id,
+    imageTitle: title,
+    filePaths: image.visual_files.map((f) => f.path),
+  };
 }
 
 // ── useImageLightbox ───────────────────────────────────────────────────────────
@@ -94,8 +104,13 @@ export function useImageLightbox() {
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [hasPrevPage, setHasPrevPage] = useState(false);
   const [hasNextPage, setHasNextPage] = useState(false);
+  const [lightboxPageStartIndex, setLightboxPageStartIndex] = useState(0);
+  const [lightboxTotalCount, setLightboxTotalCount] = useState<
+    number | undefined
+  >(undefined);
   const pageNavRef = useRef<PageNavHandle | null>(null);
   const pendingPageDirectionRef = useRef<"forward" | "backward" | null>(null);
+  const [destroyImage] = useEntityMutation(GQL.ImageDestroyDocument);
 
   // Refs so onLightboxView doesn't need to be recreated on every state change.
   const lightboxSlidesRef = useRef(lightboxSlides);
@@ -116,6 +131,10 @@ export function useImageLightbox() {
       const nav = pageNavRef.current;
       const prevPage = nav ? nav.currentPage > 1 : false;
       const nextPage = nav ? nav.currentPage < nav.totalPages : false;
+      setLightboxPageStartIndex(
+        nav ? (nav.currentPage - 1) * nav.itemsPerPage : 0,
+      );
+      setLightboxTotalCount(nav?.totalCount ?? allItems.length);
       setHasPrevPage(prevPage);
       setHasNextPage(nextPage);
       const slides = buildLightboxSlides(
@@ -162,6 +181,10 @@ export function useImageLightbox() {
     const nav = pageNavRef.current;
     const prevPage = nav ? nav.currentPage > 1 : false;
     const nextPage = nav ? nav.currentPage < nav.totalPages : false;
+    setLightboxPageStartIndex(
+      nav ? (nav.currentPage - 1) * nav.itemsPerPage : 0,
+    );
+    setLightboxTotalCount(nav?.totalCount ?? items.length);
     setHasPrevPage(prevPage);
     setHasNextPage(nextPage);
     const realSlides = items.map(imageToSlide);
@@ -177,6 +200,53 @@ export function useImageLightbox() {
     );
   }, []);
 
+  const handleDeleteImage = useCallback(
+    async (imageId: string, opts: DeleteOptions) => {
+      await destroyImage({
+        variables: {
+          id: imageId,
+          delete_file: opts.deleteFile,
+          delete_generated: opts.deleteGenerated,
+        },
+        update(cache) {
+          removeEntitiesFromCache({
+            cache,
+            typename: "Image",
+            listFieldName: "findImages",
+            itemsField: "images",
+            ids: [imageId],
+          });
+        },
+      });
+
+      setLightboxTotalCount((count) =>
+        count == null ? count : Math.max(0, count - 1),
+      );
+      setLightboxSlides((prev) => {
+        const deletedIndex = prev.findIndex((s) => s.imageId === imageId);
+        const next = prev.filter((s) => s.imageId !== imageId);
+        if (next.every((s) => s.loading)) {
+          setLightboxOpen(false);
+          return next;
+        }
+        setLightboxIndex((current) => {
+          let nextIndex =
+            deletedIndex >= 0 && current > deletedIndex
+              ? Math.max(0, current - 1)
+              : Math.min(current, next.length - 1);
+          if (next[nextIndex]?.loading && nextIndex > 0) {
+            nextIndex -= 1;
+          } else if (next[nextIndex]?.loading && nextIndex < next.length - 1) {
+            nextIndex += 1;
+          }
+          return nextIndex;
+        });
+        return next;
+      });
+    },
+    [destroyImage],
+  );
+
   const lightboxElement = lightboxOpen ? (
     <Lightbox
       open
@@ -184,6 +254,9 @@ export function useImageLightbox() {
       slides={lightboxSlides}
       index={lightboxIndex}
       onView={onLightboxView}
+      pageStartIndex={lightboxPageStartIndex}
+      totalCount={lightboxTotalCount}
+      onDeleteImage={handleDeleteImage}
       finite={lightboxSlides.some((s) => s.loading)}
     />
   ) : null;
@@ -455,9 +528,220 @@ export function useImageListConfig(
 
 // ── useGalleryListConfig ───────────────────────────────────────────────────────
 
-export function useGalleryListConfig(
-  onEdit: (id: string) => void,
-): EntityListPageConfig<GQL.FindGalleriesQuery, GalleryItem> {
+function useGalleryImageLightbox() {
+  const pageSize = 40;
+  const [fetchImages] = useLazyQuery(GQL.FindImagesDocument);
+  const [destroyImage] = useEntityMutation(GQL.ImageDestroyDocument);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxSlides, setLightboxSlides] = useState<LightboxSlide[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [lightboxPageStartIndex, setLightboxPageStartIndex] = useState(0);
+  const [lightboxTotalCount, setLightboxTotalCount] = useState<
+    number | undefined
+  >(undefined);
+  const [slideshowAutoplay, setSlideshowAutoplay] = useState(false);
+  const [hasPrevPage, setHasPrevPage] = useState(false);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const activeRef = useRef<{
+    galleryId: string;
+    page: number;
+    pages: number;
+    slideshowAutoplay: boolean;
+  } | null>(null);
+  const pendingPageDirectionRef = useRef<"forward" | "backward" | null>(null);
+
+  const loadPage = useCallback(
+    async (
+      galleryId: string,
+      page: number,
+      landing: { type: "index"; index: number } | { type: "first" | "last" },
+      autoplay: boolean,
+    ) => {
+      const result = await fetchImages({
+        variables: {
+          filter: { page, per_page: pageSize, sort: "path" },
+          image_filter: {
+            galleries: {
+              modifier: GQL.CriterionModifier.Includes,
+              value: [galleryId],
+            },
+          },
+        },
+      });
+      const images = result.data?.findImages.images ?? [];
+      const totalCount = result.data?.findImages.count ?? images.length;
+      const pages = Math.max(1, Math.ceil(totalCount / pageSize));
+      const prevPage = page > 1;
+      const nextPage = page < pages;
+      const slides = buildLightboxSlides(
+        images.map(imageToSlide),
+        prevPage,
+        nextPage,
+      );
+
+      let targetIndex = prevPage ? 1 : 0;
+      if (landing.type === "index") {
+        targetIndex = landing.index + (prevPage ? 1 : 0);
+      } else if (landing.type === "last") {
+        targetIndex = slides.length - 1 - (nextPage ? 1 : 0);
+      }
+
+      activeRef.current = {
+        galleryId,
+        page,
+        pages,
+        slideshowAutoplay: autoplay,
+      };
+      pendingPageDirectionRef.current = null;
+      setHasPrevPage(prevPage);
+      setHasNextPage(nextPage);
+      setLightboxPageStartIndex((page - 1) * pageSize);
+      setLightboxTotalCount(totalCount);
+      setSlideshowAutoplay(autoplay);
+      setLightboxSlides(slides);
+      setLightboxIndex(targetIndex);
+      setLightboxOpen(true);
+    },
+    [fetchImages],
+  );
+
+  const openGalleryLightbox = useCallback(
+    (gallery: GalleryItem, index = 0, autoplay = false) => {
+      const page = Math.floor(index / pageSize) + 1;
+      const pageIndex = index % pageSize;
+      const totalCount = gallery.image_count || undefined;
+      activeRef.current = {
+        galleryId: gallery.id,
+        page,
+        pages: totalCount ? Math.max(1, Math.ceil(totalCount / pageSize)) : 1,
+        slideshowAutoplay: autoplay,
+      };
+      setLightboxSlides([LOADING_SLIDE]);
+      setLightboxIndex(0);
+      setLightboxPageStartIndex((page - 1) * pageSize);
+      setLightboxTotalCount(totalCount);
+      setSlideshowAutoplay(autoplay);
+      setLightboxOpen(true);
+      void loadPage(
+        gallery.id,
+        page,
+        { type: "index", index: pageIndex },
+        autoplay,
+      );
+    },
+    [loadPage],
+  );
+
+  const onLightboxView = useCallback(
+    (index: number) => {
+      const active = activeRef.current;
+      if (!active || pendingPageDirectionRef.current) return;
+
+      const atEndSentinel =
+        hasNextPage &&
+        index === lightboxSlides.length - 1 &&
+        lightboxSlides[index]?.loading;
+      const atStartSentinel =
+        hasPrevPage && index === 0 && lightboxSlides[0]?.loading;
+
+      if (atEndSentinel) {
+        pendingPageDirectionRef.current = "forward";
+        setHasNextPage(false);
+        void loadPage(
+          active.galleryId,
+          active.page + 1,
+          { type: "first" },
+          active.slideshowAutoplay,
+        );
+      } else if (atStartSentinel) {
+        pendingPageDirectionRef.current = "backward";
+        setHasPrevPage(false);
+        void loadPage(
+          active.galleryId,
+          active.page - 1,
+          { type: "last" },
+          active.slideshowAutoplay,
+        );
+      }
+    },
+    [hasNextPage, hasPrevPage, lightboxSlides, loadPage],
+  );
+
+  const handleDeleteImage = useCallback(
+    async (imageId: string, opts: DeleteOptions) => {
+      await destroyImage({
+        variables: {
+          id: imageId,
+          delete_file: opts.deleteFile,
+          delete_generated: opts.deleteGenerated,
+        },
+        update(cache) {
+          removeEntitiesFromCache({
+            cache,
+            typename: "Image",
+            listFieldName: "findImages",
+            itemsField: "images",
+            ids: [imageId],
+          });
+        },
+      });
+      setLightboxTotalCount((count) =>
+        count == null ? count : Math.max(0, count - 1),
+      );
+      setLightboxSlides((prev) => {
+        const deletedIndex = prev.findIndex((s) => s.imageId === imageId);
+        const next = prev.filter((s) => s.imageId !== imageId);
+        if (next.every((s) => s.loading)) {
+          setLightboxOpen(false);
+          return next;
+        }
+        setLightboxIndex((current) => {
+          let nextIndex =
+            deletedIndex >= 0 && current > deletedIndex
+              ? Math.max(0, current - 1)
+              : Math.min(current, next.length - 1);
+          if (next[nextIndex]?.loading && nextIndex > 0) {
+            nextIndex -= 1;
+          } else if (next[nextIndex]?.loading && nextIndex < next.length - 1) {
+            nextIndex += 1;
+          }
+          return nextIndex;
+        });
+        return next;
+      });
+    },
+    [destroyImage],
+  );
+
+  const lightboxElement = lightboxOpen ? (
+    <Lightbox
+      open
+      onClose={() => setLightboxOpen(false)}
+      slides={lightboxSlides}
+      index={lightboxIndex}
+      onView={onLightboxView}
+      pageStartIndex={lightboxPageStartIndex}
+      totalCount={lightboxTotalCount}
+      onDeleteImage={handleDeleteImage}
+      slideshowAutoplay={slideshowAutoplay}
+      finite={lightboxSlides.some((s) => s.loading)}
+    />
+  ) : null;
+
+  return { openGalleryLightbox, lightboxElement, lightboxOpen };
+}
+
+export function useGalleryListConfig(onEdit: (id: string) => void): {
+  config: EntityListPageConfig<GQL.FindGalleriesQuery, GalleryItem>;
+  lightboxElement: React.ReactNode;
+  lightboxOpen: boolean;
+} {
+  const ctx = useConfigurationContextOptional();
+  const autostartGallerySlideshow =
+    ctx?.configuration.ui.autostartGallerySlideshow ?? false;
+  const { openGalleryLightbox, lightboxElement, lightboxOpen } =
+    useGalleryImageLightbox();
+
   const renderCard = useCallback(
     (
       gallery: GalleryItem,
@@ -472,9 +756,12 @@ export function useGalleryListConfig(
         selected={selected}
         onSelectedChanged={onSelectedChanged}
         onEdit={() => onEdit(gallery.id)}
+        onPreview={(index) =>
+          openGalleryLightbox(gallery, index, autostartGallerySlideshow)
+        }
       />
     ),
-    [onEdit],
+    [autostartGallerySlideshow, onEdit, openGalleryLightbox],
   );
 
   const renderTableRow = useCallback(
@@ -494,7 +781,9 @@ export function useGalleryListConfig(
     [onEdit],
   );
 
-  return useMemo(
+  const config = useMemo<
+    EntityListPageConfig<GQL.FindGalleriesQuery, GalleryItem>
+  >(
     () => ({
       filterMode: GQL.FilterMode.Galleries,
       query: GQL.FindGalleriesDocument,
@@ -513,6 +802,8 @@ export function useGalleryListConfig(
     }),
     [renderCard, renderTableRow],
   );
+
+  return { config, lightboxElement, lightboxOpen };
 }
 
 // ── usePerformerListConfig ─────────────────────────────────────────────────────

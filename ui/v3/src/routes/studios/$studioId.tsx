@@ -20,6 +20,7 @@ import { StudioEditForm } from "src/components/detail/studio-edit-form";
 import { StudioActionsMenu } from "src/components/detail/studio-actions-menu";
 import { DetailEditTransition } from "src/components/detail/detail-edit-transition";
 import { useDocumentTitle } from "src/hooks/title";
+import { useConfigurationContextOptional } from "src/hooks/config";
 import {
   StudioScenesTab,
   StudioImagesTab,
@@ -132,6 +133,9 @@ function StudioDetailPage() {
   const goBack = useSmartBack("/studios");
   const intl = useIntl();
   const [editOpen, setEditOpen] = useState(false);
+  const showChildStudioContent =
+    useConfigurationContextOptional()?.configuration.ui
+      .showChildStudioContent ?? false;
 
   const { data, loading, error } = useQuery(GQL.FindStudioDocument, {
     variables: { id: studioId },
@@ -142,6 +146,32 @@ function StudioDetailPage() {
 
   const studio = data?.findStudio;
   useDocumentTitle(studio?.name);
+
+  const sceneCount = studio
+    ? showChildStudioContent
+      ? studio.scene_count_all
+      : studio.scene_count
+    : 0;
+  const imageCount = studio
+    ? showChildStudioContent
+      ? studio.image_count_all
+      : studio.image_count
+    : 0;
+  const galleryCount = studio
+    ? showChildStudioContent
+      ? studio.gallery_count_all
+      : studio.gallery_count
+    : 0;
+  const performerCount = studio
+    ? showChildStudioContent
+      ? studio.performer_count_all
+      : studio.performer_count
+    : 0;
+  const groupCount = studio
+    ? showChildStudioContent
+      ? studio.group_count_all
+      : studio.group_count
+    : 0;
 
   function handleToggleFavorite() {
     if (!studio) return;
@@ -156,7 +186,7 @@ function StudioDetailPage() {
   type EntityTab = { id: string; label: string; content: React.ReactNode };
   const entityTabs: EntityTab[] = studio
     ? [
-        ...(studio.scene_count > 0
+        ...(sceneCount > 0
           ? [
               {
                 id: "scenes",
@@ -168,7 +198,7 @@ function StudioDetailPage() {
               },
             ]
           : []),
-        ...(studio.image_count > 0
+        ...(imageCount > 0
           ? [
               {
                 id: "images",
@@ -180,7 +210,7 @@ function StudioDetailPage() {
               },
             ]
           : []),
-        ...(studio.gallery_count > 0
+        ...(galleryCount > 0
           ? [
               {
                 id: "galleries",
@@ -192,7 +222,7 @@ function StudioDetailPage() {
               },
             ]
           : []),
-        ...(studio.performer_count > 0
+        ...(performerCount > 0
           ? [
               {
                 id: "performers",
@@ -204,7 +234,7 @@ function StudioDetailPage() {
               },
             ]
           : []),
-        ...(studio.group_count > 0
+        ...(groupCount > 0
           ? [
               {
                 id: "groups",

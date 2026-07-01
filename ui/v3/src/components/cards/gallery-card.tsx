@@ -2,8 +2,10 @@ import type React from "react";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useApolloClient } from "@apollo/client/react";
 import { useNavigate } from "@tanstack/react-router";
+import { Search } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
 import { EntityCard } from "./entity-card";
+import { Button } from "src/components/ui/button";
 import { useCardAspect } from "src/components/list/card-aspect-context";
 import { useCardLayout } from "src/components/list/card-layout-context";
 import { cn } from "src/lib/utils";
@@ -33,6 +35,7 @@ interface GalleryCardProps {
   selected?: boolean;
   onSelectedChanged?: (selected: boolean, shiftKey: boolean) => void;
   onEdit?: () => void;
+  onPreview?: (index: number) => void;
 }
 
 // ── Gallery wall overlay ──────────────────────────────────────────────────────
@@ -91,6 +94,7 @@ export const GalleryCard: React.FC<GalleryCardProps> = ({
   selected,
   onSelectedChanged,
   onEdit,
+  onPreview,
 }) => {
   const cardAspect = useCardAspect();
   const cardLayout = useCardLayout();
@@ -166,6 +170,23 @@ export const GalleryCard: React.FC<GalleryCardProps> = ({
             {gallery.image_count}
           </span>
         )
+      )}
+      {onPreview && gallery.image_count > 0 && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="absolute bottom-1.5 right-1.5 z-20 bg-black/60 text-white/85 hover:bg-black/75 hover:text-white"
+          title="Open slideshow"
+          aria-label="Open slideshow"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onPreview(scrubIndex ?? 0);
+          }}
+        >
+          <Search className="size-4" />
+        </Button>
       )}
     </EntityCard.Preview>
   );

@@ -8,6 +8,7 @@ import type * as GQL from "src/core/generated-graphql";
 import { Badge } from "src/components/ui/badge";
 import { MetaRow } from "src/components/detail/meta-row";
 import { CustomFieldsRows } from "src/components/detail/custom-fields-rows";
+import { CreatedUpdatedMetaRows } from "src/components/detail/timestamp-meta-rows";
 
 type TagData = NonNullable<GQL.FindTagQuery["findTag"]>;
 
@@ -184,6 +185,10 @@ export function TagDetailsTab({ tag }: { tag: TagData }) {
           )}
         </MetaRow>
       )}
+      <CreatedUpdatedMetaRows
+        createdAt={tag.created_at}
+        updatedAt={tag.updated_at}
+      />
       <CustomFieldsRows values={tag.custom_fields} />
     </dl>
   );

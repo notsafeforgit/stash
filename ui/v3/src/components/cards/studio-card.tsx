@@ -5,6 +5,7 @@ import * as GQL from "src/core/generated-graphql";
 import { EntityCard } from "./entity-card";
 import { useCardAspect } from "src/components/list/card-aspect-context";
 import { useStudioContextMenu } from "./use-studio-context-menu";
+import { useConfigurationContextOptional } from "src/hooks/config";
 
 // StudioDataFragment has scene_count and child_studios; use that for list cards.
 type StudioCardStudio = Pick<
@@ -14,7 +15,12 @@ type StudioCardStudio = Pick<
   | "image_path"
   | "rating100"
   | "scene_count"
+  | "scene_count_all"
+  | "performer_count"
+  | "performer_count_all"
   | "child_studios"
+  | "o_counter"
+  | "o_counter_all"
   | "favorite"
   | "tags"
 >;
@@ -36,9 +42,23 @@ export const StudioCard: React.FC<StudioCardProps> = ({
 }) => {
   const cardAspect = useCardAspect();
   const isPortrait = cardAspect === "portrait";
+  const showChildStudioContent =
+    useConfigurationContextOptional()?.configuration.ui
+      .showChildStudioContent ?? false;
+  const sceneCount = showChildStudioContent
+    ? studio.scene_count_all
+    : studio.scene_count;
+  const performerCount = showChildStudioContent
+    ? studio.performer_count_all
+    : studio.performer_count;
+  const oCounter = showChildStudioContent
+    ? studio.o_counter_all
+    : studio.o_counter;
 
   const counts = [
-    studio.scene_count > 0 ? `${studio.scene_count} scenes` : null,
+    sceneCount > 0 ? `${sceneCount} scenes` : null,
+    performerCount > 0 ? `${performerCount} performers` : null,
+    oCounter != null && oCounter > 0 ? `${oCounter} O` : null,
     studio.child_studios.length > 0
       ? `${studio.child_studios.length} sub-studios`
       : null,

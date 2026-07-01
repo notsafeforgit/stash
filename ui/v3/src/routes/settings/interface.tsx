@@ -95,6 +95,7 @@ function SettingsInterfacePage() {
   const autostartVideo = iface.autostartVideo ?? true;
   const previewDefault = iface.previewDefault ?? PreviewDefaultType.Video;
   const playVideoOnHover = iface.playVideoOnHover ?? true;
+  const autostartGallerySlideshow = ui.autostartGallerySlideshow ?? false;
   const alwaysStartFromBeginning = ui.alwaysStartFromBeginning ?? false;
   const showRangeMarkers = ui.showRangeMarkers ?? true;
   const trackActivity = ui.trackActivity ?? true;
@@ -277,6 +278,19 @@ function SettingsInterfacePage() {
           disabled={
             savingInterface || previewDefault === PreviewDefaultType.Video
           }
+        />
+        <SettingSwitch
+          label={msg(
+            "config.ui.autostart_gallery_slideshow.heading",
+            "Auto-start gallery slideshow",
+          )}
+          description={msg(
+            "config.ui.autostart_gallery_slideshow.description",
+            "Start slideshow playback when opening a gallery preview from the galleries list.",
+          )}
+          checked={autostartGallerySlideshow}
+          onChange={(v) => saveUI("autostartGallerySlideshow", v)}
+          disabled={savingUI}
         />
       </SettingsSection>
 

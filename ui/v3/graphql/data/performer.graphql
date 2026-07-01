@@ -34,6 +34,8 @@ fragment PerformerData on Performer {
   group_count
   performer_count
   o_counter
+  created_at
+  updated_at
 
   tags {
     ...SlimTagData

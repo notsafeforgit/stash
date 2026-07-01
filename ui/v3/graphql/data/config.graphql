@@ -22,6 +22,8 @@ fragment ConfigGeneralData on ConfigGeneralResult {
   previewAudio
   previewSegments
   previewSegmentDuration
+  maxMarkerPreviewDuration
+  defaultMarkerPreviewDuration
   previewExcludeStart
   previewExcludeEnd
   previewPreset

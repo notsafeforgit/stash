@@ -452,6 +452,34 @@ function SettingsSystemPage() {
         />
         <SettingNumber
           label={msg(
+            "config.general.max_marker_preview_duration_head",
+            "Max marker preview duration",
+          )}
+          description={msg(
+            "config.general.max_marker_preview_duration_desc",
+            "Maximum duration, in seconds, for generated marker previews. 0 disables the limit.",
+          )}
+          value={general.maxMarkerPreviewDuration ?? 0}
+          onChange={(v) => save({ maxMarkerPreviewDuration: v })}
+          min={0}
+          integer
+        />
+        <SettingNumber
+          label={msg(
+            "config.general.default_marker_preview_duration_head",
+            "Default marker preview duration",
+          )}
+          description={msg(
+            "config.general.default_marker_preview_duration_desc",
+            "Duration, in seconds, for marker previews without an end time. Must be greater than 0.",
+          )}
+          value={general.defaultMarkerPreviewDuration ?? 20}
+          onChange={(v) => save({ defaultMarkerPreviewDuration: v })}
+          min={1}
+          integer
+        />
+        <SettingNumber
+          label={msg(
             "dialogs.scene_gen.preview_seg_count_head",
             "Number of segments in preview",
           )}

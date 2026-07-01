@@ -450,6 +450,8 @@
       "create_galleries_from_folders_label": "Create galleries from folders containing images",
       "database": "Database",
       "db_path_head": "Database path",
+      "default_marker_preview_duration_desc": "Duration, in seconds, for marker previews without an end time. Must be greater than 0.",
+      "default_marker_preview_duration_head": "Default marker preview duration",
       "delete_trash_path": {
         "description": "Path where deleted files will be moved to instead of being permanently deleted. Leave empty to permanently delete files.",
         "heading": "Trash path"
@@ -1298,7 +1300,9 @@
       "marker_screenshots": "Marker screenshots",
       "marker_screenshots_tooltip": "Marker static JPG images",
       "markers": "Marker previews",
-      "markers_tooltip": "20 second videos which begin at the given timecode.",
+      "markers_tooltip": "Video previews which begin at the given timecode. Markers with an end time use that interval up to the max marker preview duration; markers without one use the default marker preview duration.",
+      "max_marker_preview_duration_desc": "Maximum duration, in seconds, for generated marker previews. 0 disables the limit.",
+      "max_marker_preview_duration_head": "Max marker preview duration",
       "override_preview_generation_options": "Override preview generation options",
       "override_preview_generation_options_desc": "Override preview generation options for this operation. Defaults are set in System -> Preview Generation.",
       "overwrite": "Overwrite existing files",

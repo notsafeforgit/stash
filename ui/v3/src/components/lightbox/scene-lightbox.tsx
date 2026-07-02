@@ -202,7 +202,9 @@ export function SceneLightbox({
     };
   }, [open]);
 
-  // Window-level escape handler. YARL listens for escape via React's
+  const isSingleSlide = slides.length === 1;
+
+  // Document-level keyboard handler. YARL listens for keyboard navigation via React's
   // `onKeyDown` on its own container (`subscribeSensors(EVENT_ON_KEY_DOWN, …)`),
   // which only fires when focus is somewhere inside the lightbox tree. Some
   // interactions strand focus on `document.body` — most reproducibly,
@@ -210,38 +212,52 @@ export function SceneLightbox({
   // `Player.Provider`, unmounting the menu trigger that Base UI restored
   // focus to when the menu closed; with no element to focus, the browser
   // falls back to body. Body sits outside YARL's portal tree, so escape
-  // never reaches YARL until the user clicks back into the lightbox.
-  // A window listener bypasses the focus dependency entirely.
+  // never reaches YARL until the user clicks back into the lightbox. The
+  // embedded player can also leave focus on the media surface after a mouse
+  // click, where arrow keys no longer reliably reach YARL's container. A
+  // document listener bypasses that focus dependency entirely.
   //
   // Skip when `defaultPrevented` (a Base UI menu, dialog, or the player's
-  // own escape consumer already handled it) and when an HTML5 fullscreen
-  // is active (the browser owns that exit and intercepts the key first
-  // anyway, but checking is defensive — we don't want to close the
-  // lightbox out from under a fullscreen exit).
+  // own escape consumer already handled it) or when focus is on an editable
+  // input/menu surface that should own its keyboard interaction.
   useEffect(() => {
     if (!open) return;
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key !== "Escape") return;
       if (e.defaultPrevented) return;
-      if (document.fullscreenElement) return;
-      // Don't close the lightbox if the user is dismissing an open
-      // popup that's meant to consume Escape (menu, listbox, combobox,
-      // alertdialog — e.g. the player's quality / settings menu).
-      // `role="dialog"` is intentionally NOT in this set: YARL's own
-      // container carries `role="dialog"`, so including it would make
-      // every Escape skip. Tooltip and dropdown triggers don't carry
-      // these roles, so a tooltip on a focused performer / tag chip
-      // doesn't trip this check.
+      const isEscape = e.key === "Escape";
+      const isHorizontalArrow = e.key === "ArrowLeft" || e.key === "ArrowRight";
+      if (!isEscape && !isHorizontalArrow) return;
+
       const active = document.activeElement as HTMLElement | null;
       if (
+        active?.tagName === "INPUT" ||
+        active?.tagName === "TEXTAREA" ||
+        active?.isContentEditable ||
         active?.closest(
           '[role="menu"], [role="alertdialog"], [role="listbox"], [role="combobox"]',
         )
       ) {
         return;
       }
+
+      if (isEscape) {
+        // Let the browser exit HTML5 fullscreen without also closing the
+        // lightbox underneath it.
+        if (document.fullscreenElement) return;
+        e.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (e.altKey || e.ctrlKey || e.metaKey) return;
+      if (isSingleSlide && !finite) return;
       e.preventDefault();
-      onClose();
+      e.stopPropagation();
+      if (e.key === "ArrowLeft") {
+        controllerRef.current?.prev();
+      } else {
+        controllerRef.current?.next();
+      }
     }
     // Capture phase on `document` so we run before Base UI Tooltip's
     // useDismiss listener (also on `document`, bubble phase) — its
@@ -251,7 +267,7 @@ export function SceneLightbox({
     // because the tooltip had closed and Base UI's listener was gone).
     document.addEventListener("keydown", onKeyDown, true);
     return () => document.removeEventListener("keydown", onKeyDown, true);
-  }, [open, onClose]);
+  }, [open, onClose, isSingleSlide, finite]);
 
   const renderSlide = useCallback(
     ({ slide, offset }: RenderSlideProps) => {
@@ -269,8 +285,6 @@ export function SceneLightbox({
     },
     [handleToggleLightboxFullscreen, loopEnabled, handleLoopToggle, handleNext],
   );
-
-  const isSingleSlide = slides.length === 1;
 
   return (
     <YARLightbox

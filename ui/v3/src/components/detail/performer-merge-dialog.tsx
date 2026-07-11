@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useForm } from "@tanstack/react-form";
 import { useIntl } from "react-intl";
 import { useNavigate } from "@tanstack/react-router";
-import { useApolloClient, useQuery } from "@apollo/client/react";
-import { removeEntitiesFromCache, useEntityMutation } from "src/core/client";
+import { useApolloClient, useMutation, useQuery } from "@apollo/client/react";
+import { removeEntitiesFromCache } from "src/core/client";
 import { z } from "zod";
 import { GitMerge, User } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
@@ -89,7 +89,12 @@ export function PerformerMergeDialog({
   const toast = useToast();
   const navigate = useNavigate();
   const client = useApolloClient();
-  const [mergePerformer] = useEntityMutation(GQL.PerformerMergeDocument);
+  // A merge destroys the source performer, so the global entity-mutation
+  // policy of refetching every active query is counterproductive here: it
+  // waits on detail/list queries that still target the deleted source before
+  // this dialog can close. The merge response plus the explicit cache cleanup
+  // below is sufficient; the destination route then fetches its evicted row.
+  const [mergePerformer] = useMutation(GQL.PerformerMergeDocument);
 
   const [serverQuery, setServerQuery] = useState("");
   const debouncedSetServerQuery = useDebounce(setServerQuery, 250);

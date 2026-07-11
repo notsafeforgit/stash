@@ -297,3 +297,21 @@ func TestFlatObjectFilterLossy(t *testing.T) {
 		t.Errorf("expected nil/lossless for nil AST, got %v (lossless=%v)", flat, lossless)
 	}
 }
+
+func TestFlatObjectFilterOmitsV3AllNamesCriterion(t *testing.T) {
+	ast := &FilterAST{Root: &FilterASTNode{Condition: &FilterASTCondition{
+		Field: "names",
+		Value: map[string]interface{}{
+			"value":    "Jane",
+			"modifier": "INCLUDES",
+		},
+	}}}
+
+	flat, lossless := ast.FlatObjectFilter()
+	if lossless {
+		t.Fatal("all-names criterion was incorrectly marked v2.5-compatible")
+	}
+	if len(flat) != 0 {
+		t.Fatalf("all-names criterion leaked into v2.5 projection: %#v", flat)
+	}
+}

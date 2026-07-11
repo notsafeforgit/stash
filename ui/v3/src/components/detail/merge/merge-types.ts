@@ -2,11 +2,11 @@
  * Per-field merge resolution for scene / performer merge dialogs.
  *
  * Why this exists: the backend's `sceneMerge` / `performerMerge`
- * mutations apply the supplied `values: <Type>UpdateInput` as a partial
- * update to the destination, then delete the source(s). Anything not
- * in `values` keeps whatever the destination already has — source data
- * is silently lost otherwise. So for a useful merge the client has to
- * compute the right `values` payload from per-field user choices.
+ * mutations merge the source entities and apply the supplied
+ * `values: <Type>UpdateInput` as partial destination overrides. Anything
+ * not in `values` keeps whatever the destination already has — source
+ * data is silently lost otherwise. So for a useful merge the client has
+ * to compute the right `values` payload from per-field user choices.
  *
  * Choice shape: `"keep"` | `"source:<id>"` | `"combine"`. Stored as a
  * plain string so it slots into TanStack Form fields and the

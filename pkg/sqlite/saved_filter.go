@@ -18,7 +18,9 @@ import (
 
 const (
 	savedFilterTable       = "saved_filters"
+	savedFilterStateTable  = "fork_saved_filter_state"
 	savedFilterDefaultName = ""
+	savedFilterIDColumn    = "saved_filter_id"
 )
 
 type savedFilterRow struct {
@@ -27,8 +29,12 @@ type savedFilterRow struct {
 	Name         string            `db:"name"`
 	FindFilter   string            `db:"find_filter"`
 	ObjectFilter string            `db:"object_filter"`
-	FilterAST    string            `db:"filter_ast"`
 	UIOptions    string            `db:"ui_options"`
+}
+
+type savedFilterQueryRow struct {
+	savedFilterRow
+	FilterAST string `db:"filter_ast"`
 }
 
 func encodeJSONOrEmpty(v interface{}) string {
@@ -61,14 +67,16 @@ func (r *savedFilterRow) fromSavedFilter(o models.SavedFilter) {
 
 	// encode the filters as json
 	r.FindFilter = encodeJSONOrEmpty(o.FindFilter)
-	r.ObjectFilter = encodeJSONOrEmpty(o.ObjectFilter)
 	if o.FilterAST != nil {
-		r.FilterAST = encodeJSONOrEmpty(o.FilterAST)
+		flat, _ := o.FilterAST.FlatObjectFilter()
+		r.ObjectFilter = encodeJSONOrEmpty(flat)
+	} else {
+		r.ObjectFilter = encodeJSONOrEmpty(o.ObjectFilter)
 	}
 	r.UIOptions = encodeJSONOrEmpty(o.UIOptions)
 }
 
-func (r *savedFilterRow) resolve() *models.SavedFilter {
+func (r *savedFilterQueryRow) resolve() *models.SavedFilter {
 	ret := &models.SavedFilter{
 		ID:   r.ID,
 		Mode: r.Mode,
@@ -116,7 +124,29 @@ func (qb *SavedFilterStore) table() exp.IdentifierExpression {
 }
 
 func (qb *SavedFilterStore) selectDataset() *goqu.SelectDataset {
-	return dialect.From(qb.table()).Select(qb.table().All())
+	stateTable := goqu.T(savedFilterStateTable)
+	return dialect.From(qb.table()).
+		Select(qb.table().All(), goqu.COALESCE(stateTable.Col("filter_ast"), "").As("filter_ast")).
+		LeftJoin(stateTable, goqu.On(stateTable.Col(savedFilterIDColumn).Eq(qb.table().Col(idColumn))))
+}
+
+func (qb *SavedFilterStore) setFilterAST(ctx context.Context, id int, filter *models.SavedFilter, legacyObjectFilter string) error {
+	stateTable := goqu.T(savedFilterStateTable)
+	if filter.FilterAST == nil {
+		q := dialect.Delete(stateTable).Where(stateTable.Col(savedFilterIDColumn).Eq(id))
+		_, err := exec(ctx, q)
+		return err
+	}
+
+	q := dialect.Insert(stateTable).
+		Cols(savedFilterIDColumn, "filter_ast", "legacy_object_filter").
+		Vals(goqu.Vals{id, encodeJSONOrEmpty(filter.FilterAST), legacyObjectFilter}).
+		OnConflict(goqu.DoUpdate(savedFilterIDColumn, goqu.Record{
+			"filter_ast":           goqu.I("excluded.filter_ast"),
+			"legacy_object_filter": goqu.I("excluded.legacy_object_filter"),
+		}))
+	_, err := exec(ctx, q)
+	return err
 }
 
 func (qb *SavedFilterStore) Create(ctx context.Context, newObject *models.SavedFilter) error {
@@ -125,6 +155,9 @@ func (qb *SavedFilterStore) Create(ctx context.Context, newObject *models.SavedF
 
 	id, err := qb.tableMgr.insertID(ctx, r)
 	if err != nil {
+		return err
+	}
+	if err := qb.setFilterAST(ctx, id, newObject, r.ObjectFilter); err != nil {
 		return err
 	}
 
@@ -143,6 +176,9 @@ func (qb *SavedFilterStore) Update(ctx context.Context, updatedObject *models.Sa
 	r.fromSavedFilter(*updatedObject)
 
 	if err := qb.tableMgr.updateByID(ctx, updatedObject.ID, r); err != nil {
+		return err
+	}
+	if err := qb.setFilterAST(ctx, updatedObject.ID, updatedObject, r.ObjectFilter); err != nil {
 		return err
 	}
 
@@ -217,7 +253,7 @@ func (qb *SavedFilterStore) getMany(ctx context.Context, q *goqu.SelectDataset) 
 	const single = false
 	var ret []*models.SavedFilter
 	if err := queryFunc(ctx, q, single, func(r *sqlx.Rows) error {
-		var f savedFilterRow
+		var f savedFilterQueryRow
 		if err := r.StructScan(&f); err != nil {
 			return err
 		}

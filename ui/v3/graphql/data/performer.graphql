@@ -27,6 +27,7 @@ fragment PerformerData on Performer {
   }
   favorite
   ignore_auto_tag
+  ignore_primary_name_auto_tag
   image_path
   scene_count
   image_count

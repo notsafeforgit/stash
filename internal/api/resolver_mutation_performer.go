@@ -107,6 +107,7 @@ func (r *mutationResolver) PerformerCreate(ctx context.Context, input models.Per
 	newPerformer.Height = input.HeightCm
 	newPerformer.Weight = input.Weight
 	newPerformer.IgnoreAutoTag = translator.bool(input.IgnoreAutoTag)
+	newPerformer.IgnorePrimaryNameAutoTag = translator.bool(input.IgnorePrimaryNameAutoTag)
 	newPerformer.StashIDs = models.NewRelatedStashIDs(models.StashIDInputs(input.StashIds).ToStashIDs())
 
 	newPerformer.URLs = models.NewRelatedStrings([]string{})
@@ -359,6 +360,7 @@ func performerPartialFromInput(input models.PerformerUpdateInput, translator cha
 	updatedPerformer.HairColor = translator.optionalString(input.HairColor, "hair_color")
 	updatedPerformer.Weight = translator.optionalInt(input.Weight, "weight")
 	updatedPerformer.IgnoreAutoTag = translator.optionalBool(input.IgnoreAutoTag, "ignore_auto_tag")
+	updatedPerformer.IgnorePrimaryNameAutoTag = translator.optionalBool(input.IgnorePrimaryNameAutoTag, "ignore_primary_name_auto_tag")
 	updatedPerformer.StashIDs = translator.updateStashIDs(input.StashIds, "stash_ids")
 
 	var err error
@@ -614,6 +616,7 @@ func (r *mutationResolver) BulkPerformerUpdateJob(ctx context.Context, input Bul
 	updatedPerformer.HairColor = translator.optionalString(input.HairColor, "hair_color")
 	updatedPerformer.Weight = translator.optionalInt(input.Weight, "weight")
 	updatedPerformer.IgnoreAutoTag = translator.optionalBool(input.IgnoreAutoTag, "ignore_auto_tag")
+	updatedPerformer.IgnorePrimaryNameAutoTag = translator.optionalBool(input.IgnorePrimaryNameAutoTag, "ignore_primary_name_auto_tag")
 
 	if translator.hasField("urls") {
 		// ensure url/twitter/instagram are not included in the input
@@ -812,12 +815,14 @@ func (r *mutationResolver) PerformerMerge(ctx context.Context, input PerformerMe
 			return fmt.Errorf("finding source performers: %w", err)
 		}
 
-		if _, err := qb.UpdatePartial(ctx, destID, *values); err != nil {
-			return fmt.Errorf("updating performer: %w", err)
-		}
-
 		if err := qb.Merge(ctx, srcIDs, destID); err != nil {
 			return fmt.Errorf("merging performers: %w", err)
+		}
+
+		// Remove the sources before applying values so the destination can
+		// safely take a source performer's name and disambiguation.
+		if _, err := qb.UpdatePartial(ctx, destID, *values); err != nil {
+			return fmt.Errorf("updating performer: %w", err)
 		}
 
 		if len(imageData) > 0 {

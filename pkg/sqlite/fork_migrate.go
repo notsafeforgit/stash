@@ -29,6 +29,13 @@ type forkMigration struct {
 
 var forkMigrations = make(map[uint]forkMigration)
 
+type forkReconciler struct {
+	name string
+	fn   customMigrationFunc
+}
+
+var forkReconcilers = make(map[string]forkReconciler)
+
 func RegisterForkMigration(version uint, name string, fn customMigrationFunc) {
 	registerForkMigration(version, name, 0, fn)
 }
@@ -57,6 +64,23 @@ func registerForkMigration(version uint, name string, legacySchemaVersion uint, 
 		legacySchemaVersion: legacySchemaVersion,
 		fn:                  fn,
 	}
+}
+
+// RegisterForkReconciler registers an idempotent compatibility pass that runs
+// whenever a fully migrated database is opened. Reconcilers import changes
+// made while the database was used by an upstream-only server.
+func RegisterForkReconciler(name string, fn customMigrationFunc) {
+	if name == "" {
+		panic("fork reconciler name must be non-empty")
+	}
+	if fn == nil {
+		panic("fork reconciler function must be non-nil")
+	}
+	if _, exists := forkReconcilers[name]; exists {
+		panic(fmt.Sprintf("fork reconciler %q already registered", name))
+	}
+
+	forkReconcilers[name] = forkReconciler{name: name, fn: fn}
 }
 
 func getForkMigrations() []forkMigration {
@@ -163,6 +187,24 @@ func (m *Migrator) RunAllForkMigrations(ctx context.Context) error {
 
 		if err := m.RunForkMigration(ctx, nextVersion); err != nil {
 			return err
+		}
+	}
+
+	return nil
+}
+
+func (m *Migrator) RunForkReconcilers(ctx context.Context) error {
+	reconcilers := make([]forkReconciler, 0, len(forkReconcilers))
+	for _, reconciler := range forkReconcilers {
+		reconcilers = append(reconcilers, reconciler)
+	}
+	sort.Slice(reconcilers, func(i, j int) bool {
+		return reconcilers[i].name < reconcilers[j].name
+	})
+
+	for _, reconciler := range reconcilers {
+		if err := m.runCustomMigration(ctx, reconciler.fn); err != nil {
+			return fmt.Errorf("running fork reconciler %q: %w", reconciler.name, err)
 		}
 	}
 

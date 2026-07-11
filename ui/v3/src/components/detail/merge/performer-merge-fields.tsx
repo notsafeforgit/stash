@@ -103,7 +103,7 @@ export const PERFORMER_MERGE_FIELDS: readonly AnyMergeFieldDef<
   Performer,
   PerformerUpdate
 >[] = [
-  stringField("name", "name", "Name", (p) => p.name),
+  stringField("name", "canonical_name", "Canonical name", (p) => p.name),
   stringField(
     "disambiguation",
     "disambiguation",
@@ -226,8 +226,8 @@ export const PERFORMER_MERGE_FIELDS: readonly AnyMergeFieldDef<
   }),
   defineMergeField<Performer, PerformerUpdate, PerformerAlias[]>({
     key: "aliases",
-    labelId: "aliases",
-    defaultLabel: "Aliases",
+    labelId: "names_and_aliases",
+    defaultLabel: "Names and aliases",
     read: (p) =>
       p.aliases?.map((a) => ({
         alias: a.alias,

@@ -7,6 +7,7 @@
     "add_directory": "Add directory",
     "add_entity": "Add {entityType}",
     "add_manual_date": "Add manual date",
+    "add_name": "Add name",
     "add_o": "Add O",
     "add_o_custom_date": "Add with custom date…",
     "add_o_now": "Add O (now)",
@@ -34,6 +35,7 @@
     "clean": "Clean",
     "clean_generated": "Clean generated files",
     "clear": "Clear",
+    "clear_default_filter": "Clear default",
     "clear_all": "Clear All",
     "clear_back_image": "Clear back image",
     "clear_date_data": "Clear date data",
@@ -233,6 +235,7 @@
   "age": "Age",
   "age_on_date": "{age} at production",
   "aliases": "Aliases",
+  "canonical_name": "Canonical name",
   "all": "all",
   "also_known_as": "Also known as",
   "appears_with": "Appears With",
@@ -1517,6 +1520,9 @@
   "help": "Help",
   "history": "History",
   "ignore_auto_tag": "Ignore auto tag",
+  "ignore_primary_name_auto_tag": "Ignore canonical name for auto tag",
+  "performer_name_auto_tag_aria": "Use this name for auto-tagging",
+  "performer_primary_name_auto_tag_aria": "Use the primary name for auto-tagging",
   "image": "Image",
   "image_count": "Image Count",
   "image_index": "Image #",
@@ -1603,6 +1609,9 @@
   "megabits_per_second": "{value} mbps",
   "metadata": "Metadata",
   "name": "Name",
+  "name_number": "Name {number}",
+  "names": "All names",
+  "names_and_aliases": "Names and aliases",
   "navigation": "Navigation",
   "new": "New",
   "no": "No",
@@ -1928,6 +1937,11 @@
     "will_create_studio": "Will create studio “{name}”",
     "will_create_tag": "Will create tag “{name}”"
   },
+  "default_filter": {
+    "keep_v3": "Keep v3",
+    "use_v25": "Use v2.5",
+    "version_conflict": "This default was changed in v2.5. Choose which version to keep."
+  },
   "search": "Search…",
   "search_filter": {
     "add_first_condition": "Add first condition",
@@ -1956,6 +1970,16 @@
   "select": "Select",
   "settings": "Settings",
   "setup": {
+    "configuration": {
+      "user_directory": "Stash user directory",
+      "working_directory": "Current working directory"
+    },
+    "credentials": {
+      "description": "Enter a username and password to restrict access to Stash. Leave both blank if authentication is not required. Credentials are strongly recommended when Stash is accessible from the public internet.",
+      "heading": "Set up access",
+      "password_invalid": "Password must be non-empty if username is set.",
+      "username_invalid": "Username must not have any leading or trailing whitespace."
+    },
     "confirm": {
       "almost_ready": "We're almost ready to complete the configuration. Please confirm the following settings. You can click back to change anything incorrect. If everything looks good, click Confirm to create your system.",
       "blobs_directory": "Binary data directory",
@@ -2024,7 +2048,25 @@
       "where_is_your_porn_located": "Where is your content located?",
       "where_is_your_porn_located_description": "Add directories containing your videos and images. Stash will use these directories to find videos and images during scanning."
     },
+    "progress": "Setup progress",
+    "review": {
+      "access": "Access",
+      "content_mode": "Content mode",
+      "no_credentials": "No username or password",
+      "sfw": "SFW content mode",
+      "standard": "Standard content mode"
+    },
     "stash_setup_wizard": "Stash Setup Wizard",
+    "steps": {
+      "access": "Access",
+      "configuration": "Configuration",
+      "review": "Review",
+      "storage": "Library & storage"
+    },
+    "storage": {
+      "database_blobs_description": "Keep binary image data inside the SQLite database instead of the filesystem.",
+      "locations": "Storage locations"
+    },
     "success": {
       "download_ffmpeg": "Download ffmpeg",
       "getting_help": "Getting help",
@@ -2277,6 +2319,7 @@
   "unknown_date": "Unknown date",
   "unsupported_criteria": "Unsupported criteria: {criteria}",
   "updated_at": "Updated At",
+  "unnamed": "Unnamed",
   "url": "URL",
   "urls": "URLs",
   "validation": {

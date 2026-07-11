@@ -12,6 +12,23 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+func TestGetPerformerTaggersCanIgnoreOnlyName(t *testing.T) {
+	performer := models.Performer{
+		ID:                       1,
+		Name:                     "Tia",
+		IgnorePrimaryNameAutoTag: true,
+		Aliases: models.NewRelatedPerformerAliases([]models.PerformerAlias{
+			{Alias: "Preferred Alias"},
+			{Alias: "Ignored Alias", IgnoreAutoTag: true},
+		}),
+	}
+
+	taggers := getPerformerTaggers(&performer, nil)
+	if assert.Len(t, taggers, 1) {
+		assert.Equal(t, "Preferred Alias", taggers[0].Name)
+	}
+}
+
 func TestPerformerScenes(t *testing.T) {
 	t.Parallel()
 

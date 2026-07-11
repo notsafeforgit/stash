@@ -1697,6 +1697,161 @@ func TestPerformerQueryForAutoTag(t *testing.T) {
 	})
 }
 
+func TestPerformerQueryForAutoTagCanIgnoreOnlyName(t *testing.T) {
+	if err := withRollbackTxn(func(ctx context.Context) error {
+		qb := db.Performer
+		performer := models.Performer{
+			Name:                     "Tia",
+			IgnorePrimaryNameAutoTag: true,
+			Aliases: models.NewRelatedPerformerAliases([]models.PerformerAlias{
+				{Alias: "Preferred Alias"},
+				{Alias: "Ignored Alias", IgnoreAutoTag: true},
+			}),
+		}
+		if err := qb.Create(ctx, &models.CreatePerformerInput{Performer: &performer}); err != nil {
+			return err
+		}
+
+		byName, err := qb.QueryForAutoTag(ctx, []string{"Ti"})
+		if err != nil {
+			return err
+		}
+		assert.NotContains(t, performersToIDs(byName), performer.ID)
+
+		byAlias, err := qb.QueryForAutoTag(ctx, []string{"Pr"})
+		if err != nil {
+			return err
+		}
+		assert.Contains(t, performersToIDs(byAlias), performer.ID)
+
+		byIgnoredAlias, err := qb.QueryForAutoTag(ctx, []string{"Ig"})
+		if err != nil {
+			return err
+		}
+		assert.NotContains(t, performersToIDs(byIgnoredAlias), performer.ID)
+
+		if err := performer.LoadAliases(ctx, qb); err != nil {
+			return err
+		}
+		assert.ElementsMatch(t, []models.PerformerAlias{
+			{Alias: "Preferred Alias"},
+			{Alias: "Ignored Alias", IgnoreAutoTag: true},
+		}, performer.Aliases.List())
+
+		updated, err := qb.UpdatePartial(ctx, performer.ID, models.PerformerPartial{
+			IgnorePrimaryNameAutoTag: models.NewOptionalBool(false),
+			Aliases: &models.UpdatePerformerAliases{
+				Mode: models.RelationshipUpdateModeSet,
+				Values: []models.PerformerAlias{
+					{Alias: "Preferred Alias", IgnoreAutoTag: true},
+					{Alias: "Ignored Alias"},
+				},
+			},
+		})
+		if err != nil {
+			return err
+		}
+		assert.False(t, updated.IgnorePrimaryNameAutoTag)
+		if err := updated.LoadAliases(ctx, qb); err != nil {
+			return err
+		}
+		assert.ElementsMatch(t, []models.PerformerAlias{
+			{Alias: "Preferred Alias", IgnoreAutoTag: true},
+			{Alias: "Ignored Alias"},
+		}, updated.Aliases.List())
+
+		byName, err = qb.QueryForAutoTag(ctx, []string{"Ti"})
+		if err != nil {
+			return err
+		}
+		assert.Contains(t, performersToIDs(byName), performer.ID)
+		byAlias, err = qb.QueryForAutoTag(ctx, []string{"Pr"})
+		if err != nil {
+			return err
+		}
+		assert.NotContains(t, performersToIDs(byAlias), performer.ID)
+		byIgnoredAlias, err = qb.QueryForAutoTag(ctx, []string{"Ig"})
+		if err != nil {
+			return err
+		}
+		assert.Contains(t, performersToIDs(byIgnoredAlias), performer.ID)
+
+		updated, err = qb.UpdatePartial(ctx, performer.ID, models.PerformerPartial{
+			Name:                     models.NewOptionalString("Preferred Alias"),
+			IgnorePrimaryNameAutoTag: models.NewOptionalBool(true),
+			Aliases: &models.UpdatePerformerAliases{
+				Mode: models.RelationshipUpdateModeSet,
+				Values: []models.PerformerAlias{
+					{Alias: "Tia"},
+					{Alias: "Ignored Alias"},
+				},
+			},
+		})
+		if err != nil {
+			return err
+		}
+		assert.Equal(t, "Preferred Alias", updated.Name)
+		assert.True(t, updated.IgnorePrimaryNameAutoTag)
+
+		byName, err = qb.QueryForAutoTag(ctx, []string{"Pr"})
+		if err != nil {
+			return err
+		}
+		assert.NotContains(t, performersToIDs(byName), performer.ID)
+		byAlias, err = qb.QueryForAutoTag(ctx, []string{"Ti"})
+		if err != nil {
+			return err
+		}
+		assert.Contains(t, performersToIDs(byAlias), performer.ID)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPerformerQueryASTAllNames(t *testing.T) {
+	if err := withRollbackTxn(func(ctx context.Context) error {
+		qb := db.Performer
+		performer := models.Performer{
+			Name: "Canonical Name",
+			Aliases: models.NewRelatedPerformerAliases([]models.PerformerAlias{
+				{Alias: "Matching Alias"},
+			}),
+		}
+		if err := qb.Create(ctx, &models.CreatePerformerInput{Performer: &performer}); err != nil {
+			return err
+		}
+
+		query := func(field string) ([]*models.Performer, error) {
+			returnValues, _, err := qb.QueryAST(ctx, &models.FilterAST{Root: &models.FilterASTNode{
+				Condition: &models.FilterASTCondition{
+					Field: field,
+					Value: map[string]interface{}{
+						"value":    "Matching Alias",
+						"modifier": models.CriterionModifierEquals,
+					},
+				},
+			}}, nil)
+			return returnValues, err
+		}
+
+		allNames, err := query("names")
+		if err != nil {
+			return err
+		}
+		assert.Contains(t, performersToIDs(allNames), performer.ID)
+
+		canonicalOnly, err := query("name")
+		if err != nil {
+			return err
+		}
+		assert.NotContains(t, performersToIDs(canonicalOnly), performer.ID)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestPerformerUpdatePerformerImage(t *testing.T) {
 	if err := withRollbackTxn(func(ctx context.Context) error {
 		qb := db.Performer

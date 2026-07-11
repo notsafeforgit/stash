@@ -71,6 +71,7 @@ export function offlineEntryToSceneData(
     piercings: null,
     favorite: false,
     ignore_auto_tag: false,
+    ignore_primary_name_auto_tag: false,
     image_path: null,
     scene_count: 0,
     image_count: 0,

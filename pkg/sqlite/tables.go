@@ -444,12 +444,11 @@ type performerAliasTable struct {
 }
 
 type performerAliasRow struct {
-	Alias         string `db:"alias"`
-	IgnoreAutoTag bool   `db:"ignore_auto_tag"`
+	Alias string `db:"alias"`
 }
 
 func (t *performerAliasTable) get(ctx context.Context, id int) ([]models.PerformerAlias, error) {
-	q := dialect.Select("alias", "ignore_auto_tag").From(t.table.table).Where(t.idColumn.Eq(id))
+	q := dialect.Select("alias").From(t.table.table).Where(t.idColumn.Eq(id))
 
 	const single = false
 	var ret []models.PerformerAlias
@@ -460,8 +459,7 @@ func (t *performerAliasTable) get(ctx context.Context, id int) ([]models.Perform
 		}
 
 		ret = append(ret, models.PerformerAlias{
-			Alias:         v.Alias,
-			IgnoreAutoTag: v.IgnoreAutoTag,
+			Alias: v.Alias,
 		})
 
 		return nil
@@ -473,8 +471,8 @@ func (t *performerAliasTable) get(ctx context.Context, id int) ([]models.Perform
 }
 
 func (t *performerAliasTable) insertJoin(ctx context.Context, id int, v models.PerformerAlias) (sql.Result, error) {
-	q := dialect.Insert(t.table.table).Cols(t.idColumn.GetCol(), "alias", "ignore_auto_tag").Vals(
-		goqu.Vals{id, v.Alias, v.IgnoreAutoTag},
+	q := dialect.Insert(t.table.table).Cols(t.idColumn.GetCol(), "alias").Vals(
+		goqu.Vals{id, v.Alias},
 	)
 	ret, err := exec(ctx, q)
 	if err != nil {

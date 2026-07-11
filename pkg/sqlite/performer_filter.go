@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -408,6 +409,45 @@ func (qb *performerFilterHandler) aliasCriterionHandler(alias *models.StringCrit
 	}
 
 	return h.handler(alias)
+}
+
+func (qb *performerFilterHandler) allNamesCriterionHandler(names *models.StringCriterionInput) criterionHandlerFunc {
+	return func(ctx context.Context, f *filterBuilder) {
+		if names == nil || !names.Modifier.IsValid() {
+			return
+		}
+
+		const canonical = "performers.name"
+		const aliases = "COALESCE((SELECT GROUP_CONCAT(performer_aliases.alias, ' | ') FROM performer_aliases WHERE performer_aliases.performer_id = performers.id), '')"
+		const aliasMatch = "EXISTS (SELECT 1 FROM performer_aliases WHERE performer_aliases.performer_id = performers.id AND performer_aliases.alias LIKE ?)"
+		const aliasRegex = "EXISTS (SELECT 1 FROM performer_aliases WHERE performer_aliases.performer_id = performers.id AND performer_aliases.alias regexp ?)"
+		const aliasPresent = "EXISTS (SELECT 1 FROM performer_aliases WHERE performer_aliases.performer_id = performers.id AND TRIM(performer_aliases.alias) != '')"
+
+		switch names.Modifier {
+		case models.CriterionModifierIncludes:
+			f.whereClauses = append(f.whereClauses, getStringSearchClause([]string{canonical, aliases}, names.Value, false))
+		case models.CriterionModifierExcludes:
+			f.whereClauses = append(f.whereClauses, getStringSearchClause([]string{canonical, aliases}, names.Value, true))
+		case models.CriterionModifierEquals:
+			f.addWhere("("+canonical+" LIKE ? OR "+aliasMatch+")", names.Value, names.Value)
+		case models.CriterionModifierNotEquals:
+			f.addWhere("("+canonical+" NOT LIKE ? AND NOT "+aliasMatch+")", names.Value, names.Value)
+		case models.CriterionModifierMatchesRegex, models.CriterionModifierNotMatchesRegex:
+			if _, err := regexp.Compile(names.Value); err != nil {
+				f.setError(err)
+				return
+			}
+			if names.Modifier == models.CriterionModifierMatchesRegex {
+				f.addWhere("("+canonical+" regexp ? OR "+aliasRegex+")", names.Value, names.Value)
+			} else {
+				f.addWhere("("+canonical+" NOT regexp ? AND NOT "+aliasRegex+")", names.Value, names.Value)
+			}
+		case models.CriterionModifierIsNull:
+			f.addWhere("(" + canonical + " IS NULL OR TRIM(" + canonical + ") = '') AND NOT " + aliasPresent)
+		case models.CriterionModifierNotNull:
+			f.addWhere("(" + canonical + " IS NOT NULL AND TRIM(" + canonical + ") != '') OR " + aliasPresent)
+		}
+	}
 }
 
 func (qb *performerFilterHandler) tagsCriterionHandler(tags *models.HierarchicalMultiCriterionInput) criterionHandlerFunc {

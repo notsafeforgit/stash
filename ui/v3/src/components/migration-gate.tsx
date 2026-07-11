@@ -33,6 +33,7 @@ import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
 import { DEFAULT_LOCALE, LocaleProvider } from "@/components/locale-provider";
+import { SetupWizard } from "@/components/setup-wizard";
 import * as GQL from "@/core/generated-graphql";
 
 type SystemStatus = GQL.SystemStatusQuery["systemStatus"];
@@ -376,6 +377,19 @@ export function SystemStatusGate({ children }: PropsWithChildren) {
     return (
       <LocaleProvider language={DEFAULT_LOCALE}>
         <MigrationRequiredDialog
+          status={data.systemStatus}
+          onComplete={async () => {
+            await refetch();
+          }}
+        />
+      </LocaleProvider>
+    );
+  }
+
+  if (data?.systemStatus.status === GQL.SystemStatusEnum.Setup) {
+    return (
+      <LocaleProvider language={DEFAULT_LOCALE}>
+        <SetupWizard
           status={data.systemStatus}
           onComplete={async () => {
             await refetch();

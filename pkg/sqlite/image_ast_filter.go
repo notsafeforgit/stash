@@ -133,7 +133,7 @@ func imageASTConditionHandler(condition *models.FilterASTCondition) (criterionHa
 		if err != nil {
 			return nil, err
 		}
-		return intCriterionHandler(&input, "image_files.bit_depth", imageRepository.addImageFilesTable), nil
+		return intCriterionHandler(&input, "fork_image_file_metadata.bit_depth", imageRepository.addImageFileMetadataTable), nil
 	case "orientation":
 		input, err := decodeASTValue[models.OrientationCriterionInput](condition.Value)
 		if err != nil {

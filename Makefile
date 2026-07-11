@@ -323,8 +323,9 @@ fmt:
 	go fmt ./...
 
 .PHONY: lint
+GOLANGCI_LINT_VERSION ?= v2.11.4
 lint:
-	golangci-lint run
+	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run
 
 # runs unit tests - excluding integration tests
 .PHONY: test
@@ -458,6 +459,10 @@ validate-backend: lint it
 # runs all of the tests and checks required for a PR to be accepted
 .PHONY: validate
 validate: validate-ui validate-backend
+
+# Full pre-push gate for the fork backend plus the active v3 UI.
+.PHONY: validate-fork
+validate-fork: generate-backend validate-ui-v3 validate-backend
 
 # locally builds and tags a 'stash/build' docker image
 .PHONY: docker-build

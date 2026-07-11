@@ -151,21 +151,15 @@ func PathToPerformers(ctx context.Context, path string, reader models.PerformerA
 
 	var ret []*models.Performer
 	for _, p := range performers {
-		matches := false
-		if nameMatchesPath(p.Name, path) != -1 {
-			matches = true
+		if err := p.LoadAliases(ctx, reader); err != nil {
+			return nil, err
 		}
 
-		if !matches {
-			if err := p.LoadAliases(ctx, reader); err != nil {
-				return nil, err
-			}
-
-			for _, alias := range p.Aliases.List() {
-				if !alias.IgnoreAutoTag && nameMatchesPath(alias.Alias, path) != -1 {
-					matches = true
-					break
-				}
+		matches := false
+		for _, name := range p.AutoTagNames() {
+			if !name.IgnoreAutoTag && nameMatchesPath(name.Name, path) != -1 {
+				matches = true
+				break
 			}
 		}
 

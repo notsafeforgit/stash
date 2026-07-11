@@ -31,22 +31,18 @@ type GalleryQueryPerformerUpdater interface {
 }
 
 func getPerformerTaggers(p *models.Performer, cache *match.Cache) []tagger {
-	ret := []tagger{{
-		ID:    p.ID,
-		Type:  "performer",
-		Name:  p.Name,
-		cache: cache,
-	}}
-
-	for _, a := range p.Aliases.List() {
-		if !a.IgnoreAutoTag {
-			ret = append(ret, tagger{
-				ID:    p.ID,
-				Type:  "performer",
-				Name:  a.Alias,
-				cache: cache,
-			})
+	var ret []tagger
+	for _, name := range p.AutoTagNames() {
+		if name.IgnoreAutoTag {
+			continue
 		}
+
+		ret = append(ret, tagger{
+			ID:    p.ID,
+			Type:  "performer",
+			Name:  name.Name,
+			cache: cache,
+		})
 	}
 
 	return ret

@@ -4,7 +4,7 @@ import { useForm } from "@tanstack/react-form";
 import { useLazyQuery } from "@apollo/client/react";
 import { useSmartBack } from "src/hooks/use-smart-back";
 import { useIntl } from "react-intl";
-import { Save, RotateCcw, PlusIcon, Trash2Icon } from "lucide-react";
+import { Crown, Save, RotateCcw, PlusIcon, Trash2Icon } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
 import { GenderEnum, CircumcisedEnum } from "src/core/generated-graphql";
 import {
@@ -106,6 +106,7 @@ export interface PerformerFormValues {
   rating100: number | null;
   favorite: boolean;
   ignore_auto_tag: boolean;
+  ignore_primary_name_auto_tag: boolean;
   stash_ids: StashIdEntry[];
   custom_fields: CustomFieldMap;
 }
@@ -141,6 +142,7 @@ function emptyPerformerFormValues(): PerformerFormValues {
     rating100: null,
     favorite: false,
     ignore_auto_tag: false,
+    ignore_primary_name_auto_tag: false,
     stash_ids: [],
     custom_fields: {},
   };
@@ -178,12 +180,26 @@ function performerToFormValues(p: PerformerData): PerformerFormValues {
     rating100: p.rating100 ?? null,
     favorite: p.favorite,
     ignore_auto_tag: p.ignore_auto_tag,
+    ignore_primary_name_auto_tag: p.ignore_primary_name_auto_tag,
     stash_ids: p.stash_ids.map((s) => ({
       endpoint: s.endpoint,
       stash_id: s.stash_id,
     })),
     custom_fields: p.custom_fields ?? {},
   };
+}
+
+function aliasesToInput(v: PerformerFormValues): GQL.PerformerAliasInput[] {
+  const seen = new Set([v.name.trim().toLocaleLowerCase()]);
+  const ret: GQL.PerformerAliasInput[] = [];
+  for (const entry of v.aliases) {
+    const alias = entry.alias.trim();
+    const key = alias.toLocaleLowerCase();
+    if (!alias || seen.has(key)) continue;
+    seen.add(key);
+    ret.push({ alias, ignore_auto_tag: entry.ignore_auto_tag });
+  }
+  return ret;
 }
 
 function formValuesToInput(
@@ -196,12 +212,7 @@ function formValuesToInput(
     // null = unchanged, "" = clear, non-empty = new image data
     image_input: v.image === null ? undefined : { data: v.image },
     disambiguation: v.disambiguation || null,
-    aliases: v.aliases
-      .filter((a) => a.alias.trim())
-      .map((a) => ({
-        alias: a.alias.trim(),
-        ignore_auto_tag: a.ignore_auto_tag,
-      })),
+    aliases: aliasesToInput(v),
     gender: v.gender || null,
     birthdate: v.birthdate || null,
     death_date: v.death_date || null,
@@ -225,6 +236,7 @@ function formValuesToInput(
     rating100: v.rating100,
     favorite: v.favorite,
     ignore_auto_tag: v.ignore_auto_tag,
+    ignore_primary_name_auto_tag: v.ignore_primary_name_auto_tag,
     stash_ids: v.stash_ids
       .filter((s) => s.endpoint && s.stash_id)
       .map((s) => ({ endpoint: s.endpoint, stash_id: s.stash_id })),
@@ -239,12 +251,7 @@ function formValuesToCreateInput(
     name: v.name,
     image_input: v.image ? { data: v.image } : undefined,
     disambiguation: v.disambiguation || undefined,
-    aliases: v.aliases
-      .filter((a) => a.alias.trim())
-      .map((a) => ({
-        alias: a.alias.trim(),
-        ignore_auto_tag: a.ignore_auto_tag,
-      })),
+    aliases: aliasesToInput(v),
     gender: v.gender || undefined,
     birthdate: v.birthdate || undefined,
     death_date: v.death_date || undefined,
@@ -268,6 +275,7 @@ function formValuesToCreateInput(
     rating100: v.rating100,
     favorite: v.favorite,
     ignore_auto_tag: v.ignore_auto_tag,
+    ignore_primary_name_auto_tag: v.ignore_primary_name_auto_tag,
     stash_ids: v.stash_ids
       .filter((s) => s.endpoint && s.stash_id)
       .map((s) => ({ endpoint: s.endpoint, stash_id: s.stash_id })),
@@ -347,88 +355,180 @@ function getCircumcisedOptions(
   ];
 }
 
-// ── Alias list field ───────────────────────────────────────────────────────────
+// ── Names field ────────────────────────────────────────────────────────────────
 
-interface AliasListFieldProps {
-  value: AliasEntry[];
-  onChange: (entries: AliasEntry[]) => void;
+interface PerformerNamesFieldProps {
+  canonicalName: string;
+  canonicalIgnoreAutoTag: boolean;
+  aliases: AliasEntry[];
+  onCanonicalNameChange: (name: string) => void;
+  onCanonicalNameBlur: () => void;
+  onCanonicalAutoTagChange: (ignore: boolean) => void;
+  onAliasesChange: (entries: AliasEntry[]) => void;
+  onPromoteAlias: (index: number) => void;
   disabled?: boolean;
 }
 
-function AliasListField({ value, onChange, disabled }: AliasListFieldProps) {
+function PerformerNamesField({
+  canonicalName,
+  canonicalIgnoreAutoTag,
+  aliases,
+  onCanonicalNameChange,
+  onCanonicalNameBlur,
+  onCanonicalAutoTagChange,
+  onAliasesChange,
+  onPromoteAlias,
+  disabled,
+}: PerformerNamesFieldProps) {
   const intl = useIntl();
 
   function updateAlias(index: number, alias: string) {
-    const next = [...value];
+    const next = [...aliases];
     next[index] = { ...next[index], alias };
-    onChange(next);
+    onAliasesChange(next);
   }
 
   function updateAutoTagEnabled(index: number, enabled: boolean) {
-    // Storage stays as `ignore_auto_tag` (matches the backend's
-    // PerformerAlias schema) but the UI is the inverse: a Toggle
-    // labelled "Auto-tag" reads as on when the alias contributes to
-    // auto-tagging. Inverse here keeps the persisted shape unchanged.
-    const next = [...value];
+    const next = [...aliases];
     next[index] = { ...next[index], ignore_auto_tag: !enabled };
-    onChange(next);
+    onAliasesChange(next);
   }
 
   function remove(index: number) {
-    onChange(value.filter((_, i) => i !== index));
+    onAliasesChange(aliases.filter((_, i) => i !== index));
   }
 
   function add() {
-    onChange([...value, { alias: "", ignore_auto_tag: false }]);
+    onAliasesChange([...aliases, { alias: "", ignore_auto_tag: false }]);
   }
 
   return (
-    <div className="flex flex-col gap-1.5">
-      {value.map((entry, i) => (
-        <div key={i} className="flex items-center gap-2">
-          <InputGroup className="flex-1">
-            <InputGroupInput
-              value={entry.alias}
-              disabled={disabled}
-              onChange={(e) => updateAlias(i, e.target.value)}
-            />
-            <InputGroupAddon align="inline-end">
-              <InputGroupButton
-                size="icon-xs"
-                variant="ghost"
-                disabled={disabled}
-                aria-label={intl.formatMessage({
-                  id: "actions.remove",
-                  defaultMessage: "Remove",
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-muted-foreground">
+          {intl.formatMessage({
+            id: "canonical_name",
+            defaultMessage: "Canonical name",
+          })}
+        </span>
+        <Select
+          value="canonical"
+          onValueChange={(value) => {
+            if (value?.startsWith("alias-")) {
+              onPromoteAlias(Number.parseInt(value.slice(6), 10));
+            }
+          }}
+          disabled={disabled}
+        >
+          <SelectTrigger className="min-w-48 flex-1">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="canonical">
+              {canonicalName ||
+                intl.formatMessage({
+                  id: "unnamed",
+                  defaultMessage: "Unnamed",
                 })}
-                onClick={() => remove(i)}
+            </SelectItem>
+            {aliases.map((entry, index) => (
+              <SelectItem
+                key={index}
+                value={`alias-${index}`}
+                disabled={!entry.alias.trim()}
               >
-                <Trash2Icon className="pointer-events-none size-3.5" />
-              </InputGroupButton>
-            </InputGroupAddon>
-          </InputGroup>
-          <Toggle
-            variant="outline"
-            size="sm"
-            pressed={!entry.ignore_auto_tag}
-            onPressedChange={(pressed) => updateAutoTagEnabled(i, pressed)}
-            disabled={disabled}
-            aria-label={intl.formatMessage({
-              id: "performer_alias_auto_tag_aria",
-              defaultMessage: "Use this alias for auto-tagging",
-            })}
-            title={intl.formatMessage({
-              id: "performer_alias_auto_tag_aria",
-              defaultMessage: "Use this alias for auto-tagging",
-            })}
+                {entry.alias ||
+                  intl.formatMessage(
+                    { id: "name_number", defaultMessage: "Name {number}" },
+                    { number: index + 2 },
+                  )}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="grid grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-2">
+        <Crown
+          className="size-4 text-primary"
+          aria-label={intl.formatMessage({
+            id: "canonical_name",
+            defaultMessage: "Canonical name",
+          })}
+        />
+        <Input
+          value={canonicalName}
+          disabled={disabled}
+          onBlur={onCanonicalNameBlur}
+          onChange={(e) => onCanonicalNameChange(e.target.value)}
+        />
+        <Toggle
+          variant="outline"
+          size="sm"
+          pressed={!canonicalIgnoreAutoTag}
+          onPressedChange={(pressed) => onCanonicalAutoTagChange(!pressed)}
+          disabled={disabled}
+          aria-label={intl.formatMessage({
+            id: "performer_name_auto_tag_aria",
+            defaultMessage: "Use this name for auto-tagging",
+          })}
+          title={intl.formatMessage({
+            id: "performer_name_auto_tag_aria",
+            defaultMessage: "Use this name for auto-tagging",
+          })}
+        >
+          {intl.formatMessage({ id: "auto_tag", defaultMessage: "Auto-tag" })}
+        </Toggle>
+        {aliases.map((entry, i) => (
+          <div
+            key={i}
+            className="col-span-3 grid grid-cols-subgrid items-center"
           >
-            {intl.formatMessage({
-              id: "auto_tag",
-              defaultMessage: "Auto-tag",
-            })}
-          </Toggle>
-        </div>
-      ))}
+            <span aria-hidden="true" />
+            <InputGroup className="flex-1">
+              <InputGroupInput
+                value={entry.alias}
+                disabled={disabled}
+                onChange={(e) => updateAlias(i, e.target.value)}
+              />
+              <InputGroupAddon align="inline-end">
+                <InputGroupButton
+                  size="icon-xs"
+                  variant="ghost"
+                  disabled={disabled}
+                  aria-label={intl.formatMessage({
+                    id: "actions.remove",
+                    defaultMessage: "Remove",
+                  })}
+                  onClick={() => remove(i)}
+                >
+                  <Trash2Icon className="pointer-events-none size-3.5" />
+                </InputGroupButton>
+              </InputGroupAddon>
+            </InputGroup>
+            <Toggle
+              variant="outline"
+              size="sm"
+              pressed={!entry.ignore_auto_tag}
+              onPressedChange={(pressed) => updateAutoTagEnabled(i, pressed)}
+              disabled={disabled}
+              aria-label={intl.formatMessage({
+                id: "performer_name_auto_tag_aria",
+                defaultMessage: "Use this name for auto-tagging",
+              })}
+              title={intl.formatMessage({
+                id: "performer_name_auto_tag_aria",
+                defaultMessage: "Use this name for auto-tagging",
+              })}
+            >
+              {intl.formatMessage({
+                id: "auto_tag",
+                defaultMessage: "Auto-tag",
+              })}
+            </Toggle>
+          </div>
+        ))}
+      </div>
       <Button
         type="button"
         variant="outline"
@@ -439,8 +539,8 @@ function AliasListField({ value, onChange, disabled }: AliasListFieldProps) {
       >
         <PlusIcon className="size-3.5" />
         {intl.formatMessage({
-          id: "actions.add_alias",
-          defaultMessage: "Add alias",
+          id: "actions.add_name",
+          defaultMessage: "Add name",
         })}
       </Button>
     </div>
@@ -684,62 +784,76 @@ export function PerformerEditForm(props: PerformerEditFormProps) {
             )}
           </form.Field>
 
-          {/* Name */}
+          {/* Names and aliases use the v2.5 name/aliases fields as a
+              compatibility representation. Promoting an alias swaps the
+              selected text and its auto-tag policy into the name field. */}
           <form.Field
             name="name"
             validators={{ onChange: z.string().min(1, "Required") }}
           >
-            {(field) => {
+            {(nameField) => {
               const hasError =
-                field.state.meta.isTouched &&
-                field.state.meta.errors.length > 0;
+                nameField.state.meta.isTouched &&
+                nameField.state.meta.errors.length > 0;
               return (
                 <Field data-invalid={hasError ? "true" : undefined}>
-                  <FieldLabel htmlFor={field.name}>
-                    {intl.formatMessage({ id: "name", defaultMessage: "Name" })}
+                  <FieldLabel>
+                    {intl.formatMessage({
+                      id: "names_and_aliases",
+                      defaultMessage: "Names and aliases",
+                    })}
                   </FieldLabel>
-                  <Input
-                    id={field.name}
-                    name={field.name}
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    aria-invalid={hasError || undefined}
-                    aria-describedby={
-                      hasError ? `${field.name}-error` : undefined
-                    }
-                    disabled={busy}
-                  />
+                  <form.Subscribe
+                    selector={(state) => ({
+                      aliases: state.values.aliases,
+                      ignoreCanonical:
+                        state.values.ignore_primary_name_auto_tag,
+                    })}
+                  >
+                    {({ aliases, ignoreCanonical }) => (
+                      <PerformerNamesField
+                        canonicalName={nameField.state.value}
+                        canonicalIgnoreAutoTag={ignoreCanonical}
+                        aliases={aliases}
+                        onCanonicalNameChange={nameField.handleChange}
+                        onCanonicalNameBlur={nameField.handleBlur}
+                        onCanonicalAutoTagChange={(ignore) =>
+                          form.setFieldValue(
+                            "ignore_primary_name_auto_tag",
+                            ignore,
+                          )
+                        }
+                        onAliasesChange={(next) =>
+                          form.setFieldValue("aliases", next)
+                        }
+                        onPromoteAlias={(index) => {
+                          const promoted = aliases[index];
+                          if (!promoted) return;
+                          const nextAliases = [...aliases];
+                          nextAliases[index] = {
+                            alias: nameField.state.value,
+                            ignore_auto_tag: ignoreCanonical,
+                          };
+                          nameField.handleChange(promoted.alias);
+                          form.setFieldValue(
+                            "ignore_primary_name_auto_tag",
+                            promoted.ignore_auto_tag,
+                          );
+                          form.setFieldValue("aliases", nextAliases);
+                        }}
+                        disabled={busy}
+                      />
+                    )}
+                  </form.Subscribe>
                   <FieldError
-                    id={`${field.name}-error`}
-                    errors={field.state.meta.errors.map((e) =>
+                    id={`${nameField.name}-error`}
+                    errors={nameField.state.meta.errors.map((e) =>
                       e != null ? { message: String(e) } : undefined,
                     )}
                   />
                 </Field>
               );
             }}
-          </form.Field>
-
-          {/* Aliases — placed directly after Name so the most-likely
-            secondary identity field is visible without scrolling past
-            demographics. */}
-          <form.Field name="aliases">
-            {(field) => (
-              <Field>
-                <FieldLabel>
-                  {intl.formatMessage({
-                    id: "aliases",
-                    defaultMessage: "Aliases",
-                  })}
-                </FieldLabel>
-                <AliasListField
-                  value={field.state.value}
-                  onChange={field.handleChange}
-                  disabled={busy}
-                />
-              </Field>
-            )}
           </form.Field>
 
           {/* Disambiguation */}

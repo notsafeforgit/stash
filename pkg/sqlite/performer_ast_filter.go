@@ -35,6 +35,12 @@ func performerASTConditionHandler(condition *models.FilterASTCondition) (criteri
 	qb := &performerFilterHandler{}
 
 	switch condition.Field {
+	case "names":
+		input, err := decodeASTValue[models.StringCriterionInput](condition.Value)
+		if err != nil {
+			return nil, err
+		}
+		return qb.allNamesCriterionHandler(&input), nil
 	case "name":
 		input, err := decodeASTValue[models.StringCriterionInput](condition.Value)
 		if err != nil {

@@ -23,21 +23,22 @@ type ImageAliasStashIDGetter interface {
 // ToJSON converts a Performer object into its JSON equivalent.
 func ToJSON(ctx context.Context, reader ImageAliasStashIDGetter, performer *models.Performer) (*jsonschema.Performer, error) {
 	newPerformerJSON := jsonschema.Performer{
-		Name:           performer.Name,
-		Disambiguation: performer.Disambiguation,
-		Ethnicity:      performer.Ethnicity,
-		Country:        performer.Country,
-		EyeColor:       performer.EyeColor,
-		Measurements:   performer.Measurements,
-		FakeTits:       performer.FakeTits,
-		Tattoos:        performer.Tattoos,
-		Piercings:      performer.Piercings,
-		Favorite:       performer.Favorite,
-		Details:        performer.Details,
-		HairColor:      performer.HairColor,
-		IgnoreAutoTag:  performer.IgnoreAutoTag,
-		CreatedAt:      json.JSONTime{Time: performer.CreatedAt},
-		UpdatedAt:      json.JSONTime{Time: performer.UpdatedAt},
+		Name:                     performer.Name,
+		Disambiguation:           performer.Disambiguation,
+		Ethnicity:                performer.Ethnicity,
+		Country:                  performer.Country,
+		EyeColor:                 performer.EyeColor,
+		Measurements:             performer.Measurements,
+		FakeTits:                 performer.FakeTits,
+		Tattoos:                  performer.Tattoos,
+		Piercings:                performer.Piercings,
+		Favorite:                 performer.Favorite,
+		Details:                  performer.Details,
+		HairColor:                performer.HairColor,
+		IgnoreAutoTag:            performer.IgnoreAutoTag,
+		IgnorePrimaryNameAutoTag: performer.IgnorePrimaryNameAutoTag,
+		CreatedAt:                json.JSONTime{Time: performer.CreatedAt},
+		UpdatedAt:                json.JSONTime{Time: performer.UpdatedAt},
 	}
 
 	if performer.Gender != nil {

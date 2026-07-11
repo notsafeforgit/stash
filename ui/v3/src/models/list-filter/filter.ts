@@ -30,6 +30,7 @@ import {
   decodeSavedFilterASTNode,
   encodeFilterASTNode,
   encodeFilterASTNodeToSaved,
+  filterASTNodeToLegacyObjectFilter,
   filterASTNodeToGraphQL,
   astSupportsCriterionType,
   pruneInvalidFilterASTNode,
@@ -702,6 +703,11 @@ export class ListFilterModel {
 
     if (!root) return undefined;
     return { root: encodeFilterASTNodeToSaved(root) };
+  }
+
+  public makeLegacyObjectFilter(): Record<string, unknown> {
+    const root = this.makeFilterASTNode(false);
+    return root ? filterASTNodeToLegacyObjectFilter(root) : {};
   }
 
   public makeSavedUIOptions(): SavedUIOptions {

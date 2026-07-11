@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
@@ -17,11 +18,12 @@ import (
 )
 
 const (
-	performerTable         = "performers"
-	performerIDColumn      = "performer_id"
-	performersAliasesTable = "performer_aliases"
-	performerAliasColumn   = "alias"
-	performersTagsTable    = "performers_tags"
+	performerTable                    = "performers"
+	performerIDColumn                 = "performer_id"
+	performersAliasesTable            = "performer_aliases"
+	performerAliasColumn              = "alias"
+	performersTagsTable               = "performers_tags"
+	performerAutoTagIgnoredNamesTable = "fork_performer_autotag_ignored_names"
 
 	performerURLsTable = "performer_urls"
 	performerURLColumn = "url"
@@ -54,13 +56,14 @@ type performerRow struct {
 	CreatedAt            Timestamp   `db:"created_at"`
 	UpdatedAt            Timestamp   `db:"updated_at"`
 	// expressed as 1-100
-	Rating             null.Int    `db:"rating"`
-	Details            zero.String `db:"details"`
-	DeathDate          NullDate    `db:"death_date"`
-	DeathDatePrecision null.Int    `db:"death_date_precision"`
-	HairColor          zero.String `db:"hair_color"`
-	Weight             null.Int    `db:"weight"`
-	IgnoreAutoTag      bool        `db:"ignore_auto_tag"`
+	Rating                   null.Int    `db:"rating"`
+	Details                  zero.String `db:"details"`
+	DeathDate                NullDate    `db:"death_date"`
+	DeathDatePrecision       null.Int    `db:"death_date_precision"`
+	HairColor                zero.String `db:"hair_color"`
+	Weight                   null.Int    `db:"weight"`
+	IgnoreAutoTag            bool        `db:"ignore_auto_tag"`
+	IgnorePrimaryNameAutoTag bool        `db:"ignore_primary_name_auto_tag" goqu:"skipinsert,skipupdate"`
 
 	// not used in resolution or updates
 	ImageBlob zero.String `db:"image_blob"`
@@ -124,12 +127,13 @@ func (r *performerRow) resolve() *models.Performer {
 		CreatedAt:      r.CreatedAt.Timestamp,
 		UpdatedAt:      r.UpdatedAt.Timestamp,
 		// expressed as 1-100
-		Rating:        nullIntPtr(r.Rating),
-		Details:       r.Details.String,
-		DeathDate:     r.DeathDate.DatePtr(r.DeathDatePrecision),
-		HairColor:     r.HairColor.String,
-		Weight:        nullIntPtr(r.Weight),
-		IgnoreAutoTag: r.IgnoreAutoTag,
+		Rating:                   nullIntPtr(r.Rating),
+		Details:                  r.Details.String,
+		DeathDate:                r.DeathDate.DatePtr(r.DeathDatePrecision),
+		HairColor:                r.HairColor.String,
+		Weight:                   nullIntPtr(r.Weight),
+		IgnoreAutoTag:            r.IgnoreAutoTag,
+		IgnorePrimaryNameAutoTag: r.IgnorePrimaryNameAutoTag,
 	}
 
 	if r.Gender.ValueOrZero() != "" {
@@ -262,7 +266,63 @@ func (qb *PerformerStore) table() exp.IdentifierExpression {
 }
 
 func (qb *PerformerStore) selectDataset() *goqu.SelectDataset {
-	return dialect.From(qb.table()).Select(qb.table().All())
+	ignoredPrimaryName := goqu.L(
+		"EXISTS (SELECT 1 FROM fork_performer_autotag_ignored_names WHERE performer_id = performers.id AND name = performers.name)",
+	).As("ignore_primary_name_auto_tag")
+
+	return dialect.From(qb.table()).Select(qb.table().All(), ignoredPrimaryName)
+}
+
+func (qb *PerformerStore) setPrimaryNameAutoTagIgnored(ctx context.Context, performerID int, name string, ignored bool) error {
+	return qb.setAutoTagNameIgnored(ctx, performerID, name, ignored)
+}
+
+func (qb *PerformerStore) setAutoTagNameIgnored(ctx context.Context, performerID int, name string, ignored bool) error {
+	table := goqu.T(performerAutoTagIgnoredNamesTable)
+	deleteQuery := dialect.Delete(table).Where(
+		table.Col(performerIDColumn).Eq(performerID),
+		table.Col("name").Eq(name),
+	)
+	if _, err := exec(ctx, deleteQuery); err != nil {
+		return fmt.Errorf("clearing performer auto-tag name setting: %w", err)
+	}
+
+	if !ignored {
+		return nil
+	}
+
+	insertQuery := dialect.Insert(table).
+		Cols(performerIDColumn, "name").
+		Vals(goqu.Vals{performerID, name}).
+		OnConflict(goqu.DoNothing())
+	if _, err := exec(ctx, insertQuery); err != nil {
+		return fmt.Errorf("setting performer auto-tag name setting: %w", err)
+	}
+
+	return nil
+}
+
+func (qb *PerformerStore) updateAliasAutoTagSettings(ctx context.Context, performerID int, aliases []models.PerformerAlias, mode models.RelationshipUpdateMode) error {
+	table := goqu.T(performerAutoTagIgnoredNamesTable)
+	if mode == models.RelationshipUpdateModeSet {
+		q := dialect.Delete(table).Where(table.Col(performerIDColumn).Eq(performerID)).
+			Where(goqu.L("name != (SELECT name FROM performers WHERE id = ?)", performerID))
+		if _, err := exec(ctx, q); err != nil {
+			return fmt.Errorf("clearing performer alias auto-tag settings: %w", err)
+		}
+	}
+
+	for _, alias := range aliases {
+		ignored := alias.IgnoreAutoTag
+		if mode == models.RelationshipUpdateModeRemove {
+			ignored = false
+		}
+		if err := qb.setAutoTagNameIgnored(ctx, performerID, alias.Alias, ignored); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (qb *PerformerStore) Create(ctx context.Context, newObject *models.CreatePerformerInput) error {
@@ -278,6 +338,13 @@ func (qb *PerformerStore) Create(ctx context.Context, newObject *models.CreatePe
 		if err := performersAliasesTableMgr.insertJoins(ctx, id, newObject.Aliases.List()); err != nil {
 			return err
 		}
+		if err := qb.updateAliasAutoTagSettings(ctx, id, newObject.Aliases.List(), models.RelationshipUpdateModeSet); err != nil {
+			return err
+		}
+	}
+
+	if err := qb.setPrimaryNameAutoTagIgnored(ctx, id, newObject.Name, newObject.IgnorePrimaryNameAutoTag); err != nil {
+		return err
 	}
 
 	if newObject.URLs.Loaded() {
@@ -333,6 +400,19 @@ func (qb *PerformerStore) UpdatePartial(ctx context.Context, id int, partial mod
 		if err := performersAliasesTableMgr.modifyJoins(ctx, id, partial.Aliases.Values, partial.Aliases.Mode); err != nil {
 			return nil, err
 		}
+		if err := qb.updateAliasAutoTagSettings(ctx, id, partial.Aliases.Values, partial.Aliases.Mode); err != nil {
+			return nil, err
+		}
+	}
+
+	if partial.IgnorePrimaryNameAutoTag.Set {
+		performer, err := qb.find(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if err := qb.setPrimaryNameAutoTagIgnored(ctx, id, performer.Name, partial.IgnorePrimaryNameAutoTag.Value); err != nil {
+			return nil, err
+		}
 	}
 
 	if partial.URLs != nil {
@@ -371,6 +451,13 @@ func (qb *PerformerStore) Update(ctx context.Context, updatedObject *models.Upda
 		if err := performersAliasesTableMgr.replaceJoins(ctx, updatedObject.ID, updatedObject.Aliases.List()); err != nil {
 			return err
 		}
+		if err := qb.updateAliasAutoTagSettings(ctx, updatedObject.ID, updatedObject.Aliases.List(), models.RelationshipUpdateModeSet); err != nil {
+			return err
+		}
+	}
+
+	if err := qb.setPrimaryNameAutoTagIgnored(ctx, updatedObject.ID, updatedObject.Name, updatedObject.IgnorePrimaryNameAutoTag); err != nil {
+		return err
 	}
 
 	if updatedObject.URLs.Loaded() {
@@ -421,7 +508,7 @@ func (qb *PerformerStore) FindMany(ctx context.Context, ids []int) ([]*models.Pe
 	ret := make([]*models.Performer, len(ids))
 
 	if err := batchExec(ids, defaultBatchSize, func(batch []int) error {
-		q := goqu.Select("*").From(tableMgr.table).Where(tableMgr.byIDInts(batch...))
+		q := qb.selectDataset().Where(tableMgr.byIDInts(batch...))
 		unsorted, err := qb.getMany(ctx, q)
 		if err != nil {
 			return err
@@ -598,8 +685,14 @@ func (qb *PerformerStore) QueryForAutoTag(ctx context.Context, words []string) (
 	var whereClauses []exp.Expression
 
 	for _, w := range words {
-		whereClauses = append(whereClauses, table.Col("name").Like(w+"%"))
-		whereClauses = append(whereClauses, performersAliasesJoinTable.Col("alias").Like(w+"%"))
+		whereClauses = append(whereClauses, goqu.And(
+			table.Col("name").Like(w+"%"),
+			goqu.L("NOT EXISTS (SELECT 1 FROM fork_performer_autotag_ignored_names WHERE performer_id = performers.id AND name = performers.name)"),
+		))
+		whereClauses = append(whereClauses, goqu.And(
+			performersAliasesJoinTable.Col("alias").Like(w+"%"),
+			goqu.L("NOT EXISTS (SELECT 1 FROM fork_performer_autotag_ignored_names WHERE performer_id = performers.id AND name = performer_aliases.alias)"),
+		))
 	}
 
 	sq = sq.Where(
@@ -951,7 +1044,38 @@ func (qb *PerformerStore) destroyImage(ctx context.Context, performerID int) err
 }
 
 func (qb *PerformerStore) GetPerformerAliases(ctx context.Context, performerID int) ([]models.PerformerAlias, error) {
-	return performersAliasesTableMgr.get(ctx, performerID)
+	aliases, err := performersAliasesTableMgr.get(ctx, performerID)
+	if err != nil {
+		return nil, err
+	}
+
+	table := goqu.T(performerAutoTagIgnoredNamesTable)
+	q := dialect.Select(table.Col("name")).From(table).Where(
+		table.Col(performerIDColumn).Eq(performerID),
+	)
+	var ignoredNames []string
+	const single = false
+	if err := queryFunc(ctx, q, single, func(rows *sqlx.Rows) error {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return err
+		}
+		ignoredNames = append(ignoredNames, name)
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("getting performer alias auto-tag settings: %w", err)
+	}
+
+	for i := range aliases {
+		for _, ignoredName := range ignoredNames {
+			if strings.EqualFold(aliases[i].Alias, ignoredName) {
+				aliases[i].IgnoreAutoTag = true
+				break
+			}
+		}
+	}
+
+	return aliases, nil
 }
 
 func (qb *PerformerStore) GetURLs(ctx context.Context, performerID int) ([]string, error) {

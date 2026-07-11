@@ -58,6 +58,53 @@ interface DeleteFilesListProps {
   paths: readonly string[];
 }
 
+interface DeleteOptionRowProps {
+  checked: boolean;
+  disabled: boolean;
+  label: string;
+  onCheckedChange: (checked: boolean) => void;
+}
+
+function DeleteOptionRow({
+  checked,
+  disabled,
+  label,
+  onCheckedChange,
+}: DeleteOptionRowProps) {
+  function handleRowClick(event: React.MouseEvent<HTMLDivElement>) {
+    if (disabled) return;
+
+    const target = event.target;
+    if (
+      target instanceof Element &&
+      (target.closest('[data-slot="checkbox"]') ||
+        target.closest('input[type="checkbox"]'))
+    ) {
+      return;
+    }
+
+    onCheckedChange(!checked);
+  }
+
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-2.5 text-sm",
+        disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
+      )}
+      onClick={handleRowClick}
+    >
+      <Checkbox
+        aria-label={label}
+        checked={checked}
+        onCheckedChange={onCheckedChange}
+        disabled={disabled}
+      />
+      <span>{label}</span>
+    </div>
+  );
+}
+
 /**
  * Renders a list of file paths suitable for the DeleteDialog `details` slot.
  * Monospace, breakable, no bullets — the slot itself supplies the scroll
@@ -159,25 +206,21 @@ export function DeleteDialog({
 
         {showFileOptions && (
           <div className="flex flex-col gap-3">
-            <label className="flex cursor-pointer items-center gap-2.5 text-sm">
-              <Checkbox
-                checked={deleteFile}
-                onCheckedChange={(c) => setDeleteFile(c === true)}
-                disabled={isDeleting}
-              />
-              {fileLabelText}
-            </label>
-            <label className="flex cursor-pointer items-center gap-2.5 text-sm">
-              <Checkbox
-                checked={deleteGenerated}
-                onCheckedChange={(c) => setDeleteGenerated(c === true)}
-                disabled={isDeleting}
-              />
-              {intl.formatMessage({
+            <DeleteOptionRow
+              label={fileLabelText}
+              checked={deleteFile}
+              onCheckedChange={setDeleteFile}
+              disabled={isDeleting}
+            />
+            <DeleteOptionRow
+              label={intl.formatMessage({
                 id: "dialogs.delete_generated",
                 defaultMessage: "Delete generated supporting files",
               })}
-            </label>
+              checked={deleteGenerated}
+              onCheckedChange={setDeleteGenerated}
+              disabled={isDeleting}
+            />
           </div>
         )}
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -774,6 +775,7 @@ func (r *mutationResolver) PerformerMerge(ctx context.Context, input PerformerMe
 
 	var values *models.PerformerPartial
 	var imageData []byte
+	var imageSourceID *int
 
 	if input.Values != nil {
 		translator := changesetTranslator{
@@ -790,10 +792,15 @@ func (r *mutationResolver) PerformerMerge(ctx context.Context, input PerformerMe
 		}
 
 		if input.Values.Image != nil {
-			var err error
-			imageData, err = r.processEntityImageInput(ctx, *input.Values.Image, true)
-			if err != nil {
-				return nil, fmt.Errorf("processing cover image: %w", err)
+			allowedImageSources := append(append([]int(nil), srcIDs...), destID)
+			if sourceID, ok := performerImageSourceFromURL(*input.Values.Image, allowedImageSources); ok {
+				imageSourceID = &sourceID
+			} else {
+				var err error
+				imageData, err = r.processEntityImageInput(ctx, *input.Values.Image, true)
+				if err != nil {
+					return nil, fmt.Errorf("processing cover image: %w", err)
+				}
 			}
 		}
 	} else {
@@ -811,18 +818,55 @@ func (r *mutationResolver) PerformerMerge(ctx context.Context, input PerformerMe
 		}
 
 		// ensure source performers exist
-		if _, err := qb.FindMany(ctx, srcIDs); err != nil {
+		sources, err := qb.FindMany(ctx, srcIDs)
+		if err != nil {
 			return fmt.Errorf("finding source performers: %w", err)
+		}
+
+		if imageSourceID != nil {
+			imageData, err = qb.GetImage(ctx, *imageSourceID)
+			if err != nil {
+				return fmt.Errorf("reading source performer image: %w", err)
+			}
+		}
+
+		// A selected source name/disambiguation can conflict with that source's
+		// unique performer key until it is deleted. Move source names out of the
+		// way inside this transaction, then retain the established update-before-
+		// merge order for all destination values and relationship changes.
+		if values.Name.Set || values.Disambiguation.Set {
+			finalName := dest.Name
+			if values.Name.Set {
+				finalName = values.Name.Value
+			}
+			finalDisambiguation := dest.Disambiguation
+			if values.Disambiguation.Set {
+				finalDisambiguation = values.Disambiguation.Value
+				if values.Disambiguation.Null {
+					finalDisambiguation = ""
+				}
+			}
+
+			for _, source := range sources {
+				if source.Name != finalName || source.Disambiguation != finalDisambiguation {
+					continue
+				}
+				temporary := models.PerformerPartial{
+					Name: models.NewOptionalString(fmt.Sprintf("\x00stash-merge-%d-%d", destID, source.ID)),
+				}
+				if _, err := qb.UpdatePartial(ctx, source.ID, temporary); err != nil {
+					return fmt.Errorf("preparing source performer %d for merge: %w", source.ID, err)
+				}
+			}
+		}
+
+		dest, err = qb.UpdatePartial(ctx, destID, *values)
+		if err != nil {
+			return fmt.Errorf("updating performer: %w", err)
 		}
 
 		if err := qb.Merge(ctx, srcIDs, destID); err != nil {
 			return fmt.Errorf("merging performers: %w", err)
-		}
-
-		// Remove the sources before applying values so the destination can
-		// safely take a source performer's name and disambiguation.
-		if _, err := qb.UpdatePartial(ctx, destID, *values); err != nil {
-			return fmt.Errorf("updating performer: %w", err)
 		}
 
 		if len(imageData) > 0 {
@@ -837,4 +881,23 @@ func (r *mutationResolver) PerformerMerge(ctx context.Context, input PerformerMe
 	}
 
 	return dest, nil
+}
+
+func performerImageSourceFromURL(imageURL string, allowedIDs []int) (int, bool) {
+	parsed, err := url.Parse(imageURL)
+	if err != nil {
+		return 0, false
+	}
+
+	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+	if len(parts) < 3 || parts[len(parts)-3] != "performer" || parts[len(parts)-1] != "image" {
+		return 0, false
+	}
+
+	id, err := strconv.Atoi(parts[len(parts)-2])
+	if err != nil || !slices.Contains(allowedIDs, id) {
+		return 0, false
+	}
+
+	return id, true
 }

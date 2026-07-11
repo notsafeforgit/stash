@@ -43,29 +43,30 @@ type Performer struct {
 	Country        string   `json:"country,omitempty"`
 	EyeColor       string   `json:"eye_color,omitempty"`
 	// this should be int, but keeping string for backwards compatibility
-	Height        string             `json:"height,omitempty"`
-	Measurements  string             `json:"measurements,omitempty"`
-	FakeTits      string             `json:"fake_tits,omitempty"`
-	PenisLength   float64            `json:"penis_length,omitempty"`
-	Circumcised   string             `json:"circumcised,omitempty"`
-	CareerLength  string             `json:"career_length,omitempty"` // deprecated - for import only
-	CareerStart   string             `json:"career_start,omitempty"`
-	CareerEnd     string             `json:"career_end,omitempty"`
-	Tattoos       string             `json:"tattoos,omitempty"`
-	Piercings     string             `json:"piercings,omitempty"`
-	Aliases       StringOrStringList `json:"aliases,omitempty"`
-	Favorite      bool               `json:"favorite,omitempty"`
-	Tags          []string           `json:"tags,omitempty"`
-	Image         string             `json:"image,omitempty"`
-	CreatedAt     json.JSONTime      `json:"created_at,omitempty"`
-	UpdatedAt     json.JSONTime      `json:"updated_at,omitempty"`
-	Rating        int                `json:"rating,omitempty"`
-	Details       string             `json:"details,omitempty"`
-	DeathDate     string             `json:"death_date,omitempty"`
-	HairColor     string             `json:"hair_color,omitempty"`
-	Weight        int                `json:"weight,omitempty"`
-	StashIDs      []models.StashID   `json:"stash_ids,omitempty"`
-	IgnoreAutoTag bool               `json:"ignore_auto_tag,omitempty"`
+	Height                   string             `json:"height,omitempty"`
+	Measurements             string             `json:"measurements,omitempty"`
+	FakeTits                 string             `json:"fake_tits,omitempty"`
+	PenisLength              float64            `json:"penis_length,omitempty"`
+	Circumcised              string             `json:"circumcised,omitempty"`
+	CareerLength             string             `json:"career_length,omitempty"` // deprecated - for import only
+	CareerStart              string             `json:"career_start,omitempty"`
+	CareerEnd                string             `json:"career_end,omitempty"`
+	Tattoos                  string             `json:"tattoos,omitempty"`
+	Piercings                string             `json:"piercings,omitempty"`
+	Aliases                  StringOrStringList `json:"aliases,omitempty"`
+	Favorite                 bool               `json:"favorite,omitempty"`
+	Tags                     []string           `json:"tags,omitempty"`
+	Image                    string             `json:"image,omitempty"`
+	CreatedAt                json.JSONTime      `json:"created_at,omitempty"`
+	UpdatedAt                json.JSONTime      `json:"updated_at,omitempty"`
+	Rating                   int                `json:"rating,omitempty"`
+	Details                  string             `json:"details,omitempty"`
+	DeathDate                string             `json:"death_date,omitempty"`
+	HairColor                string             `json:"hair_color,omitempty"`
+	Weight                   int                `json:"weight,omitempty"`
+	StashIDs                 []models.StashID   `json:"stash_ids,omitempty"`
+	IgnoreAutoTag            bool               `json:"ignore_auto_tag,omitempty"`
+	IgnorePrimaryNameAutoTag bool               `json:"ignore_primary_name_auto_tag,omitempty"`
 
 	CustomFields map[string]interface{} `json:"custom_fields,omitempty"`
 

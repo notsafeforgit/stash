@@ -421,6 +421,9 @@ func (a *FilterAST) FlatObjectFilter() (map[string]interface{}, bool) {
 	ret := make(map[string]interface{})
 
 	if a.Root.Condition != nil {
+		if a.Root.Condition.Field == "names" {
+			return ret, false
+		}
 		ret[a.Root.Condition.Field] = flatConditionValue(a.Root.Condition.Value)
 		return ret, true
 	}
@@ -437,6 +440,10 @@ func (a *FilterAST) FlatObjectFilter() (map[string]interface{}, bool) {
 	lossless := true
 	for _, child := range a.Root.Group.Children {
 		if child == nil || child.Condition == nil {
+			lossless = false
+			continue
+		}
+		if child.Condition.Field == "names" {
 			lossless = false
 			continue
 		}

@@ -7,6 +7,7 @@ fragment SlimPerformerData on Performer {
   image_path
   favorite
   ignore_auto_tag
+  ignore_primary_name_auto_tag
   country
   birthdate
   ethnicity

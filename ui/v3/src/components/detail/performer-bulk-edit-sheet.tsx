@@ -42,6 +42,7 @@ interface PerformerBulkFormValues {
   fake_tits: string | null | undefined;
   favorite: boolean | undefined;
   ignore_auto_tag: boolean | undefined;
+  ignore_primary_name_auto_tag: boolean | undefined;
   rating100: number | null | undefined;
   tag_ids: GQL.BulkUpdateIds;
 }
@@ -62,6 +63,7 @@ function buildInitialValues(
     fake_tits: undefined,
     favorite: undefined,
     ignore_auto_tag: undefined,
+    ignore_primary_name_auto_tag: undefined,
     rating100: undefined,
     tag_ids: makeBulkUpdateIds([], GQL.BulkUpdateIdMode.Add),
   };
@@ -84,6 +86,7 @@ function buildMutationInput(
     fake_tits: v.fake_tits,
     favorite: v.favorite,
     ignore_auto_tag: v.ignore_auto_tag,
+    ignore_primary_name_auto_tag: v.ignore_primary_name_auto_tag,
     rating100: v.rating100,
     tag_ids: v.tag_ids,
   };
@@ -492,6 +495,25 @@ export function PerformerBulkEditSheet({
                 {intl.formatMessage({
                   id: "ignore_auto_tag",
                   defaultMessage: "Ignore auto-tag",
+                })}
+              </FieldLabel>
+              <BulkBooleanField
+                value={field.state.value}
+                onChange={field.handleChange}
+                disabled={saving}
+              />
+            </Field>
+          )}
+        </form.Field>
+
+        {/* Ignore canonical name during auto-tag */}
+        <form.Field name="ignore_primary_name_auto_tag">
+          {(field) => (
+            <Field>
+              <FieldLabel>
+                {intl.formatMessage({
+                  id: "ignore_primary_name_auto_tag",
+                  defaultMessage: "Ignore canonical name for auto-tag",
                 })}
               </FieldLabel>
               <BulkBooleanField

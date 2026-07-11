@@ -17,10 +17,12 @@ import (
 )
 
 const (
-	fileTable      = "files"
-	videoFileTable = "video_files"
-	imageFileTable = "image_files"
-	fileIDColumn   = "file_id"
+	fileTable              = "files"
+	videoFileTable         = "video_files"
+	imageFileTable         = "image_files"
+	fileIDColumn           = "file_id"
+	videoFileMetadataTable = "fork_video_file_metadata"
+	imageFileMetadataTable = "fork_image_file_metadata"
 
 	videoCaptionsTable    = "video_captions"
 	captionCodeColumn     = "language_code"
@@ -51,25 +53,17 @@ func (r *basicFileRow) fromBasicFile(o models.BaseFile) {
 }
 
 type videoFileRow struct {
-	FileID              models.FileID `db:"file_id"`
-	Format              string        `db:"format"`
-	Width               int           `db:"width"`
-	Height              int           `db:"height"`
-	Duration            float64       `db:"duration"`
-	VideoStreamDuration null.Float    `db:"video_stream_duration"`
-	VideoCodec          string        `db:"video_codec"`
-	AudioCodec          string        `db:"audio_codec"`
-	FrameRate           float64       `db:"frame_rate"`
-	FrameCount          null.Int      `db:"frame_count"`
-	DurationMismatch    bool          `db:"duration_mismatch"`
-	BitRate             int64         `db:"bit_rate"`
-	BitDepth            null.Int      `db:"bit_depth"`
-	ColorRange          null.String   `db:"color_range"`
-	ColorSpace          null.String   `db:"color_space"`
-	ColorTransfer       null.String   `db:"color_transfer"`
-	ColorPrimaries      null.String   `db:"color_primaries"`
-	Interactive         bool          `db:"interactive"`
-	InteractiveSpeed    null.Int      `db:"interactive_speed"`
+	FileID           models.FileID `db:"file_id"`
+	Format           string        `db:"format"`
+	Width            int           `db:"width"`
+	Height           int           `db:"height"`
+	Duration         float64       `db:"duration"`
+	VideoCodec       string        `db:"video_codec"`
+	AudioCodec       string        `db:"audio_codec"`
+	FrameRate        float64       `db:"frame_rate"`
+	BitRate          int64         `db:"bit_rate"`
+	Interactive      bool          `db:"interactive"`
+	InteractiveSpeed null.Int      `db:"interactive_speed"`
 }
 
 func (f *videoFileRow) fromVideoFile(ff models.VideoFile) {
@@ -78,32 +72,19 @@ func (f *videoFileRow) fromVideoFile(ff models.VideoFile) {
 	f.Width = ff.Width
 	f.Height = ff.Height
 	f.Duration = ff.Duration
-	f.VideoStreamDuration = floatFromPtr(ff.VideoStreamDuration)
 	f.VideoCodec = ff.VideoCodec
 	f.AudioCodec = ff.AudioCodec
 	f.FrameRate = ff.FrameRate
-	f.FrameCount = int64FromPtr(ff.FrameCount)
-	f.DurationMismatch = ff.DurationMismatch
 	f.BitRate = ff.BitRate
-	f.BitDepth = intFromPtr(ff.BitDepth)
-	f.ColorRange = stringFromPtr(ff.ColorRange)
-	f.ColorSpace = stringFromPtr(ff.ColorSpace)
-	f.ColorTransfer = stringFromPtr(ff.ColorTransfer)
-	f.ColorPrimaries = stringFromPtr(ff.ColorPrimaries)
 	f.Interactive = ff.Interactive
 	f.InteractiveSpeed = intFromPtr(ff.InteractiveSpeed)
 }
 
 type imageFileRow struct {
-	FileID         models.FileID `db:"file_id"`
-	Format         string        `db:"format"`
-	Width          int           `db:"width"`
-	Height         int           `db:"height"`
-	BitDepth       null.Int      `db:"bit_depth"`
-	ColorRange     null.String   `db:"color_range"`
-	ColorSpace     null.String   `db:"color_space"`
-	ColorTransfer  null.String   `db:"color_transfer"`
-	ColorPrimaries null.String   `db:"color_primaries"`
+	FileID models.FileID `db:"file_id"`
+	Format string        `db:"format"`
+	Width  int           `db:"width"`
+	Height int           `db:"height"`
 }
 
 func (f *imageFileRow) fromImageFile(ff models.ImageFile) {
@@ -111,11 +92,6 @@ func (f *imageFileRow) fromImageFile(ff models.ImageFile) {
 	f.Format = ff.Format
 	f.Width = ff.Width
 	f.Height = ff.Height
-	f.BitDepth = intFromPtr(ff.BitDepth)
-	f.ColorRange = stringFromPtr(ff.ColorRange)
-	f.ColorSpace = stringFromPtr(ff.ColorSpace)
-	f.ColorTransfer = stringFromPtr(ff.ColorTransfer)
-	f.ColorPrimaries = stringFromPtr(ff.ColorPrimaries)
 }
 
 // we redefine this to change the columns around
@@ -167,24 +143,25 @@ func (f *videoFileQueryRow) resolve() *models.VideoFile {
 
 func videoFileQueryColumns() []interface{} {
 	table := videoFileTableMgr.table
+	metadata := goqu.T(videoFileMetadataTable)
 	return []interface{}{
 		table.Col("file_id").As("file_id_video"),
 		table.Col("format").As("video_format"),
 		table.Col("width").As("video_width"),
 		table.Col("height").As("video_height"),
 		table.Col("duration"),
-		table.Col("video_stream_duration"),
+		metadata.Col("video_stream_duration"),
 		table.Col("video_codec"),
 		table.Col("audio_codec"),
 		table.Col("frame_rate"),
-		table.Col("frame_count"),
-		table.Col("duration_mismatch"),
+		metadata.Col("frame_count"),
+		metadata.Col("duration_mismatch"),
 		table.Col("bit_rate"),
-		table.Col("bit_depth").As("video_bit_depth"),
-		table.Col("color_range").As("video_color_range"),
-		table.Col("color_space").As("video_color_space"),
-		table.Col("color_transfer").As("video_color_transfer"),
-		table.Col("color_primaries").As("video_color_primaries"),
+		metadata.Col("bit_depth").As("video_bit_depth"),
+		metadata.Col("color_range").As("video_color_range"),
+		metadata.Col("color_space").As("video_color_space"),
+		metadata.Col("color_transfer").As("video_color_transfer"),
+		metadata.Col("color_primaries").As("video_color_primaries"),
 		table.Col("interactive"),
 		table.Col("interactive_speed"),
 	}
@@ -205,15 +182,16 @@ type imageFileQueryRow struct {
 
 func (imageFileQueryRow) columns(table *table) []interface{} {
 	ex := table.table
+	metadata := goqu.T(imageFileMetadataTable)
 	return []interface{}{
 		ex.Col("format").As("image_format"),
 		ex.Col("width").As("image_width"),
 		ex.Col("height").As("image_height"),
-		ex.Col("bit_depth").As("image_bit_depth"),
-		ex.Col("color_range").As("image_color_range"),
-		ex.Col("color_space").As("image_color_space"),
-		ex.Col("color_transfer").As("image_color_transfer"),
-		ex.Col("color_primaries").As("image_color_primaries"),
+		metadata.Col("bit_depth").As("image_bit_depth"),
+		metadata.Col("color_range").As("image_color_range"),
+		metadata.Col("color_space").As("image_color_space"),
+		metadata.Col("color_transfer").As("image_color_transfer"),
+		metadata.Col("color_primaries").As("image_color_primaries"),
 	}
 }
 
@@ -485,7 +463,7 @@ func (qb *FileStore) createVideoFile(ctx context.Context, id models.FileID, f mo
 		return err
 	}
 
-	return nil
+	return qb.upsertVideoFileMetadata(ctx, id, f)
 }
 
 func (qb *FileStore) updateOrCreateVideoFile(ctx context.Context, id models.FileID, f models.VideoFile) error {
@@ -505,7 +483,7 @@ func (qb *FileStore) updateOrCreateVideoFile(ctx context.Context, id models.File
 		return err
 	}
 
-	return nil
+	return qb.upsertVideoFileMetadata(ctx, id, f)
 }
 
 func (qb *FileStore) createImageFile(ctx context.Context, id models.FileID, f models.ImageFile) error {
@@ -516,7 +494,7 @@ func (qb *FileStore) createImageFile(ctx context.Context, id models.FileID, f mo
 		return err
 	}
 
-	return nil
+	return qb.upsertImageFileMetadata(ctx, id, f)
 }
 
 func (qb *FileStore) updateOrCreateImageFile(ctx context.Context, id models.FileID, f models.ImageFile) error {
@@ -536,7 +514,52 @@ func (qb *FileStore) updateOrCreateImageFile(ctx context.Context, id models.File
 		return err
 	}
 
-	return nil
+	return qb.upsertImageFileMetadata(ctx, id, f)
+}
+
+func upsertFileMetadataRecord(ctx context.Context, tableName string, record goqu.Record) error {
+	update := make(goqu.Record, len(record)-1)
+	for column, value := range record {
+		if column != fileIDColumn {
+			update[column] = value
+		}
+	}
+
+	q := dialect.Insert(goqu.T(tableName)).Rows(record).
+		OnConflict(goqu.DoUpdate(fileIDColumn, update))
+	_, err := exec(ctx, q)
+	return err
+}
+
+func (qb *FileStore) upsertVideoFileMetadata(ctx context.Context, id models.FileID, f models.VideoFile) error {
+	base := f.Base()
+	return upsertFileMetadataRecord(ctx, videoFileMetadataTable, goqu.Record{
+		fileIDColumn:            id,
+		"source_size":           base.Size,
+		"source_mod_time":       Timestamp{Timestamp: base.ModTime},
+		"video_stream_duration": floatFromPtr(f.VideoStreamDuration),
+		"frame_count":           int64FromPtr(f.FrameCount),
+		"duration_mismatch":     f.DurationMismatch,
+		"bit_depth":             intFromPtr(f.BitDepth),
+		"color_range":           stringFromPtr(f.ColorRange),
+		"color_space":           stringFromPtr(f.ColorSpace),
+		"color_transfer":        stringFromPtr(f.ColorTransfer),
+		"color_primaries":       stringFromPtr(f.ColorPrimaries),
+	})
+}
+
+func (qb *FileStore) upsertImageFileMetadata(ctx context.Context, id models.FileID, f models.ImageFile) error {
+	base := f.Base()
+	return upsertFileMetadataRecord(ctx, imageFileMetadataTable, goqu.Record{
+		fileIDColumn:      id,
+		"source_size":     base.Size,
+		"source_mod_time": Timestamp{Timestamp: base.ModTime},
+		"bit_depth":       intFromPtr(f.BitDepth),
+		"color_range":     stringFromPtr(f.ColorRange),
+		"color_space":     stringFromPtr(f.ColorSpace),
+		"color_transfer":  stringFromPtr(f.ColorTransfer),
+		"color_primaries": stringFromPtr(f.ColorPrimaries),
+	})
 }
 
 func (qb *FileStore) selectDataset() *goqu.SelectDataset {
@@ -546,6 +569,8 @@ func (qb *FileStore) selectDataset() *goqu.SelectDataset {
 	fingerprintTable := fingerprintTableMgr.table
 	videoFileTable := videoFileTableMgr.table
 	imageFileTable := imageFileTableMgr.table
+	videoMetadataTable := goqu.T(videoFileMetadataTable)
+	imageMetadataTable := goqu.T(imageFileMetadataTable)
 
 	zipFileTable := table.As("zip_files")
 	zipFolderTable := folderTable.As("zip_files_folders")
@@ -585,6 +610,12 @@ func (qb *FileStore) selectDataset() *goqu.SelectDataset {
 	).LeftJoin(
 		imageFileTable,
 		goqu.On(table.Col(idColumn).Eq(imageFileTable.Col(fileIDColumn))),
+	).LeftJoin(
+		videoMetadataTable,
+		goqu.On(table.Col(idColumn).Eq(videoMetadataTable.Col(fileIDColumn))),
+	).LeftJoin(
+		imageMetadataTable,
+		goqu.On(table.Col(idColumn).Eq(imageMetadataTable.Col(fileIDColumn))),
 	).LeftJoin(
 		zipFileTable,
 		goqu.On(table.Col("zip_file_id").Eq(zipFileTable.Col("id"))),

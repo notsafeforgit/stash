@@ -124,7 +124,7 @@ export function PerformerScrapeMergeDialog({
      *  differs from the current name, the "loser" of that decision is
      *  surfaced as an alias addition. Computed at render/apply time
      *  from the name row's accept state. */
-    extraAliasAddition?: string;
+    extraAliasAddition?: AliasEntry;
   };
   type PreparedRow = {
     key: string;
@@ -132,14 +132,21 @@ export function PerformerScrapeMergeDialog({
     apply: (
       patch: Partial<PerformerFormValues>,
       mergeMode: MergeMode,
-      extraAliasAddition?: string,
+      extraAliasAddition?: AliasEntry,
     ) => void;
   };
 
   const stringRows = useMemo<PreparedRow[]>(() => {
     if (!scraped) return [];
     const defs: SimpleStringFieldDef<keyof PerformerFormValues>[] = [
-      { field: "name", label: "Name", scrapedValue: scraped.name },
+      {
+        field: "name",
+        label: intl.formatMessage({
+          id: "canonical_name",
+          defaultMessage: "Canonical name",
+        }),
+        scrapedValue: scraped.name,
+      },
       {
         field: "disambiguation",
         label: "Disambiguation",
@@ -298,21 +305,33 @@ export function PerformerScrapeMergeDialog({
     if (sameSet && !nameDiffers) return null;
     if (baseIncoming.length === 0 && !nameDiffers) return null;
 
-    function withExtra(extra: string | undefined): {
+    function withExtra(extra: AliasEntry | undefined): {
       incoming: AliasEntry[];
       additions: AliasEntry[];
     } {
       if (!extra) {
         return { incoming: baseIncoming, additions: baseAdditions };
       }
-      const k = extra.toLowerCase();
-      if (existingNamesLC.has(k) || baseIncomingLC.has(k)) {
+      const k = extra.alias.toLowerCase();
+      if (existingNamesLC.has(k)) {
         return { incoming: baseIncoming, additions: baseAdditions };
       }
-      const entry: AliasEntry = { alias: extra, ignore_auto_tag: false };
+      if (baseIncomingLC.has(k)) {
+        const withPolicy = (entry: AliasEntry) =>
+          entry.alias.toLowerCase() === k
+            ? {
+                ...entry,
+                ignore_auto_tag: entry.ignore_auto_tag || extra.ignore_auto_tag,
+              }
+            : entry;
+        return {
+          incoming: baseIncoming.map(withPolicy),
+          additions: baseAdditions.map(withPolicy),
+        };
+      }
       return {
-        incoming: [...baseIncoming, entry],
-        additions: [...baseAdditions, entry],
+        incoming: [...baseIncoming, extra],
+        additions: [...baseAdditions, extra],
       };
     }
 
@@ -337,7 +356,10 @@ export function PerformerScrapeMergeDialog({
         return (
           <RowShell
             key="aliases"
-            label="Aliases"
+            label={intl.formatMessage({
+              id: "names_and_aliases",
+              defaultMessage: "Names and aliases",
+            })}
             accepted={accepted}
             onAcceptedChange={setAccepted}
             mergeMode={allowMergeMode ? mergeMode : undefined}
@@ -586,11 +608,31 @@ export function PerformerScrapeMergeDialog({
   // silently lost when they differ. Returns `undefined` when the names
   // match (or the scraped payload has no name) — in that case the name
   // row doesn't render and there's nothing to fold in.
-  function computeLoserName(): string | undefined {
+  function autoTagPolicyFor(name: string): boolean {
+    const key = name.trim().toLowerCase();
+    if (key === current.name.trim().toLowerCase()) {
+      return current.ignore_primary_name_auto_tag;
+    }
+    return (
+      current.aliases.find((alias) => alias.alias.trim().toLowerCase() === key)
+        ?.ignore_auto_tag ?? false
+    );
+  }
+
+  function computeLoserName(): AliasEntry | undefined {
     const scrapedName = scraped?.name?.trim() ?? "";
     const currentName = current.name.trim();
-    if (!scrapedName || scrapedName === currentName) return undefined;
-    return isAccepted("name") ? currentName : scrapedName;
+    if (
+      !scrapedName ||
+      scrapedName.toLowerCase() === currentName.toLowerCase()
+    ) {
+      return undefined;
+    }
+    const alias = isAccepted("name") ? currentName : scrapedName;
+    return {
+      alias,
+      ignore_auto_tag: autoTagPolicyFor(alias),
+    };
   }
 
   async function handleApply() {
@@ -608,6 +650,9 @@ export function PerformerScrapeMergeDialog({
             row.key === "aliases" ? loserName : undefined,
           );
         }
+      }
+      if (patch.name) {
+        patch.ignore_primary_name_auto_tag = autoTagPolicyFor(patch.name);
       }
 
       // Image lives outside the PreparedRow plumbing. Apply if accepted and

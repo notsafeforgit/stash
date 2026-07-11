@@ -51,8 +51,8 @@ import {
   TableToolbarSlot,
   useDeclareTableToolbarProvider,
 } from "src/components/list/table-toolbar-slot";
-import { useConfigureUISetting } from "src/hooks/config";
-import { useToast } from "src/hooks/toast";
+import { useDefaultFilterActions } from "src/hooks/default-filter";
+import { DefaultFilterConflict } from "src/components/filters/default-filter-conflict";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -161,11 +161,9 @@ export const MobileListBar: React.FC<MobileListBarProps> = ({
   sortOptions: sortOptionsOverride,
 }) => {
   const intl = useIntl();
-  const Toast = useToast();
   const [navOpen, setNavOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingDefault, setSettingDefault] = useState(false);
-  const [saveUISetting] = useConfigureUISetting();
+  const defaultFilter = useDefaultFilterActions(view, filter);
 
   const onSearch = useCallback(
     (value: string) => {
@@ -222,30 +220,6 @@ export const MobileListBar: React.FC<MobileListBarProps> = ({
   function setDisplayMode(mode: DisplayMode) {
     setFilter(filter.setDisplayMode(mode));
   }
-
-  const onSetDefaultFilter = useCallback(async () => {
-    if (!view) return;
-    const filterCopy = filter.clone();
-    try {
-      setSettingDefault(true);
-      await saveUISetting({
-        variables: {
-          key: `defaultFilters.${view}`,
-          value: {
-            mode: filter.mode,
-            find_filter: filterCopy.makeFindFilter(),
-            filter_ast: filterCopy.makeFilterAst(),
-            ui_options: filterCopy.makeSavedUIOptions(),
-          },
-        },
-      });
-      Toast.success(intl.formatMessage({ id: "toast.default_filter_set" }));
-    } catch (error) {
-      Toast.error(error);
-    } finally {
-      setSettingDefault(false);
-    }
-  }, [view, filter, saveUISetting, intl, Toast]);
 
   return (
     <>
@@ -516,11 +490,32 @@ export const MobileListBar: React.FC<MobileListBarProps> = ({
               <Button
                 variant="outline"
                 size="sm"
-                disabled={settingDefault}
-                onClick={onSetDefaultFilter}
+                disabled={defaultFilter.saving}
+                onClick={defaultFilter.setCurrent}
               >
                 <FormattedMessage id="actions.set_current_sort_as_default" />
               </Button>
+              {defaultFilter.hasDefault && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={defaultFilter.saving}
+                  onClick={defaultFilter.clear}
+                >
+                  <X size={14} />
+                  <FormattedMessage
+                    id="actions.clear_default_filter"
+                    defaultMessage="Clear default"
+                  />
+                </Button>
+              )}
+              {defaultFilter.hasConflict && (
+                <DefaultFilterConflict
+                  disabled={defaultFilter.saving}
+                  onUseLegacy={defaultFilter.useLegacy}
+                  onKeepV3={defaultFilter.keepV3}
+                />
+              )}
             </div>
           )}
         </div>

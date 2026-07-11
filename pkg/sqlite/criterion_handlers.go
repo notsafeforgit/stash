@@ -315,7 +315,7 @@ func durationMismatchCriterionHandler(c *bool, addJoinFn func(f *filterBuilder, 
 			addJoinFn(f, joinTypeInner)
 		}
 
-		const mismatch = "video_files.duration_mismatch OR (video_files.video_stream_duration IS NOT NULL AND ABS(video_files.duration - video_files.video_stream_duration) > 0.5)"
+		const mismatch = "COALESCE(fork_video_file_metadata.duration_mismatch, 0) OR (fork_video_file_metadata.video_stream_duration IS NOT NULL AND ABS(video_files.duration - fork_video_file_metadata.video_stream_duration) > 0.5)"
 		if *c {
 			f.addWhere(mismatch)
 			return

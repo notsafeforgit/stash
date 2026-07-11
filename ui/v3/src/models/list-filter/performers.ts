@@ -90,7 +90,6 @@ const numberCriteria: CriterionType[] = [
 ];
 
 const stringCriteria: CriterionType[] = [
-  "name",
   "disambiguation",
   "details",
   "ethnicity",
@@ -100,7 +99,6 @@ const stringCriteria: CriterionType[] = [
   "fake_tits",
   "tattoos",
   "piercings",
-  "aliases",
 ];
 
 const criterionOptions = [
@@ -113,6 +111,9 @@ const criterionOptions = [
   StudiosCriterionOption,
   StashIDCriterionOption,
   createStringCriterionOption("url"),
+  createStringCriterionOption("names"),
+  createStringCriterionOption("name", "canonical_name"),
+  createStringCriterionOption("aliases"),
   RatingCriterionOption,
   createMandatoryNumberCriterionOption("tag_count"),
   createMandatoryNumberCriterionOption("scene_count"),

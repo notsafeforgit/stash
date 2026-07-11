@@ -243,6 +243,25 @@ export function PerformerMergeDialog({
           const finalNameLC = (updateValues.name ?? destinationPerformer.name)
             .trim()
             .toLowerCase();
+          const namePolicies = new Map<string, boolean>();
+          for (const performer of [
+            destinationPerformer,
+            ...sourceRefs.map((source) => source.entity),
+          ]) {
+            const canonicalKey = performer.name.trim().toLowerCase();
+            namePolicies.set(
+              canonicalKey,
+              (namePolicies.get(canonicalKey) ?? false) ||
+                performer.ignore_primary_name_auto_tag,
+            );
+            for (const alias of performer.aliases ?? []) {
+              const key = alias.alias.trim().toLowerCase();
+              namePolicies.set(
+                key,
+                (namePolicies.get(key) ?? false) || alias.ignore_auto_tag,
+              );
+            }
+          }
           const baseAliases =
             updateValues.aliases ??
             destinationPerformer.aliases?.map((a) => ({
@@ -256,18 +275,33 @@ export function PerformerMergeDialog({
             const k = a.alias.trim().toLowerCase();
             if (!k || k === finalNameLC || seen.has(k)) continue;
             seen.add(k);
-            merged.push({ alias: a.alias, ignore_auto_tag: a.ignore_auto_tag });
+            merged.push({
+              alias: a.alias,
+              ignore_auto_tag:
+                a.ignore_auto_tag || (namePolicies.get(k) ?? false),
+            });
           }
-          for (const name of [
-            destinationPerformer.name,
-            ...sourceRefs.map((s) => s.entity.name),
+          for (const [name, ignoreAutoTag] of [
+            [
+              destinationPerformer.name,
+              destinationPerformer.ignore_primary_name_auto_tag,
+            ] as const,
+            ...sourceRefs.map(
+              (source) =>
+                [
+                  source.entity.name,
+                  source.entity.ignore_primary_name_auto_tag,
+                ] as const,
+            ),
           ]) {
             const trimmed = name.trim();
             const k = trimmed.toLowerCase();
             if (!trimmed || k === finalNameLC || seen.has(k)) continue;
             seen.add(k);
-            merged.push({ alias: trimmed, ignore_auto_tag: false });
+            merged.push({ alias: trimmed, ignore_auto_tag: ignoreAutoTag });
           }
+          updateValues.ignore_primary_name_auto_tag =
+            namePolicies.get(finalNameLC) ?? false;
           updateValues.aliases = merged;
         }
         const result = await mergePerformer({

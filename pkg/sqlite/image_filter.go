@@ -89,7 +89,7 @@ func (qb *imageFilterHandler) criterionHandler() criterionHandler {
 		qb.urlsCriterionHandler(imageFilter.URL),
 
 		resolutionCriterionHandler(imageFilter.Resolution, "image_files.height", "image_files.width", imageRepository.addImageFilesTable),
-		intCriterionHandler(imageFilter.BitDepth, "image_files.bit_depth", imageRepository.addImageFilesTable),
+		intCriterionHandler(imageFilter.BitDepth, "fork_image_file_metadata.bit_depth", imageRepository.addImageFileMetadataTable),
 		orientationCriterionHandler(imageFilter.Orientation, "image_files.height", "image_files.width", imageRepository.addImageFilesTable),
 		qb.missingCriterionHandler(imageFilter.IsMissing),
 

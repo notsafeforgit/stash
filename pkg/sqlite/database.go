@@ -205,6 +205,10 @@ func (db *Database) Open(dbPath string) error {
 				RequiredForkSchemaVersion: GetRequiredForkSchemaVersion(),
 			}
 		}
+
+		if err := db.runForkReconcilers(); err != nil {
+			return fmt.Errorf("reconciling fork data: %w", err)
+		}
 	}
 
 	if err := db.initialise(); err != nil {

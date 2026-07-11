@@ -1,6 +1,14 @@
 package match
 
-import "testing"
+import (
+	"context"
+	"testing"
+
+	"github.com/stashapp/stash/pkg/models"
+	"github.com/stashapp/stash/pkg/models/mocks"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+)
 
 func Test_nameMatchesPath(t *testing.T) {
 	const name = "first last"
@@ -98,4 +106,29 @@ func Test_nameMatchesPath(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPathToPerformersCanIgnoreOnlyName(t *testing.T) {
+	ctx := context.Background()
+	performer := &models.Performer{
+		ID:                       1,
+		Name:                     "Tia",
+		IgnorePrimaryNameAutoTag: true,
+		Aliases: models.NewRelatedPerformerAliases([]models.PerformerAlias{
+			{Alias: "Preferred Alias"},
+		}),
+	}
+	db := mocks.NewDatabase()
+	db.Performer.On("QueryForAutoTag", ctx, mock.Anything).
+		Return([]*models.Performer{performer}, nil).Twice()
+	cache := &Cache{singleCharPerformers: []*models.Performer{}}
+
+	byName, err := PathToPerformers(ctx, "/library/Tia/scene.mp4", db.Performer, cache, true)
+	assert.NoError(t, err)
+	assert.Empty(t, byName)
+
+	byAlias, err := PathToPerformers(ctx, "/library/Preferred Alias/scene.mp4", db.Performer, cache, true)
+	assert.NoError(t, err)
+	assert.Equal(t, []*models.Performer{performer}, byAlias)
+	db.AssertExpectations(t)
 }

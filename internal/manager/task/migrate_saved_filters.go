@@ -230,7 +230,6 @@ func (j *MigrateLegacySavedFiltersJob) migrateDefaultFilters(ctx context.Context
 			}
 
 			filter.filter["filter_ast"] = astMap
-			delete(filter.filter, "object_filter")
 			migrated++
 		})
 	}

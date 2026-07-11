@@ -261,5 +261,15 @@ func (db *Database) RunAllMigrations() error {
 		return err
 	}
 
-	return nil
+	return m.RunForkReconcilers(ctx)
+}
+
+func (db *Database) runForkReconcilers() error {
+	m, err := NewMigrator(db)
+	if err != nil {
+		return err
+	}
+	defer m.Close()
+
+	return m.RunForkReconcilers(context.Background())
 }

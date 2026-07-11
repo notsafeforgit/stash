@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Stash is a self-hosted media organizer written in Go (backend) + React/TypeScript (frontend). It exposes a GraphQL API, manages a SQLite database, and wraps FFmpeg for video processing.
 
-This repository is a **tracking fork** of upstream stashapp/stash. Before syncing with upstream, adding database migrations, or changing the GraphQL schema, read [FORK.md](FORK.md) — it documents the merge-based sync playbook, the separate fork migration track and its hazards, and the design rules that keep the fork mergeable (additive schema changes only; fork logic in fork-owned files).
+This repository is a **tracking fork** of upstream stashapp/stash. Before syncing with upstream, adding database migrations, or changing the GraphQL schema, read [FORK.md](FORK.md) — it documents the merge-based sync playbook, the separate fork migration track and its hazards, and the design rules that keep the fork mergeable (additive schema changes only; fork logic in fork-owned files). The eventual one-way removal of v2.5 compatibility is specified in [docs/v3-schema-promotion.md](docs/v3-schema-promotion.md).
 
 ## Development quickstart
 
@@ -181,7 +181,13 @@ The codebase has a two-filter system:
 
 ### Saved filters — AST canonical, v2.5 API compat as a removable layer
 
-Saved filters persist criteria as a FilterAST (`saved_filters.filter_ast` column, fork migration 2 converts legacy rows including the transitional `__filter_ast` compact key and v2.5 `excluded`-value splits). Condition values inside the persisted AST use the **labeled saved-criterion shape** (`{value, modifier, field?}`, e.g. `[{id, label}]` items) — *not* the GraphQL input shape used by the `*_filter_ast` query arguments. The model's `ObjectFilter` field only carries data for rows/imports that failed conversion.
+Saved filters persist criteria as a FilterAST in `fork_saved_filter_state`. The consolidated fork migration converts legacy rows, including the transitional `__filter_ast` compact key and v2.5 `excluded`-value splits, while `saved_filters.object_filter` remains a v2.5-compatible projection. Condition values inside the persisted AST use the **labeled saved-criterion shape** (`{value, modifier, field?}`, e.g. `[{id, label}]` items) — *not* the GraphQL input shape used by the `*_filter_ast` query arguments. The sidecar's compatibility shadow lets the v3 startup reconciler detect object-filter edits made by an upstream-only server. It imports those edits only for losslessly flat-representable ASTs; for complex v3 ASTs it keeps the canonical AST and records the conflicting v2.5 value in `pending_legacy_object_filter`.
+
+Default filters use the same contract without changing the upstream schema. `defaultFilters.<view>` contains `filter_ast` plus a v2.5-readable `object_filter` projection; `forkDefaultFilterState.<view>` is an unknown-to-v2.5 UI config key containing the canonical AST, the last legacy shadow, and any pending v2.5 conflict. `internal/manager/default_filter_compat.go` reconciles these at startup. v3 set/clear actions write a complete UI config snapshot so nested criteria maps are replaced rather than deep-merged. When a v2.5 edit conflicts with a complex AST, the list UI offers **Use v2.5** or **Keep v3** instead of discarding either value.
+
+### Performer names
+
+v2.5 storage remains `performers.name` plus `performer_aliases`, but v3 treats both as one set of names with one canonical member. The performer editor's canonical selector swaps the selected alias into `name` and the previous canonical value into `aliases`, carrying each text value's auto-tag setting with it. Performer merge and scrape-merge must use the same rule: every retained name carries its policy, and selecting an existing name as canonical adopts that name's policy. `fork_performer_autotag_ignored_names` is a case-insensitive set keyed by `(performer_id, name)`; policy follows name text rather than the primary/alias role. Free performer search already searches both sources. The v3 AST filter `names` searches all names, while `name` means canonical only and `aliases` means aliases only. `names` is deliberately omitted from v2.5 flat projections because there is no equivalent legacy criterion.
 
 The v2.5 saved-filter API keeps working for mainline clients through two shims (`pkg/models/filter_ast_compat.go` + resolvers), both deletable once v2.5 support is dropped:
 - **Read**: `SavedFilter.object_filter` resolves by flattening the AST into the flat v2.5 criteria map (`FlatObjectFilter`). Lossy for OR groups, nesting, and repeated fields; modifier-less wrapper values (custom_fields) unwrap to their bare legacy shape.

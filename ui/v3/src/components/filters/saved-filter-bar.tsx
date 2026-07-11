@@ -1,6 +1,7 @@
 import type React from "react";
 import { useCallback, useMemo, useState, useEffect } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
+import { X } from "lucide-react";
 import { Button } from "src/components/ui/button";
 import {
   PinButton,
@@ -13,7 +14,8 @@ import { useFindSavedFilters, useSaveFilter } from "src/core/saved-filters";
 import { useToast } from "src/hooks/toast";
 import { getPinnedSavedFiltersKey } from "./filter-builder-types";
 import type { View } from "src/components/list/views";
-import { useConfigureUISetting } from "src/hooks/config";
+import { useDefaultFilterActions } from "src/hooks/default-filter";
+import { DefaultFilterConflict } from "./default-filter-conflict";
 
 function readPinnedSavedFilters(mode: string): string[] {
   if (typeof window === "undefined") return [];
@@ -77,9 +79,8 @@ export const SavedFilterBar: React.FC<{
   const saveFilter = useSaveFilter();
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [settingDefault, setSettingDefault] = useState(false);
   const { pinnedIds, togglePinned } = usePinnedSavedFilters(filter.mode);
-  const [saveUISetting] = useConfigureUISetting();
+  const defaultFilter = useDefaultFilterActions(view, filter);
 
   const savedFilters = useMemo(
     () => data?.findSavedFilters ?? previousData?.findSavedFilters ?? [],
@@ -137,30 +138,6 @@ export const SavedFilterBar: React.FC<{
     [filter, intl, onCurrentSavedFilterChange, refetch, saveFilter, Toast],
   );
 
-  const onSetDefaultFilter = useCallback(async () => {
-    if (!view) return;
-    const filterCopy = filter.clone();
-    try {
-      setSettingDefault(true);
-      await saveUISetting({
-        variables: {
-          key: `defaultFilters.${view}`,
-          value: {
-            mode: filter.mode,
-            find_filter: filterCopy.makeFindFilter(),
-            filter_ast: filterCopy.makeFilterAst(),
-            ui_options: filterCopy.makeSavedUIOptions(),
-          },
-        },
-      });
-      Toast.success(intl.formatMessage({ id: "toast.default_filter_set" }));
-    } catch (error) {
-      Toast.error(error);
-    } finally {
-      setSettingDefault(false);
-    }
-  }, [view, filter, saveUISetting, intl, Toast]);
-
   const triggerLabel =
     currentSavedFilterName ??
     intl.formatMessage({
@@ -213,11 +190,32 @@ export const SavedFilterBar: React.FC<{
             <Button
               variant="outline"
               size="sm"
-              disabled={settingDefault}
-              onClick={onSetDefaultFilter}
+              disabled={defaultFilter.saving}
+              onClick={defaultFilter.setCurrent}
             >
               <FormattedMessage id="actions.set_current_filter_as_default" />
             </Button>
+            {defaultFilter.hasDefault && (
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={defaultFilter.saving}
+                onClick={defaultFilter.clear}
+              >
+                <X size={14} />
+                <FormattedMessage
+                  id="actions.clear_default_filter"
+                  defaultMessage="Clear default"
+                />
+              </Button>
+            )}
+            {defaultFilter.hasConflict && (
+              <DefaultFilterConflict
+                disabled={defaultFilter.saving}
+                onUseLegacy={defaultFilter.useLegacy}
+                onKeepV3={defaultFilter.keepV3}
+              />
+            )}
           </div>
         )}
       </div>

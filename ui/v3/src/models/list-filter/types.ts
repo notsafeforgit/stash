@@ -144,6 +144,7 @@ export interface IOptionType {
 }
 
 export type CriterionType =
+  | "names"
   | "path"
   | "rating100"
   | "organized"

@@ -27,12 +27,13 @@ type Performer struct {
 	CreatedAt      time.Time        `json:"created_at"`
 	UpdatedAt      time.Time        `json:"updated_at"`
 	// Rating expressed in 1-100 scale
-	Rating        *int   `json:"rating"`
-	Details       string `json:"details"`
-	DeathDate     *Date  `json:"death_date"`
-	HairColor     string `json:"hair_color"`
-	Weight        *int   `json:"weight"`
-	IgnoreAutoTag bool   `json:"ignore_auto_tag"`
+	Rating                   *int   `json:"rating"`
+	Details                  string `json:"details"`
+	DeathDate                *Date  `json:"death_date"`
+	HairColor                string `json:"hair_color"`
+	Weight                   *int   `json:"weight"`
+	IgnoreAutoTag            bool   `json:"ignore_auto_tag"`
+	IgnorePrimaryNameAutoTag bool   `json:"ignore_primary_name_auto_tag"`
 
 	Aliases  RelatedPerformerAliases `json:"aliases"`
 	URLs     RelatedStrings          `json:"urls"`
@@ -84,12 +85,13 @@ type PerformerPartial struct {
 	CreatedAt      OptionalTime
 	UpdatedAt      OptionalTime
 	// Rating expressed in 1-100 scale
-	Rating        OptionalInt
-	Details       OptionalString
-	DeathDate     OptionalDate
-	HairColor     OptionalString
-	Weight        OptionalInt
-	IgnoreAutoTag OptionalBool
+	Rating                   OptionalInt
+	Details                  OptionalString
+	DeathDate                OptionalDate
+	HairColor                OptionalString
+	Weight                   OptionalInt
+	IgnoreAutoTag            OptionalBool
+	IgnorePrimaryNameAutoTag OptionalBool
 
 	Aliases  *UpdatePerformerAliases
 	TagIDs   *UpdateIDs
@@ -109,6 +111,29 @@ func (s *Performer) LoadAliases(ctx context.Context, l PerformerAliasLoader) err
 	return s.Aliases.load(func() ([]PerformerAlias, error) {
 		return l.GetPerformerAliases(ctx, s.ID)
 	})
+}
+
+type PerformerAutoTagName struct {
+	Name          string
+	IgnoreAutoTag bool
+}
+
+// AutoTagNames returns the primary name and aliases as equivalent auto-tag
+// candidates. Aliases must be loaded before calling this method.
+func (s *Performer) AutoTagNames() []PerformerAutoTagName {
+	ret := []PerformerAutoTagName{{
+		Name:          s.Name,
+		IgnoreAutoTag: s.IgnorePrimaryNameAutoTag,
+	}}
+
+	for _, alias := range s.Aliases.List() {
+		ret = append(ret, PerformerAutoTagName{
+			Name:          alias.Alias,
+			IgnoreAutoTag: alias.IgnoreAutoTag,
+		})
+	}
+
+	return ret
 }
 
 func (s *Performer) LoadURLs(ctx context.Context, l URLLoader) error {

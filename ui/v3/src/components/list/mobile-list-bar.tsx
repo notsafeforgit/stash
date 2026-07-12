@@ -53,6 +53,7 @@ import {
 } from "src/components/list/table-toolbar-slot";
 import { useDefaultFilterActions } from "src/hooks/default-filter";
 import { DefaultFilterConflict } from "src/components/filters/default-filter-conflict";
+import { useVisualViewportBottomInset } from "src/hooks/use-visual-viewport-bottom-inset";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -164,6 +165,8 @@ export const MobileListBar: React.FC<MobileListBarProps> = ({
   const [navOpen, setNavOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const defaultFilter = useDefaultFilterActions(view, filter);
+  const { bottomInset, ref: barRef } =
+    useVisualViewportBottomInset<HTMLDivElement>();
 
   const onSearch = useCallback(
     (value: string) => {
@@ -522,7 +525,15 @@ export const MobileListBar: React.FC<MobileListBarProps> = ({
       </BottomSheet>
 
       {/* ── Bottom bar ────────────────────────────────────────────────────────── */}
-      <div className="flex flex-col bg-background border-t border-border shrink-0 pb-[env(safe-area-inset-bottom,0px)]">
+      <div
+        ref={barRef}
+        className="relative z-50 flex flex-col bg-background border-t border-border shrink-0 pb-[env(safe-area-inset-bottom,0px)]"
+        style={
+          bottomInset > 0
+            ? { transform: `translateY(-${bottomInset}px)` }
+            : undefined
+        }
+      >
         {/* Pagination strip */}
         <div className="grid grid-cols-[1fr_auto_1fr] items-center border-b border-border/50 px-1 py-0.5">
           <div className="flex items-center gap-0.5">

@@ -19,7 +19,10 @@ export function AppShell() {
   const isDetailPage = DETAIL_ROUTE_RE.test(pathname);
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
+    <div
+      data-app-viewport
+      className="flex h-dvh flex-col overflow-hidden bg-background text-foreground"
+    >
       <Header />
       <DownloadProgressBar />
       <DownloadNotifications />

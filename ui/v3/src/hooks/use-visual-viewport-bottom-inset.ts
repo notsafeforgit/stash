@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 interface VisualViewportGeometry {
   height: number;
@@ -30,6 +30,7 @@ function acceptsTextInput(element: Element | null) {
 export function useVisualViewportBottomInset<T extends HTMLElement>() {
   const [element, setElement] = useState<T | null>(null);
   const [bottomInset, setBottomInset] = useState(0);
+  const updateRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     if (!element) return;
@@ -47,7 +48,13 @@ export function useVisualViewportBottomInset<T extends HTMLElement>() {
 
       setBottomInset(
         hasFocusedInput
-          ? calculateVisualViewportBottomInset(window.innerHeight, viewport)
+          ? calculateVisualViewportBottomInset(
+              element
+                .closest<HTMLElement>("[data-app-viewport]")
+                ?.getBoundingClientRect().height ??
+                document.documentElement.clientHeight,
+              viewport,
+            )
           : 0,
       );
     };
@@ -57,6 +64,8 @@ export function useVisualViewportBottomInset<T extends HTMLElement>() {
       frame = requestAnimationFrame(update);
     };
 
+    updateRef.current = update;
+
     element.addEventListener("focusin", scheduleUpdate);
     element.addEventListener("focusout", scheduleUpdate);
     viewport.addEventListener("resize", scheduleUpdate);
@@ -65,6 +74,7 @@ export function useVisualViewportBottomInset<T extends HTMLElement>() {
     scheduleUpdate();
 
     return () => {
+      updateRef.current = () => {};
       if (frame !== null) cancelAnimationFrame(frame);
       element.removeEventListener("focusin", scheduleUpdate);
       element.removeEventListener("focusout", scheduleUpdate);
@@ -73,6 +83,12 @@ export function useVisualViewportBottomInset<T extends HTMLElement>() {
       window.removeEventListener("resize", scheduleUpdate);
     };
   }, [element]);
+
+  // Query completion can make mobile WebKit reset its automatic viewport pan
+  // without consistently emitting another VisualViewport event. Re-measure
+  // after every bar render so a results update cannot strand the focused bar
+  // below the keyboard.
+  useLayoutEffect(() => updateRef.current());
 
   return { bottomInset, ref: setElement };
 }

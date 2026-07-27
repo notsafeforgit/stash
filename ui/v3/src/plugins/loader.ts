@@ -15,13 +15,21 @@ import type { IntlShape } from "react-intl";
 import * as GQL from "src/core/generated-graphql";
 import {
   HOST_VERSION,
+  type PluginFilterExtrasComponent,
   type PluginModule,
   type PluginNavItem,
   type PluginRegister,
   type PluginRouteOptions,
+  type PluginSavedFilterLoadedListener,
   type StashPluginHost,
 } from "./host";
-import { freezeRegistry, recordNavItem, recordRoute } from "./registry";
+import {
+  freezeRegistry,
+  recordFilterExtras,
+  recordNavItem,
+  recordRoute,
+  recordSavedFilterLoadedListener,
+} from "./registry";
 import * as ui from "./ui-exports";
 
 interface PluginToLoad {
@@ -68,6 +76,14 @@ function buildHost(
     }),
     nav: Object.freeze({
       add: (item: PluginNavItem) => recordNavItem(pluginId, item),
+    }),
+    filters: Object.freeze({
+      addExtras: (component: PluginFilterExtrasComponent) =>
+        recordFilterExtras(pluginId, component),
+    }),
+    events: Object.freeze({
+      onSavedFilterLoaded: (listener: PluginSavedFilterLoadedListener) =>
+        recordSavedFilterLoadedListener(pluginId, listener),
     }),
     apollo,
     intl,

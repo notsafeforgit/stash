@@ -827,6 +827,7 @@ export function SceneEditForm(props: SceneEditFormProps) {
         onOpenChange={setSearchOpen}
         source={scrapeSearchSource}
         initialQuery={form.state.values.title}
+        localFiles={scene?.files}
         onSelect={handleSearchSelect}
       />
       <SceneScrapeMergeDialog

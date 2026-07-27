@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useIntl } from "react-intl";
 import { useMutation } from "@apollo/client/react";
 import { removeEntitiesFromCache, useEntityMutation } from "src/core/client";
@@ -34,6 +34,7 @@ import { useToast } from "src/hooks/toast";
 import { useConfigurationContext } from "src/hooks/config";
 import { objectPath, objectTitle } from "src/core/files";
 import { SceneDetailDownloadMenuItem } from "src/components/offline/scene-detail-download-menu-item";
+import { type MonitoredJob, useMonitorJob } from "src/hooks/use-monitor-job";
 
 export interface SceneActionsMenuProps {
   scene: NonNullable<GQL.FindSceneQuery["findScene"]>;
@@ -41,12 +42,15 @@ export interface SceneActionsMenuProps {
   getPlayerPosition?: () => number | undefined;
   /** Called once the scene has been deleted so the page can navigate away */
   onDeleted?: () => void;
+  /** Refreshes the scene after a generated screenshot replaces its cover. */
+  onScreenshotGenerated?: () => void | Promise<void>;
 }
 
 export function SceneActionsMenu({
   scene,
   getPlayerPosition,
   onDeleted,
+  onScreenshotGenerated,
 }: SceneActionsMenuProps) {
   const intl = useIntl();
   const toast = useToast();
@@ -56,6 +60,7 @@ export function SceneActionsMenu({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
   const [mergeOpen, setMergeOpen] = useState(false);
+  const [screenshotJobId, setScreenshotJobId] = useState<string | null>(null);
   // Controlled so opening the menu forces a re-render — `getPlayerPosition`
   // reads from a ref set imperatively when the player mounts, so without this
   // the disabled check below latches at its initial render value.
@@ -67,6 +72,38 @@ export function SceneActionsMenu({
   const [submitDraft] = useMutation(GQL.SubmitStashBoxSceneDraftDocument);
 
   const sceneFilePath = scene.files.length > 0 ? objectPath(scene) : null;
+
+  const handleScreenshotJobComplete = useCallback(
+    async (job?: MonitoredJob) => {
+      setScreenshotJobId(null);
+      if (job?.status === GQL.JobStatus.Failed) {
+        toast.error(
+          job.error ||
+            intl.formatMessage({
+              id: "toast.screenshot_generation_failed",
+              defaultMessage: "Screenshot generation failed",
+            }),
+        );
+        return;
+      }
+      if (job?.status === GQL.JobStatus.Cancelled) return;
+
+      try {
+        await onScreenshotGenerated?.();
+        toast.success(
+          intl.formatMessage({
+            id: "toast.screenshot_generated",
+            defaultMessage: "Screenshot generated",
+          }),
+        );
+      } catch (error) {
+        toast.error(error);
+      }
+    },
+    [intl, onScreenshotGenerated, toast],
+  );
+
+  useMonitorJob(screenshotJobId, handleScreenshotJobComplete);
 
   async function handleRescan() {
     if (!sceneFilePath) return;
@@ -93,9 +130,15 @@ export function SceneActionsMenu({
 
   async function handleGenerateScreenshot(at?: number) {
     try {
-      await generateScreenshot({
+      const result = await generateScreenshot({
         variables: { id: scene.id, at },
       });
+      const jobId = result.data?.sceneGenerateScreenshot;
+      if (jobId) {
+        setScreenshotJobId(jobId);
+      } else {
+        await onScreenshotGenerated?.();
+      }
       toast.success(
         intl.formatMessage({
           id: "toast.generating_screenshot",
@@ -190,7 +233,9 @@ export function SceneActionsMenu({
             …
           </DropdownMenuItem>
           <DropdownMenuItem
-            disabled={getPlayerPosition?.() === undefined}
+            disabled={
+              screenshotJobId !== null || getPlayerPosition?.() === undefined
+            }
             onClick={() => {
               const at = getPlayerPosition?.();
               if (at !== undefined) handleGenerateScreenshot(at);
@@ -202,7 +247,10 @@ export function SceneActionsMenu({
               defaultMessage: "Generate thumbnail from current",
             })}
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => handleGenerateScreenshot()}>
+          <DropdownMenuItem
+            disabled={screenshotJobId !== null}
+            onClick={() => handleGenerateScreenshot()}
+          >
             <CameraOff />
             {intl.formatMessage({
               id: "actions.generate_thumb_default",

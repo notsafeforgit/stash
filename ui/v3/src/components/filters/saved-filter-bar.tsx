@@ -16,6 +16,7 @@ import { getPinnedSavedFiltersKey } from "./filter-builder-types";
 import type { View } from "src/components/list/views";
 import { useDefaultFilterActions } from "src/hooks/default-filter";
 import { DefaultFilterConflict } from "./default-filter-conflict";
+import { notifySavedFilterLoaded } from "src/plugins/registry";
 
 function readPinnedSavedFilters(mode: string): string[] {
   if (typeof window === "undefined") return [];
@@ -108,8 +109,14 @@ export const SavedFilterBar: React.FC<{
         name: savedFilter.name,
         justApplied: true,
       });
+      notifySavedFilterLoaded({
+        savedFilter,
+        filter: newFilter,
+        source: "sidebar",
+        view,
+      });
     },
-    [filter, onCurrentSavedFilterChange, setFilter],
+    [filter, onCurrentSavedFilterChange, setFilter, view],
   );
 
   const onSaveCurrentFilter = useCallback(

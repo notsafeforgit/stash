@@ -1275,6 +1275,7 @@ export function EntityListPage<TData, TItem extends IHasID>({
       setFilter={setFilter}
       listSelect={listSelect}
       activeFilterCount={activeFilterCount}
+      view={view}
       totalCount={count}
       sidebarContent={sidebarContent}
       currentSavedFilterName={currentSavedFilterName}

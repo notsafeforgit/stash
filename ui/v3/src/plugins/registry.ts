@@ -10,7 +10,13 @@
  * full page reload.
  */
 
-import type { PluginNavItem, PluginRouteOptions } from "./host";
+import type {
+  PluginFilterExtrasComponent,
+  PluginNavItem,
+  PluginRouteOptions,
+  PluginSavedFilterLoadedEvent,
+  PluginSavedFilterLoadedListener,
+} from "./host";
 
 interface RegisteredRoute extends PluginRouteOptions {
   pluginId: string;
@@ -20,8 +26,20 @@ interface RegisteredNavItem extends PluginNavItem {
   pluginId: string;
 }
 
+export interface RegisteredFilterExtras {
+  pluginId: string;
+  component: PluginFilterExtrasComponent;
+}
+
+interface RegisteredSavedFilterLoadedListener {
+  pluginId: string;
+  listener: PluginSavedFilterLoadedListener;
+}
+
 const routes: RegisteredRoute[] = [];
 const navItems: RegisteredNavItem[] = [];
+const filterExtras: RegisteredFilterExtras[] = [];
+const savedFilterLoadedListeners: RegisteredSavedFilterLoadedListener[] = [];
 let frozen = false;
 
 export function recordRoute(pluginId: string, route: PluginRouteOptions) {
@@ -56,6 +74,50 @@ export function recordNavItem(pluginId: string, item: PluginNavItem) {
   navItems.push({ ...item, pluginId });
 }
 
+export function recordFilterExtras(
+  pluginId: string,
+  component: PluginFilterExtrasComponent,
+) {
+  if (frozen) {
+    console.warn(
+      `[stash-plugin:${pluginId}] filters.addExtras() called after host froze; ignored. Filter extensions must be registered synchronously inside register().`,
+    );
+    return;
+  }
+  filterExtras.push({ pluginId, component });
+}
+
+export function recordSavedFilterLoadedListener(
+  pluginId: string,
+  listener: PluginSavedFilterLoadedListener,
+) {
+  if (frozen) {
+    console.warn(
+      `[stash-plugin:${pluginId}] events.onSavedFilterLoaded() called after host froze; ignored. Event listeners must be registered synchronously inside register().`,
+    );
+    return;
+  }
+  savedFilterLoadedListeners.push({ pluginId, listener });
+}
+
+export function notifySavedFilterLoaded(event: PluginSavedFilterLoadedEvent) {
+  for (const { pluginId, listener } of savedFilterLoadedListeners) {
+    try {
+      void Promise.resolve(listener(event)).catch((err) => {
+        console.error(
+          `[stash-plugin:${pluginId}] SavedFilter.Loaded listener failed`,
+          err,
+        );
+      });
+    } catch (err) {
+      console.error(
+        `[stash-plugin:${pluginId}] SavedFilter.Loaded listener failed`,
+        err,
+      );
+    }
+  }
+}
+
 /**
  * Mark the registry as frozen. Subsequent register/nav adds will be
  * ignored with a warning. Called after all plugins have run their
@@ -75,4 +137,8 @@ export function getRegisteredRoutes(): readonly RegisteredRoute[] {
 
 export function getRegisteredNavItems(): readonly RegisteredNavItem[] {
   return navItems;
+}
+
+export function getRegisteredFilterExtras(): readonly RegisteredFilterExtras[] {
+  return filterExtras;
 }

@@ -5,6 +5,7 @@ import { useLazyQuery } from "@apollo/client/react";
 import { useDebouncedValue } from "src/hooks/debounce";
 import { useToast } from "src/hooks/toast";
 import * as GQL from "src/core/generated-graphql";
+import { BadgeCheck } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -12,8 +13,10 @@ import {
   DialogTitle,
 } from "src/components/ui/dialog";
 import { Input } from "src/components/ui/input";
+import { Badge } from "src/components/ui/badge";
 import { type ScrapeSource, sourceToInput } from "./use-available-scrapers";
 import { SearchResultRow, SearchResultsList } from "./search-results";
+import { findSceneFingerprintMatches } from "src/utils/fingerprint-matches";
 
 type ScrapedScene = GQL.ScrapedSceneDataFragment;
 
@@ -22,6 +25,7 @@ interface SceneSearchDialogProps {
   onOpenChange: (open: boolean) => void;
   source: ScrapeSource | null;
   initialQuery: string;
+  localFiles?: GQL.SceneDataFragment["files"];
   onSelect: (scene: ScrapedScene) => void;
 }
 
@@ -30,6 +34,7 @@ export function SceneSearchDialog({
   onOpenChange,
   source,
   initialQuery,
+  localFiles = [],
   onSelect,
 }: SceneSearchDialogProps) {
   const intl = useIntl();
@@ -106,6 +111,71 @@ export function SceneSearchDialog({
                   .filter(Boolean)
                   .join(", "),
               );
+            }
+            if (source?.kind === "stashBox") {
+              const matches = findSceneFingerprintMatches(
+                s.fingerprints ?? [],
+                localFiles,
+              );
+              if (matches.phash.length > 0) {
+                const title = matches.phash
+                  .map(({ hash, distance }) =>
+                    distance === 0
+                      ? `${hash}, exact match`
+                      : `${hash}, distance ${distance}`,
+                  )
+                  .join("\n");
+                subs.push(
+                  <Badge key="phash" variant="outline" title={title}>
+                    <BadgeCheck data-icon="inline-start" />
+                    {intl.formatMessage(
+                      {
+                        id: "component_tagger.results.hash_matches",
+                        defaultMessage:
+                          "{count, plural, one {# {hash_type} match} other {# {hash_type} matches}}",
+                      },
+                      {
+                        count: matches.phash.length,
+                        hash_type: "PHash",
+                      },
+                    )}
+                  </Badge>,
+                );
+              }
+              if (matches.oshash.length > 0) {
+                const submissionCount = matches.oshash.reduce(
+                  (sum, fingerprint) => sum + fingerprint.submissions,
+                  0,
+                );
+                const title = matches.oshash
+                  .map(
+                    (fingerprint) =>
+                      `${fingerprint.hash}, ${intl.formatMessage(
+                        {
+                          id: "component_tagger.results.hash_submissions",
+                          defaultMessage: "{count} submissions",
+                        },
+                        { count: fingerprint.submissions },
+                      )}`,
+                  )
+                  .join("\n");
+                subs.push(
+                  <Badge key="oshash" variant="outline" title={title}>
+                    <BadgeCheck data-icon="inline-start" />
+                    {intl.formatMessage(
+                      {
+                        id: "component_tagger.results.hash_matches",
+                        defaultMessage:
+                          "{count, plural, one {# {hash_type} match} other {# {hash_type} matches}}",
+                      },
+                      {
+                        count: submissionCount,
+                        hash_type: "OSHash",
+                      },
+                    )}
+                  </Badge>,
+                );
+              }
             }
             return (
               <SearchResultRow

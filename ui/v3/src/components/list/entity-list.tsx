@@ -25,6 +25,8 @@ import {
 } from "src/components/ui/bottom-sheet";
 import { Button } from "src/components/ui/button";
 import { ListScrollContext } from "./list-scroll-context";
+import type { View } from "./views";
+import { PluginFilterExtras } from "src/plugins/filter-extras";
 
 // ── EntityList ────────────────────────────────────────────────────────────────
 
@@ -41,6 +43,8 @@ export interface EntityListProps {
   listSelect: IListSelect;
   /** Number of active filter conditions (for the badge on the filter toggle) */
   activeFilterCount: number;
+  /** Persisted list view name exposed to plugin filter extensions. */
+  view?: View;
   /** Total number of matching items (for pagination) */
   totalCount: number;
 
@@ -91,6 +95,7 @@ export const EntityList: React.FC<EntityListProps> = ({
   setFilter,
   listSelect,
   activeFilterCount,
+  view,
   totalCount,
   sidebarContent,
   children,
@@ -300,6 +305,8 @@ export const EntityList: React.FC<EntityListProps> = ({
                   </div>
                 </div>
               )}
+
+              <PluginFilterExtras filter={filter} view={view} />
 
               {/* Scrollable content area — bounded so the scrollbar stops here.
                 We deliberately don't render a spinner overlay during loading;

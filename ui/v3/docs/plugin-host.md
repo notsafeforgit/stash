@@ -46,7 +46,7 @@ export default function register(host) {
 }
 ```
 
-`register()` may be `async` — the loader awaits each plugin in turn. Async work inside `register` is fine for setup, but **all `routes.add()` and `nav.add()` calls must be made synchronously** (i.e. before any `await`). The registry freezes after `register` resolves; later additions are warned and ignored.
+`register()` may be `async` — the loader awaits each plugin in turn. Async work inside `register` is fine for setup, but **all route, navigation, filter-extension, and event-listener registrations must be made synchronously** (i.e. before any `await`). The registry freezes after `register` resolves; later additions are warned and ignored.
 
 A named `register` export is also accepted as a fallback if the default export is missing.
 
@@ -69,6 +69,23 @@ interface StashPluginHost {
       placement?: "main" | "mobile" | "utility";
       hotkey?: string;
     }): void;
+  };
+
+  readonly filters: {
+    addExtras(component: ComponentType<{
+      filter: ListFilterModel;
+      searchTerm: string;
+      view?: string;
+    }>): void;
+  };
+
+  readonly events: {
+    onSavedFilterLoaded(listener: (event: {
+      savedFilter: SavedFilterDataFragment;
+      filter: ListFilterModel;
+      source: "dialog" | "sidebar" | "toolbar";
+      view?: string;
+    }) => void | Promise<void>): void;
   };
 
   readonly apollo: ApolloClient;        // shared with the host
@@ -96,6 +113,20 @@ interface StashPluginHost {
 - `label` may be a string or a function `(intl) => string` for plugins that ship localized strings.
 - `hotkey` follows the same `"g <key>"` chord syntax as built-in nav (`"g s"` for `/scenes`). Built-in hotkeys take precedence; plugin hotkeys cannot shadow them.
 
+### Filter extensions
+
+`host.filters.addExtras(Component)` renders a plugin component below the list toolbar whenever an entity list is active. The component receives:
+
+- `filter` — the complete current v3 `ListFilterModel`, including its canonical Filter AST.
+- `searchTerm` — a convenience mirror of `filter.searchTerm`.
+- `view` — the persisted Stash view name when the list has one.
+
+Extensions render in plugin load order. Each extension has its own error boundary, so one plugin's render failure is logged and removes only that extension.
+
+### Saved-filter events
+
+`host.events.onSavedFilterLoaded(listener)` runs after a saved filter has been applied. The event includes the saved-filter record, the applied v3 filter model, its load source, and the current view when available. Listener failures are logged without interrupting the filter change or other plugins.
+
 ### Apollo + intl
 
 `host.apollo` is the same `ApolloClient` instance the rest of Stash uses, with the same auth cookies, cache, and link chain. Plugin-issued queries and mutations participate in cache normalization automatically.
@@ -115,11 +146,11 @@ A frozen subset of shadcn/Base UI primitives. Components in this set will not br
 | Buttons | `Button`, `buttonVariants` |
 | Cards | `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, `CardFooter` |
 | Form | `Input`, `Textarea`, `Label`, `Checkbox` |
-| Selects | `Select`, `SelectTrigger`, `SelectValue`, `SelectContent`, `SelectItem` |
+| Selects | `Select`, `SelectTrigger`, `SelectValue`, `SelectContent`, `SelectGroup`, `SelectItem` |
 | Comboboxes | `Combobox`, `ComboboxTrigger`, `ComboboxInput`, `ComboboxValue`, `ComboboxContent`, `ComboboxItem`, `ComboboxEmpty` |
 | Dialogs | `Dialog`, `DialogTrigger`, `DialogContent`, `DialogHeader`, `DialogTitle`, `DialogDescription`, `DialogFooter` |
 | Sheets | `Sheet`, `SheetTrigger`, `SheetContent`, `SheetHeader`, `SheetTitle`, `SheetDescription`, `SheetFooter` |
-| Menus | `DropdownMenu`, `DropdownMenuTrigger`, `DropdownMenuContent`, `DropdownMenuItem`, `DropdownMenuLabel`, `DropdownMenuSeparator` |
+| Menus | `DropdownMenu`, `DropdownMenuTrigger`, `DropdownMenuContent`, `DropdownMenuGroup`, `DropdownMenuItem`, `DropdownMenuLabel`, `DropdownMenuSeparator` |
 | Misc | `Tooltip`, `TooltipProvider`, `TooltipTrigger`, `TooltipContent`, `Spinner` |
 
 Bring your own libraries for anything else (charts, virtualization, drag-and-drop, etc.) — those don't belong in the host contract.
@@ -163,7 +194,7 @@ The loader is defensive:
 
 - Errors fetching the plugin list, hook order, or any individual plugin's module are caught and logged. One broken plugin never takes down the app.
 - Plugins missing a `default export register(host)` log a warning and are skipped.
-- Routes/nav added after the registry freezes are warned and ignored.
+- Routes, navigation items, filter extensions, and event listeners added after the registry freezes are warned and ignored.
 - Routes registered at colliding paths are warned and the second registration is dropped.
 
 ## Worked example: a tiny plugin
@@ -209,7 +240,7 @@ export default function register(host) {
 
 These were intentionally left out of v1; if you need them, file a request and we'll evaluate for v2:
 
-- **Component-slot extension points** (e.g. "add an item to the scene detail tab bar"). v1 only supports whole-page extension via `routes.add`.
+- **Arbitrary component-slot extension points** (e.g. "add an item to the scene detail tab bar"). v1 currently provides the list filter extras slot plus whole-page extension via `routes.add`.
 - **Plugin-to-plugin APIs.** Plugins can communicate via the GraphQL cache or window events, but there's no formal API.
 - **Settings UI integration.** Plugin settings are still configured via the v2.5 settings UI driven by the plugin manifest's `settings:` block.
 - **Lazy route loading.** `host.routes.add` accepts a synchronous component. Wrap in `React.lazy` if you want code-splitting (the host won't introspect it).

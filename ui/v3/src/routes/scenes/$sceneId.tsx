@@ -69,6 +69,7 @@ interface SceneToolbarProps {
   onToggleOrganized: () => void;
   getPlayerPosition?: () => number | undefined;
   onDeleted?: () => void;
+  onScreenshotGenerated?: () => void | Promise<void>;
 }
 
 function SceneToolbar({
@@ -78,6 +79,7 @@ function SceneToolbar({
   onToggleOrganized,
   getPlayerPosition,
   onDeleted,
+  onScreenshotGenerated,
 }: SceneToolbarProps) {
   const intl = useIntl();
 
@@ -151,6 +153,7 @@ function SceneToolbar({
           scene={scene}
           getPlayerPosition={getPlayerPosition}
           onDeleted={onDeleted}
+          onScreenshotGenerated={onScreenshotGenerated}
         />
       </div>
     </div>
@@ -228,7 +231,7 @@ function SceneDetailPage() {
   const { configuration } = useConfigurationContext();
   const autostartEnabled = configuration.interface.autostartVideo ?? true;
 
-  const { data, loading, error } = useQuery(GQL.FindSceneDocument, {
+  const { data, loading, error, refetch } = useQuery(GQL.FindSceneDocument, {
     variables: { id: sceneId },
     fetchPolicy: "cache-first",
   });
@@ -512,6 +515,9 @@ function SceneDetailPage() {
       onToggleOrganized={handleToggleOrganized}
       getPlayerPosition={getPlayerPosition}
       onDeleted={goBack}
+      onScreenshotGenerated={async () => {
+        await refetch();
+      }}
     />
   );
 

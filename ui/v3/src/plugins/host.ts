@@ -16,6 +16,8 @@ import type { ApolloClient } from "@apollo/client";
 import type { ComponentType, ReactNode } from "react";
 import type { IntlShape } from "react-intl";
 import type { Link, useNavigate } from "@tanstack/react-router";
+import type { SavedFilterDataFragment } from "src/core/generated-graphql";
+import type { ListFilterModel } from "src/models/list-filter/filter";
 import type { StashPluginUI } from "./ui-exports";
 
 export const HOST_VERSION = "1" as const;
@@ -64,6 +66,29 @@ export interface PluginNavItem {
   hotkey?: string;
 }
 
+export interface PluginFilterExtrasProps {
+  /** Current list filter, including the canonical v3 Filter AST. */
+  filter: ListFilterModel;
+  /** Convenience mirror of `filter.searchTerm`. */
+  searchTerm: string;
+  /** Current list view, when the list maps to a persisted Stash view. */
+  view?: string;
+}
+
+export type PluginFilterExtrasComponent =
+  ComponentType<PluginFilterExtrasProps>;
+
+export interface PluginSavedFilterLoadedEvent {
+  savedFilter: SavedFilterDataFragment;
+  filter: ListFilterModel;
+  source: "dialog" | "sidebar" | "toolbar";
+  view?: string;
+}
+
+export type PluginSavedFilterLoadedListener = (
+  event: PluginSavedFilterLoadedEvent,
+) => void | Promise<void>;
+
 export interface StashPluginHost {
   /**
    * Host API contract version. Plugins should check this matches their
@@ -93,6 +118,22 @@ export interface StashPluginHost {
    */
   readonly nav: {
     add(item: PluginNavItem): void;
+  };
+
+  /**
+   * Add content below the list filter toolbar. The component receives the
+   * current search term, view, and complete v3 filter model.
+   */
+  readonly filters: {
+    addExtras(component: PluginFilterExtrasComponent): void;
+  };
+
+  /**
+   * Subscribe to UI lifecycle events. Saved-filter listeners run after the
+   * selected filter has been applied to the list.
+   */
+  readonly events: {
+    onSavedFilterLoaded(listener: PluginSavedFilterLoadedListener): void;
   };
 
   /**

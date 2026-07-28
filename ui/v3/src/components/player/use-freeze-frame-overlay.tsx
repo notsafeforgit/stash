@@ -44,7 +44,7 @@ interface UseFreezeFrameOverlayResult {
   /** Snapshot the current `<video>` frame onto the canvas. The
    *  stable-`<video>` variant uses this directly instead of
    *  `beginRemount` — it doesn't need the force-abort dance because
-   *  `HlsMedia.src = newSrc` already cancels the outgoing engine. */
+   *  `HlsJsMedia.src = newSrc` transitions the active media engine. */
   captureFrame: () => void;
   /** Repaint the canvas as fully transparent. Call when the new
    *  source has finished seeking / first-painting and the overlay

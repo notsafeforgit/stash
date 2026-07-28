@@ -388,7 +388,7 @@ function isHLSSource(source: PlayerSource): boolean {
  *
  * - HLS: requires either native HLS (Safari) or MSE (Chrome/Firefox/Edge).
  *   All HLS playback is driven by hls.js (via `<StableHlsVideo>` →
- *   `@videojs/core`'s `HlsMedia`), which uses MSE on every modern browser
+ *   `@videojs/core`'s `HlsJsMedia`), which uses MSE on every modern browser
  *   and falls back to native HLS where MSE isn't available. The
  *   per-source `canDecode` check upstream gates the codec-copy fMP4
  *   variant on whether the source's actual codecs play in the browser;

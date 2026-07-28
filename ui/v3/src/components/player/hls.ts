@@ -3,7 +3,7 @@
  * to read this file.
  *
  * HLS sources route through `<StableHlsVideo>` (`@videojs/core`'s
- * `HlsMedia`, which auto-selects hls.js on MSE-capable browsers and
+ * `HlsJsMedia`, which auto-selects hls.js on MSE-capable browsers and
  * falls back to native HLS otherwise) on every browser. `canPlaySource`
  * gates HLS on `hasNativeHLS() || hasMSE()`, which covers Safari,
  * Chrome, and Firefox.
@@ -198,9 +198,10 @@ export function makeHlsStrategy(
     //     new currentTime.
     //
     // Routing the failing cases through `beginSourceRemount` writes a
-    // new `?start=` into the URL; mediaProps reassigns `HlsMedia.src`,
-    // which destroys the `HlsJsMedia` delegate and creates a fresh one
-    // with `config.startPosition = newTarget`. The new engine requests
+    // new `?start=` into the URL; our bridge reassigns `HlsJsMedia.src`
+    // and its start-position config, which destroys the active delegate
+    // and creates a fresh one with `config.startPosition = newTarget`.
+    // The new engine requests
     // the right segment from a clean state. The freeze-frame canvas
     // (captured just before this routes through `beginSourceRemount`)
     // masks the engine-recreate window.

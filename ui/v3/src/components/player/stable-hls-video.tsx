@@ -1,39 +1,24 @@
 /**
- * Drop-in replacement for `@videojs/react`'s `<HlsVideo>` that keeps the
- * `HlsMedia` attach ref stable across re-renders.
+ * Custom `HlsJsMedia` bridge for the scene player.
  *
- * The packaged component composes its callback ref via
- * `useComposedRefs(attachMediaElement(mediaApi), ref)` — `attachMediaElement`
- * returns a fresh closure on every call, so `useComposedRefs`'s `useCallback`
- * produces a new callback on every render. React then fires the old
- * ref(null) cleanup (`media.detach()`) followed by the new ref(element)
- * (`media.attach(element)`) on every re-render of `<HlsVideo>`. Each
- * detach/attach round-trip tears the underlying engine off the video
- * element; in-flight segment appends from hls.js can land on a now-detached
- * SourceBuffer and surface as
+ * Video.js beta.25 fixed the packaged component's unstable attach ref, but
+ * this wrapper still owns two scene-specific requirements that
+ * `<HlsJsVideo>` cannot express:
  *
- *   InvalidStateError: This SourceBuffer has been removed from the
- *   parent media source
+ * - inject the requested start position and ManagedMediaSource buffer limits
+ *   before the source's deferred engine load begins;
+ * - apply `muted` to the element synchronously at attach time so iOS can make
+ *   its autoplay decision from the correct initial state.
  *
- * Same shape of bug that's been flagged for `<NativeHlsVideo>` and
- * `<SimpleHlsVideo>` — different engines under the hood (hls.js for MSE
- * browsers, AVFoundation for Safari) but the same React-side ref
- * instability.
- *
- * The fix is one line: `useCallback` the attach callback so its identity
- * is stable while `mediaApi` is stable. `mediaApi` is itself stable
- * (`useState(() => new HlsMedia())`), so the memo is keyed on a single
- * stable value.
- *
- * `HlsMedia` from `@videojs/core` is a smart wrapper that auto-selects
- * between hls.js (MSE-capable browsers, including Safari) and the
- * browser's native HLS via the `preferPlayback` setting. We let it
- * default to `'mse'` so hls.js drives playback uniformly across Chrome,
- * Firefox, Edge, and Safari — single client to satisfy, no AVFoundation
- * src-reassign teardown to work around.
+ * `HlsJsMedia` auto-selects hls.js on MSE-capable browsers and native HLS
+ * otherwise. Its beta.25 configuration nests hls.js options under `hlsJs`.
  */
-import { mediaProps, useComposedRefs, useMediaInstance } from "@videojs/react";
-import { HlsMedia } from "@videojs/core/dom/media/hls";
+import { useComposedRefs, useMediaInstance } from "@videojs/react";
+import {
+  HlsJsMedia,
+  type HlsMediaConfig,
+  type HlsMediaProps,
+} from "@videojs/core/dom/media/hls-js";
 import {
   forwardRef,
   useCallback,
@@ -44,13 +29,29 @@ import {
 import type { ReactNode, VideoHTMLAttributes } from "react";
 import { parseStartPosition } from "./hls";
 
-type StableHlsVideoProps = VideoHTMLAttributes<HTMLVideoElement> & {
+type StableHlsVideoProps = Omit<
+  VideoHTMLAttributes<HTMLVideoElement>,
+  "preload" | "src"
+> & {
   children?: ReactNode;
+  preload?: HlsMediaProps["preload"];
+  src?: string;
 };
 
 export const StableHlsVideo = forwardRef<HTMLVideoElement, StableHlsVideoProps>(
-  function StableHlsVideo({ children, muted, ...props }, ref) {
-    const mediaApi = useMediaInstance(HlsMedia);
+  function StableHlsVideo(
+    { children, muted, preload = "metadata", src = "", ...videoProps },
+    ref,
+  ) {
+    const mediaApi = useMediaInstance(HlsJsMedia);
+
+    // Mirrors beta.25's internal `useSyncProps`: media-owned properties must
+    // be assigned to HlsJsMedia rather than spread onto the <video>. Setting
+    // `src` schedules a microtask load; the layout effect below runs first and
+    // installs the hls.js configuration used to construct that engine.
+    if (mediaApi.src !== src) mediaApi.src = src;
+    if (mediaApi.preload !== preload) mediaApi.preload = preload;
+
     // Live `muted` mirror so `attachRef` can read the latest value at
     // mount time without taking `muted` as a dep (which would cause a
     // detach/reattach on every mute toggle, defeating the whole point
@@ -69,19 +70,16 @@ export const StableHlsVideo = forwardRef<HTMLVideoElement, StableHlsVideoProps>(
     //
     // Wired via `useLayoutEffect`: the effect runs synchronously in
     // commit (after refs are assigned, before microtasks flush). The
-    // microtask that `HlsMedia.src = url` scheduled via `#requestLoad`
+    // microtask that `HlsJsMedia.src = url` scheduled via `#requestLoad`
     // hasn't fired yet, so when its `load()` reads `this.config` to
     // construct the HlsJsMedia delegate, it picks up our updated
     // startPosition. Setting `config` here also calls `#requestLoad`
     // again, but that's a no-op because a load is already scheduled —
     // so the engine is constructed exactly once, with the right
     // startPosition.
-    const startPosition = useMemo(
-      () => parseStartPosition(props.src as string | undefined),
-      [props.src],
-    );
+    const startPosition = useMemo(() => parseStartPosition(src), [src]);
     useLayoutEffect(() => {
-      const cfg: Record<string, unknown> = { startPosition };
+      const hlsJs: NonNullable<HlsMediaConfig["hlsJs"]> = { startPosition };
       // iOS Safari (iOS 17+) exposes ManagedMediaSource instead of MSE
       // and rate-limits hls.js's segment fetches via quota signals.
       // hls.js's default `maxBufferSize` (60 MB) caps the byte buffer
@@ -94,40 +92,25 @@ export const StableHlsVideo = forwardRef<HTMLVideoElement, StableHlsVideoProps>(
       // we can't force it past its memory budget. No effect on desktop
       // MSE because that path hits the time cap first.
       if ("ManagedMediaSource" in window) {
-        cfg.maxBufferLength = 60;
-        cfg.maxMaxBufferLength = 120;
-        cfg.maxBufferSize = 240 * 1024 * 1024;
+        hlsJs.maxBufferLength = 60;
+        hlsJs.maxMaxBufferLength = 120;
+        hlsJs.maxBufferSize = 240 * 1024 * 1024;
       }
-      mediaApi.config = cfg;
+      mediaApi.config = {
+        ...mediaApi.config,
+        hlsJs,
+      };
     }, [mediaApi, startPosition]);
-    // Inline + memoised attach callback — see the file header comment.
-    // Going through the upstream `attachMediaElement(mediaApi)` factory
-    // produces a fresh closure on every render and the React 19 cleanup
-    // detaches the engine on each one; calling `media.attach`/`detach`
-    // directly inside a `useCallback` keyed on the stable mediaApi
-    // gives a single mount-time attach and a single unmount-time detach.
+    // Inline attach callback so muted is installed before the engine's source
+    // load. Its stable identity also guarantees one mount-time attach and one
+    // unmount-time detach across ordinary React re-renders.
     const attachRef = useCallback(
       (element: HTMLVideoElement | null) => {
         if (element) {
           mediaApi.attach(element);
-          // `mediaProps` strips every prop that has a settable accessor
-          // on `HlsMedia`'s prototype chain — `muted`, `playbackRate`,
-          // etc. — and tries to apply them to `mediaApi` instead. But
-          // `mediaApi.target` is `null` during the render that calls
-          // `mediaProps`, so the setter (which checks `if (this.target)`)
-          // silently drops the value, and `attach` does NOT replay
-          // queued props onto the new target. For `muted` specifically
-          // that breaks iOS Safari's muted-autoplay path: the new
-          // `<video>` ends up with `autoplay` but no `muted`, iOS
-          // refuses to autoplay, the source-change spinner stalls, and
-          // the user has to tap play. We sidestep this entirely by
-          // omitting `muted` from the props handed to `mediaProps` (see
-          // below) and applying it imperatively here, before iOS makes
-          // its autoplay decision (which it makes after the first
-          // metadata load, well after this attach fires). Reactive
-          // updates after mount are handled by the `muted` prop passed
-          // to `<video>` directly, which React syncs to the IDL
-          // property as it does for any controlled video attribute.
+          // Apply the initial value imperatively before iOS evaluates muted
+          // autoplay. Reactive updates after mount remain owned by React via
+          // the controlled `muted` prop below.
           const m = mutedRef.current;
           if (typeof m === "boolean") element.muted = m;
         } else {
@@ -136,12 +119,12 @@ export const StableHlsVideo = forwardRef<HTMLVideoElement, StableHlsVideoProps>(
       },
       [mediaApi],
     );
-    // Pass `props` (without `muted`) to `mediaProps` so it can't drop
-    // the muted value into a null target. We own `muted` via `attachRef`
-    // for mount and via React's reconciliation for subsequent updates.
-    const restProps = mediaProps(mediaApi, HlsMedia, props);
     return (
-      <video ref={useComposedRefs(attachRef, ref)} muted={muted} {...restProps}>
+      <video
+        ref={useComposedRefs(attachRef, ref)}
+        muted={muted}
+        {...videoProps}
+      >
         {children}
       </video>
     );

@@ -4,7 +4,6 @@ import {
   Outlet,
   useRouterState,
 } from "@tanstack/react-router";
-import { zodValidator } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { useIntl } from "react-intl";
 import {
@@ -80,6 +79,6 @@ function SettingsLayout() {
 }
 
 export const Route = createFileRoute("/settings")({
-  validateSearch: zodValidator(searchSchema),
+  validateSearch: searchSchema,
   component: SettingsLayout,
 });

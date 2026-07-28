@@ -30,7 +30,6 @@
     "@tanstack/react-router": "^1.168.0",
     "@tanstack/react-table": "^8.21.3",
     "@tanstack/react-virtual": "^3.13.24",
-    "@tanstack/zod-adapter": "^1.166.9",
     "@videojs/core": "10.0.0-beta.25",
     "@videojs/react": "10.0.0-beta.25",
     "apollo-upload-client": "^19.0.0",

@@ -1,6 +1,5 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { zodValidator } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { useMutation, useQuery } from "@apollo/client/react";
 import { FormattedMessage, FormattedNumber, useIntl } from "react-intl";
@@ -1753,6 +1752,6 @@ function SceneTableSkeletonRows() {
 }
 
 export const Route = createFileRoute("/scene-duplicate-checker")({
-  validateSearch: zodValidator(searchSchema),
+  validateSearch: searchSchema,
   component: SceneDuplicateCheckerPage,
 });

@@ -3,7 +3,6 @@ import { cn } from "src/lib/utils";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useSmartBack } from "src/hooks/use-smart-back";
 import { useQuery } from "@apollo/client/react";
-import { zodValidator } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { useIntl } from "react-intl";
 import {
@@ -237,6 +236,6 @@ function GroupDetailPage() {
 // ── Route ─────────────────────────────────────────────────────────────────────
 
 export const Route = createFileRoute("/groups/$groupId")({
-  validateSearch: zodValidator(searchSchema),
+  validateSearch: searchSchema,
   component: GroupDetailPage,
 });

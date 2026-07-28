@@ -1,6 +1,5 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { zodValidator } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { useMutation, useQuery } from "@apollo/client/react";
 import { FormattedMessage, useIntl } from "react-intl";
@@ -1433,6 +1432,6 @@ function ImageTableSkeletonRows() {
 }
 
 export const Route = createFileRoute("/image-duplicate-checker")({
-  validateSearch: zodValidator(searchSchema),
+  validateSearch: searchSchema,
   component: ImageDuplicateCheckerPage,
 });

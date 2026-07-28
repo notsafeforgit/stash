@@ -22,7 +22,9 @@
  * with `pointer-events: auto`.
  */
 import type React from "react";
+import { useIntl } from "react-intl";
 import { cn } from "src/lib/utils";
+import { formatFuzzyDate } from "src/utils/date";
 
 interface LightboxOverlayProps {
   /** Top: title / metadata. Bottom: footer / counters. */
@@ -101,6 +103,18 @@ export function LightboxOverlay({
       />
       {children}
     </div>
+  );
+}
+
+/** Localized entity date shared by image and scene lightbox overlays. */
+export function LightboxDate({ date }: { date?: string | null }) {
+  const intl = useIntl();
+  if (!date) return null;
+
+  return (
+    <time dateTime={date} className="text-xs text-white/75">
+      {formatFuzzyDate(intl, date)}
+    </time>
   );
 }
 

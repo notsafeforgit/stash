@@ -16,7 +16,11 @@ import {
   TooltipTrigger,
 } from "src/components/ui/tooltip";
 import { cn } from "src/lib/utils";
-import { LightboxOverlay, LightboxDetails } from "./lightbox-overlay";
+import {
+  LightboxOverlay,
+  LightboxDate,
+  LightboxDetails,
+} from "./lightbox-overlay";
 import { LightboxScenePlayer } from "./lightbox-scene-player";
 import type { SceneSlide, SceneSlideMarker } from "./scene-lightbox";
 import { offlineEntryToSceneData } from "src/components/offline/offline-scene-adapter";
@@ -322,7 +326,7 @@ function ActiveOfflineSceneSlide({
   );
 }
 
-// Offline overlay: scene title + performer / studio badges from the
+// Offline overlay: scene title, date, and performer / studio badges from the
 // IDB snapshot. Read-only — no mutating buttons.
 function OfflineSceneOverlay({
   entry,
@@ -348,6 +352,7 @@ function OfflineSceneOverlay({
           {title}
         </div>
       )}
+      <LightboxDate date={entry.date} />
       {entry.studio_name && (
         <div className="text-xs text-white/75 pointer-events-auto min-w-0 truncate">
           {entry.studio_name}
@@ -406,7 +411,7 @@ function SceneTitleLink({
   );
 }
 
-// Title + performer badges over the top of the active slide. Hosted in
+// Title + date + performer badges over the top of the active slide. Hosted in
 // `<LightboxOverlay position="top">`, which handles the visual shell
 // (text-shadow, hover gradient, pointer-events gating).
 function SceneOverlay({
@@ -452,6 +457,8 @@ function SceneOverlay({
         </div>
       )}
 
+      <LightboxDate date={scene.date} />
+
       {performers.length > 0 && (
         <div className="flex flex-wrap gap-1 pointer-events-auto">
           {performers.map((p) => (
@@ -496,7 +503,7 @@ function SceneOverlay({
 
 // Marker overlay for marker-mode slides. Stack from top: marker title
 // (links to the scene's markers tab), scene title (links to the scene),
-// performer badges, then primary-tag-first marker tags. All tag chips
+// scene date, performer badges, then primary-tag-first marker tags. All tag chips
 // share the same style; the primary tag's only distinction is being
 // listed first.
 function MarkerOverlay({
@@ -537,6 +544,8 @@ function MarkerOverlay({
           <ExternalLinkIcon className="size-3 shrink-0 opacity-60" />
         </div>
       )}
+
+      <LightboxDate date={scene.date} />
 
       {performers.length > 0 && (
         <div className="flex flex-wrap gap-1 pointer-events-auto">

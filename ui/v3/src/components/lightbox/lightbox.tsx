@@ -18,7 +18,11 @@ import Fullscreen from "yet-another-react-lightbox/plugins/fullscreen";
 import { useFragment, useMutation } from "@apollo/client/react";
 import { useImageOCounter } from "src/hooks/use-image-o-counter";
 import { useIsTruncated } from "src/hooks/use-is-truncated";
-import { LightboxOverlay, LightboxDetails } from "./lightbox-overlay";
+import {
+  LightboxOverlay,
+  LightboxDate,
+  LightboxDetails,
+} from "./lightbox-overlay";
 import { lightboxIconRenders } from "./lightbox-icons";
 import { useIntl } from "react-intl";
 import {
@@ -380,6 +384,8 @@ function ImageEntityFooter({
           )}
         </div>
       )}
+
+      <LightboxDate date={image.date} />
 
       {/* Galleries — see Title note. */}
       {galleries.length > 0 && (

@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useSmartBack } from "src/hooks/use-smart-back";
 import { useQuery, useMutation } from "@apollo/client/react";
-import { zodValidator } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { useIntl } from "react-intl";
 import {
@@ -285,6 +284,6 @@ function GalleryDetailPage() {
 // ── Route ─────────────────────────────────────────────────────────────────────
 
 export const Route = createFileRoute("/galleries/$galleryId")({
-  validateSearch: zodValidator(searchSchema),
+  validateSearch: searchSchema,
   component: GalleryDetailPage,
 });

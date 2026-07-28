@@ -4,7 +4,6 @@ import React, { useMemo, useRef, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useSmartBack } from "src/hooks/use-smart-back";
 import { useQuery, useMutation } from "@apollo/client/react";
-import { zodValidator } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { useIntl } from "react-intl";
 import YARLightbox, { type ZoomRef } from "yet-another-react-lightbox";
@@ -502,6 +501,6 @@ function ImageDetailPage() {
 // ── Route ─────────────────────────────────────────────────────────────────────
 
 export const Route = createFileRoute("/images/$imageId")({
-  validateSearch: zodValidator(searchSchema),
+  validateSearch: searchSchema,
   component: ImageDetailPage,
 });

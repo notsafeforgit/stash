@@ -3,7 +3,6 @@ import { cn } from "src/lib/utils";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useSmartBack } from "src/hooks/use-smart-back";
 import { useQuery, useMutation } from "@apollo/client/react";
-import { zodValidator } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { useIntl } from "react-intl";
 import {
@@ -395,6 +394,6 @@ function PerformerDetailPage() {
 // ── Route ─────────────────────────────────────────────────────────────────────
 
 export const Route = createFileRoute("/performers/$performerId")({
-  validateSearch: zodValidator(searchSchema),
+  validateSearch: searchSchema,
   component: PerformerDetailPage,
 });

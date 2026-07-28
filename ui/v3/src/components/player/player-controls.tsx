@@ -40,6 +40,11 @@ import { PlayerMarkers } from "./player-markers";
 import type { IMarker } from "./player-utils";
 import { SpeedMenu, QualityMenu } from "./player-menus";
 import { DOUBLE_TAP_MAX_MS } from "./video-frame-zoom";
+import {
+  exceedsTouchTapMovement,
+  isCompletedTouchTap,
+  type TouchTapCandidate,
+} from "./touch-tap";
 
 type PlayerInstance = CreatePlayerResult<VideoPlayerStore>;
 
@@ -1215,6 +1220,11 @@ export function PlayerControls({
   // can't drift.
   const tapToggleTimerRef = useRef<number | null>(null);
   const controlsVisibleAtPointerDownRef = useRef(false);
+  const activeTouchPointerIdRef = useRef<number | null>(null);
+  const touchTapCandidateRef = useRef<
+    (TouchTapCandidate & { pointerId: number }) | null
+  >(null);
+  const completedTouchTapRef = useRef(false);
   const clearPendingTapToggle = useCallback(() => {
     if (tapToggleTimerRef.current != null) {
       window.clearTimeout(tapToggleTimerRef.current);
@@ -1297,8 +1307,52 @@ export function PlayerControls({
         // truly fills the viewport, the centerlines match exactly.
         <Controls.Group
           className="[@media(pointer:coarse)]:flex hidden absolute inset-0 items-center justify-around"
-          onPointerDownCapture={() => {
+          onPointerDownCapture={(e) => {
             controlsVisibleAtPointerDownRef.current = controlsVisible;
+            completedTouchTapRef.current = e.pointerType !== "touch";
+            activeTouchPointerIdRef.current =
+              e.pointerType === "touch" ? e.pointerId : null;
+            touchTapCandidateRef.current =
+              e.pointerType === "touch" && e.target === e.currentTarget
+                ? {
+                    pointerId: e.pointerId,
+                    startedAt: e.timeStamp,
+                    startX: e.clientX,
+                    startY: e.clientY,
+                    moved: false,
+                  }
+                : null;
+          }}
+          onPointerMove={(e) => {
+            if (
+              e.pointerType !== "touch" ||
+              e.pointerId !== activeTouchPointerIdRef.current
+            ) {
+              return;
+            }
+
+            const candidate = touchTapCandidateRef.current;
+            if (
+              candidate &&
+              !candidate.moved &&
+              exceedsTouchTapMovement(candidate, e.clientX, e.clientY)
+            ) {
+              candidate.moved = true;
+            }
+
+            // Video.js marks the user active on every pointermove, even
+            // while a touch is still down. Undo that state transition when
+            // this press began with hidden controls. Do not stop propagation:
+            // the parent lightbox still needs the move for slide swiping.
+            // This bubble handler runs after the container's native
+            // pointermove listener, so the pair settles back to hidden before
+            // the browser paints.
+            if (
+              !controlsVisibleAtPointerDownRef.current &&
+              store.state.controlsVisible
+            ) {
+              store.toggleControls();
+            }
           }}
           onTouchStart={(e) => {
             // Reset cross-gesture flag from any prior hold; the click
@@ -1322,8 +1376,8 @@ export function PlayerControls({
               return;
             }
             const t = e.touches[0];
-            holdStartPosRef.current = { x: t.clientX, y: t.clientY };
             cancelHold();
+            holdStartPosRef.current = { x: t.clientX, y: t.clientY };
             holdTimerRef.current = window.setTimeout(() => {
               holdTimerRef.current = null;
               holdOriginalRateRef.current = store.state.playbackRate ?? 1;
@@ -1360,6 +1414,24 @@ export function PlayerControls({
             holdFiredRef.current = false;
           }}
           onPointerUpCapture={(e) => {
+            if (
+              e.pointerType === "touch" &&
+              e.pointerId === activeTouchPointerIdRef.current
+            ) {
+              const candidate = touchTapCandidateRef.current;
+              completedTouchTapRef.current =
+                e.target === e.currentTarget &&
+                candidate?.pointerId === e.pointerId &&
+                isCompletedTouchTap(
+                  candidate,
+                  e.timeStamp,
+                  e.clientX,
+                  e.clientY,
+                );
+              activeTouchPointerIdRef.current = null;
+              touchTapCandidateRef.current = null;
+            }
+
             // Suppress vjs's container-level pointerup → setActive for
             // taps on the overlay's empty space, so a double-tap-zoom
             // doesn't flash controls between the first tap's pointerup
@@ -1373,6 +1445,17 @@ export function PlayerControls({
             if (e.target !== e.currentTarget) return;
             if (e.pointerType !== "touch") return;
             e.stopPropagation();
+          }}
+          onPointerCancelCapture={(e) => {
+            if (
+              e.pointerType !== "touch" ||
+              e.pointerId !== activeTouchPointerIdRef.current
+            ) {
+              return;
+            }
+            activeTouchPointerIdRef.current = null;
+            touchTapCandidateRef.current = null;
+            completedTouchTapRef.current = false;
           }}
           onClickCapture={(e) => {
             // The Quality / Speed menus use `modal={false}`, so the tap
@@ -1404,8 +1487,14 @@ export function PlayerControls({
             // single tap (new gesture) still toggles normally.
             if (holdFiredRef.current) {
               holdFiredRef.current = false;
+              completedTouchTapRef.current = false;
               return;
             }
+            // Only a short, stationary press followed by release is a tap.
+            // A hold or drag is consumed and must be followed by a fresh tap
+            // before controls can be revealed.
+            if (!completedTouchTapRef.current) return;
+            completedTouchTapRef.current = false;
             const wasVisible = controlsVisibleAtPointerDownRef.current;
             clearPendingTapToggle();
             tapToggleTimerRef.current = window.setTimeout(() => {

@@ -34,28 +34,17 @@
  * - `wheel` with `ctrlKey` (desktop) — the canonical signal for both
  *   Ctrl+scroll and trackpad-pinch.
  *
- * - Second `touchstart` within ~350 ms of the previous one (iOS
- *   Safari + Android Chrome) — `touch-action: manipulation` on every
- *   element only suppresses double-tap-zoom *most* of the time on
- *   iOS, with empirical exceptions around portaled drawer content
- *   and re-rendering buttons. This app's contract is "PWA-like — no
- *   browser-built-in double-tap-zoom anywhere; only our explicit
- *   lightbox and video-frame handlers do zoom." So every rapid
- *   second tap outside an allow-listed gesture region gets its
- *   touchstart `preventDefault`'d to cancel the browser's zoom
- *   default. `preventDefault` on touchstart also suppresses the
- *   synthesized click chain, so the handler manually dispatches a
- *   `click` on the touched element to keep button / link onClicks
- *   firing on every tap (otherwise rapid `+` / `−` zoom-button
- *   taps would only register every other tap). No spatial check —
- *   two genuinely-far-apart rapid taps shouldn't happen by mistake,
- *   and the dispatched click still goes to the correct (second-tap)
- *   target regardless.
- *
  * Regions that *want* pinch-zoom (the video frame, yarl lightbox slides)
  * opt in with `data-pinch-zoom-allowed` on a wrapper element; events
  * inside such a region pass through to component-level handlers
  * untouched.
+ *
+ * Single-finger taps are deliberately not interpreted here. Browser-level
+ * double-tap zoom is suppressed by the app's global
+ * `touch-action: manipulation`; the image and scene lightboxes own the only
+ * app-level double-tap gestures, both for local content zoom. Keeping that
+ * recognition local means a rapid scroll can never be turned into a
+ * synthetic click by a page-wide gesture listener.
  */
 
 let installed = false;
@@ -80,93 +69,15 @@ export function installPagePinchZoomGuard() {
     e.preventDefault();
   }
 
-  // Tracks the most recent single-finger touchstart so a follow-up
-  // touchstart can be identified as the second tap of a double-tap
-  // pair. Reset (zero) whenever the gesture isn't a candidate for
-  // pairing (multi-touch, or inside an allowed gesture region).
-  let lastSingleTouchStartAt = 0;
-  const DOUBLE_TAP_WINDOW_MS = 350;
-
   function onTouchStart(e: TouchEvent) {
-    if (e.touches.length >= 2) {
-      // Multi-touch — pinch territory; cancel before iOS commits.
-      if (!isInsideAllowed(e.target)) e.preventDefault();
-      lastSingleTouchStartAt = 0;
-      return;
-    }
-    if (isInsideAllowed(e.target)) {
-      // Custom gesture surface owns its own double-tap semantics
-      // (e.g. the video-frame zoom).
-      lastSingleTouchStartAt = 0;
-      return;
-    }
-    const t = e.touches[0];
-    if (!t) return;
-    const now = Date.now();
-    const dt = now - lastSingleTouchStartAt;
-    if (dt > 0 && dt < DOUBLE_TAP_WINDOW_MS && e.cancelable) {
-      // Second tap of a rapid pair — the browser would zoom the
-      // viewport. preventDefault cancels both the zoom default and
-      // the synthesized mouse-event chain (mousedown → mouseup →
-      // click); manually dispatch a click so the touched element's
-      // onClick still fires for the second tap (so e.g. the View
-      // Options drawer's `+`/`−` zoom controls advance one step
-      // per rapid tap, every tap, instead of every other one).
-      e.preventDefault();
-      const target = e.target;
-      if (target instanceof HTMLElement) {
-        // Microtask defer so the dispatched click runs after
-        // touchstart propagation finishes; firing inline can leave
-        // listeners that read `event.touches` confused.
-        queueMicrotask(() => {
-          target.dispatchEvent(
-            new MouseEvent("click", {
-              bubbles: true,
-              cancelable: true,
-              view: window,
-              button: 0,
-              clientX: t.clientX,
-              clientY: t.clientY,
-            }),
-          );
-        });
-      }
-      lastSingleTouchStartAt = 0;
-      return;
-    }
-    lastSingleTouchStartAt = now;
+    if (e.touches.length < 2) return;
+    // Multi-touch — pinch territory; cancel before iOS commits.
+    if (!isInsideAllowed(e.target)) e.preventDefault();
   }
 
   function onTouchMove(e: TouchEvent) {
-    // Single-touch movements are scrolling — leave them alone. Only
-    // multi-touch is a pinch on iOS Safari.
     if (e.touches.length < 2) return;
-    if (isInsideAllowed(e.target)) return;
-    e.preventDefault();
-  }
-
-  // Belt-and-suspenders: also preventDefault on the second touchend
-  // of a rapid pair. Some Safari versions decide double-tap-zoom at
-  // gesture-recognition time (after touchend), which our touchstart
-  // preventDefault doesn't always reach in time.
-  let lastSingleTouchEndAt = 0;
-  function onTouchEnd(e: TouchEvent) {
-    if (e.changedTouches.length !== 1 || e.touches.length !== 0) {
-      lastSingleTouchEndAt = 0;
-      return;
-    }
-    if (isInsideAllowed(e.target)) {
-      lastSingleTouchEndAt = 0;
-      return;
-    }
-    const now = Date.now();
-    const dt = now - lastSingleTouchEndAt;
-    if (dt > 0 && dt < DOUBLE_TAP_WINDOW_MS && e.cancelable) {
-      e.preventDefault();
-      lastSingleTouchEndAt = 0;
-      return;
-    }
-    lastSingleTouchEndAt = now;
+    if (!isInsideAllowed(e.target)) e.preventDefault();
   }
 
   // `gesturestart` etc. aren't in TS's WindowEventMap (Safari-only);
@@ -188,10 +99,6 @@ export function installPagePinchZoomGuard() {
     passive: false,
   });
   window.addEventListener("touchmove", onTouchMove, {
-    capture: true,
-    passive: false,
-  });
-  window.addEventListener("touchend", onTouchEnd, {
     capture: true,
     passive: false,
   });

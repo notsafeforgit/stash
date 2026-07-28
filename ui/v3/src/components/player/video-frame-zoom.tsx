@@ -170,6 +170,7 @@ export function VideoFrameZoom({
   transform,
   onTransformChange,
   onActiveGesture,
+  isTemporarySpeedActive,
 }: {
   children: React.ReactNode;
   transform: ZoomTransform;
@@ -184,6 +185,12 @@ export function VideoFrameZoom({
    * re-fire.
    */
   onActiveGesture?: () => void;
+  /**
+   * Reports whether a long-press speed boost currently owns the single-finger
+   * gesture. Movement is consumed before it can become a zoom pan or lightbox
+   * slide swipe, while release and a second-finger pinch still end the boost.
+   */
+  isTemporarySpeedActive?: () => boolean;
 }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const transformRef = useRef(transform);
@@ -192,6 +199,8 @@ export function VideoFrameZoom({
   onTransformChangeRef.current = onTransformChange;
   const onActiveGestureRef = useRef(onActiveGesture);
   onActiveGestureRef.current = onActiveGesture;
+  const isTemporarySpeedActiveRef = useRef(isTemporarySpeedActive);
+  isTemporarySpeedActiveRef.current = isTemporarySpeedActive;
   // Discrete actions (double-tap) drive a CSS transition; pinch / pan /
   // wheel must stay real-time, so the transition rule is on only for
   // the duration of an animated change. Stored in state so the inline
@@ -440,6 +449,11 @@ export function VideoFrameZoom({
 
     function onTouchMove(e: TouchEvent) {
       if (!isInside(e.target)) return;
+      if (e.touches.length === 1 && isTemporarySpeedActiveRef.current?.()) {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        return;
+      }
       if (pinching && e.touches.length >= 2) {
         const [t1, t2] = [e.touches[0], e.touches[1]];
         const dist = Math.hypot(

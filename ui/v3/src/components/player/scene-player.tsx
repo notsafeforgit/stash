@@ -52,6 +52,7 @@ import {
 import { Video, videoFeatures } from "@videojs/react/video";
 import { StableHlsVideo } from "./stable-hls-video";
 import { cn } from "src/lib/utils";
+import { Badge } from "src/components/ui/badge";
 import { Spinner } from "src/components/ui/spinner";
 import { languageMap } from "src/utils/caption";
 import { resolution as resolutionLabel } from "src/utils/file";
@@ -365,10 +366,25 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   // 2× kicking in while the user was actually starting to pan).
   const cancelPendingTapToggleRef = useRef<(() => void) | null>(null);
   const cancelPendingHoldRef = useRef<(() => void) | null>(null);
+  const temporarySpeedActiveRef = useRef(false);
+  const [temporaryPlaybackRate, setTemporaryPlaybackRate] = useState<
+    number | null
+  >(null);
   const handleZoomActiveGesture = useCallback(() => {
     cancelPendingTapToggleRef.current?.();
     cancelPendingHoldRef.current?.();
   }, []);
+  const handleTemporaryPlaybackRateChange = useCallback(
+    (rate: number | null) => {
+      temporarySpeedActiveRef.current = rate != null;
+      setTemporaryPlaybackRate(rate);
+    },
+    [],
+  );
+  const isTemporarySpeedActive = useCallback(
+    () => temporarySpeedActiveRef.current,
+    [],
+  );
 
   const file = scene.files[0];
   const fileDuration = file?.duration ?? undefined;
@@ -892,6 +908,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
                 transform={zoomTransform}
                 onTransformChange={setZoomTransform}
                 onActiveGesture={handleZoomActiveGesture}
+                isTemporarySpeedActive={isTemporarySpeedActive}
               >
                 {mediaElement}
               </VideoFrameZoom>
@@ -939,9 +956,20 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
               clipBoundsEdit={clipBoundsEdit}
               cancelPendingTapToggleRef={cancelPendingTapToggleRef}
               cancelPendingHoldRef={cancelPendingHoldRef}
+              onTemporaryPlaybackRateChange={handleTemporaryPlaybackRateChange}
             />
 
             {topOverlay}
+            {temporaryPlaybackRate != null && (
+              <Badge
+                variant="secondary"
+                role="status"
+                aria-live="polite"
+                className="pointer-events-none absolute top-4 left-1/2 z-10 -translate-x-1/2"
+              >
+                {temporaryPlaybackRate}×
+              </Badge>
+            )}
           </Player.Container>
         </Player.Provider>
 

@@ -44,6 +44,7 @@ import { DOUBLE_TAP_MAX_MS } from "./video-frame-zoom";
 import {
   exceedsTouchTapMovement,
   isCompletedTouchTap,
+  shouldCancelTouchHoldOnMove,
   type TouchTapCandidate,
 } from "./touch-tap";
 
@@ -1037,6 +1038,9 @@ export interface PlayerControlsProps {
    *  through a deliberate zoom or pan.
    */
   cancelPendingHoldRef?: React.MutableRefObject<(() => void) | null>;
+  /** Keeps the independent speed indicator and zoom gesture ownership in sync
+   *  with the temporary long-press playback rate. `null` means inactive. */
+  onTemporaryPlaybackRateChange: (rate: number | null) => void;
 }
 
 export function PlayerControls({
@@ -1064,6 +1068,7 @@ export function PlayerControls({
   clipBoundsEdit,
   cancelPendingTapToggleRef,
   cancelPendingHoldRef,
+  onTemporaryPlaybackRateChange,
 }: PlayerControlsProps) {
   const duration = fileDuration ?? 0;
   const store = Player.usePlayer();
@@ -1243,8 +1248,9 @@ export function PlayerControls({
 
   // Long-press-to-2×-speed on the coarse-pointer touch overlay. Single-
   // finger touch held on the overlay's empty space for `HOLD_PRESS_MS`
-  // (without crossing `HOLD_PRESS_MOVE_PX`) bumps playbackRate to
-  // `HOLD_PRESS_RATE` until release. Restored on touchend / cancel.
+  // bumps playbackRate to `HOLD_PRESS_RATE` until release. While pending,
+  // normal touch slop is allowed; once active, the finger owns the gesture
+  // and movement no longer cancels it. Restored on touchend / cancel.
   //
   // Coordinated with `VideoFrameZoom`'s gesture recognizer via
   // `cancelPendingHoldRef`: pinch / pan-active / double-tap all cancel
@@ -1259,7 +1265,6 @@ export function PlayerControls({
   // case a gesture aborted without firing onClick (e.g. preventDefault
   // on touchmove from `VideoFrameZoom` suppresses the click).
   const HOLD_PRESS_MS = 500;
-  const HOLD_PRESS_MOVE_PX = 10;
   const HOLD_PRESS_RATE = 2;
   const holdTimerRef = useRef<number | null>(null);
   const holdOriginalRateRef = useRef<number | null>(null);
@@ -1275,7 +1280,8 @@ export function PlayerControls({
       holdOriginalRateRef.current = null;
     }
     holdStartPosRef.current = null;
-  }, [store]);
+    onTemporaryPlaybackRateChange(null);
+  }, [store, onTemporaryPlaybackRateChange]);
   useEffect(() => {
     if (!cancelPendingHoldRef) return;
     cancelPendingHoldRef.current = cancelHold;
@@ -1368,6 +1374,7 @@ export function PlayerControls({
               holdOriginalRateRef.current = store.state.playbackRate ?? 1;
               store.setPlaybackRate(HOLD_PRESS_RATE);
               holdFiredRef.current = true;
+              onTemporaryPlaybackRateChange(HOLD_PRESS_RATE);
               // The hold consumes the gesture; suppress the deferred tap-
               // to-toggle that the eventual `click` (after release) would
               // otherwise schedule. The flag in `onClick` is a safety net,
@@ -1379,14 +1386,14 @@ export function PlayerControls({
           onTouchMove={(e) => {
             const start = holdStartPosRef.current;
             if (!start) return;
-            if (e.touches.length !== 1) {
-              cancelHold();
-              return;
-            }
-            const t = e.touches[0];
+            const touch = e.touches.length === 1 ? e.touches[0] : null;
             if (
-              Math.hypot(t.clientX - start.x, t.clientY - start.y) >
-              HOLD_PRESS_MOVE_PX
+              shouldCancelTouchHoldOnMove(
+                start,
+                touch ? { x: touch.clientX, y: touch.clientY } : null,
+                e.touches.length,
+                holdOriginalRateRef.current != null,
+              )
             ) {
               cancelHold();
             }

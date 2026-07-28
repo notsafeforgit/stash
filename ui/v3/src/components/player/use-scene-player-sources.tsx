@@ -78,7 +78,7 @@ interface UseScenePlayerSourcesArgs {
    *  parent component. Read synchronously inside the handlers. */
   storeRef: RefObject<VideoPlayerStore | null>;
   /** Player.Provider's active Media instance, captured by
-   *  `<MediaBridge>`. For HLS sources this is the `HlsMedia` wrapper
+   *  `<MediaBridge>`. For HLS sources this is the `HlsJsMedia` wrapper
    *  whose `.engine` returns the live hls.js `Hls` instance — the
    *  in-place out-of-buffer seek path reaches into it for
    *  `stopLoad` / `BUFFER_FLUSHING` / `startLoad` so the MediaSource
@@ -329,9 +329,10 @@ export function useScenePlayerSources({
   // Replaces `beginSourceRemount` from the original variant. With an
   // in-place src swap the helper is: snapshot the current frame for
   // the freeze-frame canvas, flip the spinner, commit the state.
-  // No <video> abort (HlsMedia.src reassignment cancels the engine
-  // synchronously) and no rAF defer (the canvas masks first paint
-  // via z-ordering, not opacity timing).
+  // No <video> abort (HlsJsMedia hands the new URL to the active engine,
+  // or replaces that engine when its start-position config changes) and
+  // no rAF defer (the canvas masks first paint via z-ordering, not
+  // opacity timing).
   const beginSourceRemount = useCallback(
     (applyChanges: () => void) => {
       captureFrame();
@@ -563,9 +564,10 @@ export function useScenePlayerSources({
 
       beginSourceRemount(() => {
         // State updates flow through to `<VideoComponent>`'s `src`
-        // prop and `mediaProps` performs an in-place src swap on the
-        // existing `<video>` element. No Provider remount, no fresh
-        // hls.js instance, so no `startTransition` wrapper.
+        // prop and our bridge assigns it directly to HlsJsMedia,
+        // performing an in-place source swap on the existing `<video>`.
+        // No Provider remount, no fresh hls.js instance, so no
+        // `startTransition` wrapper.
         const newStrategy = startOffsetStrategyFor(
           source.src,
           frameRate,
@@ -742,8 +744,9 @@ export function useScenePlayerSources({
       //
       // (2) Clipped (marker / clip mode): the source URL has to
       //     change because the playlist's segment range is encoded in
-      //     `?start=&end=`. URL-change → `mediaProps` reassigns
-      //     `HlsMedia.src` → `load()` destroys + recreates the
+      //     `?start=&end=`. URL-change → our bridge reassigns
+      //     `HlsJsMedia.src` and start-position config → `load()`
+      //     destroys + recreates the
       //     `HlsJsMedia` delegate. Freeze-frame canvas masks the
       //     brief MSE-teardown.
       // The in-place flush+restart path doesn't survive iOS Safari:

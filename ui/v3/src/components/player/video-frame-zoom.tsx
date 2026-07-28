@@ -634,12 +634,11 @@ export function VideoFrameZoom({
         return;
       }
       if (e.pointerType === "touch") {
-        // Includes `pending` (pre-threshold pan candidacy): the first
-        // few touch-driven `pointermove`s are below the 8 px activation
-        // threshold but still need to be hidden from vjs's container
-        // listener, which calls `setActive` on every pointermove and
-        // would otherwise surface controls as soon as the user's finger
-        // started moving during a pan.
+        // Includes `pending` (pre-threshold pan candidacy): keep the
+        // lightbox carousel from beginning a slide swipe while this
+        // scaled frame is deciding whether the gesture is a local pan.
+        // Video.js beta.25 itself ignores touch pointermove for controls
+        // activity; mouse pointermove still reveals controls normally.
         if (pinching || touchPan.state !== "idle") {
           e.stopImmediatePropagation();
           e.preventDefault();

@@ -2,9 +2,9 @@
  * Scene player — stable-`<video>` element.
  *
  * `Player.Provider` mounts once per scene; source-URL changes flow
- * through `<VideoComponent>`'s `src` prop and the `mediaProps`
- * pipeline performs an in-place reassignment on the existing element
- * (`hls.loadSource()` for HLS via `HlsMedia`, plain `<video>.src` for
+ * through `<VideoComponent>`'s `src` prop and its media bridge performs
+ * an in-place reassignment on the existing element (`hls.loadSource()`
+ * for HLS via `HlsJsMedia`, plain `<video>.src` for
  * direct). The `<video>` DOM node, the store, the controls, and every
  * overlay survive every source change — only hls.js's internal engine
  * (the `HlsJsMedia` delegate) is destroyed and recreated when the
@@ -21,7 +21,7 @@
  *     frame natively.
  *   - Out-of-buffer seek on a clipped HLS playlist (marker / clip
  *     mode), or in iOS Safari native fullscreen on any HLS source:
- *     URL-change remount (new `?start=` flows through `HlsMedia.src`
+ *     URL-change remount (new `?start=` flows through `HlsJsMedia.src`
  *     to recreate the `HlsJsMedia` delegate). The freeze-frame canvas
  *     overlays the brief MSE-teardown window.
  *   - Quality swap / direct↔HLS engine swap: URL change + engine
@@ -91,7 +91,7 @@ const Player: CreatePlayerResult<VideoPlayerStore> = createPlayer({
 const MemoVideo = React.memo(Video);
 
 // HLS sources route through `<StableHlsVideo>` (a wrapper around
-// `@videojs/core`'s `HlsMedia`, which auto-selects hls.js on MSE-capable
+// `@videojs/core`'s `HlsJsMedia`, which auto-selects hls.js on MSE-capable
 // browsers and falls back to the browser's native HLS otherwise; see
 // `./stable-hls-video.tsx` for the stable-attach-ref rationale). hls.js
 // runs over MSE for every browser including Safari, giving JS-controlled
@@ -280,7 +280,7 @@ function StoreBridge({
   return null;
 }
 
-// Captures the live Media instance (HlsMedia for HLS sources, plain
+// Captures the live Media instance (HlsJsMedia for HLS sources, plain
 // Media wrapper for direct) into a ref so handlers in
 // `useScenePlayerSources` can reach hls.js's `Hls` instance via
 // `media.engine`. Used by the in-place out-of-buffer seek path:
@@ -795,7 +795,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   const effectiveMarkers = clipRange ? [] : markers;
 
   // HLS playlists route through hls.js (`<StableHlsVideo>` →
-  // `HlsMedia`); direct byte-range files use plain `<Video>`. See the
+  // `HlsJsMedia`); direct byte-range files use plain `<Video>`. See the
   // comment on MemoVideo / MemoHlsVideo above for the rationale.
   const VideoComponent = isHlsPlaylist(finalSrc) ? MemoHlsVideo : MemoVideo;
   const mediaElement =

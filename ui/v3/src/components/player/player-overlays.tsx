@@ -111,9 +111,9 @@ export function CanPlayEffect({
   const firedRef = useRef(false);
   // The readyState >= 3 fast-path below is only safe on the *first*
   // run. On srcKey-driven re-runs the <video> element's readyState
-  // still reflects the *previous* source (HlsMedia's engine teardown
-  // and the resulting `emptied` event come a couple of microtasks
-  // after the React effect runs), so the fast-path would otherwise
+  // still reflects the *previous* source (HlsJsMedia's source transition
+  // and the resulting `emptied` event come a couple of microtasks after
+  // the React effect runs), so the fast-path would otherwise
   // fire `onCanPlay` before the new source has even started loading
   // — see the comment block below for the diagnostic trace.
   // Records the srcKey generation the watcher last attached for; `null`

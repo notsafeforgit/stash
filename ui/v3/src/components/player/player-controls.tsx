@@ -12,6 +12,7 @@
 import type React from "react";
 import { useEffect, useCallback, useState, useRef } from "react";
 import {
+  CastButton,
   Controls,
   VolumeSlider,
   type CreatePlayerResult,
@@ -791,9 +792,6 @@ function ControlBar({
   const muted = Player.usePlayer((s) => s.muted);
   const pip = Player.usePlayer((s) => s.pip);
   const canPip = Player.usePlayer((s) => s.pipAvailability === "available");
-  const canCast = Player.usePlayer((s) => s.castAvailability === "available");
-  const castState = Player.usePlayer((s) => s.castState);
-  const isCastConnected = castState === "connected";
   const store = Player.usePlayer();
 
   return (
@@ -924,21 +922,22 @@ function ControlBar({
             </Button>
           )}
 
-          {canCast && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => store.toggleCast()}
-              className={cn(
+          <CastButton
+            className={(state) =>
+              cn(
                 OVERLAY_BTN,
-                isCastConnected ? "text-blue-400" : "text-white/80",
-              )}
-              aria-label={isCastConnected ? "Stop casting" : "Start casting"}
-            >
-              <Cast size={15} />
-            </Button>
-          )}
+                state.castState === "connected"
+                  ? "text-blue-400"
+                  : "text-white/80",
+                state.availability !== "available" && "hidden",
+              )
+            }
+            render={
+              <Button type="button" variant="ghost" size="icon">
+                <Cast size={15} />
+              </Button>
+            }
+          />
 
           <Button
             type="button"
@@ -1338,20 +1337,6 @@ export function PlayerControls({
               exceedsTouchTapMovement(candidate, e.clientX, e.clientY)
             ) {
               candidate.moved = true;
-            }
-
-            // Video.js marks the user active on every pointermove, even
-            // while a touch is still down. Undo that state transition when
-            // this press began with hidden controls. Do not stop propagation:
-            // the parent lightbox still needs the move for slide swiping.
-            // This bubble handler runs after the container's native
-            // pointermove listener, so the pair settles back to hidden before
-            // the browser paints.
-            if (
-              !controlsVisibleAtPointerDownRef.current &&
-              store.state.controlsVisible
-            ) {
-              store.toggleControls();
             }
           }}
           onTouchStart={(e) => {

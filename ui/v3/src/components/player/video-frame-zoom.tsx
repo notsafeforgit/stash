@@ -72,8 +72,9 @@
  *   zoom.ts`) blocks page-level zoom app-wide; the outer wrapper
  *   marks itself `data-pinch-zoom-allowed=""` to opt back in.
  * - The inner transform target gets `touch-action: none` to suppress
- *   iOS Safari's native double-tap-to-zoom on the video frame
- *   (the user's request was "pinch yes, double-tap no").
+ *   iOS Safari's native page zoom on the video frame. The local
+ *   recognizer below owns double-tap zoom so the transform remains
+ *   confined to the scene rather than scaling the browser viewport.
  * - On Safari, wheel events can fire alongside `gesturechange`
  *   during a trackpad pinch; the wheel handler bails when a Safari
  *   gesture is active so the zoom isn't double-applied.
@@ -754,9 +755,10 @@ export function VideoFrameZoom({
           // for one paint cycle so its discrete jump animates.
           transition:
             transitionMs > 0 ? `transform ${transitionMs}ms ease` : "none",
-          // Suppress iOS Safari's native double-tap-to-zoom on the
-          // video frame. The outer wrapper keeps default touch-action
-          // so it doesn't interfere with controls above this layer.
+          // Suppress native browser gestures on the transform target.
+          // Pinch and double-tap zoom are implemented locally above so
+          // they scale only the scene frame. The outer wrapper keeps its
+          // default touch-action so controls remain interactive.
           touchAction: "none",
         }}
       >

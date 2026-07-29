@@ -1,5 +1,5 @@
 import type React from "react";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 import { ChevronRight, Trash2 } from "lucide-react";
 import { cn } from "src/lib/utils";
@@ -143,11 +143,26 @@ export function DeleteDialog({
   const [deleteGenerated, setDeleteGenerated] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const suppressFinalFocusRef = useRef(false);
+
+  useEffect(() => {
+    if (open) suppressFinalFocusRef.current = false;
+  }, [open]);
+
+  const resolveFinalFocus = useCallback(
+    () => !suppressFinalFocusRef.current,
+    [],
+  );
 
   async function handleConfirm() {
     setIsDeleting(true);
     try {
       await onConfirm({ deleteFile, deleteGenerated });
+      // React batches the close with the `isDeleting=false` update below, so
+      // deriving finalFocus from isDeleting makes it true again before Base
+      // UI performs focus restoration. Keep the successful-close reason in a
+      // ref that survives that batch and the popup's exit transition.
+      suppressFinalFocusRef.current = true;
       onOpenChange(false);
     } finally {
       setIsDeleting(false);
@@ -195,11 +210,9 @@ export function DeleteDialog({
     <Dialog open={open} onOpenChange={isDeleting ? () => {} : onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        // List-owned dialogs can unmount with the entity they just deleted.
-        // Returning focus to that disappearing card (or Base UI's fallback)
-        // can move the mobile list viewport. Keep normal focus restoration
-        // for cancel/escape; suppress it only for a confirmed deletion.
-        finalFocus={isDeleting ? false : undefined}
+        // Keep normal focus restoration for cancel/escape, but not for a
+        // successful deletion whose trigger may leave the DOM.
+        finalFocus={resolveFinalFocus}
       >
         <DialogHeader>
           <DialogTitle>{titleNode}</DialogTitle>

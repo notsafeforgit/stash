@@ -21,6 +21,7 @@ import { Button } from "src/components/ui/button";
 import { ListScrollContext } from "./list-scroll-context";
 import {
   useListPageChangeScrollPosition,
+  usePreservedEmbeddedListScrollPosition,
   usePreservedListScrollPosition,
 } from "./list-scroll-state";
 import type { View } from "./views";
@@ -161,7 +162,18 @@ export const EntityList: React.FC<EntityListProps> = ({
   // available in render so `getScrollElement()` returns non-null on the second
   // commit. `useState`'s setter doubles as a callback ref: React calls it with
   // the DOM element on attach and `null` on detach.
+  const [rootEl, setRootEl] = useState<HTMLDivElement | null>(null);
   const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
+
+  // Embedded detail lists share the surrounding detail page's scroll viewport
+  // on mobile. Preserve that outer viewport separately; the inner scrollEl is
+  // natural-height there and changing it cannot stop the performer/studio/tag
+  // header from jumping back into view when deletion shortens the page.
+  usePreservedEmbeddedListScrollPosition(
+    rootEl,
+    !!mobileChromeFixed && isMobileSidebar,
+    totalCount,
+  );
 
   // A cache deletion broadcasts a temporarily short page before Apollo's
   // refetch pulls replacements forward from later pages. Keep the same
@@ -179,7 +191,10 @@ export const EntityList: React.FC<EntityListProps> = ({
 
   return (
     <TableToolbarSlotProvider>
-      <div className={cn("flex flex-col flex-auto min-h-0", className)}>
+      <div
+        ref={setRootEl}
+        className={cn("flex flex-col flex-auto min-h-0", className)}
+      >
         {modal}
 
         {/* ── Mobile filter Sheet ── */}

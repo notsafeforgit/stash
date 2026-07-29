@@ -45,6 +45,7 @@ import { MobileListBar } from "./mobile-list-bar";
 import { MobileGridColsContext } from "./mobile-grid-context";
 import { CardLayoutContext } from "./card-layout-context";
 import { ListScrollContext } from "./list-scroll-context";
+import { shouldPreserveListScrollDuringRefill } from "./list-scroll-state";
 import { CardAspectContext, type CardAspect } from "./card-aspect-context";
 import { ZoomIndexContext } from "./zoom-index-context";
 import { EntityDataTable } from "./entity-data-table";
@@ -525,6 +526,7 @@ interface VirtualizedItemListProps<TItem extends IHasID> {
   cardIsPortrait?: boolean;
   isLoading: boolean;
   itemsPerPage: number;
+  preserveScrollDuringRefill: boolean;
   items: TItem[];
   selectedIds: Set<string>;
   onSelectChange: (id: string, selected: boolean, shiftKey: boolean) => void;
@@ -546,6 +548,7 @@ function VirtualizedItemList<TItem extends IHasID>({
   cardIsPortrait,
   isLoading,
   itemsPerPage,
+  preserveScrollDuringRefill,
   items,
   selectedIds,
   onSelectChange,
@@ -620,6 +623,8 @@ function VirtualizedItemList<TItem extends IHasID>({
         ? (el) => el.getBoundingClientRect().height
         : undefined,
   });
+  virtualizer.shouldAdjustScrollPositionOnItemSizeChange = () =>
+    !preserveScrollDuringRefill;
 
   const totalSize = virtualizer.getTotalSize();
   const virtualRows = virtualizer.getVirtualItems();
@@ -1101,33 +1106,39 @@ export function EntityListPage<TData, TItem extends IHasID>({
   // lists slice their items locally and don't have a "page beyond what
   // we've fetched" notion.
   const { refetch } = rawResult;
+  const totalPagesAfterDataChange = Math.max(
+    1,
+    Math.ceil(count / filter.itemsPerPage),
+  );
+  const preserveScrollDuringRefill =
+    !localSource &&
+    !!query &&
+    shouldPreserveListScrollDuringRefill(
+      filter.currentPage,
+      filter.itemsPerPage,
+      count,
+      items.length,
+    );
   useEffect(() => {
     if (isLoading || localSource || !query) return;
 
-    const totalPages = Math.max(1, Math.ceil(count / filter.itemsPerPage));
-
-    if (filter.currentPage > totalPages) {
-      setFilter((f) => f.changePage(totalPages));
+    if (filter.currentPage > totalPagesAfterDataChange) {
+      setFilter((f) => f.changePage(totalPagesAfterDataChange));
       return;
     }
 
-    const isLastPage = filter.currentPage === totalPages;
-    const expected = isLastPage
-      ? Math.max(0, count - (filter.currentPage - 1) * filter.itemsPerPage)
-      : filter.itemsPerPage;
-
-    if (items.length < expected) {
+    if (preserveScrollDuringRefill) {
       void refetch();
     }
   }, [
-    items.length,
-    count,
     filter,
     isLoading,
     localSource,
+    preserveScrollDuringRefill,
     query,
     refetch,
     setFilter,
+    totalPagesAfterDataChange,
   ]);
 
   const applyToAllTarget = useMemo<BulkApplyTarget>(
@@ -1277,6 +1288,7 @@ export function EntityListPage<TData, TItem extends IHasID>({
       activeFilterCount={activeFilterCount}
       view={view}
       totalCount={count}
+      preserveScrollDuringRefill={preserveScrollDuringRefill}
       sidebarContent={sidebarContent}
       currentSavedFilterName={currentSavedFilterName}
       mobileChrome={mobileChrome}
@@ -1317,6 +1329,8 @@ export function EntityListPage<TData, TItem extends IHasID>({
             listSelect={listSelect}
             visibilityKey={tableVisibilityKey ?? String(filterMode)}
             isPending={isLoading}
+            totalCount={count}
+            preserveScrollDuringRefill={preserveScrollDuringRefill}
             renderRow={renderTableRow}
           />
         </ListStateContext.Provider>
@@ -1362,6 +1376,7 @@ export function EntityListPage<TData, TItem extends IHasID>({
                         cardIsPortrait={cardIsPortrait}
                         isLoading={isLoading}
                         itemsPerPage={filter.itemsPerPage}
+                        preserveScrollDuringRefill={preserveScrollDuringRefill}
                         items={items}
                         selectedIds={listSelect.selectedIds}
                         onSelectChange={listSelect.onSelectChange}

@@ -193,7 +193,14 @@ export function DeleteDialog({
 
   return (
     <Dialog open={open} onOpenChange={isDeleting ? () => {} : onOpenChange}>
-      <DialogContent showCloseButton={false}>
+      <DialogContent
+        showCloseButton={false}
+        // List-owned dialogs can unmount with the entity they just deleted.
+        // Returning focus to that disappearing card (or Base UI's fallback)
+        // can move the mobile list viewport. Keep normal focus restoration
+        // for cancel/escape; suppress it only for a confirmed deletion.
+        finalFocus={isDeleting ? false : undefined}
+      >
         <DialogHeader>
           <DialogTitle>{titleNode}</DialogTitle>
           <DialogDescription>

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useIntl } from "react-intl";
 
@@ -77,6 +77,10 @@ import {
   useTableToolbarHasProvider,
   useTableToolbarSlotEl,
 } from "./table-toolbar-slot";
+import {
+  useListPageChangeScrollPosition,
+  usePreservedListScrollPosition,
+} from "./list-scroll-state";
 
 // ── Column visibility persistence ─────────────────────────────────────────────
 
@@ -287,6 +291,8 @@ export interface EntityDataTableProps<TItem extends IHasID> {
   visibilityKey?: string;
   /** When true the query is in-flight — suppress the "no results" state */
   isPending?: boolean;
+  totalCount: number;
+  preserveScrollDuringRefill: boolean;
   /**
    * Optional per-row wrapper. Receives the item, the default `<TableRow>`
    * JSX, and a per-row select callback (so the wrapped context menu's
@@ -308,6 +314,8 @@ export function EntityDataTable<TItem extends IHasID>({
   listSelect,
   visibilityKey,
   isPending,
+  totalCount,
+  preserveScrollDuringRefill,
   renderRow,
 }: EntityDataTableProps<TItem>) {
   const intl = useIntl();
@@ -485,16 +493,18 @@ export function EntityDataTable<TItem extends IHasID>({
   const toolbarHasProvider = useTableToolbarHasProvider();
   const columnManager = <SheetColumnManager table={table} />;
 
-  // The table container is the scroll context (so the sticky header
-  // works); reset its scroll position whenever the page changes so the user
-  // lands at the top of the new page.
-  const tableContainerRef = useRef<HTMLDivElement>(null);
-  const lastScrolledPageRef = useRef(filter.currentPage);
-  useEffect(() => {
-    if (lastScrolledPageRef.current === filter.currentPage) return;
-    lastScrolledPageRef.current = filter.currentPage;
-    tableContainerRef.current?.scrollTo({ top: 0 });
-  });
+  // The table owns a nested scroll container so its sticky header works.
+  // Apply the same deletion-refill preservation and removed-page clamping as
+  // the card layouts use on EntityList's outer scroll container.
+  const [tableContainerEl, setTableContainerEl] =
+    useState<HTMLDivElement | null>(null);
+  usePreservedListScrollPosition(tableContainerEl, preserveScrollDuringRefill);
+  useListPageChangeScrollPosition(
+    tableContainerEl,
+    filter.currentPage,
+    filter.itemsPerPage,
+    totalCount,
+  );
 
   return (
     // h-full so the Table container (below) becomes the scroll context — a
@@ -524,7 +534,7 @@ export function EntityDataTable<TItem extends IHasID>({
         </Empty>
       ) : (
         <Table
-          containerRef={tableContainerRef}
+          containerRef={setTableContainerEl}
           containerClassName="min-h-0 flex-1 overflow-auto"
         >
           <TableHeader>

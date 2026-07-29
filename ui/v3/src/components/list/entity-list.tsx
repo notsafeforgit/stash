@@ -1,11 +1,5 @@
 import type React from "react";
-import {
-  startTransition,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { startTransition, useCallback, useEffect, useState } from "react";
 import { cn } from "src/lib/utils";
 import { Bookmark, Funnel, SlidersHorizontal } from "lucide-react";
 import { useIntl } from "react-intl";
@@ -25,6 +19,10 @@ import {
 } from "src/components/ui/bottom-sheet";
 import { Button } from "src/components/ui/button";
 import { ListScrollContext } from "./list-scroll-context";
+import {
+  useListPageChangeScrollPosition,
+  usePreservedListScrollPosition,
+} from "./list-scroll-state";
 import type { View } from "./views";
 import { PluginFilterExtras } from "src/plugins/filter-extras";
 
@@ -47,6 +45,9 @@ export interface EntityListProps {
   view?: View;
   /** Total number of matching items (for pagination) */
   totalCount: number;
+  /** Retain the current viewport while a cache deletion leaves this page
+   *  temporarily short and a refetch pulls later items into the gap. */
+  preserveScrollDuringRefill?: boolean;
 
   // ── Slots ──────────────────────────────────────────────────────────────────
 
@@ -97,6 +98,7 @@ export const EntityList: React.FC<EntityListProps> = ({
   activeFilterCount,
   view,
   totalCount,
+  preserveScrollDuringRefill = false,
   sidebarContent,
   children,
   operationComponent,
@@ -160,13 +162,20 @@ export const EntityList: React.FC<EntityListProps> = ({
   // commit. `useState`'s setter doubles as a callback ref: React calls it with
   // the DOM element on attach and `null` on detach.
   const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
-  // Reset scroll position when the page changes.
-  const lastScrolledPageRef = useRef(filter.currentPage);
-  useEffect(() => {
-    if (lastScrolledPageRef.current === filter.currentPage) return;
-    lastScrolledPageRef.current = filter.currentPage;
-    scrollEl?.scrollTo({ top: 0 });
-  });
+
+  // A cache deletion broadcasts a temporarily short page before Apollo's
+  // refetch pulls replacements forward from later pages. Keep the same
+  // numeric viewport through both commits; if the old position truly no
+  // longer exists, the shared helper clamps it to the new bottom.
+  usePreservedListScrollPosition(scrollEl, preserveScrollDuringRefill);
+  // Normal pagination starts at the top. If deletion removed the page the
+  // user was on, the new last page lands at its end instead.
+  useListPageChangeScrollPosition(
+    scrollEl,
+    filter.currentPage,
+    filter.itemsPerPage,
+    totalCount,
+  );
 
   return (
     <TableToolbarSlotProvider>

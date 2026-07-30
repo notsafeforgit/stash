@@ -1,4 +1,4 @@
-import { createContext } from "react";
+import { createContext, useContext } from "react";
 
 /**
  * Exposes the `EntityList` scroll container element to descendants. The
@@ -11,3 +11,24 @@ import { createContext } from "react";
  * needs to start computing rows.
  */
 export const ListScrollContext = createContext<HTMLElement | null>(null);
+
+export type FinishListDeletionScrollPreservation = (succeeded: boolean) => void;
+export type BeginListDeletionScrollPreservation =
+  () => FinishListDeletionScrollPreservation;
+
+const finishWithoutList = () => {};
+const beginWithoutList: BeginListDeletionScrollPreservation = () =>
+  finishWithoutList;
+
+/**
+ * Delete dialogs live below the card that owns them, so they can capture the
+ * correct EntityList viewport through context before the card is evicted from
+ * Apollo's cache. The returned completion callback remains valid even if that
+ * card (and the dialog itself) unmounts while the mutation is in flight.
+ */
+export const ListDeletionScrollContext =
+  createContext<BeginListDeletionScrollPreservation>(beginWithoutList);
+
+export function useListDeletionScrollPreservation() {
+  return useContext(ListDeletionScrollContext);
+}

@@ -1,4 +1,8 @@
-import { useLayoutEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import type {
+  BeginListDeletionScrollPreservation,
+  FinishListDeletionScrollPreservation,
+} from "./list-scroll-context";
 
 export type ListPageChangeScrollTarget = "start" | "end" | null;
 
@@ -52,18 +56,24 @@ export function clampListScrollTop(
  * detail page does. When deletion shortens the list, restore that outer
  * viewport to the same numeric position, clamped to the new bottom.
  */
-export function getEmbeddedListDeletionScrollTop(
+export function getListDeletionScrollTop(
   previousTotalCount: number,
   totalCount: number,
+  previousItemCount: number,
+  itemCount: number,
   desiredScrollTop: number,
   scrollHeight: number,
   clientHeight: number,
 ): number | null {
-  if (totalCount >= previousTotalCount) return null;
+  if (totalCount >= previousTotalCount && itemCount >= previousItemCount) {
+    return null;
+  }
   return clampListScrollTop(desiredScrollTop, scrollHeight, clientHeight);
 }
 
-function findScrollableAncestor(element: HTMLElement): HTMLElement | null {
+export function findScrollableAncestor(
+  element: HTMLElement,
+): HTMLElement | null {
   let ancestor = element.parentElement;
   while (ancestor) {
     const overflowY = window.getComputedStyle(ancestor).overflowY;
@@ -80,86 +90,171 @@ function findScrollableAncestor(element: HTMLElement): HTMLElement | null {
 }
 
 /**
- * Preserve the actual page viewport used by embedded mobile lists.
+ * Capture list scroll at the deletion boundary, before Apollo evicts cards.
  *
- * EntityList's own content element is the scroll viewport on standalone pages
- * and on desktop. Collection detail pages are different on mobile: the
- * performer/studio/tag header and the embedded list share an outer scroller.
- * Remember that scroller independently, then restore it when the result count
- * drops. A second animation-frame restoration wins over browser scroll
- * anchoring and virtualizer measurement work scheduled by the same commit.
+ * Waiting until a count changes is too late: removing dangling entity
+ * references can shorten the rendered list before its cached count/refetch
+ * result changes, and the browser may already have clamped the surrounding
+ * detail-page scroller to the top. The DeleteDialog starts this preservation
+ * synchronously when the user confirms. Item/count changes restore from that
+ * pre-mutation snapshot; mutation completion performs a final two-frame
+ * restore after focus cleanup and virtualizer measurements have settled.
  */
-export function usePreservedEmbeddedListScrollPosition(
+export function useListDeletionScrollPreserver(
   listElement: HTMLElement | null,
-  enabled: boolean,
+  innerScrollElement: HTMLElement | null,
+  useOuterScrollElement: boolean,
   totalCount: number,
-): void {
-  const previousTotalCountRef = useRef(totalCount);
-  const lastKnownScrollTopRef = useRef(0);
-  const scrollElementRef = useRef<HTMLElement | null>(null);
+  itemCount: number,
+): BeginListDeletionScrollPreservation {
+  interface DeletionSnapshot {
+    element: HTMLElement;
+    desiredScrollTop: number;
+    totalCount: number;
+    itemCount: number;
+    completed: boolean;
+    contentShrank: boolean;
+  }
+
+  const latestRef = useRef({
+    listElement,
+    innerScrollElement,
+    useOuterScrollElement,
+    totalCount,
+    itemCount,
+  });
+  latestRef.current = {
+    listElement,
+    innerScrollElement,
+    useOuterScrollElement,
+    totalCount,
+    itemCount,
+  };
+
+  const snapshotRef = useRef<DeletionSnapshot | null>(null);
+  const firstFrameRef = useRef<number | null>(null);
+  const secondFrameRef = useRef<number | null>(null);
+
+  const cancelFrames = useCallback(() => {
+    if (firstFrameRef.current !== null) {
+      cancelAnimationFrame(firstFrameRef.current);
+      firstFrameRef.current = null;
+    }
+    if (secondFrameRef.current !== null) {
+      cancelAnimationFrame(secondFrameRef.current);
+      secondFrameRef.current = null;
+    }
+  }, []);
+
+  const restore = useCallback((snapshot: DeletionSnapshot) => {
+    const { element } = snapshot;
+    if (!element.isConnected) return;
+    const target = clampListScrollTop(
+      snapshot.desiredScrollTop,
+      element.scrollHeight,
+      element.clientHeight,
+    );
+    element.scrollTop = target;
+  }, []);
+
+  const restoreAcrossFrames = useCallback(
+    (snapshot: DeletionSnapshot) => {
+      cancelFrames();
+      restore(snapshot);
+      firstFrameRef.current = requestAnimationFrame(() => {
+        firstFrameRef.current = null;
+        restore(snapshot);
+        secondFrameRef.current = requestAnimationFrame(() => {
+          secondFrameRef.current = null;
+          restore(snapshot);
+          if (
+            snapshotRef.current === snapshot &&
+            snapshot.completed &&
+            snapshot.contentShrank
+          ) {
+            snapshotRef.current = null;
+          }
+        });
+      });
+    },
+    [cancelFrames, restore],
+  );
 
   useLayoutEffect(() => {
-    if (!enabled || !listElement) {
-      scrollElementRef.current = null;
-      return;
-    }
+    const snapshot = snapshotRef.current;
+    if (!snapshot) return;
+    const target = getListDeletionScrollTop(
+      snapshot.totalCount,
+      totalCount,
+      snapshot.itemCount,
+      itemCount,
+      snapshot.desiredScrollTop,
+      snapshot.element.scrollHeight,
+      snapshot.element.clientHeight,
+    );
+    if (target === null) return;
 
-    const scrollElement = findScrollableAncestor(listElement);
-    scrollElementRef.current = scrollElement;
-    if (!scrollElement) return;
+    snapshot.contentShrank = true;
+    snapshot.element.scrollTop = target;
+    if (snapshot.completed) restoreAcrossFrames(snapshot);
+  }, [itemCount, restoreAcrossFrames, totalCount]);
 
-    const rememberScrollTop = () => {
-      lastKnownScrollTopRef.current = scrollElement.scrollTop;
+  useEffect(
+    () => () => {
+      cancelFrames();
+      snapshotRef.current = null;
+    },
+    [cancelFrames],
+  );
+
+  return useCallback(() => {
+    cancelFrames();
+    const latest = latestRef.current;
+    const scrollElement =
+      latest.useOuterScrollElement && latest.listElement
+        ? findScrollableAncestor(latest.listElement)
+        : latest.innerScrollElement;
+    if (!scrollElement) return () => {};
+
+    const snapshot: DeletionSnapshot = {
+      element: scrollElement,
+      desiredScrollTop: scrollElement.scrollTop,
+      totalCount: latest.totalCount,
+      itemCount: latest.itemCount,
+      completed: false,
+      contentShrank: false,
     };
-    rememberScrollTop();
-    scrollElement.addEventListener("scroll", rememberScrollTop, {
-      passive: true,
-    });
-    return () => {
-      rememberScrollTop();
-      scrollElement.removeEventListener("scroll", rememberScrollTop);
-      if (scrollElementRef.current === scrollElement) {
-        scrollElementRef.current = null;
+    snapshotRef.current = snapshot;
+
+    const finish: FinishListDeletionScrollPreservation = (succeeded) => {
+      if (snapshotRef.current !== snapshot) return;
+      if (!succeeded) {
+        snapshotRef.current = null;
+        return;
+      }
+      snapshot.completed = true;
+      restoreAcrossFrames(snapshot);
+
+      // If the list has already shrunk, the second frame clears the snapshot.
+      // Otherwise retain it for the delayed Apollo cache/refetch commit; the
+      // layout effect above will restore and clear when item/count data lands.
+      const current = latestRef.current;
+      if (
+        getListDeletionScrollTop(
+          snapshot.totalCount,
+          current.totalCount,
+          snapshot.itemCount,
+          current.itemCount,
+          snapshot.desiredScrollTop,
+          snapshot.element.scrollHeight,
+          snapshot.element.clientHeight,
+        ) !== null
+      ) {
+        snapshot.contentShrank = true;
       }
     };
-  }, [enabled, listElement]);
-
-  useLayoutEffect(() => {
-    const previousTotalCount = previousTotalCountRef.current;
-    previousTotalCountRef.current = totalCount;
-    if (!enabled || !listElement) return;
-
-    const scrollElement =
-      scrollElementRef.current ?? findScrollableAncestor(listElement);
-    if (!scrollElement) return;
-
-    const desiredScrollTop = lastKnownScrollTopRef.current;
-    if (totalCount >= previousTotalCount) return;
-
-    const restore = () => {
-      const target = getEmbeddedListDeletionScrollTop(
-        previousTotalCount,
-        totalCount,
-        desiredScrollTop,
-        scrollElement.scrollHeight,
-        scrollElement.clientHeight,
-      );
-      if (target === null) return;
-      scrollElement.scrollTop = target;
-      lastKnownScrollTopRef.current = target;
-    };
-
-    restore();
-    let secondFrame: number | undefined;
-    const firstFrame = requestAnimationFrame(() => {
-      restore();
-      secondFrame = requestAnimationFrame(restore);
-    });
-    return () => {
-      cancelAnimationFrame(firstFrame);
-      if (secondFrame !== undefined) cancelAnimationFrame(secondFrame);
-    };
-  }, [enabled, listElement, totalCount]);
+    return finish;
+  }, [cancelFrames, restoreAcrossFrames]);
 }
 
 export function usePreservedListScrollPosition(

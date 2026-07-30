@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "src/components/ui/dialog";
+import { useListDeletionScrollPreservation } from "src/components/list/list-scroll-context";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -144,6 +145,7 @@ export function DeleteDialog({
   const [isDeleting, setIsDeleting] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const suppressFinalFocusRef = useRef(false);
+  const beginListScrollPreservation = useListDeletionScrollPreservation();
 
   useEffect(() => {
     if (open) suppressFinalFocusRef.current = false;
@@ -155,16 +157,20 @@ export function DeleteDialog({
   );
 
   async function handleConfirm() {
+    const finishListScrollPreservation = beginListScrollPreservation();
+    let succeeded = false;
+    // The card owning this dialog can be evicted synchronously inside
+    // onConfirm's Apollo update, unmounting the popup before the mutation
+    // promise resolves. Suppress final focus before that can happen.
+    suppressFinalFocusRef.current = true;
     setIsDeleting(true);
     try {
       await onConfirm({ deleteFile, deleteGenerated });
-      // React batches the close with the `isDeleting=false` update below, so
-      // deriving finalFocus from isDeleting makes it true again before Base
-      // UI performs focus restoration. Keep the successful-close reason in a
-      // ref that survives that batch and the popup's exit transition.
-      suppressFinalFocusRef.current = true;
+      succeeded = true;
       onOpenChange(false);
     } finally {
+      finishListScrollPreservation(succeeded);
+      if (!succeeded) suppressFinalFocusRef.current = false;
       setIsDeleting(false);
     }
   }

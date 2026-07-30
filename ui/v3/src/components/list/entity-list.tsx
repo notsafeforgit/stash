@@ -18,10 +18,13 @@ import {
   BottomSheetTitle,
 } from "src/components/ui/bottom-sheet";
 import { Button } from "src/components/ui/button";
-import { ListScrollContext } from "./list-scroll-context";
+import {
+  ListDeletionScrollContext,
+  ListScrollContext,
+} from "./list-scroll-context";
 import {
   useListPageChangeScrollPosition,
-  usePreservedEmbeddedListScrollPosition,
+  useListDeletionScrollPreserver,
   usePreservedListScrollPosition,
 } from "./list-scroll-state";
 import type { View } from "./views";
@@ -46,6 +49,8 @@ export interface EntityListProps {
   view?: View;
   /** Total number of matching items (for pagination) */
   totalCount: number;
+  /** Number of item cards/rows currently rendered on this page. */
+  itemCount: number;
   /** Retain the current viewport while a cache deletion leaves this page
    *  temporarily short and a refetch pulls later items into the gap. */
   preserveScrollDuringRefill?: boolean;
@@ -99,6 +104,7 @@ export const EntityList: React.FC<EntityListProps> = ({
   activeFilterCount,
   view,
   totalCount,
+  itemCount,
   preserveScrollDuringRefill = false,
   sidebarContent,
   children,
@@ -165,14 +171,12 @@ export const EntityList: React.FC<EntityListProps> = ({
   const [rootEl, setRootEl] = useState<HTMLDivElement | null>(null);
   const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
 
-  // Embedded detail lists share the surrounding detail page's scroll viewport
-  // on mobile. Preserve that outer viewport separately; the inner scrollEl is
-  // natural-height there and changing it cannot stop the performer/studio/tag
-  // header from jumping back into view when deletion shortens the page.
-  usePreservedEmbeddedListScrollPosition(
+  const beginDeletionScrollPreservation = useListDeletionScrollPreserver(
     rootEl,
+    scrollEl,
     !!mobileChromeFixed && isMobileSidebar,
     totalCount,
+    itemCount,
   );
 
   // A cache deletion broadcasts a temporarily short page before Apollo's
@@ -346,9 +350,13 @@ export const EntityList: React.FC<EntityListProps> = ({
                       "pb-[calc(5rem+env(safe-area-inset-bottom,0px))]",
                   )}
                 >
-                  <ListScrollContext.Provider value={scrollEl}>
-                    {children}
-                  </ListScrollContext.Provider>
+                  <ListDeletionScrollContext.Provider
+                    value={beginDeletionScrollPreservation}
+                  >
+                    <ListScrollContext.Provider value={scrollEl}>
+                      {children}
+                    </ListScrollContext.Provider>
+                  </ListDeletionScrollContext.Provider>
                 </div>
               </div>
 

@@ -10,10 +10,12 @@ import { Spinner } from "src/components/ui/spinner";
  * Renders nothing until configuration is available.
  */
 export function ConfigLoader({ children }: PropsWithChildren) {
-  const { data, loading } = useQuery(ConfigurationDocument);
+  const { data } = useQuery(ConfigurationDocument);
 
-  if (loading || !data) {
-    // Minimal loading state — no locale needed yet
+  if (!data) {
+    // Only replace the app during the initial load. Entity mutations refetch
+    // all active queries, including Configuration; cached data remains valid
+    // during that background request and must keep the router mounted.
     return (
       <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
         <Spinner className="size-10 text-muted-foreground" />

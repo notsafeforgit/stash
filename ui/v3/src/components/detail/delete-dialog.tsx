@@ -1,5 +1,5 @@
 import type React from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 import { ChevronRight, Trash2 } from "lucide-react";
 import { cn } from "src/lib/utils";
@@ -14,7 +14,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "src/components/ui/dialog";
-import { useListDeletionScrollPreservation } from "src/components/list/list-scroll-context";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -144,33 +143,13 @@ export function DeleteDialog({
   const [deleteGenerated, setDeleteGenerated] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const suppressFinalFocusRef = useRef(false);
-  const beginListScrollPreservation = useListDeletionScrollPreservation();
-
-  useEffect(() => {
-    if (open) suppressFinalFocusRef.current = false;
-  }, [open]);
-
-  const resolveFinalFocus = useCallback(
-    () => !suppressFinalFocusRef.current,
-    [],
-  );
 
   async function handleConfirm() {
-    const finishListScrollPreservation = beginListScrollPreservation();
-    let succeeded = false;
-    // The card owning this dialog can be evicted synchronously inside
-    // onConfirm's Apollo update, unmounting the popup before the mutation
-    // promise resolves. Suppress final focus before that can happen.
-    suppressFinalFocusRef.current = true;
     setIsDeleting(true);
     try {
       await onConfirm({ deleteFile, deleteGenerated });
-      succeeded = true;
       onOpenChange(false);
     } finally {
-      finishListScrollPreservation(succeeded);
-      if (!succeeded) suppressFinalFocusRef.current = false;
       setIsDeleting(false);
     }
   }
@@ -214,12 +193,7 @@ export function DeleteDialog({
 
   return (
     <Dialog open={open} onOpenChange={isDeleting ? () => {} : onOpenChange}>
-      <DialogContent
-        showCloseButton={false}
-        // Keep normal focus restoration for cancel/escape, but not for a
-        // successful deletion whose trigger may leave the DOM.
-        finalFocus={resolveFinalFocus}
-      >
+      <DialogContent showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>{titleNode}</DialogTitle>
           <DialogDescription>

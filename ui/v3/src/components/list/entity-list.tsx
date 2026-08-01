@@ -18,13 +18,9 @@ import {
   BottomSheetTitle,
 } from "src/components/ui/bottom-sheet";
 import { Button } from "src/components/ui/button";
-import {
-  ListDeletionScrollContext,
-  ListScrollContext,
-} from "./list-scroll-context";
+import { ListScrollContext } from "./list-scroll-context";
 import {
   useListPageChangeScrollPosition,
-  useListDeletionScrollPreserver,
   usePreservedListScrollPosition,
 } from "./list-scroll-state";
 import type { View } from "./views";
@@ -49,8 +45,6 @@ export interface EntityListProps {
   view?: View;
   /** Total number of matching items (for pagination) */
   totalCount: number;
-  /** Number of item cards/rows currently rendered on this page. */
-  itemCount: number;
   /** Retain the current viewport while a cache deletion leaves this page
    *  temporarily short and a refetch pulls later items into the gap. */
   preserveScrollDuringRefill?: boolean;
@@ -104,7 +98,6 @@ export const EntityList: React.FC<EntityListProps> = ({
   activeFilterCount,
   view,
   totalCount,
-  itemCount,
   preserveScrollDuringRefill = false,
   sidebarContent,
   children,
@@ -168,16 +161,7 @@ export const EntityList: React.FC<EntityListProps> = ({
   // available in render so `getScrollElement()` returns non-null on the second
   // commit. `useState`'s setter doubles as a callback ref: React calls it with
   // the DOM element on attach and `null` on detach.
-  const [rootEl, setRootEl] = useState<HTMLDivElement | null>(null);
   const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
-
-  const beginDeletionScrollPreservation = useListDeletionScrollPreserver(
-    rootEl,
-    scrollEl,
-    !!mobileChromeFixed && isMobileSidebar,
-    totalCount,
-    itemCount,
-  );
 
   // A cache deletion broadcasts a temporarily short page before Apollo's
   // refetch pulls replacements forward from later pages. Keep the same
@@ -195,10 +179,7 @@ export const EntityList: React.FC<EntityListProps> = ({
 
   return (
     <TableToolbarSlotProvider>
-      <div
-        ref={setRootEl}
-        className={cn("flex flex-col flex-auto min-h-0", className)}
-      >
+      <div className={cn("flex flex-col flex-auto min-h-0", className)}>
         {modal}
 
         {/* ── Mobile filter Sheet ── */}
@@ -350,13 +331,9 @@ export const EntityList: React.FC<EntityListProps> = ({
                       "pb-[calc(5rem+env(safe-area-inset-bottom,0px))]",
                   )}
                 >
-                  <ListDeletionScrollContext.Provider
-                    value={beginDeletionScrollPreservation}
-                  >
-                    <ListScrollContext.Provider value={scrollEl}>
-                      {children}
-                    </ListScrollContext.Provider>
-                  </ListDeletionScrollContext.Provider>
+                  <ListScrollContext.Provider value={scrollEl}>
+                    {children}
+                  </ListScrollContext.Provider>
                 </div>
               </div>
 

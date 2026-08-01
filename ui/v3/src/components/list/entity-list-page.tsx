@@ -1288,7 +1288,6 @@ export function EntityListPage<TData, TItem extends IHasID>({
       activeFilterCount={activeFilterCount}
       view={view}
       totalCount={count}
-      itemCount={items.length}
       preserveScrollDuringRefill={preserveScrollDuringRefill}
       sidebarContent={sidebarContent}
       currentSavedFilterName={currentSavedFilterName}

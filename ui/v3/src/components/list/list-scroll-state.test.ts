@@ -2,10 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   clampListScrollTop,
   getListPageChangeScrollTarget,
+  shouldAdjustVirtualizedListScrollPosition,
   shouldPreserveListScrollDuringRefill,
 } from "./list-scroll-state";
 
-describe("entity-list deletion scroll state", () => {
+describe("entity-list scroll state", () => {
   it("preserves scroll while a non-final page waits for a replacement", () => {
     expect(shouldPreserveListScrollDuringRefill(1, 40, 99, 39)).toBe(true);
   });
@@ -30,5 +31,23 @@ describe("entity-list deletion scroll state", () => {
     expect(getListPageChangeScrollTarget(1, 2, 3)).toBe("start");
     expect(getListPageChangeScrollTarget(3, 2, 2)).toBe("end");
     expect(getListPageChangeScrollTarget(2, 2, 2)).toBeNull();
+  });
+
+  it("does not interrupt active scrolling for virtual row measurements", () => {
+    expect(
+      shouldAdjustVirtualizedListScrollPosition(400, 800, true, false),
+    ).toBe(false);
+  });
+
+  it("only corrects idle measurements above the viewport", () => {
+    expect(
+      shouldAdjustVirtualizedListScrollPosition(400, 800, false, false),
+    ).toBe(true);
+    expect(
+      shouldAdjustVirtualizedListScrollPosition(900, 800, false, false),
+    ).toBe(false);
+    expect(
+      shouldAdjustVirtualizedListScrollPosition(400, 800, false, true),
+    ).toBe(false);
   });
 });

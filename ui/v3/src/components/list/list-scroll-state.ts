@@ -47,6 +47,22 @@ export function clampListScrollTop(
   return Math.max(0, Math.min(desiredScrollTop, maximumScrollTop));
 }
 
+/**
+ * Dynamic row measurements can change the size of content above the viewport.
+ * TanStack Virtual can compensate by writing a corrected scroll offset, but a
+ * programmatic scroll during native touch momentum stops that momentum. Only
+ * correct an idle viewport, and leave deletion-refill preservation in sole
+ * control while a page is temporarily short.
+ */
+export function shouldAdjustVirtualizedListScrollPosition(
+  itemStart: number,
+  scrollOffset: number,
+  isScrolling: boolean,
+  preserveDuringRefill: boolean,
+): boolean {
+  return !isScrolling && !preserveDuringRefill && itemStart < scrollOffset;
+}
+
 export function usePreservedListScrollPosition(
   scrollElement: HTMLElement | null,
   preserveDuringRefill: boolean,

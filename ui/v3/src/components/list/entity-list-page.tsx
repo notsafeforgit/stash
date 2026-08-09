@@ -45,7 +45,10 @@ import { MobileListBar } from "./mobile-list-bar";
 import { MobileGridColsContext } from "./mobile-grid-context";
 import { CardLayoutContext } from "./card-layout-context";
 import { ListScrollContext } from "./list-scroll-context";
-import { shouldPreserveListScrollDuringRefill } from "./list-scroll-state";
+import {
+  shouldAdjustVirtualizedListScrollPosition,
+  shouldPreserveListScrollDuringRefill,
+} from "./list-scroll-state";
 import { CardAspectContext, type CardAspect } from "./card-aspect-context";
 import { ZoomIndexContext } from "./zoom-index-context";
 import { EntityDataTable } from "./entity-data-table";
@@ -623,8 +626,17 @@ function VirtualizedItemList<TItem extends IHasID>({
         ? (el) => el.getBoundingClientRect().height
         : undefined,
   });
-  virtualizer.shouldAdjustScrollPositionOnItemSizeChange = () =>
-    !preserveScrollDuringRefill;
+  virtualizer.shouldAdjustScrollPositionOnItemSizeChange = (
+    item,
+    _delta,
+    instance,
+  ) =>
+    shouldAdjustVirtualizedListScrollPosition(
+      item.start,
+      instance.scrollOffset ?? 0,
+      instance.isScrolling,
+      preserveScrollDuringRefill,
+    );
 
   const totalSize = virtualizer.getTotalSize();
   const virtualRows = virtualizer.getVirtualItems();

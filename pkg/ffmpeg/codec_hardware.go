@@ -167,7 +167,15 @@ func (f *FFMpeg) initHWSupport(ctx context.Context) {
 }
 
 func (f *FFMpeg) hwCanFullHWTranscode(ctx context.Context, codec VideoCodec, vf *models.VideoFile, reqHeight int) bool {
+	return f.hwCanFullHWTranscodeWithRotation(ctx, codec, vf, reqHeight, 0)
+}
+
+func (f *FFMpeg) hwCanFullHWTranscodeWithRotation(ctx context.Context, codec VideoCodec, vf *models.VideoFile, reqHeight int, displayRotation int64) bool {
 	if codec == VideoCodecCopy {
+		return false
+	}
+	rotationFilter, rotationSupported := hardwareDisplayRotationFilter(codec, displayRotation)
+	if !rotationSupported {
 		return false
 	}
 
@@ -176,10 +184,12 @@ func (f *FFMpeg) hwCanFullHWTranscode(ctx context.Context, codec VideoCodec, vf 
 	args = args.LogLevel(LogLevelWarning)
 	args = args.XError()
 	args = f.hwDeviceInit(args, codec, true)
+	args = displayRotationInputArgs(args, displayRotation, true)
 	args = args.Input(vf.Path)
 	args = args.Duration(1)
 
 	videoFilter := f.hwMaxResFilter(codec, vf, reqHeight, true)
+	videoFilter = prependVideoFilter(rotationFilter, videoFilter)
 	args = append(args, CodecInit(codec)...)
 	args = args.VideoFilter(videoFilter)
 
@@ -203,6 +213,61 @@ func (f *FFMpeg) hwCanFullHWTranscode(ctx context.Context, codec VideoCodec, vf 
 	}
 
 	return true
+}
+
+func displayRotationInputArgs(args Args, displayRotation int64, hardwareFilter bool) Args {
+	if normalizeRotation(displayRotation) == 0 {
+		return args
+	}
+	if hardwareFilter {
+		// Override the input matrix so ffmpeg neither autorotates nor copies it
+		// to the encoded output; the GPU transpose filter handles the pixels.
+		return append(args, "-display_rotation:v:0", "0")
+	}
+
+	// Explicitly restore the default in case custom live-transcode input
+	// arguments disabled it. Software decode applies the matrix and ffmpeg
+	// clears the consumed transform from the encoded output.
+	return append(args, "-autorotate")
+}
+
+func hardwareDisplayRotationFilter(codec VideoCodec, displayRotation int64) (VideoFilter, bool) {
+	var direction string
+	switch normalizeRotation(displayRotation) {
+	case 0:
+		return "", true
+	case -90:
+		direction = "clock"
+	case 90:
+		direction = "cclock"
+	case 180:
+		direction = "reversal"
+	default:
+		// CUDA, QSV, and VAAPI expose only right-angle transposes. Let the
+		// generic software rotate filter handle an unusual arbitrary matrix.
+		return "", false
+	}
+
+	switch codec {
+	case VideoCodecN264, VideoCodecN264H, VideoCodecNAV1:
+		return VideoFilter(fmt.Sprintf("transpose_cuda=dir=%s", direction)), true
+	case VideoCodecI264, VideoCodecI264C, VideoCodecIAV1, VideoCodecIVP9:
+		return VideoFilter(fmt.Sprintf("vpp_qsv=transpose=%s", direction)), true
+	case VideoCodecV264, VideoCodecV265, VideoCodecVAV1, VideoCodecVVP9:
+		return VideoFilter(fmt.Sprintf("transpose_vaapi=dir=%s", direction)), true
+	default:
+		return "", false
+	}
+}
+
+func prependVideoFilter(prefix VideoFilter, videoFilter VideoFilter) VideoFilter {
+	if prefix == "" {
+		return videoFilter
+	}
+	if videoFilter == "" {
+		return prefix
+	}
+	return prefix.Append(string(videoFilter))
 }
 
 // Prepend input for hardware encoding only

@@ -128,14 +128,6 @@ func hlsSegmentDuration(frameRate float64) float64 {
 	return float64(gop) / frameRate
 }
 
-func canUseFullHardwareDecode(displayRotation int64) bool {
-	// FFmpeg's automatic display-matrix transform is a software filter.
-	// A full-hardware path keeps decoded frames in GPU memory, so the filter
-	// cannot be inserted before encoding. Software decode still feeds the
-	// configured hardware encoder after applying the transform.
-	return normalizeRotation(displayRotation) == 0
-}
-
 // Track identifies a demuxed HLS rendition. With ffmpeg's -var_stream_map
 // each variant produces its own init segment + .m4s media segments under a
 // per-track filename prefix; the master playlist references them as a video
@@ -652,19 +644,18 @@ func (s *v3RunningStream) makeStreamArgs(sm *StreamManager, segment int) Args {
 
 	codec := v3HLSGetCodec(sm, s.streamType.Name)
 
-	// Full-hardware decode keeps frames in GPU memory, where ffmpeg cannot
-	// insert its normal software autorotation filter, leaving the HLS coded
-	// pixels sideways or upside down. For a rotated source, decode in software,
-	// apply the display transform, then upload the corrected frames to the
-	// configured hardware encoder.
+	// Rotated sources need an explicit GPU transpose because ffmpeg's generic
+	// autorotation is a software filter. The full-hardware capability probe
+	// includes that transpose; if the selected CUDA/QSV/VAAPI build or device
+	// rejects it, this falls back to software decode/rotation while retaining
+	// the configured hardware encoder.
 	displayRotation := int64(0)
 	if codec != VideoCodecCopy {
 		displayRotation = s.getDisplayRotation(sm)
 	}
-	fullhw := canUseFullHardwareDecode(displayRotation) &&
-		codec.CodeName != "" &&
+	fullhw := codec.CodeName != "" &&
 		sm.config.GetTranscodeHardwareAcceleration() &&
-		sm.encoder.hwCanFullHWTranscode(sm.context, codec, s.vf, s.maxTranscodeSize)
+		sm.encoder.hwCanFullHWTranscodeWithRotation(sm.context, codec, s.vf, s.maxTranscodeSize, displayRotation)
 	args = sm.encoder.hwDeviceInit(args, codec, fullhw)
 	args = append(args, extraInputArgs...)
 
@@ -680,15 +671,14 @@ func (s *v3RunningStream) makeStreamArgs(sm *StreamManager, segment int) Args {
 		args = args.Seek(seekTime)
 	}
 
-	if displayRotation != 0 {
-		// Be explicit in case custom live-transcode input args disabled the
-		// default. Software decode applies the matrix to the pixels and clears
-		// the consumed matrix from the encoded HLS stream.
-		args = append(args, "-autorotate")
-	}
+	args = displayRotationInputArgs(args, displayRotation, fullhw)
 	args = args.Input(s.vf.Path)
 
 	videoFilter := sm.encoder.hwMaxResFilter(codec, s.vf, s.maxTranscodeSize, fullhw)
+	if fullhw {
+		rotationFilter, _ := hardwareDisplayRotationFilter(codec, displayRotation)
+		videoFilter = prependVideoFilter(rotationFilter, videoFilter)
+	}
 
 	args = append(args, s.streamType.Args(codec, segment, videoFilter, s.videoOnly(), s.outputDir, frameRate)...)
 

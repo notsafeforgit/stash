@@ -416,13 +416,14 @@ func parse(filePath string, probeJSON *FFProbeJSON) (*VideoFile, error) {
 		result.FrameRate = math.Round(framerate*100) / 100
 		result.Width = videoStream.Width
 		result.Height = videoStream.Height
+		result.Rotation = streamRotation(videoStream)
 		result.BitDepth = bitDepthFromStream(videoStream)
 		result.ColorRange = videoStream.ColorRange
 		result.ColorSpace = videoStream.ColorSpace
 		result.ColorTransfer = videoStream.ColorTransfer
 		result.ColorPrimaries = videoStream.ColorPrimaries
 
-		if isRotated(videoStream) {
+		if rotationSwapsDimensions(result.Rotation) {
 			result.Width = videoStream.Height
 			result.Height = videoStream.Width
 		}
@@ -495,23 +496,39 @@ func is8BitPixFmt(pixFmt string) bool {
 	}
 }
 
-func isRotated(s *FFProbeStream) bool {
-	rotate, _ := strconv.ParseInt(s.Tags.Rotate, 10, 64)
-	if rotate != 180 && rotate != 0 {
-		return true
+func streamRotation(s *FFProbeStream) int64 {
+	if s == nil {
+		return 0
 	}
 
+	// Display-matrix side data is the modern, authoritative form emitted
+	// by ffprobe for MOV/MP4 files. Fall back to the legacy rotate tag for
+	// older containers and ffprobe versions.
 	for _, sd := range s.SideDataList {
-		r := sd.Rotation
-		if r < 0 {
-			r = -r
-		}
-		if r != 0 && r != 180 {
-			return true
+		if rotation := normalizeRotation(int64(sd.Rotation)); rotation != 0 {
+			return rotation
 		}
 	}
 
-	return false
+	rotate, err := strconv.ParseInt(s.Tags.Rotate, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return normalizeRotation(rotate)
+}
+
+func normalizeRotation(rotation int64) int64 {
+	rotation %= 360
+	if rotation > 180 {
+		rotation -= 360
+	} else if rotation <= -180 {
+		rotation += 360
+	}
+	return rotation
+}
+
+func rotationSwapsDimensions(rotation int64) bool {
+	return rotation != 0 && rotation != 180
 }
 
 func (v *VideoFile) getAudioStream() *FFProbeStream {

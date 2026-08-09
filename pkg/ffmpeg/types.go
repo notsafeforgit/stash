@@ -94,15 +94,17 @@ type FFProbeStream struct {
 		Language     string        `json:"language"`
 		Rotate       string        `json:"rotate"`
 	} `json:"tags"`
-	TimeBase      string `json:"time_base"`
-	Width         int    `json:"width,omitempty"`
-	BitsPerSample int    `json:"bits_per_sample,omitempty"`
-	ChannelLayout string `json:"channel_layout,omitempty"`
-	Channels      int    `json:"channels,omitempty"`
-	MaxBitRate    string `json:"max_bit_rate,omitempty"`
-	SampleFmt     string `json:"sample_fmt,omitempty"`
-	SampleRate    string `json:"sample_rate,omitempty"`
-	SideDataList  []struct {
-		Rotation int `json:"rotation"`
-	} `json:"side_data_list"`
+	TimeBase      string                  `json:"time_base"`
+	Width         int                     `json:"width,omitempty"`
+	BitsPerSample int                     `json:"bits_per_sample,omitempty"`
+	ChannelLayout string                  `json:"channel_layout,omitempty"`
+	Channels      int                     `json:"channels,omitempty"`
+	MaxBitRate    string                  `json:"max_bit_rate,omitempty"`
+	SampleFmt     string                  `json:"sample_fmt,omitempty"`
+	SampleRate    string                  `json:"sample_rate,omitempty"`
+	SideDataList  []FFProbeStreamSideData `json:"side_data_list"`
+}
+
+type FFProbeStreamSideData struct {
+	Rotation int `json:"rotation"`
 }

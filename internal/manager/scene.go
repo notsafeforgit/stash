@@ -238,7 +238,11 @@ func GetSceneStreamPaths(scene *models.Scene, directStreamURL *url.URL, maxStrea
 	}
 
 	// Codec-copy HLS variants are only viable when the source's GOPs are
-	// short enough to align with our 2 s declared segment length.
+	// short enough to align with our 2 s declared segment length and the
+	// source does not rely on a display transform. Browsers honor MOV/MP4
+	// display matrices during direct playback, and ffmpeg applies them when
+	// transcoding, but MSE playback of codec-copy fMP4 can ignore the matrix
+	// and display the coded pixels sideways or upside down.
 	// `-c copy` HLS muxer can only end segments at source keyframes, so
 	// a source whose GOPs are 5+ s ends up writing 5+ s segments while
 	// our hand-rolled playlist still declares EXTINF=2.002 — hls.js loses
@@ -251,7 +255,10 @@ func GetSceneStreamPaths(scene *models.Scene, directStreamURL *url.URL, maxStrea
 	// sources whose IDRs may overshoot by a frame or two; iPhone HDR
 	// (5+ s GOPs) and most consumer-cam content (~1 s GOPs) fall
 	// cleanly on either side.
-	canCodecCopyHLS := !hasTranscode && hasShortHLSGops(pf)
+	canCodecCopyHLS := !hasTranscode &&
+		isFMP4VideoRemuxCandidate(pf.VideoCodec) &&
+		!hasDisplayRotation(pf) &&
+		hasShortHLSGops(pf)
 
 	// fMP4-copy HLS endpoint. Offered when the source's video+audio codecs
 	// can be carried in a fragmented-MP4 container without re-encoding.
@@ -351,6 +358,11 @@ const gopProbeWindowSeconds = 30
 // because the workload is read-mostly with rare writes.
 var gopProbeCache sync.Map // map[string]bool
 
+// displayRotationProbeCache memoises whether a source carries a non-zero
+// display transform. Like the GOP cache, modtime is part of the key so a
+// replacement file is re-probed automatically.
+var displayRotationProbeCache sync.Map // map[string]bool
+
 // hasShortHLSGops reports whether the source's GOP cadence is short
 // enough that `-c copy` HLS will produce segments close to our declared
 // 2 s length. False for sources with longer GOPs (notably iPhone HDR
@@ -378,6 +390,31 @@ func hasShortHLSGops(pf *models.VideoFile) bool {
 	ok := maxGOP > 0 && maxGOP <= hlsCopyMaxGOPSeconds
 	gopProbeCache.Store(key, ok)
 	return ok
+}
+
+// hasDisplayRotation reports whether the source relies on rotation metadata
+// to present its coded pixels correctly. Codec-copy fMP4/HLS is unsafe for
+// these files because MSE clients can discard the display matrix. A probe
+// failure conservatively returns true so the source uses the full transcode,
+// whose decoder applies the transform before encoding.
+func hasDisplayRotation(pf *models.VideoFile) bool {
+	if pf == nil || pf.Path == "" {
+		return true
+	}
+	key := fmt.Sprintf("%s|%d", pf.Path, pf.ModTime.Unix())
+	if cached, ok := displayRotationProbeCache.Load(key); ok {
+		return cached.(bool)
+	}
+
+	probeResult, err := GetInstance().FFProbe.NewVideoFile(pf.Path)
+	if err != nil {
+		displayRotationProbeCache.Store(key, true)
+		return true
+	}
+
+	rotated := probeResult.Rotation != 0
+	displayRotationProbeCache.Store(key, rotated)
+	return rotated
 }
 
 // HasTranscode returns true if a transcoded video exists for the provided

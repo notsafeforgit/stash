@@ -594,6 +594,9 @@ export function SceneScrapeMergeDialog({
                 <ScrapedPerformerRow
                   key={`${p.name ?? "performer"}-${i}`}
                   scraped={p}
+                  endpoint={
+                    source?.kind === "stashBox" ? source.endpoint : undefined
+                  }
                   value={getRes(performerRes, i, p)}
                   onChange={(next) =>
                     setPerformerRes((curr) => ({ ...curr, [i]: next }))

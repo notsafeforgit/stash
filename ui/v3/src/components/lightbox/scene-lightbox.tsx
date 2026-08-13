@@ -13,6 +13,7 @@ import { Spinner } from "src/components/ui/spinner";
 import { SceneSlideContent } from "./scene-slide-content";
 import { lightboxIconRenders } from "./lightbox-icons";
 import type { OfflineEntry } from "src/components/offline/offline-db";
+import { useLightboxHistory } from "./use-lightbox-history";
 
 // ── Persistence keys ───────────────────────────────────────────────────────────
 
@@ -73,6 +74,7 @@ export function SceneLightbox({
   onView,
   finite = false,
 }: SceneLightboxProps) {
+  const requestClose = useLightboxHistory(open, onClose);
   // Lightbox fullscreen ref — populated by the YARL Fullscreen plugin via
   // its `fullscreen.ref` prop. Used so the embedded ScenePlayer can
   // delegate fullscreen requests (its hidden button + `f` hotkey) to the
@@ -245,7 +247,7 @@ export function SceneLightbox({
         // lightbox underneath it.
         if (document.fullscreenElement) return;
         e.preventDefault();
-        onClose();
+        requestClose();
         return;
       }
 
@@ -267,7 +269,7 @@ export function SceneLightbox({
     // because the tooltip had closed and Base UI's listener was gone).
     document.addEventListener("keydown", onKeyDown, true);
     return () => document.removeEventListener("keydown", onKeyDown, true);
-  }, [open, onClose, isSingleSlide, finite]);
+  }, [open, requestClose, isSingleSlide, finite]);
 
   const renderSlide = useCallback(
     ({ slide, offset }: RenderSlideProps) => {
@@ -289,7 +291,7 @@ export function SceneLightbox({
   return (
     <YARLightbox
       open={open}
-      close={onClose}
+      close={requestClose}
       slides={slides as Slide[]}
       index={index}
       plugins={[Fullscreen]}

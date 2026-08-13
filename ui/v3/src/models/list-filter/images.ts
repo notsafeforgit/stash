@@ -37,6 +37,7 @@ const sortByOptions = [
   "file_count",
   "date",
   "resolution",
+  "performer_age",
   ...MediaSortByOptions,
 ]
   .map(ListFilterOptions.createSortBy)

@@ -61,6 +61,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "src/components/ui/popover";
+import { useLightboxHistory } from "./use-lightbox-history";
 
 // ── Module augmentation ────────────────────────────────────────────────────────
 
@@ -726,6 +727,7 @@ export function Lightbox({
   finite = false,
 }: LightboxProps) {
   const intl = useIntl();
+  const requestClose = useLightboxHistory(open, onClose);
   const [settings, setSettings] = useState<LightboxSettings>(loadSettings);
   const slideshowPlayingRef = useRef(false);
   const resumeSlideshowRef = useRef(false);
@@ -885,7 +887,7 @@ export function Lightbox({
         return;
       }
       e.preventDefault();
-      onClose();
+      requestClose();
     }
     // Capture phase on `document` so we run before Base UI Tooltip's
     // useDismiss listener (also on `document`, bubble phase) — its
@@ -894,7 +896,7 @@ export function Lightbox({
     // the user pressed it twice.
     document.addEventListener("keydown", onKeyDown, true);
     return () => document.removeEventListener("keydown", onKeyDown, true);
-  }, [open, onClose]);
+  }, [open, requestClose]);
 
   const isSingleSlide = slides.length === 1;
   const isSingleSlideMode = isSingleSlide && !finite;
@@ -964,7 +966,7 @@ export function Lightbox({
     <>
       <YARLightbox
         open={open}
-        close={onClose}
+        close={requestClose}
         slides={decoratedSlides as never}
         index={index}
         plugins={plugins}

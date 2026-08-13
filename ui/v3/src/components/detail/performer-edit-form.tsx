@@ -40,6 +40,7 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -381,6 +382,12 @@ function PerformerNamesField({
   disabled,
 }: PerformerNamesFieldProps) {
   const intl = useIntl();
+  const canonicalNameLabel =
+    canonicalName ||
+    intl.formatMessage({
+      id: "unnamed",
+      defaultMessage: "Unnamed",
+    });
 
   function updateAlias(index: number, alias: string) {
     const next = [...aliases];
@@ -421,47 +428,47 @@ function PerformerNamesField({
           disabled={disabled}
         >
           <SelectTrigger className="min-w-48 flex-1">
-            <SelectValue />
+            <SelectValue>{canonicalNameLabel}</SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="canonical">
-              {canonicalName ||
-                intl.formatMessage({
-                  id: "unnamed",
-                  defaultMessage: "Unnamed",
-                })}
-            </SelectItem>
-            {aliases.map((entry, index) => (
-              <SelectItem
-                key={index}
-                value={`alias-${index}`}
-                disabled={!entry.alias.trim()}
-              >
-                {entry.alias ||
-                  intl.formatMessage(
-                    { id: "name_number", defaultMessage: "Name {number}" },
-                    { number: index + 2 },
-                  )}
-              </SelectItem>
-            ))}
+            <SelectGroup>
+              <SelectItem value="canonical">{canonicalNameLabel}</SelectItem>
+              {aliases.map((entry, index) => (
+                <SelectItem
+                  key={index}
+                  value={`alias-${index}`}
+                  disabled={!entry.alias.trim()}
+                >
+                  {entry.alias ||
+                    intl.formatMessage(
+                      { id: "name_number", defaultMessage: "Name {number}" },
+                      { number: index + 2 },
+                    )}
+                </SelectItem>
+              ))}
+            </SelectGroup>
           </SelectContent>
         </Select>
       </div>
 
-      <div className="grid grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-2">
-        <Crown
-          className="size-4 text-primary"
-          aria-label={intl.formatMessage({
-            id: "canonical_name",
-            defaultMessage: "Canonical name",
-          })}
-        />
-        <Input
-          value={canonicalName}
-          disabled={disabled}
-          onBlur={onCanonicalNameBlur}
-          onChange={(e) => onCanonicalNameChange(e.target.value)}
-        />
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+        <InputGroup>
+          <InputGroupInput
+            value={canonicalName}
+            disabled={disabled}
+            onBlur={onCanonicalNameBlur}
+            onChange={(e) => onCanonicalNameChange(e.target.value)}
+          />
+          <InputGroupAddon align="inline-end">
+            <Crown
+              className="text-primary"
+              aria-label={intl.formatMessage({
+                id: "canonical_name",
+                defaultMessage: "Canonical name",
+              })}
+            />
+          </InputGroupAddon>
+        </InputGroup>
         <Toggle
           variant="outline"
           size="sm"
@@ -482,9 +489,8 @@ function PerformerNamesField({
         {aliases.map((entry, i) => (
           <div
             key={i}
-            className="col-span-3 grid grid-cols-subgrid items-center"
+            className="col-span-2 grid grid-cols-subgrid items-center"
           >
-            <span aria-hidden="true" />
             <InputGroup className="flex-1">
               <InputGroupInput
                 value={entry.alias}

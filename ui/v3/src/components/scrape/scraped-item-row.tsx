@@ -55,6 +55,10 @@ interface ScrapedItemRowProps {
   scraped: { stored_id?: string | null; name?: string | null };
   /** Optional secondary line under the name (e.g. performer disambiguation). */
   subtitle?: React.ReactNode;
+  /** Optional action next to the scraped name (for example a preview). */
+  nameAddon?: React.ReactNode;
+  /** Optional actions next to an existing-entity match. */
+  existingAddons?: React.ReactNode;
   value: ScrapedItemResolution;
   onChange: (next: ScrapedItemResolution) => void;
   /** Search results for the EntitySingleSelect. */
@@ -67,6 +71,8 @@ interface ScrapedItemRowProps {
 export function ScrapedItemRow({
   scraped,
   subtitle,
+  nameAddon,
+  existingAddons,
   value,
   onChange,
   searchOptions,
@@ -100,8 +106,11 @@ export function ScrapedItemRow({
       )}
     >
       <div className="flex-1 min-w-0">
-        <div className="font-medium text-sm truncate" title={scraped.name}>
-          {scraped.name}
+        <div className="flex items-center gap-1 min-w-0">
+          <div className="font-medium text-sm truncate" title={scraped.name}>
+            {scraped.name}
+          </div>
+          {nameAddon}
         </div>
         {subtitle && (
           <div className="text-xs text-muted-foreground truncate">
@@ -111,20 +120,23 @@ export function ScrapedItemRow({
       </div>
 
       {isExisting && (
-        <div className="w-56 shrink-0">
-          <EntitySingleSelect
-            value={value.option}
-            onChange={(opt) => {
-              if (opt) onChange({ kind: "existing", option: opt });
-            }}
-            options={searchOptions}
-            onSearch={onSearch}
-            loading={searching}
-            placeholder={intl.formatMessage({
-              id: "actions.search",
-              defaultMessage: "Search…",
-            })}
-          />
+        <div className="flex w-56 shrink-0 items-center gap-1">
+          <div className="min-w-0 flex-1">
+            <EntitySingleSelect
+              value={value.option}
+              onChange={(opt) => {
+                if (opt) onChange({ kind: "existing", option: opt });
+              }}
+              options={searchOptions}
+              onSearch={onSearch}
+              loading={searching}
+              placeholder={intl.formatMessage({
+                id: "actions.search",
+                defaultMessage: "Search…",
+              })}
+            />
+          </div>
+          {existingAddons}
         </div>
       )}
 

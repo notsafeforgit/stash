@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Stash is a self-hosted media organizer written in Go (backend) + React/TypeScript (frontend). It exposes a GraphQL API, manages a SQLite database, and wraps FFmpeg for video processing.
 
-This repository is a **tracking fork** of upstream stashapp/stash. Before syncing with upstream, adding database migrations, or changing the GraphQL schema, read [FORK.md](FORK.md) — it documents the merge-based sync playbook, the separate fork migration track and its hazards, and the design rules that keep the fork mergeable (additive schema changes only; fork logic in fork-owned files). The eventual one-way removal of v2.5 compatibility is specified in [docs/v3-schema-promotion.md](docs/v3-schema-promotion.md).
+This repository is a **tracking fork** of upstream stashapp/stash. Before syncing with upstream, adding database migrations, or changing the GraphQL schema, read [FORK.md](FORK.md) — it documents the rebase-based sync playbook, the separate fork migration track and its hazards, and the design rules that keep upstream rebases manageable (additive schema changes only; fork logic in fork-owned files). The eventual one-way removal of v2.5 compatibility is specified in [docs/v3-schema-promotion.md](docs/v3-schema-promotion.md).
 
 ## Development quickstart
 

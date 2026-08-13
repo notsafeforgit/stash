@@ -1,15 +1,18 @@
 # Fork maintenance
 
 This repository is a **tracking fork** of [stashapp/stash](https://github.com/stashapp/stash),
-not a hard fork. Upstream changes are absorbed by merging, and fork features are
-designed to keep that cheap. This document is the playbook for syncs and the
-rules that keep the merge surface small. It is written for both humans and
-LLM agents performing a sync.
+not a hard fork. Upstream changes are absorbed by rebasing the fork branch, and
+fork features are designed to keep that cheap. This document is the playbook
+for syncs and the rules that keep the conflict surface small. It is written for
+both humans and LLM agents performing a sync.
 
 ## Strategy
 
-- Sync via `git merge upstream/develop` (per upstream release, or as needed) —
-  **not** rebase. Merging resolves each conflict once and keeps history intact.
+- Sync by rebasing `v3-rewrite` onto `stashapp/develop` (per upstream release,
+  or as needed). This keeps the fork history linear and makes the upstream base
+  explicit. Because the branch is published, fetch `origin/v3-rewrite` before
+  rebasing and update it afterward with `git push --force-with-lease`, never an
+  unconditional force push.
 - Enable `git rerere` so re-encountered conflicts auto-resolve.
 - Mainline v2.5 API clients must keep working. Fork features add compatibility
   layers at the resolver level rather than changing existing API semantics
@@ -18,7 +21,7 @@ LLM agents performing a sync.
   launch flag (`--enable-v3-ui`), later inverted to `--enable-v2-ui` when v3
   becomes the default, then removed when v2.5 is dropped.
 
-## Design rules that keep merges cheap
+## Design rules that keep rebases cheap
 
 1. **New code goes in new files/directories.** `ui/v3/` is wholly fork-owned;
    Go-side fork logic lives in dedicated files (e.g. `pkg/models/filter_ast*.go`).
@@ -32,12 +35,15 @@ LLM agents performing a sync.
 
 ## Sync playbook
 
-1. `git remote add upstream https://github.com/stashapp/stash.git` (once),
-   then `git fetch upstream && git merge upstream/develop`.
+1. Add the source remote once with
+   `git remote add stashapp https://github.com/stashapp/stash.git`. Before each
+   sync, run `git fetch stashapp` and `git fetch origin v3-rewrite`,
+   then `git -c rerere.enabled=true rebase stashapp/develop`.
 2. **Generated files:** never hand-merge conflicts in them. Take either side
-   (`git checkout --theirs <file>`), finish the merge, then run
-   `make generate` and commit the regenerated output. This eliminates most
-   apparent conflicts.
+   to let the rebase proceed, then run `make generate` and commit the
+   regenerated output. During a rebase, remember that `--ours` is the new
+   upstream base plus commits already replayed, while `--theirs` is the fork
+   commit currently being replayed. This eliminates most apparent conflicts.
 3. **Database migrations** — keep upstream fallback viable:
    - Upstream migrations remain in `pkg/sqlite/migrations/*.sql` and own only
      upstream's `schema_migrations` version. Fork DB changes are registered as
@@ -71,8 +77,13 @@ LLM agents performing a sync.
    `go test -tags integration ./pkg/sqlite/... -run SavedFilter`.
    For an upstream sync that changes v2.5, additionally run
    `make generate && make validate`; fork feature work must not edit v2.5.
-6. `ui/v2.5/` is read-only fork-side: upstream changes merge in freely; fork
+6. `ui/v2.5/` is read-only fork-side: upstream changes rebase in freely; fork
    changes to it are not allowed (all active UI development is `ui/v3/`).
+7. Review the rewritten range, verify that `stashapp/develop` is an ancestor of
+   `v3-rewrite`, then publish with
+   `git push --force-with-lease origin v3-rewrite`. A lease failure means the
+   remote changed after it was fetched; fetch and inspect it rather than
+   overriding it.
 
 ## Fork-owned surfaces (update when extending)
 

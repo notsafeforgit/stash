@@ -19,7 +19,7 @@ import (
 	"github.com/stashapp/stash/pkg/scene"
 )
 
-// SceneVideoRotate changes the primary MKV's first video-stream ROTATE tag,
+// SceneVideoRotate changes the primary video's first-stream rotation metadata,
 // then updates the file row and every scene that shares the file. The remux is
 // staged before the write transaction and keeps an on-disk backup until the
 // transaction commits, so a database failure can restore the original video.

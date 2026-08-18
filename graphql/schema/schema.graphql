@@ -390,9 +390,10 @@ type Mutation {
   sceneGenerateScreenshot(id: ID!, at: Float): ID!
 
   """
-  Updates the primary MKV's ROTATE video-stream tag without re-encoding.
-  Clockwise/counter-clockwise changes compose with the existing rotation;
-  CLEAR removes the tag. The scene file is re-fingerprinted afterwards.
+  Updates the primary MKV, MP4, M4V, or MOV video-stream rotation metadata
+  without re-encoding. Clockwise/counter-clockwise changes compose with the
+  existing rotation; CLEAR removes the transform. The scene file is
+  re-fingerprinted afterwards.
   """
   sceneVideoRotate(input: SceneVideoRotateInput!): Scene
 

@@ -13,8 +13,8 @@ import (
 )
 
 // RotationDirection describes a metadata-only change to the displayed video
-// orientation. Rotating composes with the current ROTATE tag; clearing removes
-// the tag entirely.
+// orientation. Rotating composes with the current container rotation;
+// clearing removes the transform entirely.
 type RotationDirection int
 
 const (
@@ -24,8 +24,21 @@ const (
 )
 
 // ErrUnsupportedRotation indicates that a video cannot be safely updated by
-// the Matroska ROTATE-tag remux used here.
-var ErrUnsupportedRotation = errors.New("video does not support Matroska rotation metadata editing")
+// one of the stream-copy metadata remuxes used here.
+var ErrUnsupportedRotation = errors.New("video container does not support rotation metadata editing")
+
+type rotationStorage int
+
+const (
+	rotationStorageMatroskaTag rotationStorage = iota
+	rotationStorageDisplayMatrix
+)
+
+type rotationContainer struct {
+	storage       rotationStorage
+	outputFormat  string
+	tempExtension string
+}
 
 type rotationRemuxer interface {
 	Generate(context.Context, ffmpeg.Args) error
@@ -35,10 +48,10 @@ type rotationProber interface {
 	NewVideoFile(string) (*ffmpeg.VideoFile, error)
 }
 
-// RotationPatch is a staged Matroska remux. Apply swaps the staged file into
-// place while retaining the original beside it; Commit removes that backup,
-// and Rollback restores it. This lets the API keep the filesystem mutation and
-// its database transaction consistent.
+// RotationPatch is a staged stream-copy remux. Apply swaps the staged file
+// into place while retaining the original beside it; Commit removes that
+// backup, and Rollback restores it. This lets the API keep the filesystem
+// mutation and its database transaction consistent.
 type RotationPatch struct {
 	Path            string
 	StagedPath      string
@@ -53,8 +66,10 @@ type RotationPatch struct {
 	committed       bool
 }
 
-// StageRotationMetadata remuxes an MKV without re-encoding, changing only the
-// first video stream's ROTATE tag. The original file is untouched until Apply.
+// StageRotationMetadata remuxes a supported video without re-encoding,
+// changing only the first video stream's rotation metadata. Matroska stores a
+// ROTATE tag, while MP4/M4V/MOV store a display matrix. The original file is
+// untouched until Apply.
 func StageRotationMetadata(
 	ctx context.Context,
 	encoder rotationRemuxer,
@@ -65,20 +80,21 @@ func StageRotationMetadata(
 	if encoder == nil || probe == nil {
 		return nil, errors.New("ffmpeg and ffprobe must be configured")
 	}
-	if !strings.EqualFold(filepath.Ext(path), ".mkv") {
-		return nil, fmt.Errorf("%w: %q is not an MKV file", ErrUnsupportedRotation, path)
-	}
 
 	before, err := probe.NewVideoFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("probing rotation metadata for %q: %w", path, err)
 	}
-	if !isMatroskaContainer(before.Container) || before.VideoStream == nil {
-		return nil, fmt.Errorf("%w: %q is not a Matroska video", ErrUnsupportedRotation, path)
+	container, err := rotationContainerFor(path, before.Container)
+	if err != nil {
+		return nil, err
+	}
+	if before.VideoStream == nil {
+		return nil, fmt.Errorf("%w: %q has no video stream", ErrUnsupportedRotation, path)
 	}
 
 	current := canonicalRotation(before.Rotation)
-	target, removeTag, err := targetRotation(current, direction)
+	target, clearMetadata, err := targetRotation(current, direction)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +113,7 @@ func StageRotationMetadata(
 
 	dir := filepath.Dir(path)
 	base := filepath.Base(path)
-	temp, err := os.CreateTemp(dir, "."+base+".rotate-*.mkv")
+	temp, err := os.CreateTemp(dir, "."+base+".rotate-*"+container.tempExtension)
 	if err != nil {
 		return nil, fmt.Errorf("creating rotation staging file beside %q: %w", path, err)
 	}
@@ -107,24 +123,33 @@ func StageRotationMetadata(
 		return nil, fmt.Errorf("closing rotation staging file: %w", err)
 	}
 
-	metadata := "ROTATE="
-	if !removeTag {
-		metadata += strconv.FormatInt(target, 10)
-	}
 	args := ffmpeg.Args{
 		"-hide_banner",
 		"-loglevel", "error",
 		"-y",
+	}
+	if container.storage == rotationStorageDisplayMatrix {
+		args = append(args, "-display_rotation:v:0", strconv.FormatInt(signedRotation(target), 10))
+	}
+	args = append(args,
 		"-i", path,
 		"-map", "0",
 		"-map_metadata", "0",
 		"-map_chapters", "0",
 		"-copy_unknown",
 		"-c", "copy",
-		"-metadata:s:v:0", metadata,
-		"-f", "matroska",
-		stagedPath,
+	)
+	if container.storage == rotationStorageMatroskaTag {
+		metadata := "ROTATE="
+		if !clearMetadata {
+			metadata += strconv.FormatInt(target, 10)
+		}
+		args = append(args, "-metadata:s:v:0", metadata)
 	}
+	args = append(args,
+		"-f", container.outputFormat,
+		stagedPath,
+	)
 	if err := encoder.Generate(ctx, args); err != nil {
 		_ = os.Remove(stagedPath)
 		return nil, fmt.Errorf("remuxing rotation metadata for %q: %w", path, err)
@@ -141,11 +166,15 @@ func StageRotationMetadata(
 		_ = os.Remove(stagedPath)
 		return nil, fmt.Errorf("verifying rotation metadata for %q: %w", path, err)
 	}
+	if after.VideoStream == nil {
+		_ = os.Remove(stagedPath)
+		return nil, fmt.Errorf("verifying rotation metadata for %q: remux has no video stream", path)
+	}
 	if canonicalRotation(after.Rotation) != target {
 		_ = os.Remove(stagedPath)
 		return nil, fmt.Errorf("verifying rotation metadata for %q: got %d, want %d", path, after.Rotation, target)
 	}
-	if removeTag && after.VideoStream != nil && after.VideoStream.Tags.Rotate != "" {
+	if clearMetadata && container.storage == rotationStorageMatroskaTag && after.VideoStream.Tags.Rotate != "" {
 		_ = os.Remove(stagedPath)
 		return nil, fmt.Errorf("verifying cleared rotation metadata for %q: ROTATE tag remains", path)
 	}
@@ -234,7 +263,7 @@ func (p *RotationPatch) Rollback() error {
 	return nil
 }
 
-func targetRotation(current int64, direction RotationDirection) (rotation int64, removeTag bool, err error) {
+func targetRotation(current int64, direction RotationDirection) (rotation int64, clearMetadata bool, err error) {
 	switch direction {
 	case RotateCW:
 		// FFmpeg interprets display-rotation metadata as a
@@ -257,9 +286,63 @@ func canonicalRotation(rotation int64) int64 {
 	return rotation
 }
 
+func signedRotation(rotation int64) int64 {
+	rotation = canonicalRotation(rotation)
+	if rotation > 180 {
+		rotation -= 360
+	}
+	return rotation
+}
+
+func rotationContainerFor(path, probedContainer string) (rotationContainer, error) {
+	extension := strings.ToLower(filepath.Ext(path))
+	switch extension {
+	case ".mkv":
+		if isMatroskaContainer(probedContainer) {
+			return rotationContainer{
+				storage:       rotationStorageMatroskaTag,
+				outputFormat:  "matroska",
+				tempExtension: ".mkv",
+			}, nil
+		}
+	case ".mp4", ".m4v":
+		if isISOBaseMediaContainer(probedContainer) {
+			return rotationContainer{
+				storage:       rotationStorageDisplayMatrix,
+				outputFormat:  "mp4",
+				tempExtension: extension,
+			}, nil
+		}
+	case ".mov":
+		if isISOBaseMediaContainer(probedContainer) {
+			return rotationContainer{
+				storage:       rotationStorageDisplayMatrix,
+				outputFormat:  "mov",
+				tempExtension: extension,
+			}, nil
+		}
+	}
+
+	return rotationContainer{}, fmt.Errorf(
+		"%w: %q must be an MKV, MP4, M4V, or MOV file with a matching container",
+		ErrUnsupportedRotation,
+		path,
+	)
+}
+
 func isMatroskaContainer(container string) bool {
 	for _, name := range strings.Split(container, ",") {
 		if strings.EqualFold(strings.TrimSpace(name), "matroska") {
+			return true
+		}
+	}
+	return false
+}
+
+func isISOBaseMediaContainer(container string) bool {
+	for _, name := range strings.Split(container, ",") {
+		switch strings.ToLower(strings.TrimSpace(name)) {
+		case "mov", "mp4":
 			return true
 		}
 	}

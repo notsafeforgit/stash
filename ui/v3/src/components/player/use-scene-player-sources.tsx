@@ -256,13 +256,12 @@ export function useScenePlayerSources({
   const [fragmentTime, setFragmentTime] = useState<number | null>(
     initialResume.seekTo,
   );
-  // Cachebuster bumped by `forceRemountAt` so a stall-recovery
-  // remount triggers even when the seek target lands on the same
-  // segment-aligned `?start=` (HLS) or `#t=` (direct) the engine is
-  // already on. Without this, `finalSrc` would be identical to the
-  // current src and React wouldn't reassign `<video>.src` / hls.js
-  // would skip the playlist reload — the stuck connection would
-  // never get replaced. See the watchdog effect below.
+  // Cachebuster bumped by every path that explicitly rebuilds the media
+  // engine. A logical target can otherwise produce the same URL that's
+  // already loaded — most notably an iOS out-of-buffer seek to scene-time
+  // 0, where `planResume(0)` removes `?start=`. Without the nonce React
+  // wouldn't reassign `<video>.src`, no new `canplay` would arrive, and the
+  // loading overlay would remain pinned forever.
   const [reloadNonce, setReloadNonce] = useState(0);
   const [reloading, setReloadingRaw] = useState(false);
   // Hold the dim+spinner visible for a minimum window after a source
@@ -859,6 +858,10 @@ export function useScenePlayerSources({
         };
         setOffsetStart(split.offset);
         setFragmentTime(split.seekTo);
+        // This branch promises an engine reset. `split.seekTo` may equal
+        // the current fragment target (especially when clamped to 0), so
+        // make the playlist URL change independently of the seek value.
+        setReloadNonce((nonce) => nonce + 1);
       });
     },
     [
@@ -956,6 +959,7 @@ export function useScenePlayerSources({
         };
         setOffsetStart(split.offset);
         setFragmentTime(split.seekTo);
+        setReloadNonce((nonce) => nonce + 1);
       });
     },
     [

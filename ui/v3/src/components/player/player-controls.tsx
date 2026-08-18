@@ -1,5 +1,5 @@
 /**
- * Controls overlay for `<ScenePlayer>`. Rendered inside `Player.Container`
+ * Controls overlay for `<ScenePlayer>`. Rendered inside `Container`
  * so the Video.js v10 hooks (`Player.usePlayer`) can read state and call
  * actions. Handles scene-time vs media-time math, hotkeys, touch overlay,
  * source/speed menus, markers, and the frozen-frame + reloading overlay
@@ -927,10 +927,9 @@ function ControlBar({
             className={(state) =>
               cn(
                 OVERLAY_BTN,
-                state.castState === "connected"
+                state.connection === "connected"
                   ? "text-blue-400"
                   : "text-white/80",
-                state.availability !== "available" && "hidden",
               )
             }
             render={

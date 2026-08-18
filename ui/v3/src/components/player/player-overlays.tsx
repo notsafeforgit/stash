@@ -1,6 +1,6 @@
 /**
  * Tiny render-null effect components and the poster overlay that
- * `<ScenePlayer>` mounts inside `Player.Provider`. Split out of
+ * `<ScenePlayer>` mounts inside `Player.Player`. Split out of
  * `scene-player.tsx` so the component file is layout + state, not
  * a grab-bag of one-off store subscribers.
  *
@@ -65,11 +65,10 @@ export function PlayerPoster({
 }
 
 // ── Can-play latch ────────────────────────────────────────────────────────────
-// Fires `onCanPlay` once per Provider mount, on the first DOM `canplay`
-// event from the underlying `<video>` element. Source changes go
-// through a Provider remount (keyed on the source URL) which gives
-// this component a fresh ref, so the next source still gets its own
-// fire. Subsequent `canplay` blips during playback (Safari's native
+// Fires `onCanPlay` once per source generation, on the first DOM `canplay`
+// event from the underlying `<video>` element. Source changes update
+// `srcKey`, which resets the latch and attaches to the current media element.
+// Subsequent `canplay` blips during playback (Safari's native
 // HLS pipeline drops readiness briefly on seeks while it re-validates
 // the new segment range) must NOT re-fire: the consumer's pending-resume
 // work is one-shot, and its autoplay-recovery branch would un-pause the
@@ -100,12 +99,10 @@ export function CanPlayEffect({
   rootRef: RefObject<HTMLElement | null>;
   /** Optional re-fire key. When supplied, every change resets the
    *  once-per-mount latch and re-attaches the listener — needed by the
-   *  stable-`<video>` variant of `ScenePlayer` where source URL changes
-   *  don't remount the Provider but still need a fresh `canplay` fire
+   *  stable-`<video>` `ScenePlayer` where source URL changes don't remount
+   *  the player root but still need a fresh `canplay` fire
    *  (and, when the engine swaps, a fresh `<video>` listener target).
-   *  The original scene-player keys `Player.Provider` on `finalSrc`, so
-   *  the Provider remount already supplies that reset; it can leave this
-   *  prop undefined. */
+   */
   srcKey?: string;
 }) {
   const firedRef = useRef(false);

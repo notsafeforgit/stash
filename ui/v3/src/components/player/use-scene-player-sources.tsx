@@ -78,10 +78,10 @@ interface UseScenePlayerSourcesArgs {
   /** Outer wrapper used as the `querySelector("video")` root for the
    *  in-place seek choreography (`awaitSeekReady`). */
   rootRef: RefObject<HTMLDivElement | null>;
-  /** Player.Provider's store, captured by `<StoreBridge>` in the
+  /** Player.Player's store, captured by `<StoreBridge>` in the
    *  parent component. Read synchronously inside the handlers. */
   storeRef: RefObject<VideoPlayerStore | null>;
-  /** Player.Provider's active Media instance, captured by
+  /** Player.Player's active Media instance, captured by
    *  `<MediaBridge>`. For HLS sources this is the `HlsJsMedia` wrapper
    *  whose `.engine` returns the live hls.js `Hls` instance — the
    *  in-place out-of-buffer seek path reaches into it for
@@ -129,7 +129,7 @@ interface UseScenePlayerSourcesResult {
   /** Persistent canvas that masks the gap between the old MediaSource
    *  detaching and the new one decoding its first frame on src-swap /
    *  out-of-buffer HLS seek paths. Render as a sibling of
-   *  `<Player.Provider>` (z-[5]). */
+   *  `<Player.Player>` (z-[5]). */
   freezeFrameCanvas: ReactNode;
   handleSourceChange: (source: PlayerSource) => void;
   handleSeek: (targetTrueTime: number) => void;
@@ -140,7 +140,7 @@ interface UseScenePlayerSourcesResult {
    *  point — necessary after a quality swap, since the new playlist's
    *  MSE 0 is the swap-time scene-time and HTML5's ended-then-play
    *  default would replay from there instead of from the requested
-   *  target. The src swap is in-place (no Provider remount). */
+   *  target. The src swap is in-place (no player-root remount). */
   handleRestart: (targetTrueTime: number) => void;
   handleCanPlay: () => Promise<void>;
   /** Wire as `onLoadedMetadata` on the `<video>` element. Pins the
@@ -625,7 +625,8 @@ export function useScenePlayerSources({
         // State updates flow through to `<VideoComponent>`'s `src`
         // prop and our bridge assigns it directly to HlsJsMedia,
         // performing an in-place source swap on the existing `<video>`.
-        // No Provider remount, no fresh hls.js instance, so no
+        // No player-root remount; HlsJsMedia decides whether the changed
+        // structured source requires a fresh hls.js engine, so no
         // `startTransition` wrapper.
         const newStrategy = startOffsetStrategyFor(
           source.src,
@@ -672,7 +673,7 @@ export function useScenePlayerSources({
     ],
   );
 
-  // Hold the dim+spinner up through an in-place seek (no Provider
+  // Hold the dim+spinner up through an in-place seek (no player-root
   // remount) until the new position is actually decoding frames.
   //
   // The caller is expected to have already paused the video and called

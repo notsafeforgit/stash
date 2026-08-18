@@ -33,14 +33,13 @@
  *                                `gesturestart` / `gesturechange` /
  *                                `gestureend`, not ctrl+wheel.
  *
- * Persistence across Provider remounts
- * ------------------------------------
+ * Persistence across source changes
+ * ---------------------------------
  * Transform state is owned by the parent (`ScenePlayer`) and passed in
- * as a controlled prop. That way it survives the keyed-Provider remount
- * triggered by quality switches or seek-past-buffer (which both flip
- * `playerKey` on `Player.Provider` while leaving `ScenePlayer` mounted).
- * If the state lived inside this component, every such remount would
- * snap the user out of their pinched view back to 1×.
+ * as a controlled prop. That way it survives quality switches and engine
+ * swaps triggered by seek-past-buffer. If the state lived inside this
+ * component, a direct↔HLS element swap would snap the user out of their
+ * pinched view back to 1×.
  *
  * Why window-level capture-phase listeners
  * ----------------------------------------
@@ -651,7 +650,7 @@ export function VideoFrameZoom({
         // Includes `pending` (pre-threshold pan candidacy): keep the
         // lightbox carousel from beginning a slide swipe while this
         // scaled frame is deciding whether the gesture is a local pan.
-        // Video.js beta.25 itself ignores touch pointermove for controls
+        // Video.js itself ignores touch pointermove for controls
         // activity; mouse pointermove still reveals controls normally.
         if (pinching || touchPan.state !== "idle") {
           e.stopImmediatePropagation();

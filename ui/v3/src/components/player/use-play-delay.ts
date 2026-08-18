@@ -26,10 +26,10 @@
  * cannot distinguish a user-initiated play from a programmatic one at
  * the event level.
  *
- * The `<video>` element can be replaced when the player swaps sources
- * (`key={finalSrc}` on `Player.Provider` triggers a remount). The hook
- * watches `rootRef`'s subtree with a `MutationObserver` and re-attaches
- * the `playing` listener so the gate keeps suppressing across remounts.
+ * The `<video>` element can be replaced when the player swaps between direct
+ * and HLS media components. The hook watches `rootRef`'s subtree with a
+ * `MutationObserver` and re-attaches the `playing` listener so the gate keeps
+ * suppressing across element swaps.
  */
 import { useEffect, type MutableRefObject, type RefObject } from "react";
 

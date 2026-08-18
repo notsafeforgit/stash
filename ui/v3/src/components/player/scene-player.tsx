@@ -594,6 +594,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     fileDuration,
     fileWidth: file?.width ?? undefined,
     fileHeight: file?.height ?? undefined,
+    sourceRevision: file?.updated_at,
     rootRef: fullscreenContainerRef,
     storeRef,
     mediaRef,

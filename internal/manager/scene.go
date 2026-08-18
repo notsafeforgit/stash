@@ -3,6 +3,7 @@ package manager
 import (
 	"fmt"
 	"net/url"
+	"strings"
 	"sync"
 
 	"github.com/stashapp/stash/internal/manager/config"
@@ -331,6 +332,25 @@ var gopProbeCache sync.Map // map[string]bool
 // replacement file is re-probed automatically.
 var displayRotationProbeCache sync.Map // map[string]bool
 
+// InvalidateVideoProbeCaches removes file-derived stream capability results
+// after an in-place video edit. This is explicit rather than relying solely on
+// modtime because file timestamps are stored at second precision and several
+// successive 90-degree rotation edits can complete within the same second.
+func InvalidateVideoProbeCaches(path string) {
+	prefix := path + "|"
+	deleteMatchingProbeCacheEntries(&gopProbeCache, prefix)
+	deleteMatchingProbeCacheEntries(&displayRotationProbeCache, prefix)
+}
+
+func deleteMatchingProbeCacheEntries(cache *sync.Map, prefix string) {
+	cache.Range(func(key, _ any) bool {
+		if stringKey, ok := key.(string); ok && strings.HasPrefix(stringKey, prefix) {
+			cache.Delete(key)
+		}
+		return true
+	})
+}
+
 // hasShortHLSGops reports whether the source's GOP cadence is short
 // enough that `-c copy` HLS will produce segments close to our declared
 // 2 s length. False for sources with longer GOPs (notably iPhone HDR
@@ -345,7 +365,7 @@ func hasShortHLSGops(pf *models.VideoFile) bool {
 	if pf == nil || pf.Path == "" {
 		return false
 	}
-	key := fmt.Sprintf("%s|%d", pf.Path, pf.ModTime.Unix())
+	key := fmt.Sprintf("%s|%d", pf.Path, pf.ModTime.UnixNano())
 	if cached, ok := gopProbeCache.Load(key); ok {
 		return cached.(bool)
 	}
@@ -369,7 +389,7 @@ func hasDisplayRotation(pf *models.VideoFile) bool {
 	if pf == nil || pf.Path == "" {
 		return true
 	}
-	key := fmt.Sprintf("%s|%d", pf.Path, pf.ModTime.Unix())
+	key := fmt.Sprintf("%s|%d", pf.Path, pf.ModTime.UnixNano())
 	if cached, ok := displayRotationProbeCache.Load(key); ok {
 		return cached.(bool)
 	}

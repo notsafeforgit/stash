@@ -139,6 +139,7 @@ export function offlineEntryToSceneData(
     path: entry.source_file_path || entry.title || entry.scene_id,
     size: entry.bytes || 0,
     mod_time: downloadedAtIso,
+    updated_at: downloadedAtIso,
     duration: entry.duration || 0,
     video_codec: entry.source_video_codec || "",
     audio_codec: entry.source_audio_codec || "",

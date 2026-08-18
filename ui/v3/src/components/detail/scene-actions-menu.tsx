@@ -40,6 +40,7 @@ import { useConfigurationContext } from "src/hooks/config";
 import { objectPath, objectTitle } from "src/core/files";
 import { SceneDetailDownloadMenuItem } from "src/components/offline/scene-detail-download-menu-item";
 import { type MonitoredJob, useMonitorJob } from "src/hooks/use-monitor-job";
+import { supportsSceneVideoRotation } from "./scene-video-rotation";
 
 export interface SceneActionsMenuProps {
   scene: NonNullable<GQL.FindSceneQuery["findScene"]>;
@@ -80,6 +81,7 @@ export function SceneActionsMenu({
   const [submitDraft] = useMutation(GQL.SubmitStashBoxSceneDraftDocument);
 
   const sceneFilePath = scene.files.length > 0 ? objectPath(scene) : null;
+  const rotationSupported = supportsSceneVideoRotation(sceneFilePath);
 
   const handleScreenshotJobComplete = useCallback(
     async (job?: MonitoredJob) => {
@@ -289,7 +291,7 @@ export function SceneActionsMenu({
               defaultMessage: "Generate default thumbnail",
             })}
           </DropdownMenuItem>
-          {sceneFilePath?.toLowerCase().endsWith(".mkv") && (
+          {rotationSupported && (
             <DropdownMenuSub>
               <DropdownMenuSubTrigger disabled={rotationPending}>
                 {rotationPending ? <Spinner /> : <RotateCw />}

@@ -107,7 +107,9 @@ func GetVideoFileContainer(file *models.VideoFile) (ffmpeg.Container, error) {
 	return container, nil
 }
 
-func GetSceneStreamPaths(scene *models.Scene, directStreamURL *url.URL, maxStreamingTranscodeSize models.StreamingResolutionEnum) ([]*SceneStreamEndpoint, error) {
+// GetV3SceneStreamPaths returns the direct and segmented stream catalog used
+// exclusively by the v3 player.
+func GetV3SceneStreamPaths(scene *models.Scene, directStreamURL *url.URL, maxStreamingTranscodeSize models.StreamingResolutionEnum) ([]*SceneStreamEndpoint, error) {
 	if scene == nil {
 		return nil, fmt.Errorf("nil scene")
 	}
@@ -190,9 +192,9 @@ func GetSceneStreamPaths(scene *models.Scene, directStreamURL *url.URL, maxStrea
 	hasTranscode := HasTranscode(scene, config.GetInstance().GetVideoFileNamingAlgorithm())
 	if hasTranscode || ffmpeg.IsValidAudioForContainer(audioCodec, container) {
 		actualDirectType := directEndpointType
-		if config.GetInstance().GetEnableV3UI() && !hasTranscode {
-			// v3 uses the real source MIME for direct streams. v2.5 keeps
-			// the upstream MP4 MIME shim for compatibility.
+		if !hasTranscode {
+			// v3 uses the real source MIME for direct streams. The legacy
+			// catalog retains the upstream MP4 MIME shim for compatibility.
 			switch container {
 			case ffmpeg.Matroska:
 				actualDirectType.mimeType = ffmpeg.MimeMkvVideo
@@ -201,40 +203,6 @@ func GetSceneStreamPaths(scene *models.Scene, directStreamURL *url.URL, maxStrea
 			}
 		}
 		endpoints = append(endpoints, makeStreamEndpoint(actualDirectType, ""))
-	}
-
-	if !config.GetInstance().GetEnableV3UI() {
-		if container == ffmpeg.Matroska {
-			endpoints = append(endpoints, makeStreamEndpoint(mkvEndpointType, ""))
-		}
-
-		mp4Streams := []*SceneStreamEndpoint{}
-		webmStreams := []*SceneStreamEndpoint{}
-		hlsStreams := []*SceneStreamEndpoint{}
-		dashStreams := []*SceneStreamEndpoint{}
-
-		for _, res := range []models.StreamingResolutionEnum{
-			models.StreamingResolutionEnumOriginal,
-			models.StreamingResolutionEnumFourK,
-			models.StreamingResolutionEnumFullHd,
-			models.StreamingResolutionEnumStandardHd,
-			models.StreamingResolutionEnumStandard,
-			models.StreamingResolutionEnumLow,
-		} {
-			if includeSceneStreamPath(res) {
-				mp4Streams = append(mp4Streams, makeStreamEndpoint(mp4EndpointType, res))
-				webmStreams = append(webmStreams, makeStreamEndpoint(webmEndpointType, res))
-				hlsStreams = append(hlsStreams, makeStreamEndpoint(legacyHLSEndpointType, res))
-				dashStreams = append(dashStreams, makeStreamEndpoint(dashEndpointType, res))
-			}
-		}
-
-		endpoints = append(endpoints, mp4Streams...)
-		endpoints = append(endpoints, webmStreams...)
-		endpoints = append(endpoints, hlsStreams...)
-		endpoints = append(endpoints, dashStreams...)
-
-		return endpoints, nil
 	}
 
 	// Codec-copy HLS variants are only viable when the source's GOPs are

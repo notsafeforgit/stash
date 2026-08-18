@@ -83,6 +83,9 @@ type Scene {
 
   "Return valid stream paths"
   sceneStreams: [SceneStreamEndpoint!]!
+
+  "Return v3 segmented stream paths"
+  sceneStreamsV3: [SceneStreamEndpoint!]!
 }
 
 input SceneMovieInput {

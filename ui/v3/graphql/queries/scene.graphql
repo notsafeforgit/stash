@@ -145,7 +145,7 @@ query ParseSceneFilenames(
 
 query SceneStreams($id: ID!) {
   findScene(id: $id) {
-    sceneStreams {
+    sceneStreams: sceneStreamsV3 {
       url
       mime_type
       label

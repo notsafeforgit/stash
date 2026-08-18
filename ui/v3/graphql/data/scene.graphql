@@ -74,7 +74,7 @@ fragment SceneData on Scene {
     updated_at
   }
 
-  sceneStreams {
+  sceneStreams: sceneStreamsV3 {
     url
     mime_type
     label

@@ -3,8 +3,8 @@
  * being unmounted and a new one rendering its first decoded frame.
  *
  * Two load-bearing details:
- *   1. The canvas is a sibling of `Player.Provider`, so the keyed
- *      remount on source change doesn't unmount it.
+ *   1. The canvas is a sibling of `Player.Player`, so media-engine and
+ *      element swaps don't unmount it.
  *   2. Visibility is driven by canvas content (drawn vs. cleared
  *      transparent), not opacity. iOS Safari skips compositor-layer
  *      creation for opacity-0 elements even with `will-change` /
@@ -31,14 +31,14 @@ interface UseFreezeFrameOverlayArgs {
 
 interface UseFreezeFrameOverlayResult {
   /** Ready-to-render persistent canvas. Place inside the same
-   *  positioned/`isolate` container that holds `Player.Provider` so
+   *  positioned/`isolate` container that holds `Player.Player` so
    *  z-index ordering against the controls bar resolves correctly. */
   canvasElement: React.ReactNode;
   /**
    * Phase 1: capture current frame + flip `reloading=true`. Phase 2,
    * two animation frames later: invoke `applyChanges`. Caller uses
-   * `applyChanges` to commit whatever state actually triggers the
-   * Provider remount (e.g. `setManualSource`, `setOffsetStart`).
+   * `applyChanges` to commit whatever state triggers the source / media
+   * transition (e.g. `setManualSource`, `setOffsetStart`).
    */
   beginRemount: (applyChanges: () => void) => void;
   /** Snapshot the current `<video>` frame onto the canvas. The
@@ -199,7 +199,7 @@ export function useFreezeFrameOverlay({
       // user-gesture window. iOS Safari otherwise refuses to load data
       // on the fresh element and `canplay` never fires. Z-ordering does
       // the masking the rAF defer was attempting: the canvas is z-[5],
-      // the <video> below it inside Player.Container is z:auto, so the
+      // the <video> below it inside Container is z:auto, so the
       // captured frame occludes the new element's first paint regardless
       // of compositor timing.
       captureFrame();

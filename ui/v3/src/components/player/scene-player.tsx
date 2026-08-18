@@ -1,7 +1,7 @@
 /**
  * Scene player — stable-`<video>` element.
  *
- * `Player.Provider` mounts once per scene; source-URL changes flow
+ * `Player.Player` mounts once per scene; source-URL changes flow
  * through `<VideoComponent>`'s `src` prop and its media bridge performs
  * an in-place reassignment on the existing element (`hls.loadSource()`
  * for HLS via `HlsJsMedia`, plain `<video>.src` for
@@ -45,10 +45,12 @@ import React, {
   useState,
 } from "react";
 import {
+  Container,
   createPlayer,
   type CreatePlayerResult,
   type VideoPlayerStore,
 } from "@videojs/react";
+import { GoogleCast } from "@videojs/react/media/google-cast";
 import { Video, videoFeatures } from "@videojs/react/video";
 import { StableHlsVideo } from "./stable-hls-video";
 import { cn } from "src/lib/utils";
@@ -78,9 +80,10 @@ import type { ZoomTransform } from "./video-frame-zoom";
 import "./player.css";
 
 // ── Player factory ────────────────────────────────────────────────────────────
-// Video.js v10's `createPlayer` is a factory that returns a typed Provider,
-// Container, and hooks sharing one feature-set across every player instance
-// rendered in the app. Call once at module scope.
+// Video.js v10's `createPlayer` is a factory that returns a typed Player root
+// and hooks sharing one feature-set across every player instance rendered in
+// the app. `Container` is shared across factories. Call the factory once at
+// module scope.
 const Player: CreatePlayerResult<VideoPlayerStore> = createPlayer({
   features: videoFeatures,
   displayName: "ScenePlayer",
@@ -92,7 +95,7 @@ const Player: CreatePlayerResult<VideoPlayerStore> = createPlayer({
 const MemoVideo = React.memo(Video);
 
 // HLS sources route through `<StableHlsVideo>` (a wrapper around
-// `@videojs/core`'s `HlsJsMedia`, which auto-selects hls.js on MSE-capable
+// `@videojs/media`'s `HlsJsMedia`, which auto-selects hls.js on MSE-capable
 // browsers and falls back to the browser's native HLS otherwise; see
 // `./stable-hls-video.tsx` for the stable-attach-ref rationale). hls.js
 // runs over MSE for every browser including Safari, giving JS-controlled
@@ -210,7 +213,7 @@ interface ScenePlayerProps {
    */
   onControlsVisibilityChange?: (visible: boolean) => void;
   /**
-   * Extra content rendered inside `Player.Container` above the controls
+   * Extra content rendered inside `Container` above the controls
    * overlay (e.g. the lightbox title / o-counter chrome). Rendering here
    * — rather than as a DOM sibling positioned over the player — keeps
    * the cursor "inside" the player when hovering interactive overlay
@@ -263,7 +266,7 @@ export type { ClipBoundsEdit };
 // ── Store bridge ──────────────────────────────────────────────────────────────
 // Parent component owns business logic (handleSeek, handleSourceChange) that
 // needs to read store state and call actions. The store is only accessible
-// from descendants of Player.Provider via `Player.usePlayer()`, so this tiny
+// from descendants of Player.Player via `Player.usePlayer()`, so this tiny
 // child captures it into a ref the parent can read synchronously.
 
 function StoreBridge({
@@ -338,7 +341,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
 }) => {
   // Store handle captured by <StoreBridge> below — lets callbacks read
   // paused/currentTime/playbackRate and call play/pause/seek without being
-  // descendants of Player.Provider themselves.
+  // descendants of Player.Player themselves.
   const storeRef = useRef<VideoPlayerStore | null>(null);
 
   // Media handle captured by <MediaBridge> — gives
@@ -347,7 +350,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   const mediaRef = useRef<unknown>(null);
 
   // Outer wrapper used as the fullscreen target. Fullscreening this
-  // element (rather than Player.Container) keeps the scope wide enough
+  // element (rather than Container) keeps the scope wide enough
   // that the controls bar and any overlays stay onscreen.
   const fullscreenContainerRef = useRef<HTMLDivElement>(null);
 
@@ -863,14 +866,14 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
         )}
         style={!fill && videoAspect ? { aspectRatio: videoAspect } : undefined}
       >
-        {/* No `key=` here — Provider stays mounted across the scene's
+        {/* No `key=` here — Player stays mounted across the scene's
             lifetime; source URL changes flow through `<VideoComponent>`'s
             `src` prop as in-place reassignments on the same `<video>`. */}
-        <Player.Provider>
+        <Player.Player>
           <StoreBridge storeRef={storeRef} />
           <MediaBridge mediaRef={mediaRef} />
           {/* `srcKey={finalSrc}` resets the once-per-mount latch on
-              every source URL change. Required because Provider is no
+              every source URL change. Required because Player is no
               longer keyed on source URL — without this, only the first
               swap's new `<video>` ever fires `canplay` through to
               `handleCanPlay`, and the spinner stays pinned on every
@@ -903,7 +906,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
               onClipResume={handleClipResume}
             />
           )}
-          <Player.Container className="absolute inset-0 overflow-hidden">
+          <Container className="absolute inset-0 overflow-hidden">
             {enablePinchZoom ? (
               <VideoFrameZoom
                 transform={zoomTransform}
@@ -971,15 +974,16 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
                 {temporaryPlaybackRate}×
               </Badge>
             )}
-          </Player.Container>
-        </Player.Provider>
+          </Container>
+          <GoogleCast />
+        </Player.Player>
 
         {/* Freeze-frame canvas masks the engine-detach gap between
             the old MediaSource clearing and the new one decoding its
             first frame. Sits at z-[5], beneath the dim+spinner
             overlay (z-[6]/z-[7]) and the controls bar (z-[10]).
-            Lives outside `Player.Provider` so it's not affected by
-            anything the provider does (and so the canvas's persistent
+            Lives outside `Player.Player` so it's not affected by
+            anything the player root does (and so the canvas's persistent
             backing buffer survives across source swaps). */}
         {freezeFrameCanvas}
 

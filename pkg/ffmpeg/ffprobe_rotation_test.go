@@ -1,6 +1,7 @@
 package ffmpeg
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -14,8 +15,8 @@ func TestStreamRotation(t *testing.T) {
 		want     int64
 	}{
 		{name: "none", want: 0},
-		{name: "legacy clockwise", tag: "90", want: 90},
-		{name: "legacy counterclockwise", tag: "-90", want: -90},
+		{name: "legacy positive", tag: "90", want: 90},
+		{name: "legacy negative", tag: "-90", want: -90},
 		{name: "normalizes positive full turns", tag: "450", want: 90},
 		{name: "normalizes negative full turns", tag: "-450", want: -90},
 		{name: "normalizes negative half turn", tag: "-180", want: 180},
@@ -35,6 +36,16 @@ func TestStreamRotation(t *testing.T) {
 				t.Fatalf("streamRotation() = %d, want %d", got, test.want)
 			}
 		})
+	}
+}
+
+func TestStreamRotationReadsUppercaseMatroskaTag(t *testing.T) {
+	var probe FFProbeJSON
+	if err := json.Unmarshal([]byte(`{"streams":[{"codec_type":"video","tags":{"ROTATE":"180"}}]}`), &probe); err != nil {
+		t.Fatal(err)
+	}
+	if got := streamRotation(&probe.Streams[0]); got != 180 {
+		t.Fatalf("streamRotation() = %d, want 180", got)
 	}
 }
 

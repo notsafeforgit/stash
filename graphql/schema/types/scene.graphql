@@ -220,6 +220,21 @@ input ScenesSetDateFromFileMTimeInput {
   scene_filter_ast: FilterASTInput
 }
 
+"Metadata-only rotation change for a scene's primary Matroska video."
+enum SceneVideoRotationDirection {
+  "Rotate the displayed video 90° clockwise."
+  CW
+  "Rotate the displayed video 90° counter-clockwise."
+  CCW
+  "Remove the ROTATE stream tag entirely."
+  CLEAR
+}
+
+input SceneVideoRotateInput {
+  id: ID!
+  direction: SceneVideoRotationDirection!
+}
+
 input SceneDestroyInput {
   id: ID!
   delete_file: Boolean

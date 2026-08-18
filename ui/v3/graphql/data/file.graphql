@@ -9,6 +9,7 @@ fragment VideoFileData on VideoFile {
   path
   size
   mod_time
+  updated_at
   duration
   video_stream_duration
   video_codec

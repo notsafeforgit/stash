@@ -122,6 +122,12 @@ mutation SceneGenerateScreenshot($id: ID!, $at: Float) {
   sceneGenerateScreenshot(id: $id, at: $at)
 }
 
+mutation SceneVideoRotate($id: ID!, $direction: SceneVideoRotationDirection!) {
+  sceneVideoRotate(input: { id: $id, direction: $direction }) {
+    ...SceneData
+  }
+}
+
 mutation SceneAssignFile($input: AssignSceneFileInput!) {
   sceneAssignFile(input: $input)
 }

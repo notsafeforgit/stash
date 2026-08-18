@@ -23,6 +23,7 @@ import {
 import type { VideoPlayerStore } from "@videojs/react";
 import { useConfigurationContext } from "src/hooks/config";
 import { isIOS, type PlayerSource } from "./player-utils";
+import { injectReloadNonce } from "./scene-player-source-url";
 import { useFreezeFrameOverlay } from "./use-freeze-frame-overlay";
 import { isHlsPlaylist, getHlsEngine, flushAndRestartAt } from "./hls";
 import {
@@ -71,6 +72,9 @@ interface UseScenePlayerSourcesArgs {
    *  pre-allocate a backing buffer with the correct aspect ratio. */
   fileWidth: number | undefined;
   fileHeight: number | undefined;
+  /** Changes when the underlying file bytes are replaced. The hook reloads
+   *  the active URL in place while preserving playhead and paused state. */
+  sourceRevision: string | undefined;
   /** Outer wrapper used as the `querySelector("video")` root for the
    *  in-place seek choreography (`awaitSeekReady`). */
   rootRef: RefObject<HTMLDivElement | null>;
@@ -155,6 +159,7 @@ export function useScenePlayerSources({
   fileDuration,
   fileWidth,
   fileHeight,
+  sourceRevision,
   rootRef,
   storeRef,
   mediaRef,
@@ -435,16 +440,10 @@ export function useScenePlayerSources({
   const activeSrc = activeSource?.src;
 
   const finalSrc = useMemo(() => {
-    const withReloadNonce = (url: string): string => {
-      if (reloadNonce === 0) return url;
-      // Cachebuster appended only to the playlist / file URL. For HLS
-      // the in-manifest segment URIs are absolute paths returned by
-      // the server and don't carry this param, so segment caching is
-      // unaffected — only the playlist re-fetch is forced. The server
-      // ignores unknown query params.
-      const sep = url.includes("?") ? "&" : "?";
-      return `${url}${sep}_r=${reloadNonce}`;
-    };
+    // The cachebuster is added only to the playlist / file URL. HLS segment
+    // URIs don't carry it, so only the playlist re-fetch is forced.
+    const withReloadNonce = (url: string): string =>
+      injectReloadNonce(url, reloadNonce);
     if (!activeSrc) return undefined;
     if (usesStartOffset(activeSrc)) {
       // HLS: encode the desired scene-time start position into the URL
@@ -501,6 +500,67 @@ export function useScenePlayerSources({
     }
     return withReloadNonce(activeSrc);
   }, [activeSrc, fragmentTime, clipRange, reloadNonce]);
+
+  // A metadata edit keeps every stream endpoint URL stable, but the bytes
+  // behind it have changed. Bump the existing cachebuster and use the same
+  // pending-resume choreography as a quality swap so the player immediately
+  // reflects the new orientation without losing its playhead or play state.
+  const sourceRevisionRef = useRef({ sceneId: scene.id, sourceRevision });
+  useEffect(() => {
+    const previous = sourceRevisionRef.current;
+    sourceRevisionRef.current = { sceneId: scene.id, sourceRevision };
+    if (previous.sceneId !== scene.id) return;
+    if (previous.sourceRevision === sourceRevision) return;
+
+    const s = storeRef.current;
+    if (!s || !activeSrc) {
+      setReloadNonce((nonce) => nonce + 1);
+      return;
+    }
+
+    const trueTime = offsetStart + s.state.currentTime;
+    const wasPaused = s.state.paused;
+    const playbackRate = s.state.playbackRate;
+    armSeekDisplay(trueTime);
+    beginSourceRemount(() => {
+      const strategy = startOffsetStrategyFor(
+        activeSrc,
+        frameRate,
+        isClipped,
+        clipRange,
+      );
+      if (strategy) {
+        const split = strategy.planResume(trueTime);
+        pendingResumeRef.current = {
+          wasPaused,
+          seekTo: split.seekTo,
+          playbackRate,
+        };
+        setOffsetStart(split.offset);
+        setFragmentTime(split.seekTo);
+      } else {
+        pendingResumeRef.current = {
+          wasPaused,
+          seekTo: trueTime,
+          playbackRate,
+        };
+        setOffsetStart(0);
+        setFragmentTime(trueTime > 0 ? trueTime : null);
+      }
+      setReloadNonce((nonce) => nonce + 1);
+    });
+  }, [
+    activeSrc,
+    armSeekDisplay,
+    beginSourceRemount,
+    clipRange,
+    frameRate,
+    isClipped,
+    offsetStart,
+    scene.id,
+    sourceRevision,
+    storeRef,
+  ]);
 
   const handleSourceChange = useCallback(
     (source: PlayerSource) => {

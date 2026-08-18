@@ -389,6 +389,13 @@ type Mutation {
   "Generates screenshot at specified time in seconds. Leave empty to generate default screenshot"
   sceneGenerateScreenshot(id: ID!, at: Float): ID!
 
+  """
+  Updates the primary MKV's ROTATE video-stream tag without re-encoding.
+  Clockwise/counter-clockwise changes compose with the existing rotation;
+  CLEAR removes the tag. The scene file is re-fingerprinted afterwards.
+  """
+  sceneVideoRotate(input: SceneVideoRotateInput!): Scene
+
   sceneMarkerCreate(input: SceneMarkerCreateInput!): SceneMarker
   sceneMarkerUpdate(input: SceneMarkerUpdateInput!): SceneMarker
   bulkSceneMarkerUpdate(input: BulkSceneMarkerUpdateInput!): [SceneMarker!]

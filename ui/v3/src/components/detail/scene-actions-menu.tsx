@@ -9,14 +9,18 @@ import {
   EllipsisVertical,
   GitMerge,
   RefreshCcw,
+  RotateCcw,
+  RotateCw,
   Send,
   Trash2,
+  Undo2,
 } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
 import { Button } from "src/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuSub,
@@ -24,6 +28,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "src/components/ui/dropdown-menu";
+import { Spinner } from "src/components/ui/spinner";
 import {
   DeleteDialog,
   DeleteFilesList,
@@ -68,6 +73,9 @@ export function SceneActionsMenu({
 
   const [scan] = useMutation(GQL.MetadataScanDocument);
   const [generateScreenshot] = useMutation(GQL.SceneGenerateScreenshotDocument);
+  const [rotateVideo, { loading: rotationPending }] = useMutation(
+    GQL.SceneVideoRotateDocument,
+  );
   const [destroyScene] = useEntityMutation(GQL.SceneDestroyDocument);
   const [submitDraft] = useMutation(GQL.SubmitStashBoxSceneDraftDocument);
 
@@ -150,6 +158,30 @@ export function SceneActionsMenu({
     }
   }
 
+  async function handleVideoRotation(
+    direction: GQL.SceneVideoRotationDirection,
+  ) {
+    try {
+      const result = await rotateVideo({
+        variables: { id: scene.id, direction },
+      });
+      if (!result.data?.sceneVideoRotate) return;
+      toast.success(
+        direction === GQL.SceneVideoRotationDirection.Clear
+          ? intl.formatMessage({
+              id: "toast.video_rotation_cleared",
+              defaultMessage: "Video rotation cleared",
+            })
+          : intl.formatMessage({
+              id: "toast.video_rotation_updated",
+              defaultMessage: "Video rotation updated",
+            }),
+      );
+    } catch (e) {
+      toast.error(e);
+    }
+  }
+
   async function handleSubmit(endpoint: string, endpointName: string) {
     try {
       await submitDraft({
@@ -212,7 +244,7 @@ export function SceneActionsMenu({
             defaultMessage: "Operations",
           })}
         >
-          <EllipsisVertical />
+          {rotationPending ? <Spinner /> : <EllipsisVertical />}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           {sceneFilePath && (
@@ -257,6 +289,57 @@ export function SceneActionsMenu({
               defaultMessage: "Generate default thumbnail",
             })}
           </DropdownMenuItem>
+          {sceneFilePath?.toLowerCase().endsWith(".mkv") && (
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger disabled={rotationPending}>
+                {rotationPending ? <Spinner /> : <RotateCw />}
+                {intl.formatMessage({
+                  id: "actions.rotation",
+                  defaultMessage: "Rotation",
+                })}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                <DropdownMenuGroup>
+                  <DropdownMenuItem
+                    disabled={rotationPending}
+                    onClick={() =>
+                      handleVideoRotation(GQL.SceneVideoRotationDirection.Ccw)
+                    }
+                  >
+                    <RotateCcw />
+                    {intl.formatMessage({
+                      id: "actions.rotate_ccw",
+                      defaultMessage: "Rotate counter-clockwise",
+                    })}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={rotationPending}
+                    onClick={() =>
+                      handleVideoRotation(GQL.SceneVideoRotationDirection.Cw)
+                    }
+                  >
+                    <RotateCw />
+                    {intl.formatMessage({
+                      id: "actions.rotate_cw",
+                      defaultMessage: "Rotate clockwise",
+                    })}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={rotationPending}
+                    onClick={() =>
+                      handleVideoRotation(GQL.SceneVideoRotationDirection.Clear)
+                    }
+                  >
+                    <Undo2 />
+                    {intl.formatMessage({
+                      id: "actions.clear_rotation",
+                      defaultMessage: "Clear rotation",
+                    })}
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          )}
 
           {stashBoxes.length > 0 && (
             <>

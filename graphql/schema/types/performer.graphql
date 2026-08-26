@@ -218,6 +218,12 @@ input PerformerMergeInput {
   destination: ID!
   # values defined here will override values in the destination
   values: PerformerUpdateInput
+  """
+  Reject the merge when a source contains a value that differs from the
+  destination and the corresponding field is not explicitly resolved in
+  values. Omit this field for legacy merge behaviour.
+  """
+  require_resolved_values: Boolean
 }
 
 type PerformerAlias {

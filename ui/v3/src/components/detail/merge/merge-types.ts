@@ -52,10 +52,9 @@ export interface MergeFieldDef<TEntity, TUpdateInput, TValue = unknown> {
   /**
    * Apply the resolved value into the partial update input. Mutating
    * style (rather than returning a new object) so callers can compose
-   * many field projections into a single accumulating input. Called
-   * for "Use source N" choices and for "Combine"; never called for
-   * "Keep" (the backend keeps the destination value automatically when
-   * the field is absent from the update input).
+   * many field projections into a single accumulating input. Always called
+   * for "Use source N" and "Combine"; callers using a safe merge contract
+   * may also request projection for "Keep" as an explicit acknowledgement.
    */
   toUpdate(input: TUpdateInput, value: TValue): void;
 }

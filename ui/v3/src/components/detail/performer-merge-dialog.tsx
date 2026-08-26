@@ -217,6 +217,7 @@ export function PerformerMergeDialog({
     fields: PERFORMER_MERGE_FIELDS,
     destination: destinationPerformer,
     sources: sourceRefs,
+    projectKeepValues: true,
   });
   useEffect(() => {
     setChoices((prev) => {
@@ -315,6 +316,7 @@ export function PerformerMergeDialog({
               destination: value.destinationId,
               source: finalSourceIds,
               values: updateValues,
+              require_resolved_values: true,
             },
           },
         });

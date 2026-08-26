@@ -47,12 +47,16 @@ interface UseMergeResolutionArgs<TEntity, TUpdateInput> {
   fields: readonly AnyMergeFieldDef<TEntity, TUpdateInput>[];
   destination: TEntity | null;
   sources: readonly SourceRef<TEntity>[];
+  /** Project "keep" choices into the update input instead of omitting them.
+   * Safe merge APIs use field presence as an explicit resolution marker. */
+  projectKeepValues?: boolean;
 }
 
 export function useMergeResolution<TEntity, TUpdateInput>({
   fields,
   destination,
   sources,
+  projectKeepValues = false,
 }: UseMergeResolutionArgs<TEntity, TUpdateInput>): {
   rows: MergeRow<TEntity, TUpdateInput>[];
   defaultChoices: Record<string, MergeChoice>;
@@ -130,7 +134,12 @@ export function useMergeResolution<TEntity, TUpdateInput>({
     ): void => {
       for (const row of rows) {
         const choice = choices[row.field.key] ?? row.defaultChoice;
-        if (choice === "keep") continue;
+        if (choice === "keep") {
+          if (projectKeepValues) {
+            row.field.toUpdate(input, row.destValue);
+          }
+          continue;
+        }
         if (choice === "combine") {
           if (!row.field.combine) continue;
           const allValues: unknown[] = [];
@@ -149,7 +158,7 @@ export function useMergeResolution<TEntity, TUpdateInput>({
         row.field.toUpdate(input, value);
       }
     };
-  }, [rows, sources]);
+  }, [rows, sources, projectKeepValues]);
 
   return { rows, defaultChoices, applyResolutions };
 }

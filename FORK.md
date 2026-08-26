@@ -91,7 +91,8 @@ both humans and LLM agents performing a sync.
 |---|---|---|
 | `ui/v3/` | entire v3 UI | none (new directory) |
 | `ui/ui_v3.go` | v3 embedded UI selector; keep `ui/ui.go` upstream-shaped for v2.5 | low |
-| `graphql/schema/` | `*_filter_ast` args, `FilterASTInput`, `SavedFilter.filter_ast` | low (additive) |
+| `graphql/schema/` | additive v3 API fields, including filter ASTs and loss-aware performer merge opt-in | low (additive) |
+| `internal/api/performer_merge_*.go` | canonical-name retention and opt-in loss-aware performer merge validation | low (new files) |
 | `pkg/models/filter_ast*.go` | AST model + v2.5 compat layer | none (new files) |
 | `pkg/sqlite/fork_migrate.go` + `pkg/sqlite/migrations/fork_*.go` | consolidated fork migration and roll-forward reconcilers | low |
 | `fork_performer_autotag_ignored_names` | case-insensitive auto-tag opt-outs keyed by performer and name text | none (fork-owned table) |

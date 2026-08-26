@@ -3,7 +3,7 @@ import type * as GQL from "src/core/generated-graphql";
 import { Badge } from "src/components/ui/badge";
 import { defineMergeField, type AnyMergeFieldDef } from "./merge-types";
 import { MergeEmptyPreview } from "./merge-field-row";
-import { formatGender } from "src/utils/enum-labels";
+import { formatCircumcised, formatGender } from "src/utils/enum-labels";
 
 type Performer = GQL.PerformerDataFragment;
 type PerformerUpdate = GQL.PerformerUpdateInput;
@@ -52,6 +52,24 @@ function GenderPreview({ value }: { value: GQL.GenderEnum | null }) {
   return <span>{formatGender(intl, value)}</span>;
 }
 
+function CircumcisedPreview({ value }: { value: GQL.CircumcisedEnum | null }) {
+  const intl = useIntl();
+  if (!value) return <MergeEmptyPreview />;
+  return <span>{formatCircumcised(intl, value)}</span>;
+}
+
+function BooleanPreview({ value }: { value: boolean }) {
+  const intl = useIntl();
+  return (
+    <span>
+      {intl.formatMessage({
+        id: value ? "yes" : "no",
+        defaultMessage: value ? "Yes" : "No",
+      })}
+    </span>
+  );
+}
+
 function ChipList({ items }: { items: string[] }) {
   if (items.length === 0) return <MergeEmptyPreview />;
   return (
@@ -71,6 +89,57 @@ function ChipList({ items }: { items: string[] }) {
 interface PerformerAlias {
   alias: string;
   ignore_auto_tag: boolean;
+}
+
+type PerformerStashID = Performer["stash_ids"][number];
+type CustomFieldMap = Record<string, unknown>;
+
+function sameStashIDSet(a: PerformerStashID[], b: PerformerStashID[]) {
+  if (a.length !== b.length) return false;
+  const aSet = new Set(a.map((v) => `${v.endpoint}\n${v.stash_id}`));
+  return b.every((v) => aSet.has(`${v.endpoint}\n${v.stash_id}`));
+}
+
+function combineStashIDs(values: PerformerStashID[][]) {
+  const byEndpoint = new Map<string, PerformerStashID>();
+  for (const list of values) {
+    for (const value of list) {
+      if (!byEndpoint.has(value.endpoint))
+        byEndpoint.set(value.endpoint, value);
+    }
+  }
+  return Array.from(byEndpoint.values());
+}
+
+function sameCustomFieldValue(a: unknown, b: unknown) {
+  return Object.is(a, b);
+}
+
+function sameCustomFields(a: CustomFieldMap, b: CustomFieldMap) {
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  return (
+    aKeys.length === bKeys.length &&
+    aKeys.every(
+      (key) => Object.hasOwn(b, key) && sameCustomFieldValue(a[key], b[key]),
+    )
+  );
+}
+
+function combineCustomFields(values: CustomFieldMap[]) {
+  const combined: CustomFieldMap = {};
+  for (const value of values) {
+    for (const [key, next] of Object.entries(value)) {
+      if (!Object.hasOwn(combined, key)) combined[key] = next;
+    }
+  }
+  return combined;
+}
+
+function customFieldLabels(value: CustomFieldMap) {
+  return Object.keys(value)
+    .sort((a, b) => a.localeCompare(b))
+    .map((key) => `${key}: ${String(value[key])}`);
 }
 
 // String-typed scalars all share this shape — packaged as a small
@@ -122,6 +191,18 @@ export const PERFORMER_MERGE_FIELDS: readonly AnyMergeFieldDef<
       i.gender = v;
     },
   }),
+  defineMergeField<Performer, PerformerUpdate, GQL.CircumcisedEnum | null>({
+    key: "circumcised",
+    labelId: "circumcised",
+    defaultLabel: "Circumcised",
+    read: (p) => p.circumcised ?? null,
+    isEmpty: (v) => v == null,
+    isEqual: (a, b) => a === b,
+    preview: (v) => <CircumcisedPreview value={v} />,
+    toUpdate: (i, v) => {
+      i.circumcised = v;
+    },
+  }),
   stringField("birthdate", "birthdate", "Birthdate", (p) => p.birthdate),
   stringField("death_date", "death_date", "Death date", (p) => p.death_date),
   stringField("ethnicity", "ethnicity", "Ethnicity", (p) => p.ethnicity),
@@ -162,12 +243,30 @@ export const PERFORMER_MERGE_FIELDS: readonly AnyMergeFieldDef<
       i.weight = v;
     },
   }),
+  defineMergeField<Performer, PerformerUpdate, number | null>({
+    key: "penis_length",
+    labelId: "penis_length",
+    defaultLabel: "Penis length",
+    read: (p) => p.penis_length ?? null,
+    isEmpty: (v) => v == null,
+    isEqual: (a, b) => a === b,
+    preview: (v) =>
+      v == null ? (
+        <MergeEmptyPreview />
+      ) : (
+        <span className="tabular-nums">{v} cm</span>
+      ),
+    toUpdate: (i, v) => {
+      i.penis_length = v;
+    },
+  }),
   stringField(
     "measurements",
     "measurements",
     "Measurements",
     (p) => p.measurements,
   ),
+  stringField("fake_tits", "fake_tits", "Fake tits", (p) => p.fake_tits),
   stringField("tattoos", "tattoos", "Tattoos", (p) => p.tattoos),
   stringField("piercings", "piercings", "Piercings", (p) => p.piercings),
   stringField(
@@ -200,6 +299,30 @@ export const PERFORMER_MERGE_FIELDS: readonly AnyMergeFieldDef<
     },
   }),
   stringField("details", "details", "Details", (p) => p.details),
+  defineMergeField<Performer, PerformerUpdate, boolean>({
+    key: "favorite",
+    labelId: "favorite",
+    defaultLabel: "Favourite",
+    read: (p) => p.favorite,
+    isEmpty: (v) => !v,
+    isEqual: (a, b) => a === b,
+    preview: (v) => <BooleanPreview value={v} />,
+    toUpdate: (i, v) => {
+      i.favorite = v;
+    },
+  }),
+  defineMergeField<Performer, PerformerUpdate, boolean>({
+    key: "ignore_auto_tag",
+    labelId: "ignore_auto_tag",
+    defaultLabel: "Ignore auto tag",
+    read: (p) => p.ignore_auto_tag,
+    isEmpty: (v) => !v,
+    isEqual: (a, b) => a === b,
+    preview: (v) => <BooleanPreview value={v} />,
+    toUpdate: (i, v) => {
+      i.ignore_auto_tag = v;
+    },
+  }),
   defineMergeField<Performer, PerformerUpdate, string[]>({
     key: "urls",
     labelId: "urls",
@@ -274,6 +397,38 @@ export const PERFORMER_MERGE_FIELDS: readonly AnyMergeFieldDef<
     combine: (vals) => uniqById(vals.flat()),
     toUpdate: (i, v) => {
       i.tag_ids = v.map((t) => t.id);
+    },
+  }),
+  defineMergeField<Performer, PerformerUpdate, PerformerStashID[]>({
+    key: "stash_ids",
+    labelId: "stash_ids",
+    defaultLabel: "Stash IDs",
+    read: (p) => p.stash_ids ?? [],
+    isEmpty: (v) => v.length === 0,
+    isEqual: sameStashIDSet,
+    preview: (v) => (
+      <ChipList items={v.map((s) => `${s.endpoint}: ${s.stash_id}`)} />
+    ),
+    combine: combineStashIDs,
+    toUpdate: (i, v) => {
+      i.stash_ids = v.map((s) => ({
+        endpoint: s.endpoint,
+        stash_id: s.stash_id,
+        updated_at: s.updated_at,
+      }));
+    },
+  }),
+  defineMergeField<Performer, PerformerUpdate, CustomFieldMap>({
+    key: "custom_fields",
+    labelId: "custom_fields.title",
+    defaultLabel: "Custom fields",
+    read: (p) => p.custom_fields ?? {},
+    isEmpty: (v) => Object.keys(v).length === 0,
+    isEqual: sameCustomFields,
+    preview: (v) => <ChipList items={customFieldLabels(v)} />,
+    combine: combineCustomFields,
+    toUpdate: (i, v) => {
+      i.custom_fields = { full: v };
     },
   }),
   defineMergeField<Performer, PerformerUpdate, string | null>({

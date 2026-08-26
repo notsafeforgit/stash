@@ -20,11 +20,69 @@ together because default filters live in UI configuration.
 | Video/image probe metadata | `fork_video_file_metadata` and `fork_image_file_metadata` | No equivalent | Source fingerprints invalidate metadata after v2.5 changes a file row. |
 
 The global performer `ignore_auto_tag` flag remains an upstream field. UI-only
-changes and fixes such as performer merge behavior need no schema promotion.
+changes and API compatibility shims such as performer merge behavior need no
+database schema promotion.
 
 This contract preserves data, but it cannot make a complex AST and a flat
 v2.5 filter equivalent. Pending conflicts require an explicit choice; they
 must not be silently discarded during promotion.
+
+### Performer merge API bridge
+
+`performerMerge` remains one additive GraphQL mutation for v2.5, v3, plugins,
+and external clients. Its current behavior is deliberately selected by the
+optional `PerformerMergeInput.require_resolved_values` field:
+
+| Request | Contract |
+|---|---|
+| Field omitted or `false` | Preserve the legacy destination-biased merge contract. `values` remains optional and omitted fields are not treated as explicit decisions. This is the v2.5-compatible path. |
+| Field set to `true` | Require every differing, source-owned metadata field to be represented in `values`. Validation reads the current performers inside the merge transaction and aborts before any write when a field is unresolved. The v3 UI uses this path and projects even "keep destination" choices so field presence records an explicit decision. |
+
+Both paths enforce canonical-name retention on the server: every participant's
+primary name becomes an alias unless it is the final primary name. Name matching
+is case-insensitive, duplicates are removed, and the per-name auto-tag policy is
+carried with the name. This is a data invariant, not a v3 UI convenience, and
+must remain after the compatibility bridge is removed.
+
+The safe path treats an explicitly supplied value, including an empty value, as
+an intentional resolution. Collection choices are projected as final sets by
+v3. Performer relationships are transferred by the store; an explicit tag set
+is applied after that transfer so the persisted result matches the preview.
+Portraits support the normalized `image_input` form as well as participant image
+URLs. The deprecated `alias_list` input remains accepted, but because it cannot
+express per-alias policy, existing stored policies take precedence over its
+synthetic defaults.
+
+This bridge prevents accidental loss; it cannot preserve two incompatible
+values in a singular field. Selecting one value or explicitly clearing the
+field is an acknowledged discard. A caller that requires a strictly lossless
+merge must decline any plan containing such a choice.
+
+#### V3-only API cleanup
+
+Retiring the v2.5 UI alone is not enough to remove this bridge. First complete a
+normal GraphQL deprecation window for plugins and external clients. Then:
+
+1. Replace client-computed field-presence resolution with a server-generated
+   merge plan (or preview query) that identifies conflicts, legal combine
+   operations, and the exact projected performer.
+2. Include a performer revision or opaque plan token and reject execution when
+   any participant changed after preview. Keep validation and execution in one
+   transaction.
+3. Make loss-aware execution the only contract. Remove
+   `require_resolved_values`, the v3 `projectKeepValues` opt-in, and the legacy
+   destination-biased branch in a breaking API release.
+4. Remove `alias_list`, legacy policy inference, and the deprecated `image`
+   input after their own API deprecation windows; accept only policy-bearing
+   aliases and normalized `image_input`.
+5. Move merge planning and execution from the resolver into a performer domain
+   service. Keep the resolver as schema translation and keep canonical-name and
+   per-name-policy retention as service-level invariants.
+6. Remove the v3 dialog's defensive name folding once all callers rely on the
+   server invariant. Retain regression tests at the API/service boundary.
+
+The intended final shape is therefore preview/plan followed by guarded apply,
+not a silent change to the default behavior of the existing mutation.
 
 ## Promotion Gate
 
@@ -122,6 +180,8 @@ still open the database and create divergence after reconciliation is gone.
 | `internal/manager/default_filter_compat.go` | Replace with the one-time config promotion, then remove. |
 | `ui/v3/src/hooks/default-filter.ts` bridge fields | Save only canonical AST; remove projection and version-conflict controls. |
 | Performer and metadata `fork_*` constants/joins | Point to the promoted semantic tables; remove cleanup reconcilers. |
+| `performerMerge` compatibility path and `internal/api/performer_merge_*.go` | Replace the field-presence shim with guarded server-side planning; retain canonical-name/policy preservation in the domain service. |
+| v3 performer merge `projectKeepValues` and defensive name folding | Remove after the guarded API is the only supported merge contract. |
 | v2.5 UI embedding and launch flags | Remove `ui/v2.5`, the fallback selector, and `--enable-v2-ui` after the rollback window closes. |
 
 Retiring the v2.5 UI and retiring the legacy GraphQL API may be separate

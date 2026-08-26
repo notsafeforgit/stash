@@ -773,35 +773,53 @@ func (r *mutationResolver) PerformerMerge(ctx context.Context, input PerformerMe
 		return nil, errors.New("destination performer cannot be in source list")
 	}
 
+	requireResolvedValues := input.RequireResolvedValues != nil && *input.RequireResolvedValues
+	if requireResolvedValues && len(srcIDs) == 0 {
+		return nil, errors.New("safe performer merge requires at least one source performer")
+	}
+	if requireResolvedValues && input.Values != nil {
+		valuesID, err := strconv.Atoi(input.Values.ID)
+		if err != nil || valuesID != destID {
+			return nil, errors.New("performer merge values id must match destination id")
+		}
+	}
+
 	var values *models.PerformerPartial
 	var imageData []byte
+	var imageIncluded bool
 	var imageSourceID *int
+	var legacyAliasList bool
+	var resolvedTagIDs *models.UpdateIDs
+	valuesTranslator := changesetTranslator{}
 
 	if input.Values != nil {
-		translator := changesetTranslator{
+		valuesTranslator = changesetTranslator{
 			inputMap: getNamedUpdateInputMap(ctx, "input.values"),
 		}
 
-		values, err = performerPartialFromInput(*input.Values, translator)
+		values, err = performerPartialFromInput(*input.Values, valuesTranslator)
 		if err != nil {
 			return nil, err
 		}
-		legacyURLs := legacyPerformerURLsFromInput(*input.Values, translator)
+		legacyAliasList = valuesTranslator.hasField("alias_list") && !valuesTranslator.hasField("aliases")
+		legacyURLs := legacyPerformerURLsFromInput(*input.Values, valuesTranslator)
 		if legacyURLs.AnySet() {
 			return nil, errors.New("merging legacy performer URLs is not supported")
 		}
 
-		if input.Values.Image != nil {
+		if input.Values.Image != nil && input.Values.ImageInput == nil {
 			allowedImageSources := append(append([]int(nil), srcIDs...), destID)
 			if sourceID, ok := performerImageSourceFromURL(*input.Values.Image, allowedImageSources); ok {
 				imageSourceID = &sourceID
-			} else {
-				var err error
-				imageData, err = r.processEntityImageInput(ctx, *input.Values.Image, true)
-				if err != nil {
-					return nil, fmt.Errorf("processing cover image: %w", err)
-				}
 			}
+		}
+		if imageSourceID == nil {
+			imageData, imageIncluded, err = r.processEntityImageFields(ctx, input.Values.Image, input.Values.ImageInput)
+			if err != nil {
+				return nil, fmt.Errorf("processing performer image: %w", err)
+			}
+		} else {
+			imageIncluded = true
 		}
 	} else {
 		v := models.NewPerformerPartial()
@@ -816,11 +834,22 @@ func (r *mutationResolver) PerformerMerge(ctx context.Context, input PerformerMe
 		if err != nil {
 			return fmt.Errorf("finding destination performer ID %d: %w", destID, err)
 		}
+		if dest == nil {
+			return fmt.Errorf("destination performer ID %d not found", destID)
+		}
 
 		// ensure source performers exist
 		sources, err := qb.FindMany(ctx, srcIDs)
 		if err != nil {
 			return fmt.Errorf("finding source performers: %w", err)
+		}
+		if requireResolvedValues {
+			if err := validatePerformerMergeResolvedValues(ctx, qb, dest, sources, valuesTranslator); err != nil {
+				return err
+			}
+		}
+		if err := preservePerformerMergeNames(ctx, qb, dest, sources, values, legacyAliasList); err != nil {
+			return err
 		}
 
 		if imageSourceID != nil {
@@ -860,6 +889,18 @@ func (r *mutationResolver) PerformerMerge(ctx context.Context, input PerformerMe
 			}
 		}
 
+		if requireResolvedValues {
+			if err := performer.ValidateUpdate(ctx, destID, *values, qb); err != nil {
+				return fmt.Errorf("validating merged performer: %w", err)
+			}
+
+			// PerformerStore.Merge always unions source tags. Defer an explicit
+			// safe-mode tag resolution until after that transfer so keep/source
+			// choices produce exactly the set shown by the v3 preview.
+			resolvedTagIDs = values.TagIDs
+			values.TagIDs = nil
+		}
+
 		dest, err = qb.UpdatePartial(ctx, destID, *values)
 		if err != nil {
 			return fmt.Errorf("updating performer: %w", err)
@@ -869,7 +910,16 @@ func (r *mutationResolver) PerformerMerge(ctx context.Context, input PerformerMe
 			return fmt.Errorf("merging performers: %w", err)
 		}
 
-		if len(imageData) > 0 {
+		if resolvedTagIDs != nil {
+			resolvedTags := models.NewPerformerPartial()
+			resolvedTags.TagIDs = resolvedTagIDs
+			dest, err = qb.UpdatePartial(ctx, destID, resolvedTags)
+			if err != nil {
+				return fmt.Errorf("applying resolved performer tags: %w", err)
+			}
+		}
+
+		if imageIncluded {
 			if err := qb.UpdateImage(ctx, destID, imageData); err != nil {
 				return err
 			}

@@ -31,8 +31,10 @@ import {
   RotateCw,
   Cast,
   Repeat,
+  Scan,
   SkipForward,
 } from "lucide-react";
+import { useIntl } from "react-intl";
 import { cn } from "src/lib/utils";
 import { Button } from "src/components/ui/button";
 import { Spinner } from "src/components/ui/spinner";
@@ -529,11 +531,13 @@ function useHotkeys({
 
   const handler = useCallback(
     (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
+      const target = e.target;
       if (
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.isContentEditable
+        target instanceof HTMLElement &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable ||
+          target.closest("[data-player-hotkeys-disabled]"))
       )
         return;
 
@@ -1017,6 +1021,10 @@ export interface PlayerControlsProps {
    *  with v10 store fallback to webkitEnterFullscreen on the video) runs
    *  instead. Any other return — including `void` — counts as handled. */
   onToggleFullscreenOverride?: () => boolean | undefined;
+  /** Optional in-place scene viewer affordance rendered over the video. */
+  onToggleViewer?: () => void;
+  viewerOpen?: boolean;
+  viewerButtonRef?: React.Ref<HTMLButtonElement>;
   /** When set, the position slider grows two draggable handles for
    *  start / end editing. Drags emit `onChange` with new scene-time
    *  values; the playhead is left alone. Used by the scene detail page's
@@ -1064,11 +1072,15 @@ export function PlayerControls({
   onTogglePaused,
   onUserPlaybackGesture,
   onToggleFullscreenOverride,
+  onToggleViewer,
+  viewerOpen,
+  viewerButtonRef,
   clipBoundsEdit,
   cancelPendingTapToggleRef,
   cancelPendingHoldRef,
   onTemporaryPlaybackRateChange,
 }: PlayerControlsProps) {
+  const intl = useIntl();
   const duration = fileDuration ?? 0;
   const store = Player.usePlayer();
   // Default to the raw store toggle when the parent doesn't override.
@@ -1292,15 +1304,46 @@ export function PlayerControls({
   }, [cancelPendingHoldRef, cancelHold]);
   useEffect(() => cancelHold, [cancelHold]);
 
+  const controlsHidden =
+    started && !controlsVisible && !controlsGrace && !menuOpen;
+
   return (
     <Controls.Root
       className={cn(
         "absolute inset-0 flex flex-col transition-opacity duration-300",
-        started && !controlsVisible && !controlsGrace && !menuOpen
-          ? "opacity-0"
-          : "opacity-100",
+        controlsHidden ? "opacity-0" : "opacity-100",
       )}
     >
+      {onToggleViewer && !viewerOpen && (
+        <Button
+          ref={viewerButtonRef}
+          type="button"
+          variant="ghost"
+          onClick={onToggleViewer}
+          data-player-hotkeys-disabled=""
+          aria-hidden={controlsHidden || undefined}
+          tabIndex={controlsHidden ? -1 : undefined}
+          aria-label={intl.formatMessage({
+            id: "actions.open_scene_viewer",
+            defaultMessage: "Open scene viewer",
+          })}
+          title={intl.formatMessage({
+            id: "actions.open_scene_viewer",
+            defaultMessage: "Open scene viewer",
+          })}
+          className={cn(
+            "absolute top-2 right-2 z-20 h-11 rounded-full bg-black/50 px-3 text-white/80 shadow-sm hover:bg-black/70 hover:text-white",
+            controlsHidden && "pointer-events-none",
+          )}
+        >
+          <Scan />
+          {intl.formatMessage({
+            id: "scene_viewer",
+            defaultMessage: "Scene viewer",
+          })}
+        </Button>
+      )}
+
       {started && (
         // `absolute inset-0` so the seek/play row centers against the
         // *whole* player area instead of just the slice above the

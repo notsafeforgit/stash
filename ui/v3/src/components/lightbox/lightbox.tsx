@@ -9,6 +9,7 @@ import YARLightbox, {
   type RenderSlideHeaderProps,
   type SlideshowRef,
   type ZoomRef,
+  useController,
   useLightboxState,
 } from "yet-another-react-lightbox";
 import Zoom from "yet-another-react-lightbox/plugins/zoom";
@@ -31,9 +32,11 @@ import {
   ExternalLinkIcon,
   Maximize2Icon,
   Minimize2Icon,
+  MoreHorizontalIcon,
   RotateCwIcon,
   RotateCcwIcon,
   Trash2Icon,
+  XIcon,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import type { LinkProps } from "@tanstack/react-router";
@@ -42,6 +45,7 @@ import { imageTitle } from "src/core/files";
 import { galleryLabel } from "src/lib/gallery-utils";
 import { cn } from "src/lib/utils";
 import { Spinner } from "src/components/ui/spinner";
+import { Toaster } from "src/components/ui/sonner";
 import { Button } from "src/components/ui/button";
 import { Switch } from "src/components/ui/switch";
 import { NumberInput } from "src/components/filters/number-input";
@@ -61,7 +65,15 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "src/components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "src/components/ui/dropdown-menu";
+import { useToast } from "src/hooks/toast";
 import { useLightboxHistory } from "./use-lightbox-history";
+import { inverseImageRotationDirection } from "./image-rotation";
 
 // ── Module augmentation ────────────────────────────────────────────────────────
 
@@ -113,6 +125,7 @@ const DEFAULT_SETTINGS: LightboxSettings = {
   displayMode: "fitXY",
   slideshowDelay: 5,
 };
+const LIGHTBOX_TOASTER_ID = "image-lightbox";
 
 function loadSettings(): LightboxSettings {
   try {
@@ -619,12 +632,91 @@ function LightboxRotateButton({
   return (
     <button
       type="button"
-      className="yarl__button"
+      className="yarl__button hidden md:block"
       title={label}
       aria-label={label}
       onClick={() => onRotate(imageId, direction)}
     >
       <Icon className="yarl__icon" />
+    </button>
+  );
+}
+
+function LightboxImageActionsButton({
+  onRotate,
+}: {
+  onRotate: (imageId: string, direction: GQL.ImageRotateDirection) => void;
+}) {
+  const intl = useIntl();
+  const { slides, currentIndex } = useLightboxState();
+  const slide = slides[currentIndex] as LightboxSlide | undefined;
+  const imageId = slide?.imageId;
+  if (!imageId) return null;
+
+  const actionsLabel = intl.formatMessage({
+    id: "lightbox.image_actions",
+    defaultMessage: "Image actions",
+  });
+
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger
+        className="yarl__button md:hidden"
+        title={actionsLabel}
+        aria-label={actionsLabel}
+      >
+        <MoreHorizontalIcon className="yarl__icon" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        side="top"
+        align="end"
+        sideOffset={8}
+        positionerClassName="z-[10001]"
+        className="min-w-52 border-0 bg-black/90 text-white shadow-lg ring-1 ring-white/15"
+      >
+        <DropdownMenuItem
+          className="min-h-11 text-white/80 focus:bg-white/10 focus:text-white"
+          onClick={() => onRotate(imageId, GQL.ImageRotateDirection.Ccw)}
+        >
+          <RotateCcwIcon />
+          {intl.formatMessage({
+            id: "actions.rotate_ccw",
+            defaultMessage: "Rotate counter-clockwise",
+          })}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className="min-h-11 text-white/80 focus:bg-white/10 focus:text-white"
+          onClick={() => onRotate(imageId, GQL.ImageRotateDirection.Cw)}
+        >
+          <RotateCwIcon />
+          {intl.formatMessage({
+            id: "actions.rotate_cw",
+            defaultMessage: "Rotate clockwise",
+          })}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function LightboxCloseButton() {
+  const intl = useIntl();
+  const { close } = useController();
+  const label = intl.formatMessage({
+    id: "actions.close",
+    defaultMessage: "Close",
+  });
+
+  return (
+    <button
+      type="button"
+      className="yarl__button lightbox-close-button"
+      title={label}
+      aria-label={label}
+      onClick={close}
+    >
+      <XIcon className="yarl__icon" />
+      <span className="lightbox-close-label md:hidden">{label}</span>
     </button>
   );
 }
@@ -727,6 +819,7 @@ export function Lightbox({
   finite = false,
 }: LightboxProps) {
   const intl = useIntl();
+  const toast = useToast();
   const requestClose = useLightboxHistory(open, onClose);
   const [settings, setSettings] = useState<LightboxSettings>(loadSettings);
   const slideshowPlayingRef = useRef(false);
@@ -828,19 +921,62 @@ export function Lightbox({
   const [slideSrcOverrides, setSlideSrcOverrides] = useState<
     Record<string, string>
   >({});
-  const handleRotate = useCallback(
-    (imageId: string, direction: GQL.ImageRotateDirection) => {
-      void imageRotate({ variables: { id: imageId, direction } })
-        .then(({ data }) => {
-          const newSrc = data?.imageRotate?.paths?.image;
-          if (!newSrc) return;
-          setSlideSrcOverrides((prev) => ({ ...prev, [imageId]: newSrc }));
-        })
-        .catch(() => {
-          /* surface via Apollo error link / toast elsewhere */
-        });
+  const rotateImage = useCallback(
+    async (imageId: string, direction: GQL.ImageRotateDirection) => {
+      const { data } = await imageRotate({
+        variables: { id: imageId, direction },
+      });
+      const newSrc = data?.imageRotate?.paths?.image;
+      if (newSrc) {
+        setSlideSrcOverrides((prev) => ({ ...prev, [imageId]: newSrc }));
+      }
     },
     [imageRotate],
+  );
+  const handleRotate = useCallback(
+    (imageId: string, direction: GQL.ImageRotateDirection) => {
+      void rotateImage(imageId, direction)
+        .then(() => {
+          toast.success(
+            intl.formatMessage({
+              id: "toast.image_rotated",
+              defaultMessage: "Image rotated.",
+            }),
+            {
+              toasterId: LIGHTBOX_TOASTER_ID,
+              duration: 7000,
+              action: {
+                label: intl.formatMessage({
+                  id: "actions.undo",
+                  defaultMessage: "Undo",
+                }),
+                onClick: () => {
+                  void rotateImage(
+                    imageId,
+                    inverseImageRotationDirection(direction),
+                  )
+                    .then(() => {
+                      toast.success(
+                        intl.formatMessage({
+                          id: "toast.image_rotation_undone",
+                          defaultMessage: "Image rotation undone.",
+                        }),
+                        { toasterId: LIGHTBOX_TOASTER_ID },
+                      );
+                    })
+                    .catch((error: unknown) =>
+                      toast.error(error, { toasterId: LIGHTBOX_TOASTER_ID }),
+                    );
+                },
+              },
+            },
+          );
+        })
+        .catch((error: unknown) =>
+          toast.error(error, { toasterId: LIGHTBOX_TOASTER_ID }),
+        );
+    },
+    [intl, rotateImage, toast],
   );
 
   const decoratedSlides = useMemo(() => {
@@ -861,15 +997,18 @@ export function Lightbox({
   // the user clicks back inside. A window listener bypasses the focus
   // dependency entirely. Mirrors the SceneLightbox handler.
   //
-  // Skip when `defaultPrevented` (something else already handled the
-  // key) or when HTML5 fullscreen is active (the browser owns that
-  // exit and we don't want to close the lightbox underneath it).
+  // Skip when `defaultPrevented` (something else already handled the key),
+  // when HTML5 fullscreen is active (the browser owns that exit), or while
+  // the delete confirmation owns Escape.
   useEffect(() => {
     if (!open) return;
     function onKeyDown(e: KeyboardEvent) {
       if (e.key !== "Escape") return;
       if (e.defaultPrevented) return;
       if (document.fullscreenElement) return;
+      // Let the confirmation dialog consume Escape without also closing the
+      // lightbox underneath it.
+      if (deleteTarget) return;
       // Don't close the lightbox if the user is dismissing an open
       // popup that's meant to consume Escape (menu, listbox, combobox,
       // alertdialog). `role="dialog"` is intentionally NOT in this set:
@@ -896,7 +1035,7 @@ export function Lightbox({
     // the user pressed it twice.
     document.addEventListener("keydown", onKeyDown, true);
     return () => document.removeEventListener("keydown", onKeyDown, true);
-  }, [open, requestClose]);
+  }, [deleteTarget, open, requestClose]);
 
   const isSingleSlide = slides.length === 1;
   const isSingleSlideMode = isSingleSlide && !finite;
@@ -952,13 +1091,17 @@ export function Lightbox({
   );
 
   const renderControls = useCallback(
-    () =>
-      onDeleteImage ? (
-        <LightboxDeleteShortcut
-          disabled={!!deleteTarget}
-          onRequestDelete={setDeleteTarget}
-        />
-      ) : null,
+    () => (
+      <>
+        <Toaster id={LIGHTBOX_TOASTER_ID} />
+        {onDeleteImage && (
+          <LightboxDeleteShortcut
+            disabled={!!deleteTarget}
+            onRequestDelete={setDeleteTarget}
+          />
+        )}
+      </>
+    ),
     [deleteTarget, onDeleteImage],
   );
 
@@ -1036,8 +1179,12 @@ export function Lightbox({
               direction={GQL.ImageRotateDirection.Cw}
               onRotate={handleRotate}
             />,
+            <LightboxImageActionsButton
+              key="image-actions"
+              onRotate={handleRotate}
+            />,
             "fullscreen",
-            "close",
+            <LightboxCloseButton key="close" />,
           ],
         }}
         on={{
@@ -1074,6 +1221,7 @@ export function Lightbox({
       {onDeleteImage && deleteTarget && (
         <DeleteDialog
           open
+          aboveLightbox
           onOpenChange={(o) => {
             if (!o) setDeleteTarget(null);
           }}

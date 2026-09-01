@@ -166,12 +166,19 @@ function panEnd(t: PanTracker): boolean {
 
 export function VideoFrameZoom({
   children,
+  enabled = true,
   transform,
   onTransformChange,
   onActiveGesture,
   isTemporarySpeedActive,
 }: {
   children: React.ReactNode;
+  /**
+   * Enables local zoom gesture ownership without changing the wrapper DOM.
+   * Keeping this component mounted while disabled lets an inline player enter
+   * and leave a focused viewer without reparenting its `<video>` element.
+   */
+  enabled?: boolean;
   transform: ZoomTransform;
   onTransformChange: (t: ZoomTransform) => void;
   /**
@@ -209,9 +216,16 @@ export function VideoFrameZoom({
   setTransitionMsRef.current = setTransitionMs;
 
   useEffect(() => {
-    // Stable wrapper bound inside the effect so the deps array can
-    // stay []. Reads `onTransformChangeRef.current` lazily so prop
-    // updates flow through without remounting the listeners.
+    if (!enabled) {
+      setTransitionMs(0);
+      return;
+    }
+
+    // The wrapper stays mounted across enable/disable transitions; only the
+    // window listeners are rebound. Callback refs are read lazily so ordinary
+    // prop updates don't churn the gesture listeners.
+    let animationFrameId: number | undefined;
+    let transitionTimerId: number | undefined;
     function setTransform(t: ZoomTransform) {
       onTransformChangeRef.current(t);
     }
@@ -228,10 +242,14 @@ export function VideoFrameZoom({
     // `transition: none` again.
     function setTransformAnimated(t: ZoomTransform, ms: number) {
       setTransitionMsRef.current(ms);
-      requestAnimationFrame(() => {
+      animationFrameId = requestAnimationFrame(() => {
+        animationFrameId = undefined;
         onTransformChangeRef.current(t);
       });
-      setTimeout(() => setTransitionMsRef.current(0), ms + 100);
+      transitionTimerId = window.setTimeout(() => {
+        transitionTimerId = undefined;
+        setTransitionMsRef.current(0);
+      }, ms + 100);
     }
     // The "gesture zone" is the entire scene-player area (matching
     // `data-scene-player` on the player root), not just this
@@ -740,8 +758,14 @@ export function VideoFrameZoom({
 
     return () => {
       for (const fn of cleanup) fn();
+      if (animationFrameId !== undefined) {
+        cancelAnimationFrame(animationFrameId);
+      }
+      if (transitionTimerId !== undefined) {
+        window.clearTimeout(transitionTimerId);
+      }
     };
-  }, []);
+  }, [enabled]);
 
   const isZoomed = transform.scale > 1.001;
 
@@ -753,25 +777,32 @@ export function VideoFrameZoom({
       // (`installPagePinchZoomGuard`) so iOS gesturestart and
       // desktop ctrl+wheel reach the component-level handlers below
       // instead of being preventDefault'd at window level.
-      data-pinch-zoom-allowed=""
-      style={{ cursor: isZoomed ? "grab" : undefined }}
+      data-pinch-zoom-allowed={enabled ? "" : undefined}
+      data-video-frame-zoom=""
+      data-zoom-enabled={enabled ? "" : undefined}
+      style={{ cursor: enabled && isZoomed ? "grab" : undefined }}
     >
       <div
         className="w-full h-full"
         style={{
-          transform: `translate3d(${transform.x}px, ${transform.y}px, 0) scale(${transform.scale})`,
-          transformOrigin: "center center",
-          willChange: "transform",
+          transform: enabled
+            ? `translate3d(${transform.x}px, ${transform.y}px, 0) scale(${transform.scale})`
+            : undefined,
+          transformOrigin: enabled ? "center center" : undefined,
+          willChange: enabled ? "transform" : undefined,
           // Off by default so pinch / pan / wheel track fingers in
           // real-time; double-tap flips this to a non-zero duration
           // for one paint cycle so its discrete jump animates.
-          transition:
-            transitionMs > 0 ? `transform ${transitionMs}ms ease` : "none",
+          transition: enabled
+            ? transitionMs > 0
+              ? `transform ${transitionMs}ms ease`
+              : "none"
+            : undefined,
           // Suppress native browser gestures on the transform target.
           // Pinch and double-tap zoom are implemented locally above so
           // they scale only the scene frame. The outer wrapper keeps its
           // default touch-action so controls remain interactive.
-          touchAction: "none",
+          touchAction: enabled ? "none" : undefined,
         }}
       >
         {children}

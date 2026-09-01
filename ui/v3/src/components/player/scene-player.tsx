@@ -196,14 +196,18 @@ interface ScenePlayerProps {
    */
   playDelayMs?: number;
   /**
-   * Wrap the `<video>` in a transform layer that responds to pinch /
-   * trackpad-pinch / drag-when-zoomed gestures. Controls and any other
-   * overlays (poster, reload spinner) sit outside the transform so the
-   * UI stays fixed while only the video frame scales. Page-level pinch
-   * zoom is disabled app-wide via `installPagePinchZoomGuard`; the
-   * wrapper marks itself with `data-pinch-zoom-allowed` to opt back in.
+   * Enables the always-mounted video transform layer's pinch / trackpad-pinch /
+   * drag-when-zoomed gestures. Controls and other overlays stay fixed while
+   * only the video frame scales. Keeping the layer mounted when this is false
+   * prevents viewer-mode transitions from reparenting the `<video>` element.
    */
   enablePinchZoom?: boolean;
+  /** Optional scene-detail focus viewer affordance shown over the video. */
+  onToggleViewer?: () => void;
+  /** Whether the scene-detail focus viewer is currently active. */
+  viewerOpen?: boolean;
+  /** Focus-restoration ref for the scene-detail viewer trigger. */
+  viewerButtonRef?: React.Ref<HTMLButtonElement>;
   /**
    * Fired whenever the videojs/react store's `controlsVisible` flag
    * flips. Lets surrounding chrome (e.g. the scene-lightbox overlay
@@ -333,6 +337,9 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   onLoopToggle: onLoopToggleProp,
   playDelayMs = 0,
   enablePinchZoom = false,
+  onToggleViewer,
+  viewerOpen = false,
+  viewerButtonRef,
   onControlsVisibilityChange,
   topOverlay,
   clipRange,
@@ -359,6 +366,12 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   // `<VideoComponent>` toggles between `<Video>` and `<StableHlsVideo>`).
   const [zoomTransform, setZoomTransform] =
     useState<ZoomTransform>(IDENTITY_TRANSFORM);
+  useEffect(() => {
+    if (!enablePinchZoom) setZoomTransform(IDENTITY_TRANSFORM);
+  }, [enablePinchZoom]);
+  const effectiveZoomTransform = enablePinchZoom
+    ? zoomTransform
+    : IDENTITY_TRANSFORM;
 
   // Shared cancel hooks between `VideoFrameZoom`'s gesture recognizers and
   // `PlayerControls`'s tap-style timers on the coarse-pointer overlay.
@@ -907,18 +920,15 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
             />
           )}
           <Container className="absolute inset-0 overflow-hidden">
-            {enablePinchZoom ? (
-              <VideoFrameZoom
-                transform={zoomTransform}
-                onTransformChange={setZoomTransform}
-                onActiveGesture={handleZoomActiveGesture}
-                isTemporarySpeedActive={isTemporarySpeedActive}
-              >
-                {mediaElement}
-              </VideoFrameZoom>
-            ) : (
-              mediaElement
-            )}
+            <VideoFrameZoom
+              enabled={enablePinchZoom}
+              transform={effectiveZoomTransform}
+              onTransformChange={setZoomTransform}
+              onActiveGesture={handleZoomActiveGesture}
+              isTemporarySpeedActive={isTemporarySpeedActive}
+            >
+              {mediaElement}
+            </VideoFrameZoom>
 
             {/* Also hide while reloading: the dim layer of the
                 source-change overlay is partially transparent
@@ -957,6 +967,9 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
               onTogglePaused={handleTogglePaused}
               onUserPlaybackGesture={handleUserPlaybackGesture}
               onToggleFullscreenOverride={onToggleFullscreenOverride}
+              onToggleViewer={onToggleViewer}
+              viewerOpen={viewerOpen}
+              viewerButtonRef={viewerButtonRef}
               clipBoundsEdit={clipBoundsEdit}
               cancelPendingTapToggleRef={cancelPendingTapToggleRef}
               cancelPendingHoldRef={cancelPendingHoldRef}

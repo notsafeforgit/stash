@@ -869,6 +869,23 @@ html [data-sonner-toaster][data-sonner-theme="system"] {
   .image-lightbox .yarl__thumbnails_container {
     display: none;
   }
+  /* Keep the primary exit affordance distinct from image mutations and large
+     enough for a thumb. Rotation lives behind the adjacent overflow menu. */
+  .image-lightbox .lightbox-close-button {
+    display: flex;
+    min-height: 44px;
+    align-items: center;
+    gap: 0.375rem;
+    margin-left: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-left: 1px solid rgb(255 255 255 / 20%);
+    border-radius: 9999px;
+    background: rgb(255 255 255 / 10%);
+  }
+  .image-lightbox .lightbox-close-label {
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
 }
 
 /* Lean YARL's toolbar / nav icons toward our standard icon-button sizing

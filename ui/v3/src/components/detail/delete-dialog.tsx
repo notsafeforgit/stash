@@ -25,6 +25,8 @@ export interface DeleteOptions {
 interface DeleteDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Render above YARL's z-index 9999 lightbox portal. */
+  aboveLightbox?: boolean;
   /** Entity name shown quoted in the title, e.g. "My Scene" → Delete "My Scene"? */
   entityName?: string;
   /**
@@ -130,6 +132,7 @@ export function DeleteFilesList({ paths }: DeleteFilesListProps) {
 export function DeleteDialog({
   open,
   onOpenChange,
+  aboveLightbox = false,
   entityName,
   entityCountLabel,
   showFileOptions = false,
@@ -191,9 +194,15 @@ export function DeleteDialog({
       defaultMessage: "Delete file",
     });
 
+  const layerClassName = aboveLightbox ? "z-[10000]" : undefined;
+
   return (
     <Dialog open={open} onOpenChange={isDeleting ? () => {} : onOpenChange}>
-      <DialogContent showCloseButton={false}>
+      <DialogContent
+        showCloseButton={false}
+        className={layerClassName}
+        overlayClassName={layerClassName}
+      >
         <DialogHeader>
           <DialogTitle>{titleNode}</DialogTitle>
           <DialogDescription>

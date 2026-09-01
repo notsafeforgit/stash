@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   createFileRoute,
   useNavigate,
@@ -45,6 +45,7 @@ import { SceneEditForm } from "src/components/detail/scene-edit-form";
 import { SceneActionsMenu } from "src/components/detail/scene-actions-menu";
 import { DetailEditTransition } from "src/components/detail/detail-edit-transition";
 import { useDocumentTitle } from "src/hooks/title";
+import { useLightboxHistory } from "src/components/lightbox/use-lightbox-history";
 
 // ── Route search params ────────────────────────────────────────────────────────
 
@@ -168,6 +169,34 @@ function SceneDetailPage() {
   const router = useRouter();
   const goBack = useSmartBack("/scenes");
   const intl = useIntl();
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const viewerButtonRef = useRef<HTMLButtonElement>(null);
+  const closeViewer = useCallback(() => setViewerOpen(false), []);
+  const requestCloseViewer = useLightboxHistory(viewerOpen, closeViewer);
+  const toggleViewer = useCallback(() => {
+    if (viewerOpen) requestCloseViewer();
+    else setViewerOpen(true);
+  }, [requestCloseViewer, viewerOpen]);
+
+  useEffect(() => {
+    if (!viewerOpen) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      if (document.fullscreenElement) return;
+      const active = document.activeElement as HTMLElement | null;
+      if (
+        active?.closest(
+          '[role="menu"], [role="alertdialog"], [role="listbox"], [role="combobox"]',
+        )
+      ) {
+        return;
+      }
+      e.preventDefault();
+      requestCloseViewer();
+    }
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
+  }, [requestCloseViewer, viewerOpen]);
 
   const setTimestampRef = useRef<((t: number) => void) | null>(null);
   const sendSetTimestamp = useCallback((setter: (t: number) => void) => {
@@ -219,12 +248,10 @@ function SceneDetailPage() {
     [],
   );
 
-  // Pinch-zoom is desktop-only on the detail page. On mobile the page
-  // itself scrolls (mobilePageScroll), so two-finger gestures inside the
-  // player would compete with page scroll and feel unpredictable. The
-  // lightbox slide (separate consumer of ScenePlayer) keeps pinch-zoom
-  // because it owns the viewport. `lg:` is Tailwind's 1024px breakpoint,
-  // matching the same media query the surrounding layout uses.
+  // Inline pinch-zoom remains desktop-only so the mobile detail scroller owns
+  // every gesture. Opening the focus viewer promotes this same player to the
+  // viewport and enables zoom there, where page scrolling is deliberately
+  // frozen. `lg:` is Tailwind's 1024px layout breakpoint.
   const isDesktop = useMediaQuery("(min-width: 1024px)");
 
   const { configuration } = useConfigurationContext();
@@ -487,7 +514,11 @@ function SceneDetailPage() {
       onEnded={handleOnEnded}
       sendSetTimestamp={sendSetTimestamp}
       sendGetCurrentTime={sendGetCurrentTime}
-      enablePinchZoom={isDesktop}
+      fill={viewerOpen}
+      enablePinchZoom={isDesktop || viewerOpen}
+      viewerOpen={viewerOpen}
+      onToggleViewer={toggleViewer}
+      viewerButtonRef={viewerButtonRef}
       clipBoundsEdit={
         // Handles only render on desktop. On mobile / tablet portrait the
         // seek bar is narrow enough that drag handles are fiddly to grab,
@@ -530,6 +561,9 @@ function SceneDetailPage() {
       onTabChange={setActiveTab}
       onBack={goBack}
       mobilePageScroll
+      primaryFocusMode={viewerOpen}
+      onClosePrimaryFocus={requestCloseViewer}
+      primaryFocusReturnRef={viewerButtonRef}
     />
   );
 }

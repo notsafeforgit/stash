@@ -1,7 +1,7 @@
 import type React from "react";
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { cn } from "src/lib/utils";
-import { ArrowLeft, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { ArrowLeft, PanelLeftClose, PanelLeftOpen, XIcon } from "lucide-react";
 import { useIntl } from "react-intl";
 import { Tabs, TabsContent } from "src/components/ui/tabs";
 import { Button } from "src/components/ui/button";
@@ -49,6 +49,16 @@ export interface MediaDetailLayoutProps {
    * to keeping it pinned at the top. Desktop layout is unchanged.
    */
   mobilePageScroll?: boolean;
+  /**
+   * Promotes the existing primary viewer to a fixed, viewport-sized surface
+   * without moving or remounting it. The layout's own scroll position is
+   * preserved while focused and restored on exit.
+   */
+  primaryFocusMode?: boolean;
+  /** Closes `primaryFocusMode`; rendered as an always-visible control. */
+  onClosePrimaryFocus?: () => void;
+  /** Preferred focus-restoration target after leaving focus mode. */
+  primaryFocusReturnRef?: React.RefObject<HTMLElement | null>;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -72,19 +82,76 @@ export const MediaDetailLayout: React.FC<MediaDetailLayoutProps> = ({
   onBack,
   className,
   mobilePageScroll = false,
+  primaryFocusMode = false,
+  onClosePrimaryFocus,
+  primaryFocusReturnRef,
 }) => {
   const intl = useIntl();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const primaryFocusRef = useRef<HTMLDivElement>(null);
+  const closeFocusButtonRef = useRef<HTMLButtonElement>(null);
+  const savedScrollTopRef = useRef(0);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const wasPrimaryFocusedRef = useRef(false);
 
   const { activeTab, selectTab, isMounted } = useTabState({
     tabs,
     activeTab: controlledTab,
     onTabChange,
-    enableShortcuts: true,
+    enableShortcuts: !primaryFocusMode,
   });
+
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    const wasFocused = wasPrimaryFocusedRef.current;
+
+    if (primaryFocusMode && !wasFocused) {
+      savedScrollTopRef.current = root?.scrollTop ?? 0;
+      previousFocusRef.current =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
+      closeFocusButtonRef.current?.focus({ preventScroll: true });
+    } else if (!primaryFocusMode && wasFocused) {
+      if (root) root.scrollTop = savedScrollTopRef.current;
+      const returnFocus =
+        primaryFocusReturnRef?.current ?? previousFocusRef.current;
+      returnFocus?.focus({ preventScroll: true });
+      // Focusing the original trigger should not alter the restored scroller,
+      // but re-apply it for browsers that ignore `preventScroll`.
+      if (root) root.scrollTop = savedScrollTopRef.current;
+      previousFocusRef.current = null;
+    }
+
+    wasPrimaryFocusedRef.current = primaryFocusMode;
+  }, [primaryFocusMode, primaryFocusReturnRef]);
+
+  function handlePrimaryFocusKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (!primaryFocusMode || e.key !== "Tab") return;
+    const container = primaryFocusRef.current;
+    if (!container) return;
+    const focusable = Array.from(
+      container.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
+    ).filter((element) => element.getClientRects().length > 0);
+    if (focusable.length === 0) return;
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
 
   return (
     <Tabs
+      ref={rootRef}
       value={activeTab}
       onValueChange={selectTab}
       className={cn(
@@ -93,9 +160,11 @@ export const MediaDetailLayout: React.FC<MediaDetailLayoutProps> = ({
         // container scrolls (player + tab content together); otherwise
         // the inner sidebar owns the scroll. Desktop always clips here
         // so the sidebar's own scroll area can take over.
-        mobilePageScroll
-          ? "overflow-y-auto overscroll-contain lg:overflow-hidden"
-          : "overflow-hidden",
+        primaryFocusMode
+          ? "overflow-hidden overscroll-none"
+          : mobilePageScroll
+            ? "overflow-y-auto overscroll-contain lg:overflow-hidden"
+            : "overflow-hidden",
         "lg:grid lg:grid-rows-[1fr] lg:gap-0",
         // 320px matches the `lg:w-80` sidebar used by the entity
         // detail pages (performer / studio / tag / group) so the
@@ -113,6 +182,8 @@ export const MediaDetailLayout: React.FC<MediaDetailLayoutProps> = ({
           Desktop                 : order-1 (left), fixed width — hidden when
                                     collapsed                                  */}
       <div
+        inert={primaryFocusMode ? true : undefined}
+        aria-hidden={primaryFocusMode || undefined}
         className={cn(
           "order-2 lg:order-1 flex flex-col lg:border-r lg:border-border lg:flex-1 lg:min-h-0 lg:overflow-hidden",
           // Default mobile: fills remaining flex space and owns its own
@@ -207,21 +278,59 @@ export const MediaDetailLayout: React.FC<MediaDetailLayoutProps> = ({
           Mobile  : order-1 (above content), natural fluid height
           Desktop : order-2 (right), flex-1, full height, player centred       */}
       <div
+        ref={primaryFocusRef}
+        onKeyDown={handlePrimaryFocusKeyDown}
+        role={primaryFocusMode ? "dialog" : undefined}
+        aria-modal={primaryFocusMode ? true : undefined}
+        aria-label={
+          primaryFocusMode
+            ? intl.formatMessage({
+                id: "scene_viewer",
+                defaultMessage: "Scene viewer",
+              })
+            : undefined
+        }
         className={cn(
-          "order-1 lg:order-2 bg-black min-w-0 min-h-0 lg:flex lg:flex-col lg:overflow-hidden relative",
+          "order-1 lg:order-2 bg-black min-w-0 min-h-0 lg:flex lg:flex-col lg:overflow-hidden",
           // Default mobile clips so the player column doesn't push past
           // the sidebar's flex boundary. Page-scroll mode wants the
           // player at its natural height inside the outer scroll —
           // `shrink-0` is the same fix as on the sidebar above: keep
           // the flex column from compressing the player to make
           // everything fit within the parent height.
-          mobilePageScroll ? "shrink-0" : "overflow-hidden",
+          primaryFocusMode
+            ? "fixed inset-0 z-[9999] h-[100dvh] w-screen flex flex-col overflow-hidden overscroll-none touch-none pb-[env(safe-area-inset-bottom,0px)]"
+            : mobilePageScroll
+              ? "relative shrink-0"
+              : "relative overflow-hidden",
         )}
       >
+        {primaryFocusMode && onClosePrimaryFocus && (
+          <Button
+            ref={closeFocusButtonRef}
+            type="button"
+            variant="ghost"
+            onClick={onClosePrimaryFocus}
+            data-player-hotkeys-disabled=""
+            className="absolute right-3 z-50 h-11 rounded-full border border-white/15 bg-black/60 px-3 text-white shadow-lg backdrop-blur-sm hover:bg-black/75 hover:text-white"
+            style={{ top: "max(0.75rem, env(safe-area-inset-top, 0px))" }}
+            aria-label={intl.formatMessage({
+              id: "actions.close_scene_viewer",
+              defaultMessage: "Close scene viewer",
+            })}
+          >
+            <XIcon />
+            {intl.formatMessage({
+              id: "actions.close_scene_viewer",
+              defaultMessage: "Close scene viewer",
+            })}
+          </Button>
+        )}
+
         {/* Expand button — desktop only, shown when sidebar is collapsed.
             Floats over the player column so re-expanding the sidebar
             doesn't shift the primary content down. */}
-        {!sidebarOpen && (
+        {!sidebarOpen && !primaryFocusMode && (
           <Button
             type="button"
             variant="ghost"
@@ -235,55 +344,64 @@ export const MediaDetailLayout: React.FC<MediaDetailLayoutProps> = ({
         )}
 
         {/* Player — fills remaining space; video maintains aspect ratio via fill mode */}
-        <div className="lg:flex-1 lg:min-h-0 min-w-0">{primaryContent}</div>
+        <div
+          className={cn(
+            "lg:flex-1 lg:min-h-0 min-w-0",
+            primaryFocusMode && "flex-1 min-h-0",
+          )}
+        >
+          {primaryContent}
+        </div>
       </div>
 
       {/* ── Mobile fixed bottom bar — hidden on desktop ─────────────────────── */}
-      <div
-        className="lg:hidden fixed bottom-0 inset-x-0 z-50 flex flex-col border-t border-border bg-background/95 backdrop-blur-sm"
-        role="toolbar"
-      >
-        <div className="flex items-stretch h-12">
-          {/* Back button */}
-          <Button
-            variant="ghost"
-            className="h-full rounded-none border-0 border-r border-border px-3 text-muted-foreground hover:text-foreground hover:bg-transparent"
-            onClick={onBack}
-            aria-label={intl.formatMessage({ id: "actions.back" })}
-          >
-            <ArrowLeft size={18} />
-          </Button>
+      {!primaryFocusMode && (
+        <div
+          className="lg:hidden fixed bottom-0 inset-x-0 z-50 flex flex-col border-t border-border bg-background/95 backdrop-blur-sm"
+          role="toolbar"
+        >
+          <div className="flex items-stretch h-12">
+            {/* Back button */}
+            <Button
+              variant="ghost"
+              className="h-full rounded-none border-0 border-r border-border px-3 text-muted-foreground hover:text-foreground hover:bg-transparent"
+              onClick={onBack}
+              aria-label={intl.formatMessage({ id: "actions.back" })}
+            >
+              <ArrowLeft size={18} />
+            </Button>
 
-          {/* Tab buttons */}
-          <nav
-            className="flex-1 flex overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            role="tablist"
-          >
-            {tabs.map((tab) => (
-              <Button
-                key={tab.id}
-                variant="ghost"
-                role="tab"
-                aria-selected={tab.id === activeTab}
-                className={cn(
-                  "flex-1 h-full rounded-none px-2 min-w-[3.5rem] text-sm whitespace-nowrap font-normal border-t-2 border-t-transparent text-muted-foreground hover:text-foreground hover:bg-transparent",
-                  tab.id === activeTab &&
-                    "border-t-primary text-foreground font-medium",
-                )}
-                onClick={() => selectTab(tab.id)}
-                title={
-                  tab.shortcut ? `${tab.label} (${tab.shortcut})` : tab.label
-                }
-              >
-                {tab.label}
-              </Button>
-            ))}
-          </nav>
+            {/* Tab buttons */}
+            <nav
+              className="flex-1 flex overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              role="tablist"
+            >
+              {tabs.map((tab) => (
+                <Button
+                  key={tab.id}
+                  variant="ghost"
+                  role="tab"
+                  aria-selected={tab.id === activeTab}
+                  className={cn(
+                    "flex-1 h-full rounded-none px-2 min-w-[3.5rem] text-sm whitespace-nowrap font-normal border-t-2 border-t-transparent text-muted-foreground hover:text-foreground hover:bg-transparent",
+                    tab.id === activeTab &&
+                      "border-t-primary text-foreground font-medium",
+                  )}
+                  onClick={() => selectTab(tab.id)}
+                  title={
+                    tab.shortcut ? `${tab.label} (${tab.shortcut})` : tab.label
+                  }
+                >
+                  {tab.label}
+                </Button>
+              ))}
+            </nav>
+          </div>
+
+          {/* iOS home indicator clearance */}
+          <div style={{ height: "env(safe-area-inset-bottom, 0px)" }} />
         </div>
-
-        {/* iOS home indicator clearance */}
-        <div style={{ height: "env(safe-area-inset-bottom, 0px)" }} />
-      </div>
+      )}
     </Tabs>
   );
 };

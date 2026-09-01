@@ -1,12 +1,12 @@
-import { toast } from "sonner";
+import { toast, type ExternalToast } from "sonner";
 import { errorToString } from "src/utils/errors";
 
 const Toast = {
-  success(message: string) {
-    toast.success(message);
+  success(message: string, options?: ExternalToast) {
+    return toast.success(message, options);
   },
-  error(error: unknown) {
-    toast.error(errorToString(error));
+  error(error: unknown, options?: ExternalToast) {
+    return toast.error(errorToString(error), options);
   },
   /**
    * Show a single toast that progresses through loading → success/error

@@ -45,6 +45,7 @@ import { MobileListBar } from "./mobile-list-bar";
 import { MobileGridColsContext } from "./mobile-grid-context";
 import { CardLayoutContext } from "./card-layout-context";
 import { ListScrollContext } from "./list-scroll-context";
+import { useListActivity } from "./list-activity-context";
 import {
   shouldAdjustVirtualizedListScrollPosition,
   shouldPreserveListScrollDuringRefill,
@@ -864,6 +865,7 @@ export function EntityListPage<TData, TItem extends IHasID>({
   keyboardShortcutsDisabled,
   view: viewProp,
 }: EntityListPageProps<TData, TItem>) {
+  const isActive = useListActivity();
   const {
     filterMode,
     view: configView,
@@ -923,7 +925,11 @@ export function EntityListPage<TData, TItem extends IHasID>({
     filterMode,
     view,
     defaultSort,
-    useURL,
+    // DetailTabs keeps visited panels mounted. Only the visible panel may
+    // consume or rewrite the shared list params (`p`, `sortby`, etc.);
+    // otherwise an inactive one-page list can clamp the active tab's `p=2`
+    // straight back to page 1.
+    useURL: (useURL ?? true) && isActive,
     defaultFilter,
     defaultDisplayMode: displayModePref,
   });
@@ -1244,7 +1250,7 @@ export function EntityListPage<TData, TItem extends IHasID>({
     onSelectNone: listSelect.onSelectNone,
     onInvertSelection: listSelect.onInvertSelection,
     selectModeActive: listSelect.selecting,
-    disabled: keyboardShortcutsDisabled,
+    disabled: keyboardShortcutsDisabled || !isActive,
   });
 
   const sidebarContent = sidebarContentOverride ?? (

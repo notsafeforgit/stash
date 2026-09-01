@@ -3,6 +3,7 @@ import { cn } from "src/lib/utils";
 import { Tabs, TabsContent } from "src/components/ui/tabs";
 import { DetailTabStrip } from "src/components/detail/detail-tab-strip";
 import { useTabState } from "src/hooks/use-tab-state";
+import { ListActivityContext } from "src/components/list/list-activity-context";
 
 export interface DetailTabsTab {
   id: string;
@@ -85,7 +86,11 @@ export function DetailTabs({ tabs, activeTab, onTabChange }: DetailTabsProps) {
           // outer `md:overflow-hidden` and gets clipped — no scroll.
           className={cn("md:flex md:flex-col md:min-h-0")}
         >
-          {isMounted(t.id) ? t.content : null}
+          {isMounted(t.id) ? (
+            <ListActivityContext value={t.id === resolvedActiveTab}>
+              {t.content}
+            </ListActivityContext>
+          ) : null}
         </TabsContent>
       ))}
     </Tabs>

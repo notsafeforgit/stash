@@ -52,11 +52,12 @@ jobs:
     - name: Generate
       run: docker exec -t build /bin/bash -c "make generate"
 
-    - name: Validate fork before publishing
-      run: docker exec -t build /bin/bash -c "make validate-fork"
-
+    # Go validation inspects embedded UI chunks, so build the bundles first.
     - name: Build UI
       run: docker exec -t build /bin/bash -c "make ui && make ui-v3-only"
+
+    - name: Validate fork before publishing
+      run: docker exec -t build /bin/bash -c "make validate-fork"
 
     - name: Compile linux amd64
       run: docker exec -t build /bin/bash -c "make build-cc-linux"

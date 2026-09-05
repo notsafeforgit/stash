@@ -182,6 +182,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({
   return (
     <>
       <EntityCard
+        label={objectTitle(scene)}
         id={scene.id}
         href={href ?? `/scenes/${scene.id}`}
         isMobile={isMobile}

@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 function InputGroup({ className, ...props }: React.ComponentProps<"div">) {
   return (
+    // biome-ignore lint/a11y/useSemanticElements: An input and its adornments form one composite control, not a fieldset.
     <div
       data-slot="input-group"
       role="group"
@@ -49,6 +50,8 @@ function InputGroupAddon({
   ...props
 }: React.ComponentProps<"div"> & VariantProps<typeof inputGroupAddonVariants>) {
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: Clicking an adornment only focuses the input, which already has a keyboard tab stop.
+    // biome-ignore lint/a11y/useSemanticElements: An input and its adornments form one composite control, not a fieldset.
     <div
       role="group"
       data-slot="input-group-addon"

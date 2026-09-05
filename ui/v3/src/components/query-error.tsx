@@ -38,7 +38,7 @@ export function QueryError({ error, retry, retrying, stale }: QueryErrorProps) {
             />
           )}
         </EmptyTitle>
-        <EmptyDescription className="break-words">
+        <EmptyDescription className="break-words" data-selectable-text>
           {error.message}
         </EmptyDescription>
       </EmptyHeader>

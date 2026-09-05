@@ -43,6 +43,7 @@ export function GalleryDetailsTab({ gallery }: { gallery: GalleryData }) {
 
       {gallery.code && (
         <MetaRow
+          selectableText
           label={intl.formatMessage({
             id: "scene_code",
             defaultMessage: "Scene code",
@@ -77,6 +78,7 @@ export function GalleryDetailsTab({ gallery }: { gallery: GalleryData }) {
 
       {gallery.urls && gallery.urls.length > 0 && (
         <MetaRow
+          selectableText
           label={intl.formatMessage({ id: "urls", defaultMessage: "URLs" })}
         >
           <div className="flex flex-col gap-0.5">

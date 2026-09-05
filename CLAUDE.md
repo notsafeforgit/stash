@@ -183,7 +183,7 @@ The codebase has a two-filter system:
 
 Saved filters persist criteria as a FilterAST in `fork_saved_filter_state`. The consolidated fork migration converts legacy rows, including the transitional `__filter_ast` compact key and v2.5 `excluded`-value splits, while `saved_filters.object_filter` remains a v2.5-compatible projection. Condition values inside the persisted AST use the **labeled saved-criterion shape** (`{value, modifier, field?}`, e.g. `[{id, label}]` items) — *not* the GraphQL input shape used by the `*_filter_ast` query arguments. The sidecar's compatibility shadow lets the v3 startup reconciler detect object-filter edits made by an upstream-only server. It imports those edits only for losslessly flat-representable ASTs; for complex v3 ASTs it keeps the canonical AST and records the conflicting v2.5 value in `pending_legacy_object_filter`.
 
-Default filters use the same contract without changing the upstream schema. `defaultFilters.<view>` contains `filter_ast` plus a v2.5-readable `object_filter` projection; `forkDefaultFilterState.<view>` is an unknown-to-v2.5 UI config key containing the canonical AST, the last legacy shadow, and any pending v2.5 conflict. `internal/manager/default_filter_compat.go` reconciles these at startup. v3 set/clear actions write a complete UI config snapshot so nested criteria maps are replaced rather than deep-merged. When a v2.5 edit conflicts with a complex AST, the list UI offers **Use v2.5** or **Keep v3** instead of discarding either value.
+Default filters use the same contract without changing the upstream schema. `defaultFilters.<view>` contains `filter_ast` plus a v2.5-readable `object_filter` projection; `forkDefaultFilterState.<view>` is an unknown-to-v2.5 UI config key containing the canonical AST, the last legacy shadow, and any pending v2.5 conflict. `internal/manager/default_filter_compat.go` reconciles these at startup. v3 set/clear and conflict-resolution actions use the additive `configureDefaultFilter` mutation. `internal/manager/default_filter_update.go` updates one view under the configuration lock, deriving its legacy projection and resolving conflicts from current server state. Clients never replace the full UI configuration to change one default filter. When a v2.5 edit conflicts with a complex AST, the list UI offers **Use v2.5** or **Keep v3** instead of discarding either value.
 
 ### Performer names
 
@@ -204,3 +204,11 @@ Agent note for `make validate-ui-v3`: `ui/v3/src/core/generated-graphql.ts` is i
 ### Job system
 
 Background tasks (scan, generate, identify, etc.) run through `pkg/job`. Jobs are queued and can be monitored via the GraphQL subscription `jobsSubscribe`.
+
+### v3 extension points
+
+See `ui/v3/docs/architecture.md` for the current module map and compatibility rules. List configurations require a discriminated GraphQL/local `source`; generated query variables remain typed through the data hook. Layout, preferences, query state, and cache refill live in separate list modules. Player transition policy consumes plain buffered/seekable state in `scene-player-transitions.ts`; media effects, recovery, and transcode leases are separate hooks. Keep the stable player root and existing iOS seek/timeline behavior when extending these modules.
+
+Accessibility lint is enabled in v3. Use named native controls, associate labels with unique input IDs, and document narrow exceptions at component wrappers or gesture delegation. General page pinch and double-tap zoom remain disabled by product choice; retain custom image/video zoom.
+
+Interface text is non-selectable by default. Keep selection in inputs, editable regions, and technical `code`/`pre` output. Mark other copyable values (file paths, URLs, hashes, IDs, logs) with `data-selectable-text`, or use `selectableText` on `MetaRow`/`textColumn`. Do not opt whole panels or control labels into selection.

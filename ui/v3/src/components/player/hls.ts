@@ -77,8 +77,10 @@
  * `SourceStrategy` dispatch in `scene-player-sources.ts`. Non-HLS code
  * paths see only that interface and never know HLS exists.
  */
-import type { VideoPlayerStore } from "@videojs/react";
-import type { SourceStrategy } from "./scene-player-sources";
+import type {
+  SourceStrategy,
+  MediaSeekState,
+} from "./scene-player-transitions";
 
 // Mirror of `pkg/ffmpeg/stream_segmented.go:segmentLength`. The nominal
 // segment-length target the backend feeds to `-hls_time`. The actual
@@ -209,8 +211,8 @@ export function makeHlsStrategy(
       planResume(trueTime: number) {
         return { offset: 0, seekTo: trueTime > 0 ? trueTime : null };
       },
-      canSeekDirectly(targetInternal: number, store: VideoPlayerStore) {
-        const buffered = store.state.buffered;
+      canSeekDirectly(targetInternal: number, state: MediaSeekState) {
+        const buffered = state.buffered;
         if (!buffered || buffered.length === 0) {
           // No buffer yet — let hls.js's natural startup pick the
           // fragment. (This branch is mostly defensive — by the time
@@ -277,12 +279,12 @@ export function makeHlsStrategy(
         seekTo: trueTime,
       };
     },
-    canSeekDirectly(targetInternal: number, store: VideoPlayerStore) {
+    canSeekDirectly(targetInternal: number, state: MediaSeekState) {
       // `targetInternal` is MSE-time. With the playlist trimmed to a
       // clip, the seekable range is [0, clipDur] in MSE-time. Backward
       // seeks below 0 shouldn't happen (the player's effective slider
       // is constrained to the clip), but check defensively.
-      const seekable = store.state.seekable;
+      const seekable = state.seekable;
       if (seekable && seekable.length > 0) {
         const start = seekable[0][0];
         if (targetInternal < start) return false;
@@ -299,7 +301,7 @@ export function makeHlsStrategy(
       // playback stalling shortly after the first new segment plays.
       // Threshold roughly matches hls.js's default `maxBufferLength`
       // (~30 s).
-      const buffered = store.state.buffered;
+      const buffered = state.buffered;
       if (buffered && buffered.length > 0) {
         const bufferedEnd = buffered[buffered.length - 1][1];
         const FORWARD_REMOUNT_THRESHOLD_S = 30;

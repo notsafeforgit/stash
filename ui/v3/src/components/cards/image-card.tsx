@@ -106,6 +106,7 @@ export const ImageCard: React.FC<ImageCardProps> = ({
   return (
     <>
       <EntityCard
+        label={imageTitle(image)}
         id={image.id}
         href={`/images/${image.id}`}
         isMobile={isMobile}

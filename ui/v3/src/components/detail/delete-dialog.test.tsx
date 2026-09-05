@@ -28,12 +28,38 @@ vi.mock("src/components/ui/dialog", () => {
 });
 
 vi.mock("src/components/ui/button", () => ({
-  Button: ({ children }: PropsWithChildren) => <button>{children}</button>,
+  Button: ({ children }: PropsWithChildren) => (
+    <button type="button">{children}</button>
+  ),
 }));
 
 import { DeleteDialog } from "./delete-dialog";
 
 describe("DeleteDialog", () => {
+  it("associates file-option labels with unique controls across dialogs", () => {
+    const markup = renderToStaticMarkup(
+      <IntlProvider locale="en">
+        {["first", "second"].map((key) => (
+          <DeleteDialog
+            key={key}
+            open
+            showFileOptions
+            onOpenChange={() => {}}
+            onConfirm={async () => {}}
+          />
+        ))}
+      </IntlProvider>,
+    );
+    const labelTargets = [
+      ...markup.matchAll(/<label\b[^>]*for="([^"]+)"/g),
+    ].map((match) => match[1]);
+    expect(labelTargets).toHaveLength(4);
+    expect(new Set(labelTargets).size).toBe(4);
+    for (const id of labelTargets) {
+      expect(markup).toContain(`id="${id}"`);
+    }
+  });
+
   it("raises both dialog surfaces above the image lightbox", () => {
     const markup = renderToStaticMarkup(
       <IntlProvider locale="en">

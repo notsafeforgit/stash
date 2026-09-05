@@ -23,25 +23,20 @@ import {
 import type { VideoPlayerStore } from "@videojs/react";
 import { useConfigurationContext } from "src/hooks/config";
 import { isIOS, type PlayerSource } from "./player-utils";
-import { injectReloadNonce } from "./scene-player-source-url";
-import { useFreezeFrameOverlay } from "./use-freeze-frame-overlay";
-import { isHlsPlaylist, getHlsEngine, flushAndRestartAt } from "./hls";
+import { scenePlayerSourceURL } from "./scene-player-source-url";
+import { usePlayerTransitionFeedback } from "./use-player-transition-feedback";
+import { usePlayerTranscodeSession } from "./use-player-transcode-session";
+import { usePlayerRecovery } from "./use-player-recovery";
+import { planSceneSeek, planSourceResume } from "./scene-player-transitions";
+import { getHlsEngine, flushAndRestartAt } from "./hls";
 import {
   BEST_QUALITY_LABELS,
   QUALITY_STORAGE_KEY,
   computeInitialResume,
   filterSources,
   getPreferredSource,
-  hlsStreamTypeName,
-  injectEndOffset,
-  injectFragmentTime,
-  injectFragmentTimeRange,
-  injectStartOffset,
   isDirectStreamSrc,
   startOffsetStrategyFor,
-  streamResolution,
-  supportsFragmentTime,
-  usesStartOffset,
   type RawStream,
 } from "./scene-player-sources";
 
@@ -263,142 +258,17 @@ export function useScenePlayerSources({
   // wouldn't reassign `<video>.src`, no new `canplay` would arrive, and the
   // loading overlay would remain pinned forever.
   const [reloadNonce, setReloadNonce] = useState(0);
-  const [reloading, setReloadingRaw] = useState(false);
-  // Hold the dim+spinner visible for a minimum window after a source
-  // change begins. With an in-place src swap the new playlist's first
-  // `canplay` can fire within a frame or two of the state update,
-  // leaving the spinner's opacity-1 paint indistinguishable from no
-  // spinner at all. Anchoring the clear to a min-duration timer ensures
-  // the user actually sees the loading affordance before the new video
-  // takes over.
-  const RELOADING_MIN_DURATION_MS = 250;
-  const reloadingStartTsRef = useRef<number | null>(null);
-  const reloadingClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
-  const setReloading = useCallback((value: boolean) => {
-    if (value) {
-      if (reloadingClearTimerRef.current) {
-        clearTimeout(reloadingClearTimerRef.current);
-        reloadingClearTimerRef.current = null;
-      }
-      reloadingStartTsRef.current = performance.now();
-      setReloadingRaw(true);
-      return;
-    }
-    const elapsed = performance.now() - (reloadingStartTsRef.current ?? 0);
-    const remaining = RELOADING_MIN_DURATION_MS - elapsed;
-    if (remaining <= 0) {
-      reloadingStartTsRef.current = null;
-      setReloadingRaw(false);
-      return;
-    }
-    if (reloadingClearTimerRef.current) {
-      clearTimeout(reloadingClearTimerRef.current);
-    }
-    reloadingClearTimerRef.current = setTimeout(() => {
-      reloadingClearTimerRef.current = null;
-      reloadingStartTsRef.current = null;
-      setReloadingRaw(false);
-    }, remaining);
-  }, []);
-  useEffect(
-    () => () => {
-      if (reloadingClearTimerRef.current) {
-        clearTimeout(reloadingClearTimerRef.current);
-      }
-    },
-    [],
-  );
-
-  // Freeze-frame canvas: snapshots the current `<video>` frame just
-  // before the state setters fire, so the engine-detach / blob-URL-
-  // swap path (which natively goes black) sits under the captured
-  // pixels instead of nothing. Cleared in `handleCanPlay` once the
-  // new source is decoding. Direct-stream in-buffer seeks don't go
-  // through this — the browser holds the last frame natively. See
-  // `use-freeze-frame-overlay.tsx` for the canvas-content vs.
-  // opacity-toggle rationale.
   const {
-    canvasElement: freezeFrameCanvas,
-    captureFrame,
-    clear: clearCapturedFrame,
-  } = useFreezeFrameOverlay({
-    rootRef,
-    fileWidth,
-    fileHeight,
+    reloading,
     setReloading,
-  });
-
-  // Replaces `beginSourceRemount` from the original variant. With an
-  // in-place src swap the helper is: snapshot the current frame for
-  // the freeze-frame canvas, flip the spinner, commit the state.
-  // No <video> abort (HlsJsMedia hands the new URL to the active engine,
-  // or replaces that engine when its start-position config changes) and
-  // no rAF defer (the canvas masks first paint via z-ordering, not
-  // opacity timing).
-  const beginSourceRemount = useCallback(
-    (applyChanges: () => void) => {
-      captureFrame();
-      setReloading(true);
-      applyChanges();
-    },
-    [captureFrame, setReloading],
-  );
-
-  // While a seek is in flight, the player UI displays this value
-  // instead of the live `currentTime` — otherwise the time-display and
-  // progress bar bounce to 0:00 / 0% the instant the source URL swap
-  // detaches the old MediaSource (which resets `video.currentTime` to
-  // 0 until the new source's `loadedmetadata` pre-positions it back to
-  // the target). The display target stays pinned for the entire
-  // `reloading` window (covers both in-buffer direct seeks and
-  // out-of-buffer remount seeks), then clears with a short fade so the
-  // live `currentTime` can take back over once playback resumes.
-  const [seekDisplayTarget, setSeekDisplayTarget] = useState<number | null>(
-    null,
-  );
-  const seekDisplayClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
-  const armSeekDisplay = useCallback((target: number) => {
-    if (seekDisplayClearTimerRef.current) {
-      clearTimeout(seekDisplayClearTimerRef.current);
-      seekDisplayClearTimerRef.current = null;
-    }
-    setSeekDisplayTarget(target);
-  }, []);
-  // Clear the display target shortly after `reloading` flips false.
-  // The brief delay lets the player render one frame at the resume
-  // position before swapping from `seekDisplayTarget` back to the live
-  // `currentTime`, which avoids a visible bounce when the
-  // post-`canPlay` `currentTime` update lags the spinner-clear by a
-  // few ms.
-  useEffect(() => {
-    if (reloading) return;
-    if (seekDisplayTarget == null) return;
-    if (seekDisplayClearTimerRef.current) {
-      clearTimeout(seekDisplayClearTimerRef.current);
-    }
-    seekDisplayClearTimerRef.current = setTimeout(() => {
-      seekDisplayClearTimerRef.current = null;
-      setSeekDisplayTarget(null);
-    }, 100);
-    return () => {
-      if (seekDisplayClearTimerRef.current) {
-        clearTimeout(seekDisplayClearTimerRef.current);
-        seekDisplayClearTimerRef.current = null;
-      }
-    };
-  }, [reloading, seekDisplayTarget]);
-  useEffect(
-    () => () => {
-      if (seekDisplayClearTimerRef.current) {
-        clearTimeout(seekDisplayClearTimerRef.current);
-      }
-    },
-    [],
-  );
+    freezeFrameCanvas,
+    captureFrame,
+    clearCapturedFrame,
+    beginSourceRemount,
+    seekDisplayTarget,
+    armSeekDisplay,
+    awaitSeekReady,
+  } = usePlayerTransitionFeedback({ rootRef, storeRef, fileWidth, fileHeight });
 
   // `wasPaused: !allowAutoplay` on the initial / scene-change resume so
   // a deep-link `?t=` doesn't autoplay when the user has the global
@@ -438,67 +308,10 @@ export function useScenePlayerSources({
   const activeSource = manualSource ?? getPreferredSource(sources);
   const activeSrc = activeSource?.src;
 
-  const finalSrc = useMemo(() => {
-    // The cachebuster is added only to the playlist / file URL. HLS segment
-    // URIs don't carry it, so only the playlist re-fetch is forced.
-    const withReloadNonce = (url: string): string =>
-      injectReloadNonce(url, reloadNonce);
-    if (!activeSrc) return undefined;
-    if (usesStartOffset(activeSrc)) {
-      // HLS: encode the desired scene-time start position into the URL
-      // as `?start=N`. The frontend parses this back out in
-      // `StableHlsVideo` to set hls.js `config.startPosition`, so the
-      // FIRST segment request lands on the segment containing N (no
-      // segment-0 cold-start detour). Server-side, the value is
-      // ignored for playlist generation when `?end=` is absent (the
-      // playlist always covers segments 0..last) — see
-      // `serveHLSManifestFMP4`.
-      //
-      // For the marker / clip case (clipRange set), `?start=` is
-      // pinned to `clipRange.start` (NOT the live playhead) so the
-      // server's playlist always covers the full clip [start, end].
-      // Otherwise a mid-clip resolution swap would walk the playlist
-      // floor forward to the playhead, leaving the clip's earlier
-      // range unreachable until the user re-opens the marker. `?end=`
-      // pins the upper bound. Together they trim to
-      // `[⌊start/segDur⌋, ⌈end/segDur⌉-1]`, MSE-time rebases to 0 at
-      // the clip start, and native iOS fullscreen sees only the clip
-      // range as seekable.
-      const trim = clipRange ? clipRange.start : (fragmentTime ?? 0);
-      let url = injectStartOffset(activeSrc, trim);
-      if (clipRange) {
-        url = injectEndOffset(url, clipRange.end);
-      }
-      return withReloadNonce(url);
-    }
-    if (
-      clipRange &&
-      isDirectStreamSrc(activeSrc) &&
-      supportsFragmentTime(activeSrc)
-    ) {
-      // Direct-stream marker on non-iOS browsers (the sources
-      // candidate filter above drops direct stream from clip mode on
-      // iOS). Use the Media Fragments URI temporal range `#t=N,M`:
-      // browsers respecting it seek to N at load and stop playback at
-      // M. Combined with `PlaybackRangeEffect`'s scene-time stop, the
-      // clip boundary is enforced both natively and at the React
-      // layer. Our custom fullscreen (`Element.requestFullscreen` on
-      // the player container) keeps the clipRange-aware custom
-      // controls visible, so the fullscreen slider already reads
-      // clip-relative — no `video.duration` rewrite needed.
-      return withReloadNonce(
-        injectFragmentTimeRange(activeSrc, clipRange.start, clipRange.end),
-      );
-    }
-    if (
-      fragmentTime != null &&
-      fragmentTime > 0 &&
-      supportsFragmentTime(activeSrc)
-    ) {
-      return withReloadNonce(injectFragmentTime(activeSrc, fragmentTime));
-    }
-    return withReloadNonce(activeSrc);
-  }, [activeSrc, fragmentTime, clipRange, reloadNonce]);
+  const finalSrc = useMemo(
+    () => scenePlayerSourceURL(activeSrc, fragmentTime, clipRange, reloadNonce),
+    [activeSrc, fragmentTime, clipRange, reloadNonce],
+  );
 
   // A metadata edit keeps every stream endpoint URL stable, but the bytes
   // behind it have changed. Bump the existing cachebuster and use the same
@@ -528,24 +341,14 @@ export function useScenePlayerSources({
         isClipped,
         clipRange,
       );
-      if (strategy) {
-        const split = strategy.planResume(trueTime);
-        pendingResumeRef.current = {
-          wasPaused,
-          seekTo: split.seekTo,
-          playbackRate,
-        };
-        setOffsetStart(split.offset);
-        setFragmentTime(split.seekTo);
-      } else {
-        pendingResumeRef.current = {
-          wasPaused,
-          seekTo: trueTime,
-          playbackRate,
-        };
-        setOffsetStart(0);
-        setFragmentTime(trueTime > 0 ? trueTime : null);
-      }
+      const resume = planSourceResume(strategy, trueTime);
+      pendingResumeRef.current = {
+        wasPaused,
+        playbackRate,
+        seekTo: resume.seekTo,
+      };
+      setOffsetStart(resume.offset);
+      setFragmentTime(resume.fragmentTime);
       setReloadNonce((nonce) => nonce + 1);
     });
   }, [
@@ -634,31 +437,15 @@ export function useScenePlayerSources({
           isClipped,
           clipRange,
         );
-        if (newStrategy) {
-          const split = newStrategy.planResume(trueTime);
-          pendingResumeRef.current = {
-            wasPaused,
-            seekTo: split.seekTo,
-            playbackRate,
-          };
-          setOffsetStart(split.offset);
-          setFragmentTime(split.seekTo);
-          setManualSource(source);
-        } else {
-          // Direct stream (no HLS-style strategy). `<video>.currentTime`
-          // reads as scene-time directly — for clipped mode the URL
-          // carries `#t=start,end` which constrains playback to the
-          // range but doesn't rebase the timeline. So `offsetStart`
-          // stays at 0.
-          pendingResumeRef.current = {
-            wasPaused,
-            seekTo: trueTime,
-            playbackRate,
-          };
-          setOffsetStart(0);
-          setFragmentTime(trueTime > 0 ? trueTime : null);
-          setManualSource(source);
-        }
+        const resume = planSourceResume(newStrategy, trueTime);
+        pendingResumeRef.current = {
+          wasPaused,
+          playbackRate,
+          seekTo: resume.seekTo,
+        };
+        setOffsetStart(resume.offset);
+        setFragmentTime(resume.fragmentTime);
+        setManualSource(source);
       });
     },
     [
@@ -673,197 +460,61 @@ export function useScenePlayerSources({
     ],
   );
 
-  // Hold the dim+spinner up through an in-place seek (no player-root
-  // remount) until the new position is actually decoding frames.
-  //
-  // The caller is expected to have already paused the video and called
-  // `s.seek(...)` so the spinner overlays a frozen frame instead of an
-  // old-position video that keeps playing under the dim. After `seeked`
-  // fires (frame at target is decoded), this helper either:
-  //   - calls `s.play()` and waits for the `playing` event to clear
-  //     the spinner (`shouldResume` — slider seek that was playing,
-  //     or marker-tap which always wants playback), or
-  //   - clears the spinner immediately on `seeked` (paused-state seek;
-  //     no `playing` event will ever fire).
-  // A 5 s safety timeout catches the rare case where neither fires
-  // (e.g. seek aborted by a follow-up source change). Combined with
-  // the 250 ms minimum duration baked into `setReloading`, this gives
-  // short in-buffer seeks a brief flicker and long out-of-buffer seeks
-  // the full dim+spinner through the buffer wait — all paths converge
-  // to "old frame holds, spinner shows, new position plays, spinner
-  // clears".
-  const awaitSeekReady = useCallback(
-    (video: HTMLVideoElement, shouldResume: boolean) => {
-      let cleared = false;
-      const clear = () => {
-        if (cleared) return;
-        cleared = true;
-        video.removeEventListener("seeked", onSeeked);
-        video.removeEventListener("playing", onPlaying);
-        clearTimeout(timeoutId);
-        // Idempotent — direct-seek paths don't snapshot, so this is a
-        // no-op there. Guards the case where a captured frame survived
-        // a follow-up direct seek without going through handleCanPlay.
-        clearCapturedFrame();
+  // Effects apply the selected transition in a fixed order. The root and video
+  // remain mounted; only a source reload asks the bridge for a fresh engine.
+  const performSeek = useCallback(
+    (targetTime: number, intent: "seek" | "restart") => {
+      const store = storeRef.current;
+      if (!store || !activeSrc) return;
+      const engine = getHlsEngine(mediaRef.current);
+      const transition = planSceneSeek({
+        intent,
+        targetTime,
+        duration: fileDuration,
+        offsetStart,
+        src: activeSrc,
+        frameRate,
+        clipRange,
+        mediaState: store.state,
+        ios: isIOS(),
+        hasHlsEngine: engine !== null,
+      });
+      if (intent === "seek") armSeekDisplay(transition.sceneTime);
+      const wasPaused = intent === "restart" ? false : store.state.paused;
+      const playbackRate =
+        intent === "seek" ? store.state.playbackRate : undefined;
+      store.pause();
+
+      if (transition.kind === "reload-source") {
+        beginSourceRemount(() => {
+          const { resume } = transition;
+          pendingResumeRef.current = {
+            wasPaused,
+            playbackRate,
+            seekTo: resume.seekTo,
+          };
+          setOffsetStart(resume.offset);
+          setFragmentTime(resume.fragmentTime);
+          // A reload must change the URL even if the requested time is unchanged.
+          setReloadNonce((nonce) => nonce + 1);
+        });
+        return;
+      }
+
+      if (transition.kind === "restart-engine") captureFrame();
+      setReloading(true);
+      if (transition.kind === "restart-engine" && engine) {
+        flushAndRestartAt(engine, transition.mediaTime);
+      }
+      // Seek after flushing, so the write targets the clean buffer state.
+      void store.seek(transition.mediaTime);
+      const video = rootRef.current?.querySelector("video");
+      if (video instanceof HTMLVideoElement) {
+        awaitSeekReady(video, !wasPaused);
+      } else {
+        if (!wasPaused) void store.play();
         setReloading(false);
-      };
-      const onSeeked = () => {
-        if (shouldResume) {
-          // Restart playback; spinner clears once the new position is
-          // actually decoding frames (`playing` event below).
-          storeRef.current?.play();
-        } else {
-          // Stay paused — clear immediately, no `playing` event will
-          // ever fire to release the spinner otherwise.
-          clear();
-        }
-      };
-      const onPlaying = () => clear();
-      const timeoutId = setTimeout(clear, 5000);
-      video.addEventListener("seeked", onSeeked, { once: true });
-      video.addEventListener("playing", onPlaying, { once: true });
-    },
-    [setReloading, storeRef, clearCapturedFrame],
-  );
-
-  const handleSeek = useCallback(
-    (targetTrueTime: number) => {
-      const s = storeRef.current;
-      if (!s || !activeSrc) {
-        return;
       }
-      const maxT = fileDuration ?? Infinity;
-      const clamped = Math.max(0, Math.min(targetTrueTime, maxT));
-      armSeekDisplay(clamped);
-
-      // Both seek paths below run the same dim+spinner sequence so
-      // in-buffer slider seeks and out-of-buffer/before-trim seeks feel
-      // identical: pause + frame holds + spinner + dim during the seek
-      // / buffer wait, then resume the moment the new position is
-      // decoding. Pausing up-front matters visually — without it, the
-      // old position keeps playing under the dim while the spinner
-      // spins, which reads as "the player ignored my seek".
-      const runDirectSeek = (mediaTime: number) => {
-        const wasPlaying = !s.state.paused;
-        s.pause();
-        setReloading(true);
-        void s.seek(mediaTime);
-        const video = rootRef.current?.querySelector("video");
-        if (video instanceof HTMLVideoElement) {
-          awaitSeekReady(video, wasPlaying);
-        } else {
-          if (wasPlaying) void s.play();
-          setReloading(false);
-        }
-      };
-
-      const strategy = startOffsetStrategyFor(
-        activeSrc,
-        frameRate,
-        isClipped,
-        clipRange,
-      );
-      // Translate scene-time → media-element time before handing to
-      // `runDirectSeek`. For direct stream (no HLS strategy):
-      //   - non-clip: offsetStart=0, targetInternal == clamped (scene-time).
-      //   - clip: offsetStart=clipStart, targetInternal is clip-relative
-      //     time, which is what `<clip.mp4>`'s `<video>.currentTime`
-      //     expects.
-      // For HLS: targetInternal is MSE-time (scene-time minus
-      // segment-aligned trim) — what hls.js's `s.seek` writes.
-      const targetInternal = clamped - offsetStart;
-      if (!strategy) {
-        runDirectSeek(targetInternal);
-        return;
-      }
-
-      if (strategy.canSeekDirectly(targetInternal, s)) {
-        runDirectSeek(targetInternal);
-        return;
-      }
-
-      // canSeekDirectly returned false — needs an hls.js reset.
-      //
-      // Two reset paths depending on whether the playlist is clipped:
-      //
-      // (1) Non-clipped (full playlist): in-place flush + restart on
-      //     the EXISTING hls.js instance. The MediaSource stays
-      //     attached, so the `<video>` element holds its last decoded
-      //     frame natively during the catch-up window. Critical for
-      //     iOS Safari native fullscreen where our React-side canvas
-      //     mask is invisible and any MediaSource detach would flash
-      //     black.
-      //
-      //     `flushAndRestartAt` calls `engine.stopLoad()`,
-      //     `engine.trigger("hlsBufferFlushing", ...)` to clear stale
-      //     SourceBuffer contents, then `engine.startLoad(target)` to
-      //     reorient the segment scheduler. We avoid the
-      //     `detachMedia/attachMedia` sequence that
-      //     `InterstitialsController` interferes with by tracking and
-      //     restoring playback position across re-attach.
-      //
-      // (2) Clipped (marker / clip mode): the source URL has to
-      //     change because the playlist's segment range is encoded in
-      //     `?start=&end=`. URL-change → our bridge reassigns
-      //     `HlsJsMedia.src` and start-position config → `load()`
-      //     destroys + recreates the
-      //     `HlsJsMedia` delegate. Freeze-frame canvas masks the
-      //     brief MSE-teardown.
-      // The in-place flush+restart path doesn't survive iOS Safari:
-      // hls.js's BUFFER_FLUSHING + appendBuffer cycle against the MMS
-      // SourceBuffer leaves `video.buffered` stuck at empty after a
-      // far-forward seek, and playback never resumes (readyState
-      // pinned at 1 indefinitely). The behaviour is the same in or
-      // out of native fullscreen — iOS's ManagedMediaSource doesn't
-      // recover from a mid-flight flush the way desktop MSE does. We
-      // fall back to a URL-change remount on every iOS far-seek (new
-      // `?start=<target>` → fresh hls.js engine with
-      // `config.startPosition = target` cold-starts at the right
-      // fragment). Briefly flashes the freeze-frame canvas instead of
-      // a clean in-place reset, but completes correctly. Every
-      // non-iOS context (desktop / Android Chrome) stays on the
-      // in-place path.
-      const engine =
-        !isClipped && !isIOS() ? getHlsEngine(mediaRef.current) : null;
-      if (engine) {
-        const wasPlaying = !s.state.paused;
-        s.pause();
-        captureFrame();
-        setReloading(true);
-        flushAndRestartAt(engine, targetInternal);
-        // Set currentTime AFTER stopLoad/flush so the seek lands on
-        // the new (clean) buffer state. hls.js's natural seek handler
-        // will pick up the new currentTime; `startLoad(target)` has
-        // already told the scheduler where to fetch from.
-        void s.seek(targetInternal);
-        const video = rootRef.current?.querySelector("video");
-        if (video instanceof HTMLVideoElement) {
-          awaitSeekReady(video, wasPlaying);
-        } else {
-          if (wasPlaying) void s.play();
-          setReloading(false);
-        }
-        return;
-      }
-
-      // Clipped or iOS fallback (no in-place engine reset): URL change.
-      const wasPausedAtSeek = s.state.paused;
-      const playbackRateAtSeek = s.state.playbackRate;
-      s.pause();
-      beginSourceRemount(() => {
-        const split = strategy.planResume(clamped);
-        pendingResumeRef.current = {
-          wasPaused: wasPausedAtSeek,
-          seekTo: split.seekTo,
-          playbackRate: playbackRateAtSeek,
-        };
-        setOffsetStart(split.offset);
-        setFragmentTime(split.seekTo);
-        // This branch promises an engine reset. `split.seekTo` may equal
-        // the current fragment target (especially when clamped to 0), so
-        // make the playlist URL change independently of the seek value.
-        setReloadNonce((nonce) => nonce + 1);
-      });
     },
     [
       activeSrc,
@@ -875,109 +526,19 @@ export function useScenePlayerSources({
       mediaRef,
       storeRef,
       frameRate,
-      isClipped,
       clipRange,
       rootRef,
       awaitSeekReady,
       setReloading,
     ],
   );
-
+  const handleSeek = useCallback(
+    (time: number) => performSeek(time, "seek"),
+    [performSeek],
+  );
   const handleRestart = useCallback(
-    (targetTrueTime: number) => {
-      const s = storeRef.current;
-      if (!s || !activeSrc) {
-        return;
-      }
-      const max =
-        fileDuration != null && fileDuration > 0 ? fileDuration : Infinity;
-      const clamped = Math.max(0, Math.min(targetTrueTime, max));
-
-      const strategy = startOffsetStrategyFor(
-        activeSrc,
-        frameRate,
-        isClipped,
-        clipRange,
-      );
-      const targetInternal = clamped - offsetStart;
-
-      // Direct path: the current playlist already covers `clamped`.
-      // Pause + seek up-front so the dim+spinner overlay sits over a
-      // frozen frame instead of an old-position video that keeps
-      // playing under it; `awaitSeekReady` calls `s.play()` once the
-      // seek completes (`seeked` event) and clears the spinner once
-      // playback actually resumes (`playing` event). The play call
-      // running outside the click handler is fine — iOS's "user
-      // activation" carries for ~5 s past the tap, and the in-buffer
-      // direct path resolves `seeked` within milliseconds.
-      if (
-        !strategy ||
-        (targetInternal >= 0 && strategy.canSeekDirectly(targetInternal, s))
-      ) {
-        s.pause();
-        setReloading(true);
-        void s.seek(Math.max(0, targetInternal));
-        const video = rootRef.current?.querySelector("video");
-        if (video instanceof HTMLVideoElement) {
-          awaitSeekReady(video, true);
-        } else {
-          void s.play();
-          setReloading(false);
-        }
-        return;
-      }
-
-      // canSeekDirectly returned false. Two paths — same split as
-      // handleSeek: in-place flush+restart for non-iOS non-clipped
-      // (keeps the MediaSource attached, video shows last decoded
-      // frame natively), URL-change remount for clipped or iOS
-      // (playlist range must change, or MMS can't recover from a
-      // mid-flight flush — see handleSeek for the full rationale).
-      const engine =
-        !isClipped && !isIOS() ? getHlsEngine(mediaRef.current) : null;
-      if (engine) {
-        const target = Math.max(0, targetInternal);
-        s.pause();
-        captureFrame();
-        setReloading(true);
-        flushAndRestartAt(engine, target);
-        void s.seek(target);
-        const video = rootRef.current?.querySelector("video");
-        if (video instanceof HTMLVideoElement) {
-          awaitSeekReady(video, true);
-        } else {
-          void s.play();
-          setReloading(false);
-        }
-        return;
-      }
-      s.pause();
-      beginSourceRemount(() => {
-        const split = strategy.planResume(clamped);
-        pendingResumeRef.current = {
-          wasPaused: false,
-          seekTo: split.seekTo,
-        };
-        setOffsetStart(split.offset);
-        setFragmentTime(split.seekTo);
-        setReloadNonce((nonce) => nonce + 1);
-      });
-    },
-    [
-      activeSrc,
-      offsetStart,
-      fileDuration,
-      beginSourceRemount,
-      captureFrame,
-      mediaRef,
-      storeRef,
-      frameRate,
-      isClipped,
-      clipRange,
-      rootRef,
-      awaitSeekReady,
-      setReloading,
-    ],
+    (time: number) => performSeek(time, "restart"),
+    [performSeek],
   );
 
   // Force a URL-change remount at `targetTrueTime` (scene-time)
@@ -1008,26 +569,14 @@ export function useScenePlayerSources({
       const playbackRate = s.state.playbackRate;
       s.pause();
       beginSourceRemount(() => {
-        if (strategy) {
-          const split = strategy.planResume(clamped);
-          pendingResumeRef.current = {
-            wasPaused: false,
-            seekTo: split.seekTo,
-            playbackRate,
-          };
-          setOffsetStart(split.offset);
-          setFragmentTime(split.seekTo);
-        } else {
-          // Direct stream: <video>.currentTime is scene-time, offsetStart
-          // stays 0. The cachebuster (below) is what makes the URL change.
-          pendingResumeRef.current = {
-            wasPaused: false,
-            seekTo: clamped,
-            playbackRate,
-          };
-          setOffsetStart(0);
-          setFragmentTime(clamped > 0 ? clamped : null);
-        }
+        const resume = planSourceResume(strategy, clamped);
+        pendingResumeRef.current = {
+          wasPaused: false,
+          playbackRate,
+          seekTo: resume.seekTo,
+        };
+        setOffsetStart(resume.offset);
+        setFragmentTime(resume.fragmentTime);
         setReloadNonce((n) => n + 1);
       });
     },
@@ -1169,446 +718,15 @@ export function useScenePlayerSources({
     clearCapturedFrame,
   ]);
 
-  // Fire `navigator.sendBeacon` to release any HLS transcode the
-  // server has running for this scene when:
-  //   - The active source switches from HLS to a non-HLS source
-  //     (direct stream). The server-side sibling-kill in
-  //     `ServeSegment` doesn't fire for this case because direct
-  //     stream doesn't go through `ServeSegment`.
-  //   - The player unmounts (tab close, page navigation).
-  //
-  // We deliberately SKIP the beacon for HLS→HLS swaps. The
-  // sibling-kill handles those server-side and would otherwise race
-  // with the beacon — if the beacon arrived after the new stream's
-  // first segment request, it would tear down the freshly-created
-  // stream too. For HLS→non-HLS and unmount, no new HLS stream is
-  // about to be created, so killing every HLS stream for the scene
-  // is safe.
-  //
-  // `finalSrcRef` mirrors the current `finalSrc` synchronously each
-  // render so the cleanup callback can see the *new* value (the
-  // source we're transitioning TO) and skip the beacon when it's
-  // still HLS.
-  const finalSrcRef = useRef(finalSrc);
-  finalSrcRef.current = finalSrc;
-  const sceneIdRef = useRef(scene.id);
-  sceneIdRef.current = scene.id;
-  useEffect(() => {
-    if (!finalSrc || !isHlsPlaylist(finalSrc)) return;
-    const sendStop = (keepUrl?: string) => {
-      try {
-        let url = `/scene/${sceneIdRef.current}/streams.stop`;
-        if (keepUrl) {
-          const keepType = hlsStreamTypeName(keepUrl);
-          if (keepType) {
-            const params = new URLSearchParams({ keep_type: keepType });
-            const keepRes = streamResolution(keepUrl);
-            if (keepRes) params.set("keep_resolution", keepRes);
-            url = `${url}?${params.toString()}`;
-          }
-        }
-        navigator.sendBeacon(url);
-      } catch {
-        /* best-effort — if sendBeacon isn't supported, the
-           server-side idle timeout still cleans up after `maxIdleTime` */
-      }
-    };
-    // `pagehide` covers the cases React unmount can't see: tab close,
-    // navigation away from the SPA, browser back/forward, hard
-    // refresh. Fires *during* unload, which is exactly what
-    // `sendBeacon` is designed for. Not using `beforeunload` because
-    // it can trigger a "leave site?" prompt on some browsers.
-    const onPageHide = () => sendStop();
-    window.addEventListener("pagehide", onPageHide);
-    return () => {
-      window.removeEventListener("pagehide", onPageHide);
-      // At cleanup time, `finalSrcRef.current` holds the value
-      // we're transitioning to (or the unchanged last value, on
-      // unmount).
-      const next = finalSrcRef.current;
-      if (next && isHlsPlaylist(next) && next !== finalSrc) {
-        // HLS → another HLS source (resolution / variant swap). Tell
-        // the server which stream we're transitioning TO so it can
-        // tear down the old one immediately without touching the
-        // freshly-starting new one. The `ServeSegment` sibling-kill
-        // still backs us up if the beacon races or is dropped.
-        sendStop(next);
-        return;
-      }
-      sendStop();
-    };
-  }, [finalSrc]);
-
-  // HLS transcode keepalive. While the player is paused, segment
-  // fetches stop, and the server reaps the transcode after
-  // `maxIdleTime` (`pkg/ffmpeg/stream_segmented.go`). On resume the
-  // user then sees a buffer-exhaust → forced remount path that's
-  // visibly clunky. This effect prevents that by POSTing
-  // `/streams.keepalive` every ~15 s while the live `<video>` is
-  // paused, which bumps `lastAccessed` server-side without
-  // requesting any actual media. During playback we send nothing —
-  // segment fetches keep the timestamp fresh on their own.
-  //
-  // No-op when the active source is non-HLS (direct stream isn't
-  // backed by a transcode process; the watchdog handles its idle
-  // socket case separately) or when the page is hidden (iOS
-  // background tab restrictions can throttle / block fetch; nothing
-  // to keep alive when the user isn't there anyway).
-  useEffect(() => {
-    if (!finalSrc || !isHlsPlaylist(finalSrc)) return;
-    const root = rootRef.current;
-    if (!root) return;
-
-    const KEEPALIVE_INTERVAL_MS = 15000;
-    const keepType = hlsStreamTypeName(finalSrc);
-    if (!keepType) return;
-    const keepRes = streamResolution(finalSrc);
-    const params = new URLSearchParams({ keep_type: keepType });
-    if (keepRes) params.set("keep_resolution", keepRes);
-    const sceneId = sceneIdRef.current;
-    const url = `/scene/${sceneId}/streams.keepalive?${params.toString()}`;
-
-    let attachedVideo: HTMLVideoElement | null = null;
-    let intervalId: ReturnType<typeof setInterval> | null = null;
-
-    const ping = () => {
-      if (typeof document !== "undefined" && document.hidden) return;
-      try {
-        void fetch(url, { method: "POST", keepalive: true });
-      } catch {
-        /* best-effort — server's idle timeout is the safety net */
-      }
-    };
-    const start = () => {
-      if (intervalId != null) return;
-      // Fire once immediately so a quick pause→resume after a long
-      // idle (e.g. user just got back from being away) refreshes the
-      // timestamp before the first 15 s tick.
-      ping();
-      intervalId = setInterval(ping, KEEPALIVE_INTERVAL_MS);
-    };
-    const stop = () => {
-      if (intervalId == null) return;
-      clearInterval(intervalId);
-      intervalId = null;
-    };
-
-    const onPause = () => start();
-    const onPlay = () => stop();
-
-    const attach = (video: HTMLVideoElement) => {
-      if (attachedVideo === video) return;
-      if (attachedVideo) detach(attachedVideo);
-      attachedVideo = video;
-      video.addEventListener("pause", onPause);
-      video.addEventListener("play", onPlay);
-      if (video.paused) start();
-    };
-    const detach = (video: HTMLVideoElement) => {
-      video.removeEventListener("pause", onPause);
-      video.removeEventListener("play", onPlay);
-    };
-
-    const current = root.querySelector("video");
-    if (current instanceof HTMLVideoElement) attach(current);
-
-    const observer = new MutationObserver(() => {
-      const next = root.querySelector("video");
-      if (next instanceof HTMLVideoElement && next !== attachedVideo) {
-        attach(next);
-      } else if (!next && attachedVideo) {
-        detach(attachedVideo);
-        attachedVideo = null;
-        stop();
-      }
-    });
-    observer.observe(root, { childList: true, subtree: true });
-
-    return () => {
-      observer.disconnect();
-      if (attachedVideo) detach(attachedVideo);
-      stop();
-    };
-  }, [finalSrc, rootRef]);
-
-  // Intercept native `seeking` events on the `<video>` element. iOS
-  // Safari's native fullscreen player drives `video.currentTime`
-  // directly (the user drags the OS slider, the player sets
-  // currentTime, no `handleSeek` callsite runs). For HLS, big native
-  // seeks land outside the buffered range and trigger the same hls.js
-  // scheduler stall we work around for our custom-UI seeks — in-flight
-  // fragment loads complete at the OLD MSE position, playback never
-  // resumes at the new currentTime.
-  //
-  // The fix mirrors what we'd do if the seek came through our slider:
-  // when the user has stopped scrubbing (no `seeking` events for
-  // 250 ms) and the final `currentTime` is outside `buffered`, route
-  // it through `handleSeek` for the URL-change remount. `reloading`
-  // guards against re-entry — once our remount starts, the listener
-  // ignores the resulting cascade of programmatic seeking events from
-  // the engine swap.
-  const reloadingRef = useRef(reloading);
-  reloadingRef.current = reloading;
-  const offsetStartRef = useRef(offsetStart);
-  offsetStartRef.current = offsetStart;
-  const handleSeekRef = useRef(handleSeek);
-  handleSeekRef.current = handleSeek;
-  useEffect(() => {
-    if (!finalSrc || !isHlsPlaylist(finalSrc)) return;
-    const root = rootRef.current;
-    if (!root) return;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    let attachedVideo: HTMLVideoElement | null = null;
-
-    const isInBuffered = (target: number, buffered: TimeRanges): boolean => {
-      for (let i = 0; i < buffered.length; i++) {
-        if (target >= buffered.start(i) && target <= buffered.end(i)) {
-          return true;
-        }
-      }
-      return false;
-    };
-
-    const onSeeking = (e: Event) => {
-      if (reloadingRef.current) return;
-      const video = e.currentTarget;
-      if (!(video instanceof HTMLVideoElement)) return;
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
-        timer = null;
-        if (reloadingRef.current) return;
-        const target = video.currentTime;
-        if (isInBuffered(target, video.buffered)) return;
-        // `target` is MSE-time. handleSeek expects scene-time. For
-        // full playlist `offsetStart === 0`, so the addition is a
-        // no-op; for clipped (marker) sources, it converts.
-        handleSeekRef.current(target + offsetStartRef.current);
-      }, 250);
-    };
-
-    const attach = (video: HTMLVideoElement) => {
-      if (attachedVideo === video) return;
-      if (attachedVideo)
-        attachedVideo.removeEventListener("seeking", onSeeking);
-      attachedVideo = video;
-      video.addEventListener("seeking", onSeeking);
-    };
-
-    const current = root.querySelector("video");
-    if (current instanceof HTMLVideoElement) attach(current);
-
-    // Watch for <video> element replacement (engine swap direct↔HLS
-    // changes the React component type, which destroys + recreates
-    // the underlying <video>).
-    const observer = new MutationObserver(() => {
-      const next = root.querySelector("video");
-      if (next instanceof HTMLVideoElement && next !== attachedVideo) {
-        attach(next);
-      } else if (!next && attachedVideo) {
-        attachedVideo.removeEventListener("seeking", onSeeking);
-        attachedVideo = null;
-      }
-    });
-    observer.observe(root, { childList: true, subtree: true });
-
-    return () => {
-      observer.disconnect();
-      if (attachedVideo)
-        attachedVideo.removeEventListener("seeking", onSeeking);
-      if (timer) clearTimeout(timer);
-    };
-  }, [finalSrc, rootRef]);
-
-  // Stall watchdog. Forces a URL-change remount when either of two
-  // independent progress signals stalls past STALL_THRESHOLD_MS:
-  //
-  //   1. `currentTime` not advancing — engine's connection died
-  //      (transcode reaped after the server's idle window in
-  //      `maxIdleTime`, or mobile browser tore down an idle HTTP
-  //      socket). The user hits play, the resume request goes
-  //      nowhere, no bytes flow.
-  //
-  //   2. `totalVideoFrames` not advancing while `currentTime` is —
-  //      iOS Safari's "ghost playback" state. After a screen
-  //      lock / unlock cycle, ManagedMediaSource can leave the audio
-  //      clock running but the video decoder detached: the seek bar
-  //      advances and audio plays, but the `<video>` shows nothing
-  //      (black frame frozen at lock-time). No `pause`, no `stalled`,
-  //      no `error` — it just looks broken.
-  //
-  // Either failure → `forceRemountAt(currentPlayhead)` to cold-start
-  // a fresh engine / new Range request.
-  //
-  // Only armed AFTER the first `playing` event for the currently
-  // loaded media — during initial cold-start buffering (4K HLS
-  // transcode startup can exceed the threshold) `paused=false` +
-  // `currentTime=0` is the normal autoplay state, not a stall, and
-  // firing the watchdog there would trigger a recovery loop that
-  // never lets buffering complete. `loadstart` disarms again so
-  // every src swap re-enters the cold-start grace window.
-  //
-  // Bounded by a recovery cooldown so a remount that itself stalls
-  // doesn't loop. `reloadingRef` additionally suppresses the
-  // watchdog during the React-side source-change window.
-  const forceRemountAtRef = useRef(forceRemountAt);
-  forceRemountAtRef.current = forceRemountAt;
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!root) return;
-
-    const STALL_THRESHOLD_MS = 4000;
-    const CHECK_INTERVAL_MS = 1000;
-    const RECOVERY_COOLDOWN_MS = 15000;
-    const PROGRESS_EPSILON_S = 0.1;
-
-    let attachedVideo: HTMLVideoElement | null = null;
-    let armed = false;
-    let lastProgressTime = 0;
-    let lastProgressAt = 0;
-    let lastFrameCount = 0;
-    let lastFrameAt = 0;
-    let lastRecoveryAt = 0;
-
-    const readFrameCount = (v: HTMLVideoElement): number | null => {
-      // `getVideoPlaybackQuality` is the standard spec name; iOS
-      // Safari 15+ and every desktop engine implement it. Returns
-      // `null` on the rare browser that doesn't, which disables the
-      // frame-stall check while keeping the time-stall check active.
-      try {
-        return v.getVideoPlaybackQuality?.().totalVideoFrames ?? null;
-      } catch {
-        return null;
-      }
-    };
-
-    const resetBaseline = (v: HTMLVideoElement) => {
-      lastProgressTime = v.currentTime;
-      lastProgressAt = Date.now();
-      const frames = readFrameCount(v);
-      if (frames != null) lastFrameCount = frames;
-      lastFrameAt = Date.now();
-    };
-
-    const onLoadStart = (e: Event) => {
-      // New media resource loading. Disarm so cold-start buffering
-      // (which can exceed the stall threshold for 4K HLS transcodes)
-      // doesn't trigger recovery; will re-arm on the next `playing`.
-      armed = false;
-      const v = e.currentTarget;
-      if (v instanceof HTMLVideoElement) resetBaseline(v);
-    };
-    const onPlaying = (e: Event) => {
-      armed = true;
-      const v = e.currentTarget;
-      if (v instanceof HTMLVideoElement) resetBaseline(v);
-    };
-    const onPlay = (e: Event) => {
-      const v = e.currentTarget;
-      if (v instanceof HTMLVideoElement) resetBaseline(v);
-    };
-    const onTimeUpdate = (e: Event) => {
-      const v = e.currentTarget;
-      if (!(v instanceof HTMLVideoElement)) return;
-      if (Math.abs(v.currentTime - lastProgressTime) > PROGRESS_EPSILON_S) {
-        resetBaseline(v);
-      }
-    };
-    const onSeeking = (e: Event) => {
-      // Resets the progress baseline — seek arrivals at the new
-      // position aren't "stall recovery"; they're the user moving the
-      // playhead.
-      const v = e.currentTarget;
-      if (v instanceof HTMLVideoElement) resetBaseline(v);
-    };
-
-    const intervalId = setInterval(() => {
-      const v = attachedVideo;
-      if (!v || !armed || v.paused || reloadingRef.current) return;
-      // Skip while the page is hidden (iPhone screen locked / tab
-      // backgrounded). Frame-count progress legitimately stalls
-      // there because the compositor isn't drawing, and
-      // `forceRemountAt` would issue network requests that may be
-      // throttled / fail under iOS background restrictions. The
-      // `visibilitychange` handler below resets the baselines on
-      // resume so the 4 s grace window applies after the user comes
-      // back, not from when they left.
-      if (typeof document !== "undefined" && document.hidden) return;
-      const now = Date.now();
-      // Refresh the frame-count baseline. Done in-loop rather than
-      // via an event because there's no DOM event for decoded-frame
-      // progress — iOS only exposes the cumulative counter.
-      const frames = readFrameCount(v);
-      if (frames != null && frames > lastFrameCount) {
-        lastFrameCount = frames;
-        lastFrameAt = now;
-      }
-      const timeStalledMs = now - lastProgressAt;
-      const framesStalledMs = frames != null ? now - lastFrameAt : 0;
-      if (
-        timeStalledMs < STALL_THRESHOLD_MS &&
-        framesStalledMs < STALL_THRESHOLD_MS
-      ) {
-        return;
-      }
-      if (now - lastRecoveryAt < RECOVERY_COOLDOWN_MS) return;
-      lastRecoveryAt = now;
-      const sceneTime = v.currentTime + offsetStartRef.current;
-      forceRemountAtRef.current(sceneTime);
-    }, CHECK_INTERVAL_MS);
-
-    const attach = (video: HTMLVideoElement) => {
-      if (attachedVideo === video) return;
-      if (attachedVideo) detach(attachedVideo);
-      attachedVideo = video;
-      armed = false;
-      video.addEventListener("loadstart", onLoadStart);
-      video.addEventListener("playing", onPlaying);
-      video.addEventListener("play", onPlay);
-      video.addEventListener("timeupdate", onTimeUpdate);
-      video.addEventListener("seeking", onSeeking);
-      resetBaseline(video);
-    };
-    const detach = (video: HTMLVideoElement) => {
-      video.removeEventListener("loadstart", onLoadStart);
-      video.removeEventListener("playing", onPlaying);
-      video.removeEventListener("play", onPlay);
-      video.removeEventListener("timeupdate", onTimeUpdate);
-      video.removeEventListener("seeking", onSeeking);
-    };
-
-    const current = root.querySelector("video");
-    if (current instanceof HTMLVideoElement) attach(current);
-
-    const observer = new MutationObserver(() => {
-      const next = root.querySelector("video");
-      if (next instanceof HTMLVideoElement && next !== attachedVideo) {
-        attach(next);
-      } else if (!next && attachedVideo) {
-        detach(attachedVideo);
-        attachedVideo = null;
-      }
-    });
-    observer.observe(root, { childList: true, subtree: true });
-
-    // Reset progress baselines whenever the page becomes visible
-    // again, so the 4 s stall window starts ticking from "user came
-    // back" rather than "user left." Without this, the watchdog
-    // would immediately fire on resume after a long lock with a
-    // stale `lastFrameAt` from before the screen turned off, even in
-    // cases where the engine recovers on its own within a second.
-    const onVisibility = () => {
-      if (document.hidden) return;
-      if (attachedVideo) resetBaseline(attachedVideo);
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-
-    return () => {
-      observer.disconnect();
-      clearInterval(intervalId);
-      document.removeEventListener("visibilitychange", onVisibility);
-      if (attachedVideo) detach(attachedVideo);
-    };
-  }, [rootRef]);
+  usePlayerTranscodeSession(scene.id, finalSrc, rootRef);
+  usePlayerRecovery({
+    finalSrc,
+    rootRef,
+    reloading,
+    offsetStart,
+    handleSeek,
+    forceRemountAt,
+  });
 
   return {
     sources,

@@ -518,7 +518,7 @@ function ListEntryInput({
   );
 }
 
-/** Static display row (API key, version info) with optional action slot. */
+/** Copyable static value (API key, version info) with optional action slot. */
 export function SettingDisplay({
   label,
   description,
@@ -535,7 +535,12 @@ export function SettingDisplay({
       <FieldContent>
         <FieldLabel>{label}</FieldLabel>
         {value != null && value !== "" && (
-          <div className="text-sm break-all text-muted-foreground">{value}</div>
+          <div
+            className="text-sm break-all text-muted-foreground"
+            data-selectable-text
+          >
+            {value}
+          </div>
         )}
         {description && <FieldDescription>{description}</FieldDescription>}
       </FieldContent>

@@ -71,6 +71,7 @@ export const TagCard: React.FC<TagCardProps> = ({
   return (
     <>
       <EntityCard
+        label={tag.name}
         id={tag.id}
         href={`/tags/${tag.id}`}
         isMobile={isMobile}

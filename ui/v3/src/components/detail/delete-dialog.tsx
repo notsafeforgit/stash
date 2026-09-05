@@ -1,5 +1,6 @@
+import { Label } from "@/components/ui/label";
 import type React from "react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 import { ChevronRight, Trash2 } from "lucide-react";
 import { cn } from "src/lib/utils";
@@ -73,37 +74,25 @@ function DeleteOptionRow({
   label,
   onCheckedChange,
 }: DeleteOptionRowProps) {
-  function handleRowClick(event: React.MouseEvent<HTMLDivElement>) {
-    if (disabled) return;
-
-    const target = event.target;
-    if (
-      target instanceof Element &&
-      (target.closest('[data-slot="checkbox"]') ||
-        target.closest('input[type="checkbox"]'))
-    ) {
-      return;
-    }
-
-    onCheckedChange(!checked);
-  }
+  const controlId = useId();
 
   return (
-    <div
+    <Label
+      htmlFor={controlId}
       className={cn(
         "flex items-center gap-2.5 text-sm",
         disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
       )}
-      onClick={handleRowClick}
     >
       <Checkbox
+        id={controlId}
         aria-label={label}
         checked={checked}
         onCheckedChange={onCheckedChange}
         disabled={disabled}
       />
       <span>{label}</span>
-    </div>
+    </Label>
   );
 }
 
@@ -114,7 +103,7 @@ function DeleteOptionRow({
  */
 export function DeleteFilesList({ paths }: DeleteFilesListProps) {
   return (
-    <ul className="font-mono break-all select-text">
+    <ul className="font-mono break-all" data-selectable-text>
       {paths.map((p, i) => (
         <li
           key={`${i}-${p}`}

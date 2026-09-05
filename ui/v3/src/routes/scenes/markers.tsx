@@ -26,19 +26,28 @@ function MarkersPage() {
     lightboxOpen,
   } = useMarkerLightbox();
 
-  const config = useMemo<EntityListPageConfig<MarkersQuery, MarkerItem>>(
+  const config = useMemo<
+    EntityListPageConfig<
+      MarkersQuery,
+      MarkerItem,
+      GQL.FindSceneMarkersQueryVariables
+    >
+  >(
     () => ({
       filterMode: GQL.FilterMode.SceneMarkers,
       view: View.SceneMarkers,
-      query: GQL.FindSceneMarkersDocument,
-      makeVariables: (filter) => ({
-        filter: filter.makeFindFilter(),
-        scene_marker_filter_ast: filter.makeFilterAST(),
-      }),
-      extractResult: (data) => ({
-        count: data?.findSceneMarkers.count ?? 0,
-        items: data?.findSceneMarkers.scene_markers ?? [],
-      }),
+      source: {
+        kind: "graphql",
+        query: GQL.FindSceneMarkersDocument,
+        makeVariables: (filter) => ({
+          filter: filter.makeFindFilter(),
+          scene_marker_filter_ast: filter.makeFilterAST(),
+        }),
+        extractResult: (data) => ({
+          count: data?.findSceneMarkers.count ?? 0,
+          items: data?.findSceneMarkers.scene_markers ?? [],
+        }),
+      },
       renderCard: (
         marker,
         isMobile,

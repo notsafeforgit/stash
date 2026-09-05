@@ -542,6 +542,14 @@ function useHotkeys({
         return;
 
       const key = e.key.toLowerCase();
+      // The primary play surface uses its native button activation. Keep other
+      // player shortcuts (including seeking) available while it holds focus.
+      if (
+        (key === " " || key === "enter") &&
+        target instanceof HTMLElement &&
+        target.closest("[data-player-native-button]")
+      )
+        return;
       const hasModifier = e.altKey || e.ctrlKey || e.metaKey || e.shiftKey;
 
       const seekBy = (step: number) =>
@@ -1080,6 +1088,7 @@ export function PlayerControls({
   cancelPendingHoldRef,
   onTemporaryPlaybackRateChange,
 }: PlayerControlsProps) {
+  const paused = Player.usePlayer((state) => state.paused);
   const intl = useIntl();
   const duration = fileDuration ?? 0;
   const store = Player.usePlayer();
@@ -1575,9 +1584,18 @@ export function PlayerControls({
           // buttons (also absolute inset-0) and the YARL lightbox
           // prev/next arrows. Without this, the play button centers in
           // the slice above the ControlBar and is offset upward.
-          <div
+          <Button
+            variant="ghost"
+            data-player-native-button=""
+            data-video-gesture-surface=""
+            disabled={mode === "reloading"}
+            aria-label={intl.formatMessage(
+              paused || mode === "pre-start"
+                ? { id: "actions.play" }
+                : { id: "accessibility.pause", defaultMessage: "Pause" },
+            )}
             className={cn(
-              "absolute inset-0 flex items-center justify-center pointer-events-auto",
+              "absolute inset-0 size-full rounded-none p-0 flex items-center justify-center pointer-events-auto hover:bg-transparent active:translate-y-0",
               mode === "pre-start" && "cursor-pointer",
               mode === "playing" &&
                 "[@media(pointer:fine)]:cursor-pointer [@media(pointer:coarse)]:hidden",
@@ -1602,7 +1620,7 @@ export function PlayerControls({
                   <Play size={40} fill="white" />
                 </div>
               ))}
-          </div>
+          </Button>
         );
       })()}
 

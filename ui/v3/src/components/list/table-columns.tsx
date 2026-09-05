@@ -83,8 +83,17 @@ export function textColumn<T extends IHasID>(opts: {
   getValue: (row: T) => string | null | undefined;
   sortable?: boolean;
   className?: string;
+  /** Opt in for copyable values such as file paths. */
+  selectableText?: boolean;
 }): ColumnDef<T> {
-  const { id, header, getValue, sortable = true, className } = opts;
+  const {
+    id,
+    header,
+    getValue,
+    sortable = true,
+    className,
+    selectableText = false,
+  } = opts;
   return {
     id,
     accessorFn: (row) => getValue(row) ?? "",
@@ -96,7 +105,14 @@ export function textColumn<T extends IHasID>(opts: {
     cell: ({ row }) => {
       const val = getValue(row.original);
       if (!val) return null;
-      return <span className={className}>{val}</span>;
+      return (
+        <span
+          className={className}
+          data-selectable-text={selectableText || undefined}
+        >
+          {val}
+        </span>
+      );
     },
   };
 }

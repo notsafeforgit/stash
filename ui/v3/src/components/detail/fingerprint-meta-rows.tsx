@@ -27,7 +27,7 @@ export function FingerprintMetaRows({
       {fingerprints.map((fp) => {
         if (fp.type !== "phash") {
           return (
-            <MetaRow key={fp.type} label={fp.type.toUpperCase()}>
+            <MetaRow key={fp.type} label={fp.type.toUpperCase()} selectableText>
               <span className="font-mono text-xs">{fp.value}</span>
             </MetaRow>
           );
@@ -38,7 +38,7 @@ export function FingerprintMetaRows({
             ? NavUtils.makeScenesPHashMatchUrl(fp.value)
             : NavUtils.makeImagesPHashMatchUrl(fp.value);
         return (
-          <MetaRow key={fp.type} label={fp.type.toUpperCase()}>
+          <MetaRow key={fp.type} label={fp.type.toUpperCase()} selectableText>
             <FilterUrlLink
               href={href}
               title={intl.formatMessage({

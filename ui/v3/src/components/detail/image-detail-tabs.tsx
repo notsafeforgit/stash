@@ -49,6 +49,7 @@ export function ImageDetailsTab({ image }: { image: ImageData }) {
 
       {image.code && (
         <MetaRow
+          selectableText
           label={intl.formatMessage({
             id: "scene_code",
             defaultMessage: "Scene code",
@@ -94,6 +95,7 @@ export function ImageDetailsTab({ image }: { image: ImageData }) {
 
       {image.urls && image.urls.length > 0 && (
         <MetaRow
+          selectableText
           label={intl.formatMessage({ id: "urls", defaultMessage: "URLs" })}
         >
           <div className="flex flex-col gap-0.5">
@@ -216,6 +218,7 @@ export function ImageFileInfoTab({ image }: { image: ImageData }) {
       {image.visual_files.map((f) => (
         <React.Fragment key={f.id}>
           <MetaRow
+            selectableText
             label={intl.formatMessage({ id: "path", defaultMessage: "Path" })}
           >
             <span className="font-mono text-xs break-all">{f.path}</span>

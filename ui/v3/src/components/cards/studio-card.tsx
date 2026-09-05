@@ -85,6 +85,7 @@ export const StudioCard: React.FC<StudioCardProps> = ({
   return (
     <>
       <EntityCard
+        label={studio.name}
         id={studio.id}
         href={`/studios/${studio.id}`}
         isMobile={isMobile}

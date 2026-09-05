@@ -9,7 +9,7 @@ function renderZoom(enabled: boolean) {
       transform={IDENTITY_TRANSFORM}
       onTransformChange={vi.fn()}
     >
-      <video data-testid="stable-video" />
+      <video muted data-testid="stable-video" />
     </VideoFrameZoom>,
   );
 }

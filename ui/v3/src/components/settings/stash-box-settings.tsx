@@ -225,7 +225,10 @@ export function StashBoxSettings({
             <div className="truncate text-sm font-medium">
               {box.name || box.endpoint}
             </div>
-            <div className="truncate text-xs text-muted-foreground">
+            <div
+              className="truncate text-xs text-muted-foreground"
+              data-selectable-text
+            >
               {box.endpoint}
             </div>
           </div>

@@ -1,4 +1,5 @@
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { Label } from "@/components/ui/label";
+import { useId, type ReactNode, useEffect, useMemo, useState } from "react";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 import { useMutation, useQuery } from "@apollo/client/react";
@@ -395,6 +396,7 @@ function accuracyLabel(
 
 function ImageDuplicateCheckerPage() {
   const intl = useIntl();
+  const controlId = useId();
   useDocumentTitle(
     intl.formatMessage({
       id: "config.tools.image_duplicate_checker",
@@ -877,7 +879,10 @@ function ImageDuplicateCheckerPage() {
                     onValueChange={setFilterScope}
                   />
 
-                  <label className="flex items-center gap-2 text-sm">
+                  <Label
+                    htmlFor={`${controlId}-accuracy`}
+                    className="flex items-center gap-2 text-sm"
+                  >
                     <span className="text-muted-foreground">
                       <FormattedMessage
                         id="dupe_check.search_accuracy_label"
@@ -888,7 +893,11 @@ function ImageDuplicateCheckerPage() {
                       value={String(hashDistance)}
                       onValueChange={(value) => setDistance(Number(value))}
                     >
-                      <SelectTrigger size="sm" className="min-w-28">
+                      <SelectTrigger
+                        id={`${controlId}-accuracy`}
+                        size="sm"
+                        className="min-w-28"
+                      >
                         <SelectValue>
                           {accuracyLabel(hashDistance, intl.formatMessage)}
                         </SelectValue>
@@ -907,7 +916,7 @@ function ImageDuplicateCheckerPage() {
                         ))}
                       </SelectContent>
                     </Select>
-                  </label>
+                  </Label>
 
                   <DropdownMenu>
                     <DropdownMenuTrigger
@@ -1314,7 +1323,10 @@ function DuplicateTable({
                     >
                       {imageTitle(image)}
                     </Link>
-                    <div className="mt-1 break-all font-mono text-xs text-muted-foreground">
+                    <div
+                      className="mt-1 break-all font-mono text-xs text-muted-foreground"
+                      data-selectable-text
+                    >
                       {file?.path ?? ""}
                     </div>
                   </TableCell>

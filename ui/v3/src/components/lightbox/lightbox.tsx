@@ -1,8 +1,16 @@
+import { Label } from "@/components/ui/label";
 import "yet-another-react-lightbox/styles.css";
 import "yet-another-react-lightbox/plugins/thumbnails.css";
 
 import type React from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useId,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import YARLightbox, {
   type RenderSlideProps,
   type RenderSlideFooterProps,
@@ -487,6 +495,7 @@ interface SettingsButtonProps {
 }
 
 function SettingsButton({ settings, onSettingsChange }: SettingsButtonProps) {
+  const scrollZoomId = useId();
   const intl = useIntl();
 
   function update(partial: Partial<LightboxSettings>) {
@@ -521,7 +530,10 @@ function SettingsButton({ settings, onSettingsChange }: SettingsButtonProps) {
           </p>
 
           {/* Scroll to zoom */}
-          <label className="flex items-center justify-between gap-2 cursor-pointer">
+          <Label
+            htmlFor={scrollZoomId}
+            className="flex items-center justify-between gap-2 cursor-pointer"
+          >
             <span>
               {intl.formatMessage({
                 id: "lightbox.scroll_to_zoom",
@@ -529,11 +541,12 @@ function SettingsButton({ settings, onSettingsChange }: SettingsButtonProps) {
               })}
             </span>
             <Switch
+              id={scrollZoomId}
               checked={settings.scrollToZoom}
               onCheckedChange={(v) => update({ scrollToZoom: v })}
               disabled={settings.displayMode !== "fitXY"}
             />
-          </label>
+          </Label>
 
           {/* Display mode */}
           <div className="flex flex-col gap-1.5">

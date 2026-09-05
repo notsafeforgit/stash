@@ -150,15 +150,15 @@ export const LabeledIdFilter: React.FC<LabeledIdFilterProps> = ({
           <ClearableInput value={displayQuery} setValue={onQueryChange} />
           <ul className="selectable-list">
             {unselectedResults.map((item) => (
-              <li
-                key={item.id}
-                className="unselected-object"
-                onClick={() => onSelect(item)}
-              >
-                <a tabIndex={0}>
+              <li key={item.id} className="unselected-object">
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start"
+                  onClick={() => onSelect(item)}
+                >
                   <Plus className="icon" size={16} />
                   <span>{item.label}</span>
-                </a>
+                </Button>
               </li>
             ))}
           </ul>

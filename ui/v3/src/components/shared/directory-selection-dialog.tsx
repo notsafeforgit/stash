@@ -92,7 +92,11 @@ export function DirectorySelectionDialog({
                   key={p}
                   className="flex min-w-0 items-center justify-between gap-2 rounded-md border bg-card px-3 py-1.5 text-sm"
                 >
-                  <span className="min-w-0 flex-1 truncate" title={p}>
+                  <span
+                    className="min-w-0 flex-1 truncate"
+                    title={p}
+                    data-selectable-text
+                  >
                     {p}
                   </span>
                   <Button

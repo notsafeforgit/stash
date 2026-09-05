@@ -245,7 +245,7 @@ export function IdentifyDialog({ open, onOpenChange, selectedIds }: IProps) {
         id="config.tasks.identify.identifying_from_paths"
         defaultMessage="Identifying scenes from"
       />
-      <ul className="ml-2 list-disc pl-3">
+      <ul className="ml-2 list-disc pl-3" data-selectable-text>
         {paths.map((p) => (
           <li key={p}>{p}</li>
         ))}

@@ -78,7 +78,13 @@ export const SCENE_MERGE_FIELDS: readonly AnyMergeFieldDef<
     isEmpty: (v) => trimmed(v).length === 0,
     isEqual: sameStr,
     preview: (v) =>
-      v.trim() ? <span className="font-mono">{v}</span> : <MergeEmptyPreview />,
+      v.trim() ? (
+        <span className="font-mono" data-selectable-text>
+          {v}
+        </span>
+      ) : (
+        <MergeEmptyPreview />
+      ),
     toUpdate: (i, v) => {
       i.code = v;
     },
@@ -184,7 +190,12 @@ export const SCENE_MERGE_FIELDS: readonly AnyMergeFieldDef<
         <ul className="flex flex-col gap-0.5 min-w-0">
           {v.map((url) => (
             <li key={url} className="truncate">
-              <span className="text-xs text-muted-foreground">{url}</span>
+              <span
+                className="text-xs text-muted-foreground"
+                data-selectable-text
+              >
+                {url}
+              </span>
             </li>
           ))}
         </ul>

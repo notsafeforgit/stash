@@ -1,5 +1,5 @@
 import type React from "react";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 import { cn } from "src/lib/utils";
 import { ArrowLeft, PanelLeftClose, PanelLeftOpen, XIcon } from "lucide-react";
 import { useIntl } from "react-intl";
@@ -16,12 +16,6 @@ export interface DetailTab {
   /** Keyboard shortcut key (single character) */
   shortcut?: string;
   content: React.ReactNode;
-  /**
-   * When false, disables text selection inside the tab panel. Use for
-   * control-heavy tabs (sliders, toolbars) where tap-and-hold to select
-   * percentages or labels is undesired. Defaults to true.
-   */
-  selectable?: boolean;
 }
 
 export interface MediaDetailLayoutProps {
@@ -87,6 +81,7 @@ export const MediaDetailLayout: React.FC<MediaDetailLayoutProps> = ({
   primaryFocusReturnRef,
 }) => {
   const intl = useIntl();
+  const panelId = useId();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const rootRef = useRef<HTMLDivElement>(null);
   const primaryFocusRef = useRef<HTMLDivElement>(null);
@@ -259,8 +254,9 @@ export const MediaDetailLayout: React.FC<MediaDetailLayoutProps> = ({
             <TabsContent
               key={tab.id}
               value={tab.id}
+              id={`${panelId}-${tab.id}`}
               keepMounted={isMounted(tab.id)}
-              className={cn("p-3", tab.selectable === false && "select-none")}
+              className="p-3"
             >
               {isMounted(tab.id) ? tab.content : null}
             </TabsContent>
@@ -277,6 +273,8 @@ export const MediaDetailLayout: React.FC<MediaDetailLayoutProps> = ({
       {/* ── Right / top: player column ──────────────────────────────────────────
           Mobile  : order-1 (above content), natural fluid height
           Desktop : order-2 (right), flex-1, full height, player centred       */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: Focus mode traps keyboard focus on this existing container to preserve the live player. */}
+      {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: The dynamic role is dialog exactly when aria-modal is set. */}
       <div
         ref={primaryFocusRef}
         onKeyDown={handlePrimaryFocusKeyDown}
@@ -374,14 +372,17 @@ export const MediaDetailLayout: React.FC<MediaDetailLayoutProps> = ({
             {/* Tab buttons */}
             <nav
               className="flex-1 flex overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-              role="tablist"
+              aria-label={intl.formatMessage({
+                id: "accessibility.detail_sections",
+                defaultMessage: "Detail sections",
+              })}
             >
               {tabs.map((tab) => (
                 <Button
                   key={tab.id}
                   variant="ghost"
-                  role="tab"
-                  aria-selected={tab.id === activeTab}
+                  aria-pressed={tab.id === activeTab}
+                  aria-controls={`${panelId}-${tab.id}`}
                   className={cn(
                     "flex-1 h-full rounded-none px-2 min-w-[3.5rem] text-sm whitespace-nowrap font-normal border-t-2 border-t-transparent text-muted-foreground hover:text-foreground hover:bg-transparent",
                     tab.id === activeTab &&

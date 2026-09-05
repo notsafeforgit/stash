@@ -20,7 +20,6 @@ import { Button } from "src/components/ui/button";
 import { ExpandCollapseButton } from "src/components/ui/collapse-button";
 import { cn } from "src/lib/utils";
 import { queryFindSubFolders } from "src/core/folders";
-import { keyboardClickHandler } from "src/utils/keyboard";
 import type { FolderCriterion } from "src/models/list-filter/criteria/folder";
 import { FormattedMessage, type MessageDescriptor, useIntl } from "react-intl";
 import { DepthSelector } from "./selectable-filter";
@@ -75,12 +74,8 @@ const FolderRow: React.FC<{
         className="folder-row unselected-object"
         style={{ paddingLeft: (level ?? 0) * 5 }}
       >
-        <a
-          onClick={() => onSelect(folder)}
-          onKeyDown={keyboardClickHandler(() => onSelect(folder))}
-          tabIndex={0}
-        >
-          <span>
+        <div className="flex items-center gap-1">
+          <div className="flex min-w-0 flex-1 items-center">
             <span
               className={cn({
                 empty: folder.children && folder.children.length === 0,
@@ -93,8 +88,14 @@ const FolderRow: React.FC<{
                 notCollapsedIcon={ChevronDown}
               />
             </span>
-            {folder.basename}
-          </span>
+            <Button
+              variant="ghost"
+              className="min-w-0 flex-1 justify-start"
+              onClick={() => onSelect(folder)}
+            >
+              {folder.basename}
+            </Button>
+          </div>
           {canExclude && (
             <Button
               variant="ghost"
@@ -112,7 +113,7 @@ const FolderRow: React.FC<{
               <Minus className="exclude-icon" size={16} />
             </Button>
           )}
-        </a>
+        </div>
       </li>
       {folder.expanded &&
         folder.children?.map((child) => (

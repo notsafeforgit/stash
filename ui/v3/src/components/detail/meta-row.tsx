@@ -12,16 +12,22 @@ import type React from "react";
 export function MetaRow({
   label,
   children,
+  selectableText = false,
 }: {
   label: string;
   children: React.ReactNode;
+  /** Opt in for copyable values such as paths, URLs, and identifiers. */
+  selectableText?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-0.5 py-1.5 first:pt-0 last:pb-0">
       <dt className="text-[0.7rem] uppercase tracking-wide text-muted-foreground font-medium leading-none">
         {label}
       </dt>
-      <dd className="m-0 text-sm [overflow-wrap:anywhere] select-text">
+      <dd
+        className="m-0 text-sm [overflow-wrap:anywhere]"
+        data-selectable-text={selectableText || undefined}
+      >
         {children}
       </dd>
     </div>

@@ -24,7 +24,7 @@ export function DuplicateFilterScopeToggle({
   const intl = useIntl();
 
   return (
-    <label className="flex items-center gap-2 text-sm">
+    <div className="flex items-center gap-2 text-sm">
       <span className="text-muted-foreground">
         <FormattedMessage
           id="dupe_check.filter_scope"
@@ -69,6 +69,6 @@ export function DuplicateFilterScopeToggle({
           />
         </ToggleGroupItem>
       </ToggleGroup>
-    </label>
+    </div>
   );
 }

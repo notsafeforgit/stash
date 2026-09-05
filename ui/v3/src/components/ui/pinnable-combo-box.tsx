@@ -62,6 +62,9 @@ export interface PinnableComboBoxOption {
 }
 
 export interface PinnableComboBoxProps {
+  id?: string;
+  "aria-label"?: string;
+  "aria-labelledby"?: string;
   /** Displayed in the trigger. Derived automatically from the selected option;
    *  kept for call-site compatibility. */
   currentLabel: string;
@@ -83,6 +86,9 @@ export interface PinnableComboBoxProps {
 }
 
 export function PinnableComboBox({
+  id,
+  "aria-label": ariaLabel,
+  "aria-labelledby": ariaLabelledBy,
   currentLabel,
   options,
   selectedValue,
@@ -135,6 +141,9 @@ export function PinnableComboBox({
       }
     >
       <ComboboxInput
+        id={id}
+        aria-label={ariaLabel}
+        aria-labelledby={ariaLabelledBy}
         placeholder={
           open ? searchPlaceholder : currentLabel || searchPlaceholder
         }

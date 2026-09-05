@@ -40,6 +40,7 @@ export const HoverScrubber: React.FC<HoverScrubberProps> = ({
   );
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: This optional pointer preview has no action; the card link and preview button remain keyboard accessible.
     <div
       ref={containerRef}
       className={cn("relative", className)}

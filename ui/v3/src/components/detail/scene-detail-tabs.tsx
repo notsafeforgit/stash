@@ -111,6 +111,7 @@ export function SceneDetailsTab({ scene }: { scene: SceneData }) {
       )}
       {scene.code && (
         <MetaRow
+          selectableText
           label={intl.formatMessage({
             id: "scene_code",
             defaultMessage: "Scene code",
@@ -187,6 +188,7 @@ export function SceneDetailsTab({ scene }: { scene: SceneData }) {
       )}
       {scene.urls.length > 0 && (
         <MetaRow
+          selectableText
           label={intl.formatMessage({ id: "url", defaultMessage: "URL" })}
         >
           <div className="flex flex-col gap-1">
@@ -299,7 +301,11 @@ export function SceneFileInfoTab({ scene }: { scene: SceneData }) {
             {ofMany && (
               <div className="font-medium text-sm mb-2 flex items-center justify-between gap-2">
                 <span className="flex items-center gap-2 min-w-0">
-                  <span className="truncate" title={file.path}>
+                  <span
+                    className="truncate"
+                    title={file.path}
+                    data-selectable-text
+                  >
                     {file.path.split("/").pop() || file.path}
                   </span>
                   {isPrimary && (
@@ -322,6 +328,7 @@ export function SceneFileInfoTab({ scene }: { scene: SceneData }) {
             )}
             <dl className="grid m-0 p-0">
               <MetaRow
+                selectableText
                 label={intl.formatMessage({
                   id: "path",
                   defaultMessage: "Path",

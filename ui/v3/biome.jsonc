@@ -22,8 +22,6 @@
       "!.antigravitycli",
       "!.tanstack",
       "!.vite",
-      "!.git_stage_filters",
-      "!.tmp_filters",
       "!src/core/generated-graphql.ts",
       "!src/routeTree.gen.ts",
       "!src/locales/*.json"
@@ -41,7 +39,7 @@
     },
     "rules": {
       "recommended": true,
-      "a11y": "off",
+      "a11y": { "recommended": true },
       "complexity": {
         "recommended": true
       },

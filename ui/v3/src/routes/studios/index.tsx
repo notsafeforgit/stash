@@ -26,19 +26,28 @@ function StudiosPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
-  const config = useMemo<EntityListPageConfig<StudiosQuery, StudioItem>>(
+  const config = useMemo<
+    EntityListPageConfig<
+      StudiosQuery,
+      StudioItem,
+      GQL.FindStudiosQueryVariables
+    >
+  >(
     () => ({
       filterMode: GQL.FilterMode.Studios,
       view: View.Studios,
-      query: GQL.FindStudiosDocument,
-      makeVariables: (filter) => ({
-        filter: filter.makeFindFilter(),
-        studio_filter_ast: filter.makeFilterAST(),
-      }),
-      extractResult: (data) => ({
-        count: data?.findStudios.count ?? 0,
-        items: data?.findStudios.studios ?? [],
-      }),
+      source: {
+        kind: "graphql",
+        query: GQL.FindStudiosDocument,
+        makeVariables: (filter) => ({
+          filter: filter.makeFindFilter(),
+          studio_filter_ast: filter.makeFilterAST(),
+        }),
+        extractResult: (data) => ({
+          count: data?.findStudios.count ?? 0,
+          items: data?.findStudios.studios ?? [],
+        }),
+      },
       renderCard: (studio, isMobile, selected, onSelectedChanged) => (
         <StudioCard
           key={studio.id}

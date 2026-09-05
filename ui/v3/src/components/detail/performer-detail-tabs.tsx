@@ -284,6 +284,7 @@ export function PerformerDetailsTab({
 
       {(performer.urls ?? []).length > 0 && (
         <MetaRow
+          selectableText
           label={intl.formatMessage({ id: "url", defaultMessage: "URL" })}
         >
           <div className="flex flex-col gap-1">

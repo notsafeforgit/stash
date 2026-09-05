@@ -2371,5 +2371,11 @@
   "zoom_out": "Zoom out",
   "plugins": {
     "load_failed": "Some plugins could not be loaded. Reload the page to try again."
+  },
+  "accessibility": {
+    "preview_named": "Preview {name}",
+    "select_named": "Select {name}",
+    "detail_sections": "Detail sections",
+    "pause": "Pause"
   }
 }

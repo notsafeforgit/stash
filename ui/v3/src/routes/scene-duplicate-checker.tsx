@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { useId, type ReactNode, useEffect, useMemo, useState } from "react";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 import { useMutation, useQuery } from "@apollo/client/react";
@@ -473,6 +473,7 @@ function durationLabel(
 
 function SceneDuplicateCheckerPage() {
   const intl = useIntl();
+  const controlId = useId();
   useDocumentTitle(
     intl.formatMessage({
       id: "config.tools.scene_duplicate_checker",
@@ -1007,7 +1008,10 @@ function SceneDuplicateCheckerPage() {
                     onValueChange={setFilterScope}
                   />
 
-                  <label className="flex items-center gap-2 text-sm">
+                  <Label
+                    htmlFor={`${controlId}-accuracy`}
+                    className="flex items-center gap-2 text-sm"
+                  >
                     <span className="text-muted-foreground">
                       <FormattedMessage
                         id="dupe_check.search_accuracy_label"
@@ -1018,7 +1022,11 @@ function SceneDuplicateCheckerPage() {
                       value={String(hashDistance)}
                       onValueChange={(value) => setDistance(Number(value))}
                     >
-                      <SelectTrigger size="sm" className="min-w-28">
+                      <SelectTrigger
+                        id={`${controlId}-accuracy`}
+                        size="sm"
+                        className="min-w-28"
+                      >
                         <SelectValue>
                           {accuracyLabel(hashDistance, intl.formatMessage)}
                         </SelectValue>
@@ -1037,9 +1045,12 @@ function SceneDuplicateCheckerPage() {
                         ))}
                       </SelectContent>
                     </Select>
-                  </label>
+                  </Label>
 
-                  <label className="flex items-center gap-2 text-sm">
+                  <Label
+                    htmlFor={`${controlId}-duration`}
+                    className="flex items-center gap-2 text-sm"
+                  >
                     <span className="text-muted-foreground">
                       <FormattedMessage
                         id="dupe_check.duration_diff"
@@ -1050,7 +1061,11 @@ function SceneDuplicateCheckerPage() {
                       value={String(durationDiff)}
                       onValueChange={(value) => setDurationDiff(Number(value))}
                     >
-                      <SelectTrigger size="sm" className="min-w-24">
+                      <SelectTrigger
+                        id={`${controlId}-duration`}
+                        size="sm"
+                        className="min-w-24"
+                      >
                         <SelectValue>
                           {durationLabel(durationDiff, intl.formatMessage)}
                         </SelectValue>
@@ -1066,7 +1081,7 @@ function SceneDuplicateCheckerPage() {
                         ))}
                       </SelectContent>
                     </Select>
-                  </label>
+                  </Label>
 
                   <DropdownMenu>
                     <DropdownMenuTrigger
@@ -1546,7 +1561,10 @@ function DuplicateTable({
                     >
                       {objectTitle(scene)}
                     </Link>
-                    <div className="mt-1 break-all font-mono text-xs text-muted-foreground">
+                    <div
+                      className="mt-1 break-all font-mono text-xs text-muted-foreground"
+                      data-selectable-text
+                    >
                       {file?.path ?? ""}
                     </div>
                   </TableCell>

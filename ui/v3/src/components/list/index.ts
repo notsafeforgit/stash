@@ -16,7 +16,9 @@ export { EntityListPage } from "./entity-list-page";
 export type {
   EntityListPageConfig,
   LocalDataSource,
+  GraphQLDataSource,
+  ListDataSource,
   PageNavHandle,
-} from "./entity-list-page";
+} from "./entity-list-types";
 export { MobileListBar } from "./mobile-list-bar";
 export type { MobileListBarProps } from "./mobile-list-bar";

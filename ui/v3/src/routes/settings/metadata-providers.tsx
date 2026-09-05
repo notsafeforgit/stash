@@ -114,7 +114,11 @@ function ScraperTable({
                   <td className="max-w-72 p-2">
                     <ul className="space-y-0.5">
                       {s.urls.slice(0, 8).map((u) => (
-                        <li key={u} className="truncate text-xs">
+                        <li
+                          key={u}
+                          className="truncate text-xs"
+                          data-selectable-text
+                        >
                           {u}
                         </li>
                       ))}

@@ -104,7 +104,11 @@ export function FileModTimeMetaRows({
               className="min-w-0"
             >
               {file.path && (
-                <span className="mr-1 text-muted-foreground" title={file.path}>
+                <span
+                  className="mr-1 text-muted-foreground"
+                  title={file.path}
+                  data-selectable-text
+                >
                   {basename(file.path)}:
                 </span>
               )}

@@ -1,3 +1,5 @@
+import { Label } from "@/components/ui/label";
+import { useId } from "react";
 import type React from "react";
 import { useIntl } from "react-intl";
 import {
@@ -18,6 +20,7 @@ export const DuplicatedFilter: React.FC<DuplicatedFilter> = ({
   setCriterion,
 }) => {
   const intl = useIntl();
+  const controlId = useId();
 
   function onFieldChange(
     fieldId: DuplicationFieldId,
@@ -35,14 +38,18 @@ export const DuplicatedFilter: React.FC<DuplicatedFilter> = ({
   return (
     <div className="duplicated-filter">
       {DUPLICATION_FIELD_IDS.map((fieldId) => (
-        <label key={fieldId} className="duplicated-filter-item">
+        <Label
+          htmlFor={`${controlId}-${fieldId}`}
+          key={fieldId}
+          className="duplicated-filter-item"
+        >
           <IndeterminateCheckbox
-            id={`duplicated-${fieldId}`}
+            id={`${controlId}-${fieldId}`}
             checked={criterion.value[fieldId]}
             setChecked={(v) => onFieldChange(fieldId, v)}
           />
           {intl.formatMessage({ id: DUPLICATION_FIELD_MESSAGE_IDS[fieldId] })}
-        </label>
+        </Label>
       ))}
     </div>
   );

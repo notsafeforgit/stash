@@ -266,7 +266,7 @@ export const SceneVideoFilterTab: React.FC<SceneVideoFilterProps> = ({
         <svg
           xmlns="http://www.w3.org/2000/svg"
           style={{ display: "none" }}
-          aria-hidden
+          aria-hidden="true"
         >
           <defs>
             <filter id="vjs-video-filter">

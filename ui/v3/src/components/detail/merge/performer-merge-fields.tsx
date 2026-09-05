@@ -337,7 +337,12 @@ export const PERFORMER_MERGE_FIELDS: readonly AnyMergeFieldDef<
         <ul className="flex flex-col gap-0.5 min-w-0">
           {v.map((url) => (
             <li key={url} className="truncate">
-              <span className="text-xs text-muted-foreground">{url}</span>
+              <span
+                className="text-xs text-muted-foreground"
+                data-selectable-text
+              >
+                {url}
+              </span>
             </li>
           ))}
         </ul>
@@ -407,7 +412,9 @@ export const PERFORMER_MERGE_FIELDS: readonly AnyMergeFieldDef<
     isEmpty: (v) => v.length === 0,
     isEqual: sameStashIDSet,
     preview: (v) => (
-      <ChipList items={v.map((s) => `${s.endpoint}: ${s.stash_id}`)} />
+      <div data-selectable-text>
+        <ChipList items={v.map((s) => `${s.endpoint}: ${s.stash_id}`)} />
+      </div>
     ),
     combine: combineStashIDs,
     toUpdate: (i, v) => {

@@ -73,6 +73,7 @@ function Field({
   ...props
 }: React.ComponentProps<"div"> & VariantProps<typeof fieldVariants>) {
   return (
+    // biome-ignore lint/a11y/useSemanticElements: Field is a layout group for one control; FieldSet handles related control sets.
     <div
       role="group"
       data-slot="field"

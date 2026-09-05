@@ -96,6 +96,7 @@ export function GroupDetailsTab({ group }: { group: GroupData }) {
 
       {group.urls && group.urls.length > 0 && (
         <MetaRow
+          selectableText
           label={intl.formatMessage({ id: "urls", defaultMessage: "URLs" })}
         >
           <div className="flex flex-col gap-0.5">

@@ -87,6 +87,7 @@ export const MarkerCard: React.FC<MarkerCardProps> = ({
 
   return (
     <EntityCard
+      label={title}
       id={marker.id}
       href={`/scenes/${marker.scene.id}?tab=markers&t=${marker.seconds}`}
       isMobile={isMobile}

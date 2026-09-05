@@ -19,6 +19,12 @@ extend input SaveFilterInput {
   ui_options: SavedUIOptions
 }
 
+extend input DefaultFilterInput {
+  filter_ast: SavedFilterAST
+  ui_options: SavedUIOptions
+}
+
 extend type Mutation {
   configureUI(input: Map, partial: Map): UIConfig!
+  configureDefaultFilter(input: ConfigureDefaultFilterInput!): UIConfig!
 }

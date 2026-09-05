@@ -101,7 +101,7 @@ export function MarkerEditForm({
   const intl = useIntl();
   const isEdit = marker != null;
 
-  // useEntityMutation refetches every active query, which covers the scene's
+  // useEntityMutation refetches affected library queries, which covers the scene's
   // `scene_markers` field (the marker editor is low-frequency, so the slight
   // overhead beats the toReference dance for a hand-rolled cache.modify).
   const [createMarker, { loading: creating }] = useEntityMutation(

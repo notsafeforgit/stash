@@ -2,6 +2,8 @@ package manager
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/pkg/job"
@@ -31,30 +33,13 @@ func (j *bulkUpdateJob) Execute(ctx context.Context, progress *job.Progress) err
 
 	runHooks := config.GetBulkUpdateHooks()
 
-	if !runHooks {
-		// If hooks are disabled, run everything in a single transaction for maximum speed
-		err := j.repo.WithTxn(ctx, func(ctx context.Context) error {
-			for i, id := range j.ids {
-				if job.IsCancelled(ctx) {
-					return nil
-				}
-
-				if err := j.operation.Update(ctx, id); err != nil {
-					logger.Errorf("error updating item %d: %v", id, err)
-					// continue on error
-				}
-
-				progress.SetProcessed(i + 1)
-			}
-			return nil
-		})
-		return err
-	}
-
-	// Default behavior: item-by-item with hooks
+	// Each operation can write several fields and relationships. A failed
+	// item must roll back in full, independently of the post-hook setting.
+	failed := 0
+	var failures []string
 	for i, id := range j.ids {
 		if job.IsCancelled(ctx) {
-			return nil
+			break
 		}
 
 		err := j.repo.WithTxn(ctx, func(ctx context.Context) error {
@@ -62,14 +47,22 @@ func (j *bulkUpdateJob) Execute(ctx context.Context, progress *job.Progress) err
 		})
 
 		if err != nil {
+			failed++
 			logger.Errorf("error updating item %d: %v", id, err)
-		} else if j.hookExecutor != nil {
+			// Bound the job's retained error message; the log contains every failure.
+			if len(failures) < 20 {
+				failures = append(failures, fmt.Sprintf("%d: %v", id, err))
+			}
+		} else if runHooks && j.hookExecutor != nil {
 			j.hookExecutor.ExecutePostHooks(ctx, id, j.hookType, j.input, j.inputFields)
 		}
 
 		progress.SetProcessed(i + 1)
 	}
 
+	if failed > 0 {
+		return fmt.Errorf("%d of %d items failed: %s", failed, total, strings.Join(failures, "; "))
+	}
 	return nil
 }
 

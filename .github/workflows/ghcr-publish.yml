@@ -52,6 +52,9 @@ jobs:
     - name: Generate
       run: docker exec -t build /bin/bash -c "make generate"
 
+    - name: Validate fork before publishing
+      run: docker exec -t build /bin/bash -c "make validate-fork"
+
     - name: Build UI
       run: docker exec -t build /bin/bash -c "make ui && make ui-v3-only"
 
@@ -59,6 +62,7 @@ jobs:
       run: docker exec -t build /bin/bash -c "make build-cc-linux"
 
     - name: Cleanup build container
+      if: always()
       run: docker rm -f -v build
 
     - name: Log in to the Container registry

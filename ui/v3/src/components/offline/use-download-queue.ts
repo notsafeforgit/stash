@@ -1,3 +1,4 @@
+import { getPlatformURL } from "@/core/platform-url";
 /**
  * Singleton download queue for offline scene downloads.
  *
@@ -384,11 +385,13 @@ class DownloadQueueStore {
     const abort = new AbortController();
     this.currentAbort = abort;
 
-    const url = `/scene/${sceneId}/download.mp4?${downloadQueryString({
-      mode: entry.format,
-      resolution: entry.resolution as StreamingResolutionEnum,
-      effectiveHeight: 0, // unused by querystring builder
-    })}`;
+    const url = getPlatformURL(
+      `scene/${sceneId}/download.mp4?${downloadQueryString({
+        mode: entry.format,
+        resolution: entry.resolution as StreamingResolutionEnum,
+        effectiveHeight: 0, // unused by querystring builder
+      })}`,
+    ).href;
 
     const headers: HeadersInit = {};
     if (resumeOffset > 0) {

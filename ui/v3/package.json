@@ -15,9 +15,11 @@
     "format-check": "biome format",
     "check-i18n": "node scripts/check-i18n.mjs",
     "gen-settings-index": "node scripts/generate-settings-search-index.mjs && biome format --write src/components/settings/settings-search-index.gen.ts",
-    "validate": "pnpm run lint && pnpm run check && pnpm run format-check && pnpm run check-i18n",
+    "validate": "pnpm run lint && pnpm run check && pnpm run format-check && pnpm run check-i18n && pnpm run test:ci && pnpm run check-compatibility",
     "test": "pnpm run gqlgen && vitest",
-    "gqlgen": "graphql-codegen --config codegen.ts"
+    "gqlgen": "graphql-codegen --config codegen.ts",
+    "test:ci": "vitest run",
+    "check-compatibility": "node scripts/check-compatibility.mjs"
   },
   "dependencies": {
     "@apollo/client": "^4.1.0",

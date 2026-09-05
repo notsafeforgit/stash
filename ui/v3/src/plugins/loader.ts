@@ -1,3 +1,4 @@
+import { withTimeout } from "@/utils/with-timeout";
 /**
  * Plugin loader — runs once at app boot, before the TanStack Router is
  * built and React renders. Fetches the list of enabled plugins from
@@ -63,30 +64,40 @@ function applyOrder(
   return [...ordered, ...remainder];
 }
 
+let currentIntl: IntlShape | undefined;
+
+export function updatePluginIntl(intl: IntlShape) {
+  currentIntl = intl;
+}
+
 function buildHost(
   pluginId: string,
   apollo: ApolloClient,
   intl: IntlShape,
+  stage: (registration: () => void) => void,
 ): StashPluginHost {
   return Object.freeze({
     version: HOST_VERSION,
     pluginId,
     routes: Object.freeze({
-      add: (route: PluginRouteOptions) => recordRoute(pluginId, route),
+      add: (route: PluginRouteOptions) =>
+        stage(() => recordRoute(pluginId, route)),
     }),
     nav: Object.freeze({
-      add: (item: PluginNavItem) => recordNavItem(pluginId, item),
+      add: (item: PluginNavItem) => stage(() => recordNavItem(pluginId, item)),
     }),
     filters: Object.freeze({
       addExtras: (component: PluginFilterExtrasComponent) =>
-        recordFilterExtras(pluginId, component),
+        stage(() => recordFilterExtras(pluginId, component)),
     }),
     events: Object.freeze({
       onSavedFilterLoaded: (listener: PluginSavedFilterLoadedListener) =>
-        recordSavedFilterLoadedListener(pluginId, listener),
+        stage(() => recordSavedFilterLoadedListener(pluginId, listener)),
     }),
     apollo,
-    intl,
+    get intl() {
+      return currentIntl ?? intl;
+    },
     router: Object.freeze({ Link, useNavigate }),
     ui,
   }) as StashPluginHost;
@@ -97,29 +108,80 @@ export interface LoadPluginsOpts {
   intl: IntlShape;
 }
 
-let loadPromise: Promise<void> | null = null;
+export const PLUGIN_TIMEOUT_MS = 5000;
+export const PLUGIN_BOOT_TIMEOUT_MS = 30000;
+let loadPromise: Promise<PluginLoadIssue[]> | null = null;
+
+export interface PluginLoadIssue {
+  pluginId?: string;
+  error: unknown;
+}
+
+/** Stage registrations so a rejected or timed-out plugin cannot leave behind
+ * partial routes, or register later after the router has already mounted. */
+export async function registerPlugin(
+  plugin: PluginToLoad,
+  opts: LoadPluginsOpts,
+  timeout = PLUGIN_TIMEOUT_MS,
+  importModule: (entry: string) => Promise<PluginModule> = (entry) =>
+    import(/* @vite-ignore */ entry),
+): Promise<void> {
+  const registrations: (() => void)[] = [];
+  let accepting = true;
+  const host = buildHost(plugin.id, opts.apollo, opts.intl, (registration) => {
+    if (accepting) registrations.push(registration);
+  });
+  try {
+    await withTimeout(
+      (async () => {
+        const mod = await importModule(plugin.entry);
+        if (!accepting) return;
+        const register: PluginRegister | undefined =
+          mod.default ?? mod.register;
+        if (typeof register !== "function")
+          throw new Error("Plugin must export register(host)");
+        await register(host);
+      })(),
+      timeout,
+      `Plugin ${plugin.id}`,
+    );
+    for (const commit of registrations) commit();
+  } finally {
+    accepting = false;
+  }
+}
 
 /**
  * Memoized entry point — safe to call multiple times (e.g. from React
  * 18 strict-mode double-invocation). Only the first call performs the
  * fetch + register cycle; subsequent calls return the same promise.
  */
-export function ensurePluginsLoaded(opts: LoadPluginsOpts): Promise<void> {
+export function ensurePluginsLoaded(
+  opts: LoadPluginsOpts,
+): Promise<PluginLoadIssue[]> {
   if (!loadPromise) {
     loadPromise = loadPlugins(opts);
   }
   return loadPromise;
 }
 
-export async function loadPlugins(opts: LoadPluginsOpts): Promise<void> {
-  const { apollo, intl } = opts;
+export async function loadPlugins(
+  opts: LoadPluginsOpts,
+): Promise<PluginLoadIssue[]> {
+  const { apollo } = opts;
+  const issues: PluginLoadIssue[] = [];
+  const deadline = Date.now() + PLUGIN_BOOT_TIMEOUT_MS;
 
   let pluginsList: PluginToLoad[] = [];
   try {
-    const result = await apollo.query<GQL.PluginsQuery>({
-      query: GQL.PluginsDocument,
-      fetchPolicy: "network-only",
-    });
+    const result = await withTimeout(
+      apollo.query<GQL.PluginsQuery>({
+        query: GQL.PluginsDocument,
+        fetchPolicy: "network-only",
+      }),
+      PLUGIN_TIMEOUT_MS,
+      "Plugin list",
+    );
     const plugins = result.data?.plugins ?? [];
     pluginsList = plugins
       .filter((p) => p.enabled && p.paths.entry)
@@ -131,46 +193,46 @@ export async function loadPlugins(opts: LoadPluginsOpts): Promise<void> {
   } catch (err) {
     console.error("[stash-plugins] failed to query plugin list", err);
     freezeRegistry();
-    return;
+    return [{ error: err }];
   }
 
   if (pluginsList.length === 0) {
     freezeRegistry();
-    return;
+    return issues;
   }
 
   let order: readonly string[] = [];
   try {
-    const result = await apollo.query<GQL.PluginHookOrderQuery>({
-      query: GQL.PluginHookOrderDocument,
-      fetchPolicy: "network-only",
-    });
+    const result = await withTimeout(
+      apollo.query<GQL.PluginHookOrderQuery>({
+        query: GQL.PluginHookOrderDocument,
+        fetchPolicy: "network-only",
+      }),
+      PLUGIN_TIMEOUT_MS,
+      "Plugin order",
+    );
     const entry = result.data?.pluginHookOrder?.find(
       (e) => e.hook === UI_LOAD_HOOK,
     );
     if (entry) order = entry.plugin_ids;
   } catch (err) {
     console.warn("[stash-plugins] failed to query hook order", err);
+    issues.push({ error: err });
   }
 
   const ordered = applyOrder(pluginsList, order);
 
   for (const p of ordered) {
     try {
-      const mod = (await import(/* @vite-ignore */ p.entry)) as PluginModule;
-      const register: PluginRegister | undefined = mod.default ?? mod.register;
-      if (typeof register !== "function") {
-        console.warn(
-          `[stash-plugin:${p.id}] entry module did not export a default register(host) function; skipped.`,
-        );
-        continue;
-      }
-      const host = buildHost(p.id, apollo, intl);
-      await register(host);
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) throw new Error("Plugin startup deadline exceeded");
+      await registerPlugin(p, opts, Math.min(PLUGIN_TIMEOUT_MS, remaining));
     } catch (err) {
       console.error(`[stash-plugin:${p.id}] failed to load`, err);
+      issues.push({ pluginId: p.id, error: err });
     }
   }
 
   freezeRegistry();
+  return issues;
 }

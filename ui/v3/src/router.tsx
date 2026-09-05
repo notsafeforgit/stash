@@ -7,6 +7,31 @@ import {
 import { Route as rootRoute } from "@/routes/__root";
 import { routeTree as fileRouteTree } from "./routeTree.gen";
 import { getRegisteredRoutes } from "@/plugins/registry";
+import { getApplicationBasePath } from "@/core/platform-url";
+
+const coreRoutes = [
+  ...((fileRouteTree as unknown as { children?: AnyRoute[] }).children ?? []),
+];
+
+function routePattern(path: string): string {
+  return (
+    path
+      .replace(/\/+/g, "/")
+      .replace(/\/$/, "")
+      .replace(/\$[^/]+/g, "$") || "/"
+  );
+}
+
+function coreRoutePatterns(routes: AnyRoute[], parent = ""): string[] {
+  return routes.flatMap((route) => {
+    const segment = "path" in route.options ? route.options.path : "";
+    const path = `${parent}/${segment ?? ""}`;
+    return [
+      routePattern(path),
+      ...coreRoutePatterns(route.children ?? [], path),
+    ];
+  });
+}
 
 /**
  * Build the runtime route tree by appending plugin-registered routes
@@ -15,32 +40,36 @@ import { getRegisteredRoutes } from "@/plugins/registry";
  * registrations are stable. The returned tree is passed to
  * `createRouter`.
  */
-function buildRouteTree() {
-  const pluginRoutes = getRegisteredRoutes().map((r) =>
-    createRoute({
-      getParentRoute: () => rootRoute,
-      path: r.path,
-      // TanStack Router's RouteComponent has a richer shape than
-      // ComponentType (preload metadata etc.); a plain function
-      // component is structurally compatible at runtime.
-      component: r.component as RouteComponent,
-    }),
+function buildRouteTree(includePlugins: boolean) {
+  const paths = new Set(coreRoutePatterns(coreRoutes));
+  const pluginRoutes = (includePlugins ? getRegisteredRoutes() : []).map(
+    (r) => {
+      const path = routePattern(r.path);
+      if (paths.has(path))
+        throw new Error(
+          `Plugin route conflicts with an existing route: ${r.path}`,
+        );
+      paths.add(path);
+      return createRoute({
+        getParentRoute: () => rootRoute,
+        path: r.path,
+        // TanStack Router's RouteComponent has a richer shape than
+        // ComponentType (preload metadata etc.); a plain function
+        // component is structurally compatible at runtime.
+        component: r.component as RouteComponent,
+      });
+    },
   );
 
-  if (pluginRoutes.length === 0) return fileRouteTree;
-
-  // The file tree is rootRoute with children mutated in place.
-  // Read those children, append plugin routes, and re-attach.
-  const existing = (fileRouteTree as unknown as { children?: AnyRoute[] })
-    .children;
-  const combined = [...(existing ?? []), ...pluginRoutes];
+  const combined = [...coreRoutes, ...pluginRoutes];
   fileRouteTree.addChildren(combined);
   return fileRouteTree;
 }
 
-export function createAppRouter() {
+export function createAppRouter(includePlugins = true) {
   return createRouter({
-    routeTree: buildRouteTree(),
+    routeTree: buildRouteTree(includePlugins),
+    basepath: getApplicationBasePath(),
     defaultPreload: "intent",
   });
 }

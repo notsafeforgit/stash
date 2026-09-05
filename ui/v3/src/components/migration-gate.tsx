@@ -35,6 +35,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { DEFAULT_LOCALE, LocaleProvider } from "@/components/locale-provider";
 import { SetupWizard } from "@/components/setup-wizard";
 import * as GQL from "@/core/generated-graphql";
+import { StartupError } from "./query-error";
 
 type SystemStatus = GQL.SystemStatusQuery["systemStatus"];
 type MigrationJob = Pick<
@@ -365,11 +366,15 @@ function MigrationRequiredDialog({
 }
 
 export function SystemStatusGate({ children }: PropsWithChildren) {
-  const { data, loading, refetch } = useQuery(GQL.SystemStatusDocument, {
+  const { data, loading, error, refetch } = useQuery(GQL.SystemStatusDocument, {
     fetchPolicy: "network-only",
   });
 
-  if (loading && !data) {
+  if (!data && error) {
+    return <StartupError error={error} retry={refetch} retrying={loading} />;
+  }
+
+  if (!data) {
     return <FullPageSpinner />;
   }
 

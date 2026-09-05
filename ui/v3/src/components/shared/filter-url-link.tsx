@@ -10,6 +10,7 @@
 import type React from "react";
 import { useRouter } from "@tanstack/react-router";
 import { cn } from "src/lib/utils";
+import { applicationHref } from "@/core/platform-url";
 
 export function FilterUrlLink({
   href,
@@ -23,16 +24,17 @@ export function FilterUrlLink({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const publicHref = applicationHref(href);
   return (
     <a
-      href={href}
+      href={publicHref}
       title={title}
       className={cn("text-primary hover:underline", className)}
       onClick={(e) => {
         // Modified clicks (new tab / window) keep browser behaviour.
         if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
         e.preventDefault();
-        router.history.push(href);
+        router.history.push(publicHref);
       }}
     >
       {children}

@@ -1,3 +1,4 @@
+import { applicationPath } from "@/core/platform-url";
 import type React from "react";
 import {
   createContext,
@@ -123,8 +124,7 @@ function EntityCardRoot({
   function doNavigate() {
     // Capture returnTo from window.location at click time — always synchronously
     // up-to-date, unlike useLocation() which lags behind router.history.replace().
-    const returnTo =
-      window.location.pathname + window.location.search + window.location.hash;
+    const returnTo = applicationPath(window.location.href);
     // href is a dynamic runtime string — cast needed because TanStack Router's
     // `to` is typed as a union of registered route paths, not plain string.
     // viewTransition: the browser snapshots the current frame and cross-fades

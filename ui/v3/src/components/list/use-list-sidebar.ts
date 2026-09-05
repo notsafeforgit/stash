@@ -77,12 +77,12 @@ export function useListSidebar(view?: View) {
       const next = { ...sectionOpen, [section]: open };
       setSectionOpenState(next);
       if (view === undefined) return;
-      router.history.replace(
-        `${location.pathname}${location.searchStr ? `?${location.searchStr}` : ""}`,
-        { ...(locationState ?? {}), sectionOpen: next },
-      );
+      router.history.replace(router.history.location.href, {
+        ...router.history.location.state,
+        sectionOpen: next,
+      });
     },
-    [sectionOpen, view, router, location, locationState],
+    [sectionOpen, view, router],
   );
 
   // ── Open / close ──────────────────────────────────────────────────────────

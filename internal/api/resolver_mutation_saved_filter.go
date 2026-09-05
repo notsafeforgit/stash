@@ -105,47 +105,28 @@ func (r *mutationResolver) SetDefaultFilter(ctx context.Context, input SetDefaul
 	// deprecated - write to the config in the meantime
 	config := config.GetInstance()
 
-	uiConfig := config.GetUIConfiguration()
-	if uiConfig == nil {
-		uiConfig = make(map[string]interface{})
-	}
-
-	m := utils.NestedMap(uiConfig)
-
-	if input.FindFilter == nil && input.ObjectFilter == nil && input.UIOptions == nil {
-		// clearing
-		m.Delete("defaultFilters." + strings.ToLower(input.Mode.String()))
-		config.SetUIConfiguration(m)
-
-		if err := config.Write(); err != nil {
+	var subMap map[string]interface{}
+	if input.FindFilter != nil || input.ObjectFilter != nil || input.UIOptions != nil {
+		subMap = make(map[string]interface{})
+		d, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+			TagName: "json", WeaklyTypedInput: true, Result: &subMap,
+		})
+		if err != nil {
 			return false, err
 		}
-
-		return true, nil
+		if err := d.Decode(input); err != nil {
+			return false, err
+		}
 	}
-
-	subMap := make(map[string]interface{})
-	d, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		TagName:          "json",
-		WeaklyTypedInput: true,
-		Result:           &subMap,
+	_, err := config.UpdateUIConfiguration(func(ui map[string]interface{}) (map[string]interface{}, error) {
+		m := utils.NestedMap(ui)
+		key := "defaultFilters." + strings.ToLower(input.Mode.String())
+		if subMap == nil {
+			m.Delete(key)
+		} else {
+			m.Set(key, subMap)
+		}
+		return ui, nil
 	})
-
-	if err != nil {
-		return false, err
-	}
-
-	if err := d.Decode(input); err != nil {
-		return false, err
-	}
-
-	m.Set("defaultFilters."+strings.ToLower(input.Mode.String()), subMap)
-
-	config.SetUIConfiguration(m)
-
-	if err := config.Write(); err != nil {
-		return false, err
-	}
-
-	return true, nil
+	return err == nil, err
 }

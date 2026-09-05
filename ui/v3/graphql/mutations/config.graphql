@@ -44,6 +44,10 @@ mutation ConfigureUI($input: Map, $partial: Map) {
   configureUI(input: $input, partial: $partial)
 }
 
+mutation ConfigureDefaultFilter($input: ConfigureDefaultFilterInput!) {
+  configureDefaultFilter(input: $input)
+}
+
 mutation ConfigureUISetting($key: String!, $value: Any) {
   configureUISetting(key: $key, value: $value)
 }

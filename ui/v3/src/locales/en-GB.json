@@ -232,7 +232,8 @@
     "view_image": "View image",
     "view_random": "View Random",
     "open": "Open",
-    "reload_ui": "Reload UI"
+    "reload_ui": "Reload UI",
+    "retry": "Retry"
   },
   "actions_name": "Actions",
   "add_row": "Add row",
@@ -1451,7 +1452,9 @@
     "lazy_component_error_help": "If you recently upgraded Stash, please reload the page or clear your browser cache.",
     "loading_failed": "Loading failed",
     "loading_type": "Error loading {type}",
-    "something_went_wrong": "Something went wrong."
+    "something_went_wrong": "Something went wrong.",
+    "load_failed": "Could not load data.",
+    "refresh_failed": "Could not refresh. Showing previously loaded data."
   },
   "eta": "ETA",
   "job": {
@@ -2365,5 +2368,8 @@
   "zip_file_count": "Zip File Count",
   "zoom": "Zoom",
   "zoom_in": "Zoom in",
-  "zoom_out": "Zoom out"
+  "zoom_out": "Zoom out",
+  "plugins": {
+    "load_failed": "Some plugins could not be loaded. Reload the page to try again."
+  }
 }

@@ -1,3 +1,5 @@
+import { getPlatformURL } from "./platform-url";
+export { getPlatformURL } from "./platform-url";
 import {
   ApolloClient,
   InMemoryCache,
@@ -69,28 +71,6 @@ const typePolicies: TypePolicies = {
 const possibleTypes = {
   BaseFile: ["VideoFile", "ImageFile", "GalleryFile"],
   VisualFile: ["VideoFile", "ImageFile"],
-};
-
-export const baseURL =
-  document.querySelector("base")?.getAttribute("href") ?? "/";
-
-export const getPlatformURL = (path?: string) => {
-  let url = new URL(window.location.origin + baseURL);
-
-  if (import.meta.env.DEV) {
-    if (import.meta.env.VITE_APP_PLATFORM_URL) {
-      url = new URL(import.meta.env.VITE_APP_PLATFORM_URL);
-    } else {
-      url.port = import.meta.env.VITE_APP_PLATFORM_PORT ?? "8010";
-      url.hostname = "127.0.0.1";
-    }
-  }
-
-  if (path) {
-    url.pathname += path;
-  }
-
-  return url;
 };
 
 export const createClient = () => {

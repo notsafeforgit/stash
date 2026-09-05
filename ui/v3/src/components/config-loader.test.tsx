@@ -1,5 +1,6 @@
 import type { PropsWithChildren } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { IntlProvider } from "react-intl";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { useQueryMock } = vi.hoisted(() => ({
@@ -12,7 +13,9 @@ vi.mock("@apollo/client/react", () => ({
 
 vi.mock("./locale-provider", () => ({
   DEFAULT_LOCALE: "en-GB",
-  LocaleProvider: ({ children }: PropsWithChildren) => children,
+  LocaleProvider: ({ children }: PropsWithChildren) => (
+    <IntlProvider locale="en-GB">{children}</IntlProvider>
+  ),
 }));
 
 vi.mock("src/hooks/config", () => ({
@@ -58,5 +61,38 @@ describe("ConfigLoader", () => {
     );
 
     expect(markup).not.toContain('data-testid="app-content"');
+  });
+
+  it("offers retry when initial configuration fails", () => {
+    useQueryMock.mockReturnValue({
+      loading: false,
+      error: new Error("Server unavailable"),
+      refetch: vi.fn(),
+    });
+    const markup = renderToStaticMarkup(
+      <ConfigLoader>
+        <div data-testid="app-content" />
+      </ConfigLoader>,
+    );
+    expect(markup).toContain("Server unavailable");
+    expect(markup).toContain("Retry");
+    expect(markup).not.toContain('data-testid="app-content"');
+  });
+
+  it("preserves the mounted app and explains a failed refresh", () => {
+    useQueryMock.mockReturnValue({
+      loading: false,
+      error: new Error("Offline"),
+      refetch: vi.fn(),
+      data: { configuration: { interface: {} } },
+    });
+    const markup = renderToStaticMarkup(
+      <ConfigLoader>
+        <div data-testid="app-content" />
+      </ConfigLoader>,
+    );
+    expect(markup).toContain('data-testid="app-content"');
+    expect(markup).toContain("Showing previously loaded data");
+    expect(markup).toContain("Retry");
   });
 });

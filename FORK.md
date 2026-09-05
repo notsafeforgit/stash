@@ -75,6 +75,13 @@ both humans and LLM agents performing a sync.
    During iteration, use `make test`, `make validate-ui-v3`, and focused
    integration tests such as
    `go test -tags integration ./pkg/sqlite/... -run SavedFilter`.
+   v3 validation also runs Vitest and the [pinned v2.5 compatibility check](ui/v3/scripts/check-compatibility.mjs).
+   It validates mainline client operations and detects breaking GraphQL changes,
+   changed argument defaults, and changes to upstream's migration track. After
+   an upstream sync, update [the baseline revision](ui/v3/scripts/compatibility-baseline.json)
+   to the new upstream base and review the compatibility results. The SQLite
+   suite includes [mainline write fixtures](pkg/sqlite/testdata/v25_saved_filter_edits.sql)
+   exercised across v3 close/reopen cycles.
    For an upstream sync that changes v2.5, additionally run
    `make generate && make validate`; fork feature work must not edit v2.5.
 6. `ui/v2.5/` is read-only fork-side: upstream changes rebase in freely; fork
@@ -114,6 +121,13 @@ preserves the canonical default-filter AST and compatibility shadow. v3
 reconciles these values at startup. Its default-filter controls replace or
 clear both namespaces atomically, and surface a choice when a v2.5 edit
 conflicts with a complex v3 default.
+
+V3 route names may differ from v2.5. Compatibility applies to the existing
+clients' API and storage contracts. V3 navigation and HTTP requests must honor
+the public mount point in the server's base element; raw filter links and
+history writes use `applicationHref`, while backend requests use `getPlatformURL`.
+Default-filter controls use the additive `configureDefaultFilter` mutation;
+legacy `configureUI`, `configureUISetting`, and `setDefaultFilter` remain available.
 
 ## Retiring v2.5 compatibility
 

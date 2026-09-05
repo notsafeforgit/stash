@@ -1,0 +1,26 @@
+enum DefaultFilterAction {
+  SET
+  CLEAR
+  USE_LEGACY
+  KEEP_V3
+}
+
+input DefaultFilterInput {
+  mode: FilterMode!
+  find_filter: FindFilterType
+  filter_ast: FilterASTInput
+  ui_options: Map
+}
+
+input ConfigureDefaultFilterInput {
+  "View key, including scoped views such as performer_scenes"
+  view: String!
+  action: DefaultFilterAction!
+  "Required for SET; conflict resolution uses the current server state"
+  filter: DefaultFilterInput
+}
+
+extend type Mutation {
+  "Atomically updates a view's default filter and its v2.5 compatibility state"
+  configureDefaultFilter(input: ConfigureDefaultFilterInput!): Map!
+}

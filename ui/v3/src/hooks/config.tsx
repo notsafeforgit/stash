@@ -111,6 +111,19 @@ export const useConfigureUI = () => {
   return [trackedMutate, result] as const;
 };
 
+export const useConfigureDefaultFilter = () => {
+  const trackSave = useTrackedSave();
+  const [mutate, result] = useMutation(GQL.ConfigureDefaultFilterDocument, {
+    update: (cache, mutationResult) =>
+      updateUIConfig(cache, mutationResult.data?.configureDefaultFilter),
+  });
+  const trackedMutate = useCallback<typeof mutate>(
+    (options) => trackSave(mutate(options)),
+    [mutate, trackSave],
+  );
+  return [trackedMutate, result] as const;
+};
+
 // The configure* mutations return their sub-config result objects without
 // an `id`, so Apollo's normalised cache can't merge them automatically.
 // Each hook below patches the corresponding key of the cached

@@ -1,3 +1,4 @@
+import { getPlatformURL } from "@/core/platform-url";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMsg } from "src/hooks/message";
 import { Button } from "src/components/ui/button";
@@ -16,7 +17,11 @@ function SettingsToolsPage() {
           label={msg("config.tools.graphql_playground", "GraphQL playground")}
           description="Interactive query console for the GraphQL API."
           actions={
-            <a href="/playground" target="_blank" rel="noopener noreferrer">
+            <a
+              href={getPlatformURL("playground").href}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               <Button type="button" variant="outline">
                 {msg("actions.open", "Open")}
               </Button>

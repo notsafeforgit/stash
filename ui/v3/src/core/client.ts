@@ -1,3 +1,5 @@
+import { affectedActiveQueries, rootFields } from "./mutation-invalidation";
+import { invalidateAfterEntityJob } from "./entity-job-invalidation";
 import type {
   ApolloCache,
   DocumentNode,
@@ -8,15 +10,15 @@ import {
   isReference,
   type Reference,
 } from "@apollo/client/cache";
-import { useMutation } from "@apollo/client/react";
+import { useApolloClient, useMutation } from "@apollo/client/react";
 import type { TypedDocumentNode } from "@graphql-typed-document-node/core";
 import type { FieldNode, OperationDefinitionNode } from "graphql";
 import { createClient } from "./create-client";
 
-const { client, wsClient } = createClient();
-
-export const getClient = () => client;
-export const getWSClient = () => wsClient;
+let clients: ReturnType<typeof createClient> | undefined;
+const getClients = () => (clients ??= createClient());
+export const getClient = () => getClients().client;
+export const getWSClient = () => getClients().wsClient;
 
 function isField(node: { kind: string }): node is FieldNode {
   return node.kind === "Field";
@@ -124,9 +126,9 @@ export function removeEntitiesFromCache({
 /**
  * `useMutation` for mutations that change relationships, counts, or aggregate
  * fields — creates, destroys, bulk updates, edit-form submits, merges. Defaults
- * `refetchQueries` to `"active"` so any open detail page with stale parent-
- * aggregate fields (e.g. `Performer.scene_count`, conditionally-rendered
- * tabs) refetches once the mutation resolves. Pair with `removeEntitiesFromCache`
+ * refetching to active queries in the affected library domains, including
+ * parent counts and relationship lists. Configuration and plugin queries
+ * are not part of library invalidation. Pair with `removeEntitiesFromCache`
  * inside `update` for the destroying entity's own list, so the visible card
  * still drops with no flash while the rest of the page reconciles.
  *
@@ -138,8 +140,18 @@ export function useEntityMutation<TData, TVariables extends OperationVariables>(
   document: TypedDocumentNode<TData, TVariables>,
   options?: useMutation.Options<TData, TVariables>,
 ) {
+  const client = useApolloClient();
   return useMutation<TData, TVariables>(document, {
-    refetchQueries: "active",
+    refetchQueries: (result) => {
+      if (rootFields(document).some((field) => /^bulk.*Job$/.test(field))) {
+        for (const id of Object.values(result.data ?? {})) {
+          if (typeof id === "string")
+            invalidateAfterEntityJob(client, document, id);
+        }
+        return [];
+      }
+      return affectedActiveQueries(client, document);
+    },
     ...options,
   } as useMutation.Options<TData, TVariables, ApolloCache, TVariables>);
 }

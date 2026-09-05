@@ -558,7 +558,11 @@ func (i *Config) SetPassword(value string) {
 func (i *Config) Write() error {
 	i.Lock()
 	defer i.Unlock()
+	return i.write()
+}
 
+// write requires the config lock to be held.
+func (i *Config) write() error {
 	data, err := i.marshal()
 	if err != nil {
 		return err

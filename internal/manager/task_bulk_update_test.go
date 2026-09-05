@@ -135,7 +135,8 @@ func TestBulkUpdateJobContinuesAfterItemErrorsWhenHooksEnabled(t *testing.T) {
 
 	jobState := jobMgr.GetJob(jobID)
 	assert.NotNil(t, jobState)
-	assert.Equal(t, job.StatusFinished, jobState.Status)
+	assert.Equal(t, job.StatusFailed, jobState.Status)
+	assert.Contains(t, *jobState.Error, "1 of 3 items failed: 2: boom")
 	assert.Equal(t, 1.0, jobState.Progress)
 }
 
@@ -177,6 +178,7 @@ func TestBulkUpdateJobContinuesAfterItemErrorsWhenHooksDisabled(t *testing.T) {
 
 	jobState := jobMgr.GetJob(jobID)
 	assert.NotNil(t, jobState)
-	assert.Equal(t, job.StatusFinished, jobState.Status)
+	assert.Equal(t, job.StatusFailed, jobState.Status)
+	assert.Contains(t, *jobState.Error, "1 of 3 items failed: 5: boom")
 	assert.Equal(t, 1.0, jobState.Progress)
 }

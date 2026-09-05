@@ -1,3 +1,4 @@
+import { applicationHref } from "@/core/platform-url";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useRouter } from "@tanstack/react-router";
 import { ListFilterModel } from "src/models/list-filter/filter";
@@ -150,9 +151,9 @@ function useFilterURL(
           stripPageParam(newFilter.makeQueryParameters()) ===
             stripPageParam(prevFilter.makeQueryParameters());
         if (isPageOnlyChange) {
-          router.history.push(newHref);
+          router.history.push(applicationHref(newHref));
         } else {
-          router.history.replace(newHref);
+          router.history.replace(applicationHref(newHref));
         }
       }
     },
@@ -177,9 +178,11 @@ function useFilterURL(
         if (expectedSearchStr !== location.searchStr) {
           const hash = location.hash ? `#${location.hash}` : "";
           router.history.replace(
-            merged
-              ? `${location.pathname}?${merged}${hash}`
-              : `${location.pathname}${hash}`,
+            applicationHref(
+              merged
+                ? `${location.pathname}?${merged}${hash}`
+                : `${location.pathname}${hash}`,
+            ),
           );
         }
       }
@@ -224,9 +227,11 @@ function useFilterURL(
     if (expectedSearchStr !== location.searchStr) {
       const hash = location.hash ? `#${location.hash}` : "";
       router.history.replace(
-        merged
-          ? `${location.pathname}?${merged}${hash}`
-          : `${location.pathname}${hash}`,
+        applicationHref(
+          merged
+            ? `${location.pathname}?${merged}${hash}`
+            : `${location.pathname}${hash}`,
+        ),
       );
     }
     setFilterState(newFilter);

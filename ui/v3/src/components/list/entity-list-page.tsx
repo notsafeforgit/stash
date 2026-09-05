@@ -1,3 +1,4 @@
+import { QueryError } from "@/components/query-error";
 import React, {
   useContext,
   useState,
@@ -1050,12 +1051,17 @@ export function EntityListPage<TData, TItem extends IHasID>({
   // GraphQL path. When `localSource` is in play we still call useQuery
   // (with `skip: true` and a noop document) to keep the hook order
   // stable across modes — the result is ignored.
+  const queryVariables =
+    query && makeVariables ? makeVariables(debouncedFilter) : undefined;
   const rawResult = useQuery(query ?? NOOP_QUERY, {
-    variables:
-      query && makeVariables ? makeVariables(debouncedFilter) : undefined,
+    variables: queryVariables,
     skip: !query,
   });
-  const result = useCachedQueryResult(debouncedFilter, rawResult);
+  const result = useCachedQueryResult(
+    debouncedFilter,
+    rawResult,
+    JSON.stringify(queryVariables),
+  );
 
   // True whenever the *query* variables (or local-filter inputs) will
   // change vs the debounced state. Zoom and displayMode are UI-only —
@@ -1138,7 +1144,7 @@ export function EntityListPage<TData, TItem extends IHasID>({
       items.length,
     );
   useEffect(() => {
-    if (isLoading || localSource || !query) return;
+    if (isLoading || rawResult.error || localSource || !query) return;
 
     if (filter.currentPage > totalPagesAfterDataChange) {
       setFilter((f) => f.changePage(totalPagesAfterDataChange));
@@ -1146,7 +1152,7 @@ export function EntityListPage<TData, TItem extends IHasID>({
     }
 
     if (preserveScrollDuringRefill) {
-      void refetch();
+      void refetch().catch(() => {});
     }
   }, [
     filter,
@@ -1157,6 +1163,7 @@ export function EntityListPage<TData, TItem extends IHasID>({
     refetch,
     setFilter,
     totalPagesAfterDataChange,
+    rawResult.error,
   ]);
 
   const applyToAllTarget = useMemo<BulkApplyTarget>(
@@ -1317,7 +1324,17 @@ export function EntityListPage<TData, TItem extends IHasID>({
       sortOptions={sortOptionsOverride}
       pageActions={pageActions}
     >
-      {taggerActive && renderTagger ? (
+      {!localSource && rawResult.error && (
+        <QueryError
+          error={rawResult.error}
+          retry={refetch}
+          retrying={rawResult.loading}
+          stale={result.data !== undefined}
+        />
+      )}
+      {!localSource &&
+      rawResult.error &&
+      result.data === undefined ? null : taggerActive && renderTagger ? (
         renderTagger(items)
       ) : !isLoading && items.length === 0 ? (
         // The "active" branch fires whenever the user has narrowed

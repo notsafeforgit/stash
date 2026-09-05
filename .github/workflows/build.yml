@@ -73,14 +73,25 @@ jobs:
         path: |
           ui/v2.5/build
           ui/v3/build
-        key: ${{ runner.os }}-ui-build-${{ hashFiles('ui/v2.5/pnpm-lock.yaml', 'ui/v2.5/public/**', 'ui/v2.5/src/**', 'ui/v3/pnpm-lock.yaml', 'ui/v3/public/**', 'ui/v3/src/**', 'ui/v3/graphql/**', 'graphql/**/*.graphql') }}
+        key: >-
+          ${{ runner.os }}-ui-build-${{ hashFiles(
+          '.github/workflows/build.yml', 'Makefile', '.npmrc',
+          'ui/v2.5/package.json', 'ui/v2.5/pnpm-lock.yaml', 'ui/v2.5/pnpm-workspace.yaml', 'ui/v2.5/.npmrc',
+          'ui/v2.5/vite.config.*', 'ui/v2.5/tsconfig*.json', 'ui/v2.5/index.html', 'ui/v2.5/codegen.*',
+          'ui/v2.5/graphql/**', 'ui/v2.5/public/**', 'ui/v2.5/src/**',
+          'ui/v3/package.json', 'ui/v3/pnpm-lock.yaml', 'ui/v3/pnpm-workspace.yaml', 'ui/v3/.npmrc',
+          'ui/v3/vite.config.*', 'ui/v3/tsconfig*.json', 'ui/v3/index.html', 'ui/v3/codegen.*',
+          'ui/v3/biome.jsonc', 'ui/v3/components.json', 'ui/v3/scripts/**',
+          'ui/v3/public/**', 'ui/v3/src/**', 'ui/v3/graphql/**', 'graphql/**/*.graphql') }}
 
-    - name: Validate UI
+    - name: Validate v3 and v2.5 compatibility
+      run: make validate-ui-v3
+
+    - name: Validate v2.5 UI
       # skip UI validation for pull requests if UI is unchanged
       if: ${{ github.event_name != 'pull_request' || steps.cache-ui.outputs.cache-hit != 'true' }}
       run: |
         make validate-ui
-        make validate-ui-v3
 
     - name: Build UI
       # skip UI build for pull requests if UI is unchanged (UI was cached)

@@ -122,7 +122,11 @@ export function SceneSelectDialog({
             const meta = [s.studioName, s.date].filter(Boolean).join(" · ");
             if (meta) subs.push(meta);
             if (s.filePath) {
-              subs.push(<span className="font-mono">{s.filePath}</span>);
+              subs.push(
+                <span className="font-mono" data-selectable-text>
+                  {s.filePath}
+                </span>,
+              );
             }
             return (
               <SearchResultRow

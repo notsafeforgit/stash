@@ -63,6 +63,7 @@ export const GroupCard: React.FC<GroupCardProps> = ({
   return (
     <>
       <EntityCard
+        label={group.name}
         id={group.id}
         href={`/groups/${group.id}`}
         isMobile={isMobile}

@@ -184,6 +184,7 @@ export function useOfflineListSource(args: {
 
   return useMemo<LocalDataSource<OfflineCardItem>>(
     () => ({
+      kind: "local",
       // The chrome treats `items` as the raw input; `filter` projects
       // it to the page slice. We pass the entries straight through
       // and do all the work in `filter` so the dependency graph is

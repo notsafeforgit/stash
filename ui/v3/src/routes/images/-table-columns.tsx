@@ -58,6 +58,7 @@ export function useImageTableColumns(): ColumnDef<ImageItem>[] {
 
       textColumn<ImageItem>({
         id: "path",
+        selectableText: true,
         header: intl.formatMessage({ id: "path" }),
         getValue: (img) => img.visual_files[0]?.path ?? null,
         className: "text-xs text-muted-foreground font-mono truncate max-w-xs",

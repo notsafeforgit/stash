@@ -209,15 +209,15 @@ const CustomFieldFilterTag: React.FC<{
   }, [criterion, editing, intl]);
 
   return (
-    <span
-      className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-md bg-secondary text-secondary-foreground cursor-pointer hover:bg-secondary/80"
-      onClick={onEditCriterion}
-    >
-      {label}
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-md bg-secondary text-secondary-foreground cursor-pointer hover:bg-secondary/80">
+      <Button variant="ghost" size="sm" onClick={onEditCriterion}>
+        {label}
+      </Button>
       <Button
         type="button"
         variant="ghost"
         size="icon-xs"
+        aria-label={intl.formatMessage({ id: "actions.remove" })}
         onClick={(e) => {
           onRemoveCriterion();
           e.stopPropagation();

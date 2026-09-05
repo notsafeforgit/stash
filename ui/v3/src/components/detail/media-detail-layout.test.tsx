@@ -8,7 +8,7 @@ describe("MediaDetailLayout focus viewer", () => {
     const markup = renderToStaticMarkup(
       <IntlProvider locale="en">
         <MediaDetailLayout
-          primaryContent={<video data-testid="same-player" />}
+          primaryContent={<video muted data-testid="same-player" />}
           tabs={[{ id: "details", label: "Details", content: <p>Info</p> }]}
           mobilePageScroll
           primaryFocusMode

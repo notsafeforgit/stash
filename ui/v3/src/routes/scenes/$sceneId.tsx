@@ -453,7 +453,6 @@ function SceneDetailPage() {
           registerBoundSetter={registerBoundSetter}
         />
       ),
-      selectable: false,
     },
     ...(scene.groups.length > 0
       ? [
@@ -464,7 +463,6 @@ function SceneDetailPage() {
               defaultMessage: "Groups",
             }),
             content: <SceneGroupsTab scene={scene} />,
-            selectable: false,
           },
         ]
       : []),
@@ -477,7 +475,6 @@ function SceneDetailPage() {
               defaultMessage: "Galleries",
             }),
             content: <SceneGalleriesTab scene={scene} />,
-            selectable: false,
           },
         ]
       : []),
@@ -495,13 +492,11 @@ function SceneDetailPage() {
       label: intl.formatMessage({ id: "history", defaultMessage: "History" }),
       shortcut: "h",
       content: <SceneHistoryTab scene={scene} />,
-      selectable: false,
     },
     {
       id: "filters",
       label: intl.formatMessage({ id: "filters", defaultMessage: "Filters" }),
       content: <SceneVideoFilterTab sceneFile={scene.files[0]} />,
-      selectable: false,
     },
   ];
 

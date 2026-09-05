@@ -588,16 +588,14 @@ export function EntityDataTable<TItem extends IHasID>({
                   const isSelected = row.getIsSelected();
                   // In select mode, clicks on blank row chrome toggle that
                   // row (matches the card view's tap-to-select). Skip the
-                  // handler for clicks landing on interactive descendants
-                  // (links, buttons, checkboxes) so navigation/menus still
-                  // work normally — the checkbox column has its own
-                  // stopPropagation, but this guards everything else.
+                  // handler for controls and copyable values so navigation,
+                  // menus, and selecting a file path work independently.
                   const onRowClick = listSelect.selecting
                     ? (e: React.MouseEvent<HTMLTableRowElement>) => {
                         const target = e.target as HTMLElement;
                         if (
                           target.closest(
-                            'a, button, input, label, [role="button"], [role="menuitem"]',
+                            'a, button, input, label, [role="button"], [role="menuitem"], [data-selectable-text], code, pre',
                           )
                         ) {
                           return;

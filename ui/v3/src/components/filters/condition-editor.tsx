@@ -187,7 +187,8 @@ export const FilterDragHandle: React.FC<{
   isDragging: boolean;
   label: string;
 }> = ({ attributes, listeners, setActivatorNodeRef, isDragging, label }) => (
-  <span
+  <Button
+    variant="ghost"
     ref={setActivatorNodeRef}
     className="filter-drag-rail"
     title={label}
@@ -199,7 +200,7 @@ export const FilterDragHandle: React.FC<{
     <span className="text-[10px] leading-[0.7] select-none" aria-hidden="true">
       ⋮⋮
     </span>
-  </span>
+  </Button>
 );
 
 // ── ConditionEditor ───────────────────────────────────────────────────────────

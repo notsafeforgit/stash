@@ -1,3 +1,4 @@
+import { useIntl } from "react-intl";
 import { Link } from "@tanstack/react-router";
 import { BarChart3, Heart, HelpCircle, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export function UserMenu() {
+  const intl = useIntl();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -37,7 +39,9 @@ export function UserMenu() {
         <DropdownMenuSeparator />
         <DropdownMenuItem
           render={
+            // biome-ignore lint/a11y/useAnchorContent: DropdownMenuItem supplies visible text through the Base UI render prop.
             <a
+              aria-label={intl.formatMessage({ id: "help" })}
               href="https://docs.stashapp.cc"
               target="_blank"
               rel="noopener noreferrer"
@@ -50,7 +54,9 @@ export function UserMenu() {
         </DropdownMenuItem>
         <DropdownMenuItem
           render={
+            // biome-ignore lint/a11y/useAnchorContent: DropdownMenuItem supplies visible text through the Base UI render prop.
             <a
+              aria-label={intl.formatMessage({ id: "donate" })}
               href="https://opencollective.com/stashapp"
               target="_blank"
               rel="noopener noreferrer"

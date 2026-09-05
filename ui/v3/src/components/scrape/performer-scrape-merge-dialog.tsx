@@ -436,7 +436,11 @@ export function PerformerScrapeMergeDialog({
             ) : (
               <ul className="flex flex-col gap-0.5">
                 {current.urls.map((u) => (
-                  <li key={u} className="break-all text-xs">
+                  <li
+                    key={u}
+                    className="break-all text-xs"
+                    data-selectable-text
+                  >
                     {u}
                   </li>
                 ))}
@@ -447,7 +451,11 @@ export function PerformerScrapeMergeDialog({
             mergeMode === "overwrite" || current.urls.length === 0 ? (
               <ul className="flex flex-col gap-0.5">
                 {incoming.map((u) => (
-                  <li key={u} className="break-all text-xs">
+                  <li
+                    key={u}
+                    className="break-all text-xs"
+                    data-selectable-text
+                  >
                     {u}
                   </li>
                 ))}
@@ -465,7 +473,7 @@ export function PerformerScrapeMergeDialog({
                 {additions.map((u) => (
                   <li key={u} className="break-all text-xs">
                     <span className="text-emerald-500 mr-1 select-none">+</span>
-                    {u}
+                    <span data-selectable-text>{u}</span>
                   </li>
                 ))}
               </ul>
@@ -528,12 +536,18 @@ export function PerformerScrapeMergeDialog({
           onAcceptedChange={setAccepted}
           current={
             existing ? (
-              <span className="break-all text-xs">{existing.stash_id}</span>
+              <span className="break-all text-xs" data-selectable-text>
+                {existing.stash_id}
+              </span>
             ) : (
               emptyOrText(null)
             )
           }
-          scraped={<span className="break-all text-xs">{newId}</span>}
+          scraped={
+            <span className="break-all text-xs" data-selectable-text>
+              {newId}
+            </span>
+          }
         />
       ),
       apply: (patch) => {

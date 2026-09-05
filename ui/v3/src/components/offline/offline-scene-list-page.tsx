@@ -130,7 +130,7 @@ export function OfflineSceneListPage() {
       // saved-filter / URL serialisation infrastructure stays valid.
       filterMode: GQL.FilterMode.Scenes,
       defaultSort: OFFLINE_DEFAULT_SORT,
-      localSource,
+      source: localSource,
       sidebarContent: (
         <OfflineFilterSidebar
           entries={entries}

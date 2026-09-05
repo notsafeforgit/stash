@@ -14,13 +14,15 @@ const TagItem: React.FC<{
   title?: string;
   children: React.ReactNode;
 }> = ({ className, onClick, title, children }) => (
-  <span
+  <Button
+    variant="secondary"
+    size="sm"
     className={`inline-flex cursor-pointer items-center rounded-full bg-muted px-2 py-0.5 text-xs hover:bg-muted/70 ${className ?? ""}`}
     onClick={onClick}
     title={title}
   >
     {children}
-  </span>
+  </Button>
 );
 
 export const FilterASTSummary: React.FC<{

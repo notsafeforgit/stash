@@ -1,5 +1,6 @@
+import { Label } from "@/components/ui/label";
 import type React from "react";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { Dialog } from "@base-ui/react";
 import { FormattedMessage, useIntl } from "react-intl";
 import { Button } from "src/components/ui/button";
@@ -13,6 +14,7 @@ export const SaveFilterDialog: React.FC<{
   isSaving?: boolean;
 }> = ({ mode, onClose, isSaving = false }) => {
   const intl = useIntl();
+  const nameId = useId();
   const [filterName, setFilterName] = useState("");
 
   const { data } = useFindSavedFilters(mode);
@@ -40,10 +42,14 @@ export const SaveFilterDialog: React.FC<{
 
           <div className="space-y-4">
             <div>
-              <label className="mb-1 block text-sm font-medium">
+              <Label
+                htmlFor={nameId}
+                className="mb-1 block text-sm font-medium"
+              >
                 <FormattedMessage id="filter_name" />
-              </label>
+              </Label>
               <Input
+                id={nameId}
                 type="text"
                 placeholder={`${intl.formatMessage({ id: "filter_name" })}…`}
                 value={filterName}

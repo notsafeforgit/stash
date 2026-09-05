@@ -30,6 +30,7 @@ export function StudioDetailsTab({ studio }: { studio: StudioData }) {
 
       {studio.urls && studio.urls.length > 0 && (
         <MetaRow
+          selectableText
           label={intl.formatMessage({ id: "urls", defaultMessage: "URLs" })}
         >
           <div className="flex flex-col gap-0.5">

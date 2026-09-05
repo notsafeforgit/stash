@@ -17,9 +17,8 @@ both humans and LLM agents performing a sync.
 - Mainline v2.5 API clients must keep working. Fork features add compatibility
   layers at the resolver level rather than changing existing API semantics
   (see "Saved filters" in CLAUDE.md for the pattern).
-- Planned rollout gating: the v3 UI and supporting features will sit behind a
-  launch flag (`--enable-v3-ui`), later inverted to `--enable-v2-ui` when v3
-  becomes the default, then removed when v2.5 is dropped.
+- The v3 UI is currently gated by `--enable-v3-ui` / `STASH_ENABLE_V3_UI=true`.
+  Keep the existing v2.5 UI and client contract available throughout the rewrite.
 
 ## Design rules that keep rebases cheap
 
@@ -29,9 +28,9 @@ both humans and LLM agents performing a sync.
    semantics of an existing GraphQL field or argument.
 3. **Touch shared upstream files minimally** — a one-line `case` branch or call
    into a fork-owned file, not inline logic.
-4. **Never edit generated files by hand** (`internal/api/generated_*.go` is
-   gitignored; `ui/*/src/core/generated-graphql.ts` is checked in). They are
-   products of `make generate`.
+4. **Never edit generated files by hand** (`internal/api/generated_*.go` and the v3
+   `src/core/generated-graphql.ts` are gitignored). Regenerate the backend
+   with `make generate` and v3 operations with `pnpm --dir ui/v3 gqlgen`.
 
 ## Sync playbook
 
@@ -99,6 +98,9 @@ both humans and LLM agents performing a sync.
 | `ui/v3/` | entire v3 UI | none (new directory) |
 | `ui/ui_v3.go` | v3 embedded UI selector; keep `ui/ui.go` upstream-shaped for v2.5 | low |
 | `graphql/schema/` | additive v3 API fields, including filter ASTs and loss-aware performer merge opt-in | low (additive) |
+| `internal/api/resolver_mutation_bulk_*.go` + `bulk_update.go` | fork bulk-job orchestration; legacy synchronous adapters remain in shared resolvers | low (new files) |
+| `internal/api/resolver_mutation_default_filter.go` + `internal/manager/default_filter_update.go` | atomic per-view default-filter updates | low (new files) |
+| `internal/api/job_subscription.go` | cancel-aware job subscription forwarding | low (new file) |
 | `internal/api/performer_merge_*.go` | canonical-name retention and opt-in loss-aware performer merge validation | low (new files) |
 | `pkg/models/filter_ast*.go` | AST model + v2.5 compat layer | none (new files) |
 | `pkg/sqlite/fork_migrate.go` + `pkg/sqlite/migrations/fork_*.go` | consolidated fork migration and roll-forward reconcilers | low |

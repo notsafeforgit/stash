@@ -1,5 +1,6 @@
+import { Label } from "@/components/ui/label";
 import type React from "react";
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 import { useQuery } from "@apollo/client/react";
 import {
   CriterionModifier,
@@ -70,6 +71,7 @@ const StudioTagHierarchySelector: React.FC<{
   setCriterion: (c: StudioTagsCriterion) => void;
   renderHierarchyModeSelect?: TagsFilterProps["renderHierarchyModeSelect"];
 }> = ({ criterion, setCriterion, renderHierarchyModeSelect }) => {
+  const hierarchyId = useId();
   const intl = useIntl();
 
   if (
@@ -117,13 +119,14 @@ const StudioTagHierarchySelector: React.FC<{
 
   return (
     <div className="mb-2">
-      <label>
+      <Label htmlFor={hierarchyId}>
         {intl.formatMessage({
           id: "studio_tag_hierarchy_mode_label",
           defaultMessage: "Studio hierarchy",
         })}
-      </label>
+      </Label>
       <PinnableComboBox
+        id={hierarchyId}
         currentLabel={
           hierarchyModeOptions.find((o) => o.value === currentMode)?.label ??
           currentMode

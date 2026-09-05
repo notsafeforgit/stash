@@ -161,6 +161,7 @@ export function useSceneTableColumns(): ColumnDef<SceneItem>[] {
 
       textColumn<SceneItem>({
         id: "path",
+        selectableText: true,
         header: intl.formatMessage({ id: "path" }),
         getValue: (scene) => scene.files[0]?.path ?? null,
         className: "text-xs text-muted-foreground font-mono truncate max-w-xs",

@@ -8,7 +8,7 @@ This is a tracking fork of `stashapp/stash`. Read root-level `CLAUDE.md` for cur
 
 ## Project Structure
 
-File-based TanStack routes live in `src/routes/`; feature components are in `src/components/`, with shadcn/Base UI primitives in `src/components/ui/`. Domain/Apollo helpers live in `src/core/`; shared hooks, models, plugins, utilities, styles, and locales use their matching `src/` directories. Operations are under `graphql/`, static assets under `public/`, and implementation notes under `docs/`. Backend schemas and services are at root `graphql/schema/`, `internal/`, and `pkg/`.
+File-based TanStack routes live in `src/routes/`; feature components are in `src/components/`, with shadcn/Base UI primitives in `src/components/ui/`. Domain/Apollo helpers live in `src/core/`; shared hooks, models, plugins, utilities, styles, and locales use their matching `src/` directories. Operations are under `graphql/`, static assets under `public/`, and current architecture under `docs/architecture.md`; historical plans are under `docs/archive/`. Backend schemas and services are at root `graphql/schema/`, `internal/`, and `pkg/`.
 
 ## Build, Test, and Development Commands
 
@@ -18,7 +18,7 @@ Run integrated workflows from the Git root:
 - `STASH_ENABLE_V3_UI=true make server-start` runs the Go backend on port 9999.
 - `VITE_APP_PLATFORM_URL=http://127.0.0.1:9999 make ui-v3-start` runs Vite on port 3002.
 - `make ui-v3-only` type-checks and builds the embedded v3 assets.
-- `make validate-ui-v3` runs generation, Biome, TypeScript, formatting, and locale checks.
+- `make validate-ui-v3` runs generation, Biome (including accessibility), TypeScript, formatting, locale checks, Vitest, and the pinned v2.5 compatibility check.
 - `make lint` runs CI-pinned `golangci-lint` through `go run`; no local install is required.
 - `make validate-fork` is the pre-push gate for backend generation, Go lint/integration tests, and v3 validation.
 - From `ui/v3`, `pnpm test --run` runs Vitest once and `pnpm gqlgen` refreshes GraphQL types.

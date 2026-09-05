@@ -276,7 +276,11 @@ export function useSceneListConfig(
   onEdit: (id: string) => void,
   hidePerformers?: boolean,
 ): {
-  config: EntityListPageConfig<GQL.FindScenesQuery, SceneItem>;
+  config: EntityListPageConfig<
+    GQL.FindScenesQuery,
+    SceneItem,
+    GQL.FindScenesQueryVariables
+  >;
   lightboxElement: React.ReactNode;
   lightboxOpen: boolean;
 } {
@@ -332,18 +336,27 @@ export function useSceneListConfig(
   // display mode the global /scenes route does.
   const tableColumns = useSceneTableColumns();
 
-  const config = useMemo<EntityListPageConfig<GQL.FindScenesQuery, SceneItem>>(
+  const config = useMemo<
+    EntityListPageConfig<
+      GQL.FindScenesQuery,
+      SceneItem,
+      GQL.FindScenesQueryVariables
+    >
+  >(
     () => ({
       filterMode: GQL.FilterMode.Scenes,
-      query: GQL.FindScenesDocument,
-      makeVariables: (filter) => ({
-        filter: filter.makeFindFilter(),
-        scene_filter_ast: filter.makeFilterAST(),
-      }),
-      extractResult: (data) => ({
-        count: data?.findScenes.count ?? 0,
-        items: data?.findScenes.scenes ?? [],
-      }),
+      source: {
+        kind: "graphql",
+        query: GQL.FindScenesDocument,
+        makeVariables: (filter) => ({
+          filter: filter.makeFindFilter(),
+          scene_filter_ast: filter.makeFilterAST(),
+        }),
+        extractResult: (data) => ({
+          count: data?.findScenes.count ?? 0,
+          items: data?.findScenes.scenes ?? [],
+        }),
+      },
       renderCard,
       renderTableRow,
       tableColumns,
@@ -392,7 +405,11 @@ export function useImageListConfig(
   getExtraProps?: (image: ImageItem) => ImageCardExtras,
   hidePerformers?: boolean,
 ): {
-  config: EntityListPageConfig<GQL.FindImagesQuery, ImageItem>;
+  config: EntityListPageConfig<
+    GQL.FindImagesQuery,
+    ImageItem,
+    GQL.FindImagesQueryVariables
+  >;
   lightboxElement: React.ReactNode;
   lightboxOpen: boolean;
 } {
@@ -439,6 +456,7 @@ export function useImageListConfig(
       }),
       textColumn<ImageItem>({
         id: "path",
+        selectableText: true,
         header: intl.formatMessage({ id: "path" }),
         getValue: (img) => img.visual_files[0]?.path ?? null,
         className: "text-xs text-muted-foreground font-mono truncate max-w-xs",
@@ -487,18 +505,27 @@ export function useImageListConfig(
     [onEdit],
   );
 
-  const config = useMemo<EntityListPageConfig<GQL.FindImagesQuery, ImageItem>>(
+  const config = useMemo<
+    EntityListPageConfig<
+      GQL.FindImagesQuery,
+      ImageItem,
+      GQL.FindImagesQueryVariables
+    >
+  >(
     () => ({
       filterMode: GQL.FilterMode.Images,
-      query: GQL.FindImagesDocument,
-      makeVariables: (filter) => ({
-        filter: filter.makeFindFilter(),
-        image_filter_ast: filter.makeFilterAST(),
-      }),
-      extractResult: (data) => ({
-        count: data?.findImages.count ?? 0,
-        items: data?.findImages.images ?? [],
-      }),
+      source: {
+        kind: "graphql",
+        query: GQL.FindImagesDocument,
+        makeVariables: (filter) => ({
+          filter: filter.makeFindFilter(),
+          image_filter_ast: filter.makeFilterAST(),
+        }),
+        extractResult: (data) => ({
+          count: data?.findImages.count ?? 0,
+          items: data?.findImages.images ?? [],
+        }),
+      },
       renderCard,
       renderTableRow,
       zoomable: true,
@@ -732,7 +759,11 @@ function useGalleryImageLightbox() {
 }
 
 export function useGalleryListConfig(onEdit: (id: string) => void): {
-  config: EntityListPageConfig<GQL.FindGalleriesQuery, GalleryItem>;
+  config: EntityListPageConfig<
+    GQL.FindGalleriesQuery,
+    GalleryItem,
+    GQL.FindGalleriesQueryVariables
+  >;
   lightboxElement: React.ReactNode;
   lightboxOpen: boolean;
 } {
@@ -782,19 +813,26 @@ export function useGalleryListConfig(onEdit: (id: string) => void): {
   );
 
   const config = useMemo<
-    EntityListPageConfig<GQL.FindGalleriesQuery, GalleryItem>
+    EntityListPageConfig<
+      GQL.FindGalleriesQuery,
+      GalleryItem,
+      GQL.FindGalleriesQueryVariables
+    >
   >(
     () => ({
       filterMode: GQL.FilterMode.Galleries,
-      query: GQL.FindGalleriesDocument,
-      makeVariables: (filter) => ({
-        filter: filter.makeFindFilter(),
-        gallery_filter_ast: filter.makeFilterAST(),
-      }),
-      extractResult: (data) => ({
-        count: data?.findGalleries.count ?? 0,
-        items: data?.findGalleries.galleries ?? [],
-      }),
+      source: {
+        kind: "graphql",
+        query: GQL.FindGalleriesDocument,
+        makeVariables: (filter) => ({
+          filter: filter.makeFindFilter(),
+          gallery_filter_ast: filter.makeFilterAST(),
+        }),
+        extractResult: (data) => ({
+          count: data?.findGalleries.count ?? 0,
+          items: data?.findGalleries.galleries ?? [],
+        }),
+      },
       renderCard,
       renderTableRow,
       zoomable: true,
@@ -810,7 +848,11 @@ export function useGalleryListConfig(onEdit: (id: string) => void): {
 
 export function usePerformerListConfig(
   onEdit: (id: string) => void,
-): EntityListPageConfig<GQL.FindPerformersQuery, PerformerItem> {
+): EntityListPageConfig<
+  GQL.FindPerformersQuery,
+  PerformerItem,
+  GQL.FindPerformersQueryVariables
+> {
   const renderCard = useCallback(
     (
       performer: PerformerItem,
@@ -850,15 +892,18 @@ export function usePerformerListConfig(
   return useMemo(
     () => ({
       filterMode: GQL.FilterMode.Performers,
-      query: GQL.FindPerformersDocument,
-      makeVariables: (filter) => ({
-        filter: filter.makeFindFilter(),
-        performer_filter_ast: filter.makeFilterAST(),
-      }),
-      extractResult: (data) => ({
-        count: data?.findPerformers.count ?? 0,
-        items: data?.findPerformers.performers ?? [],
-      }),
+      source: {
+        kind: "graphql",
+        query: GQL.FindPerformersDocument,
+        makeVariables: (filter) => ({
+          filter: filter.makeFindFilter(),
+          performer_filter_ast: filter.makeFilterAST(),
+        }),
+        extractResult: (data) => ({
+          count: data?.findPerformers.count ?? 0,
+          items: data?.findPerformers.performers ?? [],
+        }),
+      },
       renderCard,
       renderTableRow,
       zoomable: true,
@@ -872,7 +917,11 @@ export function usePerformerListConfig(
 
 export function useGroupListConfig(
   onEdit: (id: string) => void,
-): EntityListPageConfig<GQL.FindGroupsQuery, GroupItem> {
+): EntityListPageConfig<
+  GQL.FindGroupsQuery,
+  GroupItem,
+  GQL.FindGroupsQueryVariables
+> {
   const intl = useIntl();
 
   const tableColumns = useMemo(
@@ -960,15 +1009,18 @@ export function useGroupListConfig(
   return useMemo(
     () => ({
       filterMode: GQL.FilterMode.Groups,
-      query: GQL.FindGroupsDocument,
-      makeVariables: (filter) => ({
-        filter: filter.makeFindFilter(),
-        group_filter_ast: filter.makeFilterAST(),
-      }),
-      extractResult: (data) => ({
-        count: data?.findGroups.count ?? 0,
-        items: data?.findGroups.groups ?? [],
-      }),
+      source: {
+        kind: "graphql",
+        query: GQL.FindGroupsDocument,
+        makeVariables: (filter) => ({
+          filter: filter.makeFindFilter(),
+          group_filter_ast: filter.makeFilterAST(),
+        }),
+        extractResult: (data) => ({
+          count: data?.findGroups.count ?? 0,
+          items: data?.findGroups.groups ?? [],
+        }),
+      },
       renderCard,
       renderTableRow,
       zoomable: true,
@@ -982,7 +1034,11 @@ export function useGroupListConfig(
 
 export function useTagListConfig(
   onEdit: (id: string) => void,
-): EntityListPageConfig<GQL.FindTagsQuery, TagItem> {
+): EntityListPageConfig<
+  GQL.FindTagsQuery,
+  TagItem,
+  GQL.FindTagsQueryVariables
+> {
   const renderCard = useCallback(
     (
       tag: TagItem,
@@ -1022,15 +1078,18 @@ export function useTagListConfig(
   return useMemo(
     () => ({
       filterMode: GQL.FilterMode.Tags,
-      query: GQL.FindTagsDocument,
-      makeVariables: (filter) => ({
-        filter: filter.makeFindFilter(),
-        tag_filter_ast: filter.makeFilterAST(),
-      }),
-      extractResult: (data) => ({
-        count: data?.findTags.count ?? 0,
-        items: data?.findTags.tags ?? [],
-      }),
+      source: {
+        kind: "graphql",
+        query: GQL.FindTagsDocument,
+        makeVariables: (filter) => ({
+          filter: filter.makeFindFilter(),
+          tag_filter_ast: filter.makeFilterAST(),
+        }),
+        extractResult: (data) => ({
+          count: data?.findTags.count ?? 0,
+          items: data?.findTags.tags ?? [],
+        }),
+      },
       renderCard,
       renderTableRow,
       zoomable: true,

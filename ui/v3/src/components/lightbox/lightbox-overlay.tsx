@@ -46,6 +46,8 @@ export function LightboxOverlay({
 }: LightboxOverlayProps) {
   const isTop = position === "top";
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: Only prevents child control clicks from toggling the lightbox chrome.
+    // biome-ignore lint/a11y/useKeyWithClickEvents: Child controls already provide keyboard activation; this handler only stops propagation.
     <div
       className={cn(
         "group/lightbox-overlay absolute left-0 right-0 z-20 px-4 flex flex-col gap-2 text-white/90",
@@ -142,7 +144,7 @@ export function LightboxDate({ date }: { date?: string | null }) {
  * `whitespace-pre-wrap` matches how scene/image detail tabs render
  * the same field, so newlines authored in the metadata survive into
  * the lightbox view too. `pointer-events-auto` so the user can
- * scroll / select inside the overlay (the parent overlay opts out by
+ * scroll inside the overlay (the parent overlay opts out by
  * default to let video clicks pass through).
  */
 export function LightboxDetails({
@@ -157,7 +159,7 @@ export function LightboxDetails({
   return (
     <div
       className={cn(
-        "pointer-events-auto select-text whitespace-pre-wrap text-xs leading-relaxed text-white/85 pr-1 overscroll-contain",
+        "pointer-events-auto whitespace-pre-wrap text-xs leading-relaxed text-white/85 pr-1 overscroll-contain",
         "[@media(pointer:fine)]:max-w-[20vw] [@media(pointer:fine)]:max-h-[40vh] [@media(pointer:fine)]:overflow-y-auto",
         // The top-position parent reserves `pr-20` to clear the YARL
         // fullscreen / close toolbar at top-right. The details block is the

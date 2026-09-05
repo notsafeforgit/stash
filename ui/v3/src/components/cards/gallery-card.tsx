@@ -245,6 +245,7 @@ export const GalleryCard: React.FC<GalleryCardProps> = ({
   return (
     <>
       <EntityCard
+        label={galleryLabel(gallery)}
         id={gallery.id}
         href={`/galleries/${gallery.id}`}
         isMobile={isMobile}

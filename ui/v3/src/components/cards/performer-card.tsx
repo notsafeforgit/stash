@@ -89,6 +89,7 @@ export const PerformerCard: React.FC<PerformerCardProps> = ({
   return (
     <>
       <EntityCard
+        label={displayName}
         id={performer.id}
         href={`/performers/${performer.id}`}
         isMobile={isMobile}

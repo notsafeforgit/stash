@@ -257,19 +257,26 @@ export function TagStudiosTab({ tag }: { tag: TagData }) {
   );
 
   const config = useMemo<
-    EntityListPageConfig<GQL.FindStudiosQuery, StudioItem>
+    EntityListPageConfig<
+      GQL.FindStudiosQuery,
+      StudioItem,
+      GQL.FindStudiosQueryVariables
+    >
   >(
     () => ({
       filterMode: GQL.FilterMode.Studios,
-      query: GQL.FindStudiosDocument,
-      makeVariables: (filter) => ({
-        filter: filter.makeFindFilter(),
-        studio_filter_ast: filter.makeFilterAST(),
-      }),
-      extractResult: (data) => ({
-        count: data?.findStudios.count ?? 0,
-        items: data?.findStudios.studios ?? [],
-      }),
+      source: {
+        kind: "graphql",
+        query: GQL.FindStudiosDocument,
+        makeVariables: (filter) => ({
+          filter: filter.makeFindFilter(),
+          studio_filter_ast: filter.makeFilterAST(),
+        }),
+        extractResult: (data) => ({
+          count: data?.findStudios.count ?? 0,
+          items: data?.findStudios.studios ?? [],
+        }),
+      },
       renderCard: (studio, isMobile, selected, onSelectedChanged) => (
         <StudioCard
           key={studio.id}
@@ -319,19 +326,26 @@ export function TagMarkersTab({ tag }: { tag: TagData }) {
   } = useMarkerLightbox();
 
   const config = useMemo<
-    EntityListPageConfig<GQL.FindSceneMarkersQuery, MarkerItem>
+    EntityListPageConfig<
+      GQL.FindSceneMarkersQuery,
+      MarkerItem,
+      GQL.FindSceneMarkersQueryVariables
+    >
   >(
     () => ({
       filterMode: GQL.FilterMode.SceneMarkers,
-      query: GQL.FindSceneMarkersDocument,
-      makeVariables: (filter) => ({
-        filter: filter.makeFindFilter(),
-        scene_marker_filter_ast: filter.makeFilterAST(),
-      }),
-      extractResult: (data) => ({
-        count: data?.findSceneMarkers.count ?? 0,
-        items: data?.findSceneMarkers.scene_markers ?? [],
-      }),
+      source: {
+        kind: "graphql",
+        query: GQL.FindSceneMarkersDocument,
+        makeVariables: (filter) => ({
+          filter: filter.makeFindFilter(),
+          scene_marker_filter_ast: filter.makeFilterAST(),
+        }),
+        extractResult: (data) => ({
+          count: data?.findSceneMarkers.count ?? 0,
+          items: data?.findSceneMarkers.scene_markers ?? [],
+        }),
+      },
       renderCard: (
         marker,
         isMobile,

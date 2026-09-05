@@ -1,3 +1,5 @@
+import { Button } from "@/components/ui/button";
+import { useIntl } from "react-intl";
 import { applicationPath } from "@/core/platform-url";
 import type React from "react";
 import {
@@ -35,6 +37,7 @@ import {
 
 interface EntityCardCtx {
   id: string;
+  label: string;
   isHovered: boolean;
   /**
    * Viewport-width-based "narrow screen" flag. Use for layout/density
@@ -59,6 +62,7 @@ interface EntityCardCtx {
 
 const EntityCardCtx = createContext<EntityCardCtx>({
   id: "",
+  label: "",
   isHovered: false,
   isMobile: false,
   isTouch: false,
@@ -70,6 +74,7 @@ const EntityCardCtx = createContext<EntityCardCtx>({
 
 interface EntityCardRootProps {
   id: string;
+  label: string;
   href: string;
   isMobile?: boolean;
   selected?: boolean;
@@ -93,6 +98,7 @@ interface EntityCardRootProps {
 
 function EntityCardRoot({
   id,
+  label,
   href,
   isMobile = false,
   selected,
@@ -193,6 +199,7 @@ function EntityCardRoot({
   }
 
   const article = (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: The sibling stretched link and preview/selection buttons provide keyboard activation; the article delegates pointer clicks.
     <article
       className={cn(
         "entity-card relative flex flex-col overflow-hidden bg-card text-sm text-card-foreground transition-shadow cursor-pointer h-full",
@@ -239,7 +246,7 @@ function EntityCardRoot({
         onClick={handleAnchorClick}
         viewTransition
         tabIndex={0}
-        aria-label={href}
+        aria-label={label}
       />
       {/* Content wrapper — z-[1] so performer/tag chips are above the stretched link */}
       <div
@@ -257,6 +264,7 @@ function EntityCardRoot({
     <EntityCardCtx.Provider
       value={{
         id,
+        label,
         isHovered,
         isMobile,
         isTouch,
@@ -368,8 +376,9 @@ function FadeInImage({
   className,
   onLoad,
   src,
+  alt,
   ...rest
-}: React.ImgHTMLAttributes<HTMLImageElement>) {
+}: React.ImgHTMLAttributes<HTMLImageElement> & { alt: string }) {
   const [loaded, setLoaded] = useState(() =>
     src ? fadeInLoadedSrcs.has(src) : false,
   );
@@ -390,6 +399,7 @@ function FadeInImage({
 
   return (
     <img
+      alt={alt}
       ref={ref}
       src={src}
       className={cn(
@@ -454,8 +464,16 @@ function EntityCardPreview({
     playVideoOnHoverCfg && idleMode !== "video" && !!video;
   // The autoplay (idle === "video") path also needs the <video> element.
   const wantsVideoEl = idleMode === "video" || hoverVideoEnabled;
-  const { isHovered, isMobile, isTouch, isDetails, isWall, onPreviewClick } =
-    useContext(EntityCardCtx);
+  const {
+    isHovered,
+    isMobile,
+    isTouch,
+    isDetails,
+    isWall,
+    onPreviewClick,
+    onSelectedChanged,
+    label,
+  } = useContext(EntityCardCtx);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // VTT sprite scrubber: hover-only UI, gated on pointer type — touch
@@ -522,6 +540,35 @@ function EntityCardPreview({
       ? Math.min(100, (resumeTime / duration) * 100)
       : null;
 
+  const intl = useIntl();
+  // A separate button exposes preview to keyboard users without nesting links
+  // inside a button or changing the card's pointer/gesture delegation.
+  const previewButton = onPreviewClick ? (
+    <Button
+      variant="ghost"
+      className="sr-only focus:not-sr-only focus:absolute focus:inset-0 focus:z-10"
+      aria-label={intl.formatMessage(
+        { id: "accessibility.preview_named", defaultMessage: "Preview {name}" },
+        { name: label },
+      )}
+      onClick={(event) => {
+        event.stopPropagation();
+        const article =
+          event.currentTarget.closest<HTMLElement>("article[data-id]");
+        if (article?.closest("[data-selecting]")) {
+          onSelectedChanged?.(
+            article.dataset.selected !== "true",
+            event.shiftKey,
+          );
+        } else {
+          onPreviewClick();
+        }
+      }}
+    >
+      {intl.formatMessage({ id: "actions.preview" })}
+    </Button>
+  ) : null;
+
   // Wall mode: image fills the height determined by react-photo-album's row layout.
   // The parent wrapper div has an explicit pixel height set by PhotoAlbumWall's render.photo.
   // children renders as an absolute overlay (e.g. gradient footer).
@@ -533,19 +580,8 @@ function EntityCardPreview({
           "entity-card-preview relative flex-1 min-h-0 overflow-hidden bg-muted",
           onPreviewClick && "cursor-zoom-in",
         )}
-        onClick={
-          onPreviewClick
-            ? (e) => {
-                if (
-                  (e.currentTarget as HTMLElement).closest("[data-selecting]")
-                )
-                  return;
-                e.preventDefault();
-                onPreviewClick();
-              }
-            : undefined
-        }
       >
+        {previewButton}
         {image && (
           <FadeInImage
             className={cn(
@@ -602,6 +638,7 @@ function EntityCardPreview({
         onPreviewClick && "cursor-zoom-in",
       )}
     >
+      {previewButton}
       {/* Static screenshot — hidden when actively scrubbing */}
       {image &&
         !currentSprite &&
@@ -717,6 +754,7 @@ function EntityCardPreview({
                 badgeCls,
                 "inline-flex items-center gap-0.5 text-rose-200",
               )}
+              role="img"
               aria-label={`O-count ${oCounter}`}
             >
               <Droplets className="size-2.5" aria-hidden />
@@ -967,15 +1005,24 @@ function EntityCardRating({ rating100 }: { rating100?: number | null }) {
 // In grid view: render a translucent checkmark overlay on the preview corner.
 
 function EntityCardSelectCheckbox() {
-  const { isDetails, isWall, selected, onSelectedChanged } =
+  const intl = useIntl();
+  const { isDetails, isWall, selected, onSelectedChanged, label } =
     useContext(EntityCardCtx);
 
   // Details view: classic checkbox. CSS ([data-selecting] .entity-card-checkbox)
   // controls visibility for selecting mode; .visible class handles selected state.
   if (isDetails) {
     return (
-      <div
-        className={cn("entity-card-checkbox", selected && "visible")}
+      <Button
+        variant="ghost"
+        size="icon-xs"
+        data-card-select=""
+        aria-pressed={!!selected}
+        aria-label={intl.formatMessage(
+          { id: "accessibility.select_named", defaultMessage: "Select {name}" },
+          { name: label },
+        )}
+        className={cn("entity-card-checkbox p-0", selected && "visible")}
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -997,7 +1044,7 @@ function EntityCardSelectCheckbox() {
             />
           )}
         </div>
-      </div>
+      </Button>
     );
   }
 
@@ -1006,8 +1053,16 @@ function EntityCardSelectCheckbox() {
   // PhotoAlbumWall's useLayoutEffect. No React re-renders needed on selection change.
   if (isWall) {
     return (
-      <div
-        className="entity-card-select-overlay"
+      <Button
+        variant="ghost"
+        size="icon-xs"
+        data-card-select=""
+        aria-pressed={!!selected}
+        aria-label={intl.formatMessage(
+          { id: "accessibility.select_named", defaultMessage: "Select {name}" },
+          { name: label },
+        )}
+        className="entity-card-select-overlay p-0"
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -1027,7 +1082,7 @@ function EntityCardSelectCheckbox() {
             strokeWidth={3}
           />
         </div>
-      </div>
+      </Button>
     );
   }
 
@@ -1035,8 +1090,16 @@ function EntityCardSelectCheckbox() {
   // Always rendered — CSS ([data-selecting] .entity-card-select-overlay and
   // [data-selected="true"] .entity-card-select-overlay) controls display.
   return (
-    <div
-      className="entity-card-select-overlay"
+    <Button
+      variant="ghost"
+      size="icon-xs"
+      data-card-select=""
+      aria-pressed={!!selected}
+      aria-label={intl.formatMessage(
+        { id: "accessibility.select_named", defaultMessage: "Select {name}" },
+        { name: label },
+      )}
+      className="entity-card-select-overlay p-0"
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -1058,7 +1121,7 @@ function EntityCardSelectCheckbox() {
           />
         )}
       </div>
-    </div>
+    </Button>
   );
 }
 

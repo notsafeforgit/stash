@@ -1,5 +1,6 @@
+import { Label } from "@/components/ui/label";
 import type React from "react";
-import { useState, useCallback } from "react";
+import { useId, useState, useCallback } from "react";
 import { useIntl } from "react-intl";
 import {
   useApolloClient,
@@ -112,6 +113,7 @@ const TagSaveDialog: React.FC<ITagSaveDialogProps> = ({
   endpoint,
 }) => {
   const intl = useIntl();
+  const controlId = useId();
   const [excluded, setExcluded] = useState<string[]>(
     () => state?.excludedFields ?? DEFAULT_EXCLUDED_TAG_FIELDS,
   );
@@ -176,11 +178,13 @@ const TagSaveDialog: React.FC<ITagSaveDialogProps> = ({
 
           {availableFields.map(({ field, label, value }) =>
             value != null ? (
-              <label
+              <Label
+                htmlFor={`${controlId}-${field}`}
                 key={field}
                 className="flex cursor-pointer items-start gap-2.5 text-sm"
               >
                 <Checkbox
+                  id={`${controlId}-${field}`}
                   checked={!excluded.includes(field)}
                   onCheckedChange={() => toggle(field)}
                   className="mt-0.5"
@@ -189,13 +193,17 @@ const TagSaveDialog: React.FC<ITagSaveDialogProps> = ({
                   <span className="font-medium">{label}:</span>{" "}
                   <span className="text-muted-foreground">{value}</span>
                 </span>
-              </label>
+              </Label>
             ) : null,
           )}
 
           {parentTag && (
-            <label className="flex cursor-pointer items-start gap-2.5 text-sm">
+            <Label
+              htmlFor={`${controlId}-parent-tags`}
+              className="flex cursor-pointer items-start gap-2.5 text-sm"
+            >
               <Checkbox
+                id={`${controlId}-parent-tags`}
                 checked={!excluded.includes("parent_tags")}
                 onCheckedChange={() => toggle("parent_tags")}
                 className="mt-0.5"
@@ -226,14 +234,18 @@ const TagSaveDialog: React.FC<ITagSaveDialogProps> = ({
                   )}
                 </span>
               </span>
-            </label>
+            </Label>
           )}
 
           {parentTag &&
             !parentTag.stored_id &&
             !excluded.includes("parent_tags") && (
-              <label className="flex cursor-pointer items-center gap-2.5 text-sm pl-6">
+              <Label
+                htmlFor={`${controlId}-create-parent`}
+                className="flex cursor-pointer items-center gap-2.5 text-sm pl-6"
+              >
                 <Checkbox
+                  id={`${controlId}-create-parent`}
                   checked={createParent}
                   onCheckedChange={(c) => setCreateParent(c === true)}
                 />
@@ -241,7 +253,7 @@ const TagSaveDialog: React.FC<ITagSaveDialogProps> = ({
                   id: "tagger.create_parent_tag",
                   defaultMessage: "Create missing parent tag",
                 })}
-              </label>
+              </Label>
             )}
         </div>
 
@@ -282,6 +294,7 @@ const BatchAddDialog: React.FC<IBatchAddDialogProps> = ({
   onSubmit,
 }) => {
   const intl = useIntl();
+  const controlId = useId();
   const [names, setNames] = useState("");
   const [refresh, setRefresh] = useState(false);
   const [createParent, setCreateParent] = useState(true);
@@ -329,8 +342,12 @@ const BatchAddDialog: React.FC<IBatchAddDialogProps> = ({
               defaultMessage: "Tag name\nAnother tag\n...",
             })}
           />
-          <label className="flex cursor-pointer items-center gap-2.5 text-sm">
+          <Label
+            htmlFor={`${controlId}-refresh`}
+            className="flex cursor-pointer items-center gap-2.5 text-sm"
+          >
             <Checkbox
+              id={`${controlId}-refresh`}
               checked={refresh}
               onCheckedChange={(c) => setRefresh(c === true)}
             />
@@ -338,9 +355,13 @@ const BatchAddDialog: React.FC<IBatchAddDialogProps> = ({
               id: "tagger.refresh_existing",
               defaultMessage: "Refresh already tagged items",
             })}
-          </label>
-          <label className="flex cursor-pointer items-center gap-2.5 text-sm">
+          </Label>
+          <Label
+            htmlFor={`${controlId}-create-parent`}
+            className="flex cursor-pointer items-center gap-2.5 text-sm"
+          >
             <Checkbox
+              id={`${controlId}-create-parent`}
               checked={createParent}
               onCheckedChange={(c) => setCreateParent(c === true)}
             />
@@ -348,7 +369,7 @@ const BatchAddDialog: React.FC<IBatchAddDialogProps> = ({
               id: "tagger.create_parent_tag",
               defaultMessage: "Create missing parent tag",
             })}
-          </label>
+          </Label>
         </div>
 
         <DialogFooter>

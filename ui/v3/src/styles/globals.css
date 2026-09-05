@@ -129,13 +129,6 @@
     position: fixed;
     inset: 0;
     overflow: hidden;
-    /* PWA-style chrome: no long-press text selection / iOS callout
-       menu on labels, badges, button text, etc. Inherits to all
-       children; inputs / textareas / contenteditable opt back in
-       below. */
-    -webkit-user-select: none;
-    user-select: none;
-    -webkit-touch-callout: none;
     /* `manipulation` is the only `touch-action` value that explicitly
        disables iOS Safari's double-tap-to-zoom (pan-x pan-y leaves it
        on — Safari doesn't infer "no double-tap-zoom" from a pan-only
@@ -192,14 +185,30 @@
   touch-action: manipulation;
 }
 
-/* Re-enable text selection on input surfaces. The body-level
-   `user-select: none` inherits to every descendant, so without this
-   typing in a text field couldn't long-press to position the caret /
-   select-word, and contenteditable regions wouldn't be usable. */
+/* App chrome is not selectable. Apply this directly to elements instead
+   of relying on the browser's user-select inheritance. Keep the policy
+   outside Tailwind's layers so component utilities cannot accidentally
+   make labels, badges, or controls selectable. */
+* {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Editable surfaces and copyable technical data opt in. Mark just the
+   value with data-selectable-text, not a surrounding panel with controls.
+   Code/preformatted output is copyable by default. Restore iOS's callout
+   as well so selecting and copying text works on touch devices. */
 input,
 textarea,
+code,
+code *,
+pre,
+pre *,
 [data-selectable-text],
 [data-selectable-text] *,
+[contenteditable=""],
+[contenteditable=""] *,
 [contenteditable="true"],
 [contenteditable="true"] *,
 [contenteditable="plaintext-only"],
@@ -284,6 +293,7 @@ body.mobile-list-view main {
 }
 
 /* Visible when the item is selected */
+.entity-card:focus-within .entity-card-checkbox,
 .entity-card-checkbox.visible {
   opacity: 1;
   pointer-events: auto;
@@ -296,7 +306,7 @@ body.mobile-list-view main {
 }
 
 /* Suppress on mobile unless selected or in selecting mode */
-.entity-card.mobile
+.entity-card.mobile:not(:focus-within)
 .entity-card-checkbox:not(.visible):not([data-selecting] *) {
   display: none;
 }
@@ -312,6 +322,7 @@ body.mobile-list-view main {
   cursor: pointer;
 }
 
+.entity-card:focus-within .entity-card-select-overlay,
 [data-selecting] .entity-card-select-overlay,
 [data-selected="true"] .entity-card-select-overlay {
   display: block;

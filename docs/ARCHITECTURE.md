@@ -1,5 +1,10 @@
 # Architecture
 
+> Upstream backend/v2.5 reference. For this fork's active frontend and extension
+> points, read the [v3 architecture](../ui/v3/docs/architecture.md). The
+> [documentation index](README.md) distinguishes current guides from future plans
+> and historical material.
+
 This document provides an overview of the Stash codebase architecture for new contributors.
 
 ## Project Overview

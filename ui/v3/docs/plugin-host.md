@@ -2,11 +2,20 @@
 
 This document describes the contract for v3 UI plugins — plugins that add new top-level pages, navigation entries, and other React-rendered UI to Stash. Backend plugin features (hooks, scrapers, jobs, packaged plugin sources) are unchanged.
 
+Checked against the implementation on 2026-09-07. The authoritative types are in
+[host.ts](../src/plugins/host.ts), startup behavior in
+[loader.ts](../src/plugins/loader.ts), and exported components in
+[ui-exports.ts](../src/plugins/ui-exports.ts). See the
+[documentation index](../../../docs/README.md) for related guides.
+
 ## Concept
 
 A v3 plugin is an ESM module loaded at app boot. Stash's frontend dynamic-imports the module, calls its exported `register(host)` function, and the plugin uses the host APIs to add routes, nav entries, etc. Plugin code runs in the same origin and same React tree as Stash itself, with full access to the host's GraphQL client.
 
-This is a clean break from the v2.5 plugin model (`window.PluginApi` + DOM patching). v2.5 plugins are not loaded by v3.
+The v3 UI uses this host instead of the v2.5 `window.PluginApi`/DOM-patching API.
+v3 does not load legacy UI scripts. Existing v2.5 UI plugins can still load in
+the v2.5 frontend, and backend plugin behavior remains shared. Declaring a v3
+entry does not authorize breaking the v2.5 client contract.
 
 ## Plugin manifest
 
@@ -18,26 +27,35 @@ name: StashTV
 description: Vertical-scroll TikTok-style scene viewer.
 version: 1.0.0
 ui:
-  # Path to the ESM entry module, relative to the plugin's directory.
-  # Must be reachable through one of the `assets:` mappings.
-  entry: dist/index.js
+  # URL path beneath the plugin's assets endpoint.
+  # This mapping serves ./dist/index.js as assets/index.js.
+  entry: index.js
   assets:
     /: ./dist
 ```
 
-The backend resolves the entry to `/plugin/{id}/assets/{entry-path}` and returns it as `Plugin.paths.entry` from the `plugins` GraphQL query. v3 only loads plugins whose `entry` is set; plugins missing it are skipped silently (so v2.5-style plugins continue to load on v2.5 without affecting v3).
+The backend resolves the entry beneath `/plugin/{id}/assets/`, including the
+deployment prefix, and returns it as `Plugin.paths.entry` from the `plugins`
+GraphQL query. The entry is an **asset URL path**, not an independently resolved
+filesystem path: with `assets: { "/": "./dist" }`, use `entry: index.js`, not
+`dist/index.js`. v3 loads only enabled plugins with an entry. Plugins without one
+are skipped, so their legacy UI can continue loading in v2.5.
 
 ## Entry module
 
-The entry module must default-export `register`:
+The entry module must default-export a registration function, or provide a named
+`register` export when there is no default export:
 
 ```js
 // dist/index.js
+function StashTVPage() {
+  return "StashTV";
+}
+
 export default function register(host) {
   host.nav.add({
     label: "StashTV",
     to: "/stashtv",
-    icon: TvIcon,
   });
   host.routes.add({
     path: "/stashtv",
@@ -46,9 +64,22 @@ export default function register(host) {
 }
 ```
 
-`register()` may be `async` — the loader awaits each plugin in turn. Async work inside `register` is fine for setup, but **all route, navigation, filter-extension, and event-listener registrations must be made synchronously** (i.e. before any `await`). The registry freezes after `register` resolves; later additions are warned and ignored.
+`register()` may be `async`; the loader awaits plugins sequentially. Calls to
+routes, navigation, filter extras, and saved-filter listeners are **staged until
+registration completes successfully**. They may occur after an `await`, provided
+the registration promise has not settled or timed out. If module import or
+registration rejects or times out, those staged additions are discarded. Calls
+through that plugin's host after completion/timeout are ignored.
 
-A named `register` export is also accepted as a fallback if the default export is missing.
+Import plus registration has a **5-second per-plugin timeout**. Plugin discovery
+and load-order queries each have a 5-second timeout, and the overall startup
+budget is **30 seconds**, including those queries. Later plugins receive only
+the remaining budget. The shared registry freezes after all attempts; the router
+is then built. A full page reload is required to load changed plugin code.
+
+These timeouts stop waiting for asynchronous work and prevent late host
+registrations. They do not cancel arbitrary plugin network requests or undo
+plugin side effects, and cannot preempt JavaScript that blocks the main thread.
 
 ## Host API (`host v1`)
 
@@ -99,9 +130,14 @@ interface StashPluginHost {
 
 `host.routes.add({ path, component })` mounts a top-level route. Constraints:
 
-- `path` must start with `/`.
+- `path` must start with `/` and is relative to the router's configured base path.
+  Do not include a deployment prefix such as `/stash` in the registered path.
 - Plugins should namespace their routes under a unique prefix (typically the plugin id) to avoid collisions: `/stashtv`, `/stashtv/settings`, etc.
-- `component` is a React component rendered when the route is active. It receives no props from the router; pull params/search via the host's router primitives if needed.
+- `component` is a React component rendered when the route is active. It receives
+  no injected props; close over `host` when needed. Host v1 exports `Link` and
+  `useNavigate`, not a complete set of router state/parameter hooks.
+- Core route collisions and equivalent normalized route patterns are rejected
+  during router construction. See failure handling below.
 
 ### Navigation
 
@@ -112,6 +148,8 @@ interface StashPluginHost {
 - `placement: "utility"` — utility menus only.
 - `label` may be a string or a function `(intl) => string` for plugins that ship localized strings.
 - `hotkey` follows the same `"g <key>"` chord syntax as built-in nav (`"g s"` for `/scenes`). Built-in hotkeys take precedence; plugin hotkeys cannot shadow them.
+- `icon` is a rendered React node, not a component function. For JSX source, pass
+  `icon: <TvIcon size={16} />`, not `icon: TvIcon`.
 
 ### Filter extensions
 
@@ -131,7 +169,10 @@ Extensions render in plugin load order. Each extension has its own error boundar
 
 `host.apollo` is the same `ApolloClient` instance the rest of Stash uses, with the same auth cookies, cache, and link chain. Plugin-issued queries and mutations participate in cache normalization automatically.
 
-`host.intl` is the host's `IntlShape`. Use `host.intl.formatMessage({...})` for localized strings.
+`host.intl` is a getter for the current host `IntlShape`; it follows language
+updates. Read it when formatting instead of retaining the startup instance.
+Use `host.intl.formatMessage({...})` for localized strings. Plugin-owned message
+catalog loading is the plugin's responsibility.
 
 ### Router primitives
 
@@ -139,7 +180,9 @@ Extensions render in plugin load order. Each extension has its own error boundar
 
 ### Curated UI exports (`host.ui`)
 
-A frozen subset of shadcn/Base UI primitives. Components in this set will not break in shape across host v1's lifetime. The current set:
+A curated subset of shadcn/Base UI primitives. Their API shape is part of host
+v1; internal DOM structure and classes are not an unrestricted extension API.
+The current set:
 
 | Group | Exports |
 |---|---|
@@ -153,7 +196,20 @@ A frozen subset of shadcn/Base UI primitives. Components in this set will not br
 | Menus | `DropdownMenu`, `DropdownMenuTrigger`, `DropdownMenuContent`, `DropdownMenuGroup`, `DropdownMenuItem`, `DropdownMenuLabel`, `DropdownMenuSeparator` |
 | Misc | `Tooltip`, `TooltipProvider`, `TooltipTrigger`, `TooltipContent`, `Spinner` |
 
-Bring your own libraries for anything else (charts, virtualization, drag-and-drop, etc.) — those don't belong in the host contract.
+Other libraries (charts, virtualization, drag-and-drop, etc.) are outside the
+host contract. The loader imports a browser ESM URL as-is: it does not compile
+JSX/TypeScript or resolve bare npm imports. Host v1 currently provides neither a
+React module export nor an import map. A plugin build must arrange resolvable
+imports and compatible shared React runtime access before using hooks or React
+libraries; marking `react` external alone is not sufficient. The example below
+avoids imports and hooks so it can be served directly.
+
+### Settings
+
+Manifest `settings:` entries already appear in **v3 Settings → Plugins**.
+Boolean, number, and string settings use the shared setting controls and persist
+through `configurePlugin`. This is separate from registering arbitrary React
+content inside the settings pages, which host v1 does not provide.
 
 ## Load order
 
@@ -190,12 +246,23 @@ When the host gains a new field within v1, existing plugins keep working. Breaki
 
 ## Failure handling
 
-The loader is defensive:
+The loader and router handle host-managed failures as follows:
 
-- Errors fetching the plugin list, hook order, or any individual plugin's module are caught and logged. One broken plugin never takes down the app.
-- Plugins missing a `default export register(host)` log a warning and are skipped.
-- Routes, navigation items, filter extensions, and event listeners added after the registry freezes are warned and ignored.
-- Routes registered at colliding paths are warned and the second registration is dropped.
+- Discovery failure yields an empty frozen registry. Load-order failure falls
+  back to alphabetical order. Both are logged and surfaced in the startup warning.
+- An import/registration error, missing callable export, or timeout skips that
+  plugin's staged registrations. Other attempts continue within the startup budget.
+- Exact duplicate plugin paths are warned and skipped by the registry. Router
+  construction additionally normalizes repeated/trailing slashes and parameter
+  names to detect collisions with core or other plugin routes.
+- If plugin routes prevent router construction, the app warns and retries with
+  **core routes only**. This fallback omits all plugin routes for that page load,
+  not just the colliding route.
+- Filter-extra components have individual render error boundaries; saved-filter
+  listener exceptions/rejections are logged without stopping other listeners.
+
+Late host calls are ignored. Reload after correcting an entry path, plugin
+error, or collision; registration is not a live update mechanism.
 
 ## Worked example: a tiny plugin
 
@@ -214,27 +281,23 @@ ui:
 `index.js` next to the yml:
 
 ```js
-import React from "react";
-
-function HelloPage({ host }) {
-  return React.createElement(
-    host.ui.Card,
-    { className: "m-4 p-6" },
-    React.createElement("h1", { className: "text-xl" }, "Hello from a plugin!"),
-  );
-}
-
 export default function register(host) {
   if (host.version !== "1") return;
   host.nav.add({ label: "Hello", to: "/hello", icon: null });
   host.routes.add({
     path: "/hello",
-    component: () => React.createElement(HelloPage, { host }),
+    component: () => "Hello from a plugin!",
   });
 }
 ```
 
-(For real plugins, ship a bundler config that produces an ESM `dist/index.js` so you can write JSX/TSX. The host receives whatever the entry module exports — the host doesn't care how it's built.)
+This minimal React component returns text, so the entry has no module
+dependencies. For a bundled plugin, produce browser-ready ESM, expose all chunks
+through the asset mappings, and verify imports against the deployed app as well
+as a development server. Plugin CSS is not generated by the host's Tailwind
+build; ship any styles the existing bundle does not contain. Use the
+[theming guide](theming.md) for runtime tokens and preserve the shared
+[interaction policies](architecture.md#interaction-and-accessibility).
 
 ## What this host doesn't (yet) provide
 
@@ -242,6 +305,7 @@ These were intentionally left out of v1; if you need them, file a request and we
 
 - **Arbitrary component-slot extension points** (e.g. "add an item to the scene detail tab bar"). v1 currently provides the list filter extras slot plus whole-page extension via `routes.add`.
 - **Plugin-to-plugin APIs.** Plugins can communicate via the GraphQL cache or window events, but there's no formal API.
-- **Settings UI integration.** Plugin settings are still configured via the v2.5 settings UI driven by the plugin manifest's `settings:` block.
+- **Arbitrary settings-page components.** Manifest boolean/number/string settings
+  already work in v3; there is no host API to inject custom settings controls.
 - **Lazy route loading.** `host.routes.add` accepts a synchronous component. Wrap in `React.lazy` if you want code-splitting (the host won't introspect it).
 - **Iframe / Web Component sandboxing.** Out of scope for v1. Same trust model as v2.5.

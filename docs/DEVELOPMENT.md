@@ -1,10 +1,14 @@
 # Building from Source
 
+> These are the upstream platform and v2.5 build instructions. For this branch,
+> use the [v3 development guide](../ui/v3/docs/development.md), including building
+> both embedded UIs before `make validate-fork`. Deployment is covered in the
+> [v3 runbook](v3-deployment.md); other guides are in the [documentation index](README.md).
+
 ## Pre-requisites
 
 * [Go](https://golang.org/dl/)
-* [GolangCI](https://golangci-lint.run/) - A meta-linter which runs several linters in parallel
-  * To install, follow the [local installation instructions](https://golangci-lint.run/welcome/install/#local-installation)
+* `make lint` runs the CI-pinned [GolangCI](https://golangci-lint.run/) version through `go run`; no separate linter installation is needed.
 * [nodejs](https://nodejs.org/en/download) - nodejs runtime
   * corepack/[pnpm](https://pnpm.io/installation) - nodejs package manager (included with nodejs)
 

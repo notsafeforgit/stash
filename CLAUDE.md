@@ -6,20 +6,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Stash is a self-hosted media organizer written in Go (backend) + React/TypeScript (frontend). It exposes a GraphQL API, manages a SQLite database, and wraps FFmpeg for video processing.
 
-This repository is a **tracking fork** of upstream stashapp/stash. Before syncing with upstream, adding database migrations, or changing the GraphQL schema, read [FORK.md](FORK.md) — it documents the rebase-based sync playbook, the separate fork migration track and its hazards, and the design rules that keep upstream rebases manageable (additive schema changes only; fork logic in fork-owned files). The eventual one-way removal of v2.5 compatibility is specified in [docs/v3-schema-promotion.md](docs/v3-schema-promotion.md).
+This repository is a **tracking fork** of upstream stashapp/stash. Before syncing with upstream, adding database migrations, or changing the GraphQL schema, read [FORK.md](FORK.md) — it documents the rebase-based sync playbook, the separate fork migration track and its hazards, and the design rules that keep upstream rebases manageable (additive schema changes only; fork logic in fork-owned files). The [documentation index](docs/README.md) links current guides. [docs/v3-schema-promotion.md](docs/v3-schema-promotion.md) describes a conditional future transition; v2.5 compatibility remains required today.
 
 ## Development quickstart
 
 ```bash
-make pre-ui       # Install UI deps (once after clone, or when deps change)
-make generate     # Generate GraphQL Go + UI files (run after schema changes)
+make pre-ui       # Install v2.5 dependencies for the embedded fallback
+make pre-ui-v3    # Install v3 dependencies
+make generate     # Generate Go and v2.5 GraphQL bindings
+make ui           # Build the embedded v2.5 UI
+make ui-v3-only   # Generate v3 bindings and build its embedded assets
 # Terminal 1:
-make server-start # Run Go server in .local/ directory (port 9999)
+STASH_PORT=9999 STASH_ENABLE_V3_UI=true make server-start
 # Terminal 2:
-make ui-start     # Run Vite dev server (port 3000, proxies to 9999)
+VITE_APP_PLATFORM_URL=http://127.0.0.1:9999 make ui-v3-start
 ```
 
-`VITE_APP_PLATFORM_URL` overrides the backend URL for `ui-start`.
+Open v3 at `http://localhost:3002/`. Set the backend URL explicitly; v3's proxy
+otherwise defaults to port 8010. `make ui-start` runs the v2.5 reference UI on
+port 3000. See the [v3 development guide](ui/v3/docs/development.md) for setup,
+generation, and validation, and the [deployment runbook](docs/v3-deployment.md)
+for image publication and Quadlet restarts.
 
 ## Build commands
 
@@ -28,20 +35,25 @@ make ui-start     # Run Vite dev server (port 3000, proxies to 9999)
 | `make build` | Build `stash` and `phasher` binaries |
 | `make build-release` | Release build (stripped debug info + PIE) |
 | `make stash` | Build only the main binary |
-| `make ui` | Build the frontend into the binary's embedded assets |
+| `make ui` | Build v2.5 embedded assets and login locales |
+| `make ui-v3-only` | Generate, type-check, and build v3 embedded assets |
 
 ## Testing and linting
 
 ```bash
-make validate          # Run everything required to pass CI (tests + lint + format checks)
+make validate-fork     # Fork gate: backend generation, v3 validation, Go lint/tests
 make it                # Go unit + integration tests only
-make lint              # golangci-lint on Go code
+make lint              # CI-pinned golangci-lint via go run
 make fmt               # Format Go source
-make validate-ui       # UI tests, ESLint, Prettier check
-make fmt-ui            # Format UI source
+make validate-ui-v3    # Biome, generation/types, formatting, locales, tests, compatibility
+make fmt-ui-v3         # Format v3 source
+make validate          # Upstream/v2.5 UI validation and backend checks; excludes v3
+make validate-ui       # v2.5 Biome, Stylelint, TypeScript, and formatting checks
 ```
 
-To run a single Go test: `go test ./pkg/models/... -run TestFilterAST`
+Build both UIs before full Go tests or `make validate-fork`; embedded-asset tests
+require real v3 route chunks. Use the [validation sequence](ui/v3/docs/development.md#validation).
+To run a single Go test: `go test ./pkg/models/... -run TestFilterAST`.
 
 ## Architecture
 
@@ -65,7 +77,7 @@ Browser → Vite dev server (dev) / embedded HTTP server (prod) → Chi router (
 - State: Apollo Client cache is the primary state layer; component state for UI-only concerns
 - Routing: React Router v5
 - UI: Bootstrap + custom SCSS components
-- All GraphQL queries/mutations live in `ui/v2.5/src/graphql/`; generated TypeScript types in `ui/v2.5/src/core/generated-graphql.ts`
+- All GraphQL queries/mutations live in `ui/v2.5/graphql/`; generated TypeScript types in `ui/v2.5/src/core/generated-graphql.ts`
 
 ### Frontend (`ui/v3/`)
 
@@ -73,16 +85,16 @@ Active development target. A ground-up rewrite sharing the same GraphQL API.
 
 **Routing — TanStack Router v1**
 - File-based routes under `src/routes/`. Route files use `createFileRoute`.
-- Search params validated with Zod via `zodValidator` from `@tanstack/zod-adapter`.
+- Routes validate search parameters with `validateSearch`; existing detail/settings routes pass Zod schemas directly. List filter parsing belongs in the shared list/filter modules.
 - Navigate with `useNavigate`; access params with `Route.useParams()`, search with `Route.useSearch()`.
 - Access history (back/forward) via `useRouter().history`.
 - Smart back: use `useSmartBack(defaultPath)` from `src/hooks/use-smart-back.ts` on detail pages — goes back in history if the user came from a list view, otherwise navigates to `defaultPath`.
 
 **Data fetching — Apollo Client v4**
 - `useQuery` / `useMutation` from `@apollo/client/react`.
-- Generated TypeScript types in `src/core/generated-graphql.ts` (run `make generate` after schema changes).
-- All queries/mutations use `TypedDocumentNode` from `graphql-tag`.
-- List pages use `useCachedQueryResult` to prevent content flash on pagination/sort changes; it returns `isPending: true` whenever the displayed data is stale relative to the current filter. Combine with `useDebouncedValue(filter, 150)` to coalesce rapid page changes into a single request.
+- Generated TypeScript types and operation documents live in `src/core/generated-graphql.ts`; run `pnpm --dir ui/v3 gqlgen` after schema changes (also included in v3 dev/build/check scripts).
+- Generated operations use `TypedDocumentNode` from `@graphql-typed-document-node/core`; import the generated documents at call sites.
+- List pages use `use-list-data.ts` for debounce and GraphQL/local dispatch, and `useCachedQueryResult` to retain usable data during refreshes. Preserve pending/error/retry state without treating stale data from another filter as a successful result. See the [list module map](ui/v3/docs/architecture.md#lists).
 
 **Forms — TanStack Form v1**
 - Use `useForm` from `@tanstack/react-form` for all forms.
@@ -106,7 +118,7 @@ Active development target. A ground-up rewrite sharing the same GraphQL API.
 **Styling — Tailwind CSS v4**
 - Utility-first; no custom SCSS.
 - Use `cn()` from `src/lib/utils` (combines `clsx` + `tailwind-merge`) for conditional classes. Never use `clsx` or `classnames` directly.
-- Design tokens via CSS custom properties (`--primary`, `--background`, etc.) consumed as `hsl(var(--token))`.
+- Design tokens are complete CSS colors, usually OKLCH. Use semantic utilities such as `bg-primary` or `var(--color-primary)` in CSS, without an `hsl()` wrapper. Both `--color-*` and some unprefixed variables exist; runtime overrides must account for both. Runtime `custom.css` is plain CSS; see [theming](ui/v3/docs/theming.md).
 
 **Icons — Lucide React**
 - Import named icons from `lucide-react`. Do not use other icon libraries.
@@ -130,9 +142,8 @@ Active development target. A ground-up rewrite sharing the same GraphQL API.
 **Key conventions**
 - No bare stock HTML interactive elements (`<input>`, `<select>`, `<button>`, `<textarea>`) anywhere in component code — always use the `src/components/ui/` wrappers.
 - No `react-bootstrap` or any Bootstrap dependency in v3.
-- Spinner on every loading state: queries, detail pages, list pages, app startup.
-- List pages emit a spinner immediately on filter/page change (via `isPending` + debounce) — do not wait for Apollo's `loading: true`.
-- Never use `eslint-disable` comments to suppress lint warnings — fix the underlying issue instead. The only acceptable suppressions are: `any` in generic function constraints (`T extends (...args: any[]) => any`), `no-this-alias` for intentional `this` capture in closures, and `exhaustive-deps` only when adding the dep would cause a genuine circular update loop (document why inline). For `exhaustive-deps` in particular: restructure the code so all deps can be listed; the ref-to-avoid-deps pattern is fighting the linter and is not acceptable.
+- Use shared pending states, spinners, and skeletons as appropriate; preserve usable list content during refreshes and expose errors with retry actions. Layout-only changes must not trigger query loading states.
+- Biome is authoritative for v3 linting, including recommended accessibility rules. Fix underlying issues; keep necessary suppressions narrow and explain wrapper/render-prop or gesture-delegation constraints inline. Keep hook dependencies complete instead of hiding reactive values in refs to evade checks.
 
 **HLS via hls.js on all browsers** (`pkg/ffmpeg/stream_segmented.go`, `src/components/player/player-utils.ts:canPlaySource`, `src/components/player/hls.ts`, `src/components/player/scene-player.tsx`, `src/components/player/stable-hls-video.tsx`)
 
@@ -150,7 +161,7 @@ This replaces an earlier `@videojs/spf` (with a pnpm patch to honour `MEDIA-SEQU
 - `-copyts` — keeps the demuxer's input timestamps flowing through the pipeline so the source's frame-to-frame PTS deltas survive intact. Without it, ffmpeg's muxer can rebuild timestamps from its internal frame counter; on a VFR source (common with AV1 / iOS-recorded video) that effectively coerces output to a synthetic cadence and the result reads as visible frame-pacing stutter even though the segment list is well-formed. The `setpts`/`asetpts` filters above still pin the per-track baseline to 0 (necessary for the iOS edit-list skew); `-copyts` is what preserves the deltas between successive frames.
 - `-forced_idr 1` on QSV H.264 (`pkg/ffmpeg/codec_init.go`) — h264_qsv otherwise emits non-IDR I-frames at the GOP boundary requested by `-g`, and the HLS muxer can only split at IDR boundaries. Without this the segmenter's GOP requests are silently ignored and segments end up far longer than `segmentLength` (causing foreground tab stalls when the player runs out of buffered content while waiting for the next IDR). `-g` + `-keyint_min` are computed from the source frame rate × segmentLength in `pkg/ffmpeg/stream_segmented.go:hlsGopSize`.
 
-**Backward seeks before the trim point** — `?start=<sceneTime>` only emits segments from the containing one onward, so the trimmed playlist's `seekable` range starts at the trim. A seek target before that range needs a fresh playlist with a smaller `?start=`. `hlsStrategy.canSeekDirectly` (`src/components/player/hls.ts`) detects this against `store.state.seekable[0][0]` and signals for a source-URL change that rebuilds the HLS delegate, rather than letting the player issue an MSE seek into an unbuffered region.
+**Backward seeks before the trim point** — `?start=<sceneTime>` only emits segments from the containing one onward, so the trimmed playlist's `seekable` range starts at the trim. A seek target before that range needs a fresh playlist with a smaller `?start=`. `hlsStrategy.canSeekDirectly` (`src/components/player/hls.ts`) checks the plain `MediaSeekState.seekable` ranges supplied by the transition coordinator and signals for a source-URL change that rebuilds the HLS delegate, rather than letting the player issue an MSE seek into an unbuffered region.
 
 **Stable player root with in-place source changes** (`src/components/player/scene-player.tsx`)
 
@@ -160,7 +171,7 @@ This replaces an earlier `@videojs/spf` (with a pnpm patch to honour `MEDIA-SEQU
 
 Two iOS-specific quirks that look like server slowness but aren't, with the workarounds wired in:
 
-1. **Far-forward seeks must route through URL-change remount, not `flushAndRestartAt`.** On desktop MSE we can call `engine.stopLoad() → BUFFER_FLUSHING → engine.startLoad(target)` in place and the SourceBuffer recovers cleanly. On iOS Safari's `ManagedMediaSource` (iOS 17+) the same sequence leaves `video.buffered` stuck at empty after the flush — `readyState` pins at 1, the seek never resolves. Behaviour is the same in or out of native fullscreen. `handleSeek` / `handleRestart` detect iOS via `isIOS()` and fall back to the URL-change path (new `?start=<target>` → fresh hls.js engine with `config.startPosition = target` cold-starts at the right fragment). Brief freeze-frame flash instead of an in-place reset, but completes. See `use-scene-player-sources.tsx`'s `engine = !isClipped && !isIOS() ? getHlsEngine(...) : null` gate.
+1. **Far-forward seeks must route through a source reload on iOS.** On desktop MSE we can call `engine.stopLoad() → BUFFER_FLUSHING → engine.startLoad(target)` in place and the SourceBuffer recovers cleanly. On iOS Safari's `ManagedMediaSource` (iOS 17+) the same sequence leaves `video.buffered` stuck at empty after the flush — `readyState` pins at 1, the seek never resolves. Behaviour is the same in or out of native fullscreen. `use-scene-player-sources.tsx` passes `ios: isIOS()` to the pure planners in `scene-player-transitions.ts`, which choose a source reload for distant iOS seeks and restarts. A new `?start=<target>` lets a fresh hls.js engine cold-start at the right fragment; the player root remains mounted and the freeze frame masks the transition.
 
 2. **MMS rate-limits hls.js fetches; visible "stalls" are buffer cycles, not transcode-bound.** Confirmed end-to-end on an Intel Arc A380 transcoding a 4K HDR HEVC source to H.264 via QSV: ffmpeg produces 2 s segments in ~800 ms (**~2.1× realtime**), full HW path engaged (`-hwaccel qsv -hwaccel_output_format qsv`, `-c:v h264_qsv`, `scale_qsv=format=nv12`). On the iOS client during the same playback window before tuning, `bufEnd` advanced only ~10 s of content per 18 s of wall clock — MMS releases bytes in pulses, hls.js pauses fragment loading whenever its quota is full, server sits idle ~half the time waiting. `bufEnd` plateaus for 4–5 s, then jumps forward when MMS lets more in. The visible "stall" is the tail of one of those plateaus when the safety margin gets close to zero before the next refill. To narrow the dips, `stable-hls-video.tsx` bumps hls.js's `maxBufferLength=60`, `maxMaxBufferLength=120`, `maxBufferSize=240 MB` on the MMS path only — the default 60 MB byte cap binds first on 4K H.264 at ~50 Mbps, not the time cap. After tuning: buffer peaks at ~30 s, plateau cycle ~20 s, **margin floor ~10 s** (was ~5 s) — playback never drains close enough to zero to halt. The remaining `ev:stalled` events are iOS's "no bytes in 3 s" network warnings; `currentTime` keeps advancing through them. Desktop MSE path is untouched.
 
@@ -197,7 +208,7 @@ v3 encodes/decodes the persisted shape via `encodeFilterASTNodeToSaved`/`decodeS
 
 ### Code generation
 
-Running `make generate` runs both gqlgen (Go GraphQL bindings) and graphql-codegen (TypeScript types). Always run this after modifying `graphql/schema/`.
+Running `make generate` runs gqlgen (Go GraphQL bindings) and graphql-codegen for **v2.5**. After modifying `graphql/schema/`, run it and regenerate v3 with `pnpm --dir ui/v3 gqlgen` (or its dev/build/check scripts). See the [generation guide](ui/v3/docs/development.md#generation-and-builds).
 
 Agent note for `make validate-ui-v3`: `ui/v3/src/core/generated-graphql.ts` is ignored, but `pnpm run gqlgen` still rewrites it. In a read-only sandbox, graphql-codegen can print `[SUCCESS]` for every step and then `pnpm run check` exits 1 with no TypeScript diagnostics because the hidden error is `EROFS: read-only file system, open '.../ui/v3/src/core/generated-graphql.ts'`. When validation fails with that exact shape, rerun `make validate-ui-v3` with workspace write access before chasing TypeScript, package scripts, or generated GraphQL content.
 

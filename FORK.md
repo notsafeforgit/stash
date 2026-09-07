@@ -6,6 +6,10 @@ fork features are designed to keep that cheap. This document is the playbook
 for syncs and the rules that keep the conflict surface small. It is written for
 both humans and LLM agents performing a sync.
 
+See the [documentation index](docs/README.md) for current v3 guides and the
+[deployment runbook](docs/v3-deployment.md) for publishing and restarting the
+local container after validation.
+
 ## Strategy
 
 - Sync by rebasing `v3-rewrite` onto `stashapp/develop` (per upstream release,
@@ -65,8 +69,12 @@ both humans and LLM agents performing a sync.
    `internal/api/resolver_*.go`. Resolve in favour of keeping fork behaviour;
    consult CLAUDE.md sections for the intent behind fork code before choosing
    sides.
-5. **Validate after every sync and before pushing fork changes:** run
-   `make validate-fork`. It regenerates the backend, validates v3, runs
+5. **Validate after every sync and before pushing fork changes:** install both
+   UI dependency trees, then run `make generate`, `make ui`, `make ui-v3-only`,
+   and `make validate-fork` in that order. The Go embedded-asset tests require
+   built v3 route chunks; generation's placeholder directories are insufficient.
+   See the [development guide](ui/v3/docs/development.md#validation).
+   `make validate-fork` regenerates the backend, validates v3, runs
    integration tests, and runs the CI-pinned linter without requiring a local
    install. For lint alone, use `make lint`, which executes
    `go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4 run`.

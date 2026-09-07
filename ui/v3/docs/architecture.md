@@ -1,6 +1,9 @@
 # v3 architecture
 
-Current foundation as of 2026-09-05. The [original plan](archive/rewrite-plan.md)
+Current foundation, checked against the implementation on 2026-09-07.
+Use the [development guide](development.md) for setup and validation and the
+[documentation index](../../../docs/README.md) for feature and operations guides.
+The [original plan](archive/rewrite-plan.md)
 and [early evaluation](archive/rewrite-plan-evaluation.md) are historical snapshots.
 
 ## Compatibility boundary
@@ -145,6 +148,13 @@ logs, diagnostic messages), not their labels or surrounding controls.
 `make validate-ui-v3` runs generation, lint, TypeScript, formatting, locale checks,
 Vitest, and the pinned v2.5 compatibility check. `make validate-fork` adds backend
 generation, Go lint, and integration tests. `make ui-v3-only` verifies the bundle.
+
+On a clean checkout, install both UI dependency trees, run `make generate`, then
+`make ui` and `make ui-v3-only` **before** `make validate-fork`. Go validation
+inspects the embedded v3 route chunks, so generated placeholder directories are
+not enough. The [development guide](development.md#validation) contains the full
+command sequence; the [deployment runbook](../../../docs/v3-deployment.md) covers
+the Stash publisher, stash-s6 bake, and local Quadlet verification.
 
 The compatibility checker validates mainline operations, additive schema changes,
 argument defaults, and the migration track. SQLite fixtures cover v3 close,

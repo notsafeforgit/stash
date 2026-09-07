@@ -1,516 +1,225 @@
-# Offline (in-PWA scene downloads)
+# Offline scene downloads
 
-This document specifies the design for in-PWA scene downloads — a top-level "Offline" view in v3 where users can download scenes to the device's PWA storage for offline playback. Scenes only for now; images / galleries / etc. are out of scope.
+This guide describes the implementation on `v3-rewrite`, checked on 2026-09-07.
+The earlier phased proposal has been replaced by current behavior and explicit
+limits. See the [architecture guide](architecture.md) for shared list/player
+contracts and the [documentation index](../../../docs/README.md) for other guides.
 
-## Goals
+## What is implemented
 
-- One-tap download from any scene's actions menu and from scene cards' context menus.
-- Files stored inside the PWA via OPFS (Origin Private File System) so they survive PWA reload, are sandboxed per-origin, and don't pollute the user's general device storage until explicitly exported.
-- Format chosen per-device for efficiency: codec-copy when the source's codecs are decodable on the device, otherwise transcode to the most efficient codec the device supports (HEVC if both client-decode and server-encode are available, else H.264).
-- Resolution capped by a user-configurable max ("Original" / 4K / 1440p / 1080p / 720p / 480p / 240p) shared with the existing streaming-resolution setting where it makes sense.
-- Re-downloading the same scene at a different resolution **replaces** the existing local copy (one entry per scene).
-- Downloads serialize: at most one in-flight at a time. Subsequent requests queue.
-- "Save to Files" exports a downloaded entry out of the PWA into the user's regular device storage via the platform's file save dialog.
+Scenes can be downloaded into browser-managed storage, played from the local
+file, and exported with **Save to Files**. The download queue survives route
+navigation, persists its entries across reloads, and supports retry, cancellation,
+and deletion. The Offline view reuses the shared list and lightbox components.
 
-## Non-goals
+“Offline” currently describes local media and metadata access after the app has
+loaded. There is **no service worker or Background Fetch integration**. A cold
+launch or reload without the server is not guaranteed to load the app shell or
+pass its startup gates. Downloads run in the page and can be suspended when the
+browser backgrounds or closes it. Installing the PWA does not remove these limits.
 
-- Background fetch / continuing downloads while the PWA is closed. Browser support is too patchy (Chrome only via Background Fetch API; Safari has nothing). Foreground only; clearly labelled in the UI.
-- Multi-version per scene (one downloaded copy per scene; resolution is part of the metadata, replacing on re-download).
-- Auto-eviction by Stash. The browser may evict under storage pressure (especially iOS); we request `navigator.storage.persist()` and surface eviction warnings, but Stash itself never deletes a download the user didn't explicitly remove.
-- Sharing downloads between devices. Each device's PWA has its own OPFS — downloads do not sync.
-- Selective audio track / subtitle picking. Each download is a single MP4 with one video track and one audio track (whatever the source's primary tracks are, with audio re-encoded to AAC if needed for MP4 compatibility).
-- Bulk save / multi-file zip export. Each downloaded entry is exportable on its own (per-card menu + a Save button on the offline player); chaining them into a single archive isn't worth the complexity for the use case.
+## Download and playback flow
 
-## High-level data flow
+1. The scene card/detail download action snapshots metadata and selects a format
+   using device decode support, server encoder capabilities, and the device's
+   maximum-resolution preference.
+2. The shared queue writes an IndexedDB row, then its single active worker
+   fetches the scene download endpoint and streams the response into OPFS.
+3. The tray and list show queued, downloading, complete, or error state. A known
+   `Content-Length`/`Content-Range` total enables percentage progress; otherwise
+   the UI shows bytes transferred.
+4. Completed scenes open at `/offline/$sceneId` or in the list's lightbox. The
+   player uses a `blob:` URL backed by the OPFS file and a scene adapter built
+   from the metadata snapshot. The URL is revoked when no longer needed.
+5. **Save to Files** exports one scene through `showSaveFilePicker` when available,
+   streaming to the chosen file. Otherwise it uses an anchor download with a
+   `blob:` URL; the browser controls the resulting download/share UI.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  Frontend (PWA)                                                 │
-│                                                                 │
-│  scene-card / scene-actions-menu                                │
-│        │                                                        │
-│        │ "Download" click                                       │
-│        ▼                                                        │
-│  useDownloadQueue.enqueue(scene)                                │
-│        │                                                        │
-│        ▼                                                        │
-│  pickFormat(scene, deviceCapabilities, settings)                │
-│        │                                                        │
-│        │  ?format=copy|copy-aac|hevc|h264                       │
-│        │  &resolution=ORIGINAL|FOUR_K|FULL_HD|...               │
-│        ▼                                                        │
-│  fetch('/scene/{id}/download?...')                              │
-│  pipeTo OPFS file writer (via streams API)                      │
-│        │                                                        │
-│        │ progress events update IndexedDB metadata row          │
-│        ▼                                                        │
-│  IndexedDB('offline'): { scene_id, format, resolution,          │
-│                          bytes, status, error, opfsPath }       │
-└─────────────────────────────────────────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  Backend (Go)                                                   │
-│                                                                 │
-│  GET /scene/{id}/download?format=...&resolution=...             │
-│        │                                                        │
-│        ▼                                                        │
-│  routes_scene.go → ServeDownload                                │
-│        │                                                        │
-│        ▼                                                        │
-│  pkg/ffmpeg/download.go:                                        │
-│    - format=copy:     -c:v copy -c:a copy -f mp4 -movflags ...  │
-│    - format=copy-aac: -c:v copy -c:a aac  -f mp4 -movflags ...  │
-│    - format=hevc:     -c:v <hevc-encoder> -c:a aac -f mp4 ...   │
-│    - format=h264:     -c:v <h264-encoder> -c:a aac -f mp4 ...   │
-│    All resolution-clamped via -vf scale filter.                 │
-│  ffmpeg stdout → http.ResponseWriter (chunked transfer).        │
-└─────────────────────────────────────────────────────────────────┘
-```
+Paths above are router paths relative to the application's deployment prefix.
+Backend requests use `getPlatformURL`; do not hard-code origin-root URLs.
 
-## Storage layer
+The list filters, sorts, and paginates its local entries in memory. Its
+`EntityListPageConfig.source` has `kind: "local"`; list data does not require a
+GraphQL list request. Optional online metadata refresh is a separate operation.
+The preview lightbox follows the currently displayed item order. Bulk context
+menu actions support re-download/retry, cancellation, and deletion from the
+device. There is no bulk ZIP export.
 
-### OPFS for media bytes
+## Storage contract
 
-Each downloaded scene gets one file at OPFS path `scenes/{scene_id}.mp4`. Streams are written via:
+| Storage | Current contents |
+| --- | --- |
+| OPFS | MP4 bytes at `scenes/<scene_id>.mp4` |
+| IndexedDB | Database `stash-offline`, version 1; `offline_scenes` keyed by `scene_id`, indexed by `downloaded_at` and `status` |
+| localStorage | Per-device maximum resolution under `stash-offline-max-resolution` |
 
-```ts
-const root = await navigator.storage.getDirectory();
-const scenesDir = await root.getDirectoryHandle("scenes", { create: true });
-const handle = await scenesDir.getFileHandle(`${sceneId}.mp4`, { create: true });
-const writable = await handle.createWritable();          // FileSystemWritableFileStream
-await fetchResponse.body!.pipeTo(writable);              // streaming, no buffering in JS
-```
+[OfflineEntry](../src/components/offline/offline-db.ts) is the authoritative
+metadata type. It stores title/details, studio/performer/tag snapshots, source
+metadata and asset URLs, selected download format/resolution, size and status,
+OPFS path, server-presence state, and the local playback position. Optional
+fields allow older rows to remain readable. `width_actual`/`height_actual`
+currently start from source dimensions; completion does not probe the downloaded
+file, so these fields are not verified output measurements.
 
-`pipeTo` keeps memory flat (browser handles backpressure) so multi-GB files work without tab crashes on iOS.
+Use `offline-db.ts` for all metadata transactions and `opfs-storage.ts` for file
+access. OPFS receives a stream rather than an accumulated multi-gigabyte Blob.
+`patchEntry` merges fields inside one IndexedDB transaction so progress and
+resume writes do not replace unrelated metadata. OPFS and IndexedDB are separate
+stores: metadata alone does not prove that a playable file still exists.
 
-### IndexedDB for metadata
+Storage is scoped to the browser origin/profile, with rows keyed only by scene
+ID. It is not partitioned by server identity or path prefix within an origin.
+The queue and change notifications are page-local; there is no cross-tab worker
+lock or broadcast synchronization. Do not assume independent tabs can coordinate
+downloads or that different Stash libraries on the same origin have separate
+local catalogs.
 
-OPFS doesn't store rich metadata, so a sibling IndexedDB table tracks each entry:
+Settings expose storage usage, clear-all, and a persistent-storage request.
+Persistence is subject to the browser's decision and is not a backup. The queue
+refuses to start another download when the reported origin usage is at least
+95% of quota, but does not reserve the final file size. A write can still fail
+mid-download with a quota error. Missing/evicted files surface a retry action.
 
-```ts
-interface OfflineEntry {
-  scene_id: string;             // primary key
-  // Snapshot of scene fields at download time so the Offline view doesn't
-  // need a fresh GraphQL fetch to render. Refreshed on Offline-view mount
-  // when the server is reachable — see "Metadata refresh".
-  title: string;
-  studio_name: string | null;
-  studio_id: string | null;
-  performers: { id: string; name: string }[];
-  tags: { id: string; name: string }[];
-  duration: number;
-  width: number;
-  height: number;
-  date: string | null;
-  paths: {
-    screenshot: string | null;  // remote URLs; fall back to placeholder if offline
-    preview: string | null;
-    sprite: string | null;
-    vtt: string | null;
-  };
-  // Local playback state.
-  last_position_seconds?: number;
-  // Download metadata.
-  format: "copy" | "copy-aac" | "hevc" | "h264";
-  source_video_codec: string;
-  source_audio_codec: string;
-  resolution: string;           // "ORIGINAL" | "FOUR_K" | ...
-  width_actual: number;         // post-scale
-  height_actual: number;
-  bytes: number;
-  downloaded_at: number;        // unix ms
-  status: "queued" | "downloading" | "complete" | "error";
-  bytes_downloaded?: number;    // live during downloading
-  error?: string;
-  opfs_path: string;            // "scenes/{scene_id}.mp4"
-  // Result of the most recent metadata-refresh pass; used by the card to
-  // surface "Removed from server" badges. "unknown" until first refresh.
-  server_status: "present" | "missing" | "unknown";
-}
+## Queue recovery and byte-range resume
+
+[use-download-queue.ts](../src/components/offline/use-download-queue.ts) owns a
+module-scoped store observed through `useSyncExternalStore`. One worker processes
+entries at a time; IndexedDB status is the recovery source across reloads.
+
+| Event | Behavior |
+| --- | --- |
+| Reload with queued entries | Rebuild the queue and start processing |
+| Reload with an in-flight entry | Mark it `error` with `Interrupted by reload`; allow an explicit retry |
+| Enqueue an already queued/downloading scene | No duplicate download |
+| Enqueue a new download for an existing completed/error row | Replace the prior local file with a fresh metadata/format snapshot |
+| Retry an existing entry | Re-queue with its saved format and metadata; inspect any existing file bytes |
+| Cancel a queued entry | Remove it from the queue and local stores |
+| Cancel an active download | Abort the fetch/write and expose an error state for retry |
+| Delete from device | Remove the OPFS file and IndexedDB entry; leave server media untouched |
+
+Range retry is **implemented, but best effort**:
+
+- If a partial file is present, the worker sends `Range: bytes=N-` using its
+  existing size. It appends only when the server responds with `206`.
+- A full `200` response rewrites from byte zero. This is expected for FFmpeg
+  remux/transcode output, whose bytes cannot safely be resumed across runs.
+- Explicit cancellation and a failed fresh/full-body write trigger partial-file
+  cleanup. Failed append attempts retain the existing file for another retry.
+  Browser writable-file behavior determines which bytes survive interruption;
+  reload does not guarantee that progress was committed to disk.
+- The worker does not persist a source validator or send `If-Range`, and does not
+  automatically recover from `416`. Resume assumes the source bytes are unchanged.
+  Remove the local entry and download again if the source changed or a range
+  retry fails repeatedly.
+
+## Backend endpoint and capability query
+
+With `STASH_ENABLE_V3_UI=true` (or `--enable-v3-ui`), the backend adds:
+
+```text
+GET  /scene/{id}/download.mp4?mode=copy
+GET  /scene/{id}/download.mp4?mode=h264&resolution=FULL_HD
+HEAD /scene/{id}/download.mp4?mode=copy
 ```
 
-Object-store: `offline_scenes`, key path `scene_id`. Indexed on `downloaded_at` (for chronological list view) and `status` (for resuming queue on PWA reopen).
+[routes_scene.go](../../../internal/api/routes_scene.go) selects the scene's
+primary file and calls [stream_download.go](../../../pkg/ffmpeg/stream_download.go).
+Accepted modes are `auto`, `copy`, `copy-aac`, `h264`, `hevc`, and `av1`:
 
-### Why not IndexedDB-only?
+- `copy` preserves source video/audio codecs; `copy-aac` preserves video and
+  converts audio to AAC. The client requests Original resolution for both.
+- `h264`, `hevc`, and `av1` request an encoding, with server-side copy shortcuts
+  when suitable. `auto` chooses compatible copy or H.264.
+- If the resolved copy path can serve the MP4-family source directly,
+  `http.ServeFile` provides length and byte-range support. Other paths stream
+  fragmented MP4 from FFmpeg without a total length or range support.
+- The response is a video MP4 attachment. Disconnect/abort cancels the FFmpeg
+  request context. Missing source files, disabled live transcoding, and invalid
+  copy requests surface HTTP errors to the queue.
 
-Storing the binary as a Blob in IndexedDB also works on every target browser, but it forces the whole file through V8's heap on read (no streaming reads of partial Blobs from IDB) and writes accumulate in memory until commit on some implementations. OPFS gives true streaming both ways and is the path the platform vendors are investing in. Keep IDB for metadata only.
-
-### Persistence
-
-On first download, call `navigator.storage.persist()`. If denied, surface a UI banner: "Browser may evict downloads under storage pressure. Add Stash to your Home Screen for better persistence." (iOS only grants persistent storage to PWAs added to Home Screen.)
-
-Surface `navigator.storage.estimate()` in the Offline view header: "Using 4.2 GB of ~12 GB available."
-
-## Server endpoint
-
-### Route
-
-```
-GET /scene/{id}/download
-    ?format=copy|copy-aac|hevc|h264
-    &resolution=ORIGINAL|FOUR_K|...
-    [&apikey=...]
-```
-
-Wired in `internal/api/routes_scene.go` next to the existing stream routes. Returns:
-- `200 OK` with `Content-Type: video/mp4`, `Content-Disposition: attachment; filename="{title}.mp4"`, no `Content-Length` (chunked).
-- `400 Bad Request` for invalid format/resolution combos.
-- `503 Service Unavailable` if the requested encoder isn't available (e.g. `hevc` requested but no HEVC encoder configured).
-
-### ffmpeg orchestration
-
-New file `pkg/ffmpeg/download.go` with a `ServeDownload(w http.ResponseWriter, r *http.Request, opts DownloadOptions)` similar in shape to `ServeSegment` but writing to the response directly. ffmpeg pipes stdout → `http.ResponseWriter` via `cmd.Stdout = w` and we flush periodically. On client disconnect, kill ffmpeg via `r.Context().Done()`.
-
-Per-format args:
-
-```go
-// copy: source codecs ride in MP4 cleanly, pure remux
-//   -c:v copy -c:a copy -movflags +faststart+frag_keyframe -f mp4 pipe:1
-
-// copy-aac: video copies, audio re-encodes to AAC (Opus → AAC etc.)
-//   -c:v copy -c:a aac -ac 2 -af asetpts=PTS-STARTPTS
-//   -movflags +faststart+frag_keyframe -f mp4 pipe:1
-
-// hevc: HEVC transcode (HW where available)
-//   -c:v <hevc_qsv|hevc_nvenc|libx265> -preset/quality/crf appropriate
-//   -vf "scale=if-needed,setpts=PTS-STARTPTS"
-//   -c:a aac -ac 2 -movflags +faststart+frag_keyframe -f mp4 pipe:1
-
-// h264: H.264 transcode (HW where available)
-//   -c:v <h264_qsv|h264_nvenc|libx264> ...
-//   (same shape as hevc, different codec)
-```
-
-`+faststart` is a one-shot post-process that moves the moov atom to the front; doesn't work with `pipe:1` directly because faststart needs to seek backward. **Use `+frag_keyframe+empty_moov` instead** — emits a fragmented MP4 progressively, no post-process seek required, players (including iOS) handle these fine for offline playback. This was the same trade-off that drove the HLS pipeline to fMP4.
-
-### Codec resolution server-side
-
-A new helper `pkg/ffmpeg/encoder_capabilities.go`:
-
-```go
-type EncoderSet struct {
-    H264 VideoCodec    // always non-zero (libx264 fallback)
-    HEVC VideoCodec    // zero value if no HEVC encoder available
-}
-
-// Probe at server startup. Tests each candidate via `ffmpeg -hide_banner -encoders`
-// and a tiny encode trial to filter out encoders that exist but can't run
-// (e.g. `hevc_qsv` listed but no QSV device present).
-func ProbeAvailableEncoders(ctx context.Context, ff *FFMpeg) EncoderSet
-```
-
-`H264` candidates in priority: `h264_qsv`, `h264_nvenc`, `h264_vaapi`, `h264_videotoolbox`, `libx264`. (Mirrors the existing HW-pick logic in `pkg/ffmpeg/codec.go:hwCodecHLSCompatible`.)
-
-`HEVC` candidates in priority: `hevc_qsv`, `hevc_nvenc`, `hevc_vaapi`, `hevc_videotoolbox`, `libx265`. `libx265` is the universal-CPU fallback; we'll only fall back to it on systems with capable CPU because real-time 4K HEVC encode on libx265 even at `ultrafast` is borderline. The server probe records what's actually viable; if nothing usable, `HEVC` is zero and the client never sees `hevc` as an option.
-
-Exposed via GraphQL on the existing `Configuration` query so the client can include / exclude `hevc` from format selection without a separate fetch:
+Capabilities are a **top-level GraphQL query**, not a Configuration field:
 
 ```graphql
-type Configuration {
-  ...
-  serverCapabilities: ServerCapabilities!
-}
-type ServerCapabilities {
-  downloadFormats: [String!]!     # ["copy", "copy-aac", "h264"] or [..., "hevc"]
-}
-```
-
-## Codec selection (client)
-
-`src/components/offline/pick-download-format.ts`:
-
-```ts
-type DeviceCaps = {
-  decodes: { av1: boolean; hevc: boolean; h264: boolean };
-  decodesAudio: { aac: boolean; opus: boolean };
-};
-
-type ServerCaps = {
-  encodes: { hevc: boolean; h264: boolean };
-};
-
-type SelectedDownload = {
-  format: "copy" | "copy-aac" | "hevc" | "h264";
-  resolution: StreamingResolution;     // capped by user setting
-};
-
-function pickDownloadFormat(
-  scene: Scene,
-  device: DeviceCaps,
-  server: ServerCaps,
-  maxResolution: StreamingResolution,
-): SelectedDownload {
-  // Effective resolution: source resolution clamped by user max.
-  const resolution = clampResolution(scene, maxResolution);
-  const willScale = effectiveResolution !== "ORIGINAL"
-                 && resolutionSmallerThanSource(resolution, scene);
-
-  // 1. Pure copy when the source codecs land in MP4 untouched and the device
-  //    decodes both. No scaling possible (codec-copy can't filter), so this
-  //    only applies when no scale is needed.
-  if (!willScale
-      && device.decodes[scene.video_codec]
-      && device.decodesAudio[scene.audio_codec]
-      && audioRidesInMp4(scene.audio_codec)) {
-    return { format: "copy", resolution };
+query ServerCapabilities {
+  serverCapabilities {
+    downloadFormats
   }
-
-  // 2. Video-copy + AAC re-encode. Same scale-precludes-copy constraint on
-  //    video, but audio gets re-encoded so source-audio support doesn't
-  //    matter.
-  if (!willScale && device.decodes[scene.video_codec]) {
-    return { format: "copy-aac", resolution };
-  }
-
-  // 3. Transcode. Pick the most efficient codec the device decodes AND the
-  //    server can encode.
-  if (device.decodes.hevc && server.encodes.hevc) {
-    return { format: "hevc", resolution };
-  }
-  return { format: "h264", resolution };
 }
 ```
 
-`device.decodes.*` reuses the same MMS `isTypeSupported` probe used for streaming source selection (`useCodecsDecodableInMp4`).
+The query is declared in [schema.graphql](../../../graphql/schema/schema.graphql),
+with `ServerCapabilities` in
+[metadata.graphql](../../../graphql/schema/types/metadata.graphql). The actual
+advertisement is defined in
+[server_capabilities.go](../../../internal/manager/server_capabilities.go):
+universal modes are `auto`, `copy`, `copy-aac`, and `h264`; automatic HEVC/AV1
+selection is advertised only when the corresponding hardware encoder is
+available. An explicit HEVC request can still use the slower libx265 fallback.
+The client uses Apollo's cached capability result and conservative defaults
+until it arrives. Restart the backend after changing encoder availability and
+reload the client to refresh its cached result.
 
-For phase 1 the server doesn't expose HEVC so the `hevc` branch never fires. Phase 2 lights it up.
+## Client format and resolution choice
 
-## Frontend structure
+[pick-download-format.ts](../src/components/offline/pick-download-format.ts)
+contains the shared decision function:
 
-### Routes
+1. If no downscale is needed and the device decodes the source video and audio
+   in MP4, choose `copy`.
+2. If only the source video is decodable in MP4 and no downscale is needed,
+   choose `copy-aac`.
+3. Otherwise choose AV1, then HEVC, when both device decode and advertised server
+   encode support allow it; fall back to H.264.
 
-New file `src/routes/offline.tsx` registered as a top-level TanStack route. Lists the contents of IndexedDB `offline_scenes`, sorted by `downloaded_at` desc by default (sortable in the UI).
+The resolution ceiling uses the source's shorter dimension to decide whether
+scaling is required. It does not request upscaling. The device preference
+defaults to 1080p and offers Original, 4K, 1080p, 720p, 480p, and 240p, matching
+the existing `StreamingResolutionEnum`. There is no 1440p option. Use the
+`downloadQueryString` helper rather than inventing resolution or mode strings.
 
-### Nav entry
+## Metadata and local playback position
 
-Add to `BUILTIN_NAV_ITEMS` in `src/components/layout/nav-items.tsx`:
+On Offline-view mount and catalog membership changes, the metadata refresh hook
+attempts a network query for the stored scene IDs. Successful results update the
+snapshots; missing scenes gain a “Removed from server” indication without deleting
+local media. Network failures leave the snapshots intact. Screenshots, previews,
+sprites, and VTT are stored as remote URLs, not copied into OPFS, so artwork and
+preview assets can be unavailable offline.
 
-```tsx
-{
-  label: "Offline",
-  icon: <Download className="size-4" />,
-  to: "/offline",
-  hotkey: "g o",
-}
-```
-
-Goes after Tags (last current entry). Also surfaces in `mobile-nav-sheet.tsx` and `bottom-tab-bar.tsx` automatically since they consume `useNavItems`.
-
-### List view
-
-`src/components/offline/offline-scene-list.tsx`:
-
-- Uses the same `SceneCard` component as the regular scene list. Card data is built from the IndexedDB `OfflineEntry` (we snapshot scene fields at download time so the card renders without a GraphQL fetch).
-- Card preview / poster comes from the snapshotted `paths.screenshot` URL when online; falls back to a static placeholder when offline (we don't snapshot binary preview data — adds significant storage cost for marginal value).
-- Tapping a card opens scene playback against the local OPFS file (see "Playback from OPFS" below).
-- Per-card context menu: "Save to Files…", "Re-download", "Delete".
-- Bulk-select the same way regular scene cards do, with a bulk-action menu offering "Save to Files…" (zips multiple files), "Delete".
-- Sticky header shows total size used and queue status ("3 queued, 1 downloading: 412 MB / 1.2 GB").
-
-### Context menu integration
-
-Two sites add a "Download" entry:
-
-1. **Scene card context menu** (`src/components/cards/scene-card.tsx:contextMenu`) — add a `<ContextMenuItem onClick={() => enqueueDownload(scene)}>Download</ContextMenuItem>` after the existing items, separator above.
-2. **Scene detail actions menu** (`src/components/detail/scene-actions-menu.tsx`) — same, in the dropdown.
-
-Both call `useDownloadQueue().enqueue(scene)` from a shared hook (see below). Disabled with a tooltip when an entry already exists in `complete` status (the menu item then reads "Re-download" to make the replace behaviour explicit).
-
-### Download queue
-
-`src/components/offline/use-download-queue.ts`:
-
-```ts
-type QueueState = {
-  queue: { sceneId: string; status: "queued" | "downloading" }[];
-  active: { sceneId: string; bytesDownloaded: number; bytesTotal: number | null } | null;
-};
-
-interface UseDownloadQueue {
-  state: QueueState;
-  enqueue(scene: Scene, options?: { force?: boolean }): Promise<void>;
-  cancel(sceneId: string): void;
-  retry(sceneId: string): void;
-  remove(sceneId: string): Promise<void>;     // deletes OPFS file + IDB row
-}
-```
-
-Implementation:
-- Singleton state in a Zustand-style store (or React Context with reducer; pattern already used elsewhere in v3 — pick existing convention).
-- One worker promise pumps the queue: `while (queue.length) { await downloadOne(queue.shift()) }`.
-- `enqueue` adds to queue if not already present; if a `downloading` or `queued` entry exists for the same scene the call is a no-op (returns same promise).
-- `enqueue(scene, { force: true })` wipes the existing entry (OPFS + IDB) before queuing — used by the Re-download path when the user picks a different resolution.
-- On PWA reload, scan IDB for `status: "downloading"` rows; mark them `error: "Interrupted by reload"` and let the user retry. (No partial-resume; downloads start over. Range-resume is a phase 3 enhancement.)
-- All progress + status writes go to IDB via a debounced writer (1 Hz) to avoid trashing the browser's transaction log.
-
-### Playback from OPFS
-
-`src/components/offline/offline-scene-player.tsx` reuses `<ScenePlayer>` but with a constructed scene whose `streams` field points at a Blob URL backed by the local file:
-
-```ts
-const handle = await scenesDir.getFileHandle(`${id}.mp4`);
-const file = await handle.getFile();
-const url = URL.createObjectURL(file);              // blob: URL, no copy
-```
-
-Pass that URL through as the only direct stream source. Lifetime: revoke when the player unmounts or the route changes. The existing player components route blob URLs through the plain `<Video>` element since they aren't HLS playlists, so no further changes needed in the player.
-
-Resume time: stored in IDB on the offline entry, NOT pushed back to the server. Offline playback is intentionally a local-only experience — sync would require a queued-mutation pipeline that doesn't exist in v3 yet, and the value is marginal (the user knows they were watching offline). On unmount, write `last_position_seconds` to the row.
-
-### "Save to Files" button
-
-`src/components/offline/save-to-files.ts`:
-
-```ts
-async function saveToFiles(entry: OfflineEntry) {
-  const handle = await scenesDir.getFileHandle(entry.opfs_path);
-  const file = await handle.getFile();
-
-  // Tier 1: File System Access API (desktop Chrome).
-  if ("showSaveFilePicker" in window) {
-    const out = await window.showSaveFilePicker({
-      suggestedName: `${entry.title}.mp4`,
-      types: [{ description: "MP4 Video", accept: { "video/mp4": [".mp4"] } }],
-    });
-    const writable = await out.createWritable();
-    await file.stream().pipeTo(writable);
-    return;
-  }
-
-  // Tier 2: <a download> blob URL (Safari, Firefox). On iOS this triggers the
-  // share sheet, which lets the user save to Files / send via AirDrop / etc.
-  const url = URL.createObjectURL(file);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${entry.title}.mp4`;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  // Revoke on next tick so the browser can read the URL.
-  setTimeout(() => URL.revokeObjectURL(url), 0);
-}
-```
-
-A "Save to Files" button is also surfaced in the offline player route's header so it's one tap during playback, not just a context-menu entry. Bulk save isn't supported — see Non-goals.
-
-## Settings additions
-
-`src/routes/settings.tsx` gets a new "Offline" section with:
-
-- **Maximum download resolution** — radio buttons matching the existing `StreamingResolutionEnum` verbatim: Original / 4K / 1080p (FullHd) / 720p (StandardHd) / 480p (Standard) / 240p (Low). 1440p is intentionally absent — adding `WqHd` would cascade through GraphQL schema + Go enum + every existing resolution menu and isn't worth it for MVP. Default: 1080p (sane bandwidth + storage default for mobile devices).
-- **Storage usage** — read-only display of `navigator.storage.estimate()` results, plus a "Clear all offline scenes" button (with confirm dialog).
-- **Persistent storage** — read-only "Granted ✓" / "Not granted (downloads may be evicted)" line, with a "Request" button if not granted. (Browsers handle this idempotently.)
-
-Stored in `localStorage` under `stash-offline-max-resolution`. Not in server config — this is per-device.
-
-## Metadata refresh
-
-Snapshotted scene fields (`title`, `studio_name`, `performers`, `tags`, `paths.screenshot`, etc.) go stale if the user edits the scene server-side after downloading. To keep the Offline view honest:
-
-- On Offline-view mount, batch-fetch the latest `findScenes(filter: { id: in [...] })` for every locally-stored scene, with a small debounce so a fast remount doesn't double-fire.
-- For each result, diff the snapshot against the live row; if any visible field changed, write the new values to the IDB row. Leave `format`, `resolution`, `bytes`, etc. alone — those describe the local file, not the server scene.
-- Failure is silent (offline / server unreachable) — render the snapshotted data as-is. No spinner, no banner; cards just continue showing the last-known state.
-- Scenes deleted server-side: the GraphQL response excludes them. We mark the local entry with `server_status: "missing"` (visible as a small badge on the card: "Removed from server"). The local file stays — user can keep watching it but the entry can no longer be re-downloaded; the only option is local delete.
-
-`server_status` field added to `OfflineEntry`: `"present" | "missing" | "unknown"`. Defaults to `"unknown"` on download (not yet refreshed); set to `"present"` or `"missing"` after the next refresh pass.
-
-## Deletion semantics
-
-Two paths:
-
-1. **User deletes from list view** — removes IDB row + unlinks OPFS file. Idempotent if either is already gone.
-2. **Browser evicts under quota pressure** — OPFS file vanishes; IDB row remains. On Offline view load, we walk IDB rows and check `getFileHandle(...).catch(() => "missing")`. Missing rows are marked `error: "Evicted by browser"` in-memory (not persisted) and rendered with an inline "File missing — re-download" affordance, so the user understands what happened.
-
-## Error handling
-
-| Failure | Behaviour |
-|---|---|
-| Server returns 5xx | Mark `error`, surface in card, "Retry" button |
-| Server returns 503 (encoder not available) | Same, with explanatory message |
-| Network drops mid-download | Same; partial OPFS file deleted |
-| Quota exceeded mid-write | Same; partial OPFS file deleted; surface "Out of storage" with link to settings |
-| User navigates away mid-download | Download continues if PWA is foregrounded; cancels if the tab is closed |
-| PWA reloaded mid-download | On boot, mark interrupted entries `error: "Interrupted"`; queued entries stay queued and resume |
-
-## Phasing
-
-**Phase 1 (MVP, in scope for the first PR)**
-
-- OPFS storage layer + IDB metadata
-- Backend `/scene/{id}/download` route
-- `pkg/ffmpeg/download.go` with `copy`, `copy-aac`, `h264` formats
-- HW H.264 encoder selection (reuse existing `hwCodecHLSCompatible` logic)
-- Format selection client-side (HEVC branch present but never picked; server doesn't advertise it)
-- Top-level `/offline` route + nav entry
-- `<OfflineSceneList>` list view (cards reuse `<SceneCard>`)
-- Context-menu "Download" in scene card + scene actions menu
-- Settings: max resolution, storage estimate, clear-all
-- Offline playback via blob URL into existing `<ScenePlayer>`
-- Save to Files via tier-1 / tier-2 path
-- Single-download serial queue
-- Re-download replaces
-
-**Phase 2**
-
-- HEVC backend stream type + encoder probe
-- `serverCapabilities.downloadFormats` GraphQL field
-- Client format-pick uses HEVC when available
-
-**Phase 3**
-
-Shipped:
-
-- HW AV1 encoder support (`av1_vaapi`, `av1_qsv`, `av1_nvenc`) gated through `serverCapabilities.downloadFormats`. Client format-pick prefers AV1 > HEVC > H.264 when both device decode and server encode are available.
-- Range-based resume on interrupted downloads. The server's `mode=copy` path now short-circuits to `http.ServeFile` when the source is an MP4-family container with copy-eligible codecs (the common case), giving Range / If-Range / ETag for free. The download worker checks the existing OPFS file size on retry, sends `Range: bytes=N-`, and appends to the partial when the server returns 206. `mode=copy-aac`, `mode=h264`, `mode=hevc`, `mode=av1` still flow through the ffmpeg pipe (no Range support — the server returns 200 + full body and the worker silently restarts from byte 0).
-- Full ScenePlayer chrome for offline playback. `<OfflineScenePlayer>` reuses `<PlayerControls>` (timeline, hotkeys, fullscreen, frame zoom, loop) by spinning up a parallel `createPlayer({ features: videoFeatures })` factory and pointing it at the OPFS blob URL. Markers and captions are deferred (would require snapshotting `scene_markers` + downloading caption files into OPFS).
-
-Deferred — Background Fetch on Chrome:
-
-The PWA doesn't ship a service worker today, so Background Fetch is a green-field addition: SW build pipeline (Vite plugin), SW registration only in production, Background Fetch dispatch + lifecycle (`backgroundfetchsuccess` / `backgroundfetchabort` / `backgroundfetchclick`), main-thread ↔ SW message passing for live progress (the BG Fetch API doesn't push to the main thread directly — the SW has to poll `event.registration.downloaded` and forward), plus a feature-detect path so Safari and Firefox keep the in-tab worker. Realistic effort is ~half a day plus testing on actual mobile devices to validate the Chrome-Android background path. Splitting into its own PR keeps Phase 3's review scope manageable.
+`useOfflineResumeWriter` writes the local playhead about every five seconds
+when it moves at least 0.5 seconds, plus a best-effort final write on unmount or
+`beforeunload`. Both the detail player and offline lightbox use local resume
+state. Browser termination can prevent the final asynchronous write.
 
 ## Settled decisions
 
-For reference — these were resolved during design and shouldn't be re-litigated without strong reason:
+- Offline playback position stays in IndexedDB; it does not synchronize the
+  server's resume/watch activity.
+- Device deletion never deletes server media. Server deletion never automatically
+  deletes the downloaded copy.
+- Downloading the same scene replaces its local entry; there is one local copy
+  per scene ID, not a catalog of different encodings.
+- Reuse the list/player extension points and shared format picker when extending
+  offline behavior. Keep local data independent of GraphQL list fetching.
 
-1. **No 1440p in the resolution picker.** Use the existing `StreamingResolutionEnum` verbatim; adding `WqHd` cascades through too many surfaces for the MVP.
-2. **Snapshot scene fields to IDB at download time, refresh when next online.** See "Metadata refresh" above.
-3. **Resume position is local-only.** No server sync.
-4. **Quota refusal at 95% of `quota - usage`.** Leaves headroom for browser-internal metadata.
+## Module map and future work
 
-## File-by-file change inventory
+All frontend filenames below are under `src/components/offline/` unless noted.
 
-Backend:
+| Module | Responsibility |
+| --- | --- |
+| `download-action.ts` and scene menu wrappers | Online download action and metadata snapshot |
+| `pick-download-format.ts`, `use-server-capabilities.ts`, `offline-settings.ts` | Codec/resolution policy and preferences |
+| `use-download-queue.ts`, `download-tray.tsx`, `download-notifications.tsx` | Serial worker, recovery, progress, and notifications |
+| `offline-db.ts`, `opfs-storage.ts`, `use-offline-entries.ts` | Persistent stores and subscriptions |
+| `offline-scene-list-page.tsx`, `offline-list-source.ts`, `offline-filter-sidebar.tsx` | Local list, selection, sorting, and filtering |
+| `offline-scene-card-data.ts`, `offline-scene-adapter.ts` | Shared card/player data adapters |
+| `use-opfs-blob.ts`, `use-offline-resume-writer.ts`, `use-offline-scene-lightbox.tsx` | Local playback lifetime and resume |
+| `offline-metadata-refresh.ts` | Optional server metadata refresh |
+| `save-to-files.ts`, `offline-settings-section.tsx` | Export, quota display, persistence, and clear-all |
+| `src/routes/offline/` | List and detail routes |
 
-- `pkg/ffmpeg/download.go` — new
-- `pkg/ffmpeg/encoder_capabilities.go` — new (phase 2 wires HEVC; phase 1 stubs `H264 = ...` from existing logic)
-- `internal/api/routes_scene.go` — add `/scene/{id}/download` handler
-- `graphql/schema/types/config.graphql` — phase 2: add `serverCapabilities { downloadFormats }` field
-
-Frontend:
-
-- `src/routes/offline.tsx` — new top-level route
-- `src/components/offline/` — new directory
-  - `offline-scene-list.tsx`
-  - `offline-scene-card-data.ts` (adapter: `OfflineEntry` → `SceneCardScene`)
-  - `offline-scene-player.tsx` (wraps `ScenePlayer` with blob URL)
-  - `pick-download-format.ts`
-  - `use-download-queue.ts`
-  - `opfs-storage.ts` (writes / reads / unlinks scenes in OPFS)
-  - `offline-db.ts` (IDB wrapper for `offline_scenes` object store)
-  - `save-to-files.ts`
-  - `download-button.tsx` (shared menu-item component for the two context menus)
-- `src/components/cards/scene-card.tsx` — add Download menu item
-- `src/components/detail/scene-actions-menu.tsx` — add Download menu item
-- `src/components/layout/nav-items.tsx` — add Offline nav entry
-- `src/routes/settings.tsx` — add Offline settings section
-- `src/locales/en-GB.json` — new strings (download / offline / re-download / save to files / etc.)
-
-Estimated phase 1 scope: ~1500 LOC across new files + ~100 LOC of edits.
-
-## Notes
-
-- The download endpoint reuses `pkg/ffmpeg`'s existing `CodecInit` and HW-encoder selection but writes to `pipe:1` instead of HLS-segmented disk output. It does NOT share the `runningStreams` machinery — that's tied to HLS segment lifecycle and per-segment caching, neither of which downloads need.
-- iOS PWA OPFS uses Safari's WebKit storage, which sits under the "Manage Website Data" controls in Settings → Safari. Users can blow it away there. Worth surfacing in the Offline settings help text.
-- We deliberately don't store scene previews / sprites / VTT in OPFS for phase 1. They add cost and the list view can either fetch them when online or fall back to a placeholder. If users complain about ugly offline cards, phase 2 / 3 can opt-in to download cover art.
-- The `+frag_keyframe+empty_moov` MP4 we serve is a fragmented MP4. iOS plays these natively, Chrome does, all our targets do. The downside is that MP4 inspectors show no `moov.duration` until segment parsing — minor.
+Service-worker shell caching, Background Fetch, cross-tab coordination, source
+validation for range retries, cached artwork, and multi-file export remain
+unimplemented. They require separate feature design and validation; the old
+proposal's phase labels are not a completion checklist.

@@ -1,5 +1,9 @@
 # Stash
 
+> This is the **v3-rewrite tracking fork**. Start with the
+> [project documentation](docs/README.md) for v3 development, compatibility, and
+> deployment. The installation and community links below refer to mainline Stash.
+
 [![Build](https://github.com/stashapp/stash/actions/workflows/build.yml/badge.svg?branch=develop&event=push)](https://github.com/stashapp/stash/actions/workflows/build.yml)
 [![Docker pulls](https://img.shields.io/docker/pulls/stashapp/stash?logo=docker)](https://hub.docker.com/r/stashapp/stash 'DockerHub')
 [![GitHub Sponsors](https://img.shields.io/github/sponsors/stashapp?logo=github)](https://github.com/sponsors/stashapp)

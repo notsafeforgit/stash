@@ -1,8 +1,7 @@
 import { useQuery } from "@apollo/client/react";
 import { useIntl } from "react-intl";
 import * as GQL from "src/core/generated-graphql";
-import { Sheet, SheetContent, SheetTitle } from "src/components/ui/sheet";
-import { Spinner } from "src/components/ui/spinner";
+import { EntityEditSheet } from "./entity-edit-sheet";
 import { SceneEditForm } from "./scene-edit-form";
 
 interface SceneEditSheetProps {
@@ -20,37 +19,13 @@ export function SceneEditSheet({ id, onClose }: SceneEditSheetProps) {
   const scene = data?.findScene;
 
   return (
-    <Sheet
+    <EntityEditSheet
       open={!!id}
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
+      onClose={onClose}
+      entityType={intl.formatMessage({ id: "scene", defaultMessage: "Scene" })}
+      loading={loading && !scene}
     >
-      <SheetContent
-        side="right"
-        className="sm:max-w-xl overflow-y-auto p-0"
-        showCloseButton={false}
-      >
-        <SheetTitle className="sr-only">
-          {intl.formatMessage(
-            {
-              id: "actions.edit_entity",
-              defaultMessage: "Edit {entityType}",
-            },
-            {
-              entityType: intl
-                .formatMessage({ id: "scene", defaultMessage: "Scene" })
-                .toLocaleLowerCase(),
-            },
-          )}
-        </SheetTitle>
-        {loading && (
-          <div className="flex items-center justify-center p-8">
-            <Spinner />
-          </div>
-        )}
-        {scene && <SceneEditForm scene={scene} onSaved={onClose} />}
-      </SheetContent>
-    </Sheet>
+      {scene && <SceneEditForm scene={scene} onSaved={onClose} />}
+    </EntityEditSheet>
   );
 }

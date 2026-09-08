@@ -7,7 +7,7 @@ import {
   Tags,
   Settings2,
   X,
-  Check,
+  ListChecks,
   LayoutGrid,
   Image,
   LayoutList,
@@ -583,14 +583,15 @@ export const MobileListBar: React.FC<MobileListBarProps> = ({
         <div className="flex items-center gap-2 px-3 min-h-11">
           {selecting || hasSelection ? (
             // Selection mode chrome
-            <div className="flex flex-auto items-center gap-1">
+            <div className="flex flex-auto items-center justify-end gap-1">
               <Button
                 variant="ghost"
                 size="icon-sm"
                 onClick={onSelectNone}
+                aria-label={intl.formatMessage({ id: "actions.select_none" })}
                 title={intl.formatMessage({ id: "actions.select_none" })}
               >
-                <X size={16} />
+                <X />
               </Button>
               <span className="text-sm min-w-6 text-center">
                 {selectedCount}
@@ -599,9 +600,14 @@ export const MobileListBar: React.FC<MobileListBarProps> = ({
                 variant="ghost"
                 size="icon-sm"
                 onClick={onSelectAll}
-                title={intl.formatMessage({ id: "actions.select_all" })}
+                aria-label={intl.formatMessage({
+                  id: "actions.select_all_on_page",
+                })}
+                title={intl.formatMessage({
+                  id: "actions.select_all_on_page",
+                })}
               >
-                <Check size={16} />
+                <ListChecks />
               </Button>
             </div>
           ) : (

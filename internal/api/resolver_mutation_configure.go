@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -705,11 +704,7 @@ func (r *mutationResolver) ConfigureUI(ctx context.Context, input map[string]int
 }
 
 func (r *mutationResolver) ConfigureUISetting(ctx context.Context, key string, value interface{}) (map[string]interface{}, error) {
-	if m, ok := value.(map[string]interface{}); ok {
-		value = convertMapJSONNumbers(m)
-	} else if n, ok := value.(json.Number); ok {
-		value = jsonNumberToNumber(n)
-	}
+	value = convertJSONNumbers(value)
 	return config.GetInstance().UpdateUIConfiguration(func(existing map[string]interface{}) (map[string]interface{}, error) {
 		utils.NestedMap(existing).Set(key, value)
 		return existing, nil

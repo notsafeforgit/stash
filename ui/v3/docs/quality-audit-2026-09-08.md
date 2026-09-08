@@ -129,6 +129,17 @@ reproduce the failure and cover numeric, string, and mixed IDs, custom carousels
 row order, extension fields, and unrelated configuration updates. The original
 malformed-input tests missed this valid persisted format.
 
+**Write-path follow-up:** GraphQL decodes arbitrary numeric inputs as Go
+`json.Number`. The original conversion handled nested maps but skipped arrays,
+including the top-level `frontPageContent` value in `configureUISetting`, so YAML
+persisted new numeric IDs as strings too. The shared `convertJSONNumbers` now
+walks arrays and maps, preserves actual strings and empty/null containers, and
+handles scientific notation without silently converting it to zero. New
+GraphQL-to-YAML regression tests cover per-setting saves, legacy partial/full
+configuration saves, and plugin settings, including mixed ID representations,
+custom carousels, nested extension values, and unrelated settings. Existing
+string IDs are not migrated; the compatible reader remains required.
+
 ### 5. Selection identity and typed list actions
 
 **Finding:** selection retained stale query objects with matching IDs; a generic
@@ -306,6 +317,12 @@ browser integration infallible.
 
 ## Validation
 
+- Write-path follow-up: both UI builds and `make validate-fork` passed, including
+  Go lint/integration tests, **189 v3 tests in 42 files**, and the pinned v2.5
+  compatibility gate. [Seven GraphQL save/reload cases](../../../internal/api/config_json_persistence_test.go)
+  cover all configuration write forms, scalar settings, clearing, and empty Home
+  Screens. Converter tests cover nested arrays, input ownership, numeric forms,
+  and empty/null containers.
 - Home Screen regression follow-up: both UI builds and `make validate-fork`
   passed, including **189 tests in 42 files**. A read-only check accepted the
   reported six-row configuration without changing it. Chromium against the
@@ -342,7 +359,9 @@ browser integration infallible.
 
 ## Compatibility and limits
 
-No Go implementation, GraphQL schema, primary migration, or v2.5 UI file changed.
+The original audit and Home Screen reader fix changed no Go implementation.
+The write-path follow-up corrects JSON number conversion in existing mutations;
+it changes no GraphQL schema, primary migration, or v2.5 UI file.
 Existing preference keys, saved-filter formats, and extension configuration
 fields are preserved. New offline stores use deployment namespaces; original
 legacy stores remain intact for migration and recovery. General page pinch/double-tap zoom

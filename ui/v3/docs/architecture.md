@@ -231,6 +231,15 @@ Preserve these invariants:
 
 Root [CLAUDE.md](../../../CLAUDE.md) describes the backend HLS constraints.
 
+## Entity editing
+
+All seven single-entity edit sheets use `components/detail/entity-edit-sheet.tsx`.
+Its fixed header provides the title and an explicit Close control, including
+while data is loading or unavailable. Forms own their scrolling fields and
+pinned action bars inside the remaining height. Close, Escape, and backdrop
+dismissal leave without saving; Discard resets the form and keeps the pane open.
+Successful saves close the sheet through the existing form callback.
+
 ## Bulk custom fields
 
 All seven entity bulk-edit sheets share `components/forms/bulk-custom-fields-field.tsx`.

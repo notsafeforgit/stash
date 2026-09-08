@@ -1,8 +1,7 @@
 import { useQuery } from "@apollo/client/react";
 import { useIntl } from "react-intl";
 import * as GQL from "src/core/generated-graphql";
-import { Sheet, SheetContent, SheetTitle } from "src/components/ui/sheet";
-import { Spinner } from "src/components/ui/spinner";
+import { EntityEditSheet } from "./entity-edit-sheet";
 import { GalleryEditForm } from "./gallery-edit-form";
 
 interface GalleryEditSheetProps {
@@ -20,43 +19,22 @@ export function GalleryEditSheet({ id, onClose }: GalleryEditSheetProps) {
   const gallery = data?.findGallery;
 
   return (
-    <Sheet
+    <EntityEditSheet
       open={!!id}
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
+      onClose={onClose}
+      entityType={intl.formatMessage({
+        id: "gallery",
+        defaultMessage: "Gallery",
+      })}
+      loading={loading && !gallery}
     >
-      <SheetContent
-        side="right"
-        className="sm:max-w-xl overflow-y-auto p-0"
-        showCloseButton={false}
-      >
-        <SheetTitle className="sr-only">
-          {intl.formatMessage(
-            {
-              id: "actions.edit_entity",
-              defaultMessage: "Edit {entityType}",
-            },
-            {
-              entityType: intl
-                .formatMessage({ id: "gallery", defaultMessage: "Gallery" })
-                .toLocaleLowerCase(),
-            },
-          )}
-        </SheetTitle>
-        {loading && (
-          <div className="flex items-center justify-center p-8">
-            <Spinner />
-          </div>
-        )}
-        {gallery && (
-          <GalleryEditForm
-            gallery={gallery}
-            onSaved={onClose}
-            onDeleted={onClose}
-          />
-        )}
-      </SheetContent>
-    </Sheet>
+      {gallery && (
+        <GalleryEditForm
+          gallery={gallery}
+          onSaved={onClose}
+          onDeleted={onClose}
+        />
+      )}
+    </EntityEditSheet>
   );
 }

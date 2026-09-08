@@ -167,6 +167,12 @@ codec. Unknown v2.5/plugin fields survive round trips. Configuration writes
 correlate each key with its generated value type; saving one plugin merges only
 that plugin into the existing map.
 
+Home Screen saved-filter IDs accept positive integer numbers and decimal
+strings, both of which occur in existing v2.5/v3 configurations. Preserve the
+stored representation and row order; convert IDs to GraphQL strings only when
+querying. Regression tests exercise both formats and mixed layouts through the
+actual Apollo cache, including configuration updates after unrelated edits.
+
 Offline metadata, files, broadcasts, and locks share a deployment identity from
 `offline-scope.ts`: the normalized backend mount URL, independent of v3 routes.
 Use the storage adapters instead of constructing database names or file paths.

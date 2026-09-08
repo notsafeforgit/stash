@@ -14,7 +14,12 @@ export const frontPageContentSchema = z.array(
   z.discriminatedUnion("__typename", [
     z.looseObject({
       __typename: z.literal("SavedFilter"),
-      savedFilterId: z.number().int().positive(),
+      // Existing v2.5/v3 configurations persist IDs as numbers or decimal
+      // strings. Retain their representation so reading never rewrites them.
+      savedFilterId: z.union([
+        z.number().int().positive(),
+        z.string().regex(/^[1-9]\d*$/),
+      ]),
     }),
     z.looseObject({
       __typename: z.literal("CustomFilter"),

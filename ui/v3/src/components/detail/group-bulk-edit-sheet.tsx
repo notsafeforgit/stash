@@ -1,6 +1,13 @@
+import { useBulkCustomFields } from "@/components/forms/use-bulk-custom-fields";
 import { useCommittedRef } from "@/hooks/use-committed-ref";
 import { useEffect, useRef, useState } from "react";
-import { useForm } from "@tanstack/react-form";
+import { useForm, useStore } from "@tanstack/react-form";
+import { BulkCustomFieldsField } from "@/components/forms/bulk-custom-fields-field";
+import {
+  bulkCustomFieldsInput,
+  hasBulkCustomFieldChanges,
+  type BulkCustomFieldsValue,
+} from "@/components/forms/bulk-custom-fields";
 import { useLazyQuery } from "@apollo/client/react";
 import { useEntityMutation } from "src/core/client";
 import { useIntl } from "react-intl";
@@ -29,6 +36,7 @@ export type GroupBulkItem = {
 };
 
 interface GroupBulkFormValues {
+  custom_fields: BulkCustomFieldsValue;
   date: string | null | undefined;
   director: string | null | undefined;
   rating100: number | null | undefined;
@@ -41,6 +49,7 @@ interface GroupBulkFormValues {
 function buildInitialValues(_items: GroupBulkItem[]): GroupBulkFormValues {
   // Add mode starts empty — see scene-bulk-edit-sheet for rationale.
   return {
+    custom_fields: undefined,
     date: undefined,
     director: undefined,
     rating100: undefined,
@@ -57,6 +66,7 @@ function buildMutationInput(
 ): GQL.BulkGroupUpdateInput {
   const base: GQL.BulkGroupUpdateInput = {
     ids: applyToAll ? [] : ids,
+    custom_fields: bulkCustomFieldsInput(v.custom_fields),
     date: v.date,
     director: v.director,
     rating100: v.rating100,
@@ -101,6 +111,12 @@ export function GroupBulkEditSheet({
   const itemsRef = useRef(items);
   const applyToAllTargetRef = useRef(applyToAllTarget);
   const onSavedRef = useCommittedRef(onSaved);
+  const customFields = useBulkCustomFields({
+    open,
+    mode: GQL.FilterMode.Groups,
+    items: sheetItems,
+    matching: applyToAll ? sheetApplyToAllTarget : undefined,
+  });
 
   const [bulkUpdateGroups, { loading: savingSync }] = useEntityMutation(
     GQL.BulkGroupUpdateDocument,
@@ -159,6 +175,10 @@ export function GroupBulkEditSheet({
       onOpenChange(false);
     },
   });
+  const canSubmit = useStore(form.store, (state) => state.canSubmit);
+  const editingCustomFields = useStore(form.store, (state) =>
+    hasBulkCustomFieldChanges(state.values.custom_fields),
+  );
   const wasOpenRef = useRef(false);
 
   useEffect(() => {
@@ -177,6 +197,7 @@ export function GroupBulkEditSheet({
   }, [open, form, items, applyToAllTarget, totalCount]);
 
   function handleApplyToAllChange(v: boolean) {
+    form.setFieldValue("custom_fields", undefined);
     applyToAllRef.current = v;
     setApplyToAll(v);
   }
@@ -201,6 +222,7 @@ export function GroupBulkEditSheet({
         { count: sheetItems.length },
       )}
       saving={saving}
+      canSubmit={canSubmit && (!editingCustomFields || !!customFields.summary)}
       onSubmit={form.handleSubmit}
       applyToAllTarget={sheetApplyToAllTarget}
       totalCount={sheetTotalCount}
@@ -302,6 +324,20 @@ export function GroupBulkEditSheet({
                 disabled={saving}
               />
             </Field>
+          )}
+        </form.Field>
+        <form.Field
+          name="custom_fields"
+          validators={{ onChange: customFields.schema }}
+        >
+          {(field) => (
+            <BulkCustomFieldsField
+              value={field.state.value}
+              onChange={field.handleChange}
+              entityMode={GQL.FilterMode.Groups}
+              state={customFields}
+              disabled={saving}
+            />
           )}
         </form.Field>
       </FieldGroup>

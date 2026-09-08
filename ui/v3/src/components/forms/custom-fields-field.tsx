@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useIntl } from "react-intl";
 import { PlusIcon, Trash2Icon } from "lucide-react";
 import { Input } from "src/components/ui/input";
+import { coerceCustomFieldValue } from "./custom-field-value";
 import {
   InputGroup,
   InputGroupAddon,
@@ -12,14 +13,6 @@ import {
 export type CustomFieldMap = { [key: string]: unknown };
 
 const MAX_FIELD_NAME_LENGTH = 64;
-
-function isNumeric(v: string): boolean {
-  return /^-?(?:0|(?:[1-9][0-9]*))(?:\.[0-9]+)?$/.test(v);
-}
-
-function coerceValue(v: string): string | number {
-  return isNumeric(v) ? Number(v) : v;
-}
 
 function valueToString(v: unknown): string {
   if (v === null || v === undefined) return "";
@@ -73,7 +66,7 @@ export function CustomFieldsField({
   }, [newField, value, intl]);
 
   function updateValue(field: string, raw: string) {
-    onChange({ ...value, [field]: coerceValue(raw) });
+    onChange({ ...value, [field]: coerceCustomFieldValue(raw) });
   }
 
   function removeField(field: string) {
@@ -84,7 +77,7 @@ export function CustomFieldsField({
 
   function commitNewField() {
     if (!newField || newFieldError) return;
-    onChange({ ...value, [newField]: coerceValue(newValue) });
+    onChange({ ...value, [newField]: coerceCustomFieldValue(newValue) });
     setNewField("");
     setNewValue("");
   }

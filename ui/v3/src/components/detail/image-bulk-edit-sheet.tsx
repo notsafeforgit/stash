@@ -1,6 +1,13 @@
+import { useBulkCustomFields } from "@/components/forms/use-bulk-custom-fields";
 import { useCommittedRef } from "@/hooks/use-committed-ref";
 import { useEffect, useRef, useState } from "react";
-import { useForm } from "@tanstack/react-form";
+import { useForm, useStore } from "@tanstack/react-form";
+import { BulkCustomFieldsField } from "@/components/forms/bulk-custom-fields-field";
+import {
+  bulkCustomFieldsInput,
+  hasBulkCustomFieldChanges,
+  type BulkCustomFieldsValue,
+} from "@/components/forms/bulk-custom-fields";
 import { useLazyQuery } from "@apollo/client/react";
 import { useEntityMutation } from "src/core/client";
 import { useIntl } from "react-intl";
@@ -40,6 +47,7 @@ export type ImageBulkItem = {
 };
 
 interface ImageBulkFormValues {
+  custom_fields: BulkCustomFieldsValue;
   code: string | null | undefined;
   date: string | null | undefined;
   photographer: string | null | undefined;
@@ -56,6 +64,7 @@ interface ImageBulkFormValues {
 function buildInitialValues(_items: ImageBulkItem[]): ImageBulkFormValues {
   // Add mode starts empty — see scene-bulk-edit-sheet for rationale.
   return {
+    custom_fields: undefined,
     code: undefined,
     date: undefined,
     photographer: undefined,
@@ -76,6 +85,7 @@ function buildMutationInput(
 ): GQL.BulkImageUpdateInput {
   const base: GQL.BulkImageUpdateInput = {
     ids: applyToAll ? [] : ids,
+    custom_fields: bulkCustomFieldsInput(v.custom_fields),
     code: v.code,
     date: v.date,
     photographer: v.photographer,
@@ -124,6 +134,12 @@ export function ImageBulkEditSheet({
   const itemsRef = useRef(items);
   const applyToAllTargetRef = useRef(applyToAllTarget);
   const onSavedRef = useCommittedRef(onSaved);
+  const customFields = useBulkCustomFields({
+    open,
+    mode: GQL.FilterMode.Images,
+    items: sheetItems,
+    matching: applyToAll ? sheetApplyToAllTarget : undefined,
+  });
 
   const [bulkUpdateImages, { loading: savingSync }] = useEntityMutation(
     GQL.BulkImageUpdateDocument,
@@ -211,6 +227,10 @@ export function ImageBulkEditSheet({
       onOpenChange(false);
     },
   });
+  const canSubmit = useStore(form.store, (state) => state.canSubmit);
+  const editingCustomFields = useStore(form.store, (state) =>
+    hasBulkCustomFieldChanges(state.values.custom_fields),
+  );
   const wasOpenRef = useRef(false);
 
   useEffect(() => {
@@ -229,6 +249,7 @@ export function ImageBulkEditSheet({
   }, [open, form, items, applyToAllTarget, totalCount]);
 
   function handleApplyToAllChange(v: boolean) {
+    form.setFieldValue("custom_fields", undefined);
     applyToAllRef.current = v;
     setApplyToAll(v);
   }
@@ -296,6 +317,7 @@ export function ImageBulkEditSheet({
         { count: sheetItems.length },
       )}
       saving={saving}
+      canSubmit={canSubmit && (!editingCustomFields || !!customFields.summary)}
       onSubmit={form.handleSubmit}
       applyToAllTarget={sheetApplyToAllTarget}
       totalCount={sheetTotalCount}
@@ -512,6 +534,20 @@ export function ImageBulkEditSheet({
                 disabled={saving}
               />
             </Field>
+          )}
+        </form.Field>
+        <form.Field
+          name="custom_fields"
+          validators={{ onChange: customFields.schema }}
+        >
+          {(field) => (
+            <BulkCustomFieldsField
+              value={field.state.value}
+              onChange={field.handleChange}
+              entityMode={GQL.FilterMode.Images}
+              state={customFields}
+              disabled={saving}
+            />
           )}
         </form.Field>
       </FieldGroup>

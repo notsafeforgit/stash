@@ -97,6 +97,7 @@ input BulkStudioUpdateInput {
   tag_ids: BulkUpdateIds
   ignore_auto_tag: Boolean
   organized: Boolean
+  custom_fields: CustomFieldsInput
 }
 
 input StudioDestroyInput {

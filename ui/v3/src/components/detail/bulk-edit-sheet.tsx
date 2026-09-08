@@ -20,6 +20,7 @@ export interface BulkEditSheetProps {
   onOpenChange: (open: boolean) => void;
   title: string;
   saving: boolean;
+  canSubmit?: boolean;
   onSubmit: () => void;
   /** When provided and totalCount > itemCount, shows the "apply to all" toggle. */
   applyToAllTarget?: BulkApplyTarget;
@@ -39,6 +40,7 @@ export function BulkEditSheet({
   onOpenChange,
   title,
   saving,
+  canSubmit = true,
   onSubmit,
   applyToAllTarget,
   totalCount,
@@ -118,7 +120,7 @@ export function BulkEditSheet({
                 defaultMessage: "Cancel",
               })}
             </Button>
-            <Button type="submit" size="sm" disabled={saving}>
+            <Button type="submit" size="sm" disabled={saving || !canSubmit}>
               {saving && <Spinner className="size-4" />}
               {intl.formatMessage({
                 id: "actions.save",

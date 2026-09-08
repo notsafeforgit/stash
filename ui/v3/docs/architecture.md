@@ -231,6 +231,50 @@ Preserve these invariants:
 
 Root [CLAUDE.md](../../../CLAUDE.md) describes the backend HLS constraints.
 
+## Bulk custom fields
+
+All seven entity bulk-edit sheets share `components/forms/bulk-custom-fields-field.tsx`.
+Existing editable fields are the intersection of names across every affected
+item, regardless of whether their values differ. Each shared field independently
+supports Keep (preserve each item's value), Set (write one value to all), Clear
+value (retain the field with an empty string), or Remove field (delete the key).
+Fields defined on only some items stay untouched. New fields can be added to
+every item, provided the name does not already exist on any affected item.
+
+`use-bulk-custom-fields.ts` requests `bulkCustomFieldSummary` for selected IDs or
+the complete matching filter. The fork-owned resolver reads one transaction,
+ignores pagination, and batches custom-field reads. It returns shared and
+partially shared names, without sending every item's values to the browser.
+The editor waits for a fresh summary whenever opened or its scope changes;
+changing the affected scope resets custom-field edits. Query failures offer
+Retry while leaving unrelated metadata editable. As with other bulk edits,
+the summary is a read snapshot; it does not lock records while the sheet is open.
+
+`bulk-custom-fields.ts` owns the typed form value, Zod validation, and mutation
+serialization. Draft rows belong to TanStack Form and update on every keystroke;
+there is no separate pending row or blur-time commit. Validation blocks edits
+to nonshared names and additions that collide with any existing target name.
+It also blocks empty, untrimmed, oversized, and duplicate names, including
+set/remove conflicts. Names use the server's 64-byte UTF-8 limit. Values use
+the same decimal coercion as the single-entity editor; non-decimal text remains
+text. Suggestions for additions use `customFieldNames`, excluding names
+already present in the target.
+
+`custom-field-name-input.tsx` keeps free text separate from selected suggestions.
+It filters from the current form value using Base UI's locale-aware filter and
+ignores the popup's internal query resets. When changing the editor, check
+keyboard selection, freely entered names, and immediate reopening after Tab;
+a popup's closing animation must not freeze suggestions or erase a draft name.
+
+Bulk edits send only `CustomFieldsInput.partial` plus `remove`; Keep sends
+nothing and Clear value sends an empty string. The bulk editor never sends
+`full`, including when removing every shared field. Do not reuse the
+single-entity editor's full-map replacement helper: it would erase unshared
+fields. The optional
+`custom_fields` inputs on bulk studio/tag updates extend the same existing API
+contract as the other five entity types. No database migration or v2.5 client
+change is needed.
+
 ## Backend extension points
 
 `internal/api/resolver_mutation_bulk_*.go` owns fork bulk-job resolvers and their

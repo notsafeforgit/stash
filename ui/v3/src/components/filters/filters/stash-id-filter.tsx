@@ -35,10 +35,10 @@ export const StashIDFilter: React.FC<StashIDFilterProps> = ({
   const selectedBoxIndex = stashBoxes.findIndex(
     (box) => box.endpoint === selectedEndpoint,
   );
-  const selectedLabel =
-    selectedBoxIndex >= 0
-      ? stashboxDisplayName(stashBoxes[selectedBoxIndex].name, selectedBoxIndex)
-      : selectedEndpoint;
+  const selectedBox = stashBoxes[selectedBoxIndex];
+  const selectedLabel = selectedBox
+    ? stashboxDisplayName(selectedBox.name, selectedBoxIndex)
+    : selectedEndpoint;
   const anyEndpointLabel = intl.formatMessage({
     id: "stash_id_endpoint_any",
     defaultMessage: "Any endpoint",

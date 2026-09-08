@@ -1,3 +1,4 @@
+import { entityDestination } from "@/core/navigation";
 import { useMemo } from "react";
 import { useIntl } from "react-intl";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -24,14 +25,14 @@ export function useGalleryTableColumns(): ColumnDef<GalleryItem>[] {
 
       thumbnailColumn<GalleryItem>(
         (g) => g.paths.cover,
-        (g) => `/galleries/${g.id}`,
+        (g) => entityDestination.gallery(g.id),
       ),
 
       titleColumn<GalleryItem>({
         id: "path",
         header: intl.formatMessage({ id: "title" }),
         getTitle: galleryLabel,
-        getHref: (g) => `/galleries/${g.id}`,
+        getDestination: (g) => entityDestination.gallery(g.id),
       }),
 
       textColumn<GalleryItem>({

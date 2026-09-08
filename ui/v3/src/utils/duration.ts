@@ -55,15 +55,15 @@ class DurationCount {
 
 function secondsAsTime(seconds: number = 0): DurationCount[] {
   if (Number.isNaN(parseFloat(String(seconds))) || !Number.isFinite(seconds))
-    return [new DurationCount(0, DurationUnit.DURATIONS[0])];
+    return [new DurationCount(0, DurationUnit.SECOND)];
 
   const result = [];
   let remainingSeconds = seconds;
-  for (let i = DurationUnit.DURATIONS.length - 1; i >= 0; i--) {
-    const q = Math.floor(remainingSeconds / DurationUnit.DURATIONS[i].secs);
+  for (const unit of [...DurationUnit.DURATIONS].reverse()) {
+    const q = Math.floor(remainingSeconds / unit.secs);
     if (q !== 0) {
-      remainingSeconds %= DurationUnit.DURATIONS[i].secs;
-      result.push(new DurationCount(q, DurationUnit.DURATIONS[i]));
+      remainingSeconds %= unit.secs;
+      result.push(new DurationCount(q, unit));
     }
   }
   return result;
@@ -177,7 +177,8 @@ export function timestampToSeconds(
     return null;
   }
 
-  let secondsPart = splits[splits.length - 1];
+  const secondsPart = splits.at(-1);
+  if (secondsPart === undefined) return null;
   let msFrac = 0;
   if (secondsPart.includes(".")) {
     const secondsParts = secondsPart.split(".");
@@ -185,9 +186,9 @@ export function timestampToSeconds(
       return null;
     }
 
-    secondsPart = secondsParts[0];
-
-    const msPart = parseInt(secondsParts[1], 10);
+    const fraction = secondsParts[1];
+    if (fraction === undefined) return null;
+    const msPart = parseInt(fraction, 10);
     if (Number.isNaN(msPart)) {
       return null;
     }

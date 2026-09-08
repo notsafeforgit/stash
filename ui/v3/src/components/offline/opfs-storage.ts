@@ -11,10 +11,17 @@
  * Why a sub-directory `scenes/`: future-proofing for other entity
  * types (gallery archives, etc.) — they'd live under sibling dirs.
  *
- * Layout: `<opfs-root>/scenes/<scene_id>.mp4`. The `opfs_path` field
- * on `OfflineEntry` is the under-root path string ("scenes/308785.mp4")
- * so it survives serialisation.
+ * Layout: `stash-offline/<deployment-hash>/scenes/<scene_id>.mp4`.
+ * Legacy files remain under `scenes/`, accessible to migration and read-only
+ * playback when browser storage coordination is unavailable.
  */
+
+import {
+  getOfflineScope,
+  sceneFilename,
+  type OfflineScope,
+} from "./offline-scope";
+import { locateEntry } from "./offline-db";
 
 const SCENES_DIR = "scenes";
 
@@ -29,17 +36,30 @@ async function rootDir(): Promise<FileSystemDirectoryHandle> {
   return navigator.storage.getDirectory();
 }
 
-async function scenesDir(create = false): Promise<FileSystemDirectoryHandle> {
-  const root = await rootDir();
+async function deploymentDir(scope: OfflineScope | null, create = false) {
+  let root = await rootDir();
+  if (scope) {
+    root = await root.getDirectoryHandle("stash-offline", { create });
+    root = await root.getDirectoryHandle(scope.directory, { create });
+  }
+  return root;
+}
+
+async function scenesDir(
+  create = false,
+  scope = getOfflineScope(),
+): Promise<FileSystemDirectoryHandle> {
+  const root = await deploymentDir(await scope, create);
   return root.getDirectoryHandle(SCENES_DIR, { create });
 }
 
-export function opfsPathForScene(sceneId: string): string {
-  return `${SCENES_DIR}/${sceneId}.mp4`;
+export async function opfsPathForScene(sceneId: string): Promise<string> {
+  const scope = await getOfflineScope();
+  return `stash-offline/${scope.directory}/${SCENES_DIR}/${sceneFilename(sceneId)}`;
 }
 
 /**
- * Pipe a `Response.body` into OPFS at `scenes/<sceneId>.mp4`,
+ * Pipe a `Response.body` into this deployment's `scenes/<sceneId>.mp4`,
  * reporting bytes written via `onProgress`. Returns the final byte
  * count once the stream closes cleanly.
  *
@@ -66,19 +86,16 @@ export async function writeScene(
   onProgress?: (bytes: number) => void,
   startOffset = 0,
 ): Promise<number> {
+  signal.throwIfAborted();
   const dir = await scenesDir(true);
-  const handle = await dir.getFileHandle(`${sceneId}.mp4`, { create: true });
-  // `keepExistingData` is true when resuming so bytes 0..startOffset
-  // survive; false on a fresh download so a previous attempt's
-  // partial data doesn't leak into the new file.
+  signal.throwIfAborted();
+  const handle = await dir.getFileHandle(sceneFilename(sceneId), {
+    create: true,
+  });
+  signal.throwIfAborted();
   const writable = await handle.createWritable({
     keepExistingData: startOffset > 0,
   });
-  if (startOffset > 0) {
-    // Position the cursor at the resume point so the first appended
-    // chunk lands at byte `startOffset`.
-    await writable.seek(startOffset);
-  }
 
   let bytes = startOffset;
   const progressTransform = new TransformStream<Uint8Array, Uint8Array>({
@@ -90,6 +107,9 @@ export async function writeScene(
   });
 
   try {
+    signal.throwIfAborted();
+    if (startOffset > 0) await writable.seek(startOffset);
+    signal.throwIfAborted();
     await body.pipeThrough(progressTransform, { signal }).pipeTo(writable, {
       signal,
     });
@@ -114,7 +134,9 @@ export async function writeScene(
 export async function existingSceneSize(sceneId: string): Promise<number> {
   try {
     const dir = await scenesDir(false);
-    const handle = await dir.getFileHandle(`${sceneId}.mp4`, { create: false });
+    const handle = await dir.getFileHandle(sceneFilename(sceneId), {
+      create: false,
+    });
     const file = await handle.getFile();
     return file.size;
   } catch (err) {
@@ -134,9 +156,24 @@ export async function existingSceneSize(sceneId: string): Promise<number> {
  * state with a re-download affordance.
  */
 export async function readScene(sceneId: string): Promise<File | null> {
+  const location = await locateEntry(sceneId);
+  return readSceneFromScope(
+    sceneId,
+    location?.kind === "legacy" ? null : await getOfflineScope(),
+  );
+}
+
+/** Source reader for migration and legacy playback. No operation can write or
+ * delete another deployment's files or the legacy directory through the normal
+ * storage interface. */
+export async function readSceneFromScope(
+  sceneId: string,
+  scope: OfflineScope | null,
+): Promise<File | null> {
   try {
-    const dir = await scenesDir(false);
-    const handle = await dir.getFileHandle(`${sceneId}.mp4`, { create: false });
+    const root = await deploymentDir(scope);
+    const dir = await root.getDirectoryHandle(SCENES_DIR);
+    const handle = await dir.getFileHandle(sceneFilename(sceneId));
     return await handle.getFile();
   } catch (err) {
     if (err instanceof DOMException && err.name === "NotFoundError") {
@@ -149,7 +186,7 @@ export async function readScene(sceneId: string): Promise<File | null> {
 export async function removeScene(sceneId: string): Promise<void> {
   try {
     const dir = await scenesDir(false);
-    await dir.removeEntry(`${sceneId}.mp4`);
+    await dir.removeEntry(sceneFilename(sceneId));
   } catch (err) {
     // Idempotent: missing is success.
     if (err instanceof DOMException && err.name === "NotFoundError") return;
@@ -159,7 +196,7 @@ export async function removeScene(sceneId: string): Promise<void> {
 
 export async function clearAllScenes(): Promise<void> {
   try {
-    const root = await rootDir();
+    const root = await deploymentDir(await getOfflineScope());
     await root.removeEntry(SCENES_DIR, { recursive: true });
   } catch (err) {
     if (err instanceof DOMException && err.name === "NotFoundError") return;

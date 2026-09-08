@@ -1,3 +1,4 @@
+import type { EntityDestination } from "@/core/navigation";
 import { Link } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { IHasID } from "src/utils/data";
@@ -11,7 +12,7 @@ export { selectionColumn };
 
 export function thumbnailColumn<T extends IHasID>(
   getImagePath: (row: T) => string | null | undefined,
-  getHref: (row: T) => string,
+  getDestination: (row: T) => EntityDestination,
 ): ColumnDef<T> {
   return {
     id: "thumbnail",
@@ -24,7 +25,7 @@ export function thumbnailColumn<T extends IHasID>(
     cell: ({ row }) => {
       const src = getImagePath(row.original);
       return (
-        <Link to={getHref(row.original) as never} className="block shrink-0">
+        <Link {...getDestination(row.original)} className="block shrink-0">
           {src ? (
             <img
               src={src}
@@ -47,10 +48,10 @@ export function titleColumn<T extends IHasID>(opts: {
   id: string;
   header: string;
   getTitle: (row: T) => string;
-  getHref: (row: T) => string;
+  getDestination: (row: T) => EntityDestination;
   sortable?: boolean;
 }): ColumnDef<T> {
-  const { id, header, getTitle, getHref, sortable = true } = opts;
+  const { id, header, getTitle, getDestination, sortable = true } = opts;
   return {
     id,
     accessorFn: getTitle,
@@ -65,7 +66,7 @@ export function titleColumn<T extends IHasID>(opts: {
       // applies `display: -webkit-box`, which is block-level).
       <div className="line-clamp-2">
         <Link
-          to={getHref(row.original) as never}
+          {...getDestination(row.original)}
           className="font-medium hover:underline"
         >
           {getTitle(row.original)}

@@ -12,7 +12,7 @@ interface FileTimestamp {
 
 function basename(path: string): string {
   const parts = path.split(/[/\\]/).filter(Boolean);
-  return parts.length > 0 ? parts[parts.length - 1] : path;
+  return parts.at(-1) ?? path;
 }
 
 function TimestampText({ value }: { value: string }) {
@@ -94,7 +94,7 @@ export function FileModTimeMetaRows({
         defaultMessage: "File modified",
       })}
     >
-      {filesWithModTime.length === 1 ? (
+      {filesWithModTime.length === 1 && filesWithModTime[0] ? (
         <TimestampText value={filesWithModTime[0].mod_time} />
       ) : (
         <div className="flex flex-col gap-0.5">

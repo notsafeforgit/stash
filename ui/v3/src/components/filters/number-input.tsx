@@ -1,5 +1,6 @@
+import { useCommittedRef } from "@/hooks/use-committed-ref";
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Minus, Plus } from "lucide-react";
 import { Button } from "src/components/ui/button";
 import { Input } from "src/components/ui/input";
@@ -22,8 +23,7 @@ export const NumberInput: React.FC<{
   inputClassName,
 }) => {
   const [str, setStr] = useState(String(value));
-  const strRef = useRef(str);
-  strRef.current = str;
+  const strRef = useCommittedRef(str);
 
   useEffect(() => {
     const parsed = parseInt(strRef.current, 10);

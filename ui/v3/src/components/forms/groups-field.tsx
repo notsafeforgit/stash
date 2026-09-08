@@ -56,8 +56,10 @@ export function GroupsField({
 
   function updateSceneIndex(index: number, raw: string) {
     const next = [...value];
+    const current = next[index];
+    if (!current) return;
     next[index] = {
-      ...next[index],
+      ...current,
       scene_index: raw === "" ? null : Number(raw),
     };
     onChange(next);

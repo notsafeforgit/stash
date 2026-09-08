@@ -1,3 +1,4 @@
+import { PerformerListItems } from "@/components/list/entity-list-items";
 import type React from "react";
 import { useState } from "react";
 import { useIntl } from "react-intl";
@@ -15,10 +16,7 @@ import {
 import { DeleteDialog } from "src/components/detail/delete-dialog";
 import { AutoTagDialog } from "src/components/detail/auto-tag-dialog";
 import { PerformerMergeDialog } from "src/components/detail/performer-merge-dialog";
-import {
-  PerformerBulkEditSheet,
-  type PerformerBulkItem,
-} from "src/components/detail/performer-bulk-edit-sheet";
+import { PerformerBulkEditSheet } from "src/components/detail/performer-bulk-edit-sheet";
 import {
   useBulkCardActions,
   BulkContextMenuItems,
@@ -66,7 +64,7 @@ export function usePerformerContextMenu({
     bulkEditOpen,
     setBulkEditOpen,
     onContextMenuOpen,
-  } = useBulkCardActions<PerformerBulkItem>(performer.id);
+  } = useBulkCardActions(PerformerListItems.useItems());
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [autoTagOpen, setAutoTagOpen] = useState(false);

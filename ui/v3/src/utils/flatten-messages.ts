@@ -3,9 +3,8 @@ const flattenMessages = (nestedMessages: NestedMessage | null, prefix = "") => {
   if (nestedMessages === null) {
     return {};
   }
-  return Object.keys(nestedMessages).reduce(
-    (messages, key) => {
-      const value = nestedMessages[key];
+  return Object.entries(nestedMessages).reduce<Record<string, string>>(
+    (messages, [key, value]) => {
       const prefixedKey = prefix ? `${prefix}.${key}` : key;
 
       if (typeof value === "string") {
@@ -16,7 +15,7 @@ const flattenMessages = (nestedMessages: NestedMessage | null, prefix = "") => {
 
       return messages;
     },
-    {} as Record<string, string>,
+    {},
   );
 };
 

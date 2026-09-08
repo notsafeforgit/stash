@@ -1,3 +1,4 @@
+import { entityDestination } from "@/core/navigation";
 import type React from "react";
 import { useCallback } from "react";
 import { useApolloClient } from "@apollo/client/react";
@@ -73,7 +74,7 @@ export const TagCard: React.FC<TagCardProps> = ({
       <EntityCard
         label={tag.name}
         id={tag.id}
-        href={`/tags/${tag.id}`}
+        destination={entityDestination.tag(tag.id)}
         isMobile={isMobile}
         selected={selected}
         onSelectedChanged={onSelectedChanged}

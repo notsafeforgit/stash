@@ -1,3 +1,4 @@
+import { entityDestination } from "@/core/navigation";
 import type React from "react";
 import { useCallback } from "react";
 import { useApolloClient } from "@apollo/client/react";
@@ -65,7 +66,7 @@ export const GroupCard: React.FC<GroupCardProps> = ({
       <EntityCard
         label={group.name}
         id={group.id}
-        href={`/groups/${group.id}`}
+        destination={entityDestination.group(group.id)}
         isMobile={isMobile}
         selected={selected}
         onSelectedChanged={onSelectedChanged}

@@ -1,3 +1,4 @@
+import { entityDestination } from "@/core/navigation";
 import type React from "react";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useApolloClient } from "@apollo/client/react";
@@ -45,7 +46,7 @@ function formatWallPerformers(
 ): string {
   if (!performers || performers.length === 0) return "";
   const names = performers.map((p) => p.name);
-  if (names.length === 1) return names[0];
+  if (names.length === 1) return names.join("");
   const head = names.slice(0, -2);
   const tail = names.slice(-2).join(" & ");
   return [...head, tail].join(", ");
@@ -247,7 +248,7 @@ export const GalleryCard: React.FC<GalleryCardProps> = ({
       <EntityCard
         label={galleryLabel(gallery)}
         id={gallery.id}
-        href={`/galleries/${gallery.id}`}
+        destination={entityDestination.gallery(gallery.id)}
         isMobile={isMobile}
         selected={selected}
         onSelectedChanged={onSelectedChanged}

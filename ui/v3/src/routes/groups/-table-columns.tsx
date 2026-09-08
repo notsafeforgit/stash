@@ -1,3 +1,4 @@
+import { entityDestination } from "@/core/navigation";
 import { useMemo } from "react";
 import { useIntl } from "react-intl";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -23,14 +24,14 @@ export function useGroupTableColumns(): ColumnDef<GroupItem>[] {
 
       thumbnailColumn<GroupItem>(
         (g) => g.front_image_path,
-        (g) => `/groups/${g.id}`,
+        (g) => entityDestination.group(g.id),
       ),
 
       titleColumn<GroupItem>({
         id: "name",
         header: intl.formatMessage({ id: "name" }),
         getTitle: (g) => g.name,
-        getHref: (g) => `/groups/${g.id}`,
+        getDestination: (g) => entityDestination.group(g.id),
       }),
 
       textColumn<GroupItem>({

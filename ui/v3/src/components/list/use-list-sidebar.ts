@@ -1,16 +1,17 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { useLocation, useRouter } from "@tanstack/react-router";
 import { useMediaQuery } from "src/utils/screen";
 import type { View } from "src/components/list/views";
-import {
-  type ViewConfig,
-  readInterfaceConfig,
-  useInterfaceLocalForage,
-} from "src/hooks/local-forage";
+import { useInterfacePreferences } from "@/hooks/interface-preferences";
 
 // ── SidebarStateContext ───────────────────────────────────────────────────────
 
 type SidebarSectionStates = Record<string, boolean>;
+declare module "@tanstack/react-router" {
+  interface HistoryState {
+    sectionOpen?: SidebarSectionStates;
+  }
+}
 
 interface SidebarStateContext {
   sectionOpen: SidebarSectionStates;
@@ -24,10 +25,6 @@ export const SidebarStateContext =
 
 const MOBILE_QUERY = "only screen and (max-width: 767px)";
 
-function defaultShowSidebar() {
-  return !window.matchMedia(MOBILE_QUERY).matches;
-}
-
 // ── useListSidebar ────────────────────────────────────────────────────────────
 
 export function useListSidebar(view?: View) {
@@ -36,38 +33,34 @@ export function useListSidebar(view?: View) {
   const location = useLocation();
 
   // ── localStorage: persist showSidebar per view ──────────────────────────────
-  const [interfaceData, setInterfaceLocalForage] = useInterfaceLocalForage();
-
-  const _viewConfig: ViewConfig = useMemo(
-    () => (view ? (interfaceData?.viewConfig?.[view] ?? {}) : {}),
-    [view, interfaceData],
-  );
-
-  const [showSidebar, setShowSidebarState] = useState<boolean>(() => {
-    if (!view) return defaultShowSidebar();
-    const stored = readInterfaceConfig();
-    return !!stored?.viewConfig?.[view]?.showSidebar && defaultShowSidebar();
-  });
+  const [interfaceData, setInterfaceData] = useInterfacePreferences();
+  // Mobile sheets start closed and opening them is transient. Desktop visibility
+  // follows the shared preference, including changes from other mounted views.
+  const [transientOpen, setTransientOpen] = useState(!view && !isMobileSidebar);
+  const showSidebar =
+    isMobileSidebar || !view
+      ? transientOpen
+      : (interfaceData.viewConfig[view]?.showSidebar ?? false);
 
   const setShowSidebar = useCallback(
     (show: boolean) => {
-      setShowSidebarState(show);
-      if (view === undefined) return;
-      setInterfaceLocalForage((prev) => ({
+      if (isMobileSidebar || !view) {
+        setTransientOpen(show);
+        return;
+      }
+      setInterfaceData((prev) => ({
         ...prev,
         viewConfig: {
           ...prev.viewConfig,
-          [view]: { ...(prev.viewConfig?.[view] ?? {}), showSidebar: show },
+          [view]: { ...prev.viewConfig[view], showSidebar: show },
         },
       }));
     },
-    [view, setInterfaceLocalForage],
+    [isMobileSidebar, view, setInterfaceData],
   );
 
   // ── Router state: persist sectionOpen ─────────────────────────────────────
-  const locationState = location.state as
-    | { sectionOpen?: SidebarSectionStates }
-    | undefined;
+  const locationState = location.state;
   const [sectionOpen, setSectionOpenState] = useState<SidebarSectionStates>(
     locationState?.sectionOpen ?? {},
   );

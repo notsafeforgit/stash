@@ -37,6 +37,9 @@ installation and community links; those downloads are mainline releases.
 
 ## Future plans and historical material
 
+- The [2026-09-08 v3 quality audit](../ui/v3/docs/quality-audit-2026-09-08.md)
+  records the findings, completed foundation improvements, validation, and
+  offline deployment isolation with migration and recovery.
 - [Retiring v2.5 compatibility](v3-schema-promotion.md) is a conditional,
   one-way transition plan. It is **not active migration policy** and does not
   authorize dropping compatibility during the rewrite.

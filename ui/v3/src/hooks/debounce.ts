@@ -1,83 +1,47 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import debounce from "lodash-es/debounce";
+import type { DebouncedFunc } from "lodash-es";
+import { useCommittedRef } from "./use-committed-ref";
+
+export type { DebouncedFunc } from "lodash-es";
 
 export interface DebounceSettings {
   leading?: boolean;
   trailing?: boolean;
   maxWait?: number;
+  /** Explicit opt-in for persisted edits; ordinary delayed work is cancelled. */
+  flushOnUnmount?: boolean;
 }
 
-// The loosest function shape every concrete function is assignable to:
-// `never[]` parameters are contravariant-permissive and `unknown` accepts
-// any return type — unlike `any`, neither disables type checking.
-type AnyFunction = (...args: never[]) => unknown;
-
-export type DebouncedFunc<T extends AnyFunction> = T & {
-  cancel: () => void;
-  flush: () => ReturnType<T> | undefined;
-};
-
-function debounce<T extends AnyFunction>(
-  fn: T,
+export function useDebounce<Args extends unknown[], Result>(
+  fn: (...args: Args) => Result,
   wait = 0,
-  _options?: DebounceSettings,
-): DebouncedFunc<T> {
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  let lastThis: unknown;
-  let lastArgs: Parameters<T>;
-
-  const debounced = function (this: unknown, ...args: Parameters<T>) {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    lastThis = this;
-    lastArgs = args;
-    if (timer !== null) clearTimeout(timer);
-    timer = setTimeout(() => {
-      timer = null;
-      fn.apply(lastThis, lastArgs);
-    }, wait);
-  } as DebouncedFunc<T>;
-
-  debounced.cancel = () => {
-    if (timer !== null) {
-      clearTimeout(timer);
-      timer = null;
-    }
-  };
-
-  debounced.flush = (): ReturnType<T> | undefined => {
-    if (timer !== null) {
-      clearTimeout(timer);
-      timer = null;
-      // `apply` on the generic `T` erases the return type to `unknown`;
-      // calling `fn` with `Parameters<T>` is what defines `ReturnType<T>`.
-      return fn.apply(lastThis, lastArgs) as ReturnType<T>;
-    }
-  };
-
-  return debounced;
-}
-
-export function useDebounce<T extends AnyFunction>(
-  fn: T,
-  wait?: number,
-  options?: DebounceSettings,
-): DebouncedFunc<T> {
-  const func = useRef<T>(fn);
-  func.current = fn;
-  const leading = options?.leading;
-  const trailing = options?.trailing;
-  const maxWait = options?.maxWait;
-  // func is a ref — always reflects the latest fn without re-creating the debounce.
-  return useMemo(
+  options: DebounceSettings = {},
+): DebouncedFunc<(...args: Args) => Result> {
+  const callback = useCommittedRef(fn);
+  const {
+    leading = false,
+    trailing = true,
+    maxWait,
+    flushOnUnmount = false,
+  } = options;
+  const debounced = useMemo(
     () =>
-      debounce(
-        function (this: unknown, ...args: Parameters<T>) {
-          return func.current.apply(this, args);
-        } as T,
-        wait,
-        { leading, trailing, maxWait },
-      ),
+      debounce((...args: Args) => callback.current(...args), wait, {
+        leading,
+        trailing,
+        ...(maxWait === undefined ? {} : { maxWait }),
+      }),
     [wait, leading, trailing, maxWait],
   );
+  useEffect(
+    () => () => {
+      if (flushOnUnmount) debounced.flush();
+      debounced.cancel();
+    },
+    [debounced, flushOnUnmount],
+  );
+  return debounced;
 }
 
 /**
@@ -114,10 +78,11 @@ export function useDebouncedState<T>(
 
   const setInstant = useCallback(
     (v: T) => {
+      debouncedSetValue.cancel();
       setDisplayedState(v);
       setValue(v);
     },
-    [setValue],
+    [setValue, debouncedSetValue],
   );
 
   return [displayedState, onChange, setInstant];

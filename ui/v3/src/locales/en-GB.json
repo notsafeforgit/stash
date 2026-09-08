@@ -1737,6 +1737,28 @@
       "queued_count": "{count, plural, one {# queued} other {# queued}}",
       "title": "Downloads",
       "view_all": "View all"
+    },
+    "errors": {
+      "coordination_unavailable": "Offline library changes are unavailable in this browser. Existing downloads can still be played."
+    },
+    "recovery": {
+      "action": "Restore saved downloads",
+      "description": "Choose downloads that belong to this library. Originals are kept, and downloads already saved here are not replaced. Close tabs running older Stash versions before restoring. Copying downloads needs additional free space.",
+      "source": "Saved library",
+      "downloads": "Downloads to restore",
+      "legacy": "Earlier Stash versions",
+      "unknown": "Original server unknown",
+      "exists": "Already saved here",
+      "empty": "No downloads from earlier versions or other server addresses were found in this browser.",
+      "invalid": "{count, plural, one {# saved entry could not be read. Its original data has been kept.} other {# saved entries could not be read. Their original data has been kept.}}",
+      "confirm": "These belong here — restore {count}",
+      "progress": "Restoring downloads: {completed} of {total}",
+      "pending": "Some saved downloads need attention.",
+      "restored": "Restored {count, plural, one {# download} other {# downloads}}",
+      "address": "Previous server address",
+      "address_empty": "No saved downloads were found for that address.",
+      "inspect": "Find saved downloads",
+      "loading": "Loading saved downloads"
     }
   },
   "operations": "Operations",

@@ -1,3 +1,4 @@
+import { StudioListItems } from "@/components/list/entity-list-items";
 import type React from "react";
 import { useState } from "react";
 import { useIntl } from "react-intl";
@@ -14,10 +15,7 @@ import {
 } from "src/components/ui/context-menu";
 import { DeleteDialog } from "src/components/detail/delete-dialog";
 import { AutoTagDialog } from "src/components/detail/auto-tag-dialog";
-import {
-  StudioBulkEditSheet,
-  type StudioBulkItem,
-} from "src/components/detail/studio-bulk-edit-sheet";
+import { StudioBulkEditSheet } from "src/components/detail/studio-bulk-edit-sheet";
 import {
   useBulkCardActions,
   BulkContextMenuItems,
@@ -61,7 +59,7 @@ export function useStudioContextMenu({
     bulkEditOpen,
     setBulkEditOpen,
     onContextMenuOpen,
-  } = useBulkCardActions<StudioBulkItem>(studio.id);
+  } = useBulkCardActions(StudioListItems.useItems());
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [autoTagOpen, setAutoTagOpen] = useState(false);

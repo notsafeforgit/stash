@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import type { ListFilterModel } from "src/models/list-filter/filter";
 
-interface QueryResult {
+interface QueryResult<TData> {
   loading: boolean;
-  data?: unknown;
+  data?: TData;
   error?: Error;
 }
 
@@ -20,11 +20,11 @@ export function displayedQueryData<T>(
   return undefined;
 }
 
-export function useCachedQueryResult<T extends QueryResult>(
+export function useCachedQueryResult<TData>(
   filter: ListFilterModel,
-  result: T,
+  result: QueryResult<TData>,
   key = filter.makeQueryParameters(),
-): T & { isPending: boolean } {
+) {
   const [cached, setCached] = useState({ data: result.data, key });
   useEffect(() => {
     if (!result.loading && !result.error && result.data !== undefined) {

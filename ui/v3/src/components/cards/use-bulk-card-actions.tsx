@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useIntl } from "react-intl";
 import { useListContextOptional } from "src/components/list/list-provider";
 import {
@@ -9,31 +9,36 @@ import { OpenInNewTabMenuItem } from "./open-in-new-tab-menu-item";
 import { SelectAllMenuItem } from "./select-all-menu-item";
 
 export function useBulkCardActions<TItem extends { id: string }>(
-  _itemId: string,
+  items: readonly TItem[],
 ) {
   const {
-    getSelectedItems,
+    getSelectedIds,
     totalCount,
     applyToAllTarget,
     onSelectAll,
     onSelectNone,
-  } = useListContextOptional<TItem>();
+  } = useListContextOptional();
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   // Computed lazily when the context menu opens — avoids subscribing to
   // selectedIds/selectedItems and causing re-renders on every selection change.
-  const [showBulkActions, setShowBulkActions] = useState(false);
-  const [selectedItems, setSelectedItems] = useState<TItem[]>([]);
+  const [selection, setSelection] = useState<ReadonlySet<string>>(new Set());
+  const selectedItems = useMemo(() => {
+    const byId = new Map(items.map((item) => [item.id, item]));
+    return Array.from(selection).flatMap((id) => {
+      const item = byId.get(id);
+      return item ? [item] : [];
+    });
+  }, [items, selection]);
+  const showBulkActions = selectedItems.length > 1;
 
   const onContextMenuOpen = useCallback(() => {
     // Any right-click while a multi-selection is active surfaces the bulk
     // menu — even if the right-clicked item isn't itself in the selection.
     // Without this, a selection that's scrolled off-screen has no way to
     // be acted on without scrolling back to a selected item.
-    const items = getSelectedItems() as TItem[];
-    setShowBulkActions(items.length > 1);
-    setSelectedItems(items);
-  }, [getSelectedItems]);
+    setSelection(new Set(getSelectedIds()));
+  }, [getSelectedIds]);
 
   return {
     selectedItems,

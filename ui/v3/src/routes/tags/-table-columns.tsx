@@ -1,3 +1,4 @@
+import { entityDestination } from "@/core/navigation";
 import { useMemo } from "react";
 import { useIntl } from "react-intl";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -19,14 +20,14 @@ export function useTagTableColumns(): ColumnDef<TagItem>[] {
 
       thumbnailColumn<TagItem>(
         (t) => t.image_path,
-        (t) => `/tags/${t.id}`,
+        (t) => entityDestination.tag(t.id),
       ),
 
       titleColumn<TagItem>({
         id: "name",
         header: intl.formatMessage({ id: "name" }),
         getTitle: (t) => t.name,
-        getHref: (t) => `/tags/${t.id}`,
+        getDestination: (t) => entityDestination.tag(t.id),
       }),
 
       numberColumn<TagItem>({

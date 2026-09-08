@@ -1,3 +1,4 @@
+import { entityDestination } from "@/core/navigation";
 import type React from "react";
 import { useCallback } from "react";
 import { useApolloClient } from "@apollo/client/react";
@@ -89,7 +90,10 @@ export const MarkerCard: React.FC<MarkerCardProps> = ({
     <EntityCard
       label={title}
       id={marker.id}
-      href={`/scenes/${marker.scene.id}?tab=markers&t=${marker.seconds}`}
+      destination={entityDestination.scene(marker.scene.id, {
+        tab: "markers",
+        t: marker.seconds,
+      })}
       isMobile={isMobile}
       selected={selected}
       onSelectedChanged={onSelectedChanged}

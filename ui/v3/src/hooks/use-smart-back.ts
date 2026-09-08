@@ -1,3 +1,4 @@
+import { localNavigationHref } from "@/core/navigation";
 import { useCallback, useEffect } from "react";
 import { useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
 import { applicationPath } from "@/core/platform-url";
@@ -19,7 +20,7 @@ const LIST_PATHNAMES = [
   "/studios",
   "/tags",
   "/offline",
-];
+] as const;
 
 function isListPathname(pathname: string): boolean {
   return LIST_PATHNAMES.some((p) => pathname === p || pathname === p + "/");
@@ -39,7 +40,7 @@ export function useTrackListPage() {
   const location = useRouterState({ select: (s) => s.location });
   useEffect(() => {
     const href = applicationPath(location.href);
-    if (isListPathname(href.split(/[?#]/, 1)[0])) {
+    if (isListPathname(href.split(/[?#]/, 1)[0] ?? "/")) {
       _lastListHref = href;
     }
   }, [location.href]);
@@ -59,28 +60,19 @@ export function useTrackListPage() {
  *   navigate({ to: "/scenes/$sceneId", params: { sceneId }, state: { returnTo: router.state.location.href } })
  *
  * Usage in queue navigation (next/previous scene):
- *   const returnTo = (router.state.location.state as { returnTo?: string } | null)?.returnTo;
+ *   const returnTo = router.state.location.state.returnTo;
  *   navigate({ to: "/scenes/$sceneId", params: { sceneId }, state: { returnTo } })
  */
-export function useSmartBack(defaultPath: string) {
+export function useSmartBack(defaultPath: (typeof LIST_PATHNAMES)[number]) {
   const navigate = useNavigate();
   const router = useRouter();
 
   return useCallback(() => {
-    // 1. Prefer explicit returnTo threaded through router state
-    const state = router.state.location.state;
-    if (state?.returnTo) {
-      // Cast — returnTo is a runtime URL string, not a registered route path.
-      navigate({
-        to: applicationPath(state.returnTo) as never,
-        viewTransition: true,
-      });
-      return;
-    }
-
-    // 2. Last list page visited in this SPA session
-    if (_lastListHref) {
-      navigate({ to: _lastListHref as never, viewTransition: true });
+    const href =
+      localNavigationHref(router.state.location.state.returnTo ?? "") ??
+      (_lastListHref ? localNavigationHref(_lastListHref) : undefined);
+    if (href) {
+      void navigate({ href, viewTransition: true });
       return;
     }
 

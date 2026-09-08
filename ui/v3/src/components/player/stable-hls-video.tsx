@@ -1,3 +1,4 @@
+import { useCommittedRef } from "@/hooks/use-committed-ref";
 /**
  * Custom `HlsJsMedia` bridge for the scene player.
  *
@@ -20,7 +21,7 @@ import {
   type HlsMediaProps,
   type HlsSource,
 } from "@videojs/media/dom/hls-js";
-import { forwardRef, useCallback, useMemo, useRef } from "react";
+import { forwardRef, useCallback, useMemo } from "react";
 import type { ReactNode, VideoHTMLAttributes } from "react";
 import { parseStartPosition } from "./hls";
 
@@ -44,8 +45,7 @@ export const StableHlsVideo = forwardRef<HTMLVideoElement, StableHlsVideoProps>(
     // mount time without taking `muted` as a dep (which would cause a
     // detach/reattach on every mute toggle, defeating the whole point
     // of this wrapper).
-    const mutedRef = useRef(muted);
-    mutedRef.current = muted;
+    const mutedRef = useCommittedRef(muted);
 
     // hls.js's `config.startPosition` decides which fragment is loaded
     // first when the manifest is parsed. Default (-1) makes hls.js

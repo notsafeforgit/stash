@@ -1,3 +1,4 @@
+import { decodeURLJSON, encodeURLJSON } from "@/utils/url-json";
 import {
   type ConfigDataFragment,
   type FilterMode,
@@ -129,7 +130,10 @@ export class ListFilterModel {
         this.sortDirection = SortDirectionEnum.Desc;
       }
     }
-    this.displayMode = displayModeOptions[0];
+    const defaultDisplayMode = displayModeOptions[0];
+    if (defaultDisplayMode === undefined)
+      throw new Error("A list requires at least one display mode");
+    this.displayMode = defaultDisplayMode;
   }
 
   public clone() {
@@ -184,7 +188,7 @@ export class ListFilterModel {
 
       // parse the random seed if provided
       const match = sortby.match(/^random_(\d+)$/);
-      if (match) {
+      if (match?.[1]) {
         sortby = "random";
         this.randomSeed = Number.parseInt(match[1], 10);
       }
@@ -232,12 +236,8 @@ export class ListFilterModel {
     }
 
     if (params.fa !== undefined) {
-      try {
-        const json = atob(params.fa.replace(/-/g, "+").replace(/_/g, "/"));
-        this.filterAst = decodeFilterASTNode(this.mode, JSON.parse(json));
-      } catch (err) {
-        console.error("Failed to parse encoded filter AST:", err);
-      }
+      // Invalid criteria must fail before a query or bulk action can run.
+      this.filterAst = decodeFilterASTNode(this.mode, decodeURLJSON(params.fa));
     } else {
       this.filterAst = undefined;
     }
@@ -404,7 +404,7 @@ export class ListFilterModel {
     this.sortBy = findFilter?.sort ?? this.sortBy;
     // parse the random seed if provided
     const match = this.sortBy?.match(/^random_(\d+)$/);
-    if (match) {
+    if (match?.[1]) {
       this.sortBy = "random";
       this.randomSeed = Number.parseInt(match[1], 10);
     }
@@ -532,18 +532,9 @@ export class ListFilterModel {
       return str;
     });
 
-    let encodedFilterAST: string | undefined;
-    if (this.filterAst) {
-      // Base64url: JSON.stringify produces pure ASCII so btoa is safe.
-      // Swap standard base64 chars (+, /) for URL-safe equivalents (-, _)
-      // and strip = padding (restored on decode by atob's tolerance).
-      encodedFilterAST = btoa(
-        JSON.stringify(encodeFilterASTNode(this.filterAst)),
-      )
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_")
-        .replace(/=/g, "");
-    }
+    const encodedFilterAST = this.filterAst
+      ? encodeURLJSON(encodeFilterASTNode(this.filterAst))
+      : undefined;
 
     return {
       perPage:

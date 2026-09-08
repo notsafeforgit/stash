@@ -1,6 +1,6 @@
 # Offline scene downloads
 
-This guide describes the implementation on `v3-rewrite`, checked on 2026-09-07.
+This guide describes the implementation on `v3-rewrite`, checked on 2026-09-08.
 The earlier phased proposal has been replaced by current behavior and explicit
 limits. See the [architecture guide](architecture.md) for shared list/player
 contracts and the [documentation index](../../../docs/README.md) for other guides.
@@ -49,8 +49,8 @@ device. There is no bulk ZIP export.
 
 | Storage | Current contents |
 | --- | --- |
-| OPFS | MP4 bytes at `scenes/<scene_id>.mp4` |
-| IndexedDB | Database `stash-offline`, version 1; `offline_scenes` keyed by `scene_id`, indexed by `downloaded_at` and `status` |
+| OPFS | MP4 bytes at `stash-offline/<deployment-hash>/scenes/<scene_id>.mp4` |
+| IndexedDB | Database `stash-offline:v1:<deployment-url>`, version 1; `offline_scenes` keyed by `scene_id`, indexed by `downloaded_at` and `status`; `imports` and `settings` retain migration decisions |
 | localStorage | Per-device maximum resolution under `stash-offline-max-resolution` |
 
 [OfflineEntry](../src/components/offline/offline-db.ts) is the authoritative
@@ -67,40 +67,111 @@ access. OPFS receives a stream rather than an accumulated multi-gigabyte Blob.
 resume writes do not replace unrelated metadata. OPFS and IndexedDB are separate
 stores: metadata alone does not prove that a playable file still exists.
 
-Storage is scoped to the browser origin/profile, with rows keyed only by scene
-ID. It is not partitioned by server identity or path prefix within an origin.
-The queue and change notifications are page-local; there is no cross-tab worker
-lock or broadcast synchronization. Do not assume independent tabs can coordinate
-downloads or that different Stash libraries on the same origin have separate
-local catalogs.
+Within a browser origin/profile, each backend deployment has its own catalog,
+files, broadcasts, and locks. [offline-scope.ts](../src/components/offline/offline-scope.ts)
+derives their identity from the normalized backend mount URL returned by
+`getPlatformURL()`, independently of v3 route paths. Credentials, query strings,
+fragments, and excess trailing slashes are excluded. OPFS uses a SHA-256 digest
+of that URL as a bounded directory name. Two installations under `/stash-a/`
+and `/stash-b/` can therefore download the same scene ID without collisions.
+
+Identity is address-based, not a server UUID or library fingerprint. Replacing
+the server library at the same URL cannot be detected by this namespace.
+Changing its prefix creates a new namespace; use recovery below to copy the
+old downloads. Another origin or browser profile has separate storage that this
+app cannot inspect.
 
 Settings expose storage usage, clear-all, and a persistent-storage request.
-Persistence is subject to the browser's decision and is not a backup. The queue
+Usage, quota, and persistence apply to the whole browser origin, including other
+deployments and retained migration sources. Persistence is subject to the
+browser's decision and is not a backup. The queue
 refuses to start another download when the reported origin usage is at least
 95% of quota, but does not reserve the final file size. A write can still fail
 mid-download with a quota error. Missing/evicted files surface a retry action.
 
+## Migration and recovery
+
+The earlier database `stash-offline` and OPFS directory `scenes/` remain intact.
+On queue initialization, the worker copies legacy entries whose saved artwork
+URLs consistently identify the current backend mount. It recognizes the
+server's scene screenshot/preview and sprite/VTT routes; missing, conflicting,
+or unrecognized URLs require an ownership decision. Metadata is validated before
+import; malformed rows remain untouched in their original store. Legacy entries
+marked `downloading` are not automatically imported because an older tab may
+still own them.
+
+**Restore saved downloads**, available on the Offline page and in settings,
+lists legacy storage and other deployment namespaces on this browser origin.
+Select a source and scenes, then confirm that they belong to the current server.
+This also recovers downloads after a prefix change and rebases recognized asset
+URLs. Browsers without IndexedDB database enumeration offer a previous-address
+field; inspection only reads local storage and makes no server request.
+
+Recovery streams copies into the current namespace and preserves metadata and
+the playback position. **Original metadata and files are kept**, so sufficient
+free space for another copy is required. Existing destination entries win
+collisions. Incomplete or missing files produce a recoverable error entry and
+require explicit retry; saved work never automatically queues against a newly
+chosen server.
+
+Migration holds source and destination locks, checks the source again before
+committing, and commits an import receipt alongside the new metadata. Busy
+sources ask you to close their other tabs and retry. This recheck also catches
+changes made during copying by older clients without locks, but it is not a
+content hash. Failed or cancelled copies remove their partial destination and
+remain retryable. Migration failure does not prevent new downloads.
+
+Receipts survive deletion, so retained legacy copies do not silently reappear
+on reload. Clear-all removes only the current deployment's files and catalog
+and disables further automatic imports there. Explicit recovery remains
+available. It does not remove original migration sources or another
+deployment's downloads; browser-wide storage clearing is outside this command.
+
 ## Queue recovery and byte-range resume
 
 [use-download-queue.ts](../src/components/offline/use-download-queue.ts) owns a
-module-scoped store observed through `useSyncExternalStore`. One worker processes
-entries at a time; IndexedDB status is the recovery source across reloads.
+page store observed through `useSyncExternalStore`. IndexedDB owns the durable
+queue and a BroadcastChannel named after the deployment database announces
+committed changes to its other pages. The `<database-name>:worker` Web Lock
+permits one worker per deployment at a time; different deployments can download
+concurrently. Migration and interrupted-download recovery run only after
+obtaining that lock, so opening a second tab does not mark the first tab's
+active download as interrupted.
+
+Each scene command/writer owns `<database-name>:scene:<id>`. A download establishes
+its AbortController before asynchronous initialization. Cancellation records the
+attempt's request ID and a durable cancellation flag, then signals its owner.
+Deletion waits for the writer and its progress checkpoints to settle before
+removing the file/row. Enqueue and retry recheck status under the scene lock.
+Clear-all requests cancellation and owns the worker lock while clearing OPFS
+and IndexedDB, including orphan files.
+
+Without Web Locks or BroadcastChannel, existing namespaced downloads and
+identifiable legacy downloads remain playable, while library mutations and
+migration are unavailable. Legacy playback is read-only and respects current
+entries, import receipts, and clear-all decisions; it cannot save a new resume
+position back into the old store. The UI disables the download action and
+reports unsupported commands. This fallback avoids starting competing writers.
+Browsers also need IndexedDB/OPFS in a secure
+context for offline storage; the queue is not a service worker or Background
+Fetch task.
 
 | Event | Behavior |
 | --- | --- |
 | Reload with queued entries | Rebuild the queue and start processing |
-| Reload with an in-flight entry | Mark it `error` with `Interrupted by reload`; allow an explicit retry |
+| Reload with an in-flight entry | Recover only after the previous owner releases its worker lock; mark an orphan `error` and allow retry |
 | Enqueue an already queued/downloading scene | No duplicate download |
 | Enqueue a new download for an existing completed/error row | Replace the prior local file with a fresh metadata/format snapshot |
 | Retry an existing entry | Re-queue with its saved format and metadata; inspect any existing file bytes |
 | Cancel a queued entry | Remove it from the queue and local stores |
 | Cancel an active download | Abort the fetch/write and expose an error state for retry |
-| Delete from device | Remove the OPFS file and IndexedDB entry; leave server media untouched |
+| Delete from device | Cancel the matching attempt, wait for its writer, then remove the OPFS file and IndexedDB entry |
 
 Range retry is **implemented, but best effort**:
 
 - If a partial file is present, the worker sends `Range: bytes=N-` using its
-  existing size. It appends only when the server responds with `206`.
+  existing size. It appends only when the server responds with `206` and its
+  `Content-Range` starts at the requested offset.
 - A full `200` response rewrites from byte zero. This is expected for FFmpeg
   remux/transcode output, whose bytes cannot safely be resumed across runs.
 - Explicit cancellation and a failed fresh/full-body write trigger partial-file
@@ -182,7 +253,11 @@ the existing `StreamingResolutionEnum`. There is no 1440p option. Use the
 On Offline-view mount and catalog membership changes, the metadata refresh hook
 attempts a network query for the stored scene IDs. Successful results update the
 snapshots; missing scenes gain a “Removed from server” indication without deleting
-local media. Network failures leave the snapshots intact. Screenshots, previews,
+local media. Progress updates do not cancel a membership refresh; Strict Mode
+cleanup and superseded requests cannot publish stale responses. Only valid
+numeric scene IDs are queried, and an empty set never becomes an unfiltered
+query. Connectivity returning triggers another attempt. Network failures leave
+the snapshots intact. Screenshots, previews,
 sprites, and VTT are stored as remote URLs, not copied into OPFS, so artwork and
 preview assets can be unavailable offline.
 
@@ -197,8 +272,8 @@ state. Browser termination can prevent the final asynchronous write.
   server's resume/watch activity.
 - Device deletion never deletes server media. Server deletion never automatically
   deletes the downloaded copy.
-- Downloading the same scene replaces its local entry; there is one local copy
-  per scene ID, not a catalog of different encodings.
+- Downloading the same scene replaces its local entry; there is one current copy
+  per scene ID per deployment, not a catalog of different encodings.
 - Reuse the list/player extension points and shared format picker when extending
   offline behavior. Keep local data independent of GraphQL list fetching.
 
@@ -208,10 +283,13 @@ All frontend filenames below are under `src/components/offline/` unless noted.
 
 | Module | Responsibility |
 | --- | --- |
-| `download-action.ts` and scene menu wrappers | Online download action and metadata snapshot |
+| `download-action.ts`, `scene-download-input.ts`, and scene menu wrappers | Typed download actions and one shared metadata snapshot projection |
 | `pick-download-format.ts`, `use-server-capabilities.ts`, `offline-settings.ts` | Codec/resolution policy and preferences |
 | `use-download-queue.ts`, `download-tray.tsx`, `download-notifications.tsx` | Serial worker, recovery, progress, and notifications |
 | `offline-db.ts`, `opfs-storage.ts`, `use-offline-entries.ts` | Persistent stores and subscriptions |
+| `offline-scope.ts` | One deployment identity for the database, directories, broadcasts, and locks |
+| `offline-entry-schema.ts`, `offline-migration-policy.ts`, `offline-migration.ts` | Source validation, ownership checks, copy migration, receipts, and progress |
+| `offline-recovery-control.tsx`, `offline-source-address-form.tsx` | Explicit source/scene selection and previous-address recovery |
 | `offline-scene-list-page.tsx`, `offline-list-source.ts`, `offline-filter-sidebar.tsx` | Local list, selection, sorting, and filtering |
 | `offline-scene-card-data.ts`, `offline-scene-adapter.ts` | Shared card/player data adapters |
 | `use-opfs-blob.ts`, `use-offline-resume-writer.ts`, `use-offline-scene-lightbox.tsx` | Local playback lifetime and resume |
@@ -219,7 +297,7 @@ All frontend filenames below are under `src/components/offline/` unless noted.
 | `save-to-files.ts`, `offline-settings-section.tsx` | Export, quota display, persistence, and clear-all |
 | `src/routes/offline/` | List and detail routes |
 
-Service-worker shell caching, Background Fetch, cross-tab coordination, source
-validation for range retries, cached artwork, and multi-file export remain
+Service-worker shell caching, Background Fetch, source validation for range
+retries, cached artwork, and multi-file export remain
 unimplemented. They require separate feature design and validation; the old
 proposal's phase labels are not a completion checklist.

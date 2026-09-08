@@ -37,6 +37,8 @@ export interface LocalDataSource<TItem extends IHasID> {
   ) => { count: number; items: TItem[] };
   /** Optional loading flag (e.g. while the initial IDB scan settles). */
   loading?: boolean;
+  error?: Error;
+  refresh?: () => void;
 }
 
 export interface GraphQLDataSource<
@@ -62,6 +64,10 @@ export interface EntityListPageConfig<
   TVariables extends OperationVariables,
 > {
   filterMode: GQL.FilterMode;
+  /** Entity-specific item data, checked against this config's TItem. */
+  ItemsProvider?: React.ComponentType<
+    React.PropsWithChildren<{ items: readonly TItem[] }>
+  >;
   view?: View;
   defaultSort?: string;
   source: ListDataSource<TData, TItem, TVariables>;

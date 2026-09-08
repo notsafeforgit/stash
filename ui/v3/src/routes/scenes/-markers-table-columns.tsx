@@ -1,3 +1,4 @@
+import { entityDestination } from "@/core/navigation";
 import { Link } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import type * as GQL from "src/core/generated-graphql";
@@ -27,14 +28,15 @@ export const markerTableColumns: ColumnDef<MarkerItem>[] = [
 
   thumbnailColumn<MarkerItem>(
     (m) => m.screenshot,
-    (m) => `/scenes/${m.scene.id}?t=${m.seconds}`,
+    (m) => entityDestination.scene(m.scene.id, { t: m.seconds }),
   ),
 
   titleColumn<MarkerItem>({
     id: "title",
     header: "Title",
     getTitle: markerTitle,
-    getHref: (m) => `/scenes/${m.scene.id}?t=${m.seconds}`,
+    getDestination: (m) =>
+      entityDestination.scene(m.scene.id, { t: m.seconds }),
   }),
 
   {

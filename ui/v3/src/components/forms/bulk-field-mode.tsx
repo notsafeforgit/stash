@@ -50,7 +50,7 @@ export function BulkFieldModeToggle({
 
   function handleValueChange(values: BulkFieldMode[]) {
     // ToggleGroup is single-select but allows deselect; ignore that and keep current.
-    if (values.length === 0) return;
+    if (values[0] === undefined) return;
     onModeChange(values[0]);
   }
 

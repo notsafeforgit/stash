@@ -26,9 +26,13 @@ export function useListData<
     source.kind === "graphql" ? source.query : NOOP_QUERY,
     options,
   );
-  const result = useCachedQueryResult(
+  const result = useCachedQueryResult<TData>(
     debouncedFilter,
-    raw,
+    {
+      loading: raw.loading,
+      error: raw.error,
+      data: raw.dataState === "complete" ? raw.data : undefined,
+    },
     JSON.stringify(variables),
   );
   // Layout preferences do not change query variables and must not flash a spinner.
@@ -41,7 +45,7 @@ export function useListData<
     () =>
       source.kind === "local"
         ? source.filter(source.items, debouncedFilter)
-        : source.extractResult(result.data as TData | undefined),
+        : source.extractResult(result.data),
     [source, debouncedFilter, result.data],
   );
 
@@ -52,9 +56,13 @@ export function useListData<
       (source.kind === "local"
         ? !!source.loading
         : result.isPending || result.loading),
-    error: source.kind === "graphql" ? raw.error : undefined,
-    hasData: source.kind === "local" || result.data !== undefined,
-    refetch: raw.refetch,
+    error: source.kind === "graphql" ? raw.error : source.error,
+    hasData:
+      source.kind === "local"
+        ? !source.error || source.items.length > 0
+        : result.data !== undefined,
+    refetch:
+      source.kind === "graphql" ? raw.refetch : async () => source.refresh?.(),
     refreshing: source.kind === "graphql" && raw.loading,
   };
 }

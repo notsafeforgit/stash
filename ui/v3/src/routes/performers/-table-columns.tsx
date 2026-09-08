@@ -1,3 +1,4 @@
+import { entityDestination } from "@/core/navigation";
 import { useMemo } from "react";
 import { useIntl } from "react-intl";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -65,7 +66,7 @@ export function usePerformerTableColumns(): ColumnDef<PerformerItem>[] {
 
       thumbnailColumn<PerformerItem>(
         (p) => p.image_path,
-        (p) => `/performers/${p.id}`,
+        (p) => entityDestination.performer(p.id),
       ),
 
       {
@@ -91,7 +92,7 @@ export function usePerformerTableColumns(): ColumnDef<PerformerItem>[] {
         header: intl.formatMessage({ id: "name" }),
         getTitle: (p) =>
           p.disambiguation ? `${p.name} (${p.disambiguation})` : p.name,
-        getHref: (p) => `/performers/${p.id}`,
+        getDestination: (p) => entityDestination.performer(p.id),
       }),
 
       {

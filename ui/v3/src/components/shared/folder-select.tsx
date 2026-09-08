@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useIntl } from "react-intl";
 import { useQuery } from "@apollo/client/react";
 import { CornerLeftUp, Folder, MoreHorizontal, X } from "lucide-react";
@@ -17,7 +17,7 @@ import { cn } from "src/lib/utils";
  */
 function basename(path: string): string {
   const parts = path.split(/[/\\]/).filter(Boolean);
-  return parts.length > 0 ? parts[parts.length - 1] : path;
+  return parts.at(-1) ?? path;
 }
 
 interface IProps {
@@ -46,15 +46,14 @@ export function FolderSelect({
   // Skip the empty-path query: the server interprets "" as the user's home
   // directory and returns its contents, which would briefly flash through
   // the cache as soon as `currentDirectory` first turns truthy.
-  const { data, loading, error } = useQuery(GQL.DirectoryDocument, {
-    variables: { path: debouncedPath },
-    skip: !debouncedPath,
-  });
-  // Keep the latest non-loading result so the list doesn't flicker while
-  // the user types.
-  const prevData = useRef<typeof data | undefined>(undefined);
-  if (!loading && data) prevData.current = data;
-  const currentData = loading ? prevData.current : data;
+  const { data, previousData, loading, error } = useQuery(
+    GQL.DirectoryDocument,
+    {
+      variables: { path: debouncedPath },
+      skip: !debouncedPath,
+    },
+  );
+  const currentData = data ?? previousData;
 
   useEffect(() => {
     if (!collapsible) setShowBrowser(true);

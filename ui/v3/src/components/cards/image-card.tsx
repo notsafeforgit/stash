@@ -1,3 +1,4 @@
+import { entityDestination } from "@/core/navigation";
 import type React from "react";
 import { useCallback, useState } from "react";
 import { useApolloClient } from "@apollo/client/react";
@@ -108,7 +109,7 @@ export const ImageCard: React.FC<ImageCardProps> = ({
       <EntityCard
         label={imageTitle(image)}
         id={image.id}
-        href={`/images/${image.id}`}
+        destination={entityDestination.image(image.id)}
         isMobile={isMobile}
         selected={selected}
         onSelectedChanged={onSelectedChanged}

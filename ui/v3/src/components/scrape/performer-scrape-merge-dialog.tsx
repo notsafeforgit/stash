@@ -55,7 +55,7 @@ function parseCircumcised(s: string | null | undefined): CircumcisedEnum | "" {
 function parseHeightCm(s: string | null | undefined): string {
   if (!s) return "";
   const m = s.match(/(\d+(?:\.\d+)?)/);
-  return m ? String(Math.round(parseFloat(m[1]))) : "";
+  return m?.[1] ? String(Math.round(parseFloat(m[1]))) : "";
 }
 
 function parseScrapedAliases(s: string | null | undefined): AliasEntry[] {
@@ -596,7 +596,10 @@ export function PerformerScrapeMergeDialog({
   >({});
 
   function getTagRes(i: number): ScrapedTagResolution {
-    return tagResolutions[i] ?? defaultResolution(scrapedTags[i]);
+    const tag = scrapedTags[i];
+    return (
+      tagResolutions[i] ?? (tag ? defaultResolution(tag) : { kind: "skip" })
+    );
   }
   function setTagRes(i: number, next: ScrapedTagResolution) {
     setTagResolutions((curr) => ({ ...curr, [i]: next }));

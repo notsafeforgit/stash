@@ -94,7 +94,7 @@ generate → build UIs → validate → compile order.
 
 | Command | Checks |
 | --- | --- |
-| `make validate-ui-v3` | Biome lint (including accessibility), generation, TypeScript, formatting, locales, Vitest, and pinned v2.5 compatibility |
+| `make validate-ui-v3` | Biome lint (including accessibility), React purity/type-contract lint, generation, TypeScript, formatting, locales, Vitest, and pinned v2.5 compatibility |
 | `make validate-fork` | Backend generation, v3 validation, Go lint, and Go unit/integration tests |
 | `make lint` | CI-pinned golangci-lint via `go run` |
 | `make it` | Go tests with `sqlite_stat4 sqlite_math_functions integration` build tags |
@@ -107,6 +107,29 @@ During iteration, choose checks for the changed contracts. The
 mainline operations, additive schema behavior, argument defaults, and upstream
 migrations. Follow [FORK.md](../../../FORK.md) when updating its baseline after
 an upstream sync. Do not modify `ui/v2.5/` for fork feature work.
+
+TypeScript enables `strict` and `noUncheckedIndexedAccess`: check lookup results
+or iterate actual entries. Do not add blanket non-null assertions to satisfy the
+compiler. `exactOptionalPropertyTypes` remains a separate migration because
+omitted and explicitly cleared configuration/API values have different meanings.
+
+Biome owns formatting, general lint and effect dependencies. It knows that
+`useCommittedRef` has a stable result. `pnpm --dir ui/v3 lint:contracts` adds
+React's `refs`/`purity` rules and rejects `as never` and double assertions.
+These checks run through the normal `lint` command. Public browser/plugin
+boundaries should narrow unknown inputs or expose checked capabilities.
+
+The app root enables React Strict Mode. Lifecycle regression tests use real
+React roots and, for navigation, real TanStack memory routers. Type contract
+tests include expected compiler failures for mismatched routes, configuration
+keys, list providers, and insufficient media projections.
+
+Offline migration tests use `fake-indexeddb` for database transactions and
+controlled file/lock fixtures for quota failures, cancellation, ownership,
+receipts, and concurrent imports. Changes to browser storage also need a real
+browser check with two backend prefixes on one origin, multiple tabs on one
+prefix, and legacy/previous-prefix recovery. Use synthetic files in a fresh
+browser profile so these checks do not alter existing downloads.
 
 For routing changes, exercise a deployment under a path prefix as well as `/`.
 For player or gesture changes, check target browsers and physical iOS devices;

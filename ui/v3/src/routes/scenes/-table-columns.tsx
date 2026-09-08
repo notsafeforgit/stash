@@ -1,3 +1,4 @@
+import { entityDestination } from "@/core/navigation";
 import { useMemo } from "react";
 import { useIntl } from "react-intl";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -43,14 +44,14 @@ export function useSceneTableColumns(): ColumnDef<SceneItem>[] {
 
       thumbnailColumn<SceneItem>(
         (scene) => scene.paths.webp ?? scene.paths.screenshot,
-        (scene) => `/scenes/${scene.id}`,
+        (scene) => entityDestination.scene(scene.id),
       ),
 
       titleColumn<SceneItem>({
         id: "title",
         header: intl.formatMessage({ id: "title" }),
         getTitle: (scene) => objectTitle(scene),
-        getHref: (scene) => `/scenes/${scene.id}`,
+        getDestination: (scene) => entityDestination.scene(scene.id),
       }),
 
       textColumn<SceneItem>({

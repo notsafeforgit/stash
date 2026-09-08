@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useIntl } from "react-intl";
 import { PlusIcon, Trash2Icon } from "lucide-react";
 import { Input } from "src/components/ui/input";
@@ -35,9 +35,6 @@ interface CustomFieldsFieldProps {
   disabled?: boolean;
 }
 
-let rowIdCounter = 0;
-const makeRowId = () => `cf-row-${++rowIdCounter}`;
-
 export function CustomFieldsField({
   value,
   onChange,
@@ -50,16 +47,6 @@ export function CustomFieldsField({
     names.sort();
     return names;
   }, [value]);
-
-  // Stable per-row keys so React doesn't shuffle inputs while a row is
-  // focused (mirrors UrlListField).
-  const keysRef = useRef<Map<string, string>>(new Map());
-  fieldNames.forEach((n) => {
-    if (!keysRef.current.has(n)) keysRef.current.set(n, makeRowId());
-  });
-  for (const k of Array.from(keysRef.current.keys())) {
-    if (!fieldNames.includes(k)) keysRef.current.delete(k);
-  }
 
   const [newField, setNewField] = useState("");
   const [newValue, setNewValue] = useState("");
@@ -108,7 +95,7 @@ export function CustomFieldsField({
         <div className="flex flex-col gap-1.5">
           {fieldNames.map((name) => (
             <ExistingFieldRow
-              key={keysRef.current.get(name)}
+              key={name}
               name={name}
               rawValue={valueToString(value[name])}
               disabled={disabled}

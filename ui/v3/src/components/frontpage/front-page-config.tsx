@@ -363,8 +363,8 @@ export function FrontPageConfig({
             <SortableContext items={ids} strategy={verticalListSortingStrategy}>
               {rows.map((content, i) => (
                 <SortableRow
-                  key={ids[i]}
-                  id={ids[i]}
+                  key={String(i)}
+                  id={String(i)}
                   content={content}
                   savedFilters={savedFilters}
                   onRemove={() => removeRow(i)}

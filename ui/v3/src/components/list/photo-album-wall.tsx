@@ -1,5 +1,5 @@
 import type React from "react";
-import { useRef, useLayoutEffect, useMemo, useCallback } from "react";
+import { useMemo, useCallback } from "react";
 import { RowsPhotoAlbum, type Photo } from "react-photo-album";
 import "react-photo-album/rows.css";
 import type { IHasID } from "@/utils/data";
@@ -74,38 +74,12 @@ export function PhotoAlbumWall<TItem extends IHasID>({
   getWallDimensions,
   itemsPerPage,
 }: PhotoAlbumWallProps<TItem>) {
-  // Keep a ref that always reflects the current selectedIds so renderPhoto doesn't
-  // need selectedIds as a dep — eliminates full-wall re-renders on each selection change.
-  const selectedIdsRef = useRef(selectedIds);
-  selectedIdsRef.current = selectedIds;
-
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // Imperatively sync data-selected attributes on article elements whenever
-  // selectedIds changes. CSS rules ([data-selected="true"] ...) handle the visual state.
-  useLayoutEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    container
-      .querySelectorAll<HTMLElement>("article[data-id]")
-      .forEach((article) => {
-        const id = article.dataset.id;
-        if (!id) return;
-        article
-          .querySelector("[data-card-select]")
-          ?.setAttribute("aria-pressed", String(selectedIds.has(id)));
-        if (selectedIds.has(id)) {
-          article.dataset.selected = "true";
-        } else {
-          delete article.dataset.selected;
-        }
-      });
-  }, [selectedIds]);
-
   const photos = useMemo<WallPhoto[]>(() => {
     if (isLoading) {
       return Array.from({ length: Math.min(itemsPerPage, 40) }, (_, i) => {
-        const [w, h] = SKELETON_WALL_DIMS[i % SKELETON_WALL_DIMS.length];
+        const [w, h] = SKELETON_WALL_DIMS[i % SKELETON_WALL_DIMS.length] ?? [
+          4, 3,
+        ];
         return {
           src: "",
           width: w,
@@ -141,30 +115,27 @@ export function PhotoAlbumWall<TItem extends IHasID>({
       }
       const item = items[photo.itemIndex];
       if (!item) return null;
-      // Use ref so this callback doesn't need selectedIds as a dep.
-      const isSelected = selectedIdsRef.current.has(item.id);
-      const onSelectedChanged = (selected: boolean, shiftKey: boolean) =>
-        onSelectChange(item.id, selected, shiftKey);
-      const onPreviewClick = onCardPreviewClick
-        ? () => onCardPreviewClick(item, items, photo.itemIndex)
-        : undefined;
+      const isSelected = selectedIds.has(item.id);
+
       return (
         <div key={photo.id} style={{ width, height, touchAction: "pan-y" }}>
-          {renderCard(
-            item,
-            isMobile,
-            isSelected,
-            onSelectedChanged,
-            onPreviewClick,
-          )}
+          <WallCardContent
+            item={item}
+            items={items}
+            index={photo.itemIndex}
+            isMobile={isMobile}
+            selected={isSelected}
+            onSelectChange={onSelectChange}
+            onCardPreviewClick={onCardPreviewClick}
+            renderCard={renderCard}
+          />
         </div>
       );
     },
-    // selectedIds omitted intentionally — selectedIdsRef.current is always current,
-    // and data-selected is synced imperatively via useLayoutEffect above.
     [
       isLoading,
       items,
+      selectedIds,
       onSelectChange,
       onCardPreviewClick,
       isMobile,
@@ -173,7 +144,7 @@ export function PhotoAlbumWall<TItem extends IHasID>({
   );
 
   return (
-    <div ref={containerRef}>
+    <div>
       <RowsPhotoAlbum
         photos={photos}
         spacing={2}
@@ -183,5 +154,44 @@ export function PhotoAlbumWall<TItem extends IHasID>({
         render={{ photo: renderPhoto }}
       />
     </div>
+  );
+}
+
+/** Only a changed item's selected flag invalidates its card subtree. Selection
+ * remains ordinary React data, including during interrupted layout renders. */
+function WallCardContent<TItem extends IHasID>({
+  item,
+  items,
+  index,
+  isMobile,
+  selected,
+  onSelectChange,
+  onCardPreviewClick,
+  renderCard,
+}: Pick<
+  PhotoAlbumWallProps<TItem>,
+  "items" | "isMobile" | "onSelectChange" | "onCardPreviewClick" | "renderCard"
+> & { item: TItem; index: number; selected: boolean }) {
+  return useMemo(
+    () =>
+      renderCard(
+        item,
+        isMobile,
+        selected,
+        (next, shift) => onSelectChange(item.id, next, shift),
+        onCardPreviewClick
+          ? () => onCardPreviewClick(item, items, index)
+          : undefined,
+      ),
+    [
+      item,
+      items,
+      index,
+      isMobile,
+      selected,
+      onSelectChange,
+      onCardPreviewClick,
+      renderCard,
+    ],
   );
 }

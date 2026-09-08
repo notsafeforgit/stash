@@ -1,3 +1,4 @@
+import { GroupListItems } from "@/components/list/entity-list-items";
 import type React from "react";
 import { useState } from "react";
 import { useIntl } from "react-intl";
@@ -12,10 +13,7 @@ import {
   ContextMenuTrigger,
 } from "src/components/ui/context-menu";
 import { DeleteDialog } from "src/components/detail/delete-dialog";
-import {
-  GroupBulkEditSheet,
-  type GroupBulkItem,
-} from "src/components/detail/group-bulk-edit-sheet";
+import { GroupBulkEditSheet } from "src/components/detail/group-bulk-edit-sheet";
 import {
   useBulkCardActions,
   BulkContextMenuItems,
@@ -57,7 +55,7 @@ export function useGroupContextMenu({
     bulkEditOpen,
     setBulkEditOpen,
     onContextMenuOpen,
-  } = useBulkCardActions<GroupBulkItem>(group.id);
+  } = useBulkCardActions(GroupListItems.useItems());
 
   const [deleteOpen, setDeleteOpen] = useState(false);
 

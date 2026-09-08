@@ -1,3 +1,4 @@
+import { useCommittedRef } from "@/hooks/use-committed-ref";
 import { useCallback, useEffect, useRef } from "react";
 
 const LIGHTBOX_HISTORY_KEY = "stashV3Lightbox";
@@ -25,8 +26,7 @@ function getLightboxHistoryId(state: unknown): number | undefined {
 export function useLightboxHistory(open: boolean, onClose: () => void) {
   const activeIdRef = useRef<number | undefined>(undefined);
   const dismissingRef = useRef(false);
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  const onCloseRef = useCommittedRef(onClose);
 
   useEffect(() => {
     if (!open) return;

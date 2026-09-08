@@ -1,4 +1,5 @@
-import { useRef, useState } from "react";
+import { useEditableRows } from "@/hooks/use-editable-rows";
+import { useState } from "react";
 import { PlusIcon, SearchIcon, Trash2Icon } from "lucide-react";
 import { useIntl } from "react-intl";
 import { Button } from "src/components/ui/button";
@@ -31,9 +32,6 @@ interface StashIdsFieldProps {
   searchQuery?: string;
 }
 
-let stashIdRowIdCounter = 0;
-const makeRowId = () => `stash-id-row-${++stashIdRowIdCounter}`;
-
 export function StashIdsField({
   value,
   onChange,
@@ -50,49 +48,25 @@ export function StashIdsField({
   const showSearchButton = !!searchType && stashBoxes.length > 0;
   const [searchOpen, setSearchOpen] = useState(false);
 
-  // Stable per-row keys — see url-list-field.tsx for the rationale.
-  // `key={i}` lets React mismatch row DOM nodes during mid-edit
-  // re-renders, which surfaces on mobile as taps focusing the wrong
-  // input. Internal mutations keep keysRef and `value` in lockstep;
-  // external value changes (form reset, scrape result) trigger
-  // regeneration via the length-mismatch branch.
-  const keysRef = useRef<string[]>([]);
-  if (keysRef.current.length !== value.length) {
-    keysRef.current = value.map((_, i) => keysRef.current[i] ?? makeRowId());
-  }
+  const { rows, update, remove, append } = useEditableRows(value, onChange);
 
   function updateField(index: number, field: keyof StashIdEntry, text: string) {
-    const next = [...value];
-    next[index] = { ...next[index], [field]: text };
-    onChange(next);
-  }
-
-  function remove(index: number) {
-    keysRef.current = keysRef.current.filter((_, i) => i !== index);
-    onChange(value.filter((_, i) => i !== index));
-  }
-
-  function add() {
-    keysRef.current = [...keysRef.current, makeRowId()];
-    onChange([...value, { endpoint: "", stash_id: "" }]);
+    const row = rows[index];
+    if (row) update(index, { ...row.value, [field]: text });
   }
 
   function upsertSearchResult(entry: StashIdEntry) {
-    const idx = value.findIndex((e) => e.endpoint === entry.endpoint);
-    if (idx >= 0) {
-      const next = [...value];
-      next[idx] = entry;
-      onChange(next);
-      return;
-    }
-    keysRef.current = [...keysRef.current, makeRowId()];
-    onChange([...value, entry]);
+    const index = rows.findIndex(
+      (row) => row.value.endpoint === entry.endpoint,
+    );
+    if (index >= 0) update(index, entry);
+    else append(entry);
   }
 
   return (
     <div className="flex flex-col gap-1.5">
-      {value.map((entry, i) => (
-        <div key={keysRef.current[i]} className="flex gap-1.5">
+      {rows.map(({ key, value: entry }, i) => (
+        <div key={key} className="flex gap-1.5">
           <InputGroup className="flex-1">
             <InputGroupInput
               value={entry.endpoint}
@@ -128,7 +102,7 @@ export function StashIdsField({
           variant="outline"
           size="sm"
           disabled={disabled}
-          onClick={add}
+          onClick={() => append({ endpoint: "", stash_id: "" })}
         >
           <PlusIcon className="size-3.5" />
           Add Stash ID

@@ -215,7 +215,7 @@ export function VirtualizedItemList<TItem extends IHasID>({
     if (isMobile) return mobileGridCols;
     if (containerWidth === 0) return 1;
     const inner = Math.max(0, containerWidth - pad * 2);
-    const minPx = GRID_MIN_PX[Math.max(0, Math.min(4, zoomIndex))];
+    const minPx = GRID_MIN_PX[Math.max(0, Math.min(4, zoomIndex))] ?? 240;
     // CSS grid auto-fill formula: floor((inner + gap) / (minPx + gap))
     return Math.max(1, Math.floor((inner + gap) / (minPx + gap)));
   }, [

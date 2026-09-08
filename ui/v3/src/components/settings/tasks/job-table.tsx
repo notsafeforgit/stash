@@ -68,6 +68,12 @@ function Task({ job }: { job: JobFragment }) {
     rawProgress !== null ? Math.min(99, Math.floor(rawProgress * 100)) : null;
   const finalizing = rawProgress !== null && rawProgress >= 1;
 
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    if (job.status !== GQL.JobStatus.Running) return;
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [job.status]);
   let eta: string | null = null;
   if (
     job.status === GQL.JobStatus.Running &&
@@ -76,7 +82,6 @@ function Task({ job }: { job: JobFragment }) {
     job.progress !== undefined &&
     job.progress > 0
   ) {
-    const nowMs = Date.now();
     const startMs = new Date(job.startTime).valueOf();
     if (job.progress < 1 && startMs <= nowMs) {
       const elapsedMs = nowMs - startMs;

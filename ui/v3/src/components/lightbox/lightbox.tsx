@@ -1,3 +1,8 @@
+import {
+  loadSettings,
+  persistSettings,
+  type LightboxSettings,
+} from "./settings";
 import { Label } from "@/components/ui/label";
 import "yet-another-react-lightbox/styles.css";
 import "yet-another-react-lightbox/plugins/thumbnails.css";
@@ -12,6 +17,9 @@ import {
   useState,
 } from "react";
 import YARLightbox, {
+  type Slide,
+  type SlideImage,
+  isImageSlide,
   type RenderSlideProps,
   type RenderSlideFooterProps,
   type RenderSlideHeaderProps,
@@ -86,9 +94,11 @@ import { inverseImageRotationDirection } from "./image-rotation";
 // ── Module augmentation ────────────────────────────────────────────────────────
 
 declare module "yet-another-react-lightbox" {
-  interface GenericSlide {
+  interface SlideImage {
     imageId?: string;
     imageTitle?: string;
+    filePaths?: string[];
+    loading?: boolean;
   }
 }
 
@@ -96,16 +106,10 @@ declare module "yet-another-react-lightbox" {
 
 export type DisplayMode = "fitXY" | "fitX" | "original";
 
-export interface LightboxSlide {
-  src: string;
-  alt?: string;
-  width?: number;
-  height?: number;
-  imageId?: string;
-  imageTitle?: string;
-  filePaths?: string[];
-  /** Transient placeholder shown while the next/prev page is loading. */
-  loading?: boolean;
+export type LightboxSlide = SlideImage;
+
+function getImageSlide(slide: Slide | undefined): LightboxSlide | undefined {
+  return slide && isImageSlide(slide) ? slide : undefined;
 }
 
 // ── Zoom plugin tuning ─────────────────────────────────────────────────────────
@@ -121,33 +125,7 @@ export const LIGHTBOX_ZOOM_TUNING = {
 
 // ── Settings ───────────────────────────────────────────────────────────────────
 
-interface LightboxSettings {
-  scrollToZoom: boolean;
-  displayMode: DisplayMode;
-  slideshowDelay: number;
-}
-
-const SETTINGS_KEY = "stash_lightbox_settings";
-const DEFAULT_SETTINGS: LightboxSettings = {
-  scrollToZoom: false,
-  displayMode: "fitXY",
-  slideshowDelay: 5,
-};
 const LIGHTBOX_TOASTER_ID = "image-lightbox";
-
-function loadSettings(): LightboxSettings {
-  try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
-    if (!raw) return DEFAULT_SETTINGS;
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
-  } catch {
-    return DEFAULT_SETTINGS;
-  }
-}
-
-function persistSettings(s: LightboxSettings) {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
-}
 
 // ── Custom slide renderers ─────────────────────────────────────────────────────
 
@@ -269,7 +247,7 @@ function LightboxCounter({
   totalCount?: number;
 }) {
   const { slides, currentIndex } = useLightboxState();
-  const typedSlides = slides as LightboxSlide[];
+  const typedSlides = slides.map(getImageSlide);
   const currentSlide = typedSlides[currentIndex];
   if (!isRealSlide(currentSlide)) return null;
 
@@ -319,7 +297,7 @@ function LightboxDeleteShortcut({
       }
 
       const now = Date.now();
-      const slide = (slides as LightboxSlide[])[currentIndex];
+      const slide = getImageSlide(slides[currentIndex]);
       if (now - lastDKeyTime.current < 1000 && slide?.imageId) {
         e.preventDefault();
         onRequestDelete({
@@ -627,7 +605,7 @@ function LightboxRotateButton({
 }) {
   const intl = useIntl();
   const { slides, currentIndex } = useLightboxState();
-  const slide = slides[currentIndex] as LightboxSlide | undefined;
+  const slide = getImageSlide(slides[currentIndex]);
   const imageId = slide?.imageId;
   if (!imageId) return null;
 
@@ -662,7 +640,7 @@ function LightboxImageActionsButton({
 }) {
   const intl = useIntl();
   const { slides, currentIndex } = useLightboxState();
-  const slide = slides[currentIndex] as LightboxSlide | undefined;
+  const slide = getImageSlide(slides[currentIndex]);
   const imageId = slide?.imageId;
   if (!imageId) return null;
 
@@ -1064,7 +1042,8 @@ export function Lightbox({
 
   const renderSlide = useCallback(
     ({ slide }: RenderSlideProps) => {
-      const s = slide as LightboxSlide;
+      const s = getImageSlide(slide);
+      if (!s) return undefined;
       if (s.loading)
         return (
           <div className="flex items-center justify-center w-full h-full">
@@ -1091,7 +1070,8 @@ export function Lightbox({
 
   const renderSlideFooter = useCallback(
     ({ slide }: RenderSlideFooterProps) => {
-      const s = slide as LightboxSlide;
+      const s = getImageSlide(slide);
+      if (!s) return undefined;
       if (!s.imageId) return null;
       return (
         <ImageEntityFooter
@@ -1123,7 +1103,7 @@ export function Lightbox({
       <YARLightbox
         open={open}
         close={requestClose}
-        slides={decoratedSlides as never}
+        slides={decoratedSlides}
         index={index}
         plugins={plugins}
         carousel={finite ? { finite: true } : undefined}
@@ -1203,7 +1183,7 @@ export function Lightbox({
         on={{
           click: handleSlideClick,
           view: ({ index: newIndex }) => {
-            const s = (slides as LightboxSlide[])[newIndex];
+            const s = slides[newIndex];
             if (s?.loading && slideshowPlayingRef.current) {
               resumeSlideshowRef.current = true;
             }

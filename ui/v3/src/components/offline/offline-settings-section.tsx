@@ -1,3 +1,5 @@
+import { useDownloadCommands } from "./use-download-queue";
+import { OfflineRecoveryControl } from "./offline-recovery-control";
 /**
  * Offline-feature settings section, mounted on the Settings page.
  *
@@ -24,15 +26,14 @@ import {
   OFFLINE_RESOLUTION_OPTIONS,
 } from "./offline-settings";
 import {
-  clearAllScenes,
   isPersisted,
   requestPersistent,
   storageEstimate,
 } from "./opfs-storage";
-import { clearAll as clearAllDb } from "./offline-db";
 
 export function OfflineSettingsSection() {
   const intl = useIntl();
+  const downloads = useDownloadCommands();
   const [maxRes, setMaxRes] = useState<StreamingResolutionEnum>(
     loadOfflineMaxResolution(),
   );
@@ -93,7 +94,9 @@ export function OfflineSettingsSection() {
     }
     setBusy(true);
     try {
-      await Promise.all([clearAllScenes(), clearAllDb()]);
+      await downloads.removeAll();
+    } catch {
+      // The shared command reports failure; consume this event handler's promise too.
     } finally {
       setBusy(false);
       refreshStorageInfo();
@@ -101,10 +104,12 @@ export function OfflineSettingsSection() {
   };
 
   return (
-    <section className="space-y-4">
+    <section className="flex flex-col gap-4">
       <h2 className="text-base font-medium">
         {intl.formatMessage({ id: "offline.settings.heading" })}
       </h2>
+
+      <OfflineRecoveryControl />
 
       <div className="flex items-center justify-between gap-4">
         <div>

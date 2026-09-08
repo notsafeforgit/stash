@@ -198,7 +198,7 @@ export function getPreferredSource(
   if (remuxAac) return remuxAac;
   if (originalHls) return originalHls;
   if (hls) return hls;
-  return sources[0];
+  return sources[0] ?? null;
 }
 
 export function computeInitialResume(

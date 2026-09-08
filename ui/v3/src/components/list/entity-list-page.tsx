@@ -1,3 +1,4 @@
+import { useCommittedRef } from "@/hooks/use-committed-ref";
 import { useState, useEffect, useRef, useMemo } from "react";
 import type { OperationVariables } from "@apollo/client";
 import { QueryError } from "@/components/query-error";
@@ -210,25 +211,21 @@ export function EntityListPage<
   );
 
   // Stable context: only changes when query results or filter change, never on selection.
-  // Cards read selection imperatively via getSelectedIds/getSelectedItems when needed
+  // Cards read selection imperatively via getSelectedIds when needed
   // (e.g. on context-menu open) rather than subscribing to reactive values.
-  const listStateContextValue = useMemo<ListContextState<TItem>>(
+  const listStateContextValue = useMemo<ListContextState>(
     () => ({
       selectable: true,
-      items,
       totalCount: count,
       applyToAllTarget,
       getSelectedIds: listSelect.getSelectedIds,
-      getSelectedItems: listSelect.getSelectedItems,
       onSelectAll: listSelect.onSelectAll,
       onSelectNone: listSelect.onSelectNone,
     }),
     [
-      items,
       count,
       applyToAllTarget,
       listSelect.getSelectedIds,
-      listSelect.getSelectedItems,
       listSelect.onSelectAll,
       listSelect.onSelectNone,
     ],
@@ -270,8 +267,8 @@ export function EntityListPage<
   const isInitialDataRef = useRef(true);
   // Refs so the effect doesn't need to list onItemsChanged as a dep —
   // the callback should always use the latest version without causing re-fires.
-  const onItemsChangedRef = useRef(onItemsChanged);
-  onItemsChangedRef.current = onItemsChanged;
+  const onItemsChangedRef = useCommittedRef(onItemsChanged);
+
   useEffect(() => {
     if (isLoading) return;
     if (isInitialDataRef.current) {
@@ -339,7 +336,7 @@ export function EntityListPage<
     />
   );
 
-  return (
+  const content = (
     <EntityList
       sidebarState={sidebarState}
       filter={filter}
@@ -461,5 +458,11 @@ export function EntityListPage<
         </ListStateContext.Provider>
       )}
     </EntityList>
+  );
+  const ItemsProvider = config.ItemsProvider;
+  return ItemsProvider ? (
+    <ItemsProvider items={items}>{content}</ItemsProvider>
+  ) : (
+    content
   );
 }

@@ -391,13 +391,17 @@ function PerformerNamesField({
 
   function updateAlias(index: number, alias: string) {
     const next = [...aliases];
-    next[index] = { ...next[index], alias };
+    const current = next[index];
+    if (!current) return;
+    next[index] = { ...current, alias };
     onAliasesChange(next);
   }
 
   function updateAutoTagEnabled(index: number, enabled: boolean) {
     const next = [...aliases];
-    next[index] = { ...next[index], ignore_auto_tag: !enabled };
+    const current = next[index];
+    if (!current) return;
+    next[index] = { ...current, ignore_auto_tag: !enabled };
     onAliasesChange(next);
   }
 

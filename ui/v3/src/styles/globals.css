@@ -335,9 +335,8 @@ body.mobile-list-view main {
   cursor: pointer;
 }
 
-/* Wall-mode selection overlay — fully CSS-driven, no React re-renders on selection change.
-   Circle colour and check mark visibility respond to [data-selected="true"] on the article,
-   set imperatively by PhotoAlbumWall's useLayoutEffect. */
+/* Wall selection appearance follows React's [data-selected="true"] attribute.
+   PhotoAlbumWall memoizes card subtrees whose selection and data are unchanged. */
 .entity-card-wall-circle {
   width: 1.25rem;
   height: 1.25rem;

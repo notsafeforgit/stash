@@ -1,4 +1,5 @@
-import { useEffect, useRef, type RefObject } from "react";
+import { useCommittedRef } from "@/hooks/use-committed-ref";
+import { useEffect, type RefObject } from "react";
 import { isHlsPlaylist } from "./hls";
 
 /** Native fullscreen seeks and stalled playback feed the same transition handlers
@@ -34,12 +35,12 @@ export function usePlayerRecovery({
   // guards against re-entry — once our remount starts, the listener
   // ignores the resulting cascade of programmatic seeking events from
   // the engine swap.
-  const reloadingRef = useRef(reloading);
-  reloadingRef.current = reloading;
-  const offsetStartRef = useRef(offsetStart);
-  offsetStartRef.current = offsetStart;
-  const handleSeekRef = useRef(handleSeek);
-  handleSeekRef.current = handleSeek;
+  const reloadingRef = useCommittedRef(reloading);
+
+  const offsetStartRef = useCommittedRef(offsetStart);
+
+  const handleSeekRef = useCommittedRef(handleSeek);
+
   useEffect(() => {
     if (!finalSrc || !isHlsPlaylist(finalSrc)) return;
     const root = rootRef.current;
@@ -137,8 +138,8 @@ export function usePlayerRecovery({
   // Bounded by a recovery cooldown so a remount that itself stalls
   // doesn't loop. `reloadingRef` additionally suppresses the
   // watchdog during the React-side source-change window.
-  const forceRemountAtRef = useRef(forceRemountAt);
-  forceRemountAtRef.current = forceRemountAt;
+  const forceRemountAtRef = useCommittedRef(forceRemountAt);
+
   useEffect(() => {
     const root = rootRef.current;
     if (!root) return;

@@ -51,7 +51,9 @@ export const getLocaleCode = (code: string) => {
 
 export async function registerCountry(locale: string) {
   const localeCode = getLocaleCode(locale);
-  const countries = await localeCountries[localeCode]();
+  const loader = localeCountries[localeCode];
+  if (!loader) return;
+  const countries = await loader();
   Countries.registerLocale(countries);
 }
 

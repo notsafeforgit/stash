@@ -349,8 +349,8 @@ export function SceneScrapeMergeDialog({
   ): Promise<Map<string, EntityOption> | null> {
     const additions = new Map<string, EntityOption>();
     const promises: Promise<void>[] = [];
-    for (let i = 0; i < items.length; i++) {
-      const r = getRes(resMap, i, items[i]);
+    for (const [i, item] of items.entries()) {
+      const r = getRes(resMap, i, item);
       if (r.kind === "skip") continue;
       if (r.kind === "existing") {
         additions.set(r.option.id, r.option);

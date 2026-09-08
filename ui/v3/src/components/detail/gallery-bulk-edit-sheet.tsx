@@ -1,3 +1,4 @@
+import { useCommittedRef } from "@/hooks/use-committed-ref";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import { useLazyQuery } from "@apollo/client/react";
@@ -116,12 +117,10 @@ export function GalleryBulkEditSheet({
   const [sheetApplyToAllTarget, setSheetApplyToAllTarget] =
     useState(applyToAllTarget);
   const [sheetTotalCount, setSheetTotalCount] = useState(totalCount);
-  const applyToAllRef = useRef(applyToAll);
+  const applyToAllRef = useCommittedRef(applyToAll);
   const itemsRef = useRef(items);
   const applyToAllTargetRef = useRef(applyToAllTarget);
-  const onSavedRef = useRef(onSaved);
-  applyToAllRef.current = applyToAll;
-  onSavedRef.current = onSaved;
+  const onSavedRef = useCommittedRef(onSaved);
 
   const [bulkUpdateGalleries, { loading: savingSync }] = useEntityMutation(
     GQL.BulkGalleryUpdateDocument,

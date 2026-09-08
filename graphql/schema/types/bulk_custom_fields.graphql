@@ -1,0 +1,22 @@
+"Select explicit IDs, or all items matching a filter, for one entity type."
+input BulkCustomFieldTargetInput {
+  mode: FilterMode!
+  "Mutually exclusive with find_filter and filter_ast. An empty list selects nothing."
+  ids: [ID!]
+  "Pagination is ignored, as in bulk update jobs."
+  find_filter: FindFilterType
+  filter_ast: FilterASTInput
+}
+
+type BulkCustomFieldSummary {
+  count: Int!
+  "Names defined on every target item, regardless of their values."
+  shared_names: [String!]!
+  "Names defined on some, but not all, target items."
+  partial_names: [String!]!
+}
+
+extend type Query {
+  "Custom-field name intersection for the complete bulk-edit target. Names are sorted."
+  bulkCustomFieldSummary(input: BulkCustomFieldTargetInput!): BulkCustomFieldSummary!
+}

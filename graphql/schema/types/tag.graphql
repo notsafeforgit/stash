@@ -99,4 +99,5 @@ input BulkTagUpdateInput {
 
   parent_ids: BulkUpdateIds
   child_ids: BulkUpdateIds
+  custom_fields: CustomFieldsInput
 }

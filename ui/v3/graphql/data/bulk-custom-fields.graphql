@@ -1,0 +1,7 @@
+query BulkCustomFieldSummary($input: BulkCustomFieldTargetInput!) {
+  bulkCustomFieldSummary(input: $input) {
+    count
+    shared_names
+    partial_names
+  }
+}

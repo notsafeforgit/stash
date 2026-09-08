@@ -1,6 +1,13 @@
+import { useBulkCustomFields } from "@/components/forms/use-bulk-custom-fields";
 import { useCommittedRef } from "@/hooks/use-committed-ref";
 import { useEffect, useRef, useState } from "react";
-import { useForm } from "@tanstack/react-form";
+import { useForm, useStore } from "@tanstack/react-form";
+import { BulkCustomFieldsField } from "@/components/forms/bulk-custom-fields-field";
+import {
+  bulkCustomFieldsInput,
+  hasBulkCustomFieldChanges,
+  type BulkCustomFieldsValue,
+} from "@/components/forms/bulk-custom-fields";
 import { useLazyQuery } from "@apollo/client/react";
 import { useEntityMutation } from "src/core/client";
 import { useIntl } from "react-intl";
@@ -28,6 +35,7 @@ export type StudioBulkItem = {
 };
 
 interface StudioBulkFormValues {
+  custom_fields: BulkCustomFieldsValue;
   favorite: boolean | undefined;
   ignore_auto_tag: boolean | undefined;
   organized: boolean | undefined;
@@ -41,6 +49,7 @@ interface StudioBulkFormValues {
 function buildInitialValues(_items: StudioBulkItem[]): StudioBulkFormValues {
   // Add mode starts empty — see scene-bulk-edit-sheet for rationale.
   return {
+    custom_fields: undefined,
     favorite: undefined,
     ignore_auto_tag: undefined,
     organized: undefined,
@@ -59,6 +68,7 @@ function buildMutationInput(
   // ids is required (non-optional) on BulkStudioUpdateInput
   const base: GQL.BulkStudioUpdateInput = {
     ids: applyToAll ? [] : ids,
+    custom_fields: bulkCustomFieldsInput(v.custom_fields),
     favorite: v.favorite,
     ignore_auto_tag: v.ignore_auto_tag,
     organized: v.organized,
@@ -104,6 +114,12 @@ export function StudioBulkEditSheet({
   const itemsRef = useRef(items);
   const applyToAllTargetRef = useRef(applyToAllTarget);
   const onSavedRef = useCommittedRef(onSaved);
+  const customFields = useBulkCustomFields({
+    open,
+    mode: GQL.FilterMode.Studios,
+    items: sheetItems,
+    matching: applyToAll ? sheetApplyToAllTarget : undefined,
+  });
 
   const [bulkUpdateStudios, { loading: savingSync }] = useEntityMutation(
     GQL.BulkStudioUpdateDocument,
@@ -162,6 +178,10 @@ export function StudioBulkEditSheet({
       onOpenChange(false);
     },
   });
+  const canSubmit = useStore(form.store, (state) => state.canSubmit);
+  const editingCustomFields = useStore(form.store, (state) =>
+    hasBulkCustomFieldChanges(state.values.custom_fields),
+  );
   const wasOpenRef = useRef(false);
 
   useEffect(() => {
@@ -180,6 +200,7 @@ export function StudioBulkEditSheet({
   }, [open, form, items, applyToAllTarget, totalCount]);
 
   function handleApplyToAllChange(v: boolean) {
+    form.setFieldValue("custom_fields", undefined);
     applyToAllRef.current = v;
     setApplyToAll(v);
   }
@@ -204,6 +225,7 @@ export function StudioBulkEditSheet({
         { count: sheetItems.length },
       )}
       saving={saving}
+      canSubmit={canSubmit && (!editingCustomFields || !!customFields.summary)}
       onSubmit={form.handleSubmit}
       applyToAllTarget={sheetApplyToAllTarget}
       totalCount={sheetTotalCount}
@@ -330,6 +352,20 @@ export function StudioBulkEditSheet({
                 disabled={saving}
               />
             </Field>
+          )}
+        </form.Field>
+        <form.Field
+          name="custom_fields"
+          validators={{ onChange: customFields.schema }}
+        >
+          {(field) => (
+            <BulkCustomFieldsField
+              value={field.state.value}
+              onChange={field.handleChange}
+              entityMode={GQL.FilterMode.Studios}
+              state={customFields}
+              disabled={saving}
+            />
           )}
         </form.Field>
       </FieldGroup>

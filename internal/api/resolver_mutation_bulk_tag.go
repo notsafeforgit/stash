@@ -67,6 +67,9 @@ func (r *mutationResolver) BulkTagUpdateJob(ctx context.Context, input BulkTagUp
 	updatedTag.Description = translator.optionalString(input.Description, "description")
 	updatedTag.Favorite = translator.optionalBool(input.Favorite, "favorite")
 	updatedTag.IgnoreAutoTag = translator.optionalBool(input.IgnoreAutoTag, "ignore_auto_tag")
+	if input.CustomFields != nil {
+		updatedTag.CustomFields = handleUpdateCustomFields(*input.CustomFields)
+	}
 
 	updatedTag.Aliases = translator.updateStringsBulk(input.Aliases, "aliases")
 

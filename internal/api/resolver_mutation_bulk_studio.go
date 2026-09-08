@@ -96,6 +96,9 @@ func (r *mutationResolver) BulkStudioUpdateJob(ctx context.Context, input BulkSt
 	partial.Details = translator.optionalString(input.Details, "details")
 	partial.IgnoreAutoTag = translator.optionalBool(input.IgnoreAutoTag, "ignore_auto_tag")
 	partial.Organized = translator.optionalBool(input.Organized, "organized")
+	if input.CustomFields != nil {
+		partial.CustomFields = handleUpdateCustomFields(*input.CustomFields)
+	}
 
 	partial.TagIDs, err = translator.updateIdsBulk(input.TagIds, "tag_ids")
 	if err != nil {

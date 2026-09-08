@@ -17,11 +17,10 @@ func (r *Resolver) enqueueBulkUpdate(ctx context.Context, description string, id
 }
 
 func sanitizeBulkUpdateFindFilter(findFilter *models.FindFilterType) *models.FindFilterType {
-	if findFilter == nil {
-		return nil
+	var sanitized models.FindFilterType
+	if findFilter != nil {
+		sanitized = *findFilter
 	}
-
-	sanitized := *findFilter
 	sanitized.Page = nil
 	perPageAll := models.PerPageAll
 	sanitized.PerPage = &perPageAll

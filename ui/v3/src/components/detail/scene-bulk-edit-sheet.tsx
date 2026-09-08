@@ -1,6 +1,13 @@
+import { useBulkCustomFields } from "@/components/forms/use-bulk-custom-fields";
 import { useCommittedRef } from "@/hooks/use-committed-ref";
 import { useEffect, useRef, useState } from "react";
-import { useForm } from "@tanstack/react-form";
+import { useForm, useStore } from "@tanstack/react-form";
+import { BulkCustomFieldsField } from "@/components/forms/bulk-custom-fields-field";
+import {
+  bulkCustomFieldsInput,
+  hasBulkCustomFieldChanges,
+  type BulkCustomFieldsValue,
+} from "@/components/forms/bulk-custom-fields";
 import { useLazyQuery } from "@apollo/client/react";
 import { useEntityMutation } from "src/core/client";
 import { useIntl } from "react-intl";
@@ -45,6 +52,7 @@ export type SceneBulkItem = {
 };
 
 interface SceneBulkFormValues {
+  custom_fields: BulkCustomFieldsValue;
   code: string | null | undefined;
   date: string | null | undefined;
   director: string | null | undefined;
@@ -64,6 +72,7 @@ function buildInitialValues(_items: SceneBulkItem[]): SceneBulkFormValues {
   // already on the items. Switching to Set mode in BulkEntityField seeds
   // it with the aggregated existing IDs (passed via `existingIds` below).
   return {
+    custom_fields: undefined,
     code: undefined,
     date: undefined,
     director: undefined,
@@ -85,6 +94,7 @@ function buildMutationInput(
 ): GQL.BulkSceneUpdateInput {
   const base: GQL.BulkSceneUpdateInput = {
     ids: applyToAll ? [] : ids,
+    custom_fields: bulkCustomFieldsInput(v.custom_fields),
     code: v.code,
     date: v.date,
     director: v.director,
@@ -134,6 +144,12 @@ export function SceneBulkEditSheet({
   const itemsRef = useRef(items);
   const applyToAllTargetRef = useRef(applyToAllTarget);
   const onSavedRef = useCommittedRef(onSaved);
+  const customFields = useBulkCustomFields({
+    open,
+    mode: GQL.FilterMode.Scenes,
+    items: sheetItems,
+    matching: applyToAll ? sheetApplyToAllTarget : undefined,
+  });
 
   const [bulkUpdateScenes, { loading: savingSync }] = useEntityMutation(
     GQL.BulkSceneUpdateDocument,
@@ -231,6 +247,10 @@ export function SceneBulkEditSheet({
       onOpenChange(false);
     },
   });
+  const canSubmit = useStore(form.store, (state) => state.canSubmit);
+  const editingCustomFields = useStore(form.store, (state) =>
+    hasBulkCustomFieldChanges(state.values.custom_fields),
+  );
   const wasOpenRef = useRef(false);
 
   useEffect(() => {
@@ -249,6 +269,7 @@ export function SceneBulkEditSheet({
   }, [open, form, items, applyToAllTarget, totalCount]);
 
   function handleApplyToAllChange(v: boolean) {
+    form.setFieldValue("custom_fields", undefined);
     applyToAllRef.current = v;
     setApplyToAll(v);
   }
@@ -326,6 +347,7 @@ export function SceneBulkEditSheet({
         { count: sheetItems.length },
       )}
       saving={saving}
+      canSubmit={canSubmit && (!editingCustomFields || !!customFields.summary)}
       onSubmit={form.handleSubmit}
       applyToAllTarget={sheetApplyToAllTarget}
       totalCount={sheetTotalCount}
@@ -566,6 +588,20 @@ export function SceneBulkEditSheet({
                 disabled={saving}
               />
             </Field>
+          )}
+        </form.Field>
+        <form.Field
+          name="custom_fields"
+          validators={{ onChange: customFields.schema }}
+        >
+          {(field) => (
+            <BulkCustomFieldsField
+              value={field.state.value}
+              onChange={field.handleChange}
+              entityMode={GQL.FilterMode.Scenes}
+              state={customFields}
+              disabled={saving}
+            />
           )}
         </form.Field>
       </FieldGroup>

@@ -1,6 +1,13 @@
+import { useBulkCustomFields } from "@/components/forms/use-bulk-custom-fields";
 import { useCommittedRef } from "@/hooks/use-committed-ref";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useForm } from "@tanstack/react-form";
+import { useForm, useStore } from "@tanstack/react-form";
+import { BulkCustomFieldsField } from "@/components/forms/bulk-custom-fields-field";
+import {
+  bulkCustomFieldsInput,
+  hasBulkCustomFieldChanges,
+  type BulkCustomFieldsValue,
+} from "@/components/forms/bulk-custom-fields";
 import { useLazyQuery } from "@apollo/client/react";
 import { useEntityMutation } from "src/core/client";
 import { useIntl } from "react-intl";
@@ -34,6 +41,7 @@ export type PerformerBulkItem = {
 };
 
 interface PerformerBulkFormValues {
+  custom_fields: BulkCustomFieldsValue;
   gender: GQL.GenderEnum | null | undefined;
   country: string | null | undefined;
   ethnicity: string | null | undefined;
@@ -55,6 +63,7 @@ function buildInitialValues(
 ): PerformerBulkFormValues {
   // Add mode starts empty — see scene-bulk-edit-sheet for rationale.
   return {
+    custom_fields: undefined,
     gender: undefined,
     country: undefined,
     ethnicity: undefined,
@@ -78,6 +87,7 @@ function buildMutationInput(
 ): GQL.BulkPerformerUpdateInput {
   const base: GQL.BulkPerformerUpdateInput = {
     ids: applyToAll ? [] : ids,
+    custom_fields: bulkCustomFieldsInput(v.custom_fields),
     gender: v.gender,
     country: v.country,
     ethnicity: v.ethnicity,
@@ -194,6 +204,12 @@ export function PerformerBulkEditSheet({
   const itemsRef = useRef(items);
   const applyToAllTargetRef = useRef(applyToAllTarget);
   const onSavedRef = useCommittedRef(onSaved);
+  const customFields = useBulkCustomFields({
+    open,
+    mode: GQL.FilterMode.Performers,
+    items: sheetItems,
+    matching: applyToAll ? sheetApplyToAllTarget : undefined,
+  });
 
   const [bulkUpdatePerformers, { loading: savingSync }] = useEntityMutation(
     GQL.BulkPerformerUpdateDocument,
@@ -245,6 +261,10 @@ export function PerformerBulkEditSheet({
       onOpenChange(false);
     },
   });
+  const canSubmit = useStore(form.store, (state) => state.canSubmit);
+  const editingCustomFields = useStore(form.store, (state) =>
+    hasBulkCustomFieldChanges(state.values.custom_fields),
+  );
   const wasOpenRef = useRef(false);
 
   useEffect(() => {
@@ -263,6 +283,7 @@ export function PerformerBulkEditSheet({
   }, [open, form, items, applyToAllTarget, totalCount]);
 
   function handleApplyToAllChange(v: boolean) {
+    form.setFieldValue("custom_fields", undefined);
     applyToAllRef.current = v;
     setApplyToAll(v);
   }
@@ -287,6 +308,7 @@ export function PerformerBulkEditSheet({
         { count: sheetItems.length },
       )}
       saving={saving}
+      canSubmit={canSubmit && (!editingCustomFields || !!customFields.summary)}
       onSubmit={form.handleSubmit}
       applyToAllTarget={sheetApplyToAllTarget}
       totalCount={sheetTotalCount}
@@ -521,6 +543,20 @@ export function PerformerBulkEditSheet({
                 disabled={saving}
               />
             </Field>
+          )}
+        </form.Field>
+        <form.Field
+          name="custom_fields"
+          validators={{ onChange: customFields.schema }}
+        >
+          {(field) => (
+            <BulkCustomFieldsField
+              value={field.state.value}
+              onChange={field.handleChange}
+              entityMode={GQL.FilterMode.Performers}
+              state={customFields}
+              disabled={saving}
+            />
           )}
         </form.Field>
       </FieldGroup>

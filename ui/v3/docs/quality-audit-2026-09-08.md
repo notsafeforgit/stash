@@ -118,6 +118,17 @@ Saving one plugin now merges that plugin's returned settings into the cached
 plugin map instead of replacing the entire map. Tests cover malformed and
 partial settings, ranges/enums, extension preservation, and negative type checks.
 
+**Release regression and correction:** the initial Home Screen schema accepted
+only numeric saved-filter IDs. Existing configurations also contain decimal
+string IDs, so the new Apollo boundary rejected an otherwise valid layout and
+the Home Screen displayed defaults. The reported configuration and its saved
+filters remained intact on the server; no data migration or restoration was
+needed. The schema and TypeScript contract now accept both representations
+without coercion. [Cache regression tests](../src/core/create-client.test.ts)
+reproduce the failure and cover numeric, string, and mixed IDs, custom carousels,
+row order, extension fields, and unrelated configuration updates. The original
+malformed-input tests missed this valid persisted format.
+
 ### 5. Selection identity and typed list actions
 
 **Finding:** selection retained stale query objects with matching IDs; a generic
@@ -295,6 +306,13 @@ browser integration infallible.
 
 ## Validation
 
+- Home Screen regression follow-up: both UI builds and `make validate-fork`
+  passed, including **189 tests in 42 files**. A read-only check accepted the
+  reported six-row configuration without changing it. Chromium against the
+  deployed release reproduced five default carousels and no configured
+  saved-filter queries; the corrected production bundle against the same
+  backend rendered all six rows and loaded all three configured saved filters.
+  The browser checks blocked writes and recorded no page errors.
 - `make validate-ui-v3`: passed, including **173 tests in 41 files**, lint,
   TypeScript, formatting, locale checks, and the pinned v2.5 compatibility gate.
   Compatibility covers 61 legacy operation files and 87 unchanged primary
@@ -331,7 +349,8 @@ legacy stores remain intact for migration and recovery. General page pinch/doubl
 remains disabled, custom media zoom remains available, and UI text selection
 retains the approved editable/technical exceptions.
 
-The browser fixtures use synthetic data and temporary storage rather than the
-deployed library. Physical iOS/touch gestures were not revalidated. Exact
+The original audit's browser fixtures used synthetic data and temporary storage.
+The Home Screen follow-up also used the reported live configuration with writes
+blocked. Physical iOS/touch gestures were not revalidated. Exact
 optional properties and source-version validation for resumed downloads remain
 outside this completed scope.

@@ -173,6 +173,12 @@ stored representation and row order; convert IDs to GraphQL strings only when
 querying. Regression tests exercise both formats and mixed layouts through the
 actual Apollo cache, including configuration updates after unrelated edits.
 
+The backend's `convertJSONNumbers` also walks arrays when converting GraphQL
+JSON values before persistence. Newly submitted numeric IDs stay numeric through
+YAML save/reload; existing string IDs remain strings. Both `configureUISetting`
+and the map-based `configureUI`/`configurePlugin` paths share this conversion.
+Scientific notation uses floating-point conversion rather than integer parsing.
+
 Offline metadata, files, broadcasts, and locks share a deployment identity from
 `offline-scope.ts`: the normalized backend mount URL, independent of v3 routes.
 Use the storage adapters instead of constructing database names or file paths.

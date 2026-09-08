@@ -108,6 +108,7 @@ local container after validation.
 | `graphql/schema/` | additive v3 API fields, including filter ASTs and loss-aware performer merge opt-in | low (additive) |
 | `internal/api/resolver_mutation_bulk_*.go` + `bulk_update.go` | fork bulk-job orchestration; legacy synchronous adapters remain in shared resolvers | low (new files) |
 | `internal/api/resolver_mutation_default_filter.go` + `internal/manager/default_filter_update.go` | atomic per-view default-filter updates | low (new files) |
+| `internal/api/json_values.go` | recursive JSON-number conversion for configuration persistence; shared helper/resolver call sites stay small | low (new file) |
 | `internal/api/job_subscription.go` | cancel-aware job subscription forwarding | low (new file) |
 | `internal/api/performer_merge_*.go` | canonical-name retention and opt-in loss-aware performer merge validation | low (new files) |
 | `pkg/models/filter_ast*.go` | AST model + v2.5 compat layer | none (new files) |

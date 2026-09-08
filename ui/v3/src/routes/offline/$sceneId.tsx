@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useIntl } from "react-intl";
 import { toast } from "sonner";
 import {
@@ -46,11 +46,12 @@ import {
 import { offlineEntryToSceneData } from "src/components/offline/offline-scene-adapter";
 import { useOpfsBlobUrl } from "src/components/offline/use-opfs-blob";
 import { useOfflineResumeWriter } from "src/components/offline/use-offline-resume-writer";
+import { useSmartBack } from "src/hooks/use-smart-back";
 
 function OfflineScenePage() {
   const intl = useIntl();
   const { sceneId } = Route.useParams();
-  const navigate = useNavigate();
+  const goBack = useSmartBack("/offline");
   const queue = useDownloadQueue();
   const [entry, setEntry] = useState<OfflineEntry | null | undefined>(
     undefined,
@@ -83,8 +84,6 @@ function OfflineScenePage() {
       unsubscribe();
     };
   }, [sceneId]);
-
-  const goBack = () => navigate({ to: "/offline" });
 
   // Re-download → flip back to the list view (the entry won't be in
   // `complete` state until after the download finishes; the list

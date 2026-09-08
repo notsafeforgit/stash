@@ -1,5 +1,11 @@
 import type React from "react";
-import { startTransition, useCallback, useEffect, useState } from "react";
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { cn } from "src/lib/utils";
 import { Bookmark, Funnel, SlidersHorizontal } from "lucide-react";
 import { useIntl } from "react-intl";
@@ -25,6 +31,7 @@ import {
 } from "./list-scroll-state";
 import type { View } from "./views";
 import { PluginFilterExtras } from "src/plugins/filter-extras";
+import { useListScrollRestoration } from "./use-list-scroll-restoration";
 
 // ── EntityList ────────────────────────────────────────────────────────────────
 
@@ -48,6 +55,8 @@ export interface EntityListProps {
   /** Retain the current viewport while a cache deletion leaves this page
    *  temporarily short and a refetch pulls later items into the gap. */
   preserveScrollDuringRefill?: boolean;
+  /** Restore only after the active list's data and first-paint gate are ready. */
+  scrollRestorationReady?: boolean;
 
   // ── Slots ──────────────────────────────────────────────────────────────────
 
@@ -99,6 +108,7 @@ export const EntityList: React.FC<EntityListProps> = ({
   view,
   totalCount,
   preserveScrollDuringRefill = false,
+  scrollRestorationReady = true,
   sidebarContent,
   children,
   operationComponent,
@@ -175,6 +185,18 @@ export const EntityList: React.FC<EntityListProps> = ({
     filter.currentPage,
     filter.itemsPerPage,
     totalCount,
+  );
+
+  const restorationId = `entity-list-${view ?? filter.mode}`;
+  const { restorationKey, initialOffset } = useListScrollRestoration(
+    restorationId,
+    scrollEl,
+    scrollRestorationReady,
+    filter.makeQueryParameters(),
+  );
+  const scrollContext = useMemo(
+    () => ({ element: scrollEl, restorationId, restorationKey, initialOffset }),
+    [scrollEl, restorationId, restorationKey, initialOffset],
   );
 
   return (
@@ -324,6 +346,7 @@ export const EntityList: React.FC<EntityListProps> = ({
               <div className="relative flex-1 min-h-0">
                 <div
                   ref={setScrollEl}
+                  data-scroll-restoration-id={restorationId}
                   className={cn(
                     "relative h-full overflow-y-auto overflow-x-hidden",
                     mobileChromeFixed &&
@@ -331,7 +354,7 @@ export const EntityList: React.FC<EntityListProps> = ({
                       "pb-[calc(5rem+env(safe-area-inset-bottom,0px))]",
                   )}
                 >
-                  <ListScrollContext.Provider value={scrollEl}>
+                  <ListScrollContext.Provider value={scrollContext}>
                     {children}
                   </ListScrollContext.Provider>
                 </div>

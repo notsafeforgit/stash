@@ -5,9 +5,12 @@ import { createContext } from "react";
  * virtualizer in `EntityListPage`'s grid mode uses this to observe scroll
  * events on the right element (the inner main column, not window).
  *
- * The value is the DOM element directly (not a ref) so consumers can react
- * to it in render — `useContext` will return `null` on the first commit and
- * the actual element on the second, which is exactly when the virtualizer
- * needs to start computing rows.
+ * The element is reactive callback-ref state. The saved offset lets virtual
+ * rows mount at the returning viewport instead of first rendering the top.
  */
-export const ListScrollContext = createContext<HTMLElement | null>(null);
+export const ListScrollContext = createContext<{
+  element: HTMLElement | null;
+  restorationId: string;
+  restorationKey: string;
+  initialOffset: number | undefined;
+} | null>(null);

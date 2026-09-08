@@ -195,7 +195,7 @@ function PositionSlider({
   const bufferedEnd = Math.max(
     0,
     !reloading && mediaBuffered && mediaBuffered.length > 0
-      ? offsetStart + mediaBuffered[mediaBuffered.length - 1][1]
+      ? offsetStart + (mediaBuffered.at(-1)?.[1] ?? 0)
       : offsetStart,
   );
 
@@ -1418,6 +1418,7 @@ export function PlayerControls({
               return;
             }
             const t = e.touches[0];
+            if (!t) return;
             cancelHold();
             holdStartPosRef.current = { x: t.clientX, y: t.clientY };
             holdTimerRef.current = window.setTimeout(() => {

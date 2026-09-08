@@ -57,8 +57,11 @@ function LocaleLoader({
 
       await withTimeout(registerCountry(language), 5000, "Country names");
 
+      const defaultLoader = localeLoader[defaultKey];
+      if (!defaultLoader)
+        throw new Error(`Missing default language: ${defaultKey}`);
       const defaultMsgs = (
-        await withTimeout(localeLoader[defaultKey](), 5000, "Default language")
+        await withTimeout(defaultLoader(), 5000, "Default language")
       ).default;
       const merged: Record<string, unknown> = { ...defaultMsgs };
 

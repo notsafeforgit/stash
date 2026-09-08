@@ -1,4 +1,5 @@
-import { useEffect, useRef, type RefObject } from "react";
+import { useCommittedRef } from "@/hooks/use-committed-ref";
+import { useEffect, type RefObject } from "react";
 import { getPlatformURL } from "@/core/platform-url";
 import { isHlsPlaylist } from "./hls";
 import { hlsStreamTypeName, streamResolution } from "./scene-player-source-url";
@@ -11,8 +12,8 @@ export function usePlayerTranscodeSession(
 ) {
   // Cleanup closes the transcode owned by this effect. Only quality changes
   // within the same scene preserve the incoming HLS variant.
-  const currentSourceRef = useRef({ sceneId, src: finalSrc });
-  currentSourceRef.current = { sceneId, src: finalSrc };
+  const currentSourceRef = useCommittedRef({ sceneId, src: finalSrc });
+
   useEffect(() => {
     if (!finalSrc || !isHlsPlaylist(finalSrc)) return;
     const sendStop = (keepUrl?: string) => {

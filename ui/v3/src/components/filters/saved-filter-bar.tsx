@@ -1,3 +1,4 @@
+import type { FilterMode } from "@/core/generated-graphql";
 import type React from "react";
 import { useCallback, useMemo, useState, useEffect } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
@@ -18,12 +19,10 @@ import { useDefaultFilterActions } from "src/hooks/default-filter";
 import { DefaultFilterConflict } from "./default-filter-conflict";
 import { notifySavedFilterLoaded } from "src/plugins/registry";
 
-function readPinnedSavedFilters(mode: string): string[] {
+function readPinnedSavedFilters(mode: FilterMode): string[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem(
-      getPinnedSavedFiltersKey(mode as never),
-    );
+    const raw = window.localStorage.getItem(getPinnedSavedFiltersKey(mode));
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed)
@@ -34,7 +33,7 @@ function readPinnedSavedFilters(mode: string): string[] {
   }
 }
 
-function usePinnedSavedFilters(mode: string) {
+function usePinnedSavedFilters(mode: FilterMode) {
   const [pinnedIds, setPinnedIds] = useState<string[]>(() =>
     readPinnedSavedFilters(mode),
   );
@@ -42,7 +41,7 @@ function usePinnedSavedFilters(mode: string) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(
-      getPinnedSavedFiltersKey(mode as never),
+      getPinnedSavedFiltersKey(mode),
       JSON.stringify(pinnedIds),
     );
   }, [mode, pinnedIds]);

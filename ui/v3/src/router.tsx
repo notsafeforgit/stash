@@ -1,8 +1,8 @@
+import { createElement } from "react";
 import {
   createRoute,
   createRouter,
   type AnyRoute,
-  type RouteComponent,
 } from "@tanstack/react-router";
 import { Route as rootRoute } from "@/routes/__root";
 import { routeTree as fileRouteTree } from "./routeTree.gen";
@@ -10,9 +10,7 @@ import { getRegisteredRoutes } from "@/plugins/registry";
 import { getApplicationBasePath } from "@/core/platform-url";
 import { getScrollRestorationKey } from "@/core/scroll-restoration";
 
-const coreRoutes = [
-  ...((fileRouteTree as unknown as { children?: AnyRoute[] }).children ?? []),
-];
+const coreRoutes: AnyRoute[] = Object.values(fileRouteTree.children ?? {});
 
 function routePattern(path: string): string {
   return (
@@ -54,10 +52,7 @@ function buildRouteTree(includePlugins: boolean) {
       return createRoute({
         getParentRoute: () => rootRoute,
         path: r.path,
-        // TanStack Router's RouteComponent has a richer shape than
-        // ComponentType (preload metadata etc.); a plain function
-        // component is structurally compatible at runtime.
-        component: r.component as RouteComponent,
+        component: () => createElement(r.component),
       });
     },
   );

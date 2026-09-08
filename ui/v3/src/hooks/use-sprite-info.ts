@@ -72,7 +72,7 @@ function parseVTT(text: string, baseUrl: string): SpriteInfo[] {
       if (!trimmed) continue;
 
       const match = XYWH_RE.exec(trimmed);
-      if (!match) continue;
+      if (!match?.[1] || !match[2] || !match[3] || !match[4]) continue;
 
       const rawUrl = trimmed.slice(0, trimmed.length - match[0].length);
       // Resolve relative URLs against the VTT file's directory

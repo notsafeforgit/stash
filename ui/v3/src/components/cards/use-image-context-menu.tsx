@@ -1,3 +1,4 @@
+import { ImageListItems } from "@/components/list/entity-list-items";
 import type React from "react";
 import { useState } from "react";
 import { useIntl } from "react-intl";
@@ -17,10 +18,7 @@ import {
   DeleteFilesList,
 } from "src/components/detail/delete-dialog";
 import { ImageGenerateDialog } from "src/components/detail/image-generate-dialog";
-import {
-  ImageBulkEditSheet,
-  type ImageBulkItem,
-} from "src/components/detail/image-bulk-edit-sheet";
+import { ImageBulkEditSheet } from "src/components/detail/image-bulk-edit-sheet";
 import {
   useBulkCardActions,
   BulkContextMenuItems,
@@ -94,7 +92,7 @@ export function useImageContextMenu({
     bulkEditOpen,
     setBulkEditOpen,
     onContextMenuOpen,
-  } = useBulkCardActions<ImageBulkItem>(image.id);
+  } = useBulkCardActions(ImageListItems.useItems());
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
@@ -243,9 +241,9 @@ export function useImageContextMenu({
 
   // Cast helper: selectedItems carries visual_files at runtime via the
   // list-page slim fragment, even though ImageBulkItem doesn't model it.
-  const bulkVisualFilePaths = (
-    selectedItems as unknown as readonly ImageContextMenuItem[]
-  ).flatMap((i) => i.visual_files?.map((f) => f.path) ?? []);
+  const bulkVisualFilePaths = selectedItems.flatMap(
+    (i) => i.visual_files?.map((f) => f.path) ?? [],
+  );
 
   const dialogs = (
     <>

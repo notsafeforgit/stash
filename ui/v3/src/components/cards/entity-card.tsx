@@ -1,3 +1,4 @@
+import type { EntityDestination } from "@/core/navigation";
 import { Button } from "@/components/ui/button";
 import { useIntl } from "react-intl";
 import { applicationPath } from "@/core/platform-url";
@@ -75,7 +76,7 @@ const EntityCardCtx = createContext<EntityCardCtx>({
 interface EntityCardRootProps {
   id: string;
   label: string;
-  href: string;
+  destination: EntityDestination;
   isMobile?: boolean;
   selected?: boolean;
   onSelectedChanged?: (selected: boolean, shiftKey: boolean) => void;
@@ -99,7 +100,7 @@ interface EntityCardRootProps {
 function EntityCardRoot({
   id,
   label,
-  href,
+  destination,
   isMobile = false,
   selected,
   onSelectedChanged,
@@ -131,12 +132,8 @@ function EntityCardRoot({
     // Capture returnTo from window.location at click time — always synchronously
     // up-to-date, unlike useLocation() which lags behind router.history.replace().
     const returnTo = applicationPath(window.location.href);
-    // href is a dynamic runtime string — cast needed because TanStack Router's
-    // `to` is typed as a union of registered route paths, not plain string.
-    // viewTransition: the browser snapshots the current frame and cross-fades
-    // to the new one, hiding React's reconcile cost behind a paint.
     navigate({
-      to: href as never,
+      ...destination,
       state: { returnTo },
       viewTransition: true,
     });
@@ -145,32 +142,27 @@ function EntityCardRoot({
   // Mouse clicks on the article body — skip if the click originated from a
   // chip/button inside the card (they handle their own navigation).
   function handleArticleClick(e: React.MouseEvent<HTMLElement>) {
+    if (!(e.target instanceof Element)) return;
     // data-card-link marks the stretched anchor itself — don't skip it
-    const chip = (e.target as HTMLElement).closest(
-      "a[href]:not([data-card-link]), button",
-    );
+    const chip = e.target.closest("a[href]:not([data-card-link]), button");
     if (chip) return;
 
     // Read selecting state from the DOM — avoids re-rendering all cards on
     // selecting state change; the [data-selecting] attribute on the grid
-    // container is synced imperatively by EntityListPage.
-    const articleEl = e.currentTarget as HTMLElement;
+    // container is owned by EntityListPage.
+    const articleEl = e.currentTarget;
     const isSelecting = !!articleEl.closest("[data-selecting]");
 
     if (e.metaKey || e.ctrlKey) {
-      // Read current selection from DOM so wall-mode cards (whose React selected
-      // prop may be stale) toggle correctly without a re-render.
-      onSelectedChanged?.(!(articleEl.dataset.selected === "true"), e.shiftKey);
+      onSelectedChanged?.(!selected, e.shiftKey);
       return;
     }
     if (isSelecting) {
-      onSelectedChanged?.(!(articleEl.dataset.selected === "true"), e.shiftKey);
+      onSelectedChanged?.(!selected, e.shiftKey);
       return;
     }
     if (onPreviewClick) {
-      const isPreview =
-        (e.target as HTMLElement).closest("[data-entity-card-preview]") !==
-        null;
+      const isPreview = e.target.closest("[data-entity-card-preview]") !== null;
       if (isPreview) {
         onPreviewClick();
         return;
@@ -185,14 +177,9 @@ function EntityCardRoot({
     e.stopPropagation();
     if (e.metaKey || e.ctrlKey) return; // let browser open new tab
     e.preventDefault();
-    const isSelecting = !!(e.currentTarget as HTMLElement).closest(
-      "[data-selecting]",
-    );
+    const isSelecting = !!e.currentTarget.closest("[data-selecting]");
     if (isSelecting) {
-      const article = (e.currentTarget as HTMLElement).closest<HTMLElement>(
-        "article[data-id]",
-      );
-      onSelectedChanged?.(!(article?.dataset.selected === "true"), e.shiftKey);
+      onSelectedChanged?.(!selected, e.shiftKey);
       return;
     }
     doNavigate();
@@ -228,21 +215,13 @@ function EntityCardRoot({
         and right-click / middle-click "open in new tab". Mouse clicks on
         the card body are handled by handleArticleClick on the article instead
         (because the content wrapper at z-[1] intercepts them before the anchor).
-        Using a plain <a> avoids nesting <a> inside <a> — performer/tag Link
+        Keeping the link separate avoids nested anchors — performer/tag Link
         chips inside the body are siblings in the DOM, not descendants of this anchor.
-      */}
-      {/*
-        Stretched anchor sits behind the content (z-0) for keyboard nav
-        and right-click / middle-click "open in new tab". Mouse clicks on
-        the card body are handled by handleArticleClick on the article instead
-        (because the content wrapper at z-[1] intercepts them before the anchor).
-        `to` cast to `never` because href is a dynamic string; TanStack Router's
-        to-prop is a registered-route union, not a plain string.
       */}
       <Link
         data-card-link
         className="absolute inset-0 z-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
-        to={href as never}
+        {...destination}
         onClick={handleAnchorClick}
         viewTransition
         tabIndex={0}
@@ -518,9 +497,9 @@ function EntityCardPreview({
   const [naturalIsPortrait, setNaturalIsPortrait] = useState<boolean | null>(
     naturalIsPortraitProp ?? null,
   );
-  const prevImageRef = useRef<string | null | undefined>(null);
-  if (image !== prevImageRef.current) {
-    prevImageRef.current = image;
+  const [previousImage, setPreviousImage] = useState(image);
+  if (image !== previousImage) {
+    setPreviousImage(image);
     setNaturalIsPortrait(naturalIsPortraitProp ?? null);
   }
   const cardAspect = useCardAspect();
@@ -1048,9 +1027,8 @@ function EntityCardSelectCheckbox() {
     );
   }
 
-  // Wall view: fully CSS-driven overlay — circle colour and check mark are
-  // controlled by [data-selected="true"] on the article, set imperatively by
-  // PhotoAlbumWall's useLayoutEffect. No React re-renders needed on selection change.
+  // Wall view: CSS uses the article's selected attribute. PhotoAlbumWall
+  // memoizes each card subtree so changing one selection only updates that card.
   if (isWall) {
     return (
       <Button

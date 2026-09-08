@@ -169,7 +169,8 @@ function RatingNumber({ value, onSetRating, disabled }: RatingNumberProps) {
         step={1}
         value={value ?? 0}
         onValueChange={(v) => {
-          const n = Array.isArray(v) ? (v as number[])[0] : (v as number);
+          const n = typeof v === "number" ? v : v[0];
+          if (n === undefined) return;
           onSetRating?.(n === 0 ? null : n);
         }}
         disabled={readonly}

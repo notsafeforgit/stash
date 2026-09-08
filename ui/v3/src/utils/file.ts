@@ -14,25 +14,31 @@ const Units: Unit[] = [
   "tebibyte",
   "pebibyte",
 ];
-const shortUnits = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"];
+const shortUnits: Record<Unit, string> = {
+  byte: "B",
+  kibibyte: "KiB",
+  mebibyte: "MiB",
+  gibibyte: "GiB",
+  tebibyte: "TiB",
+  pebibyte: "PiB",
+};
 
 export function fileSize(bytes: number = 0): { size: number; unit: Unit } {
   if (Number.isNaN(parseFloat(String(bytes))) || !Number.isFinite(bytes))
-    return { size: 0, unit: Units[0] };
+    return { size: 0, unit: "byte" };
 
-  let unit = 0;
+  let unit: Unit = "byte";
   let count = bytes;
-  while (count >= 1024 && unit + 1 < Units.length) {
+  for (const next of Units.slice(1)) {
+    if (count < 1024) break;
     count /= 1024;
-    unit++;
+    unit = next;
   }
-
-  return { size: count, unit: Units[unit] };
+  return { size: count, unit };
 }
 
 export function formatFileSizeUnit(u: Unit): string {
-  const i = Units.indexOf(u);
-  return shortUnits[i];
+  return shortUnits[u];
 }
 
 // Returns 0 for MB and under, 1 for GB and over.

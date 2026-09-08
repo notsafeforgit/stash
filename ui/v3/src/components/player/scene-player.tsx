@@ -1,3 +1,4 @@
+import { useCommittedRef } from "@/hooks/use-committed-ref";
 /**
  * Scene player — stable-`<video>` element.
  *
@@ -425,16 +426,19 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     file?.audio_codec,
   );
   const canDecodeVideoSnapshot = useVideoCodecDecodableInMp4(file?.video_codec);
-  const canDecodeRef = useRef(canDecodeSnapshot);
-  const canDecodeVideoRef = useRef(canDecodeVideoSnapshot);
-  const sceneIdForCanDecodeRef = useRef(scene.id);
-  if (sceneIdForCanDecodeRef.current !== scene.id) {
-    sceneIdForCanDecodeRef.current = scene.id;
-    canDecodeRef.current = canDecodeSnapshot;
-    canDecodeVideoRef.current = canDecodeVideoSnapshot;
+  const [decodeSnapshot, setDecodeSnapshot] = useState({
+    sceneId: scene.id,
+    canDecode: canDecodeSnapshot,
+    canDecodeVideo: canDecodeVideoSnapshot,
+  });
+  if (decodeSnapshot.sceneId !== scene.id) {
+    setDecodeSnapshot({
+      sceneId: scene.id,
+      canDecode: canDecodeSnapshot,
+      canDecodeVideo: canDecodeVideoSnapshot,
+    });
   }
-  const canDecode = canDecodeRef.current;
-  const canDecodeVideo = canDecodeVideoRef.current;
+  const { canDecode, canDecodeVideo } = decodeSnapshot;
 
   // Auto-detected: true for short clips that should loop by default. The
   // user-controllable `loopEnabled` state below seeds itself from this
@@ -773,8 +777,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   const effectiveAutoPlay =
     (autostartEnabled || autoAdvanceOverride) && initialAutoplayIntent;
 
-  const autoplayIntentRef = useRef(effectiveAutoPlay);
-  autoplayIntentRef.current = effectiveAutoPlay;
+  const autoplayIntentRef = useCommittedRef(effectiveAutoPlay);
 
   usePlayDelay(
     fullscreenContainerRef,

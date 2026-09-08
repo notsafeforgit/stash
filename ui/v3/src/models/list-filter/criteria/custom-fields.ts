@@ -77,6 +77,7 @@ export class CustomFieldsCriterion extends Criterion {
     }
 
     const first = this.value[0];
+    if (!first) return "";
     let messageID: string;
     let valueString = "";
 

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useLabelCache } from "@/hooks/use-label-cache";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useForm } from "@tanstack/react-form";
 import { useIntl } from "react-intl";
 import { useNavigate } from "@tanstack/react-router";
@@ -153,16 +154,12 @@ export function SceneMergeDialog({
   // the search results refetch. `itemToStringLabel` reads from this so
   // Base UI can render the picked scene's title in the input even when
   // it's no longer in the current results array.
-  const knownLabelsRef = useRef<Map<string, string>>(new Map());
-  for (const opt of options) {
-    knownLabelsRef.current.set(opt.id, opt.label);
-  }
-  for (const opt of sourceOptions) {
-    knownLabelsRef.current.set(opt.id, opt.label);
-  }
+  const [knownLabels, rememberLabels] = useLabelCache(
+    [...options, ...sourceOptions].map((option) => [option.id, option.label]),
+  );
   const itemToStringLabel = useCallback(
-    (id: string) => knownLabelsRef.current.get(id) ?? id,
-    [],
+    (id: string) => knownLabels.get(id) ?? id,
+    [knownLabels],
   );
 
   // Pass the visible item ids to the root so Base UI can compute
@@ -444,9 +441,9 @@ export function SceneMergeDialog({
                         }
                         const label =
                           options.find((o) => o.id === id)?.label ??
-                          knownLabelsRef.current.get(id) ??
+                          knownLabels.get(id) ??
                           id;
-                        knownLabelsRef.current.set(id, label);
+                        rememberLabels([[id, label]]);
                         field.handleChange(id);
                         setDestinationId(id);
                       }}

@@ -1,3 +1,4 @@
+import { entityDestination } from "@/core/navigation";
 import type React from "react";
 import { useCallback } from "react";
 import { useApolloClient } from "@apollo/client/react";
@@ -91,7 +92,7 @@ export const PerformerCard: React.FC<PerformerCardProps> = ({
       <EntityCard
         label={displayName}
         id={performer.id}
-        href={`/performers/${performer.id}`}
+        destination={entityDestination.performer(performer.id)}
         isMobile={isMobile}
         selected={selected}
         onSelectedChanged={onSelectedChanged}

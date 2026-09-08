@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useLabelCache } from "@/hooks/use-label-cache";
+import { useCallback, useMemo, useState } from "react";
 import { useIntl } from "react-intl";
 import { MinusIcon, PencilIcon, PlusIcon } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
@@ -58,27 +59,26 @@ export function BulkEntityField({
   }
 
   function handleToggleChange(values: GQL.BulkUpdateIdMode[]) {
-    if (values.length === 0) return;
+    if (values[0] === undefined) return;
     handleModeChange(values[0]);
   }
 
   // Maintain a stable id→name map across renders so chips keep their labels
   // even after the search results change (e.g. user cleared the search input
   // after picking a new item).
-  const knownNamesRef = useRef<Record<string, string>>({});
-  for (const opt of options) knownNamesRef.current[opt.id] = opt.name;
-  if (existingNames) Object.assign(knownNamesRef.current, existingNames);
+  const [knownNames, rememberNames] = useLabelCache([
+    ...options.map((item): [string, string] => [item.id, item.name]),
+    ...Object.entries(existingNames ?? {}),
+  ]);
 
   function handleSelectionChange(items: EntityOption[]) {
-    for (const item of items) {
-      knownNamesRef.current[item.id] = item.name;
-    }
-    onChange({ ...value, ids: items.map((i) => i.id) });
+    rememberNames(items.map((item) => [item.id, item.name]));
+    onChange({ ...value, ids: items.map((item) => item.id) });
   }
 
   const selected: EntityOption[] = (value.ids ?? []).map((id) => ({
     id,
-    name: knownNamesRef.current[id] ?? id,
+    name: knownNames.get(id) ?? id,
   }));
 
   // Local query state for Remove mode — we filter the union client-side

@@ -26,7 +26,7 @@ function buildChordMap(): Map<string, string> {
   for (const item of items) {
     if (!item.hotkey) continue;
     const parts = item.hotkey.split(" ");
-    if (parts.length === 2 && parts[0] === "g") {
+    if (parts.length === 2 && parts[0] === "g" && parts[1]) {
       // First registration wins; built-ins are listed first so plugins
       // can't shadow them.
       if (!map.has(parts[1])) {

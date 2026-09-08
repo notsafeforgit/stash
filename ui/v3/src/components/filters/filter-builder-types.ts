@@ -44,7 +44,7 @@ export function parsePlaceholderID(
   id: string,
 ): { groupId: string; index: number } | undefined {
   const match = id.match(/^filter-cross-group-placeholder:(.+):(-?\d+)$/);
-  if (!match) return undefined;
+  if (!match?.[1] || !match[2]) return undefined;
   return { groupId: match[1], index: parseInt(match[2], 10) };
 }
 
@@ -56,8 +56,7 @@ export function findParentOf(
   root: FilterASTGroupNode,
   groupId: string,
 ): { parent: FilterASTGroupNode; index: number } | undefined {
-  for (let i = 0; i < root.children.length; i++) {
-    const child = root.children[i];
+  for (const [i, child] of root.children.entries()) {
     if (child.id === groupId) return { parent: root, index: i };
     if (child.kind === "group") {
       const found = findParentOf(child, groupId);
@@ -121,8 +120,8 @@ export function moveItem<T>(items: T[], fromIndex: number, toIndex: number) {
     return items;
   }
   const next = [...items];
-  const [item] = next.splice(fromIndex, 1);
-  next.splice(toIndex, 0, item);
+  const moved = next.splice(fromIndex, 1);
+  next.splice(toIndex, 0, ...moved);
   return next;
 }
 
@@ -248,10 +247,10 @@ export function moveASTNode(
   if (dragItem.parentGroupId === target.groupId) {
     return updateGroupById(root, dragItem.parentGroupId, (group) => {
       const children = [...group.children];
-      const [movedNode] = children.splice(dragItem.index, 1);
+      const movedNodes = children.splice(dragItem.index, 1);
       let insertIndex = target.index;
       if (dragItem.index < target.index) insertIndex -= 1;
-      children.splice(insertIndex, 0, movedNode);
+      children.splice(insertIndex, 0, ...movedNodes);
       return { ...group, children };
     });
   }

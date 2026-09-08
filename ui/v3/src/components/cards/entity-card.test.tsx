@@ -37,7 +37,11 @@ describe("entity card actions", () => {
         <CardLayoutContext.Provider value={layout}>
           <EntityCard
             id="17"
-            href="/scenes/17"
+            destination={{
+              to: "/scenes/$sceneId",
+              params: { sceneId: "17" },
+              search: undefined,
+            }}
             label="A named scene"
             selected
             onSelectedChanged={() => {}}

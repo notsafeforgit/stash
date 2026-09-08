@@ -151,7 +151,10 @@ export function IdentifyDialog({ open, onOpenChange, selectedIds }: IProps) {
     const target = index + dir;
     if (target < 0 || target >= sources.length) return;
     const next = [...sources];
-    [next[index], next[target]] = [next[target], next[index]];
+    const source = next[index];
+    const destination = next[target];
+    if (!source || !destination) return;
+    [next[index], next[target]] = [destination, source];
     setSources(next);
   }
 

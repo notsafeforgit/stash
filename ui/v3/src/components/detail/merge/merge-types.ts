@@ -59,21 +59,91 @@ export interface MergeFieldDef<TEntity, TUpdateInput, TValue = unknown> {
   toUpdate(input: TUpdateInput, value: TValue): void;
 }
 
-// Array element type — TValue is internal to each def, so we use
-// `unknown` at the array level. Helper below creates a def with
-// inferred TValue while presenting as `MergeFieldDef<E, U, unknown>`
-// to the array.
-export type AnyMergeFieldDef<TEntity, TUpdateInput> = MergeFieldDef<
-  TEntity,
-  TUpdateInput,
-  unknown
->;
+export interface SourceRef<TEntity> {
+  id: string;
+  entity: TEntity;
+  label: string;
+}
 
-/** Type-preserving constructor for a merge field def. Lets callers
- *  write strongly-typed `read` / `preview` / `toUpdate` callbacks
- *  while the resulting object goes into a heterogeneous array. */
+export interface MergeRow<TUpdateInput> {
+  field: { key: string; labelId: string; defaultLabel: string };
+  sources: { id: string; label: string }[];
+  canCombine: boolean;
+  defaultChoice: MergeChoice;
+  preview(choice: MergeChoice): React.ReactNode;
+  apply(input: TUpdateInput, choice: MergeChoice): void;
+}
+
+/** The heterogeneous collection exposes operations, never an untyped value.
+ * Each field keeps TValue inside its closure for both preview and projection. */
+export interface AnyMergeFieldDef<TEntity, TUpdateInput> {
+  readonly key: string;
+  resolve(
+    destination: TEntity,
+    sources: readonly SourceRef<TEntity>[],
+    projectKeepValues: boolean,
+  ): MergeRow<TUpdateInput> | undefined;
+}
+
 export function defineMergeField<TEntity, TUpdateInput, TValue>(
   def: MergeFieldDef<TEntity, TUpdateInput, TValue>,
 ): AnyMergeFieldDef<TEntity, TUpdateInput> {
-  return def as unknown as AnyMergeFieldDef<TEntity, TUpdateInput>;
+  return {
+    key: def.key,
+    resolve(destination, sources, projectKeepValues) {
+      const destValue = def.read(destination);
+      const destEmpty = def.isEmpty(destValue);
+      const contributing = sources
+        .map((source) => ({ ...source, value: def.read(source.entity) }))
+        .filter((source) => !def.isEmpty(source.value));
+      const first = contributing[0];
+      if (
+        !first ||
+        (!destEmpty &&
+          contributing.every((source) => def.isEqual(destValue, source.value)))
+      )
+        return undefined;
+      const defaultChoice: MergeChoice = def.combine
+        ? "combine"
+        : destEmpty
+          ? `source:${first.id}`
+          : "keep";
+      const sourceById = new Map(
+        contributing.map((source) => [source.id, source]),
+      );
+      function resolveValue(choice: MergeChoice): TValue {
+        if (choice === "combine" && def.combine) {
+          const values = contributing.map((source) => source.value);
+          if (!destEmpty) values.unshift(destValue);
+          return def.combine(values);
+        }
+        if (choice.startsWith("source:")) {
+          const source = sourceById.get(choice.slice("source:".length));
+          return source ? source.value : destValue;
+        }
+        return destValue;
+      }
+      return {
+        field: {
+          key: def.key,
+          labelId: def.labelId,
+          defaultLabel: def.defaultLabel,
+        },
+        sources: contributing.map(({ id, label }) => ({ id, label })),
+        canCombine: !!def.combine,
+        defaultChoice,
+        preview: (choice) => def.preview(resolveValue(choice)),
+        apply(input, choice) {
+          if (choice === "keep" && !projectKeepValues) return;
+          if (choice === "combine" && !def.combine) return;
+          if (
+            choice.startsWith("source:") &&
+            !sourceById.has(choice.slice("source:".length))
+          )
+            return;
+          def.toUpdate(input, resolveValue(choice));
+        },
+      };
+    },
+  };
 }

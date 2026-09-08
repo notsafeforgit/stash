@@ -1,3 +1,4 @@
+import { useLabelCache } from "@/hooks/use-label-cache";
 import { useRef, useState } from "react";
 import {
   Combobox,
@@ -43,17 +44,16 @@ export function EntityMultiSelect({
 
   // Accumulate a stable id→name map so chips render correct names even after
   // the options list changes (e.g. user cleared the search input).
-  const knownRef = useRef<Map<string, string>>(new Map());
-  for (const item of [...value, ...options]) {
-    knownRef.current.set(item.id, item.name);
-  }
+  const [knownNames] = useLabelCache(
+    [...value, ...options].map((item) => [item.id, item.name]),
+  );
 
   const selectedIds = value.map((v) => v.id);
 
   function handleValueChange(ids: string[]) {
     const items = ids.map((id) => ({
       id,
-      name: knownRef.current.get(id) ?? id,
+      name: knownNames.get(id) ?? id,
     }));
     onChange(items);
   }
@@ -148,10 +148,9 @@ export function EntitySingleSelect({
     setInputValue(valueName ?? "");
   }
 
-  const knownRef = useRef<Map<string, string>>(new Map());
-  for (const item of [...(value ? [value] : []), ...options]) {
-    knownRef.current.set(item.id, item.name);
-  }
+  const [knownNames] = useLabelCache(
+    [...(value ? [value] : []), ...options].map((item) => [item.id, item.name]),
+  );
 
   // Guard: after selecting an item Base UI fires onInputValueChange with the
   // raw ID string. We block that one extra call.
@@ -164,7 +163,7 @@ export function EntitySingleSelect({
       onSearch("");
       return;
     }
-    const name = knownRef.current.get(id) ?? id;
+    const name = knownNames.get(id) ?? id;
     onChange({ id, name });
     setInputValue(name);
     justSelectedRef.current = true;
@@ -196,7 +195,7 @@ export function EntitySingleSelect({
       // input on close, which would otherwise replace the chosen name).
       // Cast: ComboboxRoot's typing omits this prop but the impl forwards it.
       {...({
-        itemToStringLabel: (id: string) => knownRef.current.get(id) ?? id,
+        itemToStringLabel: (id: string) => knownNames.get(id) ?? id,
       } as Record<string, unknown>)}
     >
       <ComboboxInput placeholder={placeholder} showClear={!!value} />

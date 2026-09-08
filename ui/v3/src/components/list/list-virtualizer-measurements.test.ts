@@ -27,10 +27,10 @@ it("restores the same row positions when measured heights differ from estimates"
 
   const restored = createVirtualizer(original.measurementsCache.slice());
   expect(restored.getTotalSize()).toBe(original.getTotalSize());
-  expect(restored.measurementsCache[2].start).toBe(240);
+  expect(restored.measurementsCache[2]?.start).toBe(240);
   const estimatesOnly = createVirtualizer();
   estimatesOnly.getTotalSize();
-  expect(estimatesOnly.measurementsCache[2].start).toBe(200);
+  expect(estimatesOnly.measurementsCache[2]?.start).toBe(200);
 });
 
 it("rejects measurements after the width or ordered items change", () => {

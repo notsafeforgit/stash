@@ -1,3 +1,14 @@
+import {
+  useDuplicateFilter,
+  useDuplicateSelection,
+  pageCount,
+  duplicateFilterMode,
+} from "@/components/duplicates/controller";
+import {
+  compareText,
+  groupValueTints,
+  selectAllButRetained,
+} from "@/components/duplicates/groups";
 import { Label } from "@/components/ui/label";
 import { useId, type ReactNode, useEffect, useMemo, useState } from "react";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
@@ -21,7 +32,6 @@ import {
 } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
 import { imageTitle, objectTitle } from "src/core/files";
-import { ListFilterModel } from "src/models/list-filter/filter";
 import { ToolFilterSidebar } from "src/components/filters/tool-filter-sidebar";
 import {
   MediaColorBadge,
@@ -102,18 +112,6 @@ const PAGE_SIZES = [
   10, 20, 30, 40, 50, 100, 150, 200, 250, 500, 750, 1000, 1250, 1500,
 ];
 const TABLE_SKELETON_ROWS = 12;
-const SORT_VALUE_TINT_CLASSES = [
-  "bg-sky-500/10 dark:bg-sky-400/15",
-  "bg-emerald-500/10 dark:bg-emerald-400/15",
-  "bg-amber-500/10 dark:bg-amber-400/15",
-  "bg-rose-500/10 dark:bg-rose-400/15",
-  "bg-violet-500/10 dark:bg-violet-400/15",
-  "bg-cyan-500/10 dark:bg-cyan-400/15",
-  "bg-lime-500/10 dark:bg-lime-400/15",
-  "bg-orange-500/10 dark:bg-orange-400/15",
-  "bg-fuchsia-500/10 dark:bg-fuchsia-400/15",
-  "bg-teal-500/10 dark:bg-teal-400/15",
-];
 
 const IMAGE_ACCURACY_OPTIONS = [
   { value: 0, id: "dupe_check.options.exact", defaultMessage: "Exact" },
@@ -191,13 +189,6 @@ function nextImageSort(
   };
 }
 
-function compareText(a: string, b: string, locale: string): number {
-  return a.localeCompare(b, locale, {
-    numeric: true,
-    sensitivity: "base",
-  });
-}
-
 function imageMetadataScore(image: ImageDuplicate): number {
   return (
     image.tags.length +
@@ -235,14 +226,6 @@ function compareImages(
   }
 }
 
-function stableHash(value: string): number {
-  let hash = 0;
-  for (let i = 0; i < value.length; i++) {
-    hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
-  }
-  return hash;
-}
-
 function imageSortValueKey(
   image: ImageDuplicate,
   column: ImageSortColumn,
@@ -267,40 +250,9 @@ function imageSortTintClasses(
   groups: ImageGroup[],
   column: ImageSortColumn,
 ): Map<string, string> {
-  const tintByImageId = new Map<string, string>();
-
-  for (const group of groups) {
-    const counts = new Map<string, number>();
-    for (const image of group) {
-      const key = imageSortValueKey(image, column);
-      counts.set(key, (counts.get(key) ?? 0) + 1);
-    }
-
-    if (![...counts.values()].some((count) => count > 1)) continue;
-
-    // Hash only varies the palette offset between groups; within a group each
-    // distinct value takes the next palette entry, so two different values
-    // can't share a tint until a group exceeds the palette size.
-    const groupOffset = stableHash(
-      `${group.map((image) => image.id).join(":")}:${column}`,
-    );
-    const tintByValue = new Map<string, string>();
-
-    for (const image of group) {
-      const key = imageSortValueKey(image, column);
-      let tint = tintByValue.get(key);
-      if (!tint) {
-        tint =
-          SORT_VALUE_TINT_CLASSES[
-            (groupOffset + tintByValue.size) % SORT_VALUE_TINT_CLASSES.length
-          ];
-        tintByValue.set(key, tint);
-      }
-      tintByImageId.set(image.id, tint);
-    }
-  }
-
-  return tintByImageId;
+  return groupValueTints(groups, column, (item) =>
+    imageSortValueKey(item, column),
+  );
 }
 
 function formatBytes(bytes: number | undefined): string {
@@ -366,21 +318,6 @@ function sameResolution(group: ImageGroup): boolean {
   return new Set(group.map(imageResolution)).size === 1;
 }
 
-function pageCount(total: number, pageSize: number): number {
-  return Math.max(1, Math.ceil(total / pageSize));
-}
-
-function duplicateFilterMode(
-  scope: DuplicateFilterScope,
-): GQL.DuplicateFilterMode {
-  switch (scope) {
-    case "any":
-      return GQL.DuplicateFilterMode.Any;
-    case "all":
-      return GQL.DuplicateFilterMode.All;
-  }
-}
-
 function accuracyLabel(
   value: number,
   formatMessage: ReturnType<typeof useIntl>["formatMessage"],
@@ -412,8 +349,8 @@ function ImageDuplicateCheckerPage() {
   const hashDistance = search.distance ?? DEFAULT_DISTANCE;
   const filterScope = search.filterScope ?? DEFAULT_DUPLICATE_FILTER_SCOPE;
 
-  const [checkedImages, setCheckedImages] = useState<Record<string, boolean>>(
-    {},
+  const [checkedImages, setCheckedImages] = useDuplicateSelection(
+    JSON.stringify(search),
   );
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -426,24 +363,16 @@ function ImageDuplicateCheckerPage() {
     index: number;
   } | null>(null);
 
-  const [filterModel, setFilterModel] = useState(() => {
-    const model = new ListFilterModel(GQL.FilterMode.Images);
-    if (search.fa) model.configureFromDecodedParams({ fa: search.fa });
-    return model;
-  });
-
-  function setFilter(next: ListFilterModel) {
-    setFilterModel(next);
-    setCheckedImages({});
-    void navigate({
-      search: (prev) => ({
-        ...prev,
-        page: undefined,
-        fa: next.getEncodedParams().fa ?? undefined,
-      }),
-      replace: true,
-    });
-  }
+  const { filterModel, setFilter } = useDuplicateFilter(
+    GQL.FilterMode.Images,
+    search.fa,
+    (next) => {
+      void navigate({
+        search: (prev) => ({ ...prev, ...next }),
+        replace: true,
+      });
+    },
+  );
 
   const filterVariables = useMemo(
     () => ({
@@ -620,7 +549,7 @@ function ImageDuplicateCheckerPage() {
       }),
       replace: true,
     });
-  }, [currentPage, hasDuplicateData, navigate, totalPages]);
+  }, [currentPage, hasDuplicateData, navigate, totalPages, setCheckedImages]);
 
   function checkImages(images: ImageDuplicate[]) {
     setCheckedImages(
@@ -631,15 +560,7 @@ function ImageDuplicateCheckerPage() {
   function selectAllButByGroup(
     keep: (group: ImageGroup) => ImageDuplicate | undefined,
   ) {
-    const images: ImageDuplicate[] = [];
-    for (const group of pagedGroups) {
-      const retained = keep(group);
-      if (!retained) continue;
-      for (const image of group) {
-        if (image !== retained) images.push(image);
-      }
-    }
-    checkImages(images);
+    checkImages(selectAllButRetained(pagedGroups, keep));
   }
 
   function openDeleteDialog() {
@@ -833,7 +754,7 @@ function ImageDuplicateCheckerPage() {
                             return (
                               duplicateCount > size ||
                               index === 0 ||
-                              duplicateCount > PAGE_SIZES[index - 1]
+                              duplicateCount > (PAGE_SIZES[index - 1] ?? 0)
                             );
                           }).map((size) => (
                             <SelectItem key={size} value={String(size)}>

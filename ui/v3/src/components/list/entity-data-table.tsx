@@ -340,7 +340,9 @@ export function EntityDataTable<TItem extends IHasID>({
       // cleared — keep current sort but toggle direction
       setFilter(filter.toggleSortDirection());
     } else {
-      const { id, desc } = next[0];
+      const sort = next[0];
+      if (!sort) return;
+      const { id, desc } = sort;
       const sameField = id === filter.sortBy;
       if (sameField) {
         setFilter(filter.toggleSortDirection());

@@ -1,3 +1,12 @@
+import { entityDestination } from "@/core/navigation";
+import {
+  SceneListItems,
+  ImageListItems,
+  GalleryListItems,
+  PerformerListItems,
+  GroupListItems,
+  TagListItems,
+} from "./entity-list-items";
 /**
  * Shared entity list config hooks.
  *
@@ -345,6 +354,7 @@ export function useSceneListConfig(
   >(
     () => ({
       filterMode: GQL.FilterMode.Scenes,
+      ItemsProvider: SceneListItems.Provider,
       source: {
         kind: "graphql",
         query: GQL.FindScenesDocument,
@@ -427,13 +437,13 @@ export function useImageListConfig(
       selectionColumn<ImageItem>(),
       thumbnailColumn<ImageItem>(
         (img) => img.paths.thumbnail,
-        (img) => `/images/${img.id}`,
+        (img) => entityDestination.image(img.id),
       ),
       titleColumn<ImageItem>({
         id: "title",
         header: intl.formatMessage({ id: "title" }),
         getTitle: imageTitle,
-        getHref: (img) => `/images/${img.id}`,
+        getDestination: (img) => entityDestination.image(img.id),
       }),
       textColumn<ImageItem>({
         id: "date",
@@ -514,6 +524,7 @@ export function useImageListConfig(
   >(
     () => ({
       filterMode: GQL.FilterMode.Images,
+      ItemsProvider: ImageListItems.Provider,
       source: {
         kind: "graphql",
         query: GQL.FindImagesDocument,
@@ -821,6 +832,7 @@ export function useGalleryListConfig(onEdit: (id: string) => void): {
   >(
     () => ({
       filterMode: GQL.FilterMode.Galleries,
+      ItemsProvider: GalleryListItems.Provider,
       source: {
         kind: "graphql",
         query: GQL.FindGalleriesDocument,
@@ -892,6 +904,7 @@ export function usePerformerListConfig(
   return useMemo(
     () => ({
       filterMode: GQL.FilterMode.Performers,
+      ItemsProvider: PerformerListItems.Provider,
       source: {
         kind: "graphql",
         query: GQL.FindPerformersDocument,
@@ -929,13 +942,13 @@ export function useGroupListConfig(
       selectionColumn<GroupItem>(),
       thumbnailColumn<GroupItem>(
         (g) => g.front_image_path,
-        (g) => `/groups/${g.id}`,
+        (g) => entityDestination.group(g.id),
       ),
       titleColumn<GroupItem>({
         id: "name",
         header: intl.formatMessage({ id: "name" }),
         getTitle: (g) => g.name,
-        getHref: (g) => `/groups/${g.id}`,
+        getDestination: (g) => entityDestination.group(g.id),
       }),
       textColumn<GroupItem>({
         id: "date",
@@ -1009,6 +1022,7 @@ export function useGroupListConfig(
   return useMemo(
     () => ({
       filterMode: GQL.FilterMode.Groups,
+      ItemsProvider: GroupListItems.Provider,
       source: {
         kind: "graphql",
         query: GQL.FindGroupsDocument,
@@ -1078,6 +1092,7 @@ export function useTagListConfig(
   return useMemo(
     () => ({
       filterMode: GQL.FilterMode.Tags,
+      ItemsProvider: TagListItems.Provider,
       source: {
         kind: "graphql",
         query: GQL.FindTagsDocument,

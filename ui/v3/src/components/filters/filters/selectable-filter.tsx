@@ -1,5 +1,7 @@
+import { useLabelCache } from "@/hooks/use-label-cache";
+import { useCommittedRef } from "@/hooks/use-committed-ref";
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Minus, Plus } from "lucide-react";
 import { useIntl } from "react-intl";
 import { Switch } from "src/components/ui/switch";
@@ -61,20 +63,9 @@ export const MultiSelectFilter = <
   const debouncedSetServerQuery = useDebounce(setServerQuery, 100);
   const { results } = useResults(serverQuery);
 
-  // Preserve labels for items that may leave query results
-  const labelMapRef = useRef(new Map<string, string>());
-
-  useEffect(() => {
-    results.forEach((item) => {
-      labelMapRef.current.set(item.id, item.label);
-    });
-  }, [results]);
-
-  useEffect(() => {
-    criterion.value.items.forEach((item) => {
-      labelMapRef.current.set(item.id, item.label);
-    });
-  }, [criterion.value.items]);
+  const [labels] = useLabelCache(
+    [...results, ...criterion.value.items].map((item) => [item.id, item.label]),
+  );
 
   const modifierOptions = criterion.modifierCriterionOption().modifierOptions;
   const modifierSelectItems = modifierOptions.map((m) => ({
@@ -100,7 +91,7 @@ export const MultiSelectFilter = <
       ...newCriterion.value,
       items: newIds.map((id) => ({
         id,
-        label: labelMapRef.current.get(id) ?? id,
+        label: labels.get(id) ?? id,
       })),
     };
     setCriterion(newCriterion);
@@ -164,13 +155,13 @@ export const MultiSelectFilter = <
             debouncedSetServerQuery(v);
           }}
           itemToStringLabel={(id: string | null) =>
-            labelMapRef.current.get(id ?? "") ?? id ?? ""
+            labels.get(id ?? "") ?? id ?? ""
           }
         >
           <ComboboxChips ref={anchor}>
             {criterion.value.items.map((item) => (
               <ComboboxChip key={item.id}>
-                {item.label || labelMapRef.current.get(item.id) || item.id}
+                {item.label || labels.get(item.id) || item.id}
               </ComboboxChip>
             ))}
             <ComboboxChipsInput
@@ -216,8 +207,7 @@ const DepthInput: React.FC<{
 }> = ({ id, value, onChange }) => {
   const unlimited = value < 1;
   const [str, setStr] = useState(unlimited ? "∞" : String(value));
-  const strRef = useRef(str);
-  strRef.current = str;
+  const strRef = useCommittedRef(str);
 
   useEffect(() => {
     const next = value < 1 ? "∞" : String(value);

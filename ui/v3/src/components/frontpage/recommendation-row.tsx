@@ -6,7 +6,7 @@
  * first, then delegates to EntityCarouselRow.
  */
 
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useIntl } from "react-intl";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -49,8 +49,9 @@ import { objectTitle } from "src/core/files";
  */
 function useCardScrollRefs(count: number) {
   const refs = useRef<(HTMLDivElement | null)[]>([]);
-  // Trim if items shrink, so stale refs to removed cards don't leak.
-  if (refs.current.length > count) refs.current.length = count;
+  useEffect(() => {
+    refs.current.length = count;
+  }, [count]);
   const setRefAt = (i: number) => (el: HTMLDivElement | null) => {
     refs.current[i] = el;
   };

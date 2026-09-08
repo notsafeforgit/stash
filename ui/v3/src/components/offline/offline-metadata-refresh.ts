@@ -17,7 +17,8 @@
  * a single fetch on mount + when the entry list changes substantially).
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
+import { useCommittedRef } from "@/hooks/use-committed-ref";
 import { useApolloClient } from "@apollo/client/react";
 import {
   FindScenesDocument,
@@ -31,71 +32,66 @@ interface RefreshDeps {
 
 export function useOfflineMetadataRefresh({ entries }: RefreshDeps): void {
   const client = useApolloClient();
-  const lastRunIdsRef = useRef<string>("");
+  const membership = entries
+    .map((entry) => entry.scene_id)
+    .sort()
+    .join(",");
+  const currentEntries = useCommittedRef(entries);
 
   useEffect(() => {
-    if (entries.length === 0) return;
-    // Coalesce: don't re-fetch when the entry list hasn't changed
-    // membership-wise. The list view re-renders on download progress
-    // updates; we don't want a network round-trip on every byte.
-    const ids = entries
-      .map((e) => e.scene_id)
-      .sort()
-      .join(",");
-    if (ids === lastRunIdsRef.current) return;
-    lastRunIdsRef.current = ids;
-
-    let cancelled = false;
-    void (async () => {
+    const sceneIds = membership
+      .split(",")
+      .filter((id) => /^[1-9]\d*$/.test(id))
+      .map(Number)
+      .filter(Number.isSafeInteger);
+    if (sceneIds.length === 0) return;
+    const requested = new Set(sceneIds.map(String));
+    let disposed = false;
+    let generation = 0;
+    async function refresh() {
+      const request = ++generation;
       try {
-        const sceneIds = entries
-          .map((e) => parseInt(e.scene_id, 10))
-          .filter((n) => Number.isFinite(n));
         const { data } = await client.query({
           query: FindScenesDocument,
           variables: { scene_ids: sceneIds },
           fetchPolicy: "network-only",
         });
-        if (cancelled) return;
-        const fresh = new Map<string, SlimSceneDataFragment>();
-        for (const s of data?.findScenes?.scenes ?? []) {
-          fresh.set(s.id, s);
-        }
-        for (const entry of entries) {
+        if (disposed || request !== generation || !data?.findScenes) return;
+        const fresh = new Map(
+          data.findScenes.scenes.map((scene) => [scene.id, scene]),
+        );
+        for (const entry of currentEntries.current) {
+          if (disposed || request !== generation) return;
+          if (!requested.has(entry.scene_id)) continue;
           const live = fresh.get(entry.scene_id);
           if (!live) {
-            // Server returned the row-set we asked for; absence
-            // means deleted. Mark missing without touching anything
-            // else — the local file remains playable.
-            if (entry.server_status !== "missing") {
+            if (entry.server_status !== "missing")
               await patchEntry(entry.scene_id, { server_status: "missing" });
+          } else {
+            const patch = diffEntry(entry, live);
+            if (patch || entry.server_status !== "present") {
+              await patchEntry(entry.scene_id, {
+                ...patch,
+                server_status: "present",
+              });
             }
-            continue;
-          }
-          const patch = diffEntry(entry, live);
-          if (patch) {
-            await patchEntry(entry.scene_id, {
-              ...patch,
-              server_status: "present",
-            });
-          } else if (entry.server_status !== "present") {
-            await patchEntry(entry.scene_id, { server_status: "present" });
           }
         }
-      } catch (err) {
-        // Silent: offline / server unreachable / transient. Cards
-        // continue rendering the last-known snapshot. Log under
-        // debug so it's available for diagnostics without spamming
-        // the console for a normal "user is on a plane" situation.
-        if (import.meta.env?.DEV) {
-          console.debug("[offline] metadata refresh failed:", err);
-        }
+      } catch (error) {
+        if (!disposed && import.meta.env.DEV)
+          console.debug("[offline] metadata refresh failed:", error);
       }
-    })();
-    return () => {
-      cancelled = true;
+    }
+    const onOnline = () => {
+      void refresh();
     };
-  }, [client, entries]);
+    onOnline();
+    window.addEventListener("online", onOnline);
+    return () => {
+      disposed = true;
+      window.removeEventListener("online", onOnline);
+    };
+  }, [client, membership]);
 }
 
 function diffEntry(
@@ -160,9 +156,8 @@ function sameIdNameList(
   if (a.length !== b.length) return false;
   const aSorted = [...a].sort((x, y) => x.id.localeCompare(y.id));
   const bSorted = [...b].sort((x, y) => x.id.localeCompare(y.id));
-  for (let i = 0; i < aSorted.length; i++) {
-    if (aSorted[i].id !== bSorted[i].id) return false;
-    if (aSorted[i].name !== bSorted[i].name) return false;
-  }
-  return true;
+  return aSorted.every(
+    (item, index) =>
+      item.id === bSorted[index]?.id && item.name === bSorted[index]?.name,
+  );
 }

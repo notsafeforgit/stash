@@ -221,16 +221,14 @@ export function makeHlsStrategy(
           return true;
         }
         // In-buffer.
-        for (let i = 0; i < buffered.length; i++) {
-          if (
-            targetInternal >= buffered[i][0] &&
-            targetInternal <= buffered[i][1]
-          ) {
+        for (const [start, end] of buffered) {
+          if (targetInternal >= start && targetInternal <= end) {
             return true;
           }
         }
         // Forward within prefetch window.
-        const bufferedEnd = buffered[buffered.length - 1][1];
+        const bufferedEnd = buffered.at(-1)?.[1];
+        if (bufferedEnd === undefined) return false;
         const FORWARD_PREFETCH_S = 30;
         if (
           targetInternal > bufferedEnd &&
@@ -285,7 +283,7 @@ export function makeHlsStrategy(
       // seeks below 0 shouldn't happen (the player's effective slider
       // is constrained to the clip), but check defensively.
       const seekable = state.seekable;
-      if (seekable && seekable.length > 0) {
+      if (seekable?.[0]) {
         const start = seekable[0][0];
         if (targetInternal < start) return false;
       }
@@ -303,7 +301,8 @@ export function makeHlsStrategy(
       // (~30 s).
       const buffered = state.buffered;
       if (buffered && buffered.length > 0) {
-        const bufferedEnd = buffered[buffered.length - 1][1];
+        const bufferedEnd = buffered.at(-1)?.[1];
+        if (bufferedEnd === undefined) return false;
         const FORWARD_REMOUNT_THRESHOLD_S = 30;
         if (targetInternal > bufferedEnd + FORWARD_REMOUNT_THRESHOLD_S) {
           return false;
@@ -398,8 +397,8 @@ export function getHlsEngine(media: unknown): HlsEngineLike | null {
  */
 export function isIOSNativeFullscreen(video: HTMLVideoElement): boolean {
   return (
-    (video as unknown as { webkitDisplayingFullscreen?: boolean })
-      .webkitDisplayingFullscreen === true
+    "webkitDisplayingFullscreen" in video &&
+    video.webkitDisplayingFullscreen === true
   );
 }
 

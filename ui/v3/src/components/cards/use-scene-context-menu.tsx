@@ -1,3 +1,4 @@
+import { SceneListItems } from "@/components/list/entity-list-items";
 import type React from "react";
 import { useState } from "react";
 import { useIntl } from "react-intl";
@@ -18,10 +19,7 @@ import {
 } from "src/components/detail/delete-dialog";
 import { SceneGenerateDialog } from "src/components/detail/scene-generate-dialog";
 import { SceneMergeDialog } from "src/components/detail/scene-merge-dialog";
-import {
-  SceneBulkEditSheet,
-  type SceneBulkItem,
-} from "src/components/detail/scene-bulk-edit-sheet";
+import { SceneBulkEditSheet } from "src/components/detail/scene-bulk-edit-sheet";
 import { SceneCardDownloadMenuItem } from "src/components/offline/scene-card-download-menu-item";
 import { useBulkSceneDownload } from "src/components/offline/download-action";
 import {
@@ -69,7 +67,7 @@ export function useSceneContextMenu({
     bulkEditOpen,
     setBulkEditOpen,
     onContextMenuOpen,
-  } = useBulkCardActions<SceneBulkItem>(scene.id);
+  } = useBulkCardActions(SceneListItems.useItems());
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
@@ -141,16 +139,7 @@ export function useSceneContextMenu({
           onEdit={() => setBulkEditOpen(true)}
           onGenerate={() => setBulkGenerateOpen(true)}
           onMerge={() => setBulkMergeOpen(true)}
-          onDownload={() =>
-            // selectedItems is typed as SceneBulkItem[] for the bulk-edit
-            // sheet's needs, but the runtime objects come from the list
-            // provider whose TItem is SceneCardScene (the card's actual
-            // item type). Cast back to the wider shape so the download
-            // path can read codecs / dimensions.
-            void bulkDownload(
-              selectedItems as unknown as readonly SceneCardScene[],
-            )
-          }
+          onDownload={() => void bulkDownload(selectedItems)}
           onDelete={() => setBulkDeleteOpen(true)}
         />
       ) : (
@@ -276,8 +265,7 @@ export function useSceneContextMenu({
               defaultMessage: "Delete file and funscript",
             })}
             details={(() => {
-              const items =
-                selectedItems as unknown as readonly SceneCardScene[];
+              const items = selectedItems;
               const paths = items.flatMap(
                 (s) => s.files?.map((f) => f.path) ?? [],
               );
@@ -292,9 +280,10 @@ export function useSceneContextMenu({
                   "Show {count, plural, one {# file} other {# files}}",
               },
               {
-                count: (
-                  selectedItems as unknown as readonly SceneCardScene[]
-                ).reduce((n, s) => n + (s.files?.length ?? 0), 0),
+                count: selectedItems.reduce(
+                  (n, s) => n + (s.files?.length ?? 0),
+                  0,
+                ),
               },
             )}
             onConfirm={handleConfirmedBulkDelete}

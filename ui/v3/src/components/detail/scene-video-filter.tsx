@@ -122,9 +122,10 @@ function FilterRow({
           "[&_[data-slot=slider-thumb]]:size-4 [&_[data-slot=slider-track][data-horizontal]]:h-1.5",
           "md:[&_[data-slot=slider-thumb]]:size-3 md:[&_[data-slot=slider-track][data-horizontal]]:h-1",
         )}
-        onValueChange={(v) =>
-          onChange(Array.isArray(v) ? (v as number[])[0] : (v as number))
-        }
+        onValueChange={(v) => {
+          const next = typeof v === "number" ? v : v[0];
+          if (next !== undefined) onChange(next);
+        }}
       />
       <Button
         variant="ghost"

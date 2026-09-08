@@ -1,3 +1,4 @@
+import { TagListItems } from "@/components/list/entity-list-items";
 import type React from "react";
 import { useState } from "react";
 import { useIntl } from "react-intl";
@@ -14,10 +15,7 @@ import {
 } from "src/components/ui/context-menu";
 import { DeleteDialog } from "src/components/detail/delete-dialog";
 import { AutoTagDialog } from "src/components/detail/auto-tag-dialog";
-import {
-  TagBulkEditSheet,
-  type TagBulkItem,
-} from "src/components/detail/tag-bulk-edit-sheet";
+import { TagBulkEditSheet } from "src/components/detail/tag-bulk-edit-sheet";
 import {
   useBulkCardActions,
   BulkContextMenuItems,
@@ -61,7 +59,7 @@ export function useTagContextMenu({
     bulkEditOpen,
     setBulkEditOpen,
     onContextMenuOpen,
-  } = useBulkCardActions<TagBulkItem>(tag.id);
+  } = useBulkCardActions(TagListItems.useItems());
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [autoTagOpen, setAutoTagOpen] = useState(false);

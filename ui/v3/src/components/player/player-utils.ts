@@ -62,14 +62,28 @@ export function isIOS(): boolean {
  * regular `MediaSource` (or worse, the absence of one) would over- or
  * under-report what hls.js can actually demux on the current device.
  */
-function getActiveMSE(): typeof MediaSource | undefined {
+function getActiveMSE():
+  | { isTypeSupported(type: string): boolean }
+  | undefined {
   if (typeof self === "undefined") return undefined;
-  const mms = (self as unknown as { ManagedMediaSource?: typeof MediaSource })
-    .ManagedMediaSource;
-  if (mms) return mms;
-  if (typeof MediaSource !== "undefined") return MediaSource;
-  return (self as unknown as { WebKitMediaSource?: typeof MediaSource })
-    .WebKitMediaSource;
+  // Only the static capability probe is needed; do not assert a constructor.
+  for (const candidate of [
+    "ManagedMediaSource" in self ? self.ManagedMediaSource : undefined,
+    typeof MediaSource !== "undefined" ? MediaSource : undefined,
+    "WebKitMediaSource" in self ? self.WebKitMediaSource : undefined,
+  ]) {
+    if (
+      typeof candidate === "function" &&
+      "isTypeSupported" in candidate &&
+      typeof candidate.isTypeSupported === "function"
+    ) {
+      const probe = candidate.isTypeSupported;
+      return {
+        isTypeSupported: (type: string) => probe.call(candidate, type) === true,
+      };
+    }
+  }
+  return undefined;
 }
 
 function hasMSE(): boolean {
@@ -494,41 +508,31 @@ function calculateDeltaMin(n: number): number {
 export function computeTagColors(tagNames: string[]): Record<string, string> {
   if (tagNames.length === 0) return {};
 
-  const baseHues: Record<string, number> = {};
-  for (const tag of tagNames) {
-    baseHues[tag] = djb2(tag) % 360;
+  const hues = tagNames
+    .map((name) => ({ name, hue: djb2(name) % 360 }))
+    .sort((a, b) => a.hue - b.hue);
+  const deltaMin = calculateDeltaMin(hues.length);
+  for (const [i, item] of hues.entries()) {
+    const previous = hues[i - 1];
+    if (previous && item.hue <= previous.hue) item.hue += 360;
   }
-
-  const n = tagNames.length;
-  const deltaMin = calculateDeltaMin(n);
-  const sorted = [...tagNames].sort((a, b) => baseHues[a] - baseHues[b]);
-  const unwrapped = sorted.map((t) => baseHues[t]);
-
-  for (let i = 1; i < n; i++) {
-    if (unwrapped[i] <= unwrapped[i - 1]) unwrapped[i] += 360;
+  for (const [i, item] of hues.entries()) {
+    const previous = hues[i - 1];
+    if (previous) item.hue = Math.max(item.hue, previous.hue + deltaMin);
   }
-  for (let i = 1; i < n; i++) {
-    const required = unwrapped[i - 1] + deltaMin;
-    if (unwrapped[i] < required) unwrapped[i] = required;
-  }
-
-  if (n > 1) {
-    const endGap = unwrapped[0] + 360 - unwrapped[n - 1];
+  const [first, second] = hues;
+  const last = hues.at(-1);
+  if (first && second && last) {
+    const endGap = first.hue + 360 - last.hue;
     if (endGap < deltaMin) {
-      const adj = (deltaMin - endGap) / 2;
-      unwrapped[0] = Math.max(
-        unwrapped[0] - adj,
-        unwrapped[1] - 360 + deltaMin,
-      );
-      unwrapped[n - 1] += adj;
+      const adjustment = (deltaMin - endGap) / 2;
+      first.hue = Math.max(first.hue - adjustment, second.hue - 360 + deltaMin);
+      last.hue += adjustment;
     }
   }
-
-  const colors: Record<string, string> = {};
-  for (let i = 0; i < n; i++) {
-    colors[sorted[i]] = hueToColor(unwrapped[i] % 360);
-  }
-  return colors;
+  return Object.fromEntries(
+    hues.map(({ name, hue }) => [name, hueToColor(hue % 360)]),
+  );
 }
 
 // ── MWIS ──────────────────────────────────────────────────────────────────────
@@ -539,31 +543,35 @@ export function computeTagColors(tagNames: string[]): Record<string, string> {
  * overlapping ranges are pushed to higher rows.
  */
 export function findMWIS(markers: IMarker[]): IMarker[] {
-  if (!markers.length) return [];
-  const ms = [...markers].sort(
-    (a, b) => (a.end_seconds ?? 0) - (b.end_seconds ?? 0),
-  );
-  const n = ms.length;
-  const p: number[] = new Array(n).fill(-1);
-  for (let j = 0; j < n; j++) {
+  const rows = [...markers]
+    .sort((a, b) => (a.end_seconds ?? 0) - (b.end_seconds ?? 0))
+    .map((marker) => ({ marker, previous: -1, included: 0, total: 0 }));
+  for (const [j, row] of rows.entries()) {
     for (let i = j - 1; i >= 0; i--) {
-      if ((ms[i].end_seconds ?? 0) <= ms[j].seconds) {
-        p[j] = i;
+      const candidate = rows[i];
+      if (
+        candidate &&
+        (candidate.marker.end_seconds ?? 0) <= row.marker.seconds
+      ) {
+        row.previous = i;
         break;
       }
     }
+    row.included =
+      (row.marker.end_seconds ?? 0) -
+      row.marker.seconds +
+      (rows[row.previous]?.total ?? 0);
+    row.total = Math.max(row.included, rows[j - 1]?.total ?? 0);
   }
-  const M: number[] = new Array(n).fill(0);
-  for (let j = 0; j < n; j++) {
-    const inc = (ms[j].end_seconds ?? 0) - ms[j].seconds + (M[p[j]] ?? 0);
-    const exc = j > 0 ? M[j - 1] : 0;
-    M[j] = Math.max(inc, exc);
+  const result: IMarker[] = [];
+  let index = rows.length - 1;
+  while (index >= 0) {
+    const row = rows[index];
+    if (!row) break;
+    if (row.included >= (rows[index - 1]?.total ?? 0)) {
+      result.push(row.marker);
+      index = row.previous;
+    } else index--;
   }
-  const findSolution = (j: number): IMarker[] => {
-    if (j < 0) return [];
-    const inc = (ms[j].end_seconds ?? 0) - ms[j].seconds + (M[p[j]] ?? 0);
-    const exc = j > 0 ? M[j - 1] : 0;
-    return inc >= exc ? [...findSolution(p[j]), ms[j]] : findSolution(j - 1);
-  };
-  return findSolution(n - 1);
+  return result.reverse();
 }

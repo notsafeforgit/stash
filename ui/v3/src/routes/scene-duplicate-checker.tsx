@@ -1,3 +1,14 @@
+import {
+  useDuplicateFilter,
+  useDuplicateSelection,
+  pageCount,
+  duplicateFilterMode,
+} from "@/components/duplicates/controller";
+import {
+  compareText,
+  groupValueTints,
+  selectAllButRetained,
+} from "@/components/duplicates/groups";
 import { useId, type ReactNode, useEffect, useMemo, useState } from "react";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
@@ -22,7 +33,6 @@ import {
 } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
 import { objectTitle } from "src/core/files";
-import { ListFilterModel } from "src/models/list-filter/filter";
 import { ToolFilterSidebar } from "src/components/filters/tool-filter-sidebar";
 import {
   MediaColorBadge,
@@ -107,18 +117,6 @@ const PAGE_SIZES = [
   10, 20, 30, 40, 50, 100, 150, 200, 250, 500, 750, 1000, 1250, 1500,
 ];
 const TABLE_SKELETON_ROWS = 12;
-const SORT_VALUE_TINT_CLASSES = [
-  "bg-sky-500/10 dark:bg-sky-400/15",
-  "bg-emerald-500/10 dark:bg-emerald-400/15",
-  "bg-amber-500/10 dark:bg-amber-400/15",
-  "bg-rose-500/10 dark:bg-rose-400/15",
-  "bg-violet-500/10 dark:bg-violet-400/15",
-  "bg-cyan-500/10 dark:bg-cyan-400/15",
-  "bg-lime-500/10 dark:bg-lime-400/15",
-  "bg-orange-500/10 dark:bg-orange-400/15",
-  "bg-fuchsia-500/10 dark:bg-fuchsia-400/15",
-  "bg-teal-500/10 dark:bg-teal-400/15",
-];
 
 const SCENE_ACCURACY_OPTIONS = [
   { value: 0, id: "dupe_check.options.exact", defaultMessage: "Exact" },
@@ -213,13 +211,6 @@ function nextSceneSort(
   };
 }
 
-function compareText(a: string, b: string, locale: string): number {
-  return a.localeCompare(b, locale, {
-    numeric: true,
-    sensitivity: "base",
-  });
-}
-
 function sceneMetadataScore(scene: SceneDuplicate): number {
   return (
     scene.tags.length +
@@ -276,14 +267,6 @@ function compareScenes(
   }
 }
 
-function stableHash(value: string): number {
-  let hash = 0;
-  for (let i = 0; i < value.length; i++) {
-    hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
-  }
-  return hash;
-}
-
 function sceneSortValueKey(
   scene: SceneDuplicate,
   column: SceneSortColumn,
@@ -316,40 +299,9 @@ function sceneSortTintClasses(
   groups: SceneGroup[],
   column: SceneSortColumn,
 ): Map<string, string> {
-  const tintBySceneId = new Map<string, string>();
-
-  for (const group of groups) {
-    const counts = new Map<string, number>();
-    for (const scene of group) {
-      const key = sceneSortValueKey(scene, column);
-      counts.set(key, (counts.get(key) ?? 0) + 1);
-    }
-
-    if (![...counts.values()].some((count) => count > 1)) continue;
-
-    // Hash only varies the palette offset between groups; within a group each
-    // distinct value takes the next palette entry, so two different values
-    // can't share a tint until a group exceeds the palette size.
-    const groupOffset = stableHash(
-      `${group.map((scene) => scene.id).join(":")}:${column}`,
-    );
-    const tintByValue = new Map<string, string>();
-
-    for (const scene of group) {
-      const key = sceneSortValueKey(scene, column);
-      let tint = tintByValue.get(key);
-      if (!tint) {
-        tint =
-          SORT_VALUE_TINT_CLASSES[
-            (groupOffset + tintByValue.size) % SORT_VALUE_TINT_CLASSES.length
-          ];
-        tintByValue.set(key, tint);
-      }
-      tintBySceneId.set(scene.id, tint);
-    }
-  }
-
-  return tintBySceneId;
+  return groupValueTints(groups, column, (item) =>
+    sceneSortValueKey(item, column),
+  );
 }
 
 function formatBytes(bytes: number | undefined): string {
@@ -420,21 +372,6 @@ function sameCodec(group: SceneGroup): boolean {
   );
 }
 
-function pageCount(total: number, pageSize: number): number {
-  return Math.max(1, Math.ceil(total / pageSize));
-}
-
-function duplicateFilterMode(
-  scope: DuplicateFilterScope,
-): GQL.DuplicateFilterMode {
-  switch (scope) {
-    case "any":
-      return GQL.DuplicateFilterMode.Any;
-    case "all":
-      return GQL.DuplicateFilterMode.All;
-  }
-}
-
 function accuracyLabel(
   value: number,
   formatMessage: ReturnType<typeof useIntl>["formatMessage"],
@@ -490,8 +427,8 @@ function SceneDuplicateCheckerPage() {
   const durationDiff = search.durationDiff ?? DEFAULT_DURATION_DIFF;
   const filterScope = search.filterScope ?? DEFAULT_DUPLICATE_FILTER_SCOPE;
 
-  const [checkedScenes, setCheckedScenes] = useState<Record<string, boolean>>(
-    {},
+  const [checkedScenes, setCheckedScenes] = useDuplicateSelection(
+    JSON.stringify(search),
   );
   const [safeSelect, setSafeSelect] = useState(true);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
@@ -506,24 +443,16 @@ function SceneDuplicateCheckerPage() {
     index: number;
   } | null>(null);
 
-  const [filterModel, setFilterModel] = useState(() => {
-    const model = new ListFilterModel(GQL.FilterMode.Scenes);
-    if (search.fa) model.configureFromDecodedParams({ fa: search.fa });
-    return model;
-  });
-
-  function setFilter(next: ListFilterModel) {
-    setFilterModel(next);
-    setCheckedScenes({});
-    void navigate({
-      search: (prev) => ({
-        ...prev,
-        page: undefined,
-        fa: next.getEncodedParams().fa ?? undefined,
-      }),
-      replace: true,
-    });
-  }
+  const { filterModel, setFilter } = useDuplicateFilter(
+    GQL.FilterMode.Scenes,
+    search.fa,
+    (next) => {
+      void navigate({
+        search: (prev) => ({ ...prev, ...next }),
+        replace: true,
+      });
+    },
+  );
 
   const filterVariables = useMemo(
     () => ({
@@ -752,7 +681,7 @@ function SceneDuplicateCheckerPage() {
       }),
       replace: true,
     });
-  }, [currentPage, hasDuplicateData, navigate, totalPages]);
+  }, [currentPage, hasDuplicateData, navigate, totalPages, setCheckedScenes]);
 
   function checkScenes(scenes: SceneDuplicate[]) {
     setCheckedScenes(
@@ -763,16 +692,13 @@ function SceneDuplicateCheckerPage() {
   function selectAllButByGroup(
     keep: (group: SceneGroup) => SceneDuplicate | undefined,
   ) {
-    const scenes: SceneDuplicate[] = [];
-    for (const group of pagedGroups) {
-      if (safeSelect && !sameCodec(group)) continue;
-      const retained = keep(group);
-      if (!retained) continue;
-      for (const scene of group) {
-        if (scene !== retained) scenes.push(scene);
-      }
-    }
-    checkScenes(scenes);
+    checkScenes(
+      selectAllButRetained(
+        pagedGroups,
+        keep,
+        (group) => !safeSelect || sameCodec(group),
+      ),
+    );
   }
 
   function openDeleteDialog() {
@@ -962,7 +888,7 @@ function SceneDuplicateCheckerPage() {
                             return (
                               duplicateCount > size ||
                               index === 0 ||
-                              duplicateCount > PAGE_SIZES[index - 1]
+                              duplicateCount > (PAGE_SIZES[index - 1] ?? 0)
                             );
                           }).map((size) => (
                             <SelectItem key={size} value={String(size)}>

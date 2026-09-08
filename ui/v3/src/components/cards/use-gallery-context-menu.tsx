@@ -1,3 +1,4 @@
+import { GalleryListItems } from "@/components/list/entity-list-items";
 import type React from "react";
 import { useState } from "react";
 import { useIntl } from "react-intl";
@@ -13,10 +14,7 @@ import {
   ContextMenuTrigger,
 } from "src/components/ui/context-menu";
 import { DeleteDialog } from "src/components/detail/delete-dialog";
-import {
-  GalleryBulkEditSheet,
-  type GalleryBulkItem,
-} from "src/components/detail/gallery-bulk-edit-sheet";
+import { GalleryBulkEditSheet } from "src/components/detail/gallery-bulk-edit-sheet";
 import {
   useBulkCardActions,
   BulkContextMenuItems,
@@ -61,7 +59,7 @@ export function useGalleryContextMenu({
     bulkEditOpen,
     setBulkEditOpen,
     onContextMenuOpen,
-  } = useBulkCardActions<GalleryBulkItem>(gallery.id);
+  } = useBulkCardActions(GalleryListItems.useItems());
 
   const [deleteOpen, setDeleteOpen] = useState(false);
 

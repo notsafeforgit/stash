@@ -130,10 +130,10 @@ export const useConfigureDefaultFilter = () => {
 // `Configuration` query so `useConfigurationContext` consumers see the
 // change without a refetch, and routes the promise through the
 // save-indicator so the floating spinner / check / X surfaces.
-function writeConfigKey(
+export function writeConfigKey<Key extends keyof GQL.ConfigDataFragment>(
   cache: ApolloCache,
-  key: keyof GQL.ConfigDataFragment,
-  updated: unknown,
+  key: Key,
+  updated: GQL.ConfigDataFragment[Key] | null | undefined,
 ) {
   if (!updated) return;
   const existing = cache.readQuery<GQL.ConfigurationQuery>({
@@ -220,13 +220,20 @@ export const useConfigureDLNA = () => {
   return [trackedMutate, result] as const;
 };
 
-// Per-plugin settings (`configuration.plugins` map). The mutation returns
-// the full updated plugins map.
+// configurePlugin returns one plugin's settings, not the plugins map.
 export const useConfigurePlugin = () => {
   const trackSave = useTrackedSave();
   const [mutate, result] = useMutation(GQL.ConfigurePluginDocument, {
-    update: (cache, mutationResult) =>
-      writeConfigKey(cache, "plugins", mutationResult.data?.configurePlugin),
+    update: (cache, mutationResult, { variables }) => {
+      const updated = mutationResult.data?.configurePlugin;
+      if (!updated || !variables) return;
+      const existing = cache.readQuery({ query: GQL.ConfigurationDocument });
+      if (!existing?.configuration) return;
+      writeConfigKey(cache, "plugins", {
+        ...existing.configuration.plugins,
+        [variables.plugin_id]: updated,
+      });
+    },
   });
   const trackedMutate = useCallback<typeof mutate>(
     (options) => trackSave(mutate(options)),

@@ -62,6 +62,7 @@ export function SceneActionsMenu({
   const toast = useToast();
   const { configuration } = useConfigurationContext();
   const stashBoxes = configuration.general.stashBoxes ?? [];
+  const firstStashBox = stashBoxes[0];
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
@@ -346,12 +347,12 @@ export function SceneActionsMenu({
           {stashBoxes.length > 0 && (
             <>
               <DropdownMenuSeparator />
-              {stashBoxes.length === 1 ? (
+              {stashBoxes.length === 1 && firstStashBox ? (
                 <DropdownMenuItem
                   onClick={() =>
                     handleSubmit(
-                      stashBoxes[0].endpoint,
-                      stashBoxes[0].name || stashBoxes[0].endpoint,
+                      firstStashBox.endpoint,
+                      firstStashBox.name || firstStashBox.endpoint,
                     )
                   }
                 >

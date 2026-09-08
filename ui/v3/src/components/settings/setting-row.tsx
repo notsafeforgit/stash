@@ -1,3 +1,4 @@
+import { useCommittedRef } from "@/hooks/use-committed-ref";
 /**
  * Shared building blocks for the Settings pages. Each row renders a
  * label + optional description on the left and a control on the right,
@@ -6,7 +7,7 @@
  * list inputs commit on blur or Enter). Persistence feedback comes from
  * the global save-indicator, so rows don't render their own spinners.
  */
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { useIntl } from "react-intl";
 import { FolderSearch, Minus, Plus } from "lucide-react";
 import { Button } from "src/components/ui/button";
@@ -79,8 +80,7 @@ function useDraftValue(value: string, onCommit: (draft: string) => void) {
 
   // Refs so commit/flush read current state without re-subscribing the
   // unmount effect on every keystroke.
-  const latest = useRef({ draft, value, onCommit });
-  latest.current = { draft, value, onCommit };
+  const latest = useCommittedRef({ draft, value, onCommit });
 
   const commit = useCallback(() => {
     const s = latest.current;

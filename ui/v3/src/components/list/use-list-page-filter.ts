@@ -107,7 +107,10 @@ function useDisplayModePref(
     } catch {
       // ignore
     }
-    return options[0];
+    const first = options[0];
+    if (first === undefined)
+      throw new Error("A list requires at least one display mode");
+    return first;
   });
 
   const setMode = useCallback(

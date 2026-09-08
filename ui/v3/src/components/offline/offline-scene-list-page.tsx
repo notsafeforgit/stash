@@ -1,3 +1,6 @@
+import { entityDestination } from "@/core/navigation";
+import { OfflineRecoveryControl } from "./offline-recovery-control";
+import { createListItemsContext } from "@/components/list/list-items-context";
 /**
  * Offline scene list page. Reuses the streaming list chrome
  * (`EntityListPage`) but sources items from IndexedDB via a
@@ -32,7 +35,7 @@ import { SceneCard } from "src/components/cards/scene-card";
 import { useBulkCardActions } from "src/components/cards/use-bulk-card-actions";
 import { offlineEntryToSceneCardScene } from "./offline-scene-card-data";
 import { useOfflineEntries } from "./use-offline-entries";
-import { useDownloadQueue, getDownloadQueueStore } from "./use-download-queue";
+import { useDownloadQueue, useDownloadCommands } from "./use-download-queue";
 import { useOfflineMetadataRefresh } from "./offline-metadata-refresh";
 import { useOfflineSceneLightbox } from "./use-offline-scene-lightbox";
 import { saveToFiles, FileMissingError } from "./save-to-files";
@@ -47,9 +50,11 @@ import {
 } from "./offline-list-source";
 import type { OfflineEntry } from "./offline-db";
 
+const OfflineListItems = createListItemsContext<OfflineCardItem>();
+
 export function OfflineSceneListPage() {
   const intl = useIntl();
-  const { entries, loading } = useOfflineEntries();
+  const { entries, loading, error, refresh } = useOfflineEntries();
   useOfflineMetadataRefresh({ entries });
   const queue = useDownloadQueue();
   const {
@@ -72,6 +77,8 @@ export function OfflineSceneListPage() {
   const localSource = useOfflineListSource({
     entries,
     loading,
+    error,
+    refresh,
     extra,
     activeSceneId,
   });
@@ -129,6 +136,7 @@ export function OfflineSceneListPage() {
       // available (we override which ones the toolbar shows below) and
       // saved-filter / URL serialisation infrastructure stays valid.
       filterMode: GQL.FilterMode.Scenes,
+      ItemsProvider: OfflineListItems.Provider,
       defaultSort: OFFLINE_DEFAULT_SORT,
       source: localSource,
       sidebarContent: (
@@ -186,6 +194,9 @@ export function OfflineSceneListPage() {
 
   return (
     <>
+      <div className="shrink-0 px-3 py-2">
+        <OfflineRecoveryControl />
+      </div>
       <EntityListPage
         config={config}
         keyboardShortcutsDisabled={lightboxOpen}
@@ -250,7 +261,7 @@ const OfflineSceneCardCell = React.memo(function OfflineSceneCardCell({
     showBulkActions,
     onContextMenuOpen,
     onSelectAll,
-  } = useBulkCardActions<OfflineCardItem>(entry.scene_id);
+  } = useBulkCardActions(OfflineListItems.useItems());
 
   const contextMenu = showBulkActions ? (
     <ContextMenuContent>
@@ -314,7 +325,7 @@ const OfflineSceneCardCell = React.memo(function OfflineSceneCardCell({
     <div className="relative h-full">
       <SceneCard
         scene={cardScene}
-        href={`/offline/${entry.scene_id}`}
+        destination={entityDestination.offline(entry.scene_id)}
         isMobile={isMobile}
         selected={selected}
         onSelectedChanged={onSelectedChanged}
@@ -424,6 +435,7 @@ function OfflineBulkContextMenuItems({
   count: number;
 }) {
   const intl = useIntl();
+  const store = useDownloadCommands();
 
   // Partition selection by status so we only offer actions whose
   // targets are eligible. Avoids "Cancel" surfacing when nothing is
@@ -436,15 +448,12 @@ function OfflineBulkContextMenuItems({
   );
 
   const onBulkRedownload = () => {
-    const store = getDownloadQueueStore();
     for (const item of redownloadable) void store.retry(item.entry.scene_id);
   };
   const onBulkCancel = () => {
-    const store = getDownloadQueueStore();
     for (const item of cancellable) void store.cancel(item.entry.scene_id);
   };
   const onBulkDelete = () => {
-    const store = getDownloadQueueStore();
     for (const item of items) void store.remove(item.entry.scene_id);
   };
 

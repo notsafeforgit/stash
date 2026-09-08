@@ -255,17 +255,18 @@ export function useFolderMap(props: {
 
       let currentParent: Folder | undefined;
 
-      for (let i = folder.parent_folders.length - 1; i >= 0; i--) {
-        const thisFolder = folder.parent_folders[i];
+      for (const [i, thisFolder] of [...folder.parent_folders]
+        .reverse()
+        .entries()) {
         let existing: Folder | undefined;
 
-        if (i === folder.parent_folders.length - 1) {
+        if (i === 0) {
           existing = ret.find((f) => f.id === thisFolder.id);
           if (!existing) {
             existing = {
-              ...folder.parent_folders[i],
+              ...thisFolder,
               expanded: true,
-              children: folder.parent_folders[i].sub_folders
+              children: thisFolder.sub_folders
                 .filter((f) => f.zip_file === null || !excludeZipFolders)
                 .map((f) => ({
                   ...f,
@@ -279,18 +280,20 @@ export function useFolderMap(props: {
           continue;
         }
 
+        const siblings = currentParent?.children;
         const existingIndex =
-          currentParent!.children?.findIndex((f) => f.id === thisFolder.id) ??
-          -1;
+          siblings?.findIndex((f) => f.id === thisFolder.id) ?? -1;
         if (existingIndex === -1) {
           throw new Error(
             `Parent folder ${thisFolder.id} not found in children of ${
-              currentParent!.id
+              currentParent?.id
             }`,
           );
         }
 
-        existing = currentParent!.children![existingIndex];
+        existing = siblings?.[existingIndex];
+        if (!existing || !siblings)
+          throw new Error(`Missing parent folder: ${thisFolder.id}`);
 
         existing = {
           ...existing,
@@ -304,7 +307,7 @@ export function useFolderMap(props: {
             })),
         };
 
-        currentParent!.children![existingIndex] = existing;
+        siblings[existingIndex] = existing;
         currentParent = existing;
       }
     });
@@ -331,15 +334,16 @@ export function useFolderMap(props: {
       }
 
       let currentParent: Folder | undefined;
-      for (let i = folder.parent_folders.length - 1; i >= 0; i--) {
-        const thisFolder = folder.parent_folders[i];
+      for (const [i, thisFolder] of [...folder.parent_folders]
+        .reverse()
+        .entries()) {
         let existing: Folder | undefined;
 
-        if (i === folder.parent_folders.length - 1) {
+        if (i === 0) {
           existing = ret.find((f) => f.id === thisFolder.id);
           if (!existing) {
             existing = {
-              ...folder.parent_folders[i],
+              ...thisFolder,
               expanded: true,
               children: [],
             };
@@ -349,14 +353,18 @@ export function useFolderMap(props: {
           continue;
         }
 
-        existing = currentParent!.children?.find((f) => f.id === thisFolder.id);
+        if (!currentParent)
+          throw new Error(`Missing parent folder: ${thisFolder.id}`);
+        currentParent.children ??= [];
+        const children = currentParent.children;
+        existing = children.find((f) => f.id === thisFolder.id);
         if (!existing) {
           existing = {
             ...thisFolder,
             expanded: true,
             children: [],
           };
-          currentParent!.children!.push(existing);
+          children.push(existing);
         }
         currentParent = existing;
       }
@@ -369,7 +377,7 @@ export function useFolderMap(props: {
         currentParent.children = [];
       }
 
-      currentParent!.children!.push({
+      currentParent.children.push({
         ...folder,
         expanded: false,
         children: undefined,
@@ -543,7 +551,7 @@ export const FolderFilter: React.FC<FolderFilterProps> = ({
     if (!query) return;
 
     const matchingFolders = getMatchingFolders(folderMap, query);
-    if (matchingFolders.length === 1) {
+    if (matchingFolders.length === 1 && matchingFolders[0]) {
       onSelect(matchingFolders[0]);
     }
   }

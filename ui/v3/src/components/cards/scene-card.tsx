@@ -1,3 +1,4 @@
+import { entityDestination, type EntityDestination } from "@/core/navigation";
 import type React from "react";
 import { useCallback } from "react";
 import { useApolloClient } from "@apollo/client/react";
@@ -59,7 +60,7 @@ interface SceneCardProps {
   /** Link target. Defaults to `/scenes/{id}`. Override for views that
    *  shouldn't navigate to the regular detail page (e.g. the Offline
    *  view, which links to its own player route). */
-  href?: string;
+  destination?: EntityDestination;
   /** Replace the default context menu entirely. Used by the Offline
    *  view to surface "Save to Files" / "Re-download" / "Delete"
    *  instead of the regular Edit / Generate / Merge / Delete set. */
@@ -77,7 +78,7 @@ function formatWallPerformers(
 ): string {
   if (!performers || performers.length === 0) return "";
   const names = performers.map((p) => p.name);
-  if (names.length === 1) return names[0];
+  if (names.length === 1) return names.join("");
   // Join last two with " & ", rest with ", "
   const head = names.slice(0, -2);
   const tail = names.slice(-2).join(" & ");
@@ -127,7 +128,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({
   onPreviewClick,
   onEdit,
   hidePerformers = false,
-  href,
+  destination,
   contextMenu: contextMenuOverride,
   onContextMenuOpen: onContextMenuOpenOverride,
 }) => {
@@ -184,14 +185,14 @@ export const SceneCard: React.FC<SceneCardProps> = ({
       <EntityCard
         label={objectTitle(scene)}
         id={scene.id}
-        href={href ?? `/scenes/${scene.id}`}
+        destination={destination ?? entityDestination.scene(scene.id)}
         isMobile={isMobile}
         selected={selected}
         onSelectedChanged={onSelectedChanged}
         onPreviewClick={onPreviewClick}
         contextMenu={contextMenu}
         onContextMenuOpen={effectiveOnContextMenuOpen}
-        prefetch={href ? undefined : prefetch}
+        prefetch={destination ? undefined : prefetch}
         className="scene-card"
       >
         <EntityCard.SelectCheckbox />

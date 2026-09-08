@@ -1,3 +1,4 @@
+import { StudioListItems } from "@/components/list/entity-list-items";
 import { useState, useMemo } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useIntl } from "react-intl";
@@ -35,6 +36,7 @@ function StudiosPage() {
   >(
     () => ({
       filterMode: GQL.FilterMode.Studios,
+      ItemsProvider: StudioListItems.Provider,
       view: View.Studios,
       source: {
         kind: "graphql",

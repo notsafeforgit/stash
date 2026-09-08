@@ -1,3 +1,5 @@
+import type { TaskDefaults } from "./task-defaults";
+import { frontPageContentSchema } from "./config-schema";
 import type { IntlShape } from "react-intl";
 import type { ITypename } from "src/utils/data";
 import type { ImageWallOptions } from "src/utils/image-wall";
@@ -104,7 +106,7 @@ export interface IUIConfig {
 
   advancedMode?: boolean;
 
-  taskDefaults?: Record<string, Record<string, unknown>>;
+  taskDefaults?: TaskDefaults;
 
   defaultFilters?: DefaultFilters;
 
@@ -116,7 +118,7 @@ export interface IUIConfig {
 export function getFrontPageContent(
   ui: IUIConfig | undefined,
 ): FrontPageContent[] | undefined {
-  return ui?.frontPageContent as FrontPageContent[] | undefined;
+  return frontPageContentSchema.safeParse(ui?.frontPageContent).data;
 }
 
 function recentlyReleased(

@@ -327,9 +327,10 @@ export const CustomFieldsFilter: React.FC<CustomFieldsFilterProps> = ({
       <CustomFieldsCriteriaPills
         criteria={localCriterion.value}
         editIndex={editIndex !== -1 ? editIndex : undefined}
-        onEditCriterion={(index) =>
-          setEditCriterion(localCriterion.value[index])
-        }
+        onEditCriterion={(index) => {
+          const criterion = localCriterion.value[index];
+          if (criterion) setEditCriterion(criterion);
+        }}
         onRemoveCriterion={(index) => onRemove(index)}
       />
     </div>

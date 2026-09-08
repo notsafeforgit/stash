@@ -31,12 +31,14 @@ export function fingerprintDistance(a: string, b: string): number {
 
   let distance = 0;
   for (let index = 0; index < a.length; index += 1) {
-    const left = Number.parseInt(a[index], 16);
-    const right = Number.parseInt(b[index], 16);
+    const left = Number.parseInt(a.charAt(index), 16);
+    const right = Number.parseInt(b.charAt(index), 16);
     if (Number.isNaN(left) || Number.isNaN(right)) {
       return Number.POSITIVE_INFINITY;
     }
-    distance += NIBBLE_POPCOUNT[left ^ right];
+    const bits = NIBBLE_POPCOUNT[left ^ right];
+    if (bits === undefined) return Number.POSITIVE_INFINITY;
+    distance += bits;
   }
   return distance;
 }

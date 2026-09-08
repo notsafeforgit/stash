@@ -13,16 +13,7 @@ export function SceneDetailDownloadMenuItem({
 }: {
   scene: NonNullable<GQL.FindSceneQuery["findScene"]>;
 }) {
-  // The hook accepts a structurally-narrower scene shape than the
-  // FindScene query result; cast through `unknown` to satisfy the
-  // `Pick<SceneCardScene, …>` projection without forcing a deep
-  // mapping (every field the hook reads exists on FindScene's scene
-  // with a compatible type).
-  const action = useSceneDownloadAction({
-    scene: scene as unknown as Parameters<
-      typeof useSceneDownloadAction
-    >[0]["scene"],
-  });
+  const action = useSceneDownloadAction({ scene });
   return (
     <DropdownMenuItem disabled={action.disabled} onClick={action.onSelect}>
       <Download />

@@ -1,3 +1,4 @@
+import { entityDestination } from "@/core/navigation";
 import { useMemo } from "react";
 import { useIntl } from "react-intl";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -25,14 +26,14 @@ export function useStudioTableColumns(): ColumnDef<StudioItem>[] {
 
       thumbnailColumn<StudioItem>(
         (s) => s.image_path,
-        (s) => `/studios/${s.id}`,
+        (s) => entityDestination.studio(s.id),
       ),
 
       titleColumn<StudioItem>({
         id: "name",
         header: intl.formatMessage({ id: "name" }),
         getTitle: (s) => s.name,
-        getHref: (s) => `/studios/${s.id}`,
+        getDestination: (s) => entityDestination.studio(s.id),
       }),
 
       numberColumn<StudioItem>({

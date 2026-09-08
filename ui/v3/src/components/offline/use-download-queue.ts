@@ -1,54 +1,26 @@
-import { getPlatformURL } from "@/core/platform-url";
-/**
- * Singleton download queue for offline scene downloads.
- *
- * Holds a serial worker (one in-flight download at a time) that pumps
- * `OfflineEntry` rows whose status is `queued`. Components subscribe
- * via `useDownloadQueue()` to render queue state and call
- * `enqueue` / `cancel` / `retry` / `remove`.
- *
- * Why a vanilla store + `useSyncExternalStore` instead of Context:
- * the queue outlives any single mounted component (downloads continue
- * across navigation between routes), and a Context provider would
- * have to live above the entire route tree. The vanilla store is
- * module-scoped, gets initialised once per page load, and any
- * subscriber on any route sees consistent state without prop-drilling.
- *
- * Persistence model: queue/active state is in-memory + IndexedDB.
- *   - IndexedDB row's `status` field is the source of truth across
- *     PWA reloads.
- *   - In-memory queue is rebuilt from IDB at module init by scanning
- *     for `status === "queued"`.
- *   - In-flight `status === "downloading"` rows on init mean a
- *     previous tab/PWA-session was interrupted; we mark them
- *     `error: "Interrupted"` and the user can retry. The retry path
- *     consults the existing OPFS file size and attempts a `Range:
- *     bytes=N-` request — if the server returns 206 the partial
- *     bytes are appended to, otherwise the file is rewritten from
- *     scratch. Range works against the static-file fast path
- *     (`encDownloadCopy` for MP4-family sources); ffmpeg-piped
- *     responses don't carry `Accept-Ranges`, so the server returns
- *     200 + full body and the worker restarts from byte 0
- *     transparently.
- *
- * Cancellation: each download gets a fresh AbortController whose
- * signal feeds the fetch + the OPFS writer's `pipeTo`. Cancelling
- * aborts the fetch (server-side ffmpeg gets killed via
- * connection-close), stops the OPFS write, and the worker's
- * try/catch flips status to `error` (or to a clean cancellation
- * state — see `cancel`).
- */
+import { joinPlatformURL } from "@/core/platform-url";
+import { canCoordinateOfflineStorage, getOfflineScope } from "./offline-scope";
+import { migrateLegacyDownloads } from "./offline-migration";
+/** Offline download commands are coordinated with Web Locks. IndexedDB owns
+ * the durable queue, BroadcastChannel publishes changes between tabs, and a
+ * per-scene lock prevents deletion or replacement while its writer is active.
+ * Every store, file, lock and channel belongs to the same deployment. */
 
-import { useSyncExternalStore } from "react";
+import { useMemo, useSyncExternalStore } from "react";
+import { useIntl } from "react-intl";
+import { useToast } from "@/hooks/toast";
 import {
+  clearAll,
   deleteEntry,
   getEntry,
   listEntriesByStatus,
+  listEntries,
+  subscribeToEntries,
   patchEntry,
   putEntry,
-  type OfflineEntry,
 } from "./offline-db";
 import {
+  clearAllScenes,
   existingSceneSize,
   opfsPathForScene,
   removeScene,
@@ -56,7 +28,7 @@ import {
   writeScene,
 } from "./opfs-storage";
 import { downloadQueryString, type DownloadMode } from "./pick-download-format";
-import type { StreamingResolutionEnum } from "src/core/generated-graphql";
+import { StreamingResolutionEnum } from "src/core/generated-graphql";
 
 export interface QueueSnapshot {
   /** Scene ids waiting their turn, in order. Excludes the active one. */
@@ -108,20 +80,45 @@ export interface EnqueueArgs {
   resolution: StreamingResolutionEnum;
 }
 
-// ── Store ────────────────────────────────────────────────────────────────────
-
 type Listener = () => void;
 
-class DownloadQueueStore {
+export function canCoordinateDownloads(): boolean {
+  return canCoordinateOfflineStorage();
+}
+
+export class OfflineQueueUnavailableError extends Error {
+  constructor() {
+    super(
+      "Offline library changes are unavailable in this browser. Existing downloads can still be played.",
+    );
+  }
+}
+
+async function sceneLock<T>(
+  sceneId: string,
+  action: () => Promise<T>,
+): Promise<T> {
+  if (!canCoordinateDownloads())
+    return Promise.reject(new OfflineQueueUnavailableError());
+  return await navigator.locks.request(
+    (await getOfflineScope()).sceneLock(sceneId),
+    action,
+  );
+}
+
+/** One instance per page; Web Locks own work across pages sharing the database.
+ * Scene commands and the writer use the same lock. Cancellation is a durable
+ * request outside that lock, followed by waiting for the writer to release it. */
+export class DownloadQueueStore {
   private snapshot: QueueSnapshot = { queued: [], active: null };
   private listeners = new Set<Listener>();
-  private workerRunning = false;
-  private currentAbort: AbortController | null = null;
-  /** Most recent debounced-progress write timestamp per scene. */
-  private lastProgressWrite = new Map<string, number>();
-  private readonly PROGRESS_WRITE_INTERVAL_MS = 1000;
-
-  // ── External snapshot API ──
+  private worker: Promise<void> | undefined;
+  private initialization: Promise<void> | undefined;
+  private unsubscribe: (() => void) | undefined;
+  private refreshVersion = 0;
+  private task:
+    | { sceneId: string; requestId?: string; abort: AbortController }
+    | undefined;
 
   subscribe = (listener: Listener) => {
     this.listeners.add(listener);
@@ -129,378 +126,372 @@ class DownloadQueueStore {
       this.listeners.delete(listener);
     };
   };
-
   getSnapshot = (): QueueSnapshot => this.snapshot;
 
-  private setSnapshot(next: QueueSnapshot) {
+  private publish(next: QueueSnapshot) {
     this.snapshot = next;
-    this.listeners.forEach((l) => {
-      l();
-    });
+    for (const listener of this.listeners) listener();
   }
 
   private updateActive(patch: Partial<ActiveDownload>) {
-    if (!this.snapshot.active) return;
-    this.setSnapshot({
-      ...this.snapshot,
-      active: { ...this.snapshot.active, ...patch },
+    if (this.snapshot.active)
+      this.publish({
+        ...this.snapshot,
+        active: { ...this.snapshot.active, ...patch },
+      });
+  }
+
+  private async refresh() {
+    const version = ++this.refreshVersion;
+    const entries = await listEntries();
+    if (version !== this.refreshVersion) return;
+    const taskEntry = entries.find(
+      (entry) => entry.scene_id === this.task?.sceneId,
+    );
+    if (
+      taskEntry?.cancel_requested &&
+      taskEntry.request_id === this.task?.requestId
+    )
+      this.task?.abort.abort();
+    const downloading = entries.find((entry) => entry.status === "downloading");
+    const active = downloading
+      ? {
+          sceneId: downloading.scene_id,
+          bytesDownloaded: downloading.bytes_downloaded ?? 0,
+          bytesTotal: downloading.bytes || null,
+        }
+      : null;
+    // The owner has finer progress than the periodically persisted checkpoint.
+    const localActive =
+      this.task && this.snapshot.active?.sceneId === downloading?.scene_id
+        ? this.snapshot.active
+        : active;
+    this.publish({
+      queued: entries
+        .filter((entry) => entry.status === "queued")
+        .sort((a, b) => (a.queued_at ?? 0) - (b.queued_at ?? 0))
+        .map((entry) => entry.scene_id),
+      active: localActive,
     });
   }
 
-  // ── Recovery ──
-
-  /**
-   * Initial sweep — call once at module init. Rebuilds the queue
-   * from IDB and marks any orphan `downloading` entries as errored.
-   *
-   * Partial OPFS files are NOT removed here — the retry path will
-   * inspect the file's size and attempt a range-resume against it.
-   * Worst case the server doesn't honour the range and we restart
-   * from byte 0; either way the partial isn't wasted by being
-   * eagerly deleted.
-   */
-  async init(): Promise<void> {
-    const downloading = await listEntriesByStatus("downloading");
-    for (const e of downloading) {
-      await patchEntry(e.scene_id, {
-        status: "error",
-        error: "Interrupted by reload",
-        bytes_downloaded: undefined,
+  init(): Promise<void> {
+    if (!this.initialization) {
+      this.unsubscribe = subscribeToEntries(() => {
+        void this.refresh()
+          .then(() => {
+            if (this.snapshot.queued.length) this.kickWorker();
+          })
+          .catch((error) => console.error("[offline] refresh failed", error));
       });
+      this.initialization = this.refresh()
+        .then(() => {
+          this.kickWorker();
+        })
+        .catch((error) => {
+          this.initialization = undefined;
+          this.unsubscribe?.();
+          this.unsubscribe = undefined;
+          throw error;
+        });
     }
-
-    const queued = await listEntriesByStatus("queued");
-    if (queued.length > 0) {
-      this.setSnapshot({
-        queued: queued.map((e) => e.scene_id),
-        active: null,
-      });
-      this.kickWorker();
-    }
+    return this.initialization;
   }
 
-  // ── Public actions ──
-
-  /**
-   * Insert a scene into the queue. If the scene already has a
-   * `complete` entry it's wiped (OPFS file + IDB row) before queuing
-   * so a re-download replaces in place. Pre-existing `queued` /
-   * `downloading` entries for the same scene short-circuit (no-op).
-   */
   async enqueue({ snapshot, mode, resolution }: EnqueueArgs): Promise<void> {
-    const existing = await getEntry(snapshot.scene_id);
-    if (existing) {
-      if (existing.status === "queued" || existing.status === "downloading") {
-        return; // Already in the queue.
-      }
-      // Replace in place: clear OPFS + IDB before re-queuing. Do not
-      // delete the IDB row entirely — we re-write it below with fresh
-      // metadata so the row persists across the brief gap.
-      try {
-        await removeScene(snapshot.scene_id);
-      } catch {
-        /* ignore — IDB write below is the source of truth */
-      }
-    }
-
-    const entry: OfflineEntry = {
-      scene_id: snapshot.scene_id,
-      title: snapshot.title,
-      details: snapshot.details,
-      studio_name: snapshot.studio_name,
-      studio_id: snapshot.studio_id,
-      performers: snapshot.performers,
-      tags: snapshot.tags,
-      duration: snapshot.duration,
-      width: snapshot.width,
-      height: snapshot.height,
-      date: snapshot.date,
-      paths: snapshot.paths,
-      format: mode,
-      source_video_codec: snapshot.source_video_codec,
-      source_audio_codec: snapshot.source_audio_codec,
-      source_file_path: snapshot.source_file_path,
-      resolution,
-      width_actual: snapshot.width, // tightened on completion when known
-      height_actual: snapshot.height,
-      bytes: 0,
-      downloaded_at: 0,
-      status: "queued",
-      opfs_path: opfsPathForScene(snapshot.scene_id),
-      server_status: "unknown",
-    };
-    await putEntry(entry);
-    this.setSnapshot({
-      ...this.snapshot,
-      queued: [...this.snapshot.queued, snapshot.scene_id],
+    await this.init();
+    const before = await getEntry(snapshot.scene_id);
+    if (before?.status === "queued" || before?.status === "downloading") return;
+    await sceneLock(snapshot.scene_id, async () => {
+      const existing = await getEntry(snapshot.scene_id);
+      if (existing?.status === "queued" || existing?.status === "downloading")
+        return;
+      await removeScene(snapshot.scene_id);
+      await putEntry({
+        ...snapshot,
+        format: mode,
+        resolution,
+        width_actual: snapshot.width,
+        height_actual: snapshot.height,
+        bytes: 0,
+        downloaded_at: 0,
+        status: "queued",
+        opfs_path: await opfsPathForScene(snapshot.scene_id),
+        server_status: "unknown",
+        request_id: crypto.randomUUID(),
+        queued_at: Date.now(),
+      });
     });
+    await this.refresh();
     this.kickWorker();
   }
 
-  /**
-   * Stop a queued or in-flight download. For queued: drops from the
-   * queue + deletes the IDB row. For in-flight: aborts the fetch,
-   * the worker's catch path flips status to `error` with
-   * "Cancelled" — same surface as a network failure so the user can
-   * still retry.
-   */
-  async cancel(sceneId: string): Promise<void> {
-    if (this.snapshot.active?.sceneId === sceneId && this.currentAbort) {
-      this.currentAbort.abort(new DOMException("Cancelled", "AbortError"));
-      // Status flip + queue advance happens in the worker's catch.
-      return;
-    }
-    if (this.snapshot.queued.includes(sceneId)) {
-      this.setSnapshot({
-        ...this.snapshot,
-        queued: this.snapshot.queued.filter((id) => id !== sceneId),
-      });
-      await deleteEntry(sceneId);
-      try {
-        await removeScene(sceneId);
-      } catch {
-        /* ignore */
-      }
-    }
-  }
-
-  /**
-   * Re-queue a scene whose previous attempt errored. The IDB row is
-   * patched back to `queued` (preserving metadata snapshot); the
-   * worker picks it up on next idle cycle.
-   */
   async retry(sceneId: string): Promise<void> {
-    const existing = await getEntry(sceneId);
-    if (!existing) return;
-    if (existing.status === "queued" || existing.status === "downloading") {
+    await this.init();
+    const before = await getEntry(sceneId);
+    if (
+      !before ||
+      before.status === "queued" ||
+      before.status === "downloading"
+    )
       return;
-    }
-    await patchEntry(sceneId, {
-      status: "queued",
-      error: undefined,
-      bytes_downloaded: undefined,
+    await sceneLock(sceneId, async () => {
+      const entry = await getEntry(sceneId);
+      if (!entry || entry.status === "queued" || entry.status === "downloading")
+        return;
+      if (entry.status === "complete") await removeScene(sceneId);
+      await patchEntry(sceneId, {
+        status: "queued",
+        error: undefined,
+        bytes_downloaded: undefined,
+        cancel_requested: false,
+        request_id: crypto.randomUUID(),
+        queued_at: Date.now(),
+      });
     });
-    this.setSnapshot({
-      ...this.snapshot,
-      queued: [...this.snapshot.queued, sceneId],
-    });
+    await this.refresh();
     this.kickWorker();
   }
 
-  /**
-   * Permanently remove a downloaded entry — IDB row + OPFS file. Used
-   * by the list view's per-card delete button.
-   */
-  async remove(sceneId: string): Promise<void> {
-    if (this.snapshot.active?.sceneId === sceneId) {
-      // In-flight delete: cancel first, then fall through.
-      await this.cancel(sceneId);
+  private async requestCancellation(sceneId: string) {
+    const entry = await getEntry(sceneId);
+    if (entry?.status === "queued" || entry?.status === "downloading") {
+      if (
+        this.task?.sceneId === sceneId &&
+        this.task.requestId === entry.request_id
+      )
+        this.task.abort.abort();
+      await patchEntry(sceneId, (current) =>
+        current.request_id === entry.request_id
+          ? { cancel_requested: true }
+          : {},
+      );
     }
-    if (this.snapshot.queued.includes(sceneId)) {
-      this.setSnapshot({
-        ...this.snapshot,
-        queued: this.snapshot.queued.filter((id) => id !== sceneId),
-      });
-    }
-    try {
-      await removeScene(sceneId);
-    } catch {
-      /* ignore */
-    }
-    await deleteEntry(sceneId);
+    return entry;
   }
 
-  // ── Worker ──
+  async cancel(sceneId: string): Promise<void> {
+    await this.init();
+    const requested = await this.requestCancellation(sceneId);
+    if (
+      !requested ||
+      (requested.status !== "queued" && requested.status !== "downloading")
+    )
+      return;
+    await sceneLock(sceneId, async () => {
+      const entry = await getEntry(sceneId);
+      if (
+        !entry ||
+        entry.request_id !== requested.request_id ||
+        entry.status === "complete"
+      )
+        return;
+      await removeScene(sceneId);
+      if (entry.status === "queued") await deleteEntry(sceneId);
+      else await this.markError(sceneId, "Cancelled");
+    });
+    await this.refresh();
+  }
+
+  async remove(sceneId: string): Promise<void> {
+    await this.init();
+    const requested = await this.requestCancellation(sceneId);
+    await sceneLock(sceneId, async () => {
+      const entry = await getEntry(sceneId);
+      // A retry queued after this removal request is a different operation.
+      if (entry?.request_id !== requested?.request_id) return;
+      await removeScene(sceneId);
+      await deleteEntry(sceneId);
+    });
+    await this.refresh();
+  }
+
+  async removeAll(): Promise<void> {
+    if (!canCoordinateDownloads()) throw new OfflineQueueUnavailableError();
+    await this.init();
+    await Promise.all(
+      (await listEntries()).map((entry) =>
+        this.requestCancellation(entry.scene_id),
+      ),
+    );
+    // The worker owns this lock until its writers settle. Clearing the stores
+    // under it also prevents an orphan file from surviving clear-all.
+    await navigator.locks.request(
+      (await getOfflineScope()).workerLock,
+      async () => {
+        await clearAllScenes();
+        await clearAll();
+      },
+    );
+    await this.refresh();
+  }
 
   private kickWorker() {
-    if (this.workerRunning) return;
-    this.workerRunning = true;
-    void this.runWorker().finally(() => {
-      this.workerRunning = false;
-    });
-  }
-
-  private async runWorker(): Promise<void> {
-    while (this.snapshot.queued.length > 0) {
-      const sceneId = this.snapshot.queued[0];
-      this.setSnapshot({
-        queued: this.snapshot.queued.slice(1),
-        active: { sceneId, bytesDownloaded: 0, bytesTotal: null },
+    if (this.worker || !canCoordinateDownloads()) return;
+    let failed = false;
+    this.worker = getOfflineScope()
+      .then((scope) =>
+        navigator.locks.request(scope.workerLock, async () => {
+          // A failed migration leaves its source intact and must not prevent new
+          // downloads. Its recoverable error is exposed by the migration control.
+          await migrateLegacyDownloads();
+          // The previous owner has released its lock; only now can these be orphans.
+          for (const entry of await listEntriesByStatus("downloading")) {
+            await sceneLock(entry.scene_id, async () => {
+              const current = await getEntry(entry.scene_id);
+              if (current?.status === "downloading")
+                await this.markError(entry.scene_id, "Interrupted by reload");
+            });
+          }
+          while (true) {
+            const queued = (await listEntriesByStatus("queued")).sort(
+              (a, b) => (a.queued_at ?? 0) - (b.queued_at ?? 0),
+            );
+            const next = queued[0];
+            if (!next) break;
+            await sceneLock(next.scene_id, () => this.runOne(next.scene_id));
+          }
+        }),
+      )
+      .then(() => undefined)
+      .catch((error) => {
+        failed = true;
+        console.error("[offline] worker failed", error);
+      })
+      .finally(async () => {
+        try {
+          await this.refresh();
+        } catch (error) {
+          failed = true;
+          console.error("[offline] refresh failed", error);
+        }
+        this.worker = undefined;
+        // An enqueue may have landed between the final scan and lock release.
+        if (!failed && this.snapshot.queued.length) this.kickWorker();
       });
-      try {
-        await this.runOne(sceneId);
-      } catch (err) {
-        // runOne handles its own status writes; this catch is just a
-        // safety net so the worker loop survives unexpected throws.
-        console.error("[offline] worker error for scene", sceneId, err);
-      } finally {
-        this.lastProgressWrite.delete(sceneId);
-      }
-      this.setSnapshot({ ...this.snapshot, active: null });
-    }
   }
 
   private async runOne(sceneId: string): Promise<void> {
-    const entry = await getEntry(sceneId);
-    if (!entry) return;
-
-    // Quota guard. Refuse if we'd exceed 95% of available — leaves
-    // headroom for the browser's internal metadata. We don't know
-    // the final size up-front, so the check is a coarse "are we
-    // basically full" gate, not a precise reservation.
-    const est = await storageEstimate();
-    if (est.usage != null && est.quota != null && est.quota > 0) {
-      const ratio = est.usage / est.quota;
-      if (ratio >= 0.95) {
-        await patchEntry(sceneId, {
-          status: "error",
-          error: "Out of storage. Free space and retry.",
-        });
-        return;
-      }
-    }
-
-    // Resume offset: the size of any partial OPFS file from a
-    // previous attempt. The Range header below asks the server to
-    // skip those bytes; if the server can't honour ranges (ffmpeg
-    // pipe — no Accept-Ranges) it returns 200 with the full body and
-    // we rewrite from byte 0.
-    let resumeOffset = 0;
-    try {
-      resumeOffset = await existingSceneSize(sceneId);
-    } catch {
-      /* ignore — fall through to fresh download */
-    }
-
-    await patchEntry(sceneId, {
-      status: "downloading",
-      bytes_downloaded: resumeOffset || 0,
-    });
-    if (resumeOffset > 0) {
-      // Surface the resume baseline immediately so the progress bar
-      // doesn't briefly snap back to 0 before the first chunk lands.
-      this.updateActive({ bytesDownloaded: resumeOffset });
-    }
-
     const abort = new AbortController();
-    this.currentAbort = abort;
-
-    const url = getPlatformURL(
-      `scene/${sceneId}/download.mp4?${downloadQueryString({
-        mode: entry.format,
-        resolution: entry.resolution as StreamingResolutionEnum,
-        effectiveHeight: 0, // unused by querystring builder
-      })}`,
-    ).href;
-
-    const headers: HeadersInit = {};
-    if (resumeOffset > 0) {
-      headers.Range = `bytes=${resumeOffset}-`;
-    }
-
-    let response: Response;
+    const task: {
+      sceneId: string;
+      requestId?: string;
+      abort: AbortController;
+    } = { sceneId, abort };
+    this.task = task;
+    let checkpoint: Promise<unknown> = Promise.resolve();
+    let discardPartial = false;
     try {
-      response = await fetch(url, { signal: abort.signal, headers });
-    } catch (err) {
-      this.currentAbort = null;
-      await this.markError(sceneId, errorMessage(err));
-      return;
-    }
-
-    if (!response.ok || !response.body) {
-      this.currentAbort = null;
-      await this.markError(
-        sceneId,
-        `Server returned HTTP ${response.status}: ${response.statusText}`,
+      const entry = await getEntry(sceneId);
+      if (entry?.status !== "queued") return;
+      task.requestId = entry.request_id;
+      if (entry.cancel_requested) abort.abort();
+      abort.signal.throwIfAborted();
+      this.publish({
+        queued: this.snapshot.queued.filter((id) => id !== sceneId),
+        active: { sceneId, bytesDownloaded: 0, bytesTotal: null },
+      });
+      await patchEntry(sceneId, { status: "downloading", bytes_downloaded: 0 });
+      abort.signal.throwIfAborted();
+      const estimate = await storageEstimate();
+      abort.signal.throwIfAborted();
+      if (
+        estimate.quota &&
+        estimate.usage != null &&
+        estimate.usage / estimate.quota >= 0.95
+      )
+        throw new Error("Out of storage. Free space and retry.");
+      const resumeOffset = await existingSceneSize(sceneId);
+      abort.signal.throwIfAborted();
+      await patchEntry(sceneId, { bytes_downloaded: resumeOffset });
+      this.updateActive({ bytesDownloaded: resumeOffset });
+      abort.signal.throwIfAborted();
+      const resolution = Object.values(StreamingResolutionEnum).find(
+        (value) => value === entry.resolution,
       );
-      return;
-    }
-
-    // 206 Partial Content → server honoured the range. Append from
-    // `resumeOffset`. 200 OK → server ignored the range (transcode
-    // pipe, stale partial mismatch, or no range support). Either
-    // way, rewrite from scratch — the partial bytes can't be trusted
-    // to byte-match the new full-body response.
-    const startOffset = response.status === 206 ? resumeOffset : 0;
-    if (startOffset === 0 && resumeOffset > 0) {
-      // Reset the in-memory progress to 0 so the bar visibly
-      // restarts; the subsequent writes will repaint it.
-      this.updateActive({ bytesDownloaded: 0 });
-    }
-
-    // Total size: for 206 the server sends Content-Range
-    // (`bytes <start>-<end>/<total>`); for 200 it's just
-    // Content-Length. Fall back to null when either is missing.
-    let total: number | null = null;
-    if (response.status === 206) {
-      const range = response.headers.get("content-range");
-      if (range) {
-        const match = /\/(\d+)$/.exec(range);
-        if (match) total = parseInt(match[1], 10) || null;
+      if (!resolution)
+        throw new Error(
+          "Unknown download resolution; select a resolution and download again.",
+        );
+      const url = joinPlatformURL(
+        (await getOfflineScope()).deploymentURL,
+        `scene/${sceneId}/download.mp4?${downloadQueryString({ mode: entry.format, resolution, effectiveHeight: 0 })}`,
+      ).href;
+      const response = await fetch(url, {
+        signal: abort.signal,
+        headers: resumeOffset ? { Range: `bytes=${resumeOffset}-` } : {},
+      });
+      abort.signal.throwIfAborted();
+      if (!response.ok || !response.body)
+        throw new Error(
+          `Server returned HTTP ${response.status}: ${response.statusText}`,
+        );
+      const startOffset = response.status === 206 ? resumeOffset : 0;
+      discardPartial = startOffset === 0;
+      let total: number | null = null;
+      if (response.status === 206) {
+        const range = /^bytes (\d+)-(\d+)\/(\d+|\*)$/.exec(
+          response.headers.get("content-range") ?? "",
+        );
+        if (!range || Number(range[1]) !== resumeOffset)
+          throw new Error("Server returned an inconsistent download range");
+        if (range[3] !== "*") total = Number(range[3]);
+      } else {
+        const length = response.headers.get("content-length");
+        if (length !== null) total = Number(length);
       }
-    } else {
-      const cl = response.headers.get("content-length");
-      if (cl) total = parseInt(cl, 10) || null;
-    }
-    if (total != null) {
-      this.updateActive({ bytesTotal: total });
-    }
-
-    const onProgress = (bytes: number) => {
-      this.updateActive({ bytesDownloaded: bytes });
-      // Debounced IDB write — keep the bar lively in-memory but only
-      // touch IDB ~once a second so we don't trash the transaction
-      // log on multi-GB downloads.
-      const last = this.lastProgressWrite.get(sceneId) ?? 0;
-      const now = performance.now();
-      if (now - last >= this.PROGRESS_WRITE_INTERVAL_MS) {
-        this.lastProgressWrite.set(sceneId, now);
-        void patchEntry(sceneId, { bytes_downloaded: bytes });
-      }
-    };
-
-    let bytes: number;
-    try {
-      bytes = await writeScene(
+      this.updateActive({ bytesDownloaded: startOffset, bytesTotal: total });
+      await patchEntry(sceneId, { bytes_downloaded: startOffset });
+      abort.signal.throwIfAborted();
+      let lastCheckpoint = performance.now();
+      const bytes = await writeScene(
         sceneId,
         response.body,
         abort.signal,
-        onProgress,
+        (downloaded) => {
+          this.updateActive({ bytesDownloaded: downloaded });
+          if (performance.now() - lastCheckpoint >= 1000) {
+            lastCheckpoint = performance.now();
+            checkpoint = checkpoint
+              .then(() => patchEntry(sceneId, { bytes_downloaded: downloaded }))
+              .catch((error) => {
+                console.error("[offline] progress checkpoint failed", error);
+              });
+          }
+        },
         startOffset,
       );
-    } catch (err) {
-      this.currentAbort = null;
-      // Best-effort cleanup of partial file ONLY when the partial is
-      // unrecoverable — i.e. the user explicitly cancelled, or we
-      // got a 200 response and the bytes we'd written are now half
-      // a fresh download. Network blips on a 206 leave the bytes in
-      // place so the next retry can resume from where we stopped.
-      const isCancel = err instanceof DOMException && err.name === "AbortError";
-      if (isCancel || startOffset === 0) {
-        try {
-          await removeScene(sceneId);
-        } catch {
-          /* ignore */
-        }
+      await checkpoint;
+      abort.signal.throwIfAborted();
+      await patchEntry(sceneId, {
+        status: "complete",
+        downloaded_at: Date.now(),
+        bytes,
+        bytes_downloaded: undefined,
+        error: undefined,
+        cancel_requested: false,
+      });
+    } catch (error) {
+      await checkpoint;
+      try {
+        if (abort.signal.aborted || discardPartial) await removeScene(sceneId);
+      } finally {
+        await this.markError(
+          sceneId,
+          abort.signal.aborted ? "Cancelled" : errorMessage(error),
+        );
       }
-      await this.markError(sceneId, errorMessage(err));
-      return;
+    } finally {
+      abort.abort();
+      this.task = undefined;
+      this.publish({ ...this.snapshot, active: null });
     }
-
-    this.currentAbort = null;
-    await patchEntry(sceneId, {
-      status: "complete",
-      downloaded_at: Date.now(),
-      bytes,
-      bytes_downloaded: undefined,
-      error: undefined,
-    });
   }
 
-  private async markError(sceneId: string, message: string): Promise<void> {
+  private async markError(sceneId: string, error: string) {
     await patchEntry(sceneId, {
       status: "error",
-      error: message,
+      error,
       bytes_downloaded: undefined,
     });
   }
@@ -518,17 +509,8 @@ function errorMessage(err: unknown): string {
 
 const store = new DownloadQueueStore();
 
-// Kick off the recovery sweep on first import. Failures are
-// surfaced via `init`'s patch writes — no UI surface needed at
-// boot since the user hasn't opened the Offline view yet.
-let initPromise: Promise<void> | null = null;
 function ensureInit(): Promise<void> {
-  if (!initPromise) {
-    initPromise = store.init().catch((err) => {
-      console.error("[offline] init failed:", err);
-    });
-  }
-  return initPromise;
+  return store.init();
 }
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
@@ -539,20 +521,45 @@ export interface UseDownloadQueue {
   cancel: DownloadQueueStore["cancel"];
   retry: DownloadQueueStore["retry"];
   remove: DownloadQueueStore["remove"];
+  removeAll: DownloadQueueStore["removeAll"];
   /** Returns the recovery promise. Mostly for tests. */
   ready: () => Promise<void>;
 }
 
+/** Commands attach error reporting even when event handlers discard the returned
+ * promise. The original promise still rejects for callers coordinating a batch. */
+export function useDownloadCommands() {
+  const intl = useIntl();
+  const toast = useToast();
+  return useMemo(() => {
+    function report<T>(promise: Promise<T>): Promise<T> {
+      void promise.catch((error) =>
+        toast.error(
+          error instanceof OfflineQueueUnavailableError
+            ? intl.formatMessage({
+                id: "offline.errors.coordination_unavailable",
+                defaultMessage:
+                  "Offline library changes are unavailable in this browser. Existing downloads can still be played.",
+              })
+            : error,
+        ),
+      );
+      return promise;
+    }
+    return {
+      enqueue: (args: EnqueueArgs) => report(store.enqueue(args)),
+      cancel: (sceneId: string) => report(store.cancel(sceneId)),
+      retry: (sceneId: string) => report(store.retry(sceneId)),
+      remove: (sceneId: string) => report(store.remove(sceneId)),
+      removeAll: () => report(store.removeAll()),
+      ready: ensureInit,
+    };
+  }, [intl, toast]);
+}
 export function useDownloadQueue(): UseDownloadQueue {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot);
-  return {
-    state,
-    enqueue: store.enqueue.bind(store),
-    cancel: store.cancel.bind(store),
-    retry: store.retry.bind(store),
-    remove: store.remove.bind(store),
-    ready: ensureInit,
-  };
+  const commands = useDownloadCommands();
+  return useMemo(() => ({ state, ...commands }), [state, commands]);
 }
 
 /** Direct singleton access for non-component callers (e.g. boot code). */

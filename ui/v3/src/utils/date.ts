@@ -39,7 +39,7 @@ export function stringToFuzzyDateTime(dateString: string): Date | null {
   const dateTime = dateString.split(" ");
 
   let date: Date | null = null;
-  if (dateTime.length > 0) {
+  if (dateTime[0]) {
     date = stringToFuzzyDate(dateTime[0]);
   }
 
@@ -47,7 +47,7 @@ export function stringToFuzzyDateTime(dateString: string): Date | null {
     date = new Date();
   }
 
-  if (dateTime.length > 1) {
+  if (dateTime[1]) {
     const timeParts = dateTime[1].split(":");
     if (date && timeParts.length > 0) {
       date.setHours(Number(timeParts[0]));
@@ -122,7 +122,7 @@ export function formatFuzzyDate(
   }
 
   const yearMatch = date.match(/^(\d{4})$/);
-  if (yearMatch) {
+  if (yearMatch?.[1]) {
     const year = parseInt(yearMatch[1], 10);
     return intl.formatDate(Date.UTC(year, 0), {
       year: "numeric",
@@ -131,7 +131,7 @@ export function formatFuzzyDate(
   }
 
   const yearMonthMatch = date.match(/^(\d{4})-(\d{2})$/);
-  if (yearMonthMatch) {
+  if (yearMonthMatch?.[1] && yearMonthMatch[2]) {
     const year = parseInt(yearMonthMatch[1], 10);
     const month = parseInt(yearMonthMatch[2], 10) - 1;
     return intl.formatDate(Date.UTC(year, month), {

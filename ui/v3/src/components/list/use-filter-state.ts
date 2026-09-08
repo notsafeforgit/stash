@@ -1,3 +1,4 @@
+import { useCommittedRef } from "@/hooks/use-committed-ref";
 import { applicationHref } from "@/core/platform-url";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useRouter } from "@tanstack/react-router";
@@ -8,7 +9,6 @@ import {
 } from "src/models/list-filter/filter-ast";
 import type { DisplayMode } from "src/models/list-filter/types";
 import type { View } from "src/components/list/views";
-import { usePrevious } from "src/hooks/state";
 import type * as GQL from "src/core/generated-graphql";
 import { useConfigurationContextOptional } from "src/hooks/config";
 
@@ -110,7 +110,7 @@ function useFilterURL(
 
   const router = useRouter();
   const location = useLocation();
-  const prevLocation = usePrevious(location);
+  const previousLocation = useRef<typeof location | undefined>(undefined);
 
   // Capture the pathname on mount so we can ignore location changes that
   // are actually navigations away from this list page (e.g. clicking a card
@@ -121,8 +121,7 @@ function useFilterURL(
   // Keep a ref to the current filter so updateFilter and the sync effect can
   // read the latest value without listing `filter` as a dependency (which
   // would cause infinite re-render loops when the effect sets the filter).
-  const filterRef = useRef(filter);
-  filterRef.current = filter;
+  const filterRef = useCommittedRef(filter);
 
   const updateFilter = useCallback(
     (value: ListFilterModel | ((prev: ListFilterModel) => ListFilterModel)) => {
@@ -162,6 +161,8 @@ function useFilterURL(
 
   // Sync filter when URL changes externally (back/forward navigation)
   useEffect(() => {
+    const prevLocation = previousLocation.current;
+    previousLocation.current = location;
     if (!active || locationEquals(prevLocation, location)) return;
     // If the pathname changed away from our list page (e.g. navigating to a
     // detail page), do nothing — this component is about to unmount and any
@@ -235,15 +236,7 @@ function useFilterURL(
       );
     }
     setFilterState(newFilter);
-  }, [
-    active,
-    prevLocation,
-    location,
-    defaultFilter,
-    setFilterState,
-    updateFilter,
-    router,
-  ]);
+  }, [active, location, defaultFilter, setFilterState, updateFilter, router]);
 
   return { setFilter: updateFilter };
 }
@@ -294,25 +287,13 @@ export function useFilterState(props: IFilterStateHook) {
   );
 
   // Compute the initial filter exactly once on mount. Using a ref rather than
-  // useMemo ensures this is not recomputed when config loads asynchronously —
-  // we don't want config loading to blow away a URL-derived filter the user
-  // already has (useState ignores subsequent initialState values anyway).
-  const initialFilterRef = useRef<ListFilterModel | null>(null);
-  if (initialFilterRef.current === null) {
+  const [filter, setFilterState] = useState(() => {
     const base = defaultFilterFromConfig.clone();
-    if (useURLActive && hasSearchParams(location.searchStr)) {
+    if (useURLActive && hasSearchParams(location.searchStr))
       base.configureFromQueryString(location.searchStr);
-    }
-    // Apply display mode preference (localStorage) — takes effect only when
-    // the URL doesn't override it (URL no longer carries disp, so always applies).
-    if (defaultDisplayMode !== undefined) {
-      base.displayMode = defaultDisplayMode;
-    }
-    initialFilterRef.current = base;
-  }
-  const initialFilter = initialFilterRef.current;
-
-  const [filter, setFilterState] = useState<ListFilterModel>(initialFilter);
+    if (defaultDisplayMode !== undefined) base.displayMode = defaultDisplayMode;
+    return base;
+  });
 
   const { setFilter } = useFilterURL(filter, setFilterState, {
     defaultFilter: defaultFilterFromConfig,

@@ -261,7 +261,9 @@ export function StashBoxSettings({
       <StashBoxDialog
         open={editIndex !== null}
         initial={
-          editIndex !== null && editIndex >= 0 ? boxes[editIndex] : EMPTY_DRAFT
+          (editIndex !== null && editIndex >= 0
+            ? boxes[editIndex]
+            : undefined) ?? EMPTY_DRAFT
         }
         onCancel={() => setEditIndex(null)}
         onSave={(draft) => {

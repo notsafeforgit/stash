@@ -32,9 +32,15 @@ upstream's numeric migrations and primary schema version unchanged. See
   element. Use `getPlatformURL` for backend requests, `applicationHref` for raw
   history writes, and `applicationPath` to convert a public URL to a TanStack
   destination. Router destinations are relative to its configured base path.
+  Core cards/table links use the checked descriptors in `core/navigation.ts`
+  (`to`, `params`, and `search`). Stored return URLs pass through
+  `localNavigationHref` before the router's public `href` navigation API.
 - `core/mutation-invalidation.ts` defines affected library query roots.
   `core/entity-job-invalidation.ts` refreshes after bulk jobs finish, including
-  partial failures, and survives the edit sheet closing. Unrelated configuration,
+  partial failures, and survives the edit sheet closing. The legacy `"sync"`
+  acknowledgment causes an immediate refresh; only numeric job IDs are monitored.
+  Query failures retry with bounded backoff; three consecutive failures dispose
+  the watcher and refresh once. Unrelated configuration,
   plugin, status, and job queries are excluded from library refreshes.
 
 ## Lists
@@ -64,12 +70,27 @@ Choose exactly one source. A GraphQL source requires `kind: "graphql"`, a typed
 `{ count, items }`. Carry the generated variables type as the third
 `EntityListPageConfig` type parameter. A local source requires `kind: "local"`,
 raw `items`, and `filter(items, filterModel)` returning the page slice and total;
-it may expose `loading`. Local lists never send a GraphQL list query.
+it may expose `loading`, `error`, and `refresh`. Local lists never send a GraphQL
+list query. Remote list extraction receives complete generated operation data;
+partial Apollo results are not asserted to be complete.
 
 Layout preferences must not change query variables or flash loading states.
-Only active embedded panels synchronize shared URL parameters. Wall selection
-is synchronized in the DOM for performance, including its accessible state;
-preserve both when changing that renderer.
+Only active embedded panels synchronize shared URL parameters. Selection stores
+IDs and derives selected objects from current list data. `list-provider.tsx`
+shares selection capabilities; `entity-list-items.ts` binds each item provider
+and consumer to one generated entity projection. Set `ItemsProvider` in a list
+configuration when its cards expose bulk menus. Consumers cannot choose a new
+item type independently of their provider.
+
+Wall cards render their selected and accessible state from React data. Each
+card subtree is memoized on its own selected flag, so selecting one card does
+not rebuild every card. Render callbacks must not read selection through refs.
+
+Scene/image duplicate checkers derive committed criteria from route search
+through `components/duplicates/controller.ts`. Their editing drafts remain
+local to the filter editor; Back/Forward updates query variables and resets
+selection without remounting the page. Shared grouping/selection helpers live
+beside that controller.
 
 ### Returning to a list
 
@@ -82,7 +103,12 @@ Revisiting the same URL within the session also restores its last position.
 
 `EntityList` exposes a stable `data-scroll-restoration-id` scoped to the list's
 `view` (or filter mode). Tables identify their nested scroll container separately.
-The shared restoration hook waits for active content to finish loading, including
+The shared restoration hook retains the full URL belonging to its rendered route
+match. The destination URL can change before the outgoing list unmounts; it must
+not change that list's scroll-cache lookup or invalidate its row measurements.
+Match pathnames ignore trailing slashes for ownership checks, while cache keys
+retain the full URL. Embedded lists follow their owning match when entity params
+change. The hook waits for active content to finish loading, including
 the first-paint skeleton gate, then applies the cached offset once. Grid/details
 virtualizers also receive that offset as `initialOffset`; restoring only the DOM
 scroll position would let the virtualizer start at the top. Their
@@ -93,6 +119,13 @@ ordered item IDs invalidate it. Loading virtual rows retain the full page height
 without measuring skeletons as real cards. Do not duplicate scroll tracking or
 restoration in individual routes.
 
+The retained URL and pending restoration are React state snapshots. Adjust them
+conditionally when their identity changes, following React's
+[previous-render state pattern](https://react.dev/reference/react/useState#storing-information-from-previous-renders).
+Keep DOM scroll writes in the layout effect. Do not replace these snapshots with
+refs mutated during rendering: abandoned renders could otherwise revive a
+consumed restoration and make a later refresh snap to an obsolete offset.
+
 Keep each embedded list's `view` distinct. Filter data can catch up with the URL
 after browser Back, so restoration tracks both identities. Ordinary pagination
 still starts at the top, and deletion-refill preservation and removed-last-page
@@ -102,6 +135,56 @@ When changing navigation or list layout, check browser Back/Forward and the app'
 Back button with filtered, paginated URLs. Exercise grid, details, wall, and table
 views with delayed data, including table horizontal scrolling. After restoration,
 scrolling and ordinary rerenders must not reapply the saved offset.
+Also check the outgoing list through a pending detail navigation and its view
+transition: the visible cards must stay in place until the list unmounts.
+
+## State, configuration, and type boundaries
+
+React Strict Mode is enabled at the application root. Render snapshots belong
+to state; conditional same-component state adjustment handles changed inputs.
+`useCommittedRef` is for imperative listeners and cleanup that need the latest
+committed value. Its identity is stable and its value changes in a layout effect.
+Do not read it in render callbacks. Interrupted work must not publish values to
+the committed UI. Form label caches and editable-row keys use React state.
+
+`hooks/debounce.ts` wraps Lodash's typed debounce, including leading/trailing,
+maximum wait, cancellation, and flush. Its result can be `undefined`; it does
+not promise immediate execution. Timers cancel on replacement/unmount and
+instant state updates cancel pending delayed writes. Persisted task defaults
+explicitly opt into flushing on close and consume save failures already
+reported by the shared save indicator.
+
+`hooks/stored-state.ts` owns one subscribed localStorage snapshot per key.
+`interface-preferences.ts` keeps the legacy `interface` key and synchronizes
+mounted consumers and storage events. Updates use the current snapshot;
+cross-tab conflicts follow localStorage's last-write-wins behavior. Storage
+failure preserves in-page edits. Desktop sidebar visibility is persisted;
+mobile sheets open transiently and start closed.
+
+Zod codecs validate known UI configuration, task defaults, interface preferences,
+and lightbox settings. The Apollo `ConfigResult.ui` boundary applies the UI
+codec. Unknown v2.5/plugin fields survive round trips. Configuration writes
+correlate each key with its generated value type; saving one plugin merges only
+that plugin into the existing map.
+
+Offline metadata, files, broadcasts, and locks share a deployment identity from
+`offline-scope.ts`: the normalized backend mount URL, independent of v3 routes.
+Use the storage adapters instead of constructing database names or file paths.
+Legacy migration validates source rows and copies only entries with identifiable
+ownership automatically. Explicit recovery handles ambiguous entries and prefix
+changes while retaining originals. See the [offline storage contract](offline.md#storage-contract)
+and [migration rules](offline.md#migration-and-recovery) before changing these
+boundaries; the namespace identifies an address, not a server library UUID.
+
+New filter AST URLs use versioned `u.` UTF-8/base64url JSON. The decoder also
+accepts existing unversioned ASCII/Latin-1 AST URLs. Saved-filter and legacy
+criteria formats remain supported. Invalid AST URLs fail visibly before a
+query can accidentally become unfiltered.
+
+Downloads consume the narrow `DownloadableScene` capability and use one snapshot
+projection. Lightbox slides extend the library's public image/scene types.
+Merge fields encapsulate their value type inside a resolver closure, sharing the
+same calculation for the preview and mutation input.
 
 ## Player
 

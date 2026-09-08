@@ -92,6 +92,7 @@ export function makeBulkUpdateIds(
 export function getIntersectionIds(lists: string[][]): string[] {
   if (lists.length === 0) return [];
   const [first, ...rest] = lists;
+  if (!first) return [];
   if (rest.length === 0) return [...first];
   const sets = rest.map((l) => new Set(l));
   return first.filter((id) => sets.every((s) => s.has(id)));

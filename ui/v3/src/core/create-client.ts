@@ -1,3 +1,4 @@
+import { parseUIConfig } from "./config-schema";
 import { getPlatformURL } from "./platform-url";
 export { getPlatformURL } from "./platform-url";
 import {
@@ -30,6 +31,11 @@ const readDanglingNull: FieldReadFunction = (existing, { canRead }) => {
 };
 
 const typePolicies: TypePolicies = {
+  ConfigResult: {
+    fields: {
+      ui: { merge: (_existing, incoming: unknown) => parseUIConfig(incoming) },
+    },
+  },
   Query: {
     fields: {
       findImage: { read: readReference("Image") },

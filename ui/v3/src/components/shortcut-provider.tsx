@@ -1,3 +1,4 @@
+import { useCommittedRef } from "@/hooks/use-committed-ref";
 import React, {
   createContext,
   useCallback,
@@ -5,6 +6,7 @@ import React, {
   useEffect,
   useMemo,
   useRef,
+  useState,
 } from "react";
 
 const CHORD_TIMEOUT_MS = 1500;
@@ -176,8 +178,7 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
 
     function getActiveListScope() {
       const scopes = Array.from(listScopesRef.current.values());
-      for (let i = scopes.length - 1; i >= 0; i -= 1) {
-        const scope = scopes[i];
+      for (const scope of scopes.reverse()) {
         if (!scope.disabled) return scope;
       }
       return undefined;
@@ -345,34 +346,30 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
 
 export function useListShortcutScope(scope: ListShortcutScope) {
   const context = useContext(ShortcutContext);
-  const idRef = useRef<symbol | undefined>(undefined);
-  const scopeRef = useRef(scope);
-  scopeRef.current = scope;
-  if (!idRef.current) idRef.current = Symbol("list-shortcut-scope");
+  const [scopeId] = useState(() => Symbol("shortcut-scope"));
+  const scopeRef = useCommittedRef(scope);
 
   useEffect(() => {
     if (!context) return;
-    return context.registerListScope(idRef.current!, scopeRef.current);
-  }, [context]);
+    return context.registerListScope(scopeId, scopeRef.current);
+  }, [context, scopeId]);
 
   useEffect(() => {
-    context?.updateListScope(idRef.current!, scope);
-  }, [context, scope]);
+    context?.updateListScope(scopeId, scope);
+  }, [context, scope, scopeId]);
 }
 
 export function useOverlayShortcutScope(scope: OverlayShortcutScope) {
   const context = useContext(ShortcutContext);
-  const idRef = useRef<symbol | undefined>(undefined);
-  const scopeRef = useRef(scope);
-  scopeRef.current = scope;
-  if (!idRef.current) idRef.current = Symbol("overlay-shortcut-scope");
+  const [scopeId] = useState(() => Symbol("shortcut-scope"));
+  const scopeRef = useCommittedRef(scope);
 
   useEffect(() => {
     if (!context) return;
-    return context.registerOverlayScope(idRef.current!, scopeRef.current);
-  }, [context]);
+    return context.registerOverlayScope(scopeId, scopeRef.current);
+  }, [context, scopeId]);
 
   useEffect(() => {
-    context?.updateOverlayScope(idRef.current!, scope);
-  }, [context, scope]);
+    context?.updateOverlayScope(scopeId, scope);
+  }, [context, scope, scopeId]);
 }

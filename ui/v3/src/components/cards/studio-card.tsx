@@ -1,3 +1,4 @@
+import { entityDestination } from "@/core/navigation";
 import type React from "react";
 import { useCallback } from "react";
 import { useApolloClient } from "@apollo/client/react";
@@ -87,7 +88,7 @@ export const StudioCard: React.FC<StudioCardProps> = ({
       <EntityCard
         label={studio.name}
         id={studio.id}
-        href={`/studios/${studio.id}`}
+        destination={entityDestination.studio(studio.id)}
         isMobile={isMobile}
         selected={selected}
         onSelectedChanged={onSelectedChanged}

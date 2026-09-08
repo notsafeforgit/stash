@@ -5,7 +5,6 @@
  * dialog (kept outside the form because the choice values are
  * always valid by construction — validation has nothing to add).
  */
-import type React from "react";
 import { useIntl } from "react-intl";
 import { CheckCircle2 } from "lucide-react";
 import {
@@ -20,7 +19,7 @@ import type { MergeChoice } from "./merge-types";
 import type { MergeRow, SourceRef } from "./use-merge-resolution";
 
 interface MergeResolutionPanelProps<TEntity, TUpdateInput> {
-  rows: MergeRow<TEntity, TUpdateInput>[];
+  rows: MergeRow<TUpdateInput>[];
   /** All sources passed to the resolution hook — used to look up
    *  per-source labels for the toggle buttons. */
   sources: readonly SourceRef<TEntity>[];
@@ -32,7 +31,6 @@ interface MergeResolutionPanelProps<TEntity, TUpdateInput> {
 
 export function MergeResolutionPanel<TEntity, TUpdateInput>({
   rows,
-  sources,
   choices,
   onChoiceChange,
 }: MergeResolutionPanelProps<TEntity, TUpdateInput>) {
@@ -75,7 +73,6 @@ export function MergeResolutionPanel<TEntity, TUpdateInput>({
         <MergeRowBody
           key={row.field.key}
           row={row}
-          sources={sources}
           choice={choices[row.field.key] ?? row.defaultChoice}
           onChange={(next) => onChoiceChange(row.field.key, next)}
           fieldLabel={intl.formatMessage({
@@ -88,50 +85,19 @@ export function MergeResolutionPanel<TEntity, TUpdateInput>({
   );
 }
 
-function MergeRowBody<TEntity, TUpdateInput>({
+function MergeRowBody<TUpdateInput>({
   row,
-  sources,
   choice,
   onChange,
   fieldLabel,
 }: {
-  row: MergeRow<TEntity, TUpdateInput>;
-  sources: readonly SourceRef<TEntity>[];
+  row: MergeRow<TUpdateInput>;
   choice: MergeChoice;
   onChange: (next: MergeChoice) => void;
   fieldLabel: string;
 }) {
-  // Toggle options for the contributing sources only. Source order
-  // mirrors the row's `sources` list (which itself preserves the
-  // dialog's source order).
-  const sourceById = new Map(sources.map((s) => [s.id, s]));
-  const toggleSources: MergeRowSourceOption[] = row.sources
-    .map((s) => {
-      const ref = sources.find((src) => src.entity === s.entity);
-      return ref ? { id: ref.id, label: ref.label } : null;
-    })
-    .filter((x): x is MergeRowSourceOption => x !== null);
-
-  // Live preview: mirror the resolution math in `applyResolutions`
-  // so the on-screen preview always matches the value the merge
-  // will produce.
-  const resolvedPreview: React.ReactNode = (() => {
-    if (choice === "keep") return row.field.preview(row.destValue);
-    if (choice === "combine" && row.field.combine) {
-      const all: unknown[] = [];
-      if (!row.field.isEmpty(row.destValue)) all.push(row.destValue);
-      for (const src of row.sources) all.push(src.value);
-      return row.field.preview(row.field.combine(all));
-    }
-    if (typeof choice === "string" && choice.startsWith("source:")) {
-      const id = choice.slice("source:".length);
-      const sourceRef = sourceById.get(id);
-      if (!sourceRef) return row.field.preview(row.destValue);
-      const value = row.field.read(sourceRef.entity);
-      return row.field.preview(value);
-    }
-    return row.field.preview(row.destValue);
-  })();
+  const toggleSources: MergeRowSourceOption[] = row.sources;
+  const resolvedPreview = row.preview(choice);
 
   return (
     <MergeFieldRow
@@ -140,7 +106,7 @@ function MergeRowBody<TEntity, TUpdateInput>({
       value={choice}
       onChange={onChange}
       sources={toggleSources}
-      canCombine={!!row.field.combine}
+      canCombine={row.canCombine}
       resolvedPreview={resolvedPreview}
     />
   );

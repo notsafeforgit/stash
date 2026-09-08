@@ -1,3 +1,4 @@
+import { entityDestination } from "@/core/navigation";
 import { useMemo } from "react";
 import { useIntl } from "react-intl";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -23,14 +24,14 @@ export function useImageTableColumns(): ColumnDef<ImageItem>[] {
 
       thumbnailColumn<ImageItem>(
         (img) => img.paths.thumbnail,
-        (img) => `/images/${img.id}`,
+        (img) => entityDestination.image(img.id),
       ),
 
       titleColumn<ImageItem>({
         id: "title",
         header: intl.formatMessage({ id: "title" }),
         getTitle: imageTitle,
-        getHref: (img) => `/images/${img.id}`,
+        getDestination: (img) => entityDestination.image(img.id),
       }),
 
       textColumn<ImageItem>({

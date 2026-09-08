@@ -45,7 +45,12 @@
       },
       "correctness": {
         "recommended": true,
-        "useExhaustiveDependencies": "warn"
+        "useExhaustiveDependencies": {
+          "level": "warn",
+          "options": {
+            "hooks": [{ "name": "useCommittedRef", "stableResult": true }]
+          }
+        }
       },
       "performance": {
         "recommended": true

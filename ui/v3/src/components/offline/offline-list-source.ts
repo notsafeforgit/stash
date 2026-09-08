@@ -177,10 +177,12 @@ function entryMatchesExtra(
 export function useOfflineListSource(args: {
   entries: OfflineEntry[];
   loading: boolean;
+  error?: Error;
+  refresh?: () => void;
   extra: OfflineExtraFilter;
   activeSceneId: string | null;
 }): LocalDataSource<OfflineCardItem> {
-  const { entries, loading, extra, activeSceneId } = args;
+  const { entries, loading, error, refresh, extra, activeSceneId } = args;
 
   return useMemo<LocalDataSource<OfflineCardItem>>(
     () => ({
@@ -191,6 +193,8 @@ export function useOfflineListSource(args: {
       // exact (no item reshuffling on UI-only renders).
       items: entries.map((e) => ({ id: e.scene_id, entry: e })),
       loading,
+      error,
+      refresh,
       filter: (rawItems, filterModel) => {
         const filtered = filterByExtraSearchSort(
           rawItems,
@@ -207,7 +211,7 @@ export function useOfflineListSource(args: {
         return { count: filtered.length, items: pageItems };
       },
     }),
-    [entries, loading, extra, activeSceneId],
+    [entries, loading, error, refresh, extra, activeSceneId],
   );
 }
 

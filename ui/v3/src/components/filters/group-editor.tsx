@@ -1,4 +1,5 @@
-import React, { useCallback, useRef } from "react";
+import { useCommittedRef } from "@/hooks/use-committed-ref";
+import React, { useCallback } from "react";
 import { useIntl } from "react-intl";
 import {
   SortableContext,
@@ -218,16 +219,15 @@ const GroupEditorComponent: React.FC<GroupEditorProps> = ({
 }) => {
   const intl = useIntl();
 
-  const nodeRef = useRef(node);
-  nodeRef.current = node;
-  const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
-  const onRemoveRef = useRef(onRemove);
-  onRemoveRef.current = onRemove;
-  const onMoveChildDownOutRef = useRef(onMoveChildDownOut);
-  onMoveChildDownOutRef.current = onMoveChildDownOut;
-  const onMoveChildUpOutRef = useRef(onMoveChildUpOut);
-  onMoveChildUpOutRef.current = onMoveChildUpOut;
+  const nodeRef = useCommittedRef(node);
+
+  const onChangeRef = useCommittedRef(onChange);
+
+  const onRemoveRef = useCommittedRef(onRemove);
+
+  const onMoveChildDownOutRef = useCommittedRef(onMoveChildDownOut);
+
+  const onMoveChildUpOutRef = useCommittedRef(onMoveChildUpOut);
 
   const updateChild = useCallback((index: number, child: FilterASTNode) => {
     const n = nodeRef.current;
@@ -266,7 +266,8 @@ const GroupEditorComponent: React.FC<GroupEditorProps> = ({
   const moveConditionIntoNextGroup = useCallback((condIndex: number) => {
     const n = nodeRef.current;
     const cond = n.children[condIndex];
-    const nextGroup = n.children[condIndex + 1] as FilterASTGroupNode;
+    const nextGroup = n.children[condIndex + 1];
+    if (nextGroup?.kind !== "group" || !cond) return;
     const updatedGroup: FilterASTGroupNode = {
       ...nextGroup,
       children: [cond, ...nextGroup.children],
@@ -280,7 +281,8 @@ const GroupEditorComponent: React.FC<GroupEditorProps> = ({
   const moveConditionIntoPrevGroup = useCallback((condIndex: number) => {
     const n = nodeRef.current;
     const cond = n.children[condIndex];
-    const prevGroup = n.children[condIndex - 1] as FilterASTGroupNode;
+    const prevGroup = n.children[condIndex - 1];
+    if (prevGroup?.kind !== "group" || !cond) return;
     const updatedGroup: FilterASTGroupNode = {
       ...prevGroup,
       children: [...prevGroup.children, cond],
@@ -294,7 +296,8 @@ const GroupEditorComponent: React.FC<GroupEditorProps> = ({
   const moveGroupIntoNextGroup = useCallback((groupIndex: number) => {
     const n = nodeRef.current;
     const movingGroup = n.children[groupIndex];
-    const nextGroup = n.children[groupIndex + 1] as FilterASTGroupNode;
+    const nextGroup = n.children[groupIndex + 1];
+    if (nextGroup?.kind !== "group" || !movingGroup) return;
     const updatedGroup: FilterASTGroupNode = {
       ...nextGroup,
       children: [movingGroup, ...nextGroup.children],
@@ -308,7 +311,8 @@ const GroupEditorComponent: React.FC<GroupEditorProps> = ({
   const moveGroupIntoPrevGroup = useCallback((groupIndex: number) => {
     const n = nodeRef.current;
     const movingGroup = n.children[groupIndex];
-    const prevGroup = n.children[groupIndex - 1] as FilterASTGroupNode;
+    const prevGroup = n.children[groupIndex - 1];
+    if (prevGroup?.kind !== "group" || !movingGroup) return;
     const updatedGroup: FilterASTGroupNode = {
       ...prevGroup,
       children: [...prevGroup.children, movingGroup],
@@ -337,10 +341,10 @@ const GroupEditorComponent: React.FC<GroupEditorProps> = ({
         const isFirst = index === 0;
         const isLast = index === node.children.length - 1;
         const prevSiblingIsGroup =
-          index > 0 && node.children[index - 1].kind === "group";
+          index > 0 && node.children[index - 1]?.kind === "group";
         const nextSiblingIsGroup =
           index < node.children.length - 1 &&
-          node.children[index + 1].kind === "group";
+          node.children[index + 1]?.kind === "group";
 
         const handleMoveDown = () => {
           if (!isLast) {
@@ -390,10 +394,10 @@ const GroupEditorComponent: React.FC<GroupEditorProps> = ({
       const isFirst = index === 0;
       const isLast = index === node.children.length - 1;
       const prevSiblingIsGroup =
-        index > 0 && node.children[index - 1].kind === "group";
+        index > 0 && node.children[index - 1]?.kind === "group";
       const nextSiblingIsGroup =
         index < node.children.length - 1 &&
-        node.children[index + 1].kind === "group";
+        node.children[index + 1]?.kind === "group";
       const canNestDeeper =
         depth + 2 + maxGroupNestingDepth(child) <= MAX_FILTER_AST_DEPTH;
 

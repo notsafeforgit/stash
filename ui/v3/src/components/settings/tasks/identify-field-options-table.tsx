@@ -72,7 +72,9 @@ export function IdentifyFieldOptionsTable({
     const idx = fieldOptions.findIndex((f) => f.field === field);
     if (idx < 0) return;
     const next = [...fieldOptions];
-    next[idx] = { ...next[idx], createMissing: value };
+    const current = next[idx];
+    if (!current) return;
+    next[idx] = { ...current, createMissing: value };
     setFieldOptions(next);
   }
 

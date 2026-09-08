@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo } from "react";
+import { useCommittedRef } from "./use-committed-ref";
 import type * as GQL from "src/core/generated-graphql";
 import { useConfigurationContext, useConfigureUISetting } from "./config";
 import { useDebounce } from "./debounce";
@@ -52,29 +53,28 @@ export function useTaskDefaults() {
   const { configuration } = useConfigurationContext();
   const [configureUISetting] = useConfigureUISetting();
 
-  const taskDefaults =
-    (configuration.ui as { taskDefaults?: ITaskDefaults }).taskDefaults ?? {};
+  const taskDefaults = configuration.ui.taskDefaults ?? {};
 
   // Keep a live ref so the debounced save reads the latest merged record at
   // flush time rather than the snapshot at the moment it was scheduled.
-  const taskDefaultsRef = useRef<ITaskDefaults>(taskDefaults);
-  taskDefaultsRef.current = pendingTaskDefaults ?? taskDefaults;
+  const taskDefaultsRef = useCommittedRef(pendingTaskDefaults ?? taskDefaults);
 
-  const flush = useDebounce(async (pendingSave: PendingTaskDefaultsSave) => {
-    await enqueueSave(
-      (value) =>
-        configureUISetting({
-          variables: { key: "taskDefaults", value },
-        }),
-      pendingSave,
-    );
-  }, 500);
-
-  useEffect(() => {
-    return () => {
-      flush.flush();
-    };
-  }, [flush]);
+  const flush = useDebounce(
+    (pendingSave: PendingTaskDefaultsSave) => {
+      void enqueueSave(
+        (value) =>
+          configureUISetting({
+            variables: { key: "taskDefaults", value },
+          }),
+        pendingSave,
+      ).catch(() => {
+        // configureUISetting reports the error through the save indicator/toast.
+        // Consume this queue's rejection too; its promise is intentionally detached.
+      });
+    },
+    500,
+    { flushOnUnmount: true },
+  );
 
   const save = useMemo(
     () =>

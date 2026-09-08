@@ -1,3 +1,4 @@
+import { useCommittedRef } from "@/hooks/use-committed-ref";
 /**
  * Pinch-to-zoom + pan wrapper for the video frame.
  *
@@ -199,21 +200,20 @@ export function VideoFrameZoom({
   isTemporarySpeedActive?: () => boolean;
 }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const transformRef = useRef(transform);
-  transformRef.current = transform;
-  const onTransformChangeRef = useRef(onTransformChange);
-  onTransformChangeRef.current = onTransformChange;
-  const onActiveGestureRef = useRef(onActiveGesture);
-  onActiveGestureRef.current = onActiveGesture;
-  const isTemporarySpeedActiveRef = useRef(isTemporarySpeedActive);
-  isTemporarySpeedActiveRef.current = isTemporarySpeedActive;
+  const transformRef = useCommittedRef(transform);
+
+  const onTransformChangeRef = useCommittedRef(onTransformChange);
+
+  const onActiveGestureRef = useCommittedRef(onActiveGesture);
+
+  const isTemporarySpeedActiveRef = useCommittedRef(isTemporarySpeedActive);
+
   // Discrete actions (double-tap) drive a CSS transition; pinch / pan /
   // wheel must stay real-time, so the transition rule is on only for
   // the duration of an animated change. Stored in state so the inline
   // style updates trigger a re-render the browser can pick up.
   const [transitionMs, setTransitionMs] = useState(0);
-  const setTransitionMsRef = useRef(setTransitionMs);
-  setTransitionMsRef.current = setTransitionMs;
+  const setTransitionMsRef = useCommittedRef(setTransitionMs);
 
   useEffect(() => {
     if (!enabled) {
@@ -438,13 +438,16 @@ export function VideoFrameZoom({
     function onTouchStart(e: TouchEvent) {
       if (!isInside(e.target)) return;
       if (e.touches.length === 2) {
-        startPinch(e.touches[0], e.touches[1]);
+        const [first, second] = Array.from(e.touches);
+        if (!first || !second) return;
+        startPinch(first, second);
         e.stopImmediatePropagation();
         e.preventDefault();
         return;
       }
       if (e.touches.length === 1 && !pinching) {
         const t = e.touches[0];
+        if (!t) return;
         if (tryDoubleTap(e, t)) {
           // Suppress the synthesized click of the second tap so the
           // double-tap doesn't also toggle mute / hit any underlying
@@ -475,7 +478,8 @@ export function VideoFrameZoom({
         return;
       }
       if (pinching && e.touches.length >= 2) {
-        const [t1, t2] = [e.touches[0], e.touches[1]];
+        const [t1, t2] = Array.from(e.touches);
+        if (!t1 || !t2) return;
         const dist = Math.hypot(
           t2.clientX - t1.clientX,
           t2.clientY - t1.clientY,
@@ -499,6 +503,7 @@ export function VideoFrameZoom({
       }
       if (e.touches.length === 1 && touchPan.state !== "idle") {
         const t = e.touches[0];
+        if (!t) return;
         if (t.identifier !== touchPan.id) return;
         const wasPending = touchPan.state === "pending";
         const delta = panAdvance(touchPan, t.clientX, t.clientY);
@@ -534,6 +539,7 @@ export function VideoFrameZoom({
         // can keep panning without lifting and re-tapping.
         if (e.touches.length === 1 && isScaled()) {
           const t = e.touches[0];
+          if (!t) return;
           panBegin(touchPan, t.clientX, t.clientY, t.identifier);
         }
       }

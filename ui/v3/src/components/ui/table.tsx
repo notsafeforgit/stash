@@ -6,13 +6,21 @@ function Table({
   className,
   containerClassName,
   containerRef,
+  containerProps,
   ...props
 }: React.ComponentProps<"table"> & {
   containerClassName?: string;
   containerRef?: React.Ref<HTMLDivElement>;
+  containerProps?: Omit<
+    React.ComponentProps<"div">,
+    "children" | "ref" | "className"
+  > & {
+    [attribute: `data-${string}`]: string | number | boolean | undefined;
+  };
 }) {
   return (
     <div
+      {...containerProps}
       ref={containerRef}
       data-slot="table-container"
       className={cn("relative w-full overflow-x-auto", containerClassName)}

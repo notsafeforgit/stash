@@ -1,6 +1,9 @@
-import React, { useMemo, useState } from "react";
+import React, { useContext, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useIntl } from "react-intl";
+import { ListScrollContext } from "./list-scroll-context";
+import { useListActivity } from "./list-activity-context";
+import { useListScrollRestoration } from "./use-list-scroll-restoration";
 
 import {
   type Column,
@@ -505,6 +508,15 @@ export function EntityDataTable<TItem extends IHasID>({
     filter.itemsPerPage,
     totalCount,
   );
+  const scrollContext = useContext(ListScrollContext);
+  const isActive = useListActivity();
+  const restorationId = `${scrollContext?.restorationId ?? `entity-list-${filter.mode}`}-table`;
+  useListScrollRestoration(
+    restorationId,
+    tableContainerEl,
+    isActive && !isPending,
+    filter.makeQueryParameters(),
+  );
 
   return (
     // h-full so the Table container (below) becomes the scroll context — a
@@ -535,6 +547,7 @@ export function EntityDataTable<TItem extends IHasID>({
       ) : (
         <Table
           containerRef={setTableContainerEl}
+          containerProps={{ "data-scroll-restoration-id": restorationId }}
           containerClassName="min-h-0 flex-1 overflow-auto"
         >
           <TableHeader>

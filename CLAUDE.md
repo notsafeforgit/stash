@@ -88,7 +88,7 @@ Active development target. A ground-up rewrite sharing the same GraphQL API.
 - Routes validate search parameters with `validateSearch`; existing detail/settings routes pass Zod schemas directly. List filter parsing belongs in the shared list/filter modules.
 - Navigate with `useNavigate`; access params with `Route.useParams()`, search with `Route.useSearch()`.
 - Access history (back/forward) via `useRouter().history`.
-- Smart back: use `useSmartBack(defaultPath)` from `src/hooks/use-smart-back.ts` on detail pages — goes back in history if the user came from a list view, otherwise navigates to `defaultPath`.
+- Smart back: use `useSmartBack(defaultPath)` from `src/hooks/use-smart-back.ts` on detail pages. It navigates to the explicit `returnTo` URL, the last visited list (including an initial filtered visit), or `defaultPath`. TanStack scroll restoration uses the full public URL so this action and browser Back recover the same list position; keep new lists in the shared `EntityListPage` shell.
 
 **Data fetching — Apollo Client v4**
 - `useQuery` / `useMutation` from `@apollo/client/react`.

@@ -28,9 +28,14 @@ vi.mock("@/plugins/registry", () => ({
   getRegisteredRoutes: () =>
     plugins.paths.map((path) => ({ path, component: () => null })),
 }));
-vi.mock("@/core/platform-url", () => ({
-  getApplicationBasePath: () => "/stash/",
-}));
+vi.mock("@/core/platform-url", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/core/platform-url")>();
+  return {
+    getApplicationBasePath: () => "/stash/",
+    applicationHref: (href: string) =>
+      actual.applicationHref(href, new URL("https://example.test/stash/")),
+  };
+});
 
 import { createAppRouter } from "./router";
 
@@ -59,4 +64,34 @@ it("can start the core app after a plugin registers a conflicting route", () => 
     "/scenes",
     "__root__",
   ]);
+});
+
+it("browser Back and the app's URL-based Back share scroll positions without mixing filters or pages", () => {
+  const listHref = "/stash/scenes?q=example&perPage=100&p=2";
+  const history = createMemoryHistory({ initialEntries: [listHref] });
+  const router = createAppRouter();
+  router.update({ history });
+  const getKey = router.options.getScrollRestorationKey!;
+  const readLocation = () => router.parseLocation(history.location);
+  const original = readLocation();
+  const key = getKey(original);
+
+  expect(router.options.scrollRestoration).toBe(true);
+  expect(key).toBe(listHref);
+
+  history.push("/stash/scenes/123");
+  history.back();
+  expect(getKey(readLocation())).toBe(key);
+
+  // The in-app action navigates to returnTo, creating a new history entry.
+  history.push("/stash/scenes/123");
+  history.push(listHref);
+  const returned = readLocation();
+  expect(returned.state.__TSR_key).not.toBe(original.state.__TSR_key);
+  expect(getKey(returned)).toBe(key);
+
+  history.push("/stash/scenes?q=example&perPage=100&p=3");
+  expect(getKey(readLocation())).not.toBe(key);
+  history.push("/stash/scenes?q=another&perPage=100&p=2");
+  expect(getKey(readLocation())).not.toBe(key);
 });

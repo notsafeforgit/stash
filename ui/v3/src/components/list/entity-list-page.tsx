@@ -349,6 +349,7 @@ export function EntityListPage<
       view={view}
       totalCount={count}
       preserveScrollDuringRefill={preserveScrollDuringRefill}
+      scrollRestorationReady={isActive && !isLoading}
       sidebarContent={sidebarContent}
       currentSavedFilterName={currentSavedFilterName}
       mobileChrome={mobileChrome}

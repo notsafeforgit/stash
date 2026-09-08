@@ -13,6 +13,11 @@ import { DisplayMode } from "@/models/list-filter/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ListScrollContext } from "./list-scroll-context";
 import { shouldAdjustVirtualizedListScrollPosition } from "./list-scroll-state";
+import { useCardAspect } from "./card-aspect-context";
+import {
+  listMeasurementsCache,
+  matchesListMeasurements,
+} from "./list-virtualizer-measurements";
 
 // ── Skeleton card ─────────────────────────────────────────────────────────────
 
@@ -152,12 +157,39 @@ export function VirtualizedItemList<TItem extends IHasID>({
   onCardPreviewClick,
   renderCard,
 }: VirtualizedItemListProps<TItem>) {
-  // EntityList provides the scroll element directly (callback-ref + state).
+  // EntityList provides the scroll element and cached offset through context.
   // Null on the first commit, populated on the second; the virtualizer
   // computes 0 rows on the first commit and the actual rows on the second.
-  const scrollEl = useContext(ListScrollContext);
+  const scrollContext = useContext(ListScrollContext);
+  const scrollEl = scrollContext?.element ?? null;
+  const cardAspect = useCardAspect();
+  const measurementKey = JSON.stringify([
+    scrollContext?.restorationKey,
+    displayMode,
+    zoomIndex,
+    isMobile,
+    mobileGridCols,
+    cardIsPortrait,
+    cardAspect,
+  ]);
+  const savedMeasurements = useMemo(
+    () => listMeasurementsCache.get(measurementKey),
+    [measurementKey],
+  );
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(0);
+  const [containerWidth, setContainerWidth] = useState(
+    savedMeasurements?.width ?? 0,
+  );
+  const itemIds = useMemo(() => items.map((item) => item.id), [items]);
+  const measurements =
+    savedMeasurements &&
+    matchesListMeasurements(
+      savedMeasurements,
+      containerWidth,
+      isLoading ? undefined : itemIds,
+    )
+      ? savedMeasurements
+      : undefined;
 
   useLayoutEffect(() => {
     const el = containerRef.current;
@@ -196,28 +228,47 @@ export function VirtualizedItemList<TItem extends IHasID>({
     pad,
   ]);
 
-  const total = isLoading ? Math.min(itemsPerPage, 40) : items.length;
+  // Only visible rows mount, so a loading page can retain its full geometry.
+  // Capping its count would clamp the restored offset and briefly measure
+  // unrelated real rows when the data replaces the skeletons.
+  const total = isLoading
+    ? (measurements?.itemIds.length ?? itemsPerPage)
+    : items.length;
   const rowCount = lanes > 0 ? Math.ceil(total / lanes) : 0;
 
   // Row-height estimate: card image aspect × column width + ~80px body.
   // Details cards are a fixed-height flex-row layout.
-  const estimateSize = useCallback(() => {
-    if (isDetails) return 96;
-    if (containerWidth === 0 || lanes === 0) return 280;
-    const inner = Math.max(0, containerWidth - pad * 2);
-    const colWidth = (inner - gap * (lanes - 1)) / lanes;
-    const aspectH = cardIsPortrait ? colWidth * 1.5 : colWidth * 0.5625;
-    return Math.round(aspectH + 80) + gap;
-  }, [isDetails, containerWidth, lanes, gap, pad, cardIsPortrait]);
+  const estimateSize = useCallback(
+    (index: number) => {
+      // Reuse measured rows above the viewport as well as the scroll offset;
+      // estimates alone would put the returning cards at different positions.
+      const savedSize = measurements?.rows[index]?.size;
+      if (savedSize !== undefined) return savedSize;
+      if (isDetails) return 96;
+      if (containerWidth === 0 || lanes === 0) return 280;
+      const inner = Math.max(0, containerWidth - pad * 2);
+      const colWidth = (inner - gap * (lanes - 1)) / lanes;
+      const aspectH = cardIsPortrait ? colWidth * 1.5 : colWidth * 0.5625;
+      return Math.round(aspectH + 80) + gap;
+    },
+    [measurements, isDetails, containerWidth, lanes, gap, pad, cardIsPortrait],
+  );
 
-  const virtualizer = useVirtualizer({
+  const virtualizer = useVirtualizer<HTMLElement, HTMLDivElement>({
     count: rowCount,
     getScrollElement: () => scrollEl,
+    initialOffset: scrollContext?.initialOffset,
+    initialMeasurementsCache: measurements?.rows,
     estimateSize,
     overscan: 2,
     measureElement:
       typeof ResizeObserver !== "undefined"
-        ? (el) => el.getBoundingClientRect().height
+        ? (el, _entry, instance) =>
+            // Skeleton geometry must not overwrite real row measurements.
+            isLoading
+              ? (instance.measurementsCache[Number(el.dataset.index)]?.size ??
+                estimateSize(Number(el.dataset.index)))
+              : el.getBoundingClientRect().height
         : undefined,
   });
   virtualizer.shouldAdjustScrollPositionOnItemSizeChange = (
@@ -231,6 +282,40 @@ export function VirtualizedItemList<TItem extends IHasID>({
       instance.isScrolling,
       preserveScrollDuringRefill,
     );
+
+  // The route can stay mounted when its URL or layout changes. Seed those
+  // rows from the matching snapshot too, and discard incompatible geometry.
+  const layoutKey = JSON.stringify([
+    measurementKey,
+    containerWidth,
+    !!measurements,
+  ]);
+  const previousLayoutKey = useRef(layoutKey);
+  useLayoutEffect(() => {
+    if (previousLayoutKey.current === layoutKey) return;
+    previousLayoutKey.current = layoutKey;
+    virtualizer.measure();
+    containerRef.current
+      ?.querySelectorAll<HTMLDivElement>("[data-index]")
+      .forEach((row) => {
+        virtualizer.measureElement(row);
+      });
+  }, [layoutKey, virtualizer]);
+
+  useLayoutEffect(() => {
+    if (
+      !scrollContext ||
+      isLoading ||
+      preserveScrollDuringRefill ||
+      !containerWidth
+    )
+      return;
+    listMeasurementsCache.set(measurementKey, {
+      width: containerWidth,
+      itemIds,
+      rows: virtualizer.measurementsCache.slice(),
+    });
+  });
 
   const totalSize = virtualizer.getTotalSize();
   const virtualRows = virtualizer.getVirtualItems();

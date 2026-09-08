@@ -51,6 +51,8 @@ than copying a page implementation.
 | `use-list-page-filter.ts` | Layout preferences and filter/URL synchronization |
 | `use-filter-state.ts` | Parse and persist filters, including per-view defaults |
 | `use-list-page-refill.ts` | Refill shortened remote pages while preserving scroll |
+| `use-list-scroll-restoration.ts` | Apply TanStack's cached position once the active list's content is ready |
+| `list-virtualizer-measurements.ts` | Bound and validate reusable row geometry for returning virtualized lists |
 | `use-list-select.ts` | Selection and stable selection accessors |
 | `virtualized-item-list.tsx` | Grid/details row virtualization and skeletons |
 | `photo-album-wall.tsx` | Justified wall layout and selection synchronization |
@@ -68,6 +70,38 @@ Layout preferences must not change query variables or flash loading states.
 Only active embedded panels synchronize shared URL parameters. Wall selection
 is synchronized in the DOM for performance, including its accessible state;
 preserve both when changing that renderer.
+
+### Returning to a list
+
+TanStack Router owns scroll tracking and its session cache. The router and
+`useElementScrollRestoration` share `core/scroll-restoration.ts`, which keys
+positions by the full public URL, including filters, pagination, and deployment
+prefix. The app's `useSmartBack` navigates to a saved return URL, so it restores
+the same position as browser Back even though it creates a new history entry.
+Revisiting the same URL within the session also restores its last position.
+
+`EntityList` exposes a stable `data-scroll-restoration-id` scoped to the list's
+`view` (or filter mode). Tables identify their nested scroll container separately.
+The shared restoration hook waits for active content to finish loading, including
+the first-paint skeleton gate, then applies the cached offset once. Grid/details
+virtualizers also receive that offset as `initialOffset`; restoring only the DOM
+scroll position would let the virtualizer start at the top. Their
+`initialMeasurementsCache` preserves measured row heights so the visible cards
+return to the same place too. Geometry is kept for at most 20 recently updated
+layouts in memory, keyed by list URL and layout preferences; changed widths or
+ordered item IDs invalidate it. Loading virtual rows retain the full page height
+without measuring skeletons as real cards. Do not duplicate scroll tracking or
+restoration in individual routes.
+
+Keep each embedded list's `view` distinct. Filter data can catch up with the URL
+after browser Back, so restoration tracks both identities. Ordinary pagination
+still starts at the top, and deletion-refill preservation and removed-last-page
+clamping continue to use `list-scroll-state.ts`.
+
+When changing navigation or list layout, check browser Back/Forward and the app's
+Back button with filtered, paginated URLs. Exercise grid, details, wall, and table
+views with delayed data, including table horizontal scrolling. After restoration,
+scrolling and ordinary rerenders must not reapply the saved offset.
 
 ## Player
 

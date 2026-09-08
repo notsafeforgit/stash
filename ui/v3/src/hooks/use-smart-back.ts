@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect } from "react";
 import { useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
+import { applicationPath } from "@/core/platform-url";
 
 // Extend TanStack Router's history state to allow returnTo passthrough.
 declare module "@tanstack/react-router" {
@@ -17,6 +18,7 @@ const LIST_PATHNAMES = [
   "/images",
   "/studios",
   "/tags",
+  "/offline",
 ];
 
 function isListPathname(pathname: string): boolean {
@@ -30,22 +32,17 @@ let _lastListHref: string | null = null;
 /**
  * Call once in the app shell (a component that's always mounted). Tracks the
  * current route and saves the href whenever the user visits a list page via
- * SPA navigation. Skips the initial mount so that a hard-refresh on a
- * filtered list URL does NOT pre-populate _lastListHref — only navigations
- * that happen within the current SPA session are recorded.
+ * SPA navigation, including an initial visit to a filtered list. Detail links
+ * without explicit returnTo state (such as table links) must retain that URL.
  */
 export function useTrackListPage() {
   const location = useRouterState({ select: (s) => s.location });
-  const isMountRef = useRef(true);
   useEffect(() => {
-    if (isMountRef.current) {
-      isMountRef.current = false;
-      return;
+    const href = applicationPath(location.href);
+    if (isListPathname(href.split(/[?#]/, 1)[0])) {
+      _lastListHref = href;
     }
-    if (isListPathname(location.pathname)) {
-      _lastListHref = location.href;
-    }
-  }, [location.href, location.pathname]);
+  }, [location.href]);
 }
 
 /**
@@ -74,7 +71,10 @@ export function useSmartBack(defaultPath: string) {
     const state = router.state.location.state;
     if (state?.returnTo) {
       // Cast — returnTo is a runtime URL string, not a registered route path.
-      navigate({ to: state.returnTo as never, viewTransition: true });
+      navigate({
+        to: applicationPath(state.returnTo) as never,
+        viewTransition: true,
+      });
       return;
     }
 

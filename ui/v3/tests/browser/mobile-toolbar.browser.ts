@@ -7,7 +7,7 @@ import {
   expectTouchTargets,
 } from "./test";
 
-test("navigation, filters and view options open directly and close within thumb reach", async ({
+test("mobile drawers open directly and dismiss by tapping outside", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 320, height: 568 });
@@ -17,17 +17,15 @@ test("navigation, filters and view options open directly and close within thumb 
     ["Navigation", "Fixture navigation"],
     ["Filters", "Filters"],
     ["View options", "View options"],
+    ["Entity actions", "Entity actions"],
   ]) {
     await footer.getByRole("button", { name: control, exact: true }).tap();
     const drawer = page.getByRole("dialog", { name: title, exact: true });
     await expect(drawer).toBeVisible();
-    const close = drawer.getByRole("button", { name: "Close", exact: true });
-    await expect(close).toBeInViewport();
-    const bounds = await close.boundingBox();
-    if (!bounds) throw new Error("Missing close button");
-    expect(bounds.y).toBeGreaterThan(500);
-    expect(bounds.x).toBeGreaterThan(240);
-    await close.tap();
+    await expect(
+      drawer.getByRole("button", { name: "Close", exact: true }),
+    ).toHaveCount(0);
+    await page.touchscreen.tap(8, 8);
     await expect(drawer).toBeHidden();
     await expectCompactRow(footer);
     await expectTouchTargets(footer);
@@ -64,10 +62,7 @@ test("mobile action groups are flat and their forms outlive drawer dismissal", a
     await expect(form).toBeHidden();
   }
   await trigger.tap();
-  await page
-    .getByRole("dialog", { name: "Entity actions", exact: true })
-    .getByRole("button", { name: "Close", exact: true })
-    .tap();
+  await page.keyboard.press("Escape");
   await expect(trigger).toBeFocused();
 });
 
@@ -312,7 +307,7 @@ test("standalone lists provide page jumping, view options, and navigation", asyn
   await expect(
     page.getByRole("dialog", { name: "Fixture navigation" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Close navigation" }).tap();
+  await page.touchscreen.tap(8, 8);
   await expectCompactRow(row);
 });
 

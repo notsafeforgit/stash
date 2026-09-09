@@ -6,10 +6,8 @@ import {
 } from "@tanstack/react-router";
 import { z } from "zod";
 import { useIntl } from "react-intl";
-import {
-  SettingsNav,
-  SETTINGS_NAV_ITEMS,
-} from "src/components/settings/settings-nav";
+import { SettingsLayout } from "@/components/settings/settings-layout";
+import { getSettingsSection } from "@/components/settings/settings-navigation";
 import { useDocumentTitle } from "src/hooks/title";
 
 const searchSchema = z.object({
@@ -18,16 +16,14 @@ const searchSchema = z.object({
   hl: z.string().optional(),
 });
 
-function SettingsLayout() {
+function SettingsPage() {
   const intl = useIntl();
   const { hl } = Route.useSearch();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   // "<Section> | Settings | Stash". Match the longest nav route that the
   // current path falls under (e.g. /settings/system → System).
-  const section = SETTINGS_NAV_ITEMS.filter(
-    (i) => pathname === i.to || pathname.startsWith(`${i.to}/`),
-  ).sort((a, b) => b.to.length - a.to.length)[0];
+  const section = getSettingsSection(pathname);
   useDocumentTitle(
     section
       ? intl.formatMessage({
@@ -64,21 +60,13 @@ function SettingsLayout() {
   }, [hl]);
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col md:flex-row">
-      <div className="md:flex md:flex-col md:p-6 md:pr-0">
-        <h1 className="hidden md:mb-4 md:block md:text-xl md:font-semibold">
-          {intl.formatMessage({ id: "settings", defaultMessage: "Settings" })}
-        </h1>
-        <SettingsNav />
-      </div>
-      <div className="flex-1 overflow-y-auto">
-        <Outlet />
-      </div>
-    </div>
+    <SettingsLayout>
+      <Outlet />
+    </SettingsLayout>
   );
 }
 
 export const Route = createFileRoute("/settings")({
   validateSearch: searchSchema,
-  component: SettingsLayout,
+  component: SettingsPage,
 });

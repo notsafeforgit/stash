@@ -246,6 +246,25 @@ pinned action bars inside the remaining height. Close, Escape, and backdrop
 dismissal leave without saving; Discard resets the form and keeps the pane open.
 Successful saves close the sheet through the existing form callback.
 
+## Settings navigation
+
+`SettingsLayout` keeps the settings page mounted in its own scroller. Desktop
+uses a sidebar with section links and inline search results. Mobile reserves one
+56px bottom row for Navigation, the current section, and Search, replacing the
+global bottom navigation bar. Its top header contains only the Settings title.
+Section links open in an upward menu with 44px targets and bounded scrolling.
+They remain TanStack Router links, so deep links and browser Back select the
+correct section.
+
+Search replaces the mobile row and focuses inside the opening touch handler.
+It reuses the generated, locale-resolved settings index and navigates with the
+existing `hl` parameter to reveal the chosen setting. Both layouts render results
+as ordinary route links with native touch and keyboard activation. Mobile results
+appear above the input, bounded to half the visible viewport, while the shared
+visual-viewport hook lifts the search area above the keyboard. Closing search
+restores its trigger's focus. Search state belongs to the navigation, so a
+breakpoint change preserves the query without remounting the settings form.
+
 ## Mobile detail navigation
 
 Collection and media detail layouts keep the entity title above the scroller
@@ -255,8 +274,9 @@ Entity actions, and Back controls. All targets stay at least 44px at 320px width
 the section label truncates and becomes an icon on the narrowest screens. Search
 and selection replace that row and put Close at its right edge. Navigation,
 Filters, View options, and Entity actions open bottom drawers with scrollable
-content, swipe dismissal, and a fixed bottom-right Close. The section picker
-includes page navigation and a page-jump form. Previous/next controls also
+content and dismiss through swipe-down, outside taps, or Escape. They omit Close
+rows; the shared drawer primitive supplies bottom safe-area padding. The section
+picker includes page navigation and a page-jump form. Previous/next controls also
 appear at the end of list results, and single-page lists omit pagination. Standalone mobile lists use the same
 row modes with navigation and a page picker. Desktop retains
 its sidebar controls and tab strip. Collection pages use the `md` breakpoint;

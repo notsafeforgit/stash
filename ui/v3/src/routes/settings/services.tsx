@@ -384,7 +384,7 @@ function SettingsServicesPage() {
         <SettingText
           label={msg("config.dlna.server_display_name", "Server display name")}
           description={msg(
-            "config.dlna.server_display_name_desc",
+            "config.dlna.server_display_name_help",
             "Display name for the DLNA server. Defaults to stash when empty.",
           )}
           value={dlna.serverName}
@@ -422,7 +422,7 @@ function SettingsServicesPage() {
             "Default IP whitelist",
           )}
           description={msg(
-            "config.dlna.default_ip_whitelist_desc",
+            "config.dlna.default_ip_whitelist_help",
             "IP addresses allowed to use the DLNA service by default. Use * as a wildcard.",
           )}
           value={dlna.whitelistedIPs}

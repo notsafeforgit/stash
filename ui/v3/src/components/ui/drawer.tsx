@@ -97,7 +97,7 @@ function DrawerContent({
           data-slot="drawer-content"
           className={cn(
             "group/drawer-content flex h-auto w-full flex-col bg-popover text-sm text-popover-foreground",
-            "rounded-t-xl border-t max-h-[80svh] min-h-0",
+            "rounded-t-xl border-t max-h-[80svh] min-h-0 pb-[env(safe-area-inset-bottom,0px)]",
             "translate-y-[var(--drawer-swipe-movement-y,0px)] transition-transform duration-200 ease-out data-swiping:transition-none motion-reduce:transition-none",
             "data-[starting-style]:translate-y-full data-[ending-style]:translate-y-full",
             className,

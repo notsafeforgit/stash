@@ -7,7 +7,7 @@ import { useNavItems } from "./nav-items";
 
 /**
  * Compact bottom nav. Matches the list-page top bar's height + left-aligned
- * hamburger convention so non-list pages (home, settings, etc.) share the
+ * hamburger convention so pages without their own toolbar (home, etc.) share the
  * same visual language. The hamburger opens the full top-level page drawer
  * (`MobileNavSheet`); the inline tabs are quick jumps to the most-used
  * primary destinations.

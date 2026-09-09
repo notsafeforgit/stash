@@ -99,6 +99,7 @@ generate → build UIs → validate → compile order.
 | `make lint` | CI-pinned golangci-lint via `go run` |
 | `make it` | Go tests with `sqlite_stat4 sqlite_math_functions integration` build tags |
 | `pnpm --dir ui/v3 test --run` | Generate v3 GraphQL types and run Vitest once |
+| `make test-ui-v3-browser` | Generate/check v3 and run the Chromium/WebKit toolbar regression suite |
 | `make fmt-ui-v3` | Format v3 source with Biome |
 | `make validate` | Upstream/v2.5 UI validation plus backend checks; does not validate v3 |
 
@@ -135,6 +136,36 @@ For routing changes, exercise a deployment under a path prefix as well as `/`.
 For player or gesture changes, check target browsers and physical iOS devices;
 unit tests cannot verify native fullscreen or touch behavior. Preserve the
 [zoom, keyboard, focus, and text-selection policies](architecture.md#interaction-and-accessibility).
+
+## Browser regression suite
+
+Install the browsers once after installing the locked UI dependencies:
+
+```bash
+pnpm --dir ui/v3 exec playwright install chromium webkit
+make test-ui-v3-browser
+```
+
+The [browser workflow](../../../.github/workflows/v3-browser-tests.yml) installs
+the browser system libraries with `playwright install --with-deps chromium webkit`
+on Ubuntu. It runs for relevant pushes and pull requests and saves traces and
+screenshots on failure. To inspect a local failure, run
+`pnpm --dir ui/v3 exec playwright show-report`.
+
+[tests/browser](../tests/browser) starts and stops its own Vite server on
+`127.0.0.1:3025`. It renders the real collection/media layouts, tabs, lists,
+toolbar, popovers, and forms with synthetic data; backend-dependent navigation
+and default-filter integrations are substituted. No backend, credentials, or
+existing library is required. Unexpected requests and browser errors fail the
+tests. These are shared-component integration tests, not complete entity-route
+or backend tests.
+
+The suite covers 320–1280px layouts, search/selection replacement rows, page
+validation, section state, editor dismissal, keyboard navigation, and viewport
+lifting. Browser sources are strictly type-checked by the normal validation
+command; `.browser.ts` tests run separately from Vitest. Virtual viewport
+resizing models keyboard geometry, but physical iOS keyboard and gesture checks
+remain necessary for changes to those interactions.
 
 ## Publishing
 

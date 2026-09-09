@@ -9,8 +9,6 @@ export interface DetailTabStripItem {
 
 export interface DetailTabStripProps {
   tabs: readonly DetailTabStripItem[];
-  mobile?: boolean;
-  onTabClick?: (id: string) => void;
   className?: string;
 }
 
@@ -21,12 +19,7 @@ export interface DetailTabStripProps {
  * horizontally scrollable (`overflow-x-auto`) when 5+ labels exceed the
  * column width. This is the only place the scroll behaviour lives.
  */
-export function DetailTabStrip({
-  tabs,
-  mobile = false,
-  onTabClick,
-  className,
-}: DetailTabStripProps) {
+export function DetailTabStrip({ tabs, className }: DetailTabStripProps) {
   const intl = useIntl();
   return (
     // `w-full` overrides the shadcn TabsList's default `w-fit`: without
@@ -61,22 +54,11 @@ export function DetailTabStrip({
         // forward leftover scroll momentum to the page beneath
         // (`overscroll-contain`).
         "touch-pan-x overscroll-contain",
-        mobile &&
-          "h-12 group-data-horizontal/tabs:h-12 justify-start p-0 [&>*]:px-3",
         className,
       )}
     >
       {tabs.map((t) => (
-        <TabsTrigger
-          key={t.id}
-          value={t.id}
-          onClick={() => onTabClick?.(t.id)}
-          className={
-            mobile
-              ? "h-12 after:inset-x-0 after:bottom-0 group-data-horizontal/tabs:after:bottom-0 after:h-0.5"
-              : undefined
-          }
-        >
+        <TabsTrigger key={t.id} value={t.id}>
           {t.label}
         </TabsTrigger>
       ))}

@@ -228,6 +228,10 @@ Preserve these invariants:
 - Every forced reload changes the URL, even a repeated target at zero.
 - Clip URL bounds stay fixed through quality changes so earlier portions remain
   reachable. Retain freeze-frame masking and native fullscreen behavior.
+- Temporary press-and-hold speed belongs to the current player. Release restores
+  its previous rate while the media is attached. Scene or marker auto-advance can
+  unmount the player mid-hold; cleanup must clear the gesture without sending
+  playback commands to a detached store.
 
 Root [CLAUDE.md](../../../CLAUDE.md) describes the backend HLS constraints.
 
@@ -246,8 +250,12 @@ Successful saves close the sheet through the existing form callback.
 
 Collection and media detail layouts keep the entity title above the scroller
 and navigation below it on mobile. `mobile-detail-chrome.tsx` provides a shared
-footer for Back, entity actions, the section tab strip, and the active embedded
-list's search, filtering, selection, and pagination controls. Desktop retains
+56px toolbar for the section picker, Search, More, and Back. Search and selection
+replace that row and put Close at its right edge. More holds entity actions,
+filtering, and view options; the section picker includes page navigation and a
+page-jump form. Previous/next controls also appear at the end of list results,
+and single-page lists omit pagination. Standalone mobile lists use the same
+row modes with navigation and a page picker. Desktop retains
 its sidebar controls and tab strip. Collection pages use the `md` breakpoint;
 media pages use `lg`, matching their existing split layouts.
 
@@ -256,8 +264,16 @@ fixed offsets or content overlays. It owns safe-area clearance and keyboard
 lifting. React portals move controls into its typed slots while preserving
 their tab, list, and action contexts. Only the active list publishes controls;
 previously visited panels stay mounted with their filters and state intact.
-The mobile strip uses the same Base UI tabs as desktop, supports horizontal
-swiping for longer section lists, and brings a chosen section into view.
+The mobile picker uses the same Base UI tab state as desktop, with vertical
+triggers in an upward popover, and brings a chosen section into view. The
+popover keeps its contents mounted so tab labels, action dialogs, and portal
+targets survive closing it. Search mounts and focuses within the opening touch
+handler, and flushes any pending debounce on blur before the row closes.
+List controls own their prop contract; the parent bar extends it with view
+settings. Page jumping uses TanStack Form with Zod validation and starts a new
+draft when the page or page count changes. Collection and media tab panels both
+publish their active state through `ListActivityContext`, so kept-mounted lists
+cannot leave duplicate controls in the footer.
 Tapping the current section also reveals it when the page is showing the
 entity information or media above it. The focused scene viewer keeps its
 existing player mounted and places Close below it on mobile.

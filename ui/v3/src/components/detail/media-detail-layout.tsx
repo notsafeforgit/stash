@@ -6,6 +6,8 @@ import { useIntl } from "react-intl";
 import { Tabs, TabsContent } from "src/components/ui/tabs";
 import { Button } from "src/components/ui/button";
 import { DetailTabStrip } from "src/components/detail/detail-tab-strip";
+import { MobileDetailSections } from "./mobile-detail-sections";
+import { ListActivityContext } from "@/components/list/list-activity-context";
 import { useTabState } from "src/hooks/use-tab-state";
 import {
   MobileDetailChromePortal,
@@ -172,7 +174,8 @@ function MediaDetailContent({
     <Tabs
       value={activeTab}
       onValueChange={handleTabChange}
-      className="flex-1 min-h-0 gap-0 overflow-hidden"
+      orientation={mobile ? "vertical" : "horizontal"}
+      className="flex-col flex-1 min-h-0 gap-0 overflow-hidden"
     >
       {title && !primaryFocusMode && (
         <div className="lg:hidden flex h-10 shrink-0 items-center border-b border-border bg-background px-3">
@@ -264,17 +267,18 @@ function MediaDetailContent({
             </MobileDetailChromePortal>
           )}
 
-          <MobileDetailChromePortal slot="tabs">
-            <DetailTabStrip
+          {mobile ? (
+            <MobileDetailSections
               tabs={tabs}
-              mobile={mobile}
-              onTabClick={(id) => {
-                if (mobile && mobilePageScroll && id === activeTab) {
+              activeTab={activeTab}
+              onReselect={() => {
+                if (mobilePageScroll)
                   panelsRef.current?.scrollIntoView({ block: "start" });
-                }
               }}
             />
-          </MobileDetailChromePortal>
+          ) : (
+            <DetailTabStrip tabs={tabs} />
+          )}
 
           {/* Shared tab panels — desktop always scrolls here. Mobile only
             scrolls here in default mode; in page-scroll mode the outer
@@ -294,7 +298,11 @@ function MediaDetailContent({
                 keepMounted={isMounted(tab.id)}
                 className="p-3"
               >
-                {isMounted(tab.id) ? tab.content : null}
+                {isMounted(tab.id) ? (
+                  <ListActivityContext value={tab.id === activeTab}>
+                    {tab.content}
+                  </ListActivityContext>
+                ) : null}
               </TabsContent>
             ))}
           </div>

@@ -1296,7 +1296,11 @@ export function PlayerControls({
       holdTimerRef.current = null;
     }
     if (holdOriginalRateRef.current != null) {
-      store.setPlaybackRate(holdOriginalRateRef.current);
+      // Auto-advance detaches the old media before this effect's cleanup.
+      // Restore a live player, but never call actions on a detached store.
+      if (store.target) {
+        store.setPlaybackRate(holdOriginalRateRef.current);
+      }
       holdOriginalRateRef.current = null;
     }
     holdStartPosRef.current = null;

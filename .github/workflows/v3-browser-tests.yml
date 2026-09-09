@@ -1,0 +1,51 @@
+name: v3 browser tests
+
+on:
+  push:
+    branches: [v3-rewrite]
+    paths:
+      - "ui/v3/**"
+      - "graphql/**"
+      - ".github/workflows/v3-browser-tests.yml"
+  pull_request:
+    paths:
+      - "ui/v3/**"
+      - "graphql/**"
+      - ".github/workflows/v3-browser-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v3-browser-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ui/v3
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: ui/v2.5/package.json
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: ui/v3/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium webkit
+      - run: pnpm run test:browser
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: v3-browser-failure
+          path: |
+            ui/v3/playwright-report/
+            ui/v3/test-results/
+          retention-days: 7

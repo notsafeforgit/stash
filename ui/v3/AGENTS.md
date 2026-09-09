@@ -19,6 +19,7 @@ Run integrated workflows from the Git root. Follow the [development guide](docs/
 - `VITE_APP_PLATFORM_URL=http://127.0.0.1:9999 make ui-v3-start` runs Vite on port 3002.
 - `make ui-v3-only` type-checks and builds the embedded v3 assets.
 - `make validate-ui-v3` runs generation, Biome (including accessibility), React purity/type-contract lint, TypeScript, formatting, locale checks, Vitest, and the pinned v2.5 compatibility check.
+- `make test-ui-v3-browser` runs the Chromium/WebKit toolbar regression suite; see the development guide for browser installation. The suite starts its own fixture server and needs no backend.
 - `make lint` runs CI-pinned `golangci-lint` through `go run`; no local install is required.
 - `make validate-fork` is the pre-push gate for backend generation, Go lint/integration tests, and v3 validation.
 - From `ui/v3`, `pnpm test --run` runs Vitest once and `pnpm gqlgen` refreshes GraphQL types.

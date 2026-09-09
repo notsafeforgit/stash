@@ -15,6 +15,7 @@
 import type React from "react";
 import { useEffect, useState } from "react";
 import { cn } from "src/lib/utils";
+import { useMobileDetailChrome } from "@/components/layout/mobile-detail-chrome";
 
 const TRANSITION_MS = 200;
 
@@ -45,6 +46,10 @@ export function DetailEditTransition({
   fillHeight = false,
 }: DetailEditTransitionProps) {
   const [phase, setPhase] = useState<Phase>(editing ? "edit" : "detail");
+  const setChromePanel = useMobileDetailChrome()?.setPanel;
+  useEffect(() => {
+    if (editing) setChromePanel?.(null);
+  }, [editing, setChromePanel]);
 
   // Sync the phase machine with the controlled `editing` prop.
   useEffect(() => {

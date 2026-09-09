@@ -233,7 +233,10 @@
     "view_random": "View Random",
     "open": "Open",
     "reload_ui": "Reload UI",
-    "retry": "Retry"
+    "retry": "Retry",
+    "more": "More",
+    "go": "Go",
+    "close_search": "Close search"
   },
   "actions_name": "Actions",
   "add_row": "Add row",
@@ -1592,7 +1595,8 @@
       "no_items_title": "Nothing here yet",
       "no_results_description": "Try clearing or adjusting filters to see more.",
       "no_results_title": "No results found"
-    }
+    },
+    "selected_count": "{count} selected"
   },
   "loading": {
     "generic": "Loading…",
@@ -1847,7 +1851,10 @@
     "last": "Last",
     "next": "Next",
     "previous": "Previous",
-    "previous_short": "Prev"
+    "previous_short": "Prev",
+    "pages": "Pages",
+    "go_to_page": "Go to page",
+    "invalid_page": "Enter a whole page number between 1 and {pages}."
   },
   "parent_folder": "Parent Folder",
   "parent_of": "Parent of {children}",

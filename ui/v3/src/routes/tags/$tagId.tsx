@@ -92,7 +92,7 @@ function TagToolbar({
   const intl = useIntl();
 
   return (
-    <div className="flex md:flex-wrap gap-2">
+    <div className="flex flex-wrap gap-2">
       <Button
         variant="outline"
         size="sm"

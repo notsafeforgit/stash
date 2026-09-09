@@ -149,7 +149,7 @@ function GroupDetailPage() {
                         <GroupImage group={group} />
                         <MobileDetailChromePortal slot="actions">
                           <div className="min-w-0 md:order-first">
-                            <div className="flex md:flex-wrap gap-2">
+                            <div className="flex flex-wrap gap-2">
                               <Button
                                 variant="outline"
                                 size="sm"

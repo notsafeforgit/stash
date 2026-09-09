@@ -14,6 +14,7 @@ import { SceneSlideContent } from "./scene-slide-content";
 import { lightboxIconRenders } from "./lightbox-icons";
 import type { OfflineEntry } from "src/components/offline/offline-db";
 import { useLightboxHistory } from "./use-lightbox-history";
+import { useIsTouch } from "@/utils/screen";
 
 // ── Persistence keys ───────────────────────────────────────────────────────────
 
@@ -75,6 +76,7 @@ export function SceneLightbox({
   finite = false,
 }: SceneLightboxProps) {
   const requestClose = useLightboxHistory(open, onClose);
+  const touch = useIsTouch();
   // Lightbox fullscreen ref — populated by the YARL Fullscreen plugin via
   // its `fullscreen.ref` prop. Used so the embedded ScenePlayer can
   // delegate fullscreen requests (its hidden button + `f` hotkey) to the
@@ -282,10 +284,18 @@ export function SceneLightbox({
           loopEnabled={loopEnabled}
           onLoopToggle={handleLoopToggle}
           onNext={handleNext}
+          onClose={touch ? requestClose : undefined}
         />
       );
     },
-    [handleToggleLightboxFullscreen, loopEnabled, handleLoopToggle, handleNext],
+    [
+      handleToggleLightboxFullscreen,
+      loopEnabled,
+      handleLoopToggle,
+      handleNext,
+      touch,
+      requestClose,
+    ],
   );
 
   return (
@@ -296,12 +306,11 @@ export function SceneLightbox({
       index={index}
       plugins={[Fullscreen]}
       fullscreen={{ ref: fullscreenRef }}
-      carousel={finite ? { finite: true, preload: 1 } : { preload: 1 }}
+      carousel={{ finite, preload: 1, ...(touch && { padding: 0 }) }}
       controller={{
         ref: controllerRef,
         disableSwipeNavigation: isSingleSlide && !finite,
       }}
-      animation={{ zoom: 250 }}
       toolbar={{ buttons: ["fullscreen", "close"] }}
       on={{
         view: ({ index: newIndex }) => {
@@ -316,6 +325,12 @@ export function SceneLightbox({
       }}
       render={{
         ...lightboxIconRenders,
+        // Touch users close from the player's control bar. Pending/error
+        // slides expose the same action at the bottom until a player exists.
+        ...(touch && {
+          buttonClose: () => null,
+          buttonFullscreen: () => null,
+        }),
         iconLoading: () => <Spinner className="size-10 text-white/70" />,
         slide: renderSlide,
         ...(isSingleSlide &&

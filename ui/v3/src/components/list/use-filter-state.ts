@@ -25,10 +25,6 @@ function locationEquals(
   );
 }
 
-function hasSearchParams(searchStr: string) {
-  return searchStr.length > 0 && searchStr !== "?";
-}
-
 // The set of URL params managed exclusively by the filter. Non-filter params
 // (e.g. `tab`) are preserved when updating the URL so they survive filter changes.
 const FILTER_PARAMS = [
@@ -40,6 +36,11 @@ const FILTER_PARAMS = [
   "perPage",
   "p",
 ] as const;
+
+function hasFilterParams(searchStr: string) {
+  const params = new URLSearchParams(searchStr);
+  return FILTER_PARAMS.some((key) => params.has(key));
+}
 
 /**
  * Merge new filter params into the current URL search string, preserving any
@@ -172,7 +173,7 @@ function useFilterURL(
     // the URL params. Only normalize the URL if the filter dropped invalid
     // params (e.g. a sort key not supported by this filter mode).
     if (prevLocation === undefined) {
-      if (hasSearchParams(location.searchStr)) {
+      if (hasFilterParams(location.searchStr)) {
         const currentParams = filterRef.current.makeQueryParameters();
         const merged = mergeFilterParams(location.searchStr, currentParams);
         const expectedSearchStr = merged ? `?${merged}` : "";
@@ -190,9 +191,12 @@ function useFilterURL(
       return;
     }
 
-    // No search params → reset to default filter
-    if (!hasSearchParams(location.searchStr)) {
-      if (defaultFilter) updateFilter(defaultFilter.clone());
+    // Tab navigation clears the list parameters but retains `tab`. Restore
+    // this view's saved default without writing it into the shared URL.
+    // Treating `tab` as filter state instead rebuilds a bare filter, losing
+    // saved sorts/criteria and falling back to e.g. Path for images.
+    if (!hasFilterParams(location.searchStr)) {
+      if (defaultFilter) setFilterState(defaultFilter.clone());
       return;
     }
 
@@ -236,7 +240,7 @@ function useFilterURL(
       );
     }
     setFilterState(newFilter);
-  }, [active, location, defaultFilter, setFilterState, updateFilter, router]);
+  }, [active, location, defaultFilter, setFilterState, router]);
 
   return { setFilter: updateFilter };
 }
@@ -286,10 +290,10 @@ export function useFilterState(props: IFilterStateHook) {
     view,
   );
 
-  // Compute the initial filter exactly once on mount. Using a ref rather than
+  // Apply explicit list parameters over this view's saved default on mount.
   const [filter, setFilterState] = useState(() => {
     const base = defaultFilterFromConfig.clone();
-    if (useURLActive && hasSearchParams(location.searchStr))
+    if (useURLActive && hasFilterParams(location.searchStr))
       base.configureFromQueryString(location.searchStr);
     if (defaultDisplayMode !== undefined) base.displayMode = defaultDisplayMode;
     return base;

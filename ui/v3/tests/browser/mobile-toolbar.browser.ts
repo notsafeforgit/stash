@@ -102,15 +102,27 @@ test("drawers track a downward drag and dismiss", async ({ page }) => {
   const y = bounds.y + bounds.height / 2;
   await page.mouse.move(x, y);
   await page.mouse.down();
-  await page.mouse.move(x, y + 180, { steps: 12 });
+  // Base UI establishes the drag origin on the first movement.
+  const dragY = y + 1;
+  await page.mouse.move(x, dragY);
   await expect(drawer).toHaveAttribute("data-swiping", "");
-  await expect
-    .poll(() =>
-      drawer.evaluate((element) =>
-        parseFloat(getComputedStyle(element).translate.split(" ")[1] ?? "0"),
-      ),
-    )
-    .toBeGreaterThan(100);
+  const initialTop = await drawer.evaluate(
+    (element) => element.getBoundingClientRect().top,
+  );
+  for (const distance of [60, 120, 180]) {
+    await page.mouse.move(x, dragY + distance, { steps: 4 });
+    await expect(drawer).toHaveAttribute("data-swiping", "");
+    // Measure the rendered position: `translate` and `transform` can each
+    // look correct in isolation while composing into twice the movement.
+    await expect
+      .poll(() =>
+        drawer.evaluate(
+          (element, top) => element.getBoundingClientRect().top - top,
+          initialTop,
+        ),
+      )
+      .toBeCloseTo(distance, 0);
+  }
   await page.mouse.up();
   await expect(drawer).toBeHidden();
 });

@@ -98,8 +98,10 @@ function DrawerContent({
           className={cn(
             "group/drawer-content flex h-auto w-full flex-col bg-popover text-sm text-popover-foreground",
             "rounded-t-xl border-t max-h-[80svh] min-h-0 pb-[env(safe-area-inset-bottom,0px)]",
-            "translate-y-[var(--drawer-swipe-movement-y,0px)] transition-transform duration-200 ease-out data-swiping:transition-none motion-reduce:transition-none",
-            "data-[starting-style]:translate-y-full data-[ending-style]:translate-y-full",
+            // Base UI writes an inline transform during a drag. Using the
+            // separate translate property would apply that movement twice.
+            "[transform:translateY(var(--drawer-swipe-movement-y,0px))] transition-transform duration-200 ease-out data-swiping:transition-none motion-reduce:transition-none",
+            "data-[starting-style]:[transform:translateY(100%)] data-[ending-style]:[transform:translateY(100%)]",
             className,
           )}
           {...props}

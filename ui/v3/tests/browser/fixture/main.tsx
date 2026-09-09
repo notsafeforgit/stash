@@ -9,8 +9,11 @@ import { createRoot } from "react-dom/client";
 import { IntlProvider } from "react-intl";
 import {
   createRootRoute,
+  createRoute,
   createRouter,
+  Outlet,
   RouterProvider,
+  useRouterState,
 } from "@tanstack/react-router";
 import { ShortcutProvider } from "@/components/shortcut-provider";
 import { MobileListBar } from "@/components/list/mobile-list-bar";
@@ -28,6 +31,9 @@ import { DetailTabs } from "@/components/detail/detail-tabs";
 import { DetailEditTransition } from "@/components/detail/detail-edit-transition";
 import { EntityList } from "@/components/list/entity-list";
 import { useMediaQuery } from "@/utils/screen";
+import { SettingsLayout } from "@/components/settings/settings-layout";
+import { SETTINGS_NAV_ITEMS } from "@/components/settings/settings-navigation";
+import { Input } from "@/components/ui/input";
 import messages from "@/locales/en-GB.json";
 import flattenMessages from "@/utils/flatten-messages";
 import "./style.css";
@@ -230,8 +236,57 @@ function FixturePage() {
   );
 }
 
+function FixtureSettingsPage() {
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  });
+  const [draft, setDraft] = useState("");
+  return (
+    <div className="p-6">
+      <p data-testid="settings-page">{pathname}</p>
+      <Input
+        aria-label="Unsaved setting"
+        value={draft}
+        onChange={(event) => setDraft(event.currentTarget.value)}
+      />
+      <div className="h-400">Settings content</div>
+      <p>Last setting</p>
+    </div>
+  );
+}
+
+const rootRoute = createRootRoute({ component: Outlet });
+const settingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/settings",
+  validateSearch: (search: Record<string, unknown>) => ({
+    hl: typeof search.hl === "string" ? search.hl : undefined,
+  }),
+  component: () => (
+    <div data-app-viewport className="flex h-dvh flex-col overflow-hidden">
+      <SettingsLayout>
+        <Outlet />
+      </SettingsLayout>
+    </div>
+  ),
+});
 const router = createRouter({
-  routeTree: createRootRoute({ component: FixturePage }),
+  routeTree: rootRoute.addChildren([
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/",
+      component: FixturePage,
+    }),
+    settingsRoute.addChildren(
+      SETTINGS_NAV_ITEMS.map((item) =>
+        createRoute({
+          getParentRoute: () => settingsRoute,
+          path: item.to.slice("/settings/".length),
+          component: FixtureSettingsPage,
+        }),
+      ),
+    ),
+  ]),
   scrollRestoration: true,
 });
 const root = document.getElementById("root");

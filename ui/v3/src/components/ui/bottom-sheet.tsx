@@ -1,28 +1,11 @@
 import type * as React from "react";
-import { useIntl } from "react-intl";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import {
   Drawer,
-  DrawerClose,
   DrawerContent,
   DrawerDescription,
   DrawerTitle,
 } from "@/components/ui/drawer";
-
-/** A consistent exit within thumb reach, independent of drawer scrolling. */
-export function BottomSheetCloseFooter() {
-  const intl = useIntl();
-  return (
-    <div className="flex shrink-0 justify-end border-t px-3 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))]">
-      <DrawerClose
-        render={<Button variant="ghost" className="h-11 min-w-11" />}
-      >
-        {intl.formatMessage({ id: "actions.close", defaultMessage: "Close" })}
-      </DrawerClose>
-    </div>
-  );
-}
 
 export function BottomSheetHeader({
   className,
@@ -71,7 +54,6 @@ export interface BottomSheetProps {
   className?: string;
   /** Whether this sheet should suppress background entity-list shortcuts. */
   blocksListShortcuts?: boolean;
-  showCloseButton?: boolean;
 }
 
 /**
@@ -84,7 +66,6 @@ export function BottomSheet({
   children,
   className,
   blocksListShortcuts,
-  showCloseButton = true,
 }: BottomSheetProps) {
   return (
     <Drawer
@@ -94,7 +75,6 @@ export function BottomSheet({
     >
       <DrawerContent className={cn("bg-background outline-none", className)}>
         {children}
-        {showCloseButton && <BottomSheetCloseFooter />}
       </DrawerContent>
     </Drawer>
   );

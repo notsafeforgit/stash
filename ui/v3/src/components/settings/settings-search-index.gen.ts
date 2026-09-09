@@ -512,7 +512,7 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
       defaultMessage: "Server display name",
     },
     description: {
-      id: "config.dlna.server_display_name_desc",
+      id: "config.dlna.server_display_name_help",
       defaultMessage:
         "Display name for the DLNA server. Defaults to stash when empty.",
     },
@@ -570,7 +570,7 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
       defaultMessage: "Default IP whitelist",
     },
     description: {
-      id: "config.dlna.default_ip_whitelist_desc",
+      id: "config.dlna.default_ip_whitelist_help",
       defaultMessage:
         "IP addresses allowed to use the DLNA service by default. Use * as a wildcard.",
     },

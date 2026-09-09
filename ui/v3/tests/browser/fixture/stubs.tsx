@@ -1,7 +1,6 @@
 import type { ComponentProps } from "react";
 import type { MobileNavSheet as AppMobileNavSheet } from "@/components/layout/mobile-nav-sheet";
 import type { useDefaultFilterActions as appUseDefaultFilterActions } from "@/hooks/default-filter";
-import { Button } from "@/components/ui/button";
 import {
   BottomSheet,
   BottomSheetHeader,
@@ -19,7 +18,7 @@ export function MobileNavSheet({
       <BottomSheetHeader>
         <BottomSheetTitle>Fixture navigation</BottomSheetTitle>
       </BottomSheetHeader>
-      <Button onClick={() => onOpenChange(false)}>Close navigation</Button>
+      <p className="px-4 pb-4">Navigation destinations</p>
     </BottomSheet>
   );
 }

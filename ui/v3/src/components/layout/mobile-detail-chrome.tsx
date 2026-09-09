@@ -18,7 +18,6 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
-import { BottomSheetCloseFooter } from "@/components/ui/bottom-sheet";
 import { MobileNavSheet } from "@/components/layout/mobile-nav-sheet";
 import { MobileToolbarRow } from "./mobile-toolbar";
 import { useVisualViewportBottomInset } from "@/hooks/use-visual-viewport-bottom-inset";
@@ -220,7 +219,6 @@ export function MobileDetailFooter({ onBack }: { onBack?: () => void }) {
                 className="empty:hidden"
               />
             </div>
-            <BottomSheetCloseFooter />
           </DrawerContent>
         </Drawer>
         {onBack && !chrome.interaction && (

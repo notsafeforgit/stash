@@ -5,8 +5,9 @@ import { useNavHotkeys } from "src/hooks/use-nav-hotkeys";
 import { useTrackListPage } from "src/hooks/use-smart-back";
 import { DownloadProgressBar } from "src/components/offline/download-progress-bar";
 import { DownloadNotifications } from "src/components/offline/download-notifications";
+import { cn } from "@/lib/utils";
 
-// Detail routes have their own bottom bar — hide the global nav bar on these.
+// Detail routes have their own bottom bar. Settings also owns its navigation.
 // `/offline/{sceneId}` is the offline-player page; it's a "detail page" in the
 // same sense (full-screen player, its own back affordance), so include it.
 const DETAIL_ROUTE_RE =
@@ -17,6 +18,10 @@ export function AppShell() {
   useTrackListPage();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isDetailPage = DETAIL_ROUTE_RE.test(pathname);
+  const ownsMobileNavigation =
+    isDetailPage ||
+    pathname === "/settings" ||
+    pathname.startsWith("/settings/");
 
   return (
     <div
@@ -27,11 +32,14 @@ export function AppShell() {
       <DownloadProgressBar />
       <DownloadNotifications />
       <main
-        className={`flex flex-col flex-1 min-h-0${isDetailPage ? " overflow-hidden" : " overflow-hidden pb-11 md:pb-0"}`}
+        className={cn(
+          "flex min-h-0 flex-1 flex-col overflow-hidden",
+          !ownsMobileNavigation && "pb-11 md:pb-0",
+        )}
       >
         <Outlet />
       </main>
-      {!isDetailPage && <BottomTabBar />}
+      {!ownsMobileNavigation && <BottomTabBar />}
     </div>
   );
 }

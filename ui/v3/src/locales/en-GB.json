@@ -391,6 +391,7 @@
       "allowed_ip_addresses": "Allowed IP addresses",
       "allowed_ip_temporarily": "Allowed IP temporarily",
       "default_ip_whitelist": "Default IP whitelist",
+      "default_ip_whitelist_help": "IP addresses allowed to use the DLNA service by default. Use * as a wildcard.",
       "default_ip_whitelist_desc": "Default IP addresses allow to access DLNA. Use {wildcard} to allow all IP addresses.",
       "disabled_dlna_temporarily": "Disabled DLNA temporarily",
       "disallowed_ip": "Disallowed IP",
@@ -400,6 +401,7 @@
       "network_interfaces_desc": "Interfaces to expose DLNA server on. An empty list results in running on all interfaces. Requires DLNA restart after changing.",
       "recent_ip_addresses": "Recent IP addresses",
       "server_display_name": "Server display name",
+      "server_display_name_help": "Display name for the DLNA server. Defaults to stash when empty.",
       "server_display_name_desc": "Display name for the DLNA server. Defaults to {server_name} if empty.",
       "server_port": "Server port",
       "server_port_desc": "Port to run the DLNA server on. Requires DLNA restart after changing.",
@@ -2430,6 +2432,9 @@
     "preview_named": "Preview {name}",
     "select_named": "Select {name}",
     "detail_sections": "Detail sections",
+    "settings_sections": "Settings sections",
+    "search_settings": "Search settings",
+    "settings_search_results": "Settings search results",
     "pause": "Pause"
   }
 }

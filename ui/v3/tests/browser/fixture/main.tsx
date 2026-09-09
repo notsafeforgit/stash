@@ -1,0 +1,201 @@
+import { StrictMode, useState } from "react";
+import { createRoot } from "react-dom/client";
+import { IntlProvider } from "react-intl";
+import {
+  createRootRoute,
+  createRouter,
+  RouterProvider,
+} from "@tanstack/react-router";
+import { ShortcutProvider } from "@/components/shortcut-provider";
+import { MobileListBar } from "@/components/list/mobile-list-bar";
+import { useListSelect } from "@/components/list/use-list-select";
+import { ListFilterModel } from "@/models/list-filter/filter";
+import { FilterMode } from "@/core/generated-graphql";
+import { Button } from "@/components/ui/button";
+import { CollectionDetailLayout } from "@/components/detail/collection-detail-layout";
+import { MediaDetailLayout } from "@/components/detail/media-detail-layout";
+import {
+  MobileDetailChromePortal,
+  useMobileDetailChrome,
+} from "@/components/layout/mobile-detail-chrome";
+import { DetailTabs } from "@/components/detail/detail-tabs";
+import { DetailEditTransition } from "@/components/detail/detail-edit-transition";
+import { EntityList } from "@/components/list/entity-list";
+import { useMediaQuery } from "@/utils/screen";
+import messages from "@/locales/en-GB.json";
+import flattenMessages from "@/utils/flatten-messages";
+import "./style.css";
+
+const params = new URLSearchParams(location.search);
+const items = Array.from({ length: 40 }, (_, index) => ({
+  id: String(index + 1),
+}));
+const sections = [
+  { id: "scenes", label: "Scenes" },
+  { id: "images", label: "Images" },
+  { id: "galleries", label: "Galleries" },
+  { id: "groups", label: "Groups" },
+];
+
+function FixtureList({ name }: { name: string }) {
+  const [filter, setFilter] = useState(
+    () => new ListFilterModel(FilterMode.Performers),
+  );
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [cols, setCols] = useState<1 | 2>(2);
+  const selection = useListSelect(items);
+  const smallScreen = useMediaQuery("(max-width: 767px)");
+  const mobile = useMobileDetailChrome()?.mobile ?? smallScreen;
+  const [totalCount, setTotalCount] = useState(params.has("single") ? 10 : 200);
+  const sidebarState = {
+    showSidebar: filterOpen,
+    sectionOpen: {},
+    setSectionOpen: () => {},
+    isMobileSidebar: mobile,
+    closeFilterSidebar: () => setFilterOpen(false),
+    openFilterSidebar: () => setFilterOpen(true),
+  };
+  return (
+    <EntityList
+      sidebarState={sidebarState}
+      filter={filter}
+      setFilter={setFilter}
+      listSelect={selection}
+      activeFilterCount={0}
+      totalCount={totalCount}
+      sidebarContent={<p>Example filters</p>}
+      mobileChrome={
+        <MobileListBar
+          filter={filter}
+          setFilter={setFilter}
+          totalCount={totalCount}
+          activeFilterCount={0}
+          hasSelection={selection.hasSelection}
+          selecting={selection.selecting}
+          selectedCount={selection.selectedItems.length}
+          onSelectAll={selection.onSelectAll}
+          onSelectNone={selection.onSelectNone}
+          openFilterSidebar={() => setFilterOpen(true)}
+          mobileGridCols={cols}
+          setMobileGridCols={setCols}
+        />
+      }
+    >
+      <div data-testid={`${name}-list`} className="p-3">
+        <p data-testid="list-state" data-term={filter.searchTerm ?? ""}>
+          {name} page {filter.currentPage}: {filter.searchTerm}
+        </p>
+        <Button onClick={selection.onEnterSelect}>Enter selection</Button>
+        <Button onClick={() => setTotalCount(80)}>Reduce results</Button>
+        <div
+          className="mt-3 grid gap-2"
+          style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
+        >
+          {items.map((item) => (
+            <Button
+              key={item.id}
+              variant={
+                selection.selectedIds.has(item.id) ? "secondary" : "outline"
+              }
+              className="h-28"
+              onClick={() =>
+                selection.onSelectChange(
+                  item.id,
+                  !selection.selectedIds.has(item.id),
+                  false,
+                )
+              }
+            >
+              {name} {item.id}
+            </Button>
+          ))}
+        </div>
+      </div>
+    </EntityList>
+  );
+}
+
+function FixturePage() {
+  const [tab, setTab] = useState("scenes");
+  const [editing, setEditing] = useState(false);
+  const [favourite, setFavourite] = useState(false);
+  const [backCount, setBackCount] = useState(0);
+  const tabs = sections.map((section) => ({
+    ...section,
+    content: <FixtureList name={section.id} />,
+  }));
+  const toolbar = (
+    <div className="flex flex-wrap gap-2">
+      <Button onClick={() => setFavourite(!favourite)}>
+        {favourite ? "Favourited" : "Favourite"}
+      </Button>
+      <Button onClick={() => setEditing(true)}>Edit</Button>
+    </div>
+  );
+  return (
+    <div
+      data-testid="viewport"
+      data-back-count={backCount}
+      className="flex h-dvh flex-col overflow-hidden"
+    >
+      {params.has("standalone") ? (
+        <FixtureList name="standalone" />
+      ) : params.has("media") ? (
+        <MediaDetailLayout
+          title="Example scene"
+          tabs={tabs}
+          primaryContent={<div className="h-96">Example video area</div>}
+          headerContent={toolbar}
+          mobilePageScroll
+          onBack={() => setBackCount(backCount + 1)}
+        />
+      ) : (
+        <CollectionDetailLayout
+          title="Example performer"
+          onBack={() => setBackCount(backCount + 1)}
+        >
+          <div className="md:flex md:h-full">
+            <aside className="md:w-72 md:shrink-0">
+              <DetailEditTransition
+                editing={editing}
+                detail={
+                  <>
+                    <div className="h-80 p-3">Entity information</div>
+                    <MobileDetailChromePortal slot="actions">
+                      {toolbar}
+                    </MobileDetailChromePortal>
+                  </>
+                }
+                editForm={
+                  <div className="p-3">
+                    <p>Editor</p>
+                    <Button onClick={() => setEditing(false)}>
+                      Close editor
+                    </Button>
+                  </div>
+                }
+              />
+            </aside>
+            <DetailTabs tabs={tabs} activeTab={tab} onTabChange={setTab} />
+          </div>
+        </CollectionDetailLayout>
+      )}
+    </div>
+  );
+}
+
+const router = createRouter({
+  routeTree: createRootRoute({ component: FixturePage }),
+  scrollRestoration: true,
+});
+const root = document.getElementById("root");
+if (!root) throw new Error("Missing fixture root");
+createRoot(root).render(
+  <StrictMode>
+    <IntlProvider locale="en-GB" messages={flattenMessages(messages)}>
+      <ShortcutProvider>
+        <RouterProvider router={router} />
+      </ShortcutProvider>
+    </IntlProvider>
+  </StrictMode>,
+);

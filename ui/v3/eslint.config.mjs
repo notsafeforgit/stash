@@ -13,7 +13,7 @@ export default [
     ],
   },
   {
-    files: ["src/**/*.{ts,tsx}"],
+    files: ["src/**/*.{ts,tsx}", "tests/browser/**/*.{ts,tsx}"],
     languageOptions: { parser, parserOptions: { ecmaFeatures: { jsx: true } } },
     plugins: { "react-hooks": reactHooks },
     rules: {

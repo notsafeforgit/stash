@@ -434,6 +434,10 @@ fmt-ui-v3:
 validate-ui-v3:
 	cd ui/v3 && pnpm run validate
 
+.PHONY: test-ui-v3-browser
+test-ui-v3-browser:
+	cd ui/v3 && pnpm run test:browser
+
 # these targets run the same steps as fmt-ui and validate-ui, but only on files that have changed
 fmt-ui-quick:
 	cd ui/v2.5 && \

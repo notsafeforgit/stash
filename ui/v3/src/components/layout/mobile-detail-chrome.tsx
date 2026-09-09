@@ -3,23 +3,36 @@ import {
   useCallback,
   useContext,
   useMemo,
+  useLayoutEffect,
   useState,
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
 import { useIntl } from "react-intl";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Ellipsis } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useVisualViewportBottomInset } from "@/hooks/use-visual-viewport-bottom-inset";
 import { useMediaQuery } from "@/utils/screen";
 
-type ChromeSlot = "list" | "tabs" | "actions";
+type ChromeSlot = "list" | "tabs" | "actions" | "list-actions" | "pagination";
 type ChromeTargets = Record<ChromeSlot, HTMLDivElement | null>;
+type ChromePanel = "sections" | "more" | null;
+type ChromeInteraction = "search" | "selection" | null;
 
 interface MobileDetailChromeContextValue {
   mobile: boolean;
   targets: ChromeTargets;
   setTarget: (slot: ChromeSlot, element: HTMLDivElement | null) => void;
+  panel: ChromePanel;
+  setPanel: (panel: ChromePanel) => void;
+  interaction: ChromeInteraction;
+  setInteraction: (interaction: ChromeInteraction) => void;
 }
 
 const MobileDetailChromeContext =
@@ -39,7 +52,11 @@ export function MobileDetailChromeProvider({
     list: null,
     tabs: null,
     actions: null,
+    "list-actions": null,
+    pagination: null,
   });
+  const [panel, setPanel] = useState<ChromePanel>(null);
+  const [interaction, setInteraction] = useState<ChromeInteraction>(null);
   const setTarget = useCallback(
     (slot: ChromeSlot, element: HTMLDivElement | null) => {
       setTargets((previous) =>
@@ -51,8 +68,16 @@ export function MobileDetailChromeProvider({
     [],
   );
   const value = useMemo(
-    () => ({ mobile, targets, setTarget }),
-    [mobile, targets, setTarget],
+    () => ({
+      mobile,
+      targets,
+      setTarget,
+      panel,
+      setPanel,
+      interaction,
+      setInteraction,
+    }),
+    [mobile, targets, setTarget, panel, interaction],
   );
   return (
     <MobileDetailChromeContext value={value}>
@@ -63,6 +88,18 @@ export function MobileDetailChromeProvider({
 
 export function useMobileDetailChrome() {
   return useContext(MobileDetailChromeContext);
+}
+
+/** Only the active embedded list owns the replacement search/selection row. */
+export function useMobileDetailInteraction(interaction: ChromeInteraction) {
+  const chrome = useMobileDetailChrome();
+  const mobile = chrome?.mobile;
+  const setInteraction = chrome?.setInteraction;
+  useLayoutEffect(() => {
+    if (!mobile || !setInteraction) return;
+    setInteraction(interaction);
+    return () => setInteraction(null);
+  }, [mobile, setInteraction, interaction]);
 }
 
 /** Portals retain the form, list and tab contexts of their original owner. */
@@ -79,7 +116,7 @@ export function MobileDetailChromePortal({
   return target ? createPortal(children, target) : null;
 }
 
-function MobileDetailChromeSlot({
+export function MobileDetailChromeSlot({
   slot,
   className,
 }: {
@@ -112,14 +149,57 @@ export function MobileDetailFooter({ onBack }: { onBack?: () => void }) {
           : undefined
       }
     >
-      <MobileDetailChromeSlot slot="list" />
-      <MobileDetailChromeSlot slot="tabs" className="empty:hidden border-b" />
-      <div className="flex min-h-11 items-center gap-2 px-3 py-1">
+      <div className="flex h-14 items-center gap-2 px-3">
+        <div hidden={chrome.interaction !== null} className="min-w-0 flex-1">
+          <MobileDetailChromeSlot slot="tabs" />
+        </div>
         <MobileDetailChromeSlot
-          slot="actions"
-          className="min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden touch-pan-x overscroll-x-contain"
+          slot="list"
+          className={chrome.interaction ? "min-w-0 flex-1" : "shrink-0"}
         />
-        {onBack && (
+        <Popover
+          open={chrome.panel === "more"}
+          onOpenChange={(open) => chrome.setPanel(open ? "more" : null)}
+        >
+          <PopoverTrigger
+            hidden={chrome.interaction !== null}
+            render={
+              <Button
+                variant="ghost"
+                size="icon-lg"
+                className="size-11 shrink-0"
+                aria-label={intl.formatMessage({
+                  id: "actions.more",
+                  defaultMessage: "More",
+                })}
+              />
+            }
+          >
+            <Ellipsis />
+          </PopoverTrigger>
+          <PopoverContent
+            side="top"
+            align="end"
+            keepMounted
+            className="w-80 max-w-[calc(100vw-1.5rem)] max-h-[70svh] overflow-y-auto"
+          >
+            <PopoverTitle>
+              {intl.formatMessage({
+                id: "actions.more",
+                defaultMessage: "More",
+              })}
+            </PopoverTitle>
+            <MobileDetailChromeSlot
+              slot="actions"
+              className="empty:hidden [&_button]:min-h-11 [&_button]:min-w-11"
+            />
+            <MobileDetailChromeSlot
+              slot="list-actions"
+              className="empty:hidden"
+            />
+          </PopoverContent>
+        </Popover>
+        {onBack && !chrome.interaction && (
           <Button
             variant="ghost"
             size="icon-lg"

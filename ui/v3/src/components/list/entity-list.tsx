@@ -15,6 +15,7 @@ import type { CardAspect } from "./card-aspect-context";
 import { SidebarStateContext } from "./use-list-sidebar";
 import type { IListSidebarState } from "./use-list-sidebar";
 import { ListPagination, PaginationMeta } from "./list-pagination";
+import { MobileListPagination } from "./mobile-list-pagination";
 import { ListToolbar, type ListToolbarProps } from "./list-toolbar";
 import { SearchInput } from "./search-input";
 import { TableToolbarSlotProvider } from "./table-toolbar-slot";
@@ -359,12 +360,22 @@ export const EntityList: React.FC<EntityListProps> = ({
                     mobileChromeFixed &&
                       !detailFooter &&
                       isMobileSidebar &&
-                      "pb-[calc(5rem+env(safe-area-inset-bottom,0px))]",
+                      "pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))]",
                   )}
                 >
                   <ListScrollContext.Provider value={scrollContext}>
                     {children}
                   </ListScrollContext.Provider>
+                  {isMobileSidebar && (
+                    <MobileListPagination
+                      currentPage={filter.currentPage}
+                      itemsPerPage={filter.itemsPerPage}
+                      totalItems={totalCount}
+                      onChangePage={(page) =>
+                        setFilter(filter.changePage(page))
+                      }
+                    />
+                  )}
                 </div>
               </div>
 

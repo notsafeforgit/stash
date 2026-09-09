@@ -243,8 +243,8 @@ function ImageToolbar({
   const oCounter = image.o_counter ?? 0;
 
   return (
-    <div className="flex items-center gap-2 lg:gap-3 py-1.5 lg:flex-wrap">
-      <div className="flex max-lg:shrink-0 items-center lg:flex-wrap gap-1">
+    <div className="flex flex-wrap items-center gap-2 lg:gap-3 py-1.5">
+      <div className="flex flex-wrap items-center gap-1">
         {image.rating100 != null && (
           <span
             className="inline-flex items-center bg-transparent border border-border rounded-md text-muted-foreground text-[0.8125rem] gap-1 px-2 py-1 mr-1"

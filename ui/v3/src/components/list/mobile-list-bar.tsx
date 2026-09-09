@@ -2,18 +2,11 @@ import type React from "react";
 import { startTransition, useCallback, useEffect, useState } from "react";
 import { cn } from "src/lib/utils";
 import {
-  Funnel,
-  Menu,
-  Tags,
-  Settings2,
   X,
-  ListChecks,
   LayoutGrid,
   Image,
   LayoutList,
   Table2,
-  ChevronsLeft,
-  ChevronsRight,
   Square,
   Columns2,
   RectangleVertical,
@@ -24,7 +17,6 @@ import {
 } from "lucide-react";
 import { getSortDirectionIcon } from "./sort-icon";
 import { FormattedMessage, useIntl } from "react-intl";
-import type { ListFilterModel } from "src/models/list-filter/filter";
 import type { ISortByOption } from "src/models/list-filter/filter-options";
 import { DisplayMode } from "src/models/list-filter/types";
 import { SortDirectionEnum } from "src/core/generated-graphql";
@@ -33,28 +25,23 @@ import {
   PinButton,
   PinnableComboBox,
 } from "src/components/ui/pinnable-combo-box";
-import { MobileNavSheet } from "src/components/layout/mobile-nav-sheet";
 import {
   BottomSheet,
   BottomSheetHeader,
   BottomSheetTitle,
 } from "src/components/ui/bottom-sheet";
-import {
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "src/components/ui/pagination";
 import type { View } from "src/components/list/views";
 import type { CardAspect } from "src/components/list/card-aspect-context";
-import { SearchInput } from "src/components/list/search-input";
+import {
+  MobileListControls,
+  type MobileListControlsProps,
+} from "./mobile-list-controls";
 import {
   TableToolbarSlot,
   useDeclareTableToolbarProvider,
 } from "src/components/list/table-toolbar-slot";
 import { useDefaultFilterActions } from "src/hooks/default-filter";
 import { DefaultFilterConflict } from "src/components/filters/default-filter-conflict";
-import { useVisualViewportBottomInset } from "src/hooks/use-visual-viewport-bottom-inset";
-import { useMobileDetailChrome } from "@/components/layout/mobile-detail-chrome";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -113,20 +100,8 @@ function DisplayModeIcon({ mode }: { mode: DisplayMode }) {
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
-export interface MobileListBarProps {
-  filter: ListFilterModel;
-  setFilter: (
-    f: ListFilterModel | ((prev: ListFilterModel) => ListFilterModel),
-  ) => void;
-  totalCount: number;
-  activeFilterCount: number;
-  hasSelection: boolean;
-  selecting: boolean;
-  selectedCount: number;
-  onSelectAll: () => void;
-  onSelectNone: () => void;
-  onTaggerMode?: () => void;
-  openFilterSidebar: () => void;
+export interface MobileListBarProps
+  extends Omit<MobileListControlsProps, "onSearch" | "onViewOptions"> {
   mobileGridCols: 1 | 2;
   setMobileGridCols: (cols: 1 | 2) => void;
   /** When provided, shows a portrait/landscape/auto aspect-ratio toggle in Grid mode. */
@@ -163,12 +138,8 @@ export const MobileListBar: React.FC<MobileListBarProps> = ({
   sortOptions: sortOptionsOverride,
 }) => {
   const intl = useIntl();
-  const detailFooter = useMobileDetailChrome()?.mobile ?? false;
-  const [navOpen, setNavOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const defaultFilter = useDefaultFilterActions(view, filter);
-  const { bottomInset, ref: barRef } =
-    useVisualViewportBottomInset<HTMLDivElement>();
 
   const onSearch = useCallback(
     (value: string) => {
@@ -204,14 +175,6 @@ export const MobileListBar: React.FC<MobileListBarProps> = ({
   }));
   const currentSortLabel =
     sortOptions.find((o) => o.value === (filter.sortBy ?? ""))?.label ?? "";
-  const totalPages = Math.ceil(totalCount / filter.itemsPerPage);
-  const canPrev = filter.currentPage > 1;
-  const canNext = filter.currentPage < totalPages;
-  const pageStart = (filter.currentPage - 1) * filter.itemsPerPage + 1;
-  const pageEnd = Math.min(
-    filter.currentPage * filter.itemsPerPage,
-    totalCount,
-  );
 
   function setSortBy(value: string) {
     setFilter(filter.setSortBy(value || undefined));
@@ -228,9 +191,6 @@ export const MobileListBar: React.FC<MobileListBarProps> = ({
 
   return (
     <>
-      {/* Global nav sheet */}
-      <MobileNavSheet open={navOpen} onOpenChange={setNavOpen} />
-
       {/* View-options sheet (sort / display mode / page size / pagination) */}
       <BottomSheet open={settingsOpen} onOpenChange={setSettingsOpen}>
         <BottomSheetHeader className="border-b border-border shrink-0 py-3! px-4!">
@@ -526,179 +486,21 @@ export const MobileListBar: React.FC<MobileListBarProps> = ({
         </div>
       </BottomSheet>
 
-      {/* ── Bottom bar ────────────────────────────────────────────────────────── */}
-      <div
-        ref={detailFooter ? undefined : barRef}
-        className={cn(
-          "relative z-50 flex flex-col bg-background border-t border-border shrink-0",
-          !detailFooter && "pb-[env(safe-area-inset-bottom,0px)]",
-        )}
-        style={
-          !detailFooter && bottomInset > 0
-            ? { transform: `translateY(-${bottomInset}px)` }
-            : undefined
-        }
-      >
-        {/* Pagination strip */}
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center border-b border-border/50 px-1 py-0.5">
-          <div className="flex items-center gap-0.5">
-            <PaginationLink
-              size="icon-sm"
-              disabled={!canPrev}
-              onClick={() => setFilter(filter.changePage(1))}
-              aria-label={intl.formatMessage({ id: "pagination.first" })}
-            >
-              <ChevronsLeft size={14} />
-            </PaginationLink>
-            <PaginationPrevious
-              disabled={!canPrev}
-              onClick={() =>
-                setFilter(filter.changePage(filter.currentPage - 1))
-              }
-              className="[&_span]:block"
-              text={intl.formatMessage({
-                id: "pagination.previous_short",
-                defaultMessage: "Prev",
-              })}
-            />
-          </div>
-          <span className="text-center text-xs text-muted-foreground whitespace-nowrap px-2">
-            {totalCount > 0 ? `${pageStart}–${pageEnd} / ${totalCount}` : "0"}
-          </span>
-          <div className="flex items-center gap-0.5 justify-end">
-            <PaginationNext
-              disabled={!canNext}
-              onClick={() =>
-                setFilter(filter.changePage(filter.currentPage + 1))
-              }
-              className="[&_span]:block"
-            />
-            <PaginationLink
-              size="icon-sm"
-              disabled={!canNext}
-              onClick={() => setFilter(filter.changePage(totalPages))}
-              aria-label={intl.formatMessage({ id: "pagination.last" })}
-            >
-              <ChevronsRight size={14} />
-            </PaginationLink>
-          </div>
-        </div>
-
-        {/* Icon row */}
-        <div className="flex items-center gap-2 px-3 min-h-11">
-          {selecting || hasSelection ? (
-            // Selection mode chrome
-            <div className="flex flex-auto items-center justify-end gap-1">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={onSelectNone}
-                aria-label={intl.formatMessage({ id: "actions.select_none" })}
-                title={intl.formatMessage({ id: "actions.select_none" })}
-              >
-                <X />
-              </Button>
-              <span className="text-sm min-w-6 text-center">
-                {selectedCount}
-              </span>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={onSelectAll}
-                aria-label={intl.formatMessage({
-                  id: "actions.select_all_on_page",
-                })}
-                title={intl.formatMessage({
-                  id: "actions.select_all_on_page",
-                })}
-              >
-                <ListChecks />
-              </Button>
-            </div>
-          ) : (
-            <>
-              {/* Left icons */}
-              <div className="flex shrink-0 items-center gap-1">
-                {/* Nav / entity swap */}
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => setNavOpen(true)}
-                  aria-label={intl.formatMessage({
-                    id: "navigation",
-                    defaultMessage: "Navigation",
-                  })}
-                >
-                  <Menu size={18} />
-                </Button>
-
-                {/* Filter toggle */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    "relative hover:bg-transparent",
-                    activeFilterCount > 0
-                      ? "text-foreground"
-                      : "text-muted-foreground",
-                  )}
-                  onClick={openFilterSidebar}
-                  aria-label={intl.formatMessage({
-                    id: "search_filter.edit_filter",
-                    defaultMessage: "Filters",
-                  })}
-                >
-                  <Funnel size={18} />
-                  {activeFilterCount > 0 && (
-                    <span className="absolute right-0 top-0 bg-primary text-primary-foreground rounded-full text-[0.625rem] font-semibold leading-none min-w-4 px-1 py-0.5 text-center">
-                      {activeFilterCount}
-                    </span>
-                  )}
-                </Button>
-              </div>
-
-              {/* Search input */}
-              <SearchInput
-                value={filter.searchTerm}
-                onChange={onSearch}
-                className="flex-1 min-w-0"
-                inputClassName="w-full bg-transparent border-0 border-b border-border/60 rounded-none text-sm text-foreground placeholder:text-muted-foreground px-1 py-1 outline-none focus-visible:ring-0 focus:border-primary transition-colors h-auto"
-              />
-
-              {/* Right icons */}
-              <div className="flex shrink-0 items-center gap-1">
-                {/* View / sort / settings */}
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => setSettingsOpen(true)}
-                  aria-label={intl.formatMessage({
-                    id: "view_options",
-                    defaultMessage: "View options",
-                  })}
-                >
-                  <Settings2 size={18} />
-                </Button>
-
-                {/* Tagger mode */}
-                {onTaggerMode && (
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={onTaggerMode}
-                    aria-label={intl.formatMessage({
-                      id: "actions.tagger",
-                      defaultMessage: "Tagger",
-                    })}
-                  >
-                    <Tags size={18} />
-                  </Button>
-                )}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
+      <MobileListControls
+        filter={filter}
+        setFilter={setFilter}
+        totalCount={totalCount}
+        activeFilterCount={activeFilterCount}
+        hasSelection={hasSelection}
+        selecting={selecting}
+        selectedCount={selectedCount}
+        onSelectAll={onSelectAll}
+        onSelectNone={onSelectNone}
+        onTaggerMode={onTaggerMode}
+        openFilterSidebar={openFilterSidebar}
+        onSearch={onSearch}
+        onViewOptions={() => setSettingsOpen(true)}
+      />
     </>
   );
 };

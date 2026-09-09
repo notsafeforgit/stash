@@ -25,6 +25,8 @@ export interface SearchInputProps {
   placeholder?: string;
   className?: string;
   inputClassName?: string;
+  inputRef?: React.RefObject<HTMLInputElement | null>;
+  mobile?: boolean;
 }
 
 export const SearchInput: React.FC<SearchInputProps> = ({
@@ -33,10 +35,14 @@ export const SearchInput: React.FC<SearchInputProps> = ({
   placeholder,
   className,
   inputClassName,
+  inputRef: suppliedInputRef,
+  mobile = false,
 }) => {
   const intl = useIntl();
-  const inputRef = useRef<HTMLInputElement>(null);
+  const localInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = suppliedInputRef ?? localInputRef;
   const debounceRef = useRef<number | null>(null);
+  const [initialValue] = useState(value ?? "");
   const [hasValue, setHasValue] = useState(!!value);
 
   // Sync external resets (e.g. loading a saved filter) without clobbering
@@ -47,7 +53,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
       el.value = value ?? "";
       setHasValue(!!(value ?? ""));
     }
-  }, [value]);
+  }, [value, inputRef]);
 
   const handleChange = useCallback(
     (raw: string) => {
@@ -63,8 +69,13 @@ export const SearchInput: React.FC<SearchInputProps> = ({
 
   const clear = useCallback(() => {
     if (inputRef.current) inputRef.current.value = "";
-    handleChange("");
-  }, [handleChange]);
+    if (debounceRef.current != null) {
+      window.clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    setHasValue(false);
+    onChange("");
+  }, [onChange, inputRef]);
 
   // Clean up pending debounce on unmount.
   useEffect(
@@ -89,12 +100,21 @@ export const SearchInput: React.FC<SearchInputProps> = ({
           // type=search inputs — we render our own × button below.
           "h-7 text-sm [&::-webkit-search-cancel-button]:appearance-none",
           hasValue && "pr-6",
+          mobile && "h-11 text-base pr-12",
           inputClassName,
         )}
         placeholder={placeholder ?? defaultPlaceholder}
-        defaultValue={value}
+        aria-label={placeholder ?? defaultPlaceholder}
+        defaultValue={initialValue}
         onChange={(e) => handleChange(e.target.value)}
         onFocus={(e) => e.currentTarget.select()}
+        onBlur={(e) => {
+          if (debounceRef.current != null) {
+            window.clearTimeout(debounceRef.current);
+            debounceRef.current = null;
+            onChange(e.currentTarget.value);
+          }
+        }}
         onKeyDown={(e) => {
           if (e.key === "Enter") e.currentTarget.blur();
           if (e.key === "Escape") {
@@ -109,7 +129,10 @@ export const SearchInput: React.FC<SearchInputProps> = ({
             variant="ghost"
             size="icon-xs"
             onClick={clear}
-            className="text-muted-foreground hover:text-foreground"
+            className={cn(
+              "text-muted-foreground hover:text-foreground",
+              mobile && "size-11",
+            )}
             aria-label={intl.formatMessage({
               id: "actions.clear",
               defaultMessage: "Clear",

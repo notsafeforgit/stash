@@ -4,10 +4,8 @@ import { Tabs, TabsContent } from "src/components/ui/tabs";
 import { DetailTabStrip } from "src/components/detail/detail-tab-strip";
 import { useTabState } from "src/hooks/use-tab-state";
 import { ListActivityContext } from "src/components/list/list-activity-context";
-import {
-  MobileDetailChromePortal,
-  useMobileDetailChrome,
-} from "@/components/layout/mobile-detail-chrome";
+import { useMobileDetailChrome } from "@/components/layout/mobile-detail-chrome";
+import { MobileDetailSections } from "./mobile-detail-sections";
 
 export interface DetailTabsTab {
   id: string;
@@ -55,21 +53,20 @@ export function DetailTabs({ tabs, activeTab, onTabChange }: DetailTabsProps) {
       ref={panelRef}
       value={resolvedActiveTab}
       onValueChange={handleTabChange}
-      className="md:flex-1 md:min-h-0 max-md:min-h-[100cqh]"
+      orientation={mobile ? "vertical" : "horizontal"}
+      className="flex-col md:flex-1 md:min-h-0 max-md:min-h-[100cqh]"
     >
-      <MobileDetailChromePortal slot="tabs">
-        <DetailTabStrip
+      {mobile ? (
+        <MobileDetailSections
           tabs={tabs}
-          mobile={mobile}
-          onTabClick={(id) => {
-            // The selected section may be below the entity information.
-            // Tabs only emit value changes when choosing a different section.
-            if (mobile && id === resolvedActiveTab) {
-              panelRef.current?.scrollIntoView({ block: "start" });
-            }
-          }}
+          activeTab={resolvedActiveTab}
+          onReselect={() =>
+            panelRef.current?.scrollIntoView({ block: "start" })
+          }
         />
-      </MobileDetailChromePortal>
+      ) : (
+        <DetailTabStrip tabs={tabs} />
+      )}
       {tabs.map((t) => (
         <TabsContent
           key={t.id}

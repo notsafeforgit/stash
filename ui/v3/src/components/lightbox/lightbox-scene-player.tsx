@@ -36,6 +36,8 @@ interface LightboxScenePlayerProps {
    *  `webkitEnterFullscreen` on the video element is the only
    *  reliable path on phones. */
   onToggleFullscreen: () => boolean | undefined;
+  /** Mobile lightbox dismissal, rendered with the playback controls. */
+  onClose?: () => void;
   /** Fade-in-step content rendered above the controls overlay. */
   topOverlay?: React.ReactNode;
   /** Surfaces the player's `controlsVisible` flag so the slide chrome
@@ -64,6 +66,7 @@ export function LightboxScenePlayer({
   loopEnabled,
   onLoopToggle,
   onToggleFullscreen,
+  onClose,
   topOverlay,
   onControlsVisibilityChange,
   onNext,
@@ -87,6 +90,7 @@ export function LightboxScenePlayer({
       fill
       enablePinchZoom
       onToggleFullscreenOverride={onToggleFullscreen}
+      onClose={onClose}
       loopEnabled={loopEnabled}
       onLoopToggle={onLoopToggle}
       onControlsVisibilityChange={onControlsVisibilityChange}

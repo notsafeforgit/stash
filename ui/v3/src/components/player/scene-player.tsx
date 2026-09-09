@@ -176,6 +176,8 @@ interface ScenePlayerProps {
    * handled.
    */
   onToggleFullscreenOverride?: () => boolean | undefined;
+  /** Optional dismissal action for a mobile lightbox player. */
+  onClose?: () => void;
   /**
    * Controlled loop toggle. When both are provided, the parent owns the
    * loop state — used by `SceneLightbox` so the user's toggle persists
@@ -334,6 +336,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   preload = "metadata",
   fill,
   onToggleFullscreenOverride,
+  onClose,
   loopEnabled: loopEnabledProp,
   onLoopToggle: onLoopToggleProp,
   playDelayMs = 0,
@@ -970,6 +973,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
               onTogglePaused={handleTogglePaused}
               onUserPlaybackGesture={handleUserPlaybackGesture}
               onToggleFullscreenOverride={onToggleFullscreenOverride}
+              onClose={onClose}
               onToggleViewer={onToggleViewer}
               viewerOpen={viewerOpen}
               viewerButtonRef={viewerButtonRef}

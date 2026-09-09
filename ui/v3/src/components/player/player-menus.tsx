@@ -25,9 +25,11 @@ const PLAYBACK_SPEEDS = [2, 1.75, 1.5, 1.25, 1, 0.75, 0.5, 0.25];
 export function SpeedMenu({
   Player,
   onOpenChange,
+  className,
 }: {
   Player: PlayerInstance;
   onOpenChange?: (open: boolean) => void;
+  className?: string;
 }) {
   const rate = Player.usePlayer((s) => s.playbackRate);
   const store = Player.usePlayer();
@@ -45,7 +47,10 @@ export function SpeedMenu({
         render={
           <Button
             variant="ghost"
-            className="rounded bg-transparent px-1.5 text-xs font-medium tabular-nums text-white/80 hover:bg-white/10 hover:text-white"
+            className={cn(
+              "rounded bg-transparent px-1.5 text-xs font-medium tabular-nums text-white/80 hover:bg-white/10 hover:text-white",
+              className,
+            )}
             aria-label="Playback speed"
           />
         }
@@ -96,6 +101,7 @@ interface QualityMenuProps {
    *  they're getting alongside the resolution-suffixed transcode rows. */
   sourceResolution?: string;
   onOpenChange?: (open: boolean) => void;
+  className?: string;
 }
 
 export function QualityMenu({
@@ -104,6 +110,7 @@ export function QualityMenu({
   onSourceChange,
   sourceResolution,
   onOpenChange,
+  className,
 }: QualityMenuProps) {
   // Hide rows that would re-deliver the best-quality non-loss tier at
   // identical effective quality:
@@ -165,7 +172,10 @@ export function QualityMenu({
           <Button
             variant="ghost"
             size="icon-lg"
-            className="rounded bg-transparent text-white/80 hover:bg-white/10 hover:text-white"
+            className={cn(
+              "rounded bg-transparent text-white/80 hover:bg-white/10 hover:text-white",
+              className,
+            )}
             aria-label="Quality"
           />
         }

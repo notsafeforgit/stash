@@ -162,10 +162,15 @@ or backend tests.
 
 The suite covers 320–1280px layouts, search/selection replacement rows, page
 validation, section state, direct drawer access, flat entity actions and desktop
-submenus, drawer drag and outside-tap dismissal, editor dismissal, keyboard
+submenus, drawer drag distance and outside-tap dismissal, editor dismissal, keyboard
 navigation, and viewport lifting. Settings checks cover bottom navigation,
 section routes and browser Back, search highlight links, keyboard result
 selection, and preserving unsaved form state across breakpoint changes.
+Player checks use a small synthetic MP4 and the production playback controls:
+mobile Close placement and touch targets at 320px through landscape sizes,
+speed/quality selection, revealing hidden controls without accidental dismissal,
+and loading-state/desktop lightbox dismissal. They do not access library media
+or send playback activity mutations.
 Browser sources are strictly type-checked by
 the normal validation command; `.browser.ts` tests run separately from Vitest. Virtual viewport
 resizing models keyboard geometry, but physical iOS keyboard and gesture checks

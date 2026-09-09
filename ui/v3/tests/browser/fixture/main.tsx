@@ -37,6 +37,7 @@ import { Input } from "@/components/ui/input";
 import messages from "@/locales/en-GB.json";
 import flattenMessages from "@/utils/flatten-messages";
 import "./style.css";
+import { PlayerFixture } from "./player";
 
 const params = new URLSearchParams(location.search);
 const items = Array.from({ length: 40 }, (_, index) => ({
@@ -276,6 +277,11 @@ const router = createRouter({
       getParentRoute: () => rootRoute,
       path: "/",
       component: FixturePage,
+    }),
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/player",
+      component: PlayerFixture,
     }),
     settingsRoute.addChildren(
       SETTINGS_NAV_ITEMS.map((item) =>

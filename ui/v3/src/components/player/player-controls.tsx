@@ -42,6 +42,7 @@ import type { PlayerSource } from "./player-utils";
 import { PlayerMarkers } from "./player-markers";
 import type { IMarker } from "./player-utils";
 import { SpeedMenu, QualityMenu } from "./player-menus";
+import { PlayerCloseButton } from "./player-close-button";
 import { DOUBLE_TAP_MAX_MS } from "./video-frame-zoom";
 import {
   exceedsTouchTapMovement,
@@ -74,10 +75,12 @@ function PlaybackModeButton({
   mode,
   canAdvance,
   onCycle,
+  className,
 }: {
   mode: "normal" | "loop" | "advance";
   canAdvance: boolean;
   onCycle: () => void;
+  className?: string;
 }) {
   const label =
     mode === "advance"
@@ -102,6 +105,7 @@ function PlaybackModeButton({
         // is wider than `size-8`; let the button auto-expand so the
         // press/focus indicator wraps the visible glyphs.
         mode === "normal" && canAdvance && "w-auto min-w-8 px-1.5",
+        className,
       )}
     >
       {mode === "advance" ? (
@@ -770,6 +774,8 @@ interface ControlBarProps {
   canAdvance: boolean;
   onCyclePlaybackMode: () => void;
   onTogglePaused: () => void;
+  onClose?: () => void;
+  controlsHidden: boolean;
   /** Notifies the parent when any popup menu (speed/quality) opens or
    *  closes. Used so the parent can suppress its click-anywhere
    *  play/pause toggle for the click that dismisses the menu — Base UI's
@@ -798,6 +804,8 @@ function ControlBar({
   canAdvance,
   onCyclePlaybackMode,
   onTogglePaused,
+  onClose,
+  controlsHidden,
   onMenuOpenChange,
   clipBoundsEdit,
 }: ControlBarProps) {
@@ -806,6 +814,54 @@ function ControlBar({
   const pip = Player.usePlayer((s) => s.pip);
   const canPip = Player.usePlayer((s) => s.pipAvailability === "available");
   const store = Player.usePlayer();
+
+  // Lightbox callers provide dismissal only on touch devices. Time and
+  // device controls sit above the full-width timeline so the main row
+  // retains seven 44px targets even at 320px, without an overflow menu.
+  const mobileControlClass = onClose ? "size-11 min-w-11 flex-1" : undefined;
+  const timeDisplay = (
+    <TimeDisplay
+      Player={Player}
+      offsetStart={offsetStart}
+      fileDuration={fileDuration}
+      reloading={reloading}
+      seekDisplayTarget={seekDisplayTarget}
+    />
+  );
+  const deviceControls = (
+    <>
+      {canPip && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={() => store.togglePictureInPicture()}
+          className={cn(OVERLAY_BTN, "text-white/80", onClose && "size-11")}
+          aria-label={
+            pip ? "Exit picture-in-picture" : "Enter picture-in-picture"
+          }
+        >
+          {pip ? <PictureInPicture2 /> : <PictureInPicture />}
+        </Button>
+      )}
+      <CastButton
+        className={(state) =>
+          cn(
+            OVERLAY_BTN,
+            state.connection === "connected"
+              ? "text-blue-400"
+              : "text-white/80",
+            onClose && "size-11",
+          )
+        }
+        render={
+          <Button type="button" variant="ghost" size="icon">
+            <Cast />
+          </Button>
+        }
+      />
+    </>
+  );
 
   return (
     // `mt-auto` pins the bar to the bottom of `<Controls.Root>`'s
@@ -822,7 +878,22 @@ function ControlBar({
     // tappable; without an explicit z-index those positioned siblings
     // would paint over this static-positioned bar (per CSS stacking
     // rules: positioned-with-z-auto > non-positioned).
-    <Controls.Group className="relative z-10 mt-auto flex flex-col gap-1 px-2 py-1 w-full bg-gradient-to-t from-black/70 to-transparent">
+    <Controls.Group
+      data-player-control-bar=""
+      inert={controlsHidden || undefined}
+      aria-hidden={controlsHidden || undefined}
+      className={cn(
+        "relative z-10 mt-auto flex flex-col gap-1 px-2 py-1 w-full bg-gradient-to-t from-black/70 to-transparent",
+        onClose &&
+          "px-[max(0.375rem,env(safe-area-inset-left,0px),env(safe-area-inset-right,0px))] pb-[max(0.25rem,env(safe-area-inset-bottom,0px))]",
+      )}
+    >
+      {onClose && (
+        <div className="flex items-center justify-between gap-1.5">
+          {timeDisplay}
+          <div className="flex items-center gap-1">{deviceControls}</div>
+        </div>
+      )}
       <PositionSlider
         Player={Player}
         offsetStart={offsetStart}
@@ -834,14 +905,20 @@ function ControlBar({
         clipBoundsEdit={clipBoundsEdit}
       />
 
-      <div className="flex items-center justify-between gap-1 w-full">
-        <div className="flex items-center gap-1">
+      <div
+        data-player-control-row=""
+        className={cn(
+          "flex items-center justify-between w-full",
+          !onClose && "gap-1",
+        )}
+      >
+        <div className={onClose ? "contents" : "flex items-center gap-1"}>
           <Button
             type="button"
             variant="ghost"
             size="icon"
             onClick={onTogglePaused}
-            className={cn(OVERLAY_BTN, "text-white/80")}
+            className={cn(OVERLAY_BTN, "text-white/80", mobileControlClass)}
             aria-label={paused ? "Play" : "Pause"}
           >
             {paused ? (
@@ -854,7 +931,10 @@ function ControlBar({
           <RelSeekButton
             Player={Player}
             seconds={-10}
-            className="hidden text-white/80 hover:text-white lg:flex"
+            className={cn(
+              "hidden text-white/80 hover:text-white",
+              !onClose && "lg:flex",
+            )}
             offsetStart={offsetStart}
             fileDuration={fileDuration}
             onSeek={onSeek}
@@ -865,7 +945,10 @@ function ControlBar({
           <RelSeekButton
             Player={Player}
             seconds={10}
-            className="hidden text-white/80 hover:text-white lg:flex"
+            className={cn(
+              "hidden text-white/80 hover:text-white",
+              !onClose && "lg:flex",
+            )}
             offsetStart={offsetStart}
             fileDuration={fileDuration}
             onSeek={onSeek}
@@ -878,35 +961,39 @@ function ControlBar({
             variant="ghost"
             size="icon"
             onClick={() => store.toggleMuted()}
-            className={cn(OVERLAY_BTN, "text-white/80")}
+            className={cn(OVERLAY_BTN, "text-white/80", mobileControlClass)}
             aria-label={muted ? "Unmute" : "Mute"}
           >
             {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
           </Button>
 
-          <VolumeSlider.Root className="hidden lg:relative lg:flex items-center w-20 h-8 group touch-none">
+          <VolumeSlider.Root
+            className={cn(
+              "hidden items-center w-20 h-8 group touch-none",
+              !onClose && "lg:relative lg:flex",
+            )}
+          >
             <VolumeSlider.Track className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1 bg-white/30 rounded-full group-hover:h-1.5 transition-all" />
             <VolumeSlider.Fill className="absolute left-0 top-1/2 -translate-y-1/2 h-1 w-[var(--media-slider-fill)] bg-white rounded-full group-hover:h-1.5 transition-all" />
             <VolumeSlider.Thumb className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 left-[var(--media-slider-fill)] w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
           </VolumeSlider.Root>
 
-          <TimeDisplay
-            Player={Player}
-            offsetStart={offsetStart}
-            fileDuration={fileDuration}
-            reloading={reloading}
-            seekDisplayTarget={seekDisplayTarget}
-          />
+          {!onClose && timeDisplay}
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className={onClose ? "contents" : "flex items-center gap-1"}>
           <PlaybackModeButton
             mode={playbackMode}
             canAdvance={canAdvance}
             onCycle={onCyclePlaybackMode}
+            className={mobileControlClass}
           />
 
-          <SpeedMenu Player={Player} onOpenChange={onMenuOpenChange} />
+          <SpeedMenu
+            Player={Player}
+            onOpenChange={onMenuOpenChange}
+            className={mobileControlClass}
+          />
 
           <QualityMenu
             sources={sources}
@@ -914,42 +1001,10 @@ function ControlBar({
             onSourceChange={onSourceChange}
             sourceResolution={sourceResolution}
             onOpenChange={onMenuOpenChange}
+            className={mobileControlClass}
           />
 
-          {canPip && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => store.togglePictureInPicture()}
-              className={cn(OVERLAY_BTN, "text-white/80")}
-              aria-label={
-                pip ? "Exit picture-in-picture" : "Enter picture-in-picture"
-              }
-            >
-              {pip ? (
-                <PictureInPicture2 size={15} />
-              ) : (
-                <PictureInPicture size={15} />
-              )}
-            </Button>
-          )}
-
-          <CastButton
-            className={(state) =>
-              cn(
-                OVERLAY_BTN,
-                state.connection === "connected"
-                  ? "text-blue-400"
-                  : "text-white/80",
-              )
-            }
-            render={
-              <Button type="button" variant="ghost" size="icon">
-                <Cast size={15} />
-              </Button>
-            }
-          />
+          {!onClose && deviceControls}
 
           <Button
             type="button"
@@ -966,10 +1021,12 @@ function ControlBar({
               OVERLAY_BTN,
               "text-white/80",
               hideFullscreenButton && "[@media(hover:hover)]:hidden",
+              mobileControlClass,
             )}
           >
             {isFullscreen ? <Minimize size={15} /> : <Maximize size={15} />}
           </Button>
+          {onClose && <PlayerCloseButton onClose={onClose} />}
         </div>
       </div>
     </Controls.Group>
@@ -1029,6 +1086,7 @@ export interface PlayerControlsProps {
    *  with v10 store fallback to webkitEnterFullscreen on the video) runs
    *  instead. Any other return — including `void` — counts as handled. */
   onToggleFullscreenOverride?: () => boolean | undefined;
+  onClose?: () => void;
   /** Optional in-place scene viewer affordance rendered over the video. */
   onToggleViewer?: () => void;
   viewerOpen?: boolean;
@@ -1080,6 +1138,7 @@ export function PlayerControls({
   onTogglePaused,
   onUserPlaybackGesture,
   onToggleFullscreenOverride,
+  onClose,
   onToggleViewer,
   viewerOpen,
   viewerButtonRef,
@@ -1648,6 +1707,8 @@ export function PlayerControls({
         canAdvance={canAdvance}
         onCyclePlaybackMode={onCyclePlaybackMode}
         onTogglePaused={togglePaused}
+        onClose={onClose}
+        controlsHidden={controlsHidden}
         onMenuOpenChange={handleMenuOpenChange}
         clipBoundsEdit={clipBoundsEdit}
       />

@@ -92,6 +92,12 @@ local to the filter editor; Back/Forward updates query variables and resets
 selection without remounting the page. Shared grouping/selection helpers live
 beside that controller.
 
+Embedded list defaults are scoped by `View` (for example `performer_scenes`
+and `performer_images`). Only list-owned URL parameters override them;
+`tab`, `returnTo`, and other page parameters do not constitute a filter.
+Returning to a tab without explicit filter parameters restores that view's
+saved default without serializing it into the shared page URL.
+
 ### Returning to a list
 
 TanStack Router owns scroll tracking and its session cache. The router and
@@ -232,6 +238,16 @@ Preserve these invariants:
   its previous rate while the media is attached. Scene or marker auto-advance can
   unmount the player mid-hold; cleanup must clear the gesture without sending
   playback commands to a detached store.
+- Touch scene lightboxes pass their history-aware dismissal callback into the
+  player. Close occupies the right end of the playback row and fades with it;
+  hidden controls are inert so the first tap reveals rather than activates them.
+  Time and available PiP/Cast controls sit above a full-width timeline, preserving
+  scrubbing space and direct speed, quality, playback-mode, fullscreen, and Close
+  access with 44px targets.
+  Mobile slides fill the viewport; control padding respects the home indicator
+  and landscape display cutouts.
+  Pending/error slides provide bottom dismissal until a player is available.
+  Desktop retains the lightbox toolbar and Escape behavior.
 
 Root [CLAUDE.md](../../../CLAUDE.md) describes the backend HLS constraints.
 
@@ -281,6 +297,11 @@ appear at the end of list results, and single-page lists omit pagination. Standa
 row modes with navigation and a page picker. Desktop retains
 its sidebar controls and tab strip. Collection pages use the `md` breakpoint;
 media pages use `lg`, matching their existing split layouts.
+
+Drawer motion uses `transform` for dragging and enter/exit animations. Do not
+combine it with the separate CSS `translate` property on the popup: Base UI
+supplies an inline transform while dragging, and the two translations add
+together instead of tracking the pointer one-to-one.
 
 The footer participates in flex layout, reserving its actual height without
 fixed offsets or content overlays. It owns safe-area clearance and keyboard

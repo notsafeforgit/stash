@@ -22,6 +22,7 @@ import {
   LightboxDetails,
 } from "./lightbox-overlay";
 import { LightboxScenePlayer } from "./lightbox-scene-player";
+import { PlayerCloseButton } from "@/components/player/player-close-button";
 import type { SceneSlide, SceneSlideMarker } from "./scene-lightbox";
 import { offlineEntryToSceneData } from "src/components/offline/offline-scene-adapter";
 import type { OfflineEntry } from "src/components/offline/offline-db";
@@ -46,6 +47,15 @@ interface SceneSlideContentProps {
    *  `onNext`, which both lights up the auto-advance toggle and
    *  triggers the swipe when the video ends with auto-advance on. */
   onNext: () => void;
+  onClose?: () => void;
+}
+
+function PendingPlayerClose({ onClose }: { onClose?: () => void }) {
+  return onClose ? (
+    <div className="absolute inset-x-0 bottom-0 flex justify-end px-[max(0.375rem,env(safe-area-inset-left,0px),env(safe-area-inset-right,0px))] pb-[max(0.25rem,env(safe-area-inset-bottom,0px))]">
+      <PlayerCloseButton onClose={onClose} />
+    </div>
+  ) : null;
 }
 
 export function SceneSlideContent({
@@ -55,11 +65,12 @@ export function SceneSlideContent({
   loopEnabled,
   onLoopToggle,
   onNext,
+  onClose,
 }: SceneSlideContentProps) {
   // Non-active and sentinel slides render a cheap poster only.
   if (!isActive || slide.loading) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-black">
+      <div className="relative w-full h-full flex items-center justify-center bg-black">
         {slide.posterSrc && (
           <img
             src={slide.posterSrc}
@@ -73,6 +84,7 @@ export function SceneSlideContent({
             <Spinner className="size-10 text-white/70" />
           </div>
         )}
+        {isActive && <PendingPlayerClose onClose={onClose} />}
       </div>
     );
   }
@@ -90,6 +102,7 @@ export function SceneSlideContent({
         onToggleFullscreen={onToggleFullscreen}
         loopEnabled={loopEnabled}
         onLoopToggle={onLoopToggle}
+        onClose={onClose}
       />
     );
   }
@@ -101,6 +114,7 @@ export function SceneSlideContent({
       loopEnabled={loopEnabled}
       onLoopToggle={onLoopToggle}
       onNext={onNext}
+      onClose={onClose}
     />
   );
 }
@@ -152,12 +166,14 @@ function ActiveSceneSlide({
   loopEnabled,
   onLoopToggle,
   onNext,
+  onClose,
 }: {
   slide: SceneSlide;
   onToggleFullscreen: () => boolean | undefined;
   loopEnabled: boolean;
   onLoopToggle: () => void;
   onNext: () => void;
+  onClose?: () => void;
 }) {
   const { data, loading } = useQuery(GQL.FindSceneDocument, {
     variables: { id: slide.sceneId },
@@ -211,6 +227,7 @@ function ActiveSceneSlide({
           onToggleFullscreen={onToggleFullscreen}
           onControlsVisibilityChange={setChromeVisible}
           onNext={onNext}
+          onClose={onClose}
           initialTimestamp={slide.marker?.seconds ?? 0}
           clipRange={clipRange}
           posterSrc={markerPosterSrc}
@@ -244,6 +261,7 @@ function ActiveSceneSlide({
               <Spinner className="size-10 text-white/70" />
             </div>
           )}
+          <PendingPlayerClose onClose={onClose} />
         </>
       )}
     </div>
@@ -273,12 +291,14 @@ function ActiveOfflineSceneSlide({
   onToggleFullscreen,
   loopEnabled,
   onLoopToggle,
+  onClose,
 }: {
   slide: SceneSlide;
   offlineEntry: OfflineEntry;
   onToggleFullscreen: () => boolean | undefined;
   loopEnabled: boolean;
   onLoopToggle: () => void;
+  onClose?: () => void;
 }) {
   const blob = useOpfsBlobUrl(offlineEntry.scene_id);
   const { sendGetCurrentTime } = useOfflineResumeWriter(
@@ -299,6 +319,7 @@ function ActiveOfflineSceneSlide({
           loopEnabled={loopEnabled}
           onLoopToggle={onLoopToggle}
           onToggleFullscreen={onToggleFullscreen}
+          onClose={onClose}
           onControlsVisibilityChange={setChromeVisible}
           sendGetCurrentTime={sendGetCurrentTime}
           topOverlay={
@@ -320,6 +341,7 @@ function ActiveOfflineSceneSlide({
               <Spinner className="size-10 text-white/70" />
             </div>
           )}
+          <PendingPlayerClose onClose={onClose} />
         </>
       )}
     </div>

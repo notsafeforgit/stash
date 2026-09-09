@@ -2,14 +2,13 @@
  * Shared building blocks for simple detail pages (no media player).
  *
  * Usage:
- *   <DetailBackBar title={entity.name} onBack={goBack} />
  *   <DetailPageState loading={loading} error={error} notFoundMessage="Not found" skeletonProps={...}>
  *     {entity && (...)}
  *   </DetailPageState>
  *   <DetailTabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
  *
  * `DetailTabs` lives in `./detail-tabs.tsx`; this file keeps the
- * non-tab building blocks (page state, back bars).
+ * non-tab building blocks (page state, desktop navigation).
  */
 import type React from "react";
 import { DetailPageSkeleton } from "src/components/detail/detail-page-skeleton";
@@ -52,38 +51,7 @@ export function DetailPageState({
   return <>{children}</>;
 }
 
-// ── DetailBackBar ─────────────────────────────────────────────────────────────
-
-export interface DetailBackBarProps {
-  title: string;
-  onBack: () => void;
-}
-
-// Render this OUTSIDE the page's scroll container (as a sibling above it).
-// Putting it inside as `position: sticky` causes iOS Safari's overlay
-// scrollbar to paint over the bar, since the scrollbar runs the full height
-// of the scroll container including over sticky children.
-//
-// Mobile-only: on desktop the back button moves into the sidebar (see
-// `DetailSidebarBack`) so the redundant title bar doesn't take up vertical
-// space above the two-column layout.
-export function DetailBackBar({ title, onBack }: DetailBackBarProps) {
-  return (
-    <div className="md:hidden flex items-center gap-1 h-10 shrink-0 px-1 bg-background border-b border-border">
-      <Button variant="ghost" size="sm" className="px-2" onClick={onBack}>
-        <ChevronLeft size={18} />
-      </Button>
-      <span className="text-sm font-medium truncate">{title}</span>
-    </div>
-  );
-}
-
-// ── DetailSidebarBack ─────────────────────────────────────────────────────────
-
-// Desktop-only back button + entity title row rendered as the first child of
-// a detail page's `<aside>`. Pairs with `DetailBackBar` (mobile-only) so each
-// viewport gets exactly one back affordance. Hosting the title here lets the
-// image row drop its own `<h1>`, saving vertical space in the sidebar.
+// Desktop sidebar navigation; CollectionDetailLayout owns mobile navigation.
 export function DetailSidebarBack({
   onBack,
   title,

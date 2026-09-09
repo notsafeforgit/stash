@@ -234,11 +234,35 @@ Root [CLAUDE.md](../../../CLAUDE.md) describes the backend HLS constraints.
 ## Entity editing
 
 All seven single-entity edit sheets use `components/detail/entity-edit-sheet.tsx`.
-Its fixed header provides the title and an explicit Close control, including
-while data is loading or unavailable. Forms own their scrolling fields and
+Its fixed header provides the title. Close stays in the bottom action area on
+mobile and in the header on desktop, including while data is loading or
+unavailable. Inline detail editors use `detail-editor-layout.tsx` with the same
+placement. Forms own their scrolling fields and
 pinned action bars inside the remaining height. Close, Escape, and backdrop
 dismissal leave without saving; Discard resets the form and keeps the pane open.
 Successful saves close the sheet through the existing form callback.
+
+## Mobile detail navigation
+
+Collection and media detail layouts keep the entity title above the scroller
+and navigation below it on mobile. `mobile-detail-chrome.tsx` provides a shared
+footer for Back, entity actions, the section tab strip, and the active embedded
+list's search, filtering, selection, and pagination controls. Desktop retains
+its sidebar controls and tab strip. Collection pages use the `md` breakpoint;
+media pages use `lg`, matching their existing split layouts.
+
+The footer participates in flex layout, reserving its actual height without
+fixed offsets or content overlays. It owns safe-area clearance and keyboard
+lifting. React portals move controls into its typed slots while preserving
+their tab, list, and action contexts. Only the active list publishes controls;
+previously visited panels stay mounted with their filters and state intact.
+The mobile strip uses the same Base UI tabs as desktop, supports horizontal
+swiping for longer section lists, and brings a chosen section into view.
+Tapping the current section also reveals it when the page is showing the
+entity information or media above it. The focused scene viewer keeps its
+existing player mounted and places Close below it on mobile.
+Collection panels use their scroller's container height as a minimum so a
+shorter list cannot clamp the viewport back into the entity information.
 
 ## Bulk custom fields
 

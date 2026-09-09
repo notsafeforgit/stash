@@ -6,19 +6,21 @@ import { useQuery, useMutation } from "@apollo/client/react";
 import { z } from "zod";
 import { useIntl } from "react-intl";
 import {
-  DetailBackBar,
   DetailSidebarBack,
   DetailPageState,
 } from "src/components/detail/detail-page-parts";
 import { DetailTabs } from "src/components/detail/detail-tabs";
+import { CollectionDetailLayout } from "@/components/detail/collection-detail-layout";
+import { MobileDetailChromePortal } from "@/components/layout/mobile-detail-chrome";
 import { Skeleton } from "src/components/ui/skeleton";
 import { Button } from "src/components/ui/button";
-import { Star, Heart, Droplets, User, Pencil, ChevronLeft } from "lucide-react";
+import { Star, Heart, Droplets, User, Pencil } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
 import { PerformerDetailsTab } from "src/components/detail/performer-detail-tabs";
 import { PerformerEditForm } from "src/components/detail/performer-edit-form";
 import { PerformerActionsMenu } from "src/components/detail/performer-actions-menu";
 import { DetailEditTransition } from "src/components/detail/detail-edit-transition";
+import { DetailEditorLayout } from "@/components/detail/detail-editor-layout";
 import {
   PerformerScenesTab,
   PerformerImagesTab,
@@ -115,7 +117,7 @@ function PerformerToolbar({
   const intl = useIntl();
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex md:flex-wrap gap-2">
       <Button
         variant="outline"
         size="sm"
@@ -273,12 +275,11 @@ function PerformerDetailPage() {
 
   return (
     <>
-      <DetailBackBar title={title} onBack={goBack} />
-      {/* Mobile: single vertical scroll. Desktop (md+): split into a left
+      <CollectionDetailLayout title={title} onBack={goBack}>
+        {/* Mobile: single vertical scroll. Desktop (md+): split into a left
           sidebar holding the entity details (portrait + toolbar + details
           tab) and a right column holding the embedded list tabs — each
           column scrolls independently. */}
-      <div className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden">
         <DetailPageState
           loading={loading}
           error={error}
@@ -305,14 +306,16 @@ function PerformerDetailPage() {
                             onImageClick={() => setPortraitLightboxOpen(true)}
                             imageUpdating={imageUpdating}
                           />
-                          <div className="min-w-0 md:order-first">
-                            <PerformerToolbar
-                              performer={performer}
-                              onEdit={() => setEditOpen(true)}
-                              onToggleFavorite={handleToggleFavorite}
-                              onDeleted={goBack}
-                            />
-                          </div>
+                          <MobileDetailChromePortal slot="actions">
+                            <div className="min-w-0 md:order-first">
+                              <PerformerToolbar
+                                performer={performer}
+                                onEdit={() => setEditOpen(true)}
+                                onToggleFavorite={handleToggleFavorite}
+                                onDeleted={goBack}
+                              />
+                            </div>
+                          </MobileDetailChromePortal>
                         </div>
                         <div className="px-3 pb-3">
                           <PerformerDetailsTab performer={performer} />
@@ -321,50 +324,28 @@ function PerformerDetailPage() {
                     </>
                   }
                   editForm={
-                    <div className="flex flex-col h-full">
-                      {/* Header sized to match `DetailSidebarBack` so
-                          the swap between detail header and edit-form
-                          header doesn't change the aside row height. */}
-                      <div className="flex shrink-0 items-center gap-1 px-1 py-1 border-b border-border">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="px-2 shrink-0"
-                          onClick={() => setEditOpen(false)}
-                          title={intl.formatMessage({
-                            id: "actions.back",
-                            defaultMessage: "Back",
-                          })}
-                        >
-                          <ChevronLeft size={18} />
-                        </Button>
-                        <h2 className="text-base font-semibold leading-tight truncate min-w-0">
-                          {intl.formatMessage(
-                            {
-                              id: "actions.edit_entity",
-                              defaultMessage: "Edit {entityType}",
-                            },
-                            {
-                              entityType: intl
-                                .formatMessage({
-                                  id: "performer",
-                                  defaultMessage: "Performer",
-                                })
-                                .toLocaleLowerCase(),
-                            },
-                          )}
-                        </h2>
-                      </div>
-                      {/* The form owns its own scroll body + anchored
-                          action bar via flex-col layout, so we just
-                          give it the remaining height of the aside. */}
-                      <div className="flex-1 min-h-0">
-                        <PerformerEditForm
-                          performer={performer}
-                          onSaved={() => setEditOpen(false)}
-                        />
-                      </div>
-                    </div>
+                    <DetailEditorLayout
+                      onClose={() => setEditOpen(false)}
+                      title={intl.formatMessage(
+                        {
+                          id: "actions.edit_entity",
+                          defaultMessage: "Edit {entityType}",
+                        },
+                        {
+                          entityType: intl
+                            .formatMessage({
+                              id: "performer",
+                              defaultMessage: "Performer",
+                            })
+                            .toLocaleLowerCase(),
+                        },
+                      )}
+                    >
+                      <PerformerEditForm
+                        performer={performer}
+                        onSaved={() => setEditOpen(false)}
+                      />
+                    </DetailEditorLayout>
                   }
                 />
               </aside>
@@ -378,7 +359,7 @@ function PerformerDetailPage() {
             </div>
           )}
         </DetailPageState>
-      </div>
+      </CollectionDetailLayout>
 
       {performer?.image_path && (
         <Lightbox

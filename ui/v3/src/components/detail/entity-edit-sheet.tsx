@@ -54,7 +54,7 @@ export function EntityEditSheet({
               <Button
                 variant="ghost"
                 size="icon"
-                className="shrink-0"
+                className="hidden md:inline-flex shrink-0"
                 aria-label={closeLabel}
                 title={closeLabel}
               />
@@ -70,6 +70,14 @@ export function EntityEditSheet({
             </div>
           )}
           {children}
+        </div>
+        <div className="md:hidden flex shrink-0 justify-end border-t px-3 py-1 pb-[max(0.25rem,env(safe-area-inset-bottom,0px))]">
+          <SheetClose
+            render={<Button variant="ghost" size="lg" className="h-11" />}
+          >
+            <X data-icon="inline-start" />
+            {closeLabel}
+          </SheetClose>
         </div>
       </SheetContent>
     </Sheet>

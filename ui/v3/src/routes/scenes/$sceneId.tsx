@@ -9,14 +9,7 @@ import { useQuery, useMutation } from "@apollo/client/react";
 import { z } from "zod";
 import { useIntl } from "react-intl";
 import { Spinner } from "src/components/ui/spinner";
-import {
-  Star,
-  Droplets,
-  Play,
-  CheckCircle2Icon,
-  Pencil,
-  ChevronLeft,
-} from "lucide-react";
+import { Star, Droplets, Play, CheckCircle2Icon, Pencil } from "lucide-react";
 import { Button } from "src/components/ui/button";
 import { cn } from "src/lib/utils";
 import * as GQL from "src/core/generated-graphql";
@@ -44,6 +37,7 @@ import { SceneVideoFilterTab } from "src/components/detail/scene-video-filter";
 import { SceneEditForm } from "src/components/detail/scene-edit-form";
 import { SceneActionsMenu } from "src/components/detail/scene-actions-menu";
 import { DetailEditTransition } from "src/components/detail/detail-edit-transition";
+import { DetailEditorLayout } from "@/components/detail/detail-editor-layout";
 import { useDocumentTitle } from "src/hooks/title";
 import { useLightboxHistory } from "src/components/lightbox/use-lightbox-history";
 
@@ -64,6 +58,7 @@ type SceneData = NonNullable<GQL.FindSceneQuery["findScene"]>;
 
 interface SceneToolbarProps {
   scene: SceneData;
+  onEdit: () => void;
   onAddO: () => void;
   onAddPlay: () => void;
   onToggleOrganized: () => void;
@@ -74,6 +69,7 @@ interface SceneToolbarProps {
 
 function SceneToolbar({
   scene,
+  onEdit,
   onAddO,
   onAddPlay,
   onToggleOrganized,
@@ -84,8 +80,8 @@ function SceneToolbar({
   const intl = useIntl();
 
   return (
-    <div className="flex items-center gap-3 py-1.5 flex-wrap">
-      <div className="flex items-center flex-wrap gap-2">
+    <div className="flex items-center gap-2 lg:gap-3 py-1.5 lg:flex-wrap">
+      <div className="flex max-lg:shrink-0 items-center lg:flex-wrap gap-2">
         {scene.rating100 != null && (
           <span
             className="inline-flex items-center bg-transparent border border-border rounded-md text-muted-foreground text-[0.8125rem] gap-1 px-2 py-1"
@@ -145,9 +141,20 @@ function SceneToolbar({
           size={13}
           className={scene.organized ? "fill-green-600/20" : ""}
         />
-        {intl.formatMessage({ id: "organized", defaultMessage: "Organized" })}
+        <span className="max-lg:sr-only">
+          {intl.formatMessage({ id: "organized", defaultMessage: "Organized" })}
+        </span>
       </Button>
 
+      <Button
+        variant="outline"
+        size="icon"
+        className="lg:hidden"
+        onClick={onEdit}
+        aria-label={intl.formatMessage({ id: "actions.edit" })}
+      >
+        <Pencil />
+      </Button>
       <div className="ml-auto">
         <SceneActionsMenu
           scene={scene}
@@ -376,7 +383,7 @@ function SceneDetailPage() {
           editing={editingDetails}
           detail={
             <div className="flex flex-col gap-3">
-              <div className="flex justify-end">
+              <div className="hidden lg:flex justify-end">
                 <Button
                   type="button"
                   variant="outline"
@@ -394,48 +401,28 @@ function SceneDetailPage() {
             </div>
           }
           editForm={
-            <div className="flex flex-col h-full">
-              {/* Header sized to match `DetailSidebarBack`. */}
-              <div className="flex shrink-0 items-center gap-1 px-1 py-1 border-b border-border">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="px-2 shrink-0"
-                  onClick={() => setEditingDetails(false)}
-                  title={intl.formatMessage({
-                    id: "actions.back",
-                    defaultMessage: "Back",
-                  })}
-                >
-                  <ChevronLeft size={18} />
-                </Button>
-                <h2 className="text-base font-semibold leading-tight truncate min-w-0">
-                  {intl.formatMessage(
-                    {
-                      id: "actions.edit_entity",
-                      defaultMessage: "Edit {entityType}",
-                    },
-                    {
-                      entityType: intl
-                        .formatMessage({
-                          id: "scene",
-                          defaultMessage: "Scene",
-                        })
-                        .toLocaleLowerCase(),
-                    },
-                  )}
-                </h2>
-              </div>
-              {/* The form owns its own scroll body + anchored action
-                  bar via flex-col layout, so we just give it the
-                  remaining height of the parent. */}
-              <div className="flex-1 min-h-0">
-                <SceneEditForm
-                  scene={scene}
-                  onSaved={() => setEditingDetails(false)}
-                />
-              </div>
-            </div>
+            <DetailEditorLayout
+              onClose={() => setEditingDetails(false)}
+              title={intl.formatMessage(
+                {
+                  id: "actions.edit_entity",
+                  defaultMessage: "Edit {entityType}",
+                },
+                {
+                  entityType: intl
+                    .formatMessage({
+                      id: "scene",
+                      defaultMessage: "Scene",
+                    })
+                    .toLocaleLowerCase(),
+                },
+              )}
+            >
+              <SceneEditForm
+                scene={scene}
+                onSaved={() => setEditingDetails(false)}
+              />
+            </DetailEditorLayout>
           }
         />
       ),
@@ -535,6 +522,10 @@ function SceneDetailPage() {
   const toolbar = (
     <SceneToolbar
       scene={scene}
+      onEdit={() => {
+        setActiveTab("details");
+        setEditingDetails(true);
+      }}
       onAddO={() => addO()}
       onAddPlay={() => addPlay()}
       onToggleOrganized={handleToggleOrganized}

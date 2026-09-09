@@ -1,5 +1,6 @@
 import { cn } from "src/lib/utils";
 import { TabsList, TabsTrigger } from "src/components/ui/tabs";
+import { useIntl } from "react-intl";
 
 export interface DetailTabStripItem {
   id: string;
@@ -8,10 +9,8 @@ export interface DetailTabStripItem {
 
 export interface DetailTabStripProps {
   tabs: readonly DetailTabStripItem[];
-  /** When true, the strip sticks to the top of its scroll container.
-   *  DetailTabs (entity collection pages) sets this; MediaDetailLayout
-   *  sizes the sidebar with flex column instead and doesn't need it. */
-  sticky?: boolean;
+  mobile?: boolean;
+  onTabClick?: (id: string) => void;
   className?: string;
 }
 
@@ -21,16 +20,14 @@ export interface DetailTabStripProps {
  * below their content width (`min-w-fit`), and the strip itself becomes
  * horizontally scrollable (`overflow-x-auto`) when 5+ labels exceed the
  * column width. This is the only place the scroll behaviour lives.
- *
- * The mobile bottom-bar in MediaDetailLayout is deliberately NOT routed
- * through here — that's a fixed-position toolbar of `<Button>`s, not
- * `<TabsTrigger>`s, so it has different semantics and styling.
  */
 export function DetailTabStrip({
   tabs,
-  sticky = false,
+  mobile = false,
+  onTabClick,
   className,
 }: DetailTabStripProps) {
+  const intl = useIntl();
   return (
     // `w-full` overrides the shadcn TabsList's default `w-fit`: without
     // it the strip sizes to its content's intrinsic width, which means
@@ -39,6 +36,10 @@ export function DetailTabStrip({
     // `overflow-hidden`). Pinning to the container width is what makes
     // the horizontal scroll engage when 5+ labels exceed the column.
     <TabsList
+      aria-label={intl.formatMessage({
+        id: "accessibility.detail_sections",
+        defaultMessage: "Detail sections",
+      })}
       className={cn(
         "w-full shrink-0 overflow-x-auto overflow-y-hidden",
         // Pack tabs shoulder-to-shoulder before overflowing:
@@ -60,12 +61,22 @@ export function DetailTabStrip({
         // forward leftover scroll momentum to the page beneath
         // (`overscroll-contain`).
         "touch-pan-x overscroll-contain",
-        sticky && "sticky top-0 z-10 bg-background",
+        mobile &&
+          "h-12 group-data-horizontal/tabs:h-12 justify-start p-0 [&>*]:px-3",
         className,
       )}
     >
       {tabs.map((t) => (
-        <TabsTrigger key={t.id} value={t.id}>
+        <TabsTrigger
+          key={t.id}
+          value={t.id}
+          onClick={() => onTabClick?.(t.id)}
+          className={
+            mobile
+              ? "h-12 after:inset-x-0 after:bottom-0 group-data-horizontal/tabs:after:bottom-0 after:h-0.5"
+              : undefined
+          }
+        >
           {t.label}
         </TabsTrigger>
       ))}

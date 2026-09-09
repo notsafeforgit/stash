@@ -21,7 +21,6 @@ import {
   Minus,
   RotateCcw,
   Pencil,
-  ChevronLeft,
 } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
 import { imageTitle } from "src/core/files";
@@ -36,6 +35,7 @@ import {
 import { ImageEditForm } from "src/components/detail/image-edit-form";
 import { ImageActionsMenu } from "src/components/detail/image-actions-menu";
 import { DetailEditTransition } from "src/components/detail/detail-edit-transition";
+import { DetailEditorLayout } from "@/components/detail/detail-editor-layout";
 import {
   LIGHTBOX_ZOOM_TUNING,
   OriginalSizeButton,
@@ -222,6 +222,7 @@ function ImageViewer({ image }: { image: ImageData }) {
 
 interface ImageToolbarProps {
   image: ImageData;
+  onEdit: () => void;
   onAddO: () => void;
   onSubO: () => void;
   onResetO: () => void;
@@ -231,6 +232,7 @@ interface ImageToolbarProps {
 
 function ImageToolbar({
   image,
+  onEdit,
   onAddO,
   onSubO,
   onResetO,
@@ -241,8 +243,8 @@ function ImageToolbar({
   const oCounter = image.o_counter ?? 0;
 
   return (
-    <div className="flex items-center gap-3 py-1.5 flex-wrap">
-      <div className="flex items-center flex-wrap gap-1">
+    <div className="flex items-center gap-2 lg:gap-3 py-1.5 lg:flex-wrap">
+      <div className="flex max-lg:shrink-0 items-center lg:flex-wrap gap-1">
         {image.rating100 != null && (
           <span
             className="inline-flex items-center bg-transparent border border-border rounded-md text-muted-foreground text-[0.8125rem] gap-1 px-2 py-1 mr-1"
@@ -316,9 +318,20 @@ function ImageToolbar({
           size={13}
           className={image.organized ? "fill-green-600/20" : ""}
         />
-        {intl.formatMessage({ id: "organized", defaultMessage: "Organized" })}
+        <span className="max-lg:sr-only">
+          {intl.formatMessage({ id: "organized", defaultMessage: "Organized" })}
+        </span>
       </Button>
 
+      <Button
+        variant="outline"
+        size="icon"
+        className="lg:hidden"
+        onClick={onEdit}
+        aria-label={intl.formatMessage({ id: "actions.edit" })}
+      >
+        <Pencil />
+      </Button>
       <div className="ml-auto">
         <ImageActionsMenu image={image} onDeleted={onDeleted} />
       </div>
@@ -400,7 +413,7 @@ function ImageDetailPage() {
           editing={editingDetails}
           detail={
             <div className="flex flex-col gap-3">
-              <div className="flex justify-end">
+              <div className="hidden lg:flex justify-end">
                 <Button
                   type="button"
                   variant="outline"
@@ -418,48 +431,28 @@ function ImageDetailPage() {
             </div>
           }
           editForm={
-            <div className="flex flex-col h-full">
-              {/* Header sized to match `DetailSidebarBack`. */}
-              <div className="flex shrink-0 items-center gap-1 px-1 py-1 border-b border-border">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="px-2 shrink-0"
-                  onClick={() => setEditingDetails(false)}
-                  title={intl.formatMessage({
-                    id: "actions.back",
-                    defaultMessage: "Back",
-                  })}
-                >
-                  <ChevronLeft size={18} />
-                </Button>
-                <h2 className="text-base font-semibold leading-tight truncate min-w-0">
-                  {intl.formatMessage(
-                    {
-                      id: "actions.edit_entity",
-                      defaultMessage: "Edit {entityType}",
-                    },
-                    {
-                      entityType: intl
-                        .formatMessage({
-                          id: "image",
-                          defaultMessage: "Image",
-                        })
-                        .toLocaleLowerCase(),
-                    },
-                  )}
-                </h2>
-              </div>
-              {/* The form owns its own scroll body + anchored action
-                  bar via flex-col layout, so we just give it the
-                  remaining height of the parent. */}
-              <div className="flex-1 min-h-0">
-                <ImageEditForm
-                  image={image}
-                  onSaved={() => setEditingDetails(false)}
-                />
-              </div>
-            </div>
+            <DetailEditorLayout
+              onClose={() => setEditingDetails(false)}
+              title={intl.formatMessage(
+                {
+                  id: "actions.edit_entity",
+                  defaultMessage: "Edit {entityType}",
+                },
+                {
+                  entityType: intl
+                    .formatMessage({
+                      id: "image",
+                      defaultMessage: "Image",
+                    })
+                    .toLocaleLowerCase(),
+                },
+              )}
+            >
+              <ImageEditForm
+                image={image}
+                onSaved={() => setEditingDetails(false)}
+              />
+            </DetailEditorLayout>
           }
         />
       ),
@@ -482,6 +475,10 @@ function ImageDetailPage() {
       headerContent={
         <ImageToolbar
           image={image}
+          onEdit={() => {
+            setActiveTab("details");
+            setEditingDetails(true);
+          }}
           onAddO={() => incrementO()}
           onSubO={() => decrementO()}
           onResetO={() => resetO()}

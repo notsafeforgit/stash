@@ -54,6 +54,7 @@ import {
 import { useDefaultFilterActions } from "src/hooks/default-filter";
 import { DefaultFilterConflict } from "src/components/filters/default-filter-conflict";
 import { useVisualViewportBottomInset } from "src/hooks/use-visual-viewport-bottom-inset";
+import { useMobileDetailChrome } from "@/components/layout/mobile-detail-chrome";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -162,6 +163,7 @@ export const MobileListBar: React.FC<MobileListBarProps> = ({
   sortOptions: sortOptionsOverride,
 }) => {
   const intl = useIntl();
+  const detailFooter = useMobileDetailChrome()?.mobile ?? false;
   const [navOpen, setNavOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const defaultFilter = useDefaultFilterActions(view, filter);
@@ -526,10 +528,13 @@ export const MobileListBar: React.FC<MobileListBarProps> = ({
 
       {/* ── Bottom bar ────────────────────────────────────────────────────────── */}
       <div
-        ref={barRef}
-        className="relative z-50 flex flex-col bg-background border-t border-border shrink-0 pb-[env(safe-area-inset-bottom,0px)]"
+        ref={detailFooter ? undefined : barRef}
+        className={cn(
+          "relative z-50 flex flex-col bg-background border-t border-border shrink-0",
+          !detailFooter && "pb-[env(safe-area-inset-bottom,0px)]",
+        )}
         style={
-          bottomInset > 0
+          !detailFooter && bottomInset > 0
             ? { transform: `translateY(-${bottomInset}px)` }
             : undefined
         }

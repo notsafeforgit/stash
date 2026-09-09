@@ -6,18 +6,20 @@ import { useQuery } from "@apollo/client/react";
 import { z } from "zod";
 import { useIntl } from "react-intl";
 import {
-  DetailBackBar,
   DetailSidebarBack,
   DetailPageState,
 } from "src/components/detail/detail-page-parts";
 import { DetailTabs } from "src/components/detail/detail-tabs";
+import { CollectionDetailLayout } from "@/components/detail/collection-detail-layout";
+import { MobileDetailChromePortal } from "@/components/layout/mobile-detail-chrome";
 import { Button } from "src/components/ui/button";
-import { Film, Pencil, ChevronLeft } from "lucide-react";
+import { Film, Pencil } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
 import { GroupDetailsTab } from "src/components/detail/group-detail-tabs";
 import { GroupActionsMenu } from "src/components/detail/group-actions-menu";
 import { GroupEditForm } from "src/components/detail/group-edit-form";
 import { DetailEditTransition } from "src/components/detail/detail-edit-transition";
+import { DetailEditorLayout } from "@/components/detail/detail-editor-layout";
 import { useDocumentTitle } from "src/hooks/title";
 import {
   GroupScenesTab,
@@ -122,33 +124,32 @@ function GroupDetailPage() {
   }
 
   return (
-    <>
-      <DetailBackBar title={group?.name ?? ""} onBack={goBack} />
-      <div className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden">
-        <DetailPageState
-          loading={loading}
-          error={error}
-          notFound={!group}
-          notFoundMessage={intl.formatMessage({
-            id: "group_not_found",
-            defaultMessage: "Group not found",
-          })}
-          skeletonProps={{ imageAspect: "aspect-[2/3]" }}
-        >
-          {group && (
-            <div className="md:h-full md:flex md:flex-row">
-              <aside className="md:w-72 lg:w-80 md:shrink-0 md:flex md:flex-col md:border-r md:border-border md:min-h-0">
-                <DetailEditTransition
-                  editing={editOpen}
-                  fillHeight
-                  detail={
-                    <>
-                      <DetailSidebarBack onBack={goBack} title={group.name} />
-                      <div className="md:flex-1 md:min-h-0 md:overflow-y-auto">
-                        <div className="flex flex-col items-stretch gap-3 p-3">
-                          <GroupImage group={group} />
+    <CollectionDetailLayout title={group?.name ?? ""} onBack={goBack}>
+      <DetailPageState
+        loading={loading}
+        error={error}
+        notFound={!group}
+        notFoundMessage={intl.formatMessage({
+          id: "group_not_found",
+          defaultMessage: "Group not found",
+        })}
+        skeletonProps={{ imageAspect: "aspect-[2/3]" }}
+      >
+        {group && (
+          <div className="md:h-full md:flex md:flex-row">
+            <aside className="md:w-72 lg:w-80 md:shrink-0 md:flex md:flex-col md:border-r md:border-border md:min-h-0">
+              <DetailEditTransition
+                editing={editOpen}
+                fillHeight
+                detail={
+                  <>
+                    <DetailSidebarBack onBack={goBack} title={group.name} />
+                    <div className="md:flex-1 md:min-h-0 md:overflow-y-auto">
+                      <div className="flex flex-col items-stretch gap-3 p-3">
+                        <GroupImage group={group} />
+                        <MobileDetailChromePortal slot="actions">
                           <div className="min-w-0 md:order-first">
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex md:flex-wrap gap-2">
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -166,70 +167,51 @@ function GroupDetailPage() {
                               />
                             </div>
                           </div>
-                        </div>
-                        <div className="px-3 pb-3">
-                          <GroupDetailsTab group={group} />
-                        </div>
+                        </MobileDetailChromePortal>
                       </div>
-                    </>
-                  }
-                  editForm={
-                    <div className="flex flex-col h-full">
-                      {/* Header sized to match `DetailSidebarBack`. */}
-                      <div className="flex shrink-0 items-center gap-1 px-1 py-1 border-b border-border">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="px-2 shrink-0"
-                          onClick={() => setEditOpen(false)}
-                          title={intl.formatMessage({
-                            id: "actions.back",
-                            defaultMessage: "Back",
-                          })}
-                        >
-                          <ChevronLeft size={18} />
-                        </Button>
-                        <h2 className="text-base font-semibold leading-tight truncate min-w-0">
-                          {intl.formatMessage(
-                            {
-                              id: "actions.edit_entity",
-                              defaultMessage: "Edit {entityType}",
-                            },
-                            {
-                              entityType: intl
-                                .formatMessage({
-                                  id: "group",
-                                  defaultMessage: "Group",
-                                })
-                                .toLocaleLowerCase(),
-                            },
-                          )}
-                        </h2>
-                      </div>
-                      {/* Form owns its own scroll body + anchored
-                          action bar via flex-col layout. */}
-                      <div className="flex-1 min-h-0">
-                        <GroupEditForm
-                          group={group}
-                          onSaved={() => setEditOpen(false)}
-                        />
+                      <div className="px-3 pb-3">
+                        <GroupDetailsTab group={group} />
                       </div>
                     </div>
-                  }
-                />
-              </aside>
-              <div className="md:flex-1 md:min-w-0 md:min-h-0 md:flex md:flex-col">
-                <DetailTabs
-                  tabs={entityTabs}
-                  activeTab={activeTab}
-                  onTabChange={setActiveTab}
-                />
-              </div>
+                  </>
+                }
+                editForm={
+                  <DetailEditorLayout
+                    onClose={() => setEditOpen(false)}
+                    title={intl.formatMessage(
+                      {
+                        id: "actions.edit_entity",
+                        defaultMessage: "Edit {entityType}",
+                      },
+                      {
+                        entityType: intl
+                          .formatMessage({
+                            id: "group",
+                            defaultMessage: "Group",
+                          })
+                          .toLocaleLowerCase(),
+                      },
+                    )}
+                  >
+                    <GroupEditForm
+                      group={group}
+                      onSaved={() => setEditOpen(false)}
+                    />
+                  </DetailEditorLayout>
+                }
+              />
+            </aside>
+            <div className="md:flex-1 md:min-w-0 md:min-h-0 md:flex md:flex-col">
+              <DetailTabs
+                tabs={entityTabs}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+              />
             </div>
-          )}
-        </DetailPageState>
-      </div>
-    </>
+          </div>
+        )}
+      </DetailPageState>
+    </CollectionDetailLayout>
   );
 }
 

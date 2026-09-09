@@ -3,7 +3,6 @@ import { flushSync } from "react-dom";
 import { useIntl } from "react-intl";
 import {
   ChevronUp,
-  Ellipsis,
   Funnel,
   ListChecks,
   Menu,
@@ -21,7 +20,8 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { MobileNavSheet } from "src/components/layout/mobile-nav-sheet";
+import { MobileNavSheet } from "@/components/layout/mobile-nav-sheet";
+import { MobileToolbarRow } from "@/components/layout/mobile-toolbar";
 import {
   MobileDetailChromePortal,
   useMobileDetailChrome,
@@ -70,7 +70,6 @@ export function MobileListControls({
   const hosted = chrome?.mobile ?? false;
   const [searchOpen, setSearchOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
   const [pagesOpen, setPagesOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const searchButtonRef = useRef<HTMLButtonElement>(null);
@@ -79,13 +78,9 @@ export function MobileListControls({
     selecting || hasSelection ? "selection" : searchOpen ? "search" : null;
   useMobileDetailInteraction(mode);
   const pageCount = Math.ceil(totalCount / filter.itemsPerPage);
-  const moreLabel = intl.formatMessage({
-    id: "actions.more",
-    defaultMessage: "More",
-  });
 
   function runAction(action: () => void) {
-    setMoreOpen(false);
+    setPagesOpen(false);
     chrome?.setPanel(null);
     action();
   }
@@ -102,76 +97,33 @@ export function MobileListControls({
       }}
     />
   );
-  const actions = (
-    <div className="flex flex-col gap-1">
-      {hosted && <Separator className="my-1" />}
-      <Button
-        variant="ghost"
-        className="h-11 justify-start"
-        onClick={() => runAction(openFilterSidebar)}
-      >
-        <Funnel data-icon="inline-start" />
-        {intl.formatMessage({
-          id: "search_filter.edit_filter",
-          defaultMessage: "Filters",
-        })}
-        {activeFilterCount > 0 && (
-          <Badge variant="secondary" className="ml-auto">
-            {activeFilterCount}
-          </Badge>
-        )}
-      </Button>
-      <Button
-        variant="ghost"
-        className="h-11 justify-start"
-        onClick={() => runAction(onViewOptions)}
-      >
-        <Settings2 data-icon="inline-start" />
-        {intl.formatMessage({
-          id: "view_options",
-          defaultMessage: "View options",
-        })}
-      </Button>
-      {onTaggerMode && (
-        <Button
-          variant="ghost"
-          className="h-11 justify-start"
-          onClick={() => runAction(onTaggerMode)}
-        >
-          <Tags data-icon="inline-start" />
-          {intl.formatMessage({
-            id: "actions.tagger",
-            defaultMessage: "Tagger",
-          })}
-        </Button>
-      )}
-      {hosted && (
-        <Button
-          variant="ghost"
-          className="h-11 justify-start"
-          onClick={() => runAction(() => setNavOpen(true))}
-        >
-          <Menu data-icon="inline-start" />
-          {intl.formatMessage({
-            id: "navigation",
-            defaultMessage: "Navigation",
-          })}
-        </Button>
-      )}
-    </div>
-  );
+  const taggerLabel = intl.formatMessage({
+    id: "actions.tagger",
+    defaultMessage: "Tagger",
+  });
+  const Row = hosted ? "div" : MobileToolbarRow;
 
   return (
     <>
-      <MobileNavSheet open={navOpen} onOpenChange={setNavOpen} />
+      {!hosted && <MobileNavSheet open={navOpen} onOpenChange={setNavOpen} />}
       {hosted && (
         <>
           <MobileDetailChromePortal slot="pagination">
             {pagePicker}
           </MobileDetailChromePortal>
-          <MobileDetailChromePortal slot="list-actions">
-            {actions}
-          </MobileDetailChromePortal>
+          {onTaggerMode && (
+            <MobileDetailChromePortal slot="list-actions">
+              <Separator className="my-1" />
+              <Button
+                variant="ghost"
+                className="h-11 w-full justify-start"
+                onClick={() => runAction(onTaggerMode)}
+              >
+                <Tags />
+                {taggerLabel}
+              </Button>
+            </MobileDetailChromePortal>
+          )}
         </>
       )}
       <div
@@ -179,7 +131,7 @@ export function MobileListControls({
         data-mobile-list-mode={mode ?? "browse"}
         className={cn(
           !hosted &&
-            "shrink-0 border-t bg-background pb-[env(safe-area-inset-bottom,0px)]",
+            "@container shrink-0 border-t bg-background pb-[env(safe-area-inset-bottom,0px)]",
         )}
         style={
           !hosted && bottomInset > 0
@@ -187,7 +139,13 @@ export function MobileListControls({
             : undefined
         }
       >
-        <div className={cn("flex items-center gap-2", !hosted && "h-14 px-3")}>
+        <Row
+          className={
+            hosted
+              ? "flex h-11 items-center gap-[var(--mobile-toolbar-gap)]"
+              : undefined
+          }
+        >
           {mode === "selection" ? (
             <>
               <span className="min-w-0 flex-1 truncate text-sm tabular-nums">
@@ -321,29 +279,49 @@ export function MobileListControls({
               >
                 <Search />
               </Button>
-              {!hosted && (
-                <Popover open={moreOpen} onOpenChange={setMoreOpen}>
-                  <PopoverTrigger
-                    render={
-                      <Button
-                        variant="ghost"
-                        size="icon-lg"
-                        className="size-11 shrink-0"
-                        aria-label={moreLabel}
-                      />
-                    }
-                  >
-                    <Ellipsis />
-                  </PopoverTrigger>
-                  <PopoverContent side="top" align="end">
-                    <PopoverTitle>{moreLabel}</PopoverTitle>
-                    {actions}
-                  </PopoverContent>
-                </Popover>
+              <Button
+                variant={activeFilterCount > 0 ? "secondary" : "ghost"}
+                size="icon-lg"
+                className="relative size-11 shrink-0"
+                onClick={() => runAction(openFilterSidebar)}
+                aria-label={intl.formatMessage({
+                  id: "search_filter.edit_filter",
+                  defaultMessage: "Filters",
+                })}
+              >
+                <Funnel />
+                {activeFilterCount > 0 && (
+                  <Badge className="absolute top-0 right-0 h-4 min-w-4 px-1 tabular-nums">
+                    {activeFilterCount}
+                  </Badge>
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-lg"
+                className="size-11 shrink-0"
+                onClick={() => runAction(onViewOptions)}
+                aria-label={intl.formatMessage({
+                  id: "view_options",
+                  defaultMessage: "View options",
+                })}
+              >
+                <Settings2 />
+              </Button>
+              {!hosted && onTaggerMode && (
+                <Button
+                  variant="ghost"
+                  size="icon-lg"
+                  className="size-11 shrink-0"
+                  onClick={() => runAction(onTaggerMode)}
+                  aria-label={taggerLabel}
+                >
+                  <Tags />
+                </Button>
               )}
             </>
           )}
-        </div>
+        </Row>
       </div>
     </>
   );

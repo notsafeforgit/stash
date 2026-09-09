@@ -1,3 +1,4 @@
+import { EntityActionButton } from "@/components/detail/entity-actions-menu";
 import React, { useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useSmartBack } from "src/hooks/use-smart-back";
@@ -8,7 +9,10 @@ import {
   DetailSidebarBack,
   DetailPageState,
 } from "src/components/detail/detail-page-parts";
-import { DetailTabs } from "src/components/detail/detail-tabs";
+import {
+  DetailTabs,
+  type DetailTabsTab,
+} from "src/components/detail/detail-tabs";
 import { CollectionDetailLayout } from "@/components/detail/collection-detail-layout";
 import { MobileDetailChromePortal } from "@/components/layout/mobile-detail-chrome";
 import { DetailEditTransition } from "src/components/detail/detail-edit-transition";
@@ -106,13 +110,13 @@ function GalleryDetailPage() {
   const gallery = data?.findGallery;
   useDocumentTitle(gallery ? galleryLabel(gallery) : undefined);
 
-  type EntityTab = { id: string; label: string; content: React.ReactNode };
-  const entityTabs: EntityTab[] = gallery
+  const entityTabs: DetailTabsTab[] = gallery
     ? [
         ...(gallery.image_count > 0
           ? [
               {
                 id: "images",
+                icon: Images,
                 label: intl.formatMessage({
                   id: "images",
                   defaultMessage: "Images",
@@ -166,17 +170,14 @@ function GalleryDetailPage() {
                           <MobileDetailChromePortal slot="actions">
                             <div className="min-w-0 md:order-first">
                               <div className="flex flex-wrap gap-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => setEditOpen(true)}
-                                >
-                                  <Pencil size={13} />
-                                  {intl.formatMessage({
+                                <EntityActionButton
+                                  icon={Pencil}
+                                  label={intl.formatMessage({
                                     id: "actions.edit",
                                     defaultMessage: "Edit",
                                   })}
-                                </Button>
+                                  onClick={() => setEditOpen(true)}
+                                />
                                 <Button
                                   variant="outline"
                                   size="sm"

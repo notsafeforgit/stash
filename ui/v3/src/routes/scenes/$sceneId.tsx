@@ -1,3 +1,4 @@
+import { EntityActionButton } from "@/components/detail/entity-actions-menu";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   createFileRoute,
@@ -9,7 +10,20 @@ import { useQuery, useMutation } from "@apollo/client/react";
 import { z } from "zod";
 import { useIntl } from "react-intl";
 import { Spinner } from "src/components/ui/spinner";
-import { Star, Droplets, Play, CheckCircle2Icon, Pencil } from "lucide-react";
+import {
+  Star,
+  Droplets,
+  Play,
+  CheckCircle2Icon,
+  Pencil,
+  FileText,
+  GalleryHorizontalEnd,
+  History,
+  Info,
+  Layers,
+  ListFilter,
+  MapPin,
+} from "lucide-react";
 import { Button } from "src/components/ui/button";
 import { cn } from "src/lib/utils";
 import * as GQL from "src/core/generated-graphql";
@@ -141,21 +155,18 @@ function SceneToolbar({
           size={13}
           className={scene.organized ? "fill-green-600/20" : ""}
         />
-        <span className="max-lg:sr-only">
+        <span>
           {intl.formatMessage({ id: "organized", defaultMessage: "Organized" })}
         </span>
       </Button>
 
-      <Button
-        variant="outline"
-        size="icon"
+      <EntityActionButton
+        icon={Pencil}
+        label={intl.formatMessage({ id: "actions.edit" })}
         className="lg:hidden"
         onClick={onEdit}
-        aria-label={intl.formatMessage({ id: "actions.edit" })}
-      >
-        <Pencil />
-      </Button>
-      <div className="ml-auto">
+      />
+      <div className="w-full lg:ml-auto lg:w-auto">
         <SceneActionsMenu
           scene={scene}
           getPlayerPosition={getPlayerPosition}
@@ -376,6 +387,7 @@ function SceneDetailPage() {
   const tabs: DetailTab[] = [
     {
       id: "details",
+      icon: Info,
       label: intl.formatMessage({ id: "details", defaultMessage: "Details" }),
       shortcut: "a",
       content: (
@@ -429,6 +441,7 @@ function SceneDetailPage() {
     },
     {
       id: "markers",
+      icon: MapPin,
       label: intl.formatMessage({ id: "markers", defaultMessage: "Markers" }),
       shortcut: "k",
       content: (
@@ -445,6 +458,7 @@ function SceneDetailPage() {
       ? [
           {
             id: "groups",
+            icon: Layers,
             label: intl.formatMessage({
               id: "groups",
               defaultMessage: "Groups",
@@ -457,6 +471,7 @@ function SceneDetailPage() {
       ? [
           {
             id: "galleries",
+            icon: GalleryHorizontalEnd,
             label: intl.formatMessage({
               id: "galleries",
               defaultMessage: "Galleries",
@@ -467,6 +482,7 @@ function SceneDetailPage() {
       : []),
     {
       id: "fileinfo",
+      icon: FileText,
       label: intl.formatMessage({
         id: "file_info",
         defaultMessage: "File info",
@@ -476,12 +492,14 @@ function SceneDetailPage() {
     },
     {
       id: "history",
+      icon: History,
       label: intl.formatMessage({ id: "history", defaultMessage: "History" }),
       shortcut: "h",
       content: <SceneHistoryTab scene={scene} />,
     },
     {
       id: "filters",
+      icon: ListFilter,
       label: intl.formatMessage({ id: "filters", defaultMessage: "Filters" }),
       content: <SceneVideoFilterTab sceneFile={scene.files[0]} />,
     },

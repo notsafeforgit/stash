@@ -1,10 +1,12 @@
 import { cn } from "src/lib/utils";
 import { TabsList, TabsTrigger } from "src/components/ui/tabs";
 import { useIntl } from "react-intl";
+import type { LucideIcon } from "lucide-react";
 
 export interface DetailTabStripItem {
   id: string;
   label: string;
+  icon?: LucideIcon;
 }
 
 export interface DetailTabStripProps {

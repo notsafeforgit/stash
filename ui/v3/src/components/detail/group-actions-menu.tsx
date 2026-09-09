@@ -1,15 +1,12 @@
 import { useState } from "react";
 import { useIntl } from "react-intl";
-import { EllipsisVertical, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
 import { removeEntitiesFromCache, useEntityMutation } from "src/core/client";
-import { Button } from "src/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "src/components/ui/dropdown-menu";
+  EntityActionsMenu,
+  type EntityActionItem,
+} from "./entity-actions-menu";
 import { DeleteDialog } from "src/components/detail/delete-dialog";
 
 interface GroupActionsMenuProps {
@@ -40,43 +37,30 @@ export function GroupActionsMenu({ group, onDeleted }: GroupActionsMenuProps) {
     onDeleted?.();
   }
 
+  const items: EntityActionItem[] = [
+    {
+      key: "delete",
+      icon: Trash2,
+      label:
+        intl.formatMessage(
+          {
+            id: "actions.delete_entity",
+            defaultMessage: "Delete {entityType}",
+          },
+          {
+            entityType: intl
+              .formatMessage({ id: "group", defaultMessage: "group" })
+              .toLocaleLowerCase(),
+          },
+        ) + "…",
+      onSelect: () => setDeleteOpen(true),
+      destructive: true,
+    },
+  ];
+
   return (
     <>
-      <DropdownMenu modal={false}>
-        <DropdownMenuTrigger
-          render={<Button variant="outline" size="sm" />}
-          aria-label={intl.formatMessage({
-            id: "operations",
-            defaultMessage: "Operations",
-          })}
-          title={intl.formatMessage({
-            id: "operations",
-            defaultMessage: "Operations",
-          })}
-        >
-          <EllipsisVertical />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem
-            variant="destructive"
-            onClick={() => setDeleteOpen(true)}
-          >
-            <Trash2 />
-            {intl.formatMessage(
-              {
-                id: "actions.delete_entity",
-                defaultMessage: "Delete {entityType}",
-              },
-              {
-                entityType: intl
-                  .formatMessage({ id: "group", defaultMessage: "group" })
-                  .toLocaleLowerCase(),
-              },
-            )}
-            …
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <EntityActionsMenu items={items} />
 
       <DeleteDialog
         open={deleteOpen}

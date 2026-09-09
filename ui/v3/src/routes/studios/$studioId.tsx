@@ -1,3 +1,4 @@
+import { EntityActionButton } from "@/components/detail/entity-actions-menu";
 import React, { useState } from "react";
 import { cn } from "src/lib/utils";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
@@ -9,11 +10,24 @@ import {
   DetailSidebarBack,
   DetailPageState,
 } from "src/components/detail/detail-page-parts";
-import { DetailTabs } from "src/components/detail/detail-tabs";
+import {
+  DetailTabs,
+  type DetailTabsTab,
+} from "src/components/detail/detail-tabs";
 import { CollectionDetailLayout } from "@/components/detail/collection-detail-layout";
 import { MobileDetailChromePortal } from "@/components/layout/mobile-detail-chrome";
 import { Button } from "src/components/ui/button";
-import { Building2, Star, Heart, Pencil } from "lucide-react";
+import {
+  Building2,
+  Star,
+  Heart,
+  Pencil,
+  Clapperboard,
+  GalleryHorizontalEnd,
+  Images,
+  Layers,
+  Users,
+} from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
 import { StudioDetailsTab } from "src/components/detail/studio-detail-tabs";
 import { StudioEditForm } from "src/components/detail/studio-edit-form";
@@ -116,10 +130,14 @@ function StudioToolbar({
           {studio.rating100}
         </span>
       )}
-      <Button variant="outline" size="sm" onClick={onEdit}>
-        <Pencil size={13} />
-        {intl.formatMessage({ id: "actions.edit", defaultMessage: "Edit" })}
-      </Button>
+      <EntityActionButton
+        icon={Pencil}
+        label={intl.formatMessage({
+          id: "actions.edit",
+          defaultMessage: "Edit",
+        })}
+        onClick={onEdit}
+      />
       <StudioActionsMenu studio={studio} onDeleted={onDeleted} />
     </div>
   );
@@ -184,13 +202,13 @@ function StudioDetailPage() {
     });
   }
 
-  type EntityTab = { id: string; label: string; content: React.ReactNode };
-  const entityTabs: EntityTab[] = studio
+  const entityTabs: DetailTabsTab[] = studio
     ? [
         ...(sceneCount > 0
           ? [
               {
                 id: "scenes",
+                icon: Clapperboard,
                 label: intl.formatMessage({
                   id: "scenes",
                   defaultMessage: "Scenes",
@@ -203,6 +221,7 @@ function StudioDetailPage() {
           ? [
               {
                 id: "images",
+                icon: Images,
                 label: intl.formatMessage({
                   id: "images",
                   defaultMessage: "Images",
@@ -215,6 +234,7 @@ function StudioDetailPage() {
           ? [
               {
                 id: "galleries",
+                icon: GalleryHorizontalEnd,
                 label: intl.formatMessage({
                   id: "galleries",
                   defaultMessage: "Galleries",
@@ -227,6 +247,7 @@ function StudioDetailPage() {
           ? [
               {
                 id: "performers",
+                icon: Users,
                 label: intl.formatMessage({
                   id: "performers",
                   defaultMessage: "Performers",
@@ -239,6 +260,7 @@ function StudioDetailPage() {
           ? [
               {
                 id: "groups",
+                icon: Layers,
                 label: intl.formatMessage({
                   id: "groups",
                   defaultMessage: "Groups",

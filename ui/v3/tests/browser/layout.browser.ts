@@ -34,7 +34,7 @@ for (const width of [320, 390, 768, 1280]) {
               back.evaluate((button) =>
                 Math.abs(
                   button.getBoundingClientRect().right -
-                    (window.innerWidth - 12),
+                    (window.innerWidth - 6),
                 ),
               ),
             )
@@ -50,9 +50,9 @@ for (const width of [320, 390, 768, 1280]) {
             ).toHaveCount(1);
           }
           await footer
-            .getByRole("button", { name: "More", exact: true })
+            .getByRole("button", { name: "Entity actions", exact: true })
             .click();
-          const popup = page.locator('[data-slot="popover-content"]:visible');
+          const popup = page.locator('[data-slot="drawer-content"]:visible');
           await expect(
             popup.getByRole("button", { name: "Edit", exact: true }),
           ).toBeVisible();

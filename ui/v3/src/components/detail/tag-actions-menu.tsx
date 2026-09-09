@@ -1,16 +1,12 @@
 import { useState } from "react";
 import { useIntl } from "react-intl";
-import { EllipsisVertical, Trash2, Wand2 } from "lucide-react";
+import { Trash2, Wand2 } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
 import { removeEntitiesFromCache, useEntityMutation } from "src/core/client";
-import { Button } from "src/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "src/components/ui/dropdown-menu";
+  EntityActionsMenu,
+  type EntityActionItem,
+} from "./entity-actions-menu";
 import { AutoTagDialog } from "src/components/detail/auto-tag-dialog";
 import { DeleteDialog } from "src/components/detail/delete-dialog";
 
@@ -43,52 +39,41 @@ export function TagActionsMenu({ tag, onDeleted }: TagActionsMenuProps) {
     onDeleted?.();
   }
 
+  const items: EntityActionItem[] = [
+    {
+      key: "auto-tag",
+      icon: Wand2,
+      label:
+        intl.formatMessage({
+          id: "actions.auto_tag",
+          defaultMessage: "Auto tag",
+        }) + "…",
+      onSelect: () => setAutoTagOpen(true),
+    },
+    { key: "delete-separator", separator: true },
+    {
+      key: "delete",
+      icon: Trash2,
+      label:
+        intl.formatMessage(
+          {
+            id: "actions.delete_entity",
+            defaultMessage: "Delete {entityType}",
+          },
+          {
+            entityType: intl
+              .formatMessage({ id: "tag", defaultMessage: "tag" })
+              .toLocaleLowerCase(),
+          },
+        ) + "…",
+      onSelect: () => setDeleteOpen(true),
+      destructive: true,
+    },
+  ];
+
   return (
     <>
-      <DropdownMenu modal={false}>
-        <DropdownMenuTrigger
-          render={<Button variant="outline" size="sm" />}
-          aria-label={intl.formatMessage({
-            id: "operations",
-            defaultMessage: "Operations",
-          })}
-          title={intl.formatMessage({
-            id: "operations",
-            defaultMessage: "Operations",
-          })}
-        >
-          <EllipsisVertical />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => setAutoTagOpen(true)}>
-            <Wand2 />
-            {intl.formatMessage({
-              id: "actions.auto_tag",
-              defaultMessage: "Auto tag",
-            })}
-            …
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            variant="destructive"
-            onClick={() => setDeleteOpen(true)}
-          >
-            <Trash2 />
-            {intl.formatMessage(
-              {
-                id: "actions.delete_entity",
-                defaultMessage: "Delete {entityType}",
-              },
-              {
-                entityType: intl
-                  .formatMessage({ id: "tag", defaultMessage: "tag" })
-                  .toLocaleLowerCase(),
-              },
-            )}
-            …
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <EntityActionsMenu items={items} />
 
       <AutoTagDialog
         open={autoTagOpen}

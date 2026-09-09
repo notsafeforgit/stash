@@ -6,7 +6,7 @@ import {
   Camera,
   CameraOff,
   Cog,
-  EllipsisVertical,
+  Download,
   GitMerge,
   RefreshCcw,
   RotateCcw,
@@ -16,19 +16,10 @@ import {
   Undo2,
 } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
-import { Button } from "src/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from "src/components/ui/dropdown-menu";
-import { Spinner } from "src/components/ui/spinner";
+  EntityActionsMenu,
+  type EntityActionItem,
+} from "./entity-actions-menu";
 import {
   DeleteDialog,
   DeleteFilesList,
@@ -38,7 +29,7 @@ import { SceneMergeDialog } from "src/components/detail/scene-merge-dialog";
 import { useToast } from "src/hooks/toast";
 import { useConfigurationContext } from "src/hooks/config";
 import { objectPath, objectTitle } from "src/core/files";
-import { SceneDetailDownloadMenuItem } from "src/components/offline/scene-detail-download-menu-item";
+import { useSceneDownloadAction } from "@/components/offline/download-action";
 import { type MonitoredJob, useMonitorJob } from "src/hooks/use-monitor-job";
 import { supportsSceneVideoRotation } from "./scene-video-rotation";
 
@@ -68,10 +59,7 @@ export function SceneActionsMenu({
   const [generateOpen, setGenerateOpen] = useState(false);
   const [mergeOpen, setMergeOpen] = useState(false);
   const [screenshotJobId, setScreenshotJobId] = useState<string | null>(null);
-  // Controlled so opening the menu forces a re-render — `getPlayerPosition`
-  // reads from a ref set imperatively when the player mounts, so without this
-  // the disabled check below latches at its initial render value.
-  const [menuOpen, setMenuOpen] = useState(false);
+  const download = useSceneDownloadAction({ scene });
 
   const [scan] = useMutation(GQL.MetadataScanDocument);
   const [generateScreenshot] = useMutation(GQL.SceneGenerateScreenshotDocument);
@@ -233,192 +221,165 @@ export function SceneActionsMenu({
     onDeleted?.();
   }
 
+  const items: EntityActionItem[] = [];
+  if (sceneFilePath)
+    items.push({
+      key: "rescan",
+      icon: RefreshCcw,
+      label: intl.formatMessage({
+        id: "actions.rescan",
+        defaultMessage: "Rescan",
+      }),
+      onSelect: handleRescan,
+    });
+  items.push({
+    key: "generate",
+    icon: Cog,
+    label:
+      intl.formatMessage({
+        id: "actions.generate",
+        defaultMessage: "Generate",
+      }) + "…",
+    onSelect: () => setGenerateOpen(true),
+  });
+  items.push({
+    key: "current-thumbnail",
+    icon: Camera,
+    label: intl.formatMessage({
+      id: "actions.generate_thumb_from_current",
+      defaultMessage: "Generate thumbnail from current",
+    }),
+    onSelect: () => {
+      const at = getPlayerPosition?.();
+      if (at !== undefined) return handleGenerateScreenshot(at);
+    },
+    disabled: () =>
+      screenshotJobId !== null || getPlayerPosition?.() === undefined,
+  });
+  items.push({
+    key: "default-thumbnail",
+    icon: CameraOff,
+    label: intl.formatMessage({
+      id: "actions.generate_thumb_default",
+      defaultMessage: "Generate default thumbnail",
+    }),
+    onSelect: () => handleGenerateScreenshot(),
+    disabled: screenshotJobId !== null,
+  });
+  if (rotationSupported)
+    items.push({
+      key: "rotation",
+      icon: RotateCw,
+      label: intl.formatMessage({
+        id: "actions.rotation",
+        defaultMessage: "Rotation",
+      }),
+      disabled: rotationPending,
+      actions: [
+        {
+          key: "rotate_ccw",
+          icon: RotateCcw,
+          label: intl.formatMessage({
+            id: "actions.rotate_ccw",
+            defaultMessage: "Rotate counter-clockwise",
+          }),
+          onSelect: () =>
+            handleVideoRotation(GQL.SceneVideoRotationDirection.Ccw),
+        },
+        {
+          key: "rotate_cw",
+          icon: RotateCw,
+          label: intl.formatMessage({
+            id: "actions.rotate_cw",
+            defaultMessage: "Rotate clockwise",
+          }),
+          onSelect: () =>
+            handleVideoRotation(GQL.SceneVideoRotationDirection.Cw),
+        },
+        {
+          key: "clear_rotation",
+          icon: Undo2,
+          label: intl.formatMessage({
+            id: "actions.clear_rotation",
+            defaultMessage: "Clear rotation",
+          }),
+          onSelect: () =>
+            handleVideoRotation(GQL.SceneVideoRotationDirection.Clear),
+        },
+      ],
+    });
+  if (firstStashBox) {
+    items.push({ key: "submit-separator", separator: true });
+    items.push(
+      stashBoxes.length === 1
+        ? {
+            key: "submit",
+            icon: Send,
+            label: intl.formatMessage({
+              id: "actions.submit_stash_box",
+              defaultMessage: "Submit to Stash-Box",
+            }),
+            onSelect: () =>
+              handleSubmit(
+                firstStashBox.endpoint,
+                firstStashBox.name || firstStashBox.endpoint,
+              ),
+          }
+        : {
+            key: "submit",
+            icon: Send,
+            label: intl.formatMessage({
+              id: "actions.submit_stash_box",
+              defaultMessage: "Submit to Stash-Box",
+            }),
+            actions: stashBoxes.map((box) => ({
+              key: box.endpoint,
+              icon: Send,
+              label: box.name || box.endpoint,
+              onSelect: () =>
+                handleSubmit(box.endpoint, box.name || box.endpoint),
+            })),
+          },
+    );
+  }
+  items.push(
+    { key: "download-separator", separator: true },
+    {
+      key: "download",
+      icon: Download,
+      label: download.label,
+      disabled: download.disabled,
+      onSelect: download.onSelect,
+    },
+    { key: "manage-separator", separator: true },
+  );
+  items.push({
+    key: "merge",
+    icon: GitMerge,
+    label:
+      intl.formatMessage({ id: "actions.merge", defaultMessage: "Merge" }) +
+      "…",
+    onSelect: () => setMergeOpen(true),
+  });
+  items.push({
+    key: "delete",
+    icon: Trash2,
+    label:
+      intl.formatMessage(
+        { id: "actions.delete_entity", defaultMessage: "Delete {entityType}" },
+        {
+          entityType: intl
+            .formatMessage({ id: "scene", defaultMessage: "scene" })
+            .toLocaleLowerCase(),
+        },
+      ) + "…",
+    onSelect: () => setDeleteOpen(true),
+    destructive: true,
+  });
+
   return (
     <>
-      <DropdownMenu modal={false} open={menuOpen} onOpenChange={setMenuOpen}>
-        <DropdownMenuTrigger
-          render={<Button variant="outline" size="sm" />}
-          aria-label={intl.formatMessage({
-            id: "operations",
-            defaultMessage: "Operations",
-          })}
-          title={intl.formatMessage({
-            id: "operations",
-            defaultMessage: "Operations",
-          })}
-        >
-          {rotationPending ? <Spinner /> : <EllipsisVertical />}
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          {sceneFilePath && (
-            <DropdownMenuItem onClick={handleRescan}>
-              <RefreshCcw />
-              {intl.formatMessage({
-                id: "actions.rescan",
-                defaultMessage: "Rescan",
-              })}
-            </DropdownMenuItem>
-          )}
-          <DropdownMenuItem onClick={() => setGenerateOpen(true)}>
-            <Cog />
-            {intl.formatMessage({
-              id: "actions.generate",
-              defaultMessage: "Generate",
-            })}
-            …
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            disabled={
-              screenshotJobId !== null || getPlayerPosition?.() === undefined
-            }
-            onClick={() => {
-              const at = getPlayerPosition?.();
-              if (at !== undefined) handleGenerateScreenshot(at);
-            }}
-          >
-            <Camera />
-            {intl.formatMessage({
-              id: "actions.generate_thumb_from_current",
-              defaultMessage: "Generate thumbnail from current",
-            })}
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            disabled={screenshotJobId !== null}
-            onClick={() => handleGenerateScreenshot()}
-          >
-            <CameraOff />
-            {intl.formatMessage({
-              id: "actions.generate_thumb_default",
-              defaultMessage: "Generate default thumbnail",
-            })}
-          </DropdownMenuItem>
-          {rotationSupported && (
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger disabled={rotationPending}>
-                {rotationPending ? <Spinner /> : <RotateCw />}
-                {intl.formatMessage({
-                  id: "actions.rotation",
-                  defaultMessage: "Rotation",
-                })}
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent>
-                <DropdownMenuGroup>
-                  <DropdownMenuItem
-                    disabled={rotationPending}
-                    onClick={() =>
-                      handleVideoRotation(GQL.SceneVideoRotationDirection.Ccw)
-                    }
-                  >
-                    <RotateCcw />
-                    {intl.formatMessage({
-                      id: "actions.rotate_ccw",
-                      defaultMessage: "Rotate counter-clockwise",
-                    })}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    disabled={rotationPending}
-                    onClick={() =>
-                      handleVideoRotation(GQL.SceneVideoRotationDirection.Cw)
-                    }
-                  >
-                    <RotateCw />
-                    {intl.formatMessage({
-                      id: "actions.rotate_cw",
-                      defaultMessage: "Rotate clockwise",
-                    })}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    disabled={rotationPending}
-                    onClick={() =>
-                      handleVideoRotation(GQL.SceneVideoRotationDirection.Clear)
-                    }
-                  >
-                    <Undo2 />
-                    {intl.formatMessage({
-                      id: "actions.clear_rotation",
-                      defaultMessage: "Clear rotation",
-                    })}
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-          )}
-
-          {stashBoxes.length > 0 && (
-            <>
-              <DropdownMenuSeparator />
-              {stashBoxes.length === 1 && firstStashBox ? (
-                <DropdownMenuItem
-                  onClick={() =>
-                    handleSubmit(
-                      firstStashBox.endpoint,
-                      firstStashBox.name || firstStashBox.endpoint,
-                    )
-                  }
-                >
-                  <Send />
-                  {intl.formatMessage({
-                    id: "actions.submit_stash_box",
-                    defaultMessage: "Submit to Stash-Box",
-                  })}
-                </DropdownMenuItem>
-              ) : (
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger>
-                    <Send />
-                    {intl.formatMessage({
-                      id: "actions.submit_stash_box",
-                      defaultMessage: "Submit to Stash-Box",
-                    })}
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent>
-                    {stashBoxes.map((box) => (
-                      <DropdownMenuItem
-                        key={box.endpoint}
-                        onClick={() =>
-                          handleSubmit(box.endpoint, box.name || box.endpoint)
-                        }
-                      >
-                        {box.name || box.endpoint}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
-              )}
-            </>
-          )}
-
-          <DropdownMenuSeparator />
-          <SceneDetailDownloadMenuItem scene={scene} />
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setMergeOpen(true)}>
-            <GitMerge />
-            {intl.formatMessage({
-              id: "actions.merge",
-              defaultMessage: "Merge",
-            })}
-            …
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            variant="destructive"
-            onClick={() => setDeleteOpen(true)}
-          >
-            <Trash2 />
-            {intl.formatMessage(
-              {
-                id: "actions.delete_entity",
-                defaultMessage: "Delete {entityType}",
-              },
-              {
-                entityType: intl
-                  .formatMessage({ id: "scene", defaultMessage: "scene" })
-                  .toLocaleLowerCase(),
-              },
-            )}
-            …
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <EntityActionsMenu items={items} busy={rotationPending} />
 
       <DeleteDialog
         open={deleteOpen}

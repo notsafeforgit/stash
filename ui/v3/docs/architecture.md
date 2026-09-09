@@ -250,11 +250,14 @@ Successful saves close the sheet through the existing form callback.
 
 Collection and media detail layouts keep the entity title above the scroller
 and navigation below it on mobile. `mobile-detail-chrome.tsx` provides a shared
-56px toolbar for the section picker, Search, More, and Back. Search and selection
-replace that row and put Close at its right edge. More holds entity actions,
-filtering, and view options; the section picker includes page navigation and a
-page-jump form. Previous/next controls also appear at the end of list results,
-and single-page lists omit pagination. Standalone mobile lists use the same
+56px toolbar with direct Navigation, section picker, Search, Filters, View options,
+Entity actions, and Back controls. All targets stay at least 44px at 320px width;
+the section label truncates and becomes an icon on the narrowest screens. Search
+and selection replace that row and put Close at its right edge. Navigation,
+Filters, View options, and Entity actions open bottom drawers with scrollable
+content, swipe dismissal, and a fixed bottom-right Close. The section picker
+includes page navigation and a page-jump form. Previous/next controls also
+appear at the end of list results, and single-page lists omit pagination. Standalone mobile lists use the same
 row modes with navigation and a page picker. Desktop retains
 its sidebar controls and tab strip. Collection pages use the `md` breakpoint;
 media pages use `lg`, matching their existing split layouts.
@@ -266,9 +269,13 @@ their tab, list, and action contexts. Only the active list publishes controls;
 previously visited panels stay mounted with their filters and state intact.
 The mobile picker uses the same Base UI tab state as desktop, with vertical
 triggers in an upward popover, and brings a chosen section into view. The
-popover keeps its contents mounted so tab labels, action dialogs, and portal
-targets survive closing it. Search mounts and focuses within the opening touch
-handler, and flushes any pending debounce on blur before the row closes.
+section popover and action drawer keep their portal targets mounted so tabs
+and action dialogs survive closing them. `entity-actions-menu.tsx` renders shared
+typed action definitions as desktop dropdowns or direct mobile rows. Desktop
+submenus become labelled, flat groups on mobile; invoking an action closes the
+drawer before showing its form or confirmation. Search mounts and focuses
+within the opening touch handler, and flushes any pending debounce on blur
+before the row closes.
 List controls own their prop contract; the parent bar extends it with view
 settings. Page jumping uses TanStack Form with Zod validation and starts a new
 draft when the page or page count changes. Collection and media tab panels both

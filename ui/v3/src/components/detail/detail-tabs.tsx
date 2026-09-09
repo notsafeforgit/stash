@@ -1,15 +1,16 @@
 import type React from "react";
 import { useRef } from "react";
 import { Tabs, TabsContent } from "src/components/ui/tabs";
-import { DetailTabStrip } from "src/components/detail/detail-tab-strip";
+import {
+  DetailTabStrip,
+  type DetailTabStripItem,
+} from "src/components/detail/detail-tab-strip";
 import { useTabState } from "src/hooks/use-tab-state";
 import { ListActivityContext } from "src/components/list/list-activity-context";
 import { useMobileDetailChrome } from "@/components/layout/mobile-detail-chrome";
 import { MobileDetailSections } from "./mobile-detail-sections";
 
-export interface DetailTabsTab {
-  id: string;
-  label: string;
+export interface DetailTabsTab extends DetailTabStripItem {
   content: React.ReactNode;
 }
 

@@ -1,3 +1,4 @@
+import { EntityActionButton } from "@/components/detail/entity-actions-menu";
 import React, { useState } from "react";
 import { cn } from "src/lib/utils";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
@@ -9,11 +10,25 @@ import {
   DetailSidebarBack,
   DetailPageState,
 } from "src/components/detail/detail-page-parts";
-import { DetailTabs } from "src/components/detail/detail-tabs";
+import {
+  DetailTabs,
+  type DetailTabsTab,
+} from "src/components/detail/detail-tabs";
 import { CollectionDetailLayout } from "@/components/detail/collection-detail-layout";
 import { MobileDetailChromePortal } from "@/components/layout/mobile-detail-chrome";
 import { Button } from "src/components/ui/button";
-import { Tag, Heart, Pencil } from "lucide-react";
+import {
+  Tag,
+  Heart,
+  Pencil,
+  Building2,
+  Clapperboard,
+  GalleryHorizontalEnd,
+  Images,
+  Layers,
+  MapPin,
+  Users,
+} from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
 import { TagDetailsTab } from "src/components/detail/tag-detail-tabs";
 import { TagEditForm } from "src/components/detail/tag-edit-form";
@@ -108,10 +123,14 @@ function TagToolbar({
       >
         <Heart size={13} className={tag.favorite ? "fill-current" : ""} />
       </Button>
-      <Button variant="outline" size="sm" onClick={onEdit}>
-        <Pencil size={13} />
-        {intl.formatMessage({ id: "actions.edit", defaultMessage: "Edit" })}
-      </Button>
+      <EntityActionButton
+        icon={Pencil}
+        label={intl.formatMessage({
+          id: "actions.edit",
+          defaultMessage: "Edit",
+        })}
+        onClick={onEdit}
+      />
       <TagActionsMenu tag={tag} onDeleted={onDeleted} />
     </div>
   );
@@ -147,13 +166,13 @@ function TagDetailPage() {
     });
   }
 
-  type EntityTab = { id: string; label: string; content: React.ReactNode };
-  const entityTabs: EntityTab[] = tag
+  const entityTabs: DetailTabsTab[] = tag
     ? [
         ...(tag.scene_count > 0
           ? [
               {
                 id: "scenes",
+                icon: Clapperboard,
                 label: intl.formatMessage({
                   id: "scenes",
                   defaultMessage: "Scenes",
@@ -166,6 +185,7 @@ function TagDetailPage() {
           ? [
               {
                 id: "markers",
+                icon: MapPin,
                 label: intl.formatMessage({
                   id: "markers",
                   defaultMessage: "Markers",
@@ -178,6 +198,7 @@ function TagDetailPage() {
           ? [
               {
                 id: "images",
+                icon: Images,
                 label: intl.formatMessage({
                   id: "images",
                   defaultMessage: "Images",
@@ -190,6 +211,7 @@ function TagDetailPage() {
           ? [
               {
                 id: "galleries",
+                icon: GalleryHorizontalEnd,
                 label: intl.formatMessage({
                   id: "galleries",
                   defaultMessage: "Galleries",
@@ -202,6 +224,7 @@ function TagDetailPage() {
           ? [
               {
                 id: "performers",
+                icon: Users,
                 label: intl.formatMessage({
                   id: "performers",
                   defaultMessage: "Performers",
@@ -214,6 +237,7 @@ function TagDetailPage() {
           ? [
               {
                 id: "studios",
+                icon: Building2,
                 label: intl.formatMessage({
                   id: "studios",
                   defaultMessage: "Studios",
@@ -226,6 +250,7 @@ function TagDetailPage() {
           ? [
               {
                 id: "groups",
+                icon: Layers,
                 label: intl.formatMessage({
                   id: "groups",
                   defaultMessage: "Groups",

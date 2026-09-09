@@ -202,7 +202,7 @@ export const MobileListBar: React.FC<MobileListBarProps> = ({
           </BottomSheetTitle>
         </BottomSheetHeader>
 
-        <div className="p-4 flex flex-col gap-5">
+        <div className="min-h-0 overflow-y-auto overscroll-contain p-4 flex flex-col gap-5">
           {/* Sort by — hidden in Table mode */}
           {sortByOptions.length > 0 &&
             filter.displayMode !== DisplayMode.Table && (

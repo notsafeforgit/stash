@@ -235,6 +235,7 @@
     "reload_ui": "Reload UI",
     "retry": "Retry",
     "more": "More",
+    "entity_actions": "Entity actions",
     "go": "Go",
     "close_search": "Close search"
   },
@@ -1516,6 +1517,7 @@
       "saved_filter": "Saved Filter"
     }
   },
+  "home": "Home",
   "frontpage_configure": "Customise homepage",
   "frontpage_no_rows": "No rows. Add one below.",
   "galleries": "Galleries",

@@ -2,16 +2,12 @@ import { useState } from "react";
 import { useIntl } from "react-intl";
 import { useMutation } from "@apollo/client/react";
 import { removeEntitiesFromCache, useEntityMutation } from "src/core/client";
-import { Cog, EllipsisVertical, RefreshCcw, Trash2 } from "lucide-react";
+import { Cog, RefreshCcw, Trash2 } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
-import { Button } from "src/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "src/components/ui/dropdown-menu";
+  EntityActionsMenu,
+  type EntityActionItem,
+} from "./entity-actions-menu";
 import {
   DeleteDialog,
   DeleteFilesList,
@@ -87,62 +83,47 @@ export function ImageActionsMenu({ image, onDeleted }: ImageActionsMenuProps) {
     onDeleted?.();
   }
 
+  const items: EntityActionItem[] = [];
+  if (filePath)
+    items.push({
+      key: "rescan",
+      icon: RefreshCcw,
+      label: intl.formatMessage({
+        id: "actions.rescan",
+        defaultMessage: "Rescan",
+      }),
+      onSelect: handleRescan,
+    });
+  items.push({
+    key: "generate",
+    icon: Cog,
+    label:
+      intl.formatMessage({
+        id: "actions.generate",
+        defaultMessage: "Generate",
+      }) + "…",
+    onSelect: () => setGenerateOpen(true),
+  });
+  items.push({ key: "delete-separator", separator: true });
+  items.push({
+    key: "delete",
+    icon: Trash2,
+    label:
+      intl.formatMessage(
+        { id: "actions.delete_entity", defaultMessage: "Delete {entityType}" },
+        {
+          entityType: intl
+            .formatMessage({ id: "image", defaultMessage: "image" })
+            .toLocaleLowerCase(),
+        },
+      ) + "…",
+    onSelect: () => setDeleteOpen(true),
+    destructive: true,
+  });
+
   return (
     <>
-      <DropdownMenu modal={false}>
-        <DropdownMenuTrigger
-          render={<Button variant="outline" size="sm" />}
-          aria-label={intl.formatMessage({
-            id: "operations",
-            defaultMessage: "Operations",
-          })}
-          title={intl.formatMessage({
-            id: "operations",
-            defaultMessage: "Operations",
-          })}
-        >
-          <EllipsisVertical />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          {filePath && (
-            <DropdownMenuItem onClick={handleRescan}>
-              <RefreshCcw />
-              {intl.formatMessage({
-                id: "actions.rescan",
-                defaultMessage: "Rescan",
-              })}
-            </DropdownMenuItem>
-          )}
-          <DropdownMenuItem onClick={() => setGenerateOpen(true)}>
-            <Cog />
-            {intl.formatMessage({
-              id: "actions.generate",
-              defaultMessage: "Generate",
-            })}
-            …
-          </DropdownMenuItem>
-
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            variant="destructive"
-            onClick={() => setDeleteOpen(true)}
-          >
-            <Trash2 />
-            {intl.formatMessage(
-              {
-                id: "actions.delete_entity",
-                defaultMessage: "Delete {entityType}",
-              },
-              {
-                entityType: intl
-                  .formatMessage({ id: "image", defaultMessage: "image" })
-                  .toLocaleLowerCase(),
-              },
-            )}
-            …
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <EntityActionsMenu items={items} />
 
       <DeleteDialog
         open={deleteOpen}

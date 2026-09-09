@@ -84,24 +84,32 @@ function DrawerOverlay({
 function DrawerContent({
   className,
   children,
+  keepMounted,
   ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Popup>) {
+}: React.ComponentProps<typeof DrawerPrimitive.Popup> & {
+  keepMounted?: boolean;
+}) {
   return (
-    <DrawerPortal>
+    <DrawerPortal keepMounted={keepMounted}>
       <DrawerOverlay />
       <DrawerPrimitive.Viewport className="fixed inset-0 z-50 flex items-end justify-center">
         <DrawerPrimitive.Popup
           data-slot="drawer-content"
           className={cn(
             "group/drawer-content flex h-auto w-full flex-col bg-popover text-sm text-popover-foreground",
-            "rounded-t-xl border-t max-h-[80vh]",
-            "translate-y-0 transition-transform duration-300 ease-in-out",
+            "rounded-t-xl border-t max-h-[80svh] min-h-0",
+            "translate-y-[var(--drawer-swipe-movement-y,0px)] transition-transform duration-200 ease-out data-swiping:transition-none motion-reduce:transition-none",
             "data-[starting-style]:translate-y-full data-[ending-style]:translate-y-full",
             className,
           )}
           {...props}
         >
-          <div className="mx-auto mt-4 h-1 w-[100px] shrink-0 rounded-full bg-muted" />
+          <div
+            aria-hidden="true"
+            className="flex h-7 shrink-0 items-center justify-center"
+          >
+            <div className="h-1 w-11 rounded-full bg-muted-foreground/40" />
+          </div>
           {children}
         </DrawerPrimitive.Popup>
       </DrawerPrimitive.Viewport>

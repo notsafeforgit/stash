@@ -56,6 +56,22 @@ export async function expectCompactRow(row: Locator) {
       }),
     )
     .toBeLessThan(1);
+  const buttons = row.getByRole("button");
+  await expect
+    .poll(() =>
+      buttons.evaluateAll((elements) => {
+        const boxes = elements.map((element) =>
+          element.getBoundingClientRect(),
+        );
+        return boxes.every(
+          (box, index) =>
+            box.left >= 0 &&
+            box.right <= window.innerWidth &&
+            box.left >= (boxes[index - 1]?.right ?? 0) - 0.1,
+        );
+      }),
+    )
+    .toBe(true);
 }
 
 export async function expectTouchTargets(scope: Locator) {

@@ -1,3 +1,4 @@
+import { EntityActionButton } from "@/components/detail/entity-actions-menu";
 import React, { useState } from "react";
 import { cn } from "src/lib/utils";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
@@ -9,11 +10,13 @@ import {
   DetailSidebarBack,
   DetailPageState,
 } from "src/components/detail/detail-page-parts";
-import { DetailTabs } from "src/components/detail/detail-tabs";
+import {
+  DetailTabs,
+  type DetailTabsTab,
+} from "src/components/detail/detail-tabs";
 import { CollectionDetailLayout } from "@/components/detail/collection-detail-layout";
 import { MobileDetailChromePortal } from "@/components/layout/mobile-detail-chrome";
-import { Button } from "src/components/ui/button";
-import { Film, Pencil } from "lucide-react";
+import { Film, Pencil, Clapperboard, Users } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
 import { GroupDetailsTab } from "src/components/detail/group-detail-tabs";
 import { GroupActionsMenu } from "src/components/detail/group-actions-menu";
@@ -88,13 +91,13 @@ function GroupDetailPage() {
   const group = data?.findGroup;
   useDocumentTitle(group?.name);
 
-  type EntityTab = { id: string; label: string; content: React.ReactNode };
-  const entityTabs: EntityTab[] = group
+  const entityTabs: DetailTabsTab[] = group
     ? [
         ...(group.scene_count > 0
           ? [
               {
                 id: "scenes",
+                icon: Clapperboard,
                 label: intl.formatMessage({
                   id: "scenes",
                   defaultMessage: "Scenes",
@@ -107,6 +110,7 @@ function GroupDetailPage() {
           ? [
               {
                 id: "performers",
+                icon: Users,
                 label: intl.formatMessage({
                   id: "performers",
                   defaultMessage: "Performers",
@@ -150,17 +154,14 @@ function GroupDetailPage() {
                         <MobileDetailChromePortal slot="actions">
                           <div className="min-w-0 md:order-first">
                             <div className="flex flex-wrap gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setEditOpen(true)}
-                              >
-                                <Pencil size={13} />
-                                {intl.formatMessage({
+                              <EntityActionButton
+                                icon={Pencil}
+                                label={intl.formatMessage({
                                   id: "actions.edit",
                                   defaultMessage: "Edit",
                                 })}
-                              </Button>
+                                onClick={() => setEditOpen(true)}
+                              />
                               <GroupActionsMenu
                                 group={group}
                                 onDeleted={goBack}

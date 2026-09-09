@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useIntl } from "react-intl";
-import { ChevronUp } from "lucide-react";
+import { ChevronUp, PanelsTopLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -36,6 +36,8 @@ export function MobileDetailSections({
     setPanel?.(null);
   }, [activeTab, setPanel]);
   if (!chrome) return null;
+  const selected = tabs.find((tab) => tab.id === activeTab);
+  const SectionIcon = selected?.icon ?? PanelsTopLeft;
   const label = intl.formatMessage({
     id: "accessibility.detail_sections",
     defaultMessage: "Detail sections",
@@ -51,13 +53,15 @@ export function MobileDetailSections({
           render={
             <Button
               variant="ghost"
-              className="h-11 w-full min-w-0 justify-between px-2"
+              className="h-11 w-full min-w-11 justify-center gap-0.5 px-1 @min-[361px]:justify-between @min-[361px]:px-2"
               aria-label={label}
+              aria-description={selected?.label}
             />
           }
         >
-          <span className="truncate">
-            {tabs.find((tab) => tab.id === activeTab)?.label}
+          <SectionIcon className="@min-[361px]:hidden" />
+          <span className="hidden truncate @min-[361px]:block">
+            {selected?.label}
           </span>
           <ChevronUp data-icon="inline-end" />
         </PopoverTrigger>

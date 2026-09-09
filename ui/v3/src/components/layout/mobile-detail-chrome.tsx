@@ -9,20 +9,24 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useIntl } from "react-intl";
-import { ChevronLeft, Ellipsis } from "lucide-react";
+import { ChevronLeft, Ellipsis, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTitle,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
+import { BottomSheetCloseFooter } from "@/components/ui/bottom-sheet";
+import { MobileNavSheet } from "@/components/layout/mobile-nav-sheet";
+import { MobileToolbarRow } from "./mobile-toolbar";
 import { useVisualViewportBottomInset } from "@/hooks/use-visual-viewport-bottom-inset";
 import { useMediaQuery } from "@/utils/screen";
 
 type ChromeSlot = "list" | "tabs" | "actions" | "list-actions" | "pagination";
 type ChromeTargets = Record<ChromeSlot, HTMLDivElement | null>;
-type ChromePanel = "sections" | "more" | null;
+type ChromePanel = "sections" | "actions" | "navigation" | null;
 type ChromeInteraction = "search" | "selection" | null;
 
 interface MobileDetailChromeContextValue {
@@ -142,26 +146,46 @@ export function MobileDetailFooter({ onBack }: { onBack?: () => void }) {
     <div
       ref={ref}
       data-mobile-detail-footer
-      className="relative shrink-0 border-t border-border bg-background pb-[env(safe-area-inset-bottom,0px)]"
+      className="@container relative shrink-0 border-t border-border bg-background pb-[env(safe-area-inset-bottom,0px)]"
       style={
         bottomInset > 0
           ? { transform: `translateY(-${bottomInset}px)` }
           : undefined
       }
     >
-      <div className="flex h-14 items-center gap-2 px-3">
-        <div hidden={chrome.interaction !== null} className="min-w-0 flex-1">
+      <MobileNavSheet
+        open={chrome.panel === "navigation"}
+        onOpenChange={(open) => chrome.setPanel(open ? "navigation" : null)}
+      />
+      <MobileToolbarRow>
+        <Button
+          hidden={chrome.interaction !== null}
+          variant="ghost"
+          size="icon-lg"
+          className="size-11 shrink-0"
+          onClick={() => chrome.setPanel("navigation")}
+          aria-label={intl.formatMessage({
+            id: "navigation",
+            defaultMessage: "Navigation",
+          })}
+        >
+          <Menu />
+        </Button>
+        <div
+          hidden={chrome.interaction !== null}
+          className="min-w-11 flex-1 overflow-hidden"
+        >
           <MobileDetailChromeSlot slot="tabs" />
         </div>
         <MobileDetailChromeSlot
           slot="list"
           className={chrome.interaction ? "min-w-0 flex-1" : "shrink-0"}
         />
-        <Popover
-          open={chrome.panel === "more"}
-          onOpenChange={(open) => chrome.setPanel(open ? "more" : null)}
+        <Drawer
+          open={chrome.panel === "actions"}
+          onOpenChange={(open) => chrome.setPanel(open ? "actions" : null)}
         >
-          <PopoverTrigger
+          <DrawerTrigger
             hidden={chrome.interaction !== null}
             render={
               <Button
@@ -169,36 +193,36 @@ export function MobileDetailFooter({ onBack }: { onBack?: () => void }) {
                 size="icon-lg"
                 className="size-11 shrink-0"
                 aria-label={intl.formatMessage({
-                  id: "actions.more",
-                  defaultMessage: "More",
+                  id: "actions.entity_actions",
+                  defaultMessage: "Entity actions",
                 })}
               />
             }
           >
             <Ellipsis />
-          </PopoverTrigger>
-          <PopoverContent
-            side="top"
-            align="end"
-            keepMounted
-            className="w-80 max-w-[calc(100vw-1.5rem)] max-h-[70svh] overflow-y-auto"
-          >
-            <PopoverTitle>
-              {intl.formatMessage({
-                id: "actions.more",
-                defaultMessage: "More",
-              })}
-            </PopoverTitle>
-            <MobileDetailChromeSlot
-              slot="actions"
-              className="empty:hidden [&_button]:min-h-11 [&_button]:min-w-11"
-            />
-            <MobileDetailChromeSlot
-              slot="list-actions"
-              className="empty:hidden"
-            />
-          </PopoverContent>
-        </Popover>
+          </DrawerTrigger>
+          <DrawerContent keepMounted>
+            <DrawerHeader className="shrink-0 py-2">
+              <DrawerTitle>
+                {intl.formatMessage({
+                  id: "actions.entity_actions",
+                  defaultMessage: "Entity actions",
+                })}
+              </DrawerTitle>
+            </DrawerHeader>
+            <div className="min-h-0 overflow-y-auto overscroll-contain px-3 pb-2">
+              <MobileDetailChromeSlot
+                slot="actions"
+                className="empty:hidden [&_button]:min-h-11 [&_button]:min-w-11"
+              />
+              <MobileDetailChromeSlot
+                slot="list-actions"
+                className="empty:hidden"
+              />
+            </div>
+            <BottomSheetCloseFooter />
+          </DrawerContent>
+        </Drawer>
         {onBack && !chrome.interaction && (
           <Button
             variant="ghost"
@@ -210,7 +234,7 @@ export function MobileDetailFooter({ onBack }: { onBack?: () => void }) {
             <ChevronLeft />
           </Button>
         )}
-      </div>
+      </MobileToolbarRow>
     </div>
   );
 }

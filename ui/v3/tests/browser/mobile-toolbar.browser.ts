@@ -4,7 +4,121 @@ import {
   detailFooter,
   expectCompactRow,
   chooseSection,
+  expectTouchTargets,
 } from "./test";
+
+test("navigation, filters and view options open directly and close within thumb reach", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.goto("/");
+  const footer = detailFooter(page);
+  for (const [control, title] of [
+    ["Navigation", "Fixture navigation"],
+    ["Filters", "Filters"],
+    ["View options", "View options"],
+  ]) {
+    await footer.getByRole("button", { name: control, exact: true }).tap();
+    const drawer = page.getByRole("dialog", { name: title, exact: true });
+    await expect(drawer).toBeVisible();
+    const close = drawer.getByRole("button", { name: "Close", exact: true });
+    await expect(close).toBeInViewport();
+    const bounds = await close.boundingBox();
+    if (!bounds) throw new Error("Missing close button");
+    expect(bounds.y).toBeGreaterThan(500);
+    expect(bounds.x).toBeGreaterThan(240);
+    await close.tap();
+    await expect(drawer).toBeHidden();
+    await expectCompactRow(footer);
+    await expectTouchTargets(footer);
+  }
+});
+
+test("mobile action groups are flat and their forms outlive drawer dismissal", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const trigger = detailFooter(page).getByRole("button", {
+    name: "Entity actions",
+    exact: true,
+  });
+  for (const action of [
+    "Auto tag…",
+    "Rotate clockwise",
+    "Rotate counter-clockwise",
+  ]) {
+    await trigger.tap();
+    const drawer = page.getByRole("dialog", {
+      name: "Entity actions",
+      exact: true,
+    });
+    await expect(
+      drawer.getByRole("button", { name: "Operations", exact: true }),
+    ).toHaveCount(0);
+    await expect(drawer.getByRole("menuitem")).toHaveCount(0);
+    await drawer.getByRole("button", { name: action, exact: true }).tap();
+    await expect(drawer).toBeHidden();
+    const form = page.getByRole("dialog", { name: "Action form", exact: true });
+    await expect(form).toBeVisible();
+    await form.getByRole("button", { name: "Cancel action" }).tap();
+    await expect(form).toBeHidden();
+  }
+  await trigger.tap();
+  await page
+    .getByRole("dialog", { name: "Entity actions", exact: true })
+    .getByRole("button", { name: "Close", exact: true })
+    .tap();
+  await expect(trigger).toBeFocused();
+});
+
+test("desktop keeps operation submenus and opens the same action forms", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 844 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Operations", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Rotation", exact: true }).hover();
+  await page
+    .getByRole("menuitem", { name: "Rotate clockwise", exact: true })
+    .click();
+  await expect(
+    page.getByRole("dialog", { name: "Action form", exact: true }),
+  ).toBeVisible();
+});
+
+test("drawers track a downward drag and dismiss", async ({ page }) => {
+  await page.goto("/");
+  const trigger = detailFooter(page).getByRole("button", {
+    name: "Entity actions",
+    exact: true,
+  });
+  await trigger.tap();
+  const drawer = page.getByRole("dialog", {
+    name: "Entity actions",
+    exact: true,
+  });
+  await expect(drawer).toBeVisible();
+  // Exercise the primitive's pointer gesture; physical iOS touch remains a device check.
+  const handle = drawer.locator('[aria-hidden="true"]').first();
+  await handle.hover();
+  const bounds = await handle.boundingBox();
+  if (!bounds) throw new Error("Missing drawer handle");
+  const x = bounds.x + bounds.width / 2;
+  const y = bounds.y + bounds.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x, y + 180, { steps: 12 });
+  await expect(drawer).toHaveAttribute("data-swiping", "");
+  await expect
+    .poll(() =>
+      drawer.evaluate((element) =>
+        parseFloat(getComputedStyle(element).translate.split(" ")[1] ?? "0"),
+      ),
+    )
+    .toBeGreaterThan(100);
+  await page.mouse.up();
+  await expect(drawer).toBeHidden();
+});
 
 test("search commits on close and keeps its value across section changes", async ({
   page,
@@ -54,7 +168,7 @@ test("selection replaces the row and keeps select-all and close at the right", a
     footer.getByRole("button", { name: "Detail sections" }),
   ).toBeHidden();
   await expect(
-    footer.getByRole("button", { name: "More", exact: true }),
+    footer.getByRole("button", { name: "Entity actions", exact: true }),
   ).toBeHidden();
   await expectCompactRow(footer);
   const allBounds = await selectAll.boundingBox();
@@ -63,7 +177,7 @@ test("selection replaces the row and keeps select-all and close at the right", a
   expect(closeBounds.x).toBeGreaterThan(allBounds.x);
   expect(closeBounds.x + closeBounds.width).toBeCloseTo(
     await footer.evaluate(
-      (element) => element.getBoundingClientRect().right - 12,
+      (element) => element.getBoundingClientRect().right - 6,
     ),
     0,
   );
@@ -135,12 +249,12 @@ test("page jump resets its draft when the result count changes", async ({
   await expect(input).toHaveAttribute("aria-invalid", "false");
 });
 
-test("More retains action state and closes before opening the editor", async ({
+test("Actions retains action state and closes before opening the editor", async ({
   page,
 }) => {
   await page.goto("/");
   const more = detailFooter(page).getByRole("button", {
-    name: "More",
+    name: "Entity actions",
     exact: true,
   });
   await more.tap();
@@ -157,14 +271,12 @@ test("More retains action state and closes before opening the editor", async ({
   await expectCompactRow(detailFooter(page));
 });
 
-test("switching popovers preserves the active list's filter context", async ({
+test("direct filters preserve the active list's filter context", async ({
   page,
 }) => {
   await page.goto("/");
   const footer = detailFooter(page);
-  await footer.getByRole("button", { name: "More", exact: true }).tap();
   await chooseSection(page, "Images");
-  await footer.getByRole("button", { name: "More", exact: true }).tap();
   await page.getByRole("button", { name: "Filters", exact: true }).tap();
   await expect(
     page.getByRole("dialog", { name: "Filters", exact: true }),
@@ -174,7 +286,7 @@ test("switching popovers preserves the active list's filter context", async ({
   ).toBeVisible();
   await expect(
     footer.getByRole("button", {
-      name: "More",
+      name: "Entity actions",
       exact: true,
       includeHidden: true,
     }),
@@ -191,7 +303,6 @@ test("standalone lists provide page jumping, view options, and navigation", asyn
   await page.getByRole("spinbutton", { name: "Go to page" }).fill("2");
   await page.getByRole("button", { name: "Go", exact: true }).tap();
   await expect(page.getByTestId("list-state")).toContainText("page 2:");
-  await row.getByRole("button", { name: "More", exact: true }).tap();
   await page.getByRole("button", { name: "View options", exact: true }).tap();
   await expect(
     page.getByRole("dialog", { name: "View options", exact: true }),

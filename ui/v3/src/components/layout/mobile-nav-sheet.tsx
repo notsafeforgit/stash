@@ -1,6 +1,11 @@
 import { Link } from "@tanstack/react-router";
 import { Home, Settings } from "lucide-react";
-import { BottomSheet } from "@/components/ui/bottom-sheet";
+import { useIntl } from "react-intl";
+import {
+  BottomSheet,
+  BottomSheetHeader,
+  BottomSheetTitle,
+} from "@/components/ui/bottom-sheet";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useNavItems } from "./nav-items";
@@ -11,16 +16,25 @@ interface MobileNavSheetProps {
 }
 
 export function MobileNavSheet({ open, onOpenChange }: MobileNavSheetProps) {
+  const intl = useIntl();
   const items = useNavItems({ placement: "main" });
   return (
     <BottomSheet open={open} onOpenChange={onOpenChange}>
+      <BottomSheetHeader className="py-2">
+        <BottomSheetTitle>
+          {intl.formatMessage({
+            id: "navigation",
+            defaultMessage: "Navigation",
+          })}
+        </BottomSheetTitle>
+      </BottomSheetHeader>
       {/* `activeOptions={{ exact: true, includeSearch: false }}` defeats TanStack Router's
           default prefix-match active behavior. Without it, the Markers
           route (`/scenes/markers`) would also activate the Scenes link
           (`/scenes`) since one path is a prefix of the other. Trade-off:
           scene-detail pages (`/scenes/$sceneId`) no longer highlight the
           Scenes link either. */}
-      <nav className="grid grid-cols-4 gap-1 px-2 pt-4 pb-6">
+      <nav className="grid min-h-0 grid-cols-4 gap-1 overflow-y-auto px-2 pb-3">
         <Link
           to="/"
           activeOptions={{ exact: true, includeSearch: false }}
@@ -31,7 +45,9 @@ export function MobileNavSheet({ open, onOpenChange }: MobileNavSheetProps) {
           )}
         >
           <Home className="size-6" />
-          <span className="text-xs font-medium">Home</span>
+          <span className="text-xs font-medium">
+            {intl.formatMessage({ id: "home", defaultMessage: "Home" })}
+          </span>
         </Link>
         {items.map((item) => (
           <Link
@@ -58,7 +74,9 @@ export function MobileNavSheet({ open, onOpenChange }: MobileNavSheetProps) {
           )}
         >
           <Settings className="size-6" />
-          <span className="text-xs font-medium">Settings</span>
+          <span className="text-xs font-medium">
+            {intl.formatMessage({ id: "settings", defaultMessage: "Settings" })}
+          </span>
         </Link>
       </nav>
     </BottomSheet>

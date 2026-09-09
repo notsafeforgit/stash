@@ -1,3 +1,4 @@
+import { EntityActionButton } from "@/components/detail/entity-actions-menu";
 import "yet-another-react-lightbox/styles.css";
 
 import React, { useMemo, useRef, useState } from "react";
@@ -21,6 +22,8 @@ import {
   Minus,
   RotateCcw,
   Pencil,
+  FileText,
+  Info,
 } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
 import { imageTitle } from "src/core/files";
@@ -318,21 +321,18 @@ function ImageToolbar({
           size={13}
           className={image.organized ? "fill-green-600/20" : ""}
         />
-        <span className="max-lg:sr-only">
+        <span>
           {intl.formatMessage({ id: "organized", defaultMessage: "Organized" })}
         </span>
       </Button>
 
-      <Button
-        variant="outline"
-        size="icon"
+      <EntityActionButton
+        icon={Pencil}
+        label={intl.formatMessage({ id: "actions.edit" })}
         className="lg:hidden"
         onClick={onEdit}
-        aria-label={intl.formatMessage({ id: "actions.edit" })}
-      >
-        <Pencil />
-      </Button>
-      <div className="ml-auto">
+      />
+      <div className="w-full lg:ml-auto lg:w-auto">
         <ImageActionsMenu image={image} onDeleted={onDeleted} />
       </div>
     </div>
@@ -406,6 +406,7 @@ function ImageDetailPage() {
   const tabs: DetailTab[] = [
     {
       id: "details",
+      icon: Info,
       label: intl.formatMessage({ id: "details", defaultMessage: "Details" }),
       shortcut: "a",
       content: (
@@ -459,6 +460,7 @@ function ImageDetailPage() {
     },
     {
       id: "fileinfo",
+      icon: FileText,
       label: intl.formatMessage({
         id: "file_info",
         defaultMessage: "File info",

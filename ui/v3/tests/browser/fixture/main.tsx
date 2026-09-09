@@ -1,3 +1,9 @@
+import { Pencil, Wand2, RotateCw, RotateCcw } from "lucide-react";
+import {
+  EntityActionButton,
+  EntityActionsMenu,
+} from "@/components/detail/entity-actions-menu";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { StrictMode, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { IntlProvider } from "react-intl";
@@ -120,6 +126,7 @@ function FixturePage() {
   const [editing, setEditing] = useState(false);
   const [favourite, setFavourite] = useState(false);
   const [backCount, setBackCount] = useState(0);
+  const [actionOpen, setActionOpen] = useState(false);
   const tabs = sections.map((section) => ({
     ...section,
     content: <FixtureList name={section.id} />,
@@ -129,7 +136,46 @@ function FixturePage() {
       <Button onClick={() => setFavourite(!favourite)}>
         {favourite ? "Favourited" : "Favourite"}
       </Button>
-      <Button onClick={() => setEditing(true)}>Edit</Button>
+      <EntityActionButton
+        icon={Pencil}
+        label="Edit"
+        onClick={() => setEditing(true)}
+      />
+      <EntityActionsMenu
+        items={[
+          {
+            key: "auto-tag",
+            icon: Wand2,
+            label: "Auto tag…",
+            onSelect: () => setActionOpen(true),
+          },
+          {
+            key: "rotation",
+            icon: RotateCw,
+            label: "Rotation",
+            actions: [
+              {
+                key: "clockwise",
+                icon: RotateCw,
+                label: "Rotate clockwise",
+                onSelect: () => setActionOpen(true),
+              },
+              {
+                key: "counter-clockwise",
+                icon: RotateCcw,
+                label: "Rotate counter-clockwise",
+                onSelect: () => setActionOpen(true),
+              },
+            ],
+          },
+        ]}
+      />
+      <Dialog open={actionOpen} onOpenChange={setActionOpen}>
+        <DialogContent>
+          <DialogTitle>Action form</DialogTitle>
+          <Button onClick={() => setActionOpen(false)}>Cancel action</Button>
+        </DialogContent>
+      </Dialog>
     </div>
   );
   return (

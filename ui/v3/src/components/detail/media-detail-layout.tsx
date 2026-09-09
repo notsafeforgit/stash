@@ -5,7 +5,10 @@ import { ArrowLeft, PanelLeftClose, PanelLeftOpen, XIcon } from "lucide-react";
 import { useIntl } from "react-intl";
 import { Tabs, TabsContent } from "src/components/ui/tabs";
 import { Button } from "src/components/ui/button";
-import { DetailTabStrip } from "src/components/detail/detail-tab-strip";
+import {
+  DetailTabStrip,
+  type DetailTabStripItem,
+} from "src/components/detail/detail-tab-strip";
 import { MobileDetailSections } from "./mobile-detail-sections";
 import { ListActivityContext } from "@/components/list/list-activity-context";
 import { useTabState } from "src/hooks/use-tab-state";
@@ -18,9 +21,7 @@ import {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export interface DetailTab {
-  id: string;
-  label: string;
+export interface DetailTab extends DetailTabStripItem {
   /** Keyboard shortcut key (single character) */
   shortcut?: string;
   content: React.ReactNode;

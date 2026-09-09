@@ -1,3 +1,4 @@
+import { EntityActionButton } from "@/components/detail/entity-actions-menu";
 import React, { useState, useCallback } from "react";
 import { cn } from "src/lib/utils";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
@@ -9,12 +10,25 @@ import {
   DetailSidebarBack,
   DetailPageState,
 } from "src/components/detail/detail-page-parts";
-import { DetailTabs } from "src/components/detail/detail-tabs";
+import {
+  DetailTabs,
+  type DetailTabsTab,
+} from "src/components/detail/detail-tabs";
 import { CollectionDetailLayout } from "@/components/detail/collection-detail-layout";
 import { MobileDetailChromePortal } from "@/components/layout/mobile-detail-chrome";
 import { Skeleton } from "src/components/ui/skeleton";
 import { Button } from "src/components/ui/button";
-import { Star, Heart, Droplets, User, Pencil } from "lucide-react";
+import {
+  Star,
+  Heart,
+  Droplets,
+  User,
+  Pencil,
+  Clapperboard,
+  GalleryHorizontalEnd,
+  Images,
+  Layers,
+} from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
 import { PerformerDetailsTab } from "src/components/detail/performer-detail-tabs";
 import { PerformerEditForm } from "src/components/detail/performer-edit-form";
@@ -157,10 +171,14 @@ function PerformerToolbar({
           {performer.rating100}
         </span>
       )}
-      <Button variant="outline" size="sm" onClick={onEdit}>
-        <Pencil size={13} />
-        {intl.formatMessage({ id: "actions.edit", defaultMessage: "Edit" })}
-      </Button>
+      <EntityActionButton
+        icon={Pencil}
+        label={intl.formatMessage({
+          id: "actions.edit",
+          defaultMessage: "Edit",
+        })}
+        onClick={onEdit}
+      />
       <PerformerActionsMenu performer={performer} onDeleted={onDeleted} />
     </div>
   );
@@ -203,13 +221,13 @@ function PerformerDetailPage() {
   }
 
   // Build entity tabs (only tabs that have content)
-  type EntityTab = { id: string; label: string; content: React.ReactNode };
-  const entityTabs: EntityTab[] = performer
+  const entityTabs: DetailTabsTab[] = performer
     ? [
         ...(performer.scene_count > 0
           ? [
               {
                 id: "scenes",
+                icon: Clapperboard,
                 label: intl.formatMessage({
                   id: "scenes",
                   defaultMessage: "Scenes",
@@ -222,6 +240,7 @@ function PerformerDetailPage() {
           ? [
               {
                 id: "images",
+                icon: Images,
                 label: intl.formatMessage({
                   id: "images",
                   defaultMessage: "Images",
@@ -239,6 +258,7 @@ function PerformerDetailPage() {
           ? [
               {
                 id: "galleries",
+                icon: GalleryHorizontalEnd,
                 label: intl.formatMessage({
                   id: "galleries",
                   defaultMessage: "Galleries",
@@ -251,6 +271,7 @@ function PerformerDetailPage() {
           ? [
               {
                 id: "groups",
+                icon: Layers,
                 label: intl.formatMessage({
                   id: "groups",
                   defaultMessage: "Groups",

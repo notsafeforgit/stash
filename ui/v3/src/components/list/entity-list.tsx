@@ -32,6 +32,11 @@ import {
 import type { View } from "./views";
 import { PluginFilterExtras } from "src/plugins/filter-extras";
 import { useListScrollRestoration } from "./use-list-scroll-restoration";
+import { useListActivity } from "./list-activity-context";
+import {
+  MobileDetailChromePortal,
+  useMobileDetailChrome,
+} from "@/components/layout/mobile-detail-chrome";
 
 // ── EntityList ────────────────────────────────────────────────────────────────
 
@@ -127,6 +132,8 @@ export const EntityList: React.FC<EntityListProps> = ({
   className,
 }) => {
   const intl = useIntl();
+  const isActive = useListActivity();
+  const detailFooter = useMobileDetailChrome()?.mobile ?? false;
   const {
     showSidebar,
     sectionOpen,
@@ -161,10 +168,10 @@ export const EntityList: React.FC<EntityListProps> = ({
   // Add a body class so the global CSS can hide the BottomTabBar (which
   // MobileListBar replaces) and remove any tab-bar bottom padding.
   useEffect(() => {
-    if (!isMobileSidebar) return;
+    if (!isMobileSidebar || !isActive) return;
     document.body.classList.add("mobile-list-view");
     return () => document.body.classList.remove("mobile-list-view");
-  }, [isMobileSidebar]);
+  }, [isMobileSidebar, isActive]);
 
   // Track the scroll container as state (not a ref) so descendants can react
   // to it via `ListScrollContext` — the virtualizer needs the element to be
@@ -350,6 +357,7 @@ export const EntityList: React.FC<EntityListProps> = ({
                   className={cn(
                     "relative h-full overflow-y-auto overflow-x-hidden",
                     mobileChromeFixed &&
+                      !detailFooter &&
                       isMobileSidebar &&
                       "pb-[calc(5rem+env(safe-area-inset-bottom,0px))]",
                   )}
@@ -360,10 +368,15 @@ export const EntityList: React.FC<EntityListProps> = ({
                 </div>
               </div>
 
-              {/* Mobile chrome — fixed to viewport bottom (embedded) or in-flow (standalone) */}
+              {/* Hidden, kept-mounted tabs must not publish controls into the footer. */}
               {isMobileSidebar &&
+                isActive &&
                 mobileChrome &&
-                (mobileChromeFixed ? (
+                (detailFooter ? (
+                  <MobileDetailChromePortal slot="list">
+                    {mobileChrome}
+                  </MobileDetailChromePortal>
+                ) : mobileChromeFixed ? (
                   <div className="fixed bottom-0 left-0 right-0 z-50">
                     {mobileChrome}
                   </div>

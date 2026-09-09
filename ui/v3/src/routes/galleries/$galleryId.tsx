@@ -5,15 +5,17 @@ import { useQuery, useMutation } from "@apollo/client/react";
 import { z } from "zod";
 import { useIntl } from "react-intl";
 import {
-  DetailBackBar,
   DetailSidebarBack,
   DetailPageState,
 } from "src/components/detail/detail-page-parts";
 import { DetailTabs } from "src/components/detail/detail-tabs";
+import { CollectionDetailLayout } from "@/components/detail/collection-detail-layout";
+import { MobileDetailChromePortal } from "@/components/layout/mobile-detail-chrome";
 import { DetailEditTransition } from "src/components/detail/detail-edit-transition";
+import { DetailEditorLayout } from "@/components/detail/detail-editor-layout";
 import { Button } from "src/components/ui/button";
 import { cn } from "src/lib/utils";
-import { Images, Pencil, CheckCircle2Icon, ChevronLeft } from "lucide-react";
+import { Images, Pencil, CheckCircle2Icon } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
 import { galleryLabel } from "src/lib/gallery-utils";
 import { GalleryDetailsTab } from "src/components/detail/gallery-detail-tabs";
@@ -129,11 +131,10 @@ function GalleryDetailPage() {
 
   return (
     <>
-      <DetailBackBar
+      <CollectionDetailLayout
         title={gallery ? galleryLabel(gallery) : ""}
         onBack={goBack}
-      />
-      <div className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden">
+      >
         <DetailPageState
           loading={loading}
           error={error}
@@ -162,49 +163,53 @@ function GalleryDetailPage() {
                             gallery={gallery}
                             onImageClick={() => setCoverLightboxOpen(true)}
                           />
-                          <div className="min-w-0 md:order-first">
-                            <div className="flex flex-wrap gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setEditOpen(true)}
-                              >
-                                <Pencil size={13} />
-                                {intl.formatMessage({
-                                  id: "actions.edit",
-                                  defaultMessage: "Edit",
-                                })}
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={handleToggleOrganized}
-                                className={cn(
-                                  gallery.organized &&
-                                    "text-green-600 border-green-500/60 hover:text-green-500",
-                                )}
-                                title={intl.formatMessage({
-                                  id: "organized",
-                                  defaultMessage: "Organized",
-                                })}
-                              >
-                                <CheckCircle2Icon
-                                  size={13}
-                                  className={
-                                    gallery.organized ? "fill-green-600/20" : ""
-                                  }
+                          <MobileDetailChromePortal slot="actions">
+                            <div className="min-w-0 md:order-first">
+                              <div className="flex md:flex-wrap gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setEditOpen(true)}
+                                >
+                                  <Pencil size={13} />
+                                  {intl.formatMessage({
+                                    id: "actions.edit",
+                                    defaultMessage: "Edit",
+                                  })}
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={handleToggleOrganized}
+                                  className={cn(
+                                    gallery.organized &&
+                                      "text-green-600 border-green-500/60 hover:text-green-500",
+                                  )}
+                                  title={intl.formatMessage({
+                                    id: "organized",
+                                    defaultMessage: "Organized",
+                                  })}
+                                >
+                                  <CheckCircle2Icon
+                                    size={13}
+                                    className={
+                                      gallery.organized
+                                        ? "fill-green-600/20"
+                                        : ""
+                                    }
+                                  />
+                                  {intl.formatMessage({
+                                    id: "organized",
+                                    defaultMessage: "Organized",
+                                  })}
+                                </Button>
+                                <GalleryActionsMenu
+                                  gallery={gallery}
+                                  onDeleted={goBack}
                                 />
-                                {intl.formatMessage({
-                                  id: "organized",
-                                  defaultMessage: "Organized",
-                                })}
-                              </Button>
-                              <GalleryActionsMenu
-                                gallery={gallery}
-                                onDeleted={goBack}
-                              />
+                              </div>
                             </div>
-                          </div>
+                          </MobileDetailChromePortal>
                         </div>
                         <div className="px-3 pb-3">
                           <GalleryDetailsTab gallery={gallery} />
@@ -213,48 +218,29 @@ function GalleryDetailPage() {
                     </>
                   }
                   editForm={
-                    <div className="flex flex-col h-full">
-                      {/* Header sized to match `DetailSidebarBack` so the
-                          swap between detail header and edit-form header
-                          doesn't change the aside row height. */}
-                      <div className="flex shrink-0 items-center gap-1 px-1 py-1 border-b border-border">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="px-2 shrink-0"
-                          onClick={() => setEditOpen(false)}
-                          title={intl.formatMessage({
-                            id: "actions.back",
-                            defaultMessage: "Back",
-                          })}
-                        >
-                          <ChevronLeft size={18} />
-                        </Button>
-                        <h2 className="text-base font-semibold leading-tight truncate min-w-0">
-                          {intl.formatMessage(
-                            {
-                              id: "actions.edit_entity",
-                              defaultMessage: "Edit {entityType}",
-                            },
-                            {
-                              entityType: intl
-                                .formatMessage({
-                                  id: "gallery",
-                                  defaultMessage: "Gallery",
-                                })
-                                .toLocaleLowerCase(),
-                            },
-                          )}
-                        </h2>
-                      </div>
-                      <div className="flex-1 min-h-0">
-                        <GalleryEditForm
-                          gallery={gallery}
-                          onSaved={() => setEditOpen(false)}
-                          onDeleted={goBack}
-                        />
-                      </div>
-                    </div>
+                    <DetailEditorLayout
+                      onClose={() => setEditOpen(false)}
+                      title={intl.formatMessage(
+                        {
+                          id: "actions.edit_entity",
+                          defaultMessage: "Edit {entityType}",
+                        },
+                        {
+                          entityType: intl
+                            .formatMessage({
+                              id: "gallery",
+                              defaultMessage: "Gallery",
+                            })
+                            .toLocaleLowerCase(),
+                        },
+                      )}
+                    >
+                      <GalleryEditForm
+                        gallery={gallery}
+                        onSaved={() => setEditOpen(false)}
+                        onDeleted={goBack}
+                      />
+                    </DetailEditorLayout>
                   }
                 />
               </aside>
@@ -268,7 +254,7 @@ function GalleryDetailPage() {
             </div>
           )}
         </DetailPageState>
-      </div>
+      </CollectionDetailLayout>
 
       {gallery?.paths.cover && (
         <Lightbox

@@ -72,11 +72,11 @@ async function next(page: Page, index: number) {
 }
 
 async function revealControls(page: Page) {
-  const bar = page.locator("[data-player-control-bar]");
-  if ((await bar.getAttribute("inert")) !== null) {
+  const playbackControls = page.locator("[data-player-playback-controls]");
+  if ((await playbackControls.getAttribute("inert")) !== null) {
     await page.touchscreen.tap(180, 250);
   }
-  await expect(bar).not.toHaveAttribute("inert");
+  await expect(playbackControls).not.toHaveAttribute("inert");
 }
 
 test("the real lightbox retains one video and audio through swipes, HLS and wraparound", async ({

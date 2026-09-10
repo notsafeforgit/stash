@@ -85,6 +85,9 @@ export function SettingsSearchInput({
         onChange={(event) => setQuery(event.currentTarget.value)}
         onKeyDown={(event) => {
           if (event.key !== "Escape") return;
+          // The field remains mounted during its exit animation. Prevent the
+          // browser's native search-input clear action from erasing the query.
+          event.preventDefault();
           if (onClose) onClose();
           else setQuery("");
         }}

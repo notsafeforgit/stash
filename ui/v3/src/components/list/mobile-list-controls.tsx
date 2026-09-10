@@ -1,5 +1,4 @@
-import { useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { flushSync } from "react-dom";
+import { useState, type Dispatch, type SetStateAction } from "react";
 import { useIntl } from "react-intl";
 import {
   ChevronUp,
@@ -21,12 +20,14 @@ import {
 } from "@/components/ui/popover";
 import { MobileNavSheet } from "@/components/layout/mobile-nav-sheet";
 import { MobileToolbarRow } from "@/components/layout/mobile-toolbar";
+import { MobileSearchRow } from "@/components/layout/mobile-search-row";
 import {
   MobileDetailChromePortal,
   useMobileDetailChrome,
   useMobileDetailInteraction,
 } from "@/components/layout/mobile-detail-chrome";
 import { useMobileKeyboardLayout } from "@/hooks/use-mobile-keyboard-layout";
+import { useMobileSearch } from "@/hooks/use-mobile-search";
 import { cn } from "@/lib/utils";
 import type { ListFilterModel } from "@/models/list-filter/filter";
 import { SearchInput } from "./search-input";
@@ -68,14 +69,12 @@ export function MobileListControls({
   const intl = useIntl();
   const chrome = useMobileDetailChrome();
   const hosted = chrome?.mobile ?? false;
-  const [searchOpen, setSearchOpen] = useState(false);
+  const search = useMobileSearch();
   const [navOpen, setNavOpen] = useState(false);
   const [pagesOpen, setPagesOpen] = useState(false);
-  const searchRef = useRef<HTMLInputElement>(null);
-  const searchButtonRef = useRef<HTMLButtonElement>(null);
   const keyboardRef = useMobileKeyboardLayout<HTMLDivElement>();
   const mode =
-    selecting || hasSelection ? "selection" : searchOpen ? "search" : null;
+    selecting || hasSelection ? "selection" : search.isOpen ? "search" : null;
   useMobileDetailInteraction(mode);
   const pageCount = Math.ceil(totalCount / filter.itemsPerPage);
 
@@ -174,31 +173,18 @@ export function MobileListControls({
               </Button>
             </>
           ) : mode === "search" ? (
-            <>
+            <MobileSearchRow
+              rowRef={search.rowRef}
+              onClose={search.closeSearch}
+            >
               <SearchInput
-                inputRef={searchRef}
+                inputRef={search.inputRef}
                 mobile
                 value={filter.searchTerm}
                 onChange={onSearch}
                 className="min-w-0 flex-1"
               />
-              <Button
-                variant="ghost"
-                size="icon-lg"
-                className="size-11 shrink-0"
-                onClick={() => {
-                  searchRef.current?.blur();
-                  flushSync(() => setSearchOpen(false));
-                  searchButtonRef.current?.focus({ preventScroll: true });
-                }}
-                aria-label={intl.formatMessage({
-                  id: "actions.close_search",
-                  defaultMessage: "Close search",
-                })}
-              >
-                <X />
-              </Button>
-            </>
+            </MobileSearchRow>
           ) : (
             <>
               {!hosted && (
@@ -258,14 +244,10 @@ export function MobileListControls({
                 </>
               )}
               <MobileSearchButton
-                buttonRef={searchButtonRef}
-                inputRef={searchRef}
+                buttonRef={search.buttonRef}
+                inputRef={search.inputRef}
                 query={filter.searchTerm}
-                onOpen={() => {
-                  // Mount and focus in the touch handler so iOS opens its keyboard.
-                  flushSync(() => setSearchOpen(true));
-                  searchRef.current?.focus();
-                }}
+                onOpen={search.openSearch}
                 onClear={() => onSearch("")}
               />
               <Button

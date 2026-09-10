@@ -204,7 +204,15 @@ test("active search can be previewed, edited and cleared without changing sort",
   const direction = await state.getAttribute("data-direction");
 
   const menu = page.getByRole("menu");
-  await holdForContextMenu(trigger, menu);
+  await holdForContextMenu(trigger, menu, { x: 0.1, y: 0.1 });
+  await expect
+    .poll(async () => {
+      const anchor = await trigger.boundingBox();
+      const popup = await menu.boundingBox();
+      if (!anchor || !popup) throw new Error("Missing search preview bounds");
+      return anchor.y - popup.y - popup.height;
+    })
+    .toBeCloseTo(8, 0);
   // Some touch browsers synthesize a click on release. It must remain a preview.
   await trigger.dispatchEvent("click");
   await expect(input).toHaveCount(0);
@@ -221,7 +229,15 @@ test("active search can be previewed, edited and cleared without changing sort",
   await expect(menu).toBeHidden();
   await expectCompactRow(footer);
 
-  await holdForContextMenu(trigger, menu);
+  await holdForContextMenu(trigger, menu, { x: 0.9, y: 0.9 });
+  await expect
+    .poll(async () => {
+      const anchor = await trigger.boundingBox();
+      const popup = await menu.boundingBox();
+      if (!anchor || !popup) throw new Error("Missing search preview bounds");
+      return anchor.y - popup.y - popup.height;
+    })
+    .toBeCloseTo(8, 0);
   await menu.getByRole("menuitem", { name: "Edit search" }).tap();
   await expect(input).toBeFocused();
   await expect(input).toHaveValue(query);
@@ -238,6 +254,72 @@ test("active search can be previewed, edited and cleared without changing sort",
   await expect(input).toBeFocused();
   await expect(input).toHaveValue("");
 });
+
+for (const reducedMotion of ["no-preference", "reduce"] as const) {
+  test(`search keeps focus and layout when its reveal is interrupted (${reducedMotion})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion });
+    await page.goto("/");
+    const footer = detailFooter(page);
+    const trigger = footer.getByRole("button", {
+      name: "Search…",
+      exact: true,
+    });
+    // Inspect the same event turn as opening, then pause partway through the
+    // browser animation so this also exercises closing before reveal completes.
+    const opening = await trigger.evaluate((element) => {
+      if (!(element instanceof HTMLButtonElement))
+        throw new Error("Missing search trigger");
+      element.click();
+      const row = document.querySelector("[data-mobile-search-row]");
+      const input = row?.querySelector("input");
+      if (!row || !input) throw new Error("Search did not mount synchronously");
+      const animation = row.getAnimations()[0];
+      const before = input.getBoundingClientRect();
+      if (animation) {
+        animation.pause();
+        animation.currentTime = 60;
+      }
+      const during = input.getBoundingClientRect();
+      return {
+        focused: document.activeElement === input,
+        animated: !!animation,
+        stableBounds:
+          before.x === during.x &&
+          before.y === during.y &&
+          before.width === during.width &&
+          before.height === during.height,
+      };
+    });
+    expect(opening).toEqual({
+      focused: true,
+      animated: reducedMotion === "no-preference",
+      stableBounds: true,
+    });
+    const input = footer.getByRole("searchbox");
+    await input.fill("preserve during collapse");
+    await footer
+      .getByRole("button", { name: "Close search" })
+      .dispatchEvent("click");
+    await expect(trigger).toBeFocused();
+    await expect(input).toHaveCount(0);
+    await expectCompactRow(footer);
+    await expect(
+      page.getByTestId("scenes-list").getByTestId("list-state"),
+    ).toHaveAttribute("data-term", "preserve during collapse");
+    await trigger.tap();
+    await expect(input).toBeFocused();
+    await expect(input).toHaveValue("preserve during collapse");
+    await footer.getByRole("button", { name: "Close search" }).tap();
+    await footer
+      .getByRole("button", { name: "View options", exact: true })
+      .tap();
+    await expect(
+      page.getByRole("dialog", { name: "View options", exact: true }),
+    ).toBeVisible();
+  });
+}
 
 test("selection replaces the row and keeps select-all and close at the right", async ({
   page,

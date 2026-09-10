@@ -98,19 +98,23 @@ export async function chooseSection(page: Page, name: string) {
 }
 
 /** Exercise Base UI's touch gesture in both engines (Playwright only exposes tap). */
-export async function holdForContextMenu(trigger: Locator, menu: Locator) {
-  await trigger.evaluate((element) => {
+export async function holdForContextMenu(
+  trigger: Locator,
+  menu: Locator,
+  position = { x: 0.5, y: 0.5 },
+) {
+  await trigger.evaluate((element, position) => {
     const bounds = element.getBoundingClientRect();
     // WebKit doesn't expose a constructible Touch. Supply the coordinates that
     // the real primitive consumes without replacing its event handlers/timer.
     const touch = {
-      clientX: bounds.x + bounds.width / 2,
-      clientY: bounds.y + bounds.height / 2,
+      clientX: bounds.x + bounds.width * position.x,
+      clientY: bounds.y + bounds.height * position.y,
     } satisfies Pick<Touch, "clientX" | "clientY">;
     const event = new Event("touchstart", { bubbles: true });
     Object.defineProperty(event, "touches", { value: [touch] });
     element.dispatchEvent(event);
-  });
+  }, position);
   await expect(menu).toBeVisible();
   await trigger.dispatchEvent("touchend", {
     touches: [],

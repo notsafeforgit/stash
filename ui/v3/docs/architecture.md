@@ -273,8 +273,11 @@ Preserve these invariants:
   unmount the player mid-hold; cleanup must clear the gesture without sending
   playback commands to a detached store.
 - Touch scene lightboxes pass their history-aware dismissal callback into the
-  player. Close occupies the right end of the playback row and fades with it;
-  hidden controls are inert so the first tap reveals rather than activates them.
+  player. Close occupies the right end of the playback row and remains subtly
+  visible and tappable when playback controls fade. It has one stable 44px target;
+  the fading controls and gradient are separate, so Close has no invisible or
+  inert ancestor. Hidden playback controls remain inert and let taps through to
+  the gesture surface to reveal them without activating an action.
   Time and available PiP/Cast controls sit above a full-width timeline, preserving
   scrubbing space and direct speed, quality, playback-mode, fullscreen, and Close
   access with 44px targets.
@@ -322,7 +325,7 @@ and navigation below it on mobile. `mobile-detail-chrome.tsx` provides a shared
 56px toolbar with direct Navigation, section picker, Search, Filters, View options,
 Entity actions, and Back controls. All targets stay at least 44px at 320px width;
 the section label truncates and becomes an icon on the narrowest screens. Search
-and selection replace that row and put Close at its right edge. Navigation,
+and selection replace that row, with their dismissal control at its right edge. Navigation,
 Filters, View options, and Entity actions open bottom drawers with scrollable
 content and dismiss through swipe-down, outside taps, or Escape. They omit Close
 rows; the shared drawer primitive supplies bottom safe-area padding. The section
@@ -333,12 +336,22 @@ its sidebar controls and tab strip. Collection pages use the `md` breakpoint;
 media pages use `lg`, matching their existing split layouts.
 
 An active list query keeps Search highlighted even when its input is closed.
-Tap opens the input; long press opens the existing Base UI context menu with the
+Tap opens the input; long press opens the existing Base UI context menu anchored
+above the Search button, independent of the finger's position within it, with the
 full query and Edit search/Clear search actions. Clearing only changes the query
 and resets pagination, preserving sort and other filter criteria. Filters and
 View options also show the query beneath their drawer title, so its visibility
 does not depend on discovering the long-press shortcut. Long queries wrap within
 the popup or drawer width without widening the toolbar.
+
+List and settings search share `MobileSearchRow` and `useMobileSearch`. The outer
+chevron collapses search; the X inside the input clears its text. A short native
+Web Animation reveals the row from the measured Search button bounds and folds
+it back on close. Only clipping and opacity animate: the input keeps its final
+layout size and position throughout, and focus still happens inside the opening
+gesture. Blur flushes pending text before the exit animation; its completion
+restores the toolbar and focus. Interrupted animations cancel cleanly, unmount
+cancels pending work, and reduced-motion preference skips the animation.
 
 Drawer motion uses `transform` for dragging and enter/exit animations. Do not
 combine it with the separate CSS `translate` property on the popup: Base UI

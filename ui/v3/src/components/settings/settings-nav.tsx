@@ -1,8 +1,7 @@
-import { useRef, useState } from "react";
-import { flushSync } from "react-dom";
+import { useState } from "react";
 import { useIntl } from "react-intl";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Check, ChevronUp, Menu, Search, X } from "lucide-react";
+import { Check, ChevronUp, Menu, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -13,7 +12,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MobileNavSheet } from "@/components/layout/mobile-nav-sheet";
 import { MobileToolbarRow } from "@/components/layout/mobile-toolbar";
+import { MobileSearchRow } from "@/components/layout/mobile-search-row";
 import { useMobileKeyboardLayout } from "@/hooks/use-mobile-keyboard-layout";
+import { useMobileSearch } from "@/hooks/use-mobile-search";
 import { useMediaQuery } from "@/utils/screen";
 import { cn } from "@/lib/utils";
 import { getSettingsSection, SETTINGS_NAV_ITEMS } from "./settings-navigation";
@@ -81,21 +82,13 @@ function MobileSettingsNav({
   search: ReturnType<typeof useSettingsSearch>;
 }) {
   const intl = useIntl();
-  const [panel, setPanel] = useState<
-    "navigation" | "sections" | "search" | null
-  >(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const searchButtonRef = useRef<HTMLButtonElement>(null);
+  const [panel, setPanel] = useState<"navigation" | "sections" | null>(null);
+  const { isOpen, inputRef, buttonRef, rowRef, openSearch, closeSearch } =
+    useMobileSearch();
   const keyboardRef = useMobileKeyboardLayout<HTMLDivElement>();
   const sectionsLabel = intl.formatMessage({
     id: "accessibility.settings_sections",
   });
-
-  function closeSearch() {
-    inputRef.current?.blur();
-    flushSync(() => setPanel(null));
-    searchButtonRef.current?.focus({ preventScroll: true });
-  }
 
   return (
     <>
@@ -109,24 +102,15 @@ function MobileSettingsNav({
         className="mobile-keyboard-layout @container flex shrink-0 flex-col border-t bg-background pb-[env(safe-area-inset-bottom,0px)]"
       >
         <MobileToolbarRow>
-          {panel === "search" ? (
-            <>
+          {isOpen ? (
+            <MobileSearchRow rowRef={rowRef} onClose={closeSearch}>
               <SettingsSearchInput
                 {...search}
                 inputRef={inputRef}
                 mobile
                 onClose={closeSearch}
               />
-              <Button
-                variant="ghost"
-                size="icon-lg"
-                className="size-11 shrink-0"
-                onClick={closeSearch}
-                aria-label={intl.formatMessage({ id: "actions.close_search" })}
-              >
-                <X />
-              </Button>
-            </>
+            </MobileSearchRow>
           ) : (
             <>
               <Button
@@ -198,15 +182,11 @@ function MobileSettingsNav({
                 </DropdownMenuContent>
               </DropdownMenu>
               <Button
-                ref={searchButtonRef}
+                ref={buttonRef}
                 variant="ghost"
                 size="icon-lg"
                 className="size-11 shrink-0"
-                onClick={() => {
-                  // Focus within the touch handler so iOS opens its keyboard.
-                  flushSync(() => setPanel("search"));
-                  inputRef.current?.focus();
-                }}
+                onClick={openSearch}
                 aria-label={intl.formatMessage({
                   id: "accessibility.search_settings",
                 })}
@@ -216,7 +196,7 @@ function MobileSettingsNav({
             </>
           )}
         </MobileToolbarRow>
-        {panel === "search" && search.query.trim() && (
+        {isOpen && search.query.trim() && (
           // Results share layout with the bar and take at most half the visible
           // viewport. The settings form stays mounted in the remaining space.
           <div

@@ -66,12 +66,12 @@
  *     PTS matches what's already on disk for earlier segments — no
  *     overlap, no conflict).
  *
- *   - For the clipped shape, the playlist carries
- *     `EXT-X-MEDIA-SEQUENCE = startSegment`. hls.js parses this,
- *     computes per-fragment playlist-time as
- *     `mediaSequence·targetDuration + Σ prior EXTINFs`, and uses the
- *     first parsed fMP4 PTS for `initPTS`. Both come out to
- *     `effective_trim = floor(?start / segmentLength) · segmentLength`.
+ *   - For the clipped shape, `EXT-X-MEDIA-SEQUENCE = startSegment`
+ *     identifies the first fragment; it does not offset playlist-time.
+ *     hls.js starts that fragment at playlist-time 0 and rebases its
+ *     fMP4 timestamps accordingly. Its `config.startPosition` must use
+ *     this clip-relative timeline, while `offsetStart` retains the
+ *     scene-time origin for the player's seek and display conversions.
  *
  * The strategy object exported here plugs into the generic
  * `SourceStrategy` dispatch in `scene-player-sources.ts`. Non-HLS code
@@ -315,16 +315,19 @@ export function makeHlsStrategy(
 }
 
 /**
- * Parse the `?start=` value from an HLS source URL. Used by
- * `SceneVideo` to feed hls.js's `config.startPosition` so the
- * first segment fetch lands on the requested scene-time instead of
- * segment 0 (no cold-start detour). Returns -1 (hls.js's "use
- * defaults" sentinel) when absent / invalid / non-positive.
+ * Choose hls.js's initial position in playlist-time. Full-scene
+ * playlists use the scene-time `?start=` hint. Clipped playlists
+ * (`?end=`) already begin with the marker's segment, at playlist-time
+ * 0; passing the scene-time start again skips ahead within the clip
+ * and can make hls.js seek forward after the player's resume seek.
+ * The player handles any fine seek within the first clip segment.
+ * Returns -1 (hls.js's default sentinel) for missing/invalid scene hints.
  */
 export function parseStartPosition(src: string | null | undefined): number {
   if (!src) return -1;
   try {
     const url = new URL(src, window.location.origin);
+    if (url.searchParams.has("end")) return 0;
     const raw = url.searchParams.get("start");
     if (raw == null) return -1;
     const v = parseFloat(raw);

@@ -164,7 +164,12 @@ or backend tests.
 The suite covers 320–1280px layouts, search/selection replacement rows, page
 validation, section state, direct drawer access, flat entity actions and desktop
 submenus, drawer drag distance and outside-tap dismissal, editor dismissal, keyboard
-navigation, and viewport lifting. Settings checks cover bottom navigation,
+navigation, active-query previews and drawer summaries, and keyboard space in
+the page layout. Viewport checks assert footer and scroller bounds immediately
+after resize/pan events, including refocusing an already-open search. Long-press
+checks send synthetic touch events through the production context-menu primitive;
+they cover edit/clear, outside dismissal, and suppressing the release click.
+Settings checks cover bottom navigation,
 section routes and browser Back, search highlight links, keyboard result
 selection, and preserving unsaved form state across breakpoint changes.
 Player checks use a small synthetic MP4 and the production playback controls:

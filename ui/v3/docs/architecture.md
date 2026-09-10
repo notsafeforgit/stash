@@ -311,7 +311,7 @@ It reuses the generated, locale-resolved settings index and navigates with the
 existing `hl` parameter to reveal the chosen setting. Both layouts render results
 as ordinary route links with native touch and keyboard activation. Mobile results
 appear above the input, bounded to half the visible viewport, while the shared
-visual-viewport hook lifts the search area above the keyboard. Closing search
+keyboard layout hook reserves space below the footer. Closing search
 restores its trigger's focus. Search state belongs to the navigation, so a
 breakpoint change preserves the query without remounting the settings form.
 
@@ -332,14 +332,32 @@ row modes with navigation and a page picker. Desktop retains
 its sidebar controls and tab strip. Collection pages use the `md` breakpoint;
 media pages use `lg`, matching their existing split layouts.
 
+An active list query keeps Search highlighted even when its input is closed.
+Tap opens the input; long press opens the existing Base UI context menu with the
+full query and Edit search/Clear search actions. Clearing only changes the query
+and resets pagination, preserving sort and other filter criteria. Filters and
+View options also show the query beneath their drawer title, so its visibility
+does not depend on discovering the long-press shortcut. Long queries wrap within
+the popup or drawer width without widening the toolbar.
+
 Drawer motion uses `transform` for dragging and enter/exit animations. Do not
 combine it with the separate CSS `translate` property on the popup: Base UI
 supplies an inline transform while dragging, and the two translations add
 together instead of tracking the pointer one-to-one.
 
 The footer participates in flex layout, reserving its actual height without
-fixed offsets or content overlays. It owns safe-area clearance and keyboard
-lifting. React portals move controls into its typed slots while preserving
+fixed offsets or content overlays. It owns safe-area clearance. The shared
+`useMobileKeyboardLayout` hook reserves the portion of the layout viewport below
+the visual viewport as a bottom margin, shrinking the adjacent scroller so list
+content ends at the search row. It accounts for Safari's native viewport pan and
+updates a dedicated CSS variable synchronously on focus/viewport events, avoiding
+an extra animation frame or React render between the pan and layout correction.
+Do not translate only the footer: that leaves content under the keyboard chrome
+and can briefly compound the browser's pan. Opening search mounts and focuses in
+the same touch handler and permits native focus scrolling; restoring the trigger
+on close uses `preventScroll`. This applies to standalone lists, detail footers,
+and settings. Physical iPhone keyboard animation still requires device validation.
+React portals move controls into the footer's typed slots while preserving
 their tab, list, and action contexts. Only the active list publishes controls;
 previously visited panels stay mounted with their filters and state intact.
 The mobile picker uses the same Base UI tab state as desktop, with vertical

@@ -6,7 +6,6 @@ import {
   Funnel,
   ListChecks,
   Menu,
-  Search,
   Settings2,
   Tags,
   X,
@@ -27,11 +26,12 @@ import {
   useMobileDetailChrome,
   useMobileDetailInteraction,
 } from "@/components/layout/mobile-detail-chrome";
-import { useVisualViewportBottomInset } from "@/hooks/use-visual-viewport-bottom-inset";
+import { useMobileKeyboardLayout } from "@/hooks/use-mobile-keyboard-layout";
 import { cn } from "@/lib/utils";
 import type { ListFilterModel } from "@/models/list-filter/filter";
 import { SearchInput } from "./search-input";
 import { MobileListPagePicker } from "./mobile-list-pagination";
+import { MobileSearchButton } from "./mobile-search-button";
 
 export interface MobileListControlsProps {
   filter: ListFilterModel;
@@ -73,7 +73,7 @@ export function MobileListControls({
   const [pagesOpen, setPagesOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const searchButtonRef = useRef<HTMLButtonElement>(null);
-  const { ref, bottomInset } = useVisualViewportBottomInset<HTMLDivElement>();
+  const keyboardRef = useMobileKeyboardLayout<HTMLDivElement>();
   const mode =
     selecting || hasSelection ? "selection" : searchOpen ? "search" : null;
   useMobileDetailInteraction(mode);
@@ -127,17 +127,12 @@ export function MobileListControls({
         </>
       )}
       <div
-        ref={hosted ? undefined : ref}
+        ref={hosted ? undefined : keyboardRef}
         data-mobile-list-mode={mode ?? "browse"}
         className={cn(
           !hosted &&
-            "@container shrink-0 border-t bg-background pb-[env(safe-area-inset-bottom,0px)]",
+            "mobile-keyboard-layout @container shrink-0 border-t bg-background pb-[env(safe-area-inset-bottom,0px)]",
         )}
-        style={
-          !hosted && bottomInset > 0
-            ? { transform: `translateY(-${bottomInset}px)` }
-            : undefined
-        }
       >
         <Row
           className={
@@ -262,23 +257,17 @@ export function MobileListControls({
                   </div>
                 </>
               )}
-              <Button
-                ref={searchButtonRef}
-                variant={filter.searchTerm ? "secondary" : "ghost"}
-                size="icon-lg"
-                className="size-11 shrink-0"
-                onClick={() => {
+              <MobileSearchButton
+                buttonRef={searchButtonRef}
+                inputRef={searchRef}
+                query={filter.searchTerm}
+                onOpen={() => {
                   // Mount and focus in the touch handler so iOS opens its keyboard.
                   flushSync(() => setSearchOpen(true));
-                  searchRef.current?.focus({ preventScroll: true });
+                  searchRef.current?.focus();
                 }}
-                aria-label={intl.formatMessage({
-                  id: "search",
-                  defaultMessage: "Search…",
-                })}
-              >
-                <Search />
-              </Button>
+                onClear={() => onSearch("")}
+              />
               <Button
                 variant={activeFilterCount > 0 ? "secondary" : "ghost"}
                 size="icon-lg"

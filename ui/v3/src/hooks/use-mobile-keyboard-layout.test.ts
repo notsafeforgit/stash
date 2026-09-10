@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateVisualViewportBottomInset } from "./use-visual-viewport-bottom-inset";
+import { calculateVisualViewportBottomInset } from "./use-mobile-keyboard-layout";
 
 describe("calculateVisualViewportBottomInset", () => {
   it("returns the keyboard-sized gap below a shrunken visual viewport", () => {

@@ -21,6 +21,7 @@ import { SearchInput } from "./search-input";
 import { TableToolbarSlotProvider } from "./table-toolbar-slot";
 import {
   BottomSheet,
+  BottomSheetDescription,
   BottomSheetHeader,
   BottomSheetTitle,
 } from "src/components/ui/bottom-sheet";
@@ -235,6 +236,14 @@ export const EntityList: React.FC<EntityListProps> = ({
                   </span>
                 )}
               </BottomSheetTitle>
+              {filter.searchTerm && (
+                <BottomSheetDescription className="whitespace-pre-wrap wrap-anywhere">
+                  {intl.formatMessage(
+                    { id: "list.active_search" },
+                    { query: filter.searchTerm },
+                  )}
+                </BottomSheetDescription>
+              )}
             </BottomSheetHeader>
             <div className="flex-1 overflow-y-auto">{sidebarContent}</div>
           </BottomSheet>

@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MobileNavSheet } from "@/components/layout/mobile-nav-sheet";
 import { MobileToolbarRow } from "@/components/layout/mobile-toolbar";
-import { useVisualViewportBottomInset } from "@/hooks/use-visual-viewport-bottom-inset";
+import { useMobileKeyboardLayout } from "@/hooks/use-mobile-keyboard-layout";
 import { useMediaQuery } from "@/utils/screen";
 import { cn } from "@/lib/utils";
 import { getSettingsSection, SETTINGS_NAV_ITEMS } from "./settings-navigation";
@@ -86,7 +86,7 @@ function MobileSettingsNav({
   >(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const searchButtonRef = useRef<HTMLButtonElement>(null);
-  const { ref, bottomInset } = useVisualViewportBottomInset<HTMLDivElement>();
+  const keyboardRef = useMobileKeyboardLayout<HTMLDivElement>();
   const sectionsLabel = intl.formatMessage({
     id: "accessibility.settings_sections",
   });
@@ -104,14 +104,9 @@ function MobileSettingsNav({
         onOpenChange={(open) => setPanel(open ? "navigation" : null)}
       />
       <div
-        ref={ref}
+        ref={keyboardRef}
         data-mobile-settings-footer
-        className="@container flex shrink-0 flex-col border-t bg-background pb-[env(safe-area-inset-bottom,0px)]"
-        style={
-          bottomInset > 0
-            ? { transform: `translateY(-${bottomInset}px)` }
-            : undefined
-        }
+        className="mobile-keyboard-layout @container flex shrink-0 flex-col border-t bg-background pb-[env(safe-area-inset-bottom,0px)]"
       >
         <MobileToolbarRow>
           {panel === "search" ? (
@@ -210,7 +205,7 @@ function MobileSettingsNav({
                 onClick={() => {
                   // Focus within the touch handler so iOS opens its keyboard.
                   flushSync(() => setPanel("search"));
-                  inputRef.current?.focus({ preventScroll: true });
+                  inputRef.current?.focus();
                 }}
                 aria-label={intl.formatMessage({
                   id: "accessibility.search_settings",
@@ -226,7 +221,10 @@ function MobileSettingsNav({
           // viewport. The settings form stays mounted in the remaining space.
           <div
             className="order-first overflow-y-auto overscroll-contain border-b"
-            style={{ maxHeight: `calc((100dvh - ${bottomInset}px) / 2)` }}
+            style={{
+              maxHeight:
+                "calc((100dvh - var(--mobile-keyboard-inset, 0px)) / 2)",
+            }}
           >
             <SettingsSearchResults
               results={search.results}

@@ -39,6 +39,7 @@ import flattenMessages from "@/utils/flatten-messages";
 import "./style.css";
 import { PlayerFixture } from "./player";
 import { VideoSourcesFixture } from "./video-sources";
+import { SceneLightboxFixture } from "./scene-lightbox";
 
 const params = new URLSearchParams(location.search);
 const items = Array.from({ length: 40 }, (_, index) => ({
@@ -288,6 +289,11 @@ const router = createRouter({
       getParentRoute: () => rootRoute,
       path: "/video-sources",
       component: VideoSourcesFixture,
+    }),
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/scene-lightbox",
+      component: SceneLightboxFixture,
     }),
     settingsRoute.addChildren(
       SETTINGS_NAV_ITEMS.map((item) =>

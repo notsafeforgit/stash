@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type RefObject,
@@ -14,11 +15,15 @@ export function usePlayerTransitionFeedback({
   storeRef,
   fileWidth,
   fileHeight,
+  playbackKey,
+  sourceKey,
 }: {
   rootRef: RefObject<HTMLDivElement | null>;
   storeRef: RefObject<VideoPlayerStore | null>;
   fileWidth: number | undefined;
   fileHeight: number | undefined;
+  playbackKey: string;
+  sourceKey: string | undefined;
 }) {
   const [reloading, setReloadingRaw] = useState(false);
   // Hold the dim+spinner visible for a minimum window after a source
@@ -84,7 +89,6 @@ export function usePlayerTransitionFeedback({
     rootRef,
     fileWidth,
     fileHeight,
-    setReloading,
   });
 
   // Replaces `beginSourceRemount` from the original variant. With an
@@ -125,6 +129,19 @@ export function usePlayerTransitionFeedback({
     }
     setSeekDisplayTarget(target);
   }, []);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Scene/marker selection starts a fresh visual transition lifecycle.
+  useLayoutEffect(() => {
+    setReloadingRaw(false);
+    setSeekDisplayTarget(null);
+    reloadingStartTsRef.current = null;
+    clearCapturedFrame();
+    return () => {
+      if (reloadingClearTimerRef.current)
+        clearTimeout(reloadingClearTimerRef.current);
+      if (seekDisplayClearTimerRef.current)
+        clearTimeout(seekDisplayClearTimerRef.current);
+    };
+  }, [playbackKey, clearCapturedFrame]);
   // Clear the display target shortly after `reloading` flips false.
   // The brief delay lets the player render one frame at the resume
   // position before swapping from `seekDisplayTarget` back to the live
@@ -176,15 +193,29 @@ export function usePlayerTransitionFeedback({
   // the full dim+spinner through the buffer wait — all paths converge
   // to "old frame holds, spinner shows, new position plays, spinner
   // clears".
+  const cancelSeekRef = useRef<(() => void) | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: A pending seek must be cancelled when its scene or source is replaced.
+  useLayoutEffect(
+    () => () => {
+      cancelSeekRef.current?.();
+      cancelSeekRef.current = null;
+    },
+    [playbackKey, sourceKey],
+  );
   const awaitSeekReady = useCallback(
     (video: HTMLVideoElement, shouldResume: boolean) => {
+      cancelSeekRef.current?.();
       let cleared = false;
-      const clear = () => {
+      const cancel = () => {
         if (cleared) return;
         cleared = true;
         video.removeEventListener("seeked", onSeeked);
         video.removeEventListener("playing", onPlaying);
         clearTimeout(timeoutId);
+      };
+      const clear = () => {
+        if (cleared) return;
+        cancel();
         // Idempotent — direct-seek paths don't snapshot, so this is a
         // no-op there. Guards the case where a captured frame survived
         // a follow-up direct seek without going through handleCanPlay.
@@ -204,6 +235,7 @@ export function usePlayerTransitionFeedback({
       };
       const onPlaying = () => clear();
       const timeoutId = setTimeout(clear, 5000);
+      cancelSeekRef.current = cancel;
       video.addEventListener("seeked", onSeeked, { once: true });
       video.addEventListener("playing", onPlaying, { once: true });
     },

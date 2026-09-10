@@ -173,8 +173,12 @@ speed/quality selection, revealing hidden controls without accidental dismissal,
 and loading-state/desktop lightbox dismissal. An additional synthetic AVC/AAC
 file and fMP4 HLS fixtures exercise source and engine changes, marker playlists,
 start positions, mute preservation, DOM identity and repeated `ended`-driven
-advance. This media-adapter fixture uses the existing explicit resume path; it
-is not a test of lightbox swipe ownership or physical iPhone autoplay permission.
+advance. A separate fixture mounts the production `SceneLightbox` and `ScenePlayer`
+with synthetic GraphQL responses and media at Stash-shaped endpoints. It checks
+DOM identity across navigation, pointer tracking, markers, loading sentinels,
+late query results, muted/unmuted playback and held-speed automatic advance.
+Transcode stop/keepalive requests are intercepted locally. The tests do not
+establish physical iPhone autoplay permission or ManagedMediaSource behavior.
 See [media fixture generation](../tests/browser/fixture/media/README.md).
 The tests do not access library media or send playback activity mutations.
 Browser sources are strictly type-checked by

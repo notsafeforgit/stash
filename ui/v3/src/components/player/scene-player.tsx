@@ -12,11 +12,18 @@ import { useCommittedRef } from "@/hooks/use-committed-ref";
  * Retain those reloads and the freeze frame that covers MediaSource teardown.
  * They do not require a new DOM element.
  *
- * The lightbox still owns separate sessions per slide. Retaining an element
- * across scene/marker navigation also requires changing carousel ownership.
+ * The lightbox retains this session across selections. `playbackKey` resets
+ * scene/marker state; `suspended` releases media during query/OPFS gaps.
  */
 import type React from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Container,
   createPlayer,
@@ -71,6 +78,10 @@ export type ScenePlayerScene = NonNullable<GQL.FindSceneQuery["findScene"]>;
 
 interface ScenePlayerProps {
   scene: ScenePlayerScene;
+  /** Resets scene/marker state while preserving the player and media element. */
+  playbackKey?: string;
+  /** Release the current source while its replacement is being resolved. */
+  suspended?: boolean;
   initialTimestamp?: number;
   autoplay?: boolean;
   /**
@@ -134,14 +145,14 @@ interface ScenePlayerProps {
   /**
    * Controlled loop toggle. When both are provided, the parent owns the
    * loop state — used by `SceneLightbox` so the user's toggle persists
-   * across the per-scene player remount that a slide swipe triggers.
+   * across closing and reopening the viewer.
    * When omitted, the player manages loop state internally and seeds it
    * from the auto-detected short-clip default.
    */
   loopEnabled?: boolean;
   onLoopToggle?: () => void;
   /**
-   * Suppress visible playback for this many milliseconds after mount.
+   * Suppress visible playback for this many milliseconds after each selection.
    * The `<video autoPlay>` attribute stays set so iOS's muted-fallback
    * autoplay path still works (a programmatic play() call after this
    * point is treated as a user-gesture-required action and routinely
@@ -273,6 +284,8 @@ function MediaBridge({
 
 export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   scene,
+  playbackKey: playbackKeyProp,
+  suspended = false,
   initialTimestamp,
   autoplay = false,
   autostartEnabled,
@@ -303,6 +316,10 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   posterSrc,
   clipBoundsEdit,
 }) => {
+  const playbackKey = playbackKeyProp ?? scene.id;
+  const playbackRateRef = useRef(1);
+  const stoppedAtEndRef = useRef(false);
+  const userPlaybackIntentRef = useRef(false);
   // Store handle captured by <StoreBridge> below — lets callbacks read
   // paused/currentTime/playbackRate and call play/pause/seek without being
   // descendants of Player.Player themselves.
@@ -410,9 +427,9 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
 
   // Loop preference. Uncontrolled by default — internal state seeds from
   // the auto-detected short-clip `looping` value and resets on scene
-  // change (ScenePlayer remounts via the parent's `key=`). When the
+  // change via playbackKey. When the
   // parent supplies `loopEnabled` + `onLoopToggle` (lightbox), the parent
-  // owns the value so it persists across the per-slide remount.
+  // owns the value so it persists across opening sessions.
   const isLoopControlled = loopEnabledProp !== undefined;
   const [internalLoopEnabled, setInternalLoopEnabled] = useState(looping);
   const loopEnabled = isLoopControlled ? loopEnabledProp : internalLoopEnabled;
@@ -531,15 +548,19 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     [scene.scene_markers],
   );
 
-  // Reset on scene change. Source-machinery resets are owned by the
-  // hook below; only the parent-owned `started` latch is reset here.
-  const lastSceneIdRef = useRef(scene.id);
+  const [lastPlaybackKey, setLastPlaybackKey] = useState(playbackKey);
   const [hasEverStarted, setHasEverStarted] = useState(false);
-  useEffect(() => {
-    if (lastSceneIdRef.current === scene.id) return;
-    lastSceneIdRef.current = scene.id;
+  if (lastPlaybackKey !== playbackKey) {
+    setLastPlaybackKey(playbackKey);
     setHasEverStarted(false);
-  }, [scene.id]);
+    setZoomTransform(IDENTITY_TRANSFORM);
+    setInternalLoopEnabled(looping);
+  }
+  // biome-ignore lint/correctness/useExhaustiveDependencies: These latches belong to a playback selection, including its loading gap.
+  useLayoutEffect(() => {
+    stoppedAtEndRef.current = false;
+    userPlaybackIntentRef.current = false;
+  }, [playbackKey, suspended]);
 
   // Page-level autoplay gate. Stamps `wasPaused` on the initial
   // pending-resume so a deep-link `?t=` doesn't autoplay when the user
@@ -553,6 +574,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     offsetStart,
     initialResume,
     reloading,
+    ready: sourceReady,
     seekDisplayTarget,
     freezeFrameCanvas,
     handleSourceChange,
@@ -562,6 +584,10 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     handleLoadedMetadata,
   } = useScenePlayerSources({
     scene,
+    autoplay,
+    playbackKey,
+    suspended,
+    playbackRateRef,
     initialTimestamp,
     canDecode,
     canDecodeVideo,
@@ -648,14 +674,8 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   // to re-render the new `paused: false` state) loses Safari's gesture
   // permission and the programmatic `play()` gets blocked, leaving the
   // user with a "click play twice" experience. See `handleTogglePaused`
-  // below for the synchronous replay path. Resets on scene change via
-  // the parent's per-scene player remount.
-  const stoppedAtEndRef = useRef(false);
-  // Latched true on the first explicit playback gesture (play/pause
-  // toggle, pre-start play click). Read by `usePlayDelay` — see the
-  // hook's header comment. Never reset: the gate only spans the first
-  // `playDelayMs` after mount, and a scene change remounts the player.
-  const userPlaybackIntentRef = useRef(false);
+  // below for the synchronous replay path. Both this latch and the explicit
+  // user-playback intent reset at the playbackKey boundary above.
   const handleClipStop = useCallback(() => {
     if (!clipRange) return;
     stoppedAtEndRef.current = true;
@@ -730,7 +750,9 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     autoplay || initialResume.offset > 0 || (initialResume.seekTo ?? 0) > 0;
   const autoAdvanceOverride = autoAdvanceEnabled && !!onNext;
   const effectiveAutoPlay =
-    (autostartEnabled || autoAdvanceOverride) && initialAutoplayIntent;
+    !suspended &&
+    (autostartEnabled || autoAdvanceOverride) &&
+    initialAutoplayIntent;
 
   const autoplayIntentRef = useCommittedRef(effectiveAutoPlay);
 
@@ -739,6 +761,8 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     playDelayMs,
     autoplayIntentRef,
     userPlaybackIntentRef,
+    playbackKey,
+    suspended,
   );
 
   const handleUserPlaybackGesture = useCallback(() => {
@@ -785,22 +809,32 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   // timeline that no longer represents the whole scene.
   const effectiveMarkers = clipRange ? [] : markers;
 
-  const mediaElement =
-    finalSrc !== undefined ? (
-      <SceneVideo
-        src={finalSrc}
-        sourceType={activeSource?.type}
-        autoPlay={effectiveAutoPlay}
-        loop={loopEnabled && !clipRange}
-        playsInline
-        preload={preload}
-        onEnded={handleEnded}
-        onLoadedMetadata={handleLoadedMetadata}
-        className="w-full h-full"
-      >
-        {trackElements}
-      </SceneVideo>
-    ) : null;
+  const mediaElement = (
+    <SceneVideo
+      src={finalSrc}
+      sourceType={activeSource?.type}
+      autoPlay={effectiveAutoPlay}
+      loop={loopEnabled && !clipRange}
+      playsInline
+      preload={preload}
+      // PlaybackRangeEffect owns clip completion, including native EOF.
+      // Handling both here would advance twice when a clip ends at EOF.
+      onEnded={sourceReady && !clipRange ? handleEnded : undefined}
+      onLoadedMetadata={handleLoadedMetadata}
+      onRateChange={(event) => {
+        const video = event.currentTarget;
+        playbackRateRef.current = video.playbackRate;
+        // load() resets playbackRate to defaultPlaybackRate. Keep the native
+        // default in sync, including a held 2× gesture spanning auto-advance.
+        if (video.defaultPlaybackRate !== video.playbackRate) {
+          video.defaultPlaybackRate = video.playbackRate;
+        }
+      }}
+      className="size-full"
+    >
+      {trackElements}
+    </SceneVideo>
+  );
 
   return (
     <div
@@ -811,6 +845,10 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
         className,
       )}
       data-scene-player
+      data-playback-key={playbackKey}
+      data-playback-ready={sourceReady}
+      inert={suspended}
+      aria-hidden={suspended || undefined}
       data-fill={fill ? "" : undefined}
     >
       <div
@@ -844,22 +882,27 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
             onCanPlay={handleCanPlay}
             rootRef={fullscreenContainerRef}
             srcKey={finalSrc}
+            playbackKey={playbackKey}
           />
-          <StartedEffect Player={Player} onStarted={handleStarted} />
+          <StartedEffect
+            Player={Player}
+            onStarted={handleStarted}
+            ready={sourceReady}
+          />
           {onControlsVisibilityChange && (
             <ControlsVisibilityEffect
               Player={Player}
               onChange={onControlsVisibilityChange}
             />
           )}
-          {clipRange && (
+          {clipRange && sourceReady && (
             <PlaybackRangeEffect
               Player={Player}
               start={clipRange.start}
               end={clipRange.end}
               offsetStart={offsetStart}
               loopEnabled={loopEnabled}
-              onLoop={handleSeek}
+              onLoop={handleRestart}
               onAdvance={autoAdvanceEnabled ? onNext : undefined}
               onStop={handleClipStop}
               onClipResume={handleClipResume}
@@ -883,6 +926,8 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
                 capture (e.g. iOS canvas CORS taint), giving the
                 "cover briefly visible" flash the user sees. */}
             <PlayerPoster
+              key={playbackKey}
+              ready={sourceReady}
               Player={Player}
               src={posterSrc ?? scene.paths.screenshot ?? undefined}
               hide={reloading}

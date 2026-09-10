@@ -1417,220 +1417,219 @@ export function PlayerControls({
           </Button>
         )}
 
-        {started && (
-          // `absolute inset-0` so the seek/play row centers against the
-          // *whole* player area instead of just the slice above the
-          // ControlBar — that's what brings the three touch buttons in
-          // line with the YARL lightbox prev/next buttons (which sit at
-          // viewport-center). Combined with the lightbox bypass of the
-          // mobile-cap (`[data-scene-player][data-fill]`) so the player
-          // truly fills the viewport, the centerlines match exactly.
-          <Controls.Group
-            className="[@media(pointer:coarse)]:flex hidden absolute inset-0 items-center justify-around"
-            onPointerDownCapture={(e) => {
-              controlsVisibleAtPointerDownRef.current = controlsVisible;
-              completedTouchTapRef.current = e.pointerType !== "touch";
-              activeTouchPointerIdRef.current =
-                e.pointerType === "touch" ? e.pointerId : null;
-              touchTapCandidateRef.current =
-                e.pointerType === "touch" && e.target === e.currentTarget
-                  ? {
-                      pointerId: e.pointerId,
-                      startedAt: e.timeStamp,
-                      startX: e.clientX,
-                      startY: e.clientY,
-                      moved: false,
-                    }
-                  : null;
-            }}
-            onPointerMove={(e) => {
-              if (
-                e.pointerType !== "touch" ||
-                e.pointerId !== activeTouchPointerIdRef.current
-              ) {
-                return;
-              }
+        {/* Keep the gesture target mounted while sources load so a held
+            speed gesture can receive touchend after auto-advance. */}
+        <Controls.Group
+          className={cn(
+            "[@media(pointer:coarse)]:flex hidden absolute inset-0 items-center justify-around",
+            !started && "invisible pointer-events-none",
+          )}
+          inert={!started}
+          onPointerDownCapture={(e) => {
+            controlsVisibleAtPointerDownRef.current = controlsVisible;
+            completedTouchTapRef.current = e.pointerType !== "touch";
+            activeTouchPointerIdRef.current =
+              e.pointerType === "touch" ? e.pointerId : null;
+            touchTapCandidateRef.current =
+              e.pointerType === "touch" && e.target === e.currentTarget
+                ? {
+                    pointerId: e.pointerId,
+                    startedAt: e.timeStamp,
+                    startX: e.clientX,
+                    startY: e.clientY,
+                    moved: false,
+                  }
+                : null;
+          }}
+          onPointerMove={(e) => {
+            if (
+              e.pointerType !== "touch" ||
+              e.pointerId !== activeTouchPointerIdRef.current
+            ) {
+              return;
+            }
 
+            const candidate = touchTapCandidateRef.current;
+            if (
+              candidate &&
+              !candidate.moved &&
+              exceedsTouchTapMovement(candidate, e.clientX, e.clientY)
+            ) {
+              candidate.moved = true;
+            }
+          }}
+          onTouchStart={(e) => {
+            // Reset cross-gesture flag from any prior hold; the click
+            // handler clears it on consume but movement-aborted gestures
+            // (preventDefault from `VideoFrameZoom`'s active pan) never
+            // synthesize a click to consume it.
+            holdFiredRef.current = false;
+            // Long-press only on empty-area taps (target===currentTarget)
+            // so taps on the inner play / skip buttons keep their normal
+            // tap-to-activate semantics. Multi-touch (pinch) cancels any
+            // pending hold immediately. The lightbox's `VideoFrameZoom`
+            // also stops the second finger's touchstart from reaching
+            // here at all, so the parallel `onActiveGesture` callback is
+            // what fires `cancelHold` in that path.
+            if (e.target !== e.currentTarget) {
+              cancelHold();
+              return;
+            }
+            if (e.touches.length !== 1) {
+              cancelHold();
+              return;
+            }
+            const t = e.touches[0];
+            if (!t) return;
+            cancelHold();
+            holdStartPosRef.current = { x: t.clientX, y: t.clientY };
+            holdTimerRef.current = window.setTimeout(() => {
+              holdTimerRef.current = null;
+              holdOriginalRateRef.current = store.state.playbackRate ?? 1;
+              store.setPlaybackRate(HOLD_PRESS_RATE);
+              holdFiredRef.current = true;
+              onTemporaryPlaybackRateChange(HOLD_PRESS_RATE);
+              // The hold consumes the gesture; suppress the deferred tap-
+              // to-toggle that the eventual `click` (after release) would
+              // otherwise schedule. The flag in `onClick` is a safety net,
+              // but clearing now avoids any race where the toggle is
+              // already scheduled when the click finally fires.
+              clearPendingTapToggle();
+            }, HOLD_PRESS_MS);
+          }}
+          onTouchMove={(e) => {
+            const start = holdStartPosRef.current;
+            if (!start) return;
+            const touch = e.touches.length === 1 ? e.touches[0] : null;
+            if (
+              shouldCancelTouchHoldOnMove(
+                start,
+                touch ? { x: touch.clientX, y: touch.clientY } : null,
+                e.touches.length,
+                holdOriginalRateRef.current != null,
+              )
+            ) {
+              cancelHold();
+            }
+          }}
+          onTouchEnd={() => {
+            cancelHold();
+          }}
+          onTouchCancel={() => {
+            cancelHold();
+            holdFiredRef.current = false;
+          }}
+          onPointerUpCapture={(e) => {
+            if (
+              e.pointerType === "touch" &&
+              e.pointerId === activeTouchPointerIdRef.current
+            ) {
               const candidate = touchTapCandidateRef.current;
-              if (
-                candidate &&
-                !candidate.moved &&
-                exceedsTouchTapMovement(candidate, e.clientX, e.clientY)
-              ) {
-                candidate.moved = true;
-              }
-            }}
-            onTouchStart={(e) => {
-              // Reset cross-gesture flag from any prior hold; the click
-              // handler clears it on consume but movement-aborted gestures
-              // (preventDefault from `VideoFrameZoom`'s active pan) never
-              // synthesize a click to consume it.
-              holdFiredRef.current = false;
-              // Long-press only on empty-area taps (target===currentTarget)
-              // so taps on the inner play / skip buttons keep their normal
-              // tap-to-activate semantics. Multi-touch (pinch) cancels any
-              // pending hold immediately. The lightbox's `VideoFrameZoom`
-              // also stops the second finger's touchstart from reaching
-              // here at all, so the parallel `onActiveGesture` callback is
-              // what fires `cancelHold` in that path.
-              if (e.target !== e.currentTarget) {
-                cancelHold();
-                return;
-              }
-              if (e.touches.length !== 1) {
-                cancelHold();
-                return;
-              }
-              const t = e.touches[0];
-              if (!t) return;
-              cancelHold();
-              holdStartPosRef.current = { x: t.clientX, y: t.clientY };
-              holdTimerRef.current = window.setTimeout(() => {
-                holdTimerRef.current = null;
-                holdOriginalRateRef.current = store.state.playbackRate ?? 1;
-                store.setPlaybackRate(HOLD_PRESS_RATE);
-                holdFiredRef.current = true;
-                onTemporaryPlaybackRateChange(HOLD_PRESS_RATE);
-                // The hold consumes the gesture; suppress the deferred tap-
-                // to-toggle that the eventual `click` (after release) would
-                // otherwise schedule. The flag in `onClick` is a safety net,
-                // but clearing now avoids any race where the toggle is
-                // already scheduled when the click finally fires.
-                clearPendingTapToggle();
-              }, HOLD_PRESS_MS);
-            }}
-            onTouchMove={(e) => {
-              const start = holdStartPosRef.current;
-              if (!start) return;
-              const touch = e.touches.length === 1 ? e.touches[0] : null;
-              if (
-                shouldCancelTouchHoldOnMove(
-                  start,
-                  touch ? { x: touch.clientX, y: touch.clientY } : null,
-                  e.touches.length,
-                  holdOriginalRateRef.current != null,
-                )
-              ) {
-                cancelHold();
-              }
-            }}
-            onTouchEnd={() => {
-              cancelHold();
-            }}
-            onTouchCancel={() => {
-              cancelHold();
-              holdFiredRef.current = false;
-            }}
-            onPointerUpCapture={(e) => {
-              if (
-                e.pointerType === "touch" &&
-                e.pointerId === activeTouchPointerIdRef.current
-              ) {
-                const candidate = touchTapCandidateRef.current;
-                completedTouchTapRef.current =
-                  e.target === e.currentTarget &&
-                  candidate?.pointerId === e.pointerId &&
-                  isCompletedTouchTap(
-                    candidate,
-                    e.timeStamp,
-                    e.clientX,
-                    e.clientY,
-                  );
-                activeTouchPointerIdRef.current = null;
-                touchTapCandidateRef.current = null;
-              }
-
-              // Suppress vjs's container-level pointerup → setActive for
-              // taps on the overlay's empty space, so a double-tap-zoom
-              // doesn't flash controls between the first tap's pointerup
-              // and `VideoFrameZoom` recognising the second tap. The toggle
-              // is performed by our own deferred timer in `onClick` below,
-              // which `VideoFrameZoom` cancels on double-tap. Only stop
-              // empty-area taps — taps on the inner buttons (play / skip)
-              // still need vjs's setActive to reset the auto-hide idle
-              // timer. Limited to touch pointers; mouse taps run vjs's
-              // normal activity-tracking path.
-              if (e.target !== e.currentTarget) return;
-              if (e.pointerType !== "touch") return;
-              e.stopPropagation();
-            }}
-            onPointerCancelCapture={(e) => {
-              if (
-                e.pointerType !== "touch" ||
-                e.pointerId !== activeTouchPointerIdRef.current
-              ) {
-                return;
-              }
+              completedTouchTapRef.current =
+                e.target === e.currentTarget &&
+                candidate?.pointerId === e.pointerId &&
+                isCompletedTouchTap(
+                  candidate,
+                  e.timeStamp,
+                  e.clientX,
+                  e.clientY,
+                );
               activeTouchPointerIdRef.current = null;
               touchTapCandidateRef.current = null;
+            }
+
+            // Suppress vjs's container-level pointerup → setActive for
+            // taps on the overlay's empty space, so a double-tap-zoom
+            // doesn't flash controls between the first tap's pointerup
+            // and `VideoFrameZoom` recognising the second tap. The toggle
+            // is performed by our own deferred timer in `onClick` below,
+            // which `VideoFrameZoom` cancels on double-tap. Only stop
+            // empty-area taps — taps on the inner buttons (play / skip)
+            // still need vjs's setActive to reset the auto-hide idle
+            // timer. Limited to touch pointers; mouse taps run vjs's
+            // normal activity-tracking path.
+            if (e.target !== e.currentTarget) return;
+            if (e.pointerType !== "touch") return;
+            // A drag must reach the carousel so it can finish the swipe.
+            if (!completedTouchTapRef.current) return;
+            e.stopPropagation();
+          }}
+          onPointerCancelCapture={(e) => {
+            if (
+              e.pointerType !== "touch" ||
+              e.pointerId !== activeTouchPointerIdRef.current
+            ) {
+              return;
+            }
+            activeTouchPointerIdRef.current = null;
+            touchTapCandidateRef.current = null;
+            completedTouchTapRef.current = false;
+          }}
+          onClickCapture={(e) => {
+            // The Quality / Speed menus use `modal={false}`, so the tap
+            // that dismisses the menu also lands on whatever sits
+            // underneath — on mobile that's this overlay (with the
+            // big play/pause and seek buttons inside TouchOverlay).
+            // Without this guard, dismissing the menu also toggles
+            // playback or seeks. Stopping propagation in the capture
+            // phase prevents the inner button onClicks from firing as
+            // well as our own onClick below. The 300ms grace inside
+            // `isMenuActive()` covers the gap between Base UI's
+            // outside-click handler firing on pointerdown and React's
+            // click event arriving here.
+            if (isMenuActive()) {
+              e.stopPropagation();
+              e.preventDefault();
+            }
+          }}
+          onClick={(e) => {
+            // Only react to taps on the empty space between the touch
+            // overlay's big buttons; the buttons themselves stop the
+            // event by virtue of being descendants — `e.target ===
+            // e.currentTarget` matches only when the tap landed on the
+            // group itself.
+            if (e.target !== e.currentTarget) return;
+            // The synthesized click after releasing a long-press should
+            // not also toggle controls — the hold already consumed the
+            // gesture. Consume and clear the flag here so a follow-up
+            // single tap (new gesture) still toggles normally.
+            if (holdFiredRef.current) {
+              holdFiredRef.current = false;
               completedTouchTapRef.current = false;
-            }}
-            onClickCapture={(e) => {
-              // The Quality / Speed menus use `modal={false}`, so the tap
-              // that dismisses the menu also lands on whatever sits
-              // underneath — on mobile that's this overlay (with the
-              // big play/pause and seek buttons inside TouchOverlay).
-              // Without this guard, dismissing the menu also toggles
-              // playback or seeks. Stopping propagation in the capture
-              // phase prevents the inner button onClicks from firing as
-              // well as our own onClick below. The 300ms grace inside
-              // `isMenuActive()` covers the gap between Base UI's
-              // outside-click handler firing on pointerdown and React's
-              // click event arriving here.
-              if (isMenuActive()) {
-                e.stopPropagation();
-                e.preventDefault();
+              return;
+            }
+            // Only a short, stationary press followed by release is a tap.
+            // A hold or drag is consumed and must be followed by a fresh tap
+            // before controls can be revealed.
+            if (!completedTouchTapRef.current) return;
+            completedTouchTapRef.current = false;
+            const wasVisible = controlsVisibleAtPointerDownRef.current;
+            clearPendingTapToggle();
+            tapToggleTimerRef.current = window.setTimeout(() => {
+              tapToggleTimerRef.current = null;
+              // `wasVisible` captured at pointerdown is the pre-tap
+              // state — vjs's setActive was suppressed above, so the
+              // store's current `controlsVisible` still matches. Toggle
+              // flips it: hidden → setActive (reveal), visible →
+              // setInactive (dismiss).
+              if (!wasVisible && muted) {
+                // Tap-to-unmute on the reveal tap: clears an autoplay-
+                // fallback mute alongside the controls reveal. One-way —
+                // re-muting is via the explicit mute button in the bar.
+                store.toggleMuted();
               }
-            }}
-            onClick={(e) => {
-              // Only react to taps on the empty space between the touch
-              // overlay's big buttons; the buttons themselves stop the
-              // event by virtue of being descendants — `e.target ===
-              // e.currentTarget` matches only when the tap landed on the
-              // group itself.
-              if (e.target !== e.currentTarget) return;
-              // The synthesized click after releasing a long-press should
-              // not also toggle controls — the hold already consumed the
-              // gesture. Consume and clear the flag here so a follow-up
-              // single tap (new gesture) still toggles normally.
-              if (holdFiredRef.current) {
-                holdFiredRef.current = false;
-                completedTouchTapRef.current = false;
-                return;
-              }
-              // Only a short, stationary press followed by release is a tap.
-              // A hold or drag is consumed and must be followed by a fresh tap
-              // before controls can be revealed.
-              if (!completedTouchTapRef.current) return;
-              completedTouchTapRef.current = false;
-              const wasVisible = controlsVisibleAtPointerDownRef.current;
-              clearPendingTapToggle();
-              tapToggleTimerRef.current = window.setTimeout(() => {
-                tapToggleTimerRef.current = null;
-                // `wasVisible` captured at pointerdown is the pre-tap
-                // state — vjs's setActive was suppressed above, so the
-                // store's current `controlsVisible` still matches. Toggle
-                // flips it: hidden → setActive (reveal), visible →
-                // setInactive (dismiss).
-                if (!wasVisible && muted) {
-                  // Tap-to-unmute on the reveal tap: clears an autoplay-
-                  // fallback mute alongside the controls reveal. One-way —
-                  // re-muting is via the explicit mute button in the bar.
-                  store.toggleMuted();
-                }
-                store.toggleControls();
-              }, DOUBLE_TAP_MAX_MS);
-            }}
-          >
-            <TouchOverlay
-              Player={Player}
-              offsetStart={offsetStart}
-              fileDuration={duration}
-              onSeek={onSeek}
-              onTogglePaused={togglePaused}
-            />
-          </Controls.Group>
-        )}
+              store.toggleControls();
+            }, DOUBLE_TAP_MAX_MS);
+          }}
+        >
+          <TouchOverlay
+            Player={Player}
+            offsetStart={offsetStart}
+            fileDuration={duration}
+            onSeek={onSeek}
+            onTogglePaused={togglePaused}
+          />
+        </Controls.Group>
         {(() => {
           // `pendingPlay` keeps us in pre-start so the spinner above the
           // Play button stays mounted until the initial seek finishes —

@@ -9,9 +9,15 @@ let root: Root;
 let autoplayIntent: { current: boolean };
 let userIntent: { current: boolean };
 
-function Gate() {
+function Gate({
+  playbackKey = "first",
+  suspended = false,
+}: {
+  playbackKey?: string;
+  suspended?: boolean;
+}) {
   const ref = useRef<HTMLDivElement>(null);
-  usePlayDelay(ref, 500, autoplayIntent, userIntent);
+  usePlayDelay(ref, 500, autoplayIntent, userIntent, playbackKey, suspended);
   return (
     <div ref={ref}>
       {/* biome-ignore lint/a11y/useMediaCaption: no media source; tests mocked play promises only. */}
@@ -75,6 +81,8 @@ it.each([
   "source changed",
   "user took control",
   "unmounted",
+  "playback changed",
+  "suspended",
 ])("ignores a pending autoplay rejection after %s", async (change) => {
   const video = await mount();
   const pending = Promise.withResolvers<void>();
@@ -85,6 +93,10 @@ it.each([
       Object.defineProperty(video, "currentSrc", { value: "next.mp4" });
     } else if (change === "user took control") {
       userIntent.current = true;
+    } else if (change === "playback changed") {
+      root.render(<Gate playbackKey="next" />);
+    } else if (change === "suspended") {
+      root.render(<Gate suspended />);
     } else {
       root.render(null);
     }
@@ -94,4 +106,16 @@ it.each([
   });
   expect(play).toHaveBeenCalledOnce();
   expect(video.muted).toBe(false);
+});
+
+it("restarts the animation deadline for a new playback without replacing the video", async () => {
+  const video = await mount();
+  const play = vi.spyOn(video, "play").mockResolvedValue();
+  await act(async () => vi.advanceTimersByTime(400));
+  await act(async () => root.render(<Gate playbackKey="next" />));
+  await act(async () => vi.advanceTimersByTime(100));
+  expect(play).not.toHaveBeenCalled();
+  await act(async () => vi.advanceTimersByTime(400));
+  expect(play).toHaveBeenCalledOnce();
+  expect(container.querySelector("video")).toBe(video);
 });

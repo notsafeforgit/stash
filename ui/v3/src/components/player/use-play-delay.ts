@@ -36,9 +36,12 @@ export function usePlayDelay(
   delayMs: number,
   autoplayIntentRef: MutableRefObject<boolean>,
   userPlaybackIntentRef: MutableRefObject<boolean>,
+  playbackKey?: string,
+  suspended = false,
 ): void {
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Each selected scene/marker owns a new animation deadline.
   useEffect(() => {
-    if (delayMs <= 0) return;
+    if (suspended || delayMs <= 0) return;
     const root = rootRef.current;
     if (!root) return;
 
@@ -65,6 +68,7 @@ export function usePlayDelay(
 
     function attach(video: HTMLVideoElement) {
       video.addEventListener("playing", onPlaying);
+      if (!video.paused && !userPlaybackIntentRef.current) video.pause();
     }
     function detach(video: HTMLVideoElement) {
       video.removeEventListener("playing", onPlaying);
@@ -120,5 +124,12 @@ export function usePlayDelay(
       observer.disconnect();
       if (attached) detach(attached);
     };
-  }, [rootRef, delayMs, autoplayIntentRef, userPlaybackIntentRef]);
+  }, [
+    rootRef,
+    delayMs,
+    autoplayIntentRef,
+    userPlaybackIntentRef,
+    playbackKey,
+    suspended,
+  ]);
 }

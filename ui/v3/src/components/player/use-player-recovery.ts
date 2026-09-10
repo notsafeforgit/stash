@@ -85,9 +85,8 @@ export function usePlayerRecovery({
     const current = root.querySelector("video");
     if (current instanceof HTMLVideoElement) attach(current);
 
-    // Watch for <video> element replacement (engine swap direct↔HLS
-    // changes the React component type, which destroys + recreates
-    // the underlying <video>).
+    // Cover a late media attachment while retaining the same element through
+    // normal source changes.
     const observer = new MutationObserver(() => {
       const next = root.querySelector("video");
       if (next instanceof HTMLVideoElement && next !== attachedVideo) {
@@ -141,6 +140,7 @@ export function usePlayerRecovery({
   const forceRemountAtRef = useCommittedRef(forceRemountAt);
 
   useEffect(() => {
+    if (!finalSrc) return;
     const root = rootRef.current;
     if (!root) return;
 
@@ -296,5 +296,5 @@ export function usePlayerRecovery({
       document.removeEventListener("visibilitychange", onVisibility);
       if (attachedVideo) detach(attachedVideo);
     };
-  }, [rootRef]);
+  }, [rootRef, finalSrc]);
 }

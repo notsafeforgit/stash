@@ -1,3 +1,4 @@
+import { MockedProvider } from "@apollo/client/testing/react";
 import { useState } from "react";
 import { Container, createPlayer } from "@videojs/react";
 import { Video, videoFeatures } from "@videojs/react/video";
@@ -28,11 +29,13 @@ export function PlayerFixture() {
     <>
       <Button onClick={() => setOpen(true)}>Open player</Button>
       {loading ? (
-        <SceneLightbox
-          open={open}
-          onClose={close}
-          slides={[{ type: "scene", sceneId: "pending", loading: true }]}
-        />
+        <MockedProvider>
+          <SceneLightbox
+            open={open}
+            onClose={close}
+            slides={[{ type: "scene", sceneId: "pending", loading: true }]}
+          />
+        </MockedProvider>
       ) : open ? (
         <div
           data-testid="player"

@@ -40,19 +40,22 @@ export function PlayerPoster({
   src,
   hide,
   minMediaTime = 0,
+  ready = true,
 }: {
   Player: PlayerInstance;
   src?: string;
   hide: boolean;
   minMediaTime?: number;
+  ready?: boolean;
 }) {
   const started = Player.usePlayer((s) => s.started);
   const currentTime = Player.usePlayer((s) => s.currentTime);
   const seeking = Player.usePlayer((s) => s.seeking);
   const [revealed, setRevealed] = useState(false);
   useEffect(() => {
-    if (started && !seeking && currentTime >= minMediaTime) setRevealed(true);
-  }, [started, seeking, currentTime, minMediaTime]);
+    if (ready && started && !seeking && currentTime >= minMediaTime)
+      setRevealed(true);
+  }, [ready, started, seeking, currentTime, minMediaTime]);
   if (!src || revealed || hide) return null;
   return (
     <img
@@ -92,6 +95,7 @@ export function CanPlayEffect({
   onCanPlay,
   rootRef,
   srcKey,
+  playbackKey,
 }: {
   onCanPlay: () => void;
   /** Outer fullscreen wrapper. The effect does a `querySelector("video")`
@@ -103,6 +107,7 @@ export function CanPlayEffect({
    *  the player root but still need a fresh `canplay` fire
    */
   srcKey?: string;
+  playbackKey?: string;
 }) {
   const firedRef = useRef(false);
   // The readyState >= 3 fast-path below is only safe on the *first*
@@ -114,7 +119,10 @@ export function CanPlayEffect({
   // — see the comment block below for the diagnostic trace.
   // Records the srcKey generation the watcher last attached for; `null`
   // means "never attached" (the true first run).
-  const attachedForRef = useRef<{ srcKey?: string } | null>(null);
+  const attachedForRef = useRef<{
+    srcKey?: string;
+    playbackKey?: string;
+  } | null>(null);
   useEffect(() => {
     firedRef.current = false;
     const root = rootRef.current;
@@ -131,8 +139,11 @@ export function CanPlayEffect({
     // effect attaches, so we check up-front. Skip on re-runs: at that
     // point readyState reflects the OLD source.
     const isFirstRun = attachedForRef.current === null;
-    attachedForRef.current = { srcKey };
-    if (isFirstRun && video.readyState >= 3) {
+    const sameSourceNewPlayback =
+      attachedForRef.current?.srcKey === srcKey &&
+      attachedForRef.current?.playbackKey !== playbackKey;
+    attachedForRef.current = { srcKey, playbackKey };
+    if ((isFirstRun || sameSourceNewPlayback) && video.readyState >= 3) {
       handler();
       return;
     }
@@ -142,7 +153,7 @@ export function CanPlayEffect({
       video.removeEventListener("canplay", handler);
       video.removeEventListener("loadeddata", handler);
     };
-  }, [onCanPlay, rootRef, srcKey]);
+  }, [onCanPlay, rootRef, srcKey, playbackKey]);
   return null;
 }
 
@@ -154,14 +165,16 @@ export function CanPlayEffect({
 export function StartedEffect({
   Player,
   onStarted,
+  ready = true,
 }: {
   Player: PlayerInstance;
   onStarted: () => void;
+  ready?: boolean;
 }) {
   const started = Player.usePlayer((s) => s.started);
   useEffect(() => {
-    if (started) onStarted();
-  }, [started, onStarted]);
+    if (ready && started) onStarted();
+  }, [ready, started, onStarted]);
   return null;
 }
 
@@ -238,9 +251,13 @@ export function PlaybackRangeEffect({
 }) {
   const currentTime = Player.usePlayer((s) => s.currentTime);
   const trueTime = offsetStart + currentTime;
+  const ended = Player.usePlayer((s) => s.ended);
   const firedRef = useRef(false);
   useEffect(() => {
-    if (trueTime < end) {
+    // Encoded clip duration may end just before the requested boundary.
+    // This effect is the sole completion owner for both that EOF and an
+    // in-file marker boundary, so a final timeupdate + ended advances once.
+    if (!ended && trueTime < end) {
       firedRef.current = false;
       onClipResume?.();
       return;
@@ -256,6 +273,7 @@ export function PlaybackRangeEffect({
     }
   }, [
     trueTime,
+    ended,
     end,
     start,
     loopEnabled,

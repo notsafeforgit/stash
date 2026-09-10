@@ -1,6 +1,6 @@
 /**
- * Persistent canvas overlay that masks the gap between an old `<video>`
- * being unmounted and a new one rendering its first decoded frame.
+ * Persistent canvas overlay that masks media-engine teardown while retaining
+ * the same video element. Late JPEG exports are scoped to their capture.
  *
  * Two load-bearing details:
  *   1. The canvas is a sibling of `Player.Player`, so media-engine and
@@ -24,9 +24,6 @@ interface UseFreezeFrameOverlayArgs {
    *  captures don't reallocate the GPU texture. */
   fileWidth: number | undefined;
   fileHeight: number | undefined;
-  /** Setter for the player's `reloading` state — flipped to true in
-   *  phase 1 of `beginRemount`. */
-  setReloading: (reloading: boolean) => void;
 }
 
 interface UseFreezeFrameOverlayResult {
@@ -34,17 +31,7 @@ interface UseFreezeFrameOverlayResult {
    *  positioned/`isolate` container that holds `Player.Player` so
    *  z-index ordering against the controls bar resolves correctly. */
   canvasElement: React.ReactNode;
-  /**
-   * Phase 1: capture current frame + flip `reloading=true`. Phase 2,
-   * two animation frames later: invoke `applyChanges`. Caller uses
-   * `applyChanges` to commit whatever state triggers the source / media
-   * transition (e.g. `setManualSource`, `setOffsetStart`).
-   */
-  beginRemount: (applyChanges: () => void) => void;
-  /** Snapshot the current `<video>` frame onto the canvas. The
-   *  stable-`<video>` variant uses this directly instead of
-   *  `beginRemount` — it doesn't need the force-abort dance because
-   *  `HlsJsAdapter.src = newSrc` transitions the active media engine. */
+  /** Snapshot the current video before the adapter transitions its engine. */
   captureFrame: () => void;
   /** Repaint the canvas as fully transparent. Call when the new
    *  source has finished seeking / first-painting and the overlay
@@ -56,7 +43,6 @@ export function useFreezeFrameOverlay({
   rootRef,
   fileWidth,
   fileHeight,
-  setReloading,
 }: UseFreezeFrameOverlayArgs): UseFreezeFrameOverlayResult {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -68,8 +54,10 @@ export function useFreezeFrameOverlay({
   // on-screen), so without poster, fullscreen seeks past buffered
   // flash to black. Revoked + replaced on each `captureFrame`.
   const lastPosterUrlRef = useRef<string | null>(null);
+  const captureIdRef = useRef(0);
 
   const captureFrame = useCallback(() => {
+    const captureId = ++captureIdRef.current;
     const root = rootRef.current;
     const video = root?.querySelector("video");
     if (!(video instanceof HTMLVideoElement)) return;
@@ -107,16 +95,14 @@ export function useFreezeFrameOverlay({
     try {
       canvas.toBlob(
         (blob) => {
-          if (!blob) return;
+          if (!blob || captureId !== captureIdRef.current) return;
+          const liveVideo = rootRef.current?.querySelector("video");
+          if (liveVideo !== video) return;
           const url = URL.createObjectURL(blob);
-          // Bail if the video element is gone or this capture has
-          // been superseded by a later one (lastPosterUrlRef was
-          // replaced before we resolved).
           if (lastPosterUrlRef.current) {
             URL.revokeObjectURL(lastPosterUrlRef.current);
           }
           lastPosterUrlRef.current = url;
-          const liveVideo = rootRef.current?.querySelector("video");
           if (liveVideo instanceof HTMLVideoElement) {
             liveVideo.poster = url;
           }
@@ -131,6 +117,7 @@ export function useFreezeFrameOverlay({
   }, [rootRef]);
 
   const clear = useCallback(() => {
+    captureIdRef.current += 1;
     const canvas = canvasRef.current;
     if (canvas) {
       const ctx = canvas.getContext("2d");
@@ -182,62 +169,8 @@ export function useFreezeFrameOverlay({
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   }, [fileWidth, fileHeight]);
 
-  // Revoke any in-flight poster object URL on unmount.
-  useEffect(
-    () => () => {
-      if (lastPosterUrlRef.current) {
-        URL.revokeObjectURL(lastPosterUrlRef.current);
-        lastPosterUrlRef.current = null;
-      }
-    },
-    [],
-  );
-
-  const beginRemount = useCallback(
-    (applyChanges: () => void) => {
-      // Everything synchronous so the new <video> mounts inside the
-      // user-gesture window. iOS Safari otherwise refuses to load data
-      // on the fresh element and `canplay` never fires. Z-ordering does
-      // the masking the rAF defer was attempting: the canvas is z-[5],
-      // the <video> below it inside Container is z:auto, so the
-      // captured frame occludes the new element's first paint regardless
-      // of compositor timing.
-      captureFrame();
-
-      // Force-abort the outgoing <video>'s network activity *before* we
-      // trigger the keyed remount. Chrome (and Firefox to a lesser
-      // degree) keeps the underlying media engine — and the in-flight
-      // HTTP response — alive across React's unmount until garbage
-      // collection runs, so the backend's live transcode (mp4 / webm /
-      // mkv served via `streamTranscode`) and any pending HLS / DASH
-      // segment fetches stay attached to a connection the browser has
-      // visually thrown away. The result: ffmpeg keeps running for many
-      // seconds after a source switch.
-      //
-      // `pause()` + `removeAttribute("src")` + `load()` is the
-      // documented sequence for cancelling an active <video> resource:
-      // it tears down the media engine synchronously, which closes the
-      // socket; the Go handler sees `r.Context().Done()` fire, the
-      // attached ffmpeg cmd's context cancels, and the process exits.
-      // Order matters — captureFrame runs first so the freeze-frame
-      // overlay still has pixels to draw, *then* the abort blanks the
-      // element.
-      const video = rootRef.current?.querySelector("video");
-      if (video instanceof HTMLVideoElement) {
-        try {
-          video.pause();
-          video.removeAttribute("src");
-          video.load();
-        } catch {
-          /* defensive — element may already be torn down */
-        }
-      }
-
-      setReloading(true);
-      applyChanges();
-    },
-    [captureFrame, setReloading, rootRef],
-  );
+  // Invalidate pending exports as well as revoking the current poster.
+  useEffect(() => clear, [clear]);
 
   const canvasElement = useMemo(
     () => (
@@ -259,5 +192,5 @@ export function useFreezeFrameOverlay({
     [],
   );
 
-  return { canvasElement, beginRemount, captureFrame, clear };
+  return { canvasElement, captureFrame, clear };
 }

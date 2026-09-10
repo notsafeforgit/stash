@@ -226,7 +226,7 @@ export function usePlayerTransitionFeedback({
         if (shouldResume) {
           // Restart playback; spinner clears once the new position is
           // actually decoding frames (`playing` event below).
-          storeRef.current?.play();
+          void storeRef.current?.play().catch(() => {});
         } else {
           // Stay paused — clear immediately, no `playing` event will
           // ever fire to release the spinner otherwise.

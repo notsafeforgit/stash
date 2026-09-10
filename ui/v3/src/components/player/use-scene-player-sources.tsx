@@ -548,12 +548,12 @@ export function useScenePlayerSources({
         flushAndRestartAt(engine, transition.mediaTime);
       }
       // Seek after flushing, so the write targets the clean buffer state.
-      void store.seek(transition.mediaTime);
+      void store.seek(transition.mediaTime).catch(() => {});
       const video = rootRef.current?.querySelector("video");
       if (video instanceof HTMLVideoElement) {
         awaitSeekReady(video, !wasPaused);
       } else {
-        if (!wasPaused) void store.play();
+        if (!wasPaused) void store.play().catch(() => {});
         setReloading(false);
       }
     },
@@ -751,10 +751,10 @@ export function useScenePlayerSources({
       if (pending.wasPaused) {
         s.pause();
       } else {
-        // Stable `<video>` retains user-gesture activation across the
-        // src swap, so this `play()` works without the muted hack the
-        // remount-era code needed.
-        void s.play();
+        // A pause, animation gate, or newer source can cancel this request.
+        // Media errors remain observable through the player store; autoplay
+        // permission fallback belongs to usePlayDelay.
+        void s.play().catch(() => {});
       }
     }
   }, [

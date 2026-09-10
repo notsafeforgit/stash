@@ -17,14 +17,16 @@ const sourceURL = (path: string) => new URL(path, location.href).href;
 function ResumeWhenReady({
   src,
   rootRef,
+  enabled,
 }: {
   src: string;
   rootRef: RefObject<HTMLDivElement | null>;
+  enabled: boolean;
 }) {
   const store = Player.usePlayer();
   const resume = useCallback(() => {
-    void store.play();
-  }, [store]);
+    if (enabled) void store.play().catch(() => {});
+  }, [store, enabled]);
   return <CanPlayEffect srcKey={src} rootRef={rootRef} onCanPlay={resume} />;
 }
 
@@ -57,6 +59,9 @@ export function VideoSourcesFixture() {
   const [sequence, setSequence] = useState(0);
   const [loads, setLoads] = useState(0);
   const [mounted, setMounted] = useState(true);
+  // Authorize the first play with the sound button. These tests exercise
+  // source continuity after a gesture, independently of initial autoplay policy.
+  const [started, setStarted] = useState(false);
 
   return (
     <>
@@ -65,7 +70,8 @@ export function VideoSourcesFixture() {
           const video = videoRef.current;
           if (video) {
             video.muted = !video.muted;
-            void video.play();
+            setStarted(true);
+            void video.play().catch(() => {});
           }
         }}
       >
@@ -105,12 +111,12 @@ export function VideoSourcesFixture() {
       {mounted && (
         <Player.Player>
           <Container ref={rootRef}>
-            <ResumeWhenReady src={src} rootRef={rootRef} />
+            <ResumeWhenReady src={src} rootRef={rootRef} enabled={started} />
             <SceneVideo
               ref={videoRef}
               src={src}
               sourceType="video/mp4"
-              autoPlay
+              autoPlay={started}
               muted
               playsInline
               preload="auto"

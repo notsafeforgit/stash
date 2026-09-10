@@ -2,6 +2,7 @@
 import { act, StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { deferred } from "@/test-utils/deferred";
 import type { OfflineEntry } from "./offline-db";
 
 const mocks = vi.hoisted(() => ({
@@ -46,13 +47,6 @@ const entry: OfflineEntry = {
   opfs_path: "scenes/1.mp4",
   server_status: "unknown",
 };
-function deferred<T>() {
-  let resolve: (value: T) => void = () => {};
-  const promise = new Promise<T>((done) => {
-    resolve = done;
-  });
-  return { promise, resolve };
-}
 let root: Root;
 let host: HTMLDivElement;
 function Probe({ id }: { id: string }) {

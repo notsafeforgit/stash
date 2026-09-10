@@ -59,6 +59,13 @@ type PlayerInstance = CreatePlayerResult<VideoPlayerStore>;
 const OVERLAY_BTN =
   "shrink-0 bg-transparent hover:bg-transparent hover:text-white";
 
+function controlsFadeClass(hidden: boolean) {
+  return cn(
+    "transition-opacity duration-300 motion-reduce:transition-none",
+    hidden ? "opacity-0" : "opacity-100",
+  );
+}
+
 // ── Playback-mode button ──────────────────────────────────────────────────────
 // Single tri-state cycle: normal → advance → loop → normal. Replaces the two
 // separate Loop / Auto-advance toggles since the states are mutually
@@ -819,6 +826,7 @@ function ControlBar({
   // device controls sit above the full-width timeline so the main row
   // retains seven 44px targets even at 320px, without an overflow menu.
   const mobileControlClass = onClose ? "size-11 min-w-11 flex-1" : undefined;
+  const fadeClass = controlsFadeClass(controlsHidden);
   const timeDisplay = (
     <TimeDisplay
       Player={Player}
@@ -864,7 +872,7 @@ function ControlBar({
   );
 
   return (
-    // `mt-auto` pins the bar to the bottom of `<Controls.Root>`'s
+    // `mt-auto` pins the bar to the bottom of `<Controls.Content>`'s
     // flex-col regardless of which siblings render in the row above.
     // Without it, a brief render where neither the touch-overlay nor
     // the click-to-play div claims the flex-1 slot — e.g. the moment
@@ -880,154 +888,179 @@ function ControlBar({
     // rules: positioned-with-z-auto > non-positioned).
     <Controls.Group
       data-player-control-bar=""
-      inert={controlsHidden || undefined}
-      aria-hidden={controlsHidden || undefined}
       className={cn(
-        "relative z-10 mt-auto flex flex-col gap-1 px-2 py-1 w-full bg-gradient-to-t from-black/70 to-transparent",
+        "pointer-events-none relative z-10 mt-auto flex flex-col gap-1 px-2 py-1 w-full",
         onClose &&
           "px-[max(0.375rem,env(safe-area-inset-left,0px),env(safe-area-inset-right,0px))] pb-[max(0.25rem,env(safe-area-inset-bottom,0px))]",
       )}
     >
+      <div
+        aria-hidden="true"
+        className={cn(
+          "pointer-events-none absolute inset-0 -z-10 bg-gradient-to-t from-black/70 to-transparent",
+          fadeClass,
+        )}
+      />
       {onClose && (
-        <div className="flex items-center justify-between gap-1.5">
+        <div
+          inert={controlsHidden || undefined}
+          aria-hidden={controlsHidden || undefined}
+          className={cn(
+            "pointer-events-auto flex items-center justify-between gap-1.5",
+            fadeClass,
+          )}
+        >
           {timeDisplay}
           <div className="flex items-center gap-1">{deviceControls}</div>
         </div>
       )}
-      <PositionSlider
-        Player={Player}
-        offsetStart={offsetStart}
-        fileDuration={fileDuration}
-        markers={markers}
-        onSeek={onSeek}
-        reloading={reloading}
-        seekDisplayTarget={seekDisplayTarget}
-        clipBoundsEdit={clipBoundsEdit}
-      />
-
       <div
-        data-player-control-row=""
-        className={cn(
-          "flex items-center justify-between w-full",
-          !onClose && "gap-1",
-        )}
+        inert={controlsHidden || undefined}
+        aria-hidden={controlsHidden || undefined}
+        className={cn("pointer-events-auto", fadeClass)}
       >
-        <div className={onClose ? "contents" : "flex items-center gap-1"}>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={onTogglePaused}
-            className={cn(OVERLAY_BTN, "text-white/80", mobileControlClass)}
-            aria-label={paused ? "Play" : "Pause"}
-          >
-            {paused ? (
-              <Play size={16} fill="currentColor" />
-            ) : (
-              <Pause size={16} fill="currentColor" />
-            )}
-          </Button>
+        <PositionSlider
+          Player={Player}
+          offsetStart={offsetStart}
+          fileDuration={fileDuration}
+          markers={markers}
+          onSeek={onSeek}
+          reloading={reloading}
+          seekDisplayTarget={seekDisplayTarget}
+          clipBoundsEdit={clipBoundsEdit}
+        />
+      </div>
 
-          <RelSeekButton
-            Player={Player}
-            seconds={-10}
-            className={cn(
-              "hidden text-white/80 hover:text-white",
-              !onClose && "lg:flex",
-            )}
-            offsetStart={offsetStart}
-            fileDuration={fileDuration}
-            onSeek={onSeek}
-          >
-            <RotateCcw size={14} />
-          </RelSeekButton>
+      <div data-player-control-row="" className="flex items-center w-full">
+        <div
+          data-player-playback-controls=""
+          inert={controlsHidden || undefined}
+          aria-hidden={controlsHidden || undefined}
+          className={cn(
+            "pointer-events-auto flex min-w-0 flex-1 items-center justify-between",
+            fadeClass,
+            !onClose && "gap-1",
+          )}
+        >
+          <div className={onClose ? "contents" : "flex items-center gap-1"}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={onTogglePaused}
+              className={cn(OVERLAY_BTN, "text-white/80", mobileControlClass)}
+              aria-label={paused ? "Play" : "Pause"}
+            >
+              {paused ? (
+                <Play size={16} fill="currentColor" />
+              ) : (
+                <Pause size={16} fill="currentColor" />
+              )}
+            </Button>
 
-          <RelSeekButton
-            Player={Player}
-            seconds={10}
-            className={cn(
-              "hidden text-white/80 hover:text-white",
-              !onClose && "lg:flex",
-            )}
-            offsetStart={offsetStart}
-            fileDuration={fileDuration}
-            onSeek={onSeek}
-          >
-            <RotateCw size={14} />
-          </RelSeekButton>
+            <RelSeekButton
+              Player={Player}
+              seconds={-10}
+              className={cn(
+                "hidden text-white/80 hover:text-white",
+                !onClose && "lg:flex",
+              )}
+              offsetStart={offsetStart}
+              fileDuration={fileDuration}
+              onSeek={onSeek}
+            >
+              <RotateCcw size={14} />
+            </RelSeekButton>
 
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => store.toggleMuted()}
-            className={cn(OVERLAY_BTN, "text-white/80", mobileControlClass)}
-            aria-label={muted ? "Unmute" : "Mute"}
-          >
-            {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-          </Button>
+            <RelSeekButton
+              Player={Player}
+              seconds={10}
+              className={cn(
+                "hidden text-white/80 hover:text-white",
+                !onClose && "lg:flex",
+              )}
+              offsetStart={offsetStart}
+              fileDuration={fileDuration}
+              onSeek={onSeek}
+            >
+              <RotateCw size={14} />
+            </RelSeekButton>
 
-          <VolumeSlider.Root
-            className={cn(
-              "hidden items-center w-20 h-8 group touch-none",
-              !onClose && "lg:relative lg:flex",
-            )}
-          >
-            <VolumeSlider.Track className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1 bg-white/30 rounded-full group-hover:h-1.5 transition-all" />
-            <VolumeSlider.Fill className="absolute left-0 top-1/2 -translate-y-1/2 h-1 w-[var(--media-slider-fill)] bg-white rounded-full group-hover:h-1.5 transition-all" />
-            <VolumeSlider.Thumb className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 left-[var(--media-slider-fill)] w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-          </VolumeSlider.Root>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => store.toggleMuted()}
+              className={cn(OVERLAY_BTN, "text-white/80", mobileControlClass)}
+              aria-label={muted ? "Unmute" : "Mute"}
+            >
+              {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+            </Button>
 
-          {!onClose && timeDisplay}
+            <VolumeSlider.Root
+              className={cn(
+                "hidden items-center w-20 h-8 group touch-none",
+                !onClose && "lg:relative lg:flex",
+              )}
+            >
+              <VolumeSlider.Track className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1 bg-white/30 rounded-full group-hover:h-1.5 transition-all" />
+              <VolumeSlider.Fill className="absolute left-0 top-1/2 -translate-y-1/2 h-1 w-[var(--media-slider-fill)] bg-white rounded-full group-hover:h-1.5 transition-all" />
+              <VolumeSlider.Thumb className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 left-[var(--media-slider-fill)] w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+            </VolumeSlider.Root>
+
+            {!onClose && timeDisplay}
+          </div>
+
+          <div className={onClose ? "contents" : "flex items-center gap-1"}>
+            <PlaybackModeButton
+              mode={playbackMode}
+              canAdvance={canAdvance}
+              onCycle={onCyclePlaybackMode}
+              className={mobileControlClass}
+            />
+
+            <SpeedMenu
+              Player={Player}
+              onOpenChange={onMenuOpenChange}
+              className={mobileControlClass}
+            />
+
+            <QualityMenu
+              sources={sources}
+              activeSource={activeSource}
+              onSourceChange={onSourceChange}
+              sourceResolution={sourceResolution}
+              onOpenChange={onMenuOpenChange}
+              className={mobileControlClass}
+            />
+
+            {!onClose && deviceControls}
+
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={onToggleFullscreen}
+              aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+              // Hide on hover-capable devices when an external surface
+              // (e.g. lightbox) owns fullscreen — its toolbar already
+              // exposes the affordance there. Touch devices keep the
+              // in-bar button so users aren't stuck hunting for the
+              // 16px YARL toolbar icon at the top-right corner.
+              className={cn(
+                OVERLAY_BTN,
+                "text-white/80",
+                hideFullscreenButton && "[@media(hover:hover)]:hidden",
+                mobileControlClass,
+              )}
+            >
+              {isFullscreen ? <Minimize size={15} /> : <Maximize size={15} />}
+            </Button>
+          </div>
         </div>
-
-        <div className={onClose ? "contents" : "flex items-center gap-1"}>
-          <PlaybackModeButton
-            mode={playbackMode}
-            canAdvance={canAdvance}
-            onCycle={onCyclePlaybackMode}
-            className={mobileControlClass}
-          />
-
-          <SpeedMenu
-            Player={Player}
-            onOpenChange={onMenuOpenChange}
-            className={mobileControlClass}
-          />
-
-          <QualityMenu
-            sources={sources}
-            activeSource={activeSource}
-            onSourceChange={onSourceChange}
-            sourceResolution={sourceResolution}
-            onOpenChange={onMenuOpenChange}
-            className={mobileControlClass}
-          />
-
-          {!onClose && deviceControls}
-
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={onToggleFullscreen}
-            aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-            // Hide on hover-capable devices when an external surface
-            // (e.g. lightbox) owns fullscreen — its toolbar already
-            // exposes the affordance there. Touch devices keep the
-            // in-bar button so users aren't stuck hunting for the
-            // 16px YARL toolbar icon at the top-right corner.
-            className={cn(
-              OVERLAY_BTN,
-              "text-white/80",
-              hideFullscreenButton && "[@media(hover:hover)]:hidden",
-              mobileControlClass,
-            )}
-          >
-            {isFullscreen ? <Minimize size={15} /> : <Maximize size={15} />}
-          </Button>
-          {onClose && <PlayerCloseButton onClose={onClose} />}
-        </div>
+        {onClose && (
+          <PlayerCloseButton onClose={onClose} subtle={controlsHidden} />
+        )}
       </div>
     </Controls.Group>
   );
@@ -1381,12 +1414,7 @@ export function PlayerControls({
 
   return (
     <Controls.Root>
-      <Controls.Content
-        className={cn(
-          "absolute inset-0 flex flex-col transition-opacity duration-300",
-          controlsHidden ? "opacity-0" : "opacity-100",
-        )}
-      >
+      <Controls.Content className="absolute inset-0 flex flex-col">
         {onToggleViewer && !viewerOpen && (
           <Button
             ref={viewerButtonRef}
@@ -1406,6 +1434,7 @@ export function PlayerControls({
             })}
             className={cn(
               "absolute top-2 right-2 z-20 h-11 rounded-full bg-black/50 px-3 text-white/80 shadow-sm hover:bg-black/70 hover:text-white",
+              controlsFadeClass(controlsHidden),
               controlsHidden && "pointer-events-none",
             )}
           >
@@ -1422,6 +1451,7 @@ export function PlayerControls({
         <Controls.Group
           className={cn(
             "[@media(pointer:coarse)]:flex hidden absolute inset-0 items-center justify-around",
+            controlsFadeClass(controlsHidden),
             !started && "invisible pointer-events-none",
           )}
           inert={!started}
@@ -1660,6 +1690,7 @@ export function PlayerControls({
               )}
               className={cn(
                 "absolute inset-0 size-full rounded-none p-0 flex items-center justify-center pointer-events-auto hover:bg-transparent active:translate-y-0",
+                controlsFadeClass(controlsHidden),
                 mode === "pre-start" && "cursor-pointer",
                 mode === "playing" &&
                   "[@media(pointer:fine)]:cursor-pointer [@media(pointer:coarse)]:hidden",

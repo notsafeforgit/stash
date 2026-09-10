@@ -56,8 +56,10 @@ export function MobileSearchButton({
         <Search />
       </ContextMenuTrigger>
       <ContextMenuContent
+        anchor={buttonRef}
         side="top"
-        align="end"
+        align="center"
+        alignOffset={0}
         sideOffset={8}
         className="w-72 max-w-[calc(100vw-1.5rem)]"
         // Editing replaces the trigger with an input. Preserve its focus when

@@ -7,7 +7,7 @@ test("mobile Close fits beside playback settings at narrow and landscape sizes",
   await page.getByRole("button", { name: "Open player" }).click();
   const player = page.getByTestId("player");
   const row = player.locator("[data-player-control-row]");
-  const bar = player.locator("[data-player-control-bar]");
+  const playbackControls = player.locator("[data-player-playback-controls]");
   const close = row.getByRole("button", { name: "Close", exact: true });
   // Pause through the actual playback button so auto-hide cannot race layout checks.
   await row.getByRole("button", { name: "Pause", exact: true }).click();
@@ -57,32 +57,75 @@ test("mobile Close fits beside playback settings at narrow and landscape sizes",
     "src",
     "/player.mp4?quality=720",
   );
-  await expect(bar).not.toHaveAttribute("inert");
+  await expect(playbackControls).not.toHaveAttribute("inert");
   await close.tap();
   await expect(player).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Open player" })).toBeVisible();
 });
 
-test("hidden Close does not intercept the tap that reveals playback controls", async ({
+test("mobile Close remains visible and dismisses in one tap after controls hide", async ({
   page,
 }) => {
   await page.goto("/player");
   await page.getByRole("button", { name: "Open player" }).click();
   const player = page.getByTestId("player");
-  const bar = player.locator("[data-player-control-bar]");
+  const playbackControls = player.locator("[data-player-playback-controls]");
   const close = player.locator("[data-player-close]");
   await expect(close).toBeVisible();
   const bounds = await close.boundingBox();
   if (!bounds) throw new Error("Missing close control bounds");
-  await expect(bar).toHaveAttribute("inert", "", { timeout: 10000 });
+  await expect(playbackControls).toHaveAttribute("inert", "", {
+    timeout: 10000,
+  });
+  await expect(playbackControls).toHaveCSS("opacity", "0");
+  await expect(close).toHaveAccessibleName("Close");
+  expect(await close.boundingBox()).toEqual(bounds);
+  expect(
+    await close.evaluate((element) => {
+      // Playwright's visibility check ignores opacity on ancestors.
+      for (
+        let ancestor: Element | null = element;
+        ancestor;
+        ancestor = ancestor.parentElement
+      ) {
+        if (getComputedStyle(ancestor).opacity === "0") return false;
+      }
+      return true;
+    }),
+  ).toBe(true);
+  await page.screenshot({
+    path: test.info().outputPath("mobile-player-idle.png"),
+  });
   await page.touchscreen.tap(
     bounds.x + bounds.width / 2,
     bounds.y + bounds.height / 2,
   );
-  await expect(player).toBeVisible();
-  await expect(bar).not.toHaveAttribute("inert");
-  await player.getByRole("button", { name: "Close", exact: true }).tap();
   await expect(player).toHaveCount(0);
+});
+
+test("tapping a hidden playback button reveals controls without activating it", async ({
+  page,
+}) => {
+  await page.goto("/player");
+  await page.getByRole("button", { name: "Open player" }).click();
+  const player = page.getByTestId("player");
+  const playbackControls = player.locator("[data-player-playback-controls]");
+  const pause = playbackControls.getByRole("button", {
+    name: "Pause",
+    exact: true,
+  });
+  const bounds = await pause.boundingBox();
+  if (!bounds) throw new Error("Missing pause control bounds");
+  await expect(playbackControls).toHaveAttribute("inert", "", {
+    timeout: 10000,
+  });
+  await page.touchscreen.tap(
+    bounds.x + bounds.width / 2,
+    bounds.y + bounds.height / 2,
+  );
+  await expect(playbackControls).not.toHaveAttribute("inert");
+  await expect(pause).toBeVisible();
+  await expect(player.locator("video")).toHaveJSProperty("paused", false);
 });
 
 test("the lightbox remains dismissible at the bottom while a mobile scene loads", async ({

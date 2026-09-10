@@ -168,13 +168,17 @@ navigation, active-query previews and drawer summaries, and keyboard space in
 the page layout. Viewport checks assert footer and scroller bounds immediately
 after resize/pan events, including refocusing an already-open search. Long-press
 checks send synthetic touch events through the production context-menu primitive;
-they cover edit/clear, outside dismissal, and suppressing the release click.
+they cover button anchoring at different press positions, edit/clear, outside
+dismissal, and suppressing the release click. Search animation checks cover
+synchronous focus, stable input bounds, interrupted reveals, query preservation,
+and reduced motion.
 Settings checks cover bottom navigation,
 section routes and browser Back, search highlight links, keyboard result
 selection, and preserving unsaved form state across breakpoint changes.
 Player checks use a small synthetic MP4 and the production playback controls:
 mobile Close placement and touch targets at 320px through landscape sizes,
-speed/quality selection, revealing hidden controls without accidental dismissal,
+speed/quality selection, persistent Close visibility and dismissal while other
+controls are hidden, revealing hidden playback controls without activating them,
 and loading-state/desktop lightbox dismissal. An additional synthetic AVC/AAC
 file and fMP4 HLS fixtures exercise source and engine changes, marker playlists,
 start positions, mute preservation, DOM identity and repeated `ended`-driven

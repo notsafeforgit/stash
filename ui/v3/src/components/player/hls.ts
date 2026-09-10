@@ -2,8 +2,8 @@
  * HLS-specific source handling. The rest of the player should not need
  * to read this file.
  *
- * HLS sources route through `<StableHlsVideo>` (`@videojs/core`'s
- * `HlsJsMedia`, which auto-selects hls.js on MSE-capable browsers and
+ * HLS sources route through `<SceneVideo>` (`@videojs/hlsjs-video`'s
+ * `HlsJsAdapter`, which auto-selects hls.js on MSE-capable browsers and
  * falls back to native HLS otherwise) on every browser. `canPlaySource`
  * gates HLS on `hasNativeHLS() || hasMSE()`, which covers Safari,
  * Chrome, and Firefox.
@@ -200,7 +200,7 @@ export function makeHlsStrategy(
     //     new currentTime.
     //
     // Routing the failing cases through `beginSourceRemount` writes a
-    // new `?start=` into the URL; our bridge reassigns `HlsJsMedia.src`
+    // new `?start=` into the URL; our bridge reassigns `HlsJsAdapter.src`
     // and its start-position config, which destroys the active delegate
     // and creates a fresh one with `config.startPosition = newTarget`.
     // The new engine requests
@@ -316,7 +316,7 @@ export function makeHlsStrategy(
 
 /**
  * Parse the `?start=` value from an HLS source URL. Used by
- * `StableHlsVideo` to feed hls.js's `config.startPosition` so the
+ * `SceneVideo` to feed hls.js's `config.startPosition` so the
  * first segment fetch lands on the requested scene-time instead of
  * segment 0 (no cold-start detour). Returns -1 (hls.js's "use
  * defaults" sentinel) when absent / invalid / non-positive.

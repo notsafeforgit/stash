@@ -1,66 +1,37 @@
 import { useCommittedRef } from "@/hooks/use-committed-ref";
 /**
- * Scene player — stable-`<video>` element.
+ * Scene player: one player root, store and native video element per session.
+ * SceneVideo passes direct and HLS sources to Video.js's HlsJsAdapter. Source
+ * changes load in place; changes to type or engine configuration rebuild the
+ * delegate without replacing the video element or resetting its audio state.
  *
- * `Player.Player` mounts once per scene; source-URL changes flow
- * through `<VideoComponent>`'s `src` prop and its media bridge performs
- * an in-place reassignment on the existing element (`hls.loadSource()`
- * for HLS via `HlsJsMedia`, plain `<video>.src` for
- * direct). The `<video>` DOM node, the store, the controls, and every
- * overlay survive every source change — only hls.js's internal engine
- * (the `HlsJsMedia` delegate) is destroyed and recreated when the
- * source URL changes, and only the *fragment scheduler* is reset (no
- * MSE detach) for in-engine seek recovery.
+ * useScenePlayerSources preserves playhead, paused state and playback rate,
+ * explicitly resuming after canplay (required by WebKit on engine changes).
+ * Buffered seeks stay in place. Distant desktop HLS seeks can restart the
+ * fragment scheduler; MMS and clipped-playlist seeks reload the source URL.
+ * Retain those reloads and the freeze frame that covers MediaSource teardown.
+ * They do not require a new DOM element.
  *
- * Source/seek dispatch (see `use-scene-player-sources.tsx` for the
- * code paths):
- *   - In-buffer seek: direct `video.currentTime` write. No engine
- *     intervention.
- *   - Out-of-buffer seek on a full HLS playlist (non-clipped):
- *     `engine.stopLoad()` + `BUFFER_FLUSHING` + `engine.startLoad()`
- *     — MediaSource stays attached, `<video>` holds the last decoded
- *     frame natively.
- *   - Out-of-buffer seek on a clipped HLS playlist (marker / clip
- *     mode), or in iOS Safari native fullscreen on any HLS source:
- *     URL-change remount (new `?start=` flows through `HlsJsMedia.src`
- *     to recreate the `HlsJsMedia` delegate). The freeze-frame canvas
- *     overlays the brief MSE-teardown window.
- *   - Quality swap / direct↔HLS engine swap: URL change + engine
- *     recreate; freeze-frame canvas masks the visible window.
- *
- * Backend coordination:
- *   - Full HLS playlist is the default; the server only trims when
- *     `?end=` is present (marker-clip mode). See
- *     `pkg/ffmpeg/stream_segmented.go`.
- *   - Per-scene sibling-kill in `ServeSegment` tears down stale
- *     transcodes on quality/codec swap with no idle wait.
- *   - The `streams.stop` beacon (fired on HLS→non-HLS source change
- *     and on `pagehide`) explicitly releases the previous
- *     transcode when no new HLS stream is about to take its place.
+ * The lightbox still owns separate sessions per slide. Retaining an element
+ * across scene/marker navigation also requires changing carousel ownership.
  */
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import type React from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Container,
   createPlayer,
   type CreatePlayerResult,
   type VideoPlayerStore,
 } from "@videojs/react";
-import { GoogleCast } from "@videojs/react/media/google-cast";
-import { Video, videoFeatures } from "@videojs/react/video";
-import { StableHlsVideo } from "./stable-hls-video";
+import { GoogleCast } from "@videojs/react/extensions/google-cast";
+import { videoFeatures } from "@videojs/react/video";
+import { SceneVideo } from "./scene-video";
 import { cn } from "src/lib/utils";
 import { Badge } from "src/components/ui/badge";
 import { Spinner } from "src/components/ui/spinner";
 import { languageMap } from "src/utils/caption";
 import { resolution as resolutionLabel } from "src/utils/file";
 import type * as GQL from "src/core/generated-graphql";
-import { isHlsPlaylist } from "./hls";
 import {
   useCodecsDecodableInMp4,
   useVideoCodecDecodableInMp4,
@@ -89,24 +60,6 @@ const Player: CreatePlayerResult<VideoPlayerStore> = createPlayer({
   features: videoFeatures,
   displayName: "ScenePlayer",
 });
-
-// Non-HLS sources (direct stream) render through `<Video>` — plain
-// `<video>` semantics, no media engine. `React.memo` skips reconciliation
-// in non-context-driven re-render cases (e.g. menu open/close churn).
-const MemoVideo = React.memo(Video);
-
-// HLS sources route through `<StableHlsVideo>` (a wrapper around
-// `@videojs/media`'s `HlsJsMedia`, which auto-selects hls.js on MSE-capable
-// browsers and falls back to the browser's native HLS otherwise; see
-// `./stable-hls-video.tsx` for the stable-attach-ref rationale). hls.js
-// runs over MSE for every browser including Safari, giving JS-controlled
-// segment loading, HTTP cache hits, and predictable pause/resume — versus
-// AVFoundation, which bypasses the HTTP cache and tears down its segment
-// loader on user pause (visible re-fetch freezes on resume). The backend
-// serves a multivariant master playlist (`/stream.master.m3u8`,
-// `/stream.fmp4.master.m3u8`) so hls.js can read codec/resolution/bandwidth
-// metadata before allocating SourceBuffers.
-const MemoHlsVideo = React.memo(StableHlsVideo);
 
 // ── Persistence keys ──────────────────────────────────────────────────────────
 
@@ -291,8 +244,8 @@ function StoreBridge({
   return null;
 }
 
-// Captures the live Media instance (HlsJsMedia for HLS sources, plain
-// Media wrapper for direct) into a ref so handlers in
+// Captures the live HlsJsAdapter (whose engine is null for direct files)
+// into a ref so handlers in
 // `useScenePlayerSources` can reach hls.js's `Hls` instance via
 // `media.engine`. Used by the in-place out-of-buffer seek path:
 // `flushAndRestartAt` calls `engine.stopLoad()` +
@@ -366,8 +319,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   const fullscreenContainerRef = useRef<HTMLDivElement>(null);
 
   // Pinch / wheel / double-tap zoom transform. Owned at this level so
-  // it persists across source changes (including engine swaps where
-  // `<VideoComponent>` toggles between `<Video>` and `<StableHlsVideo>`).
+  // it persists across source changes, including direct/HLS engine swaps.
   const [zoomTransform, setZoomTransform] =
     useState<ZoomTransform>(IDENTITY_TRANSFORM);
   useEffect(() => {
@@ -794,7 +746,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   }, []);
 
   // Memoized so the array reference is stable when only an unrelated state
-  // change re-renders ScenePlayer — keeps `MemoVideo`'s shallow equality
+  // change re-renders ScenePlayer — keeps `SceneVideo`'s shallow equality
   // check passing through such renders.
   const trackElements = useMemo(
     () =>
@@ -833,14 +785,11 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   // timeline that no longer represents the whole scene.
   const effectiveMarkers = clipRange ? [] : markers;
 
-  // HLS playlists route through hls.js (`<StableHlsVideo>` →
-  // `HlsJsMedia`); direct byte-range files use plain `<Video>`. See the
-  // comment on MemoVideo / MemoHlsVideo above for the rationale.
-  const VideoComponent = isHlsPlaylist(finalSrc) ? MemoHlsVideo : MemoVideo;
   const mediaElement =
     finalSrc !== undefined ? (
-      <VideoComponent
+      <SceneVideo
         src={finalSrc}
+        sourceType={activeSource?.type}
         autoPlay={effectiveAutoPlay}
         loop={loopEnabled && !clipRange}
         playsInline
@@ -850,7 +799,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
         className="w-full h-full"
       >
         {trackElements}
-      </VideoComponent>
+      </SceneVideo>
     ) : null;
 
   return (
@@ -885,21 +834,12 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
         )}
         style={!fill && videoAspect ? { aspectRatio: videoAspect } : undefined}
       >
-        {/* No `key=` here — Player stays mounted across the scene's
-            lifetime; source URL changes flow through `<VideoComponent>`'s
-            `src` prop as in-place reassignments on the same `<video>`. */}
+        {/* The root and SceneVideo keep their identity across source changes. */}
         <Player.Player>
           <StoreBridge storeRef={storeRef} />
           <MediaBridge mediaRef={mediaRef} />
-          {/* `srcKey={finalSrc}` resets the once-per-mount latch on
-              every source URL change. Required because Player is no
-              longer keyed on source URL — without this, only the first
-              swap's new `<video>` ever fires `canplay` through to
-              `handleCanPlay`, and the spinner stays pinned on every
-              subsequent swap (most visibly on direct ↔ HLS engine swaps,
-              where `<video>` is also recreated and the effect's
-              `querySelector("video")` would otherwise capture the old
-              torn-down element). */}
+          {/* Each source load needs its own once-only resume, even though
+              the store and native video element remain attached. */}
           <CanPlayEffect
             onCanPlay={handleCanPlay}
             rootRef={fullscreenContainerRef}

@@ -9,9 +9,10 @@ architecture, compatibility, feature guides, and operations.
 
 Run the commands below from the Git root. Use Go matching
 [go.mod](../../../go.mod), a C compiler for SQLite/CGO, Make, Git, FFmpeg/ffprobe,
-and Node.js 24 (the compiler image's Node major). Use pnpm 10, matching the
-version pinned in [the v2.5 package manifest](../../v2.5/package.json); both UI
-trees have their own lockfiles. `make lint` runs the CI-pinned Go linter through
+and Node.js 24 (the compiler image's Node major). Both UI manifests pin pnpm
+10.33.0, matching the [v2.5 manifest used by CI](../../v2.5/package.json); each UI
+has its own lockfile. Honor that package-manager pin: v3’s scoped HLS dependency
+override uses pnpm 10’s manifest configuration. `make lint` runs the CI-pinned Go linter through
 `go run`, so a separate golangci-lint installation is unnecessary.
 
 ## First checkout and local development
@@ -169,8 +170,13 @@ selection, and preserving unsaved form state across breakpoint changes.
 Player checks use a small synthetic MP4 and the production playback controls:
 mobile Close placement and touch targets at 320px through landscape sizes,
 speed/quality selection, revealing hidden controls without accidental dismissal,
-and loading-state/desktop lightbox dismissal. They do not access library media
-or send playback activity mutations.
+and loading-state/desktop lightbox dismissal. An additional synthetic AVC/AAC
+file and fMP4 HLS fixtures exercise source and engine changes, marker playlists,
+start positions, mute preservation, DOM identity and repeated `ended`-driven
+advance. This media-adapter fixture uses the existing explicit resume path; it
+is not a test of lightbox swipe ownership or physical iPhone autoplay permission.
+See [media fixture generation](../tests/browser/fixture/media/README.md).
+The tests do not access library media or send playback activity mutations.
 Browser sources are strictly type-checked by
 the normal validation command; `.browser.ts` tests run separately from Vitest. Virtual viewport
 resizing models keyboard geometry, but physical iOS keyboard and gesture checks

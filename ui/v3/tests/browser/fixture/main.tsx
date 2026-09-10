@@ -38,6 +38,7 @@ import messages from "@/locales/en-GB.json";
 import flattenMessages from "@/utils/flatten-messages";
 import "./style.css";
 import { PlayerFixture } from "./player";
+import { VideoSourcesFixture } from "./video-sources";
 
 const params = new URLSearchParams(location.search);
 const items = Array.from({ length: 40 }, (_, index) => ({
@@ -282,6 +283,11 @@ const router = createRouter({
       getParentRoute: () => rootRoute,
       path: "/player",
       component: PlayerFixture,
+    }),
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/video-sources",
+      component: VideoSourcesFixture,
     }),
     settingsRoute.addChildren(
       SETTINGS_NAV_ITEMS.map((item) =>

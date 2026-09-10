@@ -208,9 +208,13 @@ same calculation for the preview and mutation input.
 
 `components/player/scene-player.tsx` owns the stable player shell.
 `use-scene-player-sources.tsx` coordinates selected sources and pending resumes.
+The Video.js packages are pinned together at 10.0.0-rc.2. Its split HLS adapter
+pins an older hls.js, so a version-scoped pnpm override preserves the existing
+1.6.16 engine. Reassess that override with the next adapter upgrade.
 
 | Module | Responsibility |
 | --- | --- |
+| `scene-video.tsx` | One native video element; typed direct/HLS source configuration |
 | `scene-player-sources.ts` | Source eligibility, quality preferences, initial resume |
 | `scene-player-transitions.ts` | Pure seek/restart decisions and resume plans |
 | `scene-player-source-url.ts` | Stream URLs, clip bounds, fragments, reload nonce |
@@ -218,6 +222,13 @@ same calculation for the preview and mutation input.
 | `use-player-transition-feedback.tsx` | Freeze frame, loading feedback, seek readiness |
 | `use-player-transcode-session.ts` | Release transcodes and keep paused sessions alive |
 | `use-player-recovery.ts` | Native fullscreen seeking and stalled-playback recovery |
+
+The lightbox currently owns a separate player session per active scene/marker
+slide. Keeping audio permission across actual carousel navigation requires
+moving that ownership out of the per-slide renderer; retaining the media element
+through quality changes alone does not resolve it. Browser fixtures cover direct,
+HLS and trimmed-playlist transitions with audio, but physical iPhone autoplay
+permission and MMS still need device testing.
 
 Transition plans consume plain buffered/seekable state and return an in-place
 seek, engine restart, or source reload. Browser effects apply the plan; keep DOM
@@ -227,8 +238,13 @@ Preserve these invariants:
 
 - Scene time is absolute. A clip's media time is relative to its segment-aligned
   origin; convert only at the media seek boundary.
-- The player root survives source changes. Retain the playhead, paused state,
-  and playback rate through the pending-resume path.
+- The player root and native video element survive source changes, including
+  direct/HLS engine switches. `SceneVideo` configures Video.js 10 RC.2’s packaged
+  `HlsJsVideo` through a typed source, with an explicit MIME type for direct files.
+  Retain playhead, paused state and playback rate through the pending-resume path,
+  including WebKit’s explicit resume after `canplay`.
+- Muted autoplay fallback is only for `NotAllowedError` on a current request.
+  Source-change aborts and obsolete requests must not change the audio state.
 - Buffered seeks stay in place. Distant desktop HLS seeks can flush the engine;
   iOS ManagedMediaSource and clipped playlists use source reloads.
 - Every forced reload changes the URL, even a repeated target at zero.

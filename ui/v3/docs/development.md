@@ -186,6 +186,9 @@ advance. A separate fixture mounts the production `SceneLightbox` and `ScenePlay
 with synthetic GraphQL responses and media at Stash-shaped endpoints. It checks
 DOM identity across navigation, pointer tracking, markers, loading sentinels,
 late query results, muted/unmuted playback and held-speed automatic advance.
+Close checks also cover first-tap dismissal while controls are hidden and ensure
+pointer release, compatibility pointer movement and focus leave them hidden
+until the button's click dismisses the lightbox.
 Transcode stop/keepalive requests are intercepted locally. The tests do not
 establish physical iPhone autoplay permission or ManagedMediaSource behavior.
 See [media fixture generation](../tests/browser/fixture/media/README.md).

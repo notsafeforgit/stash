@@ -79,6 +79,48 @@ async function revealControls(page: Page) {
   await expect(playbackControls).not.toHaveAttribute("inert");
 }
 
+test("mobile Close owns the touch sequence before its native click", async ({
+  page,
+}) => {
+  await open(page);
+  const controls = page.locator("[data-player-playback-controls]");
+  const close = page.locator("[data-player-close]");
+  await expect(controls).toHaveAttribute("inert", "", { timeout: 10000 });
+  const pointer = {
+    pointerType: "touch",
+    pointerId: 1,
+    isPrimary: true,
+    button: 0,
+  };
+  await close.dispatchEvent("pointerdown", { ...pointer, buttons: 1 });
+  await close.dispatchEvent("pointerup", { ...pointer, buttons: 0 });
+  // Safari can consume the first tap if activity handling reveals UI before
+  // the compatibility click arrives. Check that gap, not only the final click.
+  await expect(controls).toHaveAttribute("inert", "", { timeout: 1000 });
+  await close.dispatchEvent("pointermove", {
+    pointerType: "mouse",
+    buttons: 0,
+  });
+  await close.focus();
+  await expect(controls).toHaveAttribute("inert", "", { timeout: 1000 });
+  await close.dispatchEvent("click");
+  await expect(page.locator(".yarl__root")).toHaveCount(0);
+});
+
+test("mobile Close dismisses the real lightbox on the first tap while controls are hidden", async ({
+  page,
+}) => {
+  const video = await open(page);
+  await expect(page.locator("[data-player-playback-controls]")).toHaveAttribute(
+    "inert",
+    "",
+    { timeout: 10000 },
+  );
+  await page.locator("[data-player-close]").tap();
+  await expect(page.locator(".yarl__root")).toHaveCount(0);
+  await expect(video).toHaveCount(0);
+});
+
 test("the real lightbox retains one video and audio through swipes, HLS and wraparound", async ({
   page,
 }) => {

@@ -10,9 +10,8 @@
  * (`scene`, `topOverlay`, `onNext`, `clipRange`, `posterSrc`,
  * `initialTimestamp`, `sendGetCurrentTime`) pass through.
  *
- * Without this wrapper the same ~10 baseline props appear at every
- * call site (`ActiveSceneSlide`, `ActiveOfflineSceneSlide`), and a
- * future "lightbox player UX" tweak would have to change each one.
+ * The center carousel slot retains this wrapper across online/offline scenes
+ * and markers. Selection changes reset playback state through `playbackKey`.
  */
 
 import type React from "react";
@@ -22,8 +21,9 @@ import { useConfigurationContext } from "src/hooks/config";
 
 interface LightboxScenePlayerProps {
   scene: ScenePlayerScene;
-  /** Lightbox-scoped loop preference — see `<SceneLightbox>` for why
-   *  this lives outside the player (per-slide remount survival). */
+  playbackKey: string;
+  suspended: boolean;
+  /** Lightbox preference, retained across closing and reopening. */
   loopEnabled: boolean;
   onLoopToggle: () => void;
   /** Toggles the YARL Fullscreen plugin's fullscreen instead of the
@@ -63,6 +63,8 @@ interface LightboxScenePlayerProps {
 
 export function LightboxScenePlayer({
   scene,
+  playbackKey,
+  suspended,
   loopEnabled,
   onLoopToggle,
   onToggleFullscreen,
@@ -82,6 +84,8 @@ export function LightboxScenePlayer({
   return (
     <ScenePlayer
       scene={scene}
+      playbackKey={playbackKey}
+      suspended={suspended}
       autoplay
       autostartEnabled={autostartEnabled}
       playDelayMs={500}

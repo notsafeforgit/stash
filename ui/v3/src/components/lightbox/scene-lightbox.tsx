@@ -5,12 +5,12 @@ import YARLightbox, {
   type ControllerRef,
   type GenericSlide,
   type RenderSlideProps,
-  type Slide,
   type FullscreenRef,
 } from "yet-another-react-lightbox";
 import Fullscreen from "yet-another-react-lightbox/plugins/fullscreen";
 import { Spinner } from "src/components/ui/spinner";
 import { SceneSlideContent } from "./scene-slide-content";
+import { PersistentSceneCarousel } from "./scene-carousel";
 import { lightboxIconRenders } from "./lightbox-icons";
 import type { OfflineEntry } from "src/components/offline/offline-db";
 import { useLightboxHistory } from "./use-lightbox-history";
@@ -113,14 +113,8 @@ export function SceneLightbox({
     return true;
   }, []);
 
-  // Lightbox-scoped loop preference. Lifted out of ScenePlayer so
-  // the user's toggle persists across the per-scene player remount that
-  // a slide swipe triggers (key={slide.sceneId} on ActiveSceneSlide).
-  // Also persisted to localStorage so it survives close-then-reopen,
-  // matching how `ScenePlayer` already persists auto-advance — without
-  // this the user's chosen playback mode resets to "normal" every time
-  // the lightbox is reopened, even if localStorage retained auto-advance,
-  // because cycling into "loop" writes auto-advance = false.
+  // Keep the loop preference across closing/reopening, alongside the player's
+  // persisted auto-advance choice. Loop and auto-advance remain exclusive.
   const [loopEnabled, setLoopEnabled] = useState(() => {
     try {
       return localStorage.getItem(LOOP_STORAGE_KEY) === "true";
@@ -208,19 +202,8 @@ export function SceneLightbox({
 
   const isSingleSlide = slides.length === 1;
 
-  // Document-level keyboard handler. YARL listens for keyboard navigation via React's
-  // `onKeyDown` on its own container (`subscribeSensors(EVENT_ON_KEY_DOWN, …)`),
-  // which only fires when focus is somewhere inside the lightbox tree. Some
-  // interactions strand focus on `document.body` — most reproducibly,
-  // switching the player's source via the controls menu remounts
-  // `Player.Provider`, unmounting the menu trigger that Base UI restored
-  // focus to when the menu closed; with no element to focus, the browser
-  // falls back to body. Body sits outside YARL's portal tree, so escape
-  // never reaches YARL until the user clicks back into the lightbox. The
-  // embedded player can also leave focus on the media surface after a mouse
-  // click, where arrow keys no longer reliably reach YARL's container. A
-  // document listener bypasses that focus dependency entirely.
-  //
+  // Document-level navigation also handles focus restored to body after menus
+  // or left on the media surface, outside YARL's keyboard sensor container.
   // Skip when `defaultPrevented` (a Base UI menu, dialog, or the player's
   // own escape consumer already handled it) or when focus is on an editable
   // input/menu surface that should own its keyboard interaction.
@@ -232,11 +215,11 @@ export function SceneLightbox({
       const isHorizontalArrow = e.key === "ArrowLeft" || e.key === "ArrowRight";
       if (!isEscape && !isHorizontalArrow) return;
 
-      const active = document.activeElement as HTMLElement | null;
+      const active = document.activeElement;
       if (
         active?.tagName === "INPUT" ||
         active?.tagName === "TEXTAREA" ||
-        active?.isContentEditable ||
+        (active instanceof HTMLElement && active.isContentEditable) ||
         active?.closest(
           '[role="menu"], [role="alertdialog"], [role="listbox"], [role="combobox"]',
         )
@@ -302,9 +285,9 @@ export function SceneLightbox({
     <YARLightbox
       open={open}
       close={requestClose}
-      slides={slides as Slide[]}
+      slides={slides}
       index={index}
-      plugins={[Fullscreen]}
+      plugins={[Fullscreen, PersistentSceneCarousel]}
       fullscreen={{ ref: fullscreenRef }}
       carousel={{ finite, preload: 1, ...(touch && { padding: 0 }) }}
       controller={{

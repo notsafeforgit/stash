@@ -13,6 +13,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -20,6 +21,7 @@ import {
   type RefObject,
   type SyntheticEvent,
 } from "react";
+import { useCommittedRef } from "@/hooks/use-committed-ref";
 import type { VideoPlayerStore } from "@videojs/react";
 import { useConfigurationContext } from "src/hooks/config";
 import { isIOS, type PlayerSource } from "./player-utils";
@@ -48,6 +50,10 @@ interface SourceScene {
 
 interface UseScenePlayerSourcesArgs {
   scene: SourceScene;
+  autoplay: boolean;
+  playbackKey: string;
+  suspended: boolean;
+  playbackRateRef: RefObject<number>;
   initialTimestamp: number | undefined;
   /** Combined video + audio fMP4 decode capability (gates the full
    *  codec-copy remux variant). */
@@ -120,6 +126,7 @@ interface UseScenePlayerSourcesResult {
   offsetStart: number;
   initialResume: { offset: number; seekTo: number | null };
   reloading: boolean;
+  ready: boolean;
   seekDisplayTarget: number | null;
   /** Persistent canvas that masks the gap between the old MediaSource
    *  detaching and the new one decoding its first frame on src-swap /
@@ -147,6 +154,10 @@ interface UseScenePlayerSourcesResult {
 
 export function useScenePlayerSources({
   scene,
+  autoplay,
+  playbackKey,
+  suspended,
+  playbackRateRef,
   initialTimestamp,
   canDecode,
   canDecodeVideo,
@@ -217,6 +228,8 @@ export function useScenePlayerSources({
   // list.
   const captureResume = () => ({
     sceneId: scene.id,
+    playbackKey,
+    suspended,
     resume: computeInitialResume(
       getPreferredSource(sources)?.src,
       initialTimestamp,
@@ -227,9 +240,6 @@ export function useScenePlayerSources({
     ),
   });
   const [capturedResume, setCapturedResume] = useState(captureResume);
-  if (capturedResume.sceneId !== scene.id) {
-    setCapturedResume(captureResume());
-  }
   const initialResume = capturedResume.resume;
 
   const [offsetStart, setOffsetStart] = useState(initialResume.offset);
@@ -258,28 +268,16 @@ export function useScenePlayerSources({
   // wouldn't reassign `<video>.src`, no new `canplay` would arrive, and the
   // loading overlay would remain pinned forever.
   const [reloadNonce, setReloadNonce] = useState(0);
-  const {
-    reloading,
-    setReloading,
-    freezeFrameCanvas,
-    captureFrame,
-    clearCapturedFrame,
-    beginSourceRemount,
-    seekDisplayTarget,
-    armSeekDisplay,
-    awaitSeekReady,
-  } = usePlayerTransitionFeedback({ rootRef, storeRef, fileWidth, fileHeight });
-
   // `wasPaused: !allowAutoplay` on the initial / scene-change resume so
   // a deep-link `?t=` doesn't autoplay when the user has the global
   // autostart toggle off. Source-change pending-resumes — written by
   // `handleSourceChange` and the seek-past-buffer src-swap path —
   // overwrite this with the live `paused` state, which is the desired
   // behaviour for cross-swap continuity.
-  const allowAutoplayRef = useRef(allowAutoplay);
-  useEffect(() => {
-    allowAutoplayRef.current = allowAutoplay;
-  }, [allowAutoplay]);
+  const allowAutoplayRef = useCommittedRef(
+    allowAutoplay &&
+      (autoplay || initialResume.offset > 0 || (initialResume.seekTo ?? 0) > 0),
+  );
   const pendingResumeRef = useRef<{
     wasPaused: boolean;
     seekTo: number | null;
@@ -290,28 +288,71 @@ export function useScenePlayerSources({
       : null,
   );
 
-  const lastSceneIdRef = useRef(scene.id);
-  useEffect(() => {
-    if (lastSceneIdRef.current === scene.id) return;
-    lastSceneIdRef.current = scene.id;
-    setOffsetStart(initialResume.offset);
-    setFragmentTime(initialResume.seekTo);
+  // Reset before committing a different scene/marker. An effect-only reset
+  // would briefly publish the previous scene's manual source and offsets.
+  if (
+    capturedResume.playbackKey !== playbackKey ||
+    capturedResume.sceneId !== scene.id ||
+    capturedResume.suspended !== suspended
+  ) {
+    const next = captureResume();
+    setCapturedResume(next);
+    setOffsetStart(next.resume.offset);
+    setFragmentTime(next.resume.seekTo);
     setManualSource(null);
-    setReloading(false);
     setReloadNonce(0);
-    pendingResumeRef.current = {
-      wasPaused: !allowAutoplayRef.current,
-      seekTo: initialResume.seekTo,
-    };
-  }, [scene.id, initialResume, setReloading]);
+  }
 
   const activeSource = manualSource ?? getPreferredSource(sources);
   const activeSrc = activeSource?.src;
-
   const finalSrc = useMemo(
-    () => scenePlayerSourceURL(activeSrc, fragmentTime, clipRange, reloadNonce),
-    [activeSrc, fragmentTime, clipRange, reloadNonce],
+    () =>
+      suspended
+        ? undefined
+        : scenePlayerSourceURL(activeSrc, fragmentTime, clipRange, reloadNonce),
+    [activeSrc, fragmentTime, clipRange, reloadNonce, suspended],
   );
+  const [load, setLoad] = useState({ playbackKey, src: finalSrc });
+  if (load.playbackKey !== playbackKey || load.src !== finalSrc) {
+    setLoad({ playbackKey, src: finalSrc });
+  }
+  const currentLoadRef = useCommittedRef(load);
+  const [readyLoad, setReadyLoad] = useState<typeof load | null>(null);
+  const mountedRef = useRef(false);
+  useLayoutEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+  useLayoutEffect(() => {
+    pendingResumeRef.current = suspended
+      ? null
+      : {
+          wasPaused: !allowAutoplayRef.current,
+          seekTo: initialResume.seekTo ?? 0,
+          playbackRate: playbackRateRef.current,
+        };
+  }, [initialResume, suspended, playbackRateRef]);
+
+  const {
+    reloading,
+    setReloading,
+    freezeFrameCanvas,
+    captureFrame,
+    clearCapturedFrame,
+    beginSourceRemount,
+    seekDisplayTarget,
+    armSeekDisplay,
+    awaitSeekReady,
+  } = usePlayerTransitionFeedback({
+    rootRef,
+    storeRef,
+    fileWidth,
+    fileHeight,
+    playbackKey,
+    sourceKey: finalSrc,
+  });
 
   // A metadata edit keeps every stream endpoint URL stable, but the bytes
   // behind it have changed. Bump the existing cachebuster and use the same
@@ -610,6 +651,7 @@ export function useScenePlayerSources({
   // and the subtraction is a no-op.
   const handleLoadedMetadata = useCallback(
     (e: SyntheticEvent<HTMLVideoElement>) => {
+      e.currentTarget.playbackRate = playbackRateRef.current;
       const pending = pendingResumeRef.current;
       if (!pending || pending.seekTo == null || pending.seekTo <= 0) return;
       const max =
@@ -622,13 +664,13 @@ export function useScenePlayerSources({
         /* ignore — not seekable yet, canPlay path will retry */
       }
     },
-    [fileDuration, offsetStart],
+    [fileDuration, offsetStart, playbackRateRef],
   );
 
   const handleCanPlay = useCallback(async () => {
     const pending = pendingResumeRef.current;
     const s = storeRef.current;
-    if (!s) return;
+    if (!s || !finalSrc || currentLoadRef.current !== load) return;
 
     let seekPromise: Promise<unknown> | undefined;
 
@@ -682,7 +724,11 @@ export function useScenePlayerSources({
     }
 
     if (seekPromise) {
-      await seekPromise;
+      try {
+        await seekPromise;
+      } catch {
+        return;
+      }
       // Source-changed-again-while-seeking: a fresh source-change
       // populated pendingResumeRef again. Its own canplay handler
       // owns the overlay teardown — bail so we don't tear down
@@ -691,6 +737,8 @@ export function useScenePlayerSources({
         return;
       }
     }
+    if (!mountedRef.current || currentLoadRef.current !== load) return;
+    setReadyLoad(load);
     clearCapturedFrame();
     setReloading(false);
 
@@ -716,6 +764,8 @@ export function useScenePlayerSources({
     offsetStart,
     setReloading,
     clearCapturedFrame,
+    finalSrc,
+    load,
   ]);
 
   usePlayerTranscodeSession(scene.id, finalSrc, rootRef);
@@ -735,6 +785,7 @@ export function useScenePlayerSources({
     offsetStart,
     initialResume,
     reloading,
+    ready: !!finalSrc && readyLoad === load,
     seekDisplayTarget,
     freezeFrameCanvas,
     handleSourceChange,

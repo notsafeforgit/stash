@@ -1,6 +1,6 @@
 import type React from "react";
-import { useCallback, useRef, useState } from "react";
-import { useQuery, useMutation } from "@apollo/client/react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { skipToken, useQuery, useMutation } from "@apollo/client/react";
 import { Link } from "@tanstack/react-router";
 import { useIntl } from "react-intl";
 import { DropletsIcon, ExternalLinkIcon } from "lucide-react";
@@ -38,9 +38,7 @@ interface SceneSlideContentProps {
    *  just the video element. Forwarded to the player as
    *  `onToggleFullscreenOverride`. */
   onToggleFullscreen: () => boolean | undefined;
-  /** Lightbox-scoped loop preference. Controls the player's loop toggle
-   *  externally so the value survives the per-scene player remount on
-   *  slide swipe. */
+  /** Loop preference owned by the lightbox across opening sessions. */
   loopEnabled: boolean;
   onLoopToggle: () => void;
   /** Advances to the next lightbox slide. Forwarded to the player as
@@ -58,64 +56,26 @@ function PendingPlayerClose({ onClose }: { onClose?: () => void }) {
   ) : null;
 }
 
-export function SceneSlideContent({
-  slide,
-  isActive,
-  onToggleFullscreen,
-  loopEnabled,
-  onLoopToggle,
-  onNext,
-  onClose,
-}: SceneSlideContentProps) {
-  // Non-active and sentinel slides render a cheap poster only.
-  if (!isActive || slide.loading) {
-    return (
-      <div className="relative w-full h-full flex items-center justify-center bg-black">
-        {slide.posterSrc && (
-          <img
-            src={slide.posterSrc}
-            alt={slide.title ?? ""}
-            className="max-w-full max-h-full object-contain select-none"
-            draggable={false}
-          />
-        )}
-        {slide.loading && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Spinner className="size-10 text-white/70" />
-          </div>
-        )}
-        {isActive && <PendingPlayerClose onClose={onClose} />}
-      </div>
-    );
-  }
+export function SceneSlideContent(props: SceneSlideContentProps) {
+  return props.isActive ? (
+    <ActiveSceneSlide {...props} />
+  ) : (
+    <SceneSlidePoster slide={props.slide} />
+  );
+}
 
-  // `key` forces a full remount on scene change so Video.js tears down cleanly
-  // instead of swapping its source in-place mid-animation (which can strand the
-  // media in a buffered-but-paused state). Markers on the same scene also
-  // remount so the new `initialTimestamp` takes effect on the fresh player.
-  if (slide.offlineEntry) {
-    return (
-      <ActiveOfflineSceneSlide
-        key={slide.sceneId}
-        slide={slide}
-        offlineEntry={slide.offlineEntry}
-        onToggleFullscreen={onToggleFullscreen}
-        loopEnabled={loopEnabled}
-        onLoopToggle={onLoopToggle}
-        onClose={onClose}
-      />
-    );
-  }
+function SceneSlidePoster({ slide }: { slide: SceneSlide }) {
   return (
-    <ActiveSceneSlide
-      key={slide.marker ? `${slide.sceneId}:${slide.marker.id}` : slide.sceneId}
-      slide={slide}
-      onToggleFullscreen={onToggleFullscreen}
-      loopEnabled={loopEnabled}
-      onLoopToggle={onLoopToggle}
-      onNext={onNext}
-      onClose={onClose}
-    />
+    <div className="absolute inset-0 flex items-center justify-center bg-black">
+      {slide.posterSrc && (
+        <img
+          src={slide.posterSrc}
+          alt={slide.title ?? ""}
+          className="max-w-full max-h-full object-contain select-none"
+          draggable={false}
+        />
+      )}
+    </div>
   );
 }
 
@@ -151,8 +111,8 @@ function computeMarkerEnd(
 function useNewTabLinkPause(pauseRef: React.RefObject<(() => void) | null>) {
   return useCallback(
     (e: React.MouseEvent<HTMLElement>) => {
-      const target = e.target as Element | null;
-      if (!target) return;
+      const target = e.target;
+      if (!(target instanceof Element)) return;
       const anchor = target.closest('a[target="_blank"]');
       if (anchor) pauseRef.current?.();
     },
@@ -167,182 +127,119 @@ function ActiveSceneSlide({
   onLoopToggle,
   onNext,
   onClose,
-}: {
-  slide: SceneSlide;
-  onToggleFullscreen: () => boolean | undefined;
-  loopEnabled: boolean;
-  onLoopToggle: () => void;
-  onNext: () => void;
-  onClose?: () => void;
-}) {
-  const { data, loading } = useQuery(GQL.FindSceneDocument, {
-    variables: { id: slide.sceneId },
-  });
+}: SceneSlideContentProps) {
+  const { data, loading } = useQuery(
+    GQL.FindSceneDocument,
+    slide.loading || slide.offlineEntry
+      ? skipToken
+      : { variables: { id: slide.sceneId } },
+  );
+  const blob = useOpfsBlobUrl(slide.offlineEntry?.scene_id);
+  const offlineScene = useMemo(
+    () =>
+      slide.offlineEntry && blob.url
+        ? offlineEntryToSceneData(slide.offlineEntry, blob.url)
+        : undefined,
+    [slide.offlineEntry, blob.url],
+  );
+  // Apollo may retain the previous result while variables change. Never
+  // expose that result as the newly selected scene.
+  const scene = slide.loading
+    ? undefined
+    : slide.offlineEntry
+      ? offlineScene
+      : data?.findScene?.id === slide.sceneId
+        ? data.findScene
+        : undefined;
 
-  const scene = data?.findScene;
-
-  // Mirrors the player's controls bar fade so the title / performer
-  // overlay disappears together with the bottom controls when the user
-  // is idle, then reappears on the next user-active gesture.
+  // Keep the player mounted through query/OPFS gaps and boundary sentinels.
+  // Suspended playback clears its source and releases the previous transcode;
+  // the pending poster masks its retained layout until the new scene is ready.
+  const [retainedScene, setRetainedScene] = useState(scene);
+  if (scene && scene !== retainedScene) setRetainedScene(scene);
+  const playerScene = scene ?? retainedScene;
+  const pending = !scene;
   const [chromeVisible, setChromeVisible] = useState(true);
-
-  // The marker lightbox presents each marker as a standalone clip — the
-  // player's timeline, time display, and skip-step bounds all use the
-  // marker range as if it were the whole video, with loop / auto-advance
-  // firing at the clip boundary. See ScenePlayer's `clipRange` prop.
-  const clipRange = (() => {
-    if (!scene || !slide.marker) return undefined;
-    const end = computeMarkerEnd(scene, slide.marker.id, slide.marker.seconds);
-    if (end == null || end <= slide.marker.seconds) return undefined;
-    return { start: slide.marker.seconds, end };
-  })();
-
-  // Pre-play poster: marker slides use the marker's own screenshot so the
-  // brief frame shown before playback starts already matches the clip,
-  // not the scene's cover frame from elsewhere in the video. Falls back
-  // to `slide.posterSrc` (also the marker screenshot, captured when the
-  // slide was built) so a missing/late `scene_markers` entry can't drop
-  // us onto the scene cover via `<ScenePlayer>`'s default fallback.
-  const markerPosterSrc = slide.marker
-    ? (scene?.scene_markers.find((m) => m.id === slide.marker!.id)
-        ?.screenshot ?? slide.posterSrc)
-    : undefined;
-
-  // Pauser captured from the player via `sendPause`; invoked on
-  // `target="_blank"` link clicks within the slide so the video doesn't
-  // keep playing in a backgrounded tab.
   const pauseRef = useRef<(() => void) | null>(null);
   const handleSlideClickCapture = useNewTabLinkPause(pauseRef);
+  const { sendGetCurrentTime } = useOfflineResumeWriter(
+    scene ? slide.offlineEntry?.scene_id : undefined,
+    slide.offlineEntry?.last_position_seconds,
+  );
+
+  const marker = slide.marker;
+  const clipRange = useMemo(() => {
+    if (!scene || !marker) return undefined;
+    const end = computeMarkerEnd(scene, marker.id, marker.seconds);
+    return end != null && end > marker.seconds
+      ? { start: marker.seconds, end }
+      : undefined;
+  }, [scene, marker]);
+  const markerPosterSrc = marker
+    ? (scene?.scene_markers.find((m) => m.id === marker.id)?.screenshot ??
+      slide.posterSrc)
+    : undefined;
+  const playbackKey = JSON.stringify([
+    slide.sceneId,
+    marker?.id,
+    Boolean(slide.offlineEntry),
+  ]);
 
   return (
     <div
-      className="relative w-full h-full flex items-center justify-center bg-black"
+      className="relative size-full flex items-center justify-center bg-black"
       onClickCapture={handleSlideClickCapture}
     >
-      {scene ? (
+      {playerScene && (
         <LightboxScenePlayer
-          scene={scene}
+          scene={playerScene}
+          playbackKey={playbackKey}
+          suspended={pending}
           loopEnabled={loopEnabled}
           onLoopToggle={onLoopToggle}
           onToggleFullscreen={onToggleFullscreen}
           onControlsVisibilityChange={setChromeVisible}
-          onNext={onNext}
+          onNext={slide.offlineEntry ? undefined : onNext}
           onClose={onClose}
-          initialTimestamp={slide.marker?.seconds ?? 0}
+          initialTimestamp={
+            slide.offlineEntry ? undefined : (marker?.seconds ?? 0)
+          }
           clipRange={clipRange}
           posterSrc={markerPosterSrc}
-          sendPause={(p) => {
-            pauseRef.current = p;
+          sendGetCurrentTime={sendGetCurrentTime}
+          sendPause={(pause) => {
+            pauseRef.current = pause;
           }}
           topOverlay={
-            slide.marker ? (
+            scene &&
+            (slide.offlineEntry ? (
+              <OfflineSceneOverlay
+                entry={slide.offlineEntry}
+                visible={chromeVisible}
+              />
+            ) : marker ? (
               <MarkerOverlay
                 scene={scene}
-                marker={slide.marker}
+                marker={marker}
                 visible={chromeVisible}
               />
             ) : (
               <SceneOverlay scene={scene} visible={chromeVisible} />
-            )
+            ))
           }
         />
-      ) : (
-        <>
-          {slide.posterSrc && (
-            <img
-              src={slide.posterSrc}
-              alt={slide.title ?? ""}
-              className="max-w-full max-h-full object-contain select-none"
-              draggable={false}
-            />
-          )}
-          {loading && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Spinner className="size-10 text-white/70" />
-            </div>
-          )}
-          <PendingPlayerClose onClose={onClose} />
-        </>
       )}
-    </div>
-  );
-}
-
-// Offline-mode active slide. Resolves the OPFS file → blob URL on
-// mount, builds a fake scene from the IDB-snapshotted `OfflineEntry`,
-// and feeds both to the same `<ScenePlayer>` the online slide uses.
-//
-// Differences from the online active slide:
-//   - No GraphQL `findScene` round-trip — the snapshot has the
-//     player-essential fields and the rest doesn't matter for offline.
-//   - Mutating overlay buttons (Add O, etc.) are suppressed because the
-//     scene id may not exist server-side, and even when it does we
-//     intentionally don't write to the live record from the offline
-//     surface.
-//   - No `onNext` wiring: the offline carousel doesn't have an
-//     auto-advance use case (the user explicitly opens what they
-//     downloaded), and the slide-swipe still works via the lightbox's
-//     own controls.
-//   - Resume position writes back to IDB on a 5 s poll + unmount, same
-//     pattern as `routes/offline/$sceneId.tsx`.
-function ActiveOfflineSceneSlide({
-  slide,
-  offlineEntry,
-  onToggleFullscreen,
-  loopEnabled,
-  onLoopToggle,
-  onClose,
-}: {
-  slide: SceneSlide;
-  offlineEntry: OfflineEntry;
-  onToggleFullscreen: () => boolean | undefined;
-  loopEnabled: boolean;
-  onLoopToggle: () => void;
-  onClose?: () => void;
-}) {
-  const blob = useOpfsBlobUrl(offlineEntry.scene_id);
-  const { sendGetCurrentTime } = useOfflineResumeWriter(
-    offlineEntry.scene_id,
-    offlineEntry.last_position_seconds,
-  );
-  const [chromeVisible, setChromeVisible] = useState(true);
-
-  const fakeScene = blob.url
-    ? offlineEntryToSceneData(offlineEntry, blob.url)
-    : null;
-
-  return (
-    <div className="relative w-full h-full flex items-center justify-center bg-black">
-      {fakeScene ? (
-        <LightboxScenePlayer
-          scene={fakeScene}
-          loopEnabled={loopEnabled}
-          onLoopToggle={onLoopToggle}
-          onToggleFullscreen={onToggleFullscreen}
-          onClose={onClose}
-          onControlsVisibilityChange={setChromeVisible}
-          sendGetCurrentTime={sendGetCurrentTime}
-          topOverlay={
-            <OfflineSceneOverlay entry={offlineEntry} visible={chromeVisible} />
-          }
-        />
-      ) : (
-        <>
-          {slide.posterSrc && (
-            <img
-              src={slide.posterSrc}
-              alt={slide.title ?? ""}
-              className="max-w-full max-h-full object-contain select-none"
-              draggable={false}
-            />
-          )}
-          {!(blob.error || blob.missing) && (
+      {pending && (
+        <div className="absolute inset-0">
+          <SceneSlidePoster slide={slide} />
+          {(slide.loading ||
+            (slide.offlineEntry ? !(blob.error || blob.missing) : loading)) && (
             <div className="absolute inset-0 flex items-center justify-center">
               <Spinner className="size-10 text-white/70" />
             </div>
           )}
           <PendingPlayerClose onClose={onClose} />
-        </>
+        </div>
       )}
     </div>
   );

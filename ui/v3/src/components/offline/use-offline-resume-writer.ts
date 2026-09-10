@@ -19,7 +19,8 @@
  * write rhythm.
  */
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useLayoutEffect, useRef } from "react";
+import { useCommittedRef } from "@/hooks/use-committed-ref";
 import { patchEntry } from "./offline-db";
 
 const POLL_INTERVAL_MS = 5000;
@@ -31,7 +32,7 @@ export interface OfflineResumeWriter {
 }
 
 export function useOfflineResumeWriter(
-  sceneId: string,
+  sceneId: string | null | undefined,
   initialPositionSeconds: number | null | undefined,
 ): OfflineResumeWriter {
   const getCurrentTimeRef = useRef<(() => number | undefined) | null>(null);
@@ -39,14 +40,18 @@ export function useOfflineResumeWriter(
     getCurrentTimeRef.current = getter;
   }, []);
 
-  const lastWrittenRef = useRef<number>(initialPositionSeconds ?? 0);
+  const initialPositionRef = useCommittedRef(initialPositionSeconds ?? 0);
 
-  useEffect(() => {
+  // Flush before the shared video's source changes in passive media effects.
+  // Reading it in passive cleanup can attribute the new playhead to the old row.
+  useLayoutEffect(() => {
+    if (!sceneId) return;
+    let lastWritten = initialPositionRef.current;
     const flush = () => {
       const t = getCurrentTimeRef.current?.();
       if (t == null || t <= 0) return;
-      if (Math.abs(t - lastWrittenRef.current) < MIN_POSITION_DELTA_S) return;
-      lastWrittenRef.current = t;
+      if (Math.abs(t - lastWritten) < MIN_POSITION_DELTA_S) return;
+      lastWritten = t;
       void patchEntry(sceneId, { last_position_seconds: t });
     };
 

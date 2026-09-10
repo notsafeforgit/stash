@@ -34,14 +34,17 @@ export interface OpfsBlobResult {
 export function useOpfsBlobUrl(
   sceneId: string | null | undefined,
 ): OpfsBlobResult {
-  const [url, setUrl] = useState<string | null>(null);
-  const [missing, setMissing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<
+    OpfsBlobResult & { sceneId: typeof sceneId }
+  >({
+    sceneId,
+    url: null,
+    missing: false,
+    error: null,
+  });
 
   useEffect(() => {
-    setUrl(null);
-    setMissing(false);
-    setError(null);
+    setResult({ sceneId, url: null, missing: false, error: null });
     if (!sceneId) return;
 
     let created: string | null = null;
@@ -51,14 +54,19 @@ export function useOpfsBlobUrl(
         const file = await readScene(sceneId);
         if (cancelled) return;
         if (!file) {
-          setMissing(true);
+          setResult({ sceneId, url: null, missing: true, error: null });
           return;
         }
         created = URL.createObjectURL(file);
-        setUrl(created);
+        setResult({ sceneId, url: created, missing: false, error: null });
       } catch (err) {
         if (cancelled) return;
-        setError(err instanceof Error ? err.message : String(err));
+        setResult({
+          sceneId,
+          url: null,
+          missing: false,
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
     })();
     return () => {
@@ -67,5 +75,8 @@ export function useOpfsBlobUrl(
     };
   }, [sceneId]);
 
-  return { url, missing, error };
+  // A new scene must never render the previous scene's (soon revoked) URL.
+  return result.sceneId === sceneId
+    ? result
+    : { url: null, missing: false, error: null };
 }

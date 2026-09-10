@@ -223,12 +223,30 @@ pins an older hls.js, so a version-scoped pnpm override preserves the existing
 | `use-player-transcode-session.ts` | Release transcodes and keep paused sessions alive |
 | `use-player-recovery.ts` | Native fullscreen seeking and stalled-playback recovery |
 
-The lightbox currently owns a separate player session per active scene/marker
-slide. Keeping audio permission across actual carousel navigation requires
-moving that ownership out of the per-slide renderer; retaining the media element
-through quality changes alone does not resolve it. Browser fixtures cover direct,
-HLS and trimmed-playlist transitions with audio, but physical iPhone autoplay
-permission and MMS still need device testing.
+The scene lightbox uses `scene-carousel.tsx`, a YARL carousel module with three
+stable slots: one active player and two poster previews. YARL's controller still
+owns pointer/wheel navigation, drag offsets and swipe animations. The center slot
+keeps the same player/store/video across scenes, markers and loading sentinels;
+closing the lightbox disposes that session. No media DOM is moved between slides.
+
+`playbackKey` identifies the selected scene/marker independently of media ownership.
+Selection changes reset source preferences, clip offsets, poster/started latches,
+zoom and recovery state before the new playback becomes active. Quality changes
+within that selection retain their existing playhead/resume behavior. Pending
+queries, missing scenes and OPFS reads suspend the retained player, clear its
+source and release the outgoing transcode. Late query results are checked against
+the selected scene. Offline resume writes flush before the shared playhead changes.
+
+Audio and playback rate belong to the persistent media element. A held 2× gesture
+keeps its touch target through automatic advance and restores the prior rate on
+release. Animation deadlines and asynchronous seeks belong to their playback/load;
+obsolete work cannot resume or mute a later scene. Deferred freeze-frame JPEG
+exports are also cancelled when cleared or superseded. One clip-range effect
+owns both marker boundaries and native EOF; loops explicitly seek and resume,
+while auto-advance fires once. The explicit WebKit `canplay`
+resume remains necessary. Chromium/WebKit fixtures exercise the actual lightbox
+and its source machinery, but physical iPhone autoplay permission and MMS still
+need device testing.
 
 Transition plans consume plain buffered/seekable state and return an in-place
 seek, engine restart, or source reload. Browser effects apply the plan; keep DOM

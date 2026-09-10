@@ -54,7 +54,10 @@ function PlaybackState() {
 export function VideoSourcesFixture() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
-  const [src, setSrc] = useState(() => sourceURL("/media/audio.mp4"));
+  const short = new URLSearchParams(location.search).has("short");
+  const [src, setSrc] = useState(() =>
+    sourceURL(short ? "/media/short.mp4" : "/media/audio.mp4"),
+  );
   const [advance, setAdvance] = useState(false);
   const [sequence, setSequence] = useState(0);
   const [loads, setLoads] = useState(0);
@@ -136,9 +139,15 @@ export function VideoSourcesFixture() {
                   setSequence(sequence + 1);
                   const path =
                     sequence % 2 === 0
-                      ? "/media/hls/stream.m3u8"
-                      : "/media/audio.mp4";
-                  setSrc(sourceURL(`${path}?sequence=${sequence + 1}`));
+                      ? short
+                        ? "/media/clip/stream.m3u8?start=6&end=10"
+                        : "/media/hls/stream.m3u8"
+                      : short
+                        ? "/media/short.mp4"
+                        : "/media/audio.mp4";
+                  const next = new URL(path, location.href);
+                  next.searchParams.set("sequence", String(sequence + 1));
+                  setSrc(next.href);
                 }
               }}
             />

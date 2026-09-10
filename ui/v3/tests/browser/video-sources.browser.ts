@@ -70,7 +70,7 @@ test("direct, HLS, quality and seek reloads retain the authorized video element"
 test("ended-driven direct/HLS changes keep audio and the same element across several videos", async ({
   page,
 }) => {
-  await page.goto("/video-sources");
+  await page.goto("/video-sources?short");
   const video = page.locator("video");
   const original = await video.elementHandle();
   if (!original) throw new Error("Missing video element");
@@ -83,17 +83,11 @@ test("ended-driven direct/HLS changes keep audio and the same element across sev
   await expect(video).toHaveJSProperty("paused", false);
   await page.getByRole("button", { name: "Enable auto advance" }).click();
   for (let sequence = 1; sequence <= 4; sequence += 1) {
-    // `paused === false` means play was requested, not that the source has
-    // decoded frames yet. Wait for real progress before seeking to its end.
-    await expect
-      .poll(() =>
-        video.evaluate((element: HTMLVideoElement) => element.currentTime),
-      )
-      .toBeGreaterThan(0.1);
-    await video.evaluate((element: HTMLVideoElement) => {
-      element.currentTime = element.duration - 0.3;
+    // Let the short clips finish naturally: this exercises real autoplay
+    // without making its outcome depend on a seek right up to native EOF.
+    await expect(page.getByTestId("sequence")).toHaveText(String(sequence), {
+      timeout: 8000,
     });
-    await expect(page.getByTestId("sequence")).toHaveText(String(sequence));
     await expect(video).toHaveJSProperty("paused", false);
     await expect(video).toHaveJSProperty("muted", false);
     expect(
@@ -106,6 +100,6 @@ test("ended-driven direct/HLS changes keep audio and the same element across sev
       .poll(() =>
         video.evaluate((element: HTMLVideoElement) => element.currentTime),
       )
-      .toBeLessThan(4);
+      .toBeLessThan(1.5);
   }
 });

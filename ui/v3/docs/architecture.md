@@ -276,7 +276,10 @@ Preserve these invariants:
   player. Close occupies the right end of the playback row and remains subtly
   visible and tappable when playback controls fade. It has one stable 44px target;
   the fading controls and gradient are separate, so Close has no invisible or
-  inert ancestor. Hidden playback controls remain inert and let taps through to
+  inert ancestor. Close captures pointer and focus activity before Video.js's
+  native container listeners can reveal controls and consume Safari's first tap;
+  its normal click remains the sole dismissal handler for touch and keyboard.
+  Hidden playback controls remain inert and let taps through to
   the gesture surface to reveal them without activating an action.
   Time and available PiP/Cast controls sit above a full-width timeline, preserving
   scrubbing space and direct speed, quality, playback-mode, fullscreen, and Close

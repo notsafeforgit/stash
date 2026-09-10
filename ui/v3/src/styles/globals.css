@@ -110,6 +110,13 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* The keyboard occupies layout space so the scroller ends at the footer.
+   Moving only the footer with a transform leaves list content behind Safari's
+   translucent keyboard chrome and compounds its native focus pan. */
+.mobile-keyboard-layout {
+  margin-bottom: var(--mobile-keyboard-inset, 0px);
+}
+
 @layer base {
   *,
   ::after,

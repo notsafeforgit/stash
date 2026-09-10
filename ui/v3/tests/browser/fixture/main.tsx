@@ -97,7 +97,12 @@ function FixtureList({ name }: { name: string }) {
       }
     >
       <div data-testid={`${name}-list`} className="p-3">
-        <p data-testid="list-state" data-term={filter.searchTerm ?? ""}>
+        <p
+          data-testid="list-state"
+          data-term={filter.searchTerm ?? ""}
+          data-sort={filter.sortBy}
+          data-direction={filter.sortDirection}
+        >
           {name} page {filter.currentPage}: {filter.searchTerm}
         </p>
         <Button onClick={selection.onEnterSelect}>Enter selection</Button>
@@ -189,6 +194,7 @@ function FixturePage() {
   );
   return (
     <div
+      data-app-viewport
       data-testid="viewport"
       data-back-count={backCount}
       className="flex h-dvh flex-col overflow-hidden"

@@ -5,6 +5,7 @@ import {
   expectCompactRow,
   chooseSection,
   expectTouchTargets,
+  holdForContextMenu,
 } from "./test";
 
 test("mobile drawers open directly and dismiss by tapping outside", async ({
@@ -156,6 +157,86 @@ test("search commits on close and keeps its value across section changes", async
     page.getByTestId("scenes-list").getByTestId("list-state"),
   ).toHaveAttribute("data-term", "");
   await expectCompactRow(footer);
+});
+
+test("active search can be previewed, edited and cleared without changing sort", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.goto("/");
+  const footer = detailFooter(page);
+  // Keep the gesture's original target addressable while the modal menu hides
+  // background controls from the accessibility tree.
+  const trigger = footer.getByRole("button", {
+    name: "Search…",
+    exact: true,
+    includeHidden: true,
+  });
+  const input = footer.getByRole("searchbox");
+  const state = page.getByTestId("scenes-list").getByTestId("list-state");
+  const query = "a-long-query/".repeat(12);
+  await trigger.tap();
+  await input.fill(query);
+  await footer.getByRole("button", { name: "Close search" }).tap();
+  await expect(trigger).toHaveAccessibleDescription(`Search: “${query}”`);
+  const initialDirection = await state.getAttribute("data-direction");
+
+  for (const title of ["View options", "Filters"]) {
+    await footer.getByRole("button", { name: title, exact: true }).tap();
+    const drawer = page.getByRole("dialog", { name: title, exact: true });
+    await expect(drawer).toHaveAccessibleDescription(`Search: “${query}”`);
+    await expect(
+      drawer.getByText(`Search: “${query}”`, { exact: true }),
+    ).toBeVisible();
+    if (title === "View options") {
+      await drawer.getByTitle(/^(Ascending|Descending)$/).tap();
+      await expect(state).not.toHaveAttribute(
+        "data-direction",
+        initialDirection ?? "",
+      );
+      await expect(state).toHaveAttribute("data-term", query);
+    }
+    await page.touchscreen.tap(8, 8);
+    await expect(drawer).toBeHidden();
+  }
+  const sort = await state.getAttribute("data-sort");
+  const direction = await state.getAttribute("data-direction");
+
+  const menu = page.getByRole("menu");
+  await holdForContextMenu(trigger, menu);
+  // Some touch browsers synthesize a click on release. It must remain a preview.
+  await trigger.dispatchEvent("click");
+  await expect(input).toHaveCount(0);
+  await expect(menu).toContainText(`Search: “${query}”`);
+  expect(
+    await menu.evaluate(
+      (element) => element.scrollWidth <= element.clientWidth,
+    ),
+  ).toBe(true);
+  // Base UI intentionally ignores outside presses for 500ms after a long press
+  // opens the menu, so that releasing the opening gesture cannot dismiss it.
+  await page.clock.runFor(500);
+  await page.touchscreen.tap(8, 8);
+  await expect(menu).toBeHidden();
+  await expectCompactRow(footer);
+
+  await holdForContextMenu(trigger, menu);
+  await menu.getByRole("menuitem", { name: "Edit search" }).tap();
+  await expect(input).toBeFocused();
+  await expect(input).toHaveValue(query);
+  await footer.getByRole("button", { name: "Close search" }).tap();
+  await holdForContextMenu(trigger, menu);
+  await menu.getByRole("menuitem", { name: "Clear search" }).tap();
+  await expect(menu).toBeHidden();
+  await expect(input).toHaveCount(0);
+  await expect(state).toHaveAttribute("data-term", "");
+  expect(await state.getAttribute("data-sort")).toBe(sort);
+  expect(await state.getAttribute("data-direction")).toBe(direction);
+  await expect(trigger).not.toHaveAttribute("aria-description");
+  await trigger.tap();
+  await expect(input).toBeFocused();
+  await expect(input).toHaveValue("");
 });
 
 test("selection replaces the row and keeps select-all and close at the right", async ({
@@ -389,30 +470,65 @@ test("resizing to desktop and back preserves the mounted list and its state", as
   ).toHaveAttribute("data-term", "retained across resize");
 });
 
-test("search follows a reduced visual viewport and returns when focus leaves", async ({
-  page,
-}) => {
-  await page.goto("/");
-  const footer = detailFooter(page);
-  await footer.getByRole("button", { name: "Search…", exact: true }).tap();
-  await expect(footer.getByRole("searchbox")).toBeFocused();
-  // Desktop browser automation cannot open a physical iOS keyboard. Model only
-  // its viewport resize here; native keyboard behavior still needs a device check.
-  await page.evaluate(() => {
-    if (!window.visualViewport) throw new Error("Missing visual viewport");
-    Object.defineProperty(window.visualViewport, "height", {
-      configurable: true,
-      value: 500,
-    });
-    window.visualViewport.dispatchEvent(new Event("resize"));
-  });
-  await expect
-    .poll(() =>
-      footer.evaluate((element) =>
-        Math.abs(element.getBoundingClientRect().bottom - 500),
+for (const layout of ["standalone", "collection", "media"]) {
+  test(`search reserves keyboard space without a delayed pan correction (${layout})`, async ({
+    page,
+  }) => {
+    await page.goto(`/?${layout}`);
+    const footer =
+      layout === "standalone"
+        ? page.locator("[data-mobile-list-mode]")
+        : detailFooter(page);
+    await footer.getByRole("button", { name: "Search…", exact: true }).tap();
+    await expect(footer.getByRole("searchbox")).toBeFocused();
+    // Model keyboard opening, Safari's pan, then its reset. Check geometry during
+    // the event, not after polling: the old rAF + React update briefly double-lifted
+    // the footer. Actual OS keyboard timing still needs a physical iPhone check.
+    for (const geometry of [
+      { height: 650, offsetTop: 0 },
+      { height: 500, offsetTop: 0 },
+      { height: 500, offsetTop: 240 },
+      { height: 500, offsetTop: 344 },
+      { height: 500, offsetTop: 0 },
+    ]) {
+      const bounds = await footer.evaluate((element, geometry) => {
+        if (!window.visualViewport) throw new Error("Missing visual viewport");
+        for (const [key, value] of Object.entries(geometry)) {
+          Object.defineProperty(window.visualViewport, key, {
+            configurable: true,
+            value,
+          });
+        }
+        window.visualViewport.dispatchEvent(new Event("resize"));
+        window.visualViewport.dispatchEvent(new Event("scroll"));
+        // Detail pages scroll the full collection/media region. Standalone
+        // pages scroll the list itself; both must end above the search row.
+        const scroller = element.hasAttribute("data-mobile-detail-footer")
+          ? element.previousElementSibling
+          : document.querySelector("[data-scroll-restoration-id]");
+        if (!scroller) throw new Error("Missing list scroller");
+        return {
+          footerTop: element.getBoundingClientRect().top,
+          footerBottom: element.getBoundingClientRect().bottom,
+          listBottom: scroller.getBoundingClientRect().bottom,
+        };
+      }, geometry);
+      expect(bounds.footerBottom).toBeCloseTo(
+        geometry.height + geometry.offsetTop,
+        0,
+      );
+      expect(bounds.listBottom).toBeLessThanOrEqual(bounds.footerTop + 1);
+    }
+    // Dismiss the keyboard while keeping search open, then focus the same field.
+    await footer.getByRole("searchbox").blur();
+    await expectCompactRow(footer);
+    await footer.getByRole("searchbox").focus();
+    expect(
+      await footer.evaluate(
+        (element) => element.getBoundingClientRect().bottom,
       ),
-    )
-    .toBeLessThan(1);
-  await footer.getByRole("button", { name: "Close search" }).tap();
-  await expectCompactRow(footer);
-});
+    ).toBeCloseTo(500, 0);
+    await footer.getByRole("button", { name: "Close search" }).tap();
+    await expectCompactRow(footer);
+  });
+}

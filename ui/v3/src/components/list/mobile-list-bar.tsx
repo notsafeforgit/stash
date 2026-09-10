@@ -27,6 +27,7 @@ import {
 } from "src/components/ui/pinnable-combo-box";
 import {
   BottomSheet,
+  BottomSheetDescription,
   BottomSheetHeader,
   BottomSheetTitle,
 } from "src/components/ui/bottom-sheet";
@@ -200,6 +201,14 @@ export const MobileListBar: React.FC<MobileListBarProps> = ({
               defaultMessage: "View options",
             })}
           </BottomSheetTitle>
+          {filter.searchTerm && (
+            <BottomSheetDescription className="whitespace-pre-wrap wrap-anywhere">
+              {intl.formatMessage(
+                { id: "list.active_search" },
+                { query: filter.searchTerm },
+              )}
+            </BottomSheetDescription>
+          )}
         </BottomSheetHeader>
 
         <div className="min-h-0 overflow-y-auto overscroll-contain p-4 flex flex-col gap-5">

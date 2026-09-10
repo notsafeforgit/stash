@@ -96,3 +96,25 @@ export async function chooseSection(page: Page, name: string) {
   await expect(trigger).toHaveAttribute("aria-expanded", "false");
   await expect(trigger).toHaveText(name);
 }
+
+/** Exercise Base UI's touch gesture in both engines (Playwright only exposes tap). */
+export async function holdForContextMenu(trigger: Locator, menu: Locator) {
+  await trigger.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    // WebKit doesn't expose a constructible Touch. Supply the coordinates that
+    // the real primitive consumes without replacing its event handlers/timer.
+    const touch = {
+      clientX: bounds.x + bounds.width / 2,
+      clientY: bounds.y + bounds.height / 2,
+    } satisfies Pick<Touch, "clientX" | "clientY">;
+    const event = new Event("touchstart", { bubbles: true });
+    Object.defineProperty(event, "touches", { value: [touch] });
+    element.dispatchEvent(event);
+  });
+  await expect(menu).toBeVisible();
+  await trigger.dispatchEvent("touchend", {
+    touches: [],
+    targetTouches: [],
+    changedTouches: [],
+  });
+}

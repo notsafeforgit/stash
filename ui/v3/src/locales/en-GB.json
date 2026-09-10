@@ -237,7 +237,9 @@
     "more": "More",
     "entity_actions": "Entity actions",
     "go": "Go",
-    "close_search": "Close search"
+    "close_search": "Close search",
+    "edit_search": "Edit search",
+    "clear_search": "Clear search"
   },
   "actions_name": "Actions",
   "add_row": "Add row",
@@ -1594,6 +1596,7 @@
     "slideshow_delay": "Slideshow (s)"
   },
   "list": {
+    "active_search": "Search: “{query}”",
     "empty": {
       "no_items_description": "There are no items to display.",
       "no_items_title": "Nothing here yet",

@@ -111,6 +111,16 @@ test("settings search follows keyboard geometry and supports keyboard result sel
       ),
     )
     .toBeLessThan(1);
+  expect(
+    await page.locator("[data-settings-scroll]").evaluate((element) => {
+      const footer = document.querySelector("[data-mobile-settings-footer]");
+      return Boolean(
+        footer &&
+          element.getBoundingClientRect().bottom <=
+            footer.getBoundingClientRect().top + 1,
+      );
+    }),
+  ).toBe(true);
   // A broad query fills the result list so its scrolling limit is exercised.
   await input.fill("a");
   const results = page.getByRole("navigation", {

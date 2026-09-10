@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/drawer";
 import { MobileNavSheet } from "@/components/layout/mobile-nav-sheet";
 import { MobileToolbarRow } from "./mobile-toolbar";
-import { useVisualViewportBottomInset } from "@/hooks/use-visual-viewport-bottom-inset";
+import { useMobileKeyboardLayout } from "@/hooks/use-mobile-keyboard-layout";
 import { useMediaQuery } from "@/utils/screen";
 
 type ChromeSlot = "list" | "tabs" | "actions" | "list-actions" | "pagination";
@@ -138,19 +138,14 @@ export function MobileDetailChromeSlot({
 export function MobileDetailFooter({ onBack }: { onBack?: () => void }) {
   const chrome = useMobileDetailChrome();
   const intl = useIntl();
-  const { ref, bottomInset } = useVisualViewportBottomInset<HTMLDivElement>();
+  const keyboardRef = useMobileKeyboardLayout<HTMLDivElement>();
   if (!chrome?.mobile) return null;
 
   return (
     <div
-      ref={ref}
+      ref={keyboardRef}
       data-mobile-detail-footer
-      className="@container relative shrink-0 border-t border-border bg-background pb-[env(safe-area-inset-bottom,0px)]"
-      style={
-        bottomInset > 0
-          ? { transform: `translateY(-${bottomInset}px)` }
-          : undefined
-      }
+      className="mobile-keyboard-layout @container relative shrink-0 border-t border-border bg-background pb-[env(safe-area-inset-bottom,0px)]"
     >
       <MobileNavSheet
         open={chrome.panel === "navigation"}

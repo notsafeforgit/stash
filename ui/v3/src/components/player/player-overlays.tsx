@@ -101,14 +101,13 @@ export function CanPlayEffect({
    *  once-per-mount latch and re-attaches the listener — needed by the
    *  stable-`<video>` `ScenePlayer` where source URL changes don't remount
    *  the player root but still need a fresh `canplay` fire
-   *  (and, when the engine swaps, a fresh `<video>` listener target).
    */
   srcKey?: string;
 }) {
   const firedRef = useRef(false);
   // The readyState >= 3 fast-path below is only safe on the *first*
   // run. On srcKey-driven re-runs the <video> element's readyState
-  // still reflects the *previous* source (HlsJsMedia's source transition
+  // still reflects the *previous* source (HlsJsAdapter's source transition
   // and the resulting `emptied` event come a couple of microtasks after
   // the React effect runs), so the fast-path would otherwise
   // fire `onCanPlay` before the new source has even started loading

@@ -90,7 +90,7 @@ export function usePlayerTransitionFeedback({
   // Replaces `beginSourceRemount` from the original variant. With an
   // in-place src swap the helper is: snapshot the current frame for
   // the freeze-frame canvas, flip the spinner, commit the state.
-  // No <video> abort (HlsJsMedia hands the new URL to the active engine,
+  // No <video> abort (HlsJsAdapter hands the new URL to the active engine,
   // or replaces that engine when its start-position config changes) and
   // no rAF defer (the canvas masks first paint via z-ordering, not
   // opacity timing).

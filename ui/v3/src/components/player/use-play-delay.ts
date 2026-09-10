@@ -26,10 +26,8 @@
  * cannot distinguish a user-initiated play from a programmatic one at
  * the event level.
  *
- * The `<video>` element can be replaced when the player swaps between direct
- * and HLS media components. The hook watches `rootRef`'s subtree with a
- * `MutationObserver` and re-attaches the `playing` listener so the gate keeps
- * suppressing across element swaps.
+ * Source discovery can mount the media after this effect starts. Watch the
+ * subtree so the gate also covers that late attachment.
  */
 import { useEffect, type MutableRefObject, type RefObject } from "react";
 
@@ -46,6 +44,7 @@ export function usePlayDelay(
 
     const deadline = Date.now() + delayMs;
     let suppressed = true;
+    let active = true;
 
     function findVideo(): HTMLVideoElement | null {
       return root?.querySelector("video") ?? null;
@@ -92,7 +91,22 @@ export function usePlayDelay(
         const video = findVideo();
         if (!video?.paused) return;
         if (!autoplayIntentRef.current) return;
-        video.play().catch(() => {
+        const source = video.currentSrc;
+        video.play().catch((error: unknown) => {
+          // Source changes can abort play(). Only a browser permission
+          // rejection warrants muted autoplay; obsolete requests must not
+          // change the next source's audio or override a user's pause.
+          if (
+            !(error instanceof DOMException) ||
+            error.name !== "NotAllowedError" ||
+            !active ||
+            !autoplayIntentRef.current ||
+            userPlaybackIntentRef.current ||
+            findVideo() !== video ||
+            video.currentSrc !== source
+          ) {
+            return;
+          }
           video.muted = true;
           video.play().catch(() => {});
         });
@@ -101,6 +115,7 @@ export function usePlayDelay(
     );
 
     return () => {
+      active = false;
       window.clearTimeout(t);
       observer.disconnect();
       if (attached) detach(attached);

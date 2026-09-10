@@ -154,7 +154,7 @@ export function scenePlayerSourceURL(
   if (usesStartOffset(activeSrc)) {
     // HLS: encode the desired scene-time start position into the URL
     // as `?start=N`. The frontend parses this back out in
-    // `StableHlsVideo` to set hls.js `config.startPosition`, so the
+    // `SceneVideo` to set hls.js `config.startPosition`, so the
     // FIRST segment request lands on the segment containing N (no
     // segment-0 cold-start detour). Server-side, the value is
     // ignored for playlist generation when `?end=` is absent (the

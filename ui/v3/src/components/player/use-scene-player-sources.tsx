@@ -77,7 +77,7 @@ interface UseScenePlayerSourcesArgs {
    *  parent component. Read synchronously inside the handlers. */
   storeRef: RefObject<VideoPlayerStore | null>;
   /** Player.Player's active Media instance, captured by
-   *  `<MediaBridge>`. For HLS sources this is the `HlsJsMedia` wrapper
+   *  `<MediaBridge>`. For HLS sources this is the `HlsJsAdapter` wrapper
    *  whose `.engine` returns the live hls.js `Hls` instance — the
    *  in-place out-of-buffer seek path reaches into it for
    *  `stopLoad` / `BUFFER_FLUSHING` / `startLoad` so the MediaSource
@@ -425,10 +425,10 @@ export function useScenePlayerSources({
       armSeekDisplay(trueTime);
 
       beginSourceRemount(() => {
-        // State updates flow through to `<VideoComponent>`'s `src`
-        // prop and our bridge assigns it directly to HlsJsMedia,
+        // State updates flow through to `<SceneVideo>`'s `src`
+        // prop and our bridge assigns it directly to HlsJsAdapter,
         // performing an in-place source swap on the existing `<video>`.
-        // No player-root remount; HlsJsMedia decides whether the changed
+        // No player-root remount; HlsJsAdapter decides whether the changed
         // structured source requires a fresh hls.js engine, so no
         // `startTransition` wrapper.
         const newStrategy = startOffsetStrategyFor(

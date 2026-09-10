@@ -8,6 +8,11 @@ test("direct, HLS, quality and seek reloads retain the authorized video element"
   await expect(video).toHaveJSProperty("muted", true);
   const original = await video.elementHandle();
   if (!original) throw new Error("Missing video element");
+  await expect
+    .poll(() =>
+      video.evaluate((element: HTMLVideoElement) => element.readyState),
+    )
+    .toBeGreaterThanOrEqual(3);
   await page.getByRole("button", { name: "Toggle sound" }).click();
   await expect(video).toHaveJSProperty("paused", false);
 
@@ -69,10 +74,22 @@ test("ended-driven direct/HLS changes keep audio and the same element across sev
   const video = page.locator("video");
   const original = await video.elementHandle();
   if (!original) throw new Error("Missing video element");
+  await expect
+    .poll(() =>
+      video.evaluate((element: HTMLVideoElement) => element.readyState),
+    )
+    .toBeGreaterThanOrEqual(3);
   await page.getByRole("button", { name: "Toggle sound" }).click();
   await expect(video).toHaveJSProperty("paused", false);
   await page.getByRole("button", { name: "Enable auto advance" }).click();
   for (let sequence = 1; sequence <= 4; sequence += 1) {
+    // `paused === false` means play was requested, not that the source has
+    // decoded frames yet. Wait for real progress before seeking to its end.
+    await expect
+      .poll(() =>
+        video.evaluate((element: HTMLVideoElement) => element.currentTime),
+      )
+      .toBeGreaterThan(0.1);
     await video.evaluate((element: HTMLVideoElement) => {
       element.currentTime = element.duration - 0.3;
     });

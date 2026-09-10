@@ -2,6 +2,7 @@
 import { act, useLayoutEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { deferred } from "@/test-utils/deferred";
 import { useOpfsBlobUrl } from "./use-opfs-blob";
 import { readScene } from "./opfs-storage";
 
@@ -41,7 +42,7 @@ afterEach(async () => {
 
 it("never commits the previous scene's URL under the next scene's identity", async () => {
   vi.mocked(readScene).mockResolvedValueOnce(new File([], "first"));
-  const pending = Promise.withResolvers<File | null>();
+  const pending = deferred<File | null>();
   vi.mocked(readScene).mockReturnValueOnce(pending.promise);
   await act(async () => root.render(<BlobView sceneId="first" />));
   await act(async () => root.render(<BlobView sceneId="second" />));
@@ -53,7 +54,7 @@ it("never commits the previous scene's URL under the next scene's identity", asy
 });
 
 it("ignores a late OPFS read after selecting a different scene", async () => {
-  const first = Promise.withResolvers<File | null>();
+  const first = deferred<File | null>();
   vi.mocked(readScene).mockReturnValueOnce(first.promise);
   vi.mocked(readScene).mockResolvedValueOnce(new File([], "second"));
   await act(async () => root.render(<BlobView sceneId="first" />));

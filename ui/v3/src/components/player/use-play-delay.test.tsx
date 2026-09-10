@@ -2,6 +2,7 @@
 import { act, useRef } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { deferred } from "@/test-utils/deferred";
 import { usePlayDelay } from "./use-play-delay";
 
 let container: HTMLDivElement;
@@ -85,7 +86,7 @@ it.each([
   "suspended",
 ])("ignores a pending autoplay rejection after %s", async (change) => {
   const video = await mount();
-  const pending = Promise.withResolvers<void>();
+  const pending = deferred<void>();
   const play = vi.spyOn(video, "play").mockReturnValue(pending.promise);
   await act(async () => vi.advanceTimersByTime(500));
   await act(async () => {

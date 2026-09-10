@@ -25,10 +25,10 @@ seeking to the last frames, which can stall WebKit's native decoder.
 
 Tests use the production `SceneVideo` and `CanPlayEffect`. Source/engine changes
 use the existing metadata pre-positioning and explicit resume, as in
-`useScenePlayerSources`. Clip seeks use the relative media timeline, while
-`source.engine.hlsJs.startPosition` uses the source URL’s scene time. They check DOM
-identity, progressing playback, start positions, mute preservation and repeated
-natural `ended` transitions. The fixture uses no B-frames to keep decoded-frame
+`useScenePlayerSources`. Clip seeks and `source.engine.hlsJs.startPosition` use
+the relative clip timeline; full-scene HLS starts use the source URL's scene time.
+They check DOM identity, progressing playback, start positions, mute preservation
+and repeated natural `ended` transitions. The fixture uses no B-frames to keep decoded-frame
 timestamps near the requested segment boundary; an initial buffer gap can leave
 WebKit waiting at the seek target. Headless WebKit does not establish physical
 iPhone autoplay policy or ManagedMediaSource behavior.

@@ -32,8 +32,8 @@ export const SceneVideo = memo(function SceneVideo({
       type: ContentTypes.M3U8,
       engine: {
         hlsJs: {
-          // Load the segment containing the requested scene time first,
-          // avoiding a needless transcode at zero followed by a restart.
+          // Clipped playlists start at zero in their own timeline;
+          // full-scene playlists use the requested scene-time hint.
           startPosition: parseStartPosition(src),
           // MMS rate-limits segment fetches. These existing ceilings leave
           // enough buffered video to cover its quota cycles on iPhones.

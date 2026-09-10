@@ -167,6 +167,27 @@ test("rapid navigation ignores late query results and missing scenes remain dism
   await expect(video).toHaveCount(0);
 });
 
+test("a multi-segment marker loads its beginning before later clip segments", async ({
+  page,
+}) => {
+  const firstSegment = page.waitForRequest((request) =>
+    /\/media\/hls\/segment-\d+\.m4s$/.test(new URL(request.url()).pathname),
+  );
+  const video = await open(page, "?mode=long-marker&paused");
+  expect(new URL((await firstSegment).url()).pathname).toBe(
+    "/media/hls/segment-1.m4s",
+  );
+  await expect(video).toHaveJSProperty("paused", true);
+  await expect
+    .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
+    .toBeLessThan(0.1);
+  await page.getByRole("button", { name: "Play", exact: true }).first().click();
+  await expect(video).toHaveJSProperty("paused", false);
+  await expect
+    .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
+    .toBeGreaterThan(2.1);
+});
+
 test("same-scene marker navigation resets clip timestamps and end state", async ({
   page,
 }) => {

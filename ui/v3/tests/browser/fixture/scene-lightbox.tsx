@@ -71,12 +71,12 @@ const scenes = ["1", "2", "3", "slow"].map((id): GQL.SceneDataFragment => {
         label: "HLS (240p)",
       },
     ],
-    scene_markers: [6, 8].map((seconds, index) => ({
+    scene_markers: [6, 8, 2].map((seconds, index) => ({
       __typename: "SceneMarker",
       id: `marker-${index}`,
       title: `Marker ${index + 1}`,
       seconds,
-      end_seconds: seconds + 2,
+      end_seconds: index === 2 ? 10 : seconds + 2,
       scene,
       primary_tag: { id: "tag", name: "Example" },
       tags: [],
@@ -126,6 +126,20 @@ export function SceneLightboxFixture() {
     return () => clearTimeout(timer);
   }, [mode, index]);
   const slides = useMemo<SceneSlide[]>(() => {
+    if (mode === "long-marker")
+      return [
+        {
+          type: "scene",
+          sceneId: "2",
+          marker: {
+            id: "marker-2",
+            title: "Long marker",
+            seconds: 2,
+            primaryTag: { id: "tag", name: "Example" },
+            tags: [],
+          },
+        },
+      ];
     if (mode === "markers")
       return [6, 8].map((seconds, i) => ({
         type: "scene",

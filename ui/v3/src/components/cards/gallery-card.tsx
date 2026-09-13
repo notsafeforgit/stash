@@ -228,7 +228,6 @@ export const GalleryCard: React.FC<GalleryCardProps> = ({
             to: "/images/$imageId",
             params: { imageId },
             state: { returnTo: `/galleries/${gallery.id}` },
-            viewTransition: true,
           });
           return;
         }
@@ -238,7 +237,6 @@ export const GalleryCard: React.FC<GalleryCardProps> = ({
       navigate({
         to: "/galleries/$galleryId",
         params: { galleryId: gallery.id },
-        viewTransition: true,
       });
     })();
   }, [client, gallery.id, navigate, scrubIndex]);

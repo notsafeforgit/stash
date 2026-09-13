@@ -145,7 +145,7 @@ export function MobileDetailFooter({ onBack }: { onBack?: () => void }) {
     <div
       ref={keyboardRef}
       data-mobile-detail-footer
-      className="mobile-keyboard-layout @container relative shrink-0 border-t border-border bg-background pb-[env(safe-area-inset-bottom,0px)]"
+      className="mobile-safe-footer mobile-keyboard-layout @container relative shrink-0 border-t border-border bg-background"
     >
       <MobileNavSheet
         open={chrome.panel === "navigation"}

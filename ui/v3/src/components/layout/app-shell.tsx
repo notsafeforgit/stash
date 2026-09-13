@@ -5,7 +5,6 @@ import { useNavHotkeys } from "src/hooks/use-nav-hotkeys";
 import { useTrackListPage } from "src/hooks/use-smart-back";
 import { DownloadProgressBar } from "src/components/offline/download-progress-bar";
 import { DownloadNotifications } from "src/components/offline/download-notifications";
-import { cn } from "@/lib/utils";
 
 // Detail routes have their own bottom bar. Settings also owns its navigation.
 // `/offline/{sceneId}` is the offline-player page; it's a "detail page" in the
@@ -32,10 +31,8 @@ export function AppShell() {
       <DownloadProgressBar />
       <DownloadNotifications />
       <main
-        className={cn(
-          "flex min-h-0 flex-1 flex-col overflow-hidden",
-          !ownsMobileNavigation && "pb-11 md:pb-0",
-        )}
+        data-route-viewport
+        className="flex min-h-0 flex-1 flex-col overflow-hidden"
       >
         <Outlet />
       </main>

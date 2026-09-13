@@ -71,7 +71,7 @@ export function EntityEditSheet({
           )}
           {children}
         </div>
-        <div className="md:hidden flex shrink-0 justify-end border-t px-3 py-1 pb-[max(0.25rem,env(safe-area-inset-bottom,0px))]">
+        <div className="md:hidden flex shrink-0 justify-end border-t px-[var(--mobile-control-gutter)] py-1">
           <SheetClose
             render={<Button variant="ghost" size="lg" className="h-11" />}
           >

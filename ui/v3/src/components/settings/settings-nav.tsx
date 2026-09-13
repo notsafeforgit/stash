@@ -99,7 +99,7 @@ function MobileSettingsNav({
       <div
         ref={keyboardRef}
         data-mobile-settings-footer
-        className="mobile-keyboard-layout @container flex shrink-0 flex-col border-t bg-background pb-[env(safe-area-inset-bottom,0px)]"
+        className="mobile-safe-footer mobile-keyboard-layout @container flex shrink-0 flex-col border-t bg-background"
       >
         <MobileToolbarRow>
           {isOpen ? (

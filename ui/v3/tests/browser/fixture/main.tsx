@@ -42,6 +42,8 @@ import { VideoSourcesFixture } from "./video-sources";
 import { SceneLightboxFixture } from "./scene-lightbox";
 import { SceneDetailFixture } from "./scene-detail";
 import { EntityCardsFixture } from "./entity-cards";
+import { RouteTransitionsFixture } from "./route-transitions";
+import { HomeFixture } from "./home";
 
 const params = new URLSearchParams(location.search);
 const items = Array.from({ length: 40 }, (_, index) => ({
@@ -266,7 +268,13 @@ function FixtureSettingsPage() {
   );
 }
 
-const rootRoute = createRootRoute({ component: Outlet });
+const rootRoute = createRootRoute({
+  component: () => (
+    <div data-route-viewport className="flex h-dvh flex-col overflow-hidden">
+      <Outlet />
+    </div>
+  ),
+});
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/settings",
@@ -331,7 +339,13 @@ createRoot(root).render(
   <StrictMode>
     <IntlProvider locale="en-GB" messages={flattenMessages(messages)}>
       <ShortcutProvider>
-        <RouterProvider router={router} />
+        {location.pathname.startsWith("/home-fixture") ? (
+          <HomeFixture />
+        ) : location.pathname.includes("/transitions") ? (
+          <RouteTransitionsFixture />
+        ) : (
+          <RouterProvider router={router} />
+        )}
       </ShortcutProvider>
     </IntlProvider>
   </StrictMode>,

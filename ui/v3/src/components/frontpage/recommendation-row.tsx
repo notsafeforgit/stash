@@ -13,6 +13,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useQuery } from "@apollo/client/react";
 import * as GQL from "src/core/generated-graphql";
 import { Button } from "src/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "src/lib/utils";
 import { ListFilterModel } from "src/models/list-filter/filter";
 import type { ICustomFilter, ISavedFilterRow } from "src/core/config";
@@ -174,9 +175,9 @@ export function RecommendationRow({
       >
         {loading
           ? Array.from({ length: 8 }).map((_, i) => (
-              <div
+              <Skeleton
                 key={i}
-                className="shrink-0 w-56 h-40 rounded-md bg-muted animate-pulse [scroll-snap-align:start]"
+                className="shrink-0 w-56 aspect-[2/3] [scroll-snap-align:start]"
               />
             ))
           : children}

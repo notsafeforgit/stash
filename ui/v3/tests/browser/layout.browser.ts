@@ -34,7 +34,8 @@ for (const width of [320, 390, 768, 1280]) {
               back.evaluate((button) =>
                 Math.abs(
                   button.getBoundingClientRect().right -
-                    (window.innerWidth - 6),
+                    (window.innerWidth -
+                      Math.min(16, Math.max(6, (window.innerWidth - 308) / 2))),
                 ),
               ),
             )

@@ -44,6 +44,7 @@ const scenes = ["1", "2", "3", "slow"].map((id): GQL.SceneDataFragment => {
   );
   return {
     ...scene,
+    preview_image: null,
     files: scene.files.map((file) => ({
       ...file,
       frame_rate: 30,
@@ -73,6 +74,7 @@ const scenes = ["1", "2", "3", "slow"].map((id): GQL.SceneDataFragment => {
     ],
     scene_markers: [6, 8, 2].map((seconds, index) => ({
       __typename: "SceneMarker",
+      preview_image: null,
       id: `marker-${index}`,
       title: `Marker ${index + 1}`,
       seconds,

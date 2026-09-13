@@ -890,8 +890,7 @@ function ControlBar({
       data-player-control-bar=""
       className={cn(
         "pointer-events-none relative z-10 mt-auto flex flex-col gap-1 px-2 py-1 w-full",
-        onClose &&
-          "px-[max(0.375rem,env(safe-area-inset-left,0px),env(safe-area-inset-right,0px))] pb-[max(0.25rem,env(safe-area-inset-bottom,0px))]",
+        onClose && "viewport-controls",
       )}
     >
       <div

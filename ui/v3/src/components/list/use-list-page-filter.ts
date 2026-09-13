@@ -203,8 +203,8 @@ export function useListPageFilter({
   // unnecessarily, adding latency to instant UI actions like zoom.
   //
   // Zoom changes go through `document.startViewTransition` on supporting
-  // browsers — without naming any elements, so the browser snapshots the
-  // page before and after as two whole-page bitmaps and crossfades between
+  // browsers — using the app shell's single content snapshot, so the browser
+  // captures the layout before and after as two bitmaps and crossfades between
   // them on the GPU. That's a single composited animation regardless of
   // how many cards are on screen, so it stays smooth even on dense grids.
   // The trade-off: cards don't visibly morph from old position to new —

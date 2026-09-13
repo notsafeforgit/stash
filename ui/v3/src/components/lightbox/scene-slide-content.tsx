@@ -51,7 +51,7 @@ interface SceneSlideContentProps {
 
 function PendingPlayerClose({ onClose }: { onClose?: () => void }) {
   return onClose ? (
-    <div className="absolute inset-x-0 bottom-0 flex justify-end px-[max(0.375rem,env(safe-area-inset-left,0px),env(safe-area-inset-right,0px))] pb-[max(0.25rem,env(safe-area-inset-bottom,0px))]">
+    <div className="viewport-controls absolute inset-x-0 bottom-0 flex justify-end">
       <PlayerCloseButton onClose={onClose} />
     </div>
   ) : null;

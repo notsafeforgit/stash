@@ -9,6 +9,7 @@ import { routeTree as fileRouteTree } from "./routeTree.gen";
 import { getRegisteredRoutes } from "@/plugins/registry";
 import { getApplicationBasePath } from "@/core/platform-url";
 import { getScrollRestorationKey } from "@/core/scroll-restoration";
+import { installRouteTransitions } from "@/core/route-transitions";
 
 const coreRoutes: AnyRoute[] = Object.values(fileRouteTree.children ?? {});
 
@@ -63,13 +64,15 @@ function buildRouteTree(includePlugins: boolean) {
 }
 
 export function createAppRouter(includePlugins = true) {
-  return createRouter({
+  const router = createRouter({
     routeTree: buildRouteTree(includePlugins),
     basepath: getApplicationBasePath(),
     defaultPreload: "intent",
     scrollRestoration: true,
     getScrollRestorationKey,
   });
+  installRouteTransitions(router);
+  return router;
 }
 
 export type AppRouter = ReturnType<typeof createAppRouter>;

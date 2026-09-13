@@ -338,7 +338,7 @@ function MediaDetailContent({
             // the flex column from compressing the player to make
             // everything fit within the parent height.
             primaryFocusMode
-              ? "fixed inset-0 z-[9999] h-[100dvh] w-screen flex flex-col overflow-hidden overscroll-none touch-none pb-[env(safe-area-inset-bottom,0px)]"
+              ? "safe-area-viewport fixed inset-0 z-[9999] h-[100dvh] w-screen flex flex-col overflow-hidden overscroll-none touch-none pb-[var(--safe-area-bottom)]"
               : mobilePageScroll
                 ? "relative shrink-0"
                 : "relative overflow-hidden",

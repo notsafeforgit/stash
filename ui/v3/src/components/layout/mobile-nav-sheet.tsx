@@ -37,6 +37,7 @@ export function MobileNavSheet({ open, onOpenChange }: MobileNavSheetProps) {
       <nav className="grid min-h-0 grid-cols-4 gap-1 overflow-y-auto px-2 pb-3">
         <Link
           to="/"
+          preload="viewport"
           activeOptions={{ exact: true, includeSearch: false }}
           onClick={() => onOpenChange(false)}
           className={cn(

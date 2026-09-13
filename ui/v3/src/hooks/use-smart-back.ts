@@ -72,11 +72,11 @@ export function useSmartBack(defaultPath: (typeof LIST_PATHNAMES)[number]) {
       localNavigationHref(router.state.location.state.returnTo ?? "") ??
       (_lastListHref ? localNavigationHref(_lastListHref) : undefined);
     if (href) {
-      void navigate({ href, viewTransition: true });
+      void navigate({ href, state: { navigationDirection: "back" } });
       return;
     }
 
     // 3. Direct link / external referral
-    navigate({ to: defaultPath, viewTransition: true });
+    navigate({ to: defaultPath, state: { navigationDirection: "back" } });
   }, [navigate, router, defaultPath]);
 }

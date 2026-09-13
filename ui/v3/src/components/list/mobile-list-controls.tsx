@@ -130,7 +130,7 @@ export function MobileListControls({
         data-mobile-list-mode={mode ?? "browse"}
         className={cn(
           !hosted &&
-            "mobile-keyboard-layout @container shrink-0 border-t bg-background pb-[env(safe-area-inset-bottom,0px)]",
+            "mobile-safe-footer mobile-keyboard-layout @container shrink-0 border-t bg-background",
         )}
       >
         <Row

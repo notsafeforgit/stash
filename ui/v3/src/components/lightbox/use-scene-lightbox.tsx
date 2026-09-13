@@ -18,6 +18,7 @@ function sceneToSlide(scene: SceneItem): SceneSlide {
     sceneId: scene.id,
     title: objectTitle(scene) || undefined,
     posterSrc: scene.paths.screenshot ?? undefined,
+    posterImage: scene.preview_image,
   };
 }
 

@@ -1,3 +1,4 @@
+import { PreviewImage } from "@/components/shared/preview-image";
 import {
   useDuplicateFilter,
   useDuplicateSelection,
@@ -1126,6 +1127,7 @@ function SceneDuplicateCheckerPage() {
                         sceneId: scene.id,
                         title: objectTitle(scene) || undefined,
                         posterSrc: scene.paths.screenshot ?? undefined,
+                        posterImage: scene.preview_image,
                       })),
                       index,
                     })
@@ -1160,6 +1162,7 @@ function SceneDuplicateCheckerPage() {
                         sceneId: scene.id,
                         title: objectTitle(scene) || undefined,
                         posterSrc: scene.paths.screenshot ?? undefined,
+                        posterImage: scene.preview_image,
                       })),
                       index,
                     })
@@ -1463,7 +1466,8 @@ function DuplicateTable({
                         { entityType: objectTitle(scene) },
                       )}
                     >
-                      <img
+                      <PreviewImage
+                        preview={scene.preview_image}
                         src={scene.paths.screenshot ?? ""}
                         alt=""
                         className={cn(

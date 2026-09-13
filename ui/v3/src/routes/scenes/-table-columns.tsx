@@ -43,8 +43,9 @@ export function useSceneTableColumns(): ColumnDef<SceneItem>[] {
       selectionColumn<SceneItem>(),
 
       thumbnailColumn<SceneItem>(
-        (scene) => scene.paths.webp ?? scene.paths.screenshot,
+        (scene) => scene.paths.screenshot,
         (scene) => entityDestination.scene(scene.id),
+        (scene) => scene.preview_image,
       ),
 
       titleColumn<SceneItem>({

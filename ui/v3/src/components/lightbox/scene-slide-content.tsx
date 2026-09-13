@@ -1,3 +1,4 @@
+import { PreviewImage } from "@/components/shared/preview-image";
 import type React from "react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { skipToken, useQuery, useMutation } from "@apollo/client/react";
@@ -67,8 +68,9 @@ export function SceneSlideContent(props: SceneSlideContentProps) {
 function SceneSlidePoster({ slide }: { slide: SceneSlide }) {
   return (
     <div className="absolute inset-0 flex items-center justify-center bg-black">
-      {slide.posterSrc && (
-        <img
+      {(slide.posterSrc || slide.posterImage) && (
+        <PreviewImage
+          preview={slide.posterImage}
           src={slide.posterSrc}
           alt={slide.title ?? ""}
           className="max-w-full max-h-full object-contain select-none"
@@ -206,6 +208,12 @@ function ActiveSceneSlide({
           }
           clipRange={clipRange}
           posterSrc={markerPosterSrc}
+          posterImage={
+            marker
+              ? (scene?.scene_markers.find((m) => m.id === marker.id)
+                  ?.preview_image ?? slide.posterImage)
+              : undefined
+          }
           sendGetCurrentTime={sendGetCurrentTime}
           sendPause={(pause) => {
             pauseRef.current = pause;

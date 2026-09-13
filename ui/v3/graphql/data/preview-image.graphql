@@ -1,0 +1,10 @@
+fragment PreviewImageData on PreviewImage {
+  fallback
+  sources {
+    url
+    mime_type
+    dynamic_range
+    width
+    height
+  }
+}

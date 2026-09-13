@@ -23,6 +23,9 @@ type FileDeleter struct {
 // MarkGeneratedFiles marks for deletion the generated files for the provided scene.
 // Generated files bypass trash and are permanently deleted since they can be regenerated.
 func (d *FileDeleter) MarkGeneratedFiles(scene *models.Scene) error {
+	if err := d.markPreviewImages(scene.ID); err != nil {
+		return err
+	}
 	sceneHash := scene.GetHash(d.FileNamingAlgo)
 
 	if sceneHash == "" {

@@ -17,6 +17,7 @@ type MarkerCardMarker = Pick<
   | "stream"
   | "preview"
   | "screenshot"
+  | "preview_image"
   | "scene"
   | "primary_tag"
   | "tags"
@@ -104,6 +105,7 @@ export const MarkerCard: React.FC<MarkerCardProps> = ({
       <EntityCard.SelectCheckbox />
       <EntityCard.Preview
         image={marker.screenshot}
+        previewImage={marker.preview_image}
         video={marker.stream}
         animated={marker.preview}
         resolution={cardLayout === "wall" ? null : resolution}

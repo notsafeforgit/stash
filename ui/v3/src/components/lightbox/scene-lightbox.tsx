@@ -1,3 +1,4 @@
+import type { PreviewImageData } from "@/components/shared/preview-image";
 import "yet-another-react-lightbox/styles.css";
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -35,6 +36,7 @@ export interface SceneSlide extends GenericSlide {
   sceneId: string;
   title?: string;
   posterSrc?: string;
+  posterImage?: PreviewImageData | null;
   /** Transient placeholder shown while the next/prev page is loading. */
   loading?: boolean;
   /** When set, the player starts playback at this marker's `seconds` and the

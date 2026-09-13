@@ -26,6 +26,7 @@ function markerToSlide(m: MarkerItem): SceneSlide {
     sceneId: m.scene.id,
     title: markerTitle(m),
     posterSrc: m.screenshot ?? undefined,
+    posterImage: m.preview_image,
     marker: {
       id: m.id,
       title: markerTitle(m),

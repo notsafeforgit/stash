@@ -16,6 +16,7 @@ v3 route paths may differ, but existing v2.5 clients must keep working.
 | [Plugin host](../ui/v3/docs/plugin-host.md) | Current v3 UI plugin API, startup lifecycle, and failure handling |
 | [Theming](../ui/v3/docs/theming.md) | Runtime CSS, JavaScript, custom assets, and component selectors |
 | [Offline downloads](../ui/v3/docs/offline.md) | Implemented download/storage/playback behavior and remaining limits |
+| [Preview images](preview-images.md) | HDR AVIF, SDR fallbacks, generation requirements, and the v2.5 compatibility boundary |
 | [Locales](../ui/v3/src/locales/README.md) | Translation files and message conventions |
 
 ## Operations

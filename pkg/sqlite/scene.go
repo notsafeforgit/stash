@@ -111,6 +111,7 @@ func (r *sceneQueryRow) resolve() *models.Scene {
 		PrimaryFileID: nullIntFileIDPtr(r.PrimaryFileID),
 		OSHash:        r.PrimaryFileOshash.String,
 		Checksum:      r.PrimaryFileChecksum.String,
+		CoverChecksum: r.CoverBlob.String,
 
 		CreatedAt: r.CreatedAt.Timestamp,
 		UpdatedAt: r.UpdatedAt.Timestamp,

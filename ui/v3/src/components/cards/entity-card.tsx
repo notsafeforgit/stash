@@ -1,3 +1,8 @@
+import {
+  PreviewImage,
+  type PreviewImageData,
+  type PreviewImageProps,
+} from "@/components/shared/preview-image";
 import type { EntityDestination } from "@/core/navigation";
 import { Button } from "@/components/ui/button";
 import { useIntl } from "react-intl";
@@ -283,6 +288,7 @@ interface PreviewBadges {
 }
 
 interface EntityCardPreviewProps extends PreviewBadges {
+  previewImage?: PreviewImageData | null;
   image?: string | null;
   video?: string | null;
   /** Animated WebP preview URL — shown as the idle state when the
@@ -357,7 +363,7 @@ function FadeInImage({
   src,
   alt,
   ...rest
-}: React.ImgHTMLAttributes<HTMLImageElement> & { alt: string }) {
+}: PreviewImageProps) {
   const [loaded, setLoaded] = useState(() =>
     src ? fadeInLoadedSrcs.has(src) : false,
   );
@@ -377,7 +383,7 @@ function FadeInImage({
   }, [src]);
 
   return (
-    <img
+    <PreviewImage
       alt={alt}
       ref={ref}
       src={src}
@@ -397,7 +403,8 @@ function FadeInImage({
 }
 
 function EntityCardPreview({
-  image,
+  image: legacyImage,
+  previewImage,
   video,
   animated,
   vtt,
@@ -413,6 +420,7 @@ function EntityCardPreview({
   oCounter,
   children,
 }: EntityCardPreviewProps) {
+  const image = legacyImage || previewImage?.fallback;
   // Card preview behaviour is driven by two interface settings:
   //   - previewDefault: which asset to show when the card is idle
   //   - playVideoOnHover: whether hover swaps to the video preview
@@ -639,6 +647,7 @@ function EntityCardPreview({
             <FadeInImage
               className="absolute inset-0 h-full w-full object-contain"
               src={image}
+              preview={previewImage}
               alt=""
               onLoad={
                 naturalIsPortraitProp === undefined
@@ -655,6 +664,7 @@ function EntityCardPreview({
           <FadeInImage
             className={cn("absolute inset-0 h-full w-full", mediaFitClass)}
             src={image}
+            preview={previewImage}
             alt=""
             onLoad={
               naturalIsPortraitProp === undefined

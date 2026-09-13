@@ -29,6 +29,7 @@ export const markerTableColumns: ColumnDef<MarkerItem>[] = [
   thumbnailColumn<MarkerItem>(
     (m) => m.screenshot,
     (m) => entityDestination.scene(m.scene.id, { t: m.seconds }),
+    (m) => m.preview_image,
   ),
 
   titleColumn<MarkerItem>({

@@ -71,6 +71,8 @@ func (rs sceneRoutes) Routes() chi.Router {
 		r.Get("/stream.mpd/{segment}_a.webm", rs.StreamDASHAudioSegment)
 
 		if config.GetInstance().GetEnableV3UI() {
+			r.Get("/preview-image/{previewFile}", rs.PreviewImage)
+			r.Get("/scene_marker/{sceneMarkerId}/preview-image/{previewFile}", rs.MarkerPreviewImage)
 			// HLS transcode (re-encode to H.264 + AAC fMP4). The
 			// `.master.m3u8` endpoint serves a multivariant master playlist with
 			// EXT-X-MEDIA audio rendition + EXT-X-STREAM-INF video variant, both

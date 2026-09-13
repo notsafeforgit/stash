@@ -1,0 +1,30 @@
+"Display characteristics of a generated image rendition."
+enum PreviewImageDynamicRange {
+  SDR
+  "A plain HDR image; select it only for HDR-capable displays."
+  HDR
+  "An SDR base with an HDR gain map; suitable for either display type."
+  ADAPTIVE
+}
+
+type PreviewImageSource {
+  url: String!
+  mime_type: String!
+  dynamic_range: PreviewImageDynamicRange!
+  width: Int!
+  height: Int!
+}
+
+"A generated still image with a display-safe fallback and preferred renditions."
+type PreviewImage {
+  fallback: String!
+  sources: [PreviewImageSource!]!
+}
+
+extend type Scene {
+  preview_image: PreviewImage # Resolver
+}
+
+extend type SceneMarker {
+  preview_image: PreviewImage # Resolver
+}

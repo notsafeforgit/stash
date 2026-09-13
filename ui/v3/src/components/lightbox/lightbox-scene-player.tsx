@@ -1,3 +1,4 @@
+import type { PreviewImageData } from "@/components/shared/preview-image";
 /**
  * `<ScenePlayer>` configured for the lightbox carousel use case —
  * autoplay, full-fill, no seek arrows (the lightbox owns horizontal
@@ -50,6 +51,7 @@ interface LightboxScenePlayerProps {
   clipRange?: { start: number; end: number };
   /** Marker poster override; defaults to the slide's poster. */
   posterSrc?: string;
+  posterImage?: PreviewImageData | null;
   /** Marker slides start at the marker's `seconds`. */
   initialTimestamp?: number;
   /** Captures a getter for the live playhead — used by the offline
@@ -74,6 +76,7 @@ export function LightboxScenePlayer({
   onNext,
   clipRange,
   posterSrc,
+  posterImage,
   initialTimestamp,
   sendGetCurrentTime,
   sendPause,
@@ -101,6 +104,7 @@ export function LightboxScenePlayer({
       onNext={onNext}
       clipRange={clipRange}
       posterSrc={posterSrc}
+      posterImage={posterImage}
       initialTimestamp={initialTimestamp}
       sendGetCurrentTime={sendGetCurrentTime}
       sendPause={sendPause}

@@ -1,4 +1,7 @@
 fragment SlimSceneData on Scene {
+  preview_image {
+    ...PreviewImageData
+  }
   id
   title
   code

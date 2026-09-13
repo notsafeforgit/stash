@@ -1,4 +1,7 @@
 fragment SceneMarkerData on SceneMarker {
+  preview_image {
+    ...PreviewImageData
+  }
   id
   title
   seconds

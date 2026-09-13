@@ -77,6 +77,7 @@ function sceneToCarouselSlide(scene: SceneCardScene): SceneSlide {
     sceneId: scene.id,
     title: objectTitle(scene) || undefined,
     posterSrc: scene.paths.screenshot ?? undefined,
+    posterImage: scene.preview_image,
   };
 }
 
@@ -99,6 +100,7 @@ function markerToCarouselSlide(m: GQL.SceneMarkerDataFragment): SceneSlide {
     sceneId: m.scene.id,
     title: markerTitleStr(m),
     posterSrc: m.screenshot ?? undefined,
+    posterImage: m.preview_image,
     marker: {
       id: m.id,
       title: markerTitleStr(m),

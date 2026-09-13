@@ -109,6 +109,9 @@ export function OfflineSettingsSection() {
         {intl.formatMessage({ id: "offline.settings.heading" })}
       </h2>
 
+      <p className="text-sm text-muted-foreground">
+        {intl.formatMessage({ id: "offline.background.unavailable" })}
+      </p>
       <OfflineRecoveryControl />
 
       <div className="flex items-center justify-between gap-4">

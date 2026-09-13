@@ -1,20 +1,16 @@
 import { test, expect } from "./test";
 
 interface TransitionObservation {
-  direction?: "forward" | "back" | "replace";
-  contentAnimation?: string;
-  contentDuration?: string;
-  rootName?: string;
-  contentName?: string;
-  error?: string;
-  frames?: { opacity: number; x: number }[];
-  nativeAnimations?: string[];
+  direction?: string;
+  duration?: number;
+  frames: { opacity: number; x: number }[];
   finished: boolean;
 }
 
 declare global {
   interface Window {
     observedTransitions: TransitionObservation[];
+    nativeRouteSnapshots: number;
   }
 }
 
@@ -24,64 +20,42 @@ test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.addInitScript(() => {
     window.observedTransitions = [];
-    if (typeof document.startViewTransition !== "function") return;
-    const start = document.startViewTransition.bind(document);
-    document.startViewTransition = (...args) => {
-      const observation: TransitionObservation = { finished: false };
+    window.nativeRouteSnapshots = 0;
+    const native = document.startViewTransition?.bind(document);
+    if (native)
+      document.startViewTransition = (...args) => {
+        window.nativeRouteSnapshots++;
+        return native(...args);
+      };
+    const animate = Element.prototype.animate;
+    Element.prototype.animate = function (...args) {
+      const animation = animate.apply(this, args);
+      if (!this.hasAttribute("data-route-viewport")) return animation;
+      const observation: TransitionObservation = {
+        direction: animation.id.replace("route-", ""),
+        duration: Number(animation.effect?.getTiming().duration),
+        frames: [],
+        finished: false,
+      };
       window.observedTransitions.push(observation);
-      const transition = start(...args);
-      void transition.ready.then(
+      const sample = () => {
+        const style = getComputedStyle(this);
+        observation.frames.push({
+          opacity: Number(style.opacity),
+          x: new DOMMatrixReadOnly(style.transform).m41,
+        });
+        if (!observation.finished) requestAnimationFrame(sample);
+      };
+      sample();
+      void animation.finished.then(
         () => {
-          const root = document.documentElement;
-          for (const direction of ["forward", "back", "replace"] as const) {
-            const selector = `:active-view-transition-type(route-${direction})`;
-            if (
-              CSS.supports(`selector(${selector})`) &&
-              root.matches(selector)
-            ) {
-              observation.direction = direction;
-            }
-          }
-          const content = document.querySelector("[data-route-viewport]");
-          if (!content) throw new Error("Missing route viewport");
-          const style = getComputedStyle(
-            root,
-            "::view-transition-new(route-content)",
-          );
-          observation.contentAnimation = style.animationName;
-          observation.contentDuration = style.animationDuration;
-          observation.rootName = getComputedStyle(root).viewTransitionName;
-          observation.contentName =
-            getComputedStyle(content).viewTransitionName;
-          observation.nativeAnimations = document
-            .getAnimations()
-            .filter(
-              (animation): animation is CSSAnimation =>
-                animation instanceof CSSAnimation,
-            )
-            .map((animation) => animation.animationName);
-          observation.frames = [];
-          const sampleFrame = () => {
-            const frame = getComputedStyle(
-              root,
-              "::view-transition-new(route-content)",
-            );
-            observation.frames?.push({
-              opacity: Number(frame.opacity),
-              x: new DOMMatrixReadOnly(frame.transform).m41,
-            });
-            if (!observation.finished) requestAnimationFrame(sampleFrame);
-          };
-          sampleFrame();
+          observation.finished = true;
         },
-        (error: unknown) => {
-          observation.error = String(error);
+        () => {
+          observation.finished = true;
         },
       );
-      void transition.finished.then(() => {
-        observation.finished = true;
-      });
-      return transition;
+      return animation;
     };
   });
 });
@@ -106,11 +80,7 @@ test.describe("mobile touch navigation", () => {
     for (const [index, direction] of ["forward", "back"].entries()) {
       const transition = transitions[index];
       if (!transition) throw new Error("Missing touch transition");
-      expect(transition.error).toBeUndefined();
       expect(transition.direction).toBe(direction);
-      expect(transition.nativeAnimations).toEqual(
-        expect.arrayContaining(["route-content-in", "route-content-out"]),
-      );
       const frames = transition.frames ?? [];
       expect(frames.length).toBeGreaterThan(1);
       const start = frames[0];
@@ -124,50 +94,14 @@ test.describe("mobile touch navigation", () => {
     }
   });
 
-  test("fresh route CSS produces both outgoing and incoming snapshots", async ({
+  test("image-heavy routes do not start native snapshot capture", async ({
     page,
   }) => {
-    await page.route("**/route-snapshot.css", (route) =>
-      route.fulfill({
-        contentType: "text/css",
-        body: "[data-route-viewport] { view-transition-name: route-content !important; }",
-      }),
-    );
     await page.goto("/transitions");
-    await page.addStyleTag({
-      content: "[data-route-viewport] { view-transition-name: none; }",
-    });
-    await page.locator("[data-route-viewport]").evaluate((element) => {
-      if (getComputedStyle(element).viewTransitionName !== "none")
-        throw new Error("Expected the initial snapshot name to be unset");
-    });
-    // Navigate as soon as uncached CSS arrives, before another layout turn.
-    await page.evaluate(async () => {
-      const stylesheet = document.createElement("link");
-      stylesheet.rel = "stylesheet";
-      stylesheet.href = "/route-snapshot.css";
-      await new Promise<void>((resolve, reject) => {
-        stylesheet.onerror = () => reject(new Error("CSS failed to load"));
-        stylesheet.onload = () => {
-          const link = document.querySelector('a[href="/transitions/1"]');
-          if (!(link instanceof HTMLAnchorElement)) {
-            reject(new Error("Missing entity link"));
-            return;
-          }
-          link.click();
-          resolve();
-        };
-        document.head.append(stylesheet);
-      });
-    });
-    await expect
-      .poll(() => page.evaluate(() => window.observedTransitions[0]?.finished))
-      .toBe(true);
-    const transition = await page.evaluate(() => window.observedTransitions[0]);
-    expect(transition?.error).toBeUndefined();
-    expect(transition?.nativeAnimations).toEqual(
-      expect.arrayContaining(["route-content-in", "route-content-out"]),
-    );
+    await page.getByRole("link", { name: "Entity 1", exact: true }).tap();
+    await page.getByRole("button", { name: "Back to list" }).tap();
+    await expect(page.getByRole("heading", { name: "Entities" })).toBeVisible();
+    expect(await page.evaluate(() => window.nativeRouteSnapshots)).toBe(0);
   });
 });
 
@@ -194,10 +128,7 @@ for (const prefix of ["", "/stash"]) {
       );
       expect(observation).toMatchObject({
         direction,
-        contentAnimation: "route-content-in",
-        contentDuration: "0.18s",
-        rootName: "none",
-        contentName: "route-content",
+        duration: 180,
       });
       expect(await page.locator("header").boundingBox()).toEqual(header);
     }
@@ -239,17 +170,13 @@ test("search/hash changes preserve the form and entity changes preserve React st
   expect(await page.evaluate(() => window.observedTransitions.length)).toBe(1);
 });
 
-test("older View Transition implementations still honor navigation opt-outs", async ({
+test("route motion works without native View Transition support", async ({
   page,
 }) => {
   await page.addInitScript(() => {
-    const supports = CSS.supports.bind(CSS);
-    CSS.supports = (property: string, value?: string) => {
-      if (property.includes("active-view-transition-type")) return false;
-      return value === undefined
-        ? supports(property)
-        : supports(property, value);
-    };
+    Object.defineProperty(document, "startViewTransition", {
+      value: undefined,
+    });
   });
   await page.goto("/transitions");
   await page.getByRole("link", { name: "Entity 1", exact: true }).click();
@@ -259,9 +186,8 @@ test("older View Transition implementations still honor navigation opt-outs", as
   expect(
     await page.evaluate(() => window.observedTransitions[0]),
   ).toMatchObject({
-    contentDuration: "0.14s",
-    rootName: "none",
-    contentName: "route-content",
+    duration: 180,
+    direction: "forward",
   });
   await page.getByRole("button", { name: "Details tab" }).click();
   await expect(page).toHaveURL(/tab=details#metadata$/);
@@ -277,7 +203,7 @@ test("rapid navigation can interrupt motion and Smart Back can reverse to a sibl
   await page.goto("/transitions/1");
   await page.getByRole("link", { name: "Next entity" }).click();
   await expect(page.getByRole("heading", { name: "Entity 2" })).toBeVisible();
-  // Dispatch during the native animation, without Playwright waiting for stability.
+  // Dispatch during the animation, without Playwright waiting for stability.
   await page
     .getByRole("button", { name: "Back to entity" })
     .evaluate((element) => {
@@ -324,9 +250,7 @@ test("returning to a scrolled list restores its position with either Back action
     await expect
       .poll(() => list.evaluate((element) => element.scrollTop))
       .toBe(250);
-    // Playwright's next click scrolls captured elements to the center while
-    // their real DOM is hidden by a native snapshot. Finish this animation
-    // before asking it to click the restored list again.
+    // Finish the entrance animation before clicking the restored list again.
     await expect
       .poll(() =>
         page.evaluate(() =>
@@ -352,7 +276,7 @@ test("reduced motion is checked on every navigation", async ({ page }) => {
 
 test("unsupported browsers navigate normally", async ({ page }) => {
   await page.addInitScript(() => {
-    Object.defineProperty(document, "startViewTransition", {
+    Object.defineProperty(Element.prototype, "animate", {
       value: undefined,
     });
   });

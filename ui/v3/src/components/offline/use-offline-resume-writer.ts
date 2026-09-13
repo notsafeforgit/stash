@@ -57,9 +57,16 @@ export function useOfflineResumeWriter(
 
     const timer = setInterval(flush, POLL_INTERVAL_MS);
     const onBeforeUnload = () => flush();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    window.addEventListener("pagehide", onBeforeUnload);
+    document.addEventListener("visibilitychange", onVisibilityChange);
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => {
       clearInterval(timer);
+      window.removeEventListener("pagehide", onBeforeUnload);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("beforeunload", onBeforeUnload);
       // Final write on the route-navigation / lightbox-close path.
       flush();

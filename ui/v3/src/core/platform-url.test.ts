@@ -13,6 +13,11 @@ import {
 } from "./platform-url";
 
 describe("public mount point", () => {
+  it("resolves a standalone offline document's relative base within its deployment", () => {
+    expect(
+      applicationBaseURL("https://example.test/stash/offline.html", "./").href,
+    ).toBe("https://example.test/stash/");
+  });
   it("preserves encoded filters in links and raw pagination history", async () => {
     const base = applicationBaseURL("https://example.test", "/stash/");
     const filter = "/scenes?c=%7B%22value%22%3A%22a%2Fb%22%7D&p=2#top";

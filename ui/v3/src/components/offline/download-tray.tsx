@@ -255,6 +255,13 @@ function ActiveRow({
           <XIcon />
         </Button>
       </div>
+      <p className="text-xs text-muted-foreground">
+        {intl.formatMessage({
+          id: entry.background_fetch_id
+            ? "offline.background.active"
+            : "offline.background.foreground",
+        })}
+      </p>
       {/* Base UI Progress: pass the live percentage as `value`, or
           `null` to flip into indeterminate mode (Base UI then drops
           the inline width on the indicator and our CSS keyframe

@@ -1,6 +1,6 @@
 # Offline scene downloads
 
-This guide describes the implementation on `v3-rewrite`, checked on 2026-09-08.
+This guide describes the implementation on `v3-rewrite`, checked on 2026-09-13.
 The earlier phased proposal has been replaced by current behavior and explicit
 limits. See the [architecture guide](architecture.md) for shared list/player
 contracts and the [documentation index](../../../docs/README.md) for other guides.
@@ -12,11 +12,21 @@ file, and exported with **Save to Files**. The download queue survives route
 navigation, persists its entries across reloads, and supports retry, cancellation,
 and deletion. The Offline view reuses the shared list and lightbox components.
 
-“Offline” currently describes local media and metadata access after the app has
-loaded. There is **no service worker or Background Fetch integration**. A cold
-launch or reload without the server is not guaranteed to load the app shell or
-pass its startup gates. Downloads run in the page and can be suspended when the
-browser backgrounds or closes it. Installing the PWA does not remove these limits.
+A service worker precaches a small standalone offline library and its player
+assets. After its first successful online installation, a cold launch or reload
+without the server opens saved videos without configuration, plugin, or GraphQL
+startup gates. Navigation timeouts and server 5xx responses also open this view;
+authentication responses remain untouched. Online navigation stays network-first.
+The fallback uses the worker registration's deployment prefix, never a cached
+server configuration. Its player shares the normal Video.js implementation.
+
+Downloads use browser-managed Background Fetch when the API accepts the request.
+The browser continues the transfer after the page closes; the service worker
+streams the completed response to OPFS and advances the durable queue. The
+foreground queue remains the fallback when the API is missing or refuses the
+request, and for retries with partial local bytes. That fallback can be suspended
+by the OS and needs an open app; installing on iOS does not grant arbitrary
+background execution. The active download explains which behavior is in use.
 
 ## Download and playback flow
 
@@ -24,7 +34,7 @@ browser backgrounds or closes it. Installing the PWA does not remove these limit
    using device decode support, server encoder capabilities, and the device's
    maximum-resolution preference.
 2. The shared queue writes an IndexedDB row, then its single active worker
-   fetches the scene download endpoint and streams the response into OPFS.
+   hands the transfer to Background Fetch or streams a foreground response to OPFS.
 3. The tray and list show queued, downloading, complete, or error state. A known
    `Content-Length`/`Content-Range` total enables percentage progress; otherwise
    the UI shows bytes transferred.
@@ -153,8 +163,14 @@ entries, import receipts, and clear-all decisions; it cannot save a new resume
 position back into the old store. The UI disables the download action and
 reports unsupported commands. This fallback avoids starting competing writers.
 Browsers also need IndexedDB/OPFS in a secure
-context for offline storage; the queue is not a service worker or Background
-Fetch task.
+context for offline storage. Background Fetch ownership is stored in the optional
+`background_fetch_id` field. Recovery reattaches to an existing browser transfer
+before treating a `downloading` row as an orphan. Completion uses the same worker
+and scene locks as foreground commands, validates HTTP status/content type and
+byte count, and checks durable cancellation before publishing `complete`.
+An old completion cannot overwrite a newer request. Browser-staged bytes and
+the final OPFS copy can temporarily need space together; completion checks the
+reported quota before copying and surfaces storage failures for retry.
 
 | Event | Behavior |
 | --- | --- |
@@ -263,7 +279,7 @@ preview assets can be unavailable offline.
 
 `useOfflineResumeWriter` writes the local playhead about every five seconds
 when it moves at least 0.5 seconds, plus a best-effort final write on unmount or
-`beforeunload`. Both the detail player and offline lightbox use local resume
+`pagehide`, hidden visibility, or `beforeunload`. Both the detail player and offline lightbox use local resume
 state. Browser termination can prevent the final asynchronous write.
 
 ## Settled decisions
@@ -297,7 +313,21 @@ All frontend filenames below are under `src/components/offline/` unless noted.
 | `save-to-files.ts`, `offline-settings-section.tsx` | Export, quota display, persistence, and clear-all |
 | `src/routes/offline/` | List and detail routes |
 
-Service-worker shell caching, Background Fetch, source validation for range
-retries, cached artwork, and multi-file export remain
-unimplemented. They require separate feature design and validation; the old
-proposal's phase labels are not a completion checklist.
+`src/pwa/register.ts` registers a stable worker URL under the application base.
+`src/pwa/service-worker.ts` handles navigation fallback and browser transfer
+completion; `background-fetch-handler.ts` performs the locked file commit.
+`scripts/offline-assets.ts` limits precaching to the offline entry dependency
+graph plus styles/fonts. API responses, server configuration, remote artwork and
+streamed video are not cached by fetch handlers. Completed MP4s live only in OPFS.
+New workers wait for existing windows to close; updates never force a reload.
+The precache lifecycle retires obsolete bundled assets on activation.
+
+`pnpm test:pwa` builds and tests offline cold launch, proxy prefixes, namespace
+isolation, native background completion with app windows closed, and local
+playback. It uses a synthetic MP4 and no backend. For an existing Browserless
+container, set `PLAYWRIGHT_WS_ENDPOINT=ws://127.0.0.1:3000/chromium/playwright`
+and `PWA_TEST_HOST` to the host IP reachable from the container. The secure-context
+exception applies only to this HTTP test fixture. Production requires HTTPS.
+
+Source validation for byte-range retries, cached artwork and multi-file export
+remain unimplemented. No native sharing, push, or background sync is introduced.

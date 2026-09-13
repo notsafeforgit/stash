@@ -34,6 +34,8 @@ export interface OfflineEntry {
   request_id?: string;
   queued_at?: number;
   cancel_requested?: boolean;
+  /** Durable browser transfer ownership, independent of any open page. */
+  background_fetch_id?: string;
 
   // ── Scene fields snapshotted at download time ──
   // Refreshed by the metadata-refresh pass on Offline-view mount when

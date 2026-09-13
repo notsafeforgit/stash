@@ -12,6 +12,7 @@
 import type React from "react";
 import { useEffect, useCallback, useState, useRef } from "react";
 import {
+  AirPlayButton,
   CastButton,
   Controls,
   VolumeSlider,
@@ -29,6 +30,7 @@ import {
   PictureInPicture2,
   RotateCcw,
   RotateCw,
+  Airplay,
   Cast,
   Repeat,
   Scan,
@@ -852,6 +854,21 @@ function ControlBar({
           {pip ? <PictureInPicture2 /> : <PictureInPicture />}
         </Button>
       )}
+      <AirPlayButton
+        aria-label="AirPlay"
+        className={(state) =>
+          cn(
+            OVERLAY_BTN,
+            state.state === "connected" ? "text-primary" : "text-white/80",
+            onClose && "size-11",
+          )
+        }
+        render={
+          <Button type="button" variant="ghost" size="icon">
+            <Airplay data-icon="inline-start" />
+          </Button>
+        }
+      />
       <CastButton
         className={(state) =>
           cn(

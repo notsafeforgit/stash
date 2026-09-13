@@ -122,7 +122,7 @@ function TransitionDetail() {
             transitionRouter.navigate({
               to: "/transitions/$entityId",
               params: { entityId: "3" },
-              viewTransition: false,
+              state: { routeMotion: false },
             })
           }
         >

@@ -83,6 +83,85 @@ function video() {
   return element;
 }
 
+it("offers AirPlay only when Video.js reports an available target", async () => {
+  const picker = vi.fn();
+  const remoteDescriptor = Object.getOwnPropertyDescriptor(
+    HTMLMediaElement.prototype,
+    "remote",
+  );
+  const remote = Object.assign(new EventTarget(), {
+    state: "disconnected",
+    prompt: picker,
+  });
+  Object.defineProperty(HTMLMediaElement.prototype, "remote", {
+    configurable: true,
+    value: remote,
+  });
+  const audioDescriptor = Object.getOwnPropertyDescriptor(
+    HTMLMediaElement.prototype,
+    "audioTracks",
+  );
+  const audioTracks = Object.assign(new EventTarget(), {
+    length: 0,
+    [Symbol.iterator]: () => [][Symbol.iterator](),
+  });
+  Object.defineProperty(HTMLMediaElement.prototype, "audioTracks", {
+    configurable: true,
+    value: audioTracks,
+  });
+  Object.defineProperty(
+    HTMLMediaElement.prototype,
+    "webkitShowPlaybackTargetPicker",
+    { configurable: true, value: picker },
+  );
+  Object.defineProperty(
+    HTMLMediaElement.prototype,
+    "webkitCurrentPlaybackTargetIsWireless",
+    { configurable: true, value: false },
+  );
+  vi.stubGlobal("WebKitPlaybackTargetAvailabilityEvent", Event);
+  try {
+    await act(async () => root.render(<PlayerSession />));
+    const availability = async (value: string) => {
+      const event = new Event("webkitplaybacktargetavailabilitychanged");
+      Object.defineProperty(event, "availability", { value });
+      await act(async () => video().dispatchEvent(event));
+    };
+    await availability("available");
+    const button = container.querySelector('button[aria-label="AirPlay"]');
+    if (!(button instanceof HTMLButtonElement))
+      throw new Error("Missing AirPlay button");
+    expect(button.hidden).toBe(false);
+    await act(async () => button.click());
+    expect(picker).toHaveBeenCalledOnce();
+    await availability("not-available");
+    expect(button.isConnected).toBe(false);
+  } finally {
+    if (remoteDescriptor)
+      Object.defineProperty(
+        HTMLMediaElement.prototype,
+        "remote",
+        remoteDescriptor,
+      );
+    else Reflect.deleteProperty(HTMLMediaElement.prototype, "remote");
+    if (audioDescriptor)
+      Object.defineProperty(
+        HTMLMediaElement.prototype,
+        "audioTracks",
+        audioDescriptor,
+      );
+    else Reflect.deleteProperty(HTMLMediaElement.prototype, "audioTracks");
+    Reflect.deleteProperty(
+      HTMLMediaElement.prototype,
+      "webkitShowPlaybackTargetPicker",
+    );
+    Reflect.deleteProperty(
+      HTMLMediaElement.prototype,
+      "webkitCurrentPlaybackTargetIsWireless",
+    );
+  }
+});
+
 async function startHold() {
   await act(async () => root.render(<PlayerSession key="first" />));
   const media = video();

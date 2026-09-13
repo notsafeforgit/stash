@@ -2,7 +2,7 @@ import { Outlet, useRouterState } from "@tanstack/react-router";
 import { Header } from "./header";
 import { BottomTabBar } from "./bottom-tab-bar";
 import { useNavHotkeys } from "src/hooks/use-nav-hotkeys";
-import { useTrackListPage } from "src/hooks/use-smart-back";
+import { useTrackBrowsePage } from "src/hooks/use-smart-back";
 import { DownloadProgressBar } from "src/components/offline/download-progress-bar";
 import { DownloadNotifications } from "src/components/offline/download-notifications";
 
@@ -14,7 +14,7 @@ const DETAIL_ROUTE_RE =
 
 export function AppShell() {
   useNavHotkeys();
-  useTrackListPage();
+  useTrackBrowsePage();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isDetailPage = DETAIL_ROUTE_RE.test(pathname);
   const ownsMobileNavigation =

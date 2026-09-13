@@ -6,6 +6,9 @@ interface TransitionObservation {
   contentDuration?: string;
   rootName?: string;
   contentName?: string;
+  error?: string;
+  frames?: { opacity: number; x: number }[];
+  nativeAnimations?: string[];
   finished: boolean;
 }
 
@@ -50,14 +53,121 @@ test.beforeEach(async ({ page }) => {
           observation.rootName = getComputedStyle(root).viewTransitionName;
           observation.contentName =
             getComputedStyle(content).viewTransitionName;
+          observation.nativeAnimations = document
+            .getAnimations()
+            .filter(
+              (animation): animation is CSSAnimation =>
+                animation instanceof CSSAnimation,
+            )
+            .map((animation) => animation.animationName);
+          observation.frames = [];
+          const sampleFrame = () => {
+            const frame = getComputedStyle(
+              root,
+              "::view-transition-new(route-content)",
+            );
+            observation.frames?.push({
+              opacity: Number(frame.opacity),
+              x: new DOMMatrixReadOnly(frame.transform).m41,
+            });
+            if (!observation.finished) requestAnimationFrame(sampleFrame);
+          };
+          sampleFrame();
         },
-        () => {},
+        (error: unknown) => {
+          observation.error = String(error);
+        },
       );
       void transition.finished.then(() => {
         observation.finished = true;
       });
       return transition;
     };
+  });
+});
+
+test.describe("mobile touch navigation", () => {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true });
+
+  test("entity taps and on-screen Back render a fade and directional movement", async ({
+    page,
+  }) => {
+    await page.goto("/transitions");
+    await page.getByRole("link", { name: "Entity 1", exact: true }).tap();
+    await expect
+      .poll(() => page.evaluate(() => window.observedTransitions[0]?.finished))
+      .toBe(true);
+    await page.getByRole("button", { name: "Back to list" }).tap();
+    await expect
+      .poll(() => page.evaluate(() => window.observedTransitions[1]?.finished))
+      .toBe(true);
+    const transitions = await page.evaluate(() => window.observedTransitions);
+    expect(transitions).toHaveLength(2);
+    for (const [index, direction] of ["forward", "back"].entries()) {
+      const transition = transitions[index];
+      if (!transition) throw new Error("Missing touch transition");
+      expect(transition.error).toBeUndefined();
+      expect(transition.direction).toBe(direction);
+      expect(transition.nativeAnimations).toEqual(
+        expect.arrayContaining(["route-content-in", "route-content-out"]),
+      );
+      const frames = transition.frames ?? [];
+      expect(frames.length).toBeGreaterThan(1);
+      const start = frames[0];
+      if (!start) throw new Error("Missing animation frames");
+      expect(start.opacity).toBeLessThan(1);
+      expect(Math.sign(start.x)).toBe(index === 0 ? 1 : -1);
+      expect(frames.some((frame) => frame.opacity > start.opacity)).toBe(true);
+      expect(
+        frames.some((frame) => Math.abs(frame.x) < Math.abs(start.x)),
+      ).toBe(true);
+    }
+  });
+
+  test("fresh route CSS produces both outgoing and incoming snapshots", async ({
+    page,
+  }) => {
+    await page.route("**/route-snapshot.css", (route) =>
+      route.fulfill({
+        contentType: "text/css",
+        body: "[data-route-viewport] { view-transition-name: route-content !important; }",
+      }),
+    );
+    await page.goto("/transitions");
+    await page.addStyleTag({
+      content: "[data-route-viewport] { view-transition-name: none; }",
+    });
+    await page.locator("[data-route-viewport]").evaluate((element) => {
+      if (getComputedStyle(element).viewTransitionName !== "none")
+        throw new Error("Expected the initial snapshot name to be unset");
+    });
+    // Navigate as soon as uncached CSS arrives, before another layout turn.
+    await page.evaluate(async () => {
+      const stylesheet = document.createElement("link");
+      stylesheet.rel = "stylesheet";
+      stylesheet.href = "/route-snapshot.css";
+      await new Promise<void>((resolve, reject) => {
+        stylesheet.onerror = () => reject(new Error("CSS failed to load"));
+        stylesheet.onload = () => {
+          const link = document.querySelector('a[href="/transitions/1"]');
+          if (!(link instanceof HTMLAnchorElement)) {
+            reject(new Error("Missing entity link"));
+            return;
+          }
+          link.click();
+          resolve();
+        };
+        document.head.append(stylesheet);
+      });
+    });
+    await expect
+      .poll(() => page.evaluate(() => window.observedTransitions[0]?.finished))
+      .toBe(true);
+    const transition = await page.evaluate(() => window.observedTransitions[0]);
+    expect(transition?.error).toBeUndefined();
+    expect(transition?.nativeAnimations).toEqual(
+      expect.arrayContaining(["route-content-in", "route-content-out"]),
+    );
   });
 });
 

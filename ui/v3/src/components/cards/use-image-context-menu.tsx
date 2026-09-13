@@ -8,7 +8,6 @@ import { imageTitle } from "src/core/files";
 import { removeEntitiesFromCache, useEntityMutation } from "src/core/client";
 import {
   ContextMenu,
-  ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
@@ -25,6 +24,7 @@ import {
 } from "./use-bulk-card-actions";
 import { OpenInNewTabMenuItem } from "./open-in-new-tab-menu-item";
 import { SelectAllMenuItem } from "./select-all-menu-item";
+import { EntityContextMenuContent } from "./entity-context-menu-content";
 
 // Local re-declaration of the image shape SceneCard uses. We can't import
 // `ImageCardImage` from image-card.tsx without creating a circular runtime
@@ -147,7 +147,7 @@ export function useImageContextMenu({
     onSetTagImage;
 
   const menuContent = (
-    <ContextMenuContent>
+    <EntityContextMenuContent title={imageTitle(image)}>
       {showBulkActions ? (
         <BulkContextMenuItems
           count={bulkCount}
@@ -236,7 +236,7 @@ export function useImageContextMenu({
           </ContextMenuItem>
         </>
       )}
-    </ContextMenuContent>
+    </EntityContextMenuContent>
   );
 
   // Cast helper: selectedItems carries visual_files at runtime via the

@@ -839,6 +839,7 @@ function useIsSingleCol(): boolean {
 // changes inside a stable-sized box, so we also re-check when the content
 // dep (e.g. the children string) changes.
 function EntityCardTitle({ children }: { children: React.ReactNode }) {
+  const { isTouch } = useContext(EntityCardCtx);
   const singleCol = useIsSingleCol();
   const text = String(children ?? "");
   const [ref, truncated] = useIsTruncated<HTMLDivElement>();
@@ -852,7 +853,12 @@ function EntityCardTitle({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <Tooltip disabled={!truncated}>
+    <Tooltip
+      disabled={isTouch || !truncated}
+      onOpenChange={(open, details) => {
+        if (open && details.reason !== "trigger-hover") details.cancel();
+      }}
+    >
       <TooltipTrigger
         render={
           <div
@@ -879,6 +885,7 @@ function EntityCardSubtitle({
    *  (e.g. dates) that's effectively guaranteed to fit. */
   noTooltip?: boolean;
 }) {
+  const { isTouch } = useContext(EntityCardCtx);
   const singleCol = useIsSingleCol();
   const text = String(children ?? "");
   const [ref, truncated] = useIsTruncated<HTMLDivElement>();
@@ -900,7 +907,12 @@ function EntityCardSubtitle({
   }
 
   return (
-    <Tooltip disabled={!truncated}>
+    <Tooltip
+      disabled={isTouch || !truncated}
+      onOpenChange={(open, details) => {
+        if (open && details.reason !== "trigger-hover") details.cancel();
+      }}
+    >
       <TooltipTrigger
         render={
           <div

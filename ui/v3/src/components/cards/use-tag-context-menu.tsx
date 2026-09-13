@@ -8,7 +8,6 @@ import * as GQL from "src/core/generated-graphql";
 import { removeEntitiesFromCache, useEntityMutation } from "src/core/client";
 import {
   ContextMenu,
-  ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
@@ -22,6 +21,7 @@ import {
 } from "./use-bulk-card-actions";
 import { OpenInNewTabMenuItem } from "./open-in-new-tab-menu-item";
 import { SelectAllMenuItem } from "./select-all-menu-item";
+import { EntityContextMenuContent } from "./entity-context-menu-content";
 
 export interface TagContextMenuItem {
   id: string;
@@ -97,7 +97,7 @@ export function useTagContextMenu({
   }
 
   const menuContent = (
-    <ContextMenuContent>
+    <EntityContextMenuContent title={tag.name}>
       {showBulkActions ? (
         <BulkContextMenuItems
           count={bulkCount}
@@ -171,7 +171,7 @@ export function useTagContextMenu({
           </ContextMenuItem>
         </>
       )}
-    </ContextMenuContent>
+    </EntityContextMenuContent>
   );
 
   const dialogs = (

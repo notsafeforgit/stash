@@ -8,7 +8,6 @@ import { galleryLabel } from "src/lib/gallery-utils";
 import { removeEntitiesFromCache, useEntityMutation } from "src/core/client";
 import {
   ContextMenu,
-  ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
@@ -21,6 +20,7 @@ import {
 } from "./use-bulk-card-actions";
 import { OpenInNewTabMenuItem } from "./open-in-new-tab-menu-item";
 import { SelectAllMenuItem } from "./select-all-menu-item";
+import { EntityContextMenuContent } from "./entity-context-menu-content";
 
 // Structural shape needed by the context menu — the caller passes the wider
 // gallery item; we read only id/title/files/folder for label + delete confirmation.
@@ -115,7 +115,7 @@ export function useGalleryContextMenu({
   }
 
   const menuContent = (
-    <ContextMenuContent>
+    <EntityContextMenuContent title={galleryLabel(gallery)}>
       {showBulkActions ? (
         <BulkContextMenuItems
           count={bulkCount}
@@ -163,7 +163,7 @@ export function useGalleryContextMenu({
           </ContextMenuItem>
         </>
       )}
-    </ContextMenuContent>
+    </EntityContextMenuContent>
   );
 
   const dialogs = (

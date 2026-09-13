@@ -1,20 +1,12 @@
 /* ── Mobile player container ──────────────────────────────────────────────────
-   Cap height so a landscape-orientation phone (short viewport) never pushes
-   the player controls behind the fixed h-12 tab bar (3rem). Skipped when
-   the player is in `fill` mode (lightbox) — there's no tab bar visible
-   inside the lightbox modal, and the cap also breaks vertical alignment
-   between the touch-overlay buttons and the lightbox prev/next buttons
-   (which sit at viewport-center).                                        */
+   The detail scroller is a size container whose height already excludes
+   the header, title, footer and safe-area padding. Fit portrait videos and
+   short landscape viewports inside it so controls stay above the footer.
+   Outside that layout, cqh falls back to the small viewport height.
+   Fill mode (lightbox / focused viewer) owns its available space instead. */
 @media (max-width: 1023px) {
   [data-scene-player]:not([data-fill]) .vjs-player-container {
-    max-height: calc(100vh - 3rem); /* fallback for browsers without svh */
-  }
-
-  /* svh = visual viewport, excludes browser chrome */
-  @supports (height: 100svh) {
-    [data-scene-player]:not([data-fill]) .vjs-player-container {
-      max-height: calc(100svh - 3rem);
-    }
+    max-height: 100cqh;
   }
 }
 

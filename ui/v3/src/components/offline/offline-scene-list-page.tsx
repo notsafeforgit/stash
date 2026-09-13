@@ -20,7 +20,6 @@ import { HardDriveDownloadIcon } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
 import { EntityListPage } from "src/components/list";
 import {
-  ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
 } from "src/components/ui/context-menu";
@@ -32,6 +31,8 @@ import {
   EmptyDescription,
 } from "src/components/ui/empty";
 import { SceneCard } from "src/components/cards/scene-card";
+import { EntityContextMenuContent } from "@/components/cards/entity-context-menu-content";
+import { objectTitle } from "@/core/files";
 import { useBulkCardActions } from "src/components/cards/use-bulk-card-actions";
 import { offlineEntryToSceneCardScene } from "./offline-scene-card-data";
 import { useOfflineEntries } from "./use-offline-entries";
@@ -264,11 +265,11 @@ const OfflineSceneCardCell = React.memo(function OfflineSceneCardCell({
   } = useBulkCardActions(OfflineListItems.useItems());
 
   const contextMenu = showBulkActions ? (
-    <ContextMenuContent>
+    <EntityContextMenuContent title={objectTitle(cardScene)}>
       <OfflineBulkContextMenuItems items={selectedItems} count={bulkCount} />
-    </ContextMenuContent>
+    </EntityContextMenuContent>
   ) : (
-    <ContextMenuContent>
+    <EntityContextMenuContent title={objectTitle(cardScene)}>
       {/* Select kicks the card into multi-select mode without
           requiring the user to first toggle the checkbox — same UX
           as the streaming cards. Once the first card is selected,
@@ -311,7 +312,7 @@ const OfflineSceneCardCell = React.memo(function OfflineSceneCardCell({
       <ContextMenuItem variant="destructive" onClick={onDelete}>
         {intl.formatMessage({ id: "offline.actions.delete_from_device" })}
       </ContextMenuItem>
-    </ContextMenuContent>
+    </EntityContextMenuContent>
   );
 
   return (

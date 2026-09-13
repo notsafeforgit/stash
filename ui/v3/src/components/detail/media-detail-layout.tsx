@@ -45,9 +45,9 @@ export interface MediaDetailLayoutProps {
   className?: string;
   /**
    * When true, on mobile the player and tab content share a single
-   * scroll container — the player renders at its natural height and the
-   * user scrolls past it to reach the tab content. The bottom bar (back
-   * + tab triggers) stays pinned. Use on leaf detail pages (scenes,
+   * scroll container — the player uses its natural height up to the
+   * visible content height, and users scroll past it to reach the tabs.
+   * The unified bottom bar stays pinned. Use on leaf detail pages (scenes,
    * images) where the player/image is the focus and there's no benefit
    * to keeping it pinned at the top. Desktop layout is unchanged.
    */
@@ -191,10 +191,12 @@ function MediaDetailContent({
           // container scrolls (player + tab content together); otherwise
           // the inner sidebar owns the scroll. Desktop always clips here
           // so the sidebar's own scroll area can take over.
+          // Size containment lets inline players cap their height at this
+          // scroller. Remove it in focus mode so fixed viewers use the viewport.
           primaryFocusMode
             ? "overflow-hidden overscroll-none"
             : mobilePageScroll
-              ? "overflow-y-auto overscroll-contain lg:overflow-hidden"
+              ? "overflow-y-auto overscroll-contain lg:overflow-hidden max-lg:[container-type:size]"
               : "overflow-hidden",
           "lg:grid lg:grid-rows-[1fr] lg:gap-0",
           // 320px matches the `lg:w-80` sidebar used by the entity

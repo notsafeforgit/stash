@@ -347,7 +347,7 @@ test("selection replaces the row and keeps select-all and close at the right", a
   expect(closeBounds.x).toBeGreaterThan(allBounds.x);
   expect(closeBounds.x + closeBounds.width).toBeCloseTo(
     await footer.evaluate(
-      (element) => element.getBoundingClientRect().right - 6,
+      (element) => element.getBoundingClientRect().right - 16,
     ),
     0,
   );

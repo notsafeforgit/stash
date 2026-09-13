@@ -140,7 +140,6 @@ function EntityCardRoot({
     navigate({
       ...destination,
       state: { returnTo },
-      viewTransition: true,
     });
   }
 
@@ -228,7 +227,6 @@ function EntityCardRoot({
         className="absolute inset-0 z-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
         {...destination}
         onClick={handleAnchorClick}
-        viewTransition
         tabIndex={0}
         aria-label={label}
       />

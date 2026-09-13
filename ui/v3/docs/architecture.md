@@ -43,6 +43,26 @@ upstream's numeric migrations and primary schema version unchanged. See
   the watcher and refresh once. Unrelated configuration,
   plugin, status, and job queries are excluded from library refreshes.
 
+`core/route-transitions.ts` installs the shared navigation motion policy on each
+app router. Path changes use native View Transitions: a 180ms content fade with
+an 8px directional entrance, reversed for browser Back and returns to parent
+lists. Replacements crossfade. The existing `data-route-viewport` main is the
+only named snapshot; the header and portaled overlays stay still. Routes need
+no animation wrappers or remount keys, and existing loading states and scroll
+restoration continue independently. Search, filter, tab, hash, initial-load,
+and reduced-motion navigations skip transitions. Leave `viewTransition` unset
+on links and navigation calls to inherit this policy; use `false` to opt out.
+Smart Back supplies typed `state.navigationDirection: "back"` so returning to
+a saved sibling entity also reverses the animation.
+Browsers without transition types get a content crossfade; browsers without
+View Transitions navigate normally. Motion styles live in `styles/globals.css`.
+
+Home mounts its first carousel immediately and uses `DeferredMount` to start
+other rows when they approach its scroll viewport. Mounted rows retain their
+cards, filters and lightbox state when scrolled away. The drawer preloads Home's
+route code when its link becomes visible; the customisation sheet loads on first
+use and queries saved filters only while open.
+
 ## Lists
 
 `components/list/entity-list-page.tsx` composes list chrome, selection, sidebar,
@@ -362,7 +382,13 @@ supplies an inline transform while dragging, and the two translations add
 together instead of tracking the pointer one-to-one.
 
 The footer participates in flex layout, reserving its actual height without
-fixed offsets or content overlays. It owns safe-area clearance. The shared
+fixed offsets or content overlays, including Home's bottom navigation. The shell
+owns top/side safe-area insets; footers own the bottom inset. Shared CSS tokens
+read Safari's current `env(safe-area-inset-*)` values in browser and Home Screen
+modes. Toolbar margins grow from 6px at 320px to 16px on wider phones while
+retaining every 44px touch target. Portaled drawers, sheets and full-screen player
+controls account for their own screen edges. The keyboard replaces the bottom
+safe-area padding rather than adding a second gap above its chrome. The shared
 `useMobileKeyboardLayout` hook reserves the portion of the layout viewport below
 the visual viewport as a bottom margin, shrinking the adjacent scroller so list
 content ends at the search row. It accounts for Safari's native viewport pan and

@@ -309,7 +309,10 @@ export function FrontPageConfig({
   const { data: savedFiltersData } = useQuery<
     GQL.FindSavedFiltersQuery,
     GQL.FindSavedFiltersQueryVariables
-  >(GQL.FindSavedFiltersDocument, { variables: { mode: undefined } });
+  >(GQL.FindSavedFiltersDocument, {
+    variables: { mode: undefined },
+    skip: !open,
+  });
   const savedFilters = savedFiltersData?.findSavedFilters ?? [];
 
   const premade = useMemo(() => generatePremadeFrontPageContent(intl), [intl]);

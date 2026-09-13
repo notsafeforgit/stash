@@ -31,7 +31,7 @@ export function DetailEditorLayout({
         </h2>
       </div>
       <div className="min-h-0 flex-1">{children}</div>
-      <div className="md:hidden flex shrink-0 justify-end border-t px-3 py-1 pb-[max(0.25rem,env(safe-area-inset-bottom,0px))]">
+      <div className="md:hidden flex shrink-0 justify-end border-t px-[var(--mobile-control-gutter)] py-1 pb-[max(0.5rem,var(--safe-area-bottom))]">
         <Button variant="ghost" size="lg" className="h-11" onClick={onClose}>
           <X data-icon="inline-start" />
           {intl.formatMessage({ id: "actions.close" })}

@@ -9,6 +9,7 @@ export const offlineEntrySchema = z.looseObject({
   request_id: z.string().optional(),
   queued_at: z.number().optional(),
   cancel_requested: z.boolean().optional(),
+  background_fetch_id: z.string().optional(),
   title: z.string(),
   details: z.string().nullable().optional(),
   studio_name: z.string().nullable(),

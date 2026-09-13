@@ -1006,82 +1006,24 @@ html [data-sonner-toaster][data-sonner-theme="system"] {
   }
 }
 
-/* One content snapshot keeps route changes and dense-grid zoom inexpensive.
-   Chrome and portaled overlays stay live outside the named viewport. Naming
-   the existing main avoids keyed wrappers or transforms on the real DOM,
-   preserving player/form state, fixed positioning, and scroll restoration. */
+/* Explicit grid zoom keeps its snapshot within the page content.
+   Shell controls and portaled overlays stay outside the named viewport.
+   Route navigation uses Web Animations in core/route-transitions.ts. */
 @supports (view-transition-name: a) {
   :root:has([data-route-viewport]) {
     view-transition-name: none;
   }
-
   [data-route-viewport] {
     view-transition-name: route-content;
   }
-
   ::view-transition {
     pointer-events: none;
   }
-
-  /* Untyped transitions (including grid zoom) use a quiet crossfade. */
-  ::view-transition-old(root),
-  ::view-transition-new(root),
   ::view-transition-group(route-content),
   ::view-transition-old(route-content),
   ::view-transition-new(route-content) {
     animation-duration: 140ms;
     animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    :root:active-view-transition-type(route-forward) {
-      --route-enter-x: 8px;
-      --route-exit-x: -4px;
-    }
-
-    :root:active-view-transition-type(route-back) {
-      --route-enter-x: -8px;
-      --route-exit-x: 4px;
-    }
-
-    :root:active-view-transition-type(route)::view-transition-group(
-        route-content
-      ) {
-      animation-duration: 180ms;
-      overflow: clip;
-    }
-
-    :root:active-view-transition-type(route)::view-transition-old(
-        route-content
-      ) {
-      animation: route-content-out 120ms ease-out both;
-      mix-blend-mode: normal;
-    }
-
-    :root:active-view-transition-type(route)::view-transition-new(
-        route-content
-      ) {
-      animation: route-content-in 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
-      mix-blend-mode: normal;
-    }
-  }
-}
-
-@keyframes route-content-in {
-  from {
-    opacity: 0;
-    transform: translateX(var(--route-enter-x, 0px));
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes route-content-out {
-  to {
-    opacity: 0;
-    transform: translateX(var(--route-exit-x, 0px));
   }
 }
 

@@ -6,13 +6,17 @@ declare module "@tanstack/react-router" {
   interface HistoryState {
     /** Semantic direction for actions such as Smart Back, which push a URL. */
     navigationDirection?: "forward" | "back";
+    /** Opt out of route motion for an exceptional navigation. */
+    routeMotion?: false;
   }
 }
 
 function transitionForNavigation({
   fromLocation,
   toLocation,
-}: RouterEvents["onBeforeLoad"]): RouteTransition | undefined {
+}: Pick<RouterEvents["onResolved"], "fromLocation" | "toLocation">):
+  | RouteTransition
+  | undefined {
   const fromPath = fromLocation?.pathname.replace(/\/+$/, "");
   const toPath = toLocation.pathname.replace(/\/+$/, "");
   // Initial visits, filters, tabs, hashes, and revalidation stay still.
@@ -32,25 +36,54 @@ function transitionForNavigation({
   return "route-forward";
 }
 
-/** Install once per router. Links, imperative navigation, and browser history
- * share this policy; an exceptional navigation can opt out with
- * `viewTransition: false`. The browser owns snapshots, so route components,
- * players, and forms keep their normal React lifecycle. */
+/** Animate committed content without taking snapshots or delaying the router.
+ * Native view-transition capture can stall WebKit on image-heavy lists. The
+ * Web Animations API keeps this small effect interruptible, preserves React
+ * state, and leaves shell controls and portaled dialogs outside the animation. */
 export function installRouteTransitions(
   router: Pick<AnyRouter, "subscribe" | "update">,
 ) {
-  return router.subscribe("onBeforeLoad", (event) => {
-    const transition = transitionForNavigation(event);
-    const enabled =
-      transition &&
-      typeof window !== "undefined" &&
-      !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    // Gate before the native call: TanStack doesn't evaluate `types` callbacks
-    // in browsers that support View Transitions but not transition types.
-    // Those browsers still get a content crossfade, with the same opt-outs.
-    router.update({
-      defaultViewTransition: enabled ? { types: ["route", transition] } : false,
-    });
+  router.update({ defaultViewTransition: false });
+  if (typeof window === "undefined") return () => {};
+  const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
+  let animation: Animation | undefined;
+  const cancel = () => {
+    animation?.cancel();
+    animation = undefined;
+  };
+  const before = router.subscribe("onBeforeLoad", cancel);
+  const resolved = router.subscribe("onResolved", (event) => {
+    cancel();
+    const direction = transitionForNavigation(event);
+    if (
+      !direction ||
+      preference.matches ||
+      event.toLocation.state.routeMotion === false
+    )
+      return;
+    const viewport = document.querySelector<HTMLElement>(
+      "[data-route-viewport]",
+    );
+    if (!viewport?.animate) return;
+    const x =
+      direction === "route-back" ? -8 : direction === "route-forward" ? 8 : 0;
+    animation = viewport.animate(
+      [
+        { opacity: 0, transform: `translateX(${x}px)` },
+        { opacity: 1, transform: "translateX(0)" },
+      ],
+      {
+        id: direction,
+        duration: 180,
+        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+      },
+    );
   });
+  preference.addEventListener("change", cancel);
+  return () => {
+    before();
+    resolved();
+    preference.removeEventListener("change", cancel);
+    cancel();
+  };
 }

@@ -1692,7 +1692,8 @@
       "retry_download": "Retry download",
       "save_to_files": "Save to Files…",
       "save_to_files_short": "Save to Files",
-      "save_to_files_title": "Save to your device's file system"
+      "save_to_files_title": "Save to your device's file system",
+      "remove": "Remove download"
     },
     "card": {
       "downloading_bytes": "Downloading {bytes}",
@@ -1793,6 +1794,22 @@
       "address_empty": "No saved downloads were found for that address.",
       "inspect": "Find saved downloads",
       "loading": "Loading saved downloads"
+    },
+    "launch": {
+      "title": "Offline library",
+      "reconnect": "Open online app",
+      "description": "The server is unavailable. Videos saved on this device are ready to play.",
+      "file_unavailable": "Video unavailable",
+      "file_evicted": "This file is no longer on this device. Download it again when connected.",
+      "storage_error": "Could not open local storage",
+      "empty": "No saved videos",
+      "empty_description": "Download videos while connected to watch them here without the server."
+    },
+    "background": {
+      "active": "Managed by your browser. The download can continue with the app closed.",
+      "foreground": "Keep the app open while downloading. This browser may pause downloads in the background; interrupted downloads can be retried.",
+      "ready": "Background downloads are available in this browser.",
+      "unavailable": "Background downloads depend on browser support. Where unavailable, keep the app open until downloads finish."
     }
   },
   "operations": "Operations",

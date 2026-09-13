@@ -3,8 +3,11 @@ import react from "@vitejs/plugin-react";
 import viteCompression from "vite-plugin-compression";
 import tailwindcss from "@tailwindcss/vite";
 import { TanStackRouterVite } from "@tanstack/router-plugin/vite";
+import { VitePWA } from "vite-plugin-pwa";
+import { collectOfflineAssets } from "./scripts/offline-assets";
 
 const sourcemap = process.env.VITE_APP_SOURCEMAPS === "true";
+const offlineAssets = new Set<string>();
 
 export default defineConfig({
   base: "",
@@ -12,6 +15,7 @@ export default defineConfig({
     outDir: "build",
     sourcemap,
     reportCompressedSize: false,
+    rollupOptions: { input: { app: "index.html", offline: "offline.html" } },
   },
   resolve: {
     tsconfigPaths: true,
@@ -61,9 +65,27 @@ export default defineConfig({
     }),
     react(),
     tailwindcss(),
+    collectOfflineAssets(offlineAssets),
+    VitePWA({
+      strategies: "injectManifest",
+      srcDir: "src/pwa",
+      filename: "service-worker.ts",
+      injectRegister: false,
+      manifest: false,
+      injectManifest: {
+        globPatterns: ["**/*.{js,css,woff2,html,png}"],
+        manifestTransforms: [
+          async (entries) => ({
+            manifest: entries.filter((entry) => offlineAssets.has(entry.url)),
+            warnings: [],
+          }),
+        ],
+      },
+    }),
     viteCompression({
       algorithm: "gzip",
-      deleteOriginFile: true,
+      // Workbox reads the original files to revision the offline bundle.
+      deleteOriginFile: false,
       threshold: 0,
       filter: /\.(js|json|css|svg|md)$/i,
     }),

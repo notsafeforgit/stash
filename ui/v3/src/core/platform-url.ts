@@ -1,6 +1,6 @@
 /** The server's base element is the public mount point, including proxy prefixes. */
 export function applicationBaseURL(
-  origin = window.location.origin,
+  origin = window.location.href,
   base = document.querySelector("base")?.getAttribute("href") ?? "/",
 ): URL {
   const url = new URL(base, origin);

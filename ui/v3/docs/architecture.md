@@ -43,19 +43,19 @@ upstream's numeric migrations and primary schema version unchanged. See
   the watcher and refresh once. Unrelated configuration,
   plugin, status, and job queries are excluded from library refreshes.
 
-`core/route-transitions.ts` installs the shared navigation motion policy on each
-app router. Path changes use native View Transitions: a 180ms content fade with
-an 8px directional entrance, reversed for browser Back and returns to parent
-lists. Replacements crossfade. The existing `data-route-viewport` main is the
-only named snapshot; the header and portaled overlays stay still. Routes need
-no animation wrappers or remount keys, and existing loading states and scroll
-restoration continue independently. Search, filter, tab, hash, initial-load,
-and reduced-motion navigations skip transitions. Leave `viewTransition` unset
-on links and navigation calls to inherit this policy; use `false` to opt out.
-Smart Back supplies typed `state.navigationDirection: "back"` so returning to
-a saved sibling entity also reverses the animation.
-Browsers without transition types get a content crossfade; browsers without
-View Transitions navigate normally. Motion styles live in `styles/globals.css`.
+`core/route-transitions.ts` animates committed content with the Web Animations
+API: a 180ms fade and 8px directional entrance, reversed for browser Back and
+Smart Back. It does not take snapshots or wait before committing navigation.
+WebKit profiling with real Home thumbnails found native snapshot capture could
+add 0.6–1.1 seconds; live-content animation removes that capture cost. The
+existing `data-route-viewport` main animates; shell controls and portaled overlays
+stay still. No keyed wrappers or forced remounts are involved.
+Search/filter/tab/hash changes, initial load, and reduced motion stay still.
+Smart Back supplies typed `state.navigationDirection: "back"`; exceptional
+navigations can set `state.routeMotion: false`. Rapid navigation cancels the
+previous animation, as does a change to Reduce Motion. Browsers without Web
+Animations navigate normally. Explicit list-grid zoom retains its separate
+native View Transition styling in `styles/globals.css`.
 
 Home mounts its first carousel immediately and uses `DeferredMount` to start
 other rows when they approach its scroll viewport. Mounted rows retain their
@@ -314,6 +314,17 @@ Preserve these invariants:
   Desktop retains the lightbox toolbar and Escape behavior.
 
 Root [CLAUDE.md](../../../CLAUDE.md) describes the backend HLS constraints.
+
+`PlatformMediaEffects` binds the active Video.js store to Media Session and
+screen wake locks. OS seeks use the same offset/clip-aware seek callback as the
+player timeline. The most recently started player owns metadata and actions;
+paused previews and stale cleanup cannot replace a newer owner. Session state
+clears on suspension/unmount. Wake locks cover visible, local playback only,
+release on pause/end/PiP/casting/hidden state, and handle late requests and browser
+refusal without interrupting playback. Visibility return can reacquire a lock.
+AirPlay uses Video.js 10's `AirPlayButton` and built-in HLS AirPlay bridge; PiP
+uses its existing feature store. Unavailable controls stay hidden, and local
+blob media disables remote playback. Receivers must be able to fetch the source.
 
 ## Entity editing
 

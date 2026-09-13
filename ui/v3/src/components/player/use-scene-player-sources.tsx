@@ -23,7 +23,7 @@ import {
 } from "react";
 import { useCommittedRef } from "@/hooks/use-committed-ref";
 import type { VideoPlayerStore } from "@videojs/react";
-import { useConfigurationContext } from "src/hooks/config";
+import { useConfigurationContextOptional } from "src/hooks/config";
 import { isIOS, type PlayerSource } from "./player-utils";
 import { scenePlayerSourceURL } from "./scene-player-source-url";
 import { usePlayerTransitionFeedback } from "./use-player-transition-feedback";
@@ -214,11 +214,9 @@ export function useScenePlayerSources({
   //     `initialTimestamp ?? resumeTime ?? 0` ordering, so we don't
   //     need to gate it here, but the comment is here so the next
   //     reader doesn't think the gate's behaviour is incomplete.
-  const ui = useConfigurationContext().configuration.ui as {
-    alwaysStartFromBeginning?: boolean;
-  };
+  const ui = useConfigurationContextOptional()?.configuration.ui;
   const effectiveResumeTime =
-    !isClipped && ui.alwaysStartFromBeginning ? null : scene.resume_time;
+    !isClipped && ui?.alwaysStartFromBeginning ? null : scene.resume_time;
 
   // `initialResume` is a deliberate once-per-scene capture: resume_time,
   // sources, etc. keep changing during playback, and recomputing would

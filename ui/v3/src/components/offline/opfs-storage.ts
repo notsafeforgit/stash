@@ -29,8 +29,7 @@ async function rootDir(): Promise<FileSystemDirectoryHandle> {
   if (!("storage" in navigator) || !navigator.storage.getDirectory) {
     throw new Error(
       "OPFS not available in this browser. Offline downloads require " +
-        "Origin Private File System support (Safari 15.2+, Chrome 86+, " +
-        "Firefox 111+).",
+        "Origin Private File System support in a secure context.",
     );
   }
   return navigator.storage.getDirectory();
@@ -224,10 +223,9 @@ export async function storageEstimate(): Promise<StorageEstimate> {
 
 /**
  * Ask the browser for "persistent" storage so OPFS files aren't first
- * in line for eviction under storage pressure. On iOS Safari this only
- * succeeds for PWAs added to Home Screen — desktop browsers grant it
- * more liberally. Idempotent: calling repeatedly is cheap and a
- * granted state never reverts to unsought.
+ * in line for eviction under storage pressure. The browser decides whether
+ * to grant it using its own policy, including installation and usage signals.
+ * Persistent storage is not a backup; users can still clear it.
  */
 export async function requestPersistent(): Promise<boolean> {
   if (!("storage" in navigator) || !navigator.storage.persist) {

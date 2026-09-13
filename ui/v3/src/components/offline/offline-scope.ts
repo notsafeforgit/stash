@@ -55,6 +55,11 @@ export async function createOfflineScope(
 }
 
 let current: Promise<OfflineScope> | undefined;
+/** Service workers have no document/base element. Bind storage to their own
+ * registration scope before handling events, never to a client-supplied URL. */
+export function initializeWorkerOfflineScope(scope: string) {
+  current ??= createOfflineScope(scope);
+}
 export function getOfflineScope(): Promise<OfflineScope> {
   current ??= createOfflineScope(getPlatformURL()).catch((error: unknown) => {
     current = undefined;

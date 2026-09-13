@@ -28,7 +28,8 @@
     "test:ci": "vitest run",
     "test:browser": "pnpm run check && playwright test",
     "check-compatibility": "node scripts/check-compatibility.mjs",
-    "lint:contracts": "eslint src tests/browser"
+    "lint:contracts": "eslint src tests/browser",
+    "test:pwa": "pnpm run build && playwright test --config playwright.pwa.config.ts"
   },
   "dependencies": {
     "@apollo/client": "^4.1.0",
@@ -96,6 +97,9 @@
     "typescript": "^5.8.0",
     "vite": "^8.0.0",
     "vite-plugin-compression": "^0.5.1",
-    "vitest": "^4.1.0"
+    "vite-plugin-pwa": "^1.3.0",
+    "vitest": "^4.1.0",
+    "workbox-precaching": "^7.4.1",
+    "workbox-routing": "^7.4.1"
   }
 }

@@ -34,6 +34,8 @@ import {
 import { GoogleCast } from "@videojs/react/extensions/google-cast";
 import { videoFeatures } from "@videojs/react/video";
 import { SceneVideo } from "./scene-video";
+import { PlatformMediaEffects } from "./platform-media-effects";
+import { objectTitle } from "@/core/files";
 import { cn } from "src/lib/utils";
 import { Badge } from "src/components/ui/badge";
 import { Spinner } from "src/components/ui/spinner";
@@ -631,19 +633,6 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     sendPause(() => storeRef.current?.pause());
   }, [sendPause]);
 
-  useEffect(() => {
-    if (!("mediaSession" in navigator)) return;
-    navigator.mediaSession.setActionHandler("nexttrack", onNext ?? null);
-    navigator.mediaSession.setActionHandler(
-      "previoustrack",
-      onPrevious ?? null,
-    );
-    return () => {
-      navigator.mediaSession.setActionHandler("nexttrack", null);
-      navigator.mediaSession.setActionHandler("previoustrack", null);
-    };
-  }, [onNext, onPrevious]);
-
   // Force-abort the <video>'s network activity on unmount. Rapid lightbox
   // swipes otherwise queue stale fetches behind Chrome's per-host
   // connection pool (default 6) and saturate the backend transcoder, so
@@ -812,6 +801,19 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   // timeline that no longer represents the whole scene.
   const effectiveMarkers = clipRange ? [] : markers;
 
+  const mediaMetadata = useMemo<MediaMetadataInit>(
+    () => ({
+      title: objectTitle(scene),
+      artist: scene.performers.map((performer) => performer.name).join(", "),
+      album: scene.studio?.name ?? "",
+      artwork:
+        (posterSrc ?? scene.paths.screenshot)
+          ? [{ src: posterSrc ?? scene.paths.screenshot ?? "" }]
+          : [],
+    }),
+    [scene, posterSrc],
+  );
+
   const mediaElement = (
     <SceneVideo
       src={finalSrc}
@@ -819,6 +821,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
       autoPlay={effectiveAutoPlay}
       loop={loopEnabled && !clipRange}
       playsInline
+      disableRemotePlayback={finalSrc?.startsWith("blob:")}
       preload={preload}
       // PlaybackRangeEffect owns clip completion, including native EOF.
       // Handling both here would advance twice when a clip ends at EOF.
@@ -879,6 +882,16 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
         <Player.Player>
           <StoreBridge storeRef={storeRef} />
           <MediaBridge mediaRef={mediaRef} />
+          <PlatformMediaEffects
+            Player={Player}
+            metadata={mediaMetadata}
+            duration={effectiveFileDuration}
+            offsetStart={effectiveOffsetStart}
+            suspended={suspended}
+            seek={effectiveOnSeek}
+            next={onNext}
+            previous={onPrevious}
+          />
           {/* Each source load needs its own once-only resume, even though
               the store and native video element remain attached. */}
           <CanPlayEffect
@@ -988,7 +1001,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
               </Badge>
             )}
           </Container>
-          <GoogleCast />
+          {!finalSrc?.startsWith("blob:") && <GoogleCast />}
         </Player.Player>
 
         {/* Freeze-frame canvas masks the engine-detach gap between

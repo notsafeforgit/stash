@@ -1,3 +1,8 @@
+import {
+  abortBackgroundDownload,
+  resumeBackgroundDownload,
+  tryBackgroundDownload,
+} from "./background-downloads";
 import { joinPlatformURL } from "@/core/platform-url";
 import { canCoordinateOfflineStorage, getOfflineScope } from "./offline-scope";
 import { migrateLegacyDownloads } from "./offline-migration";
@@ -247,6 +252,7 @@ export class DownloadQueueStore {
         cancel_requested: false,
         request_id: crypto.randomUUID(),
         queued_at: Date.now(),
+        background_fetch_id: undefined,
       });
     });
     await this.refresh();
@@ -266,6 +272,7 @@ export class DownloadQueueStore {
           ? { cancel_requested: true }
           : {},
       );
+      await abortBackgroundDownload(entry);
     }
     return entry;
   }
@@ -329,6 +336,7 @@ export class DownloadQueueStore {
   private kickWorker() {
     if (this.worker || !canCoordinateDownloads()) return;
     let failed = false;
+    let backgroundOwnsQueue = false;
     this.worker = getOfflineScope()
       .then((scope) =>
         navigator.locks.request(scope.workerLock, async () => {
@@ -337,6 +345,10 @@ export class DownloadQueueStore {
           await migrateLegacyDownloads();
           // The previous owner has released its lock; only now can these be orphans.
           for (const entry of await listEntriesByStatus("downloading")) {
+            if (await resumeBackgroundDownload(entry)) {
+              backgroundOwnsQueue = true;
+              return;
+            }
             await sceneLock(entry.scene_id, async () => {
               const current = await getEntry(entry.scene_id);
               if (current?.status === "downloading")
@@ -349,7 +361,12 @@ export class DownloadQueueStore {
             );
             const next = queued[0];
             if (!next) break;
-            await sceneLock(next.scene_id, () => this.runOne(next.scene_id));
+            if (
+              await sceneLock(next.scene_id, () => this.runOne(next.scene_id))
+            ) {
+              backgroundOwnsQueue = true;
+              break;
+            }
           }
         }),
       )
@@ -367,11 +384,12 @@ export class DownloadQueueStore {
         }
         this.worker = undefined;
         // An enqueue may have landed between the final scan and lock release.
-        if (!failed && this.snapshot.queued.length) this.kickWorker();
+        if (!failed && !backgroundOwnsQueue && this.snapshot.queued.length)
+          this.kickWorker();
       });
   }
 
-  private async runOne(sceneId: string): Promise<void> {
+  private async runOne(sceneId: string): Promise<boolean> {
     const abort = new AbortController();
     const task: {
       sceneId: string;
@@ -383,7 +401,7 @@ export class DownloadQueueStore {
     let discardPartial = false;
     try {
       const entry = await getEntry(sceneId);
-      if (entry?.status !== "queued") return;
+      if (entry?.status !== "queued") return false;
       task.requestId = entry.request_id;
       if (entry.cancel_requested) abort.abort();
       abort.signal.throwIfAborted();
@@ -403,6 +421,10 @@ export class DownloadQueueStore {
         throw new Error("Out of storage. Free space and retry.");
       const resumeOffset = await existingSceneSize(sceneId);
       abort.signal.throwIfAborted();
+      if (!resumeOffset && (await tryBackgroundDownload(entry, abort.signal)))
+        return true;
+      abort.signal.throwIfAborted();
+      await patchEntry(sceneId, { status: "downloading" });
       await patchEntry(sceneId, { bytes_downloaded: resumeOffset });
       this.updateActive({ bytesDownloaded: resumeOffset });
       abort.signal.throwIfAborted();
@@ -463,14 +485,24 @@ export class DownloadQueueStore {
       );
       await checkpoint;
       abort.signal.throwIfAborted();
-      await patchEntry(sceneId, {
-        status: "complete",
-        downloaded_at: Date.now(),
-        bytes,
-        bytes_downloaded: undefined,
-        error: undefined,
-        cancel_requested: false,
+      let committed = false;
+      await patchEntry(sceneId, (current) => {
+        if (current.cancel_requested || current.request_id !== task.requestId)
+          return {};
+        committed = true;
+        return {
+          status: "complete",
+          downloaded_at: Date.now(),
+          bytes,
+          bytes_downloaded: undefined,
+          error: undefined,
+          cancel_requested: false,
+        };
       });
+      if (!committed) {
+        abort.abort();
+        abort.signal.throwIfAborted();
+      }
     } catch (error) {
       await checkpoint;
       try {
@@ -486,11 +518,13 @@ export class DownloadQueueStore {
       this.task = undefined;
       this.publish({ ...this.snapshot, active: null });
     }
+    return false;
   }
 
   private async markError(sceneId: string, error: string) {
     await patchEntry(sceneId, {
       status: "error",
+      background_fetch_id: undefined,
       error,
       bytes_downloaded: undefined,
     });

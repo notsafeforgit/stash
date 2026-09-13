@@ -3,5 +3,10 @@
   "compilerOptions": {
     "types": ["vite/client", "node"]
   },
-  "include": ["./**/*.ts", "./**/*.tsx", "../../playwright.config.ts"]
+  "include": [
+    "./**/*.ts",
+    "./**/*.tsx",
+    "../../playwright.config.ts",
+    "../../src/hooks/use-smart-back.ts"
+  ]
 }

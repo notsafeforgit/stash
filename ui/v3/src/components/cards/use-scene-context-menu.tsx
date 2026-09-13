@@ -8,7 +8,6 @@ import { objectTitle } from "src/core/files";
 import { removeEntitiesFromCache, useEntityMutation } from "src/core/client";
 import {
   ContextMenu,
-  ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
@@ -28,6 +27,7 @@ import {
 } from "./use-bulk-card-actions";
 import { OpenInNewTabMenuItem } from "./open-in-new-tab-menu-item";
 import { SelectAllMenuItem } from "./select-all-menu-item";
+import { EntityContextMenuContent } from "./entity-context-menu-content";
 import type { SceneCardScene } from "./scene-card";
 
 interface UseSceneContextMenuProps {
@@ -130,7 +130,7 @@ export function useSceneContextMenu({
   }
 
   const menuContent = (
-    <ContextMenuContent>
+    <EntityContextMenuContent title={objectTitle(scene)}>
       {showBulkActions ? (
         <BulkContextMenuItems
           count={bulkCount}
@@ -197,7 +197,7 @@ export function useSceneContextMenu({
           </ContextMenuItem>
         </>
       )}
-    </ContextMenuContent>
+    </EntityContextMenuContent>
   );
 
   const dialogs = (

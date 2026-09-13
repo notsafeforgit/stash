@@ -126,6 +126,10 @@ positions by the full public URL, including filters, pagination, and deployment
 prefix. The app's `useSmartBack` navigates to a saved return URL, so it restores
 the same position as browser Back even though it creates a new history entry.
 Revisiting the same URL within the session also restores its last position.
+Explicit `returnTo` state takes priority; links without it return to the last
+Home or list page visited by the current router. Home must replace an older
+list origin when opening performer-name links from a carousel. The fallback is
+scoped to the router so a recreated app cannot reuse an earlier session's origin.
 
 `EntityList` exposes a stable `data-scroll-restoration-id` scoped to the list's
 `view` (or filter mode). Tables identify their nested scroll container separately.

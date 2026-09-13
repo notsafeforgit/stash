@@ -30,6 +30,8 @@ type Scene struct {
 	OSHash string
 	// transient - checksum of primary file - empty if no files
 	Checksum string
+	// Transient artwork identity, used to invalidate derived preview images.
+	CoverChecksum string `json:"-"`
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

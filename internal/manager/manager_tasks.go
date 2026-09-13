@@ -293,11 +293,12 @@ func (s *Manager) generateScreenshot(ctx context.Context, sceneId string, at *fl
 			Overwrite:    true,
 		}
 
-		task.Start(ctx)
+		if err := task.generate(ctx); err != nil {
+			return err
+		}
 
 		logger.Infof("Generate screenshot finished")
 
-		// TODO - return error from task
 		return nil
 	})
 

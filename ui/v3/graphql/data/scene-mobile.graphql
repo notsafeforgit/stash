@@ -1,4 +1,7 @@
 fragment MobileSceneData on Scene {
+  preview_image {
+    ...PreviewImageData
+  }
   id
   title
   date

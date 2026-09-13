@@ -62,7 +62,9 @@ export function SceneActionsMenu({
   const download = useSceneDownloadAction({ scene });
 
   const [scan] = useMutation(GQL.MetadataScanDocument);
-  const [generateScreenshot] = useMutation(GQL.SceneGenerateScreenshotDocument);
+  const [generateScreenshot, { loading: screenshotPending }] = useMutation(
+    GQL.SceneGenerateScreenshotDocument,
+  );
   const [rotateVideo, { loading: rotationPending }] = useMutation(
     GQL.SceneVideoRotateDocument,
   );
@@ -71,6 +73,7 @@ export function SceneActionsMenu({
 
   const sceneFilePath = scene.files.length > 0 ? objectPath(scene) : null;
   const rotationSupported = supportsSceneVideoRotation(sceneFilePath);
+  const coverBusy = screenshotJobId !== null || screenshotPending;
 
   const handleScreenshotJobComplete = useCallback(
     async (job?: MonitoredJob) => {
@@ -253,8 +256,7 @@ export function SceneActionsMenu({
       const at = getPlayerPosition?.();
       if (at !== undefined) return handleGenerateScreenshot(at);
     },
-    disabled: () =>
-      screenshotJobId !== null || getPlayerPosition?.() === undefined,
+    disabled: () => coverBusy || getPlayerPosition?.() === undefined,
   });
   items.push({
     key: "default-thumbnail",
@@ -264,7 +266,7 @@ export function SceneActionsMenu({
       defaultMessage: "Generate default thumbnail",
     }),
     onSelect: () => handleGenerateScreenshot(),
-    disabled: screenshotJobId !== null,
+    disabled: coverBusy,
   });
   if (rotationSupported)
     items.push({

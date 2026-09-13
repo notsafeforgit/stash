@@ -1,3 +1,4 @@
+import type { PreviewImageData } from "@/components/shared/preview-image";
 import { useCommittedRef } from "@/hooks/use-committed-ref";
 /**
  * Scene player: one player root, store and native video element per session.
@@ -221,6 +222,7 @@ interface ScenePlayerProps {
    * matches the clip the user is about to see, not the scene's cover frame.
    */
   posterSrc?: string;
+  posterImage?: PreviewImageData | null;
   /**
    * When set, two draggable handles render on the position slider for
    * editing a marker's start / end. Drags update the bounds via
@@ -314,6 +316,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   topOverlay,
   clipRange,
   posterSrc,
+  posterImage,
   clipBoundsEdit,
 }) => {
   const playbackKey = playbackKeyProp ?? scene.id;
@@ -930,6 +933,11 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
               ready={sourceReady}
               Player={Player}
               src={posterSrc ?? scene.paths.screenshot ?? undefined}
+              previewImage={
+                posterSrc !== undefined || posterImage !== undefined
+                  ? posterImage
+                  : scene.preview_image
+              }
               hide={reloading}
               minMediaTime={
                 clipRange ? Math.max(0, clipRange.start - offsetStart) : 0

@@ -21,6 +21,14 @@ func (t *GenerateCoverTask) GetDescription() string {
 }
 
 func (t *GenerateCoverTask) Start(ctx context.Context) {
+	if err := t.generate(ctx); err != nil && ctx.Err() == nil {
+		logger.Error(err)
+		logErrorOutput(err)
+	}
+}
+
+// generate returns failures to callers that expose the task as a monitored job.
+func (t *GenerateCoverTask) generate(ctx context.Context) error {
 	scenePath := t.Scene.Path
 
 	r := t.repository
@@ -31,17 +39,16 @@ func (t *GenerateCoverTask) Start(ctx context.Context) {
 
 		return t.Scene.LoadPrimaryFile(ctx, r.File)
 	}); err != nil {
-		logger.Error(err)
-		return
+		return err
 	}
 
 	if !required {
-		return
+		return nil
 	}
 
 	videoFile := t.Scene.Files.Primary()
 	if videoFile == nil {
-		return
+		return fmt.Errorf("scene %d has no primary video file", t.Scene.ID)
 	}
 
 	var at float64
@@ -64,16 +71,12 @@ func (t *GenerateCoverTask) Start(ctx context.Context) {
 		Overwrite:    true,
 	}
 
-	coverImageData, err := g.Screenshot(context.TODO(), videoFile.Path, videoFile.Width, videoFile.Duration, generate.ScreenshotOptions{
-		At: &at,
-	})
+	coverImageData, err := instance.generateCoverImage(ctx, &t.Scene, videoFile, at, g)
 	if err != nil {
-		logger.Errorf("Error generating screenshot: %v", err)
-		logErrorOutput(err)
-		return
+		return fmt.Errorf("error generating screenshot: %w", err)
 	}
 
-	if err := r.WithTxn(ctx, func(ctx context.Context) error {
+	return r.WithTxn(ctx, func(ctx context.Context) error {
 		qb := r.Scene
 		scenePartial := models.NewScenePartial()
 
@@ -89,9 +92,7 @@ func (t *GenerateCoverTask) Start(ctx context.Context) {
 		}
 
 		return nil
-	}); err != nil && ctx.Err() == nil {
-		logger.Error(err.Error())
-	}
+	})
 }
 
 // required returns true if the sprite needs to be generated

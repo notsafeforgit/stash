@@ -1,3 +1,7 @@
+import {
+  PreviewImage,
+  type PreviewImageData,
+} from "@/components/shared/preview-image";
 /**
  * Tiny render-null effect components and the poster overlay that
  * `<ScenePlayer>` mounts inside `Player.Player`. Split out of
@@ -38,12 +42,14 @@ type PlayerInstance = CreatePlayerResult<VideoPlayerStore>;
 export function PlayerPoster({
   Player,
   src,
+  previewImage,
   hide,
   minMediaTime = 0,
   ready = true,
 }: {
   Player: PlayerInstance;
   src?: string;
+  previewImage?: PreviewImageData | null;
   hide: boolean;
   minMediaTime?: number;
   ready?: boolean;
@@ -56,10 +62,11 @@ export function PlayerPoster({
     if (ready && started && !seeking && currentTime >= minMediaTime)
       setRevealed(true);
   }, [ready, started, seeking, currentTime, minMediaTime]);
-  if (!src || revealed || hide) return null;
+  if ((!src && !previewImage) || revealed || hide) return null;
   return (
-    <img
+    <PreviewImage
       src={src}
+      preview={previewImage}
       className="absolute inset-0 w-full h-full object-contain pointer-events-none"
       style={{ zIndex: 0 }}
       alt=""

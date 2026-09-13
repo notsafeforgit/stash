@@ -145,6 +145,9 @@ func (j *CleanGeneratedJob) Execute(ctx context.Context, progress *job.Progress)
 
 	if j.Options.Screenshots {
 		progress.ExecuteTask("Cleaning screenshot files", func() {
+			if err := j.cleanPreviewImages(ctx, "cover"); err != nil {
+				j.logError(err)
+			}
 			if err := j.cleanScreenshotFiles(ctx, progress); err != nil {
 				j.logError(fmt.Errorf("error cleaning screenshot files: %w", err))
 			}
@@ -163,6 +166,9 @@ func (j *CleanGeneratedJob) Execute(ctx context.Context, progress *job.Progress)
 
 	if j.Options.Markers {
 		progress.ExecuteTask("Cleaning marker files", func() {
+			if err := j.cleanPreviewImages(ctx, "marker"); err != nil {
+				j.logError(err)
+			}
 			if err := j.cleanMarkerFiles(ctx, progress); err != nil {
 				j.logError(fmt.Errorf("error cleaning marker files: %w", err))
 			}

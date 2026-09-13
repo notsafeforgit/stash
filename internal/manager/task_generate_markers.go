@@ -72,7 +72,7 @@ func (t *GenerateMarkersTask) generateSpecificMarker(ctx context.Context, marker
 		return
 	}
 
-	if err := t.generateMarker(videoFile, scene, marker); err != nil {
+	if err := t.generateMarker(ctx, videoFile, scene, marker); err != nil {
 		logger.Errorf("[generator] error generating marker files for scene (%d) marker (%d) at %s: %v", scene.ID, marker.ID, formatSeconds(float64(marker.Seconds)), err)
 	}
 }
@@ -113,13 +113,13 @@ func (t *GenerateMarkersTask) generateSceneMarkers(ctx context.Context, scene *m
 		index := i + 1
 		logger.Progressf("[generator] <%s> scene marker %d of %d", sceneHash, index, len(sceneMarkers))
 
-		if err := t.generateMarker(videoFile, scene, sceneMarker); err != nil {
+		if err := t.generateMarker(ctx, videoFile, scene, sceneMarker); err != nil {
 			logger.Errorf("[generator] error generating marker files for scene (%d) marker (%d) at %s: %v", scene.ID, sceneMarker.ID, formatSeconds(float64(sceneMarker.Seconds)), err)
 		}
 	}
 }
 
-func (t *GenerateMarkersTask) generateMarker(videoFile *models.VideoFile, scene *models.Scene, sceneMarker *models.SceneMarker) error {
+func (t *GenerateMarkersTask) generateMarker(ctx context.Context, videoFile *models.VideoFile, scene *models.Scene, sceneMarker *models.SceneMarker) error {
 	sceneHash := scene.GetHash(t.fileNamingAlgorithm)
 	seconds := float64(sceneMarker.Seconds)
 
@@ -145,7 +145,7 @@ func (t *GenerateMarkersTask) generateMarker(videoFile *models.VideoFile, scene 
 	}
 
 	if t.Screenshot {
-		if err := g.SceneMarkerScreenshot(context.TODO(), videoFile.Path, sceneHash, seconds, videoFile.Width); err != nil {
+		if err := t.generateMarkerScreenshot(ctx, scene, sceneMarker, videoFile); err != nil {
 			logger.Errorf("[generator] failed to generate marker screenshot for scene (%d) marker (%d) at %s: %v", scene.ID, sceneMarker.ID, formatSeconds(float64(sceneMarker.Seconds)), err)
 			logErrorOutput(err)
 		}
@@ -170,7 +170,7 @@ func (t *GenerateMarkersTask) markersNeeded(ctx context.Context) int {
 	for _, sceneMarker := range sceneMarkers {
 		seconds := int(sceneMarker.Seconds)
 
-		if t.Overwrite || !t.markerExists(sceneHash, seconds) {
+		if t.Overwrite || !t.markerExists(sceneHash, seconds) || (t.Screenshot && instance.Config.GetEnableV3UI() && instance.MarkerPreviewImage(t.Scene, sceneMarker) == nil) {
 			markers++
 		}
 	}

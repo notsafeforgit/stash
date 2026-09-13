@@ -1,3 +1,4 @@
+import { PreviewImage } from "@/components/shared/preview-image";
 /**
  * Editable scene markers tab. Replaces the v2.5-style read-only list
  * with an inline editor (`MarkerEditPanel`) that swaps in for the list
@@ -301,7 +302,8 @@ export function SceneMarkersTab({
                           })}
                           className="shrink-0 h-auto w-auto p-0 rounded overflow-hidden bg-transparent hover:bg-transparent"
                         >
-                          <img
+                          <PreviewImage
+                            preview={marker.preview_image}
                             src={marker.screenshot}
                             alt={marker.title}
                             loading="lazy"

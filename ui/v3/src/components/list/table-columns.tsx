@@ -1,4 +1,8 @@
 import type { EntityDestination } from "@/core/navigation";
+import {
+  PreviewImage,
+  type PreviewImageData,
+} from "@/components/shared/preview-image";
 import { Link } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { IHasID } from "src/utils/data";
@@ -13,6 +17,7 @@ export { selectionColumn };
 export function thumbnailColumn<T extends IHasID>(
   getImagePath: (row: T) => string | null | undefined,
   getDestination: (row: T) => EntityDestination,
+  getPreviewImage?: (row: T) => PreviewImageData | null | undefined,
 ): ColumnDef<T> {
   return {
     id: "thumbnail",
@@ -23,12 +28,14 @@ export function thumbnailColumn<T extends IHasID>(
     minSize: 56,
     maxSize: 56,
     cell: ({ row }) => {
-      const src = getImagePath(row.original);
+      const preview = getPreviewImage?.(row.original);
+      const src = getImagePath(row.original) || preview?.fallback;
       return (
         <Link {...getDestination(row.original)} className="block shrink-0">
           {src ? (
-            <img
+            <PreviewImage
               src={src}
+              preview={preview}
               alt=""
               className="h-10 w-10 rounded object-cover"
               loading="lazy"

@@ -198,6 +198,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({
         <EntityCard.SelectCheckbox />
         <EntityCard.Preview
           image={scene.paths.screenshot}
+          previewImage={scene.preview_image}
           video={scene.paths.preview}
           animated={scene.paths.webp}
           vtt={scene.paths.vtt}

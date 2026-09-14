@@ -16,6 +16,13 @@ async function open(page: Page, query = "?paused") {
     window.tvFixtureVideo = video;
   });
 }
+async function openSettings(page: Page) {
+  await page.getByRole("button", { name: "TV settings", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Open TV settings", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/tv-fixture\/settings\/tv/);
+}
 async function next(page: Page, id: number) {
   // Return keyboard ownership from a previously used playback control.
   await page.evaluate(() => {
@@ -102,7 +109,7 @@ test("TV markers use parent streams and never write activity", async ({
         .evaluate((video: HTMLVideoElement) => video.currentTime),
     )
     .toBeGreaterThan(0.5);
-  await page.getByRole("button", { name: "TV settings", exact: true }).click();
+  await openSettings(page);
   await expect(
     page.getByRole("heading", { name: "TV settings", exact: true }),
   ).toBeVisible();
@@ -255,6 +262,163 @@ test("TV exposes mute at the bottom and uses video taps instead of transport but
     dock.getByRole("button", { name: "Unmute", exact: true }),
   ).toBeVisible();
 });
+
+for (const viewport of [
+  { name: "mobile", width: 390, height: 844, isMobile: true, hasTouch: true },
+  {
+    name: "desktop",
+    width: 1280,
+    height: 800,
+    isMobile: false,
+    hasTouch: false,
+  },
+]) {
+  test.describe(`TV quick settings on ${viewport.name}`, () => {
+    test.use({
+      viewport: { width: viewport.width, height: viewport.height },
+      isMobile: viewport.isMobile,
+      hasTouch: viewport.hasTouch,
+    });
+    test("keeps playback in place until the explicit settings-page action", async ({
+      page,
+    }, testInfo) => {
+      const editorRequests: string[] = [];
+      page.on("request", (request) => {
+        if (new URL(request.url()).pathname.endsWith("/tv-rail-editor.tsx"))
+          editorRequests.push(request.url());
+      });
+      await open(page);
+      await page.locator("[data-tv-play-surface]").click({
+        position: { x: 150, y: 250 },
+      });
+      await expect(page.locator("video")).toHaveJSProperty("paused", false);
+      await page
+        .getByRole("button", { name: "TV settings", exact: true })
+        .click();
+      const menu = page.getByRole("dialog", {
+        name: "Quick settings",
+        exact: true,
+      });
+      await expect(menu).toBeVisible();
+      await expect(page).toHaveURL(/\/tv-fixture\/tv\?/);
+      await expect(page.locator("video")).toHaveJSProperty("paused", false);
+      await page.keyboard.press("ArrowDown");
+      await expect(page.locator("[data-scene-player]")).toHaveAttribute(
+        "data-playback-key",
+        /scene:1$/,
+      );
+      await menu.screenshot({
+        path: testInfo.outputPath("tv-quick-settings.png"),
+      });
+      await menu
+        .getByRole("button", { name: "Playback speed", exact: true })
+        .click();
+      const speed = page.getByRole("combobox", {
+        name: "Playback speed",
+        exact: true,
+      });
+      await speed.click();
+      await expect(speed).toHaveAttribute("aria-expanded", "true");
+      await page.getByRole("option", { name: "1.5×", exact: true }).click();
+      await page.getByRole("button", { name: "Close", exact: true }).click();
+      await expect(page.locator("video")).toHaveJSProperty("playbackRate", 1.5);
+      expect(
+        await page
+          .locator("video")
+          .evaluate((video) => video === window.tvFixtureVideo),
+      ).toBe(true);
+      await page
+        .getByRole("button", { name: "TV settings", exact: true })
+        .click();
+      await menu.getByRole("button", { name: "Close", exact: true }).click();
+      await expect(page).toHaveURL(/\/tv-fixture\/tv\?/);
+      await expect(page.locator("video")).toHaveJSProperty("paused", false);
+      expect(editorRequests).toEqual([]);
+      await openSettings(page);
+      await expect(page.locator("video")).toHaveCount(0);
+      await expect(
+        page.getByRole("switch", { name: "Start muted", exact: true }),
+      ).toBeVisible();
+    });
+  });
+}
+
+for (const mode of ["scenes", "markers"] as const) {
+  test(`TV ${mode} respect the saved startup mute preference and retain manual audio changes`, async ({
+    page,
+  }) => {
+    await open(page, mode === "markers" ? "?paused&markers" : "?paused");
+    await expect(page.locator("video")).toHaveJSProperty("muted", true);
+    for (const startMuted of [false, true]) {
+      await openSettings(page);
+      const preference = page.getByRole("switch", {
+        name: "Start muted",
+        exact: true,
+      });
+      await expect(preference).toBeChecked({ checked: !startMuted });
+      await preference.setChecked(startMuted);
+      await page
+        .getByRole("button", { name: "Save TV settings", exact: true })
+        .click();
+      await expect
+        .poll(() =>
+          page.evaluate(() =>
+            window.tvFixtureRequests
+              .filter((request) => request.name === "ConfigureUISetting")
+              .at(-1),
+          ),
+        )
+        .toMatchObject({ variables: { key: "tv", value: { startMuted } } });
+      await page
+        .getByRole("link", { name: "Return to TV", exact: true })
+        .click();
+      const video = page.locator("video");
+      await expect(video).toHaveJSProperty("muted", startMuted);
+      await expect(page.locator("[data-scene-player]")).toHaveAttribute(
+        "data-playback-ready",
+        "true",
+      );
+      await video.evaluate((element: HTMLVideoElement) => {
+        window.tvFixtureVideo = element;
+      });
+      const selection = await page
+        .locator("[data-scene-player]")
+        .getAttribute("data-playback-key");
+      await page
+        .getByRole("button", {
+          name: startMuted ? "Unmute" : "Mute",
+          exact: true,
+        })
+        .click();
+      await expect(video).toHaveJSProperty("muted", !startMuted);
+      await page.evaluate(() => {
+        if (document.activeElement instanceof HTMLElement)
+          document.activeElement.blur();
+      });
+      await page.keyboard.press("ArrowDown");
+      await expect(page.locator("[data-scene-player]")).not.toHaveAttribute(
+        "data-playback-key",
+        selection ?? "",
+      );
+      await expect(page.locator("[data-scene-player]")).toHaveAttribute(
+        "data-playback-ready",
+        "true",
+      );
+      await expect(video).toHaveJSProperty("muted", !startMuted);
+      expect(
+        await video.evaluate((element) => element === window.tvFixtureVideo),
+      ).toBe(true);
+    }
+    expect(
+      await page.evaluate(
+        () =>
+          window.tvFixtureRequests.filter(
+            (request) => request.name === "ConfigureUISetting",
+          ).length,
+      ),
+    ).toBe(2);
+  });
+}
 
 test("holding the video uses 2x, consumes movement and release, and restores the saved rate", async ({
   page,
@@ -601,7 +765,7 @@ test("TV restores feed context after settings without refetching page one", asyn
       window.tvFixtureRequests.filter((request) => request.name === "TvScenes")
         .length,
   );
-  await page.getByRole("button", { name: "TV settings", exact: true }).click();
+  await openSettings(page);
   await expect(page.locator("video")).toHaveCount(0);
   await page.getByRole("link", { name: "Return to TV" }).click();
   await expect(page.locator("[data-scene-player]")).toHaveAttribute(
@@ -641,7 +805,7 @@ test("scene activity records watched time on pause and counts once per visit", a
       ),
     )
     .toBe(1);
-  await page.getByRole("button", { name: "TV settings", exact: true }).click();
+  await openSettings(page);
   const requests = await page.evaluate(() =>
     window.tvFixtureRequests.filter(
       (request) => request.name === "SceneSaveActivity",
@@ -853,7 +1017,7 @@ test("TV settings show the rail editor directly and save reordered actions witho
   });
   await open(page, "?paused&legacy-rules");
   expect(editorRequests).toEqual([]);
-  await page.getByRole("button", { name: "TV settings", exact: true }).click();
+  await openSettings(page);
   await expect(
     page.getByRole("combobox", { name: "Scene filter", exact: true }),
   ).toContainText("Scene picks");
@@ -930,7 +1094,7 @@ test("TV settings save the shared quality under only the TV key", async ({
   page,
 }) => {
   await open(page);
-  await page.getByRole("button", { name: "TV settings", exact: true }).click();
+  await openSettings(page);
   await page
     .getByRole("combobox", { name: "Default quality for scenes and markers" })
     .click();
@@ -957,7 +1121,7 @@ test("TV settings save the shared quality under only the TV key", async ({
       }),
     ]);
   await page.getByRole("link", { name: "Return to TV" }).click();
-  await page.getByRole("button", { name: "TV settings", exact: true }).click();
+  await openSettings(page);
   await expect(
     page.getByRole("combobox", {
       name: "Default quality for scenes and markers",
@@ -969,7 +1133,7 @@ test("failed TV settings saves retain the draft for retry", async ({
   page,
 }) => {
   await open(page, "?paused&save-error");
-  await page.getByRole("button", { name: "TV settings", exact: true }).click();
+  await openSettings(page);
   await page
     .getByRole("combobox", { name: "Default quality for scenes and markers" })
     .click();
@@ -988,7 +1152,7 @@ test("failed TV settings saves retain the draft for retry", async ({
     )
     .toBe(1);
   await page.getByRole("link", { name: "Return to TV" }).click();
-  await page.getByRole("button", { name: "TV settings", exact: true }).click();
+  await openSettings(page);
   await expect(
     page.getByRole("combobox", {
       name: "Default quality for scenes and markers",

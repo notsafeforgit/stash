@@ -38,9 +38,11 @@ time and playback state. It does not change the shared player's saved quality.
 Transcodes are generated on demand by Stash; no generated video preview mode
 is involved. Posters and timeline sprite images remain available.
 
-TV starts muted with a visible mute/unmute control in the bottom dock, and
-retains user audio/rate choices across item changes. Temporary holds never
-replace the saved playback rate.
+**Start muted** in Settings → TV controls the initial audio when entering TV
+(enabled by default). The visible mute/unmute control in the bottom dock changes
+audio for the current viewing session and carries across item changes. Browsers
+may still require muted autoplay. Temporary holds never replace the saved
+playback rate.
 Playback menus include captions and supported device playback controls.
 Fit/fill, zoom, rotation, left-handed actions, and hiding controls are available.
 Navigation, mute, Settings and restore-controls stay reachable in the bottom
@@ -61,6 +63,11 @@ keep Close reachable below a bounded scroller; long titles, descriptions and
 tag/performer labels wrap without horizontal overflow.
 
 ## Actions and settings
+
+The TV settings action opens **Quick settings** over the current video, with
+access to quality, speed, volume and subtitles. Opening or closing it preserves
+playback. Select **Open TV settings** to leave the player for saved preferences;
+the full settings editor loads only after that explicit navigation.
 
 Metadata links open the app's existing detail routes. Returning to TV restores
 the recent feed, selection, and scalar playback state while cached. Rating,
@@ -84,6 +91,8 @@ rules. Earlier settings retain their selected filters and playback preferences;
 retired rules are removed. Version 1 settings with Shuffle enabled load as Random;
 other saved sort choices remain intact. Saving writes the new format without
 rules or a shuffle flag. Sort labels use the same translations as the library menus.
+Saved versions without a startup mute preference default to muted without
+resetting their other preferences.
 
 ## Activity and ownership
 

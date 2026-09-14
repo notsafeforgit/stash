@@ -39,6 +39,8 @@ export const tvSettingsSchema = z.object({
   prefetch: z.number().int().min(1).max(5),
   itemLimit: z.number().int().positive().max(100000).nullable(),
   autoplay: z.boolean(),
+  // Additive preference: existing saved settings retain their muted startup.
+  startMuted: z.boolean().default(true),
   start: z.enum(["resume", "beginning", "random-marker", "random-position"]),
   window: tvWindowSchema,
   completion: z.enum(["normal", "advance", "loop"]),
@@ -80,6 +82,7 @@ export const defaultTvSettings: TvSettings = {
   prefetch: 2,
   itemLimit: null,
   autoplay: true,
+  startMuted: true,
   start: "resume",
   window: { kind: "full" },
   completion: "advance",

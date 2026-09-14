@@ -323,7 +323,7 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
                           ? -90
                           : 0
                     }
-                    initiallyMuted
+                    initiallyMuted={settings.startMuted}
                     qualityPreference={settings.defaultQuality}
                     initialTimestamp={
                       planReady

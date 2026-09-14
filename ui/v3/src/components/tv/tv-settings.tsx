@@ -5,7 +5,6 @@ import { useForm, useStore } from "@tanstack/react-form";
 import { useTvSettings } from "@/hooks/use-tv-settings";
 import { useMsg } from "@/hooks/message";
 import {
-  defaultTvSettings,
   tvSettingsSchema,
   tvModeSchema,
   type TvSettings,
@@ -36,24 +35,21 @@ function TvSettingsForm({ initial }: { initial: TvSettings }) {
   const adapter = useTvSettings();
   const intl = useIntl();
   const msg = useMsg();
-  const [resetOpen, setResetOpen] = useState(false);
   const form = useForm({
     defaultValues: { settings: initial },
-    onSubmit: async ({ value, formApi }) => {
-      const parsed = tvSettingsSchema.safeParse(value.settings);
-      if (!parsed.success) return;
-      if (!(await adapter.save(parsed.data))) return;
-      formApi.reset({ settings: parsed.data });
-    },
   });
   const values = useStore(form.store, (state) => state.values.settings);
-  const submitting = useStore(form.store, (state) => state.isSubmitting);
   const validation = tvSettingsSchema.safeParse(values);
+  const update = (next: TvSettings) => {
+    form.setFieldValue("settings", next);
+    const parsed = tvSettingsSchema.safeParse(next);
+    if (parsed.success) void adapter.save(parsed.data);
+  };
   const set = <K extends keyof TvSettings>(key: K, value: TvSettings[K]) =>
-    form.setFieldValue("settings", (previous) => ({
-      ...previous,
+    update({
+      ...form.state.values.settings,
       [key]: value,
-    }));
+    });
   const modes = [
     { value: "scenes", label: msg("tv.text.scenes", "Scenes") },
     { value: "markers", label: msg("tv.text.markers", "Markers") },
@@ -77,7 +73,6 @@ function TvSettingsForm({ initial }: { initial: TvSettings }) {
       onSubmit={(event) => {
         event.preventDefault();
         event.stopPropagation();
-        void form.handleSubmit();
       }}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -95,7 +90,8 @@ function TvSettingsForm({ initial }: { initial: TvSettings }) {
             const result = tvModeSchema.safeParse(next);
             if (result.success) {
               const options = getFilterOptions(tvFilterMode(result.data));
-              form.setFieldValue("settings", (previous) => ({
+              const previous = form.state.values.settings;
+              update({
                 ...previous,
                 mode: result.data,
                 sort: options.sortByOptions.some(
@@ -103,7 +99,7 @@ function TvSettingsForm({ initial }: { initial: TvSettings }) {
                 )
                   ? previous.sort
                   : null,
-              }));
+              });
             }
           }}
         />
@@ -453,35 +449,28 @@ function TvSettingsForm({ initial }: { initial: TvSettings }) {
           </AlertDescription>
         </Alert>
       )}
-      <div className="sticky bottom-0 flex flex-wrap gap-3 border-t bg-background py-3">
-        <Button type="submit" disabled={submitting || !validation.success}>
-          {submitting && <Spinner data-icon="inline-start" />}
-          {msg("tv.settings.save", "Save TV settings")}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => setResetOpen(true)}
-        >
-          {msg("tv.settings.reset", "Reset TV settings")}
-        </Button>
-      </div>
-      <DestructiveConfirmDialog
-        open={resetOpen}
-        onOpenChange={setResetOpen}
-        title={msg("tv.text.reset_tv_settings", "Reset TV settings?")}
-        onConfirm={async () => {
-          if (!(await adapter.reset())) return;
-          adapter.setRotation("normal");
-          form.reset({ settings: defaultTvSettings });
-          setResetOpen(false);
-        }}
-      >
-        <FormattedMessage
-          id="tv.text.restore_the_default_feed_playback_and_action_rail_settings"
-          defaultMessage="Restore the default feed, playback and action rail settings."
-        />
-      </DestructiveConfirmDialog>
+      {adapter.failed && (
+        <Alert variant="destructive">
+          <AlertTitle>
+            {msg("tv.settings.save_failed", "TV settings could not be saved")}
+          </AlertTitle>
+          <AlertDescription>
+            <p>
+              {msg(
+                "tv.settings.save_failed_description",
+                "Your changes are kept here. Retry to save them.",
+              )}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void adapter.retry()}
+            >
+              {msg("actions.retry", "Retry")}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
     </form>
   );
 }

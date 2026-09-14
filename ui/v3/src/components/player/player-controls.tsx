@@ -1695,7 +1695,7 @@ export function PlayerControls({
             // prev/next arrows. Without this, the play button centers in
             // the slice above the ControlBar and is offset upward.
             <Button
-              variant="ghost"
+              variant="transparent"
               data-player-native-button=""
               data-video-gesture-surface=""
               disabled={mode === "reloading"}
@@ -1705,7 +1705,7 @@ export function PlayerControls({
                   : { id: "accessibility.pause", defaultMessage: "Pause" },
               )}
               className={cn(
-                "absolute inset-0 size-full rounded-none p-0 flex items-center justify-center pointer-events-auto hover:bg-transparent active:translate-y-0",
+                "absolute inset-0 size-full rounded-none p-0 flex items-center justify-center pointer-events-auto active:translate-y-0",
                 controlsFadeClass(controlsHidden),
                 mode === "pre-start" && "cursor-pointer",
                 mode === "playing" &&

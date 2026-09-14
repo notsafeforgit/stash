@@ -20,6 +20,7 @@ import { installRouteTransitions } from "@/core/route-transitions";
 import { defaultTvSettings, type TvSettings } from "@/core/tv/settings";
 import { createTvAction, type TvRailEntry } from "@/core/tv/action-config";
 import { useTvSettings } from "@/hooks/use-tv-settings";
+import { SaveIndicatorProvider } from "@/hooks/save-indicator";
 import type { TvFeedQuery } from "@/core/tv/feed-query";
 import * as GQL from "@/core/generated-graphql";
 import { scenes as sourceScenes } from "./scene-lightbox";
@@ -28,11 +29,13 @@ import { playerConfiguration } from "./player-configuration";
 declare global {
   interface Window {
     tvFixtureRequests: { name: string; variables: unknown }[];
+    tvFixtureSaveAttempts: GQL.ConfigureUiSettingMutationVariables[];
     tvFixtureVideo?: HTMLVideoElement;
     tvFixtureNativeFullscreen: number;
   }
 }
 window.tvFixtureRequests = [];
+window.tvFixtureSaveAttempts = [];
 window.tvFixtureNativeFullscreen = 0;
 const params = new URLSearchParams(location.search);
 const base = sourceScenes[0];
@@ -270,9 +273,15 @@ const configure: MockedResponse<
   GQL.ConfigureUiSettingMutation,
   GQL.ConfigureUiSettingMutationVariables
 > = {
-  request: { query: GQL.ConfigureUiSettingDocument, variables: () => true },
+  request: {
+    query: GQL.ConfigureUiSettingDocument,
+    variables: (variables) => {
+      window.tvFixtureSaveAttempts.push(variables);
+      return true;
+    },
+  },
   maxUsageCount: Infinity,
-  delay: 50,
+  delay: params.has("slow-save") ? 500 : 50,
   result: (variables) => {
     record("ConfigureUISetting", variables);
     if (params.has("save-error") && !saveFailed) {
@@ -332,16 +341,18 @@ const root = createRootRoute({
   component: () => (
     <ApolloProvider client={client}>
       <FixtureConfiguration>
-        <MobileNavigationProvider>
-          <div
-            data-app-viewport
-            className="flex h-dvh flex-col overflow-hidden"
-          >
-            <RouteViewport>
-              <Outlet />
-            </RouteViewport>
-          </div>
-        </MobileNavigationProvider>
+        <SaveIndicatorProvider>
+          <MobileNavigationProvider>
+            <div
+              data-app-viewport
+              className="flex h-dvh flex-col overflow-hidden"
+            >
+              <RouteViewport>
+                <Outlet />
+              </RouteViewport>
+            </div>
+          </MobileNavigationProvider>
+        </SaveIndicatorProvider>
       </FixtureConfiguration>
     </ApolloProvider>
   ),

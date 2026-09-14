@@ -19,7 +19,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { ArrowUp, ArrowDown, GripVertical, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { SettingText } from "@/components/settings/setting-row";
 import { Switch } from "@/components/ui/switch";
 import { Field, FieldLabel, FieldGroup } from "@/components/ui/field";
 import { TvSelect } from "./tv-select";
@@ -53,24 +53,16 @@ function ActionFields({
   const intl = useIntl();
   return (
     <FieldGroup>
-      <Field>
-        <FieldLabel>
-          <FormattedMessage
-            id="tv.text.button_label"
-            defaultMessage="Button label"
-          />
-        </FieldLabel>
-        <Input
-          value={action.label}
-          onChange={(event) =>
-            onChange({ ...action, label: event.target.value })
-          }
-          placeholder={msg(
-            `tv.action.${action.kind}`,
-            tvActionLabels[action.kind],
-          )}
-        />
-      </Field>
+      <SettingText
+        label={msg("tv.text.button_label", "Button label")}
+        value={action.label}
+        onChange={(label) => onChange({ ...action, label })}
+        placeholder={msg(
+          `tv.action.${action.kind}`,
+          tvActionLabels[action.kind],
+        )}
+        inputClassName="w-full"
+      />
       <Field>
         <FieldLabel>
           <FormattedMessage id="tv.text.icon" defaultMessage="Icon" />
@@ -137,20 +129,12 @@ function ActionFields({
       )}
       {action.kind === "quick-marker" && (
         <>
-          <Field>
-            <FieldLabel>
-              <FormattedMessage
-                id="tv.text.marker_title"
-                defaultMessage="Marker title"
-              />
-            </FieldLabel>
-            <Input
-              value={action.title}
-              onChange={(event) =>
-                onChange({ ...action, title: event.target.value })
-              }
-            />
-          </Field>
+          <SettingText
+            label={msg("tv.text.marker_title", "Marker title")}
+            value={action.title}
+            onChange={(title) => onChange({ ...action, title })}
+            inputClassName="w-full"
+          />
           <Field>
             <FieldLabel>
               <FormattedMessage
@@ -200,28 +184,21 @@ function ActionFields({
               }
             />
           </Field>
-          <Field>
-            <FieldLabel>
-              <FormattedMessage
-                id="tv.text.duration_in_seconds_blank_for_implicit_end"
-                defaultMessage="Duration in seconds (blank for implicit end)"
-              />
-            </FieldLabel>
-            <Input
-              type="number"
-              min={0.1}
-              value={action.duration ?? ""}
-              onChange={(event) =>
-                onChange({
-                  ...action,
-                  duration:
-                    event.target.value === ""
-                      ? null
-                      : Number(event.target.value),
-                })
-              }
-            />
-          </Field>
+          <SettingText
+            label={msg(
+              "tv.text.duration_in_seconds_blank_for_implicit_end",
+              "Duration in seconds (blank for implicit end)",
+            )}
+            type="number"
+            value={action.duration === null ? "" : String(action.duration)}
+            onChange={(value) =>
+              onChange({
+                ...action,
+                duration: value === "" ? null : Number(value),
+              })
+            }
+            inputClassName="w-full"
+          />
         </>
       )}
     </FieldGroup>
@@ -382,20 +359,12 @@ function RailRow({
           </>
         ) : (
           <FieldGroup>
-            <Field>
-              <FieldLabel>
-                <FormattedMessage
-                  id="tv.text.folder_name"
-                  defaultMessage="Folder name"
-                />
-              </FieldLabel>
-              <Input
-                value={entry.label}
-                onChange={(event) =>
-                  update({ ...entry, label: event.target.value })
-                }
-              />
-            </Field>
+            <SettingText
+              label={msg("tv.text.folder_name", "Folder name")}
+              value={entry.label}
+              onChange={(label) => update({ ...entry, label })}
+              inputClassName="w-full"
+            />
             <Field>
               <FieldLabel>
                 <FormattedMessage

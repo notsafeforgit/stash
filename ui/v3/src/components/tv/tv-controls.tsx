@@ -436,13 +436,13 @@ export function TvControls({
       data-tv-controls
     >
       <Button
-        variant="ghost"
+        variant="transparent"
         data-video-gesture-surface=""
         data-tv-play-surface
         aria-label={
           paused ? msg("tv.text.play", "Play") : msg("tv.text.pause", "Pause")
         }
-        className="pointer-events-auto absolute inset-0 size-full touch-none rounded-none p-0 hover:bg-transparent active:translate-y-0 [-webkit-touch-callout:none]"
+        className="pointer-events-auto absolute inset-0 size-full touch-none rounded-none p-0 active:translate-y-0 [-webkit-touch-callout:none]"
         onClick={input.tap}
       />
       {paused && (

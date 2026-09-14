@@ -207,7 +207,8 @@ Action inventory for TV-20: settings, UI visibility, scene information, rating,
 O-counter, organized toggle, tag editor, quick tag, create marker, delete current
 media, rotation, fullscreen, volume/mute, fit mode, loop/completion mode,
 playback rate, subtitles and resolution. Not every setting needs a default rail
-button. The settings action opens the main app's Settings → TV page.
+button. The settings action opens quick playback settings over the video;
+an explicit Open TV settings button navigates to the main app's Settings → TV page.
 
 ## 5. Explicit product choices and scope boundaries
 
@@ -844,9 +845,11 @@ Settings → TV is the configuration home, accessible without opening a TV feed.
 Group playback (including Default quality), feed behavior/limits,
 presentation, and action-layout editing using existing settings sections and
 TanStack Form/Zod patterns. Device-only rotation is edited here too, clearly
-labeled as local. The TV rail's settings action navigates here with return
-context; it does not open a separate TV configuration drawer. Immediate playback
-menus and metadata editors remain available in the viewing surface.
+labeled as local. The TV rail's settings action opens quick playback settings
+in the viewing surface, preserving playback and selection. A separate Open TV
+settings button navigates here with return context. Saved preferences remain
+owned by the main settings page; immediate playback menus and metadata editors
+remain available in the viewing surface.
 
 Show the action-rail editor directly in its settings section, without a
 Customize button. Keep its module lazy and mount it automatically when the
@@ -915,8 +918,10 @@ scene-end completion with automatic advance;
 TV autoplay enabled but still subject to the app's global autostart preference
 and browser permission; Best available quality for both feeds; fit/contain;
 normal orientation; right rail; UI visible; page size 20; two-item prefetch
-threshold; no item limit. Resolve initial audio/rate from current shared preferences,
-otherwise use muted/1x, without resetting them between items. Respect the
+threshold; no item limit. Start muted is enabled by default and configurable in
+Settings → TV. Apply it when entering TV, subject to browser autoplay permission;
+retain the viewer's audio choices between items. Resolve the initial rate from
+shared preferences, otherwise use 1x. Respect the
 existing maximum-short-clip loop preference through the single completion policy.
 
 Ship a compact default rail with essential actions and metadata/playback folders,

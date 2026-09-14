@@ -18,6 +18,7 @@ import { MobileNavigationProvider } from "@/components/layout/mobile-navigation"
 import { RouteViewport } from "@/components/layout/route-viewport";
 import { installRouteTransitions } from "@/core/route-transitions";
 import { defaultTvSettings, type TvSettings } from "@/core/tv/settings";
+import { useTvSettings } from "@/hooks/use-tv-settings";
 import type { TvFeedQuery } from "@/core/tv/feed-query";
 import * as GQL from "@/core/generated-graphql";
 import { scenes as sourceScenes } from "./scene-lightbox";
@@ -98,6 +99,7 @@ const settings: TvSettings = {
   mode,
   pageSize: 5,
   autoplay: !params.has("paused"),
+  startMuted: !params.has("unmuted"),
   completion: params.has("advance") ? "advance" : "normal",
   defaultQuality: params.has("low")
     ? { kind: "fixed", resolution: GQL.StreamingResolutionEnum.Low }
@@ -301,6 +303,18 @@ const query: TvFeedQuery = {
   prefetch: 2,
   itemLimit: null,
 };
+function FixtureTvPage() {
+  const { result } = useTvSettings();
+  if (result.kind !== "ready") throw new Error("Invalid fixture TV settings");
+  return (
+    <TvPage
+      query={query}
+      settings={result.settings}
+      seed={37}
+      search={{ seed: 37 }}
+    />
+  );
+}
 const root = createRootRoute({
   component: () => (
     <ApolloProvider client={client}>
@@ -325,14 +339,7 @@ const router = createRouter({
     createRoute({
       getParentRoute: () => root,
       path: "/tv",
-      component: () => (
-        <TvPage
-          query={query}
-          settings={settings}
-          seed={37}
-          search={{ seed: 37 }}
-        />
-      ),
+      component: FixtureTvPage,
     }),
     createRoute({
       getParentRoute: () => root,

@@ -230,6 +230,15 @@ function TvSettingsForm({ initial }: { initial: TvSettings }) {
           checked={values.autoplay}
           onChange={(value) => set("autoplay", value)}
         />
+        <SettingSwitch
+          label={msg("tv.settings.start_muted", "Start muted")}
+          description={msg(
+            "tv.settings.start_muted_description",
+            "Applies when entering TV. Your mute choice carries across videos; your browser may still require muted autoplay.",
+          )}
+          checked={values.startMuted}
+          onChange={(value) => set("startMuted", value)}
+        />
         <SettingSelect
           label={msg(
             "tv.settings.quality",

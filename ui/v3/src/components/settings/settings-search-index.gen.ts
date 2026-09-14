@@ -1414,6 +1414,22 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
       defaultMessage: "Playback",
     },
     label: {
+      id: "tv.settings.start_muted",
+      defaultMessage: "Start muted",
+    },
+    description: {
+      id: "tv.settings.start_muted_description",
+      defaultMessage:
+        "Applies when entering TV. Your mute choice carries across videos; your browser may still require muted autoplay.",
+    },
+  },
+  {
+    to: "/settings/tv",
+    section: {
+      id: "tv.settings.playback",
+      defaultMessage: "Playback",
+    },
+    label: {
       id: "tv.settings.quality",
       defaultMessage: "Default quality for scenes and markers",
     },

@@ -122,6 +122,35 @@ describe("TV media policies", () => {
 
 describe("TV settings validation", () => {
   it.each([
+    1, 2, 3,
+  ])("adds the startup mute default to version %i without resetting preferences", (version) => {
+    const previous = {
+      ...defaultTvSettings,
+      version,
+      shuffle: false,
+      startMuted: undefined,
+      autoplay: false,
+      sceneFilter: { kind: "saved", id: "12" },
+    };
+    const expected = {
+      ...defaultTvSettings,
+      autoplay: false,
+      sceneFilter: { kind: "saved", id: "12" },
+    };
+    expect(decodeTvSettings(previous)).toEqual({
+      kind: "ready",
+      settings: expected,
+    });
+    expect(decodeTvSettings({ ...previous, startMuted: false })).toEqual({
+      kind: "ready",
+      settings: { ...expected, startMuted: false },
+    });
+    expect(decodeTvSettings({ ...previous, startMuted: "false" }).kind).toBe(
+      "invalid",
+    );
+  });
+
+  it.each([
     { shuffle: true, sort: "created_at", expected: "random" },
     { shuffle: true, sort: null, expected: "random" },
     { shuffle: false, sort: "created_at", expected: "created_at" },

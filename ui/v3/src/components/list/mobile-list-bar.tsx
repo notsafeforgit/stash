@@ -18,6 +18,7 @@ import {
 import { getSortDirectionIcon } from "./sort-icon";
 import { FormattedMessage, useIntl } from "react-intl";
 import type { ISortByOption } from "src/models/list-filter/filter-options";
+import { formatSortOptions } from "@/models/list-filter/labels";
 import { DisplayMode } from "src/models/list-filter/types";
 import { SortDirectionEnum } from "src/core/generated-graphql";
 import { Button } from "src/components/ui/button";
@@ -170,10 +171,7 @@ export const MobileListBar: React.FC<MobileListBarProps> = ({
   const { pinnedValues: pinnedSortValues, togglePinned: toggleSortPin } =
     usePinnedSortOptions(filter.mode);
 
-  const sortOptions = sortByOptions.map((opt) => ({
-    value: opt.value,
-    label: intl.formatMessage({ id: opt.messageID, defaultMessage: opt.value }),
-  }));
+  const sortOptions = formatSortOptions(intl, sortByOptions);
   const currentSortLabel =
     sortOptions.find((o) => o.value === (filter.sortBy ?? ""))?.label ?? "";
 

@@ -29,6 +29,7 @@ import {
 import type { ListFilterModel } from "src/models/list-filter/filter";
 import { DisplayMode } from "src/models/list-filter/types";
 import type { ISortByOption } from "src/models/list-filter/filter-options";
+import { formatSortOptions } from "@/models/list-filter/labels";
 import { SortDirectionEnum } from "src/core/generated-graphql";
 import type { IListSelect } from "./use-list-select";
 import type { CardAspect } from "./card-aspect-context";
@@ -187,10 +188,7 @@ export const ListToolbar: React.FC<ListToolbarProps> = ({
   const { pinnedValues: pinnedSortValues, togglePinned: toggleSortPin } =
     usePinnedSortOptions(filter.mode);
 
-  const sortOptions = sortByOptions.map((opt) => ({
-    value: opt.value,
-    label: intl.formatMessage({ id: opt.messageID, defaultMessage: opt.value }),
-  }));
+  const sortOptions = formatSortOptions(intl, sortByOptions);
   const currentSortLabel =
     sortOptions.find((o) => o.value === (filter.sortBy ?? ""))?.label ?? "";
 

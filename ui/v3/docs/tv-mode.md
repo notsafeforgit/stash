@@ -10,7 +10,8 @@ It needs no Stash TV plugin or separate application.
 Choose a scene or marker feed, an app default, saved filter, or all items.
 Saved search, criteria groups and sort retain the library's filter semantics.
 Additional saved-filter rules combine criteria with AND; text search belongs
-in the primary filter. Shuffle keeps a seed across pages. Matching orientation
+in the primary filter. Choose **Random** in **Sort order** for a seeded order
+that stays stable across pages. Matching orientation
 uses the viewing surface, including forced rotation, and includes square videos.
 
 Swipe vertically, use a wheel gesture, press Up/Down, or use the visible
@@ -62,6 +63,11 @@ top level. Presets require real tag IDs. Only the versioned `tv` configuration
 key is saved; local rotation is scoped to the backend URL in browser storage.
 Failed saves retain the draft for retry, and invalid/future settings remain
 recoverable until an explicit reset. The main settings search includes TV rows.
+
+Settings version 2 uses one sort choice. Version 1 settings with Shuffle enabled
+load as Random; other saved sort choices remain intact. Saving writes the new
+format without a separate shuffle flag. Sort labels use the same translations
+as the library menus.
 
 ## Activity and ownership
 

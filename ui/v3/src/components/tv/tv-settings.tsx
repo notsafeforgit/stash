@@ -1,9 +1,8 @@
-import { FormattedMessage } from "react-intl";
+import { FormattedMessage, useIntl } from "react-intl";
 import { lazy, Suspense, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useForm, useStore } from "@tanstack/react-form";
 import { useTvSettings } from "@/hooks/use-tv-settings";
-import { useConfigurationContext } from "@/hooks/config";
 import { useMsg } from "@/hooks/message";
 import {
   defaultTvSettings,
@@ -12,7 +11,11 @@ import {
   type TvSettings,
 } from "@/core/tv/settings";
 import { qualityTiers, qualityHeight } from "@/core/player-quality";
-import { ListFilterModel } from "@/models/list-filter/filter";
+import { getFilterOptions } from "@/models/list-filter/factory";
+import {
+  formatSortLabel,
+  formatSortOptions,
+} from "@/models/list-filter/labels";
 import { tvFilterMode } from "@/core/tv/feed-query";
 import { TvFilterSelect } from "@/components/tv/tv-filter-select";
 import { TvSelect } from "@/components/tv/tv-select";
@@ -32,7 +35,7 @@ const TvRailEditor = lazy(() => import("@/components/tv/tv-rail-editor"));
 
 function TvSettingsForm({ initial }: { initial: TvSettings }) {
   const adapter = useTvSettings();
-  const { configuration } = useConfigurationContext();
+  const intl = useIntl();
   const msg = useMsg();
   const [railOpened, setRailOpened] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
@@ -57,10 +60,19 @@ function TvSettingsForm({ initial }: { initial: TvSettings }) {
     { value: "scenes", label: msg("tv.text.scenes", "Scenes") },
     { value: "markers", label: msg("tv.text.markers", "Markers") },
   ];
-  const sortOptions = new ListFilterModel(
-    tvFilterMode(values.mode),
-    configuration,
-  ).options.sortByOptions;
+  const sortOptions = formatSortOptions(
+    intl,
+    getFilterOptions(tvFilterMode(values.mode)).sortByOptions,
+  );
+  if (
+    values.sort &&
+    !sortOptions.some((option) => option.value === values.sort)
+  ) {
+    sortOptions.push({
+      value: values.sort,
+      label: formatSortLabel(intl, undefined),
+    });
+  }
   return (
     <form
       className="flex max-w-3xl flex-col gap-8 p-6"
@@ -84,8 +96,16 @@ function TvSettingsForm({ initial }: { initial: TvSettings }) {
           onChange={(next) => {
             const result = tvModeSchema.safeParse(next);
             if (result.success) {
-              set("mode", result.data);
-              set("sort", null);
+              const options = getFilterOptions(tvFilterMode(result.data));
+              form.setFieldValue("settings", (previous) => ({
+                ...previous,
+                mode: result.data,
+                sort: options.sortByOptions.some(
+                  (option) => option.value === previous.sort,
+                )
+                  ? previous.sort
+                  : null,
+              }));
             }
           }}
         />
@@ -111,11 +131,6 @@ function TvSettingsForm({ initial }: { initial: TvSettings }) {
             onChange={(next) => set("markerFilter", next)}
           />
         </Field>
-        <SettingSwitch
-          label={msg("tv.settings.shuffle", "Shuffle")}
-          checked={values.shuffle}
-          onChange={(value) => set("shuffle", value)}
-        />
         <SettingSelect
           label={msg("tv.settings.sort", "Sort order")}
           value={values.sort ?? "saved"}
@@ -127,10 +142,7 @@ function TvSettingsForm({ initial }: { initial: TvSettings }) {
                 "Use saved filter order",
               ),
             },
-            ...sortOptions.map((option) => ({
-              value: option.value,
-              label: option.value,
-            })),
+            ...sortOptions,
           ]}
           onChange={(value) => set("sort", value === "saved" ? null : value)}
         />

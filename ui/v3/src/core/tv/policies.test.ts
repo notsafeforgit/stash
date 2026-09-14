@@ -121,6 +121,33 @@ describe("TV media policies", () => {
 });
 
 describe("TV settings validation", () => {
+  it.each([
+    { shuffle: true, sort: "created_at", expected: "random" },
+    { shuffle: true, sort: null, expected: "random" },
+    { shuffle: false, sort: "created_at", expected: "created_at" },
+    { shuffle: false, sort: "random", expected: "random" },
+    { shuffle: false, sort: null, expected: null },
+  ])("migrates legacy sort $sort with shuffle $shuffle", ({
+    shuffle,
+    sort,
+    expected,
+  }) => {
+    const result = decodeTvSettings({
+      ...defaultTvSettings,
+      version: 1,
+      shuffle,
+      sort,
+    });
+    expect(result).toEqual({
+      kind: "ready",
+      settings: { ...defaultTvSettings, sort: expected },
+    });
+    if (result.kind === "ready") {
+      expect(result.settings).not.toHaveProperty("shuffle");
+      expect(decodeTvSettings(result.settings)).toEqual(result);
+    }
+  });
+
   it("retains invalid and future envelopes without silently resetting them", () => {
     expect(decodeTvSettings(undefined)).toEqual({
       kind: "ready",

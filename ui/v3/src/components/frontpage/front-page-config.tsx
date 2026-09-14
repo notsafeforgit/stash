@@ -7,7 +7,7 @@
 
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
-import { useIntl } from "react-intl";
+import { type IntlShape, useIntl } from "react-intl";
 import {
   DndContext,
   closestCenter,
@@ -46,6 +46,33 @@ import {
   SheetFooter,
 } from "src/components/ui/sheet";
 import { Button } from "src/components/ui/button";
+import { getFilterOptions } from "@/models/list-filter/factory";
+import {
+  formatFilterModeLabel,
+  formatSortLabel,
+} from "@/models/list-filter/labels";
+
+function formatRowLabel(intl: IntlShape, content: ICustomFilter) {
+  if (content.title !== undefined) return content.title;
+  const fallback = intl.formatMessage(
+    { id: "front_page_row_label", defaultMessage: "{objects} – {sort}" },
+    {
+      objects: formatFilterModeLabel(intl, content.mode),
+      sort: formatSortLabel(
+        intl,
+        getFilterOptions(content.mode).sortByOptions.find(
+          (option) => option.value === content.sortBy,
+        ),
+      ),
+    },
+  );
+  return content.message
+    ? intl.formatMessage(
+        { id: content.message.id, defaultMessage: fallback },
+        content.message.values,
+      )
+    : fallback;
+}
 
 // ── SavedFilter row label (async name lookup) ──────────────────────────────────
 
@@ -101,6 +128,7 @@ function RowItemShell({
   onRemove,
   dragHandleProps,
 }: RowItemShellProps) {
+  const intl = useIntl();
   return (
     <div className="flex items-center gap-2 bg-card border border-border rounded-md px-2 py-2">
       <Button
@@ -108,7 +136,10 @@ function RowItemShell({
         size="icon-sm"
         className="cursor-grab active:cursor-grabbing shrink-0"
         {...dragHandleProps}
-        aria-label="Drag to reorder"
+        aria-label={intl.formatMessage({
+          id: "actions.drag_to_reorder",
+          defaultMessage: "Drag to reorder",
+        })}
       >
         <GripVertical size={16} />
       </Button>
@@ -125,7 +156,10 @@ function RowItemShell({
         size="icon-sm"
         className="hover:text-destructive shrink-0"
         onClick={onRemove}
-        aria-label="Remove row"
+        aria-label={intl.formatMessage({
+          id: "actions.remove_row",
+          defaultMessage: "Remove row",
+        })}
       >
         <Trash2 size={15} />
       </Button>
@@ -182,20 +216,11 @@ function SortableRow({
     );
   }
 
-  const label =
-    content.title ??
-    (content.message
-      ? intl.formatMessage(
-          { id: content.message.id, defaultMessage: content.message.id },
-          content.message.values,
-        )
-      : `${content.mode} – ${content.sortBy}`);
-
   return (
     <div ref={setNodeRef} style={style}>
       <RowItemShell
-        label={label}
-        badge={content.mode}
+        label={formatRowLabel(intl, content)}
+        badge={formatFilterModeLabel(intl, content.mode)}
         onRemove={onRemove}
         dragHandleProps={dragHandleProps}
       />
@@ -226,14 +251,7 @@ function AddRowMenu({
         {intl.formatMessage({ id: "premade", defaultMessage: "Premade" })}
       </p>
       {premade.map((item, i) => {
-        const label =
-          item.title ??
-          (item.message
-            ? intl.formatMessage(
-                { id: item.message.id, defaultMessage: item.message.id },
-                item.message.values,
-              )
-            : `${item.mode} – ${item.sortBy}`);
+        const label = formatRowLabel(intl, item);
         return (
           <Button
             key={i}
@@ -272,7 +290,7 @@ function AddRowMenu({
             >
               {sf.name}
               <span className="text-muted-foreground text-xs ml-2">
-                {sf.mode}
+                {formatFilterModeLabel(intl, sf.mode)}
               </span>
             </Button>
           ))}

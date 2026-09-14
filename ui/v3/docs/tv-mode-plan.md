@@ -914,7 +914,8 @@ preserves in-page operation. Cross-device saves follow the app's existing
 last-write behavior; this feature does not introduce a distributed editor.
 
 Initial defaults: scenes using the configured default filter; saved sort order
-with shuffle off; resume start; scene-end completion with automatic advance;
+(Random is a sort choice, with no separate shuffle toggle); resume start;
+scene-end completion with automatic advance;
 TV autoplay enabled but still subject to the app's global autostart preference
 and browser permission; Best available quality for both feeds; fit/contain;
 normal orientation; right rail; UI visible; page size 20; two-item prefetch

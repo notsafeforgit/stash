@@ -130,7 +130,6 @@ export async function resolveTvQuery(
         ? GQL.SortDirectionEnum.Asc
         : GQL.SortDirectionEnum.Desc;
   }
-  if (settings.shuffle) model.sortBy = "random";
   model.randomSeed = seed;
   model.itemsPerPage = settings.pageSize;
   const roots: GQL.FilterAstNodeInput[] = [];

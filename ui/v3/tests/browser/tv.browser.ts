@@ -340,6 +340,75 @@ test("automatic advance retains audio state and one video", async ({
   ).toBe(true);
 });
 
+test("TV has one localized sort choice and retains Random between feed modes", async ({
+  page,
+}) => {
+  await page.goto("/tv-fixture/settings/tv?paused");
+  const sort = page.getByRole("combobox", { name: "Sort order", exact: true });
+  await expect(
+    page.getByRole("switch", { name: "Shuffle", exact: true }),
+  ).toHaveCount(0);
+  await sort.click();
+  await page.getByRole("option", { name: "Created At", exact: true }).click();
+  await expect(sort).toContainText("Created At");
+  await sort.click();
+  await page.getByRole("option", { name: "Studio Code", exact: true }).click();
+  await expect(sort).toContainText("Studio Code");
+  await sort.click();
+  await page.getByRole("option", { name: "Random", exact: true }).click();
+  await page
+    .getByRole("combobox", { name: "Default feed", exact: true })
+    .click();
+  await page.getByRole("option", { name: "Markers", exact: true }).click();
+  await expect(sort).toContainText("Random");
+  await sort.click();
+  await expect(
+    page.getByRole("option", { name: "Scene Updated At", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("option", { name: "Random", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Save TV settings", exact: true })
+    .click();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.tvFixtureRequests.filter(
+          (request) => request.name === "ConfigureUISetting",
+        ),
+      ),
+    )
+    .toEqual([
+      expect.objectContaining({
+        variables: expect.objectContaining({
+          key: "tv",
+          value: expect.objectContaining({
+            version: 2,
+            sort: "random",
+            mode: "markers",
+          }),
+        }),
+      }),
+    ]);
+  const saved = await page.evaluate(() =>
+    window.tvFixtureRequests.find(
+      (request) => request.name === "ConfigureUISetting",
+    ),
+  );
+  expect(saved?.variables).not.toHaveProperty("value.shuffle");
+});
+
+test("TV settings load a legacy Shuffle preference as Random", async ({
+  page,
+}) => {
+  await page.goto("/tv-fixture/settings/tv?paused&legacy-shuffle");
+  await expect(
+    page.getByRole("combobox", { name: "Sort order", exact: true }),
+  ).toContainText("Random");
+  await expect(
+    page.getByRole("switch", { name: "Shuffle", exact: true }),
+  ).toHaveCount(0);
+});
+
 test("TV settings save the shared quality under only the TV key", async ({
   page,
 }) => {

@@ -12,11 +12,15 @@ export function DeferredMount({
   fallback,
   eager = false,
   scrollRoot,
+  rootMargin = "160px 0px",
+  className,
 }: {
   children: ReactNode;
   fallback: ReactNode;
   eager?: boolean;
   scrollRoot?: RefObject<Element | null>;
+  rootMargin?: string;
+  className?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(eager);
@@ -35,11 +39,15 @@ export function DeferredMount({
         setMounted(true);
         observer.disconnect();
       },
-      { root: scrollRoot?.current, rootMargin: "160px 0px" },
+      { root: scrollRoot?.current, rootMargin },
     );
     observer.observe(element);
     return () => observer.disconnect();
-  }, [mounted, scrollRoot]);
+  }, [mounted, scrollRoot, rootMargin]);
 
-  return <div ref={ref}>{mounted ? children : fallback}</div>;
+  return (
+    <div ref={ref} className={className}>
+      {mounted ? children : fallback}
+    </div>
+  );
 }

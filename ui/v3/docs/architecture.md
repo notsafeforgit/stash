@@ -48,8 +48,12 @@ owns interruptible Web Animations on the empty surface in
 `layout/content-reveal.tsx`; it never animates the image/player subtree.
 `core/route-transitions.ts` uses this for the 200ms committed-page reveal in
 `layout/route-viewport.tsx`.
-The cover starts at 12% opacity so the committed content remains readable;
-an opaque cover could briefly hide an already painted destination and flash.
+The viewport prepares the 12% cover in its layout effect before the destination's
+first paint, then fades it to transparent. Starting from `onResolved` could dim
+an already visible destination. The transparent final frame is held through
+cleanup so the inline starting opacity cannot flash at animation completion.
+Browser Back/Forward traversal gets no extra reveal: Safari already animates its
+restored swipe snapshot. App navigation, including Smart Back, still reveals.
 The image/video/scroller subtree stays opaque and untransformed. It does not
 take snapshots or wait before committing navigation.
 WebKit profiling with real Home thumbnails found native snapshot capture could
@@ -60,8 +64,8 @@ Search/filter/hash changes and initial load do not reveal the whole page.
 Reduced Motion skips the reveals and cancels a running one.
 Smart Back supplies typed `state.navigationDirection: "back"`; exceptional
 navigations can set `state.routeMotion: false`. Rapid navigation cancels the
-previous animation, as does a visibility or Reduce Motion change. Duplicate
-same-location router resolutions do not cancel the committed page's reveal.
+previous animation, as does a visibility or Reduce Motion change. A pending
+reveal belongs to its destination and is consumed once by the viewport commit.
 Finished effects are canceled and their paint surface is hidden. Browsers without Web
 Animations navigate normally. `layout/mobile-navigation.tsx` owns one persistent
 navigation drawer for all toolbars. Its lease holds only the visual reveal until
@@ -108,7 +112,12 @@ route code when its link becomes visible; the customisation sheet loads on first
 use and queries saved filters only while open.
 `frontpage/front-page-state.ts` retains random seeds, mounted-row flags and
 vertical/horizontal scroll positions for the current Home configuration and
-Apollo client. Returning Home renders its previously loaded rows immediately
+Apollo client. Each carousel keeps all native snap targets but mounts cards
+only near the visible horizontal range. Returning Home eagerly restores that
+range and its saved row height, without rebuilding every offscreen card. Touch
+cards omit hover-only tooltip roots and text measurement. Mobile detail action
+drawers mount their toolbars on first use and retain their state after closing.
+Returning Home renders its previously loaded rows immediately
 from Apollo; random rows reshuffle on browser reload or configuration change.
 No departed page DOM or duplicate entity data is retained. Loading rows reserve
 their card type's cover geometry and typical metadata height.
@@ -332,6 +341,13 @@ while auto-advance fires once. The explicit WebKit `canplay`
 resume remains necessary. Chromium/WebKit fixtures exercise the actual lightbox
 and its source machinery, but physical iPhone autoplay permission and MMS still
 need device testing.
+
+Freeze-frame canvases start with a minimal backing buffer. Texture allocation
+and synchronous GPU readback wait for playable video data, a paint and idle time
+(a timer after paint where idle callbacks are unavailable). An early capture
+prepares the buffer on demand. Warm-up is cancelled on departure, and an already
+prepared buffer is reused without clearing a captured frame. Page mounting and
+initial scrolling do not depend on this optional warm-up.
 
 Transition plans consume plain buffered/seekable state and return an in-place
 seek, engine restart, or source reload. Browser effects apply the plan; keep DOM

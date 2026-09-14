@@ -20,7 +20,7 @@ interface UseFreezeFrameOverlayArgs {
    */
   rootRef: RefObject<HTMLElement | null>;
   /** Native dimensions from scene metadata. Used to pin the canvas's
-   *  backing buffer to the correct aspect at mount, so subsequent
+   *  backing buffer to the correct aspect before a capture, so subsequent
    *  captures don't reallocate the GPU texture. */
   fileWidth: number | undefined;
   fileHeight: number | undefined;
@@ -45,6 +45,41 @@ export function useFreezeFrameOverlay({
   fileHeight,
 }: UseFreezeFrameOverlayArgs): UseFreezeFrameOverlayResult {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const preparedRef = useRef<HTMLCanvasElement | null>(null);
+
+  const prepareCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    const fw = fileWidth ?? 0;
+    const fh = fileHeight ?? 0;
+    let w = fw > 0 && fh > 0 ? fw : 1920;
+    let h = fw > 0 && fh > 0 ? fh : 1080;
+    if (w > 1920) {
+      h = Math.round((1920 / w) * h);
+      w = 1920;
+    }
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    if (
+      preparedRef.current === canvas &&
+      canvas.width === w &&
+      canvas.height === h
+    )
+      return ctx;
+    canvas.width = w;
+    canvas.height = h;
+    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    ctx.fillRect(0, 0, 1, 1);
+    try {
+      // Commit the texture before a source change needs its first capture.
+      ctx.getImageData(0, 0, 1, 1);
+    } catch {
+      // A capture can still work if a browser disallows readback.
+    }
+    ctx.clearRect(0, 0, w, h);
+    preparedRef.current = canvas;
+    return ctx;
+  }, [fileWidth, fileHeight]);
 
   // Object URL of the captured frame as a JPEG blob. Set on
   // `<video>.poster` so iOS Safari's native fullscreen player has
@@ -64,17 +99,11 @@ export function useFreezeFrameOverlay({
     if (video.videoWidth === 0 || video.videoHeight === 0) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d");
+    const ctx = prepareCanvas();
     if (!ctx) return;
-    // Canvas dimensions are pinned to the file's aspect at mount (see
-    // pre-warm effect below), so we deliberately do NOT touch
-    // canvas.width / canvas.height here — that would trigger a buffer
-    // reallocation and a fresh GPU texture upload, which is what we
-    // were paying for on the first source change. Instead, we draw
-    // the (variable-resolution) video stretched to fill the canvas.
-    // Aspect is preserved because the canvas was sized to the file's
-    // aspect ratio, and every transcode/stream of this scene shares
-    // that aspect.
+    // Usually prepared during idle time after playback has data. An immediate
+    // source change also prepares it synchronously, preserving the freeze frame.
+    // Subsequent captures reuse the buffer at the file's aspect ratio.
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     try {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -114,12 +143,12 @@ export function useFreezeFrameOverlay({
       /* tainted canvas → toBlob throws SecurityError. Defer to the
          dim+spinner overlay for the visible mask. */
     }
-  }, [rootRef]);
+  }, [rootRef, prepareCanvas]);
 
   const clear = useCallback(() => {
     captureIdRef.current += 1;
     const canvas = canvasRef.current;
-    if (canvas) {
+    if (canvas && preparedRef.current === canvas) {
       const ctx = canvas.getContext("2d");
       if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
@@ -136,38 +165,36 @@ export function useFreezeFrameOverlay({
     }
   }, [rootRef]);
 
-  // Pre-warm: pin the canvas dimensions to the file's aspect (capped at
-  // 1920px wide so we don't burn 33MB of GPU memory on a 4K source) and
-  // force the GPU texture to actually allocate now, not on the first
-  // real captureFrame. clearRect on a fresh-transparent buffer is a
-  // recognized no-op and gets elided, so we have to actually write a
-  // pixel and read it back via getImageData (which forces a synchronous
-  // GPU round-trip) to commit the texture.
+  // GPU readback is synchronous and can hold up both route paint and scrolling.
+  // Wait for playable data and a paint, then warm during idle time. The capture
+  // path above remains ready if the user changes source before this runs.
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const fw = fileWidth ?? 0;
-    const fh = fileHeight ?? 0;
-    let w = fw > 0 && fh > 0 ? fw : 1920;
-    let h = fw > 0 && fh > 0 ? fh : 1080;
-    if (w > 1920) {
-      h = Math.round((1920 / w) * h);
-      w = 1920;
-    }
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.fillStyle = "rgba(0,0,0,0.5)";
-    ctx.fillRect(0, 0, 1, 1);
-    try {
-      ctx.getImageData(0, 0, 1, 1);
-    } catch {
-      // Pre-warm runs at mount before any cross-origin drawImage, so
-      // the canvas is not tainted; this catch is defensive.
-    }
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-  }, [fileWidth, fileHeight]);
+    const video = rootRef.current?.querySelector("video");
+    if (!video) return;
+    let frame: number | undefined;
+    let idle: number | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const warm = () => {
+      if (!document.hidden) prepareCanvas();
+    };
+    const schedule = () => {
+      frame = requestAnimationFrame(() => {
+        frame = requestAnimationFrame(() => {
+          if (typeof window.requestIdleCallback === "function")
+            idle = window.requestIdleCallback(warm);
+          else timer = setTimeout(warm, 0);
+        });
+      });
+    };
+    if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) schedule();
+    else video.addEventListener("loadeddata", schedule, { once: true });
+    return () => {
+      video.removeEventListener("loadeddata", schedule);
+      if (frame !== undefined) cancelAnimationFrame(frame);
+      if (idle !== undefined) window.cancelIdleCallback(idle);
+      if (timer !== undefined) clearTimeout(timer);
+    };
+  }, [rootRef, prepareCanvas]);
 
   // Invalidate pending exports as well as revoking the current poster.
   useEffect(() => clear, [clear]);
@@ -176,6 +203,8 @@ export function useFreezeFrameOverlay({
     () => (
       <canvas
         ref={canvasRef}
+        width={1}
+        height={1}
         aria-hidden
         className="absolute inset-0 w-full h-full object-contain pointer-events-none z-[5]"
         // `transform: translateZ(0)` forces a continuous GPU compositor

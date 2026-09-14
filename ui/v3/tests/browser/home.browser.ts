@@ -134,7 +134,8 @@ test("the drawer preloads Home and offscreen rows wait until approached", async 
   const firstRow = page
     .locator("section")
     .filter({ has: page.getByRole("heading", { name: "Row 1", exact: true }) });
-  await expect(firstRow.locator(".studio-card")).toHaveCount(25);
+  await expect(firstRow.locator(".studio-card").first()).toBeVisible();
+  expect(await firstRow.locator(".studio-card").count()).toBeLessThan(10);
   expect(
     await page.evaluate(() => window.homeFixtureQueries.length),
   ).toBeLessThan(5);
@@ -150,7 +151,8 @@ test("the drawer preloads Home and offscreen rows wait until approached", async 
     .filter({ has: page.getByRole("heading", { name: "Row 5", exact: true }) });
   await expect(lastRow.locator(".studio-card")).toHaveCount(0);
   await lastRow.scrollIntoViewIfNeeded();
-  await expect(lastRow.locator(".studio-card")).toHaveCount(25);
+  await expect(lastRow.locator(".studio-card").first()).toBeVisible();
+  expect(await lastRow.locator(".studio-card").count()).toBeLessThan(10);
   await firstRow.scrollIntoViewIfNeeded();
   expect(await firstCard?.evaluate((element) => element.isConnected)).toBe(
     true,
@@ -216,7 +218,7 @@ test("returning Home restores cached random rows and both scroll positions witho
   // The deferred row's wrapper stays mounted while its placeholder is replaced.
   const row = home.locator(":scope > div").nth(1);
   await row.scrollIntoViewIfNeeded();
-  await expect(row.locator(".studio-card")).toHaveCount(25);
+  await expect(row.locator(".studio-card").first()).toBeVisible();
   await row.locator(".overflow-x-auto").evaluate((element) => {
     element.scrollLeft = 650;
   });
@@ -233,6 +235,15 @@ test("returning Home restores cached random rows and both scroll positions witho
       .locator(".overflow-x-auto")
       .evaluate((element) => element.scrollLeft),
     queries: await page.evaluate(() => window.homeFixtureQueries),
+    visibleCards: await row.locator(".overflow-x-auto").evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      return [...element.querySelectorAll("article")]
+        .filter((card) => {
+          const rect = card.getBoundingClientRect();
+          return rect.right > bounds.left && rect.left < bounds.right;
+        })
+        .map((card) => card.getAttribute("data-id"));
+    }),
   };
   expect(before.queries.some((query) => query.startsWith("random_"))).toBe(
     true,
@@ -240,26 +251,38 @@ test("returning Home restores cached random rows and both scroll positions witho
   await page.getByRole("button", { name: "Open navigation menu" }).click();
   await page.getByRole("link", { name: "Scenes", exact: true }).click();
   await expect(home).toHaveCount(0);
-  const paintedCounts = page.evaluate(
+  const paintedCards = page.evaluate(
     () =>
-      new Promise<number[]>((resolve) => {
-        const counts: number[] = [];
+      new Promise<(string | null)[][]>((resolve) => {
+        const frames: (string | null)[][] = [];
         const sample = () => {
           const home = document.querySelector("[data-front-page]");
-          if (home)
-            counts.push(
-              home
-                .querySelectorAll("section")[1]
-                ?.querySelectorAll(".studio-card").length ?? 0,
+          const strip = home
+            ?.querySelectorAll("section")[1]
+            ?.querySelector(".overflow-x-auto");
+          if (strip) {
+            const bounds = strip.getBoundingClientRect();
+            frames.push(
+              [...strip.querySelectorAll("article")]
+                .filter((card) => {
+                  const rect = card.getBoundingClientRect();
+                  return rect.right > bounds.left && rect.left < bounds.right;
+                })
+                .map((card) => card.getAttribute("data-id")),
             );
-          if (counts.length === 15) resolve(counts);
+          }
+          if (frames.length === 15) resolve(frames);
           else requestAnimationFrame(sample);
         };
         requestAnimationFrame(sample);
       }),
   );
   await page.goBack();
-  expect(await paintedCounts).toEqual(Array.from({ length: 15 }, () => 25));
+  expect(before.visibleCards.length).toBeGreaterThan(0);
+  expect(await paintedCards).toEqual(
+    Array.from({ length: 15 }, () => before.visibleCards),
+  );
+  expect(await row.locator(".studio-card").count()).toBeLessThan(10);
   expect(await page.evaluate(() => window.homeFixtureQueries)).toEqual(
     before.queries,
   );
@@ -272,4 +295,26 @@ test("returning Home restores cached random rows and both scroll positions witho
       .locator(".overflow-x-auto")
       .evaluate((element) => element.scrollLeft),
   ).toBeCloseTo(before.left, 0);
+});
+
+test("a Home carousel keeps its full snap range while mounting nearby cards", async ({
+  page,
+}) => {
+  await page.goto("/home-fixture/");
+  const strip = page
+    .locator("[data-front-page] section")
+    .first()
+    .locator(".overflow-x-auto");
+  await expect(strip.locator("article").first()).toBeVisible();
+  const width = await strip.evaluate((element) => element.scrollWidth);
+  expect(await strip.locator("article").count()).toBeLessThan(10);
+  await strip.evaluate((element) => {
+    element.scrollLeft = element.scrollWidth;
+  });
+  await expect
+    .poll(() => strip.locator("article").last().getAttribute("data-id"))
+    .toBe("24");
+  await expect(strip.locator("article").last()).toBeInViewport();
+  expect(await strip.evaluate((element) => element.scrollWidth)).toBe(width);
+  expect(await strip.locator("article").count()).toBeLessThan(15);
 });

@@ -839,44 +839,47 @@ function useIsSingleCol(): boolean {
   return isDetails || (isMobile && mobileGridCols === 1);
 }
 
-// Watches an element's intrinsic vs visible width and reports whether its
-// content is currently being truncated (overflowing past `clientWidth`).
-// `scrollWidth` updates without triggering ResizeObserver when content
-// changes inside a stable-sized box, so we also re-check when the content
-// dep (e.g. the children string) changes.
-function EntityCardTitle({ children }: { children: React.ReactNode }) {
-  const { isTouch } = useContext(EntityCardCtx);
-  const singleCol = useIsSingleCol();
-  const text = String(children ?? "");
+/** Only hover-capable cards need tooltip roots and text measurements. Keeping
+ * them out of touch cards avoids synchronous layout and a second card render
+ * for every clipped title when Home or a list mounts. */
+function CardTextTooltip({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className: string;
+}) {
   const [ref, truncated] = useIsTruncated<HTMLDivElement>();
-
-  if (singleCol) {
-    return (
-      <div className="entity-card-title break-words font-medium leading-snug">
-        {children}
-      </div>
-    );
-  }
-
   return (
     <Tooltip
-      disabled={isTouch || !truncated}
+      disabled={!truncated}
       onOpenChange={(open, details) => {
         if (open && details.reason !== "trigger-hover") details.cancel();
       }}
     >
       <TooltipTrigger
         render={
-          <div
-            ref={ref}
-            className="entity-card-title truncate font-medium leading-snug"
-          >
+          <div ref={ref} className={className}>
             {children}
           </div>
         }
       />
-      <TooltipContent>{text}</TooltipContent>
+      <TooltipContent>{String(children ?? "")}</TooltipContent>
     </Tooltip>
+  );
+}
+
+function EntityCardTitle({ children }: { children: React.ReactNode }) {
+  const { isTouch } = useContext(EntityCardCtx);
+  const singleCol = useIsSingleCol();
+  const className = cn(
+    "entity-card-title font-medium leading-snug",
+    singleCol ? "break-words" : "truncate",
+  );
+  return isTouch || singleCol ? (
+    <div className={className}>{children}</div>
+  ) : (
+    <CardTextTooltip className={className}>{children}</CardTextTooltip>
   );
 }
 
@@ -893,44 +896,14 @@ function EntityCardSubtitle({
 }) {
   const { isTouch } = useContext(EntityCardCtx);
   const singleCol = useIsSingleCol();
-  const text = String(children ?? "");
-  const [ref, truncated] = useIsTruncated<HTMLDivElement>();
-
-  if (singleCol) {
-    return (
-      <div className="entity-card-subtitle break-words text-xs text-muted-foreground">
-        {children}
-      </div>
-    );
-  }
-
-  if (noTooltip) {
-    return (
-      <div className="entity-card-subtitle truncate text-xs text-muted-foreground">
-        {children}
-      </div>
-    );
-  }
-
-  return (
-    <Tooltip
-      disabled={isTouch || !truncated}
-      onOpenChange={(open, details) => {
-        if (open && details.reason !== "trigger-hover") details.cancel();
-      }}
-    >
-      <TooltipTrigger
-        render={
-          <div
-            ref={ref}
-            className="entity-card-subtitle truncate text-xs text-muted-foreground"
-          >
-            {children}
-          </div>
-        }
-      />
-      <TooltipContent>{text}</TooltipContent>
-    </Tooltip>
+  const className = cn(
+    "entity-card-subtitle text-xs text-muted-foreground",
+    singleCol ? "break-words" : "truncate",
+  );
+  return isTouch || singleCol || noTooltip ? (
+    <div className={className}>{children}</div>
+  ) : (
+    <CardTextTooltip className={className}>{children}</CardTextTooltip>
   );
 }
 

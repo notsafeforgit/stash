@@ -44,6 +44,9 @@ export function createContentReveal() {
       {
         ...pending,
         easing: motion.easing.reveal,
+        // Keep the transparent final frame until cleanup. Otherwise WebKit
+        // can briefly restore the inline starting opacity at completion.
+        fill: "forwards",
       },
     );
     pending = undefined;
@@ -58,10 +61,9 @@ export function createContentReveal() {
   };
   const schedule = () => {
     if (holds.size || !pending || frame !== undefined) return;
-    // Layout must get a paint before the short animation's clock starts.
-    frame = requestAnimationFrame(() => {
-      frame = requestAnimationFrame(start);
-    });
+    // The starting style is installed during the destination's layout effect.
+    // Start before its first paint, without a second, visibly dimmed frame.
+    frame = requestAnimationFrame(start);
   };
   preference.addEventListener("change", cancel);
   document.addEventListener("visibilitychange", cancel);

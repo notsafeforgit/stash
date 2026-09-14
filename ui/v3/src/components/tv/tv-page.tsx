@@ -41,6 +41,7 @@ import { readTvSession, saveTvSession } from "./tv-session-state";
 import { useTvPresentation } from "./use-tv-presentation";
 import { useTvNavigation } from "./use-tv-navigation";
 import { TvControls } from "./tv-controls";
+import { TvNavigationButton } from "./tv-navigation-button";
 import { TvRotationProvider } from "./tv-slider";
 
 function ScenePoster({ item }: { item: TvFeedItem }) {
@@ -143,6 +144,11 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
   }, [settings.orientation, router]);
   const { configuration } = useConfigurationContext();
   const openDrawer = useMobileNavigation();
+  const openNavigation = () => {
+    if (presentationMode === "fullscreen")
+      void enterImmersive().then(openDrawer);
+    else openDrawer();
+  };
   const [leaving, setLeaving] = useState(false);
   const [interactionBlocked, setInteractionBlocked] = useState(false);
   const [completion, setCompletion] = useState(settings.completion);
@@ -262,12 +268,6 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
     (deleted?: TvFeedItem) => controller.reconcile(deleted),
     [controller],
   );
-  const leave = () => {
-    setLeaving(true);
-    void navigate({
-      to: query.mode === "scenes" ? "/scenes" : "/scenes/markers",
-    });
-  };
   const reshuffle = () => {
     void navigate({
       to: "/tv",
@@ -373,15 +373,9 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
                           root={presentationRoot}
                           rotation={rotation}
                           setRotation={setRotation}
-                          mode={presentationMode}
                           togglePresentation={togglePresentation}
                           exitPresentation={exitPresentation}
-                          openNavigation={() => {
-                            if (presentationMode === "fullscreen")
-                              void enterImmersive().then(openDrawer);
-                            else openDrawer();
-                          }}
-                          leave={leave}
+                          openNavigation={openNavigation}
                           navigateItem={selection.move}
                           drag={selection.drag}
                           cancelDrag={selection.cancel}
@@ -417,6 +411,9 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
             </div>
             {(!active || pending) && (
               <div className="pointer-events-auto absolute inset-0 flex items-center justify-center bg-background/60 p-4">
+                <div className="tv-topbar absolute left-0 top-0 p-3">
+                  <TvNavigationButton onClick={openNavigation} />
+                </div>
                 <Empty>
                   <EmptyHeader>
                     <EmptyTitle>
@@ -489,12 +486,6 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
                         defaultMessage="TV settings"
                       />
                     </Link>
-                    <Button variant="outline" onClick={leave}>
-                      <FormattedMessage
-                        id="tv.text.exit_tv"
-                        defaultMessage="Exit TV"
-                      />
-                    </Button>
                   </EmptyContent>
                 </Empty>
               </div>

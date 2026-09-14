@@ -17,7 +17,12 @@ async function open(page: Page, query = "?paused") {
   });
 }
 async function next(page: Page, id: number) {
-  await page.getByRole("button", { name: "Next TV item", exact: true }).click();
+  // Return keyboard ownership from a previously used playback control.
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement)
+      document.activeElement.blur();
+  });
+  await page.keyboard.press("ArrowDown");
   await expect(page.locator("[data-scene-player]")).toHaveAttribute(
     "data-playback-key",
     new RegExp(`scene:${id}$`),
@@ -112,7 +117,7 @@ test("TV markers use parent streams and never write activity", async ({
   ).toEqual([]);
 });
 
-test("TV immersive fallback retains inline video, rotation and exit controls", async ({
+test("TV immersive fallback retains inline video, rotation and app navigation", async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -145,17 +150,161 @@ test("TV immersive fallback retains inline video, rotation and exit controls", a
     "data-tv-rotation",
     "clockwise",
   );
-  await expect(
-    page.getByRole("button", { name: "Next TV item", exact: true }),
-  ).toBeVisible();
   await page.keyboard.press("h");
   await expect(
     page.getByRole("button", { name: "Show TV controls", exact: true }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Exit immersive mode", exact: true }),
-  ).toBeVisible();
+  await page.getByRole("button", { name: "Navigation", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Navigation" })).toBeVisible();
   expect(await page.evaluate(() => window.tvFixtureNativeFullscreen)).toBe(0);
+  await page.getByRole("link", { name: "Scenes", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Scenes", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator("video")).toHaveCount(0);
+});
+
+test("TV is a top-level page with navigation instead of exit and item buttons", async ({
+  page,
+}) => {
+  await open(page);
+  await expect(
+    page.getByRole("button", {
+      name: /^(Exit TV|Exit immersive mode|Previous TV item|Next TV item)$/,
+    }),
+  ).toHaveCount(0);
+  await page.keyboard.press("f");
+  await expect(page.locator("[data-tv]")).not.toHaveAttribute(
+    "data-tv-presentation",
+    "normal",
+  );
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-tv]")).toHaveAttribute(
+    "data-tv-presentation",
+    "normal",
+  );
+  await page.keyboard.press("Escape");
+  await expect(page).toHaveURL(/\/tv-fixture\/tv\?/);
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await expect(page.locator("video")).toHaveJSProperty("paused", false);
+  await page.getByRole("button", { name: "Navigation", exact: true }).click();
+  await expect(page.locator("video")).toHaveJSProperty("paused", true);
+  await page.keyboard.press("ArrowDown");
+  await expect(page.locator("[data-scene-player]")).toHaveAttribute(
+    "data-playback-key",
+    /scene:1$/,
+  );
+  await page.getByRole("link", { name: "Scenes", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Scenes", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator("video")).toHaveCount(0);
+});
+
+for (const [query, title] of [
+  ["empty", "No matching items"],
+  ["missing", "Media unavailable"],
+  ["feed-loading", "Loading TV…"],
+] as const) {
+  test(`TV navigation is available during ${title}`, async ({ page }) => {
+    await page.goto(`/tv-fixture/tv?paused&${query}`);
+    await expect(page.getByText(title, { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Navigation", exact: true }).click();
+    await page.getByRole("link", { name: "Scenes", exact: true }).click();
+    await expect(
+      page.getByRole("heading", { name: "Scenes", exact: true }),
+    ).toBeVisible();
+  });
+}
+
+test("vertical gestures change videos in both directions while retaining one player", async ({
+  page,
+  context,
+  browserName,
+}) => {
+  await open(page);
+  const input =
+    browserName === "chromium" ? await context.newCDPSession(page) : undefined;
+  const swipe = async (from: number, to: number) => {
+    if (input) {
+      await input.send("Input.dispatchTouchEvent", {
+        type: "touchStart",
+        touchPoints: [{ x: 150, y: from }],
+      });
+      for (let step = 1; step <= 10; step++) {
+        await input.send("Input.dispatchTouchEvent", {
+          type: "touchMove",
+          touchPoints: [{ x: 150, y: from + ((to - from) * step) / 10 }],
+        });
+      }
+      await input.send("Input.dispatchTouchEvent", {
+        type: "touchEnd",
+        touchPoints: [],
+      });
+    } else {
+      // Playwright exposes no native WebKit swipe. Use a real pointer drag
+      // through the same handler, including the browser's pointer capture.
+      await page.mouse.move(150, from);
+      await page.mouse.down();
+      await page.mouse.move(150, to, { steps: 10 });
+      await page.mouse.up();
+    }
+  };
+  try {
+    await swipe(500, 250);
+    await expect(page.locator("[data-scene-player]")).toHaveAttribute(
+      "data-playback-key",
+      /scene:2$/,
+    );
+    await expect(page.locator("[data-scene-player]")).toHaveAttribute(
+      "data-playback-ready",
+      "true",
+    );
+    await swipe(250, 500);
+    await expect(page.locator("[data-scene-player]")).toHaveAttribute(
+      "data-playback-key",
+      /scene:1$/,
+    );
+    await expect(page.locator("video")).toHaveCount(1);
+    expect(
+      await page
+        .locator("video")
+        .evaluate((video) => video === window.tvFixtureVideo),
+    ).toBe(true);
+  } finally {
+    await input?.detach();
+  }
+});
+
+test.describe("desktop TV", () => {
+  test.use({
+    isMobile: false,
+    hasTouch: false,
+    viewport: { width: 1280, height: 800 },
+  });
+  test("wheel momentum advances once and keyboard returns to the previous video", async ({
+    page,
+  }) => {
+    await open(page);
+    await expect(
+      page.getByRole("button", { name: /^(Previous TV item|Next TV item)$/ }),
+    ).toHaveCount(0);
+    await page.mouse.move(500, 350);
+    for (let step = 0; step < 5; step++) await page.mouse.wheel(0, 120);
+    await expect(page.locator("[data-scene-player]")).toHaveAttribute(
+      "data-playback-key",
+      /scene:2$/,
+    );
+    await expect(page.locator("[data-scene-player]")).toHaveAttribute(
+      "data-playback-ready",
+      "true",
+    );
+    await page.keyboard.press("ArrowUp");
+    await expect(page.locator("[data-scene-player]")).toHaveAttribute(
+      "data-playback-key",
+      /scene:1$/,
+    );
+  });
 });
 
 test("TV restores feed context after settings without refetching page one", async ({

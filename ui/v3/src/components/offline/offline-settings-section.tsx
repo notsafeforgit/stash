@@ -1,4 +1,5 @@
-import { useDownloadCommands } from "./use-download-queue";
+import { canDownloadScenes, useDownloadCommands } from "./use-download-queue";
+import { registerOfflineWorker } from "@/pwa/register";
 import { OfflineRecoveryControl } from "./offline-recovery-control";
 /**
  * Offline-feature settings section, mounted on the Settings page.
@@ -14,6 +15,7 @@ import { useIntl } from "react-intl";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -26,6 +28,7 @@ import {
   OFFLINE_RESOLUTION_OPTIONS,
 } from "./offline-settings";
 import {
+  canRequestPersistence,
   isPersisted,
   requestPersistent,
   storageEstimate,
@@ -42,7 +45,11 @@ export function OfflineSettingsSection() {
     quota?: number;
   }>({});
   const [persisted, setPersisted] = useState<boolean>(false);
+  const [backgroundAvailable, setBackgroundAvailable] = useState<
+    boolean | null
+  >(null);
   const [busy, setBusy] = useState(false);
+  const persistenceSupported = canRequestPersistence();
 
   // Refresh storage figures on mount and after each operation completes
   // (operations change usage / persistence state).
@@ -56,6 +63,19 @@ export function OfflineSettingsSection() {
   useEffect(() => {
     refreshStorageInfo();
   }, [refreshStorageInfo]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void registerOfflineWorker().then((registration) => {
+      if (!cancelled)
+        setBackgroundAvailable(
+          typeof registration?.backgroundFetch?.fetch === "function",
+        );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const onResolutionChange = (value: StreamingResolutionEnum | null) => {
     if (!value) return;
@@ -110,7 +130,15 @@ export function OfflineSettingsSection() {
       </h2>
 
       <p className="text-sm text-muted-foreground">
-        {intl.formatMessage({ id: "offline.background.unavailable" })}
+        {intl.formatMessage({
+          id: !canDownloadScenes()
+            ? "offline.settings.downloads_unavailable"
+            : backgroundAvailable === null
+              ? "offline.background.unavailable"
+              : backgroundAvailable
+                ? "offline.background.ready"
+                : "offline.background.foreground",
+        })}
       </p>
       <OfflineRecoveryControl />
 
@@ -130,11 +158,13 @@ export function OfflineSettingsSection() {
             <SelectValue>{resolutionLabels[maxRes]}</SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {OFFLINE_RESOLUTION_OPTIONS.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {resolutionLabels[opt.value]}
-              </SelectItem>
-            ))}
+            <SelectGroup>
+              {OFFLINE_RESOLUTION_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {resolutionLabels[opt.value]}
+                </SelectItem>
+              ))}
+            </SelectGroup>
           </SelectContent>
         </Select>
       </div>
@@ -177,11 +207,13 @@ export function OfflineSettingsSection() {
             {intl.formatMessage({
               id: persisted
                 ? "offline.settings.persistent_granted"
-                : "offline.settings.persistent_not_granted",
+                : persistenceSupported
+                  ? "offline.settings.persistent_not_granted"
+                  : "offline.settings.persistent_unavailable",
             })}
           </p>
         </div>
-        {!persisted && (
+        {!persisted && persistenceSupported && (
           <Button
             variant="outline"
             size="sm"

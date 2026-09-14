@@ -1,5 +1,8 @@
 /** Short, interruptible transitions for navigation and local view changes. */
 export const motion = {
+  // Keep content readable throughout a reveal; an opaque cover flashes when
+  // the router resolves after the destination's first paint.
+  contentCoverOpacity: 0.12,
   duration: {
     page: 200,
     content: 140,

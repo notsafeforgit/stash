@@ -48,6 +48,8 @@ owns interruptible Web Animations on the empty surface in
 `layout/content-reveal.tsx`; it never animates the image/player subtree.
 `core/route-transitions.ts` uses this for the 200ms committed-page reveal in
 `layout/route-viewport.tsx`.
+The cover starts at 12% opacity so the committed content remains readable;
+an opaque cover could briefly hide an already painted destination and flash.
 The image/video/scroller subtree stays opaque and untransformed. It does not
 take snapshots or wait before committing navigation.
 WebKit profiling with real Home thumbnails found native snapshot capture could
@@ -92,7 +94,7 @@ dismissal callback in `use-lightbox-history.ts` also preserves the existing
 history-only contract for the focused scene viewer.
 
 `cards/use-card-press.ts` uses the same interruptible animation owner to enlarge
-the preview slightly on primary-pointer down and ease it back on release.
+the entire card slightly on primary-pointer down and ease it back on release.
 It does not rerender the card or delay navigation/playback. Scrolling, pointer
 cancellation, context menus, selection and nested controls cancel or bypass
 this feedback. Neither path captures native View Transition snapshots. Effects,
@@ -104,6 +106,23 @@ other rows when they approach its scroll viewport. Mounted rows retain their
 cards, filters and lightbox state when scrolled away. The drawer preloads Home's
 route code when its link becomes visible; the customisation sheet loads on first
 use and queries saved filters only while open.
+`frontpage/front-page-state.ts` retains random seeds, mounted-row flags and
+vertical/horizontal scroll positions for the current Home configuration and
+Apollo client. Returning Home renders its previously loaded rows immediately
+from Apollo; random rows reshuffle on browser reload or configuration change.
+No departed page DOM or duplicate entity data is retained. Loading rows reserve
+their card type's cover geometry and typical metadata height.
+Home's route loader warms only its configured saved-filter definitions so the
+initial placeholders already know their card type; it does not fetch entity
+rows or the complete saved-filter catalogue.
+
+Scene and performer routes warm their typed Apollo detail query in the router
+loader. Short loads retain the outgoing page and its navigation chrome, then
+commit the destination with its essential data. After 600ms, a navigable pending
+layout appears without an artificial minimum duration. Failures offer Retry and
+Back. The loader returns no entity data, leaving Apollo as its sole cache.
+Performer portraits contain the uncropped image in a stable frame during decode, and scene
+refreshes retain the existing player, including when a refresh fails.
 
 ## Lists
 

@@ -1,9 +1,11 @@
 import { cn } from "src/lib/utils";
 import { Skeleton } from "src/components/ui/skeleton";
+import type { ReactNode } from "react";
 
 interface DetailPageSkeletonProps {
   /** Tailwind aspect-ratio class for the image, e.g. "aspect-square" or "aspect-[2/3]" */
   imageAspect?: string;
+  navigation?: ReactNode;
 }
 
 // Chrome-only skeleton (image, title, toolbar, meta rows, tab bar).
@@ -19,6 +21,7 @@ interface DetailPageSkeletonProps {
 // whole page is loading" instead of "only the list is loading".
 export function DetailPageSkeleton({
   imageAspect = "aspect-square",
+  navigation,
 }: DetailPageSkeletonProps) {
   // Tall (portrait) aspects get a centered, 3/5-width clamp on mobile so
   // they don't dominate the viewport. Square / landscape aspects are
@@ -29,10 +32,12 @@ export function DetailPageSkeleton({
     <div className="md:h-full md:flex md:flex-row">
       {/* Left sidebar: back button + title (desktop) / image + toolbar / meta rows */}
       <aside className="md:w-72 lg:w-80 md:shrink-0 md:flex md:flex-col md:border-r md:border-border">
-        <div className="hidden md:flex shrink-0 items-center gap-1 px-1 py-1 border-b border-border">
-          <Skeleton className="h-7 w-9 rounded-md shrink-0" />
-          <Skeleton className="h-4 w-2/3" />
-        </div>
+        {navigation ?? (
+          <div className="hidden md:flex shrink-0 items-center gap-1 px-1 py-1 border-b border-border">
+            <Skeleton className="h-7 w-9 rounded-md shrink-0" />
+            <Skeleton className="h-4 w-2/3" />
+          </div>
+        )}
         <div className="md:flex-1 md:min-h-0 md:overflow-y-auto">
           <div className="flex flex-col items-stretch gap-3 p-3">
             <Skeleton

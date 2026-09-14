@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   remove: vi.fn(),
   fetch: vi.fn(),
   size: vi.fn(),
+  canWrite: vi.fn(),
+  persistence: vi.fn(),
 }));
 vi.mock("./offline-migration", () => ({
   migrateLegacyDownloads: async () => {},
@@ -69,6 +71,8 @@ vi.mock("./offline-db", () => {
   };
 });
 vi.mock("./opfs-storage", () => ({
+  canWriteOfflineFiles: mocks.canWrite,
+  requestDownloadPersistence: mocks.persistence,
   clearAllScenes: mocks.remove,
   existingSceneSize: mocks.size,
   opfsPathForScene: (id: string) => `scenes/${id}.mp4`,
@@ -107,6 +111,8 @@ beforeEach(() => {
   mocks.rows.clear();
   mocks.listeners.clear();
   vi.clearAllMocks();
+  mocks.canWrite.mockReturnValue(true);
+  mocks.persistence.mockResolvedValue(false);
   mocks.storage.mockResolvedValue({});
   mocks.size.mockResolvedValue(0);
   mocks.remove.mockResolvedValue(undefined);
@@ -205,6 +211,30 @@ it("rejects unsafe mutation when coordination is unavailable without clearing do
   );
   expect(mocks.remove).not.toHaveBeenCalled();
   expect(mocks.fetch).not.toHaveBeenCalled();
+});
+
+it("preserves the saved library when OPFS exists without streaming writes", async () => {
+  mocks.canWrite.mockReturnValue(false);
+  const queue = new DownloadQueueStore();
+  await expect(queue.enqueue(args)).rejects.toBeInstanceOf(
+    OfflineQueueUnavailableError,
+  );
+  await expect(queue.retry("1")).rejects.toBeInstanceOf(
+    OfflineQueueUnavailableError,
+  );
+  await queue.init();
+  expect(mocks.remove).not.toHaveBeenCalled();
+  expect(mocks.fetch).not.toHaveBeenCalled();
+  expect(mocks.persistence).not.toHaveBeenCalled();
+});
+
+it("does not delay downloads while the browser considers storage persistence", async () => {
+  mocks.persistence.mockReturnValue(new Promise(() => {}));
+  const queue = new DownloadQueueStore();
+  const pending = queue.enqueue(args);
+  expect(mocks.persistence).toHaveBeenCalledOnce();
+  await pending;
+  await vi.waitFor(() => expect(mocks.rows.get("1")?.status).toBe("complete"));
 });
 
 it("recovers an orphan only after acquiring ownership and rejects mismatched ranges", async () => {

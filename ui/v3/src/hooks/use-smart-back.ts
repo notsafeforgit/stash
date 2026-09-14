@@ -70,7 +70,9 @@ export function useTrackBrowsePage() {
  *   const returnTo = router.state.location.state.returnTo;
  *   navigate({ to: "/scenes/$sceneId", params: { sceneId }, state: { returnTo } })
  */
-export function useSmartBack(defaultPath: (typeof LIST_PATHNAMES)[number]) {
+export function useSmartBack(
+  defaultPath: (typeof LIST_PATHNAMES)[number] | "/",
+) {
   const navigate = useNavigate();
   const router = useRouter();
 

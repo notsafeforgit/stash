@@ -7,14 +7,21 @@ import {
 
 export { expect };
 
-export const test = base.extend({
-  page: async ({ page, baseURL }, use) => {
+export const test = base.extend<{ expectedConsoleErrors: string[] }>({
+  expectedConsoleErrors: [[], { option: true }],
+  page: async ({ page, baseURL, expectedConsoleErrors }, use) => {
     if (!baseURL) throw new Error("Missing fixture URL");
     const origin = new URL(baseURL).origin;
     const failures: string[] = [];
     page.on("pageerror", (error) => failures.push(error.message));
     page.on("console", (message) => {
-      if (message.type() === "error") failures.push(message.text());
+      if (
+        message.type() === "error" &&
+        !expectedConsoleErrors.some((expected) =>
+          message.text().includes(expected),
+        )
+      )
+        failures.push(message.text());
     });
     await page.route("**/*", async (route) => {
       const request = route.request();

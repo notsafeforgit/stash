@@ -10,9 +10,8 @@
  *
  *   2. Anchor download fallback. Available on Safari (incl. iOS),
  *      Firefox, anywhere without FSA. Creates a `blob:` URL backed by
- *      the OPFS file and triggers an anchor click. On iOS this
- *      surfaces the system share sheet, which lets the user save to
- *      Files / send via AirDrop / etc.
+ *      the OPFS file and triggers an anchor click. The browser owns
+ *      the download UI and destination; this does not use native sharing.
  *
  * Both paths feature-detect; no UA sniffing.
  */
@@ -59,20 +58,34 @@ export class FileMissingError extends Error {
  * anchor.
  */
 export async function saveToFiles(entry: OfflineEntry): Promise<void> {
-  const file = await readScene(entry.scene_id);
-  if (!file) throw new FileMissingError(entry.scene_id);
-
   const suggested = ensureMp4Extension(filenameStemForEntry(entry));
+  let destination: FsaFileHandle | undefined;
 
-  if (
-    "showSaveFilePicker" in window &&
-    typeof window.showSaveFilePicker === "function"
-  ) {
-    await saveViaFSA(file, suggested);
-    return;
+  if (typeof window.showSaveFilePicker === "function") {
+    try {
+      // Open during the user's gesture, before slow OPFS/IndexedDB reads can
+      // expire transient activation. Cancelling the picker is a normal exit.
+      destination = await window.showSaveFilePicker({
+        suggestedName: suggested,
+        types: [
+          { description: "MP4 Video", accept: { "video/mp4": [".mp4"] } },
+        ],
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      throw error;
+    }
   }
 
-  saveViaAnchor(file, suggested);
+  const file = await readScene(entry.scene_id);
+  if (!file) throw new FileMissingError(entry.scene_id);
+  if (destination) {
+    const writable = await destination.createWritable();
+    // Stream with backpressure; multi-GB exports need no extra in-memory copy.
+    await file.stream().pipeTo(writable);
+  } else {
+    saveViaAnchor(file, suggested);
+  }
 }
 
 function filenameStemForEntry(entry: OfflineEntry): string {
@@ -103,24 +116,6 @@ function sanitiseFilename(name: string): string {
     .trim();
 }
 
-async function saveViaFSA(file: File, suggested: string): Promise<void> {
-  const picker = window.showSaveFilePicker;
-  if (!picker) throw new Error("showSaveFilePicker not available");
-  const handle = await picker({
-    suggestedName: suggested,
-    types: [
-      {
-        description: "MP4 Video",
-        accept: { "video/mp4": [".mp4"] },
-      },
-    ],
-  });
-  const writable = await handle.createWritable();
-  // file.stream() returns a ReadableStream<Uint8Array>; pipeTo handles
-  // backpressure so multi-GB writes don't balloon the JS heap.
-  await file.stream().pipeTo(writable);
-}
-
 function saveViaAnchor(file: File, suggested: string): void {
   const url = URL.createObjectURL(file);
   const a = document.createElement("a");
@@ -129,8 +124,10 @@ function saveViaAnchor(file: File, suggested: string): void {
   document.body.append(a);
   a.click();
   a.remove();
-  // Defer revoke a tick so the browser actually consumes the URL.
-  setTimeout(() => URL.revokeObjectURL(url), 0);
+  // Safari may consume a download URL after the click task has finished. Keep
+  // the disk-backed reference briefly, then release it without retaining it
+  // for the lifetime of this tab.
+  setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
 function ensureMp4Extension(name: string): string {

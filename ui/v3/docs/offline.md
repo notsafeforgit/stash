@@ -1,6 +1,6 @@
 # Offline scene downloads
 
-This guide describes the implementation on `v3-rewrite`, checked on 2026-09-13.
+This guide describes the implementation on `v3-rewrite`, checked on 2026-09-14.
 The earlier phased proposal has been replaced by current behavior and explicit
 limits. See the [architecture guide](architecture.md) for shared list/player
 contracts and the [documentation index](../../../docs/README.md) for other guides.
@@ -21,12 +21,52 @@ The fallback uses the worker registration's deployment prefix, never a cached
 server configuration. Its player shares the normal Video.js implementation.
 
 Downloads use browser-managed Background Fetch when the API accepts the request.
-The browser continues the transfer after the page closes; the service worker
+The browser can continue the transfer after the page closes while the browser
+is still running; this does not guarantee progress after quitting the browser
+or while the device sleeps. The service worker
 streams the completed response to OPFS and advances the durable queue. The
 foreground queue remains the fallback when the API is missing or refuses the
 request, and for retries with partial local bytes. That fallback can be suspended
 by the OS and needs an open app; installing on iOS does not grant arbitrary
 background execution. The active download explains which behavior is in use.
+
+## Browser capabilities and fallbacks
+
+Current desktop Chrome is the primary target; current Safari/iOS 26 uses the
+same storage and player code with feature detection at each optional API boundary.
+Browser names and OS versions are not used to decide support.
+
+| Feature | Chrome on macOS | Safari / iOS 26 |
+| --- | --- | --- |
+| Offline files and metadata | Stream MP4s into OPFS; keep metadata/queue in IndexedDB | Same; Safari 26 supports the writable streams used here |
+| Offline launch | Service-worker precache of the offline library/player | Same after a successful online installation of the worker |
+| Background downloads | Native Background Fetch when available and accepted; foreground otherwise | Foreground downloads; keep the app open, retry interruptions |
+| Retention | Request StorageManager persistence when saving and show the result in settings | Same request; Safari decides whether to grant it |
+| Export | Open the native save picker during the user's gesture, then stream to the chosen file | Standard browser download using an OPFS-backed Blob URL |
+| System media controls, PiP, casting, wake lock | Player integrations detect available APIs and handle refusal | Same, with WebKit's media presentation/AirPlay APIs where needed; OS policy still applies |
+
+OPFS is private browser storage, not permission to browse arbitrary device files.
+Safari has supported basic OPFS since 15.2; its streaming `createWritable()` API
+arrived in Safari 26. Browsers without that write operation cannot start new
+downloads, but can still read/export existing files if their storage APIs work.
+See [WebKit's OPFS introduction](https://webkit.org/blog/12257/the-file-system-access-api-with-origin-private-file-system/)
+and [Safari 26 release notes](https://developer.apple.com/documentation/safari-release-notes/safari-26-release-notes).
+
+There is no fixed 50 MB Safari limit. Since Safari 17, WebKit's documented
+per-origin quota for browsers is up to 60% of total disk capacity; installed
+Home Screen/Dock web apps use the browser quota. This is a ceiling, not reserved
+free space. Best-effort data can still be evicted. Home Screen web apps are
+exempt from ITP's seven-day script-storage cap; ordinary Safari websites are not
+covered by that exemption. Safari and installed web apps may have separate data
+containers, so installation does not promise to copy existing downloads.
+See [WebKit storage policy](https://webkit.org/blog/14403/updates-to-storage-policy/)
+and [tracking prevention](https://webkit.org/tracking-prevention/).
+
+Service workers handle caching and bounded browser events; they are not permanent
+background processes. We do not emulate Background Fetch with timers or
+Background Sync. Chrome's native API owns a transfer after accepting it; see
+[Chrome's Background Fetch documentation](https://developer.chrome.com/blog/background-fetch).
+Unsupported integrations do not add mobile-only controls to desktop pages.
 
 ## Download and playback flow
 
@@ -42,8 +82,10 @@ background execution. The active download explains which behavior is in use.
    player uses a `blob:` URL backed by the OPFS file and a scene adapter built
    from the metadata snapshot. The URL is revoked when no longer needed.
 5. **Save to Files** exports one scene through `showSaveFilePicker` when available,
-   streaming to the chosen file. Otherwise it uses an anchor download with a
-   `blob:` URL; the browser controls the resulting download/share UI.
+   opening the picker before asynchronous file lookup to retain user activation,
+   then streaming to the chosen file. Cancelling the picker is a normal exit.
+   Otherwise it uses an anchor download with a briefly retained `blob:` URL;
+   the browser controls the download UI. No native sharing API is used.
 
 Paths above are router paths relative to the application's deployment prefix.
 Backend requests use `getPlatformURL`; do not hard-code origin-root URLs.
@@ -91,7 +133,11 @@ Changing its prefix creates a new namespace; use recovery below to copy the
 old downloads. Another origin or browser profile has separate storage that this
 app cannot inspect.
 
-Settings expose storage usage, clear-all, and a persistent-storage request.
+Settings expose storage usage, clear-all, and a persistent-storage request where
+supported. The first explicit download/retry per page also requests persistence
+without delaying the download; bulk downloads do not repeatedly ask. Refusal or
+failure is nonfatal, and the settings request can be retried later. Unavailable
+or failed quota estimates are displayed as unknown, not as an empty/full disk.
 Usage, quota, and persistence apply to the whole browser origin, including other
 deployments and retained migration sources. Persistence is subject to the
 browser's decision and is not a backup. The queue
@@ -323,8 +369,14 @@ New workers wait for existing windows to close; updates never force a reload.
 The precache lifecycle retires obsolete bundled assets on activation.
 
 `pnpm test:pwa` builds and tests offline cold launch, proxy prefixes, namespace
-isolation, native background completion with app windows closed, and local
-playback. It uses a synthetic MP4 and no backend. For an existing Browserless
+isolation, native background completion with app windows closed, 64 MiB
+foreground storage across offline reopening, and local playback. Set
+`PWA_TEST_BROWSER=webkit` to exercise offline launch and foreground storage in
+WebKit; only the Chromium-specific Background Fetch/media test is skipped.
+WebKit uses an isolated persistent profile for OPFS and an actual server socket
+disconnect for offline checks: its ephemeral profile rejects file writes, and
+its protocol offline emulation bypasses service-worker navigation handling.
+It uses a synthetic MP4 and no backend. For an existing Browserless
 container, set `PLAYWRIGHT_WS_ENDPOINT=ws://127.0.0.1:3000/chromium/playwright`
 and `PWA_TEST_HOST` to the host IP reachable from the container. The secure-context
 exception applies only to this HTTP test fixture. Production requires HTTPS.

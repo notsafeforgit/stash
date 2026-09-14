@@ -25,10 +25,12 @@ import {
   putEntry,
 } from "./offline-db";
 import {
+  canWriteOfflineFiles,
   clearAllScenes,
   existingSceneSize,
   opfsPathForScene,
   removeScene,
+  requestDownloadPersistence,
   storageEstimate,
   writeScene,
 } from "./opfs-storage";
@@ -89,6 +91,10 @@ type Listener = () => void;
 
 export function canCoordinateDownloads(): boolean {
   return canCoordinateOfflineStorage();
+}
+
+export function canDownloadScenes(): boolean {
+  return canCoordinateDownloads() && canWriteOfflineFiles();
 }
 
 export class OfflineQueueUnavailableError extends Error {
@@ -204,6 +210,8 @@ export class DownloadQueueStore {
   }
 
   async enqueue({ snapshot, mode, resolution }: EnqueueArgs): Promise<void> {
+    if (!canDownloadScenes()) throw new OfflineQueueUnavailableError();
+    void requestDownloadPersistence();
     await this.init();
     const before = await getEntry(snapshot.scene_id);
     if (before?.status === "queued" || before?.status === "downloading") return;
@@ -232,6 +240,8 @@ export class DownloadQueueStore {
   }
 
   async retry(sceneId: string): Promise<void> {
+    if (!canDownloadScenes()) throw new OfflineQueueUnavailableError();
+    void requestDownloadPersistence();
     await this.init();
     const before = await getEntry(sceneId);
     if (
@@ -334,7 +344,7 @@ export class DownloadQueueStore {
   }
 
   private kickWorker() {
-    if (this.worker || !canCoordinateDownloads()) return;
+    if (this.worker || !canDownloadScenes()) return;
     let failed = false;
     let backgroundOwnsQueue = false;
     this.worker = getOfflineScope()

@@ -39,10 +39,13 @@ export function createContentReveal() {
       cancel();
       return;
     }
-    const running = surface.animate([{ opacity: 1 }, { opacity: 0 }], {
-      ...pending,
-      easing: motion.easing.reveal,
-    });
+    const running = surface.animate(
+      [{ opacity: motion.contentCoverOpacity }, { opacity: 0 }],
+      {
+        ...pending,
+        easing: motion.easing.reveal,
+      },
+    );
     pending = undefined;
     animation = running;
     const finish = () => {
@@ -69,7 +72,7 @@ export function createContentReveal() {
       if (!target?.animate || preference.matches || document.hidden) return;
       surface = target;
       surface.hidden = false;
-      surface.style.opacity = "1";
+      surface.style.opacity = String(motion.contentCoverOpacity);
       pending = { id, duration };
       schedule();
     },

@@ -1,5 +1,6 @@
-import { MockedProvider } from "@apollo/client/testing/react";
-import type { MockedResponse } from "@apollo/client/testing";
+import { ApolloClient, InMemoryCache } from "@apollo/client";
+import { ApolloProvider } from "@apollo/client/react";
+import { MockLink, type MockedResponse } from "@apollo/client/testing";
 import {
   createRootRoute,
   createRoute,
@@ -16,17 +17,20 @@ import { playerConfiguration } from "./player-configuration";
 import { installRouteTransitions } from "@/core/route-transitions";
 import { MobileNavigationProvider } from "@/components/layout/mobile-navigation";
 import { RouteViewport } from "@/components/layout/route-viewport";
+import { preloadFrontPage } from "@/components/frontpage/preload-front-page";
 
 declare global {
   interface Window {
     homeFixtureQueries: string[];
     homeFixturePreloaded: boolean;
+    homeFixtureDefinitions: string[];
   }
 }
 window.homeFixtureQueries = [];
 window.homeFixturePreloaded = false;
+window.homeFixtureDefinitions = [];
 
-const rows = ["name", "created_at", "updated_at", "scenes_count", "rating"].map(
+const rows = ["name", "random", "updated_at", "scenes_count", "rating"].map(
   (sortBy, index): FrontPageContent => ({
     __typename: "CustomFilter",
     mode: GQL.FilterMode.Studios,
@@ -35,6 +39,7 @@ const rows = ["name", "created_at", "updated_at", "scenes_count", "rating"].map(
     title: `Row ${index + 1}`,
   }),
 );
+rows[1] = { __typename: "SavedFilter", savedFilterId: "2" };
 
 const studios: GQL.StudioDataFragment[] = Array.from(
   { length: 25 },
@@ -105,9 +110,50 @@ const studioPrefetchMock: MockedResponse<
   maxUsageCount: Number.POSITIVE_INFINITY,
 };
 
+const definitionMock: MockedResponse<
+  GQL.FindSavedFilterQuery,
+  GQL.FindSavedFilterQueryVariables
+> = {
+  request: { query: GQL.FindSavedFilterDocument, variables: { id: "2" } },
+  result: () => {
+    window.homeFixtureDefinitions.push("2");
+    return {
+      data: {
+        findSavedFilter: {
+          __typename: "SavedFilter",
+          id: "2",
+          name: "Row 2",
+          mode: GQL.FilterMode.Studios,
+          filter_ast: null,
+          ui_options: null,
+          find_filter: {
+            __typename: "SavedFindFilterType",
+            q: null,
+            page: 1,
+            per_page: 25,
+            sort: "random",
+            direction: GQL.SortDirectionEnum.Asc,
+          },
+        },
+      },
+    };
+  },
+  delay: 150,
+  maxUsageCount: Number.POSITIVE_INFINITY,
+};
+const client = new ApolloClient({
+  cache: new InMemoryCache(),
+  link: new MockLink([
+    studioMock,
+    filtersMock,
+    studioPrefetchMock,
+    definitionMock,
+  ]),
+});
+
 const root = createRootRoute({
   component: () => (
-    <MockedProvider mocks={[studioMock, filtersMock, studioPrefetchMock]}>
+    <ApolloProvider client={client}>
       <ConfigurationProvider
         configuration={{
           ...playerConfiguration,
@@ -126,7 +172,7 @@ const root = createRootRoute({
           </div>
         </MobileNavigationProvider>
       </ConfigurationProvider>
-    </MockedProvider>
+    </ApolloProvider>
   ),
 });
 const router = createRouter({
@@ -138,6 +184,7 @@ const router = createRouter({
       path: "/",
       loader: ({ preload }) => {
         if (preload) window.homeFixturePreloaded = true;
+        return preloadFrontPage(client, rows);
       },
       component: FrontPage,
     }),

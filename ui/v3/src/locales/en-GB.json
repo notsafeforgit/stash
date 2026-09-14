@@ -1751,12 +1751,14 @@
     },
     "settings": {
       "clear_all_confirm": "Delete all offline downloads from this device? Files cannot be recovered.",
+      "downloads_unavailable": "This browser cannot save offline videos. Existing downloads can still be played or exported where local storage is available.",
       "heading": "Offline downloads",
       "max_resolution": "Maximum download resolution",
       "max_resolution_description": "Cap on the resolution downloaded for offline playback. Source files shorter than the cap are downloaded at original.",
-      "persistent_granted": "Granted — downloads are not first in line for browser eviction.",
-      "persistent_not_granted": "Not granted. Browser may evict downloads under storage pressure. Add Stash to your Home Screen on iOS for better persistence.",
+      "persistent_granted": "Protected from automatic storage eviction. Clearing this site's data still removes downloads.",
+      "persistent_not_granted": "The browser has not granted protection from storage eviction. Installing and regularly using Stash can help it grant your request.",
       "persistent_storage": "Persistent storage",
+      "persistent_unavailable": "This browser manages storage retention automatically and cannot grant additional protection. Save important downloads to Files to keep a separate copy.",
       "storage_estimate_unavailable": "Storage estimate unavailable",
       "storage_usage": "Storage usage"
     },
@@ -1806,9 +1808,9 @@
       "empty_description": "Download videos while connected to watch them here without the server."
     },
     "background": {
-      "active": "Managed by your browser. The download can continue with the app closed.",
+      "active": "Managed by your browser. The download can continue with the app window closed while the browser is running.",
       "foreground": "Keep the app open while downloading. This browser may pause downloads in the background; interrupted downloads can be retried.",
-      "ready": "Background downloads are available in this browser.",
+      "ready": "Background downloads are available. Accepted downloads can continue with the app window closed while the browser is running; otherwise, keep the app open.",
       "unavailable": "Background downloads depend on browser support. Where unavailable, keep the app open until downloads finish."
     }
   },

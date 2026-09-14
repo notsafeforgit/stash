@@ -43,6 +43,8 @@ import {
 } from "src/components/detail/performer-list-tabs";
 import { Lightbox } from "src/components/lightbox";
 import { useDocumentTitle } from "src/hooks/title";
+import { getClient } from "@/core/client";
+import { detailRouteState } from "@/components/detail/detail-route-state";
 
 // ── Route search params ────────────────────────────────────────────────────────
 
@@ -55,17 +57,8 @@ const searchSchema = z.object({
 
 type PerformerData = NonNullable<GQL.FindPerformerQuery["findPerformer"]>;
 
-// Mobile width policy for entity detail images: portrait images get
-// clamped to 3/5 width and centered so they don't dominate the viewport;
-// landscape / square images take the full pane width since they're shorter
-// at the same width. Aspect is detected from the image's natural
-// dimensions on load — fallback / loading states default to the entity's
-// canonical aspect (`aspect-[2/3]` for performers / groups, `aspect-square`
-// for tags / studios / galleries) so the placeholder stays compact.
-function entityImageWidthClass(isPortrait: boolean) {
-  return isPortrait ? "max-md:w-3/5 max-md:self-center md:w-full" : "w-full";
-}
-
+// A stable portrait frame keeps metadata and lists in place during decode.
+// Contain the image so wide portraits remain fully visible in the same frame.
 function PerformerPortrait({
   performer,
   onImageClick,
@@ -76,7 +69,6 @@ function PerformerPortrait({
   imageUpdating?: boolean;
 }) {
   const [failed, setFailed] = React.useState(false);
-  const [isPortrait, setIsPortrait] = React.useState(true);
 
   if (imageUpdating) {
     return (
@@ -94,21 +86,16 @@ function PerformerPortrait({
   return (
     <Button
       variant="ghost"
-      className={cn(
-        entityImageWidthClass(isPortrait),
-        "shrink-0 overflow-hidden rounded p-0 h-auto cursor-zoom-in hover:bg-transparent",
-      )}
+      className="max-md:w-3/5 max-md:self-center md:w-full aspect-[2/3] shrink-0 overflow-hidden rounded p-0 h-auto cursor-zoom-in hover:bg-transparent"
       onClick={onImageClick}
       aria-label="View full image"
     >
       <img
         src={performer.image_path}
         alt={performer.name}
-        className="w-full h-auto"
-        onLoad={(e) => {
-          const img = e.currentTarget;
-          setIsPortrait(img.naturalHeight > img.naturalWidth);
-        }}
+        width={2}
+        height={3}
+        className="size-full object-contain"
         onError={() => setFailed(true)}
       />
     </Button>
@@ -397,5 +384,14 @@ function PerformerDetailPage() {
 
 export const Route = createFileRoute("/performers/$performerId")({
   validateSearch: searchSchema,
+  ...detailRouteState,
+  loader: ({ params }) =>
+    getClient()
+      .query({
+        query: GQL.FindPerformerDocument,
+        variables: { id: params.performerId },
+        fetchPolicy: "cache-first",
+      })
+      .then(() => undefined),
   component: PerformerDetailPage,
 });

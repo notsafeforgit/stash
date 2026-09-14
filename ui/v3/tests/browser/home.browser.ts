@@ -126,6 +126,9 @@ test("the drawer preloads Home and offscreen rows wait until approached", async 
   await expect
     .poll(() => page.evaluate(() => window.homeFixturePreloaded))
     .toBe(true);
+  await expect
+    .poll(() => page.evaluate(() => window.homeFixtureDefinitions))
+    .toEqual(["2"]);
   expect(await page.evaluate(() => window.homeFixtureQueries)).toEqual([]);
   await page.getByRole("link", { name: "Home", exact: true }).click();
   const firstRow = page
@@ -203,4 +206,70 @@ test("Home loads its customisation code and saved filters only when opened", asy
     page.getByRole("dialog", { name: "Customise homepage" }),
   ).toBeVisible();
   expect(configRequests).toHaveLength(1);
+});
+
+test("returning Home restores cached random rows and both scroll positions without placeholders", async ({
+  page,
+}) => {
+  await page.goto("/home-fixture/");
+  const home = page.locator("[data-front-page]");
+  // The deferred row's wrapper stays mounted while its placeholder is replaced.
+  const row = home.locator(":scope > div").nth(1);
+  await row.scrollIntoViewIfNeeded();
+  await expect(row.locator(".studio-card")).toHaveCount(25);
+  await row.locator(".overflow-x-auto").evaluate((element) => {
+    element.scrollLeft = 650;
+  });
+  await expect
+    .poll(() =>
+      row.locator(".overflow-x-auto").evaluate((element) => element.scrollLeft),
+    )
+    .toBeGreaterThan(500);
+  // Let nearby rows finish before comparing the request count on return.
+  await page.waitForTimeout(250);
+  const before = {
+    top: await home.evaluate((element) => element.scrollTop),
+    left: await row
+      .locator(".overflow-x-auto")
+      .evaluate((element) => element.scrollLeft),
+    queries: await page.evaluate(() => window.homeFixtureQueries),
+  };
+  expect(before.queries.some((query) => query.startsWith("random_"))).toBe(
+    true,
+  );
+  await page.getByRole("button", { name: "Open navigation menu" }).click();
+  await page.getByRole("link", { name: "Scenes", exact: true }).click();
+  await expect(home).toHaveCount(0);
+  const paintedCounts = page.evaluate(
+    () =>
+      new Promise<number[]>((resolve) => {
+        const counts: number[] = [];
+        const sample = () => {
+          const home = document.querySelector("[data-front-page]");
+          if (home)
+            counts.push(
+              home
+                .querySelectorAll("section")[1]
+                ?.querySelectorAll(".studio-card").length ?? 0,
+            );
+          if (counts.length === 15) resolve(counts);
+          else requestAnimationFrame(sample);
+        };
+        requestAnimationFrame(sample);
+      }),
+  );
+  await page.goBack();
+  expect(await paintedCounts).toEqual(Array.from({ length: 15 }, () => 25));
+  expect(await page.evaluate(() => window.homeFixtureQueries)).toEqual(
+    before.queries,
+  );
+  expect(await home.evaluate((element) => element.scrollTop)).toBeCloseTo(
+    before.top,
+    0,
+  );
+  expect(
+    await row
+      .locator(".overflow-x-auto")
+      .evaluate((element) => element.scrollLeft),
+  ).toBeCloseTo(before.left, 0);
 });

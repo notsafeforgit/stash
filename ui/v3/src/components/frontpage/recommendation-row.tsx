@@ -6,7 +6,13 @@
  * first, then delegates to EntityCarouselRow.
  */
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Link } from "@tanstack/react-router";
 import { useIntl } from "react-intl";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -37,6 +43,8 @@ import {
 } from "src/components/lightbox";
 import { imageToSlide } from "src/components/list/entity-list-configs";
 import { objectTitle } from "src/core/files";
+import { useFrontPageRowState } from "./front-page-state";
+import { QueryError } from "@/components/query-error";
 
 // ── Carousel-row lightbox helpers ──────────────────────────────────────────────
 
@@ -119,6 +127,7 @@ interface CarouselProps {
   viewAllHref?: string;
   children: React.ReactNode;
   loading?: boolean;
+  mode?: GQL.FilterMode;
 }
 
 export function RecommendationRow({
@@ -126,8 +135,16 @@ export function RecommendationRow({
   viewAllHref,
   children,
   loading,
+  mode,
 }: CarouselProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const rowState = useFrontPageRowState();
+  const kind = mode ? MODE_KINDS[mode] : undefined;
+  useLayoutEffect(() => {
+    if (!loading && scrollRef.current && rowState) {
+      scrollRef.current.scrollLeft = rowState.scrollLeft;
+    }
+  }, [loading, rowState]);
 
   function scrollBy(delta: number) {
     scrollRef.current?.scrollBy({ left: delta, behavior: "smooth" });
@@ -167,6 +184,9 @@ export function RecommendationRow({
 
       <div
         ref={scrollRef}
+        onScroll={(event) => {
+          if (rowState) rowState.scrollLeft = event.currentTarget.scrollLeft;
+        }}
         className={cn(
           "flex gap-3 overflow-x-auto px-4 pb-2",
           "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
@@ -175,10 +195,28 @@ export function RecommendationRow({
       >
         {loading
           ? Array.from({ length: 8 }).map((_, i) => (
-              <Skeleton
+              <div
                 key={i}
-                className="shrink-0 w-56 aspect-[2/3] [scroll-snap-align:start]"
-              />
+                className={cn(
+                  "shrink-0 [scroll-snap-align:start]",
+                  SNAP_WIDTHS[kind ?? "studio"],
+                )}
+              >
+                <Skeleton
+                  className={
+                    kind === "gallery" ? "aspect-video" : "aspect-[2/3]"
+                  }
+                />
+                <div
+                  className={cn(
+                    "flex flex-col gap-2 px-3 py-2.5",
+                    BODY_HEIGHTS[kind ?? "studio"],
+                  )}
+                >
+                  <Skeleton className="h-4 w-4/5" />
+                  <Skeleton className="h-3 w-2/3" />
+                </div>
+              </div>
             ))
           : children}
       </div>
@@ -211,6 +249,29 @@ const SNAP_WIDTHS: Record<SnapCardKind, string> = {
   performer: "w-44",
   group: "w-44",
   tag: "w-40",
+};
+
+// Skeletons reserve the same cover width/aspect and typical metadata space as
+// their cards. A generic portrait rectangle made the next row jump by ~170px.
+const BODY_HEIGHTS: Record<SnapCardKind, string> = {
+  scene: "h-30",
+  gallery: "h-24",
+  marker: "h-24",
+  image: "h-24",
+  studio: "h-12",
+  performer: "h-24",
+  group: "h-20",
+  tag: "h-16",
+};
+const MODE_KINDS: Partial<Record<GQL.FilterMode, SnapCardKind>> = {
+  [GQL.FilterMode.Scenes]: "scene",
+  [GQL.FilterMode.Galleries]: "gallery",
+  [GQL.FilterMode.SceneMarkers]: "marker",
+  [GQL.FilterMode.Images]: "image",
+  [GQL.FilterMode.Studios]: "studio",
+  [GQL.FilterMode.Performers]: "performer",
+  [GQL.FilterMode.Groups]: "group",
+  [GQL.FilterMode.Tags]: "tag",
 };
 
 const SnapCard = React.forwardRef<
@@ -247,6 +308,24 @@ function buildFilter(
   return f;
 }
 
+function useCarouselFilter(
+  mode: GQL.FilterMode,
+  sortBy: string,
+  direction: GQL.SortDirectionEnum,
+  filterProp?: ListFilterModel,
+) {
+  const rowState = useFrontPageRowState();
+  useLayoutEffect(() => {
+    if (rowState) rowState.mounted = true;
+  }, [rowState]);
+  return useMemo(() => {
+    const filter = filterProp?.clone() ?? buildFilter(mode, sortBy, direction);
+    if (rowState && filter.sortBy === "random")
+      filter.randomSeed = rowState.randomSeed;
+    return filter;
+  }, [mode, sortBy, direction, filterProp, rowState]);
+}
+
 // ── Scenes ─────────────────────────────────────────────────────────────────────
 
 interface SceneRowProps {
@@ -262,17 +341,11 @@ export function SceneCarouselRow({
   direction,
   filter: filterProp,
 }: SceneRowProps) {
-  // Memoise so the filter object is stable across re-renders. Without
-  // this, every render of this component would either rebuild via
-  // `buildFilter` (resetting `randomSeed` to -1) or accept a fresh
-  // `filterProp` from a non-memoised parent — both cases force a new
-  // seed each render and refetch the carousel needlessly. With this,
-  // the seed is generated on the first read and reused for the lifetime
-  // of the mount; the carousel reshuffles only when the component is
-  // re-mounted (page revisit) or the inputs actually change.
-  const filter = useMemo(
-    () => filterProp ?? buildFilter(GQL.FilterMode.Scenes, sortBy, direction),
-    [filterProp, sortBy, direction],
+  const filter = useCarouselFilter(
+    GQL.FilterMode.Scenes,
+    sortBy,
+    direction,
+    filterProp,
   );
   const { data, loading } = useQuery(GQL.FindScenesDocument, {
     variables: {
@@ -303,6 +376,7 @@ export function SceneCarouselRow({
     <RecommendationRow
       heading={heading}
       viewAllHref="/scenes"
+      mode={GQL.FilterMode.Scenes}
       loading={loading && !data}
     >
       {scenes.map((scene, i) => (
@@ -348,9 +422,11 @@ export function StudioCarouselRow({
   direction,
   filter: filterProp,
 }: StudioRowProps) {
-  const filter = useMemo(
-    () => filterProp ?? buildFilter(GQL.FilterMode.Studios, sortBy, direction),
-    [filterProp, sortBy, direction],
+  const filter = useCarouselFilter(
+    GQL.FilterMode.Studios,
+    sortBy,
+    direction,
+    filterProp,
   );
   const { data, loading } = useQuery(GQL.FindStudiosDocument, {
     variables: {
@@ -365,6 +441,7 @@ export function StudioCarouselRow({
     <RecommendationRow
       heading={heading}
       viewAllHref="/studios"
+      mode={GQL.FilterMode.Studios}
       loading={loading && !data}
     >
       {studios.map((studio) => (
@@ -391,10 +468,11 @@ export function PerformerCarouselRow({
   direction,
   filter: filterProp,
 }: PerformerRowProps) {
-  const filter = useMemo(
-    () =>
-      filterProp ?? buildFilter(GQL.FilterMode.Performers, sortBy, direction),
-    [filterProp, sortBy, direction],
+  const filter = useCarouselFilter(
+    GQL.FilterMode.Performers,
+    sortBy,
+    direction,
+    filterProp,
   );
   const { data, loading } = useQuery(GQL.FindPerformersDocument, {
     variables: {
@@ -409,6 +487,7 @@ export function PerformerCarouselRow({
     <RecommendationRow
       heading={heading}
       viewAllHref="/performers"
+      mode={GQL.FilterMode.Performers}
       loading={loading && !data}
     >
       {performers.map((performer) => (
@@ -435,9 +514,11 @@ export function GroupCarouselRow({
   direction,
   filter: filterProp,
 }: GroupRowProps) {
-  const filter = useMemo(
-    () => filterProp ?? buildFilter(GQL.FilterMode.Groups, sortBy, direction),
-    [filterProp, sortBy, direction],
+  const filter = useCarouselFilter(
+    GQL.FilterMode.Groups,
+    sortBy,
+    direction,
+    filterProp,
   );
   const { data, loading } = useQuery(GQL.FindGroupsDocument, {
     variables: {
@@ -452,6 +533,7 @@ export function GroupCarouselRow({
     <RecommendationRow
       heading={heading}
       viewAllHref="/groups"
+      mode={GQL.FilterMode.Groups}
       loading={loading && !data}
     >
       {groups.map((group) => (
@@ -478,10 +560,11 @@ export function GalleryCarouselRow({
   direction,
   filter: filterProp,
 }: GalleryRowProps) {
-  const filter = useMemo(
-    () =>
-      filterProp ?? buildFilter(GQL.FilterMode.Galleries, sortBy, direction),
-    [filterProp, sortBy, direction],
+  const filter = useCarouselFilter(
+    GQL.FilterMode.Galleries,
+    sortBy,
+    direction,
+    filterProp,
   );
   const { data, loading } = useQuery(GQL.FindGalleriesDocument, {
     variables: {
@@ -502,6 +585,7 @@ export function GalleryCarouselRow({
       <RecommendationRow
         heading={heading}
         viewAllHref="/galleries"
+        mode={GQL.FilterMode.Galleries}
         loading={loading && !data}
       >
         {galleries.map((gallery) => (
@@ -529,9 +613,11 @@ export function ImageCarouselRow({
   direction,
   filter: filterProp,
 }: ImageRowProps) {
-  const filter = useMemo(
-    () => filterProp ?? buildFilter(GQL.FilterMode.Images, sortBy, direction),
-    [filterProp, sortBy, direction],
+  const filter = useCarouselFilter(
+    GQL.FilterMode.Images,
+    sortBy,
+    direction,
+    filterProp,
   );
   const { data, loading } = useQuery(GQL.FindImagesDocument, {
     variables: {
@@ -555,6 +641,7 @@ export function ImageCarouselRow({
     <RecommendationRow
       heading={heading}
       viewAllHref="/images"
+      mode={GQL.FilterMode.Images}
       loading={loading && !data}
     >
       {images.map((image, i) => (
@@ -600,9 +687,11 @@ export function TagCarouselRow({
   direction,
   filter: filterProp,
 }: TagRowProps) {
-  const filter = useMemo(
-    () => filterProp ?? buildFilter(GQL.FilterMode.Tags, sortBy, direction),
-    [filterProp, sortBy, direction],
+  const filter = useCarouselFilter(
+    GQL.FilterMode.Tags,
+    sortBy,
+    direction,
+    filterProp,
   );
   const { data, loading } = useQuery(GQL.FindTagsDocument, {
     variables: {
@@ -617,6 +706,7 @@ export function TagCarouselRow({
     <RecommendationRow
       heading={heading}
       viewAllHref="/tags"
+      mode={GQL.FilterMode.Tags}
       loading={loading && !data}
     >
       {tags.map((tag) => (
@@ -643,10 +733,11 @@ export function MarkerCarouselRow({
   direction,
   filter: filterProp,
 }: MarkerRowProps) {
-  const filter = useMemo(
-    () =>
-      filterProp ?? buildFilter(GQL.FilterMode.SceneMarkers, sortBy, direction),
-    [filterProp, sortBy, direction],
+  const filter = useCarouselFilter(
+    GQL.FilterMode.SceneMarkers,
+    sortBy,
+    direction,
+    filterProp,
   );
   const { data, loading } = useQuery(GQL.FindSceneMarkersDocument, {
     variables: {
@@ -674,6 +765,7 @@ export function MarkerCarouselRow({
     <RecommendationRow
       heading={heading}
       viewAllHref="/scenes/markers"
+      mode={GQL.FilterMode.SceneMarkers}
       loading={loading && !data}
     >
       {markers.map((marker, i) => (
@@ -788,6 +880,7 @@ export function CustomFilterCarouselRow({ heading, content }: CustomRowProps) {
 
 interface SavedFilterRowProps {
   content: ISavedFilterRow;
+  placeholderOnly?: boolean;
 }
 
 function savedFilterToCarouselRow(
@@ -797,12 +890,8 @@ function savedFilterToCarouselRow(
   const f = new ListFilterModel(savedFilter.mode);
   f.configureFromSavedFilter(savedFilter);
   f.itemsPerPage = CAROUSEL_PAGE_SIZE;
-  // Carousels reshuffle on every page load: a saved filter's persisted
-  // random seed represents the order at save-time, but homepage rows
-  // aren't URL-bookmarkable and the user expectation is "new content
-  // each visit." Clear the seed so the first read inside the carousel
-  // generates a fresh one. (List views, which DO want refresh-stable
-  // ordering, parse the seed directly from the URL.)
+  // Ignore the saved order. Home supplies a visit seed so Back reuses the
+  // same cached cards; a browser reload or configuration change reshuffles.
   if (f.sortBy === "random") {
     f.randomSeed = -1;
   }
@@ -885,9 +974,12 @@ function savedFilterToCarouselRow(
   }
 }
 
-export function SavedFilterCarouselRow({ content }: SavedFilterRowProps) {
+export function SavedFilterCarouselRow({
+  content,
+  placeholderOnly,
+}: SavedFilterRowProps) {
   const intl = useIntl();
-  const { data, loading } = useQuery<
+  const { data, loading, error, refetch } = useQuery<
     GQL.FindSavedFilterQuery,
     GQL.FindSavedFilterQueryVariables
   >(GQL.FindSavedFilterDocument, {
@@ -896,20 +988,25 @@ export function SavedFilterCarouselRow({ content }: SavedFilterRowProps) {
 
   const savedFilter = data?.findSavedFilter;
 
-  // Memoise the constructed row (and its embedded `ListFilterModel`)
-  // per saved-filter reference. Without this, every parent re-render
-  // would rebuild the filter via `savedFilterToCarouselRow` — and
-  // because we deliberately clear `randomSeed` in that function (so
-  // page-load reshuffles), each rebuild would also generate a new
-  // seed and cause the carousel to refetch. The memo keeps the seed
-  // stable for the lifetime of this mount, so the carousel reshuffles
-  // exactly once (on mount / page revisit), not on every parent tick.
   const row = useMemo(
     () => (savedFilter ? savedFilterToCarouselRow(savedFilter) : null),
     [savedFilter],
   );
 
-  if (loading) {
+  if (error && !savedFilter)
+    return <QueryError error={error} retry={refetch} retrying={loading} />;
+  if (placeholderOnly && savedFilter)
+    return (
+      <RecommendationRow
+        heading={savedFilter.name}
+        mode={savedFilter.mode}
+        loading
+      >
+        {null}
+      </RecommendationRow>
+    );
+
+  if (loading && !savedFilter) {
     return (
       <RecommendationRow
         heading={intl.formatMessage({

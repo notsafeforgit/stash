@@ -2,7 +2,10 @@ import { test, expect, type Page } from "@playwright/test";
 import type { OfflineEntry } from "@/components/offline/offline-db";
 
 async function install(page: Page, prefix: string) {
-  await page.goto(`${prefix}offline.html`);
+  const response = await page.goto(`${prefix}offline.html`);
+  expect(response?.headers()["content-security-policy"]).toContain(
+    "worker-src blob: 'self'",
+  );
   await expect(page.locator("[data-offline-launch]")).toBeVisible();
   await page.evaluate(async (prefix) => {
     await navigator.serviceWorker.register(`${prefix}service-worker.js`, {
@@ -52,7 +55,11 @@ for (const prefix of ["/", "/stash/"]) {
   }) => {
     await install(page, prefix);
     await context.setOffline(true);
-    await page.goto(`${prefix}performers/123`);
+    const response = await page.goto(`${prefix}performers/123`);
+    expect(response?.headers()["content-security-policy"]).toContain(
+      "worker-src blob: 'self'",
+    );
+    expect(response?.headers()["referrer-policy"]).toBe("same-origin");
     await expect(
       page.getByRole("heading", { name: "Offline library" }),
     ).toBeVisible();

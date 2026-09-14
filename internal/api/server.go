@@ -668,9 +668,14 @@ func setPageSecurityHeaders(w http.ResponseWriter, r *http.Request, plugins []*p
 	connectSrc := strings.Join(connectSrcSlice, " ")
 	scriptSrc := strings.Join(scriptSrcSlice, " ")
 	styleSrc := strings.Join(styleSrcSlice, " ")
+	workerSrc := "blob:"
+	if c.GetEnableV3UI() {
+		// The v3 offline library registers a bundled, same-origin service worker.
+		workerSrc += " 'self'"
+	}
 
 	cspDirectives := fmt.Sprintf("default-src %s; connect-src %s; img-src %s; script-src %s; style-src %s; media-src %s;", defaultSrc, connectSrc, imageSrc, scriptSrc, styleSrc, mediaSrc)
-	cspDirectives += " worker-src blob:; child-src 'none'; object-src 'none'; form-action 'self';"
+	cspDirectives += fmt.Sprintf(" worker-src %s; child-src 'none'; object-src 'none'; form-action 'self';", workerSrc)
 
 	w.Header().Set("Referrer-Policy", "same-origin")
 	w.Header().Set("Content-Security-Policy", cspDirectives)

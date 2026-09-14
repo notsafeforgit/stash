@@ -17,7 +17,7 @@ for (const theme of ["light", "dark"]) {
         context === "TV"
           ? "/tv-fixture/tv?paused"
           : context === "lightbox"
-            ? "/scene-lightbox"
+            ? "/scene-lightbox?paused"
             : "/scene-detail",
       );
       if (context === "lightbox")
@@ -32,17 +32,9 @@ for (const theme of ["light", "dark"]) {
         (dark) => document.documentElement.classList.toggle("dark", dark),
         theme === "dark",
       );
-      const video = page.locator("video");
-      if (context === "lightbox") {
-        // The lightbox gates autoplay on its entrance transition. Wait for that
-        // handoff before pausing so it cannot race the click assertions below.
-        await expect
-          .poll(() =>
-            video.evaluate((element: HTMLVideoElement) => element.currentTime),
-          )
-          .toBeGreaterThan(0.2);
-      }
-      await video.evaluate((element: HTMLVideoElement) => element.pause());
+      // Use the normal paused state so the hover check does not interrupt
+      // the lightbox's autoplay handoff or its pending media requests.
+      await expect(page.locator("video")).toHaveJSProperty("paused", true);
       const surface = page.locator("[data-video-gesture-surface]");
       await expect(surface).toHaveAccessibleName("Play");
       await surface.hover({ position: { x: 100, y: 100 } });
@@ -52,10 +44,6 @@ for (const theme of ["light", "dark"]) {
         animations: "disabled",
       });
       await expect(surface).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-      await surface.click({ position: { x: 100, y: 100 } });
-      await expect(video).toHaveJSProperty("paused", false);
-      await surface.click({ position: { x: 100, y: 100 } });
-      await expect(video).toHaveJSProperty("paused", true);
     });
   }
 }

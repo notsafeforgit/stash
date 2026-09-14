@@ -1,6 +1,7 @@
 "use client";
 
 import type * as React from "react";
+import { useOverlayContainer } from "./overlay-container";
 import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 
 import { cn } from "@/lib/utils";
@@ -55,8 +56,9 @@ function PopoverContent({
     positionerClassName?: string;
     keepMounted?: boolean;
   }) {
+  const container = useOverlayContainer();
   return (
-    <PopoverPrimitive.Portal keepMounted={keepMounted}>
+    <PopoverPrimitive.Portal keepMounted={keepMounted} container={container}>
       <PopoverPrimitive.Positioner
         align={align}
         alignOffset={alignOffset}

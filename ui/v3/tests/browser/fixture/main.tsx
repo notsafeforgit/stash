@@ -44,6 +44,7 @@ import { SceneDetailFixture } from "./scene-detail";
 import { EntityCardsFixture } from "./entity-cards";
 import { RouteTransitionsFixture } from "./route-transitions";
 import { HomeFixture } from "./home";
+import { TvFixture } from "./tv";
 import { MotionFixture, MotionViewerFixture } from "./motion";
 import { MobileNavigationProvider } from "@/components/layout/mobile-navigation";
 
@@ -355,7 +356,9 @@ createRoot(root).render(
   <StrictMode>
     <IntlProvider locale="en-GB" messages={flattenMessages(messages)}>
       <ShortcutProvider>
-        {location.pathname.startsWith("/home-fixture") ? (
+        {location.pathname.startsWith("/tv-fixture") ? (
+          <TvFixture />
+        ) : location.pathname.startsWith("/home-fixture") ? (
           <HomeFixture />
         ) : location.pathname.includes("/transitions") ? (
           <RouteTransitionsFixture />

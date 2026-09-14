@@ -1005,3 +1005,36 @@ html [data-sonner-toaster][data-sonner-theme="system"] {
     pointer-events: none;
   }
 }
+
+/* TV keeps its video, controls and portals in one stable presentation surface. */
+.tv-viewport[data-tv-fit="cover"] video {
+  object-fit: cover;
+}
+.tv-viewport[data-tv-fit="contain"] video {
+  object-fit: contain;
+}
+.tv-surface {
+  transform: translateZ(0);
+}
+.tv-viewport[data-tv-rotation="clockwise"] .tv-surface,
+.tv-viewport[data-tv-rotation="counterclockwise"] .tv-surface {
+  inset: auto;
+  top: 50%;
+  left: 50%;
+  width: var(--tv-height, 100dvh);
+  height: var(--tv-width, 100dvw);
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+.tv-viewport[data-tv-rotation="counterclockwise"] .tv-surface {
+  transform: translate(-50%, -50%) rotate(-90deg);
+}
+.tv-topbar {
+  padding-top: max(0.75rem, var(--safe-area-top, 0px));
+}
+.tv-footer {
+  padding-bottom: max(0.75rem, var(--safe-area-bottom, 0px));
+}
+[data-app-viewport]:has([data-tv-presentation="immersive"]) [data-app-header],
+[data-app-viewport]:has([data-tv-presentation="fullscreen"]) [data-app-header] {
+  display: none;
+}

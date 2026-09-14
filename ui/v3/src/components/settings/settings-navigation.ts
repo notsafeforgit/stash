@@ -15,6 +15,11 @@ export const SETTINGS_NAV_ITEMS = [
     defaultLabel: "Interface",
   },
   {
+    to: "/settings/tv",
+    labelId: "tv.title",
+    defaultLabel: "TV",
+  },
+  {
     to: "/settings/security",
     labelId: "config.categories.security",
     defaultLabel: "Security",

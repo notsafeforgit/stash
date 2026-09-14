@@ -73,6 +73,7 @@ export function useOverlayOpenState<T extends unknown[]>({
 }
 
 interface ShortcutContextValue {
+  overlaysBlockShortcuts: () => boolean;
   registerListScope: (id: symbol, scope: ListShortcutScope) => () => void;
   updateListScope: (id: symbol, scope: ListShortcutScope) => void;
   registerOverlayScope: (id: symbol, scope: OverlayShortcutScope) => () => void;
@@ -151,6 +152,10 @@ export function ShortcutProvider({ children }: { children: React.ReactNode }) {
 
   const contextValue = useMemo<ShortcutContextValue>(
     () => ({
+      overlaysBlockShortcuts: () =>
+        [...overlayScopesRef.current.values()].some(
+          (scope) => scope.open && scope.blocksListShortcuts !== false,
+        ),
       registerListScope,
       updateListScope,
       registerOverlayScope,
@@ -357,6 +362,16 @@ export function useListShortcutScope(scope: ListShortcutScope) {
   useEffect(() => {
     context?.updateListScope(scopeId, scope);
   }, [context, scope, scopeId]);
+}
+
+/** Read at an input-event boundary; opening a menu does not publish a new
+ * application context through a playing TV feed. */
+export function useOverlayShortcutsBlocked() {
+  const context = useContext(ShortcutContext);
+  return useCallback(
+    () => context?.overlaysBlockShortcuts() ?? false,
+    [context],
+  );
 }
 
 export function useOverlayShortcutScope(scope: OverlayShortcutScope) {

@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useOverlayContainer } from "./overlay-container";
 import { Combobox as ComboboxPrimitive } from "@base-ui/react";
 
 import { cn } from "@/lib/utils";
@@ -121,7 +122,7 @@ function ComboboxContent({
     "side" | "align" | "sideOffset" | "alignOffset" | "anchor"
   >) {
   return (
-    <ComboboxPrimitive.Portal>
+    <ComboboxPrimitive.Portal container={useOverlayContainer()}>
       <ComboboxPrimitive.Positioner
         side={side}
         sideOffset={sideOffset}

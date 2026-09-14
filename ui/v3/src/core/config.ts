@@ -44,6 +44,8 @@ export const defaultMaxOptionsShown = 200;
 export const defaultPreviewVolume = 25;
 
 export interface IUIConfig {
+  /** Decoded by TV at its owning boundary, retaining future versions for recovery. */
+  tv?: unknown;
   // unknown to prevent direct access - use getFrontPageContent
   frontPageContent?: unknown;
 

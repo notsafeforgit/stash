@@ -36,7 +36,29 @@ const entries = [];
 for (const file of readdirSync(routesDir).sort()) {
   if (!file.endsWith(".tsx") || file === "index.tsx") continue;
   const route = `/settings/${file.replace(/\.tsx$/, "")}`;
-  const src = readFileSync(join(routesDir, file), "utf8").replace(/\s+/g, " ");
+  let pageSource = readFileSync(join(routesDir, file), "utf8");
+  // A settings route can delegate its whole page to a reusable component.
+  // Follow that named component import so extracted forms stay searchable.
+  const component = /component:\s*(\w+)/.exec(pageSource)?.[1];
+  if (component && !pageSource.includes("<SettingsSection")) {
+    for (const match of pageSource.matchAll(
+      /import\s*\{([^}]+)\}\s*from\s*"(@\/components\/[^"\n]+)"/g,
+    )) {
+      if (
+        !match[1]
+          .split(",")
+          .map((name) => name.trim())
+          .includes(component)
+      )
+        continue;
+      pageSource = readFileSync(
+        join(root, "src", `${match[2].slice(2)}.tsx`),
+        "utf8",
+      );
+      break;
+    }
+  }
+  const src = pageSource.replace(/\s+/g, " ");
 
   // Section boundaries: list of [position, {id, default}] then assign each
   // row to the latest section that starts before it.

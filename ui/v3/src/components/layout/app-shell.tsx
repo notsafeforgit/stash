@@ -23,6 +23,7 @@ export function AppShell() {
   });
   const isDetailPage = DETAIL_ROUTE_RE.test(pathname);
   const ownsMobileNavigation =
+    pathname === "/tv" ||
     isDetailPage ||
     pathname === "/settings" ||
     pathname.startsWith("/settings/");
@@ -33,7 +34,12 @@ export function AppShell() {
         data-app-viewport
         className="flex h-dvh flex-col overflow-hidden bg-background text-foreground"
       >
-        <Header />
+        <div
+          data-app-header
+          className={pathname === "/tv" ? "hidden md:contents" : "contents"}
+        >
+          <Header />
+        </div>
         <DownloadProgressBar />
         <DownloadNotifications />
         <RouteViewport>

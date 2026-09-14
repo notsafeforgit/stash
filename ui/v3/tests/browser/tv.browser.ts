@@ -117,7 +117,7 @@ test("TV markers use parent streams and never write activity", async ({
   ).toEqual([]);
 });
 
-test("TV immersive fallback retains inline video, rotation and app navigation", async ({
+test("TV hides unsupported fullscreen and retains inline video, rotation and navigation", async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -136,7 +136,7 @@ test("TV immersive fallback retains inline video, rotation and app navigation", 
   await page.keyboard.press("f");
   await expect(page.locator("[data-tv]")).toHaveAttribute(
     "data-tv-presentation",
-    "immersive",
+    "normal",
   );
   expect(
     await page
@@ -150,7 +150,14 @@ test("TV immersive fallback retains inline video, rotation and app navigation", 
     "data-tv-rotation",
     "clockwise",
   );
-  await page.keyboard.press("h");
+  await page.getByRole("button", { name: "Playback", exact: true }).click();
+  await expect(
+    page.getByRole("menuitem", { name: "Fullscreen", exact: true }),
+  ).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await page
+    .getByRole("button", { name: "Show or hide controls", exact: true })
+    .click();
   await expect(
     page.getByRole("button", { name: "Show TV controls", exact: true }),
   ).toBeVisible();
@@ -164,6 +171,30 @@ test("TV immersive fallback retains inline video, rotation and app navigation", 
   await expect(page.locator("video")).toHaveCount(0);
 });
 
+test("a rejected fullscreen request leaves the ordinary TV layout and hides the action", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(document, "fullscreenEnabled", {
+      configurable: true,
+      value: true,
+    });
+    Element.prototype.requestFullscreen = () =>
+      Promise.reject(new Error("Fullscreen unavailable"));
+  });
+  await open(page);
+  await page.getByRole("button", { name: "Playback", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Fullscreen", exact: true }).click();
+  await expect(page.locator("[data-tv]")).toHaveAttribute(
+    "data-tv-presentation",
+    "normal",
+  );
+  await page.getByRole("button", { name: "Playback", exact: true }).click();
+  await expect(
+    page.getByRole("menuitem", { name: "Fullscreen", exact: true }),
+  ).toHaveCount(0);
+});
+
 test("TV is a top-level page with navigation instead of exit and item buttons", async ({
   page,
 }) => {
@@ -173,16 +204,6 @@ test("TV is a top-level page with navigation instead of exit and item buttons", 
       name: /^(Exit TV|Exit immersive mode|Previous TV item|Next TV item)$/,
     }),
   ).toHaveCount(0);
-  await page.keyboard.press("f");
-  await expect(page.locator("[data-tv]")).not.toHaveAttribute(
-    "data-tv-presentation",
-    "normal",
-  );
-  await page.keyboard.press("Escape");
-  await expect(page.locator("[data-tv]")).toHaveAttribute(
-    "data-tv-presentation",
-    "normal",
-  );
   await page.keyboard.press("Escape");
   await expect(page).toHaveURL(/\/tv-fixture\/tv\?/);
   await page.getByRole("button", { name: "Play", exact: true }).click();
@@ -200,6 +221,231 @@ test("TV is a top-level page with navigation instead of exit and item buttons", 
   ).toBeVisible();
   await expect(page.locator("video")).toHaveCount(0);
 });
+
+test("TV exposes mute at the bottom and uses video taps instead of transport buttons", async ({
+  page,
+}) => {
+  await open(page);
+  const dock = page.locator("[data-tv-dock]");
+  const surface = page.locator("[data-tv-play-surface]");
+  await expect(
+    dock.getByRole("button", { name: /^(Play|Pause|Seek to .* marker)$/ }),
+  ).toHaveCount(0);
+  const unmute = dock.getByRole("button", { name: "Unmute", exact: true });
+  await expect(unmute).toBeVisible();
+  for (const name of ["Navigation", "Unmute", "TV settings"]) {
+    const bounds = await page
+      .getByRole("button", { name, exact: true })
+      .boundingBox();
+    expect(bounds?.y).toBeGreaterThan(844 * 0.45);
+  }
+  await unmute.click();
+  await expect(page.locator("video")).toHaveJSProperty("muted", false);
+  await surface.tap({ position: { x: 150, y: 250 } });
+  await expect(page.locator("video")).toHaveJSProperty("paused", false);
+  await surface.tap({ position: { x: 150, y: 250 } });
+  await expect(page.locator("video")).toHaveJSProperty("paused", true);
+  await page.keyboard.press("h");
+  await expect(
+    page.getByRole("button", { name: "Show TV controls", exact: true }),
+  ).toBeVisible();
+  await dock.getByRole("button", { name: "Mute", exact: true }).click();
+  await expect(page.locator("video")).toHaveJSProperty("muted", true);
+  await expect(
+    dock.getByRole("button", { name: "Unmute", exact: true }),
+  ).toBeVisible();
+});
+
+test("holding the video uses 2x, consumes movement and release, and restores the saved rate", async ({
+  page,
+  context,
+  browserName,
+}) => {
+  await open(page, "?advance");
+  await expect(page.locator("video")).toHaveJSProperty("paused", false);
+  await page
+    .locator("[data-tv-play-surface]")
+    .tap({ position: { x: 150, y: 250 } });
+  await expect(page.locator("video")).toHaveJSProperty("paused", true);
+  await page.getByRole("button", { name: "Playback", exact: true }).click();
+  await page
+    .getByRole("menuitem", { name: "Playback speed", exact: true })
+    .click();
+  await page
+    .getByRole("combobox", { name: "Playback speed", exact: true })
+    .click();
+  await page.getByRole("option", { name: "1.5×", exact: true }).click();
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+  const input =
+    browserName === "chromium" ? await context.newCDPSession(page) : undefined;
+  const begin = async () => {
+    if (input)
+      await input.send("Input.dispatchTouchEvent", {
+        type: "touchStart",
+        touchPoints: [{ x: 150, y: 250 }],
+      });
+    else {
+      await page.mouse.move(150, 250);
+      await page.mouse.down();
+    }
+  };
+  const release = async () => {
+    if (input)
+      await input.send("Input.dispatchTouchEvent", {
+        type: "touchEnd",
+        touchPoints: [],
+      });
+    else await page.mouse.up();
+  };
+  try {
+    await begin();
+    await expect(page.locator("video")).toHaveJSProperty("playbackRate", 2);
+    await expect(page.locator("video")).toHaveJSProperty("paused", false);
+    if (input)
+      await input.send("Input.dispatchTouchEvent", {
+        type: "touchMove",
+        touchPoints: [{ x: 150, y: 400 }],
+      });
+    else await page.mouse.move(150, 400, { steps: 5 });
+    await expect(page.locator("[data-scene-player]")).toHaveAttribute(
+      "data-playback-key",
+      /scene:1$/,
+    );
+    await release();
+    await expect(page.locator("video")).toHaveJSProperty("playbackRate", 1.5);
+    // Wait through the deferred single-tap window; releasing a hold is consumed.
+    await page.waitForTimeout(250);
+    await expect(page.locator("video")).toHaveJSProperty("paused", true);
+    await page
+      .locator("[data-tv-play-surface]")
+      .tap({ position: { x: 150, y: 250 } });
+    await expect(page.locator("video")).toHaveJSProperty("paused", false);
+    await begin();
+    await expect(page.locator("video")).toHaveJSProperty("playbackRate", 2);
+    await page.locator("video").evaluate((video: HTMLVideoElement) => {
+      video.currentTime = video.duration - 0.1;
+    });
+    await expect(page.locator("[data-scene-player]")).toHaveAttribute(
+      "data-playback-key",
+      /scene:2$/,
+    );
+    await expect(page.locator("[data-scene-player]")).toHaveAttribute(
+      "data-playback-ready",
+      "true",
+    );
+    await expect(page.locator("video")).toHaveJSProperty("playbackRate", 2);
+    await release();
+    await expect(page.locator("video")).toHaveJSProperty("playbackRate", 1.5);
+    await expect(page.locator("video")).toHaveJSProperty("paused", false);
+    expect(
+      await page
+        .locator("video")
+        .evaluate((video) => video === window.tvFixtureVideo),
+    ).toBe(true);
+    await begin();
+    await expect(page.locator("video")).toHaveJSProperty("playbackRate", 2);
+    await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+    await expect(page.locator("video")).toHaveJSProperty("playbackRate", 1.5);
+    await release();
+  } finally {
+    await input?.detach();
+  }
+});
+
+test("double-tap zoom owns the gesture without changing playback", async ({
+  page,
+}) => {
+  await open(page);
+  const surface = page.locator("[data-tv-play-surface]");
+  await surface.tap({ position: { x: 150, y: 250 } });
+  await expect(page.locator("video")).toHaveJSProperty("paused", false);
+  await surface.tap({ position: { x: 150, y: 250 } });
+  await surface.tap({ position: { x: 150, y: 250 } });
+  await expect(
+    page.getByRole("button", { name: "Reset zoom", exact: true }),
+  ).toBeVisible();
+  await page.waitForTimeout(550);
+  await expect(page.locator("video")).toHaveJSProperty("paused", false);
+  await expect(page.locator("video")).toHaveJSProperty("playbackRate", 1);
+});
+
+for (const device of ["mobile", "desktop"] as const) {
+  test.describe(`TV info on ${device}`, () => {
+    test.use(
+      device === "mobile"
+        ? {
+            viewport: { width: 390, height: 844 },
+            isMobile: true,
+            hasTouch: true,
+          }
+        : {
+            viewport: { width: 1280, height: 800 },
+            isMobile: false,
+            hasTouch: false,
+          },
+    );
+    test("long titles and many tags wrap without horizontal overflow and Close stays reachable", async ({
+      page,
+    }, testInfo) => {
+      await open(page, "?paused&long-info");
+      await page.screenshot({
+        path: testInfo.outputPath(`tv-controls-${device}.png`),
+      });
+      await page
+        .getByRole("button", { name: "Information", exact: true })
+        .click();
+      const dialog = page.getByRole("dialog", {
+        name: "Information",
+        exact: true,
+      });
+      const body = dialog.locator("[data-tv-dialog-body]");
+      await expect(dialog).toBeVisible();
+      expect(
+        await dialog.evaluate(
+          (element) => element.scrollWidth <= element.clientWidth,
+        ),
+      ).toBe(true);
+      expect(
+        await body.evaluate(
+          (element) => element.scrollWidth <= element.clientWidth,
+        ),
+      ).toBe(true);
+      const title = dialog.getByRole("link", { name: /^Scene 1 / });
+      expect(
+        await title.evaluate(
+          (element) => element.scrollWidth <= element.clientWidth,
+        ),
+      ).toBe(true);
+      const lastTag = dialog.getByRole("link", { name: /^Tag 59 / });
+      await lastTag.scrollIntoViewIfNeeded();
+      await expect(lastTag).toBeVisible();
+      expect(
+        await body.evaluate((element) => {
+          const bounds = element.getBoundingClientRect();
+          return Array.from(
+            element.querySelectorAll('[data-slot="badge"]'),
+          ).every((badge) => {
+            const rect = badge.getBoundingClientRect();
+            return (
+              rect.left >= bounds.left - 1 && rect.right <= bounds.right + 1
+            );
+          });
+        }),
+      ).toBe(true);
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      ).toBe(true);
+      await page.screenshot({
+        path: testInfo.outputPath(`tv-info-${device}.png`),
+      });
+      await dialog.getByRole("button", { name: "Close", exact: true }).click();
+      await expect(dialog).toHaveCount(0);
+      await expect(page.locator("video")).toHaveJSProperty("paused", true);
+    });
+  });
+}
 
 for (const [query, title] of [
   ["empty", "No matching items"],
@@ -281,6 +527,44 @@ test.describe("desktop TV", () => {
     isMobile: false,
     hasTouch: false,
     viewport: { width: 1280, height: 800 },
+  });
+  test("supported fullscreen targets TV and navigation returns to the app", async ({
+    page,
+  }) => {
+    await open(page);
+    const supported = await page.evaluate(
+      () =>
+        document.fullscreenEnabled &&
+        typeof document.documentElement.requestFullscreen === "function",
+    );
+    await page.getByRole("button", { name: "Playback", exact: true }).click();
+    const action = page.getByRole("menuitem", {
+      name: "Fullscreen",
+      exact: true,
+    });
+    if (!supported) {
+      await expect(action).toHaveCount(0);
+      return;
+    }
+    await action.click();
+    await expect(page.locator("[data-tv]")).toHaveAttribute(
+      "data-tv-presentation",
+      "fullscreen",
+    );
+    expect(
+      await page.evaluate(() =>
+        document.fullscreenElement?.hasAttribute("data-tv"),
+      ),
+    ).toBe(true);
+    await page.getByRole("button", { name: "Navigation", exact: true }).click();
+    await expect(
+      page.getByRole("dialog", { name: "Navigation" }),
+    ).toBeVisible();
+    expect(await page.evaluate(() => document.fullscreenElement)).toBeNull();
+    await page.getByRole("link", { name: "Scenes", exact: true }).click();
+    await expect(
+      page.getByRole("heading", { name: "Scenes", exact: true }),
+    ).toBeVisible();
   });
   test("wheel momentum advances once and keyboard returns to the previous video", async ({
     page,

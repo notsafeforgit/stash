@@ -1,11 +1,6 @@
 import { FormattedMessage } from "react-intl";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
+import { TvDialogContent } from "./tv-dialog";
 
 export default function TvHelp({ close }: { close: () => void }) {
   return (
@@ -15,18 +10,18 @@ export default function TvHelp({ close }: { close: () => void }) {
         if (!open) close();
       }}
     >
-      <DialogContent className="max-h-[calc(100%-2rem)] overflow-y-auto sm:max-w-xl">
-        <DialogHeader>
-          <DialogTitle>
-            <FormattedMessage id="tv.text.tv_guide" defaultMessage="TV guide" />
-          </DialogTitle>
-          <DialogDescription>
-            <FormattedMessage
-              id="tv.text.scenes_and_markers_in_a_continuous_vertical_feed"
-              defaultMessage="Scenes and markers in a continuous vertical feed."
-            />
-          </DialogDescription>
-        </DialogHeader>
+      <TvDialogContent
+        className="sm:max-w-xl"
+        title={
+          <FormattedMessage id="tv.text.tv_guide" defaultMessage="TV guide" />
+        }
+        description={
+          <FormattedMessage
+            id="tv.text.scenes_and_markers_in_a_continuous_vertical_feed"
+            defaultMessage="Scenes and markers in a continuous vertical feed."
+          />
+        }
+      >
         <div className="flex flex-col gap-4" data-selectable-text>
           <p>
             <FormattedMessage
@@ -36,8 +31,8 @@ export default function TvHelp({ close }: { close: () => void }) {
           </p>
           <p>
             <FormattedMessage
-              id="tv.text.tap_the_seek_buttons_to_jump_between_markers_or_move"
-              defaultMessage="Tap the seek buttons to jump between markers, or move ten seconds when there is no next marker. Hold forward for faster playback and hold reverse to scrub backwards. Release to restore playback."
+              id="tv.text.tap_and_hold_playback"
+              defaultMessage="Tap the video to play or pause. Hold it for 2× speed, then release to restore playback. Drag the scrubber to seek. Mute and navigation stay available at the bottom."
             />
           </p>
           <table className="w-full text-left">
@@ -127,8 +122,8 @@ export default function TvHelp({ close }: { close: () => void }) {
                 </td>
                 <td>
                   <FormattedMessage
-                    id="tv.text.immersive_or_fullscreen_rotate_the_presentation"
-                    defaultMessage="Immersive or fullscreen / rotate the presentation"
+                    id="tv.text.fullscreen_or_rotate_the_presentation"
+                    defaultMessage="Fullscreen when supported / rotate the presentation"
                   />
                 </td>
               </tr>
@@ -155,8 +150,8 @@ export default function TvHelp({ close }: { close: () => void }) {
                 </td>
                 <td>
                   <FormattedMessage
-                    id="tv.text.close_a_menu_or_exit_immersive_mode"
-                    defaultMessage="Close a menu or exit immersive mode"
+                    id="tv.text.close_a_menu_or_exit_fullscreen"
+                    defaultMessage="Close a menu or exit fullscreen"
                   />
                 </td>
               </tr>
@@ -176,8 +171,8 @@ export default function TvHelp({ close }: { close: () => void }) {
           </p>
           <p>
             <FormattedMessage
-              id="tv.text.immersive_mode_fills_the_browser_viewport_where_supported_fullscreen_includes"
-              defaultMessage="Immersive mode fills the browser viewport. Where supported, fullscreen includes the entire TV interface. Safari may keep its browser bars visible; the video stays inline so navigation, menus and the rail remain available."
+              id="tv.text.fullscreen_when_supported"
+              defaultMessage="Fullscreen is available only when the browser supports the entire TV interface in fullscreen. The video stays inline so navigation, menus and the rail remain available."
             />
           </p>
           <p>
@@ -193,7 +188,7 @@ export default function TvHelp({ close }: { close: () => void }) {
             />
           </p>
         </div>
-      </DialogContent>
+      </TvDialogContent>
     </Dialog>
   );
 }

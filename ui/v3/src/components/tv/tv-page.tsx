@@ -126,7 +126,7 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
     mode: presentationMode,
     toggle: togglePresentation,
     exit: exitPresentation,
-    immersive: enterImmersive,
+    canFullscreen,
   } = useTvPresentation();
   const { rotation, setRotation: storeRotation } = useTvSettings();
   const setRotation = (next: typeof rotation) => {
@@ -146,7 +146,7 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
   const openDrawer = useMobileNavigation();
   const openNavigation = () => {
     if (presentationMode === "fullscreen")
-      void enterImmersive().then(openDrawer);
+      void exitPresentation().then(openDrawer);
     else openDrawer();
   };
   const [leaving, setLeaving] = useState(false);
@@ -224,7 +224,7 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
           latest.current.identity,
           latest.current.controller.getSnapshot(),
         );
-        exitPresentation();
+        void exitPresentation();
       }),
     [router, client, selection.cancel, exitPresentation],
   );
@@ -374,6 +374,8 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
                           rotation={rotation}
                           setRotation={setRotation}
                           togglePresentation={togglePresentation}
+                          canFullscreen={canFullscreen}
+                          fullscreen={presentationMode === "fullscreen"}
                           exitPresentation={exitPresentation}
                           openNavigation={openNavigation}
                           navigateItem={selection.move}
@@ -411,7 +413,7 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
             </div>
             {(!active || pending) && (
               <div className="pointer-events-auto absolute inset-0 flex items-center justify-center bg-background/60 p-4">
-                <div className="tv-topbar absolute left-0 top-0 p-3">
+                <div className="tv-footer absolute bottom-0 left-0 p-3">
                   <TvNavigationButton onClick={openNavigation} />
                 </div>
                 <Empty>

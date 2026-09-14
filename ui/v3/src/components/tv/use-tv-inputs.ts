@@ -1,7 +1,14 @@
-import { useCallback, useEffect, useRef, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  type MouseEvent,
+  type RefObject,
+} from "react";
 import { useCommittedRef } from "@/hooks/use-committed-ref";
 import { useOverlayShortcutsBlocked } from "@/components/shortcut-provider";
 import { useScenePlayerControls } from "@/components/player/scene-player-controls";
+import { DOUBLE_TAP_MAX_MS } from "@/components/player/video-frame-zoom";
 import type { TvRotation } from "@/core/tv/settings";
 import { tvCoordinates } from "./use-tv-presentation";
 
@@ -51,7 +58,6 @@ export function useTvInputs({
   });
   const hold = useRef<{
     direction: -1 | 1;
-    originalRate: number;
     wasPaused: boolean;
     speed: number;
     key: string;
@@ -61,18 +67,22 @@ export function useTvInputs({
   const reverseTimer = useRef<ReturnType<typeof setInterval> | undefined>(
     undefined,
   );
-  const suppressClick = useRef(false);
+  const tapTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const completedTap = useRef<{ touch: boolean; key: string } | null>(null);
+  const cancelTap = useCallback(() => {
+    clearTimeout(tapTimer.current);
+    completedTap.current = null;
+  }, []);
   const endHold = useCallback(() => {
     clearTimeout(timer.current);
     clearInterval(reverseTimer.current);
     const current = hold.current;
     hold.current = null;
     if (current?.started) {
-      suppressClick.current = true;
       // WebKit can finish a rate change using the prior playing state.
       // Restore pause first so releasing a hold cannot resume playback.
       if (current.wasPaused) controls.pause();
-      controls.setRate(current.originalRate);
+      controls.setTemporaryRate(null);
       if (
         !current.wasPaused &&
         current.direction === -1 &&
@@ -82,13 +92,11 @@ export function useTvInputs({
     }
   }, [controls]);
   const startHold = useCallback(
-    (direction: -1 | 1) => {
+    (direction: -1 | 1, delay = 350) => {
       if (hold.current || latest.current.blocked || overlaysBlocked()) return;
-      suppressClick.current = false;
       const state = controls.read();
       hold.current = {
         direction,
-        originalRate: state.rate,
         wasPaused: state.paused,
         speed: 2,
         key: latest.current.selectionKey,
@@ -99,7 +107,7 @@ export function useTvInputs({
         if (!current) return;
         current.started = true;
         if (direction === 1) {
-          controls.setRate(current.speed);
+          controls.setTemporaryRate(current.speed);
           controls.play();
         } else {
           controls.pause();
@@ -112,32 +120,65 @@ export function useTvInputs({
             controls.seek(controls.read().position - active.speed * 0.2);
           }, 200);
         }
-      }, 350);
+      }, delay);
     },
     [controls, endHold, overlaysBlocked],
   );
-  const seekClick = useCallback((direction: -1 | 1) => {
-    if (suppressClick.current) {
-      suppressClick.current = false;
-      return;
-    }
-    latest.current.dispatch({ type: "seek", direction });
-  }, []);
+  const tap = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => {
+      const candidate = completedTap.current;
+      cancelTap();
+      if (latest.current.blocked || overlaysBlocked()) return;
+      // Keyboard and assistive activation have no pointer sequence.
+      if (event.detail === 0) {
+        controls.togglePaused();
+        return;
+      }
+      if (!candidate) return;
+      const toggle = () => {
+        if (
+          !latest.current.blocked &&
+          !overlaysBlocked() &&
+          candidate.key === latest.current.selectionKey
+        )
+          controls.togglePaused();
+      };
+      // Let the shared zoom recognizer claim a second touch before playing.
+      if (candidate.touch)
+        tapTimer.current = setTimeout(toggle, DOUBLE_TAP_MAX_MS);
+      else toggle();
+    },
+    [cancelTap, controls, overlaysBlocked],
+  );
   useEffect(() => {
-    if (hold.current?.direction === -1 && hold.current.key !== selectionKey)
+    cancelTap();
+    if (
+      hold.current &&
+      hold.current.key !== selectionKey &&
+      (hold.current.direction === -1 || !hold.current.started)
+    )
       endHold();
-  }, [selectionKey, endHold]);
+  }, [selectionKey, endHold, cancelTap]);
   useEffect(() => {
     const element = surface.current;
     if (!element) return;
-    const ignored = (target: EventTarget | null) =>
-      target instanceof Element &&
-      !!target.closest(
+    const ignored = (target: EventTarget | null) => {
+      if (!(target instanceof Element)) return false;
+      const control = target.closest(
         "button,a,input,textarea,select,[role=slider],[role=dialog],[role=menu],[contenteditable=true],[data-tv-interactive]",
       );
+      return !!control && !control.hasAttribute("data-video-gesture-surface");
+    };
     const blockedNow = () => latest.current.blocked || overlaysBlocked();
     let pointer:
-      | { id: number; x: number; y: number; moved: boolean }
+      | {
+          id: number;
+          x: number;
+          y: number;
+          moved: boolean;
+          touch: boolean;
+          key: string;
+        }
       | undefined;
     const pointers = new Set<number>();
     let wheelLast = 0;
@@ -146,6 +187,7 @@ export function useTvInputs({
     const cancel = () => {
       pointer = undefined;
       pointers.clear();
+      cancelTap();
       endHold();
       latest.current.cancelDrag();
     };
@@ -153,38 +195,45 @@ export function useTvInputs({
       pointers.add(event.pointerId);
       if (pointers.size > 1) {
         pointer = undefined;
+        cancelTap();
+        endHold();
         latest.current.cancelDrag();
         return;
       }
-      if (
-        blockedNow() ||
-        ignored(event.target) ||
-        controls.read().zoomed ||
-        event.button !== 0
-      )
-        return;
+      if (blockedNow() || ignored(event.target) || event.button !== 0) return;
+      completedTap.current = null;
       pointer = {
         id: event.pointerId,
         x: event.clientX,
         y: event.clientY,
         moved: false,
+        touch: event.pointerType === "touch",
+        key: latest.current.selectionKey,
       };
+      startHold(1, 500);
     };
     const move = (event: PointerEvent) => {
       if (
         !pointer ||
         event.pointerId !== pointer.id ||
         blockedNow() ||
-        controls.read().zoomed ||
         event.defaultPrevented
       )
         return;
+      if (hold.current?.started) {
+        event.preventDefault();
+        return;
+      }
       const delta = tvCoordinates(
         event.clientX - pointer.x,
         event.clientY - pointer.y,
         latest.current.rotation,
       );
-      if (!pointer.moved && Math.abs(delta.y) < 10) return;
+      if (!pointer.moved && Math.max(Math.abs(delta.x), Math.abs(delta.y)) < 10)
+        return;
+      cancelTap();
+      endHold();
+      if (controls.read().zoomed) return;
       if (!pointer.moved && Math.abs(delta.x) > Math.abs(delta.y)) {
         pointer = undefined;
         return;
@@ -204,6 +253,8 @@ export function useTvInputs({
       if (!pointer || pointer.id !== event.pointerId) return;
       const current = pointer;
       pointer = undefined;
+      const held = hold.current?.started;
+      endHold();
       if (element.hasPointerCapture(event.pointerId))
         element.releasePointerCapture(event.pointerId);
       const delta = tvCoordinates(
@@ -211,6 +262,7 @@ export function useTvInputs({
         event.clientY - current.y,
         latest.current.rotation,
       );
+      if (held || blockedNow() || event.defaultPrevented) return;
       if (current.moved) {
         event.preventDefault();
         if (Math.abs(delta.y) > 55)
@@ -219,6 +271,8 @@ export function useTvInputs({
             direction: delta.y < 0 ? 1 : -1,
           });
         else latest.current.cancelDrag();
+      } else {
+        completedTap.current = { touch: current.touch, key: current.key };
       }
     };
     const wheel = (event: WheelEvent) => {
@@ -275,7 +329,8 @@ export function useTvInputs({
           0.25,
           Math.min(16, hold.current.speed * (key === "arrowup" ? 2 : 0.5)),
         );
-        if (hold.current.direction === 1) controls.setRate(hold.current.speed);
+        if (hold.current.direction === 1)
+          controls.setTemporaryRate(hold.current.speed);
         event.preventDefault();
         return;
       }
@@ -323,25 +378,40 @@ export function useTvInputs({
     };
     element.addEventListener("pointerdown", down);
     element.addEventListener("pointermove", move);
-    element.addEventListener("pointerup", up);
-    element.addEventListener("pointercancel", cancel);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", cancel);
     element.addEventListener("wheel", wheel, { passive: false });
     window.addEventListener("keydown", keyDown);
     window.addEventListener("keyup", keyUp);
     window.addEventListener("blur", cancel);
     document.addEventListener("visibilitychange", cancel);
+    const unsubscribeZoom = controls.subscribeToZoomGesture(cancel);
+    const contextMenu = (event: Event) => {
+      if (!ignored(event.target)) event.preventDefault();
+    };
+    element.addEventListener("contextmenu", contextMenu);
     return () => {
       element.removeEventListener("pointerdown", down);
       element.removeEventListener("pointermove", move);
-      element.removeEventListener("pointerup", up);
-      element.removeEventListener("pointercancel", cancel);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", cancel);
+      element.removeEventListener("contextmenu", contextMenu);
       element.removeEventListener("wheel", wheel);
       window.removeEventListener("keydown", keyDown);
       window.removeEventListener("keyup", keyUp);
       window.removeEventListener("blur", cancel);
       document.removeEventListener("visibilitychange", cancel);
+      unsubscribeZoom();
       cancel();
     };
-  }, [surface, controls, overlaysBlocked, startHold, endHold]);
-  return { startHold, endHold, seekClick };
+  }, [
+    surface,
+    controls,
+    overlaysBlocked,
+    startHold,
+    endHold,
+    cancelTap,
+    blocked,
+  ]);
+  return { tap };
 }

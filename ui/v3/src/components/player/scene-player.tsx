@@ -384,6 +384,16 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   // 2× kicking in while the user was actually starting to pan).
   const cancelPendingTapToggleRef = useRef<(() => void) | null>(null);
   const cancelPendingHoldRef = useRef<(() => void) | null>(null);
+  const [zoomGestureListeners] = useState(() => new Set<() => void>());
+  const subscribeToZoomGesture = useCallback(
+    (cancel: () => void) => {
+      zoomGestureListeners.add(cancel);
+      return () => {
+        zoomGestureListeners.delete(cancel);
+      };
+    },
+    [zoomGestureListeners],
+  );
   const temporarySpeedActiveRef = useRef(false);
   const [temporaryPlaybackRate, setTemporaryPlaybackRate] = useState<
     number | null
@@ -391,7 +401,8 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   const handleZoomActiveGesture = useCallback(() => {
     cancelPendingTapToggleRef.current?.();
     cancelPendingHoldRef.current?.();
-  }, []);
+    for (const cancel of zoomGestureListeners) cancel();
+  }, [zoomGestureListeners]);
   const handleTemporaryPlaybackRateChange = useCallback(
     (rate: number | null) => {
       temporarySpeedActiveRef.current = rate != null;
@@ -1076,6 +1087,8 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
               togglePaused={handleTogglePaused}
               selectSource={handleSourceChange}
               resetZoom={() => setZoomTransform(IDENTITY_TRANSFORM)}
+              temporaryRateChanged={handleTemporaryPlaybackRateChange}
+              subscribeToZoomGesture={subscribeToZoomGesture}
               retry={() =>
                 retrySource(
                   offsetStart + (storeRef.current?.state.currentTime ?? 0),

@@ -2,6 +2,14 @@ import type { AnyRouter, RouterEvents } from "@tanstack/react-router";
 
 type RouteTransition = "route-forward" | "route-back" | "route-replace";
 
+const controllers = new WeakMap<object, { hold: () => () => void }>();
+
+/** Keep route motion behind a navigation overlay until its exit has finished.
+ * Routing and data loading continue immediately. Each hold releases once. */
+export function holdRouteMotion(router: object): () => void {
+  return controllers.get(router)?.hold() ?? (() => {});
+}
+
 declare module "@tanstack/react-router" {
   interface HistoryState {
     /** Semantic direction for actions such as Smart Back, which push a URL. */
@@ -36,10 +44,8 @@ function transitionForNavigation({
   return "route-forward";
 }
 
-/** Animate committed content without taking snapshots or delaying the router.
- * Native view-transition capture can stall WebKit on image-heavy lists. The
- * Web Animations API keeps this small effect interruptible, preserves React
- * state, and leaves shell controls and portaled dialogs outside the animation. */
+/** Reveal committed content through a small, empty paint layer. The page itself
+ * remains untransformed and fully opaque; no native snapshots are captured. */
 export function installRouteTransitions(
   router: Pick<AnyRouter, "subscribe" | "update">,
 ) {
@@ -47,43 +53,94 @@ export function installRouteTransitions(
   if (typeof window === "undefined") return () => {};
   const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
   let animation: Animation | undefined;
+  let surface: HTMLElement | undefined;
+  let pending: RouteTransition | undefined;
+  let frame: number | undefined;
+  const holds = new Set<symbol>();
+  const hide = () => {
+    if (surface) {
+      surface.hidden = true;
+      surface.style.removeProperty("opacity");
+    }
+    surface = undefined;
+  };
   const cancel = () => {
+    if (frame !== undefined) cancelAnimationFrame(frame);
+    frame = undefined;
+    pending = undefined;
     animation?.cancel();
     animation = undefined;
+    hide();
   };
+  const start = () => {
+    frame = undefined;
+    if (holds.size || !pending || !surface) return;
+    if (preference.matches || document.hidden || !surface.isConnected) {
+      cancel();
+      return;
+    }
+    const running = surface.animate([{ opacity: 1 }, { opacity: 0 }], {
+      id: pending,
+      duration: 200,
+      easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+    });
+    pending = undefined;
+    animation = running;
+    const finish = () => {
+      if (animation !== running) return;
+      // Release the effect and paint surface when it finishes, including when
+      // the user stays on this page for a long time after navigating.
+      running.cancel();
+      animation = undefined;
+      hide();
+    };
+    void running.finished.then(finish, finish);
+  };
+  const schedule = () => {
+    if (holds.size || !pending || frame !== undefined) return;
+    // Give the new DOM one paint before starting the clock. Heavy first layout
+    // must not consume most of the short animation before Safari shows it.
+    frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(start);
+    });
+  };
+  controllers.set(router, {
+    hold: () => {
+      const token = Symbol();
+      holds.add(token);
+      cancel();
+      return () => {
+        if (holds.delete(token)) schedule();
+      };
+    },
+  });
   const before = router.subscribe("onBeforeLoad", cancel);
   const resolved = router.subscribe("onResolved", (event) => {
-    cancel();
     const direction = transitionForNavigation(event);
-    if (
-      !direction ||
-      preference.matches ||
-      event.toLocation.state.routeMotion === false
-    )
+    // Router state updates can resolve the same location again immediately
+    // after a commit. They must not cancel that commit's pending reveal.
+    if (!direction) return;
+    cancel();
+    if (preference.matches || event.toLocation.state.routeMotion === false)
       return;
-    const viewport = document.querySelector<HTMLElement>(
-      "[data-route-viewport]",
-    );
-    if (!viewport?.animate) return;
-    const x =
-      direction === "route-back" ? -8 : direction === "route-forward" ? 8 : 0;
-    animation = viewport.animate(
-      [
-        { opacity: 0, transform: `translateX(${x}px)` },
-        { opacity: 1, transform: "translateX(0)" },
-      ],
-      {
-        id: direction,
-        duration: 180,
-        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
-      },
-    );
+    surface =
+      document.querySelector<HTMLElement>(
+        "[data-route-viewport] > [data-route-transition]",
+      ) ?? undefined;
+    if (!surface?.animate || document.hidden) return;
+    surface.hidden = false;
+    surface.style.opacity = "1";
+    pending = direction;
+    schedule();
   });
   preference.addEventListener("change", cancel);
+  document.addEventListener("visibilitychange", cancel);
   return () => {
     before();
     resolved();
     preference.removeEventListener("change", cancel);
+    document.removeEventListener("visibilitychange", cancel);
+    controllers.delete(router);
     cancel();
   };
 }

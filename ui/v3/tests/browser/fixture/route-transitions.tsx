@@ -10,6 +10,7 @@ import { useState } from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { installRouteTransitions } from "@/core/route-transitions";
+import { RouteViewport } from "@/components/layout/route-viewport";
 import { getScrollRestorationKey } from "@/core/scroll-restoration";
 
 function TransitionShell() {
@@ -18,12 +19,9 @@ function TransitionShell() {
       <header className="flex h-14 shrink-0 items-center border-b px-6">
         Library
       </header>
-      <main
-        data-route-viewport
-        className="flex min-h-0 flex-1 flex-col overflow-hidden"
-      >
+      <RouteViewport>
         <Outlet />
-      </main>
+      </RouteViewport>
     </div>
   );
 }

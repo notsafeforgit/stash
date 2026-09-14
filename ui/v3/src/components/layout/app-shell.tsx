@@ -1,6 +1,8 @@
 import { Outlet, useRouterState } from "@tanstack/react-router";
 import { Header } from "./header";
 import { BottomTabBar } from "./bottom-tab-bar";
+import { MobileNavigationProvider } from "./mobile-navigation";
+import { RouteViewport } from "./route-viewport";
 import { useNavHotkeys } from "src/hooks/use-nav-hotkeys";
 import { useTrackBrowsePage } from "src/hooks/use-smart-back";
 import { DownloadProgressBar } from "src/components/offline/download-progress-bar";
@@ -23,20 +25,19 @@ export function AppShell() {
     pathname.startsWith("/settings/");
 
   return (
-    <div
-      data-app-viewport
-      className="flex h-dvh flex-col overflow-hidden bg-background text-foreground"
-    >
-      <Header />
-      <DownloadProgressBar />
-      <DownloadNotifications />
-      <main
-        data-route-viewport
-        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+    <MobileNavigationProvider>
+      <div
+        data-app-viewport
+        className="flex h-dvh flex-col overflow-hidden bg-background text-foreground"
       >
-        <Outlet />
-      </main>
-      {!ownsMobileNavigation && <BottomTabBar />}
-    </div>
+        <Header />
+        <DownloadProgressBar />
+        <DownloadNotifications />
+        <RouteViewport>
+          <Outlet />
+        </RouteViewport>
+        {!ownsMobileNavigation && <BottomTabBar />}
+      </div>
+    </MobileNavigationProvider>
   );
 }

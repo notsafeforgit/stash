@@ -9,6 +9,9 @@ import { Button } from "@/components/ui/button";
 
 const viewport = vi.hoisted(() => ({ mobile: false }));
 vi.mock("@/utils/screen", () => ({ useMediaQuery: () => viewport.mobile }));
+vi.mock("@/components/layout/mobile-navigation", () => ({
+  useMobileNavigation: () => () => {},
+}));
 
 describe("MediaDetailLayout focus viewer", () => {
   it("promotes the existing primary content and isolates background controls", () => {

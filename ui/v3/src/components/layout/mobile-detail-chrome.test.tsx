@@ -13,8 +13,8 @@ import {
 } from "./mobile-detail-chrome";
 
 const viewport = vi.hoisted(() => ({ mobile: true }));
-vi.mock("@/components/layout/mobile-nav-sheet", () => ({
-  MobileNavSheet: () => null,
+vi.mock("@/components/layout/mobile-navigation", () => ({
+  useMobileNavigation: () => () => {},
 }));
 vi.mock("@/utils/screen", () => ({
   useMediaQuery: () => viewport.mobile,

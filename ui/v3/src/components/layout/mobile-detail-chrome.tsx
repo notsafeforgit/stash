@@ -18,14 +18,14 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
-import { MobileNavSheet } from "@/components/layout/mobile-nav-sheet";
+import { useMobileNavigation } from "@/components/layout/mobile-navigation";
 import { MobileToolbarRow } from "./mobile-toolbar";
 import { useMobileKeyboardLayout } from "@/hooks/use-mobile-keyboard-layout";
 import { useMediaQuery } from "@/utils/screen";
 
 type ChromeSlot = "list" | "tabs" | "actions" | "list-actions" | "pagination";
 type ChromeTargets = Record<ChromeSlot, HTMLDivElement | null>;
-type ChromePanel = "sections" | "actions" | "navigation" | null;
+type ChromePanel = "sections" | "actions" | null;
 type ChromeInteraction = "search" | "selection" | null;
 
 interface MobileDetailChromeContextValue {
@@ -137,6 +137,7 @@ export function MobileDetailChromeSlot({
 /** Render beside the page scroller: flex layout reserves the exact height. */
 export function MobileDetailFooter({ onBack }: { onBack?: () => void }) {
   const chrome = useMobileDetailChrome();
+  const openNavigation = useMobileNavigation();
   const intl = useIntl();
   const keyboardRef = useMobileKeyboardLayout<HTMLDivElement>();
   if (!chrome?.mobile) return null;
@@ -147,17 +148,16 @@ export function MobileDetailFooter({ onBack }: { onBack?: () => void }) {
       data-mobile-detail-footer
       className="mobile-safe-footer mobile-keyboard-layout @container relative shrink-0 border-t border-border bg-background"
     >
-      <MobileNavSheet
-        open={chrome.panel === "navigation"}
-        onOpenChange={(open) => chrome.setPanel(open ? "navigation" : null)}
-      />
       <MobileToolbarRow>
         <Button
           hidden={chrome.interaction !== null}
           variant="ghost"
           size="icon-lg"
           className="size-11 shrink-0"
-          onClick={() => chrome.setPanel("navigation")}
+          onClick={() => {
+            chrome.setPanel(null);
+            openNavigation();
+          }}
           aria-label={intl.formatMessage({
             id: "navigation",
             defaultMessage: "Navigation",

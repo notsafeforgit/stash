@@ -14,6 +14,8 @@ import type { FrontPageContent } from "@/core/config";
 import * as GQL from "@/core/generated-graphql";
 import { playerConfiguration } from "./player-configuration";
 import { installRouteTransitions } from "@/core/route-transitions";
+import { MobileNavigationProvider } from "@/components/layout/mobile-navigation";
+import { RouteViewport } from "@/components/layout/route-viewport";
 
 declare global {
   interface Window {
@@ -112,15 +114,17 @@ const root = createRootRoute({
           ui: { frontPageContent: rows },
         }}
       >
-        <div data-app-viewport className="flex h-dvh flex-col overflow-hidden">
-          <main
-            data-route-viewport
-            className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        <MobileNavigationProvider>
+          <div
+            data-app-viewport
+            className="flex h-dvh flex-col overflow-hidden"
           >
-            <Outlet />
-          </main>
-          <BottomTabBar />
-        </div>
+            <RouteViewport>
+              <Outlet />
+            </RouteViewport>
+            <BottomTabBar />
+          </div>
+        </MobileNavigationProvider>
       </ConfigurationProvider>
     </MockedProvider>
   ),

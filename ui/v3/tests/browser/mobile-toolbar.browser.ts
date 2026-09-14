@@ -15,7 +15,7 @@ test("mobile drawers open directly and dismiss by tapping outside", async ({
   await page.goto("/");
   const footer = detailFooter(page);
   for (const [control, title] of [
-    ["Navigation", "Fixture navigation"],
+    ["Navigation", "Navigation"],
     ["Filters", "Filters"],
     ["View options", "View options"],
     ["Entity actions", "Entity actions"],
@@ -480,7 +480,7 @@ test("standalone lists provide page jumping, view options, and navigation", asyn
   await page.keyboard.press("Escape");
   await row.getByRole("button", { name: "Navigation", exact: true }).tap();
   await expect(
-    page.getByRole("dialog", { name: "Fixture navigation" }),
+    page.getByRole("dialog", { name: "Navigation", exact: true }),
   ).toBeVisible();
   await page.touchscreen.tap(8, 8);
   await expectCompactRow(row);

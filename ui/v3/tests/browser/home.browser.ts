@@ -1,5 +1,123 @@
 import { test, expect } from "./test";
 
+interface NavigationMotion {
+  drawersAtStart: number;
+  frames: number;
+  finished: boolean;
+}
+
+declare global {
+  interface Window {
+    navigationMotion: NavigationMotion[];
+  }
+}
+
+for (const theme of ["light", "dark"] as const) {
+  test(`navigation reveals the page after the drawer closes in ${theme} mode`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({
+      colorScheme: theme,
+      reducedMotion: "no-preference",
+    });
+    await page.addInitScript(() => {
+      window.navigationMotion = [];
+      const animate = Element.prototype.animate;
+      Element.prototype.animate = function (...args) {
+        const animation = animate.apply(this, args);
+        if (!this.hasAttribute("data-route-transition")) return animation;
+        const observation: NavigationMotion = {
+          drawersAtStart: document.querySelectorAll("[data-mobile-navigation]")
+            .length,
+          frames: 0,
+          finished: false,
+        };
+        window.navigationMotion.push(observation);
+        const sample = () => {
+          observation.frames++;
+          if (!observation.finished) requestAnimationFrame(sample);
+        };
+        requestAnimationFrame(sample);
+        void animation.finished.then(
+          () => {
+            observation.finished = true;
+          },
+          () => {
+            observation.finished = true;
+          },
+        );
+        return animation;
+      };
+    });
+    await page.goto("/home-fixture/images");
+    await page.evaluate(
+      (theme) =>
+        document.documentElement.classList.toggle("dark", theme === "dark"),
+      theme,
+    );
+    const menu = page.getByRole("button", {
+      name: "Open navigation menu",
+      includeHidden: true,
+    });
+    await menu.tap();
+    const navigation = page.locator("[data-mobile-navigation]");
+    const backdrop = page.locator('[data-slot="drawer-overlay"]');
+    await expect(backdrop).toHaveCSS("backdrop-filter", "none");
+    await expect(backdrop).toHaveCSS("will-change", "auto");
+    await navigation.getByRole("link", { name: "Scenes", exact: true }).tap();
+    await expect(page).toHaveURL(/\/home-fixture\/scenes$/);
+    await expect
+      .poll(() => page.evaluate(() => window.navigationMotion[0]?.finished))
+      .toBe(true);
+    expect(await page.evaluate(() => window.navigationMotion[0])).toMatchObject(
+      { drawersAtStart: 0 },
+    );
+    expect(
+      await page.evaluate(() => window.navigationMotion[0]?.frames),
+    ).toBeGreaterThan(1);
+    const viewport = page.locator("[data-route-viewport]");
+    await expect(viewport).toHaveCSS("transform", "none");
+    await expect(viewport).toHaveCSS("opacity", "1");
+    expect(
+      await page
+        .locator("[data-route-transition]")
+        .evaluate((element) => element.hasAttribute("hidden")),
+    ).toBe(true);
+
+    // Reopen during the previous exit, bypassing actionability's animation wait.
+    // The latest navigation owns the reveal and there is only one drawer.
+    for (let index = 0; index < 20; index++) {
+      const target = index % 2 === 0 ? "Images" : "Groups";
+      await menu.dispatchEvent("click");
+      await expect(navigation).toHaveCount(1);
+      await navigation
+        .getByRole("link", { name: target, exact: true })
+        .dispatchEvent("click");
+      await expect(page).toHaveURL(
+        new RegExp(`/home-fixture/${target.toLowerCase()}$`),
+      );
+      expect(
+        await page.locator('[data-slot="drawer-overlay"]').count(),
+      ).toBeLessThanOrEqual(1);
+    }
+    await expect(navigation).toHaveCount(0);
+    await expect
+      .poll(() =>
+        page
+          .locator("[data-route-transition]")
+          .evaluate((element) => element.hasAttribute("hidden")),
+      )
+      .toBe(true);
+    expect(
+      await page.evaluate(() =>
+        window.navigationMotion.every(
+          (motion) => motion.drawersAtStart === 0 && motion.finished,
+        ),
+      ),
+    ).toBe(true);
+  });
+}
+
 test("the drawer preloads Home and offscreen rows wait until approached", async ({
   page,
 }) => {

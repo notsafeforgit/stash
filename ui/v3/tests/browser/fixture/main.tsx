@@ -44,6 +44,7 @@ import { SceneDetailFixture } from "./scene-detail";
 import { EntityCardsFixture } from "./entity-cards";
 import { RouteTransitionsFixture } from "./route-transitions";
 import { HomeFixture } from "./home";
+import { MobileNavigationProvider } from "@/components/layout/mobile-navigation";
 
 const params = new URLSearchParams(location.search);
 const items = Array.from({ length: 40 }, (_, index) => ({
@@ -270,9 +271,11 @@ function FixtureSettingsPage() {
 
 const rootRoute = createRootRoute({
   component: () => (
-    <div data-route-viewport className="flex h-dvh flex-col overflow-hidden">
-      <Outlet />
-    </div>
+    <MobileNavigationProvider>
+      <div data-route-viewport className="flex h-dvh flex-col overflow-hidden">
+        <Outlet />
+      </div>
+    </MobileNavigationProvider>
   ),
 });
 const settingsRoute = createRoute({

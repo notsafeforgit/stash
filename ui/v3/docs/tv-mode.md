@@ -1,7 +1,8 @@
 # TV mode
 
 TV is a native v3 navigation item at `/tv`. Configure it in **Settings → TV**
-at `/settings/tv`, then select **Save TV settings**. The implementation follows
+at `/settings/tv`. Switches and selections save immediately; text and numbers
+save on blur or Enter, like the other settings pages. The implementation follows
 the [accepted plan](tv-mode-plan.md), including its recent performance constraints.
 It needs no Stash TV plugin or separate application.
 
@@ -84,7 +85,8 @@ one-level folders, moving actions into/out of folders, custom labels, curated
 icons, quick tags, and quick markers. Visibility remains at the top level.
 Presets require real tag IDs. Only the versioned `tv` configuration
 key is saved; local rotation is scoped to the backend URL in browser storage.
-Failed saves retain the draft for retry, and invalid/future settings remain
+The shared save indicator reports progress. Failed saves retain the draft and
+offer Retry; incomplete presets remain editable until valid. Invalid/future settings remain
 recoverable until an explicit reset. The main settings search includes TV rows.
 
 Settings version 4 removes the formerly required, unchanged default settings

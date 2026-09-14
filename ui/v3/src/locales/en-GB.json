@@ -2521,8 +2521,8 @@
       "rotation": "Rotation on this browser",
       "rotation_description": "Saved only for this browser and server. The video remains inline, with the TV controls available.",
       "rail": "Action rail",
-      "save": "Save TV settings",
-      "reset": "Reset TV settings"
+      "save_failed": "TV settings could not be saved",
+      "save_failed_description": "Your changes are kept here. Retry to save them."
     },
     "action": {
       "settings": "TV settings",
@@ -2673,8 +2673,6 @@
       "clockwise": "Clockwise",
       "counterclockwise": "Counterclockwise",
       "check_tv_settings": "Check TV settings",
-      "reset_tv_settings": "Reset TV settings?",
-      "restore_the_default_feed_playback_and_action_rail_settings": "Restore the default feed, playback and action rail settings.",
       "tv_settings_need_recovery": "TV settings need recovery",
       "the_original_settings_are_preserved_including_unknown_action_types_or": "The original settings are preserved, including unknown action types or future versions.",
       "reset_tv_settings_2": "Reset TV settings",

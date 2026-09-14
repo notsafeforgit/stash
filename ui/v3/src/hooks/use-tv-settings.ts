@@ -12,8 +12,13 @@ import {
   type TvSettings,
 } from "@/core/tv/settings";
 
-type PendingSettings = {
+type SaveSnapshot = {
   draft: TvSettings | undefined;
+  failed: boolean;
+};
+const savedSnapshot: SaveSnapshot = { draft: undefined, failed: false };
+type PendingSettings = {
+  snapshot: SaveSnapshot;
   chain: Promise<void>;
   revision: number;
   listeners: Set<() => void>;
@@ -30,7 +35,7 @@ function stateFor(client: ApolloClient): PendingSettings {
   let state = pending.get(client);
   if (!state) {
     state = {
-      draft: undefined,
+      snapshot: savedSnapshot,
       chain: Promise.resolve(),
       revision: 0,
       listeners: new Set(),
@@ -38,6 +43,11 @@ function stateFor(client: ApolloClient): PendingSettings {
     pending.set(client, state);
   }
   return state;
+}
+
+function publish(state: PendingSettings, snapshot: SaveSnapshot) {
+  state.snapshot = snapshot;
+  for (const notify of state.listeners) notify();
 }
 
 /** One serialized TV-key writer per backend client. Drafts survive a route
@@ -56,8 +66,11 @@ export function useTvSettings() {
     },
     [client],
   );
-  const getSnapshot = useCallback(() => pending.get(client)?.draft, [client]);
-  const draft = useSyncExternalStore(subscribe, getSnapshot);
+  const getSnapshot = useCallback(
+    () => pending.get(client)?.snapshot ?? savedSnapshot,
+    [client],
+  );
+  const { draft, failed } = useSyncExternalStore(subscribe, getSnapshot);
   const result = useMemo(
     () => decodeTvSettings(draft ?? configuration.ui.tv),
     [draft, configuration.ui.tv],
@@ -66,21 +79,21 @@ export function useTvSettings() {
     (next: TvSettings) => {
       const parsed = tvSettingsSchema.parse(next);
       const state = stateFor(client);
-      state.draft = parsed;
       const revision = ++state.revision;
-      for (const notify of state.listeners) notify();
+      publish(state, { draft: parsed, failed: false });
       const operation = state.chain
         .then(async () => {
           if (state.revision !== revision) return false;
           await configure({ variables: { key: "tv", value: parsed } });
           if (state.revision === revision) {
-            state.draft = undefined;
-            for (const notify of state.listeners) notify();
+            publish(state, savedSnapshot);
           }
           return true;
         })
         .catch(() => {
           /* Tracked save reports failure; retain the recoverable draft. */
+          if (state.revision === revision)
+            publish(state, { draft: parsed, failed: true });
           return false;
         });
       state.chain = operation.then(() => {});
@@ -93,6 +106,8 @@ export function useTvSettings() {
   return {
     result,
     save,
+    failed,
+    retry: () => (draft ? save(draft) : Promise.resolve(false)),
     reset: () => save(defaultTvSettings),
     rotation,
     setRotation,

@@ -843,6 +843,9 @@ physical iPhone/iPad Safari devices.
 ### Main app settings ownership
 
 Settings → TV is the configuration home, accessible without opening a TV feed.
+Save changes automatically using the shared settings conventions and save indicator:
+switches/selections immediately, text/numbers on blur or Enter. Keep serialized
+TV-key writes and recover failed saves with Retry; do not add a Save/Reset toolbar.
 Group playback (including Default quality), feed behavior/limits,
 presentation, and action-layout editing using existing settings sections and
 TanStack Form/Zod patterns. Device-only rotation is edited here too, clearly
@@ -1046,7 +1049,7 @@ mirror JSX or simply assert that an action registry contains its own keys.
 | Player and observer cost | Delayed media causes no eager GPU readback; early capture still works and obsolete warm-up/exports cancel; no adjacent-item media requests; activity/time/drag observations do not continuously rerender the page/queue/rail or write Apollo on every tick |
 | Mutation/config tests | Correct scene versus marker target, double-click prevention, failure recovery, normalized metadata updates, unknown-field preservation, backend-prefix isolation and no TV writes to global player quality |
 | Chromium and WebKit | Real TV surface plus production player; inline element identity across direct/HLS/marker/quality/presentation transitions; first media request honors TV quality; wheel/touch navigation, holds, zoom arbitration, delayed pages and video errors |
-| Browser interaction | Main settings navigation/search/save/reset; returning preserves feed/position and applies default quality; rotated sliders/popovers/dialogs, small safe-area viewport, focus/escape, hidden-UI recovery, reduced motion, action editor and nav overflow |
+| Browser interaction | Main settings navigation/search/automatic saves/retry; unreadable-settings recovery; returning preserves feed/position and applies default quality; rotated sliders/popovers/dialogs, small safe-area viewport, focus/escape, hidden-UI recovery, reduced motion, action editor and nav overflow |
 | Manual devices | Physical iPhone/iPad Safari inline autoplay/audio/MMS, toolbar/keyboard resizing and rotation; swipe/rail/metadata/navigation remain usable after presentation and quality changes; Android Chrome touch; desktop keyboard/mouse/trackpad, including hold cancellation on blur |
 | Regression | Scene detail, scene/marker lightbox, image lightbox and offline player still satisfy their existing contracts, including native fullscreen and source eligibility for consumers that support it |
 

@@ -25,6 +25,17 @@ async function openSettings(page: Page) {
     .click();
   await expect(page).toHaveURL(/\/tv-fixture\/settings\/tv/);
 }
+async function expectSavedSettings(page: Page, value: Record<string, unknown>) {
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.tvFixtureRequests
+          .filter((request) => request.name === "ConfigureUISetting")
+          .at(-1),
+      ),
+    )
+    .toMatchObject({ variables: { key: "tv", value } });
+}
 async function next(page: Page, id: number) {
   // Return keyboard ownership from a previously used playback control.
   await page.evaluate(() => {
@@ -307,29 +318,7 @@ for (const viewport of [
       expect(editorRequests).toEqual([]);
       await openSettings(page);
 
-      const saveAndReturn = async () => {
-        const before = await page.evaluate(
-          () =>
-            window.tvFixtureRequests.filter(
-              (request) => request.name === "ConfigureUISetting",
-            ).length,
-        );
-        const save = page.getByRole("button", {
-          name: "Save TV settings",
-          exact: true,
-        });
-        await save.click();
-        await expect
-          .poll(() =>
-            page.evaluate(
-              () =>
-                window.tvFixtureRequests.filter(
-                  (request) => request.name === "ConfigureUISetting",
-                ).length,
-            ),
-          )
-          .toBe(before + 1);
-        await expect(save).toBeEnabled();
+      const returnToTv = async () => {
         await page
           .getByRole("link", { name: "Return to TV", exact: true })
           .click();
@@ -354,7 +343,7 @@ for (const viewport of [
       await page
         .getByRole("switch", { name: "Pin TV settings", exact: true })
         .check();
-      await saveAndReturn();
+      await returnToTv();
       await expect(
         page
           .locator("[data-tv-dock]")
@@ -369,7 +358,7 @@ for (const viewport of [
         .getByRole("combobox", { name: "Move into folder", exact: true })
         .click();
       await page.getByRole("option", { name: "Playback", exact: true }).click();
-      await saveAndReturn();
+      await returnToTv();
       await expect(shortcut).toHaveCount(0);
       await page.getByRole("button", { name: "Playback", exact: true }).click();
       const folderShortcut = page.getByRole("menuitem", {
@@ -392,7 +381,7 @@ for (const viewport of [
       await settingsRow
         .getByRole("button", { name: "Remove", exact: true })
         .click();
-      await saveAndReturn();
+      await returnToTv();
       await expect(shortcut).toHaveCount(0);
       await page.getByRole("button", { name: "Playback", exact: true }).click();
       await expect(
@@ -416,9 +405,6 @@ for (const mode of ["scenes", "markers"] as const) {
       });
       await expect(preference).toBeChecked({ checked: !startMuted });
       await preference.setChecked(startMuted);
-      await page
-        .getByRole("button", { name: "Save TV settings", exact: true })
-        .click();
       await expect
         .poll(() =>
           page.evaluate(() =>
@@ -1022,33 +1008,15 @@ test("TV has one localized sort choice and retains Random between feed modes", a
     page.getByRole("option", { name: "Scene Updated At", exact: true }),
   ).toBeVisible();
   await page.getByRole("option", { name: "Random", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Save TV settings", exact: true })
-    .click();
-  await expect
-    .poll(() =>
-      page.evaluate(() =>
-        window.tvFixtureRequests.filter(
-          (request) => request.name === "ConfigureUISetting",
-        ),
-      ),
-    )
-    .toEqual([
-      expect.objectContaining({
-        variables: expect.objectContaining({
-          key: "tv",
-          value: expect.objectContaining({
-            version: 4,
-            sort: "random",
-            mode: "markers",
-          }),
-        }),
-      }),
-    ]);
+  await expectSavedSettings(page, {
+    version: 4,
+    sort: "random",
+    mode: "markers",
+  });
   const saved = await page.evaluate(() =>
-    window.tvFixtureRequests.find(
-      (request) => request.name === "ConfigureUISetting",
-    ),
+    window.tvFixtureRequests
+      .filter((request) => request.name === "ConfigureUISetting")
+      .at(-1),
   );
   expect(saved?.variables).not.toHaveProperty("value.shuffle");
 });
@@ -1112,15 +1080,12 @@ test("TV settings show the rail editor directly and save reordered actions witho
   await expect(icon).toContainText("Default");
   await icon.click();
   await page.getByRole("option", { name: "Heart", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Save TV settings", exact: true })
-    .click();
   await expect
     .poll(() =>
       page.evaluate(() =>
-        window.tvFixtureRequests.find(
-          (request) => request.name === "ConfigureUISetting",
-        ),
+        window.tvFixtureRequests
+          .filter((request) => request.name === "ConfigureUISetting")
+          .at(-1),
       ),
     )
     .toMatchObject({
@@ -1141,9 +1106,9 @@ test("TV settings show the rail editor directly and save reordered actions witho
       },
     });
   const saved = await page.evaluate(() =>
-    window.tvFixtureRequests.find(
-      (request) => request.name === "ConfigureUISetting",
-    ),
+    window.tvFixtureRequests
+      .filter((request) => request.name === "ConfigureUISetting")
+      .at(-1),
   );
   expect(saved?.variables).not.toHaveProperty("value.rules");
 });
@@ -1157,9 +1122,6 @@ test("TV settings save the shared quality under only the TV key", async ({
     .getByRole("combobox", { name: "Default quality for scenes and markers" })
     .click();
   await page.getByRole("option", { name: "480p", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Save TV settings", exact: true })
-    .click();
   await expect
     .poll(() =>
       page.evaluate(() =>
@@ -1196,9 +1158,6 @@ test("failed TV settings saves retain the draft for retry", async ({
     .getByRole("combobox", { name: "Default quality for scenes and markers" })
     .click();
   await page.getByRole("option", { name: "480p", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Save TV settings", exact: true })
-    .click();
   await expect
     .poll(() =>
       page.evaluate(
@@ -1209,6 +1168,9 @@ test("failed TV settings saves retain the draft for retry", async ({
       ),
     )
     .toBe(1);
+  await expect(
+    page.getByText("TV settings could not be saved", { exact: true }),
+  ).toBeVisible();
   await page.getByRole("link", { name: "Return to TV" }).click();
   await openSettings(page);
   await expect(
@@ -1216,9 +1178,7 @@ test("failed TV settings saves retain the draft for retry", async ({
       name: "Default quality for scenes and markers",
     }),
   ).toContainText("480p");
-  await page
-    .getByRole("button", { name: "Save TV settings", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Retry", exact: true }).click();
   await expect
     .poll(() =>
       page.evaluate(
@@ -1229,4 +1189,91 @@ test("failed TV settings saves retain the draft for retry", async ({
       ),
     )
     .toBe(2);
+  await expect(
+    page.getByText("TV settings could not be saved", { exact: true }),
+  ).toHaveCount(0);
 });
+
+test("TV settings commit numbers and rail text without a Save or Reset toolbar", async ({
+  page,
+}) => {
+  await page.goto("/tv-fixture/settings/tv?paused");
+  await expect(
+    page.getByRole("button", {
+      name: /^(Save TV settings|Reset TV settings)$/,
+    }),
+  ).toHaveCount(0);
+  const pageSize = page.getByRole("spinbutton", {
+    name: "Items per page",
+    exact: true,
+  });
+  await pageSize.fill("12");
+  expect(await page.evaluate(() => window.tvFixtureSaveAttempts)).toEqual([]);
+  await pageSize.press("Enter");
+  await expectSavedSettings(page, { pageSize: 12 });
+  await expect(pageSize).toBeFocused();
+  await expect(page.getByLabel("Saved", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: /^Playback \(\d+\)$/ }).click();
+  const name = page.getByRole("textbox", { name: "Folder name", exact: true });
+  const before = await page.evaluate(() => window.tvFixtureSaveAttempts.length);
+  await name.fill("");
+  await name.press("Tab");
+  await expect(
+    page.getByText("Check TV settings", { exact: true }),
+  ).toBeVisible();
+  expect(await page.evaluate(() => window.tvFixtureSaveAttempts.length)).toBe(
+    before,
+  );
+  await name.fill("Viewing");
+  expect(await page.evaluate(() => window.tvFixtureSaveAttempts.length)).toBe(
+    before,
+  );
+  await name.press("Tab");
+  await expectSavedSettings(page, {
+    pageSize: 12,
+    rail: expect.arrayContaining([
+      expect.objectContaining({ id: "playback", label: "Viewing" }),
+    ]),
+  });
+  await expect(
+    page.getByText("Check TV settings", { exact: true }),
+  ).toHaveCount(0);
+});
+
+for (const failure of [false, true]) {
+  test(`TV preserves newer automatic edits across navigation when an older save ${failure ? "fails" : "finishes"}`, async ({
+    page,
+  }) => {
+    await page.goto(
+      `/tv-fixture/settings/tv?paused&slow-save${failure ? "&save-error" : ""}`,
+    );
+    await page
+      .getByRole("switch", { name: "Start muted", exact: true })
+      .uncheck();
+    await expect
+      .poll(() => page.evaluate(() => window.tvFixtureSaveAttempts.length))
+      .toBe(1);
+    await page
+      .getByRole("switch", {
+        name: "Place the action rail on the left",
+        exact: true,
+      })
+      .check();
+    await page.getByRole("link", { name: "Return to TV", exact: true }).click();
+    await expectSavedSettings(page, { startMuted: false, leftHanded: true });
+    await openSettings(page);
+    await expect(
+      page.getByRole("switch", { name: "Start muted", exact: true }),
+    ).not.toBeChecked();
+    await expect(
+      page.getByRole("switch", {
+        name: "Place the action rail on the left",
+        exact: true,
+      }),
+    ).toBeChecked();
+    await expect(
+      page.getByText("TV settings could not be saved", { exact: true }),
+    ).toHaveCount(0);
+  });
+}

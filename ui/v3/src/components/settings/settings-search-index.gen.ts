@@ -1321,17 +1321,6 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
       defaultMessage: "Feed",
     },
     label: {
-      id: "tv.settings.shuffle",
-      defaultMessage: "Shuffle",
-    },
-  },
-  {
-    to: "/settings/tv",
-    section: {
-      id: "tv.settings.feed",
-      defaultMessage: "Feed",
-    },
-    label: {
       id: "tv.settings.sort",
       defaultMessage: "Sort order",
     },

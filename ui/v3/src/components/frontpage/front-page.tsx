@@ -26,6 +26,7 @@ import { CardAspectContext } from "src/components/list/card-aspect-context";
 import { DeferredMount } from "@/components/shared/deferred-mount";
 import { Spinner } from "@/components/ui/spinner";
 import { FrontPageRowContext, useFrontPageState } from "./front-page-state";
+import { formatFilterModeLabel } from "@/models/list-filter/labels";
 
 const FrontPageConfig = lazy(() =>
   import("./front-page-config").then((module) => ({
@@ -101,11 +102,14 @@ export function FrontPage() {
                   ? intl.formatMessage(
                       {
                         id: content.message.id,
-                        defaultMessage: content.message.id,
+                        defaultMessage: formatFilterModeLabel(
+                          intl,
+                          content.mode,
+                        ),
                       },
                       content.message.values,
                     )
-                  : `${content.mode}`));
+                  : formatFilterModeLabel(intl, content.mode)));
           return (
             <FrontPageRowContext.Provider
               key={`${visit.key}:${i}`}

@@ -90,7 +90,9 @@ const configuration: GQL.ConfigDataFragment = {
   __typename: "ConfigResult",
   ui: {
     ...playerConfiguration.ui,
-    tv: settings,
+    tv: params.has("legacy-shuffle")
+      ? { ...settings, version: 1, shuffle: true, sort: "created_at" }
+      : settings,
     trackActivity: params.has("activity"),
     minimumPlayPercent: 0,
   },

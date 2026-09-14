@@ -30,6 +30,8 @@ Before full Go tests or `make validate-fork`, install both UIs' dependencies and
 
 Use strict TypeScript, functional components, two-space indentation, double quotes, and trailing commas; Biome is authoritative. Prefer `@/` imports, kebab-case files, PascalCase components, and `use`-prefixed hooks. Use TanStack Form with Zod, Apollo typed documents, Lucide icons, `cn()` for conditional Tailwind classes, and repository UI wrappers instead of bare interactive HTML elements. Wrap user-visible strings with `react-intl`; edit only `en-GB` locale source.
 
+Display localized labels for built-in options everywhere, including dropdowns, selected values, badges, and fallback text. Keep enum values, sort keys, and other stored identifiers in data; do not show them as labels or derive labels by changing their casing. Reuse the canonical option message IDs and shared formatters. User-provided names and titles remain user content.
+
 Co-locate Vitest files as `*.test.ts(x)` and cover regressions and user behavior. For Go integration changes, run focused root tests such as `go test ./ui` plus affected packages. Do not hand-edit generated GraphQL types, `src/routeTree.gen.ts`, or `settings-search-index.gen.ts`.
 
 Preserve the [interaction policy](docs/architecture.md#interaction-and-accessibility): general page pinch and double-tap zoom remain disabled, while custom media zoom remains available. Interface text is non-selectable except inputs, editable regions, technical output, and values explicitly marked with `data-selectable-text` or `selectableText`. Keep labels and surrounding controls outside those exceptions.

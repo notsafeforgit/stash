@@ -80,12 +80,12 @@ describe("TV query construction", () => {
     });
   });
 
-  it("uses a stable shuffle seed across pages and a new identity on reshuffle", async () => {
+  it("uses a stable Random sort seed across pages and a new identity on reshuffle", async () => {
     const client = clientWithFilter();
     const query = await resolveTvQuery(
       client,
       playerConfiguration,
-      { ...defaultTvSettings, shuffle: true },
+      { ...defaultTvSettings, sort: "random" },
       "scenes",
       { kind: "all" },
       42,

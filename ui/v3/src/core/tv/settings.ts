@@ -28,12 +28,11 @@ export const tvWindowSchema = z.discriminatedUnion("kind", [
     ),
 ]);
 export const tvSettingsSchema = z.object({
-  version: z.literal(1),
+  version: z.literal(2),
   mode: tvModeSchema,
   sceneFilter: tvFilterSchema,
   markerFilter: tvFilterSchema,
   orientation: z.enum(["all", "match", "portrait", "landscape"]),
-  shuffle: z.boolean(),
   sort: z.string().max(60).nullable(),
   direction: z.enum(["ASC", "DESC"]),
   /** Extra saved filters are AND-ed using the existing nested AST, including
@@ -62,13 +61,27 @@ export const tvSettingsSchema = z.object({
 });
 export type TvSettings = z.infer<typeof tvSettingsSchema>;
 
+// Version 1 exposed two controls for random ordering. Preserve the effective
+// choice when reading it; forms and new saves use only the canonical sort.
+const persistedTvSettingsSchema = z.union([
+  tvSettingsSchema,
+  tvSettingsSchema
+    .extend({ version: z.literal(1), shuffle: z.boolean() })
+    .transform(
+      ({ shuffle, ...settings }): TvSettings => ({
+        ...settings,
+        version: 2,
+        sort: shuffle ? "random" : settings.sort,
+      }),
+    ),
+]);
+
 export const defaultTvSettings: TvSettings = {
-  version: 1,
+  version: 2,
   mode: "scenes",
   sceneFilter: { kind: "default" },
   markerFilter: { kind: "default" },
   orientation: "all",
-  shuffle: false,
   sort: null,
   direction: "ASC",
   rules: [],
@@ -92,7 +105,7 @@ export type TvSettingsResult =
 export function decodeTvSettings(raw: unknown): TvSettingsResult {
   if (raw === undefined || raw === null)
     return { kind: "ready", settings: defaultTvSettings };
-  const result = tvSettingsSchema.safeParse(raw);
+  const result = persistedTvSettingsSchema.safeParse(raw);
   return result.success
     ? { kind: "ready", settings: result.data }
     : {

@@ -11,6 +11,39 @@ import { ConfigurationProvider } from "@/hooks/config";
 import { Button } from "@/components/ui/button";
 import * as GQL from "@/core/generated-graphql";
 import { playerConfiguration } from "./player-configuration";
+declare global {
+  interface Window {
+    lightboxActivity: {
+      saves: GQL.SceneSaveActivityMutationVariables[];
+      plays: number;
+    };
+  }
+}
+window.lightboxActivity = { saves: [], plays: 0 };
+const activityMock: MockedResponse<
+  GQL.SceneSaveActivityMutation,
+  GQL.SceneSaveActivityMutationVariables
+> = {
+  request: { query: GQL.SceneSaveActivityDocument, variables: () => true },
+  maxUsageCount: Infinity,
+  delay: 0,
+  result: (variables) => {
+    window.lightboxActivity.saves.push(variables);
+    return { data: { sceneSaveActivity: true } };
+  },
+};
+const playMock: MockedResponse<
+  GQL.SceneAddPlayMutation,
+  GQL.SceneAddPlayMutationVariables
+> = {
+  request: { query: GQL.SceneAddPlayDocument, variables: () => true },
+  maxUsageCount: Infinity,
+  delay: 0,
+  result: () => {
+    window.lightboxActivity.plays++;
+    return { data: { sceneAddPlay: { count: 1, history: [] } } };
+  },
+};
 
 const entry: OfflineEntry = {
   scene_id: "1",
@@ -37,61 +70,63 @@ const entry: OfflineEntry = {
   server_status: "present",
 };
 const url = (path: string) => new URL(path, location.href).href;
-const scenes = ["1", "2", "3", "slow"].map((id): GQL.SceneDataFragment => {
-  const scene = offlineEntryToSceneData(
-    { ...entry, scene_id: id, title: `Scene ${id}` },
-    url(`/scene/${id}/stream`),
-  );
-  return {
-    ...scene,
-    preview_image: null,
-    files: scene.files.map((file) => ({
-      ...file,
-      frame_rate: 30,
-      video_stream_duration: 12,
-      frame_count: 360,
-      bit_depth: 8,
-      color_range: null,
-      color_space: null,
-      color_transfer: null,
-      color_primaries: null,
-    })),
-    sceneStreams: [
-      ...(id === "2"
-        ? []
-        : [
-            {
-              url: url(`/scene/${id}/stream`),
-              mime_type: "video/mp4",
-              label: "Direct stream",
-            },
-          ]),
-      {
-        url: url(`/scene/${id}/stream.master.m3u8?resolution=LOW`),
-        mime_type: "application/vnd.apple.mpegurl",
-        label: "HLS (240p)",
-      },
-    ],
-    scene_markers: [6, 8, 2].map((seconds, index) => ({
-      __typename: "SceneMarker",
+export const scenes = ["1", "2", "3", "slow"].map(
+  (id): GQL.SceneDataFragment => {
+    const scene = offlineEntryToSceneData(
+      { ...entry, scene_id: id, title: `Scene ${id}` },
+      url(`/scene/${id}/stream`),
+    );
+    return {
+      ...scene,
       preview_image: null,
-      id: `marker-${index}`,
-      title: `Marker ${index + 1}`,
-      seconds,
-      end_seconds: index === 2 ? 10 : seconds + 2,
-      scene,
-      primary_tag: { id: "tag", name: "Example" },
-      tags: [],
-      screenshot: "",
-      stream: "",
-      preview: "",
-      created_at: "",
-      updated_at: "",
-    })),
-    captions: [{ language_code: "en", caption_type: "srt" }],
-    paths: { ...scene.paths, caption: url(`/scene/${id}/caption`) },
-  };
-});
+      files: scene.files.map((file) => ({
+        ...file,
+        frame_rate: 30,
+        video_stream_duration: 12,
+        frame_count: 360,
+        bit_depth: 8,
+        color_range: null,
+        color_space: null,
+        color_transfer: null,
+        color_primaries: null,
+      })),
+      sceneStreams: [
+        ...(id === "2"
+          ? []
+          : [
+              {
+                url: url(`/scene/${id}/stream`),
+                mime_type: "video/mp4",
+                label: "Direct stream",
+              },
+            ]),
+        {
+          url: url(`/scene/${id}/stream.master.m3u8?resolution=LOW`),
+          mime_type: "application/vnd.apple.mpegurl",
+          label: "HLS (240p)",
+        },
+      ],
+      scene_markers: [6, 8, 2].map((seconds, index) => ({
+        __typename: "SceneMarker",
+        preview_image: null,
+        id: `marker-${index}`,
+        title: `Marker ${index + 1}`,
+        seconds,
+        end_seconds: index === 2 ? 10 : seconds + 2,
+        scene,
+        primary_tag: { id: "tag", name: "Example" },
+        tags: [],
+        screenshot: "",
+        stream: "",
+        preview: "",
+        created_at: "",
+        updated_at: "",
+      })),
+      captions: [{ language_code: "en", caption_type: "srt" }],
+      paths: { ...scene.paths, caption: url(`/scene/${id}/caption`) },
+    };
+  },
+);
 const mocks: MockedResponse<GQL.FindSceneQuery>[] = scenes.map((scene) => ({
   request: { query: GQL.FindSceneDocument, variables: { id: scene.id } },
   result: { data: { findScene: scene } },
@@ -112,15 +147,17 @@ export function SceneLightboxFixture() {
   const params = new URLSearchParams(location.search);
   const mode = params.get("mode");
   const autostart = !params.has("paused");
+  const trackActivity = params.has("activity");
   const configuration = useMemo(
     () => ({
       ...playerConfiguration,
+      ui: { ...playerConfiguration.ui, trackActivity, minimumPlayPercent: 0 },
       interface: {
         ...playerConfiguration.interface,
         autostartVideo: autostart,
       },
     }),
-    [autostart],
+    [autostart, trackActivity],
   );
   useEffect(() => {
     if (mode !== "pending" || index !== 1) return;
@@ -164,7 +201,7 @@ export function SceneLightboxFixture() {
     }));
   }, [mode, resolved]);
   return (
-    <MockedProvider mocks={mocks}>
+    <MockedProvider mocks={[...mocks, activityMock, playMock]}>
       <ConfigurationProvider configuration={configuration}>
         <Button
           onClick={() => {

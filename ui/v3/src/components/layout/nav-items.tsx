@@ -10,6 +10,7 @@ import {
   Building,
   Tag,
   Download,
+  Tv,
 } from "lucide-react";
 import { getRegisteredNavItems, type NavPlacement } from "@/plugins";
 
@@ -45,6 +46,7 @@ const BUILTIN_NAV_ITEMS: NavItem[] = [
     to: "/scenes/markers",
     hotkey: "g k",
   },
+  { label: "TV", icon: <Tv className="size-4" />, to: "/tv", hotkey: "g r" },
   {
     label: "Galleries",
     icon: <Images className="size-4" />,

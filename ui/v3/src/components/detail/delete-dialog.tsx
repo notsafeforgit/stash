@@ -1,4 +1,5 @@
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/toast";
 import type React from "react";
 import { useId, useState } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
@@ -135,12 +136,15 @@ export function DeleteDialog({
   const [deleteGenerated, setDeleteGenerated] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const report = useToast().error;
 
   async function handleConfirm() {
     setIsDeleting(true);
     try {
       await onConfirm({ deleteFile, deleteGenerated });
       onOpenChange(false);
+    } catch (error) {
+      report(error);
     } finally {
       setIsDeleting(false);
     }

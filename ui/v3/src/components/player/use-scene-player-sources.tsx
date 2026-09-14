@@ -22,6 +22,7 @@ import {
   type SyntheticEvent,
 } from "react";
 import { useCommittedRef } from "@/hooks/use-committed-ref";
+import { selectFixedQuality, type PlayerQuality } from "@/core/player-quality";
 import type { VideoPlayerStore } from "@videojs/react";
 import { useConfigurationContextOptional } from "src/hooks/config";
 import { isIOS, type PlayerSource } from "./player-utils";
@@ -49,6 +50,8 @@ interface SourceScene {
 }
 
 interface UseScenePlayerSourcesArgs {
+  qualityPreference?: PlayerQuality;
+  nativeFullscreenAllowed?: boolean;
   scene: SourceScene;
   autoplay: boolean;
   playbackKey: string;
@@ -144,6 +147,7 @@ interface UseScenePlayerSourcesResult {
    *  default would replay from there instead of from the requested
    *  target. The src swap is in-place (no player-root remount). */
   handleRestart: (targetTrueTime: number) => void;
+  retrySource: (targetTrueTime: number) => void;
   handleCanPlay: () => Promise<void>;
   /** Wire as `onLoadedMetadata` on the `<video>` element. Pins the
    *  playhead to the pending-resume target before the browser's
@@ -153,6 +157,8 @@ interface UseScenePlayerSourcesResult {
 }
 
 export function useScenePlayerSources({
+  qualityPreference,
+  nativeFullscreenAllowed = true,
   scene,
   autoplay,
   playbackKey,
@@ -197,9 +203,22 @@ export function useScenePlayerSources({
     // (`Element.requestFullscreen` on the player container) which
     // keeps clipRange-aware custom controls visible, so the direct
     // stream + `#t=start,end` path is fine there.
-    if (!isIOS()) return all;
+    if (!nativeFullscreenAllowed || !isIOS()) return all;
     return all.filter((s) => !isDirectStreamSrc(s.src));
-  }, [scene.sceneStreams, canDecode, canDecodeVideo, isClipped]);
+  }, [
+    scene.sceneStreams,
+    canDecode,
+    canDecodeVideo,
+    isClipped,
+    nativeFullscreenAllowed,
+  ]);
+  const preferredSource =
+    qualityPreference?.kind === "fixed"
+      ? selectFixedQuality(sources, qualityPreference, {
+          width: fileWidth,
+          height: fileHeight,
+        })
+      : getPreferredSource(sources, qualityPreference === undefined);
 
   // Honour the `alwaysStartFromBeginning` UI preference for full-scene
   // playback only. When set, the player ignores the scene's persisted
@@ -229,7 +248,7 @@ export function useScenePlayerSources({
     playbackKey,
     suspended,
     resume: computeInitialResume(
-      getPreferredSource(sources)?.src,
+      preferredSource?.src,
       initialTimestamp,
       effectiveResumeTime,
       frameRate,
@@ -301,7 +320,7 @@ export function useScenePlayerSources({
     setReloadNonce(0);
   }
 
-  const activeSource = manualSource ?? getPreferredSource(sources);
+  const activeSource = manualSource ?? preferredSource;
   const activeSrc = activeSource?.src;
   const finalSrc = useMemo(
     () =>
@@ -431,13 +450,13 @@ export function useScenePlayerSources({
       // "Direct stream" entry locks in the user's preference even when
       // nothing else changes.
       if (source.src === activeSrc) {
-        if (persistedLabel) {
+        if (persistedLabel && !qualityPreference) {
           localStorage.setItem(QUALITY_STORAGE_KEY, persistedLabel);
         }
         return;
       }
 
-      if (persistedLabel) {
+      if (persistedLabel && !qualityPreference) {
         localStorage.setItem(QUALITY_STORAGE_KEY, persistedLabel);
       }
 
@@ -449,8 +468,12 @@ export function useScenePlayerSources({
       // display — `offsetStart + currentTime` — then reads sceneDuration
       // + N and ticks upward past the actual duration.
       const endedAtSwitch = s.state.ended;
-      const trueTime = endedAtSwitch ? 0 : offsetStart + s.state.currentTime;
-      const wasPaused = endedAtSwitch ? false : s.state.paused;
+      const trueTime =
+        endedAtSwitch && !qualityPreference
+          ? 0
+          : offsetStart + s.state.currentTime;
+      const wasPaused =
+        endedAtSwitch && !qualityPreference ? false : s.state.paused;
       const playbackRate = s.state.playbackRate;
 
       // Pin the seekbar / time display at the current scene-time
@@ -488,6 +511,7 @@ export function useScenePlayerSources({
       });
     },
     [
+      qualityPreference,
       activeSrc,
       offsetStart,
       beginSourceRemount,
@@ -789,6 +813,7 @@ export function useScenePlayerSources({
     handleSourceChange,
     handleSeek,
     handleRestart,
+    retrySource: forceRemountAt,
     handleCanPlay,
     handleLoadedMetadata,
   };

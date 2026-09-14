@@ -1,5 +1,11 @@
 import type { PreviewImageData } from "@/components/shared/preview-image";
 import { useCommittedRef } from "@/hooks/use-committed-ref";
+import type { PlayerQuality } from "@/core/player-quality";
+import { selectFixedQuality } from "@/core/player-quality";
+import { getPreferredSource } from "./scene-player-sources";
+import type { SceneActivityScope } from "@/core/scene-activity";
+import { SceneActivityEffects } from "./scene-activity-effects";
+import { ScenePlayerControlsProvider } from "./scene-player-controls";
 /**
  * Scene player: one player root, store and native video element per session.
  * SceneVideo passes direct and HLS sources to Video.js's HlsJsAdapter. Source
@@ -80,6 +86,15 @@ const AUTO_ADVANCE_STORAGE_KEY = "stash-player-auto-advance";
 export type ScenePlayerScene = NonNullable<GQL.FindSceneQuery["findScene"]>;
 
 interface ScenePlayerProps {
+  activityScope?: SceneActivityScope;
+  qualityPreference?: PlayerQuality;
+  nativeFullscreenAllowed?: boolean;
+  presentationRotation?: 0 | 90 | -90;
+  initiallyMuted?: boolean;
+  /** External controllers own their keyboard/gesture surface. */
+  controls?: "standard" | "external";
+  completionMode?: "normal" | "loop" | "advance";
+  onCompletionModeChange?: (mode: "normal" | "loop" | "advance") => void;
   scene: ScenePlayerScene;
   /** Resets scene/marker state while preserving the player and media element. */
   playbackKey?: string;
@@ -287,6 +302,14 @@ function MediaBridge({
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export const ScenePlayer: React.FC<ScenePlayerProps> = ({
+  activityScope,
+  qualityPreference,
+  nativeFullscreenAllowed = true,
+  presentationRotation = 0,
+  initiallyMuted = false,
+  controls = "standard",
+  completionMode,
+  onCompletionModeChange,
   scene,
   playbackKey: playbackKeyProp,
   suspended = false,
@@ -324,6 +347,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   const playbackKey = playbackKeyProp ?? scene.id;
   const playbackRateRef = useRef(1);
   const stoppedAtEndRef = useRef(false);
+  const endedHandledRef = useRef(false);
   const userPlaybackIntentRef = useRef(false);
   // Store handle captured by <StoreBridge> below — lets callbacks read
   // paused/currentTime/playbackRate and call play/pause/seek without being
@@ -437,7 +461,12 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   // owns the value so it persists across opening sessions.
   const isLoopControlled = loopEnabledProp !== undefined;
   const [internalLoopEnabled, setInternalLoopEnabled] = useState(looping);
-  const loopEnabled = isLoopControlled ? loopEnabledProp : internalLoopEnabled;
+  const loopEnabled =
+    completionMode !== undefined
+      ? completionMode === "loop"
+      : isLoopControlled
+        ? loopEnabledProp
+        : internalLoopEnabled;
   const setLoopEnabled = useCallback(
     (value: boolean) => {
       if (isLoopControlled) {
@@ -481,7 +510,11 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   // advance turned on). Loop and auto-advance are mutually exclusive —
   // toggling into one always clears the other.
   const canAdvance = !!onNext;
-  const advanceActive = canAdvance && autoAdvanceEnabled;
+  const autoAdvance =
+    completionMode !== undefined
+      ? completionMode === "advance"
+      : autoAdvanceEnabled;
+  const advanceActive = canAdvance && autoAdvance;
   const playbackMode: "normal" | "loop" | "advance" = loopEnabled
     ? "loop"
     : advanceActive
@@ -497,6 +530,10 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     if (current === "normal") next = canAdvance ? "advance" : "loop";
     else if (current === "advance") next = "loop";
     else next = "normal";
+    if (completionMode !== undefined) {
+      onCompletionModeChange?.(next);
+      return;
+    }
     setLoopEnabled(next === "loop");
     // Only mutate the persisted auto-advance flag in contexts that
     // support advance — otherwise cycling through `loop` on the scene-
@@ -505,6 +542,8 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
       setAutoAdvancePersisted(next === "advance");
     }
   }, [
+    completionMode,
+    onCompletionModeChange,
     loopEnabled,
     advanceActive,
     autoAdvanceEnabled,
@@ -519,12 +558,14 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   // `onNext` to swipe to the next slide; firing both would double-fire
   // any analytics tied to the ended event).
   const handleEnded = useCallback(() => {
-    if (autoAdvanceEnabled && onNext) {
+    if (endedHandledRef.current) return;
+    endedHandledRef.current = true;
+    if (autoAdvance && onNext) {
       onNext();
       return;
     }
     onEnded?.();
-  }, [autoAdvanceEnabled, onNext, onEnded]);
+  }, [autoAdvance, onNext, onEnded]);
 
   const captions = useMemo(() => {
     const captionBasePath = scene.paths.caption;
@@ -565,12 +606,15 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   useLayoutEffect(() => {
     stoppedAtEndRef.current = false;
     userPlaybackIntentRef.current = false;
+    endedHandledRef.current = false;
   }, [playbackKey, suspended]);
 
   // Page-level autoplay gate. Stamps `wasPaused` on the initial
   // pending-resume so a deep-link `?t=` doesn't autoplay when the user
   // has the global autostart toggle off.
-  const allowAutoplay = autostartEnabled || (autoAdvanceEnabled && !!onNext);
+  const allowAutoplay =
+    autostartEnabled ||
+    (completionMode === undefined && autoAdvance && !!onNext);
 
   const {
     sources,
@@ -585,9 +629,12 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     handleSourceChange,
     handleSeek,
     handleRestart,
+    retrySource,
     handleCanPlay,
     handleLoadedMetadata,
   } = useScenePlayerSources({
+    qualityPreference,
+    nativeFullscreenAllowed,
     scene,
     autoplay,
     playbackKey,
@@ -717,6 +764,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     // Force a real restart from scene-time 0 — `handleRestart` issues
     // a fresh playlist when the trim is past 0.
     if (!clipRange && s.state.ended) {
+      endedHandledRef.current = false;
       handleRestart(0);
       return;
     }
@@ -740,7 +788,8 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   // `<video autoplay>`-attribute hack needed.
   const initialAutoplayIntent =
     autoplay || initialResume.offset > 0 || (initialResume.seekTo ?? 0) > 0;
-  const autoAdvanceOverride = autoAdvanceEnabled && !!onNext;
+  const autoAdvanceOverride =
+    completionMode === undefined && autoAdvance && !!onNext;
   const effectiveAutoPlay =
     !suspended &&
     (autostartEnabled || autoAdvanceOverride) &&
@@ -819,6 +868,14 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
       src={finalSrc}
       sourceType={activeSource?.type}
       autoPlay={effectiveAutoPlay}
+      muted={initiallyMuted || undefined}
+      onSeeking={(event) => {
+        if (
+          event.currentTarget.currentTime <
+          event.currentTarget.duration - 0.25
+        )
+          endedHandledRef.current = false;
+      }}
       loop={loopEnabled && !clipRange}
       playsInline
       disableRemotePlayback={finalSrc?.startsWith("blob:")}
@@ -882,6 +939,17 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
         <Player.Player>
           <StoreBridge storeRef={storeRef} />
           <MediaBridge mediaRef={mediaRef} />
+          {activityScope?.kind === "online-scene" && (
+            <SceneActivityEffects
+              Player={Player}
+              scope={activityScope}
+              duration={fileDuration ?? 0}
+              offsetStart={offsetStart}
+              source={finalSrc}
+              suspended={suspended}
+              ready={sourceReady}
+            />
+          )}
           <PlatformMediaEffects
             Player={Player}
             metadata={mediaMetadata}
@@ -919,7 +987,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
               offsetStart={offsetStart}
               loopEnabled={loopEnabled}
               onLoop={handleRestart}
-              onAdvance={autoAdvanceEnabled ? onNext : undefined}
+              onAdvance={autoAdvance ? onNext : undefined}
               onStop={handleClipStop}
               onClipResume={handleClipResume}
             />
@@ -927,6 +995,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
           <Container className="absolute inset-0 overflow-hidden">
             <VideoFrameZoom
               enabled={enablePinchZoom}
+              presentationRotation={presentationRotation}
               transform={effectiveZoomTransform}
               onTransformChange={setZoomTransform}
               onActiveGesture={handleZoomActiveGesture}
@@ -957,39 +1026,74 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
               }
             />
 
-            <PlayerControls
+            {controls === "standard" && (
+              <PlayerControls
+                Player={Player}
+                sources={sources}
+                activeSource={activeSource}
+                onSourceChange={handleSourceChange}
+                markers={effectiveMarkers}
+                fileDuration={effectiveFileDuration}
+                frameRate={file?.frame_rate ?? undefined}
+                sourceResolution={sourceResolution}
+                offsetStart={effectiveOffsetStart}
+                onSeek={effectiveOnSeek}
+                disableSeekArrows={disableSeekArrows}
+                hasEverStarted={hasEverStarted}
+                reloading={reloading}
+                seekDisplayTarget={effectiveSeekDisplayTarget}
+                fullscreenContainerRef={fullscreenContainerRef}
+                playbackMode={playbackMode}
+                canAdvance={canAdvance}
+                onCyclePlaybackMode={handleCyclePlaybackMode}
+                onTogglePaused={handleTogglePaused}
+                onUserPlaybackGesture={handleUserPlaybackGesture}
+                onToggleFullscreenOverride={onToggleFullscreenOverride}
+                onClose={onClose}
+                onToggleViewer={onToggleViewer}
+                viewerOpen={viewerOpen}
+                viewerButtonRef={viewerButtonRef}
+                clipBoundsEdit={clipBoundsEdit}
+                cancelPendingTapToggleRef={cancelPendingTapToggleRef}
+                cancelPendingHoldRef={cancelPendingHoldRef}
+                onTemporaryPlaybackRateChange={
+                  handleTemporaryPlaybackRateChange
+                }
+              />
+            )}
+
+            <ScenePlayerControlsProvider
               Player={Player}
+              offsetStart={offsetStart}
+              duration={fileDuration ?? 0}
+              range={clipRange}
+              ready={sourceReady && !suspended}
+              zoomed={effectiveZoomTransform.scale > 1}
+              rootRef={fullscreenContainerRef}
               sources={sources}
               activeSource={activeSource}
-              onSourceChange={handleSourceChange}
-              markers={effectiveMarkers}
-              fileDuration={effectiveFileDuration}
-              frameRate={file?.frame_rate ?? undefined}
-              sourceResolution={sourceResolution}
-              offsetStart={effectiveOffsetStart}
-              onSeek={effectiveOnSeek}
-              disableSeekArrows={disableSeekArrows}
-              hasEverStarted={hasEverStarted}
-              reloading={reloading}
-              seekDisplayTarget={effectiveSeekDisplayTarget}
-              fullscreenContainerRef={fullscreenContainerRef}
-              playbackMode={playbackMode}
-              canAdvance={canAdvance}
-              onCyclePlaybackMode={handleCyclePlaybackMode}
-              onTogglePaused={handleTogglePaused}
-              onUserPlaybackGesture={handleUserPlaybackGesture}
-              onToggleFullscreenOverride={onToggleFullscreenOverride}
-              onClose={onClose}
-              onToggleViewer={onToggleViewer}
-              viewerOpen={viewerOpen}
-              viewerButtonRef={viewerButtonRef}
-              clipBoundsEdit={clipBoundsEdit}
-              cancelPendingTapToggleRef={cancelPendingTapToggleRef}
-              cancelPendingHoldRef={cancelPendingHoldRef}
-              onTemporaryPlaybackRateChange={handleTemporaryPlaybackRateChange}
-            />
-
-            {topOverlay}
+              seek={handleSeek}
+              togglePaused={handleTogglePaused}
+              selectSource={handleSourceChange}
+              resetZoom={() => setZoomTransform(IDENTITY_TRANSFORM)}
+              retry={() =>
+                retrySource(
+                  offsetStart + (storeRef.current?.state.currentTime ?? 0),
+                )
+              }
+              resetQuality={() => {
+                const source =
+                  qualityPreference?.kind === "fixed"
+                    ? selectFixedQuality(sources, qualityPreference, {
+                        width: file?.width,
+                        height: file?.height,
+                      })
+                    : getPreferredSource(sources, !qualityPreference);
+                if (source) handleSourceChange(source);
+              }}
+            >
+              {topOverlay}
+            </ScenePlayerControlsProvider>
             {temporaryPlaybackRate != null && (
               <Badge
                 variant="secondary"

@@ -20,6 +20,7 @@ import { useForm, useStore } from "@tanstack/react-form";
 import { useLazyQuery } from "@apollo/client/react";
 import { useEntityMutation } from "src/core/client";
 import { useIntl } from "react-intl";
+import { useToast } from "@/hooks/toast";
 import { Save, RotateCcw, X } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
 import { Button } from "src/components/ui/button";
@@ -48,11 +49,31 @@ interface MarkerFormValues {
   primary_tag: EntityOption | null;
   tags: EntityOption[];
 }
+function validMarkerForm(
+  value: MarkerFormValues,
+  maxTimestamp?: number,
+): value is MarkerFormValues & { start: number; primary_tag: EntityOption } {
+  return Boolean(
+    value.title.trim() &&
+      value.primary_tag &&
+      value.start != null &&
+      Number.isFinite(value.start) &&
+      value.start >= 0 &&
+      (maxTimestamp == null || value.start < maxTimestamp) &&
+      (value.end == null ||
+        (Number.isFinite(value.end) &&
+          value.end > value.start &&
+          (maxTimestamp == null || value.end <= maxTimestamp))),
+  );
+}
 
-function markerToFormValues(marker: SceneMarker | null): MarkerFormValues {
+function markerToFormValues(
+  marker: SceneMarker | null,
+  initialTimestamp?: number,
+): MarkerFormValues {
   return {
     title: marker?.title ?? "",
-    start: marker?.seconds ?? null,
+    start: marker?.seconds ?? initialTimestamp ?? null,
     end: marker?.end_seconds ?? null,
     primary_tag: marker?.primary_tag
       ? { id: marker.primary_tag.id, name: marker.primary_tag.name }
@@ -62,6 +83,8 @@ function markerToFormValues(marker: SceneMarker | null): MarkerFormValues {
 }
 
 interface MarkerEditFormProps {
+  initialTimestamp?: number;
+  maxTimestamp?: number;
   sceneId: string;
   /** Existing marker for edit mode; null for create. */
   marker: SceneMarker | null;
@@ -90,6 +113,8 @@ interface MarkerEditFormProps {
 }
 
 export function MarkerEditForm({
+  initialTimestamp,
+  maxTimestamp,
   sceneId,
   marker,
   getCurrentTime,
@@ -99,6 +124,7 @@ export function MarkerEditForm({
   onCancel,
 }: MarkerEditFormProps) {
   const intl = useIntl();
+  const report = useToast().error;
   const isEdit = marker != null;
 
   // useEntityMutation refetches affected library queries, which covers the scene's
@@ -126,19 +152,9 @@ export function MarkerEditForm({
 
   // ── Form ──
   const form = useForm({
-    defaultValues: markerToFormValues(marker),
+    defaultValues: markerToFormValues(marker, initialTimestamp),
     onSubmit: async ({ value, formApi }) => {
-      // Validation gate: title, primary tag, and start are required for
-      // both create and update. Form-level validation could also work but
-      // keeping the guard inline avoids a second source of truth.
-      if (
-        !value.title.trim() ||
-        !value.primary_tag ||
-        value.start == null ||
-        value.start < 0
-      ) {
-        return;
-      }
+      if (!validMarkerForm(value, maxTimestamp)) return;
       const variables = {
         title: value.title.trim(),
         seconds: value.start,
@@ -147,13 +163,27 @@ export function MarkerEditForm({
         primary_tag_id: value.primary_tag.id,
         tag_ids: value.tags.map((t) => t.id),
       };
-      if (isEdit && marker) {
-        await updateMarker({ variables: { id: marker.id, ...variables } });
-      } else {
-        await createMarker({ variables });
+      try {
+        const saved =
+          isEdit && marker
+            ? (
+                await updateMarker({
+                  variables: { id: marker.id, ...variables },
+                })
+              ).data?.sceneMarkerUpdate
+            : (await createMarker({ variables })).data?.sceneMarkerCreate;
+        if (!saved)
+          throw new Error(
+            intl.formatMessage({
+              id: "marker_save_failed",
+              defaultMessage: "The marker could not be saved",
+            }),
+          );
+        formApi.reset(value);
+        onSaved?.();
+      } catch (error) {
+        report(error);
       }
-      formApi.reset(value);
-      onSaved?.();
     },
   });
 
@@ -162,8 +192,8 @@ export function MarkerEditForm({
   // ── Bidirectional bound binding ──
   // Form → parent: subscribe to start/end via the form store so changes
   // (typed input, clock-grab button, programmatic setter) propagate up.
-  const start = useStore(form.store, (s) => s.values.start as number | null);
-  const end = useStore(form.store, (s) => s.values.end as number | null);
+  const start = useStore(form.store, (s) => s.values.start);
+  const end = useStore(form.store, (s) => s.values.end);
   useEffect(() => {
     onBoundsChange?.({ start, end });
   }, [start, end, onBoundsChange]);
@@ -335,12 +365,7 @@ export function MarkerEditForm({
           })}
         >
           {({ isSubmitting, isDirty, values }) => {
-            const valid =
-              values.title.trim().length > 0 &&
-              values.primary_tag != null &&
-              values.start != null &&
-              values.start >= 0 &&
-              (values.end == null || values.end > values.start);
+            const valid = validMarkerForm(values, maxTimestamp);
             return (
               <>
                 <div className="flex items-center gap-2">

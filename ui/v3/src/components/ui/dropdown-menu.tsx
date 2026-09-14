@@ -1,6 +1,7 @@
 "use client";
 
 import type * as React from "react";
+import { useOverlayContainer } from "./overlay-container";
 import { Menu as MenuPrimitive } from "@base-ui/react/menu";
 
 import { cn } from "@/lib/utils";
@@ -40,7 +41,13 @@ function DropdownMenu<Payload = unknown>({
 }
 
 function DropdownMenuPortal({ ...props }: MenuPrimitive.Portal.Props) {
-  return <MenuPrimitive.Portal data-slot="dropdown-menu-portal" {...props} />;
+  return (
+    <MenuPrimitive.Portal
+      data-slot="dropdown-menu-portal"
+      container={useOverlayContainer()}
+      {...props}
+    />
+  );
 }
 
 function DropdownMenuTrigger({ ...props }: MenuPrimitive.Trigger.Props) {
@@ -67,7 +74,7 @@ function DropdownMenuContent({
     positionerClassName?: string;
   }) {
   return (
-    <MenuPrimitive.Portal>
+    <MenuPrimitive.Portal container={useOverlayContainer()}>
       <MenuPrimitive.Positioner
         className={cn("isolate z-50 outline-none", positionerClassName)}
         align={align}

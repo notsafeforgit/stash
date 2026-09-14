@@ -1,4 +1,5 @@
 import type * as React from "react";
+import { useOverlayContainer } from "./overlay-container";
 import { Select as SelectPrimitive } from "@base-ui/react/select";
 
 import { cn } from "@/lib/utils";
@@ -98,7 +99,7 @@ function SelectContent({
     "align" | "alignOffset" | "side" | "sideOffset" | "alignItemWithTrigger"
   > & { visibleItems?: number }) {
   return (
-    <SelectPrimitive.Portal>
+    <SelectPrimitive.Portal container={useOverlayContainer()}>
       <SelectPrimitive.Positioner
         side={side}
         sideOffset={sideOffset}

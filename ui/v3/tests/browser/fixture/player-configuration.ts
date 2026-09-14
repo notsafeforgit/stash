@@ -2,7 +2,7 @@ import * as GQL from "@/core/generated-graphql";
 
 // Synthetic configuration; no server or personal settings are used.
 export const playerConfiguration: GQL.ConfigDataFragment = {
-  ui: {},
+  ui: { trackActivity: false },
   plugins: {},
   general: {
     databasePath: "",

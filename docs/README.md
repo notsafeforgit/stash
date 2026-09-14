@@ -16,6 +16,7 @@ v3 route paths may differ, but existing v2.5 clients must keep working.
 | [Plugin host](../ui/v3/docs/plugin-host.md) | Current v3 UI plugin API, startup lifecycle, and failure handling |
 | [Theming](../ui/v3/docs/theming.md) | Runtime CSS, JavaScript, custom assets, and component selectors |
 | [Offline downloads](../ui/v3/docs/offline.md) | Implemented download/storage/playback behavior and remaining limits |
+| [TV mode](../ui/v3/docs/tv-mode.md) | Scene and marker feeds, quality settings, controls, shared activity, and implementation boundaries |
 | [Preview images](preview-images.md) | HDR AVIF, SDR fallbacks, generation requirements, and the v2.5 compatibility boundary |
 | [Locales](../ui/v3/src/locales/README.md) | Translation files and message conventions |
 
@@ -38,6 +39,8 @@ installation and community links; those downloads are mainline releases.
 
 ## Future plans and historical material
 
+- The [TV implementation plan](../ui/v3/docs/tv-mode-plan.md) records the
+  accepted scope and performance constraints behind the implemented feature.
 - The [2026-09-08 v3 quality audit](../ui/v3/docs/quality-audit-2026-09-08.md)
   records the findings, completed foundation improvements, validation, and
   offline deployment isolation with migration and recovery.

@@ -23,6 +23,7 @@ import {
   LightboxDetails,
 } from "./lightbox-overlay";
 import { LightboxScenePlayer } from "./lightbox-scene-player";
+import { markerRange } from "@/core/marker-range";
 import { PlayerCloseButton } from "@/components/player/player-close-button";
 import type { SceneSlide, SceneSlideMarker } from "./scene-lightbox";
 import { offlineEntryToSceneData } from "src/components/offline/offline-scene-adapter";
@@ -79,28 +80,6 @@ function SceneSlidePoster({ slide }: { slide: SceneSlide }) {
       )}
     </div>
   );
-}
-
-function computeMarkerEnd(
-  scene: NonNullable<GQL.FindSceneQuery["findScene"]>,
-  markerId: string,
-  fallbackSeconds: number,
-): number | undefined {
-  const own = scene.scene_markers.find((m) => m.id === markerId);
-  const start = own?.seconds ?? fallbackSeconds;
-  if (own?.end_seconds != null) return own.end_seconds;
-  // Implicit end: next marker on the same scene by start time, or scene
-  // duration. Strict `>` skips coincident markers — they share a boundary
-  // and would otherwise zero-length the range.
-  const next = scene.scene_markers
-    .filter((m) => m.seconds > start)
-    .reduce<number | undefined>(
-      (acc, m) => (acc == null || m.seconds < acc ? m.seconds : acc),
-      undefined,
-    );
-  if (next != null) return next;
-  const fileDuration = scene.files[0]?.duration;
-  return fileDuration ?? undefined;
 }
 
 /**
@@ -172,10 +151,7 @@ function ActiveSceneSlide({
   const marker = slide.marker;
   const clipRange = useMemo(() => {
     if (!scene || !marker) return undefined;
-    const end = computeMarkerEnd(scene, marker.id, marker.seconds);
-    return end != null && end > marker.seconds
-      ? { start: marker.seconds, end }
-      : undefined;
+    return markerRange(scene, marker);
   }, [scene, marker]);
   const markerPosterSrc = marker
     ? (scene?.scene_markers.find((m) => m.id === marker.id)?.screenshot ??
@@ -194,6 +170,17 @@ function ActiveSceneSlide({
     >
       {playerScene && (
         <LightboxScenePlayer
+          activityScope={
+            slide.offlineEntry
+              ? { kind: "offline" }
+              : marker
+                ? { kind: "marker" }
+                : {
+                    kind: "online-scene",
+                    sceneId: slide.sceneId,
+                    visitKey: playbackKey,
+                  }
+          }
           scene={playerScene}
           playbackKey={playbackKey}
           suspended={pending}

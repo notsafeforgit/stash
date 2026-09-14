@@ -1,6 +1,25 @@
 import type { Page } from "@playwright/test";
 import { test, expect } from "./test";
 
+test("online lightbox uses shared activity accounting without a detail route owner", async ({
+  page,
+}) => {
+  await page.goto("/scene-lightbox?activity");
+  await page.getByRole("button", { name: "Open scenes", exact: true }).click();
+  const video = page.locator("video");
+  await expect
+    .poll(() => video.evaluate((video: HTMLVideoElement) => video.currentTime))
+    .toBeGreaterThan(1);
+  await video.evaluate((video: HTMLVideoElement) => video.pause());
+  await expect
+    .poll(() => page.evaluate(() => window.lightboxActivity.plays))
+    .toBe(1);
+  const activity = await page.evaluate(() => window.lightboxActivity);
+  expect(activity.saves.length).toBeGreaterThan(0);
+  expect(activity.saves[0]?.playDuration).toBeGreaterThan(0);
+  expect(activity.saves[0]?.playDuration).toBeLessThan(5);
+});
+
 // Serve synthetic media at the real Stash endpoint shapes. Production source
 // selection, clip URLs, HLS attachment, resume and lease cleanup all run intact.
 test.beforeEach(async ({ page }) => {

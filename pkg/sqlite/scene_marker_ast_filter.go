@@ -34,6 +34,16 @@ func sceneMarkerASTConditionHandler(condition *models.FilterASTCondition) (crite
 	qb := &sceneMarkerFilterHandler{}
 
 	switch condition.Field {
+	case "orientation":
+		input, err := decodeASTValue[models.OrientationCriterionInput](condition.Value)
+		if err != nil {
+			return nil, err
+		}
+		scenes := &sceneFilterHandler{}
+		return orientationCriterionHandler(&input, "video_files.height", "video_files.width", func(f *filterBuilder, joinType joinType) {
+			qb.joinScenes(f)
+			scenes.addVideoFilesTable(f, joinType)
+		}), nil
 	case "tags":
 		input, err := decodeASTValue[models.HierarchicalMultiCriterionInput](condition.Value)
 		if err != nil {

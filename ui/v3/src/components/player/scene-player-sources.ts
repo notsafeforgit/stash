@@ -149,6 +149,7 @@ export const BEST_QUALITY_LABELS = new Set([
 
 export function getPreferredSource(
   sources: PlayerSource[],
+  useSavedPreference = true,
 ): PlayerSource | null {
   if (!sources.length) return null;
 
@@ -167,7 +168,12 @@ export function getPreferredSource(
   const originalHls = findOriginalResolutionTranscode(sources);
   const hls = findSourceByPath(sources, "/stream.master.m3u8");
 
-  const saved = localStorage.getItem(QUALITY_STORAGE_KEY);
+  let saved: string | null = null;
+  try {
+    if (useSavedPreference) saved = localStorage.getItem(QUALITY_STORAGE_KEY);
+  } catch {
+    /* unavailable storage */
+  }
   if (saved) {
     if (BEST_QUALITY_LABELS.has(saved)) {
       // Virtual "best quality" preference: direct → full remux →

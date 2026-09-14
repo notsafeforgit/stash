@@ -302,6 +302,14 @@ same calculation for the preview and mutation input.
 
 `components/player/scene-player.tsx` owns the stable player shell.
 `use-scene-player-sources.tsx` coordinates selected sources and pending resumes.
+
+TV uses this same shell through the semantic commands and scalar subscriptions
+in `scene-player-controls.tsx`. Automatic activity for scene detail, online
+scene lightbox, and TV is owned by `scene-activity-effects.tsx` and the
+per-client coordinator in `core/scene-activity.ts`. Do not add route-owned
+automatic activity mutations. Explicit marker, offline, and disabled scopes
+exclude server accounting. See [TV mode](tv-mode.md) for feed ownership,
+quality policy, inline presentation, and the full feature map.
 The Video.js packages are pinned together at 10.0.0-rc.2. Its split HLS adapter
 pins an older hls.js, so a version-scoped pnpm override preserves the existing
 1.6.16 engine. Reassess that override with the next adapter upgrade.

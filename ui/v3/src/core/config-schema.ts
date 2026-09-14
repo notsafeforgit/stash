@@ -72,6 +72,7 @@ const taggerSchema = z.looseObject({
 });
 
 const shape = {
+  tv: z.unknown().optional(),
   frontPageContent: frontPageContentSchema.optional().catch(undefined),
   showChildTagContent: optionalBoolean,
   showChildStudioContent: optionalBoolean,

@@ -1303,4 +1303,250 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
       defaultMessage: "Image duplicate checker",
     },
   },
+  {
+    to: "/settings/tv",
+    section: {
+      id: "tv.settings.feed",
+      defaultMessage: "Feed",
+    },
+    label: {
+      id: "tv.settings.mode",
+      defaultMessage: "Default feed",
+    },
+  },
+  {
+    to: "/settings/tv",
+    section: {
+      id: "tv.settings.feed",
+      defaultMessage: "Feed",
+    },
+    label: {
+      id: "tv.settings.shuffle",
+      defaultMessage: "Shuffle",
+    },
+  },
+  {
+    to: "/settings/tv",
+    section: {
+      id: "tv.settings.feed",
+      defaultMessage: "Feed",
+    },
+    label: {
+      id: "tv.settings.sort",
+      defaultMessage: "Sort order",
+    },
+  },
+  {
+    to: "/settings/tv",
+    section: {
+      id: "tv.settings.feed",
+      defaultMessage: "Feed",
+    },
+    label: {
+      id: "tv.settings.direction",
+      defaultMessage: "Sort direction",
+    },
+  },
+  {
+    to: "/settings/tv",
+    section: {
+      id: "tv.settings.feed",
+      defaultMessage: "Feed",
+    },
+    label: {
+      id: "tv.settings.orientation",
+      defaultMessage: "Media orientation",
+    },
+  },
+  {
+    to: "/settings/tv",
+    section: {
+      id: "tv.settings.feed",
+      defaultMessage: "Feed",
+    },
+    label: {
+      id: "tv.settings.page_size",
+      defaultMessage: "Items per page",
+    },
+  },
+  {
+    to: "/settings/tv",
+    section: {
+      id: "tv.settings.feed",
+      defaultMessage: "Feed",
+    },
+    label: {
+      id: "tv.settings.prefetch",
+      defaultMessage: "Load the next page with this many items remaining",
+    },
+  },
+  {
+    to: "/settings/tv",
+    section: {
+      id: "tv.settings.feed",
+      defaultMessage: "Feed",
+    },
+    label: {
+      id: "tv.settings.limit_enabled",
+      defaultMessage: "Limit items per session",
+    },
+  },
+  {
+    to: "/settings/tv",
+    section: {
+      id: "tv.settings.feed",
+      defaultMessage: "Feed",
+    },
+    label: {
+      id: "tv.settings.limit",
+      defaultMessage: "Item limit",
+    },
+  },
+  {
+    to: "/settings/tv",
+    section: {
+      id: "tv.settings.playback",
+      defaultMessage: "Playback",
+    },
+    label: {
+      id: "tv.settings.autoplay",
+      defaultMessage: "Autoplay",
+    },
+    description: {
+      id: "tv.settings.autoplay_description",
+      defaultMessage:
+        "Also respects the app’s Auto-start video setting and your browser’s playback permission.",
+    },
+  },
+  {
+    to: "/settings/tv",
+    section: {
+      id: "tv.settings.playback",
+      defaultMessage: "Playback",
+    },
+    label: {
+      id: "tv.settings.quality",
+      defaultMessage: "Default quality for scenes and markers",
+    },
+    description: {
+      id: "tv.settings.quality_description",
+      defaultMessage:
+        "Lower resolutions use the normal scene stream. A fixed quality never silently falls back to a higher resolution or the original file.",
+    },
+  },
+  {
+    to: "/settings/tv",
+    section: {
+      id: "tv.settings.playback",
+      defaultMessage: "Playback",
+    },
+    label: {
+      id: "tv.settings.start",
+      defaultMessage: "Start scenes at",
+    },
+  },
+  {
+    to: "/settings/tv",
+    section: {
+      id: "tv.settings.playback",
+      defaultMessage: "Playback",
+    },
+    label: {
+      id: "tv.settings.window",
+      defaultMessage: "Scene playback length",
+    },
+  },
+  {
+    to: "/settings/tv",
+    section: {
+      id: "tv.settings.playback",
+      defaultMessage: "Playback",
+    },
+    label: {
+      id: "tv.settings.seconds",
+      defaultMessage: "Length in seconds",
+    },
+  },
+  {
+    to: "/settings/tv",
+    section: {
+      id: "tv.settings.playback",
+      defaultMessage: "Playback",
+    },
+    label: {
+      id: "tv.settings.min_seconds",
+      defaultMessage: "Minimum seconds",
+    },
+  },
+  {
+    to: "/settings/tv",
+    section: {
+      id: "tv.settings.playback",
+      defaultMessage: "Playback",
+    },
+    label: {
+      id: "tv.settings.max_seconds",
+      defaultMessage: "Maximum seconds",
+    },
+  },
+  {
+    to: "/settings/tv",
+    section: {
+      id: "tv.settings.playback",
+      defaultMessage: "Playback",
+    },
+    label: {
+      id: "tv.settings.completion",
+      defaultMessage: "At the end of playback",
+    },
+  },
+  {
+    to: "/settings/tv",
+    section: {
+      id: "tv.settings.presentation",
+      defaultMessage: "Presentation",
+    },
+    label: {
+      id: "tv.settings.fit",
+      defaultMessage: "Video fit",
+    },
+  },
+  {
+    to: "/settings/tv",
+    section: {
+      id: "tv.settings.presentation",
+      defaultMessage: "Presentation",
+    },
+    label: {
+      id: "tv.settings.left_handed",
+      defaultMessage: "Place the action rail on the left",
+    },
+  },
+  {
+    to: "/settings/tv",
+    section: {
+      id: "tv.settings.presentation",
+      defaultMessage: "Presentation",
+    },
+    label: {
+      id: "tv.settings.ui_visible",
+      defaultMessage: "Show controls initially",
+    },
+  },
+  {
+    to: "/settings/tv",
+    section: {
+      id: "tv.settings.presentation",
+      defaultMessage: "Presentation",
+    },
+    label: {
+      id: "tv.settings.rotation",
+      defaultMessage: "Rotation on this browser",
+    },
+    description: {
+      id: "tv.settings.rotation_description",
+      defaultMessage:
+        "Saved only for this browser and server. The video remains inline, with the TV controls available.",
+    },
+  },
 ];

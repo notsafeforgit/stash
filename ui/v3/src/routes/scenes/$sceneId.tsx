@@ -318,8 +318,6 @@ function SceneDetailPage() {
     },
   });
 
-  const [saveActivity] = useMutation(GQL.SceneSaveActivityDocument);
-
   const [updateScene] = useMutation(GQL.SceneUpdateDocument);
   function handleToggleOrganized() {
     if (!scene) return;
@@ -329,21 +327,6 @@ function SceneDetailPage() {
         sceneUpdate: { ...scene, organized: !scene.organized },
       },
     });
-  }
-
-  function handleOnEnded() {
-    // Save final play activity on video end
-    if (!scene) return;
-    const file = scene.files[0];
-    if (!file) return;
-    saveActivity({
-      variables: {
-        id: sceneId,
-        resume_time: 0,
-        playDuration: file.duration,
-      },
-    });
-    addPlay({ variables: { id: sceneId } });
   }
 
   function handleSeek(seconds: number) {
@@ -527,7 +510,7 @@ function SceneDetailPage() {
       initialTimestamp={t}
       autoplay={autoplay}
       autostartEnabled={autostartEnabled}
-      onEnded={handleOnEnded}
+      activityScope={{ kind: "online-scene", sceneId, visitKey: sceneId }}
       sendSetTimestamp={sendSetTimestamp}
       sendGetCurrentTime={sendGetCurrentTime}
       fill={viewerOpen}

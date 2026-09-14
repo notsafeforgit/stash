@@ -1,4 +1,5 @@
 import type { PreviewImageData } from "@/components/shared/preview-image";
+import type { SceneActivityScope } from "@/core/scene-activity";
 /**
  * `<ScenePlayer>` configured for the lightbox carousel use case —
  * autoplay, full-fill, no seek arrows (the lightbox owns horizontal
@@ -21,6 +22,7 @@ import type { ScenePlayerScene } from "src/components/player/scene-player";
 import { useConfigurationContext } from "src/hooks/config";
 
 interface LightboxScenePlayerProps {
+  activityScope?: SceneActivityScope;
   scene: ScenePlayerScene;
   playbackKey: string;
   suspended: boolean;
@@ -64,6 +66,7 @@ interface LightboxScenePlayerProps {
 }
 
 export function LightboxScenePlayer({
+  activityScope,
   scene,
   playbackKey,
   suspended,
@@ -86,6 +89,7 @@ export function LightboxScenePlayer({
 
   return (
     <ScenePlayer
+      activityScope={activityScope}
       scene={scene}
       playbackKey={playbackKey}
       suspended={suspended}

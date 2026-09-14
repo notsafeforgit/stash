@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TvRouteImport } from './routes/tv'
 import { Route as TestRouteImport } from './routes/test'
 import { Route as StatsRouteImport } from './routes/stats'
 import { Route as SettingsRouteImport } from './routes/settings'
@@ -26,6 +27,7 @@ import { Route as GroupsIndexRouteImport } from './routes/groups/index'
 import { Route as GalleriesIndexRouteImport } from './routes/galleries/index'
 import { Route as TagsTagIdRouteImport } from './routes/tags/$tagId'
 import { Route as StudiosStudioIdRouteImport } from './routes/studios/$studioId'
+import { Route as SettingsTvRouteImport } from './routes/settings/tv'
 import { Route as SettingsToolsRouteImport } from './routes/settings/tools'
 import { Route as SettingsTasksRouteImport } from './routes/settings/tasks'
 import { Route as SettingsSystemRouteImport } from './routes/settings/system'
@@ -45,6 +47,11 @@ import { Route as ImagesImageIdRouteImport } from './routes/images/$imageId'
 import { Route as GroupsGroupIdRouteImport } from './routes/groups/$groupId'
 import { Route as GalleriesGalleryIdRouteImport } from './routes/galleries/$galleryId'
 
+const TvRoute = TvRouteImport.update({
+  id: '/tv',
+  path: '/tv',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TestRoute = TestRouteImport.update({
   id: '/test',
   path: '/test',
@@ -129,6 +136,11 @@ const StudiosStudioIdRoute = StudiosStudioIdRouteImport.update({
   id: '/studios/$studioId',
   path: '/studios/$studioId',
   getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsTvRoute = SettingsTvRouteImport.update({
+  id: '/tv',
+  path: '/tv',
+  getParentRoute: () => SettingsRoute,
 } as any)
 const SettingsToolsRoute = SettingsToolsRouteImport.update({
   id: '/tools',
@@ -229,6 +241,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRouteWithChildren
   '/stats': typeof StatsRoute
   '/test': typeof TestRoute
+  '/tv': typeof TvRoute
   '/galleries/$galleryId': typeof GalleriesGalleryIdRoute
   '/groups/$groupId': typeof GroupsGroupIdRoute
   '/images/$imageId': typeof ImagesImageIdRoute
@@ -247,6 +260,7 @@ export interface FileRoutesByFullPath {
   '/settings/system': typeof SettingsSystemRoute
   '/settings/tasks': typeof SettingsTasksRoute
   '/settings/tools': typeof SettingsToolsRoute
+  '/settings/tv': typeof SettingsTvRoute
   '/studios/$studioId': typeof StudiosStudioIdRoute
   '/tags/$tagId': typeof TagsTagIdRoute
   '/galleries/': typeof GalleriesIndexRoute
@@ -265,6 +279,7 @@ export interface FileRoutesByTo {
   '/scene-duplicate-checker': typeof SceneDuplicateCheckerRoute
   '/stats': typeof StatsRoute
   '/test': typeof TestRoute
+  '/tv': typeof TvRoute
   '/galleries/$galleryId': typeof GalleriesGalleryIdRoute
   '/groups/$groupId': typeof GroupsGroupIdRoute
   '/images/$imageId': typeof ImagesImageIdRoute
@@ -283,6 +298,7 @@ export interface FileRoutesByTo {
   '/settings/system': typeof SettingsSystemRoute
   '/settings/tasks': typeof SettingsTasksRoute
   '/settings/tools': typeof SettingsToolsRoute
+  '/settings/tv': typeof SettingsTvRoute
   '/studios/$studioId': typeof StudiosStudioIdRoute
   '/tags/$tagId': typeof TagsTagIdRoute
   '/galleries': typeof GalleriesIndexRoute
@@ -303,6 +319,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRouteWithChildren
   '/stats': typeof StatsRoute
   '/test': typeof TestRoute
+  '/tv': typeof TvRoute
   '/galleries/$galleryId': typeof GalleriesGalleryIdRoute
   '/groups/$groupId': typeof GroupsGroupIdRoute
   '/images/$imageId': typeof ImagesImageIdRoute
@@ -321,6 +338,7 @@ export interface FileRoutesById {
   '/settings/system': typeof SettingsSystemRoute
   '/settings/tasks': typeof SettingsTasksRoute
   '/settings/tools': typeof SettingsToolsRoute
+  '/settings/tv': typeof SettingsTvRoute
   '/studios/$studioId': typeof StudiosStudioIdRoute
   '/tags/$tagId': typeof TagsTagIdRoute
   '/galleries/': typeof GalleriesIndexRoute
@@ -342,6 +360,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/stats'
     | '/test'
+    | '/tv'
     | '/galleries/$galleryId'
     | '/groups/$groupId'
     | '/images/$imageId'
@@ -360,6 +379,7 @@ export interface FileRouteTypes {
     | '/settings/system'
     | '/settings/tasks'
     | '/settings/tools'
+    | '/settings/tv'
     | '/studios/$studioId'
     | '/tags/$tagId'
     | '/galleries/'
@@ -378,6 +398,7 @@ export interface FileRouteTypes {
     | '/scene-duplicate-checker'
     | '/stats'
     | '/test'
+    | '/tv'
     | '/galleries/$galleryId'
     | '/groups/$groupId'
     | '/images/$imageId'
@@ -396,6 +417,7 @@ export interface FileRouteTypes {
     | '/settings/system'
     | '/settings/tasks'
     | '/settings/tools'
+    | '/settings/tv'
     | '/studios/$studioId'
     | '/tags/$tagId'
     | '/galleries'
@@ -415,6 +437,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/stats'
     | '/test'
+    | '/tv'
     | '/galleries/$galleryId'
     | '/groups/$groupId'
     | '/images/$imageId'
@@ -433,6 +456,7 @@ export interface FileRouteTypes {
     | '/settings/system'
     | '/settings/tasks'
     | '/settings/tools'
+    | '/settings/tv'
     | '/studios/$studioId'
     | '/tags/$tagId'
     | '/galleries/'
@@ -453,6 +477,7 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRouteWithChildren
   StatsRoute: typeof StatsRoute
   TestRoute: typeof TestRoute
+  TvRoute: typeof TvRoute
   GalleriesGalleryIdRoute: typeof GalleriesGalleryIdRoute
   GroupsGroupIdRoute: typeof GroupsGroupIdRoute
   ImagesImageIdRoute: typeof ImagesImageIdRoute
@@ -474,6 +499,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/tv': {
+      id: '/tv'
+      path: '/tv'
+      fullPath: '/tv'
+      preLoaderRoute: typeof TvRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/test': {
       id: '/test'
       path: '/test'
@@ -592,6 +624,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/studios/$studioId'
       preLoaderRoute: typeof StudiosStudioIdRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/settings/tv': {
+      id: '/settings/tv'
+      path: '/tv'
+      fullPath: '/settings/tv'
+      preLoaderRoute: typeof SettingsTvRouteImport
+      parentRoute: typeof SettingsRoute
     }
     '/settings/tools': {
       id: '/settings/tools'
@@ -734,6 +773,7 @@ interface SettingsRouteChildren {
   SettingsSystemRoute: typeof SettingsSystemRoute
   SettingsTasksRoute: typeof SettingsTasksRoute
   SettingsToolsRoute: typeof SettingsToolsRoute
+  SettingsTvRoute: typeof SettingsTvRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
 }
 
@@ -749,6 +789,7 @@ const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsSystemRoute: SettingsSystemRoute,
   SettingsTasksRoute: SettingsTasksRoute,
   SettingsToolsRoute: SettingsToolsRoute,
+  SettingsTvRoute: SettingsTvRoute,
   SettingsIndexRoute: SettingsIndexRoute,
 }
 
@@ -763,6 +804,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRouteWithChildren,
   StatsRoute: StatsRoute,
   TestRoute: TestRoute,
+  TvRoute: TvRoute,
   GalleriesGalleryIdRoute: GalleriesGalleryIdRoute,
   GroupsGroupIdRoute: GroupsGroupIdRoute,
   ImagesImageIdRoute: ImagesImageIdRoute,

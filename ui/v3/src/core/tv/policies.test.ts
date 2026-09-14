@@ -137,6 +137,7 @@ describe("TV settings validation", () => {
       version: 1,
       shuffle,
       sort,
+      rules: [],
     });
     expect(result).toEqual({
       kind: "ready",
@@ -144,6 +145,26 @@ describe("TV settings validation", () => {
     });
     if (result.kind === "ready") {
       expect(result.settings).not.toHaveProperty("shuffle");
+      expect(decodeTvSettings(result.settings)).toEqual(result);
+    }
+  });
+
+  it("removes legacy rules while preserving saved filters and playback preferences", () => {
+    const settings = {
+      ...defaultTvSettings,
+      sceneFilter: { kind: "saved", id: "12" },
+      markerFilter: { kind: "saved", id: "34" },
+      sort: "random",
+      autoplay: false,
+    };
+    const result = decodeTvSettings({
+      ...settings,
+      version: 2,
+      rules: [{ kind: "filter", mode: "scenes", filterId: "56" }],
+    });
+    expect(result).toEqual({ kind: "ready", settings });
+    if (result.kind === "ready") {
+      expect(result.settings).not.toHaveProperty("rules");
       expect(decodeTvSettings(result.settings)).toEqual(result);
     }
   });

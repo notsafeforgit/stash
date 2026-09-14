@@ -382,7 +382,7 @@ test("TV has one localized sort choice and retains Random between feed modes", a
         variables: expect.objectContaining({
           key: "tv",
           value: expect.objectContaining({
-            version: 2,
+            version: 3,
             sort: "random",
             mode: "markers",
           }),
@@ -407,6 +407,90 @@ test("TV settings load a legacy Shuffle preference as Random", async ({
   await expect(
     page.getByRole("switch", { name: "Shuffle", exact: true }),
   ).toHaveCount(0);
+});
+
+test("TV settings show the rail editor directly and save reordered actions without extra rules", async ({
+  page,
+}) => {
+  const editorRequests: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname.endsWith("/tv-rail-editor.tsx")) {
+      editorRequests.push(request.url());
+    }
+  });
+  await open(page, "?paused&legacy-rules");
+  expect(editorRequests).toEqual([]);
+  await page.getByRole("button", { name: "TV settings", exact: true }).click();
+  await expect(
+    page.getByRole("combobox", { name: "Scene filter", exact: true }),
+  ).toContainText("Scene picks");
+  await expect(
+    page.getByRole("combobox", { name: "Marker filter", exact: true }),
+  ).toContainText("Marker picks");
+  await expect(
+    page.getByRole("button", { name: "Customize action rail", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText("Additional feed rules", { exact: true }),
+  ).toHaveCount(0);
+  const drag = page.getByRole("button", {
+    name: "Drag Information",
+    exact: true,
+  });
+  await expect(drag).toBeVisible();
+  expect(editorRequests).toHaveLength(1);
+  await drag.focus();
+  await page.keyboard.press("Space");
+  await expect(drag).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("status")).toContainText(
+    "Draggable item info was moved over droppable area info.",
+  );
+  await page.keyboard.press("ArrowUp");
+  await expect(page.getByRole("status")).toContainText(
+    "Draggable item info was moved over droppable area visibility.",
+  );
+  await page.keyboard.press("Space");
+  await expect(drag).not.toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Information", exact: true }).click();
+  const icon = page.getByRole("combobox", { name: "Action icon", exact: true });
+  await expect(icon).toContainText("Default");
+  await icon.click();
+  await page.getByRole("option", { name: "Heart", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Save TV settings", exact: true })
+    .click();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.tvFixtureRequests.find(
+          (request) => request.name === "ConfigureUISetting",
+        ),
+      ),
+    )
+    .toMatchObject({
+      variables: {
+        key: "tv",
+        value: {
+          version: 3,
+          sceneFilter: { kind: "saved", id: "1" },
+          markerFilter: { kind: "saved", id: "2" },
+          rail: [
+            { action: { id: "settings" } },
+            { action: { id: "info", icon: "heart" } },
+            { action: { id: "visibility" } },
+            { action: { id: "counter" } },
+            { id: "edit" },
+            { id: "playback" },
+          ],
+        },
+      },
+    });
+  const saved = await page.evaluate(() =>
+    window.tvFixtureRequests.find(
+      (request) => request.name === "ConfigureUISetting",
+    ),
+  );
+  expect(saved?.variables).not.toHaveProperty("value.rules");
 });
 
 test("TV settings save the shared quality under only the TV key", async ({

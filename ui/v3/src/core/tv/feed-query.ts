@@ -135,20 +135,6 @@ export async function resolveTvQuery(
   const roots: GQL.FilterAstNodeInput[] = [];
   const base = model.makeFilterAST();
   if (base) roots.push(base.root);
-  const extra = await Promise.all(
-    settings.rules
-      .filter((rule) => rule.mode === mode)
-      .map((rule) => getSaved(rule.filterId)),
-  );
-  for (const rule of extra) {
-    const extraModel = filterModel(mode, configuration, rule);
-    if (extraModel.searchTerm)
-      throw new Error(
-        "Additional filter rules must use criteria; put text search in the main feed filter",
-      );
-    const ast = extraModel.makeFilterAST();
-    if (ast) roots.push(ast.root);
-  }
   const effectiveOrientation =
     settings.orientation === "match" ? orientation : settings.orientation;
   if (effectiveOrientation !== "all")

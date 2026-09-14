@@ -1,4 +1,4 @@
-import { FormattedMessage } from "react-intl";
+import { FormattedMessage, useIntl } from "react-intl";
 import { useMsg } from "@/hooks/message";
 import { useState } from "react";
 import {
@@ -24,7 +24,7 @@ import { Switch } from "@/components/ui/switch";
 import { Field, FieldLabel, FieldGroup } from "@/components/ui/field";
 import { TvSelect } from "./tv-select";
 import { TvTagPicker, TvTagsPicker } from "./tv-tag-picker";
-import { tvActionLabels } from "./tv-action-labels";
+import { tvActionLabels, tvIconLabels } from "./tv-action-labels";
 import {
   createTvAction,
   railEntryId,
@@ -50,6 +50,7 @@ function ActionFields({
   onChange: (next: TvAction) => void;
 }) {
   const msg = useMsg();
+  const intl = useIntl();
   return (
     <FieldGroup>
       <Field>
@@ -77,7 +78,10 @@ function ActionFields({
         <TvSelect
           label={msg("tv.text.action_icon", "Action icon")}
           value={action.icon}
-          options={tvIconIds.map((value) => ({ value, label: value }))}
+          options={tvIconIds.map((value) => ({
+            value,
+            label: intl.formatMessage(tvIconLabels[value]),
+          }))}
           onChange={(icon) => onChange({ ...action, icon })}
         />
       </Field>
@@ -91,7 +95,13 @@ function ActionFields({
               label={msg("tv.text.choose_a_tag", "Choose a tag")}
               value={
                 action.tagId
-                  ? { id: action.tagId, name: `Tag ${action.tagId}` }
+                  ? {
+                      id: action.tagId,
+                      name: intl.formatMessage(
+                        { id: "tv.rail.tag_id", defaultMessage: "Tag {id}" },
+                        { id: action.tagId },
+                      ),
+                    }
                   : null
               }
               onChange={(tag) => onChange({ ...action, tagId: tag?.id ?? "" })}
@@ -157,7 +167,10 @@ function ActionFields({
                 action.primaryTagId
                   ? {
                       id: action.primaryTagId,
-                      name: `Tag ${action.primaryTagId}`,
+                      name: intl.formatMessage(
+                        { id: "tv.rail.tag_id", defaultMessage: "Tag {id}" },
+                        { id: action.primaryTagId },
+                      ),
                     }
                   : null
               }
@@ -175,7 +188,13 @@ function ActionFields({
             </FieldLabel>
             <TvTagsPicker
               label={msg("tv.text.additional_tags", "Additional tags")}
-              value={action.tagIds.map((id) => ({ id, name: `Tag ${id}` }))}
+              value={action.tagIds.map((id) => ({
+                id,
+                name: intl.formatMessage(
+                  { id: "tv.rail.tag_id", defaultMessage: "Tag {id}" },
+                  { id },
+                ),
+              }))}
               onChange={(tags) =>
                 onChange({ ...action, tagIds: tags.map((tag) => tag.id) })
               }
@@ -221,6 +240,7 @@ function RailRow({
   onChange: (entries: TvRailEntry[]) => void;
 }) {
   const msg = useMsg();
+  const intl = useIntl();
   const id = railEntryId(entry);
   const { setNodeRef, transform, transition, attributes, listeners } =
     useSortable({ id });
@@ -252,7 +272,10 @@ function RailRow({
           type="button"
           variant="ghost"
           size="icon-lg"
-          aria-label={`Drag ${label}`}
+          aria-label={intl.formatMessage(
+            { id: "tv.rail.drag", defaultMessage: "Drag {label}" },
+            { label },
+          )}
           {...attributes}
           {...listeners}
         >
@@ -269,7 +292,10 @@ function RailRow({
         </Button>
         <Switch
           checked={entry.pinned}
-          aria-label={`Pin ${label}`}
+          aria-label={intl.formatMessage(
+            { id: "tv.rail.pin", defaultMessage: "Pin {label}" },
+            { label },
+          )}
           onCheckedChange={(pinned) => update({ ...entry, pinned })}
         />
         <Button
@@ -277,7 +303,10 @@ function RailRow({
           variant="ghost"
           size="icon-lg"
           disabled={index === 0}
-          aria-label={`Move ${label} up`}
+          aria-label={intl.formatMessage(
+            { id: "tv.rail.move_up", defaultMessage: "Move {label} up" },
+            { label },
+          )}
           onClick={() => onChange(arrayMove(entries, index, index - 1))}
         >
           <ArrowUp />
@@ -287,7 +316,10 @@ function RailRow({
           variant="ghost"
           size="icon-lg"
           disabled={index === entries.length - 1}
-          aria-label={`Move ${label} down`}
+          aria-label={intl.formatMessage(
+            { id: "tv.rail.move_down", defaultMessage: "Move {label} down" },
+            { label },
+          )}
           onClick={() => onChange(arrayMove(entries, index, index + 1))}
         >
           <ArrowDown />
@@ -297,7 +329,10 @@ function RailRow({
           variant="ghost"
           size="icon-lg"
           disabled={essential}
-          aria-label={`Remove ${label}`}
+          aria-label={intl.formatMessage(
+            { id: "tv.rail.remove", defaultMessage: "Remove {label}" },
+            { label },
+          )}
           onClick={() =>
             onChange(entries.filter((item) => railEntryId(item) !== id))
           }
@@ -372,7 +407,10 @@ function RailRow({
               <TvSelect
                 label={msg("tv.text.folder_icon", "Folder icon")}
                 value={entry.icon}
-                options={tvIconIds.map((value) => ({ value, label: value }))}
+                options={tvIconIds.map((value) => ({
+                  value,
+                  label: intl.formatMessage(tvIconLabels[value]),
+                }))}
                 onChange={(icon) => update({ ...entry, icon })}
               />
             </Field>

@@ -18,7 +18,6 @@ import {
 } from "@/models/list-filter/labels";
 import { tvFilterMode } from "@/core/tv/feed-query";
 import { TvFilterSelect } from "@/components/tv/tv-filter-select";
-import { TvSelect } from "@/components/tv/tv-select";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
@@ -28,7 +27,7 @@ import {
   SettingsSection,
   SettingSwitch,
 } from "@/components/settings/setting-row";
-import { Field, FieldLabel, FieldGroup } from "@/components/ui/field";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { DestructiveConfirmDialog } from "@/components/shared/destructive-confirm-dialog";
 
 const TvRailEditor = lazy(() => import("@/components/tv/tv-rail-editor"));
@@ -37,7 +36,6 @@ function TvSettingsForm({ initial }: { initial: TvSettings }) {
   const adapter = useTvSettings();
   const intl = useIntl();
   const msg = useMsg();
-  const [railOpened, setRailOpened] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const form = useForm({
     defaultValues: { settings: initial },
@@ -425,95 +423,13 @@ function TvSettingsForm({ initial }: { initial: TvSettings }) {
           }}
         />
       </SettingsSection>
-      <SettingsSection
-        title={msg("tv.settings.rules", "Additional feed rules")}
-        description={msg(
-          "tv.settings.rules_description",
-          "Combine saved filters with AND. Their nested include/exclude criteria are preserved. Text search and ordering belong to the main feed filter.",
-        )}
-      >
-        {values.rules.map((rule, index) => (
-          <FieldGroup key={`${rule.mode}:${index}`}>
-            <TvSelect
-              label={msg("tv.text.rule_feed", "Rule feed")}
-              value={rule.mode}
-              options={[
-                { value: "scenes", label: msg("tv.text.scenes", "Scenes") },
-                { value: "markers", label: msg("tv.text.markers", "Markers") },
-              ]}
-              onChange={(mode) =>
-                set(
-                  "rules",
-                  values.rules.map((item, i) =>
-                    i === index ? { ...item, mode } : item,
-                  ),
-                )
-              }
-            />
-            <TvFilterSelect
-              savedOnly
-              label={msg("tv.text.additional_filter", "Additional filter")}
-              mode={rule.mode}
-              value={{ kind: "saved", id: rule.filterId }}
-              onChange={(choice) => {
-                if (choice.kind === "saved")
-                  set(
-                    "rules",
-                    values.rules.map((item, i) =>
-                      i === index ? { ...item, filterId: choice.id } : item,
-                    ),
-                  );
-              }}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                set(
-                  "rules",
-                  values.rules.filter((_, i) => i !== index),
-                )
-              }
-            >
-              <FormattedMessage
-                id="tv.text.remove_rule"
-                defaultMessage="Remove rule"
-              />
-            </Button>
-          </FieldGroup>
-        ))}
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() =>
-            set("rules", [
-              ...values.rules,
-              { kind: "filter", mode: values.mode, filterId: "" },
-            ])
-          }
-        >
-          <FormattedMessage
-            id="tv.text.add_filter_rule"
-            defaultMessage="Add filter rule"
-          />
-        </Button>
-      </SettingsSection>
       <SettingsSection title={msg("tv.settings.rail", "Action rail")}>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => setRailOpened(true)}
-        >
-          {msg("tv.settings.customize_rail", "Customize action rail")}
-        </Button>
-        {railOpened && (
-          <Suspense fallback={<Spinner />}>
-            <TvRailEditor
-              value={values.rail}
-              onChange={(value) => set("rail", value)}
-            />
-          </Suspense>
-        )}
+        <Suspense fallback={<Spinner />}>
+          <TvRailEditor
+            value={values.rail}
+            onChange={(value) => set("rail", value)}
+          />
+        </Suspense>
       </SettingsSection>
       {!validation.success && (
         <Alert variant="destructive">

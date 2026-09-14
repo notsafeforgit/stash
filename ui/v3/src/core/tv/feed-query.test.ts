@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import * as GQL from "../generated-graphql";
 import { playerConfiguration } from "../../../tests/browser/fixture/player-configuration";
 import { resolveTvQuery, tvQueryIdentity } from "./feed-query";
-import { defaultTvSettings } from "./settings";
+import { decodeTvSettings, defaultTvSettings } from "./settings";
 
 const condition = {
   condition: {
@@ -189,20 +189,28 @@ describe("TV query construction", () => {
     ).rejects.toThrow("conflict");
   });
 
-  it("rejects additional rules containing text search rather than dropping it", async () => {
-    await expect(
-      resolveTvQuery(
-        clientWithFilter(),
-        playerConfiguration,
-        {
-          ...defaultTvSettings,
-          rules: [{ kind: "filter", mode: "scenes", filterId: "1" }],
-        },
-        "scenes",
-        { kind: "all" },
-        1,
-        "portrait",
-      ),
-    ).rejects.toThrow("text search");
+  it("uses the chosen saved filter without resolving retired extra rules", async () => {
+    const decoded = decodeTvSettings({
+      ...defaultTvSettings,
+      version: 2,
+      sceneFilter: { kind: "saved", id: "1" },
+      rules: [{ kind: "filter", mode: "scenes", filterId: "999" }],
+    });
+    if (decoded.kind !== "ready") throw new Error(decoded.message);
+    const query = await resolveTvQuery(
+      clientWithFilter(),
+      playerConfiguration,
+      decoded.settings,
+      "scenes",
+      decoded.settings.sceneFilter,
+      1,
+      "portrait",
+    );
+    expect(query.filter).toMatchObject({
+      q: "example",
+      sort: "date",
+      direction: "DESC",
+    });
+    expect(query.ast?.root.group?.children).toEqual([condition]);
   });
 });

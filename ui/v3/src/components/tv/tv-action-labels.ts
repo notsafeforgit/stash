@@ -27,6 +27,19 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { TvAction, TvActionKind } from "@/core/tv/action-config";
+import type { MessageDescriptor } from "react-intl";
+
+export const tvIconLabels = {
+  default: { id: "tv.icon.default", defaultMessage: "Default" },
+  heart: { id: "tv.icon.heart", defaultMessage: "Heart" },
+  star: { id: "tv.icon.star", defaultMessage: "Star" },
+  tag: { id: "tv.icon.tag", defaultMessage: "Tag" },
+  bookmark: { id: "tv.icon.bookmark", defaultMessage: "Bookmark" },
+  flame: { id: "tv.icon.flame", defaultMessage: "Flame" },
+  sparkles: { id: "tv.icon.sparkles", defaultMessage: "Sparkles" },
+  check: { id: "tv.icon.check", defaultMessage: "Check mark" },
+  plus: { id: "tv.icon.plus", defaultMessage: "Plus" },
+} satisfies Record<TvAction["icon"], MessageDescriptor>;
 
 export const tvActionLabels: Record<TvActionKind, string> = {
   settings: "TV settings",

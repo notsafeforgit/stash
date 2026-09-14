@@ -3,12 +3,9 @@ import { useMsg } from "@/hooks/message";
 import { Link } from "@tanstack/react-router";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
+import { TvDialogContent } from "./tv-dialog";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { objectTitle } from "@/core/files";
 import {
@@ -54,31 +51,37 @@ export function TvPlaybackMenu({
         if (!open) close();
       }}
     >
-      <DialogContent className="max-h-[calc(100%-2rem)] overflow-y-auto sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>
-            {msg(`tv.action.${action}`, tvActionLabels[action])}
-          </DialogTitle>
-        </DialogHeader>
+      <TvDialogContent
+        title={msg(`tv.action.${action}`, tvActionLabels[action])}
+      >
         {action === "info" && (
-          <div className="flex flex-col gap-4">
+          <div className="flex min-w-0 flex-col gap-4">
             <Link
               to="/scenes/$sceneId"
               params={{ sceneId: scene.id }}
               search={{ t: Math.floor(controls.read().position) }}
-              className={buttonVariants({ variant: "outline" })}
+              className={cn(
+                buttonVariants({ variant: "outline" }),
+                "h-auto min-w-0 max-w-full justify-start whitespace-normal py-2 text-left [overflow-wrap:anywhere]",
+              )}
             >
               {objectTitle(scene)}
             </Link>
-            <p>{scene.details}</p>
+            <p className="whitespace-pre-wrap">{scene.details}</p>
             <div className="flex flex-wrap gap-2">
               {scene.performers.map((performer) => (
                 <Link
                   key={performer.id}
                   to="/performers/$performerId"
                   params={{ performerId: performer.id }}
+                  className="min-w-0 max-w-full"
                 >
-                  <Badge variant="secondary">{performer.name}</Badge>
+                  <Badge
+                    variant="secondary"
+                    className="h-auto max-w-full whitespace-normal py-1 text-left [overflow-wrap:anywhere]"
+                  >
+                    {performer.name}
+                  </Badge>
                 </Link>
               ))}
             </div>
@@ -92,8 +95,18 @@ export function TvPlaybackMenu({
             )}
             <div className="flex flex-wrap gap-2">
               {scene.tags.map((tag) => (
-                <Link key={tag.id} to="/tags/$tagId" params={{ tagId: tag.id }}>
-                  <Badge variant="outline">{tag.name}</Badge>
+                <Link
+                  key={tag.id}
+                  to="/tags/$tagId"
+                  params={{ tagId: tag.id }}
+                  className="min-w-0 max-w-full"
+                >
+                  <Badge
+                    variant="outline"
+                    className="h-auto max-w-full whitespace-normal py-1 text-left [overflow-wrap:anywhere]"
+                  >
+                    {tag.name}
+                  </Badge>
                 </Link>
               ))}
             </div>
@@ -249,7 +262,7 @@ export function TvPlaybackMenu({
             ))}
           </div>
         )}
-      </DialogContent>
+      </TvDialogContent>
     </Dialog>
   );
 }

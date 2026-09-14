@@ -26,8 +26,8 @@ v3 scene streams and on-demand transcoding. Marker playback uses the same
 quality policy on its parent scene's stream, bounded to the marker range.
 
 Keep the entire TV interface in control of presentation. Fullscreen targets
-the TV container where supported; otherwise use a viewport-filling immersive
-layout with inline video. Swiping, the action rail, metadata and app navigation
+the TV container only where the browser supports it. Otherwise keep the normal
+inline TV layout and hide the fullscreen action. Swiping, the action rail, metadata and app navigation
 must remain available in both presentations.
 
 Unify automatic activity tracking as shared player behavior and wire it into
@@ -185,10 +185,10 @@ Requirement IDs remain stable; removed IDs are not reused.
 | TV-06 | Scene start and end policies | Start at resume, beginning, or a random marker/random valid position; stop at scene end, after a fixed duration, or after a sampled duration within validated bounds |
 | TV-07 | Marker playback | Markers use their parent scene's normal streams at the selected TV quality with bounded scene-time playback; explicit end times, coincident markers, missing duration and invalid bounds are handled |
 | TV-09 | Playback controls | Play/pause, volume/mute, playback rate, subtitles and source/quality selection share the v3 engine; audio/rate continue across swipes; quality changes preserve time/state and follow TV-27 |
-| TV-10 | Seeking and timeline information | Tap/keyboard skip is marker-aware; scrubber thumbnails and marker labels/ranges use absolute scene time; show current marker/tag information |
-| TV-11 | Hold controls | Press-and-hold forward speed and reverse scrubbing, with speed adjustment during a hold, restore the previous state on release/cancel; unsupported negative playback rates are not assumed |
-| TV-12 | Presentation | Fit/contain versus fill/crop, left-handed rail, hide/show controls, and media zoom coexist; settings, restore-controls and app navigation remain reachable |
-| TV-13 | Forced landscape and immersive presentation | Rotate the viewing surface and its controls without modifying files; fullscreen the whole TV container where supported, otherwise fill the browser viewport with inline video; iOS Safari retains swipe navigation, rail, metadata, menus and app navigation; TV never requests native video fullscreen |
+| TV-10 | Seeking and timeline information | The scrubber owns touch seeking; keyboard seeking is marker-aware; scrubber thumbnails and marker labels/ranges use absolute scene time; show current marker/tag information |
+| TV-11 | Hold controls | Tap the video to play/pause and hold it for temporary 2× speed; keyboard forward/reverse holds retain speed adjustment; release/cancel restores the previous state without saving a temporary rate; unsupported negative playback rates are not assumed |
+| TV-12 | Presentation | Fit/contain versus fill/crop, left-handed rail, hide/show controls, and media zoom coexist; navigation, mute, settings and restore-controls remain reachable in a bottom dock; pinned actions use that dock and the remaining rail is bounded above it |
+| TV-13 | Forced landscape and supported fullscreen | Rotate the viewing surface and its controls without modifying files; offer fullscreen for the whole TV container only where supported; unavailable/rejected requests retain normal inline TV and hide the action; iOS Safari retains swipe navigation, rail, metadata, menus and app navigation; TV never requests native video fullscreen |
 | TV-15 | Metadata and details | Scene title, performers, studio, tags and marker information are available; links use v3 routes and returning restores the feed context |
 | TV-16 | Rating, organized status and O-counter | Update the parent scene from either feed mode, with pending/error feedback and correct normalized cache updates; counter increment/decrement/reset follow existing app operations |
 | TV-17 | Tag editing and quick tags | Scene feed edits scene tags; marker feed edits marker tags and primary tag correctly; pinned tags and repeatable quick-tag presets are supported |
@@ -225,8 +225,8 @@ button. The settings action opens the main app's Settings → TV page.
   settings page.
 - TV uses inline video and custom controls, including on iOS Safari. Native
   video fullscreen is excluded even as an error/unsupported-browser fallback.
-  Container fullscreen is an optional enhancement to the complete immersive
-  viewport experience; support is determined at runtime, without Safari-version
+  Container fullscreen is an optional enhancement to the normal inline TV
+  experience; unavailable or rejected requests have no simulated fallback; support is determined at runtime, without Safari-version
   assumptions. Apply this policy to TV without changing other player consumers.
 - Shared activity tracking includes migrating scene detail and enabling it in
   the online scene lightbox now. The offline lightbox retains local resume
@@ -299,7 +299,7 @@ Suggested modules, to create only as their responsibilities become concrete:
 | `src/components/tv/tv-surface.tsx`, `use-tv-navigation.ts` | Three-slot vertical track, drag/settle lifecycle and accessible navigation |
 | `src/components/tv/tv-player.tsx` | Adapt the selected item/policy to the shared player, without a second playback engine |
 | `src/components/tv/use-tv-input.ts` | Keyboard/pointer input-to-command translation with teardown and focus arbitration |
-| `src/components/tv/tv-viewport.tsx` | Scoped rotation, coordinate conversion, portal container, immersive layout and TV-owned container fullscreen |
+| `src/components/tv/tv-viewport.tsx` | Scoped rotation, coordinate conversion, portal container and supported TV-owned container fullscreen |
 | `src/components/tv/actions/` | Narrow typed action components, metadata registry and rail/editor UI |
 | `src/hooks/use-tv-settings.ts` | One typed settings adapter shared by the settings route and TV consumers; tracked persistence and local-storage subscriptions |
 | `src/components/tv/tv-info.tsx`, `tv-help.tsx` | Focused presentation surfaces |
@@ -348,9 +348,9 @@ Use generated route types and regenerate the route tree through the build.
 
 Keep the desktop app header in ordinary viewing. Mobile TV owns the viewport
 and supplies a visible app navigation affordance instead of the global bottom
-bar. Explicit immersive/fullscreen mode hides ordinary app chrome while keeping
-the TV interface reachable. Immersive layout fills the available browser
-viewport; it does not promise to hide Safari's address/tab bars. Make the shell
+bar. Supported container fullscreen hides ordinary app chrome while keeping the TV
+interface reachable. Unsupported browsers retain their ordinary inline layout
+and do not offer a fullscreen action. Make the shell
 change small and route-scoped, using the router's normalized route identity
 where possible. Leaving TV exits any TV-owned container fullscreen and restores
 the shell and focus. Do not change layout for unrelated routes.
@@ -360,7 +360,7 @@ second drawer when hiding the global mobile bar. Keep TV inside the existing
 `RouteViewport` and let the shell own route reveals. Its drawer lease delays
 only the visual reveal, never routing, data loading or source cleanup. Preserve
 the current dimmed navigation backdrop rather than adding a backdrop filter
-over playing media. If TV container fullscreen is active, return to immersive
+over playing media. If TV container fullscreen is active, return to normal inline viewing
 layout before opening the shared drawer so its existing portal remains visible.
 
 Use `motion.ts` timings and the shared empty-surface reveal helpers. Route
@@ -457,7 +457,7 @@ Keep the shared player interface small. A typed context rendered beneath the
 existing player provider can expose readonly capabilities/state and semantic
 commands such as play, pause, scene-time seek, volume, rate, subtitle choice and
 source preference. Presentation commands delegate to TV's viewport owner;
-normal/immersive/container-fullscreen state is distinct from the video store's
+normal/container-fullscreen state is distinct from the video store's
 fullscreen flag. Make disabled/unavailable capabilities explicit. TV's
 input handlers and action rail call this same interface; they do not inspect
 private Video.js fields, locate players with selectors or create another store.
@@ -768,12 +768,11 @@ events and modified keyboard shortcuts. One trackpad gesture must not skip
 multiple items because of momentum.
 
 Default shortcuts follow the reference: Up/Down previous/next, Left/Right
-marker-aware seek, Space play/pause, D delete dialog, E tags, F immersive or
-container fullscreen, I info, L loop, M mute, O presentation rotation and S
+marker-aware seek, Space play/pause, D delete dialog, E tags, F supported container fullscreen, I info, L loop, M mute, O presentation rotation and S
 subtitles. Hold Left/Right
 for reverse/forward control; while holding, Up/Down adjusts speed rather than
 moving to another item. Suppress conflicting shared-player shortcuts only inside
-the TV surface. Escape closes an overlay or exits immersive presentation, staying
+the TV surface. Escape closes an overlay or exits fullscreen, staying
 on the TV route. Closing an overlay must not also advance the feed.
 
 Reverse control uses bounded repeated scene-time seeks because native negative
@@ -804,9 +803,8 @@ needed; do not patch Video.js internals or add global DOM interception.
 
 Request fullscreen only on the stable TV container containing the video,
 vertical navigation, rail, metadata and overlay portal host. Check capability
-at runtime, request from a user action, and handle rejection by staying in
-the immersive viewport layout. Track actual container entry/exit through the
-Fullscreen API and keep CSS immersive state separate; show the correct action
+at runtime, request from a user action, and handle rejection by retaining the ordinary inline view and hiding the action.
+Track actual container entry/exit through the Fullscreen API; show the correct action
 label for each mode. Synchronize browser-initiated exit and Escape with this
 state, restoring the prior layout without remounting the player. Route teardown
 exits TV-owned fullscreen and cleans up listeners and pending requests. See the
@@ -834,7 +832,7 @@ the app's general page-zoom and text-selection policy.
 
 Hidden UI retains a stable restore-controls affordance, app navigation and access to
 settings. Keep essential controls outside fading/inert ancestors. Container
-fullscreen and immersive layout retain the same TV controls and swipe behavior.
+fullscreen and ordinary inline viewing retain the same TV controls and swipe behavior.
 Explain the two presentations in help and verify the inline experience on
 physical iPhone/iPad Safari devices.
 
@@ -953,8 +951,8 @@ verified; direct navigation under root and a deployment prefix works.
 - Establish typed activity observations and the single shared player integration;
   migrate scene detail and wire eligible online scene lightbox/TV playback to it.
   Remove the old automatic route writer when enabling the shared owner.
-- Wire inline playback and TV-owned presentation controls, including the
-  immersive fallback, before exposing any fullscreen action.
+- Wire inline playback and TV-owned presentation controls, including capability
+  detection and rejection handling, before exposing any fullscreen action.
 - Implement the stable three-slot vertical surface and command arbitration.
 - Make scene playback, quality changes, source suspension and return navigation
   work before adding advanced controls.
@@ -1005,7 +1003,7 @@ are enforced and usable with a keyboard.
 - Complete keyboard mappings, speed holds and cancellation behavior.
 - Complete Settings → TV forms, action-layout editing, shared/local persistence,
   limits and help; verify settings search and return state.
-- Validate inline iOS playback, immersive/container presentation, mobile portals,
+- Validate inline iOS playback, normal/container presentation, mobile portals,
   gestures and desktop header width with the new navigation entry.
 
 Exit evidence: every required feature-matrix row has an implementation and an
@@ -1119,8 +1117,8 @@ behavior still needing verification.
   boundaries and throughout the application.
 - [ ] Mobile gestures/rotation/portals and keyboard/pointer cleanup are verified.
 - [ ] iOS Safari keeps video inline with the TV feed/rail/metadata; unavailable
-  or rejected container fullscreen uses immersive layout with no native-video
-  fallback.
+  or rejected container fullscreen retains ordinary inline TV and hides the action
+  with no native-video fallback.
 - [ ] Existing v3 player/lightbox/offline behavior and v2.5 compatibility survive.
 - [ ] Relevant checks pass and untested device cases are recorded honestly.
 - [ ] Current user/architecture documentation describes the final implementation.
@@ -1133,8 +1131,10 @@ Suggested instruction for the implementation context:
 > preview modes. Put TV configuration in main Settings → TV at `/settings/tv`,
 > with one default quality for both scenes and markers using normal v3 streams.
 > Keep video inline on iOS Safari with the complete Reels/TikTok-style TV UI.
-> Fullscreen may target the whole TV container; otherwise use immersive viewport
-> layout. Never fall back to native video fullscreen in TV.
+> Tap the video to play/pause, hold for temporary 2× speed, and seek with the
+> scrubber. Keep navigation, mute and pinned actions in a reachable bottom dock.
+> Offer fullscreen for the whole TV container only where supported. Unsupported
+> or rejected requests retain normal inline TV; never use native video fullscreen.
 > Unify automatic activity tracking and wire the same implementation into TV,
 > scene detail and the online scene lightbox. Replace the route's automatic
 > writer, retain manual add-play/offline resume behavior, and verify one owner

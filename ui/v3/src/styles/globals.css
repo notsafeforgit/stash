@@ -1016,6 +1016,11 @@ html [data-sonner-toaster][data-sonner-theme="system"] {
 .tv-surface {
   transform: translateZ(0);
 }
+/* Match the unlayered page gesture policy: a layered touch-none utility cannot
+   override it, and this surface must own vertical drags and speed holds. */
+[data-tv-play-surface] {
+  touch-action: none;
+}
 .tv-viewport[data-tv-rotation="clockwise"] .tv-surface,
 .tv-viewport[data-tv-rotation="counterclockwise"] .tv-surface {
   inset: auto;
@@ -1028,13 +1033,9 @@ html [data-sonner-toaster][data-sonner-theme="system"] {
 .tv-viewport[data-tv-rotation="counterclockwise"] .tv-surface {
   transform: translate(-50%, -50%) rotate(-90deg);
 }
-.tv-topbar {
-  padding-top: max(0.75rem, var(--safe-area-top, 0px));
-}
 .tv-footer {
   padding-bottom: max(0.75rem, var(--safe-area-bottom, 0px));
 }
-[data-app-viewport]:has([data-tv-presentation="immersive"]) [data-app-header],
 [data-app-viewport]:has([data-tv-presentation="fullscreen"]) [data-app-header] {
   display: none;
 }

@@ -18,33 +18,29 @@ export function useTvPresentation() {
   const root = useRef<HTMLDivElement>(null);
   const surface = useRef<HTMLDivElement>(null);
   const portals = useRef<HTMLDivElement>(null);
-  const [mode, setMode] = useState<"normal" | "immersive" | "fullscreen">(
-    "normal",
-  );
+  const [mode, setMode] = useState<"normal" | "fullscreen">("normal");
+  const [rejected, setRejected] = useState(false);
+  const canFullscreen =
+    !rejected &&
+    document.fullscreenEnabled === true &&
+    typeof document.documentElement.requestFullscreen === "function";
   const requestGeneration = useRef(0);
-  const exit = useCallback(() => {
-    requestGeneration.current++;
-    if (document.fullscreenElement === root.current)
-      void document.exitFullscreen().catch(() => {});
-    setMode("normal");
-  }, []);
-  const immersive = useCallback(async () => {
+  const exit = useCallback(async () => {
     requestGeneration.current++;
     if (document.fullscreenElement === root.current)
       await document.exitFullscreen().catch(() => {});
-    setMode("immersive");
+    setMode("normal");
   }, []);
   const toggle = useCallback((): true => {
     if (mode !== "normal") {
-      exit();
+      void exit();
       return true;
     }
-    setMode("immersive");
     const element = root.current;
     const generation = ++requestGeneration.current;
     if (
       element &&
-      document.fullscreenEnabled &&
+      canFullscreen &&
       typeof element.requestFullscreen === "function"
     ) {
       void element
@@ -57,21 +53,15 @@ export function useTvPresentation() {
             return document.exitFullscreen();
         })
         .catch(() => {
-          /* Inline immersive layout is the complete fallback. */
+          if (generation === requestGeneration.current) setRejected(true);
         });
     }
     return true;
-  }, [mode, exit]);
+  }, [mode, exit, canFullscreen]);
   useEffect(() => {
     const element = root.current;
     const change = () =>
-      setMode((previous) =>
-        document.fullscreenElement === element
-          ? "fullscreen"
-          : previous === "fullscreen"
-            ? "normal"
-            : previous,
-      );
+      setMode(document.fullscreenElement === element ? "fullscreen" : "normal");
     document.addEventListener("fullscreenchange", change);
     return () => {
       requestGeneration.current++;
@@ -94,5 +84,5 @@ export function useTvPresentation() {
     update();
     return () => observer.disconnect();
   }, []);
-  return { root, surface, portals, mode, toggle, exit, immersive };
+  return { root, surface, portals, mode, toggle, exit, canFullscreen };
 }

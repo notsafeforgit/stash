@@ -33,6 +33,9 @@ export interface ScenePlayerCommands {
   setVolume: (volume: number) => void;
   toggleMuted: () => void;
   setRate: (rate: number) => void;
+  /** A held rate is restored on null and never becomes a saved preference. */
+  setTemporaryRate: (rate: number | null) => void;
+  subscribeToZoomGesture: (cancel: () => void) => () => void;
   setCaption: (index: number | null) => void;
   toggleCaptions: () => void;
   selectSource: (src: string) => void;
@@ -95,6 +98,8 @@ export function ScenePlayerControlsProvider({
   resetQuality: () => void;
   retry: () => void;
   resetZoom: () => void;
+  temporaryRateChanged: (rate: number | null) => void;
+  subscribeToZoomGesture: (cancel: () => void) => () => void;
 }) {
   const store = Player.usePlayer();
   const [listeners] = useState(() => new Set<() => void>());
@@ -105,6 +110,7 @@ export function ScenePlayerControlsProvider({
     for (const notify of listeners) notify();
   });
   const value = useMemo<ControlContext>(() => {
+    let originalRate: number | undefined;
     const tracks = () =>
       latest.current.rootRef.current?.querySelector("video")?.textTracks;
     const setCaption = (index: number | null) => {
@@ -160,6 +166,20 @@ export function ScenePlayerControlsProvider({
           if (Number.isFinite(rate) && rate >= 0.25 && rate <= 16)
             store.setPlaybackRate(rate);
         },
+        setTemporaryRate: (rate) => {
+          if (rate === null) {
+            if (originalRate !== undefined && store.target)
+              store.setPlaybackRate(originalRate);
+            originalRate = undefined;
+            latest.current.temporaryRateChanged(null);
+          } else if (Number.isFinite(rate) && rate >= 0.25 && rate <= 16) {
+            originalRate ??= store.state.playbackRate;
+            latest.current.temporaryRateChanged(rate);
+            store.setPlaybackRate(rate);
+          }
+        },
+        subscribeToZoomGesture: (cancel) =>
+          latest.current.subscribeToZoomGesture(cancel),
         setCaption,
         toggleCaptions: () => {
           const list = tracks();

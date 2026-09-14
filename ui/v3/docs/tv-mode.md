@@ -15,11 +15,13 @@ that stays stable across pages. Matching orientation
 uses the viewing surface, including forced rotation, and includes square videos.
 
 Swipe vertically, use a wheel gesture, or press Up/Down to change videos.
-Seek buttons jump between markers and otherwise move ten
-seconds. Hold forward for faster playback or reverse for backward scrubbing;
-Up/Down changes the held speed. Release, blur, and visibility changes restore
-the previous rate and pause state. Menus, form inputs, and zoom take ownership
-of their input. The guide inside TV lists the remaining shortcuts.
+Tap the video to play or pause, hold it for temporary 2× playback, and use the
+scrubber to seek. There are no separate transport buttons. Left/Right keys seek
+between markers or by ten seconds; holding those keys retains forward-speed
+and reverse-scrubbing controls, with Up/Down adjusting the held speed. Release,
+blur, visibility changes and zoom gestures restore the previous rate and pause
+state. A swipe cannot also become a tap or a speed hold. The guide lists the
+remaining shortcuts.
 
 Scenes can start at resume, beginning, a sampled marker, or a sampled position.
 Playback can use the full scene or a fixed/random duration window, with stop,
@@ -36,20 +38,27 @@ time and playback state. It does not change the shared player's saved quality.
 Transcodes are generated on demand by Stash; no generated video preview mode
 is involved. Posters and timeline sprite images remain available.
 
-TV starts muted and retains user audio/rate choices across item changes.
+TV starts muted with a visible mute/unmute control in the bottom dock, and
+retains user audio/rate choices across item changes. Temporary holds never
+replace the saved playback rate.
 Playback menus include captions and supported device playback controls.
 Fit/fill, zoom, rotation, left-handed actions, and hiding controls are available.
-Settings, restore-controls, and navigation stay reachable with chrome hidden.
+Navigation, mute, Settings and restore-controls stay reachable in the bottom
+dock with chrome hidden. Pinned actions use that dock; the remaining action
+rail is bounded above it, on the preferred hand's side.
 Use the navigation drawer to switch to another top-level page; TV has no close
 button. The drawer also remains available while loading or when media is
-unavailable. Escape closes an open menu or exits immersive presentation while
+unavailable. Escape closes an open menu or exits fullscreen while
 remaining on the TV page.
 
-Fullscreen targets the entire TV container. When unavailable or rejected,
-immersive presentation fills the viewport with inline video and the TV UI.
+Fullscreen targets the entire TV container and is offered only when the browser
+supports it. When unavailable or rejected, the action is hidden and TV retains
+its ordinary inline layout. There is no simulated immersive fallback.
 TV never requests native video fullscreen, including on iOS Safari. Browser
 bars may remain visible. Dialogs and menus use a portal inside the presentation
-surface, and rotated slider and zoom gestures map to its coordinates.
+surface, and rotated slider and zoom gestures map to its coordinates. Dialogs
+keep Close reachable below a bounded scroller; long titles, descriptions and
+tag/performer labels wrap without horizontal overflow.
 
 ## Actions and settings
 

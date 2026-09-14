@@ -10,10 +10,9 @@ import {
 } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
-  ArrowLeft,
-  ArrowRight,
   Play,
-  Pause,
+  Volume2,
+  VolumeX,
   Eye,
   Scan,
   PictureInPicture,
@@ -71,21 +70,21 @@ type Panel =
     }
   | { kind: "edit"; target: TvEditTarget };
 
-function PlayButton() {
+function MuteButton() {
   const msg = useMsg();
   const controls = useScenePlayerControls();
-  const paused = useScenePlayerValue("paused");
+  const muted = useScenePlayerValue("muted");
   return (
     <Button
       variant="secondary"
       size="icon-lg"
       className="size-11"
-      onClick={controls.togglePaused}
+      onClick={controls.toggleMuted}
       aria-label={
-        paused ? msg("tv.text.play", "Play") : msg("tv.text.pause", "Pause")
+        muted ? msg("tv.text.unmute", "Unmute") : msg("tv.text.mute", "Mute")
       }
     >
-      {paused ? <Play /> : <Pause />}
+      {muted ? <VolumeX /> : <Volume2 />}
     </Button>
   );
 }
@@ -96,12 +95,14 @@ function RailEntry({
   folder,
   setFolder,
   busy,
+  fullscreen,
 }: {
   entry: TvRailEntry;
   run: (action: TvAction) => void;
   folder: string | null;
   setFolder: (id: string | null) => void;
   busy: boolean;
+  fullscreen: boolean;
 }) {
   const msg = useMsg();
   if (entry.type === "action") {
@@ -113,10 +114,12 @@ function RailEntry({
         className="size-11 shrink-0"
         aria-label={
           entry.action.label ||
-          msg(
-            `tv.action.${entry.action.kind}`,
-            tvActionLabels[entry.action.kind],
-          )
+          (entry.action.kind === "fullscreen" && fullscreen
+            ? msg("tv.text.exit_fullscreen", "Exit fullscreen")
+            : msg(
+                `tv.action.${entry.action.kind}`,
+                tvActionLabels[entry.action.kind],
+              ))
         }
         disabled={
           busy &&
@@ -148,7 +151,7 @@ function RailEntry({
       >
         <Icon />
       </DropdownMenuTrigger>
-      <DropdownMenuContent side="left">
+      <DropdownMenuContent side={entry.pinned ? "top" : "left"}>
         <DropdownMenuGroup>
           {entry.actions.map((action) => {
             const Icon = tvActionIcon(action);
@@ -164,7 +167,12 @@ function RailEntry({
               >
                 <Icon />
                 {action.label ||
-                  msg(`tv.action.${action.kind}`, tvActionLabels[action.kind])}
+                  (action.kind === "fullscreen" && fullscreen
+                    ? msg("tv.text.exit_fullscreen", "Exit fullscreen")
+                    : msg(
+                        `tv.action.${action.kind}`,
+                        tvActionLabels[action.kind],
+                      ))}
               </DropdownMenuItem>
             );
           })}
@@ -232,6 +240,8 @@ export function TvControls({
   rotation,
   setRotation,
   togglePresentation,
+  canFullscreen,
+  fullscreen,
   exitPresentation,
   openNavigation,
   navigateItem,
@@ -256,6 +266,8 @@ export function TvControls({
   rotation: TvRotation;
   setRotation: (rotation: TvRotation) => void;
   togglePresentation: () => true;
+  canFullscreen: boolean;
+  fullscreen: boolean;
   exitPresentation: () => void;
   openNavigation: () => void;
   navigateItem: (direction: -1 | 1) => void;
@@ -272,6 +284,7 @@ export function TvControls({
   onInteractionBlockedChange: (blocked: boolean) => void;
 }) {
   const controls = useScenePlayerControls();
+  const paused = useScenePlayerValue("paused");
   const navigate = useNavigate();
   const msg = useMsg();
   const [panel, setPanel] = useState<Panel>({ kind: "closed" });
@@ -400,7 +413,13 @@ export function TvControls({
   });
   const canPip = useScenePlayerValue("canPip");
   const zoomed = useScenePlayerValue("zoomed");
-  const entries = settings.rail;
+  const entries = settings.rail.flatMap<TvRailEntry>((entry) => {
+    const available = (action: TvAction) =>
+      action.kind !== "fullscreen" || canFullscreen;
+    if (entry.type === "action") return available(entry.action) ? [entry] : [];
+    const actions = entry.actions.filter(available);
+    return actions.length ? [{ ...entry, actions }] : [];
+  });
   const renderEntry = (entry: TvRailEntry) => (
     <RailEntry
       key={railEntryId(entry)}
@@ -409,175 +428,169 @@ export function TvControls({
       folder={folder}
       setFolder={setFolder}
       busy={mutations.busy}
+      fullscreen={fullscreen}
     />
   );
   return (
     <div
-      className="pointer-events-none absolute inset-0 text-foreground"
+      className="pointer-events-none absolute inset-0 flex min-h-0 flex-col justify-end text-foreground"
       data-tv-controls
     >
-      <div className="tv-topbar pointer-events-auto absolute left-0 right-0 top-0 flex items-center gap-2 p-3">
-        <TvNavigationButton
-          onClick={() => {
-            controls.pause();
-            openNavigation();
-          }}
-        />
-        <span
-          className={cn(
-            "min-w-0 flex-1 truncate rounded-lg bg-background/80 px-3 py-2 text-sm",
-            !visible && "invisible",
-          )}
+      <Button
+        variant="ghost"
+        data-video-gesture-surface=""
+        data-tv-play-surface
+        aria-label={
+          paused ? msg("tv.text.play", "Play") : msg("tv.text.pause", "Pause")
+        }
+        className="pointer-events-auto absolute inset-0 size-full touch-none rounded-none p-0 hover:bg-transparent active:translate-y-0 [-webkit-touch-callout:none]"
+        onClick={input.tap}
+      />
+      {paused && (
+        <div
+          className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-background/70 p-4"
+          aria-hidden
         >
-          {objectTitle(scene)}
-        </span>
-        {!visible && (
-          <>
-            <Button
-              variant="secondary"
-              size="icon-lg"
-              className="size-11"
-              aria-label={msg("tv.text.show_tv_controls", "Show TV controls")}
-              onClick={() => setVisible(true)}
-            >
-              <Eye />
-            </Button>
-            <Button
-              variant="secondary"
-              size="icon-lg"
-              className="size-11"
-              aria-label={msg("tv.text.tv_settings", "TV settings")}
-              onClick={() => action("settings")}
-            >
-              <Settings />
-            </Button>
-          </>
-        )}
-      </div>
+          <Play className="size-8" />
+        </div>
+      )}
+      <SourceFeedback openQuality={() => action("quality")} />
       {visible && (
         <aside
           aria-label={msg("tv.text.tv_actions", "TV actions")}
           data-tv-interactive
           className={cn(
-            "pointer-events-auto absolute bottom-36 top-20 flex w-14 flex-col gap-2",
-            settings.leftHanded ? "left-3" : "right-3",
+            "pointer-events-auto relative mb-3 flex min-h-0 max-h-[30%] w-11 flex-col gap-2",
+            settings.leftHanded ? "ml-3 mr-auto" : "ml-auto mr-3",
           )}
         >
-          <div className="flex max-h-1/2 shrink-0 flex-col gap-2 overflow-y-auto overscroll-contain">
-            {entries.filter((entry) => entry.pinned).map(renderEntry)}
-          </div>
-          <div className="flex min-h-0 flex-col gap-2 overflow-y-auto overscroll-contain pb-2">
+          <div className="flex min-h-0 flex-col gap-2 overflow-y-auto overscroll-contain">
             {entries.filter((entry) => !entry.pinned).map(renderEntry)}
           </div>
         </aside>
       )}
-      <SourceFeedback openQuality={() => action("quality")} />
-      {visible && (
-        <div className="tv-footer pointer-events-auto absolute bottom-0 left-0 right-0 flex flex-col gap-1 bg-background/85 p-3">
-          <TvTimeline scene={scene} range={range} />
-          <div className="flex items-center justify-between gap-1">
-            <div className="flex items-center gap-1">
-              <Button
-                variant="secondary"
-                size="icon-lg"
-                className="size-11"
-                aria-label={msg(
-                  "tv.text.seek_to_previous_marker",
-                  "Seek to previous marker",
-                )}
-                onPointerDown={() => input.startHold(-1)}
-                onPointerUp={input.endHold}
-                onPointerCancel={input.endHold}
-                onPointerLeave={input.endHold}
-                onClick={() => input.seekClick(-1)}
-              >
-                <ArrowLeft />
-              </Button>
-              <PlayButton />
-              <Button
-                variant="secondary"
-                size="icon-lg"
-                className="size-11"
-                aria-label={msg(
-                  "tv.text.seek_to_next_marker",
-                  "Seek to next marker",
-                )}
-                onPointerDown={() => input.startHold(1)}
-                onPointerUp={input.endHold}
-                onPointerCancel={input.endHold}
-                onPointerLeave={input.endHold}
-                onClick={() => input.seekClick(1)}
-              >
-                <ArrowRight />
-              </Button>
+      <div
+        className="tv-footer pointer-events-auto relative flex shrink-0 flex-col gap-2 bg-background/85 p-3"
+        data-tv-dock
+        data-tv-interactive
+      >
+        {visible && (
+          <>
+            <div className="flex min-w-0 items-center gap-2">
+              <p className="min-w-0 flex-1 truncate text-sm">
+                {objectTitle(scene)}
+              </p>
+              <span className="shrink-0 text-xs text-muted-foreground">
+                {snapshot.selected + 1} / {snapshot.total ?? "…"} ·{" "}
+                {completion === "advance"
+                  ? msg("tv.text.auto_advance", "Auto-advance")
+                  : completion === "loop"
+                    ? msg("tv.text.loop_2", "Loop")
+                    : msg("tv.text.stop_at_end", "Stop at end")}
+              </span>
             </div>
-            <div className="flex items-center gap-1">
-              {zoomed && (
-                <Button
-                  variant="secondary"
-                  size="icon-lg"
-                  className="size-11"
-                  aria-label={msg("tv.text.reset_zoom", "Reset zoom")}
-                  onClick={controls.resetZoom}
-                >
-                  <Scan />
-                </Button>
-              )}
-              {canPip && (
-                <Button
-                  variant="secondary"
-                  size="icon-lg"
-                  className="hidden size-11 sm:inline-flex"
-                  aria-label={msg(
-                    "tv.text.picture_in_picture",
-                    "Picture in picture",
-                  )}
-                  onClick={controls.togglePip}
-                >
-                  <PictureInPicture />
-                </Button>
-              )}
-            </div>
-          </div>
-          <div className="flex min-h-6 items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span>
-              {snapshot.selected + 1} / {snapshot.total ?? "…"} ·{" "}
-              {completion === "advance"
-                ? msg("tv.text.auto_advance", "Auto-advance")
-                : completion === "loop"
-                  ? msg("tv.text.loop_2", "Loop")
-                  : msg("tv.text.stop_at_end", "Stop at end")}
-            </span>
             {snapshot.status === "loading" ? (
               <Spinner />
             ) : snapshot.status === "error" ||
               snapshot.status === "continue" ? (
-              <Button size="sm" variant="link" onClick={retry}>
+              <Button
+                className="min-h-11"
+                size="sm"
+                variant="link"
+                onClick={retry}
+              >
                 {snapshot.status === "error"
                   ? msg("tv.text.retry_loading", "Retry loading")
                   : msg("tv.text.load_more", "Load more")}
               </Button>
             ) : snapshot.exhausted &&
               snapshot.selected === snapshot.items.length - 1 ? (
-              <Button size="sm" variant="link" onClick={reshuffle}>
+              <Button
+                className="min-h-11"
+                size="sm"
+                variant="link"
+                onClick={reshuffle}
+              >
                 <FormattedMessage
                   id="tv.text.replay_reshuffle"
                   defaultMessage="Replay / reshuffle"
                 />
               </Button>
-            ) : (
-              <Button size="sm" variant="link" onClick={() => action("help")}>
-                <FormattedMessage id="tv.text.guide" defaultMessage="Guide" />
+            ) : null}
+            <TvTimeline scene={scene} range={range} />
+          </>
+        )}
+        <div className="flex min-w-0 items-center gap-2">
+          <TvNavigationButton
+            onClick={() => {
+              controls.pause();
+              openNavigation();
+            }}
+          />
+          <MuteButton />
+          {visible && (
+            <div
+              className="flex min-w-0 flex-1 gap-2 overflow-x-auto overscroll-contain"
+              data-tv-pinned-actions
+            >
+              {entries.filter((entry) => entry.pinned).map(renderEntry)}
+            </div>
+          )}
+          {zoomed && (
+            <Button
+              variant="secondary"
+              size="icon-lg"
+              className="size-11"
+              aria-label={msg("tv.text.reset_zoom", "Reset zoom")}
+              onClick={controls.resetZoom}
+            >
+              <Scan />
+            </Button>
+          )}
+          {canPip && (
+            <Button
+              variant="secondary"
+              size="icon-lg"
+              className="hidden size-11 sm:inline-flex"
+              aria-label={msg(
+                "tv.text.picture_in_picture",
+                "Picture in picture",
+              )}
+              onClick={controls.togglePip}
+            >
+              <PictureInPicture />
+            </Button>
+          )}
+          {!visible && (
+            <>
+              <div className="min-w-0 flex-1" />
+              <Button
+                variant="secondary"
+                size="icon-lg"
+                className="size-11"
+                aria-label={msg("tv.text.show_tv_controls", "Show TV controls")}
+                onClick={() => setVisible(true)}
+              >
+                <Eye />
               </Button>
-            )}
-          </div>
-          {snapshot.error && (
-            <p role="alert" className="text-xs">
-              {snapshot.error}
-            </p>
+              <Button
+                variant="secondary"
+                size="icon-lg"
+                className="size-11"
+                aria-label={msg("tv.text.tv_settings", "TV settings")}
+                onClick={() => action("settings")}
+              >
+                <Settings />
+              </Button>
+            </>
           )}
         </div>
-      )}
+        {visible && snapshot.error && (
+          <p role="alert" className="text-xs">
+            {snapshot.error}
+          </p>
+        )}
+      </div>
       <Suspense fallback={<Spinner className="absolute left-1/2 top-1/2" />}>
         {panel.kind === "help" && (
           <TvHelp close={() => setPanel({ kind: "closed" })} />

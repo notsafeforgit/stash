@@ -54,7 +54,7 @@ export const tvActionLabels: Record<TvActionKind, string> = {
   "quick-marker": "Quick marker",
   delete: "Delete current item",
   rotation: "Rotate presentation",
-  fullscreen: "Immersive / fullscreen",
+  fullscreen: "Fullscreen",
   volume: "Volume",
   fit: "Fit or fill",
   completion: "Playback mode",

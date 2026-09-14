@@ -6,13 +6,8 @@ import {
   DeleteDialog,
   DeleteFilesList,
 } from "@/components/detail/delete-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
+import { TvDialogContent } from "./tv-dialog";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, FieldGroup } from "@/components/ui/field";
 import { TvTagPicker, TvTagsPicker } from "./tv-tag-picker";
@@ -155,15 +150,14 @@ export default function TvEditPanel({
         if (!open && !mutations.busy) close();
       }}
     >
-      <DialogContent className="max-h-[calc(100%-2rem)] overflow-y-auto sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>
-            {target.kind === "marker"
-              ? msg("tv.text.create_marker", "Create marker")
-              : msg("tv.text.edit_tags", "Edit tags")}
-          </DialogTitle>
-          <DialogDescription>{title}</DialogDescription>
-        </DialogHeader>
+      <TvDialogContent
+        title={
+          target.kind === "marker"
+            ? msg("tv.text.create_marker", "Create marker")
+            : msg("tv.text.edit_tags", "Edit tags")
+        }
+        description={title}
+      >
         {target.kind === "marker" ? (
           <MarkerEditForm
             sceneId={target.scene.id}
@@ -180,7 +174,7 @@ export default function TvEditPanel({
         ) : (
           <TagsForm target={target} mutations={mutations} close={close} />
         )}
-      </DialogContent>
+      </TvDialogContent>
     </Dialog>
   );
 }

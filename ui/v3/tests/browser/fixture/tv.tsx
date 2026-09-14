@@ -42,7 +42,25 @@ const scenes: GQL.SceneDataFragment[] = Array.from(
     const scene = {
       ...base,
       id,
-      title: `Scene ${id}`,
+      title: params.has("long-info")
+        ? `Scene ${id} ${"VeryLongUnbrokenTitle".repeat(25)}`
+        : `Scene ${id}`,
+      details: params.has("long-info")
+        ? "Long description. ".repeat(100)
+        : base.details,
+      tags: params.has("long-info")
+        ? Array.from({ length: 60 }, (_, tagIndex) => ({
+            __typename: "Tag" as const,
+            id: `tag-${tagIndex}`,
+            name: `Tag ${tagIndex} ${tagIndex === 0 ? "UnbrokenTagName".repeat(30) : "A long tag label"}`,
+            sort_name: null,
+            aliases: [],
+            image_path: null,
+            parent_count: 0,
+            child_count: 0,
+            stash_ids: [],
+          }))
+        : base.tags,
       paths: {
         ...base.paths,
         caption: new URL(`/scene/${id}/caption`, location.href).href,

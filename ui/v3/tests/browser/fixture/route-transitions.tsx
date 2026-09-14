@@ -12,17 +12,28 @@ import { Input } from "@/components/ui/input";
 import { installRouteTransitions } from "@/core/route-transitions";
 import { RouteViewport } from "@/components/layout/route-viewport";
 import { getScrollRestorationKey } from "@/core/scroll-restoration";
+import { detailRouteState } from "@/components/detail/detail-route-state";
+import { MobileNavigationProvider } from "@/components/layout/mobile-navigation";
+
+declare global {
+  interface Window {
+    releaseDetailLoad?: () => void;
+  }
+}
+let failedOnce = false;
 
 function TransitionShell() {
   return (
-    <div className="flex h-dvh flex-col bg-background text-foreground">
-      <header className="flex h-14 shrink-0 items-center border-b px-6">
-        Library
-      </header>
-      <RouteViewport>
-        <Outlet />
-      </RouteViewport>
-    </div>
+    <MobileNavigationProvider>
+      <div className="flex h-dvh flex-col bg-background text-foreground">
+        <header className="flex h-14 shrink-0 items-center border-b px-6">
+          Library
+        </header>
+        <RouteViewport>
+          <Outlet />
+        </RouteViewport>
+      </div>
+    </MobileNavigationProvider>
   );
 }
 
@@ -51,6 +62,16 @@ function TransitionList() {
       >
         Slow entity
       </Link>
+      {["pending", "error"].map((entityId) => (
+        <Link<typeof transitionRouter, string, "/transitions/$entityId">
+          key={entityId}
+          to="/transitions/$entityId"
+          params={{ entityId }}
+          state={{ returnTo: "/transitions" }}
+        >
+          {entityId} entity
+        </Link>
+      ))}
     </div>
   );
 }
@@ -137,10 +158,20 @@ const rootRoute = createRootRoute({ component: TransitionShell });
 const detailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/transitions/$entityId",
+  ...detailRouteState,
   validateSearch: (search: Record<string, unknown>) => ({
     tab: typeof search.tab === "string" ? search.tab : undefined,
   }),
   loader: async ({ params }) => {
+    if (params.entityId === "pending") {
+      await new Promise<void>((resolve) => {
+        window.releaseDetailLoad = resolve;
+      });
+    }
+    if (params.entityId === "error" && !failedOnce) {
+      failedOnce = true;
+      throw new Error("Temporary entity load failure");
+    }
     if (params.entityId === "slow") {
       await new Promise((resolve) => setTimeout(resolve, 300));
     }

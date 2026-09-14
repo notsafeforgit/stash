@@ -25,7 +25,7 @@ import { pickDownloadFormat } from "./pick-download-format";
 import {
   useDownloadQueue,
   getDownloadQueueStore,
-  canCoordinateDownloads,
+  canDownloadScenes,
 } from "./use-download-queue";
 import {
   loadOfflineMaxResolution,
@@ -152,7 +152,7 @@ export function useSceneDownloadAction(
     status,
     entry,
     disabled:
-      !canCoordinateDownloads() ||
+      !canDownloadScenes() ||
       !file ||
       entryLoading ||
       !!entryError ||

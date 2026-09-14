@@ -108,22 +108,22 @@ const touchPointer = {
 };
 
 for (const kind of ["image", "scene"] as const) {
-  test(`${kind} thumbnail responds before opening and the lightbox reveals stable media`, async ({
+  test(`${kind} card responds before opening and the lightbox reveals stable media`, async ({
     page,
   }) => {
     await page.goto("/motion");
-    const preview = page.locator(
-      `article[data-id="${kind}"] [data-entity-card-preview]`,
-    );
-    const original = await preview.elementHandle();
+    const card = page.locator(`article[data-id="${kind}"]`);
+    const preview = card.locator("[data-entity-card-preview]");
+    const original = await card.elementHandle();
     await preview.dispatchEvent("pointerdown", { ...touchPointer, buttons: 1 });
     await expect
       .poll(() =>
-        preview.evaluate((element) =>
+        card.evaluate((element) =>
           Number.parseFloat(getComputedStyle(element).scale),
         ),
       )
       .toBeGreaterThan(1.02);
+    await expect(preview).toHaveCSS("scale", "none");
     await expect(page.locator(".yarl__portal")).toHaveCount(0);
     await preview.dispatchEvent("pointerup", { ...touchPointer, buttons: 0 });
     await preview.dispatchEvent("click");
@@ -185,16 +185,16 @@ test("scrolling cancels card feedback, while nested controls and selection keep 
     buttons: 0,
     clientY: 330,
   });
-  await expect(preview).toHaveCSS("scale", "none");
+  await expect(card).toHaveCSS("scale", "none");
   await expect(page.locator(".yarl__portal")).toHaveCount(0);
   const action = card.getByRole("button", { name: "Card action", exact: true });
   await action.dispatchEvent("pointerdown", { ...touchPointer, buttons: 1 });
-  await expect(preview).toHaveCSS("scale", "none");
+  await expect(card).toHaveCSS("scale", "none");
   await action.click();
   await expect(page.getByTestId("selection")).toHaveText("true");
   await page.getByRole("button", { name: "Select cards", exact: true }).click();
   await preview.dispatchEvent("pointerdown", { ...touchPointer, buttons: 1 });
-  await expect(preview).toHaveCSS("scale", "none");
+  await expect(card).toHaveCSS("scale", "none");
   await preview.dispatchEvent("click");
   await expect(page.getByTestId("selection")).toHaveText("false");
   await expect(page.locator(".yarl__portal")).toHaveCount(0);
@@ -204,12 +204,11 @@ test("Reduce Motion cancels a held press and skips the lightbox reveal", async (
   page,
 }) => {
   await page.goto("/motion");
-  const preview = page.locator(
-    'article[data-id="image"] [data-entity-card-preview]',
-  );
+  const card = page.locator('article[data-id="image"]');
+  const preview = card.locator("[data-entity-card-preview]");
   await preview.dispatchEvent("pointerdown", { ...touchPointer, buttons: 1 });
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await expect(preview).toHaveCSS("scale", "none");
+  await expect(card).toHaveCSS("scale", "none");
   await preview.dispatchEvent("pointerup", { ...touchPointer, buttons: 0 });
   await preview.dispatchEvent("click");
   await expect(page.locator("[data-lightbox-reveal]")).toHaveCSS(

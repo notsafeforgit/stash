@@ -132,6 +132,7 @@ test.describe("mobile touch navigation", () => {
       const start = frames[0];
       if (!start) throw new Error("Missing animation frames");
       expect(start.opacity).toBeLessThan(1);
+      expect(start.opacity).toBeGreaterThanOrEqual(0.85);
       expect(
         frames.every((frame) => frame.x === 0 && frame.contentOpacity === 1),
       ).toBe(true);
@@ -350,4 +351,40 @@ test("a slow route keeps its outgoing content until the route can commit", async
   await expect
     .poll(() => page.evaluate(() => window.observedTransitions.length))
     .toBe(1);
+});
+
+test("a long detail load stays navigable and a cancelled load cannot replace the current page", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/transitions");
+  await page.getByRole("link", { name: "pending entity" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Entities", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.locator('[data-slot="skeleton"]').filter({ visible: true }).first(),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await page.evaluate(() => window.releaseDetailLoad?.());
+  await expect(
+    page.getByRole("heading", { name: "Entities", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator('[data-slot="skeleton"]')).toHaveCount(0);
+});
+
+test.describe("detail load recovery", () => {
+  test.use({ expectedConsoleErrors: ["Error: Temporary entity load failure"] });
+  test("a failed detail load offers a working retry", async ({ page }) => {
+    await page.goto("/transitions");
+    await page.getByRole("link", { name: "error entity" }).click();
+    await expect(page.getByRole("alert")).toContainText(
+      "Temporary entity load failure",
+    );
+    await page.getByRole("button", { name: "Retry", exact: true }).click();
+    await expect(
+      page.getByRole("heading", { name: "Entity error" }),
+    ).toBeVisible();
+    await expect(page.getByRole("alert")).toHaveCount(0);
+  });
 });

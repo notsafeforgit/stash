@@ -17,7 +17,10 @@ const DETAIL_ROUTE_RE =
 export function AppShell() {
   useNavHotkeys();
   useTrackBrowsePage();
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  // Keep the outgoing page's chrome while the destination loader is pending.
+  const pathname = useRouterState({
+    select: (s) => s.matches.at(-1)?.pathname ?? s.location.pathname,
+  });
   const isDetailPage = DETAIL_ROUTE_RE.test(pathname);
   const ownsMobileNavigation =
     isDetailPage ||

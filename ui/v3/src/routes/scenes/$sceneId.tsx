@@ -54,6 +54,12 @@ import { DetailEditTransition } from "src/components/detail/detail-edit-transiti
 import { DetailEditorLayout } from "@/components/detail/detail-editor-layout";
 import { useDocumentTitle } from "src/hooks/title";
 import { useLightboxHistory } from "src/components/lightbox/use-lightbox-history";
+import { getClient } from "@/core/client";
+import {
+  detailRouteState,
+  SceneRoutePending,
+} from "@/components/detail/detail-route-state";
+import { QueryError } from "@/components/query-error";
 
 // ── Route search params ────────────────────────────────────────────────────────
 
@@ -275,10 +281,13 @@ function SceneDetailPage() {
   const { configuration } = useConfigurationContext();
   const autostartEnabled = configuration.interface.autostartVideo ?? true;
 
-  const { data, loading, error, refetch } = useQuery(GQL.FindSceneDocument, {
-    variables: { id: sceneId },
-    fetchPolicy: "cache-first",
-  });
+  const { data, previousData, loading, error, refetch } = useQuery(
+    GQL.FindSceneDocument,
+    {
+      variables: { id: sceneId },
+      fetchPolicy: "cache-first",
+    },
+  );
 
   const [addO] = useMutation(GQL.SceneAddODocument, {
     variables: { id: sceneId },
@@ -361,10 +370,17 @@ function SceneDetailPage() {
     if (activeTab !== "details") setEditingDetails(false);
   }, [activeTab]);
 
-  const scene = data?.findScene;
+  // A failed background refresh must not dispose a playing scene. Never carry
+  // another scene's data across navigation, or mask an explicit not-found result.
+  const scene =
+    data !== undefined
+      ? data.findScene
+      : previousData?.findScene?.id === sceneId
+        ? previousData.findScene
+        : undefined;
   useDocumentTitle(scene ? objectTitle(scene) || undefined : undefined);
 
-  if (loading) {
+  if (loading && !scene) {
     return (
       <div className="flex items-center justify-center h-48 text-muted-foreground">
         <Spinner className="size-10" />
@@ -372,7 +388,7 @@ function SceneDetailPage() {
     );
   }
 
-  if (error || !scene) {
+  if (!scene) {
     return (
       <div className="p-4 text-destructive">
         {error?.message ??
@@ -559,7 +575,19 @@ function SceneDetailPage() {
     <MediaDetailLayout
       title={objectTitle(scene) || undefined}
       primaryContent={player}
-      headerContent={toolbar}
+      headerContent={
+        <>
+          {error && (
+            <QueryError
+              error={error}
+              retry={refetch}
+              retrying={loading}
+              stale
+            />
+          )}
+          {toolbar}
+        </>
+      }
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={setActiveTab}
@@ -576,5 +604,15 @@ function SceneDetailPage() {
 
 export const Route = createFileRoute("/scenes/$sceneId")({
   validateSearch: searchSchema,
+  ...detailRouteState,
+  pendingComponent: SceneRoutePending,
+  loader: ({ params }) =>
+    getClient()
+      .query({
+        query: GQL.FindSceneDocument,
+        variables: { id: params.sceneId },
+        fetchPolicy: "cache-first",
+      })
+      .then(() => undefined),
   component: SceneDetailPage,
 });

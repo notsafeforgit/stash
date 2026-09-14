@@ -7,7 +7,7 @@ import {
 import { createPaintAnimation } from "@/core/paint-animation";
 import { motion } from "@/core/motion";
 
-/** A small thumbnail response, starting on finger-down without rerendering the
+/** A small whole-card response, starting on finger-down without rerendering the
  * card or delaying its action. Scrolling, selection and nested actions cancel it. */
 export function useCardPress() {
   const feedback = useRef<ReturnType<typeof createPaintAnimation> | null>(null);
@@ -33,12 +33,9 @@ export function useCardPress() {
       )
     )
       return;
-    const target = event.currentTarget.querySelector<HTMLElement>(
-      "[data-entity-card-preview]",
-    );
+    const target = event.currentTarget;
     const preference = matchMedia("(prefers-reduced-motion: reduce)");
-    if (!target || typeof target.animate !== "function" || preference.matches)
-      return;
+    if (typeof target.animate !== "function" || preference.matches) return;
     const { pointerId, clientX, clientY } = event;
     feedback.current ??= createPaintAnimation();
     const controller = feedback.current;

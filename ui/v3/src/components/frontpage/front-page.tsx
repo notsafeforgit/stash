@@ -1,4 +1,11 @@
-import { lazy, Suspense, useMemo, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useIntl } from "react-intl";
 import { useDocumentTitle } from "src/hooks/title";
 import { Settings2 } from "lucide-react";
@@ -18,6 +25,7 @@ import {
 import { CardAspectContext } from "src/components/list/card-aspect-context";
 import { DeferredMount } from "@/components/shared/deferred-mount";
 import { Spinner } from "@/components/ui/spinner";
+import { FrontPageRowContext, useFrontPageState } from "./front-page-state";
 
 const FrontPageConfig = lazy(() =>
   import("./front-page-config").then((module) => ({
@@ -44,6 +52,13 @@ export function FrontPage() {
     () => getFrontPageContent(ui) ?? generateDefaultFrontPageContent(intl),
     [ui, intl],
   );
+  const visit = useFrontPageState(
+    JSON.stringify([intl.locale, rows]),
+    rows.length,
+  );
+  useLayoutEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = visit.scrollTop;
+  }, [visit]);
 
   async function handleSave(updated: FrontPageContent[]) {
     setConfigOpen(false);
@@ -72,6 +87,9 @@ export function FrontPage() {
       <div
         ref={scrollRef}
         data-front-page
+        onScroll={(event) => {
+          visit.scrollTop = event.currentTarget.scrollTop;
+        }}
         className="flex flex-col gap-6 py-4 flex-1 min-h-0 overflow-y-auto"
       >
         {rows.map((content, i) => {
@@ -89,22 +107,37 @@ export function FrontPage() {
                     )
                   : `${content.mode}`));
           return (
-            <DeferredMount
-              key={i}
-              eager={i === 0}
-              scrollRoot={scrollRef}
-              fallback={
-                <RecommendationRow heading={heading} loading>
-                  {null}
-                </RecommendationRow>
-              }
+            <FrontPageRowContext.Provider
+              key={`${visit.key}:${i}`}
+              value={visit.rows[i]}
             >
-              {content.__typename === "SavedFilter" ? (
-                <SavedFilterCarouselRow content={content} />
-              ) : (
-                <CustomFilterCarouselRow heading={heading} content={content} />
-              )}
-            </DeferredMount>
+              <DeferredMount
+                eager={i === 0 || visit.rows[i]?.mounted}
+                scrollRoot={scrollRef}
+                fallback={
+                  content.__typename === "SavedFilter" ? (
+                    <SavedFilterCarouselRow content={content} placeholderOnly />
+                  ) : (
+                    <RecommendationRow
+                      heading={heading}
+                      mode={content.mode}
+                      loading
+                    >
+                      {null}
+                    </RecommendationRow>
+                  )
+                }
+              >
+                {content.__typename === "SavedFilter" ? (
+                  <SavedFilterCarouselRow content={content} />
+                ) : (
+                  <CustomFilterCarouselRow
+                    heading={heading}
+                    content={content}
+                  />
+                )}
+              </DeferredMount>
+            </FrontPageRowContext.Provider>
           );
         })}
 

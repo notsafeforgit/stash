@@ -25,6 +25,17 @@ import { locateEntry } from "./offline-db";
 
 const SCENES_DIR = "scenes";
 
+/** OPFS reads predate streaming writes in Safari. Detect the operation we need,
+ * not a browser name/version; existing files can still be read without it. */
+export function canWriteOfflineFiles(): boolean {
+  return (
+    globalThis.isSecureContext === true &&
+    typeof navigator.storage?.getDirectory === "function" &&
+    typeof FileSystemFileHandle !== "undefined" &&
+    typeof FileSystemFileHandle.prototype.createWritable === "function"
+  );
+}
+
 async function rootDir(): Promise<FileSystemDirectoryHandle> {
   if (!("storage" in navigator) || !navigator.storage.getDirectory) {
     throw new Error(
@@ -205,8 +216,8 @@ export async function clearAllScenes(): Promise<void> {
 
 /**
  * Storage estimate exposed in settings + on Offline view header.
- * Browsers may return values in different units; spec says bytes.
- * Both fields are best-effort and may be undefined on older engines.
+ * Both fields are approximate byte counts and may be unavailable. Estimates
+ * are advisory: their failure must not prevent an otherwise valid download.
  */
 export interface StorageEstimate {
   usage: number | undefined;
@@ -217,8 +228,12 @@ export async function storageEstimate(): Promise<StorageEstimate> {
   if (!("storage" in navigator) || !navigator.storage.estimate) {
     return { usage: undefined, quota: undefined };
   }
-  const e = await navigator.storage.estimate();
-  return { usage: e.usage, quota: e.quota };
+  try {
+    const e = await navigator.storage.estimate();
+    return { usage: e.usage, quota: e.quota };
+  } catch {
+    return { usage: undefined, quota: undefined };
+  }
 }
 
 /**
@@ -228,15 +243,41 @@ export async function storageEstimate(): Promise<StorageEstimate> {
  * Persistent storage is not a backup; users can still clear it.
  */
 export async function requestPersistent(): Promise<boolean> {
-  if (!("storage" in navigator) || !navigator.storage.persist) {
+  if (!canRequestPersistence()) return false;
+  try {
+    return await navigator.storage.persist();
+  } catch {
     return false;
   }
-  return navigator.storage.persist();
 }
 
 export async function isPersisted(): Promise<boolean> {
   if (!("storage" in navigator) || !navigator.storage.persisted) {
     return false;
   }
-  return navigator.storage.persisted();
+  try {
+    return await navigator.storage.persisted();
+  } catch {
+    return false;
+  }
+}
+
+export function canRequestPersistence(): boolean {
+  return typeof navigator.storage?.persist === "function";
+}
+
+const downloadPersistence = new WeakMap<StorageManager, Promise<boolean>>();
+
+/** Call from an explicit Download/Retry action, before asynchronous work. Ask
+ * once per page, including bulk actions, without delaying the transfer. The
+ * Settings request remains available if the browser initially declines. */
+export function requestDownloadPersistence(): Promise<boolean> {
+  if (!canRequestPersistence()) return Promise.resolve(false);
+  const storage = navigator.storage;
+  let request = downloadPersistence.get(storage);
+  if (!request) {
+    request = requestPersistent();
+    downloadPersistence.set(storage, request);
+  }
+  return request;
 }

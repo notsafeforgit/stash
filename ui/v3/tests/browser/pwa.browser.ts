@@ -1,5 +1,38 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test as base, expect, type Page } from "@playwright/test";
 import type { OfflineEntry } from "@/components/offline/offline-db";
+
+const test = base.extend<{ disconnect: () => Promise<void> }>({
+  context: async ({ browserName, playwright, context, baseURL }, use, info) => {
+    if (browserName !== "webkit") return use(context);
+    // Playwright's ephemeral WebKit profile rejects even a 16-byte OPFS write.
+    // Use a real isolated disk profile, as a normal Safari/PWA installation does.
+    const persistent = await playwright.webkit.launchPersistentContext(
+      info.outputPath("webkit-profile"),
+      { baseURL, headless: true },
+    );
+    try {
+      await use(persistent);
+    } finally {
+      await persistent.close();
+    }
+  },
+  disconnect: async ({ browserName, context, request }, use) => {
+    await request.post("/__pwa_network?online=1");
+    try {
+      await use(async () => {
+        if (browserName === "webkit") {
+          // WebKit's protocol offline emulation aborts navigation before the
+          // service worker runs. Close real HTTP sockets to test its fallback.
+          await request.post("/__pwa_network?online=0");
+        } else {
+          await context.setOffline(true);
+        }
+      });
+    } finally {
+      await request.post("/__pwa_network?online=1");
+    }
+  },
+});
 
 async function install(page: Page, prefix: string) {
   const response = await page.goto(`${prefix}offline.html`);
@@ -47,42 +80,8 @@ async function readEntry(page: Page, id: string) {
   }, id);
 }
 
-for (const prefix of ["/", "/stash/"]) {
-  test(`cold offline launch preserves the deployment base ${prefix}`, async ({
-    page,
-    context,
-    baseURL,
-  }) => {
-    await install(page, prefix);
-    await context.setOffline(true);
-    const response = await page.goto(`${prefix}performers/123`);
-    expect(response?.headers()["content-security-policy"]).toContain(
-      "worker-src blob: 'self'",
-    );
-    expect(response?.headers()["referrer-policy"]).toBe("same-origin");
-    await expect(
-      page.getByRole("heading", { name: "Offline library" }),
-    ).toBeVisible();
-    expect(await page.evaluate(() => document.baseURI)).toBe(
-      `${baseURL}${prefix}`,
-    );
-    await expect(
-      page.getByText("No saved videos", { exact: true }),
-    ).toBeVisible();
-  });
-}
-
-test("browser downloads finish with the app closed and play on an offline cold launch", async ({
-  page,
-  context,
-  browserName,
-}) => {
-  test.skip(
-    browserName !== "chromium",
-    "Native Background Fetch is exercised in Chromium; playback also requires its media codecs.",
-  );
-  await install(page, "/");
-  await page.evaluate(async () => {
+async function queueDownloads(page: Page, ids: string[]) {
+  await page.evaluate(async (ids) => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open(`stash-offline:v1:${location.origin}/`);
       request.onsuccess = () => resolve(request.result);
@@ -96,7 +95,7 @@ test("browser downloads finish with the app closed and play on an offline cold l
       .map((byte) => byte.toString(16).padStart(2, "0"))
       .join("");
     const tx = db.transaction("offline_scenes", "readwrite");
-    for (const sceneId of ["900000001", "900000002"]) {
+    for (const sceneId of ids) {
       const entry: OfflineEntry = {
         scene_id: sceneId,
         request_id: crypto.randomUUID(),
@@ -130,7 +129,107 @@ test("browser downloads finish with the app closed and play on an offline cold l
       tx.onerror = () => reject(tx.error);
     });
     db.close();
+  }, ids);
+}
+
+for (const prefix of ["/", "/stash/"]) {
+  test(`cold offline launch preserves the deployment base ${prefix}`, async ({
+    page,
+    disconnect,
+    baseURL,
+  }) => {
+    await install(page, prefix);
+    await disconnect();
+    const response = await page.goto(`${prefix}performers/123`);
+    expect(response?.headers()["content-security-policy"]).toContain(
+      "worker-src blob: 'self'",
+    );
+    expect(response?.headers()["referrer-policy"]).toBe("same-origin");
+    await expect(
+      page.getByRole("heading", { name: "Offline library" }),
+    ).toBeVisible();
+    expect(await page.evaluate(() => document.baseURI)).toBe(
+      `${baseURL}${prefix}`,
+    );
+    await expect(
+      page.getByText("No saved videos", { exact: true }),
+    ).toBeVisible();
   });
+}
+
+test("foreground downloads store 64 MiB and survive closing and reopening offline", async ({
+  page,
+  context,
+  disconnect,
+}) => {
+  test.setTimeout(60_000);
+  // Exercise the real foreground writer, including Chrome's fallback when
+  // Background Fetch is absent. WebKit has no native Background Fetch.
+  await context.addInitScript(() => {
+    Object.defineProperty(
+      ServiceWorkerRegistration.prototype,
+      "backgroundFetch",
+      {
+        configurable: true,
+        get: () => undefined,
+      },
+    );
+  });
+  await install(page, "/");
+  await queueDownloads(page, ["900000003"]);
+  await page.reload();
+  await expect
+    .poll(async () => (await readEntry(page, "900000003"))?.status, {
+      timeout: 45_000,
+    })
+    .toBe("complete");
+  const entry = await readEntry(page, "900000003");
+  expect(entry?.background_fetch_id).toBeUndefined();
+  expect(entry?.bytes).toBe(64 * 1024 * 1024);
+  await page.close();
+  await disconnect();
+  const reopened = await context.newPage();
+  await reopened.goto("/scenes/900000003");
+  await expect(
+    reopened.getByRole("button", {
+      name: "Fixture 900000003",
+      exact: true,
+    }),
+  ).toBeVisible();
+  const saved = await readEntry(reopened, "900000003");
+  if (!saved) throw new Error("Missing saved catalog entry");
+  const bytes = await reopened.evaluate(async (path) => {
+    const parts = path.split("/");
+    const filename = parts.pop();
+    if (!filename) throw new Error("Missing saved filename");
+    let directory = await navigator.storage.getDirectory();
+    for (const part of parts)
+      directory = await directory.getDirectoryHandle(part);
+    const file = await (await directory.getFileHandle(filename)).getFile();
+    return {
+      size: file.size,
+      header: await file.slice(4, 8).text(),
+      tail: [...new Uint8Array(await file.slice(-4).arrayBuffer())],
+    };
+  }, saved.opfs_path);
+  expect(bytes).toEqual({
+    size: 64 * 1024 * 1024,
+    header: "ftyp",
+    tail: [0, 0, 0, 0],
+  });
+});
+
+test("browser downloads finish with the app closed and play on an offline cold launch", async ({
+  page,
+  context,
+  browserName,
+}) => {
+  test.skip(
+    browserName !== "chromium",
+    "Native Background Fetch is exercised in Chromium; playback also requires its media codecs.",
+  );
+  await install(page, "/");
+  await queueDownloads(page, ["900000001", "900000002"]);
   await page.reload();
   await expect
     .poll(async () => (await readEntry(page, "900000001"))?.background_fetch_id)

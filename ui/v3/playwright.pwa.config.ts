@@ -3,6 +3,9 @@ import { defineConfig } from "@playwright/test";
 const host = process.env.PWA_TEST_HOST ?? "127.0.0.1";
 const origin = `http://${host}:3034`;
 const websocket = process.env.PLAYWRIGHT_WS_ENDPOINT;
+const browserName = process.env.PWA_TEST_BROWSER ?? "chromium";
+if (browserName !== "chromium" && browserName !== "webkit")
+  throw new Error("PWA_TEST_BROWSER must be chromium or webkit");
 // Remote Browserless needs a routable host and a secure-context exception for
 // this synthetic HTTP fixture only. Production still requires HTTPS.
 const launch = encodeURIComponent(
@@ -18,11 +21,12 @@ export default defineConfig({
   use: {
     baseURL: origin,
     trace: "retain-on-failure",
-    ...(websocket && {
-      connectOptions: { wsEndpoint: `${websocket}?launch=${launch}` },
-    }),
+    ...(websocket &&
+      browserName === "chromium" && {
+        connectOptions: { wsEndpoint: `${websocket}?launch=${launch}` },
+      }),
   },
-  projects: [{ name: "chromium", use: { browserName: "chromium" } }],
+  projects: [{ name: browserName, use: { browserName } }],
   webServer: {
     command: "node tests/browser/pwa-server.mjs",
     url: `${origin}/offline.html`,

@@ -4,6 +4,10 @@ import { readFile } from "node:fs/promises";
 import { extname, resolve } from "node:path";
 
 const root = resolve("build");
+// Match the production page policy: registration and blob playback must work
+// with CSP enabled. The Go v3 security-header test covers the server's policy.
+const pagePolicy =
+  "default-src data: 'self' 'unsafe-inline'; connect-src data: 'self' ws: wss:; img-src data: *; script-src 'self' http://www.gstatic.com https://www.gstatic.com 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; media-src blob: 'self'; worker-src blob: 'self'; child-src 'none'; object-src 'none'; form-action 'self';";
 const types = {
   ".html": "text/html",
   ".js": "text/javascript",
@@ -39,6 +43,10 @@ http
       response.writeHead(200, {
         "content-type": types[extname(file)] ?? "application/octet-stream",
         "cache-control": "no-cache",
+        ...(extname(file) === ".html" && {
+          "content-security-policy": pagePolicy,
+          "referrer-policy": "same-origin",
+        }),
       });
       response.end(data);
     } catch {

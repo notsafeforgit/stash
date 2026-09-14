@@ -61,9 +61,18 @@ registerRoute(
         /<base href="\.\/"\s*\/?>/,
         `<base href="${base}">`,
       );
-      return new Response(html, {
-        headers: { "Content-Type": "text/html; charset=utf-8" },
-      });
+      // Preserve the server's CSP and other security headers on cold launches.
+      // The decoded, rewritten body no longer has the original byte metadata.
+      const headers = new Headers(fallback.headers);
+      headers.set("Content-Type", "text/html; charset=utf-8");
+      for (const name of [
+        "Content-Length",
+        "Content-Encoding",
+        "ETag",
+        "Last-Modified",
+      ])
+        headers.delete(name);
+      return new Response(html, { headers });
     } finally {
       clearTimeout(timeout);
     }

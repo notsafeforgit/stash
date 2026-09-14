@@ -1,10 +1,29 @@
-import type { AnyRouter, RouterEvents } from "@tanstack/react-router";
+import type {
+  AnyRouter,
+  RouterEvents,
+  RouterHistory,
+} from "@tanstack/react-router";
 import { createContentReveal } from "./content-reveal";
 import { motion } from "./motion";
 
 type RouteTransition = "route-forward" | "route-back" | "route-replace";
 
-const controllers = new WeakMap<object, { hold: () => () => void }>();
+const controllers = new WeakMap<
+  object,
+  {
+    hold: () => () => void;
+    commit: (pathname: string | undefined, surface: HTMLElement | null) => void;
+  }
+>();
+
+/** Called by the viewport's layout effect, before the destination can paint. */
+export function commitRouteMotion(
+  router: object,
+  pathname: string | undefined,
+  surface: HTMLElement | null,
+) {
+  controllers.get(router)?.commit(pathname, surface);
+}
 
 /** Keep route motion behind a navigation overlay until its exit has finished.
  * Routing and data loading continue immediately. Each hold releases once. */
@@ -49,33 +68,42 @@ function transitionForNavigation({
 /** Reveal committed content through a small, empty paint layer. The page itself
  * remains untransformed and fully opaque; no native snapshots are captured. */
 export function installRouteTransitions(
-  router: Pick<AnyRouter, "subscribe" | "update">,
+  router: Pick<AnyRouter, "subscribe" | "update"> & { history: RouterHistory },
 ) {
   router.update({ defaultViewTransition: false });
   if (typeof window === "undefined") return () => {};
   const reveal = createContentReveal();
-  controllers.set(router, reveal);
-  const before = router.subscribe("onBeforeLoad", reveal.cancel);
-  const resolved = router.subscribe("onResolved", (event) => {
+  let pending: { pathname: string; direction: RouteTransition } | undefined;
+  let traversingHistory = false;
+  // Safari restores its own swipe snapshot for browser Back/Forward. Adding
+  // another entrance effect after that snapshot produces a visible flash.
+  const history = router.history.subscribe(({ action }) => {
+    traversingHistory = action.type !== "PUSH" && action.type !== "REPLACE";
+  });
+  controllers.set(router, {
+    hold: reveal.hold,
+    commit(pathname, surface) {
+      if (!pending || pending.pathname !== pathname) return;
+      const { direction } = pending;
+      pending = undefined;
+      reveal.play(surface, direction, motion.duration.page);
+    },
+  });
+  const before = router.subscribe("onBeforeLoad", (event) => {
+    reveal.cancel();
+    pending = undefined;
     const direction = transitionForNavigation(event);
-    // Router state updates can resolve the same location again immediately
-    // after a commit. They must not cancel that commit's pending reveal.
-    if (!direction) return;
-    if (event.toLocation.state.routeMotion === false) {
-      reveal.cancel();
-      return;
+    if (
+      direction &&
+      !traversingHistory &&
+      event.toLocation.state.routeMotion !== false
+    ) {
+      pending = { pathname: event.toLocation.pathname, direction };
     }
-    reveal.play(
-      document.querySelector<HTMLElement>(
-        "[data-route-viewport] > [data-route-transition]",
-      ),
-      direction,
-      motion.duration.page,
-    );
   });
   return () => {
     before();
-    resolved();
+    history();
     controllers.delete(router);
     reveal.dispose();
   };

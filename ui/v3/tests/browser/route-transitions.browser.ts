@@ -7,10 +7,16 @@ interface TransitionObservation {
   finished: boolean;
 }
 
+interface PaintedRoute {
+  heading: string | null;
+  cover: number;
+}
+
 declare global {
   interface Window {
     observedTransitions: TransitionObservation[];
     nativeRouteSnapshots: number;
+    paintedRoutes: PaintedRoute[];
   }
 }
 
@@ -21,6 +27,19 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     window.observedTransitions = [];
     window.nativeRouteSnapshots = 0;
+    window.paintedRoutes = [];
+    const paint = () => {
+      const cover = document.querySelector<HTMLElement>(
+        "[data-route-transition]",
+      );
+      window.paintedRoutes.push({
+        heading: document.querySelector("h1")?.textContent ?? null,
+        cover:
+          cover && !cover.hidden ? Number(getComputedStyle(cover).opacity) : 0,
+      });
+      requestAnimationFrame(paint);
+    };
+    requestAnimationFrame(paint);
     const native = document.startViewTransition?.bind(document);
     if (native)
       document.startViewTransition = (...args) => {
@@ -152,7 +171,7 @@ test.describe("mobile touch navigation", () => {
 });
 
 for (const prefix of ["", "/stash"]) {
-  test(`entity navigation and both Back actions animate only content under ${prefix || "/"}`, async ({
+  test(`app navigation animates and browser history stays still under ${prefix || "/"}`, async ({
     page,
   }) => {
     await page.goto(`${prefix}/transitions`);
@@ -186,14 +205,54 @@ for (const prefix of ["", "/stash"]) {
     await expectTransition(2, "forward");
     await page.goBack();
     await expect(page.getByRole("heading", { name: "Entity 1" })).toBeVisible();
-    await expectTransition(3, "back");
+    expect(await page.evaluate(() => window.observedTransitions.length)).toBe(
+      2,
+    );
     await page.goForward();
-    await expectTransition(4, "forward");
+    await expect(page.getByRole("heading", { name: "Entity 2" })).toBeVisible();
+    expect(await page.evaluate(() => window.observedTransitions.length)).toBe(
+      2,
+    );
     await page.getByRole("button", { name: "Back to list" }).click();
     await expect(page.getByRole("heading", { name: "Entities" })).toBeVisible();
-    await expectTransition(5, "back");
+    await expectTransition(3, "back");
   });
 }
+
+test("a committed page never paints clearly and then gets dimmed", async ({
+  page,
+}) => {
+  await page.goto("/transitions");
+  await page.getByRole("link", { name: "Entity 1", exact: true }).click();
+  await expect
+    .poll(() => page.evaluate(() => window.observedTransitions[0]?.finished))
+    .toBe(true);
+  const frames = await page.evaluate(() =>
+    window.paintedRoutes.filter((frame) => frame.heading === "Entity 1"),
+  );
+  expect(frames.length).toBeGreaterThan(2);
+  expect(frames[0]?.cover).toBeGreaterThan(0);
+  for (let i = 1; i < frames.length; i++) {
+    expect(frames[i]?.cover ?? 0).toBeLessThanOrEqual(
+      (frames[i - 1]?.cover ?? 0) + 0.001,
+    );
+  }
+  await page.evaluate(() => {
+    window.paintedRoutes = [];
+  });
+  await page.goBack();
+  await expect(
+    page.getByRole("heading", { name: "Entities", exact: true }),
+  ).toBeVisible();
+  // Include the interval where onResolved and the old double RAF added a
+  // second fade after Safari's restored snapshot was already in place.
+  await page.waitForTimeout(300);
+  const restored = await page.evaluate(() =>
+    window.paintedRoutes.filter((frame) => frame.heading === "Entities"),
+  );
+  expect(restored.length).toBeGreaterThan(2);
+  expect(restored.every((frame) => frame.cover === 0)).toBe(true);
+});
 
 test("search/hash changes preserve the form and entity changes preserve React state", async ({
   page,

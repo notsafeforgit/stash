@@ -140,6 +140,7 @@ export function MobileDetailFooter({ onBack }: { onBack?: () => void }) {
   const openNavigation = useMobileNavigation();
   const intl = useIntl();
   const keyboardRef = useMobileKeyboardLayout<HTMLDivElement>();
+  const [actionsMounted, setActionsMounted] = useState(false);
   if (!chrome?.mobile) return null;
 
   return (
@@ -177,7 +178,10 @@ export function MobileDetailFooter({ onBack }: { onBack?: () => void }) {
         />
         <Drawer
           open={chrome.panel === "actions"}
-          onOpenChange={(open) => chrome.setPanel(open ? "actions" : null)}
+          onOpenChange={(open) => {
+            if (open) setActionsMounted(true);
+            chrome.setPanel(open ? "actions" : null);
+          }}
         >
           <DrawerTrigger
             hidden={chrome.interaction !== null}
@@ -195,7 +199,9 @@ export function MobileDetailFooter({ onBack }: { onBack?: () => void }) {
           >
             <Ellipsis />
           </DrawerTrigger>
-          <DrawerContent keepMounted>
+          {/* Toolbars can own many menus and forms. Mount them on demand,
+              then retain them so closing the drawer preserves their state. */}
+          <DrawerContent keepMounted={actionsMounted}>
             <DrawerHeader className="shrink-0 py-2">
               <DrawerTitle>
                 {intl.formatMessage({

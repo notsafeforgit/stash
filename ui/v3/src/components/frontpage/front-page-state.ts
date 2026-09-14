@@ -5,6 +5,8 @@ export interface FrontPageRowState {
   randomSeed: number;
   mounted: boolean;
   scrollLeft: number;
+  /** Preserve the carousel's height while nearby cards remount on Back. */
+  carouselHeight?: number;
 }
 
 interface FrontPageState {

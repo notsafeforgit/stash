@@ -402,9 +402,15 @@ test("a held 2x gesture continues through auto-advance and restores its original
   await expect(video).toHaveJSProperty("paused", false);
 });
 
-test("a paused quality change preserves its playhead, then the next scene starts independently", async ({
+test("a paused quality change before idle warm-up preserves its playhead, then the next scene starts independently", async ({
   page,
 }) => {
+  await page.addInitScript(() => {
+    // A busy browser may never grant the warm-up an idle deadline. Capturing
+    // a frame must still prepare the canvas immediately for the source swap.
+    window.requestIdleCallback = () => 1;
+    window.cancelIdleCallback = () => {};
+  });
   const video = await open(page);
   await revealControls(page);
   const row = page.locator("[data-player-control-row]");

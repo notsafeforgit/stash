@@ -7,6 +7,8 @@
  */
 
 import React, {
+  createContext,
+  useContext,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -45,6 +47,7 @@ import { imageToSlide } from "src/components/list/entity-list-configs";
 import { objectTitle } from "src/core/files";
 import { useFrontPageRowState } from "./front-page-state";
 import { QueryError } from "@/components/query-error";
+import { DeferredMount } from "@/components/shared/deferred-mount";
 
 // ── Carousel-row lightbox helpers ──────────────────────────────────────────────
 
@@ -130,6 +133,13 @@ interface CarouselProps {
   mode?: GQL.FilterMode;
 }
 
+const CarouselContext = createContext<{
+  scrollRef: React.RefObject<HTMLDivElement | null>;
+  initialOffset: number;
+  viewportWidth: number;
+  rem: number;
+} | null>(null);
+
 export function RecommendationRow({
   heading,
   viewAllHref,
@@ -140,10 +150,30 @@ export function RecommendationRow({
   const scrollRef = useRef<HTMLDivElement>(null);
   const rowState = useFrontPageRowState();
   const kind = mode ? MODE_KINDS[mode] : undefined;
+  const carousel = useMemo(
+    () => ({
+      scrollRef,
+      initialOffset: rowState?.scrollLeft ?? 0,
+      viewportWidth: window.innerWidth,
+      rem: Number.parseFloat(
+        getComputedStyle(document.documentElement).fontSize,
+      ),
+    }),
+    [rowState],
+  );
   useLayoutEffect(() => {
     if (!loading && scrollRef.current && rowState) {
       scrollRef.current.scrollLeft = rowState.scrollLeft;
     }
+  }, [loading, rowState]);
+  useEffect(() => {
+    const element = scrollRef.current;
+    if (loading || !element || !rowState) return;
+    const observer = new ResizeObserver(() => {
+      rowState.carouselHeight = element.getBoundingClientRect().height;
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
   }, [loading, rowState]);
 
   function scrollBy(delta: number) {
@@ -184,6 +214,7 @@ export function RecommendationRow({
 
       <div
         ref={scrollRef}
+        style={{ minHeight: rowState?.carouselHeight }}
         onScroll={(event) => {
           if (rowState) rowState.scrollLeft = event.currentTarget.scrollLeft;
         }}
@@ -193,32 +224,32 @@ export function RecommendationRow({
           "scroll-snap-type-x-mandatory [scroll-snap-type:x_mandatory]",
         )}
       >
-        {loading
-          ? Array.from({ length: 8 }).map((_, i) => (
+        {loading ? (
+          Array.from({ length: 8 }).map((_, i) => (
+            <div
+              key={i}
+              className={cn(
+                "shrink-0 [scroll-snap-align:start]",
+                SNAP_WIDTHS[kind ?? "studio"],
+              )}
+            >
+              <Skeleton
+                className={kind === "gallery" ? "aspect-video" : "aspect-[2/3]"}
+              />
               <div
-                key={i}
                 className={cn(
-                  "shrink-0 [scroll-snap-align:start]",
-                  SNAP_WIDTHS[kind ?? "studio"],
+                  "flex flex-col gap-2 px-3 py-2.5",
+                  BODY_HEIGHTS[kind ?? "studio"],
                 )}
               >
-                <Skeleton
-                  className={
-                    kind === "gallery" ? "aspect-video" : "aspect-[2/3]"
-                  }
-                />
-                <div
-                  className={cn(
-                    "flex flex-col gap-2 px-3 py-2.5",
-                    BODY_HEIGHTS[kind ?? "studio"],
-                  )}
-                >
-                  <Skeleton className="h-4 w-4/5" />
-                  <Skeleton className="h-3 w-2/3" />
-                </div>
+                <Skeleton className="h-4 w-4/5" />
+                <Skeleton className="h-3 w-2/3" />
               </div>
-            ))
-          : children}
+            </div>
+          ))
+        ) : (
+          <CarouselContext value={carousel}>{children}</CarouselContext>
+        )}
       </div>
     </section>
   );
@@ -251,6 +282,17 @@ const SNAP_WIDTHS: Record<SnapCardKind, string> = {
   tag: "w-40",
 };
 
+const SNAP_WIDTH_REM: Record<SnapCardKind, number> = {
+  scene: 16,
+  gallery: 16,
+  marker: 16,
+  image: 14,
+  studio: 14,
+  performer: 11,
+  group: 11,
+  tag: 10,
+};
+
 // Skeletons reserve the same cover width/aspect and typical metadata space as
 // their cards. A generic portrait rectangle made the next row jump by ~170px.
 const BODY_HEIGHTS: Record<SnapCardKind, string> = {
@@ -278,15 +320,34 @@ const SnapCard = React.forwardRef<
   HTMLDivElement,
   {
     kind: SnapCardKind;
+    index: number;
     children: React.ReactNode;
   }
->(function SnapCard({ kind, children }, ref) {
+>(function SnapCard({ kind, index, children }, ref) {
+  const carousel = useContext(CarouselContext);
+  // Keep all native snap targets and the strip's width, but only build cards
+  // near the visible range. Returning to Home eagerly restores that range;
+  // it doesn't synchronously rebuild every card in every visited row.
+  const step = (SNAP_WIDTH_REM[kind] + 0.75) * (carousel?.rem ?? 16);
+  const start = index * step;
+  const eager =
+    !carousel ||
+    (start + step >= carousel.initialOffset - step &&
+      start <= carousel.initialOffset + carousel.viewportWidth + step);
   return (
     <div
       ref={ref}
       className={cn("shrink-0 [scroll-snap-align:start]", SNAP_WIDTHS[kind])}
     >
-      {children}
+      <DeferredMount
+        eager={eager}
+        scrollRoot={carousel?.scrollRef}
+        rootMargin="0px 320px"
+        className="h-full"
+        fallback={null}
+      >
+        {children}
+      </DeferredMount>
     </div>
   );
 });
@@ -380,7 +441,7 @@ export function SceneCarouselRow({
       loading={loading && !data}
     >
       {scenes.map((scene, i) => (
-        <SnapCard key={scene.id} kind="scene" ref={setRefAt(i)}>
+        <SnapCard key={scene.id} kind="scene" index={i} ref={setRefAt(i)}>
           <SceneCard
             scene={scene}
             onPreviewClick={() => {
@@ -444,8 +505,8 @@ export function StudioCarouselRow({
       mode={GQL.FilterMode.Studios}
       loading={loading && !data}
     >
-      {studios.map((studio) => (
-        <SnapCard key={studio.id} kind="studio">
+      {studios.map((studio, i) => (
+        <SnapCard key={studio.id} kind="studio" index={i}>
           <StudioCard studio={studio} />
         </SnapCard>
       ))}
@@ -490,8 +551,8 @@ export function PerformerCarouselRow({
       mode={GQL.FilterMode.Performers}
       loading={loading && !data}
     >
-      {performers.map((performer) => (
-        <SnapCard key={performer.id} kind="performer">
+      {performers.map((performer, i) => (
+        <SnapCard key={performer.id} kind="performer" index={i}>
           <PerformerCard performer={performer} />
         </SnapCard>
       ))}
@@ -536,8 +597,8 @@ export function GroupCarouselRow({
       mode={GQL.FilterMode.Groups}
       loading={loading && !data}
     >
-      {groups.map((group) => (
-        <SnapCard key={group.id} kind="group">
+      {groups.map((group, i) => (
+        <SnapCard key={group.id} kind="group" index={i}>
           <GroupCard group={group} />
         </SnapCard>
       ))}
@@ -588,8 +649,8 @@ export function GalleryCarouselRow({
         mode={GQL.FilterMode.Galleries}
         loading={loading && !data}
       >
-        {galleries.map((gallery) => (
-          <SnapCard key={gallery.id} kind="gallery">
+        {galleries.map((gallery, i) => (
+          <SnapCard key={gallery.id} kind="gallery" index={i}>
             <GalleryCard gallery={gallery} />
           </SnapCard>
         ))}
@@ -645,7 +706,7 @@ export function ImageCarouselRow({
       loading={loading && !data}
     >
       {images.map((image, i) => (
-        <SnapCard key={image.id} kind="image" ref={setRefAt(i)}>
+        <SnapCard key={image.id} kind="image" index={i} ref={setRefAt(i)}>
           <ImageCard
             image={image}
             onPreviewClick={() => {
@@ -709,8 +770,8 @@ export function TagCarouselRow({
       mode={GQL.FilterMode.Tags}
       loading={loading && !data}
     >
-      {tags.map((tag) => (
-        <SnapCard key={tag.id} kind="tag">
+      {tags.map((tag, i) => (
+        <SnapCard key={tag.id} kind="tag" index={i}>
           <TagCard tag={tag} />
         </SnapCard>
       ))}
@@ -769,7 +830,7 @@ export function MarkerCarouselRow({
       loading={loading && !data}
     >
       {markers.map((marker, i) => (
-        <SnapCard key={marker.id} kind="marker" ref={setRefAt(i)}>
+        <SnapCard key={marker.id} kind="marker" index={i} ref={setRefAt(i)}>
           <MarkerCard
             marker={marker}
             onPreviewClick={() => {

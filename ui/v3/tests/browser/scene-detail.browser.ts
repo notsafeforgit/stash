@@ -1,5 +1,11 @@
 import { test, expect, detailFooter, chooseSection } from "./test";
 
+declare global {
+  interface Window {
+    freezeFrameWarmups: number[];
+  }
+}
+
 test.beforeEach(async ({ page }) => {
   await page.route("**/scene/detail/**", async (route) => {
     const url = new URL(route.request().url());
@@ -109,4 +115,73 @@ test("the focused viewer fills the viewport and restores the same inline player"
   await expect(open).toBeFocused();
   await expect(detailFooter(page)).toBeVisible();
   expect(await video?.evaluate((element) => element.isConnected)).toBe(true);
+});
+
+test("a scene scrolls while media is loading without warming a full-size canvas", async ({
+  page,
+  context,
+  browserName,
+}) => {
+  let release: () => void = () => {};
+  const mediaReady = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/scene/detail/stream", async (route) => {
+    await mediaReady;
+    await route.fallback();
+  });
+  await page.addInitScript(() => {
+    window.freezeFrameWarmups = [];
+    const read = CanvasRenderingContext2D.prototype.getImageData;
+    CanvasRenderingContext2D.prototype.getImageData = function (...args) {
+      window.freezeFrameWarmups.push(
+        document.querySelector("video")?.readyState ?? -1,
+      );
+      return read.apply(this, args);
+    };
+  });
+  try {
+    await page.goto("/scene-detail", { waitUntil: "domcontentloaded" });
+    const player = page.locator("[data-scene-player]");
+    await expect(player).toBeVisible();
+    expect(await page.evaluate(() => window.freezeFrameWarmups)).toEqual([]);
+    const scroller = page.locator(".overflow-y-auto").filter({ has: player });
+    if (browserName === "chromium") {
+      const input = await context.newCDPSession(page);
+      await input.send("Input.dispatchTouchEvent", {
+        type: "touchStart",
+        touchPoints: [{ x: 100, y: 300 }],
+      });
+      for (let y = 280; y >= 100; y -= 20) {
+        await input.send("Input.dispatchTouchEvent", {
+          type: "touchMove",
+          touchPoints: [{ x: 100, y }],
+        });
+      }
+      await input.send("Input.dispatchTouchEvent", {
+        type: "touchEnd",
+        touchPoints: [],
+      });
+      await input.detach();
+    } else {
+      // Playwright cannot synthesize a swipe/wheel in mobile WebKit. Exercise
+      // the actual section control's native scroll path while media is held.
+      await chooseSection(page, "Details");
+    }
+    await expect
+      .poll(() => scroller.evaluate((element) => element.scrollTop))
+      .toBeGreaterThan(30);
+    expect(await page.evaluate(() => window.freezeFrameWarmups)).toEqual([]);
+    release();
+    await expect
+      .poll(() => page.evaluate(() => window.freezeFrameWarmups.length))
+      .toBeGreaterThan(0);
+    expect(
+      await page.evaluate(() =>
+        window.freezeFrameWarmups.every((ready) => ready >= 2),
+      ),
+    ).toBe(true);
+  } finally {
+    release();
+  }
 });

@@ -1,4 +1,6 @@
-import type { ComponentProps } from "react";
+import { type ComponentProps, useLayoutEffect, useRef } from "react";
+import { useRouter, useRouterState } from "@tanstack/react-router";
+import { commitRouteMotion } from "@/core/route-transitions";
 import { cn } from "@/lib/utils";
 import { ContentReveal } from "./content-reveal";
 
@@ -10,6 +12,15 @@ export function RouteViewport({
   className,
   ...props
 }: ComponentProps<"main">) {
+  const router = useRouter();
+  const surface = useRef<HTMLDivElement>(null);
+  const pathname = useRouterState({
+    select: (state) => state.matches.at(-1)?.pathname,
+  });
+  useLayoutEffect(() => {
+    commitRouteMotion(router, pathname, surface.current);
+  }, [router, pathname]);
+
   return (
     <main
       {...props}
@@ -20,7 +31,7 @@ export function RouteViewport({
       )}
     >
       {children}
-      <ContentReveal data-route-transition />
+      <ContentReveal ref={surface} data-route-transition />
     </main>
   );
 }

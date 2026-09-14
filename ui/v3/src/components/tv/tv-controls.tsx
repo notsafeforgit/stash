@@ -10,14 +10,10 @@ import {
 } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
-  ArrowDown,
-  ArrowUp,
   ArrowLeft,
   ArrowRight,
   Play,
   Pause,
-  Menu,
-  X,
   Eye,
   Scan,
   PictureInPicture,
@@ -59,6 +55,7 @@ import {
   tvCustomIcons,
 } from "./tv-action-labels";
 import { TvTimeline } from "./tv-timeline";
+import { TvNavigationButton } from "./tv-navigation-button";
 import { useTvInputs } from "./use-tv-inputs";
 import { useTvMutations, type TvScene } from "./use-tv-mutations";
 import type { TvEditTarget } from "./tv-edit-panel";
@@ -234,11 +231,9 @@ export function TvControls({
   root,
   rotation,
   setRotation,
-  mode,
   togglePresentation,
   exitPresentation,
   openNavigation,
-  leave,
   navigateItem,
   drag,
   cancelDrag,
@@ -260,11 +255,9 @@ export function TvControls({
   root: RefObject<HTMLDivElement | null>;
   rotation: TvRotation;
   setRotation: (rotation: TvRotation) => void;
-  mode: "normal" | "immersive" | "fullscreen";
   togglePresentation: () => true;
   exitPresentation: () => void;
   openNavigation: () => void;
-  leave: () => void;
   navigateItem: (direction: -1 | 1) => void;
   drag: (offset: number) => void;
   cancelDrag: () => void;
@@ -399,9 +392,8 @@ export function TvControls({
           if (command.action === "subtitles") controls.toggleCaptions();
           else action(command.action);
           break;
-        case "exit":
-          if (mode !== "normal") exitPresentation();
-          else leave();
+        case "exit-presentation":
+          exitPresentation();
           break;
       }
     },
@@ -419,26 +411,18 @@ export function TvControls({
       busy={mutations.busy}
     />
   );
-  const blocked =
-    panel.kind !== "closed" || folder !== null || mutations.busy || leaving;
   return (
     <div
       className="pointer-events-none absolute inset-0 text-foreground"
       data-tv-controls
     >
       <div className="tv-topbar pointer-events-auto absolute left-0 right-0 top-0 flex items-center gap-2 p-3">
-        <Button
-          variant="secondary"
-          size="icon-lg"
-          className="size-11"
-          aria-label={msg("navigation", "Navigation")}
+        <TvNavigationButton
           onClick={() => {
             controls.pause();
             openNavigation();
           }}
-        >
-          <Menu />
-        </Button>
+        />
         <span
           className={cn(
             "min-w-0 flex-1 truncate rounded-lg bg-background/80 px-3 py-2 text-sm",
@@ -469,22 +453,6 @@ export function TvControls({
             </Button>
           </>
         )}
-        <Button
-          variant="secondary"
-          size="icon-lg"
-          className="size-11"
-          aria-label={
-            mode === "normal"
-              ? msg("tv.text.exit_tv", "Exit TV")
-              : msg("tv.text.exit_immersive_mode", "Exit immersive mode")
-          }
-          onClick={() => {
-            if (mode === "normal") leave();
-            else exitPresentation();
-          }}
-        >
-          <X />
-        </Button>
       </div>
       {visible && (
         <aside
@@ -569,30 +537,6 @@ export function TvControls({
                   <PictureInPicture />
                 </Button>
               )}
-              <Button
-                variant="secondary"
-                size="icon-lg"
-                className="size-11"
-                aria-label={msg("tv.text.previous_tv_item", "Previous TV item")}
-                disabled={blocked || snapshot.selected === 0}
-                onClick={() => navigateItem(-1)}
-              >
-                <ArrowUp />
-              </Button>
-              <Button
-                variant="secondary"
-                size="icon-lg"
-                className="size-11"
-                aria-label={msg("tv.text.next_tv_item", "Next TV item")}
-                disabled={
-                  blocked ||
-                  (snapshot.exhausted &&
-                    snapshot.selected === snapshot.items.length - 1)
-                }
-                onClick={() => navigateItem(1)}
-              >
-                <ArrowDown />
-              </Button>
             </div>
           </div>
           <div className="flex min-h-6 items-center justify-between gap-2 text-xs text-muted-foreground">

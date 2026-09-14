@@ -14,8 +14,8 @@ that filter in TV. Choose **Random** in **Sort order** for a seeded order
 that stays stable across pages. Matching orientation
 uses the viewing surface, including forced rotation, and includes square videos.
 
-Swipe vertically, use a wheel gesture, press Up/Down, or use the visible
-previous/next buttons. Seek buttons jump between markers and otherwise move ten
+Swipe vertically, use a wheel gesture, or press Up/Down to change videos.
+Seek buttons jump between markers and otherwise move ten
 seconds. Hold forward for faster playback or reverse for backward scrubbing;
 Up/Down changes the held speed. Release, blur, and visibility changes restore
 the previous rate and pause state. Menus, form inputs, and zoom take ownership
@@ -39,7 +39,11 @@ is involved. Posters and timeline sprite images remain available.
 TV starts muted and retains user audio/rate choices across item changes.
 Playback menus include captions and supported device playback controls.
 Fit/fill, zoom, rotation, left-handed actions, and hiding controls are available.
-Settings, restore-controls, navigation, and exit stay reachable with chrome hidden.
+Settings, restore-controls, and navigation stay reachable with chrome hidden.
+Use the navigation drawer to switch to another top-level page; TV has no close
+button. The drawer also remains available while loading or when media is
+unavailable. Escape closes an open menu or exits immersive presentation while
+remaining on the TV page.
 
 Fullscreen targets the entire TV container. When unavailable or rejected,
 immersive presentation fills the viewport with inline video and the TV UI.

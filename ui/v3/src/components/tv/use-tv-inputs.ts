@@ -20,7 +20,7 @@ export type TvInputCommand =
         | "subtitles"
         | "visibility";
     }
-  | { type: "exit" };
+  | { type: "exit-presentation" };
 
 export function useTvInputs({
   surface,
@@ -293,7 +293,8 @@ export function useTvInputs({
         });
       else if (key === " ") controls.togglePaused();
       else if (key === "m") controls.toggleMuted();
-      else if (key === "escape") latest.current.dispatch({ type: "exit" });
+      else if (key === "escape")
+        latest.current.dispatch({ type: "exit-presentation" });
       else {
         const actions = {
           d: "delete",

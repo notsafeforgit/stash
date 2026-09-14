@@ -155,8 +155,8 @@ export default function TvHelp({ close }: { close: () => void }) {
                 </td>
                 <td>
                   <FormattedMessage
-                    id="tv.text.close_a_menu_exit_immersive_mode_then_leave_tv"
-                    defaultMessage="Close a menu, exit immersive mode, then leave TV"
+                    id="tv.text.close_a_menu_or_exit_immersive_mode"
+                    defaultMessage="Close a menu or exit immersive mode"
                   />
                 </td>
               </tr>

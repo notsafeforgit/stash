@@ -121,7 +121,7 @@ const scenePage: MockedResponse<GQL.TvScenesQuery, GQL.TvScenesQueryVariables> =
   {
     request: { query: GQL.TvScenesDocument, variables: () => true },
     maxUsageCount: Infinity,
-    delay: 0,
+    delay: params.has("feed-loading") ? 5000 : 0,
     result: (variables) => {
       record("TvScenes", variables);
       const page = variables.filter?.page ?? 1;
@@ -129,8 +129,10 @@ const scenePage: MockedResponse<GQL.TvScenesQuery, GQL.TvScenesQueryVariables> =
       return {
         data: {
           findScenes: {
-            count: scenes.length,
-            scenes: scenes.slice((page - 1) * size, page * size),
+            count: params.has("empty") ? 0 : scenes.length,
+            scenes: params.has("empty")
+              ? []
+              : scenes.slice((page - 1) * size, page * size),
           },
         },
       };
@@ -166,7 +168,9 @@ const detail: MockedResponse<GQL.FindSceneQuery, GQL.FindSceneQueryVariables> =
       record("FindScene", variables);
       return {
         data: {
-          findScene: scenes.find((scene) => scene.id === variables.id) ?? null,
+          findScene: params.has("missing")
+            ? null
+            : (scenes.find((scene) => scene.id === variables.id) ?? null),
         },
       };
     },

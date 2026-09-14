@@ -27,7 +27,7 @@ quality policy on its parent scene's stream, bounded to the marker range.
 
 Keep the entire TV interface in control of presentation. Fullscreen targets
 the TV container where supported; otherwise use a viewport-filling immersive
-layout with inline video. Swiping, the action rail, metadata and exit controls
+layout with inline video. Swiping, the action rail, metadata and app navigation
 must remain available in both presentations.
 
 Unify automatic activity tracking as shared player behavior and wire it into
@@ -177,8 +177,8 @@ Requirement IDs remain stable; removed IDs are not reused.
 
 | ID | Capability | Acceptance behavior |
 | --- | --- | --- |
-| TV-01 | Separate navigation | TV appears in desktop navigation and the mobile navigation sheet, highlights correctly, and opens `/tv` without a plugin installed |
-| TV-02 | Vertical scene and marker feeds | Touch drag, mouse wheel/trackpad, visible previous/next controls and keyboard navigation select one item predictably; large libraries load incrementally |
+| TV-01 | Separate navigation | TV appears in desktop navigation and the mobile navigation sheet, highlights correctly, and opens `/tv` without a plugin installed; its navigation drawer remains reachable in every state and switches top-level pages without a TV close button |
+| TV-02 | Vertical scene and marker feeds | Vertical touch drag, mouse wheel/trackpad and keyboard navigation select one item predictably without previous/next item buttons; large libraries load incrementally |
 | TV-03 | Saved and default filters | Scene and marker saved filters retain full v3 nested AST semantics, search and sort; first launch respects the relevant configured default; explicit all-items selection is available |
 | TV-04 | Shuffle and orientation filtering | A stable seed preserves random order across pages; reshuffle creates a new session; matching-orientation filtering includes square media and composes with the selected filter |
 | TV-05 | Autoplay, looping and automatic advance | Autoplay preference is respected; stop/loop/advance have one unambiguous completion policy; no duplicate advance at clip end or native EOF |
@@ -187,8 +187,8 @@ Requirement IDs remain stable; removed IDs are not reused.
 | TV-09 | Playback controls | Play/pause, volume/mute, playback rate, subtitles and source/quality selection share the v3 engine; audio/rate continue across swipes; quality changes preserve time/state and follow TV-27 |
 | TV-10 | Seeking and timeline information | Tap/keyboard skip is marker-aware; scrubber thumbnails and marker labels/ranges use absolute scene time; show current marker/tag information |
 | TV-11 | Hold controls | Press-and-hold forward speed and reverse scrubbing, with speed adjustment during a hold, restore the previous state on release/cancel; unsupported negative playback rates are not assumed |
-| TV-12 | Presentation | Fit/contain versus fill/crop, left-handed rail, hide/show controls, and media zoom coexist; settings, restore-controls and exit remain reachable |
-| TV-13 | Forced landscape and immersive presentation | Rotate the viewing surface and its controls without modifying files; fullscreen the whole TV container where supported, otherwise fill the browser viewport with inline video; iOS Safari retains swipe navigation, rail, metadata, menus and exit; TV never requests native video fullscreen |
+| TV-12 | Presentation | Fit/contain versus fill/crop, left-handed rail, hide/show controls, and media zoom coexist; settings, restore-controls and app navigation remain reachable |
+| TV-13 | Forced landscape and immersive presentation | Rotate the viewing surface and its controls without modifying files; fullscreen the whole TV container where supported, otherwise fill the browser viewport with inline video; iOS Safari retains swipe navigation, rail, metadata, menus and app navigation; TV never requests native video fullscreen |
 | TV-15 | Metadata and details | Scene title, performers, studio, tags and marker information are available; links use v3 routes and returning restores the feed context |
 | TV-16 | Rating, organized status and O-counter | Update the parent scene from either feed mode, with pending/error feedback and correct normalized cache updates; counter increment/decrement/reset follow existing app operations |
 | TV-17 | Tag editing and quick tags | Scene feed edits scene tags; marker feed edits marker tags and primary tag correctly; pinned tags and repeatable quick-tag presets are supported |
@@ -347,7 +347,7 @@ item. This also avoids displacing the first three mobile quick tabs. Use
 Use generated route types and regenerate the route tree through the build.
 
 Keep the desktop app header in ordinary viewing. Mobile TV owns the viewport
-and supplies a visible navigation/exit affordance instead of the global bottom
+and supplies a visible app navigation affordance instead of the global bottom
 bar. Explicit immersive/fullscreen mode hides ordinary app chrome while keeping
 the TV interface reachable. Immersive layout fills the available browser
 viewport; it does not promise to hide Safari's address/tab bars. Make the shell
@@ -773,7 +773,8 @@ container fullscreen, I info, L loop, M mute, O presentation rotation and S
 subtitles. Hold Left/Right
 for reverse/forward control; while holding, Up/Down adjusts speed rather than
 moving to another item. Suppress conflicting shared-player shortcuts only inside
-the TV surface. Closing an overlay must not also exit TV or advance the feed.
+the TV surface. Escape closes an overlay or exits immersive presentation, staying
+on the TV route. Closing an overlay must not also advance the feed.
 
 Reverse control uses bounded repeated scene-time seeks because native negative
 playback rate is not a portable contract. Rate/seek holds release on pointer
@@ -831,7 +832,7 @@ dialogs/sheets have titles, focus restores correctly, and reduce-motion settings
 remove nonessential transitions. Custom media zoom remains available; preserve
 the app's general page-zoom and text-selection policy.
 
-Hidden UI retains a stable restore-controls affordance, exit and access to
+Hidden UI retains a stable restore-controls affordance, app navigation and access to
 settings. Keep essential controls outside fading/inert ancestors. Container
 fullscreen and immersive layout retain the same TV controls and swipe behavior.
 Explain the two presentations in help and verify the inline experience on
@@ -1042,7 +1043,7 @@ mirror JSX or simply assert that an action registry contains its own keys.
 | Mutation/config tests | Correct scene versus marker target, double-click prevention, failure recovery, normalized metadata updates, unknown-field preservation, backend-prefix isolation and no TV writes to global player quality |
 | Chromium and WebKit | Real TV surface plus production player; inline element identity across direct/HLS/marker/quality/presentation transitions; first media request honors TV quality; wheel/touch navigation, holds, zoom arbitration, delayed pages and video errors |
 | Browser interaction | Main settings navigation/search/save/reset; returning preserves feed/position and applies default quality; rotated sliders/popovers/dialogs, small safe-area viewport, focus/escape, hidden-UI recovery, reduced motion, action editor and nav overflow |
-| Manual devices | Physical iPhone/iPad Safari inline autoplay/audio/MMS, toolbar/keyboard resizing and rotation; swipe/rail/metadata/exit remain usable after presentation and quality changes; Android Chrome touch; desktop keyboard/mouse/trackpad, including hold cancellation on blur |
+| Manual devices | Physical iPhone/iPad Safari inline autoplay/audio/MMS, toolbar/keyboard resizing and rotation; swipe/rail/metadata/navigation remain usable after presentation and quality changes; Android Chrome touch; desktop keyboard/mouse/trackpad, including hold cancellation on blur |
 | Regression | Scene detail, scene/marker lightbox, image lightbox and offline player still satisfy their existing contracts, including native fullscreen and source eligibility for consumers that support it |
 
 Extend the existing route-transition, interaction-motion, Home, scene-detail

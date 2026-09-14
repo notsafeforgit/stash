@@ -1,28 +1,7 @@
-import type { ComponentProps } from "react";
-import type { MobileNavSheet as AppMobileNavSheet } from "@/components/layout/mobile-nav-sheet";
 import type { useDefaultFilterActions as appUseDefaultFilterActions } from "@/hooks/default-filter";
-import {
-  BottomSheet,
-  BottomSheetHeader,
-  BottomSheetTitle,
-} from "@/components/ui/bottom-sheet";
 
 // Only backend-dependent integrations are substituted; toolbar, tab, form,
 // popover and drawer behavior comes from the production components.
-export function MobileNavSheet({
-  open,
-  onOpenChange,
-}: ComponentProps<typeof AppMobileNavSheet>) {
-  return (
-    <BottomSheet open={open} onOpenChange={onOpenChange}>
-      <BottomSheetHeader>
-        <BottomSheetTitle>Fixture navigation</BottomSheetTitle>
-      </BottomSheetHeader>
-      <p className="px-4 pb-4">Navigation destinations</p>
-    </BottomSheet>
-  );
-}
-
 export function useDefaultFilterActions(): ReturnType<
   typeof appUseDefaultFilterActions
 > {

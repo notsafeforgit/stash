@@ -3,7 +3,7 @@ import { test, expect } from "./test";
 interface TransitionObservation {
   direction?: string;
   duration?: number;
-  frames: { opacity: number; x: number }[];
+  frames: { opacity: number; x: number; contentOpacity: number }[];
   finished: boolean;
 }
 
@@ -30,7 +30,7 @@ test.beforeEach(async ({ page }) => {
     const animate = Element.prototype.animate;
     Element.prototype.animate = function (...args) {
       const animation = animate.apply(this, args);
-      if (!this.hasAttribute("data-route-viewport")) return animation;
+      if (!this.hasAttribute("data-route-transition")) return animation;
       const observation: TransitionObservation = {
         direction: animation.id.replace("route-", ""),
         duration: Number(animation.effect?.getTiming().duration),
@@ -40,9 +40,13 @@ test.beforeEach(async ({ page }) => {
       window.observedTransitions.push(observation);
       const sample = () => {
         const style = getComputedStyle(this);
+        const viewport = this.parentElement;
+        if (!viewport) throw new Error("Missing route viewport");
+        const contentStyle = getComputedStyle(viewport);
         observation.frames.push({
-          opacity: Number(style.opacity),
-          x: new DOMMatrixReadOnly(style.transform).m41,
+          opacity: 1 - Number(style.opacity),
+          x: new DOMMatrixReadOnly(contentStyle.transform).m41,
+          contentOpacity: Number(contentStyle.opacity),
         });
         if (!observation.finished) requestAnimationFrame(sample);
       };
@@ -63,7 +67,49 @@ test.beforeEach(async ({ page }) => {
 test.describe("mobile touch navigation", () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true });
 
-  test("entity taps and on-screen Back render a fade and directional movement", async ({
+  for (const theme of ["light", "dark"] as const) {
+    test(`the reveal paints intermediate pixels in ${theme} mode`, async ({
+      page,
+    }) => {
+      await page.goto("/transitions");
+      await page.evaluate((theme) => {
+        document.documentElement.classList.toggle("dark", theme === "dark");
+        const animate = Element.prototype.animate;
+        Element.prototype.animate = function (...args) {
+          const animation = animate.apply(this, args);
+          if (this.hasAttribute("data-route-transition")) {
+            animation.pause();
+            animation.currentTime = 0;
+          }
+          return animation;
+        };
+      }, theme);
+      await page.getByRole("link", { name: "Entity 1", exact: true }).tap();
+      const surface = page.locator("[data-route-transition]");
+      await expect
+        .poll(() =>
+          surface.evaluate((element) => element.getAnimations().length),
+        )
+        .toBe(1);
+      const heading = page.getByRole("heading", { name: "Entity 1" });
+      const covered = await heading.screenshot();
+      await surface.evaluate((element) => {
+        const animation = element.getAnimations()[0];
+        if (!animation) throw new Error("Missing reveal animation");
+        animation.currentTime = 40;
+      });
+      const partial = await heading.screenshot();
+      await surface.evaluate((element) => element.getAnimations()[0]?.finish());
+      await expect(surface).toBeHidden();
+      const revealed = await heading.screenshot();
+      // Computed opacity alone cannot catch a compositor that fails to paint.
+      expect(covered.equals(partial)).toBe(false);
+      expect(partial.equals(revealed)).toBe(false);
+      expect(covered.equals(revealed)).toBe(false);
+    });
+  }
+
+  test("entity taps and on-screen Back reveal content without transforming the page", async ({
     page,
   }) => {
     await page.goto("/transitions");
@@ -86,11 +132,10 @@ test.describe("mobile touch navigation", () => {
       const start = frames[0];
       if (!start) throw new Error("Missing animation frames");
       expect(start.opacity).toBeLessThan(1);
-      expect(Math.sign(start.x)).toBe(index === 0 ? 1 : -1);
-      expect(frames.some((frame) => frame.opacity > start.opacity)).toBe(true);
       expect(
-        frames.some((frame) => Math.abs(frame.x) < Math.abs(start.x)),
+        frames.every((frame) => frame.x === 0 && frame.contentOpacity === 1),
       ).toBe(true);
+      expect(frames.some((frame) => frame.opacity > start.opacity)).toBe(true);
     }
   });
 
@@ -128,7 +173,7 @@ for (const prefix of ["", "/stash"]) {
       );
       expect(observation).toMatchObject({
         direction,
-        duration: 180,
+        duration: 200,
       });
       expect(await page.locator("header").boundingBox()).toEqual(header);
     }
@@ -186,7 +231,7 @@ test("route motion works without native View Transition support", async ({
   expect(
     await page.evaluate(() => window.observedTransitions[0]),
   ).toMatchObject({
-    duration: 180,
+    duration: 200,
     direction: "forward",
   });
   await page.getByRole("button", { name: "Details tab" }).click();
@@ -203,6 +248,10 @@ test("rapid navigation can interrupt motion and Smart Back can reverse to a sibl
   await page.goto("/transitions/1");
   await page.getByRole("link", { name: "Next entity" }).click();
   await expect(page.getByRole("heading", { name: "Entity 2" })).toBeVisible();
+  // Wait for its first paint, then interrupt the running effect.
+  await expect
+    .poll(() => page.evaluate(() => window.observedTransitions.length))
+    .toBe(1);
   // Dispatch during the animation, without Playwright waiting for stability.
   await page
     .getByRole("button", { name: "Back to entity" })

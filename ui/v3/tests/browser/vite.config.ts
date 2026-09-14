@@ -14,8 +14,6 @@ export default defineConfig({
   resolve: {
     alias: {
       "src/hooks/default-filter": stubs,
-      "src/components/layout/mobile-nav-sheet": stubs,
-      "@/components/layout/mobile-nav-sheet": stubs,
       "@": source,
       src: source,
     },

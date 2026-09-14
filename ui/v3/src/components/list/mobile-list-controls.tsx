@@ -18,7 +18,7 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { MobileNavSheet } from "@/components/layout/mobile-nav-sheet";
+import { useMobileNavigation } from "@/components/layout/mobile-navigation";
 import { MobileToolbarRow } from "@/components/layout/mobile-toolbar";
 import { MobileSearchRow } from "@/components/layout/mobile-search-row";
 import {
@@ -70,7 +70,7 @@ export function MobileListControls({
   const chrome = useMobileDetailChrome();
   const hosted = chrome?.mobile ?? false;
   const search = useMobileSearch();
-  const [navOpen, setNavOpen] = useState(false);
+  const openNavigation = useMobileNavigation();
   const [pagesOpen, setPagesOpen] = useState(false);
   const keyboardRef = useMobileKeyboardLayout<HTMLDivElement>();
   const mode =
@@ -104,7 +104,6 @@ export function MobileListControls({
 
   return (
     <>
-      {!hosted && <MobileNavSheet open={navOpen} onOpenChange={setNavOpen} />}
       {hosted && (
         <>
           <MobileDetailChromePortal slot="pagination">
@@ -193,7 +192,7 @@ export function MobileListControls({
                     variant="ghost"
                     size="icon-lg"
                     className="size-11 shrink-0"
-                    onClick={() => setNavOpen(true)}
+                    onClick={openNavigation}
                     aria-label={intl.formatMessage({
                       id: "navigation",
                       defaultMessage: "Navigation",

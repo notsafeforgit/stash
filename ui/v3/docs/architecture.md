@@ -43,18 +43,25 @@ upstream's numeric migrations and primary schema version unchanged. See
   the watcher and refresh once. Unrelated configuration,
   plugin, status, and job queries are excluded from library refreshes.
 
-`core/route-transitions.ts` animates committed content with the Web Animations
-API: a 180ms fade and 8px directional entrance, reversed for browser Back and
-Smart Back. It does not take snapshots or wait before committing navigation.
+`core/route-transitions.ts` reveals committed content with a 200ms Web Animations
+fade on the empty, viewport-sized surface in `layout/route-viewport.tsx`.
+The image/video/scroller subtree stays opaque and untransformed. It does not
+take snapshots or wait before committing navigation.
 WebKit profiling with real Home thumbnails found native snapshot capture could
-add 0.6–1.1 seconds; live-content animation removes that capture cost. The
-existing `data-route-viewport` main animates; shell controls and portaled overlays
-stay still. No keyed wrappers or forced remounts are involved.
+add 0.6–1.1 seconds. A separate paint surface also avoids promoting that whole
+subtree during rapid navigation. Shell controls and portaled overlays stay
+still. No keyed wrappers or forced remounts are involved.
 Search/filter/tab/hash changes, initial load, and reduced motion stay still.
 Smart Back supplies typed `state.navigationDirection: "back"`; exceptional
 navigations can set `state.routeMotion: false`. Rapid navigation cancels the
-previous animation, as does a change to Reduce Motion. Browsers without Web
-Animations navigate normally. Explicit list-grid zoom retains its separate
+previous animation, as does a visibility or Reduce Motion change. Duplicate
+same-location router resolutions do not cancel the committed page's reveal. Finished
+effects are canceled and their paint surface is hidden. Browsers without Web
+Animations navigate normally. `layout/mobile-navigation.tsx` owns one persistent
+navigation drawer for all toolbars. Its lease holds only the visual reveal until
+the drawer exits; navigation and loading continue immediately. This drawer uses
+a dimmed backdrop to avoid filtering a changing image-heavy page.
+Explicit list-grid zoom retains its separate
 native View Transition styling in `styles/globals.css`.
 
 Home mounts its first carousel immediately and uses `DeferredMount` to start

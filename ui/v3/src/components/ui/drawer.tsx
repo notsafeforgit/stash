@@ -7,6 +7,8 @@ import {
   useOverlayOpenState,
 } from "@/components/shortcut-provider";
 
+export type DrawerBackdrop = "blurred" | "dimmed";
+
 function Drawer({
   open,
   defaultOpen,
@@ -55,8 +57,11 @@ function DrawerClose({
 
 function DrawerOverlay({
   className,
+  appearance = "blurred",
   ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Backdrop>) {
+}: React.ComponentProps<typeof DrawerPrimitive.Backdrop> & {
+  appearance?: DrawerBackdrop;
+}) {
   return (
     <DrawerPrimitive.Backdrop
       data-slot="drawer-overlay"
@@ -66,13 +71,21 @@ function DrawerOverlay({
       // zoom from inside the drawer). Without this, iOS Safari (and to a
       // lesser extent Chrome) briefly drops the backdrop-filter during
       // heavy layout updates and the unblurred content flashes through.
-      style={{
-        willChange: "backdrop-filter",
-        transform: "translateZ(0)",
-      }}
+      style={
+        appearance === "blurred"
+          ? {
+              willChange: "backdrop-filter",
+              transform: "translateZ(0)",
+            }
+          : undefined
+      }
       className={cn(
-        "fixed inset-0 z-50 bg-black/10 supports-backdrop-filter:backdrop-blur-xs",
-        "transition-opacity duration-300",
+        "fixed inset-0 z-50",
+        appearance === "blurred"
+          ? "bg-black/10 supports-backdrop-filter:backdrop-blur-xs"
+          : "bg-black/40",
+        "transition-opacity",
+        appearance === "blurred" ? "duration-300" : "duration-100",
         "data-[starting-style]:opacity-0 data-[ending-style]:opacity-0",
         className,
       )}
@@ -85,13 +98,15 @@ function DrawerContent({
   className,
   children,
   keepMounted,
+  backdrop = "blurred",
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Popup> & {
   keepMounted?: boolean;
+  backdrop?: DrawerBackdrop;
 }) {
   return (
     <DrawerPortal keepMounted={keepMounted}>
-      <DrawerOverlay />
+      <DrawerOverlay appearance={backdrop} />
       <DrawerPrimitive.Viewport className="fixed inset-0 z-50 flex items-end justify-center">
         <DrawerPrimitive.Popup
           data-slot="drawer-content"

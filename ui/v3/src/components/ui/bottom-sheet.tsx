@@ -5,6 +5,7 @@ import {
   DrawerContent,
   DrawerDescription,
   DrawerTitle,
+  type DrawerBackdrop,
 } from "@/components/ui/drawer";
 
 export function BottomSheetHeader({
@@ -54,6 +55,8 @@ export interface BottomSheetProps {
   className?: string;
   /** Whether this sheet should suppress background entity-list shortcuts. */
   blocksListShortcuts?: boolean;
+  onOpenChangeComplete?: (open: boolean) => void;
+  backdrop?: DrawerBackdrop;
 }
 
 /**
@@ -66,14 +69,20 @@ export function BottomSheet({
   children,
   className,
   blocksListShortcuts,
+  onOpenChangeComplete,
+  backdrop,
 }: BottomSheetProps) {
   return (
     <Drawer
       open={open}
       onOpenChange={onOpenChange}
       blocksListShortcuts={blocksListShortcuts}
+      onOpenChangeComplete={onOpenChangeComplete}
     >
-      <DrawerContent className={cn("bg-background outline-none", className)}>
+      <DrawerContent
+        backdrop={backdrop}
+        className={cn("bg-background outline-none", className)}
+      >
         {children}
       </DrawerContent>
     </Drawer>

@@ -1,8 +1,7 @@
-import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { MobileNavSheet } from "./mobile-nav-sheet";
+import { useMobileNavigation } from "./mobile-navigation";
 import { useNavItems } from "./nav-items";
 import { MobileToolbarRow } from "./mobile-toolbar";
 
@@ -18,42 +17,38 @@ export function BottomTabBar() {
   // First 3 stay as primary inline tabs; everything else is reachable via
   // the drawer behind the hamburger.
   const primary = allTabs.slice(0, 3);
-  const [navOpen, setNavOpen] = useState(false);
+  const openNavigation = useMobileNavigation();
 
   return (
-    <>
-      <nav className="bottom-tab-bar mobile-safe-footer @container shrink-0 border-t bg-background md:hidden">
-        <MobileToolbarRow>
-          <Button
-            variant="ghost"
-            size="icon-lg"
-            className="size-11 shrink-0"
-            onClick={() => setNavOpen(true)}
-            aria-label="Open navigation menu"
+    <nav className="bottom-tab-bar mobile-safe-footer @container shrink-0 border-t bg-background md:hidden">
+      <MobileToolbarRow>
+        <Button
+          variant="ghost"
+          size="icon-lg"
+          className="size-11 shrink-0"
+          onClick={openNavigation}
+          aria-label="Open navigation menu"
+        >
+          <Menu />
+        </Button>
+
+        {primary.map((item) => (
+          <Link
+            key={item.to}
+            to={item.to}
+            // Exact match — see nav-items.tsx for the rationale (the
+            // Markers route is nested under `/scenes`, so prefix-match
+            // would activate Scenes too on `/scenes/markers`).
+            // `includeSearch: false` so list pages stay highlighted when
+            // their URL carries filter params (e.g. /images?fa=...).
+            activeOptions={{ exact: true, includeSearch: false }}
+            className="flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md text-xs font-medium text-muted-foreground transition-colors hover:text-foreground [&.active]:bg-accent [&.active]:text-foreground"
           >
-            <Menu />
-          </Button>
-
-          {primary.map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              // Exact match — see nav-items.tsx for the rationale (the
-              // Markers route is nested under `/scenes`, so prefix-match
-              // would activate Scenes too on `/scenes/markers`).
-              // `includeSearch: false` so list pages stay highlighted when
-              // their URL carries filter params (e.g. /images?fa=...).
-              activeOptions={{ exact: true, includeSearch: false }}
-              className="flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md text-xs font-medium text-muted-foreground transition-colors hover:text-foreground [&.active]:bg-accent [&.active]:text-foreground"
-            >
-              {item.icon}
-              <span>{item.label}</span>
-            </Link>
-          ))}
-        </MobileToolbarRow>
-      </nav>
-
-      <MobileNavSheet open={navOpen} onOpenChange={setNavOpen} />
-    </>
+            {item.icon}
+            <span>{item.label}</span>
+          </Link>
+        ))}
+      </MobileToolbarRow>
+    </nav>
   );
 }

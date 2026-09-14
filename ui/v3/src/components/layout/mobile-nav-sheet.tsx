@@ -13,13 +13,24 @@ import { useNavItems } from "./nav-items";
 interface MobileNavSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onOpenChangeComplete?: (open: boolean) => void;
 }
 
-export function MobileNavSheet({ open, onOpenChange }: MobileNavSheetProps) {
+export function MobileNavSheet({
+  open,
+  onOpenChange,
+  onOpenChangeComplete,
+}: MobileNavSheetProps) {
   const intl = useIntl();
   const items = useNavItems({ placement: "main" });
   return (
-    <BottomSheet open={open} onOpenChange={onOpenChange}>
+    <BottomSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      onOpenChangeComplete={onOpenChangeComplete}
+      backdrop="dimmed"
+      className="data-ending-style:duration-100"
+    >
       <BottomSheetHeader className="py-2">
         <BottomSheetTitle>
           {intl.formatMessage({
@@ -34,7 +45,10 @@ export function MobileNavSheet({ open, onOpenChange }: MobileNavSheetProps) {
           (`/scenes`) since one path is a prefix of the other. Trade-off:
           scene-detail pages (`/scenes/$sceneId`) no longer highlight the
           Scenes link either. */}
-      <nav className="grid min-h-0 grid-cols-4 gap-1 overflow-y-auto px-2 pb-3">
+      <nav
+        data-mobile-navigation
+        className="grid min-h-0 grid-cols-4 gap-1 overflow-y-auto px-2 pb-3"
+      >
         <Link
           to="/"
           preload="viewport"

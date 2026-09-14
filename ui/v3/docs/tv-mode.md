@@ -9,8 +9,8 @@ It needs no Stash TV plugin or separate application.
 
 Choose a scene or marker feed, an app default, saved filter, or all items.
 Saved search, criteria groups and sort retain the library's filter semantics.
-Additional saved-filter rules combine criteria with AND; text search belongs
-in the primary filter. Choose **Random** in **Sort order** for a seeded order
+Build include/exclude combinations in the app's saved-filter editor and select
+that filter in TV. Choose **Random** in **Sort order** for a seeded order
 that stays stable across pages. Matching orientation
 uses the viewing surface, including forced rotation, and includes square videos.
 
@@ -56,7 +56,9 @@ Tags target the scene or marker as appropriate, including marker primary tags.
 Create markers through the shared editor or repeatable quick-create presets.
 Deletion uses the shared confirmation and scene file/generated-file choices.
 
-The action editor supports keyboard or pointer reorder, pinned entries,
+The action editor appears directly in the **Action rail** settings section. Its
+code loads automatically when that page opens. It supports keyboard or pointer
+reorder, pinned entries,
 one-level folders, moving actions into/out of folders, custom labels, curated
 icons, quick tags, and quick markers. Settings and visibility remain at the
 top level. Presets require real tag IDs. Only the versioned `tv` configuration
@@ -64,10 +66,11 @@ key is saved; local rotation is scoped to the backend URL in browser storage.
 Failed saves retain the draft for retry, and invalid/future settings remain
 recoverable until an explicit reset. The main settings search includes TV rows.
 
-Settings version 2 uses one sort choice. Version 1 settings with Shuffle enabled
-load as Random; other saved sort choices remain intact. Saving writes the new
-format without a separate shuffle flag. Sort labels use the same translations
-as the library menus.
+Settings version 3 uses the chosen saved/default filter without additional feed
+rules. Earlier settings retain their selected filters and playback preferences;
+retired rules are removed. Version 1 settings with Shuffle enabled load as Random;
+other saved sort choices remain intact. Saving writes the new format without
+rules or a shuffle flag. Sort labels use the same translations as the library menus.
 
 ## Activity and ownership
 
@@ -91,7 +94,7 @@ never write server activity; offline playback keeps its existing local resume.
 | Plan features | Implementation |
 | --- | --- |
 | TV-01, TV-21 | Route/nav integration, `tv-settings.tsx`, `use-tv-settings.ts` |
-| TV-02–04, TV-25–26 | `core/tv/feed-query.ts`, `feed-state.ts`, `tv-session-state.ts` |
+| TV-02–04, TV-25 | `core/tv/feed-query.ts`, `feed-state.ts`, `tv-session-state.ts` |
 | TV-05–07, TV-09–11, TV-27 | Shared player controls/sources, `playback-policy.ts`, `player-quality.ts`, `marker-range.ts`, `tv-timeline.tsx`, `use-tv-inputs.ts` |
 | TV-12–13, TV-23 | `use-tv-presentation.ts`, `tv-slider.tsx`, scoped overlay portals and zoom coordinates |
 | TV-15–20, TV-24 | TV controls, playback menus, edit panel, mutation adapter, rail editor, and guide |

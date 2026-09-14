@@ -28,24 +28,13 @@ export const tvWindowSchema = z.discriminatedUnion("kind", [
     ),
 ]);
 export const tvSettingsSchema = z.object({
-  version: z.literal(2),
+  version: z.literal(3),
   mode: tvModeSchema,
   sceneFilter: tvFilterSchema,
   markerFilter: tvFilterSchema,
   orientation: z.enum(["all", "match", "portrait", "landscape"]),
   sort: z.string().max(60).nullable(),
   direction: z.enum(["ASC", "DESC"]),
-  /** Extra saved filters are AND-ed using the existing nested AST, including
-   * its include/exclude modifiers. There is no second expression language. */
-  rules: z
-    .array(
-      z.object({
-        kind: z.literal("filter"),
-        mode: tvModeSchema,
-        filterId: z.string().regex(/^[1-9]\d*$/),
-      }),
-    )
-    .max(10),
   pageSize: z.number().int().min(5).max(50),
   prefetch: z.number().int().min(1).max(5),
   itemLimit: z.number().int().positive().max(100000).nullable(),
@@ -61,30 +50,32 @@ export const tvSettingsSchema = z.object({
 });
 export type TvSettings = z.infer<typeof tvSettingsSchema>;
 
-// Version 1 exposed two controls for random ordering. Preserve the effective
-// choice when reading it; forms and new saves use only the canonical sort.
+// Older versions carried additional feed rules; Zod strips that retired field.
+// Version 1 also had a shuffle override. Preserve its effective sort choice.
 const persistedTvSettingsSchema = z.union([
   tvSettingsSchema,
+  tvSettingsSchema
+    .extend({ version: z.literal(2) })
+    .transform((settings): TvSettings => ({ ...settings, version: 3 })),
   tvSettingsSchema
     .extend({ version: z.literal(1), shuffle: z.boolean() })
     .transform(
       ({ shuffle, ...settings }): TvSettings => ({
         ...settings,
-        version: 2,
+        version: 3,
         sort: shuffle ? "random" : settings.sort,
       }),
     ),
 ]);
 
 export const defaultTvSettings: TvSettings = {
-  version: 2,
+  version: 3,
   mode: "scenes",
   sceneFilter: { kind: "default" },
   markerFilter: { kind: "default" },
   orientation: "all",
   sort: null,
   direction: "ASC",
-  rules: [],
   pageSize: 20,
   prefetch: 2,
   itemLimit: null,

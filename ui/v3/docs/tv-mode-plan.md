@@ -200,7 +200,7 @@ Requirement IDs remain stable; removed IDs are not reused.
 | TV-23 | Keyboard controls | Preserve the documented navigation/player shortcuts, including holds, rotation, focus ownership, blur and visibility cleanup |
 | TV-24 | Help and feedback | A discoverable guide explains touch/mouse gestures and keyboard shortcuts; loading, empty, exhausted, missing-media, request-error and retry states are explicit |
 | TV-25 | Feed limits and performance | Optional item limit and bounded page/prefetch controls work; one active player and three slots bound media/DOM costs; preserve current reveal, cache-return, lazy-mount and deferred-canvas contracts; activity/progress updates do not rerender the whole feed |
-| TV-26 | Advanced feed customization | Provide the validated feed-rule design in section 5; its transformations cannot break media identity, pagination or typed playback contracts |
+| TV-26 | Removed: additional feed rules | Use the existing saved-filter editor and select one saved/default filter per feed; no separate TV rule system |
 | TV-27 | Shared default quality | One persisted TV default applies before loading every scene and marker range; lower resolutions use normal v3 streams; available-quality fallback and temporary per-item overrides follow section 9 |
 
 Action inventory for TV-20: settings, UI visibility, scene information, rating,
@@ -233,18 +233,11 @@ button. The settings action opens the main app's Settings → TV page.
   persistence without server activity or a new offline synchronization feature.
   Global tracking and minimum-play settings stay in their existing settings
   location; do not add competing TV or lightbox tracking preferences.
-- **Advanced customization default:** use type-safe, validated feed rules
-  instead of executing stored JavaScript. This is an explicit planning
-  assumption consistent with the strict type-safety requirement. Use it for
-  implementation unless the user selects custom scripting; that choice would
-  require revising this boundary, not the rest of the feature architecture.
-- Rules use the existing AST for metadata predicates and a small discriminated
-  union for ordering/limits. Support include/exclude criteria, server-supported
-  sorting in either direction, seeded shuffle and item limits. Do not create
-  a second expression language. Reverse ordering is a query direction change,
-  not reversal of each newly fetched page. Unsupported transformations get
-  a visible validation error. This deliberately does not promise equivalence
-  with arbitrary JavaScript or full-library transformations on partial pages.
+- Use the app's saved-filter editor for include/exclude combinations and choose
+  one saved/default filter per feed in TV. Additional TV feed rules and stored
+  JavaScript are out of scope. TV retains sorting in either direction, seeded
+  Random ordering, orientation matching and item limits. Reverse ordering is a
+  query direction change, not reversal of each newly fetched page.
 - Preserve major behavior, not implementation quirks. Native TV uses the v3
   implicit marker-end policy: explicit valid end, otherwise the next strictly
   later marker, otherwise scene duration. The plugin used a fixed-duration
@@ -479,7 +472,7 @@ Reuse `ListFilterModel.configureFromSavedFilter`, `makeFindFilter()` and
 `makeFilterAST()`. The differently named `makeFilterAst()` produces saved
 criteria; do not confuse that representation with GraphQL input. Apply
 `scene_filter_ast` or `scene_marker_filter_ast` to the correct operation.
-Compose orientation and extra rules into a cloned AST with AND; never mutate
+Compose orientation into a cloned AST with AND; never mutate
 the saved filter or flatten nested groups to legacy `object_filter`.
 
 Wait for configuration/default/saved-filter resolution before issuing the
@@ -489,7 +482,7 @@ explicit filter selection/retry. TV selection does not change the main app's
 default filters. Selecting all items is an intentional empty-filter query.
 
 Feed identity includes backend scope, entity kind, canonical query input,
-effective orientation, sort/seed, page size and applicable feed rules. Changing
+effective orientation, sort/seed, page size and item limits. Changing
 identity cancels pending work and starts a new generation. Playback-only
 settings such as quality, volume or fit mode do not reset the queue.
 
@@ -849,12 +842,16 @@ physical iPhone/iPad Safari devices.
 ### Main app settings ownership
 
 Settings → TV is the configuration home, accessible without opening a TV feed.
-Group playback (including Default quality), feed behavior/limits/rules,
+Group playback (including Default quality), feed behavior/limits,
 presentation, and action-layout editing using existing settings sections and
 TanStack Form/Zod patterns. Device-only rotation is edited here too, clearly
 labeled as local. The TV rail's settings action navigates here with return
 context; it does not open a separate TV configuration drawer. Immediate playback
 menus and metadata editors remain available in the viewing surface.
+
+Show the action-rail editor directly in its settings section, without a
+Customize button. Keep its module lazy and mount it automatically when the
+settings page opens; detailed action forms still open on demand.
 
 ### Actions
 
@@ -1006,7 +1003,7 @@ are enforced and usable with a keyboard.
 - Add left-handed layout, fit/crop, hide/restore controls and rotation.
 - Complete keyboard mappings, speed holds and cancellation behavior.
 - Complete Settings → TV forms, action-layout editing, shared/local persistence,
-  limits, validated feed rules and help; verify settings search and return state.
+  limits and help; verify settings search and return state.
 - Validate inline iOS playback, immersive/container presentation, mobile portals,
   gestures and desktop header width with the new navigation entry.
 

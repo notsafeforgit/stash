@@ -2463,6 +2463,25 @@
     "pause": "Pause"
   },
   "tv": {
+    "icon": {
+      "default": "Default",
+      "heart": "Heart",
+      "star": "Star",
+      "tag": "Tag",
+      "bookmark": "Bookmark",
+      "flame": "Flame",
+      "sparkles": "Sparkles",
+      "check": "Check mark",
+      "plus": "Plus"
+    },
+    "rail": {
+      "drag": "Drag {label}",
+      "pin": "Pin {label}",
+      "move_up": "Move {label} up",
+      "move_down": "Move {label} down",
+      "remove": "Remove {label}",
+      "tag_id": "Tag {id}"
+    },
     "loading": "Loading TV…",
     "filter": {
       "default": "App default filter",
@@ -2499,10 +2518,7 @@
       "ui_visible": "Show controls initially",
       "rotation": "Rotation on this browser",
       "rotation_description": "Saved only for this browser and server. The video remains inline, with the TV controls available.",
-      "rules": "Additional feed rules",
-      "rules_description": "Combine saved filters with AND. Their nested include/exclude criteria are preserved. Text search and ordering belong to the main feed filter.",
       "rail": "Action rail",
-      "customize_rail": "Customize action rail",
       "save": "Save TV settings",
       "reset": "Reset TV settings"
     },
@@ -2660,10 +2676,6 @@
       "normal_2": "Normal",
       "clockwise": "Clockwise",
       "counterclockwise": "Counterclockwise",
-      "rule_feed": "Rule feed",
-      "additional_filter": "Additional filter",
-      "remove_rule": "Remove rule",
-      "add_filter_rule": "Add filter rule",
       "check_tv_settings": "Check TV settings",
       "reset_tv_settings": "Reset TV settings?",
       "restore_the_default_feed_playback_and_action_rail_settings": "Restore the default feed, playback and action rail settings.",

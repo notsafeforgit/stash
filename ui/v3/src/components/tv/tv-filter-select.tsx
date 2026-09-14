@@ -10,13 +10,11 @@ export function TvFilterSelect({
   value,
   onChange,
   label,
-  savedOnly = false,
 }: {
   mode: TvMode;
   value: TvFilterChoice;
   onChange: (choice: TvFilterChoice) => void;
   label: string;
-  savedOnly?: boolean;
 }) {
   const { data, error } = useQuery(FindSavedFiltersDocument, {
     variables: { mode: tvFilterMode(mode) },
@@ -28,15 +26,11 @@ export function TvFilterSelect({
         label={label}
         value={value.kind === "saved" ? value.id : value.kind}
         options={[
-          ...(savedOnly
-            ? []
-            : [
-                {
-                  value: "default",
-                  label: msg("tv.filter.default", "App default filter"),
-                },
-                { value: "all", label: msg("tv.filter.all", "All items") },
-              ]),
+          {
+            value: "default",
+            label: msg("tv.filter.default", "App default filter"),
+          },
+          { value: "all", label: msg("tv.filter.all", "All items") },
           ...(data?.findSavedFilters ?? []).map((filter) => ({
             value: filter.id,
             label: filter.name,

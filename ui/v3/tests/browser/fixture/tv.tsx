@@ -91,8 +91,22 @@ const configuration: GQL.ConfigDataFragment = {
   ui: {
     ...playerConfiguration.ui,
     tv: params.has("legacy-shuffle")
-      ? { ...settings, version: 1, shuffle: true, sort: "created_at" }
-      : settings,
+      ? {
+          ...settings,
+          version: 1,
+          shuffle: true,
+          sort: "created_at",
+          rules: [],
+        }
+      : params.has("legacy-rules")
+        ? {
+            ...settings,
+            version: 2,
+            sceneFilter: { kind: "saved", id: "1" },
+            markerFilter: { kind: "saved", id: "2" },
+            rules: [{ kind: "filter", mode: "scenes", filterId: "999" }],
+          }
+        : settings,
     trackActivity: params.has("activity"),
     minimumPlayPercent: 0,
   },
@@ -189,7 +203,30 @@ const savedFilters: MockedResponse<
   request: { query: GQL.FindSavedFiltersDocument, variables: () => true },
   maxUsageCount: Infinity,
   delay: 0,
-  result: { data: { findSavedFilters: [] } },
+  result: (variables) => ({
+    data: {
+      findSavedFilters: [
+        {
+          __typename: "SavedFilter" as const,
+          id: "1",
+          name: "Scene picks",
+          mode: GQL.FilterMode.Scenes,
+          find_filter: null,
+          filter_ast: null,
+          ui_options: null,
+        },
+        {
+          __typename: "SavedFilter" as const,
+          id: "2",
+          name: "Marker picks",
+          mode: GQL.FilterMode.SceneMarkers,
+          find_filter: null,
+          filter_ast: null,
+          ui_options: null,
+        },
+      ].filter((filter) => !variables.mode || filter.mode === variables.mode),
+    },
+  }),
 };
 let saveFailed = false;
 const configure: MockedResponse<

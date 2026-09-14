@@ -17,9 +17,11 @@ async function open(page: Page, query = "?paused") {
   });
 }
 async function openSettings(page: Page) {
-  await page.getByRole("button", { name: "TV settings", exact: true }).click();
+  await page.getByRole("button", { name: "Navigation", exact: true }).click();
+  await page.getByRole("link", { name: "Settings", exact: true }).click();
   await page
-    .getByRole("button", { name: "Open TV settings", exact: true })
+    .getByRole("main")
+    .getByRole("link", { name: "TV", exact: true })
     .click();
   await expect(page).toHaveURL(/\/tv-fixture\/settings\/tv/);
 }
@@ -236,11 +238,14 @@ test("TV exposes mute at the bottom and uses video taps instead of transport but
   const dock = page.locator("[data-tv-dock]");
   const surface = page.locator("[data-tv-play-surface]");
   await expect(
+    page.getByRole("button", { name: "TV settings", exact: true }),
+  ).toHaveCount(0);
+  await expect(
     dock.getByRole("button", { name: /^(Play|Pause|Seek to .* marker)$/ }),
   ).toHaveCount(0);
   const unmute = dock.getByRole("button", { name: "Unmute", exact: true });
   await expect(unmute).toBeVisible();
-  for (const name of ["Navigation", "Unmute", "TV settings"]) {
+  for (const name of ["Navigation", "Unmute"]) {
     const bounds = await page
       .getByRole("button", { name, exact: true })
       .boundingBox();
@@ -273,13 +278,13 @@ for (const viewport of [
     hasTouch: false,
   },
 ]) {
-  test.describe(`TV quick settings on ${viewport.name}`, () => {
+  test.describe(`TV settings shortcuts on ${viewport.name}`, () => {
     test.use({
       viewport: { width: viewport.width, height: viewport.height },
       isMobile: viewport.isMobile,
       hasTouch: viewport.hasTouch,
     });
-    test("keeps playback in place until the explicit settings-page action", async ({
+    test("removes the default gear and supports optional direct links in the dock and folders", async ({
       page,
     }, testInfo) => {
       const editorRequests: string[] = [];
@@ -287,58 +292,112 @@ for (const viewport of [
         if (new URL(request.url()).pathname.endsWith("/tv-rail-editor.tsx"))
           editorRequests.push(request.url());
       });
-      await open(page);
-      await page.locator("[data-tv-play-surface]").click({
-        position: { x: 150, y: 250 },
-      });
-      await expect(page.locator("video")).toHaveJSProperty("paused", false);
-      await page
-        .getByRole("button", { name: "TV settings", exact: true })
-        .click();
-      const menu = page.getByRole("dialog", {
-        name: "Quick settings",
+      await open(page, "?paused&legacy-gear");
+      await next(page, 2);
+      const shortcut = page.getByRole("button", {
+        name: "TV settings",
         exact: true,
       });
-      await expect(menu).toBeVisible();
-      await expect(page).toHaveURL(/\/tv-fixture\/tv\?/);
-      await expect(page.locator("video")).toHaveJSProperty("paused", false);
-      await page.keyboard.press("ArrowDown");
-      await expect(page.locator("[data-scene-player]")).toHaveAttribute(
-        "data-playback-key",
-        /scene:1$/,
-      );
-      await menu.screenshot({
-        path: testInfo.outputPath("tv-quick-settings.png"),
-      });
-      await menu
-        .getByRole("button", { name: "Playback speed", exact: true })
-        .click();
-      const speed = page.getByRole("combobox", {
-        name: "Playback speed",
-        exact: true,
-      });
-      await speed.click();
-      await expect(speed).toHaveAttribute("aria-expanded", "true");
-      await page.getByRole("option", { name: "1.5×", exact: true }).click();
-      await page.getByRole("button", { name: "Close", exact: true }).click();
-      await expect(page.locator("video")).toHaveJSProperty("playbackRate", 1.5);
-      expect(
-        await page
-          .locator("video")
-          .evaluate((video) => video === window.tvFixtureVideo),
-      ).toBe(true);
-      await page
-        .getByRole("button", { name: "TV settings", exact: true })
-        .click();
-      await menu.getByRole("button", { name: "Close", exact: true }).click();
-      await expect(page).toHaveURL(/\/tv-fixture\/tv\?/);
-      await expect(page.locator("video")).toHaveJSProperty("paused", false);
+      await expect(shortcut).toHaveCount(0);
+      await page.keyboard.press("h");
+      await expect(
+        page.getByRole("button", { name: "Show TV controls", exact: true }),
+      ).toBeVisible();
+      await expect(shortcut).toHaveCount(0);
       expect(editorRequests).toEqual([]);
       await openSettings(page);
-      await expect(page.locator("video")).toHaveCount(0);
+
+      const saveAndReturn = async () => {
+        const before = await page.evaluate(
+          () =>
+            window.tvFixtureRequests.filter(
+              (request) => request.name === "ConfigureUISetting",
+            ).length,
+        );
+        const save = page.getByRole("button", {
+          name: "Save TV settings",
+          exact: true,
+        });
+        await save.click();
+        await expect
+          .poll(() =>
+            page.evaluate(
+              () =>
+                window.tvFixtureRequests.filter(
+                  (request) => request.name === "ConfigureUISetting",
+                ).length,
+            ),
+          )
+          .toBe(before + 1);
+        await expect(save).toBeEnabled();
+        await page
+          .getByRole("link", { name: "Return to TV", exact: true })
+          .click();
+        await expect(page.locator("[data-scene-player]")).toHaveAttribute(
+          "data-playback-key",
+          /scene:2$/,
+        );
+      };
+
+      await page
+        .getByRole("combobox", { name: "New action", exact: true })
+        .click();
+      await page
+        .getByRole("option", { name: "TV settings", exact: true })
+        .click();
+      await page
+        .getByRole("button", { name: "Add action", exact: true })
+        .click();
       await expect(
-        page.getByRole("switch", { name: "Start muted", exact: true }),
+        page.getByRole("button", { name: "Remove TV settings", exact: true }),
+      ).toBeEnabled();
+      await page
+        .getByRole("switch", { name: "Pin TV settings", exact: true })
+        .check();
+      await saveAndReturn();
+      await expect(
+        page
+          .locator("[data-tv-dock]")
+          .getByRole("button", { name: "TV settings", exact: true }),
       ).toBeVisible();
+      await shortcut.click();
+      await expect(page).toHaveURL(/\/tv-fixture\/settings\/tv/);
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+
+      await shortcut.click();
+      await page
+        .getByRole("combobox", { name: "Move into folder", exact: true })
+        .click();
+      await page.getByRole("option", { name: "Playback", exact: true }).click();
+      await saveAndReturn();
+      await expect(shortcut).toHaveCount(0);
+      await page.getByRole("button", { name: "Playback", exact: true }).click();
+      const folderShortcut = page.getByRole("menuitem", {
+        name: "TV settings",
+        exact: true,
+      });
+      await expect(folderShortcut).toBeVisible();
+      await page.screenshot({
+        path: testInfo.outputPath("tv-settings-folder.png"),
+      });
+      await folderShortcut.click();
+      await expect(page).toHaveURL(/\/tv-fixture\/settings\/tv/);
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+
+      await page.getByRole("button", { name: /^Playback \(\d+\)$/ }).click();
+      const settingsRow = page
+        .locator("p")
+        .filter({ hasText: /^TV settings$/ })
+        .locator("..");
+      await settingsRow
+        .getByRole("button", { name: "Remove", exact: true })
+        .click();
+      await saveAndReturn();
+      await expect(shortcut).toHaveCount(0);
+      await page.getByRole("button", { name: "Playback", exact: true }).click();
+      await expect(
+        page.getByRole("menuitem", { name: "TV settings", exact: true }),
+      ).toHaveCount(0);
     });
   });
 }
@@ -979,7 +1038,7 @@ test("TV has one localized sort choice and retains Random between feed modes", a
         variables: expect.objectContaining({
           key: "tv",
           value: expect.objectContaining({
-            version: 3,
+            version: 4,
             sort: "random",
             mode: "markers",
           }),
@@ -1068,11 +1127,10 @@ test("TV settings show the rail editor directly and save reordered actions witho
       variables: {
         key: "tv",
         value: {
-          version: 3,
+          version: 4,
           sceneFilter: { kind: "saved", id: "1" },
           markerFilter: { kind: "saved", id: "2" },
           rail: [
-            { action: { id: "settings" } },
             { action: { id: "info", icon: "heart" } },
             { action: { id: "visibility" } },
             { action: { id: "counter" } },

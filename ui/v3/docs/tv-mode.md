@@ -45,7 +45,7 @@ may still require muted autoplay. Temporary holds never replace the saved
 playback rate.
 Playback menus include captions and supported device playback controls.
 Fit/fill, zoom, rotation, left-handed actions, and hiding controls are available.
-Navigation, mute, Settings and restore-controls stay reachable in the bottom
+Navigation, mute and restore-controls stay reachable in the bottom
 dock with chrome hidden. Pinned actions use that dock; the remaining action
 rail is bounded above it, on the preferred hand's side.
 Use the navigation drawer to switch to another top-level page; TV has no close
@@ -64,10 +64,11 @@ tag/performer labels wrap without horizontal overflow.
 
 ## Actions and settings
 
-The TV settings action opens **Quick settings** over the current video, with
-access to quality, speed, volume and subtitles. Opening or closing it preserves
-playback. Select **Open TV settings** to leave the player for saved preferences;
-the full settings editor loads only after that explicit navigation.
+Quality, speed, volume and subtitles are available in the default Playback
+folder. The optional **TV settings** action links directly to **Settings → TV**,
+preserving the current selection and position for return. Add it anywhere in the
+rail, pin it, move it into a folder, or remove it. The default rail has no settings
+button; the settings page is always accessible through app navigation.
 
 Metadata links open the app's existing detail routes. Returning to TV restores
 the recent feed, selection, and scalar playback state while cached. Rating,
@@ -80,14 +81,16 @@ The action editor appears directly in the **Action rail** settings section. Its
 code loads automatically when that page opens. It supports keyboard or pointer
 reorder, pinned entries,
 one-level folders, moving actions into/out of folders, custom labels, curated
-icons, quick tags, and quick markers. Settings and visibility remain at the
-top level. Presets require real tag IDs. Only the versioned `tv` configuration
+icons, quick tags, and quick markers. Visibility remains at the top level.
+Presets require real tag IDs. Only the versioned `tv` configuration
 key is saved; local rotation is scoped to the backend URL in browser storage.
 Failed saves retain the draft for retry, and invalid/future settings remain
 recoverable until an explicit reset. The main settings search includes TV rows.
 
-Settings version 3 uses the chosen saved/default filter without additional feed
-rules. Earlier settings retain their selected filters and playback preferences;
+Settings version 4 removes the formerly required, unchanged default settings
+button from older rails while preserving customized settings shortcuts. It uses
+the chosen saved/default filter without additional feed rules. Earlier settings
+retain their selected filters and playback preferences;
 retired rules are removed. Version 1 settings with Shuffle enabled load as Random;
 other saved sort choices remain intact. Saving writes the new format without
 rules or a shuffle flag. Sort labels use the same translations as the library menus.

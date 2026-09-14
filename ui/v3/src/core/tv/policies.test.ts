@@ -8,7 +8,11 @@ import {
   decodeTvSettings,
   tvSettingsSchema,
 } from "./settings";
-import { createTvAction, defaultTvRail } from "./action-config";
+import {
+  createTvAction,
+  defaultTvRail,
+  type TvRailEntry,
+} from "./action-config";
 import {
   appendTvPage,
   type TvFeedSnapshot,
@@ -121,6 +125,61 @@ describe("TV media policies", () => {
 });
 
 describe("TV settings validation", () => {
+  const legacySettingsEntry: TvRailEntry = {
+    type: "action",
+    pinned: true,
+    action: createTvAction("settings", "settings"),
+  };
+
+  it.each([
+    1, 2, 3,
+  ])("retires the default gear from version %i without resetting the rail or audio", (version) => {
+    const settings = {
+      ...defaultTvSettings,
+      startMuted: false,
+      rail: [...defaultTvRail].reverse(),
+    };
+    const result = decodeTvSettings({
+      ...settings,
+      version,
+      shuffle: false,
+      rail: [legacySettingsEntry, ...settings.rail],
+    });
+    expect(result).toEqual({ kind: "ready", settings });
+    if (result.kind === "ready")
+      expect(decodeTvSettings(result.settings)).toEqual(result);
+  });
+
+  it.each([
+    { ...legacySettingsEntry, pinned: false },
+    {
+      ...legacySettingsEntry,
+      action: { ...legacySettingsEntry.action, label: "Preferences" },
+    },
+    {
+      ...legacySettingsEntry,
+      action: { ...legacySettingsEntry.action, icon: "star" as const },
+    },
+    {
+      ...legacySettingsEntry,
+      action: { ...legacySettingsEntry.action, id: "custom-settings" },
+    },
+  ])("preserves a customized legacy settings shortcut: %j", (entry) => {
+    const settings = { ...defaultTvSettings, rail: [...defaultTvRail, entry] };
+    expect(decodeTvSettings({ ...settings, version: 3 })).toEqual({
+      kind: "ready",
+      settings,
+    });
+  });
+
+  it("keeps explicitly added settings shortcuts after saving the current format", () => {
+    const settings = {
+      ...defaultTvSettings,
+      rail: [legacySettingsEntry, ...defaultTvRail],
+    };
+    expect(decodeTvSettings(settings)).toEqual({ kind: "ready", settings });
+  });
+
   it.each([
     1, 2, 3,
   ])("adds the startup mute default to version %i without resetting preferences", (version) => {
@@ -216,7 +275,25 @@ describe("TV settings validation", () => {
     ).toBe(false);
   });
 
-  it("requires reachable settings and visibility actions and valid quick presets", () => {
+  it("allows an optional settings shortcut inside a folder", () => {
+    const settings = {
+      ...defaultTvSettings,
+      rail: defaultTvRail.map((entry) =>
+        entry.type === "folder" && entry.id === "playback"
+          ? {
+              ...entry,
+              actions: [
+                ...entry.actions,
+                createTvAction("settings", "settings"),
+              ],
+            }
+          : entry,
+      ),
+    };
+    expect(decodeTvSettings(settings)).toEqual({ kind: "ready", settings });
+  });
+
+  it("requires reachable visibility and valid quick presets without a settings action", () => {
     expect(tvSettingsSchema.safeParse(defaultTvSettings).success).toBe(true);
     expect(
       tvSettingsSchema.safeParse({ ...defaultTvSettings, rail: [] }).success,

@@ -246,8 +246,7 @@ function RailRow({
     useSortable({ id });
   const [editing, setEditing] = useState(false);
   const essential =
-    entry.type === "action" &&
-    (entry.action.kind === "settings" || entry.action.kind === "visibility");
+    entry.type === "action" && entry.action.kind === "visibility";
   const update = (next: TvRailEntry) =>
     onChange(entries.map((item) => (railEntryId(item) === id ? next : item)));
   const label =
@@ -561,7 +560,7 @@ export default function TvRailEditor({
       <p className="text-muted-foreground">
         <FormattedMessage
           id="tv.text.drag_to_reorder_or_use_the_move_buttons_pinned_actions"
-          defaultMessage="Drag to reorder, or use the move buttons. Pinned actions stay visible. Settings and visibility always remain available."
+          defaultMessage="Drag to reorder, or use the move buttons. Pinned actions stay visible. TV settings is an optional link and can go in a folder."
         />
       </p>
       <DndContext

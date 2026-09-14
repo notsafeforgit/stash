@@ -9,6 +9,10 @@ import { useTabState } from "src/hooks/use-tab-state";
 import { ListActivityContext } from "src/components/list/list-activity-context";
 import { useMobileDetailChrome } from "@/components/layout/mobile-detail-chrome";
 import { MobileDetailSections } from "./mobile-detail-sections";
+import {
+  ContentReveal,
+  useContentReveal,
+} from "@/components/layout/content-reveal";
 
 export interface DetailTabsTab extends DetailTabStripItem {
   content: React.ReactNode;
@@ -40,6 +44,7 @@ export function DetailTabs({ tabs, activeTab, onTabChange }: DetailTabsProps) {
     activeTab,
     onTabChange,
   });
+  const revealRef = useContentReveal(resolvedActiveTab, "detail-tab");
 
   function handleTabChange(id: string) {
     selectTab(id);
@@ -78,13 +83,14 @@ export function DetailTabs({ tabs, activeTab, onTabChange }: DetailTabsProps) {
           // against it and its inner scroll container picks up a
           // bounded height. Without this the list overflows the
           // outer `md:overflow-hidden` and gets clipped — no scroll.
-          className="md:flex md:flex-col md:min-h-0"
+          className="relative md:flex md:flex-col md:min-h-0"
         >
           {isMounted(t.id) ? (
             <ListActivityContext value={t.id === resolvedActiveTab}>
               {t.content}
             </ListActivityContext>
           ) : null}
+          {t.id === resolvedActiveTab && <ContentReveal ref={revealRef} />}
         </TabsContent>
       ))}
     </Tabs>

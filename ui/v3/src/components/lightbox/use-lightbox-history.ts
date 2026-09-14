@@ -23,10 +23,15 @@ function getLightboxHistoryId(state: unknown): number | undefined {
  * instead of leaving the page and the close button does not leave a dead
  * history step behind.
  */
-export function useLightboxHistory(open: boolean, onClose: () => void) {
+export function useLightboxHistory(
+  open: boolean,
+  onClose: () => void,
+  onDismiss?: () => void,
+) {
   const activeIdRef = useRef<number | undefined>(undefined);
   const dismissingRef = useRef(false);
   const onCloseRef = useCommittedRef(onClose);
+  const onDismissRef = useCommittedRef(onDismiss);
 
   useEffect(() => {
     if (!open) return;
@@ -52,8 +57,12 @@ export function useLightboxHistory(open: boolean, onClose: () => void) {
       }
 
       activeIdRef.current = undefined;
+      const completingClose = dismissingRef.current;
       dismissingRef.current = false;
-      onCloseRef.current();
+      // Browser Back starts the optional visual exit. A close whose exit
+      // already finished only completes the matching history operation.
+      if (!completingClose && onDismissRef.current) onDismissRef.current();
+      else onCloseRef.current();
     }
 
     window.addEventListener("popstate", handlePopState);

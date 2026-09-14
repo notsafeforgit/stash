@@ -39,7 +39,7 @@ for (const width of [320, 390]) {
 
     await footer.getByRole("button", { name: "Navigation", exact: true }).tap();
     const navigation = page.getByRole("dialog", {
-      name: "Fixture navigation",
+      name: "Navigation",
       exact: true,
     });
     await expect(navigation).toBeVisible();

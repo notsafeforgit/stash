@@ -88,7 +88,8 @@ import {
   DropdownMenuTrigger,
 } from "src/components/ui/dropdown-menu";
 import { useToast } from "src/hooks/toast";
-import { useLightboxHistory } from "./use-lightbox-history";
+import { lightboxAnimation, useLightboxMotion } from "./use-lightbox-motion";
+import { motion } from "@/core/motion";
 import { inverseImageRotationDirection } from "./image-rotation";
 
 // ── Module augmentation ────────────────────────────────────────────────────────
@@ -811,7 +812,8 @@ export function Lightbox({
 }: LightboxProps) {
   const intl = useIntl();
   const toast = useToast();
-  const requestClose = useLightboxHistory(open, onClose);
+  const { controllerRef, requestClose, finishClose, onExiting } =
+    useLightboxMotion(open, onClose);
   const [settings, setSettings] = useState<LightboxSettings>(loadSettings);
   const slideshowPlayingRef = useRef(false);
   const resumeSlideshowRef = useRef(false);
@@ -1102,12 +1104,13 @@ export function Lightbox({
     <>
       <YARLightbox
         open={open}
-        close={requestClose}
+        close={finishClose}
         slides={decoratedSlides}
         index={index}
         plugins={plugins}
         carousel={finite ? { finite: true } : undefined}
         controller={{
+          ref: controllerRef,
           disableSwipeNavigation: isSingleSlideMode,
           // YARL otherwise calls preventDefault() on horizontal wheel events
           // (via a non-passive native listener) so its swipe controller can
@@ -1117,7 +1120,7 @@ export function Lightbox({
           // handler that stopPropagation's while there's still room to pan.
           preventDefaultWheelX: settings.displayMode !== "original",
         }}
-        animation={{ zoom: 250 }}
+        animation={{ ...lightboxAnimation, zoom: motion.duration.zoom }}
         className={cn(
           "image-lightbox lightbox-mobile-toolbar-bottom",
           chromeRevealed ? "chrome-revealed" : "chrome-hidden",
@@ -1181,6 +1184,7 @@ export function Lightbox({
           ],
         }}
         on={{
+          exiting: onExiting,
           click: handleSlideClick,
           view: ({ index: newIndex }) => {
             const s = slides[newIndex];

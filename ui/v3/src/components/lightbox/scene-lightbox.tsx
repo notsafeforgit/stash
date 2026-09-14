@@ -3,7 +3,6 @@ import "yet-another-react-lightbox/styles.css";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import YARLightbox, {
-  type ControllerRef,
   type GenericSlide,
   type RenderSlideProps,
   type FullscreenRef,
@@ -14,8 +13,8 @@ import { SceneSlideContent } from "./scene-slide-content";
 import { PersistentSceneCarousel } from "./scene-carousel";
 import { lightboxIconRenders } from "./lightbox-icons";
 import type { OfflineEntry } from "src/components/offline/offline-db";
-import { useLightboxHistory } from "./use-lightbox-history";
 import { useIsTouch } from "@/utils/screen";
+import { lightboxAnimation, useLightboxMotion } from "./use-lightbox-motion";
 
 // ── Persistence keys ───────────────────────────────────────────────────────────
 
@@ -77,7 +76,8 @@ export function SceneLightbox({
   onView,
   finite = false,
 }: SceneLightboxProps) {
-  const requestClose = useLightboxHistory(open, onClose);
+  const { controllerRef, requestClose, finishClose, onExiting } =
+    useLightboxMotion(open, onClose);
   const touch = useIsTouch();
   // Lightbox fullscreen ref — populated by the YARL Fullscreen plugin via
   // its `fullscreen.ref` prop. Used so the embedded ScenePlayer can
@@ -138,10 +138,9 @@ export function SceneLightbox({
 
   // YARL controller — used to advance imperatively from the player's
   // auto-advance toggle (which fires on the video's `ended` event).
-  const controllerRef = useRef<ControllerRef>(null);
   const handleNext = useCallback(() => {
     controllerRef.current?.next();
-  }, []);
+  }, [controllerRef]);
 
   // Per-gesture wheel lockout — pin one trackpad swipe to one slide
   // advance, with an early-release escape hatch for deliberate
@@ -256,7 +255,7 @@ export function SceneLightbox({
     // because the tooltip had closed and Base UI's listener was gone).
     document.addEventListener("keydown", onKeyDown, true);
     return () => document.removeEventListener("keydown", onKeyDown, true);
-  }, [open, requestClose, isSingleSlide, finite]);
+  }, [open, requestClose, isSingleSlide, finite, controllerRef]);
 
   const renderSlide = useCallback(
     ({ slide, offset }: RenderSlideProps) => {
@@ -286,7 +285,8 @@ export function SceneLightbox({
   return (
     <YARLightbox
       open={open}
-      close={requestClose}
+      close={finishClose}
+      animation={lightboxAnimation}
       slides={slides}
       index={index}
       plugins={[Fullscreen, PersistentSceneCarousel]}
@@ -298,6 +298,7 @@ export function SceneLightbox({
       }}
       toolbar={{ buttons: ["fullscreen", "close"] }}
       on={{
+        exiting: onExiting,
         view: ({ index: newIndex }) => {
           // Latch the wheel lockout on every slide change so the
           // trackpad momentum tail can't drag the next slide partway

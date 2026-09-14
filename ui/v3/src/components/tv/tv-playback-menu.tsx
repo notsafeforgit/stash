@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { TvDialogContent } from "./tv-dialog";
-import { TvSettingsMenu } from "./tv-settings-menu";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { objectTitle } from "@/core/files";
 import {
@@ -20,7 +19,6 @@ import { TvSelect } from "./tv-select";
 import { tvActionLabels } from "./tv-action-labels";
 import type { TvScene, useTvMutations } from "./use-tv-mutations";
 export type TvPlaybackMenuAction =
-  | "settings"
   | "info"
   | "rating"
   | "counter"
@@ -34,15 +32,11 @@ export function TvPlaybackMenu({
   scene,
   close,
   mutations,
-  selectAction,
-  openSettings,
 }: {
   action: TvPlaybackMenuAction;
   scene: TvScene;
   close: () => void;
   mutations: ReturnType<typeof useTvMutations>;
-  selectAction: (action: TvPlaybackMenuAction) => void;
-  openSettings: () => void;
 }) {
   const msg = useMsg();
   const controls = useScenePlayerControls();
@@ -50,8 +44,6 @@ export function TvPlaybackMenu({
   const rate = useScenePlayerValue("rate");
   const muted = useScenePlayerValue("muted");
   const { sources, activeSource } = useScenePlayerSourcesMenu();
-  // Share one modal across quick settings and playback panels so an outgoing
-  // dialog cannot restore focus over the next panel's controls.
   return (
     <Dialog
       open
@@ -60,18 +52,8 @@ export function TvPlaybackMenu({
       }}
     >
       <TvDialogContent
-        title={
-          action === "settings"
-            ? msg("tv.text.quick_settings", "Quick settings")
-            : msg(`tv.action.${action}`, tvActionLabels[action])
-        }
+        title={msg(`tv.action.${action}`, tvActionLabels[action])}
       >
-        {action === "settings" && (
-          <TvSettingsMenu
-            openPlayback={selectAction}
-            openSettings={openSettings}
-          />
-        )}
         {action === "info" && (
           <div className="flex min-w-0 flex-col gap-4">
             <Link

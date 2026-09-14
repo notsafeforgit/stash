@@ -16,7 +16,6 @@ import {
   Eye,
   Scan,
   PictureInPicture,
-  Settings,
 } from "lucide-react";
 import {
   useScenePlayerControls,
@@ -319,6 +318,11 @@ export function TvControls({
   const run = (action: TvAction) => {
     const position = controls.read().position;
     switch (action.kind) {
+      case "settings":
+        remember(position);
+        controls.pause();
+        void navigate({ to: "/settings/tv" });
+        return;
       case "visibility":
         setVisible((value) => !value);
         return;
@@ -568,15 +572,6 @@ export function TvControls({
               >
                 <Eye />
               </Button>
-              <Button
-                variant="secondary"
-                size="icon-lg"
-                className="size-11"
-                aria-label={msg("tv.text.tv_settings", "TV settings")}
-                onClick={() => action("settings")}
-              >
-                <Settings />
-              </Button>
             </>
           )}
         </div>
@@ -602,12 +597,6 @@ export function TvControls({
             action={panel.action}
             scene={scene}
             mutations={mutations}
-            selectAction={(action) => setPanel({ kind: "menu", action })}
-            openSettings={() => {
-              remember(controls.read().position);
-              controls.pause();
-              void navigate({ to: "/settings/tv" });
-            }}
             close={() => setPanel({ kind: "closed" })}
           />
         )}

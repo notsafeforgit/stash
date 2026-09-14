@@ -28,7 +28,7 @@ export const tvWindowSchema = z.discriminatedUnion("kind", [
     ),
 ]);
 export const tvSettingsSchema = z.object({
-  version: z.literal(3),
+  version: z.literal(4),
   mode: tvModeSchema,
   sceneFilter: tvFilterSchema,
   markerFilter: tvFilterSchema,
@@ -56,22 +56,41 @@ export type TvSettings = z.infer<typeof tvSettingsSchema>;
 // Version 1 also had a shuffle override. Preserve its effective sort choice.
 const persistedTvSettingsSchema = z.union([
   tvSettingsSchema,
-  tvSettingsSchema
-    .extend({ version: z.literal(2) })
-    .transform((settings): TvSettings => ({ ...settings, version: 3 })),
-  tvSettingsSchema
-    .extend({ version: z.literal(1), shuffle: z.boolean() })
+  z
+    .union([
+      tvSettingsSchema.extend({
+        version: z.union([z.literal(2), z.literal(3)]),
+      }),
+      tvSettingsSchema
+        .extend({ version: z.literal(1), shuffle: z.boolean() })
+        .transform(({ shuffle, ...settings }) => ({
+          ...settings,
+          sort: shuffle ? "random" : settings.sort,
+        })),
+    ])
     .transform(
-      ({ shuffle, ...settings }): TvSettings => ({
+      (settings): TvSettings => ({
         ...settings,
-        version: 3,
-        sort: shuffle ? "random" : settings.sort,
+        version: 4,
+        // Retire the formerly required default gear once. Preserve customized
+        // shortcuts, and allow new version-4 settings actions in any position.
+        rail: settings.rail.filter(
+          (entry) =>
+            !(
+              entry.type === "action" &&
+              entry.pinned &&
+              entry.action.kind === "settings" &&
+              entry.action.id === "settings" &&
+              entry.action.icon === "default" &&
+              entry.action.label === ""
+            ),
+        ),
       }),
     ),
 ]);
 
 export const defaultTvSettings: TvSettings = {
-  version: 3,
+  version: 4,
   mode: "scenes",
   sceneFilter: { kind: "default" },
   markerFilter: { kind: "default" },

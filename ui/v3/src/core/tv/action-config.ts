@@ -130,20 +130,17 @@ export const tvRailSchema = z
             message: "Only tag and marker presets may repeat",
           });
         kinds.add(action.kind);
-        if (
-          entry.type === "folder" &&
-          (action.kind === "settings" || action.kind === "visibility")
-        )
+        if (entry.type === "folder" && action.kind === "visibility")
           context.addIssue({
             code: "custom",
-            message: "Settings and visibility must stay at the top level",
+            message: "Visibility must stay at the top level",
           });
       }
     }
-    if (!kinds.has("settings") || !kinds.has("visibility"))
+    if (!kinds.has("visibility"))
       context.addIssue({
         code: "custom",
-        message: "Keep Settings and visibility actions",
+        message: "Keep the visibility action",
       });
   });
 export type TvRailEntry = z.infer<typeof tvRailSchema>[number];
@@ -168,11 +165,6 @@ export function createTvAction(kind: TvActionKind, id: string): TvAction {
 }
 
 export const defaultTvRail: TvRailEntry[] = [
-  {
-    type: "action",
-    pinned: true,
-    action: createTvAction("settings", "settings"),
-  },
   {
     type: "action",
     pinned: true,

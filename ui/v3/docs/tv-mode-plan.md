@@ -207,8 +207,8 @@ Action inventory for TV-20: settings, UI visibility, scene information, rating,
 O-counter, organized toggle, tag editor, quick tag, create marker, delete current
 media, rotation, fullscreen, volume/mute, fit mode, loop/completion mode,
 playback rate, subtitles and resolution. Not every setting needs a default rail
-button. The settings action opens quick playback settings over the video;
-an explicit Open TV settings button navigates to the main app's Settings → TV page.
+button. Settings is an optional direct link to the main app's Settings → TV page,
+absent from the default rail and freely removable or movable into a folder.
 
 ## 5. Explicit product choices and scope boundaries
 
@@ -831,8 +831,9 @@ dialogs/sheets have titles, focus restores correctly, and reduce-motion settings
 remove nonessential transitions. Custom media zoom remains available; preserve
 the app's general page-zoom and text-selection policy.
 
-Hidden UI retains a stable restore-controls affordance, app navigation and access to
-settings. Keep essential controls outside fading/inert ancestors. Container
+Hidden UI retains a stable restore-controls affordance, app navigation and mute.
+Settings remains accessible through app navigation. Keep essential controls
+outside fading/inert ancestors. Container
 fullscreen and ordinary inline viewing retain the same TV controls and swipe behavior.
 Explain the two presentations in help and verify the inline experience on
 physical iPhone/iPad Safari devices.
@@ -845,9 +846,9 @@ Settings → TV is the configuration home, accessible without opening a TV feed.
 Group playback (including Default quality), feed behavior/limits,
 presentation, and action-layout editing using existing settings sections and
 TanStack Form/Zod patterns. Device-only rotation is edited here too, clearly
-labeled as local. The TV rail's settings action opens quick playback settings
-in the viewing surface, preserving playback and selection. A separate Open TV
-settings button navigates here with return context. Saved preferences remain
+labeled as local. The optional TV settings rail action navigates here directly
+with return context. The default Playback folder contains the immediate playback
+controls; no quick-settings modal or mandatory gear is needed. Saved preferences remain
 owned by the main settings page; immediate playback menus and metadata editors
 remain available in the viewing surface.
 
@@ -865,8 +866,8 @@ Curated icon IDs map to Lucide components at the UI boundary.
 Support one open action popover/folder at a time within the TV session. Use
 dnd-kit for the rail editor and keyboard-accessible move controls. Present the
 same order in the editor and the rail. Pinned entries remain reachable when
-the rest of the rail scrolls. Settings cannot be removed or nested; restore-UI
-cannot be nested; only top-level entries can be pinned. Validate these rules
+the rest of the rail scrolls. Settings can be removed or nested; restore-UI must
+remain at the top level; only top-level entries can be pinned. Validate these rules
 at both the editor and persisted-data boundary.
 
 Unknown action kinds or future config versions render an inert explanatory

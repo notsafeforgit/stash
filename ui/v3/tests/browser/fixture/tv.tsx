@@ -18,6 +18,7 @@ import { MobileNavigationProvider } from "@/components/layout/mobile-navigation"
 import { RouteViewport } from "@/components/layout/route-viewport";
 import { installRouteTransitions } from "@/core/route-transitions";
 import { defaultTvSettings, type TvSettings } from "@/core/tv/settings";
+import { createTvAction, type TvRailEntry } from "@/core/tv/action-config";
 import { useTvSettings } from "@/hooks/use-tv-settings";
 import type { TvFeedQuery } from "@/core/tv/feed-query";
 import * as GQL from "@/core/generated-graphql";
@@ -105,6 +106,14 @@ const settings: TvSettings = {
     ? { kind: "fixed", resolution: GQL.StreamingResolutionEnum.Low }
     : { kind: "best" },
 };
+const legacyRail: TvRailEntry[] = [
+  {
+    type: "action",
+    pinned: true,
+    action: createTvAction("settings", "settings"),
+  },
+  ...settings.rail,
+];
 const configuration: GQL.ConfigDataFragment = {
   ...playerConfiguration,
   __typename: "ConfigResult",
@@ -114,6 +123,7 @@ const configuration: GQL.ConfigDataFragment = {
       ? {
           ...settings,
           version: 1,
+          rail: legacyRail,
           shuffle: true,
           sort: "created_at",
           rules: [],
@@ -122,11 +132,14 @@ const configuration: GQL.ConfigDataFragment = {
         ? {
             ...settings,
             version: 2,
+            rail: legacyRail,
             sceneFilter: { kind: "saved", id: "1" },
             markerFilter: { kind: "saved", id: "2" },
             rules: [{ kind: "filter", mode: "scenes", filterId: "999" }],
           }
-        : settings,
+        : params.has("legacy-gear")
+          ? { ...settings, version: 3, rail: legacyRail }
+          : settings,
     trackActivity: params.has("activity"),
     minimumPlayPercent: 0,
   },
@@ -340,6 +353,16 @@ const router = createRouter({
       getParentRoute: () => root,
       path: "/tv",
       component: FixtureTvPage,
+    }),
+    createRoute({
+      getParentRoute: () => root,
+      path: "/settings",
+      component: () => (
+        <div>
+          <h1>Settings</h1>
+          <Link to="/settings/tv">TV</Link>
+        </div>
+      ),
     }),
     createRoute({
       getParentRoute: () => root,

@@ -89,6 +89,7 @@ import {
 } from "src/components/ui/dropdown-menu";
 import { useToast } from "src/hooks/toast";
 import { lightboxAnimation, useLightboxMotion } from "./use-lightbox-motion";
+import { LightboxMotionSurface } from "./lightbox-motion-surface";
 import { motion } from "@/core/motion";
 import { inverseImageRotationDirection } from "./image-rotation";
 
@@ -812,8 +813,14 @@ export function Lightbox({
 }: LightboxProps) {
   const intl = useIntl();
   const toast = useToast();
-  const { controllerRef, requestClose, finishClose, onExiting } =
-    useLightboxMotion(open, onClose);
+  const {
+    controllerRef,
+    portal,
+    requestClose,
+    finishClose,
+    onSurfaceReady,
+    onExiting,
+  } = useLightboxMotion(open, onClose);
   const [settings, setSettings] = useState<LightboxSettings>(loadSettings);
   const slideshowPlayingRef = useRef(false);
   const resumeSlideshowRef = useRef(false);
@@ -1088,6 +1095,7 @@ export function Lightbox({
   const renderControls = useCallback(
     () => (
       <>
+        <LightboxMotionSurface onReady={onSurfaceReady} />
         <Toaster id={LIGHTBOX_TOASTER_ID} />
         {onDeleteImage && (
           <LightboxDeleteShortcut
@@ -1097,13 +1105,14 @@ export function Lightbox({
         )}
       </>
     ),
-    [deleteTarget, onDeleteImage],
+    [deleteTarget, onDeleteImage, onSurfaceReady],
   );
 
   return (
     <>
       <YARLightbox
         open={open}
+        portal={portal}
         close={finishClose}
         slides={decoratedSlides}
         index={index}

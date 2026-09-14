@@ -74,13 +74,30 @@ restart motion. Surfaces are capped at a viewport's height, and only an active
 list can animate. Grid zoom commits immediately on all devices; it no longer
 captures native View Transition snapshots.
 
-Image and scene lightboxes share `lightbox/use-lightbox-motion.ts`: a 180ms
-entry/exit fade, 240ms swipe settling and 180ms button/keyboard navigation.
-Image zoom keeps its 250ms timing. YARL owns gestures, reduced motion and exit
-completion. Mobile Close, Escape and browser Back use the library's exit before
+Image and scene lightboxes share `lightbox/use-lightbox-motion.ts`: a 240ms
+entrance reveal, 180ms exit, 240ms swipe settling and 180ms button/keyboard
+navigation. Image zoom keeps its 250ms timing. An empty black surface in YARL's
+controls slot fades away to reveal the media and fades back for dismissal.
+The media stays opaque and untransformed, preserving video and swipe geometry
+and avoiding dropped frames from compositing the whole lightbox in WebKit at
+phone pixel densities. `core/paint-animation.ts` prepares a temporary layer
+and holds the first frame through a paint before starting the clock, so startup
+work cannot consume the entrance unseen. The cover starts at 99% opacity to
+allow initial media rasterization. YARL's root CSS opacity transition is disabled
+when Web Animations are available; unsupported browsers retain the native fade.
+YARL owns gestures and exit completion.
+Mobile Close, Escape and browser Back use the library's exit before
 disposing the player, consuming exactly one history entry. The optional visual
 dismissal callback in `use-lightbox-history.ts` also preserves the existing
 history-only contract for the focused scene viewer.
+
+`cards/use-card-press.ts` uses the same interruptible animation owner to enlarge
+the preview slightly on primary-pointer down and ease it back on release.
+It does not rerender the card or delay navigation/playback. Scrolling, pointer
+cancellation, context menus, selection and nested controls cancel or bypass
+this feedback. Neither path captures native View Transition snapshots. Effects,
+pending frames and temporary listeners are released on completion, unmount,
+visibility changes or Reduce Motion changes.
 
 Home mounts its first carousel immediately and uses `DeferredMount` to start
 other rows when they approach its scroll viewport. Mounted rows retain their

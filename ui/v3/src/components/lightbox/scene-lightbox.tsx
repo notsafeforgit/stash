@@ -15,6 +15,7 @@ import { lightboxIconRenders } from "./lightbox-icons";
 import type { OfflineEntry } from "src/components/offline/offline-db";
 import { useIsTouch } from "@/utils/screen";
 import { lightboxAnimation, useLightboxMotion } from "./use-lightbox-motion";
+import { LightboxMotionSurface } from "./lightbox-motion-surface";
 
 // ── Persistence keys ───────────────────────────────────────────────────────────
 
@@ -76,8 +77,14 @@ export function SceneLightbox({
   onView,
   finite = false,
 }: SceneLightboxProps) {
-  const { controllerRef, requestClose, finishClose, onExiting } =
-    useLightboxMotion(open, onClose);
+  const {
+    controllerRef,
+    portal,
+    requestClose,
+    finishClose,
+    onSurfaceReady,
+    onExiting,
+  } = useLightboxMotion(open, onClose);
   const touch = useIsTouch();
   // Lightbox fullscreen ref — populated by the YARL Fullscreen plugin via
   // its `fullscreen.ref` prop. Used so the embedded ScenePlayer can
@@ -285,6 +292,7 @@ export function SceneLightbox({
   return (
     <YARLightbox
       open={open}
+      portal={portal}
       close={finishClose}
       animation={lightboxAnimation}
       slides={slides}
@@ -311,6 +319,7 @@ export function SceneLightbox({
       }}
       render={{
         ...lightboxIconRenders,
+        controls: () => <LightboxMotionSurface onReady={onSurfaceReady} />,
         // Touch users close from the player's control bar. Pending/error
         // slides expose the same action at the bottom until a player exists.
         ...(touch && {

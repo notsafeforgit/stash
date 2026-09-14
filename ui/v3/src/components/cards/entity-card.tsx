@@ -21,6 +21,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { cn } from "src/lib/utils";
 import { Check, Droplets } from "lucide-react";
 import { HoverScrubber } from "./hover-scrubber";
+import { useCardPress } from "./use-card-press";
 import { useSpriteInfo } from "src/hooks/use-sprite-info";
 import { useIsTruncated } from "src/hooks/use-is-truncated";
 import { useCardAspect } from "src/components/list/card-aspect-context";
@@ -122,6 +123,7 @@ function EntityCardRoot({
   const isWall = cardLayout === "wall";
   const isTouch = useIsTouch();
   const navigate = useNavigate();
+  const press = useCardPress();
 
   // Prefetch fires at most once per card mount: `pointerenter` covers both
   // desktop hover and the finger-down phase of a tap, so by the time the
@@ -213,6 +215,8 @@ function EntityCardRoot({
       onMouseEnter={isTouch ? undefined : () => setIsHovered(true)}
       onMouseLeave={isTouch ? undefined : () => setIsHovered(false)}
       onClick={handleArticleClick}
+      onPointerDownCapture={press.onPointerDownCapture}
+      onContextMenuCapture={press.cancel}
     >
       {/*
         Stretched anchor sits behind the content (z-0) for keyboard nav
@@ -260,7 +264,10 @@ function EntityCardRoot({
       {contextMenu ? (
         <ContextMenu
           onOpenChange={(open) => {
-            if (open) onContextMenuOpen?.();
+            if (open) {
+              press.cancel();
+              onContextMenuOpen?.();
+            }
           }}
         >
           <ContextMenuTrigger className="h-full">{article}</ContextMenuTrigger>
@@ -530,6 +537,7 @@ function EntityCardPreview({
   // inside a button or changing the card's pointer/gesture delegation.
   const previewButton = onPreviewClick ? (
     <Button
+      data-card-preview-button
       variant="ghost"
       className="sr-only focus:not-sr-only focus:absolute focus:inset-0 focus:z-10"
       aria-label={intl.formatMessage(

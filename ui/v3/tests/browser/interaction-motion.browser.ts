@@ -11,6 +11,7 @@ interface RevealObservation {
 interface LightboxObservation {
   entering: number[];
   exiting: number[];
+  mediaStable: boolean;
   removed: boolean;
 }
 declare global {
@@ -63,6 +64,7 @@ test.beforeEach(async ({ page }) => {
         const observation: LightboxObservation = {
           entering: [],
           exiting: [],
+          mediaStable: true,
           removed: false,
         };
         window.lightboxMotion.push(observation);
@@ -74,13 +76,202 @@ test.beforeEach(async ({ page }) => {
           const frames = portal.classList.contains("yarl__portal_open")
             ? observation.entering
             : observation.exiting;
-          frames.push(Number(getComputedStyle(portal).opacity));
+          const surface = portal.querySelector("[data-lightbox-reveal]");
+          const opacity = Number(getComputedStyle(portal).opacity);
+          frames.push(
+            opacity *
+              (1 - (surface ? Number(getComputedStyle(surface).opacity) : 0)),
+          );
+          const slide = portal.querySelector(".yarl__slide_current");
+          if (slide) {
+            const style = getComputedStyle(slide);
+            observation.mediaStable &&=
+              opacity === 1 &&
+              style.scale === "none" &&
+              style.transform === "none";
+          }
           requestAnimationFrame(sample);
         };
         requestAnimationFrame(sample);
       }
     }).observe(document, { childList: true, subtree: true });
   });
+});
+
+const touchPointer = {
+  pointerId: 71,
+  pointerType: "touch",
+  isPrimary: true,
+  button: 0,
+  clientX: 60,
+  clientY: 300,
+};
+
+for (const kind of ["image", "scene"] as const) {
+  test(`${kind} thumbnail responds before opening and the lightbox reveals stable media`, async ({
+    page,
+  }) => {
+    await page.goto("/motion");
+    const preview = page.locator(
+      `article[data-id="${kind}"] [data-entity-card-preview]`,
+    );
+    const original = await preview.elementHandle();
+    await preview.dispatchEvent("pointerdown", { ...touchPointer, buttons: 1 });
+    await expect
+      .poll(() =>
+        preview.evaluate((element) =>
+          Number.parseFloat(getComputedStyle(element).scale),
+        ),
+      )
+      .toBeGreaterThan(1.02);
+    await expect(page.locator(".yarl__portal")).toHaveCount(0);
+    await preview.dispatchEvent("pointerup", { ...touchPointer, buttons: 0 });
+    await preview.dispatchEvent("click");
+    const portal = page.locator(".yarl__portal");
+    await expect(portal.locator("[data-lightbox-reveal]")).toHaveCSS(
+      "opacity",
+      "0",
+    );
+    expect(await original?.evaluate((element) => element.isConnected)).toBe(
+      true,
+    );
+    const observation = await page.evaluate(() => window.lightboxMotion[0]);
+    expect(
+      observation?.entering.some((opacity) => opacity > 0.05 && opacity < 0.95),
+    ).toBe(true);
+    expect(observation?.mediaStable).toBe(true);
+    await expect
+      .poll(() =>
+        portal.evaluate((element) =>
+          [
+            element,
+            element.querySelector<HTMLElement>("[data-lightbox-reveal]"),
+          ].every((node) => !node?.style.willChange),
+        ),
+      )
+      .toBe(true);
+    await portal
+      .getByRole("button", { name: "Close", exact: true })
+      .dispatchEvent("click");
+    await expect(portal).toHaveCount(0);
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            document
+              .getAnimations()
+              .filter((animation) => /^(card-|lightbox-)/.test(animation.id))
+              .length,
+        ),
+      )
+      .toBe(0);
+  });
+}
+
+test("scrolling cancels card feedback, while nested controls and selection keep their own actions", async ({
+  page,
+}) => {
+  await page.goto("/motion");
+  const card = page.locator('article[data-id="image"]');
+  const preview = card.locator("[data-entity-card-preview]");
+  await preview.dispatchEvent("pointerdown", { ...touchPointer, buttons: 1 });
+  await preview.dispatchEvent("pointermove", {
+    ...touchPointer,
+    buttons: 1,
+    clientY: 330,
+  });
+  await preview.dispatchEvent("pointerup", {
+    ...touchPointer,
+    buttons: 0,
+    clientY: 330,
+  });
+  await expect(preview).toHaveCSS("scale", "none");
+  await expect(page.locator(".yarl__portal")).toHaveCount(0);
+  const action = card.getByRole("button", { name: "Card action", exact: true });
+  await action.dispatchEvent("pointerdown", { ...touchPointer, buttons: 1 });
+  await expect(preview).toHaveCSS("scale", "none");
+  await action.click();
+  await expect(page.getByTestId("selection")).toHaveText("true");
+  await page.getByRole("button", { name: "Select cards", exact: true }).click();
+  await preview.dispatchEvent("pointerdown", { ...touchPointer, buttons: 1 });
+  await expect(preview).toHaveCSS("scale", "none");
+  await preview.dispatchEvent("click");
+  await expect(page.getByTestId("selection")).toHaveText("false");
+  await expect(page.locator(".yarl__portal")).toHaveCount(0);
+});
+
+test("Reduce Motion cancels a held press and skips the lightbox reveal", async ({
+  page,
+}) => {
+  await page.goto("/motion");
+  const preview = page.locator(
+    'article[data-id="image"] [data-entity-card-preview]',
+  );
+  await preview.dispatchEvent("pointerdown", { ...touchPointer, buttons: 1 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(preview).toHaveCSS("scale", "none");
+  await preview.dispatchEvent("pointerup", { ...touchPointer, buttons: 0 });
+  await preview.dispatchEvent("click");
+  await expect(page.locator("[data-lightbox-reveal]")).toHaveCSS(
+    "opacity",
+    "0",
+  );
+  expect(
+    await page.evaluate(
+      () =>
+        document
+          .getAnimations()
+          .filter((animation) => /^(card-|lightbox-)/.test(animation.id))
+          .length,
+    ),
+  ).toBe(0);
+});
+
+test("an entrance can be closed immediately and reopened without leftover effects", async ({
+  page,
+}) => {
+  await page.goto("/motion");
+  for (let index = 1; index <= 3; index++) {
+    await page
+      .getByRole("button", { name: "Open scenes", exact: true })
+      .dispatchEvent("click");
+    const portal = page.locator(".yarl__portal");
+    await portal
+      .getByRole("button", { name: "Close", exact: true })
+      .dispatchEvent("click");
+    await expect(portal).toHaveCount(0);
+    await expect(page.getByTestId("close-count")).toHaveText(String(index));
+    expect(
+      await page.evaluate(
+        () =>
+          document
+            .getAnimations()
+            .filter((animation) => /^lightbox-/.test(animation.id)).length,
+      ),
+    ).toBe(0);
+  }
+});
+
+test("browsers without Web Animations retain the library fade and dismissal", async ({
+  page,
+}) => {
+  await page.goto("/motion");
+  await page.evaluate(() => {
+    Object.defineProperty(Element.prototype, "animate", {
+      value: undefined,
+      configurable: true,
+    });
+  });
+  await page.getByRole("button", { name: "Open images", exact: true }).tap();
+  const portal = page.locator(".yarl__portal");
+  await expect(portal).toHaveCSS("opacity", "1");
+  await expect(portal.locator("[data-lightbox-reveal]")).toHaveCSS(
+    "opacity",
+    "0",
+  );
+  await page.goBack();
+  await expect(portal).toHaveCount(0);
+  await expect(page.getByTestId("close-count")).toHaveText("1");
 });
 
 for (const layout of ["collection", "media"] as const) {
@@ -205,6 +396,72 @@ test("opening and leaving the focused viewer reveals the same media container", 
   expect(await page.evaluate(() => window.interactionSnapshots)).toBe(0);
 });
 
+test.describe("lightbox painting at phone pixel density", () => {
+  test.use({ deviceScaleFactor: 3 });
+  for (const theme of ["light", "dark"] as const) {
+    test(`image reveal paints intermediate pixels in ${theme} mode`, async ({
+      page,
+    }) => {
+      await page.goto("/motion");
+      await page.evaluate((theme) => {
+        document.documentElement.classList.toggle("dark", theme === "dark");
+        const animate = Element.prototype.animate;
+        Element.prototype.animate = function (...args) {
+          const animation = animate.apply(this, args);
+          if (animation.id === "lightbox-enter") {
+            animation.pause();
+            animation.currentTime = 0;
+          }
+          return animation;
+        };
+      }, theme);
+      await page
+        .getByRole("button", { name: "Open images", exact: true })
+        .tap();
+      const surface = page.locator("[data-lightbox-reveal]");
+      await expect
+        .poll(() =>
+          surface.evaluate((element) => element.getAnimations().length),
+        )
+        .toBe(1);
+      const image = page.locator(".yarl__slide_current .yarl__slide_image");
+      const covered = await image.screenshot();
+      await surface.evaluate((element) => {
+        const animation = element.getAnimations()[0];
+        if (!animation) throw new Error("Missing lightbox reveal");
+        animation.currentTime = 100;
+      });
+      const partial = await image.screenshot();
+      await surface.evaluate((element) => element.getAnimations()[0]?.finish());
+      await expect(surface).toHaveCSS("opacity", "0");
+      const revealed = await image.screenshot();
+      expect(covered.equals(partial)).toBe(false);
+      expect(partial.equals(revealed)).toBe(false);
+      expect(covered.equals(revealed)).toBe(false);
+    });
+  }
+  for (const kind of ["images", "scenes"] as const) {
+    test(`${kind} entrance remains visible after expensive first-frame work`, async ({
+      page,
+    }) => {
+      await page.goto("/motion?busy");
+      await page
+        .getByRole("button", { name: `Open ${kind}`, exact: true })
+        .tap();
+      await expect(page.locator("[data-lightbox-reveal]")).toHaveCSS(
+        "opacity",
+        "0",
+      );
+      const frames = await page.evaluate(
+        () => window.lightboxMotion[0]?.entering,
+      );
+      expect(
+        frames?.filter((value) => value > 0.05 && value < 0.95).length,
+      ).toBeGreaterThan(2);
+    });
+  }
+});
+
 for (const kind of ["images", "scenes"] as const) {
   for (const dismissal of ["Close", "Escape", "browser Back"] as const) {
     test(`${kind} lightbox fades in and out using ${dismissal}`, async ({
@@ -216,7 +473,10 @@ for (const kind of ["images", "scenes"] as const) {
         .getByRole("button", { name: `Open ${kind}`, exact: true })
         .tap();
       const portal = page.locator(".yarl__portal");
-      await expect(portal).toHaveCSS("opacity", "1");
+      await expect(portal.locator("[data-lightbox-reveal]")).toHaveCSS(
+        "opacity",
+        "0",
+      );
       if (dismissal === "Close") {
         await portal
           .getByRole("button", { name: "Close", exact: true })

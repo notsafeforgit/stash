@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { flushSync } from "react-dom";
 import type { FilterMode } from "@/core/generated-graphql";
 import { ListFilterModel } from "@/models/list-filter/filter";
 import type { DisplayMode } from "@/models/list-filter/types";
@@ -160,8 +159,7 @@ export function useListPageFilter({
   // handler reads the same (stale) state and computes the same target.
   // `intendedZoomRef` mirrors the latest *intended* zoom, updated
   // synchronously inside `setFilter`, so back-to-back clicks compound
-  // correctly. The View Transition path also defers state updates by
-  // a frame, which makes this even more important there.
+  // correctly even when React batches the updates.
   const intendedZoomRef = useRef(zoomPref);
   useEffect(() => {
     intendedZoomRef.current = zoomPref;
@@ -201,16 +199,8 @@ export function useListPageFilter({
   // and displayMode are UI-only prefs that don't belong in the URL, and routing
   // through rawSetFilter for those would trigger router.history.replace
   // unnecessarily, adding latency to instant UI actions like zoom.
-  //
-  // Zoom changes go through `document.startViewTransition` on supporting
-  // browsers — using the app shell's single content snapshot, so the browser
-  // captures the layout before and after as two bitmaps and crossfades between
-  // them on the GPU. That's a single composited animation regardless of
-  // how many cards are on screen, so it stays smooth even on dense grids.
-  // The trade-off: cards don't visibly morph from old position to new —
-  // they just dissolve through. `flushSync` ensures the new lane count is
-  // committed inside the transition callback so the "after" snapshot is
-  // taken with the new layout.
+  // EntityList reveals the committed layout through its empty paint surface;
+  // preference updates stay synchronous and never capture page snapshots.
   const setFilter = useCallback(
     (f: ListFilterModel | ((prev: ListFilterModel) => ListFilterModel)) => {
       // For functional updaters: substitute the latest intended zoom into
@@ -235,36 +225,6 @@ export function useListPageFilter({
         // Update intended zoom synchronously so rapid follow-up clicks
         // see the new target before React commits.
         intendedZoomRef.current = next.zoomIndex;
-        // Skip View Transitions on mobile: the settings drawer's
-        // swipe-to-dismiss tracking races with the VT snapshot and
-        // rapid taps inside the drawer end up closing it. Snap zoom
-        // changes there instead — the screen is small enough that
-        // the crossfade adds little visible value.
-        const isMobile =
-          typeof window !== "undefined" &&
-          window.matchMedia("(max-width: 767px)").matches;
-        const canVT =
-          typeof document !== "undefined" &&
-          typeof document.startViewTransition === "function" &&
-          !isMobile;
-        if (canVT) {
-          // Each rapid click starts its own VT. `startViewTransition`
-          // skips any in-flight transition and starts fresh with the
-          // current state as "old"; per spec the skipped transition's
-          // update callback still runs, so every intermediate
-          // `setZoomPref` commits in order. Visually the user sees a
-          // single crossfade from the initial state to the final
-          // zoom level — the intermediate stops are skipped over,
-          // which matches what they're asking for when mashing the
-          // button.
-          document.startViewTransition(() => {
-            flushSync(() => {
-              setZoomPref(next.zoomIndex);
-              applyNonZoom();
-            });
-          });
-          return;
-        }
         setZoomPref(next.zoomIndex);
       }
       applyNonZoom();

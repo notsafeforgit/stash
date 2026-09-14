@@ -44,6 +44,7 @@ import { SceneDetailFixture } from "./scene-detail";
 import { EntityCardsFixture } from "./entity-cards";
 import { RouteTransitionsFixture } from "./route-transitions";
 import { HomeFixture } from "./home";
+import { MotionFixture, MotionViewerFixture } from "./motion";
 import { MobileNavigationProvider } from "@/components/layout/mobile-navigation";
 
 const params = new URLSearchParams(location.search);
@@ -83,6 +84,8 @@ function FixtureList({ name }: { name: string }) {
       listSelect={selection}
       activeFilterCount={0}
       totalCount={totalCount}
+      mobileGridCols={cols}
+      zoomable
       sidebarContent={<p>Example filters</p>}
       mobileChrome={
         <MobileListBar
@@ -313,6 +316,16 @@ const router = createRouter({
       getParentRoute: () => rootRoute,
       path: "/scene-lightbox",
       component: SceneLightboxFixture,
+    }),
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/motion",
+      component: MotionFixture,
+    }),
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/motion-viewer",
+      component: MotionViewerFixture,
     }),
     createRoute({
       getParentRoute: () => rootRoute,

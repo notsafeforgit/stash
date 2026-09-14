@@ -356,6 +356,7 @@ export function EntityListPage<
       setCardAspect={supportsCardAspect ? setCardAspect : undefined}
       sortOptions={sortOptionsOverride}
       pageActions={pageActions}
+      mobileGridCols={mobileGridCols}
     >
       {error && (
         <QueryError

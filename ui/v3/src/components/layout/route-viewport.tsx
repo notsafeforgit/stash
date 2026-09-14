@@ -1,5 +1,6 @@
 import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
+import { ContentReveal } from "./content-reveal";
 
 /** A bounded paint surface fades over the new view. Animating this empty layer
  * avoids promoting every image, scroller and video under the page to a moving
@@ -19,12 +20,7 @@ export function RouteViewport({
       )}
     >
       {children}
-      <div
-        data-route-transition
-        aria-hidden="true"
-        hidden
-        className="pointer-events-none absolute inset-0 z-50 bg-background opacity-0"
-      />
+      <ContentReveal data-route-transition />
     </main>
   );
 }

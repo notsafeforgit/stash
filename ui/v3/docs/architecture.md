@@ -43,26 +43,44 @@ upstream's numeric migrations and primary schema version unchanged. See
   the watcher and refresh once. Unrelated configuration,
   plugin, status, and job queries are excluded from library refreshes.
 
-`core/route-transitions.ts` reveals committed content with a 200ms Web Animations
-fade on the empty, viewport-sized surface in `layout/route-viewport.tsx`.
+`core/motion.ts` defines the shared motion timings. `core/content-reveal.ts`
+owns interruptible Web Animations on the empty surface in
+`layout/content-reveal.tsx`; it never animates the image/player subtree.
+`core/route-transitions.ts` uses this for the 200ms committed-page reveal in
+`layout/route-viewport.tsx`.
 The image/video/scroller subtree stays opaque and untransformed. It does not
 take snapshots or wait before committing navigation.
 WebKit profiling with real Home thumbnails found native snapshot capture could
 add 0.6–1.1 seconds. A separate paint surface also avoids promoting that whole
 subtree during rapid navigation. Shell controls and portaled overlays stay
 still. No keyed wrappers or forced remounts are involved.
-Search/filter/tab/hash changes, initial load, and reduced motion stay still.
+Search/filter/hash changes and initial load do not reveal the whole page.
+Reduced Motion skips the reveals and cancels a running one.
 Smart Back supplies typed `state.navigationDirection: "back"`; exceptional
 navigations can set `state.routeMotion: false`. Rapid navigation cancels the
 previous animation, as does a visibility or Reduce Motion change. Duplicate
-same-location router resolutions do not cancel the committed page's reveal. Finished
-effects are canceled and their paint surface is hidden. Browsers without Web
+same-location router resolutions do not cancel the committed page's reveal.
+Finished effects are canceled and their paint surface is hidden. Browsers without Web
 Animations navigate normally. `layout/mobile-navigation.tsx` owns one persistent
 navigation drawer for all toolbars. Its lease holds only the visual reveal until
 the drawer exits; navigation and loading continue immediately. This drawer uses
 a dimmed backdrop to avoid filtering a changing image-heavy page.
-Explicit list-grid zoom retains its separate
-native View Transition styling in `styles/globals.css`.
+Local view changes use the same empty surface with a 140ms reveal. `EntityList`
+observes layout mode, zoom, aspect ratio, mobile columns and pagination; its
+surface sits outside the list scroller. Detail layouts reveal only the selected
+tab panel or the focused/inline viewer area, preserving visited panels, media,
+focus and scroll state. Background data refreshes and selection changes do not
+restart motion. Surfaces are capped at a viewport's height, and only an active
+list can animate. Grid zoom commits immediately on all devices; it no longer
+captures native View Transition snapshots.
+
+Image and scene lightboxes share `lightbox/use-lightbox-motion.ts`: a 180ms
+entry/exit fade, 240ms swipe settling and 180ms button/keyboard navigation.
+Image zoom keeps its 250ms timing. YARL owns gestures, reduced motion and exit
+completion. Mobile Close, Escape and browser Back use the library's exit before
+disposing the player, consuming exactly one history entry. The optional visual
+dismissal callback in `use-lightbox-history.ts` also preserves the existing
+history-only contract for the focused scene viewer.
 
 Home mounts its first carousel immediately and uses `DeferredMount` to start
 other rows when they approach its scroll viewport. Mounted rows retain their

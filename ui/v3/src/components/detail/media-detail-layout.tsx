@@ -13,6 +13,10 @@ import { MobileDetailSections } from "./mobile-detail-sections";
 import { ListActivityContext } from "@/components/list/list-activity-context";
 import { useTabState } from "src/hooks/use-tab-state";
 import {
+  ContentReveal,
+  useContentReveal,
+} from "@/components/layout/content-reveal";
+import {
   MobileDetailChromePortal,
   MobileDetailChromeProvider,
   MobileDetailFooter,
@@ -115,6 +119,15 @@ function MediaDetailContent({
     onTabChange,
     enableShortcuts: !primaryFocusMode,
   });
+  const revealRef = useContentReveal(
+    activeTab,
+    "detail-tab",
+    !primaryFocusMode,
+  );
+  const focusRevealRef = useContentReveal(
+    Number(primaryFocusMode),
+    "focused-view",
+  );
 
   function handleTabChange(id: string) {
     selectTab(id);
@@ -299,13 +312,14 @@ function MediaDetailContent({
                 value={tab.id}
                 id={`${panelId}-${tab.id}`}
                 keepMounted={isMounted(tab.id)}
-                className="p-3"
+                className="relative p-3"
               >
                 {isMounted(tab.id) ? (
                   <ListActivityContext value={tab.id === activeTab}>
                     {tab.content}
                   </ListActivityContext>
                 ) : null}
+                {tab.id === activeTab && <ContentReveal ref={revealRef} />}
               </TabsContent>
             ))}
           </div>
@@ -384,11 +398,12 @@ function MediaDetailContent({
           {/* Player — fills remaining space; video maintains aspect ratio via fill mode */}
           <div
             className={cn(
-              "lg:flex-1 lg:min-h-0 min-w-0",
+              "relative lg:flex-1 lg:min-h-0 min-w-0",
               primaryFocusMode && "flex-1 min-h-0",
             )}
           >
             {primaryContent}
+            <ContentReveal ref={focusRevealRef} tone="media" />
           </div>
         </div>
       </div>

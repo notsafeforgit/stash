@@ -34,6 +34,10 @@ import {
 import type { View } from "./views";
 import { PluginFilterExtras } from "src/plugins/filter-extras";
 import { useListScrollRestoration } from "./use-list-scroll-restoration";
+import {
+  ContentReveal,
+  useContentReveal,
+} from "@/components/layout/content-reveal";
 import { useListActivity } from "./list-activity-context";
 import {
   MobileDetailChromePortal,
@@ -93,6 +97,7 @@ export interface EntityListProps {
   zoomable?: ListToolbarProps["zoomable"];
   /** When provided, shows an aspect-ratio toggle in the desktop toolbar (Grid mode). */
   cardAspect?: CardAspect;
+  mobileGridCols?: 1 | 2;
   setCardAspect?: (a: CardAspect) => void;
   /** Forwarded to ListToolbar — overrides the sort dropdown options. */
   sortOptions?: ListToolbarProps["sortOptions"];
@@ -127,6 +132,7 @@ export const EntityList: React.FC<EntityListProps> = ({
   onDelete,
   zoomable,
   cardAspect,
+  mobileGridCols,
   setCardAspect,
   sortOptions,
   currentSavedFilterName,
@@ -135,6 +141,11 @@ export const EntityList: React.FC<EntityListProps> = ({
 }) => {
   const intl = useIntl();
   const isActive = useListActivity();
+  const revealRef = useContentReveal(
+    `${filter.displayMode}:${filter.zoomIndex}:${cardAspect}:${mobileGridCols}:${filter.currentPage}`,
+    "list-view",
+    isActive,
+  );
   const detailFooter = useMobileDetailChrome()?.mobile ?? false;
   const {
     showSidebar,
@@ -386,6 +397,7 @@ export const EntityList: React.FC<EntityListProps> = ({
                     />
                   )}
                 </div>
+                <ContentReveal ref={revealRef} />
               </div>
 
               {/* Hidden, kept-mounted tabs must not publish controls into the footer. */}

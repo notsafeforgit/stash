@@ -1005,33 +1005,3 @@ html [data-sonner-toaster][data-sonner-theme="system"] {
     pointer-events: none;
   }
 }
-
-/* Explicit grid zoom keeps its snapshot within the page content.
-   Shell controls and portaled overlays stay outside the named viewport.
-   Route navigation uses Web Animations in core/route-transitions.ts. */
-@supports (view-transition-name: a) {
-  :root:has([data-route-viewport]) {
-    view-transition-name: none;
-  }
-  [data-route-viewport] {
-    view-transition-name: route-content;
-  }
-  ::view-transition {
-    pointer-events: none;
-  }
-  ::view-transition-group(route-content),
-  ::view-transition-old(route-content),
-  ::view-transition-new(route-content) {
-    animation-duration: 140ms;
-    animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
-  }
-}
-
-/* Also covers a preference change during an animation and non-router calls. */
-@media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) {
-    animation: none;
-  }
-}

@@ -287,13 +287,15 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
       data-tv-presentation={presentationMode}
       data-tv-rotation={rotation}
       className={cn(
-        "tv-viewport relative isolate size-full min-h-0 overflow-hidden bg-black",
+        "tv-viewport relative isolate size-full min-h-0 overflow-clip bg-black",
         presentationMode !== "normal" && "fixed inset-0 z-40 h-dvh",
       )}
     >
+      {/* Clipping prevents native focus scrolling from shifting the three TV
+          slots. Only metadata and action scrollers should scroll this view. */}
       <div
         ref={presentationSurface}
-        className="tv-surface absolute inset-0 touch-none overflow-hidden"
+        className="tv-surface absolute inset-0 touch-none overflow-clip"
         data-tv-surface
       >
         <OverlayContainerProvider container={presentationPortals}>

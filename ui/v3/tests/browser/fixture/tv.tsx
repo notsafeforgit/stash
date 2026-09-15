@@ -29,6 +29,8 @@ import type { TvFeedQuery } from "@/core/tv/feed-query";
 import * as GQL from "@/core/generated-graphql";
 import { scenes as sourceScenes } from "./scene-lightbox";
 import { playerConfiguration } from "./player-configuration";
+import { RatingStarPrecision, RatingSystemType } from "@/utils/rating";
+import { RatingSystem } from "@/components/ui/rating-system";
 
 declare global {
   interface Window {
@@ -51,6 +53,7 @@ const scenes: GQL.SceneDataFragment[] = Array.from(
     const scene = {
       ...base,
       id,
+      o_counter: Number(params.get("count") ?? 0),
       resume_time: params.has("resume") ? 4 : base.resume_time,
       files: params.has("portrait")
         ? base.files.map((file) => ({ ...file, width: 180, height: 320 }))
@@ -60,20 +63,30 @@ const scenes: GQL.SceneDataFragment[] = Array.from(
         : `Scene ${id}`,
       details: params.has("long-info")
         ? "Long description. ".repeat(100)
-        : base.details,
-      tags: params.has("long-info")
-        ? Array.from({ length: 60 }, (_, tagIndex) => ({
-            __typename: "Tag" as const,
-            id: `tag-${tagIndex}`,
-            name: `Tag ${tagIndex} ${tagIndex === 0 ? "UnbrokenTagName".repeat(30) : "A long tag label"}`,
-            sort_name: null,
-            aliases: [],
-            image_path: null,
-            parent_count: 0,
-            child_count: 0,
-            stash_ids: [],
-          }))
-        : base.tags,
+        : params.has("metadata")
+          ? "An unhurried study in colour and motion, captured in a single take."
+          : base.details,
+      tags:
+        params.has("long-info") || params.has("metadata")
+          ? Array.from(
+              { length: params.has("long-info") ? 60 : 4 },
+              (_, tagIndex) => ({
+                __typename: "Tag" as const,
+                id: `tag-${tagIndex}`,
+                name: params.has("long-info")
+                  ? `Tag ${tagIndex} ${tagIndex === 0 ? "UnbrokenTagName".repeat(30) : "A long tag label"}`
+                  : (["Colour study", "Portrait", "One take", "Motion"][
+                      tagIndex
+                    ] ?? "Tag"),
+                sort_name: null,
+                aliases: [],
+                image_path: null,
+                parent_count: 0,
+                child_count: 0,
+                stash_ids: [],
+              }),
+            )
+          : base.tags,
       paths: {
         ...base.paths,
         caption: new URL(`/scene/${id}/caption`, location.href).href,
@@ -109,6 +122,25 @@ const mode = params.has("markers") ? "markers" : "scenes";
 const start = tvSettingsSchema.shape.start.safeParse(params.get("start"));
 const settings: TvSettings = {
   ...defaultTvSettings,
+  leftHanded: params.has("left-handed"),
+  rail: defaultTvSettings.rail.flatMap<TvRailEntry>((entry) => {
+    if (entry.type === "action" && entry.action.kind === "counter") {
+      if (params.get("counter") === "folder") return [];
+      return [{ ...entry, pinned: params.get("counter") === "pinned" }];
+    }
+    if (
+      entry.type === "folder" &&
+      entry.id === "edit" &&
+      params.get("counter") === "folder"
+    )
+      return [
+        {
+          ...entry,
+          actions: [createTvAction("counter", "counter"), ...entry.actions],
+        },
+      ];
+    return [entry];
+  }),
   mode,
   pageSize: 5,
   autoplay: !params.has("paused"),
@@ -138,6 +170,15 @@ const configuration: GQL.ConfigDataFragment = {
   __typename: "ConfigResult",
   ui: {
     ...playerConfiguration.ui,
+    ratingSystemOptions: {
+      type: params.has("decimal")
+        ? RatingSystemType.Decimal
+        : RatingSystemType.Stars,
+      starPrecision:
+        Object.values(RatingStarPrecision).find(
+          (value) => value === params.get("precision"),
+        ) ?? RatingStarPrecision.Full,
+    },
     tv: params.has("legacy-shuffle")
       ? {
           ...settings,
@@ -252,6 +293,72 @@ const play: MockedResponse<
   },
 };
 const cache = new InMemoryCache();
+function targetScene(id: string) {
+  const scene = scenes.find((scene) => scene.id === id);
+  if (!scene) throw new Error("Missing mutation target");
+  return scene;
+}
+const updateScene: MockedResponse<
+  GQL.SceneUpdateMutation,
+  GQL.SceneUpdateMutationVariables
+> = {
+  request: { query: GQL.SceneUpdateDocument, variables: () => true },
+  maxUsageCount: Infinity,
+  delay: 100,
+  result: (variables) => {
+    record("SceneUpdate", variables);
+    const scene = targetScene(variables.input.id);
+    if (variables.input.rating100 !== undefined)
+      scene.rating100 = variables.input.rating100;
+    return { data: { sceneUpdate: scene } };
+  },
+};
+let counterFailed = false;
+const addO: MockedResponse<
+  GQL.SceneAddOMutation,
+  GQL.SceneAddOMutationVariables
+> = {
+  request: { query: GQL.SceneAddODocument, variables: () => true },
+  maxUsageCount: Infinity,
+  delay: 100,
+  result: (variables) => {
+    record("SceneAddO", variables);
+    if (params.has("counter-error") && !counterFailed) {
+      counterFailed = true;
+      return { errors: [new GraphQLError("Counter unavailable")] };
+    }
+    const scene = targetScene(variables.id);
+    scene.o_counter = (scene.o_counter ?? 0) + 1;
+    return { data: { sceneAddO: { count: scene.o_counter, history: [] } } };
+  },
+};
+const deleteO: MockedResponse<
+  GQL.SceneDeleteOMutation,
+  GQL.SceneDeleteOMutationVariables
+> = {
+  request: { query: GQL.SceneDeleteODocument, variables: () => true },
+  maxUsageCount: Infinity,
+  delay: 100,
+  result: (variables) => {
+    record("SceneDeleteO", variables);
+    const scene = targetScene(variables.id);
+    scene.o_counter = Math.max(0, (scene.o_counter ?? 0) - 1);
+    return { data: { sceneDeleteO: { count: scene.o_counter, history: [] } } };
+  },
+};
+const resetO: MockedResponse<
+  GQL.SceneResetOMutation,
+  GQL.SceneResetOMutationVariables
+> = {
+  request: { query: GQL.SceneResetODocument, variables: () => true },
+  maxUsageCount: Infinity,
+  delay: 100,
+  result: (variables) => {
+    record("SceneResetO", variables);
+    targetScene(variables.id).o_counter = 0;
+    return { data: { sceneResetO: 0 } };
+  },
+};
 const savedFilters: MockedResponse<
   GQL.FindSavedFiltersQuery,
   GQL.FindSavedFiltersQueryVariables
@@ -322,6 +429,10 @@ const client = new ApolloClient({
     play,
     savedFilters,
     configure,
+    updateScene,
+    addO,
+    deleteO,
+    resetO,
   ]),
 });
 function FixtureConfiguration({ children }: { children: ReactNode }) {
@@ -353,6 +464,22 @@ function FixtureTvPage() {
     />
   );
 }
+function FixtureRating() {
+  const { data } = useQuery(GQL.FindSceneDocument, { variables: { id: "1" } });
+  return (
+    <div className="m-4 w-64">
+      <RatingSystem
+        value={data?.findScene?.rating100}
+        onSetRating={(rating100) => {
+          void client.mutate({
+            mutation: GQL.SceneUpdateDocument,
+            variables: { input: { id: "1", rating100 } },
+          });
+        }}
+      />
+    </div>
+  );
+}
 const root = createRootRoute({
   component: () => (
     <ApolloProvider client={client}>
@@ -376,6 +503,11 @@ const root = createRootRoute({
 const router = createRouter({
   basepath: "/tv-fixture",
   routeTree: root.addChildren([
+    createRoute({
+      getParentRoute: () => root,
+      path: "/rating",
+      component: FixtureRating,
+    }),
     createRoute({
       getParentRoute: () => root,
       path: "/tv",

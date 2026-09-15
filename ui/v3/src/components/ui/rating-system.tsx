@@ -1,7 +1,8 @@
-import type React from "react";
-import { useState } from "react";
+import { useState, type ComponentType } from "react";
+import { useIntl } from "react-intl";
 import { Star, X } from "lucide-react";
-import { useConfigurationContextOptional } from "src/hooks/config";
+import { useConfigurationContextOptional } from "@/hooks/config";
+import { useMsg } from "@/hooks/message";
 import {
   convertFromRatingFormat,
   convertToRatingFormat,
@@ -9,10 +10,25 @@ import {
   getRatingPrecision,
   RatingStarPrecision,
   RatingSystemType,
-} from "src/utils/rating";
-import { Slider } from "src/components/ui/slider";
-import { Button } from "src/components/ui/button";
-import { cn } from "src/lib/utils";
+} from "@/utils/rating";
+import { Slider } from "@/components/ui/slider";
+import { Button } from "@/components/ui/button";
+import { FieldSet } from "@/components/ui/field";
+import { cn } from "@/lib/utils";
+
+/** A small value/commit boundary lets rotated media surfaces supply their
+ * coordinate-aware slider without coupling shared ratings to a player. */
+export interface RatingSliderProps {
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  label: string;
+  disabled?: boolean;
+  onChange: (value: number) => void;
+  onCommit: (value: number) => void;
+  onCancel: () => void;
+}
 
 export interface IRatingSystemProps {
   value: number | null | undefined;
@@ -21,210 +37,184 @@ export interface IRatingSystemProps {
   valueRequired?: boolean;
   clickToRate?: boolean;
   withoutContext?: boolean;
+  size?: "default" | "touch";
+  SliderComponent?: ComponentType<RatingSliderProps>;
 }
 
-// ── RatingStars ────────────────────────────────────────────────────────────────
-
-interface RatingStarsProps {
-  value: number | null;
-  onSetRating?: (value: number | null) => void;
-  disabled?: boolean;
-  precision: RatingStarPrecision;
-  valueRequired?: boolean;
+function RatingSlider({
+  value,
+  label,
+  onChange,
+  onCommit,
+  onCancel,
+  ...props
+}: RatingSliderProps) {
+  return (
+    <Slider
+      {...props}
+      aria-label={label}
+      value={[value]}
+      className="py-3"
+      onValueChange={(next) =>
+        onChange(Array.isArray(next) ? (next[0] ?? value) : next)
+      }
+      onValueCommitted={(next) =>
+        onCommit(Array.isArray(next) ? (next[0] ?? value) : next)
+      }
+      onPointerCancel={onCancel}
+    />
+  );
 }
-
-const MAX_STARS = 5;
 
 function RatingStars({
   value,
   onSetRating,
   disabled,
-  precision,
   valueRequired,
-}: RatingStarsProps) {
-  const [hoverStar, setHoverStar] = useState<number | undefined>();
-  const readonly = disabled || !onSetRating;
-
-  const rating = convertToRatingFormat(value, {
-    type: RatingSystemType.Stars,
-    starPrecision: precision,
-  });
-  const currentStars = rating ? Math.floor(rating) : 0;
-  const currentFraction = rating ? ((rating * 10) % 10) / 10 : 0;
-
-  /** Fill percentage (0–100) for button `thisStar` (1-based). */
-  function getFillPercent(thisStar: number): number {
-    // While hovering, show whole-star preview
-    if (hoverStar !== undefined) {
-      return thisStar <= hoverStar ? 100 : 0;
-    }
-    // Otherwise reflect the actual value including any fraction
-    if (thisStar <= currentStars) return 100;
-    if (thisStar === currentStars + 1) return currentFraction * 100;
-    return 0;
-  }
-
-  function handleClick(thisStar: number) {
-    if (!onSetRating) return;
-
-    const isCurrentStar =
-      thisStar === currentStars + (currentFraction > 0 ? 1 : 0) ||
-      (thisStar === currentStars && currentFraction === 0);
-
-    if (isCurrentStar && !valueRequired) {
-      onSetRating(null);
-      setHoverStar(undefined);
-      return;
-    }
-
-    onSetRating(convertFromRatingFormat(thisStar, RatingSystemType.Stars));
-  }
-
-  const displayRating =
-    hoverStar !== undefined ? hoverStar : rating != null ? rating : undefined;
-
-  const step = getRatingPrecision(precision);
-  const showNumber = precision !== RatingStarPrecision.Full;
-
+  size,
+}: {
+  value: number | null;
+  onSetRating: (value: number | null) => void;
+  disabled: boolean;
+  valueRequired: boolean;
+  size: "default" | "touch";
+}) {
+  const intl = useIntl();
+  const [hoverStar, setHoverStar] = useState<number>();
   return (
     <div className="inline-flex items-center gap-1">
-      {Array.from({ length: MAX_STARS }, (_, i) => i + 1).map((thisStar) => {
-        const fillPct = getFillPercent(thisStar);
+      {Array.from({ length: 5 }, (_, index) => index + 1).map((star) => {
+        const fill =
+          Math.max(0, Math.min(1, (hoverStar ?? value ?? 0) - star + 1)) * 100;
         return (
-          <button
-            key={thisStar}
+          <Button
+            key={star}
             type="button"
-            disabled={readonly}
-            className={cn(
-              "relative p-0 size-7 bg-transparent border-0 flex items-center justify-center",
-              "focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/60 focus-visible:rounded-sm",
-              !readonly &&
-                "cursor-pointer hover:scale-110 transition-transform",
-              readonly && "cursor-default opacity-70",
+            variant="transparent"
+            size="icon-sm"
+            disabled={disabled}
+            className={cn("relative p-0", size === "touch" && "size-11")}
+            onMouseEnter={() => !disabled && setHoverStar(star)}
+            onMouseLeave={() => setHoverStar(undefined)}
+            onFocus={() => !disabled && setHoverStar(star)}
+            onBlur={() => setHoverStar(undefined)}
+            onClick={() => {
+              onSetRating(star === value && !valueRequired ? null : star);
+              setHoverStar(undefined);
+            }}
+            aria-label={intl.formatMessage(
+              {
+                id: "rating_control.stars",
+                defaultMessage: "{count, plural, one {# star} other {# stars}}",
+              },
+              { count: star },
             )}
-            onClick={() => handleClick(thisStar)}
-            onMouseEnter={() => !readonly && setHoverStar(thisStar)}
-            onMouseLeave={() => !readonly && setHoverStar(undefined)}
-            aria-label={`${thisStar} star${thisStar !== 1 ? "s" : ""}`}
           >
-            {/* Unfilled / outline star */}
-            <Star className="size-5 text-muted-foreground" strokeWidth={1.5} />
-            {/* Filled star — clipped to fillPct width */}
-            {fillPct > 0 && (
-              <div
-                className="absolute inset-0 flex items-center justify-center overflow-hidden"
-                style={{ width: `${fillPct}%` }}
+            <span className="relative block size-5">
+              <Star
+                className="size-5 text-muted-foreground"
+                strokeWidth={1.5}
+              />
+              <span
+                aria-hidden
+                className="absolute inset-y-0 left-0 overflow-hidden"
+                style={{ width: `${fill}%` }}
               >
                 <Star
-                  className="size-5 text-yellow-400 fill-yellow-400 shrink-0"
+                  className="size-5 shrink-0 fill-yellow-400 text-yellow-400"
                   strokeWidth={1.5}
                 />
-              </div>
-            )}
-          </button>
+              </span>
+            </span>
+          </Button>
         );
       })}
-
-      {/* Numeric label for fractional precisions */}
-      {showNumber && (
-        <span className="ml-0.5 w-6 text-sm tabular-nums text-muted-foreground">
-          {displayRating != null && displayRating > 0
-            ? displayRating.toFixed(step < 0.1 ? 2 : 1)
-            : ""}
-        </span>
-      )}
-
-      {/* Clear button */}
-      {!readonly && value != null && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          onClick={() => onSetRating?.(null)}
-          aria-label="Clear rating"
-        >
-          <X className="size-3.5" />
-        </Button>
-      )}
     </div>
   );
 }
 
-// ── RatingNumber (decimal / slider mode) ──────────────────────────────────────
-
-interface RatingNumberProps {
-  value: number | null;
-  onSetRating?: (value: number | null) => void;
-  disabled?: boolean;
-}
-
-function RatingNumber({ value, onSetRating, disabled }: RatingNumberProps) {
-  const readonly = disabled || !onSetRating;
-
-  return (
-    <div className="flex items-center gap-3">
-      <Slider
-        min={0}
-        max={100}
-        step={1}
-        value={value ?? 0}
-        onValueChange={(v) => {
-          const n = typeof v === "number" ? v : v[0];
-          if (n === undefined) return;
-          onSetRating?.(n === 0 ? null : n);
-        }}
-        disabled={readonly}
-        className="flex-1"
-      />
-      <span className="w-8 text-right text-sm tabular-nums text-muted-foreground">
-        {value != null ? (value / 10).toFixed(1) : "—"}
-      </span>
-      {!readonly && value != null && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          onClick={() => onSetRating?.(null)}
-          aria-label="Clear rating"
-        >
-          <X className="size-3.5" />
-        </Button>
-      )}
-    </div>
-  );
-}
-
-// ── RatingSystem ───────────────────────────────────────────────────────────────
-
-export const RatingSystem: React.FC<IRatingSystemProps> = ({
+export function RatingSystem({
   value,
   onSetRating,
   disabled = false,
-  valueRequired,
-}) => {
+  valueRequired = false,
+  size = "default",
+  SliderComponent = RatingSlider,
+}: IRatingSystemProps) {
   const ctx = useConfigurationContextOptional();
-  const ratingSystemOptions =
+  const msg = useMsg();
+  const intl = useIntl();
+  const options =
     ctx?.configuration.ui.ratingSystemOptions ?? defaultRatingSystemOptions;
-
-  if (ratingSystemOptions.type === RatingSystemType.Stars) {
-    return (
-      <RatingStars
-        value={value ?? null}
-        onSetRating={onSetRating}
-        disabled={disabled}
-        precision={
-          ratingSystemOptions.starPrecision ?? RatingStarPrecision.Full
-        }
-        valueRequired={valueRequired}
-      />
+  const stars = options.type === RatingSystemType.Stars;
+  const precision = options.starPrecision ?? RatingStarPrecision.Full;
+  const step = stars ? getRatingPrecision(precision) : 0.1;
+  const readonly = disabled || !onSetRating;
+  // Pointer previews are local. Persist one rating on release/keyboard commit,
+  // rather than starting a mutation for every intermediate slider position.
+  const [preview, setPreview] = useState<number | null>(null);
+  const rating = preview ?? convertToRatingFormat(value, options);
+  const setRating = (next: number | null) => {
+    setPreview(null);
+    onSetRating?.(
+      next == null || next === 0
+        ? null
+        : convertFromRatingFormat(next, options.type),
     );
-  }
-
+  };
+  const showNumber = !stars || precision !== RatingStarPrecision.Full;
   return (
-    <RatingNumber
-      value={value ?? null}
-      onSetRating={onSetRating}
-      disabled={disabled}
-    />
+    <FieldSet
+      aria-label={msg("rating", "Rating")}
+      className="flex min-w-0 flex-col gap-1"
+    >
+      <div className="flex min-w-0 flex-wrap items-center gap-1">
+        {stars && (
+          <RatingStars
+            value={rating}
+            onSetRating={setRating}
+            disabled={readonly}
+            valueRequired={valueRequired}
+            size={size}
+          />
+        )}
+        {showNumber && (
+          <span className="text-sm tabular-nums text-muted-foreground">
+            {rating == null
+              ? "—"
+              : intl.formatNumber(rating, {
+                  minimumFractionDigits: step < 1 ? 1 : 0,
+                  maximumFractionDigits: 2,
+                })}
+          </span>
+        )}
+        {onSetRating && !valueRequired && value != null && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            className={size === "touch" ? "size-11" : undefined}
+            disabled={disabled}
+            onClick={() => setRating(null)}
+            aria-label={msg("rating_control.clear", "Clear rating")}
+          >
+            <X />
+          </Button>
+        )}
+      </div>
+      {showNumber && (onSetRating || !stars) && (
+        <SliderComponent
+          value={rating ?? 0}
+          min={valueRequired ? step : 0}
+          max={stars ? 5 : 10}
+          step={step}
+          label={msg("rating", "Rating")}
+          disabled={readonly}
+          onChange={setPreview}
+          onCommit={setRating}
+          onCancel={() => setPreview(null)}
+        />
+      )}
+    </FieldSet>
   );
-};
+}

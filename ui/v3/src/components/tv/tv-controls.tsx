@@ -1,10 +1,11 @@
-import { FormattedMessage } from "react-intl";
+import { FormattedMessage, useIntl } from "react-intl";
 import { TvPlaybackMenu, type TvPlaybackMenuAction } from "./tv-playback-menu";
 import {
   lazy,
   Suspense,
   useEffect,
   useLayoutEffect,
+  useRef,
   useState,
   type RefObject,
 } from "react";
@@ -55,6 +56,8 @@ import {
 import { TvTimeline } from "./tv-timeline";
 import { TvNavigationButton } from "./tv-navigation-button";
 import { TvIconButton } from "./tv-icon-button";
+import { TvCounter, TvCounterBadge, type TvCounterAnchor } from "./tv-counter";
+import { TvInfo } from "./tv-info";
 import { useTvInputs } from "./use-tv-inputs";
 import { useTvMutations, type TvScene } from "./use-tv-mutations";
 import type { TvEditTarget } from "./tv-edit-panel";
@@ -64,6 +67,7 @@ const TvEditPanel = lazy(() => import("./tv-edit-panel"));
 type Panel =
   | { kind: "closed" }
   | { kind: "help" }
+  | { kind: "counter"; anchor: TvCounterAnchor }
   | {
       kind: "menu";
       action: TvPlaybackMenuAction;
@@ -93,19 +97,47 @@ function RailEntry({
   setFolder,
   busy,
   fullscreen,
+  count,
+  counterEntry,
+  infoVisible,
+  leftHanded,
 }: {
   entry: TvRailEntry;
-  run: (action: TvAction) => void;
+  run: (action: TvAction, anchor?: TvCounterAnchor) => void;
   folder: string | null;
   setFolder: (id: string | null) => void;
   busy: boolean;
   fullscreen: boolean;
+  count: number;
+  counterEntry: string | null;
+  infoVisible: boolean;
+  leftHanded: boolean;
 }) {
   const msg = useMsg();
+  const intl = useIntl();
+  const folderButton = useRef<HTMLButtonElement>(null);
+  const id = railEntryId(entry);
+  const side = entry.pinned ? "top" : leftHanded ? "right" : "left";
+  const countDescription = intl.formatMessage(
+    {
+      id: "tv.text.current_o_count",
+      defaultMessage: "Current count: {count, number}",
+    },
+    { count },
+  );
   if (entry.type === "action") {
     const Icon = tvActionIcon(entry.action);
     return (
       <TvIconButton
+        className="relative"
+        aria-haspopup={entry.action.kind === "counter" ? "dialog" : undefined}
+        aria-expanded={
+          entry.action.kind === "counter" ? counterEntry === id : undefined
+        }
+        aria-description={
+          entry.action.kind === "counter" ? countDescription : undefined
+        }
+        aria-pressed={entry.action.kind === "info" ? infoVisible : undefined}
         aria-label={
           entry.action.label ||
           (entry.action.kind === "fullscreen" && fullscreen
@@ -118,11 +150,18 @@ function RailEntry({
         disabled={
           busy &&
           entry.action.kind !== "settings" &&
-          entry.action.kind !== "visibility"
+          entry.action.kind !== "visibility" &&
+          entry.action.kind !== "counter" &&
+          entry.action.kind !== "info"
         }
-        onClick={() => run(entry.action)}
+        onClick={(event) =>
+          run(entry.action, { element: event.currentTarget, entryId: id, side })
+        }
       >
         <Icon />
+        {entry.action.kind === "counter" && (
+          <TvCounterBadge count={count} overlay />
+        )}
       </TvIconButton>
     );
   }
@@ -133,10 +172,15 @@ function RailEntry({
       open={folder === entry.id}
       onOpenChange={(open) => setFolder(open ? entry.id : null)}
     >
-      <DropdownMenuTrigger render={<TvIconButton aria-label={entry.label} />}>
+      <DropdownMenuTrigger
+        render={<TvIconButton ref={folderButton} aria-label={entry.label} />}
+      >
         <Icon />
       </DropdownMenuTrigger>
-      <DropdownMenuContent side={entry.pinned ? "top" : "left"}>
+      <DropdownMenuContent
+        side={side}
+        finalFocus={counterEntry === id ? false : undefined}
+      >
         <DropdownMenuGroup>
           {entry.actions.map((action) => {
             const Icon = tvActionIcon(action);
@@ -145,9 +189,17 @@ function RailEntry({
                 key={action.id}
                 disabled={busy}
                 className="min-h-11"
+                aria-description={
+                  action.kind === "counter" ? countDescription : undefined
+                }
                 onClick={() => {
                   setFolder(null);
-                  run(action);
+                  run(
+                    action,
+                    folderButton.current
+                      ? { element: folderButton.current, entryId: id, side }
+                      : undefined,
+                  );
                 }}
               >
                 <Icon />
@@ -158,6 +210,7 @@ function RailEntry({
                         `tv.action.${action.kind}`,
                         tvActionLabels[action.kind],
                       ))}
+                {action.kind === "counter" && <TvCounterBadge count={count} />}
               </DropdownMenuItem>
             );
           })}
@@ -276,6 +329,7 @@ export function TvControls({
   const [panel, setPanel] = useState<Panel>({ kind: "closed" });
   const [folder, setFolder] = useState<string | null>(null);
   const [visible, setVisible] = useState(settings.uiVisible);
+  const [infoVisible, setInfoVisible] = useState(false);
   const [fit, setFit] = useState(settings.fit);
   const mutations = useTvMutations(changed);
   useLayoutEffect(() => {
@@ -306,9 +360,15 @@ export function TvControls({
   useEffect(() => {
     if (root.current) root.current.dataset.tvFit = fit;
   }, [root, fit]);
-  const run = (action: TvAction) => {
+  const run = (action: TvAction, anchor?: TvCounterAnchor) => {
     const position = controls.read().position;
     switch (action.kind) {
+      case "info":
+        setInfoVisible((value) => !value);
+        return;
+      case "counter":
+        if (anchor) setPanel({ kind: "counter", anchor });
+        return;
       case "settings":
         remember(position);
         controls.pause();
@@ -419,6 +479,10 @@ export function TvControls({
       setFolder={setFolder}
       busy={mutations.busy}
       fullscreen={fullscreen}
+      count={scene.o_counter ?? 0}
+      counterEntry={panel.kind === "counter" ? panel.anchor.entryId : null}
+      infoVisible={infoVisible}
+      leftHanded={settings.leftHanded}
     />
   );
   return (
@@ -446,18 +510,26 @@ export function TvControls({
       )}
       <SourceFeedback openQuality={() => action("quality")} />
       {visible && (
-        <aside
-          aria-label={msg("tv.text.tv_actions", "TV actions")}
-          data-tv-interactive
+        <div
           className={cn(
-            "pointer-events-none relative mb-2 flex min-h-0 max-h-[30%] w-11 flex-col gap-2",
-            settings.leftHanded ? "ml-3 mr-auto" : "ml-auto mr-3",
+            "pointer-events-none relative mb-2 flex min-h-0 flex-1 items-end gap-3 px-3",
+            settings.leftHanded && "flex-row-reverse",
           )}
         >
-          <div className="pointer-events-auto flex min-h-0 flex-col gap-2 overflow-y-auto overscroll-contain">
-            {entries.filter((entry) => !entry.pinned).map(renderEntry)}
-          </div>
-        </aside>
+          {infoVisible && <TvInfo key={item.key} scene={scene} />}
+          <aside
+            aria-label={msg("tv.text.tv_actions", "TV actions")}
+            data-tv-interactive
+            className={cn(
+              "pointer-events-none relative flex min-h-0 max-h-[35%] w-11 shrink-0 flex-col gap-2",
+              settings.leftHanded ? "mr-auto" : "ml-auto",
+            )}
+          >
+            <div className="pointer-events-auto flex min-h-0 flex-col gap-2 overflow-y-auto overscroll-contain">
+              {entries.filter((entry) => !entry.pinned).map(renderEntry)}
+            </div>
+          </aside>
+        </div>
       )}
       <div
         className="tv-footer pointer-events-none relative flex shrink-0 flex-col gap-1 px-2 pt-1 text-white [text-shadow:0_1px_2px_rgb(0_0_0/0.85)]"
@@ -467,7 +539,13 @@ export function TvControls({
         {visible && (
           <>
             <div className="flex min-w-0 items-center gap-2">
-              <p className="min-w-0 flex-1 truncate text-sm">
+              <p
+                aria-hidden={infoVisible}
+                className={cn(
+                  "min-w-0 flex-1 truncate text-sm",
+                  infoVisible && "invisible",
+                )}
+              >
                 {objectTitle(scene)}
               </p>
               <span className="shrink-0 text-xs text-white/80">
@@ -565,6 +643,14 @@ export function TvControls({
         )}
       </div>
       <Suspense fallback={<Spinner className="absolute left-1/2 top-1/2" />}>
+        {panel.kind === "counter" && (
+          <TvCounter
+            scene={scene}
+            anchor={panel.anchor}
+            mutations={mutations}
+            close={() => setPanel({ kind: "closed" })}
+          />
+        )}
         {panel.kind === "help" && (
           <TvHelp close={() => setPanel({ kind: "closed" })} />
         )}

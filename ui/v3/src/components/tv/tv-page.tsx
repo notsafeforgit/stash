@@ -279,9 +279,7 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
     });
   };
   const msg = useMsg();
-  const range = planReady
-    ? (plan.range ?? { start: 0, end: scene?.files[0]?.duration ?? 0 })
-    : { start: 0, end: 0 };
+  const range = planReady ? plan.range : { start: 0, end: 0 };
   return (
     <div
       ref={presentationRoot}
@@ -330,7 +328,7 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
                         ? snapshot.playback &&
                           snapshot.playback.key === active?.key
                           ? snapshot.playback.position
-                          : plan.start
+                          : plan.range.start
                         : undefined
                     }
                     clipRange={planReady ? plan.range : undefined}

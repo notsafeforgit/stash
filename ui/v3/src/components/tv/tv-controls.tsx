@@ -8,7 +8,7 @@ import {
   useState,
   type RefObject,
 } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouter } from "@tanstack/react-router";
 import {
   Play,
   Volume2,
@@ -271,6 +271,7 @@ export function TvControls({
   const controls = useScenePlayerControls();
   const paused = useScenePlayerValue("paused");
   const navigate = useNavigate();
+  const router = useRouter();
   const msg = useMsg();
   const [panel, setPanel] = useState<Panel>({ kind: "closed" });
   const [folder, setFolder] = useState<string | null>(null);
@@ -285,19 +286,23 @@ export function TvControls({
   }, [panel.kind, folder, mutations.busy, onInteractionBlockedChange]);
   const latest = useCommittedRef({ remember, item, leaving });
   useEffect(() => {
-    const save = () => latest.current.remember(controls.read().position);
+    const save = () => {
+      const state = controls.read();
+      if (state.ready && !latest.current.leaving)
+        latest.current.remember(state.position);
+    };
     const timer = window.setInterval(save, 1000);
+    // Capture before navigation suspends the media and resets its playhead.
+    const unsubscribe = router.subscribe("onBeforeNavigate", save);
     return () => {
       window.clearInterval(timer);
+      unsubscribe();
       save();
     };
-  }, [controls]);
+  }, [controls, router]);
   useEffect(() => {
-    if (leaving) {
-      remember(controls.read().position);
-      controls.pause();
-    }
-  }, [leaving, remember, controls]);
+    if (leaving) controls.pause();
+  }, [leaving, controls]);
   useEffect(() => {
     if (root.current) root.current.dataset.tvFit = fit;
   }, [root, fit]);
@@ -502,7 +507,7 @@ export function TvControls({
                 />
               </Button>
             ) : null}
-            <TvTimeline scene={scene} range={range} />
+            <TvTimeline key={item.key} scene={scene} range={range} />
           </>
         )}
         <div className="flex min-w-0 items-center gap-1">

@@ -827,10 +827,10 @@ test("TV restores feed context after settings without refetching page one", asyn
   ).toBe(before);
 });
 
-test("scene activity records watched time on pause and counts once per visit", async ({
+test("scene activity retains absolute resume time for a segment and counts once per visit", async ({
   page,
 }) => {
-  await open(page, "?paused&activity");
+  await open(page, "?paused&activity&resume");
   await page.getByRole("button", { name: "Play", exact: true }).click();
   await expect
     .poll(() =>
@@ -838,7 +838,7 @@ test("scene activity records watched time on pause and counts once per visit", a
         .locator("video")
         .evaluate((video: HTMLVideoElement) => video.currentTime),
     )
-    .toBeGreaterThan(1);
+    .toBeGreaterThan(5);
   await page.getByRole("button", { name: "Pause", exact: true }).click();
   await expect
     .poll(() =>
@@ -871,6 +871,13 @@ test("scene activity records watched time on pause and counts once per visit", a
       typeof value.playDuration === "number"
     )
       expect(value.playDuration).toBeLessThan(5);
+    if (
+      value &&
+      typeof value === "object" &&
+      "resume_time" in value &&
+      typeof value.resume_time === "number"
+    )
+      expect(value.resume_time).toBeGreaterThanOrEqual(4);
   }
   expect(
     await page.evaluate(

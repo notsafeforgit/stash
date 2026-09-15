@@ -216,7 +216,11 @@ const scenePage: MockedResponse<GQL.TvScenesQuery, GQL.TvScenesQueryVariables> =
   {
     request: { query: GQL.TvScenesDocument, variables: () => true },
     maxUsageCount: Infinity,
-    delay: params.has("feed-loading") ? 5000 : 0,
+    delay: params.has("feed-loading")
+      ? 5000
+      : params.has("slow-feed")
+        ? 500
+        : 0,
     result: (variables) => {
       record("TvScenes", variables);
       const page = variables.filter?.page ?? 1;
@@ -316,13 +320,14 @@ const updateScene: MockedResponse<
   },
 };
 let counterFailed = false;
+const counterDelay = params.has("slow-counter") ? 500 : 100;
 const addO: MockedResponse<
   GQL.SceneAddOMutation,
   GQL.SceneAddOMutationVariables
 > = {
   request: { query: GQL.SceneAddODocument, variables: () => true },
   maxUsageCount: Infinity,
-  delay: 100,
+  delay: counterDelay,
   result: (variables) => {
     record("SceneAddO", variables);
     if (params.has("counter-error") && !counterFailed) {
@@ -340,7 +345,7 @@ const deleteO: MockedResponse<
 > = {
   request: { query: GQL.SceneDeleteODocument, variables: () => true },
   maxUsageCount: Infinity,
-  delay: 100,
+  delay: counterDelay,
   result: (variables) => {
     record("SceneDeleteO", variables);
     const scene = targetScene(variables.id);
@@ -354,7 +359,7 @@ const resetO: MockedResponse<
 > = {
   request: { query: GQL.SceneResetODocument, variables: () => true },
   maxUsageCount: Infinity,
-  delay: 100,
+  delay: counterDelay,
   result: (variables) => {
     record("SceneResetO", variables);
     targetScene(variables.id).o_counter = 0;

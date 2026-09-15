@@ -832,6 +832,9 @@ remove nonessential transitions. Custom media zoom remains available; preserve
 the app's general page-zoom and text-selection policy.
 
 Hidden UI retains a stable restore-controls affordance, app navigation and mute.
+Use transparent icon controls with subtle shadows and comfortable tap targets.
+The bottom dock must not paint a panel over portrait video; its empty space
+passes taps and swipes to the video, including when the other UI is hidden.
 Settings remains accessible through app navigation. Keep essential controls
 outside fading/inert ancestors. Container
 fullscreen and ordinary inline viewing retain the same TV controls and swipe behavior.

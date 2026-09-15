@@ -68,7 +68,10 @@ export function TvTimeline({
     currentMarker = marker;
   }
   return (
-    <div className="relative flex min-w-0 flex-col gap-2" data-tv-interactive>
+    <div
+      className="pointer-events-auto relative flex min-w-0 flex-col gap-1"
+      data-tv-interactive
+    >
       {previewVisible && sprite && (
         <div
           className="pointer-events-none absolute bottom-full left-1/2 mb-3 -translate-x-1/2 overflow-hidden rounded-lg border bg-background"

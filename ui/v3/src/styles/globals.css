@@ -1034,7 +1034,7 @@ html [data-sonner-toaster][data-sonner-theme="system"] {
   transform: translate(-50%, -50%) rotate(-90deg);
 }
 .tv-footer {
-  padding-bottom: max(0.75rem, var(--safe-area-bottom, 0px));
+  padding-bottom: max(0.5rem, var(--safe-area-bottom, 0px));
 }
 [data-app-viewport]:has([data-tv-presentation="fullscreen"]) [data-app-header] {
   display: none;

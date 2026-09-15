@@ -13,6 +13,17 @@ ffmpeg -i audio.mp4 -c copy -hls_time 2 -hls_list_size 0 \
 ffmpeg -i audio.mp4 -t 2 -c copy -movflags +faststart short.mp4
 ```
 
+`portrait.mp4` is a synthetic 180×320 pattern with the same duration and audio.
+TV's portrait fixture describes its actual dimensions and uses it to check
+control visibility, unobstructed video, and touch targets on phones and desktops:
+
+```sh
+ffmpeg -f lavfi -i testsrc2=s=180x320:r=30:d=12 \
+  -f lavfi -i sine=frequency=440:sample_rate=48000:duration=12 \
+  -c:v libx264 -profile:v main -pix_fmt yuv420p -bf 0 -g 60 -keyint_min 60 \
+  -sc_threshold 0 -c:a aac -b:a 32k -movflags +faststart portrait.mp4
+```
+
 `clip/stream.m3u8` uses segments 3 and 4 from the same file, retaining their
 timestamps and setting `MEDIA-SEQUENCE:3` to exercise a trimmed marker playlist.
 The fixture uses absolute URLs and Stash's `stream.m3u8` path convention, as the

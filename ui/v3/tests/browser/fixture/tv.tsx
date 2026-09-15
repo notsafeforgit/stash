@@ -47,6 +47,9 @@ const scenes: GQL.SceneDataFragment[] = Array.from(
     const scene = {
       ...base,
       id,
+      files: params.has("portrait")
+        ? base.files.map((file) => ({ ...file, width: 180, height: 320 }))
+        : base.files,
       title: params.has("long-info")
         ? `Scene ${id} ${"VeryLongUnbrokenTitle".repeat(25)}`
         : `Scene ${id}`,

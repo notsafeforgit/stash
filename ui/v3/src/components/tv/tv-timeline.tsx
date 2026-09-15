@@ -25,7 +25,7 @@ export function TvTimeline({
 }) {
   const msg = useMsg();
   const position = useScenePlayerValue("displayPosition");
-  const bufferedEnd = useScenePlayerValue("bufferedEnd");
+  const bufferedRanges = useScenePlayerValue("bufferedRanges");
   const rotation = useTvRotation();
   const controls = useScenePlayerControls();
   const [draft, setDraft] = useState<number | null>(null);
@@ -109,7 +109,8 @@ export function TvTimeline({
       <PositionScrubber
         value={value}
         duration={duration}
-        bufferedEnd={bufferedEnd - range.start}
+        bufferedRanges={bufferedRanges}
+        bufferedOffset={-range.start}
         direction={
           rotation === "normal"
             ? "right"

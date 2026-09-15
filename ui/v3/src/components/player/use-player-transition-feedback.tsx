@@ -6,20 +6,17 @@ import {
   useState,
   type RefObject,
 } from "react";
-import type { VideoPlayerStore } from "@videojs/react";
 import { useFreezeFrameOverlay } from "./use-freeze-frame-overlay";
 
 /** Visual feedback and DOM readiness for both in-place seeks and source reloads. */
 export function usePlayerTransitionFeedback({
   rootRef,
-  storeRef,
   fileWidth,
   fileHeight,
   playbackKey,
   sourceKey,
 }: {
   rootRef: RefObject<HTMLDivElement | null>;
-  storeRef: RefObject<VideoPlayerStore | null>;
   fileWidth: number | undefined;
   fileHeight: number | undefined;
   playbackKey: string;
@@ -174,25 +171,10 @@ export function usePlayerTransitionFeedback({
     [],
   );
 
-  // Hold the dim+spinner up through an in-place seek (no player-root
-  // remount) until the new position is actually decoding frames.
-  //
-  // The caller is expected to have already paused the video and called
-  // `s.seek(...)` so the spinner overlays a frozen frame instead of an
-  // old-position video that keeps playing under the dim. After `seeked`
-  // fires (frame at target is decoded), this helper either:
-  //   - calls `s.play()` and waits for the `playing` event to clear
-  //     the spinner (`shouldResume` — slider seek that was playing,
-  //     or marker-tap which always wants playback), or
-  //   - clears the spinner immediately on `seeked` (paused-state seek;
-  //     no `playing` event will ever fire).
-  // A 5 s safety timeout catches the rare case where neither fires
-  // (e.g. seek aborted by a follow-up source change). Combined with
-  // the 250 ms minimum duration baked into `setReloading`, this gives
-  // short in-buffer seeks a brief flicker and long out-of-buffer seeks
-  // the full dim+spinner through the buffer wait — all paths converge
-  // to "old frame holds, spinner shows, new position plays, spinner
-  // clears".
+  // In-place seeking preserves the native playback intent. This helper only
+  // observes readiness; it must never pause or resume the video. Register it
+  // before writing currentTime so even a fast seek cannot outrun its listeners.
+  // Buffered seeks need no artificial loading overlay or minimum wait.
   const cancelSeekRef = useRef<(() => void) | null>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: A pending seek must be cancelled when its scene or source is replaced.
   useLayoutEffect(
@@ -202,44 +184,38 @@ export function usePlayerTransitionFeedback({
     },
     [playbackKey, sourceKey],
   );
-  const awaitSeekReady = useCallback(
-    (video: HTMLVideoElement, shouldResume: boolean) => {
+  const beginSeekFeedback = useCallback(
+    (video: HTMLVideoElement, showLoading: boolean) => {
       cancelSeekRef.current?.();
+      if (!showLoading) clearCapturedFrame();
+      setReloading(showLoading);
       let cleared = false;
       const cancel = () => {
         if (cleared) return;
         cleared = true;
-        video.removeEventListener("seeked", onSeeked);
-        video.removeEventListener("playing", onPlaying);
+        video.removeEventListener("seeked", onReady);
+        video.removeEventListener("playing", onReady);
         clearTimeout(timeoutId);
       };
       const clear = () => {
         if (cleared) return;
         cancel();
-        // Idempotent — direct-seek paths don't snapshot, so this is a
-        // no-op there. Guards the case where a captured frame survived
-        // a follow-up direct seek without going through handleCanPlay.
         clearCapturedFrame();
         setReloading(false);
       };
-      const onSeeked = () => {
-        if (shouldResume) {
-          // Restart playback; spinner clears once the new position is
-          // actually decoding frames (`playing` event below).
-          void storeRef.current?.play().catch(() => {});
-        } else {
-          // Stay paused — clear immediately, no `playing` event will
-          // ever fire to release the spinner otherwise.
-          clear();
-        }
+      const onReady = () => {
+        // A previous seek's queued event cannot finish a newer seek.
+        if (!video.seeking) clear();
       };
-      const onPlaying = () => clear();
+      // Release visual feedback if a seek fails to produce a readiness event.
+      // Native playback and the stall watchdog keep ownership of recovery.
       const timeoutId = setTimeout(clear, 5000);
       cancelSeekRef.current = cancel;
-      video.addEventListener("seeked", onSeeked, { once: true });
-      video.addEventListener("playing", onPlaying, { once: true });
+      video.addEventListener("seeked", onReady);
+      video.addEventListener("playing", onReady);
+      return clear;
     },
-    [setReloading, storeRef, clearCapturedFrame],
+    [setReloading, clearCapturedFrame],
   );
 
   return {
@@ -251,6 +227,6 @@ export function usePlayerTransitionFeedback({
     beginSourceRemount,
     seekDisplayTarget,
     armSeekDisplay,
-    awaitSeekReady,
+    beginSeekFeedback,
   };
 }

@@ -32,6 +32,7 @@ import { usePlayerTranscodeSession } from "./use-player-transcode-session";
 import { usePlayerRecovery } from "./use-player-recovery";
 import { planSceneSeek, planSourceResume } from "./scene-player-transitions";
 import { getHlsEngine, flushAndRestartAt } from "./hls";
+import { isTimeBuffered, readTimeRanges } from "./buffered-ranges";
 import {
   BEST_QUALITY_LABELS,
   QUALITY_STORAGE_KEY,
@@ -80,7 +81,7 @@ interface UseScenePlayerSourcesArgs {
    *  the active URL in place while preserving playhead and paused state. */
   sourceRevision: string | undefined;
   /** Outer wrapper used as the `querySelector("video")` root for the
-   *  in-place seek choreography (`awaitSeekReady`). */
+   *  in-place seek feedback. */
   rootRef: RefObject<HTMLDivElement | null>;
   /** Player.Player's store, captured by `<StoreBridge>` in the
    *  parent component. Read synchronously inside the handlers. */
@@ -361,10 +362,9 @@ export function useScenePlayerSources({
     beginSourceRemount,
     seekDisplayTarget,
     armSeekDisplay,
-    awaitSeekReady,
+    beginSeekFeedback,
   } = usePlayerTransitionFeedback({
     rootRef,
-    storeRef,
     fileWidth,
     fileHeight,
     playbackKey,
@@ -530,6 +530,15 @@ export function useScenePlayerSources({
       const store = storeRef.current;
       if (!store || !activeSrc) return;
       const engine = getHlsEngine(mediaRef.current);
+      const video = rootRef.current?.querySelector("video");
+      // Consult the current native ranges: the store's most recent progress
+      // event may predate buffer eviction (especially on ManagedMediaSource).
+      const mediaState = video
+        ? {
+            buffered: readTimeRanges(video.buffered),
+            seekable: readTimeRanges(video.seekable),
+          }
+        : store.state;
       const transition = planSceneSeek({
         intent,
         targetTime,
@@ -538,17 +547,17 @@ export function useScenePlayerSources({
         src: activeSrc,
         frameRate,
         clipRange,
-        mediaState: store.state,
+        mediaState,
         ios: isIOS(),
         hasHlsEngine: engine !== null,
       });
       if (intent === "seek") armSeekDisplay(transition.sceneTime);
-      const wasPaused = intent === "restart" ? false : store.state.paused;
+      const wasPaused =
+        intent === "restart" ? false : (video?.paused ?? store.state.paused);
       const playbackRate =
         intent === "seek" ? store.state.playbackRate : undefined;
-      store.pause();
-
       if (transition.kind === "reload-source") {
+        store.pause();
         beginSourceRemount(() => {
           const { resume } = transition;
           pendingResumeRef.current = {
@@ -565,19 +574,34 @@ export function useScenePlayerSources({
       }
 
       if (transition.kind === "restart-engine") captureFrame();
-      setReloading(true);
+      const finish = video
+        ? beginSeekFeedback(
+            video,
+            transition.kind === "restart-engine" ||
+              !isTimeBuffered(transition.mediaTime, mediaState.buffered),
+          )
+        : undefined;
       if (transition.kind === "restart-engine" && engine) {
         flushAndRestartAt(engine, transition.mediaTime);
       }
-      // Seek after flushing, so the write targets the clean buffer state.
-      void store.seek(transition.mediaTime).catch(() => {});
-      const video = rootRef.current?.querySelector("video");
-      if (video instanceof HTMLVideoElement) {
-        awaitSeekReady(video, !wasPaused);
+      if (
+        transition.kind === "seek" &&
+        video &&
+        video.readyState > 0 &&
+        !video.seeking &&
+        Math.abs(video.currentTime - transition.mediaTime) < 0.001
+      ) {
+        // A no-op seek need not emit seeked. Do not wait on that event.
+        finish?.();
       } else {
-        if (!wasPaused) void store.play().catch(() => {});
-        setReloading(false);
+        // A normal seek keeps the browser's paused/playing state. Pausing here
+        // would make another seek capture that temporary pause as user intent,
+        // and resuming on seeked would lose Safari's user-gesture permission.
+        void store.seek(transition.mediaTime).catch(() => finish?.());
       }
+      // Replay is an explicit play request. Keep it in the gesture call stack;
+      // readiness feedback never issues a delayed play that could undo a pause.
+      if (intent === "restart") void store.play().catch(() => {});
     },
     [
       activeSrc,
@@ -591,8 +615,7 @@ export function useScenePlayerSources({
       frameRate,
       clipRange,
       rootRef,
-      awaitSeekReady,
-      setReloading,
+      beginSeekFeedback,
     ],
   );
   const handleSeek = useCallback(

@@ -200,6 +200,10 @@ export function useTvInputs({
       latest.current.cancelDrag();
     };
     const down = (event: PointerEvent) => {
+      // Controls such as the scrubber own their release and stop propagation.
+      // Tracking those pointers here would leave phantom fingers in the set,
+      // causing the next video tap to be discarded as a multitouch gesture.
+      if (blockedNow() || ignored(event.target) || event.button !== 0) return;
       pointers.add(event.pointerId);
       if (pointers.size > 1) {
         pointer = undefined;
@@ -208,7 +212,6 @@ export function useTvInputs({
         latest.current.cancelDrag();
         return;
       }
-      if (blockedNow() || ignored(event.target) || event.button !== 0) return;
       completedTap.current = null;
       pointer = {
         id: event.pointerId,

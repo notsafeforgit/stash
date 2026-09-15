@@ -30,7 +30,7 @@ async function expectSceneTime(page: Page, seconds: number) {
 
 async function clickTimeline(page: Page, fraction: number) {
   const bounds = await page
-    .locator('[data-tv-dock] [data-slot="slider-track"]')
+    .locator("[data-tv-dock] [data-position-scrubber-track]")
     .boundingBox();
   if (!bounds) throw new Error("Missing TV timeline");
   await page.mouse.click(
@@ -92,9 +92,11 @@ for (const mobile of [true, false]) {
           const slider = timeline(page);
           const dock = page.locator("[data-tv-dock]");
           await expectSceneTime(page, segment.start);
-          await expect(slider).toHaveAttribute("min", "0");
+          await expect(slider).toHaveAttribute("aria-valuemin", "0");
           await expect
-            .poll(async () => Number(await slider.getAttribute("max")))
+            .poll(async () =>
+              Number(await slider.getAttribute("aria-valuemax")),
+            )
             .toBeCloseTo(duration, 5);
           await expect(
             dock.getByText(`0:00 / ${time(duration)}`, { exact: true }),
@@ -164,7 +166,7 @@ test("a scene segment survives quality changes and a settings round trip", async
       Number(await timeline(page).getAttribute("aria-valuenow")),
     )
     .toBeCloseTo(elapsed, 0);
-  await expect(timeline(page)).toHaveAttribute("max", "8");
+  await expect(timeline(page)).toHaveAttribute("aria-valuemax", "8");
   expect(
     await page
       .locator("video")
@@ -182,8 +184,8 @@ test("a scene segment survives quality changes and a settings round trip", async
     "data-playback-ready",
     "true",
   );
-  await expect(timeline(page)).toHaveAttribute("min", "0");
-  await expect(timeline(page)).toHaveAttribute("max", "8");
+  await expect(timeline(page)).toHaveAttribute("aria-valuemin", "0");
+  await expect(timeline(page)).toHaveAttribute("aria-valuemax", "8");
   await expect
     .poll(async () =>
       Number(await timeline(page).getAttribute("aria-valuenow")),

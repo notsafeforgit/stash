@@ -10,6 +10,7 @@ import type { TvRotation } from "@/core/tv/settings";
 
 const RotationContext = createContext<TvRotation>("normal");
 export const TvRotationProvider = RotationContext.Provider;
+export const useTvRotation = () => useContext(RotationContext);
 
 /** Base UI owns semantics, keyboard input and ordinary dragging. For a rotated
  * presentation only, map pointer input to the visible track's axis locally. */
@@ -36,7 +37,7 @@ export function TvSlider({
   onCancel?: () => void;
   onPreviewChange?: (visible: boolean) => void;
 }) {
-  const rotation = useContext(RotationContext);
+  const rotation = useTvRotation();
   const pointer = useRef<number | null>(null);
   const [draft, setDraft] = useState<number | null>(null);
   const change = (next: number) => {

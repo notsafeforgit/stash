@@ -42,6 +42,8 @@ import { Button } from "src/components/ui/button";
 import { Spinner } from "src/components/ui/spinner";
 import type { PlayerSource } from "./player-utils";
 import { PlayerMarkers } from "./player-markers";
+import { PositionScrubber, type ClipBoundsEdit } from "./position-scrubber";
+export type { ClipBoundsEdit } from "./position-scrubber";
 import type { IMarker } from "./player-utils";
 import { SpeedMenu, QualityMenu } from "./player-menus";
 import { PlayerCloseButton } from "./player-close-button";
@@ -170,12 +172,6 @@ interface PositionSliderProps {
   clipBoundsEdit?: ClipBoundsEdit;
 }
 
-export interface ClipBoundsEdit {
-  start: number | null;
-  end: number | null;
-  onChange: (next: { start?: number | null; end?: number | null }) => void;
-}
-
 function PositionSlider({
   Player,
   offsetStart,
@@ -212,240 +208,17 @@ function PositionSlider({
       : offsetStart,
   );
 
-  const trackRef = useRef<HTMLDivElement>(null);
-  const [dragTime, setDragTime] = useState<number | null>(null);
-  const draggingRef = useRef(false);
-
-  const displayTime = dragTime ?? trueTime;
-  const progress =
-    fileDuration > 0 ? Math.max(0, Math.min(1, displayTime / fileDuration)) : 0;
-  const bufferedProgress =
-    fileDuration > 0 ? Math.max(0, Math.min(1, bufferedEnd / fileDuration)) : 0;
-
-  function timeFromPointer(clientX: number): number {
-    const track = trackRef.current;
-    if (!track || fileDuration <= 0) return 0;
-    const rect = track.getBoundingClientRect();
-    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    return ratio * fileDuration;
-  }
-
-  // `stopPropagation` on every pointer event keeps a seek-drag from also
-  // being interpreted as a horizontal swipe by an enclosing carousel
-  // (e.g. YARL's pointer-swipe controller in the lightbox scene player).
-  // Without it, the slightest horizontal movement during a drag jumps to
-  // the next slide.
-  function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
-    if (fileDuration <= 0) return;
-    // When controls are hidden, the first tap should reveal them rather
-    // than initiate a seek-drag. Without this gate the slider takes a
-    // single tap to both reveal and seek (it stays interactive through
-    // the parent's `opacity-0` since opacity doesn't disable pointer
-    // events), while the rest of the controls follow the standard
-    // mobile two-tap pattern (first tap reveals, second tap interacts)
-    // because the user can't precisely hit a button they can't see.
-    // Bailing here without `stopPropagation` lets the native pointer
-    // listener `@videojs/core`'s controls feature attaches on the
-    // container fire its `setActive` path and bring the bar back.
-    if (!controlsVisible) return;
-    e.stopPropagation();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    draggingRef.current = true;
-    setDragTime(timeFromPointer(e.clientX));
-  }
-
-  function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
-    if (!draggingRef.current) return;
-    e.stopPropagation();
-    setDragTime(timeFromPointer(e.clientX));
-  }
-
-  function handlePointerUp(e: React.PointerEvent<HTMLDivElement>) {
-    if (!draggingRef.current) return;
-    e.stopPropagation();
-    draggingRef.current = false;
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch {
-      /* ignore — pointer may have already been released */
-    }
-    const t = timeFromPointer(e.clientX);
-    setDragTime(null);
-    onSeek(t);
-  }
-
-  function handlePointerCancel() {
-    draggingRef.current = false;
-    setDragTime(null);
-  }
-
   return (
-    // `items-end` pins the bar to the bottom of the container; the
-    // height is the hit area, sized so the slack lives entirely *above*
-    // the bar (the buttons row sits just below via `gap-1` on
-    // `Controls.Group`). Fine pointers (mouse) get a tight `h-3`; coarse
-    // pointers (touch) bump up to `h-5` for a comfortable tap target.
-    <div
-      ref={trackRef}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerCancel}
-      className="group relative flex items-end w-full min-w-[4em] h-3 pointer-coarse:h-5 touch-none cursor-pointer"
-    >
-      <div className="relative h-1 w-full bg-white/25 rounded-sm group-hover:h-1.5 transition-all">
-        <div
-          className="absolute inset-y-0 left-0 bg-white/40 rounded-sm"
-          style={{ width: `${bufferedProgress * 100}%` }}
-        />
-        <div
-          className="absolute inset-y-0 left-0 bg-white rounded-sm"
-          style={{ width: `${progress * 100}%` }}
-        />
-        {/* Markers float in their own band above the bar so they don't
-            visually merge with the playback line. The 2px gap between the
-            wrapper's bottom and the bar's top matches the gap between
-            successive marker layers (LAYER_HEIGHT_PX - marker height in
-            player-markers.tsx). pointer-events-none on the wrapper lets
-            the user scrub through gaps between markers; individual
-            markers re-enable pointer events for tooltip hover. */}
-        <div className="absolute left-0 right-0 bottom-[calc(100%+2px)] pointer-events-none">
-          <PlayerMarkers markers={markers} duration={fileDuration} />
-        </div>
-        <div
-          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-          style={{ left: `${progress * 100}%` }}
-        />
-        {clipBoundsEdit && fileDuration > 0 && (
-          <>
-            {clipBoundsEdit.start != null && (
-              <ClipBoundHandle
-                trackRef={trackRef}
-                boundary="start"
-                time={clipBoundsEdit.start}
-                fileDuration={fileDuration}
-                onDrag={(t) => clipBoundsEdit.onChange({ start: t })}
-              />
-            )}
-            {clipBoundsEdit.end != null && (
-              <ClipBoundHandle
-                trackRef={trackRef}
-                boundary="end"
-                time={clipBoundsEdit.end}
-                fileDuration={fileDuration}
-                onDrag={(t) => clipBoundsEdit.onChange({ end: t })}
-              />
-            )}
-          </>
-        )}
-      </div>
-    </div>
+    <PositionScrubber
+      value={trueTime}
+      bufferedEnd={bufferedEnd}
+      duration={fileDuration}
+      disabled={!controlsVisible}
+      markers={<PlayerMarkers markers={markers} duration={fileDuration} />}
+      clipBoundsEdit={clipBoundsEdit}
+      onSeek={onSeek}
+    />
   );
-}
-
-// Marker-edit handle on the position slider. Dragged in scene time;
-// `stopPropagation` keeps `PositionSlider`'s seek-drag from also firing.
-// `setPointerCapture` is required so the pointer keeps tracking the handle
-// even when the user drags past the slider's bounding box. Hit area
-// (`w-5 h-7`) is intentionally larger than the visual flag so touch
-// targets meet WCAG; the inner divs are positioned to render the visible
-// flag inside that area.
-function ClipBoundHandle({
-  trackRef,
-  boundary,
-  time,
-  fileDuration,
-  onDrag,
-}: {
-  trackRef: React.RefObject<HTMLDivElement | null>;
-  boundary: "start" | "end";
-  time: number;
-  fileDuration: number;
-  onDrag: (t: number) => void;
-}) {
-  const draggingRef = useRef(false);
-  const progress =
-    fileDuration > 0 ? Math.max(0, Math.min(1, time / fileDuration)) : 0;
-
-  function timeFromPointer(clientX: number): number {
-    const track = trackRef.current;
-    if (!track || fileDuration <= 0) return 0;
-    const rect = track.getBoundingClientRect();
-    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    return ratio * fileDuration;
-  }
-
-  function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
-    e.stopPropagation();
-    e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    draggingRef.current = true;
-  }
-  function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
-    if (!draggingRef.current) return;
-    e.stopPropagation();
-    onDrag(timeFromPointer(e.clientX));
-  }
-  function handlePointerUp(e: React.PointerEvent<HTMLDivElement>) {
-    if (!draggingRef.current) return;
-    draggingRef.current = false;
-    e.stopPropagation();
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch {
-      /* released already */
-    }
-  }
-  function handlePointerCancel() {
-    draggingRef.current = false;
-  }
-
-  return (
-    <div
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerCancel}
-      // `select-none` + `[-webkit-touch-callout:none]`: a long-press on the
-      // handle on iOS Safari otherwise triggers text-selection / the
-      // callout menu before our pointer-drag completes, which both hijacks
-      // the gesture and surfaces a "Copy / Look Up" affordance over the
-      // player. `touch-none` already disables panning/zooming gestures
-      // here, but iOS treats text selection as a separate concern.
-      className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-7 cursor-ew-resize touch-none select-none [-webkit-touch-callout:none] z-10"
-      style={{ left: `${progress * 100}%` }}
-      data-clip-bound={boundary}
-      title={`${boundary === "start" ? "Start" : "End"}: ${formatDurationMs(time)}`}
-    >
-      <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[2px] bg-amber-400" />
-      <div
-        className={cn(
-          "absolute top-1/2 -translate-y-1/2 h-3 w-2 rounded-sm bg-amber-400 ring-1 ring-black/40",
-          boundary === "start"
-            ? "left-1/2 -translate-x-full"
-            : "left-1/2 translate-x-0",
-        )}
-      />
-    </div>
-  );
-}
-
-// Like `formatDuration` above but always includes thousandths — the marker
-// editor needs millisecond precision in handle tooltips so the user can
-// read out the exact captured time.
-function formatDurationMs(secs: number): string {
-  const t = !Number.isFinite(secs) || secs < 0 ? 0 : secs;
-  const wholeMs = Math.round(t * 1000);
-  const ms = wholeMs % 1000;
-  const totalSec = Math.floor(wholeMs / 1000);
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  const base =
-    h > 0
-      ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
-      : `${m}:${String(s).padStart(2, "0")}`;
-  return `${base}.${String(ms).padStart(3, "0")}`;
 }
 
 // ── Relative-seek helpers ─────────────────────────────────────────────────────
@@ -550,6 +323,7 @@ function useHotkeys({
         (target.tagName === "INPUT" ||
           target.tagName === "TEXTAREA" ||
           target.isContentEditable ||
+          target.closest('[role="slider"]') ||
           target.closest("[data-player-hotkeys-disabled]"))
       )
         return;

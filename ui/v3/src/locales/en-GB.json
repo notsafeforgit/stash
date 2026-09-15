@@ -1622,6 +1622,9 @@
   "markers": "Markers",
   "markers_count_summary": "{count, plural, =0 {No markers} one {# marker} other {# markers}}",
   "measurements": "Measurements",
+  "media_player": {
+    "position": "Playback position"
+  },
   "media_info": {
     "audio_codec": "Audio Codec",
     "bit_depth": "Bit Depth",

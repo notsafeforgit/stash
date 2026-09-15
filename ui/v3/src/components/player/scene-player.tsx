@@ -1081,6 +1081,8 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
 
             <ScenePlayerControlsProvider
               Player={Player}
+              reloading={reloading}
+              seekDisplayTarget={seekDisplayTarget}
               offsetStart={offsetStart}
               duration={fileDuration ?? 0}
               range={clipRange}

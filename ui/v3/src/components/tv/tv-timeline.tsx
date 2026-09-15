@@ -4,7 +4,8 @@ import {
   useScenePlayerControls,
   useScenePlayerValue,
 } from "@/components/player/scene-player-controls";
-import { TvSlider } from "./tv-slider";
+import { PositionScrubber } from "@/components/player/position-scrubber";
+import { useTvRotation } from "./tv-slider";
 import { useSpriteInfo } from "@/hooks/use-sprite-info";
 import type { PlaybackRange } from "@/core/marker-range";
 import type { TvScene } from "./use-tv-mutations";
@@ -23,7 +24,9 @@ export function TvTimeline({
   range: PlaybackRange;
 }) {
   const msg = useMsg();
-  const position = useScenePlayerValue("position");
+  const position = useScenePlayerValue("displayPosition");
+  const bufferedEnd = useScenePlayerValue("bufferedEnd");
+  const rotation = useTvRotation();
   const controls = useScenePlayerControls();
   const [draft, setDraft] = useState<number | null>(null);
   const [previewOpened, setPreviewOpened] = useState(false);
@@ -103,39 +106,40 @@ export function TvTimeline({
           {tvTime(value)} / {tvTime(duration)}
         </span>
       </div>
-      <div className="relative">
-        <svg
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-2.5 h-2 w-full text-primary/40"
-          viewBox="0 0 1000 8"
-          preserveAspectRatio="none"
-        >
-          <title>{msg("tv.timeline_markers", "Scene markers")}</title>
-          <path
-            d={markerPath}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          />
-        </svg>
-        <TvSlider
-          label={msg("tv.text.scene_position", "Scene position")}
-          value={value}
-          min={0}
-          max={duration}
-          step={0.1}
-          disabled={duration <= 0}
-          onPreviewChange={(visible) => {
-            if (visible) setPreviewOpened(true);
-            setPreviewVisible(visible);
-          }}
-          onChange={setDraft}
-          onCommit={(next) => {
-            controls.seek(range.start + next);
-            setDraft(null);
-          }}
-        />
-      </div>
+      <PositionScrubber
+        value={value}
+        duration={duration}
+        bufferedEnd={bufferedEnd - range.start}
+        direction={
+          rotation === "normal"
+            ? "right"
+            : rotation === "clockwise"
+              ? "down"
+              : "up"
+        }
+        onPreviewChange={(visible) => {
+          if (visible) setPreviewOpened(true);
+          setPreviewVisible(visible);
+        }}
+        onScrubChange={setDraft}
+        onSeek={(next) => controls.seek(range.start + next)}
+        markers={
+          <svg
+            aria-hidden
+            className="h-2 w-full text-white/40"
+            viewBox="0 0 1000 8"
+            preserveAspectRatio="none"
+          >
+            <title>{msg("tv.timeline_markers", "Scene markers")}</title>
+            <path
+              d={markerPath}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            />
+          </svg>
+        }
+      />
     </div>
   );
 }

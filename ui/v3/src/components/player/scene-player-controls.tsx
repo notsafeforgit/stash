@@ -19,6 +19,9 @@ export interface ScenePlayerState {
   volume: number;
   rate: number;
   position: number;
+  /** Scene time held steady through a seek or source transition. */
+  displayPosition: number;
+  bufferedEnd: number;
   ready: boolean;
   zoomed: boolean;
   error: string | null;
@@ -90,6 +93,8 @@ export function ScenePlayerControlsProvider({
   ready: boolean;
   zoomed: boolean;
   rootRef: RefObject<HTMLDivElement | null>;
+  reloading: boolean;
+  seekDisplayTarget: number | null;
   sources: PlayerSource[];
   activeSource: PlayerSource | null;
   seek: (position: number) => void;
@@ -138,6 +143,16 @@ export function ScenePlayerControlsProvider({
           volume: store.state.volume,
           rate: store.state.playbackRate,
           position: latest.current.offsetStart + store.state.currentTime,
+          displayPosition:
+            latest.current.seekDisplayTarget ??
+            (latest.current.reloading
+              ? latest.current.offsetStart
+              : latest.current.offsetStart + store.state.currentTime),
+          bufferedEnd:
+            latest.current.offsetStart +
+            (latest.current.reloading
+              ? 0
+              : (store.state.buffered.at(-1)?.[1] ?? 0)),
           ready: latest.current.ready,
           zoomed: latest.current.zoomed,
           error: store.state.error?.message ?? null,

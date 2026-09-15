@@ -224,6 +224,7 @@ export function SceneLightbox({
       if (!isEscape && !isHorizontalArrow) return;
 
       const active = document.activeElement;
+      if (isHorizontalArrow && active?.closest('[role="slider"]')) return;
       if (
         active?.tagName === "INPUT" ||
         active?.tagName === "TEXTAREA" ||

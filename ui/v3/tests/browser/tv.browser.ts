@@ -893,7 +893,7 @@ test("rotated timeline seeking follows the visible track and keeps the item sele
 }) => {
   await open(page);
   await page.keyboard.press("o");
-  const track = page.locator('[data-slot="slider-track"]').first();
+  const track = page.locator("[data-position-scrubber-track]");
   const bounds = await track.boundingBox();
   if (!bounds) throw new Error("Missing timeline track");
   await page.mouse.click(

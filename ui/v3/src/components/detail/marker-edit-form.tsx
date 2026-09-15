@@ -54,8 +54,7 @@ function validMarkerForm(
   maxTimestamp?: number,
 ): value is MarkerFormValues & { start: number; primary_tag: EntityOption } {
   return Boolean(
-    value.title.trim() &&
-      value.primary_tag &&
+    value.primary_tag &&
       value.start != null &&
       Number.isFinite(value.start) &&
       value.start >= 0 &&

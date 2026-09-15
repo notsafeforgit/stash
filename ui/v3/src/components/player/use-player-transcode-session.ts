@@ -1,14 +1,13 @@
 import { useCommittedRef } from "@/hooks/use-committed-ref";
-import { useEffect, type RefObject } from "react";
+import { useEffect } from "react";
 import { getPlatformURL } from "@/core/platform-url";
 import { isHlsPlaylist } from "./hls";
 import { hlsStreamTypeName, streamResolution } from "./scene-player-source-url";
 
-/** Owns the server transcode lease: release on exit, keep alive while paused. */
+/** Owns the server transcode lease while this visible player has an HLS source. */
 export function usePlayerTranscodeSession(
   sceneId: string,
   finalSrc: string | undefined,
-  rootRef: RefObject<HTMLDivElement | null>,
 ) {
   // Cleanup closes the transcode owned by this effect. Only quality changes
   // within the same scene preserve the incoming HLS variant.
@@ -65,25 +64,14 @@ export function usePlayerTranscodeSession(
     };
   }, [finalSrc, sceneId]);
 
-  // HLS transcode keepalive. While the player is paused, segment
-  // fetches stop, and the server reaps the transcode after
-  // `maxIdleTime` (`pkg/ffmpeg/stream_segmented.go`). On resume the
-  // user then sees a buffer-exhaust → forced remount path that's
-  // visibly clunky. This effect prevents that by POSTing
-  // `/streams.keepalive` every ~15 s while the live `<video>` is
-  // paused, which bumps `lastAccessed` server-side without
-  // requesting any actual media. During playback we send nothing —
-  // segment fetches keep the timestamp fresh on their own.
-  //
-  // No-op when the active source is non-HLS (direct stream isn't
-  // backed by a transcode process; the watchdog handles its idle
-  // socket case separately) or when the page is hidden (iOS
-  // background tab restrictions can throttle / block fetch; nothing
-  // to keep alive when the user isn't there anyway).
+  // Playing does not guarantee segment requests: a fast connection, slower
+  // playback rate, or ManagedMediaSource scheduling can leave the server idle
+  // past its 60 s timeout while the player consumes its buffer. Keep the lease
+  // independent of pause state so the encoder and cached fragments survive.
+  // The server still suspends encoding once its lookahead is full. Hidden
+  // pages stop renewing; the existing idle timeout reclaims abandoned streams.
   useEffect(() => {
     if (!finalSrc || !isHlsPlaylist(finalSrc)) return;
-    const root = rootRef.current;
-    if (!root) return;
 
     const KEEPALIVE_INTERVAL_MS = 15000;
     const keepType = hlsStreamTypeName(finalSrc);
@@ -95,7 +83,6 @@ export function usePlayerTranscodeSession(
       `scene/${sceneId}/streams.keepalive?${params.toString()}`,
     ).toString();
 
-    let attachedVideo: HTMLVideoElement | null = null;
     let intervalId: ReturnType<typeof setInterval> | null = null;
 
     const ping = () => {
@@ -108,9 +95,7 @@ export function usePlayerTranscodeSession(
     };
     const start = () => {
       if (intervalId != null) return;
-      // Fire once immediately so a quick pause→resume after a long
-      // idle (e.g. user just got back from being away) refreshes the
-      // timestamp before the first 15 s tick.
+      // Renew immediately on source selection and foreground return.
       ping();
       intervalId = setInterval(ping, KEEPALIVE_INTERVAL_MS);
     };
@@ -120,41 +105,16 @@ export function usePlayerTranscodeSession(
       intervalId = null;
     };
 
-    const onPause = () => start();
-    const onPlay = () => stop();
-
-    const attach = (video: HTMLVideoElement) => {
-      if (attachedVideo === video) return;
-      if (attachedVideo) detach(attachedVideo);
-      attachedVideo = video;
-      video.addEventListener("pause", onPause);
-      video.addEventListener("play", onPlay);
-      if (video.paused) start();
+    const onVisibility = () => {
+      if (document.hidden) stop();
+      else start();
     };
-    const detach = (video: HTMLVideoElement) => {
-      video.removeEventListener("pause", onPause);
-      video.removeEventListener("play", onPlay);
-    };
-
-    const current = root.querySelector("video");
-    if (current instanceof HTMLVideoElement) attach(current);
-
-    const observer = new MutationObserver(() => {
-      const next = root.querySelector("video");
-      if (next instanceof HTMLVideoElement && next !== attachedVideo) {
-        attach(next);
-      } else if (!next && attachedVideo) {
-        detach(attachedVideo);
-        attachedVideo = null;
-        stop();
-      }
-    });
-    observer.observe(root, { childList: true, subtree: true });
+    document.addEventListener("visibilitychange", onVisibility);
+    onVisibility();
 
     return () => {
-      observer.disconnect();
-      if (attachedVideo) detach(attachedVideo);
+      document.removeEventListener("visibilitychange", onVisibility);
       stop();
     };
-  }, [finalSrc, rootRef, sceneId]);
+  }, [finalSrc, sceneId]);
 }

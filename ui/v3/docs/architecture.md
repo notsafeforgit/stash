@@ -322,7 +322,7 @@ pins an older hls.js, so a version-scoped pnpm override preserves the existing
 | `scene-player-source-url.ts` | Stream URLs, clip bounds, fragments, reload nonce |
 | `hls.ts` | HLS timeline policy and engine helpers |
 | `use-player-transition-feedback.tsx` | Freeze frame, loading feedback, seek readiness |
-| `use-player-transcode-session.ts` | Release transcodes and keep paused sessions alive |
+| `use-player-transcode-session.ts` | Renew visible HLS sessions during playback and pause; release on exit |
 | `use-player-recovery.ts` | Native fullscreen seeking and stalled-playback recovery |
 
 The scene lightbox uses `scene-carousel.tsx`, a YARL carousel module with three

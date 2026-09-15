@@ -127,6 +127,8 @@ interface UseScenePlayerSourcesResult {
   sources: PlayerSource[];
   activeSource: PlayerSource | null;
   finalSrc: string | undefined;
+  /** Initial position in the media timeline, independent of playlist bounds. */
+  startPosition: number;
   offsetStart: number;
   initialResume: { offset: number; seekTo: number | null };
   reloading: boolean;
@@ -261,21 +263,11 @@ export function useScenePlayerSources({
   const initialResume = capturedResume.resume;
 
   const [offsetStart, setOffsetStart] = useState(initialResume.offset);
-  // `fragmentTime` mirrors the pending-seek target into the URL so the
-  // first network round-trip lands on (or near) the target frame instead
-  // of time 0. The exact mechanism depends on the source type:
-  //   - Direct byte-range files: Media Fragments URI (`#t=N`) — browsers
-  //     honouring the fragment set `<video>.currentTime` before any data
-  //     is fetched.
-  //   - HLS playlists (`.m3u8` / `.fmp4.m3u8`): `?start=N` query param —
-  //     the server trims the playlist to begin at `floor(N/segmentLength)`,
-  //     so Safari fetches the segment containing the target time first
-  //     instead of loading from segment 0 and then jumping (which stalls
-  //     on the first frame for several seconds).
-  // Cleared when no pre-position is needed (transcode `?start=` sources,
-  // or scene-time 0). The post-`canPlay` `s.seek(target)` runs either way
-  // as a fallback / fine seek; for HLS it lands as a fast in-segment seek
-  // since the playlist trim has already loaded the right range.
+  // This target changes only when loading a source, not during ordinary
+  // playback or buffered seeks. Direct files carry it in #t=. HLS passes its
+  // media-relative value to the engine separately from the URL's fixed clip
+  // bounds, so recovery/quality changes fetch at the playhead without losing
+  // the earlier portion of the marker's seekable range.
   const [fragmentTime, setFragmentTime] = useState<number | null>(
     initialResume.seekTo,
   );
@@ -813,7 +805,7 @@ export function useScenePlayerSources({
     load,
   ]);
 
-  usePlayerTranscodeSession(scene.id, finalSrc, rootRef);
+  usePlayerTranscodeSession(scene.id, finalSrc);
   usePlayerRecovery({
     finalSrc,
     rootRef,
@@ -827,6 +819,7 @@ export function useScenePlayerSources({
     sources,
     activeSource,
     finalSrc,
+    startPosition: Math.max(0, (fragmentTime ?? offsetStart) - offsetStart),
     offsetStart,
     initialResume,
     reloading,

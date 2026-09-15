@@ -51,7 +51,9 @@ const typePolicies: TypePolicies = {
   Scene: {
     fields: {
       studio: { read: readDanglingNull },
-      paths: { merge: false },
+      // Feed summaries select only screenshot. Retain the other paths from
+      // scene details so refreshing a feed cannot invalidate active media.
+      paths: { merge: true },
     },
   },
   Image: {
@@ -78,6 +80,10 @@ const possibleTypes = {
   BaseFile: ["VideoFile", "ImageFile", "GalleryFile"],
   VisualFile: ["VideoFile", "ImageFile"],
 };
+
+/** Keep entity normalization and partial-query merging consistent per client. */
+export const createCache = () =>
+  new InMemoryCache({ typePolicies, possibleTypes });
 
 export const createClient = () => {
   const url = getPlatformURL("graphql");
@@ -134,10 +140,7 @@ export const createClient = () => {
 
   const link = from([errorLink, splitLink]);
 
-  const cache = new InMemoryCache({
-    typePolicies,
-    possibleTypes,
-  });
+  const cache = createCache();
 
   const client = new ApolloClient({
     link,

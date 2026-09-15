@@ -194,7 +194,12 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
   }
   const plan = resolvedPlan?.key === currentKey ? resolvedPlan.plan : undefined;
   const planReady = plan?.kind === "ready";
-  const pending = !scene || !planReady;
+  // Metadata refreshes may temporarily leave the query incomplete. Keep the
+  // selected media running; only a different selection needs to suspend it.
+  const pending =
+    playerScene?.id !== active?.sceneId ||
+    !planReady ||
+    data?.findScene === null;
   const latest = useCommittedRef({ identity, controller });
   useEffect(() => {
     controller.start();

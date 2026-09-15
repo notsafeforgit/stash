@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 import { gql, type TypedDocumentNode } from "@apollo/client";
 import { expect, it } from "vitest";
-import { createClient } from "./create-client";
+import { createCache, createClient } from "./create-client";
 import { getFrontPageContent } from "./config";
 import {
   type ConfigDataFragment,
   FilterMode,
   SortDirectionEnum,
+  TvScenesDocument,
 } from "./generated-graphql";
 
 const configurationQuery: TypedDocumentNode<{
@@ -72,4 +73,62 @@ it.each([
     client.stop();
     await wsClient.dispose();
   }
+});
+
+const scenePathsQuery: TypedDocumentNode<{
+  findScene: {
+    __typename: "Scene";
+    id: string;
+    paths: {
+      __typename: "ScenePathsType";
+      screenshot: string | null;
+      stream: string;
+      vtt: string;
+    };
+  };
+}> = gql`
+  query PlayerScenePaths {
+    findScene(id: "1") {
+      id
+      paths { screenshot stream vtt }
+    }
+  }
+`;
+
+it.each([
+  "/updated.jpg",
+  null,
+])("keeps scene media paths complete when a feed summary updates screenshot to %s", (screenshot) => {
+  const cache = createCache();
+  const paths = {
+    __typename: "ScenePathsType" as const,
+    screenshot: "/original.jpg",
+    stream: "/scene/1/stream",
+    vtt: "/scene/1.vtt",
+  };
+  cache.writeQuery({
+    query: scenePathsQuery,
+    data: { findScene: { __typename: "Scene", id: "1", paths } },
+  });
+  cache.writeQuery({
+    query: TvScenesDocument,
+    data: {
+      findScenes: {
+        count: 1,
+        scenes: [
+          {
+            __typename: "Scene",
+            id: "1",
+            title: "Scene 1",
+            paths: { __typename: "ScenePathsType", screenshot },
+            preview_image: null,
+          },
+        ],
+      },
+    },
+  });
+  expect(cache.readQuery({ query: scenePathsQuery })?.findScene.paths).toEqual({
+    ...paths,
+    screenshot,
+  });
 });

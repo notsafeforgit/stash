@@ -1,4 +1,4 @@
-import { ApolloClient, InMemoryCache } from "@apollo/client";
+import { ApolloClient } from "@apollo/client";
 import { ApolloProvider, useQuery } from "@apollo/client/react";
 import type { ReactNode } from "react";
 import { GraphQLError } from "graphql";
@@ -27,6 +27,7 @@ import { useTvSettings } from "@/hooks/use-tv-settings";
 import { SaveIndicatorProvider } from "@/hooks/save-indicator";
 import type { TvFeedQuery } from "@/core/tv/feed-query";
 import * as GQL from "@/core/generated-graphql";
+import { createCache } from "@/core/create-client";
 import { scenes as sourceScenes } from "./scene-lightbox";
 import { playerConfiguration } from "./player-configuration";
 import { RatingStarPrecision, RatingSystemType } from "@/utils/rating";
@@ -298,7 +299,7 @@ const play: MockedResponse<
     return { data: { sceneAddPlay: { count: 1, history: [] } } };
   },
 };
-const cache = new InMemoryCache();
+const cache = createCache();
 function targetScene(id: string) {
   const scene = scenes.find((scene) => scene.id === id);
   if (!scene) throw new Error("Missing mutation target");

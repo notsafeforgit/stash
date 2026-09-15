@@ -12,6 +12,7 @@ import type { CreatePlayerResult, VideoPlayerStore } from "@videojs/react";
 import { useCommittedRef } from "@/hooks/use-committed-ref";
 import type { PlayerSource } from "./player-utils";
 import type { PlaybackRange } from "@/core/marker-range";
+import { createBufferedRangesReader } from "./buffered-ranges";
 
 export interface ScenePlayerState {
   paused: boolean;
@@ -21,7 +22,8 @@ export interface ScenePlayerState {
   position: number;
   /** Scene time held steady through a seek or source transition. */
   displayPosition: number;
-  bufferedEnd: number;
+  /** Separate buffered intervals in scene time, including gaps and eviction. */
+  bufferedRanges: readonly PlaybackRange[];
   ready: boolean;
   zoomed: boolean;
   error: string | null;
@@ -79,7 +81,7 @@ export function useScenePlayerSourcesMenu() {
 }
 
 /** Library adaptation lives here. TV receives only semantic commands and
- * scalar subscriptions; it cannot reach adapters, native fullscreen or stores. */
+ * stable snapshots; it cannot reach adapters, native fullscreen or stores. */
 export function ScenePlayerControlsProvider({
   Player,
   children,
@@ -117,6 +119,7 @@ export function ScenePlayerControlsProvider({
   });
   const value = useMemo<ControlContext>(() => {
     let originalRate: number | undefined;
+    const readBufferedRanges = createBufferedRangesReader();
     const tracks = () =>
       latest.current.rootRef.current?.querySelector("video")?.textTracks;
     const setCaption = (index: number | null) => {
@@ -148,11 +151,10 @@ export function ScenePlayerControlsProvider({
             (latest.current.reloading
               ? latest.current.offsetStart
               : latest.current.offsetStart + store.state.currentTime),
-          bufferedEnd:
-            latest.current.offsetStart +
-            (latest.current.reloading
-              ? 0
-              : (store.state.buffered.at(-1)?.[1] ?? 0)),
+          bufferedRanges: readBufferedRanges(
+            latest.current.reloading ? [] : store.state.buffered,
+            latest.current.offsetStart,
+          ),
           ready: latest.current.ready,
           zoomed: latest.current.zoomed,
           error: store.state.error?.message ?? null,

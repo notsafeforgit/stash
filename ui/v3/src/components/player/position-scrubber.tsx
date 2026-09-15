@@ -2,6 +2,7 @@ import type React from "react";
 import { useRef, useState, type ReactNode } from "react";
 import { useMsg } from "@/hooks/message";
 import { cn } from "@/lib/utils";
+import type { PlaybackRange } from "@/core/marker-range";
 
 export interface ClipBoundsEdit {
   start: number | null;
@@ -15,7 +16,8 @@ export interface ClipBoundsEdit {
 export function PositionScrubber({
   value,
   duration,
-  bufferedEnd = 0,
+  bufferedRanges = [],
+  bufferedOffset = 0,
   disabled = false,
   direction = "right",
   markers,
@@ -26,7 +28,9 @@ export function PositionScrubber({
 }: {
   value: number;
   duration: number;
-  bufferedEnd?: number;
+  bufferedRanges?: readonly PlaybackRange[];
+  /** Translate buffered scene times into this segment's display coordinates. */
+  bufferedOffset?: number;
   disabled?: boolean;
   direction?: "right" | "down" | "up";
   markers?: ReactNode;
@@ -43,7 +47,6 @@ export function PositionScrubber({
   const clamp = (time: number) => Math.max(0, Math.min(duration, time));
   const displayTime = clamp(dragTime ?? value);
   const progress = duration > 0 ? displayTime / duration : 0;
-  const bufferedProgress = duration > 0 ? clamp(bufferedEnd) / duration : 0;
   const change = (time: number | null) => {
     setDragTime(time);
     onScrubChange?.(time);
@@ -155,11 +158,23 @@ export function PositionScrubber({
         data-position-scrubber-track
         className="relative h-1 w-full rounded-sm bg-white/25 transition-[height] group-hover/scrubber:h-1.5 group-focus-visible/scrubber:h-1.5 group-data-[dragging]/scrubber:h-1.5"
       >
-        <div
-          data-position-scrubber-buffer
-          className="absolute inset-y-0 left-0 rounded-sm bg-white/40"
-          style={{ width: `${bufferedProgress * 100}%` }}
-        />
+        {duration > 0 &&
+          bufferedRanges.map(({ start, end }) => {
+            const left = clamp(start + bufferedOffset);
+            const right = clamp(end + bufferedOffset);
+            if (right <= left) return null;
+            return (
+              <div
+                key={start}
+                data-position-scrubber-buffer
+                className="absolute inset-y-0 rounded-sm bg-white/40"
+                style={{
+                  left: `${(left / duration) * 100}%`,
+                  width: `${((right - left) / duration) * 100}%`,
+                }}
+              />
+            );
+          })}
         <div
           data-position-scrubber-progress
           className="absolute inset-y-0 left-0 rounded-sm bg-white"

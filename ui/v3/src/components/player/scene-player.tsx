@@ -732,14 +732,9 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     const s = storeRef.current;
     if (!s) return;
     s.pause();
-    // Pin the playhead exactly at `clipRange.end` so the timeline
-    // displays the marker as "finished". Use `s.seek` directly
-    // instead of `handleSeek` — `handleSeek`'s `runDirectSeek`
-    // captures `wasPlaying = !s.state.paused` and auto-resumes
-    // playback in `awaitSeekReady`, which would un-pause the video
-    // we just stopped (and `PlaybackRangeEffect.firedRef` would stay
-    // latched, so it wouldn't re-fire when playback then runs past
-    // the marker end into the playlist's leftover seconds).
+    // Pin the playhead exactly at `clipRange.end` so the timeline displays
+    // the marker as finished. This automatic stop does not need the visual
+    // feedback or source recovery used by user-initiated seeking.
     void s.seek(Math.max(0, clipRange.end - offsetStart));
   }, [clipRange, offsetStart]);
   const handleClipResume = useCallback(() => {

@@ -400,7 +400,7 @@ export function VideoFrameZoom({
     function isInteractive(target: EventTarget | null): boolean {
       if (!(target instanceof Element)) return false;
       const control = target.closest(
-        'button, a, [role="button"], [role="link"], input, select, textarea',
+        'button, a, [role="button"], [role="link"], [role="slider"], input, select, textarea, [data-tv-interactive]',
       );
       // The full-frame play surface is a native button for keyboard access,
       // but still belongs to the video's gesture area. Toolbar controls do not.

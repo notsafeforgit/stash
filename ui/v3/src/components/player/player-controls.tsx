@@ -10,7 +10,7 @@
  * `createPlayer(...)` call and passes its `CreatePlayerResult` down.
  */
 import type React from "react";
-import { useEffect, useCallback, useState, useRef } from "react";
+import { useEffect, useCallback, useState, useRef, useMemo } from "react";
 import {
   AirPlayButton,
   CastButton,
@@ -201,17 +201,21 @@ function PositionSlider({
         ? offsetStart
         : offsetStart + mediaCurrentTime,
   );
-  const bufferedEnd = Math.max(
-    0,
-    !reloading && mediaBuffered && mediaBuffered.length > 0
-      ? offsetStart + (mediaBuffered.at(-1)?.[1] ?? 0)
-      : offsetStart,
+  const bufferedRanges = useMemo(
+    () =>
+      reloading
+        ? []
+        : mediaBuffered.map(([start, end]) => ({
+            start: start + offsetStart,
+            end: end + offsetStart,
+          })),
+    [reloading, mediaBuffered, offsetStart],
   );
 
   return (
     <PositionScrubber
       value={trueTime}
-      bufferedEnd={bufferedEnd}
+      bufferedRanges={bufferedRanges}
       duration={fileDuration}
       disabled={!controlsVisible}
       markers={<PlayerMarkers markers={markers} duration={fileDuration} />}

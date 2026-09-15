@@ -127,7 +127,7 @@ func (qb *sceneMarkerFilterHandler) tagsCriterionHandler(criterion *models.Hiera
 				}
 			}
 
-			if len(criterion.Excludes) > 0 {
+			if len(tags.Excludes) > 0 {
 				valuesClause, err := getHierarchicalValues(ctx, tags.Excludes, tagTable, "tags_relations", "parent_id", "child_id", tags.Depth)
 				if err != nil {
 					f.setError(err)

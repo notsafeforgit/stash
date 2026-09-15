@@ -243,7 +243,7 @@ func TestMarkerQueryTags(t *testing.T) {
 				"excludes",
 				&models.SceneMarkerFilterType{
 					Tags: &models.HierarchicalMultiCriterionInput{
-						Modifier: models.CriterionModifierIncludes,
+						Modifier: models.CriterionModifierExcludes,
 						Value: []string{
 							strconv.Itoa(tagIDs[tagIdx2WithMarkers]),
 						},

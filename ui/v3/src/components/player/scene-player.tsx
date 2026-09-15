@@ -635,6 +635,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     sources,
     activeSource,
     finalSrc,
+    startPosition,
     offsetStart,
     initialResume,
     reloading,
@@ -882,6 +883,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   const mediaElement = (
     <SceneVideo
       src={finalSrc}
+      startPosition={startPosition}
       sourceType={activeSource?.type}
       autoPlay={effectiveAutoPlay}
       muted={initiallyMuted || undefined}

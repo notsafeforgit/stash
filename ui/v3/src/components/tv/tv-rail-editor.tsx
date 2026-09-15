@@ -17,10 +17,25 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowUp, ArrowDown, GripVertical, Trash2, Plus } from "lucide-react";
+import {
+  ArrowUp,
+  ArrowDown,
+  ChevronDown,
+  Folder,
+  GripVertical,
+  Pin,
+  PinOff,
+  Trash2,
+  Plus,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SettingText } from "@/components/settings/setting-row";
-import { Switch } from "@/components/ui/switch";
+import { Toggle } from "@/components/ui/toggle";
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from "@/components/ui/collapsible";
 import { Field, FieldLabel, FieldGroup } from "@/components/ui/field";
 import { TvSelect } from "./tv-select";
 import { TvTagPicker, TvTagsPicker } from "./tv-tag-picker";
@@ -221,7 +236,6 @@ function RailRow({
   const id = railEntryId(entry);
   const { setNodeRef, transform, transition, attributes, listeners } =
     useSortable({ id });
-  const [editing, setEditing] = useState(false);
   const essential =
     entry.type === "action" && entry.action.kind === "visibility";
   const update = (next: TvRailEntry) =>
@@ -235,89 +249,133 @@ function RailRow({
           tvActionLabels[entry.action.kind],
         );
   return (
-    <div
+    <Collapsible
       ref={setNodeRef}
+      data-tv-rail-entry={id}
       style={{
         transform: CSS.Transform.toString(transform),
         transition: transition,
       }}
-      className="flex flex-col gap-3 rounded-lg border p-3"
+      className="rounded-lg border p-2"
     >
-      <div className="flex flex-wrap items-center gap-1">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-lg"
-          aria-label={intl.formatMessage(
-            { id: "tv.rail.drag", defaultMessage: "Drag {label}" },
-            { label },
-          )}
-          {...attributes}
-          {...listeners}
-        >
-          <GripVertical />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          className="min-h-11 flex-1 justify-start"
-          onClick={() => setEditing(!editing)}
-        >
-          {label}
-          {entry.type === "folder" ? ` (${entry.actions.length})` : ""}
-        </Button>
-        <Switch
-          checked={entry.pinned}
-          aria-label={intl.formatMessage(
-            { id: "tv.rail.pin", defaultMessage: "Pin {label}" },
-            { label },
-          )}
-          onCheckedChange={(pinned) => update({ ...entry, pinned })}
-        />
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-lg"
-          disabled={index === 0}
-          aria-label={intl.formatMessage(
-            { id: "tv.rail.move_up", defaultMessage: "Move {label} up" },
-            { label },
-          )}
-          onClick={() => onChange(arrayMove(entries, index, index - 1))}
-        >
-          <ArrowUp />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-lg"
-          disabled={index === entries.length - 1}
-          aria-label={intl.formatMessage(
-            { id: "tv.rail.move_down", defaultMessage: "Move {label} down" },
-            { label },
-          )}
-          onClick={() => onChange(arrayMove(entries, index, index + 1))}
-        >
-          <ArrowDown />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-lg"
-          disabled={essential}
-          aria-label={intl.formatMessage(
-            { id: "tv.rail.remove", defaultMessage: "Remove {label}" },
-            { label },
-          )}
-          onClick={() =>
-            onChange(entries.filter((item) => railEntryId(item) !== id))
-          }
-        >
-          <Trash2 />
-        </Button>
+      <div className="grid gap-1 @xl:grid-cols-[minmax(0,1fr)_auto] @xl:items-center">
+        <div className="flex min-w-0 items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-lg"
+            className="size-11 touch-none text-muted-foreground"
+            aria-label={intl.formatMessage(
+              { id: "tv.rail.drag", defaultMessage: "Drag {label}" },
+              { label },
+            )}
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical />
+          </Button>
+          <CollapsibleTrigger
+            render={
+              <Button
+                type="button"
+                variant="ghost"
+                className="group/rail-trigger h-auto min-h-11 min-w-0 flex-1 justify-start gap-2 py-2 text-left whitespace-normal"
+              />
+            }
+          >
+            {entry.type === "folder" && <Folder data-icon="inline-start" />}
+            <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
+              <span className="block">{label}</span>
+              {entry.type === "folder" && (
+                <span className="block text-xs font-normal text-muted-foreground">
+                  <FormattedMessage
+                    id="tv.rail.folder_count"
+                    defaultMessage="Folder · {count, plural, one {# action} other {# actions}}"
+                    values={{ count: entry.actions.length }}
+                  />
+                </span>
+              )}
+            </span>
+            <ChevronDown
+              data-icon="inline-end"
+              className="text-muted-foreground transition-transform group-data-panel-open/rail-trigger:rotate-180"
+            />
+          </CollapsibleTrigger>
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <Toggle
+            type="button"
+            variant="outline"
+            className="h-11 min-w-24 shrink-0 px-3 text-muted-foreground data-pressed:border-primary/40 data-pressed:bg-primary/10 data-pressed:text-primary"
+            pressed={entry.pinned}
+            aria-label={intl.formatMessage(
+              { id: "tv.rail.pin", defaultMessage: "Pin {label}" },
+              { label },
+            )}
+            onPressedChange={(pinned) => update({ ...entry, pinned })}
+          >
+            {entry.pinned ? (
+              <Pin data-icon="inline-start" fill="currentColor" />
+            ) : (
+              <PinOff data-icon="inline-start" />
+            )}
+            {entry.pinned
+              ? msg("tv.rail.pinned", "Pinned")
+              : msg("tv.rail.pin_action", "Pin")}
+          </Toggle>
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-lg"
+              className="size-11"
+              disabled={index === 0}
+              aria-label={intl.formatMessage(
+                { id: "tv.rail.move_up", defaultMessage: "Move {label} up" },
+                { label },
+              )}
+              onClick={() => onChange(arrayMove(entries, index, index - 1))}
+            >
+              <ArrowUp />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-lg"
+              className="size-11"
+              disabled={index === entries.length - 1}
+              aria-label={intl.formatMessage(
+                {
+                  id: "tv.rail.move_down",
+                  defaultMessage: "Move {label} down",
+                },
+                { label },
+              )}
+              onClick={() => onChange(arrayMove(entries, index, index + 1))}
+            >
+              <ArrowDown />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-lg"
+              className="size-11"
+              disabled={essential}
+              aria-label={intl.formatMessage(
+                { id: "tv.rail.remove", defaultMessage: "Remove {label}" },
+                { label },
+              )}
+              onClick={() =>
+                onChange(entries.filter((item) => railEntryId(item) !== id))
+              }
+            >
+              <Trash2 />
+            </Button>
+          </div>
+        </div>
       </div>
-      {editing &&
-        (entry.type === "action" ? (
+      <CollapsibleContent className="flex flex-col gap-3 px-1 pt-3">
+        {entry.type === "action" ? (
           <>
             <ActionFields
               action={entry.action}
@@ -491,8 +549,9 @@ function RailRow({
               </div>
             ))}
           </FieldGroup>
-        ))}
-    </div>
+        )}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -525,11 +584,11 @@ export default function TvRailEditor({
       !present.has(action),
   );
   return (
-    <div className="flex flex-col gap-4">
+    <div className="@container flex flex-col gap-4">
       <p className="text-muted-foreground">
         <FormattedMessage
-          id="tv.text.drag_to_reorder_or_use_the_move_buttons_pinned_actions"
-          defaultMessage="Drag to reorder, or use the move buttons. Pinned actions stay visible. TV settings is an optional link and can go in a folder."
+          id="tv.rail.instructions"
+          defaultMessage="Drag to reorder, or use the arrows. Select a name to edit. Pin actions or folders to the bottom bar."
         />
       </p>
       <DndContext

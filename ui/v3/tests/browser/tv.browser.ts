@@ -341,8 +341,8 @@ for (const viewport of [
         page.getByRole("button", { name: "Remove TV settings", exact: true }),
       ).toBeEnabled();
       await page
-        .getByRole("switch", { name: "Pin TV settings", exact: true })
-        .check();
+        .getByRole("button", { name: "Pin TV settings", exact: true })
+        .click();
       await returnToTv();
       await expect(
         page
@@ -373,7 +373,9 @@ for (const viewport of [
       await expect(page).toHaveURL(/\/tv-fixture\/settings\/tv/);
       await expect(page.getByRole("dialog")).toHaveCount(0);
 
-      await page.getByRole("button", { name: /^Playback \(\d+\)$/ }).click();
+      await page
+        .getByRole("button", { name: /^Playback Folder · \d+ actions$/ })
+        .click();
       const settingsRow = page
         .locator("p")
         .filter({ hasText: /^TV settings$/ })
@@ -1155,6 +1157,124 @@ test("TV settings save the shared quality under only the TV key", async ({
   ).toContainText("480p");
 });
 
+for (const width of [320, 390, 1280]) {
+  test.describe(`TV rail editor at ${width}px`, () => {
+    test.use({
+      viewport: { width, height: 844 },
+      isMobile: width < 600,
+      hasTouch: width < 600,
+    });
+
+    test("explains folders and pinning and keeps long labels clear of the controls", async ({
+      page,
+    }, testInfo) => {
+      await page.goto("/tv-fixture/settings/tv?paused");
+      const folder = page.getByRole("button", {
+        name: "Edit Folder · 5 actions",
+        exact: true,
+      });
+      await expect(folder).toHaveAttribute("aria-expanded", "false");
+      await expect(
+        page.getByRole("button", {
+          name: "Playback Folder · 9 actions",
+          exact: true,
+        }),
+      ).toBeVisible();
+      await folder.click();
+      await expect(folder).toHaveAttribute("aria-expanded", "true");
+      await expect(
+        page.getByRole("textbox", { name: "Folder name" }),
+      ).toHaveValue("Edit");
+      await folder.click();
+      await expect(folder).toHaveAttribute("aria-expanded", "false");
+
+      const pin = page.getByRole("button", { name: "Pin Edit", exact: true });
+      await expect(pin).toHaveAttribute("aria-pressed", "false");
+      await expect(pin).toHaveText("Pin");
+      await pin.click();
+      await expect(pin).toHaveAttribute("aria-pressed", "true");
+      await expect(pin).toHaveText("Pinned");
+      await expect(folder).toHaveAttribute("aria-expanded", "false");
+      await expectSavedSettings(page, {
+        rail: expect.arrayContaining([
+          expect.objectContaining({ id: "edit", pinned: true }),
+        ]),
+      });
+      await pin.click();
+      await expect(pin).toHaveAttribute("aria-pressed", "false");
+      await expectSavedSettings(page, {
+        rail: expect.arrayContaining([
+          expect.objectContaining({ id: "edit", pinned: false }),
+        ]),
+      });
+
+      await page
+        .getByText("Action rail", { exact: true })
+        .scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: testInfo.outputPath("tv-rail-editor.png"),
+      });
+
+      const longLabel = "W".repeat(60);
+      await page
+        .getByRole("button", { name: "Information", exact: true })
+        .click();
+      await page
+        .getByRole("textbox", { name: "Button label", exact: true })
+        .fill(longLabel);
+      await page
+        .getByRole("textbox", { name: "Button label", exact: true })
+        .press("Tab");
+      await page.getByRole("button", { name: longLabel, exact: true }).click();
+      await expectSavedSettings(page, {
+        rail: expect.arrayContaining([
+          expect.objectContaining({
+            action: expect.objectContaining({ id: "info", label: longLabel }),
+          }),
+        ]),
+      });
+
+      const rows = page.locator("[data-tv-rail-entry]");
+      for (const row of await rows.all()) {
+        const bounds = await row.boundingBox();
+        if (!bounds) throw new Error("Missing rail entry bounds");
+        expect(bounds.x).toBeGreaterThanOrEqual(0);
+        expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
+        const controls = row.getByRole("button");
+        for (const control of await controls.all()) {
+          const box = await control.boundingBox();
+          if (!box) throw new Error("Missing rail control bounds");
+          expect(box.width).toBeGreaterThanOrEqual(44);
+          expect(box.height).toBeGreaterThanOrEqual(44);
+          expect(box.x).toBeGreaterThanOrEqual(bounds.x);
+          expect(box.x + box.width).toBeLessThanOrEqual(
+            bounds.x + bounds.width,
+          );
+          expect(
+            await control.evaluate(
+              (element) => element.scrollWidth <= element.clientWidth,
+            ),
+          ).toBe(true);
+        }
+        const management = await row
+          .getByRole("button", { name: /^(Pin |Move .* (up|down)$|Remove )/ })
+          .all();
+        const boxes = await Promise.all(
+          management.map((control) => control.boundingBox()),
+        );
+        expect(boxes).toHaveLength(4);
+        for (const box of boxes) {
+          expect(box?.y).toBe(boxes[0]?.y);
+        }
+      }
+      await rows.nth(1).scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: testInfo.outputPath("tv-rail-long-label.png"),
+      });
+    });
+  });
+}
+
 test("failed TV settings saves retain the draft for retry", async ({
   page,
 }) => {
@@ -1220,7 +1340,9 @@ test("TV settings commit numbers and rail text without a Save or Reset toolbar",
   await expect(duration).toBeFocused();
   await expect(page.getByLabel("Saved", { exact: true })).toBeVisible();
 
-  await page.getByRole("button", { name: /^Playback \(\d+\)$/ }).click();
+  await page
+    .getByRole("button", { name: /^Playback Folder · \d+ actions$/ })
+    .click();
   const name = page.getByRole("textbox", { name: "Folder name", exact: true });
   const before = await page.evaluate(() => window.tvFixtureSaveAttempts.length);
   await name.fill("");

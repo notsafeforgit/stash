@@ -145,7 +145,6 @@ const settings: TvSettings = {
     return [entry];
   }),
   mode,
-  pageSize: 5,
   autoplay: !params.has("paused"),
   startMuted: !params.has("unmuted"),
   start: start.success ? start.data : defaultTvSettings.start,
@@ -453,7 +452,6 @@ const query: TvFeedQuery = {
   filter: { sort: "title", direction: GQL.SortDirectionEnum.Asc },
   pageSize: 5,
   prefetch: 2,
-  itemLimit: null,
 };
 function FixtureTvPage() {
   const { result } = useTvSettings();

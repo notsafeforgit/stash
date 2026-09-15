@@ -1350,50 +1350,6 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
   {
     to: "/settings/tv",
     section: {
-      id: "tv.settings.feed",
-      defaultMessage: "Feed",
-    },
-    label: {
-      id: "tv.settings.page_size",
-      defaultMessage: "Items per page",
-    },
-  },
-  {
-    to: "/settings/tv",
-    section: {
-      id: "tv.settings.feed",
-      defaultMessage: "Feed",
-    },
-    label: {
-      id: "tv.settings.prefetch",
-      defaultMessage: "Load the next page with this many items remaining",
-    },
-  },
-  {
-    to: "/settings/tv",
-    section: {
-      id: "tv.settings.feed",
-      defaultMessage: "Feed",
-    },
-    label: {
-      id: "tv.settings.limit_enabled",
-      defaultMessage: "Limit items per session",
-    },
-  },
-  {
-    to: "/settings/tv",
-    section: {
-      id: "tv.settings.feed",
-      defaultMessage: "Feed",
-    },
-    label: {
-      id: "tv.settings.limit",
-      defaultMessage: "Item limit",
-    },
-  },
-  {
-    to: "/settings/tv",
-    section: {
       id: "tv.settings.playback",
       defaultMessage: "Playback",
     },

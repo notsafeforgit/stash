@@ -229,16 +229,21 @@ describe("TV settings validation", () => {
     });
   });
 
-  it("keeps explicitly added settings shortcuts after saving the current format", () => {
+  it.each([
+    4, 5,
+  ])("keeps explicitly added settings shortcuts from version %i", (version) => {
     const settings = {
       ...defaultTvSettings,
       rail: [legacySettingsEntry, ...defaultTvRail],
     };
-    expect(decodeTvSettings(settings)).toEqual({ kind: "ready", settings });
+    expect(decodeTvSettings({ ...settings, version })).toEqual({
+      kind: "ready",
+      settings,
+    });
   });
 
   it.each([
-    1, 2, 3,
+    1, 2, 3, 4,
   ])("adds the startup mute default to version %i without resetting preferences", (version) => {
     const previous = {
       ...defaultTvSettings,
@@ -314,12 +319,39 @@ describe("TV settings validation", () => {
     }
   });
 
+  it.each([
+    1, 2, 3, 4,
+  ])("retires paging and session caps from version %i without resetting preferences", (version) => {
+    const settings = {
+      ...defaultTvSettings,
+      sceneFilter: { kind: "saved", id: "12" },
+      markerFilter: { kind: "saved", id: "34" },
+      startMuted: false,
+      autoplay: false,
+      sort: "random",
+    };
+    expect(
+      decodeTvSettings({
+        ...settings,
+        version,
+        shuffle: false,
+        pageSize: 5,
+        prefetch: 5,
+        itemLimit: 1,
+      }),
+    ).toEqual({ kind: "ready", settings });
+  });
+
   it("retains invalid and future envelopes without silently resetting them", () => {
     expect(decodeTvSettings(undefined)).toEqual({
       kind: "ready",
       settings: defaultTvSettings,
     });
-    const future = { version: 5, unknownSetting: "retain me" };
+    const future = {
+      ...defaultTvSettings,
+      version: 6,
+      unknownSetting: "retain me",
+    };
     expect(decodeTvSettings(future)).toMatchObject({
       kind: "invalid",
       raw: future,
@@ -393,17 +425,22 @@ describe("bounded TV pages", () => {
       [item("1"), item("2"), item("3")],
       10,
       3,
-      null,
     );
     expect(next.items.map((item) => item.id)).toEqual(["1", "3"]);
     expect(next.selected).toBe(0);
     expect(next.nextPage).toBe(3);
     expect(next.exhausted).toBe(false);
   });
-  it("enforces the item limit and terminates on short pages", () => {
+  it("admits the full batch and stops only at the end of the matching feed", () => {
     expect(
-      appendTvPage(initial, [item("3"), item("4"), item("5")], 20, 3, 2),
-    ).toMatchObject({ items: [item("1"), item("3")], exhausted: true });
-    expect(appendTvPage(initial, [], 20, 3, null).exhausted).toBe(true);
+      appendTvPage(initial, [item("3"), item("4"), item("5")], 20, 3),
+    ).toMatchObject({
+      items: [item("1"), item("3"), item("4"), item("5")],
+      exhausted: false,
+    });
+    expect(appendTvPage(initial, [], 20, 3).exhausted).toBe(true);
+    expect(
+      appendTvPage(initial, [item("3"), item("4"), item("5")], 6, 3).exhausted,
+    ).toBe(true);
   });
 });

@@ -199,7 +199,7 @@ Requirement IDs remain stable; removed IDs are not reused.
 | TV-22 | Shared activity accounting | Scene detail, online scene lightbox and TV use one automatic tracking implementation with one owner per playback session; respect global tracking/minimum-play settings, save actual watched duration/resume and eligible play counts, and exclude preloads, marker clips and offline playback from server activity |
 | TV-23 | Keyboard controls | Preserve the documented navigation/player shortcuts, including holds, rotation, focus ownership, blur and visibility cleanup |
 | TV-24 | Help and feedback | A discoverable guide explains touch/mouse gestures and keyboard shortcuts; loading, empty, exhausted, missing-media, request-error and retry states are explicit |
-| TV-25 | Feed limits and performance | Optional item limit and bounded page/prefetch controls work; one active player and three slots bound media/DOM costs; preserve current reveal, cache-return, lazy-mount and deferred-canvas contracts; activity/progress updates do not rerender the whole feed |
+| TV-25 | Continuous feed and performance | Feed loading is automatic with internal bounded metadata batches and no user-facing paging controls or session item cap; one active player and three slots bound media/DOM costs; preserve current reveal, cache-return, lazy-mount and deferred-canvas contracts; activity/progress updates do not rerender the whole feed |
 | TV-26 | Removed: additional feed rules | Use the existing saved-filter editor and select one saved/default filter per feed; no separate TV rule system |
 | TV-27 | Shared default quality | One persisted TV default applies before loading every scene and marker range; lower resolutions use normal v3 streams; available-quality fallback and temporary per-item overrides follow section 9 |
 
@@ -498,10 +498,11 @@ settings such as quality, volume or fit mode do not reset the queue.
 - Use independent typed page requests. Do not add a global `findScenes`/
   `findSceneMarkers` cache merge policy. Advance the next page only after that
   request succeeds, independently of rendered item count or item deletions.
-- Use a constant page size within a generation; start with 20 and prefetch when
-  two admitted items remain. An advanced change to page size starts a new
-  generation. Never fetch page 1 with 20 and page 2 with 5 under page-based
-  offsets. Deduplicate results by kind plus ID.
+- Keep request sizing internal: fetch 20 metadata entries at a time and start
+  the next request when two admitted items remain. These are implementation
+  constants, not saved preferences or settings controls. Keep the size constant
+  within a generation because the API uses page-based offsets. Deduplicate
+  results by kind plus ID.
 - Allow one next-page request per generation. Tag every page/detail request,
   completion and retry with generation/selection identity. Abort where the
   existing link supports it, and independently reject stale completions.
@@ -511,8 +512,8 @@ settings such as quality, volume or fit mode do not reset the queue.
   posters. Keep full-detail retention bounded; do not keep copies of full scenes
   in every queue entry. Lightweight history may grow with admitted items;
   distinguish that from constant player/decoder resource usage.
-- End-of-feed is based on consumed server pages/count and the requested item
-  limit, not the number of valid/unique items left after transformation. An
+- End-of-feed is based on consumed server pages/count, not a session cap or
+  the number of valid/unique items left after transformation. An
   all-invalid page must not cause either false exhaustion or an unbounded
   automatic request loop. Bound each automatic refill burst and provide an
   explicit continue/retry state if more scanning is needed.
@@ -919,7 +920,7 @@ competing global player storage writers. Active volume/rate live in the one
 player store; persisted TV defaults initialize it and deliberate user changes
 update the settings adapter. They do not repeatedly overwrite it on rerenders.
 
-Validate finite volume/rate values, positive page/limit/window values,
+Validate finite volume/rate values, positive playback-window values,
 ordered duration limits, IDs and action layouts. Hydration completes before
 saving defaults. An invalid configuration shows a usable recovery/reset path
 without automatically overwriting the original. Settings use TanStack Form
@@ -932,8 +933,8 @@ Initial defaults: scenes using the configured default filter; saved sort order
 scene-end completion with automatic advance;
 TV autoplay enabled but still subject to the app's global autostart preference
 and browser permission; Best available quality for both feeds; fit/contain;
-normal orientation; right rail; UI visible; page size 20; two-item prefetch
-threshold; no item limit. Start muted is enabled by default and configurable in
+normal orientation; right rail; UI visible; continuous automatic feed loading
+without a session item cap. Start muted is enabled by default and configurable in
 Settings → TV. Apply it when entering TV, subject to browser autoplay permission;
 retain the viewer's audio choices between items. Resolve the initial rate from
 shared preferences, otherwise use 1x. Respect the

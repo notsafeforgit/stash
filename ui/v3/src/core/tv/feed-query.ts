@@ -8,6 +8,11 @@ import {
 import type { TvFilterChoice, TvMode, TvSettings } from "./settings";
 import type { FilterASTNode } from "@/models/list-filter/filter-ast";
 
+// Internal metadata-fetch policy. Keep request size stable for the feed's
+// lifetime because the server uses page-based offsets. Media is never preloaded.
+const PAGE_SIZE = 20;
+const PREFETCH_REMAINING = 2;
+
 export interface TvFeedQuery {
   seed: number;
   mode: TvMode;
@@ -15,7 +20,6 @@ export interface TvFeedQuery {
   ast?: GQL.FilterAstInput;
   pageSize: number;
   prefetch: number;
-  itemLimit: number | null;
 }
 export const tvFilterMode = (mode: TvMode) =>
   mode === "scenes" ? GQL.FilterMode.Scenes : GQL.FilterMode.SceneMarkers;
@@ -131,7 +135,7 @@ export async function resolveTvQuery(
         : GQL.SortDirectionEnum.Desc;
   }
   model.randomSeed = seed;
-  model.itemsPerPage = settings.pageSize;
+  model.itemsPerPage = PAGE_SIZE;
   const roots: GQL.FilterAstNodeInput[] = [];
   const base = model.makeFilterAST();
   if (base) roots.push(base.root);
@@ -162,9 +166,8 @@ export async function resolveTvQuery(
           },
         }
       : undefined,
-    pageSize: settings.pageSize,
-    prefetch: settings.prefetch,
-    itemLimit: settings.itemLimit,
+    pageSize: PAGE_SIZE,
+    prefetch: PREFETCH_REMAINING,
   };
 }
 
@@ -175,6 +178,5 @@ export function tvQueryIdentity(query: TvFeedQuery): string {
     query.filter,
     query.ast,
     query.pageSize,
-    query.itemLimit,
   ]);
 }

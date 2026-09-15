@@ -184,37 +184,6 @@ function TvSettingsForm({ initial }: { initial: TvSettings }) {
             if (parsed.success) set("orientation", parsed.data);
           }}
         />
-        <SettingNumber
-          label={msg("tv.settings.page_size", "Items per page")}
-          value={values.pageSize}
-          min={5}
-          max={50}
-          onChange={(value) => set("pageSize", value)}
-        />
-        <SettingNumber
-          label={msg(
-            "tv.settings.prefetch",
-            "Load the next page with this many items remaining",
-          )}
-          value={values.prefetch}
-          min={1}
-          max={5}
-          onChange={(value) => set("prefetch", value)}
-        />
-        <SettingSwitch
-          label={msg("tv.settings.limit_enabled", "Limit items per session")}
-          checked={values.itemLimit !== null}
-          onChange={(value) => set("itemLimit", value ? 100 : null)}
-        />
-        {values.itemLimit !== null && (
-          <SettingNumber
-            label={msg("tv.settings.limit", "Item limit")}
-            value={values.itemLimit}
-            min={1}
-            max={100000}
-            onChange={(value) => set("itemLimit", value)}
-          />
-        )}
       </SettingsSection>
       <SettingsSection title={msg("tv.settings.playback", "Playback")}>
         <SettingSwitch

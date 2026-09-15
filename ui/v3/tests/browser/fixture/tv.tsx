@@ -111,6 +111,9 @@ const scenes: GQL.SceneDataFragment[] = Array.from(
       ...scene,
       scene_markers: scene.scene_markers.map((marker, markerIndex) => ({
         ...marker,
+        ...(params.has("long-marker") && markerIndex === 0
+          ? { seconds: 2, end_seconds: 10 }
+          : {}),
         id: String((index + 1) * 10 + markerIndex),
         scene,
       })),

@@ -12,8 +12,12 @@ Choose a scene or marker feed, an app default, saved filter, or all items.
 Saved search, criteria groups and sort retain the library's filter semantics.
 Build include/exclude combinations in the app's saved-filter editor and select
 that filter in TV. Choose **Random** in **Sort order** for a seeded order
-that stays stable across pages. Matching orientation
+that stays stable as you keep scrolling. Matching orientation
 uses the viewing surface, including forced rotation, and includes square videos.
+
+The feed loads more items automatically as you scroll, until the matching
+library is exhausted. Request sizing and loading thresholds are internal;
+there are no paging controls or item caps for a viewing session.
 
 Swipe vertically, use a wheel gesture, or press Up/Down to change videos.
 Tap the video to play or pause, hold it for temporary 2× playback, and use the
@@ -111,8 +115,10 @@ The shared save indicator reports progress. Failed saves retain the draft and
 offer Retry; incomplete presets remain editable until valid. Invalid/future settings remain
 recoverable until an explicit reset. The main settings search includes TV rows.
 
-Settings version 4 removes the formerly required, unchanged default settings
-button from older rails while preserving customized settings shortcuts. It uses
+Settings version 5 removes the old page-size, loading-threshold and session-limit
+preferences while retaining other settings. Version 4 removed the formerly
+required, unchanged default settings button from older rails; customized shortcuts
+and those deliberately added since version 4 remain intact. TV uses
 the chosen saved/default filter without additional feed rules. Earlier settings
 retain their selected filters and playback preferences;
 retired rules are removed. Version 1 settings with Shuffle enabled load as Random;

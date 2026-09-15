@@ -28,16 +28,13 @@ export const tvWindowSchema = z.discriminatedUnion("kind", [
     ),
 ]);
 export const tvSettingsSchema = z.object({
-  version: z.literal(4),
+  version: z.literal(5),
   mode: tvModeSchema,
   sceneFilter: tvFilterSchema,
   markerFilter: tvFilterSchema,
   orientation: z.enum(["all", "match", "portrait", "landscape"]),
   sort: z.string().max(60).nullable(),
   direction: z.enum(["ASC", "DESC"]),
-  pageSize: z.number().int().min(5).max(50),
-  prefetch: z.number().int().min(1).max(5),
-  itemLimit: z.number().int().positive().max(100000).nullable(),
   autoplay: z.boolean(),
   // Additive preference: existing saved settings retain their muted startup.
   startMuted: z.boolean().default(true),
@@ -52,14 +49,14 @@ export const tvSettingsSchema = z.object({
 });
 export type TvSettings = z.infer<typeof tvSettingsSchema>;
 
-// Older versions carried additional feed rules; Zod strips that retired field.
+// Zod strips retired feed rules, paging preferences and session limits.
 // Version 1 also had a shuffle override. Preserve its effective sort choice.
 const persistedTvSettingsSchema = z.union([
   tvSettingsSchema,
   z
     .union([
       tvSettingsSchema.extend({
-        version: z.union([z.literal(2), z.literal(3)]),
+        version: z.union([z.literal(2), z.literal(3), z.literal(4)]),
       }),
       tvSettingsSchema
         .extend({ version: z.literal(1), shuffle: z.boolean() })
@@ -71,35 +68,35 @@ const persistedTvSettingsSchema = z.union([
     .transform(
       (settings): TvSettings => ({
         ...settings,
-        version: 4,
+        version: 5,
         // Retire the formerly required default gear once. Preserve customized
         // shortcuts, and allow new version-4 settings actions in any position.
-        rail: settings.rail.filter(
-          (entry) =>
-            !(
-              entry.type === "action" &&
-              entry.pinned &&
-              entry.action.kind === "settings" &&
-              entry.action.id === "settings" &&
-              entry.action.icon === "default" &&
-              entry.action.label === ""
-            ),
-        ),
+        rail:
+          settings.version === 4
+            ? settings.rail
+            : settings.rail.filter(
+                (entry) =>
+                  !(
+                    entry.type === "action" &&
+                    entry.pinned &&
+                    entry.action.kind === "settings" &&
+                    entry.action.id === "settings" &&
+                    entry.action.icon === "default" &&
+                    entry.action.label === ""
+                  ),
+              ),
       }),
     ),
 ]);
 
 export const defaultTvSettings: TvSettings = {
-  version: 4,
+  version: 5,
   mode: "scenes",
   sceneFilter: { kind: "default" },
   markerFilter: { kind: "default" },
   orientation: "all",
   sort: null,
   direction: "ASC",
-  pageSize: 20,
-  prefetch: 2,
-  itemLimit: null,
   autoplay: true,
   startMuted: true,
   start: "resume",

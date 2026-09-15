@@ -11,7 +11,6 @@ const query: TvFeedQuery = {
   filter: { sort: "title" },
   pageSize: 5,
   prefetch: 2,
-  itemLimit: null,
 };
 const scene = (id: number): GQL.TvSceneSummaryFragment => ({
   __typename: "Scene",

@@ -1015,7 +1015,7 @@ test("TV has one localized sort choice and retains Random between feed modes", a
   ).toBeVisible();
   await page.getByRole("option", { name: "Random", exact: true }).click();
   await expectSavedSettings(page, {
-    version: 4,
+    version: 5,
     sort: "random",
     mode: "markers",
   });
@@ -1098,7 +1098,7 @@ test("TV settings show the rail editor directly and save reordered actions witho
       variables: {
         key: "tv",
         value: {
-          version: 4,
+          version: 5,
           sceneFilter: { kind: "saved", id: "1" },
           markerFilter: { kind: "saved", id: "2" },
           rail: [
@@ -1203,21 +1203,21 @@ test("failed TV settings saves retain the draft for retry", async ({
 test("TV settings commit numbers and rail text without a Save or Reset toolbar", async ({
   page,
 }) => {
-  await page.goto("/tv-fixture/settings/tv?paused");
+  await page.goto("/tv-fixture/settings/tv?paused&window=fixed");
   await expect(
     page.getByRole("button", {
       name: /^(Save TV settings|Reset TV settings)$/,
     }),
   ).toHaveCount(0);
-  const pageSize = page.getByRole("spinbutton", {
-    name: "Items per page",
+  const duration = page.getByRole("spinbutton", {
+    name: "Length in seconds",
     exact: true,
   });
-  await pageSize.fill("12");
+  await duration.fill("12");
   expect(await page.evaluate(() => window.tvFixtureSaveAttempts)).toEqual([]);
-  await pageSize.press("Enter");
-  await expectSavedSettings(page, { pageSize: 12 });
-  await expect(pageSize).toBeFocused();
+  await duration.press("Enter");
+  await expectSavedSettings(page, { window: { kind: "fixed", seconds: 12 } });
+  await expect(duration).toBeFocused();
   await expect(page.getByLabel("Saved", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: /^Playback \(\d+\)$/ }).click();
@@ -1237,7 +1237,7 @@ test("TV settings commit numbers and rail text without a Save or Reset toolbar",
   );
   await name.press("Tab");
   await expectSavedSettings(page, {
-    pageSize: 12,
+    window: { kind: "fixed", seconds: 12 },
     rail: expect.arrayContaining([
       expect.objectContaining({ id: "playback", label: "Viewing" }),
     ]),

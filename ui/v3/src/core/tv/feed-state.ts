@@ -33,7 +33,6 @@ export function appendTvPage(
   incoming: readonly TvFeedItem[],
   total: number,
   pageSize: number,
-  limit: number | null,
 ): TvFeedSnapshot {
   const known = new Set([
     ...state.items.map((item) => item.key),
@@ -41,7 +40,7 @@ export function appendTvPage(
   ]);
   const items = [...state.items];
   for (const item of incoming) {
-    if (!known.has(item.key) && (limit === null || items.length < limit)) {
+    if (!known.has(item.key)) {
       known.add(item.key);
       items.push(item);
     }
@@ -53,10 +52,7 @@ export function appendTvPage(
     total,
     status: "ready",
     error: undefined,
-    exhausted:
-      incoming.length < pageSize ||
-      state.nextPage * pageSize >= total ||
-      (limit !== null && items.length >= limit),
+    exhausted: incoming.length < pageSize || state.nextPage * pageSize >= total,
   };
 }
 
@@ -182,13 +178,7 @@ export class TvFeedController {
           total = page.count;
         }
         if (!this.active || generation !== this.generation) return;
-        let next = appendTvPage(
-          this.state,
-          items,
-          total,
-          this.query.pageSize,
-          this.query.itemLimit,
-        );
+        let next = appendTvPage(this.state, items, total, this.query.pageSize);
         if (this.requestedKey) {
           const selected = next.items.findIndex(
             (item) => item.key === this.requestedKey,

@@ -50,6 +50,7 @@ async function watchCounterLayout(page: Page) {
       popupShift: 0,
       popupReplaced: false,
       addOpacity: 1,
+      feedLoadingFrames: 0,
     };
     const delta = (before: DOMRect, after: DOMRect) =>
       Math.max(
@@ -59,6 +60,7 @@ async function watchCounterLayout(page: Page) {
       );
     let frameId: number;
     const frame = () => {
+      if (dock.querySelector('[role="status"]')) observed.feedLoadingFrames++;
       observed.dockShift = Math.max(
         observed.dockShift,
         delta(dockBox, dock.getBoundingClientRect()),
@@ -179,7 +181,6 @@ for (const device of ["mobile", "desktop"] as const) {
         await add.dispatchEvent("click");
         await expect(popup).toContainText("10,000");
         const feedLoading = page.locator("[data-tv-dock]").getByRole("status");
-        await expect(feedLoading).toBeVisible();
         await expect(feedLoading).toBeHidden();
         if (placement !== "folder") {
           await expect(badge).toHaveText("9999+");
@@ -224,6 +225,9 @@ for (const device of ["mobile", "desktop"] as const) {
         const observed = await layout.evaluate((observer) => observer.stop());
         await layout.dispose();
         expect(observed.frames).toBeGreaterThan(0);
+        // The count assertion can finish polling after loading has disappeared.
+        // Observe the transient state in the browser, alongside its bounds.
+        expect(observed.feedLoadingFrames).toBeGreaterThan(0);
         expect(observed.dockShift, "dock moves during a save").toBeLessThan(1);
         expect(
           observed.popupShift,

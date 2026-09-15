@@ -68,7 +68,11 @@ export function useTvInputs({
     undefined,
   );
   const tapTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const completedTap = useRef<{ touch: boolean; key: string } | null>(null);
+  const completedTap = useRef<{
+    touch: boolean;
+    key: string;
+    wasPaused: boolean;
+  } | null>(null);
   const cancelTap = useCallback(() => {
     clearTimeout(tapTimer.current);
     completedTap.current = null;
@@ -130,23 +134,26 @@ export function useTvInputs({
       cancelTap();
       if (latest.current.blocked || overlaysBlocked()) return;
       // Keyboard and assistive activation have no pointer sequence.
-      if (event.detail === 0) {
-        controls.togglePaused();
+      if (!candidate) {
+        if (event.detail === 0) controls.togglePaused();
         return;
       }
-      if (!candidate) return;
-      const toggle = () => {
+      const commit = () => {
         if (
           !latest.current.blocked &&
           !overlaysBlocked() &&
           candidate.key === latest.current.selectionKey
-        )
-          controls.togglePaused();
+        ) {
+          // Preserve the intent from touch-down. A marker can finish while
+          // we wait for a second tap; pausing must never turn into replay.
+          if (candidate.wasPaused) controls.play();
+          else controls.pause();
+        }
       };
       // Let the shared zoom recognizer claim a second touch before playing.
       if (candidate.touch)
-        tapTimer.current = setTimeout(toggle, DOUBLE_TAP_MAX_MS);
-      else toggle();
+        tapTimer.current = setTimeout(commit, DOUBLE_TAP_MAX_MS);
+      else commit();
     },
     [cancelTap, controls, overlaysBlocked],
   );
@@ -178,6 +185,7 @@ export function useTvInputs({
           moved: boolean;
           touch: boolean;
           key: string;
+          wasPaused: boolean;
         }
       | undefined;
     const pointers = new Set<number>();
@@ -209,6 +217,7 @@ export function useTvInputs({
         moved: false,
         touch: event.pointerType === "touch",
         key: latest.current.selectionKey,
+        wasPaused: controls.read().paused,
       };
       startHold(1, 500);
     };
@@ -233,7 +242,10 @@ export function useTvInputs({
         return;
       cancelTap();
       endHold();
-      if (controls.read().zoomed) return;
+      if (controls.read().zoomed) {
+        pointer = undefined;
+        return;
+      }
       if (!pointer.moved && Math.abs(delta.x) > Math.abs(delta.y)) {
         pointer = undefined;
         return;
@@ -272,7 +284,11 @@ export function useTvInputs({
           });
         else latest.current.cancelDrag();
       } else {
-        completedTap.current = { touch: current.touch, key: current.key };
+        completedTap.current = {
+          touch: current.touch,
+          key: current.key,
+          wasPaused: current.wasPaused,
+        };
       }
     };
     const wheel = (event: WheelEvent) => {

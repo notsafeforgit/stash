@@ -745,6 +745,12 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   const handleClipResume = useCallback(() => {
     stoppedAtEndRef.current = false;
   }, []);
+  const handlePause = useCallback(() => {
+    // Explicit pause commands own playback just like the play/pause toggle.
+    // The animation autoplay gate must not resume a deferred TV pause.
+    userPlaybackIntentRef.current = true;
+    storeRef.current?.pause();
+  }, []);
   const handleTogglePaused = useCallback(() => {
     const s = storeRef.current;
     if (!s) return;
@@ -1084,6 +1090,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
               sources={sources}
               activeSource={activeSource}
               seek={handleSeek}
+              pause={handlePause}
               togglePaused={handleTogglePaused}
               selectSource={handleSourceChange}
               resetZoom={() => setZoomTransform(IDENTITY_TRANSFORM)}

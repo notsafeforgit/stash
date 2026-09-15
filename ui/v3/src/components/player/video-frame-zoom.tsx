@@ -356,7 +356,7 @@ export function VideoFrameZoom({
     const touchPan = newPanTracker();
     const mousePan = newPanTracker();
     // Set when `touchend` resets a previously-active touch pan to idle —
-    // the synthesized `pointerup` fires right after, but by then the
+    // if the engine delivers `pointerup` afterwards, by then the
     // state-machine check below reads "idle" and would let vjs's
     // container `pointerup` listener run `setActive` (the controls
     // feature's catch-all branch for non-tap pointerups), surfacing
@@ -639,9 +639,12 @@ export function VideoFrameZoom({
 
     // ── Pointer (mouse pan + touch pointer interception) ──────────
     function onPointerDown(e: PointerEvent) {
+      // Engines differ on whether touchend precedes pointerup. An ended pan
+      // may suppress that release, never the next independent finger tap.
+      if (e.pointerType === "touch") touchPanJustEnded = false;
       if (!isInside(e.target)) return;
       if (e.pointerType === "mouse") {
-        if (!isScaled()) return;
+        if (!isScaled() || e.button !== 0 || isInteractive(e.target)) return;
         // Record start position for threshold check on subsequent
         // moves. Don't intercept yet — a quick click should still
         // toggle pause (intercepting pointerdown suppresses click).
@@ -663,6 +666,11 @@ export function VideoFrameZoom({
     function onPointerMove(e: PointerEvent) {
       if (e.pointerType === "mouse") {
         if (mousePan.state === "idle" || e.pointerId !== mousePan.id) return;
+        if (isTemporarySpeedActiveRef.current?.()) {
+          e.stopImmediatePropagation();
+          e.preventDefault();
+          return;
+        }
         const wasPending = mousePan.state === "pending";
         const delta = panAdvance(mousePan, e.clientX, e.clientY);
         if (!delta) return;
@@ -675,6 +683,7 @@ export function VideoFrameZoom({
               /* ignore */
             }
           }
+          onActiveGestureRef.current?.();
         }
         applyPanDelta(delta.dx, delta.dy);
         e.stopImmediatePropagation();
@@ -714,7 +723,7 @@ export function VideoFrameZoom({
         return;
       }
       if (e.pointerType === "touch") {
-        // `touchend` resets the tracker to idle before this fires, so
+        // `touchend` can reset the tracker to idle before this fires, so
         // we also honour the one-shot `touchPanJustEnded` flag set by
         // `onTouchEnd` — without it the pan-completing pointerup falls
         // through to vjs's `else setActive()` branch and re-surfaces

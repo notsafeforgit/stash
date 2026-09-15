@@ -93,6 +93,7 @@ export function ScenePlayerControlsProvider({
   sources: PlayerSource[];
   activeSource: PlayerSource | null;
   seek: (position: number) => void;
+  pause: () => void;
   togglePaused: () => void;
   selectSource: (source: PlayerSource) => void;
   resetQuality: () => void;
@@ -145,7 +146,7 @@ export function ScenePlayerControlsProvider({
         play: () => {
           if (store.state.paused) latest.current.togglePaused();
         },
-        pause: () => store.pause(),
+        pause: () => latest.current.pause(),
         togglePaused: () => latest.current.togglePaused(),
         seek: (position) => {
           if (!Number.isFinite(position)) return;

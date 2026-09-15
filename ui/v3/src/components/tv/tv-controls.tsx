@@ -548,6 +548,11 @@ export function TvControls({
               >
                 {objectTitle(scene)}
               </p>
+              {/* Background feed refreshes must not move the rail or any
+                  popover anchored to it. Reserve space within this row. */}
+              <span className="inline-flex size-4 shrink-0 items-center justify-center">
+                {snapshot.status === "loading" && <Spinner />}
+              </span>
               <span className="shrink-0 text-xs text-white/80">
                 {snapshot.selected + 1} / {snapshot.total ?? "…"} ·{" "}
                 {completion === "advance"
@@ -557,10 +562,7 @@ export function TvControls({
                     : msg("tv.text.stop_at_end", "Stop at end")}
               </span>
             </div>
-            {snapshot.status === "loading" ? (
-              <Spinner />
-            ) : snapshot.status === "error" ||
-              snapshot.status === "continue" ? (
+            {snapshot.status === "error" || snapshot.status === "continue" ? (
               <Button
                 className="pointer-events-auto min-h-11 self-start"
                 size="sm"

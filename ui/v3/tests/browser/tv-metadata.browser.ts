@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { test, expect } from "./test";
 import { serveSceneMedia } from "./scene-media";
 
@@ -35,6 +35,64 @@ async function expectRating(page: Page, rating100: number | null) {
     .toMatchObject({ variables: { input: { id: "1", rating100 } } });
 }
 
+// Sample painted frames: checking only settled bounds misses the loading row
+// briefly moving the rail (and its anchored popover) during a mutation refresh.
+async function watchCounterLayout(page: Page) {
+  return page.evaluateHandle(() => {
+    const dock = document.querySelector("[data-tv-dock]");
+    if (!dock) throw new Error("Missing TV dock");
+    const dockBox = dock.getBoundingClientRect();
+    let popup: Element | null = null;
+    let popupBox: DOMRect | null = null;
+    const observed = {
+      frames: 0,
+      dockShift: 0,
+      popupShift: 0,
+      popupReplaced: false,
+      addOpacity: 1,
+    };
+    const delta = (before: DOMRect, after: DOMRect) =>
+      Math.max(
+        ...(["x", "y", "width", "height"] as const).map((key) =>
+          Math.abs(before[key] - after[key]),
+        ),
+      );
+    let frameId: number;
+    const frame = () => {
+      observed.dockShift = Math.max(
+        observed.dockShift,
+        delta(dockBox, dock.getBoundingClientRect()),
+      );
+      const current = document.querySelector("[data-tv-counter]");
+      if (current && Number(getComputedStyle(current).opacity) > 0) {
+        observed.frames++;
+        if (popup && popup !== current) observed.popupReplaced = true;
+        popup = current;
+        const bounds = current.getBoundingClientRect();
+        popupBox ??= bounds;
+        observed.popupShift = Math.max(
+          observed.popupShift,
+          delta(popupBox, bounds),
+        );
+        const add = current.querySelector('[aria-label="Add O"]');
+        if (add)
+          observed.addOpacity = Math.min(
+            observed.addOpacity,
+            Number(getComputedStyle(add).opacity),
+          );
+      }
+      frameId = requestAnimationFrame(frame);
+    };
+    frameId = requestAnimationFrame(frame);
+    return {
+      stop() {
+        cancelAnimationFrame(frameId);
+        return observed;
+      },
+    };
+  });
+}
+
 for (const device of ["mobile", "desktop"] as const) {
   test.describe(`TV metadata on ${device}`, () => {
     test.use(
@@ -54,9 +112,16 @@ for (const device of ["mobile", "desktop"] as const) {
       test(`counter ${placement} anchors its popover and keeps four-digit badges inside controls`, async ({
         page,
       }, testInfo) => {
-        await open(page, `count=9999&counter=${placement}`);
+        await open(
+          page,
+          `count=9999&counter=${placement}&slow-counter&slow-feed`,
+        );
+        const activate = (control: Locator) =>
+          device === "mobile" ? control.tap() : control.click();
         if (placement === "folder")
-          await page.getByRole("button", { name: "Edit", exact: true }).click();
+          await activate(
+            page.getByRole("button", { name: "Edit", exact: true }),
+          );
         const trigger = page.getByRole(
           placement === "folder" ? "menuitem" : "button",
           { name: "O-counter", exact: true },
@@ -81,7 +146,8 @@ for (const device of ["mobile", "desktop"] as const) {
         await page.screenshot({
           path: testInfo.outputPath(`counter-badge-${placement}.png`),
         });
-        await trigger.click();
+        const layout = await watchCounterLayout(page);
+        await activate(trigger);
         const popup = page.locator("[data-tv-counter]");
         await expect(popup).toBeVisible();
         await expect(popup).not.toHaveAttribute("aria-modal", "true");
@@ -104,8 +170,17 @@ for (const device of ["mobile", "desktop"] as const) {
         expect(popupBox.y + popupBox.height).toBeLessThanOrEqual(
           anchorBox.y + anchorBox.height + 10,
         );
-        await popup.getByRole("button", { name: "Add O", exact: true }).click();
+        const add = popup.getByRole("button", { name: "Add O", exact: true });
+        await activate(add);
+        await expect(add).toBeDisabled();
+        await expect(popup).toHaveAttribute("aria-busy", "true");
+        if (device === "desktop") await expect(add).toBeFocused();
+        // Disabled controls still own focus, but cannot submit duplicate writes.
+        await add.dispatchEvent("click");
         await expect(popup).toContainText("10,000");
+        const feedLoading = page.locator("[data-tv-dock]").getByRole("status");
+        await expect(feedLoading).toBeVisible();
+        await expect(feedLoading).toBeHidden();
         if (placement !== "folder") {
           await expect(badge).toHaveText("9999+");
           expect(
@@ -114,25 +189,50 @@ for (const device of ["mobile", "desktop"] as const) {
             ),
           ).toBe(true);
         }
-        await popup
-          .getByRole("button", { name: "Decrement O", exact: true })
-          .click();
+        const subtract = popup.getByRole("button", {
+          name: "Decrement O",
+          exact: true,
+        });
+        if (device === "desktop") {
+          await subtract.focus();
+          await page.keyboard.press("Enter");
+          await expect(subtract).toBeDisabled();
+          await expect(subtract).toBeFocused();
+        } else await activate(subtract);
         await expect(popup).toContainText("9,999");
+        await expect(feedLoading).toBeHidden();
         expect(await page.locator("[data-tv-dock]").boundingBox()).toEqual(
           initialDock,
         );
         await page.screenshot({
           path: testInfo.outputPath(`counter-popover-${placement}.png`),
         });
-        await popup
-          .getByRole("button", { name: "Reset O", exact: true })
-          .click();
+        await activate(
+          popup.getByRole("button", { name: "Reset", exact: true }),
+        );
         await expect(
           popup.getByRole("button", { name: "Decrement O", exact: true }),
         ).toBeDisabled();
         await expect(
           popup.getByRole("button", { name: "Add O", exact: true }),
         ).toBeEnabled();
+        await expect(feedLoading).toBeHidden();
+        if (device === "desktop")
+          await expect(
+            popup.getByRole("button", { name: "Reset", exact: true }),
+          ).toBeFocused();
+        const observed = await layout.evaluate((observer) => observer.stop());
+        await layout.dispose();
+        expect(observed.frames).toBeGreaterThan(0);
+        expect(observed.dockShift, "dock moves during a save").toBeLessThan(1);
+        expect(
+          observed.popupShift,
+          "popover moves during opening or saving",
+        ).toBeLessThan(1);
+        expect(observed.popupReplaced, "popover remounts during a save").toBe(
+          false,
+        );
+        expect(observed.addOpacity, "controls flash during a save").toBe(1);
         await page.keyboard.press("Escape");
         await expect(popup).toHaveCount(0);
         await expect(anchor).toBeFocused();

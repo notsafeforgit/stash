@@ -2677,11 +2677,16 @@
       "the_original_settings_are_preserved_including_unknown_action_types_or": "The original settings are preserved, including unknown action types or future versions.",
       "reset_tv_settings_2": "Reset TV settings",
       "replace_unreadable_tv_settings": "Replace unreadable TV settings?",
-      "this_replaces_the_saved_tv_document_with_defaults_other_app": "This replaces the saved TV document with defaults. Other app settings are preserved."
+      "this_replaces_the_saved_tv_document_with_defaults_other_app": "This replaces the saved TV document with defaults. Other app settings are preserved.",
+      "current_o_count": "Current count: {count, number}"
     },
     "pip": "Picture in picture",
     "cast": "Cast",
     "timeline_markers": "Scene markers"
   },
-  "marker_save_failed": "The marker could not be saved"
+  "marker_save_failed": "The marker could not be saved",
+  "rating_control": {
+    "clear": "Clear rating",
+    "stars": "{count, plural, one {# star} other {# stars}}"
+  }
 }

@@ -21,6 +21,7 @@ export function TvSlider({
   label,
   onChange,
   onCommit,
+  onCancel,
   onPreviewChange,
   disabled,
 }: {
@@ -32,6 +33,7 @@ export function TvSlider({
   disabled?: boolean;
   onChange?: (value: number) => void;
   onCommit?: (value: number) => void;
+  onCancel?: () => void;
   onPreviewChange?: (visible: boolean) => void;
 }) {
   const rotation = useContext(RotationContext);
@@ -106,6 +108,7 @@ export function TvSlider({
       onPointerCancel={() => {
         pointer.current = null;
         setDraft(null);
+        onCancel?.();
         onPreviewChange?.(false);
       }}
     />

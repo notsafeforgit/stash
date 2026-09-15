@@ -85,6 +85,17 @@ button; the settings page is always accessible through app navigation.
 Metadata links open the app's existing detail routes. Returning to TV restores
 the recent feed, selection, and scalar playback state while cached. Rating,
 organized state, and O-counter operations target the parent scene in both modes.
+**Information** toggles transparent metadata beside the lower action rail.
+Its bounded scroller wraps long titles and tags; playback, swiping and automatic
+advance continue outside it. Hiding the controls hides the metadata too.
+The O-counter has a numeric badge and an anchored, nonmodal popover for Add O,
+Decrement O and Reset O. Badges show four digits in full and cap larger values
+at `9999+`; the popover shows the full, localized count. Custom pinned and folder
+placements retain the same behavior.
+The rating dialog uses the shared rating component and the server's configured
+star or decimal format. Fractional stars expose a slider at the configured
+precision; decimal ratings use 0.1 increments out of ten. Slider gestures preview
+locally and save on release, and Clear rating removes the rating.
 Tags target the scene or marker as appropriate, including marker primary tags.
 Create markers through the shared editor or repeatable quick-create presets.
 Deletion uses the shared confirmation and scene file/generated-file choices.

@@ -46,12 +46,13 @@ function PopoverContent({
   alignOffset = 0,
   side = "bottom",
   sideOffset = 4,
+  anchor,
   keepMounted,
   ...props
 }: PopoverPrimitive.Popup.Props &
   Pick<
     PopoverPrimitive.Positioner.Props,
-    "align" | "alignOffset" | "side" | "sideOffset"
+    "align" | "alignOffset" | "side" | "sideOffset" | "anchor"
   > & {
     positionerClassName?: string;
     keepMounted?: boolean;
@@ -60,6 +61,7 @@ function PopoverContent({
   return (
     <PopoverPrimitive.Portal keepMounted={keepMounted} container={container}>
       <PopoverPrimitive.Positioner
+        anchor={anchor}
         align={align}
         alignOffset={alignOffset}
         side={side}

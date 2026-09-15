@@ -593,7 +593,7 @@ for (const device of ["mobile", "desktop"] as const) {
             hasTouch: false,
           },
     );
-    test("long titles and many tags wrap without horizontal overflow and Close stays reachable", async ({
+    test("long metadata wraps on the video and the information toggle stays reachable", async ({
       page,
     }, testInfo) => {
       await open(page, "?paused&long-info");
@@ -603,33 +603,27 @@ for (const device of ["mobile", "desktop"] as const) {
       await page
         .getByRole("button", { name: "Information", exact: true })
         .click();
-      const dialog = page.getByRole("dialog", {
+      const info = page.getByRole("region", {
         name: "Information",
         exact: true,
       });
-      const body = dialog.locator("[data-tv-dialog-body]");
-      await expect(dialog).toBeVisible();
+      await expect(info).toBeVisible();
+      await expect(page.getByRole("dialog")).toHaveCount(0);
       expect(
-        await dialog.evaluate(
+        await info.evaluate(
           (element) => element.scrollWidth <= element.clientWidth,
         ),
       ).toBe(true);
       expect(
-        await body.evaluate(
-          (element) => element.scrollWidth <= element.clientWidth,
+        await info.evaluate(
+          (element) => getComputedStyle(element).backgroundColor,
         ),
-      ).toBe(true);
-      const title = dialog.getByRole("link", { name: /^Scene 1 / });
-      expect(
-        await title.evaluate(
-          (element) => element.scrollWidth <= element.clientWidth,
-        ),
-      ).toBe(true);
-      const lastTag = dialog.getByRole("link", { name: /^Tag 59 / });
+      ).toBe("rgba(0, 0, 0, 0)");
+      const lastTag = info.getByRole("link", { name: /^Tag 59 / });
       await lastTag.scrollIntoViewIfNeeded();
       await expect(lastTag).toBeVisible();
       expect(
-        await body.evaluate((element) => {
+        await info.evaluate((element) => {
           const bounds = element.getBoundingClientRect();
           return Array.from(
             element.querySelectorAll('[data-slot="badge"]'),
@@ -649,8 +643,13 @@ for (const device of ["mobile", "desktop"] as const) {
       await page.screenshot({
         path: testInfo.outputPath(`tv-info-${device}.png`),
       });
-      await dialog.getByRole("button", { name: "Close", exact: true }).click();
-      await expect(dialog).toHaveCount(0);
+      const toggle = page.getByRole("button", {
+        name: "Information",
+        exact: true,
+      });
+      await expect(toggle).toHaveAttribute("aria-pressed", "true");
+      await toggle.click();
+      await expect(info).toHaveCount(0);
       await expect(page.locator("video")).toHaveJSProperty("paused", true);
     });
   });

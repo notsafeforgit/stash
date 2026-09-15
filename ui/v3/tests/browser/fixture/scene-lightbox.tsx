@@ -192,7 +192,11 @@ export function SceneLightboxFixture() {
         },
       }));
     const ids =
-      mode === "slow" ? ["1", "slow", "3", "missing"] : ["1", "2", "3"];
+      mode === "slow"
+        ? ["1", "slow", "3", "missing"]
+        : mode === "hls"
+          ? ["2", "3"]
+          : ["1", "2", "3"];
     return ids.map((sceneId, i) => ({
       type: "scene",
       sceneId,

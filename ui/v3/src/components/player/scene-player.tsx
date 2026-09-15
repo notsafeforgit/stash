@@ -39,6 +39,8 @@ import {
 } from "@videojs/react";
 import { GoogleCast } from "@videojs/react/extensions/google-cast";
 import { videoFeatures } from "@videojs/react/video";
+import { bufferFeature } from "@videojs/core/dom";
+import { sceneBufferFeature } from "./scene-buffer-feature";
 import { SceneVideo } from "./scene-video";
 import { PlatformMediaEffects } from "./platform-media-effects";
 import { objectTitle } from "@/core/files";
@@ -73,7 +75,9 @@ import "./player.css";
 // the app. `Container` is shared across factories. Call the factory once at
 // module scope.
 const Player: CreatePlayerResult<VideoPlayerStore> = createPlayer({
-  features: videoFeatures,
+  features: videoFeatures.map((feature) =>
+    feature === bufferFeature ? sceneBufferFeature : feature,
+  ),
   displayName: "ScenePlayer",
 });
 

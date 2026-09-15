@@ -68,8 +68,7 @@ describe("TV media policies", () => {
     const first = tvPlaybackPlan(scene, settings, 42, "scene:1");
     expect(first).toEqual(tvPlaybackPlan(scene, settings, 42, "scene:1"));
     expect(first).not.toEqual(tvPlaybackPlan(scene, settings, 43, "scene:1"));
-    if (first.kind !== "ready" || !first.range)
-      throw new Error("Expected a playable window");
+    if (first.kind !== "ready") throw new Error("Expected a playable window");
     expect(first.range.end).toBeLessThanOrEqual(100);
     expect(first.range.end - first.range.start).toBeGreaterThan(0);
     expect(first.range.end - first.range.start).toBeLessThanOrEqual(10);
@@ -81,7 +80,65 @@ describe("TV media policies", () => {
         1,
         "scene:1",
       ),
-    ).toEqual({ kind: "ready", start: 80, range: { start: 80, end: 100 } });
+    ).toEqual({ kind: "ready", range: { start: 80, end: 100 } });
+  });
+
+  it.each([
+    "beginning",
+    "resume",
+    "random-marker",
+    "random-position",
+  ] as const)("bounds the full window from the %s start to scene end", (start) => {
+    const plan = tvPlaybackPlan(
+      scene,
+      { ...defaultTvSettings, start },
+      42,
+      "scene:1",
+    );
+    if (plan.kind !== "ready") throw new Error("Expected a playable segment");
+    expect(plan.range.end).toBe(100);
+    if (start === "beginning") expect(plan.range.start).toBe(0);
+    else if (start === "resume") expect(plan.range.start).toBe(80);
+    else if (start === "random-marker")
+      expect([10, 40]).toContain(plan.range.start);
+    else {
+      expect(plan.range.start).toBeGreaterThan(0);
+      expect(plan.range.start).toBeLessThan(99);
+    }
+    expect(plan).toEqual(
+      tvPlaybackPlan(scene, { ...defaultTvSettings, start }, 42, "scene:1"),
+    );
+  });
+
+  it.each([
+    NaN,
+    -1,
+    100,
+  ])("resets an invalid resume position %s to scene start", (resume_time) => {
+    expect(
+      tvPlaybackPlan(
+        { ...scene, resume_time },
+        defaultTvSettings,
+        42,
+        "scene:1",
+      ),
+    ).toEqual({ kind: "ready", range: { start: 0, end: 100 } });
+  });
+
+  it("preserves marker bounds independently of scene start and window settings", () => {
+    expect(
+      tvPlaybackPlan(
+        scene,
+        {
+          ...defaultTvSettings,
+          start: "random-position",
+          window: { kind: "fixed", seconds: 1 },
+        },
+        42,
+        "marker:3",
+        { id: "3", seconds: 40, end_seconds: 45 },
+      ),
+    ).toEqual({ kind: "ready", range: { start: 40, end: 45 } });
   });
 
   it("keeps marker-aware seeks inside the active scene range", () => {

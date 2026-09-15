@@ -185,7 +185,7 @@ Requirement IDs remain stable; removed IDs are not reused.
 | TV-06 | Scene start and end policies | Start at resume, beginning, or a random marker/random valid position; stop at scene end, after a fixed duration, or after a sampled duration within validated bounds |
 | TV-07 | Marker playback | Markers use their parent scene's normal streams at the selected TV quality with bounded scene-time playback; explicit end times, coincident markers, missing duration and invalid bounds are handled |
 | TV-09 | Playback controls | Play/pause, volume/mute, playback rate, subtitles and source/quality selection share the v3 engine; audio/rate continue across swipes; quality changes preserve time/state and follow TV-27 |
-| TV-10 | Seeking and timeline information | The scrubber owns touch seeking; keyboard seeking is marker-aware; scrubber thumbnails and marker labels/ranges use absolute scene time; show current marker/tag information |
+| TV-10 | Seeking and timeline information | The scrubber and timestamps span 0 to the selected segment duration for markers and all scene start/window policies; scrubbing and marker-aware keyboard seeking stay inside that range; thumbnails and marker metadata resolve in absolute scene time; show current marker/tag information |
 | TV-11 | Hold controls | Tap the video to play/pause and hold it for temporary 2× speed; keyboard forward/reverse holds retain speed adjustment; release/cancel restores the previous state without saving a temporary rate; unsupported negative playback rates are not assumed |
 | TV-12 | Presentation | Fit/contain versus fill/crop, left-handed rail, hide/show controls, and media zoom coexist; navigation, mute, settings and restore-controls remain reachable in a bottom dock; pinned actions use that dock and the remaining rail is bounded above it |
 | TV-13 | Forced landscape and supported fullscreen | Rotate the viewing surface and its controls without modifying files; offer fullscreen for the whole TV container only where supported; unavailable/rejected requests retain normal inline TV and hide the action; iOS Safari retains swipe navigation, rail, metadata, menus and app navigation; TV never requests native video fullscreen |
@@ -611,6 +611,14 @@ Random start prefers a valid marker, otherwise samples a valid scene position.
 Fixed/random lengths must be positive finite durations with ordered limits and
 must fit the remaining scene. Resample only on a deliberate new selection or
 session action. Reject unusable zero-length ranges visibly.
+
+Every ready plan carries an explicit scene-time range, including starts followed
+by playback to scene end. Display elapsed time as `sceneTime - range.start` and
+duration as `range.end - range.start`; the slider spans `0..duration` and maps
+seeks back to scene time at the control boundary. Preserve that range across
+quality changes and settings round trips rather than rebasing it to the current
+playhead. Sprite lookup, marker labels and activity accounting retain absolute
+scene coordinates.
 
 Use the shared marker-bound helper for marker playback at every quality.
 Full-scene window settings do not redefine an explicit marker range. Centralize end

@@ -31,12 +31,21 @@ export function TvTimeline({
   const sprites = useSpriteInfo(
     previewOpened ? (scene.paths.vtt ?? undefined) : undefined,
   );
-  const value = Math.max(range.start, Math.min(range.end, draft ?? position));
+  const duration = Math.max(0, range.end - range.start);
+  // Only the controls use segment time. Media commands, sprites and marker
+  // metadata stay in the original scene's coordinate system.
+  const value = Math.max(
+    0,
+    Math.min(duration, draft ?? position - range.start),
+  );
+  const sceneTime = range.start + value;
   const sprite =
     sprites?.[
       Math.min(
         sprites.length - 1,
-        Math.floor((value / (scene.files[0]?.duration || 1)) * sprites.length),
+        Math.floor(
+          (sceneTime / (scene.files[0]?.duration || 1)) * sprites.length,
+        ),
       )
     ];
   const markers = useMemo(
@@ -64,7 +73,7 @@ export function TvTimeline({
   }, [markers, range.start, range.end]);
   let currentMarker: TvScene["scene_markers"][number] | undefined;
   for (const marker of markers) {
-    if (marker.seconds > value) break;
+    if (marker.seconds > sceneTime) break;
     currentMarker = marker;
   }
   return (
@@ -91,7 +100,7 @@ export function TvTimeline({
             : ""}
         </span>
         <span className="shrink-0 tabular-nums">
-          {tvTime(value)} / {tvTime(range.end)}
+          {tvTime(value)} / {tvTime(duration)}
         </span>
       </div>
       <div className="relative">
@@ -112,16 +121,17 @@ export function TvTimeline({
         <TvSlider
           label={msg("tv.text.scene_position", "Scene position")}
           value={value}
-          min={range.start}
-          max={range.end}
+          min={0}
+          max={duration}
           step={0.1}
+          disabled={duration <= 0}
           onPreviewChange={(visible) => {
             if (visible) setPreviewOpened(true);
             setPreviewVisible(visible);
           }}
           onChange={setDraft}
           onCommit={(next) => {
-            controls.seek(next);
+            controls.seek(range.start + next);
             setDraft(null);
           }}
         />

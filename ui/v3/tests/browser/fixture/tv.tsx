@@ -17,7 +17,11 @@ import { ConfigurationProvider } from "@/hooks/config";
 import { MobileNavigationProvider } from "@/components/layout/mobile-navigation";
 import { RouteViewport } from "@/components/layout/route-viewport";
 import { installRouteTransitions } from "@/core/route-transitions";
-import { defaultTvSettings, type TvSettings } from "@/core/tv/settings";
+import {
+  defaultTvSettings,
+  tvSettingsSchema,
+  type TvSettings,
+} from "@/core/tv/settings";
 import { createTvAction, type TvRailEntry } from "@/core/tv/action-config";
 import { useTvSettings } from "@/hooks/use-tv-settings";
 import { SaveIndicatorProvider } from "@/hooks/save-indicator";
@@ -47,6 +51,7 @@ const scenes: GQL.SceneDataFragment[] = Array.from(
     const scene = {
       ...base,
       id,
+      resume_time: params.has("resume") ? 4 : base.resume_time,
       files: params.has("portrait")
         ? base.files.map((file) => ({ ...file, width: 180, height: 320 }))
         : base.files,
@@ -101,12 +106,20 @@ const scenes: GQL.SceneDataFragment[] = Array.from(
 );
 const markers = scenes.flatMap((scene) => scene.scene_markers);
 const mode = params.has("markers") ? "markers" : "scenes";
+const start = tvSettingsSchema.shape.start.safeParse(params.get("start"));
 const settings: TvSettings = {
   ...defaultTvSettings,
   mode,
   pageSize: 5,
   autoplay: !params.has("paused"),
   startMuted: !params.has("unmuted"),
+  start: start.success ? start.data : defaultTvSettings.start,
+  window:
+    params.get("window") === "fixed"
+      ? { kind: "fixed", seconds: 3 }
+      : params.get("window") === "random"
+        ? { kind: "random", min: 2, max: 3 }
+        : { kind: "full" },
   completion: params.has("advance") ? "advance" : "normal",
   defaultQuality: params.has("low")
     ? { kind: "fixed", resolution: GQL.StreamingResolutionEnum.Low }

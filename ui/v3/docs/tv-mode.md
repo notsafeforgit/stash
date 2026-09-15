@@ -30,6 +30,14 @@ loop, or advance at completion. Marker ranges use the parent's normal scene
 stream: explicit valid end, next strictly later marker, or scene end. The scene's
 actual duration, stream list, and Apollo identity remain unchanged.
 
+The timeline covers only the selected segment: **0:00** at its start and the
+segment duration at its end. This applies to markers and every scene start/window
+setting, including a random or resume start followed by playback to scene end.
+Scrubbing and keyboard seeking stay inside that range; replay returns to its
+start. Quality changes and returning from settings retain the selected segment
+and elapsed position. Sprite previews, marker metadata and activity still use
+the original scene timestamps internally.
+
 One saved **default quality for scenes and markers** is applied before each
 item loads. A fixed resolution selects an advertised normal HLS transcode at
 that resolution or below. If none is compatible, TV offers quality selection

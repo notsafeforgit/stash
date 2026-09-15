@@ -13,7 +13,7 @@ export function seededValue(seed: number, key: string): number {
   return (hash >>> 0) / 4294967296;
 }
 export type TvPlaybackPlan =
-  | { kind: "ready"; start: number; range?: PlaybackRange }
+  | { kind: "ready"; range: PlaybackRange }
   | { kind: "invalid"; reason: string };
 export function tvPlaybackPlan(
   scene: SceneTiming,
@@ -28,7 +28,7 @@ export function tvPlaybackPlan(
   if (marker) {
     const range = markerRange(scene, marker);
     return range
-      ? { kind: "ready", start: range.start, range }
+      ? { kind: "ready", range }
       : { kind: "invalid", reason: "This marker has no playable range" };
   }
   const random = seededValue(seed, key);
@@ -45,7 +45,8 @@ export function tvPlaybackPlan(
           : random * Math.max(0, duration - 1);
   if (!Number.isFinite(start) || start < 0 || start >= duration - 0.05)
     start = 0;
-  if (settings.window.kind === "full") return { kind: "ready", start };
+  if (settings.window.kind === "full")
+    return { kind: "ready", range: { start, end: duration } };
   const length =
     settings.window.kind === "fixed"
       ? settings.window.seconds
@@ -54,7 +55,6 @@ export function tvPlaybackPlan(
           (settings.window.max - settings.window.min);
   return {
     kind: "ready",
-    start,
     range: { start, end: Math.min(duration, start + length) },
   };
 }

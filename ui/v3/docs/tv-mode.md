@@ -49,6 +49,9 @@ Fit/fill, zoom, rotation, left-handed actions, and hiding controls are available
 Navigation, mute and restore-controls stay reachable in the bottom
 dock with chrome hidden. Pinned actions use that dock; the remaining action
 rail is bounded above it, on the preferred hand's side.
+Controls are transparent icons with small shadows and comfortable tap targets.
+The bottom dock has no background panel, including when the UI is hidden;
+empty space around the essential icons passes taps and swipes to the video.
 Use the navigation drawer to switch to another top-level page; TV has no close
 button. The drawer also remains available while loading or when media is
 unavailable. Escape closes an open menu or exits fullscreen while

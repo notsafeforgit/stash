@@ -54,6 +54,7 @@ import {
 } from "./tv-action-labels";
 import { TvTimeline } from "./tv-timeline";
 import { TvNavigationButton } from "./tv-navigation-button";
+import { TvIconButton } from "./tv-icon-button";
 import { useTvInputs } from "./use-tv-inputs";
 import { useTvMutations, type TvScene } from "./use-tv-mutations";
 import type { TvEditTarget } from "./tv-edit-panel";
@@ -74,17 +75,14 @@ function MuteButton() {
   const controls = useScenePlayerControls();
   const muted = useScenePlayerValue("muted");
   return (
-    <Button
-      variant="secondary"
-      size="icon-lg"
-      className="size-11"
+    <TvIconButton
       onClick={controls.toggleMuted}
       aria-label={
         muted ? msg("tv.text.unmute", "Unmute") : msg("tv.text.mute", "Mute")
       }
     >
       {muted ? <VolumeX /> : <Volume2 />}
-    </Button>
+    </TvIconButton>
   );
 }
 
@@ -107,10 +105,7 @@ function RailEntry({
   if (entry.type === "action") {
     const Icon = tvActionIcon(entry.action);
     return (
-      <Button
-        variant="secondary"
-        size="icon-lg"
-        className="size-11 shrink-0"
+      <TvIconButton
         aria-label={
           entry.action.label ||
           (entry.action.kind === "fullscreen" && fullscreen
@@ -128,7 +123,7 @@ function RailEntry({
         onClick={() => run(entry.action)}
       >
         <Icon />
-      </Button>
+      </TvIconButton>
     );
   }
   const Icon = tvCustomIcons[entry.icon];
@@ -138,16 +133,7 @@ function RailEntry({
       open={folder === entry.id}
       onOpenChange={(open) => setFolder(open ? entry.id : null)}
     >
-      <DropdownMenuTrigger
-        render={
-          <Button
-            variant="secondary"
-            size="icon-lg"
-            className="size-11 shrink-0"
-            aria-label={entry.label}
-          />
-        }
-      >
+      <DropdownMenuTrigger render={<TvIconButton aria-label={entry.label} />}>
         <Icon />
       </DropdownMenuTrigger>
       <DropdownMenuContent side={entry.pinned ? "top" : "left"}>
@@ -447,10 +433,10 @@ export function TvControls({
       />
       {paused && (
         <div
-          className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-background/70 p-4"
+          className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white/80 drop-shadow-[0_1px_2px_rgb(0_0_0/0.85)]"
           aria-hidden
         >
-          <Play className="size-8" />
+          <Play className="size-12 fill-current" />
         </div>
       )}
       <SourceFeedback openQuality={() => action("quality")} />
@@ -459,17 +445,17 @@ export function TvControls({
           aria-label={msg("tv.text.tv_actions", "TV actions")}
           data-tv-interactive
           className={cn(
-            "pointer-events-auto relative mb-3 flex min-h-0 max-h-[30%] w-11 flex-col gap-2",
+            "pointer-events-none relative mb-2 flex min-h-0 max-h-[30%] w-11 flex-col gap-2",
             settings.leftHanded ? "ml-3 mr-auto" : "ml-auto mr-3",
           )}
         >
-          <div className="flex min-h-0 flex-col gap-2 overflow-y-auto overscroll-contain">
+          <div className="pointer-events-auto flex min-h-0 flex-col gap-2 overflow-y-auto overscroll-contain">
             {entries.filter((entry) => !entry.pinned).map(renderEntry)}
           </div>
         </aside>
       )}
       <div
-        className="tv-footer pointer-events-auto relative flex shrink-0 flex-col gap-2 bg-background/85 p-3"
+        className="tv-footer pointer-events-none relative flex shrink-0 flex-col gap-1 px-2 pt-1 text-white [text-shadow:0_1px_2px_rgb(0_0_0/0.85)]"
         data-tv-dock
         data-tv-interactive
       >
@@ -479,7 +465,7 @@ export function TvControls({
               <p className="min-w-0 flex-1 truncate text-sm">
                 {objectTitle(scene)}
               </p>
-              <span className="shrink-0 text-xs text-muted-foreground">
+              <span className="shrink-0 text-xs text-white/80">
                 {snapshot.selected + 1} / {snapshot.total ?? "…"} ·{" "}
                 {completion === "advance"
                   ? msg("tv.text.auto_advance", "Auto-advance")
@@ -493,9 +479,9 @@ export function TvControls({
             ) : snapshot.status === "error" ||
               snapshot.status === "continue" ? (
               <Button
-                className="min-h-11"
+                className="pointer-events-auto min-h-11 self-start"
                 size="sm"
-                variant="link"
+                variant="transparent"
                 onClick={retry}
               >
                 {snapshot.status === "error"
@@ -505,9 +491,9 @@ export function TvControls({
             ) : snapshot.exhausted &&
               snapshot.selected === snapshot.items.length - 1 ? (
               <Button
-                className="min-h-11"
+                className="pointer-events-auto min-h-11 self-start"
                 size="sm"
-                variant="link"
+                variant="transparent"
                 onClick={reshuffle}
               >
                 <FormattedMessage
@@ -519,7 +505,7 @@ export function TvControls({
             <TvTimeline scene={scene} range={range} />
           </>
         )}
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 items-center gap-1">
           <TvNavigationButton
             onClick={() => {
               controls.pause();
@@ -529,28 +515,23 @@ export function TvControls({
           <MuteButton />
           {visible && (
             <div
-              className="flex min-w-0 flex-1 gap-2 overflow-x-auto overscroll-contain"
+              className="pointer-events-auto flex min-w-0 flex-1 gap-1 overflow-x-auto overscroll-contain"
               data-tv-pinned-actions
             >
               {entries.filter((entry) => entry.pinned).map(renderEntry)}
             </div>
           )}
           {zoomed && (
-            <Button
-              variant="secondary"
-              size="icon-lg"
-              className="size-11"
+            <TvIconButton
               aria-label={msg("tv.text.reset_zoom", "Reset zoom")}
               onClick={controls.resetZoom}
             >
               <Scan />
-            </Button>
+            </TvIconButton>
           )}
-          {canPip && (
-            <Button
-              variant="secondary"
-              size="icon-lg"
-              className="hidden size-11 sm:inline-flex"
+          {visible && canPip && (
+            <TvIconButton
+              className="hidden sm:inline-flex"
               aria-label={msg(
                 "tv.text.picture_in_picture",
                 "Picture in picture",
@@ -558,20 +539,17 @@ export function TvControls({
               onClick={controls.togglePip}
             >
               <PictureInPicture />
-            </Button>
+            </TvIconButton>
           )}
           {!visible && (
             <>
               <div className="min-w-0 flex-1" />
-              <Button
-                variant="secondary"
-                size="icon-lg"
-                className="size-11"
+              <TvIconButton
                 aria-label={msg("tv.text.show_tv_controls", "Show TV controls")}
                 onClick={() => setVisible(true)}
               >
                 <Eye />
-              </Button>
+              </TvIconButton>
             </>
           )}
         </div>

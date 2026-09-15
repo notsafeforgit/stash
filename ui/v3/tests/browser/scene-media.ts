@@ -2,7 +2,10 @@ import type { Page } from "@playwright/test";
 
 /** Real player engines against synthetic media, with transcode leases kept
  * inside the fixture. No library or remote requests are permitted. */
-export async function serveSceneMedia(page: Page) {
+export async function serveSceneMedia(
+  page: Page,
+  orientation: "landscape" | "portrait" = "landscape",
+) {
   await page.route("**/scene/*/**", async (route) => {
     const url = new URL(route.request().url());
     if (/\/streams\.(stop|keepalive)$/.test(url.pathname))
@@ -14,7 +17,12 @@ export async function serveSceneMedia(page: Page) {
       });
     else if (url.pathname.endsWith("/stream")) {
       const response = await route.fetch({
-        url: new URL("/media/audio.mp4", url).href,
+        url: new URL(
+          orientation === "portrait"
+            ? "/media/portrait.mp4"
+            : "/media/audio.mp4",
+          url,
+        ).href,
       });
       await route.fulfill({ response });
     } else if (url.pathname.endsWith("/stream.master.m3u8")) {

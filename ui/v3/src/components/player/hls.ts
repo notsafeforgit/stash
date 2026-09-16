@@ -148,13 +148,27 @@ export function isHlsPlaylist(src: string | null | undefined): boolean {
   }
 }
 
+// Both full scenes and clips can have disjoint buffered ranges after seeks.
+// A valid position in the playlist is not necessarily available in the buffer.
+function canSeekWithinBuffer(target: number, state: MediaSeekState): boolean {
+  const buffered = state.buffered;
+  if (!buffered?.length) return true;
+  if (buffered.some(([start, end]) => target >= start && target <= end)) {
+    return true;
+  }
+  const bufferedEnd = buffered.at(-1)?.[1];
+  if (bufferedEnd === undefined) return false;
+  const FORWARD_PREFETCH_S = 30;
+  return target > bufferedEnd && target <= bufferedEnd + FORWARD_PREFETCH_S;
+}
+
 // Factory returning the HLS `SourceStrategy` for a given source frame
 // rate and playlist shape. Two shapes the backend serves:
 //
 //   - Full playlist (mediaSequence=0, `isClipped: false`) — every
 //     segment from 0 to EOF. hls.js's MSE timeline = scene-time
 //     directly (no rebase). Used for scene playback. The strategy is
-//     near-identity: offset always 0, every seek is direct.
+//     near-identity: offset always 0; seeks use the shared buffer policy.
 //
 //   - Trimmed (clipped) playlist (mediaSequence>0, `isClipped: true`) —
 //     only segments covering the marker / clip range. hls.js rebases
@@ -175,71 +189,14 @@ export function makeHlsStrategy(
   const segDur = hlsSegmentDuration(frameRate);
 
   if (!isClipped) {
-    // Full-playlist case: MSE-time = scene-time. No offset bookkeeping
-    // needed; backward "past the trim" doesn't exist (no trim).
-    //
-    // Direct-seek (just `video.currentTime = N` with no engine churn)
-    // works when:
-    //   - target is inside one of the buffered ranges, OR
-    //   - target is forward of the last buffered range by ≤ ~30 s
-    //     (hls.js's stream-controller naturally prefetches ahead).
-    //
-    // Everything else needs the URL-change remount:
-    //   - Far-forward seeks (target > bufferedEnd + 30 s) — hls.js's
-    //     scheduler doesn't reorient cleanly when in-flight fragments
-    //     are far from the new currentTime; they complete and append
-    //     at unrelated MSE positions, BUFFER_EOS signals prematurely,
-    //     playback stalls at readyState=1.
-    //   - Backward seeks past the start of buffered — same scheduler
-    //     issue. Despite the playlist exposing every segment as a
-    //     valid seek target, hls.js continues loading the old position
-    //     after a big backward currentTime jump, segments land at the
-    //     old MSE position, currentTime never gets data. Confirmed by
-    //     diagnostic: post-seek `hlsBufferAppended` events keep
-    //     showing the pre-seek buffered range with no fragment at the
-    //     new currentTime.
-    //
-    // Routing the failing cases through `beginSourceRemount` writes a
-    // new `?start=` into the URL; our bridge reassigns `HlsJsAdapter.src`
-    // and its start-position config, which destroys the active delegate
-    // and creates a fresh one with `config.startPosition = newTarget`.
-    // The new engine requests
-    // the right segment from a clean state. The freeze-frame canvas
-    // (captured just before this routes through `beginSourceRemount`)
-    // masks the engine-recreate window.
+    // Full playlists use scene time directly. Unbuffered distant seeks
+    // signal the transition planner to reset loading at the requested time;
+    // it chooses an engine restart or a source reload for the platform.
     return {
       planResume(trueTime: number) {
         return { offset: 0, seekTo: trueTime > 0 ? trueTime : null };
       },
-      canSeekDirectly(targetInternal: number, state: MediaSeekState) {
-        const buffered = state.buffered;
-        if (!buffered || buffered.length === 0) {
-          // No buffer yet — let hls.js's natural startup pick the
-          // fragment. (This branch is mostly defensive — by the time
-          // the user can issue a seek, there's almost always some
-          // buffered data.)
-          return true;
-        }
-        // In-buffer.
-        for (const [start, end] of buffered) {
-          if (targetInternal >= start && targetInternal <= end) {
-            return true;
-          }
-        }
-        // Forward within prefetch window.
-        const bufferedEnd = buffered.at(-1)?.[1];
-        if (bufferedEnd === undefined) return false;
-        const FORWARD_PREFETCH_S = 30;
-        if (
-          targetInternal > bufferedEnd &&
-          targetInternal <= bufferedEnd + FORWARD_PREFETCH_S
-        ) {
-          return true;
-        }
-        // Either far-forward or backward outside buffer — need the
-        // remount path.
-        return false;
-      },
+      canSeekDirectly: canSeekWithinBuffer,
     };
   }
 
@@ -249,8 +206,8 @@ export function makeHlsStrategy(
   // is fixed for the lifetime of the source (the marker boundary), so
   // there is no more "backward-past-trim" seek path here — the marker
   // lightbox constrains the slider to the clip range. We still
-  // implement `canSeekDirectly` defensively for the forward-buffer
-  // case, where a too-far-forward seek would still want a remount.
+  // use the same buffer policy as full scenes so a backward seek into
+  // an unbuffered region also resumes through a source reload.
   // For clipped playlists the trim point is fixed to the marker's
   // start. Resolution / quality swaps mid-clip must not narrow the
   // seekable window — if the URL `?start=` (and therefore `offset`)
@@ -288,28 +245,10 @@ export function makeHlsStrategy(
         if (targetInternal < start) return false;
       }
 
-      // Forward seeks far past the buffered range force the backend to
-      // kill its in-flight ffmpeg and restart at the seek-target
-      // segment (`ensureTranscode` in `pkg/ffmpeg/stream_segmented.go`
-      // triggers a kill once the requested segment overshoots current
-      // progress by `maxSegmentGap`). The kill/restart cycle leaves
-      // hls.js trying to splice the new run's first segment onto a
-      // SourceBuffer whose existing buffered range is far behind the
-      // new MSE position; the resulting discontinuity manifests as
-      // playback stalling shortly after the first new segment plays.
-      // Threshold roughly matches hls.js's default `maxBufferLength`
-      // (~30 s).
-      const buffered = state.buffered;
-      if (buffered && buffered.length > 0) {
-        const bufferedEnd = buffered.at(-1)?.[1];
-        if (bufferedEnd === undefined) return false;
-        const FORWARD_REMOUNT_THRESHOLD_S = 30;
-        if (targetInternal > bufferedEnd + FORWARD_REMOUNT_THRESHOLD_S) {
-          return false;
-        }
-      }
-
-      return true;
+      // Backward seeks into an unbuffered part of a long clip need the
+      // same source recovery as full scenes. Otherwise the old video
+      // loader can keep fetching ahead until the stall watchdog fires.
+      return canSeekWithinBuffer(targetInternal, state);
     },
   };
 }

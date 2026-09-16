@@ -70,6 +70,54 @@ describe("scene seek transitions", () => {
     ).toEqual({ kind: "seek", sceneTime: 120, mediaTime: 20 });
   });
 
+  it("reloads unbuffered backward seeks in TV while retaining the entire clip", () => {
+    for (const ios of [true, false]) {
+      for (const buffered of [
+        [[8000, 8030]],
+        [
+          [0, 30],
+          [8000, 8030],
+        ],
+      ] satisfies [number, number][][]) {
+        expect(
+          planSceneSeek({
+            ...fullScene,
+            ios,
+            duration: 11070,
+            clipRange: { start: 1001, end: 11070 },
+            offsetStart: 1000,
+            targetTime: 1800,
+            mediaState: { buffered, seekable: [[0, 10070]] },
+          }),
+        ).toEqual({
+          kind: "reload-source",
+          sceneTime: 1800,
+          resume: { offset: 1000, seekTo: 1800, fragmentTime: 1800 },
+        });
+      }
+    }
+  });
+
+  it("keeps buffered backward TV seeks in place across disjoint ranges", () => {
+    expect(
+      planSceneSeek({
+        ...fullScene,
+        ios: true,
+        duration: 11070,
+        clipRange: { start: 1001, end: 11070 },
+        offsetStart: 1000,
+        targetTime: 1020,
+        mediaState: {
+          buffered: [
+            [0, 30],
+            [8000, 8030],
+          ],
+          seekable: [[0, 10070]],
+        },
+      }),
+    ).toEqual({ kind: "seek", sceneTime: 1020, mediaTime: 20 });
+  });
+
   it("seeks direct files without an HLS reset and clamps to file bounds", () => {
     const direct = { ...fullScene, src: "https://stash.test/scene/1/stream" };
     expect(planSceneSeek({ ...direct, targetTime: 900 })).toEqual({

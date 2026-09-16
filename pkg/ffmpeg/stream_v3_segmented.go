@@ -446,6 +446,15 @@ func hlsSegmentArgs(segment int, videoOnly bool, outputDir string, frameRate flo
 		// clean, non-overlapping fragments.
 		"-hls_flags", "temp_file",
 		"-hls_segment_type", "fmp4",
+		// The MP4 muxer otherwise subtracts each run's first DTS from
+		// every fragment's tfdt, even with output_ts_offset. A seek then
+		// caches segment N with timestamps starting at zero, breaking
+		// continuity with earlier runs. frag_discont tells the muxer
+		// that earlier fragments already exist on this same timeline.
+		// Keep edit lists enabled (the default): disabling them lets
+		// the muxer rebase to zero again. This is a muxer option, not an
+		// EXT-X-DISCONTINUITY in the client playlist.
+		"-hls_segment_options", "movflags=+frag_discont",
 		"-hls_playlist_type", "vod",
 		"-hls_fmp4_init_filename", initFilename,
 		"-hls_segment_filename", filepath.Join(outputDir, ".%v_%d.m4s"),

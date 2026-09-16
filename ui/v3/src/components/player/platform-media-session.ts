@@ -12,6 +12,8 @@ export interface PlatformMediaOptions {
   duration?: number;
   suspended: boolean;
   seek(time: number): void;
+  /** Share explicit pause intent and frame preservation with the app controls. */
+  pause?: () => void;
   next?: () => void;
   previous?: () => void;
 }
@@ -63,6 +65,11 @@ export function createPlatformMediaSession(
     if (Number.isFinite(time) && Number.isFinite(duration) && duration > 0)
       options().seek(Math.max(0, Math.min(duration, time)));
   };
+  const pause = () => {
+    const handler = options().pause;
+    if (handler) handler();
+    else playback.pause();
+  };
   const clear = () => {
     if (!session || owner !== token) return;
     owner = undefined;
@@ -100,11 +107,9 @@ export function createPlatformMediaSession(
     handle("play", () => {
       void Promise.resolve(playback.play()).catch(() => {});
     });
-    handle("pause", () => {
-      playback.pause();
-    });
+    handle("pause", pause);
     handle("stop", () => {
-      playback.pause();
+      pause();
       clear();
     });
     handle("seekto", (event) => {

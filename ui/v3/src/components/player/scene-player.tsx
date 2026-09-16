@@ -42,6 +42,7 @@ import { videoFeatures } from "@videojs/react/video";
 import { bufferFeature } from "@videojs/core/dom";
 import { sceneBufferFeature } from "./scene-buffer-feature";
 import { SceneVideo } from "./scene-video";
+import { createPausedFrame } from "./paused-frame";
 import { PlatformMediaEffects } from "./platform-media-effects";
 import { objectTitle } from "@/core/files";
 import { cn } from "src/lib/utils";
@@ -350,6 +351,11 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
 }) => {
   const playbackKey = playbackKeyProp ?? scene.id;
   const playbackRateRef = useRef(1);
+  const [pausedFrame] = useState(createPausedFrame);
+  const attachPauseVideo = useCallback(
+    (video: HTMLVideoElement | null) => pausedFrame.attach(video),
+    [pausedFrame],
+  );
   const stoppedAtEndRef = useRef(false);
   const endedHandledRef = useRef(false);
   const userPlaybackIntentRef = useRef(false);
@@ -694,10 +700,20 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     });
   }, [sendGetCurrentTime, offsetStart]);
 
-  useEffect(() => {
-    if (!sendPause) return;
-    sendPause(() => storeRef.current?.pause());
-  }, [sendPause]);
+  // A marker/source selection can reuse the element, but never its old frame.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Selection and source define the presentation lifetime.
+  useLayoutEffect(
+    () => pausedFrame.reset(),
+    [pausedFrame, playbackKey, finalSrc],
+  );
+  const preservePausedFrame = useCallback(
+    (command: () => void) =>
+      pausedFrame.preserveOnPause(
+        command,
+        Math.max(0, (clipRange?.start ?? 0) - offsetStart),
+      ),
+    [pausedFrame, clipRange?.start, offsetStart],
+  );
 
   // Force-abort the <video>'s network activity on unmount. Rapid lightbox
   // swipes otherwise queue stale fetches behind Chrome's per-host
@@ -753,8 +769,11 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     // The animation autoplay gate must not resume a deferred TV pause.
     userPlaybackIntentRef.current = true;
     setPendingPaused(true);
-    storeRef.current?.pause();
-  }, [setPendingPaused]);
+    preservePausedFrame(() => storeRef.current?.pause());
+  }, [setPendingPaused, preservePausedFrame]);
+  useEffect(() => {
+    sendPause?.(handlePause);
+  }, [sendPause, handlePause]);
   const handleSeekPreview = useCallback(
     (time: number | null) => {
       // A drag owns playback even during the lightbox's opening animation.
@@ -767,6 +786,14 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   const handleTogglePaused = useCallback(() => {
     const s = storeRef.current;
     if (!s) return;
+    // Native intent updates synchronously; the store's pause event may still
+    // be queued when another tap arrives. Remote targets retain store ownership.
+    const video = fullscreenContainerRef.current?.querySelector("video");
+    const paused =
+      s.state.remotePlaybackState === "disconnected" &&
+      video instanceof HTMLVideoElement
+        ? video.paused
+        : s.state.paused;
     // Every toggle is an explicit user gesture — from here on the user
     // owns the playback state, so the play-delay gate must neither
     // suppress the resulting play nor auto-resume at its deadline.
@@ -782,7 +809,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     // fresh playlist with `?start=clipRange.start` (in-place src swap)
     // so playback genuinely begins at the marker's start frame instead
     // of the swap-point segment boundary.
-    if (clipRange && stoppedAtEndRef.current && s.state.paused) {
+    if (clipRange && stoppedAtEndRef.current && paused) {
       stoppedAtEndRef.current = false;
       handleRestart(clipRange.start);
       return;
@@ -798,9 +825,15 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
       handleRestart(0);
       return;
     }
-    setPendingPaused(!s.state.paused);
-    s.togglePaused();
-  }, [clipRange, handleRestart, setPendingPaused]);
+    setPendingPaused(!paused);
+    if (paused) {
+      // A subsequent pause/seek can cancel play before its promise settles.
+      // The library's toggle discards that promise, leaking AbortError.
+      void s.play().catch(() => {});
+    } else {
+      preservePausedFrame(() => s.pause());
+    }
+  }, [clipRange, handleRestart, setPendingPaused, preservePausedFrame]);
 
   // Initial-load autoplay covers three triggers: caller-driven autoplay,
   // a resume-time on the scene, and a deep-link `?t=` timestamp. All
@@ -902,6 +935,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
 
   const mediaElement = (
     <SceneVideo
+      ref={attachPauseVideo}
       src={finalSrc}
       startPosition={startPosition}
       sourceType={activeSource?.type}
@@ -995,6 +1029,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
             offsetStart={effectiveOffsetStart}
             suspended={suspended}
             seek={effectiveOnSeek}
+            pause={handlePause}
             next={onNext}
             previous={onPrevious}
           />

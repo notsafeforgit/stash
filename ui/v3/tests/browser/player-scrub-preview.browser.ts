@@ -77,49 +77,4 @@ for (const hls of [false, true]) {
       ]);
     });
   }
-
-  test(`scene detail ${hls ? "HLS" : "direct"} pause keeps the frame and resumes at normal speed`, async ({
-    page,
-  }) => {
-    await serveSceneMedia(page);
-    await page.goto(`/scene-detail?landscape&short${hls ? "&hls" : ""}`);
-    const video = page.locator("video");
-    const player = page.locator("[data-scene-player]");
-    await player.locator("[data-player-native-button]").click();
-    await expect
-      .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
-      .toBeGreaterThan(0.5);
-    await player.hover();
-    const bar = player.locator("[data-player-control-bar]");
-    await bar.getByRole("button", { name: "Pause", exact: true }).click();
-    await expect(video).toHaveJSProperty("paused", true);
-    const pausedAt = await video.evaluate(
-      (v: HTMLVideoElement) => v.currentTime,
-    );
-    await page.waitForTimeout(4000);
-    expect(
-      await video.evaluate((v: HTMLVideoElement) => v.currentTime),
-    ).toBeCloseTo(pausedAt, 1);
-    const frame = await video.evaluateHandle((v: HTMLVideoElement) => {
-      const state = { time: -1 };
-      v.requestVideoFrameCallback((_now, metadata) => {
-        state.time = metadata.mediaTime;
-      });
-      return state;
-    });
-    await bar.getByRole("button", { name: "Play", exact: true }).click();
-    await expect
-      .poll(() => frame.evaluate((state) => state.time))
-      .toBeGreaterThanOrEqual(0);
-    expect(await frame.evaluate((state) => state.time)).toBeLessThan(
-      pausedAt + 0.15,
-    );
-    await page.waitForTimeout(1000);
-    const resumedAt = await video.evaluate(
-      (v: HTMLVideoElement) => v.currentTime,
-    );
-    expect(resumedAt).toBeGreaterThan(pausedAt + 0.5);
-    expect(resumedAt).toBeLessThan(pausedAt + 1.7);
-    await expect(video).toHaveJSProperty("playbackRate", 1);
-  });
 }

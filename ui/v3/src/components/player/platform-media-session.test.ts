@@ -10,17 +10,22 @@ const session = {
   metadata: null,
   playbackState: "none",
   setPositionState: vi.fn(),
-  setActionHandler: vi.fn(
-    (action: MediaSessionAction, handler: MediaSessionActionHandler | null) => {
-      if (handler) handlers.set(action, handler);
-      else handlers.delete(action);
-    },
-  ),
+  setActionHandler:
+    vi.fn<
+      (
+        action: MediaSessionAction,
+        handler: MediaSessionActionHandler | null,
+      ) => void
+    >(),
 };
 const disposers: (() => void)[] = [];
 beforeEach(() => {
   handlers.clear();
   vi.clearAllMocks();
+  session.setActionHandler.mockImplementation((action, handler) => {
+    if (handler) handlers.set(action, handler);
+    else handlers.delete(action);
+  });
   vi.stubGlobal("navigator", { mediaSession: session });
   vi.stubGlobal(
     "MediaMetadata",
@@ -123,4 +128,19 @@ it("tolerates unsupported actions and clears invalid position state", () => {
   expect(p.options.seek).not.toHaveBeenCalled();
   action("play");
   expect(p.playback.play).toHaveBeenCalledOnce();
+});
+
+it("routes OS pause and stop through the player's current explicit pause handler", () => {
+  const p = player();
+  p.playback.state.paused = false;
+  p.options.pause = vi.fn();
+  p.refresh();
+  action("pause");
+  expect(p.options.pause).toHaveBeenCalledOnce();
+  const next = vi.fn();
+  p.options.pause = next;
+  action("stop");
+  expect(next).toHaveBeenCalledOnce();
+  expect(p.playback.pause).not.toHaveBeenCalled();
+  expect(session.playbackState).toBe("none");
 });

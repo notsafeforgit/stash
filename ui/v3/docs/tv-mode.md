@@ -63,7 +63,9 @@ dock with chrome hidden. Pinned actions use that dock; the remaining action
 rail is bounded above it, on the preferred hand's side.
 Controls are transparent icons with small shadows and comfortable tap targets.
 The bottom dock has no background panel, including when the UI is hidden;
-empty space around the essential icons passes taps and swipes to the video.
+its gaps, side gutters and bottom safe-area padding stay outside the video
+gesture surface. Tapping those areas cannot pause playback, and video gestures
+remain available above the dock.
 Use the navigation drawer to switch to another top-level page; TV has no close
 button. The drawer also remains available while loading or when media is
 unavailable. Escape closes an open menu or exits fullscreen while

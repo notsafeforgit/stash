@@ -531,8 +531,9 @@ export function TvControls({
           </aside>
         </div>
       )}
+      {/* Gaps and safe-area padding belong to the dock, not the video gestures. */}
       <div
-        className="tv-footer pointer-events-none relative flex shrink-0 flex-col gap-1 px-2 pt-1 text-white [text-shadow:0_1px_2px_rgb(0_0_0/0.85)]"
+        className="tv-footer pointer-events-auto relative flex shrink-0 flex-col gap-1 px-2 pt-1 text-white [text-shadow:0_1px_2px_rgb(0_0_0/0.85)]"
         data-tv-dock
         data-tv-interactive
       >

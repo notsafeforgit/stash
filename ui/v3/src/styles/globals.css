@@ -246,10 +246,10 @@
    on every element forces gesture resolution to stop at the touched
    element, so disabled buttons / drawer bodies / portaled popups
    can't fall back to `auto` and re-enable double-tap-zoom. Specific
-   surfaces that need `touch-action: none` (the video-frame zoom
-   inner, marker handles, filter-drag overlay) explicitly set it
-   inline / via class, which beats the `*` selector's specificity
-   here. */
+   surfaces that need `touch-action: none` must set it inline or in an
+   unlayered rule (e.g. the filter-drag overlay below). Layered utilities
+   such as Tailwind's `touch-none` cannot override this rule regardless
+   of selector specificity. */
 *,
 ::before,
 ::after {

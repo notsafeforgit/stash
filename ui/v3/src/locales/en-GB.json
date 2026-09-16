@@ -2486,7 +2486,7 @@
       "plus": "Plus"
     },
     "rail": {
-      "instructions": "Drag to reorder, or use the arrows. Select a name to edit. Pin actions or folders to the bottom bar.",
+      "instructions": "Drag a handle to reorder, or use the arrows. Select a name to edit. Pin actions or folders to the bottom bar.",
       "folder_count": "Folder · {count, plural, one {# action} other {# actions}}",
       "drag": "Drag {label}",
       "pin": "Pin {label}",

@@ -234,8 +234,14 @@ function RailRow({
   const msg = useMsg();
   const intl = useIntl();
   const id = railEntryId(entry);
-  const { setNodeRef, transform, transition, attributes, listeners } =
-    useSortable({ id });
+  const {
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    attributes,
+    listeners,
+  } = useSortable({ id });
   const essential =
     entry.type === "action" && entry.action.kind === "visibility";
   const update = (next: TvRailEntry) =>
@@ -261,10 +267,14 @@ function RailRow({
       <div className="grid gap-1 @xl:grid-cols-[minmax(0,1fr)_auto] @xl:items-center">
         <div className="flex min-w-0 items-center gap-1">
           <Button
+            ref={setActivatorNodeRef}
             type="button"
             variant="ghost"
             size="icon-lg"
-            className="size-11 touch-none text-muted-foreground"
+            className="size-11 cursor-grab text-muted-foreground active:cursor-grabbing"
+            // The unlayered page gesture policy overrides Tailwind touch-none.
+            // Claim this handle before pointerdown; the rest of the row scrolls.
+            style={{ touchAction: "none" }}
             aria-label={intl.formatMessage(
               { id: "tv.rail.drag", defaultMessage: "Drag {label}" },
               { label },
@@ -588,7 +598,7 @@ export default function TvRailEditor({
       <p className="text-muted-foreground">
         <FormattedMessage
           id="tv.rail.instructions"
-          defaultMessage="Drag to reorder, or use the arrows. Select a name to edit. Pin actions or folders to the bottom bar."
+          defaultMessage="Drag a handle to reorder, or use the arrows. Select a name to edit. Pin actions or folders to the bottom bar."
         />
       </p>
       <DndContext

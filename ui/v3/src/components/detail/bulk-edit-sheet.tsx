@@ -58,6 +58,7 @@ export function BulkEditSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
+        showCloseButton={false}
         className="flex flex-col gap-0 p-0 sm:max-w-md"
       >
         <SheetHeader className="border-b px-4 py-3">

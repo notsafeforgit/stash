@@ -44,6 +44,7 @@ import { SceneDetailFixture } from "./scene-detail";
 import { SceneCoverFixture } from "./scene-cover";
 import { MarkerEditorFixture } from "./marker-editor";
 import { MergeDialogsFixture } from "./merge-dialogs";
+import { DialogDismissalFixture } from "./dialog-dismissal";
 import { EntityCardsFixture } from "./entity-cards";
 import { RouteTransitionsFixture } from "./route-transitions";
 import { HomeFixture } from "./home";
@@ -345,6 +346,11 @@ const router = createRouter({
       getParentRoute: () => rootRoute,
       path: "/merge-dialogs",
       component: MergeDialogsFixture,
+    }),
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/dialog-dismissal",
+      component: DialogDismissalFixture,
     }),
     createRoute({
       getParentRoute: () => rootRoute,

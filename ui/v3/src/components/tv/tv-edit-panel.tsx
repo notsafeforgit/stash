@@ -64,12 +64,13 @@ function TagsForm({
   const values = useStore(form.store, (state) => state.values);
   return (
     <form
+      className="flex min-h-0 flex-col gap-4"
       onSubmit={(event) => {
         event.preventDefault();
         void form.handleSubmit();
       }}
     >
-      <FieldGroup>
+      <FieldGroup className="min-h-0 overflow-y-auto overscroll-contain">
         {marker && (
           <Field>
             <FieldLabel>
@@ -97,15 +98,27 @@ function TagsForm({
             onChange={(tags) => form.setFieldValue("tags", tags)}
           />
         </Field>
+      </FieldGroup>
+      <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t pt-3">
+        <Button
+          type="button"
+          variant="outline"
+          className="min-h-11"
+          onClick={close}
+          disabled={mutations.busy}
+        >
+          <FormattedMessage id="actions.cancel" defaultMessage="Cancel" />
+        </Button>
         <Button
           type="submit"
+          className="min-h-11"
           disabled={
             mutations.busy || (target.item.kind === "marker" && !values.primary)
           }
         >
           <FormattedMessage id="tv.text.save_tags" defaultMessage="Save tags" />
         </Button>
-      </FieldGroup>
+      </div>
     </form>
   );
 }
@@ -151,6 +164,7 @@ export default function TvEditPanel({
       }}
     >
       <TvDialogContent
+        variant="form"
         title={
           target.kind === "marker"
             ? msg("tv.text.create_marker", "Create marker")
@@ -160,6 +174,7 @@ export default function TvEditPanel({
       >
         {target.kind === "marker" ? (
           <MarkerEditForm
+            layout="dialog"
             sceneId={target.scene.id}
             marker={null}
             initialTimestamp={target.position}

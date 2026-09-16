@@ -38,7 +38,7 @@ export function DestructiveConfirmDialog({
 }: IProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>

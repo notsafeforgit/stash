@@ -1,5 +1,5 @@
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useIntl } from "react-intl";
 import { useLazyQuery } from "@apollo/client/react";
 import { useDebouncedValue } from "src/hooks/debounce";
@@ -52,6 +52,7 @@ export function SceneSelectDialog({
   onSelect,
 }: SceneSelectDialogProps) {
   const intl = useIntl();
+  const searchInput = useRef<HTMLInputElement>(null);
   const toast = useToast();
   const [query, setQuery] = useState(initialQuery);
   const debouncedQuery = useDebouncedValue(query, 250);
@@ -98,7 +99,11 @@ export function SceneSelectDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent
+        initialFocus={searchInput}
+        showCloseButton={false}
+        className="max-w-lg"
+      >
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
@@ -106,7 +111,7 @@ export function SceneSelectDialog({
         <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          autoFocus
+          ref={searchInput}
           placeholder={intl.formatMessage({
             id: "actions.search",
             defaultMessage: "Search…",

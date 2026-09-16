@@ -759,7 +759,7 @@ export function PerformerScrapeMergeDialog({
         onOpenChange(next);
       }}
     >
-      <DialogContent className="max-w-3xl">
+      <DialogContent showCloseButton={false} className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>
             {intl.formatMessage({

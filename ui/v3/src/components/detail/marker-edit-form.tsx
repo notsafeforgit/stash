@@ -27,6 +27,7 @@ import { Button } from "src/components/ui/button";
 import { Input } from "src/components/ui/input";
 import { DurationInput } from "src/components/ui/duration-input";
 import { Field, FieldLabel, FieldGroup } from "src/components/ui/field";
+import { cn } from "@/lib/utils";
 import {
   type EntityOption,
   EntityMultiSelect,
@@ -81,7 +82,7 @@ function markerToFormValues(
   };
 }
 
-interface MarkerEditFormProps {
+interface MarkerEditFormOptions {
   initialTimestamp?: number;
   maxTimestamp?: number;
   sceneId: string;
@@ -107,9 +108,13 @@ interface MarkerEditFormProps {
   ) => void;
   /** Called after a successful save. */
   onSaved?: () => void;
-  /** Called when the user clicks Cancel. */
-  onCancel?: () => void;
 }
+
+type MarkerEditFormProps = MarkerEditFormOptions &
+  (
+    | { layout?: "inline"; onCancel?: () => void }
+    | { layout: "dialog"; onCancel: () => void }
+  );
 
 export function MarkerEditForm({
   initialTimestamp,
@@ -121,6 +126,7 @@ export function MarkerEditForm({
   registerBoundSetter,
   onSaved,
   onCancel,
+  layout = "inline",
 }: MarkerEditFormProps) {
   const intl = useIntl();
   const report = useToast().error;
@@ -216,13 +222,21 @@ export function MarkerEditForm({
 
   return (
     <form
-      className="min-w-0 overflow-x-hidden flex flex-col gap-3"
+      className={cn(
+        "min-w-0 flex flex-col gap-3",
+        layout === "dialog" ? "min-h-0" : "overflow-x-hidden",
+      )}
       onSubmit={(e) => {
         e.preventDefault();
         form.handleSubmit();
       }}
     >
-      <FieldGroup className="gap-3">
+      <FieldGroup
+        className={cn(
+          "gap-3",
+          layout === "dialog" && "min-h-0 overflow-y-auto overscroll-contain",
+        )}
+      >
         {/* Title */}
         <form.Field name="title">
           {(field) => (
@@ -355,7 +369,14 @@ export function MarkerEditForm({
       </FieldGroup>
 
       {/* Action bar */}
-      <div className="sticky bottom-0 z-10 flex items-center justify-between gap-2 border-t border-border bg-background/95 backdrop-blur-sm h-10 -mx-3 px-3">
+      <div
+        className={cn(
+          "flex items-center gap-2 border-t",
+          layout === "dialog"
+            ? "shrink-0 flex-wrap justify-end pt-3"
+            : "sticky bottom-0 z-10 border-border bg-background/95 backdrop-blur-sm h-10 -mx-3 px-3",
+        )}
+      >
         <form.Subscribe
           selector={(s) => ({
             isSubmitting: s.isSubmitting,
@@ -365,20 +386,38 @@ export function MarkerEditForm({
         >
           {({ isSubmitting, isDirty, values }) => {
             const valid = validMarkerForm(values, maxTimestamp);
+            const cancelButton = onCancel && (
+              <Button
+                type="button"
+                variant={layout === "dialog" ? "outline" : "ghost"}
+                size={layout === "dialog" ? "default" : "sm"}
+                className={layout === "dialog" ? "min-h-11" : "ml-auto"}
+                onClick={onCancel}
+                disabled={busy || isSubmitting}
+              >
+                {layout === "inline" && <X />}
+                {intl.formatMessage({
+                  id: "actions.cancel",
+                  defaultMessage: "Cancel",
+                })}
+              </Button>
+            );
             return (
               <>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="submit"
-                    size="sm"
-                    disabled={busy || isSubmitting || !valid || !isDirty}
-                  >
-                    <Save />
-                    {intl.formatMessage({
-                      id: "actions.save",
-                      defaultMessage: "Save",
-                    })}
-                  </Button>
+                {layout === "dialog" && cancelButton}
+                <Button
+                  type="submit"
+                  size={layout === "dialog" ? "default" : "sm"}
+                  className={layout === "dialog" ? "min-h-11" : undefined}
+                  disabled={busy || isSubmitting || !valid || !isDirty}
+                >
+                  <Save />
+                  {intl.formatMessage({
+                    id: "actions.save",
+                    defaultMessage: "Save",
+                  })}
+                </Button>
+                {layout === "inline" && (
                   <Button
                     type="button"
                     variant="outline"
@@ -392,22 +431,8 @@ export function MarkerEditForm({
                       defaultMessage: "Discard",
                     })}
                   </Button>
-                </div>
-                {onCancel && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={onCancel}
-                    disabled={busy}
-                  >
-                    <X />
-                    {intl.formatMessage({
-                      id: "actions.cancel",
-                      defaultMessage: "Cancel",
-                    })}
-                  </Button>
                 )}
+                {layout === "inline" && cancelButton}
               </>
             );
           }}

@@ -522,7 +522,7 @@ export function SceneScrapeMergeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent showCloseButton={false} className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>
             {intl.formatMessage({

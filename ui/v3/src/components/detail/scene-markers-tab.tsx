@@ -409,7 +409,7 @@ export function SceneMarkersTab({
           if (!o && !destroying) setPendingDelete(null);
         }}
       >
-        <DialogContent>
+        <DialogContent showCloseButton={false}>
           <DialogHeader>
             <DialogTitle>
               {intl.formatMessage({

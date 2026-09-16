@@ -20,7 +20,7 @@ window.markerFixtureSaves = [];
 const original = scenes[0]?.scene_markers[0];
 if (!original) throw new Error("Missing synthetic marker");
 let savedMarker: GQL.SceneMarkerDataFragment = original;
-const tag: GQL.TagDataFragment = {
+export const markerTag: GQL.TagDataFragment = {
   __typename: "Tag",
   id: original.primary_tag.id,
   name: original.primary_tag.name,
@@ -55,7 +55,7 @@ const tags: MockedResponse<GQL.FindTagsQuery, GQL.FindTagsQueryVariables> = {
   request: { query: GQL.FindTagsDocument, variables: () => true },
   delay: 0,
   maxUsageCount: Infinity,
-  result: { data: { findTags: { count: 1, tags: [tag] } } },
+  result: { data: { findTags: { count: 1, tags: [markerTag] } } },
 };
 function save(variables: GQL.SceneMarkerCreateMutationVariables) {
   savedMarker = {

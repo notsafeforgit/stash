@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useIntl } from "react-intl";
 import { useLazyQuery } from "@apollo/client/react";
 import { useDebouncedValue } from "src/hooks/debounce";
@@ -42,6 +42,7 @@ export function StashBoxPerformerSearchDialog({
   onSelect,
 }: StashBoxPerformerSearchDialogProps) {
   const intl = useIntl();
+  const searchInput = useRef<HTMLInputElement>(null);
   const toast = useToast();
   const { stashBoxes } = useAvailablePerformerScrapers();
 
@@ -96,7 +97,7 @@ export function StashBoxPerformerSearchDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent initialFocus={searchInput} className="max-w-lg">
         <DialogHeader>
           <DialogTitle>
             {intl.formatMessage({
@@ -138,7 +139,7 @@ export function StashBoxPerformerSearchDialog({
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              autoFocus
+              ref={searchInput}
               placeholder={intl.formatMessage({
                 id: "scrape.stash_box_search_placeholder",
                 defaultMessage: "Performer name or stash-id (UUID)",

@@ -29,6 +29,7 @@ import type { TvFeedQuery } from "@/core/tv/feed-query";
 import * as GQL from "@/core/generated-graphql";
 import { createCache } from "@/core/create-client";
 import { scenes as sourceScenes } from "./scene-lightbox";
+import { markerTag } from "./marker-editor";
 import { playerConfiguration } from "./player-configuration";
 import { RatingStarPrecision, RatingSystemType } from "@/utils/rating";
 import { RatingSystem } from "@/components/ui/rating-system";
@@ -300,6 +301,45 @@ const play: MockedResponse<
   },
 };
 const cache = createCache();
+const tags: MockedResponse<GQL.FindTagsQuery, GQL.FindTagsQueryVariables> = {
+  request: { query: GQL.FindTagsDocument, variables: () => true },
+  maxUsageCount: Infinity,
+  delay: 0,
+  result: { data: { findTags: { count: 1, tags: [markerTag] } } },
+};
+const tagsForSelect: MockedResponse<
+  GQL.FindTagsForSelectQuery,
+  GQL.FindTagsForSelectQueryVariables
+> = {
+  request: { query: GQL.FindTagsForSelectDocument, variables: () => true },
+  maxUsageCount: Infinity,
+  delay: 0,
+  result: { data: { findTags: { count: 1, tags: [markerTag] } } },
+};
+const createMarker: MockedResponse<
+  GQL.SceneMarkerCreateMutation,
+  GQL.SceneMarkerCreateMutationVariables
+> = {
+  request: { query: GQL.SceneMarkerCreateDocument, variables: () => true },
+  delay: 500,
+  result: (variables) => {
+    record("SceneMarkerCreate", variables);
+    const scene = targetScene(variables.scene_id);
+    const template = scene.scene_markers[0];
+    if (!template) throw new Error("Missing synthetic marker");
+    const marker = {
+      ...template,
+      id: "created-marker",
+      title: variables.title || markerTag.name,
+      seconds: variables.seconds,
+      end_seconds: variables.end_seconds ?? null,
+      primary_tag: markerTag,
+      tags: [],
+    };
+    scene.scene_markers.push(marker);
+    return { data: { sceneMarkerCreate: marker } };
+  },
+};
 function targetScene(id: string) {
   const scene = scenes.find((scene) => scene.id === id);
   if (!scene) throw new Error("Missing mutation target");
@@ -441,6 +481,9 @@ const client = new ApolloClient({
     addO,
     deleteO,
     resetO,
+    tags,
+    tagsForSelect,
+    createMarker,
   ]),
 });
 function FixtureConfiguration({ children }: { children: ReactNode }) {

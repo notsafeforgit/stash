@@ -192,7 +192,10 @@ export function OfflineRecoveryControl() {
           setOpen(next);
         }}
       >
-        <DialogContent className="flex max-h-[85dvh] flex-col overflow-hidden sm:max-w-xl">
+        <DialogContent
+          showCloseButton={false}
+          className="flex max-h-[85dvh] flex-col overflow-hidden sm:max-w-xl"
+        >
           <DialogHeader className="shrink-0">
             <DialogTitle>
               {intl.formatMessage({ id: "offline.recovery.action" })}

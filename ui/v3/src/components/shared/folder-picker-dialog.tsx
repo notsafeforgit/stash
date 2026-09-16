@@ -41,7 +41,10 @@ export function FolderPickerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="min-w-0 overflow-x-hidden sm:max-w-lg">
+      <DialogContent
+        showCloseButton={false}
+        className="min-w-0 overflow-x-hidden sm:max-w-lg"
+      >
         <DialogHeader>
           <DialogTitle>
             {title ?? (

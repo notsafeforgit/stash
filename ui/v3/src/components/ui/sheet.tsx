@@ -1,4 +1,5 @@
 import type * as React from "react";
+import { FormattedMessage } from "react-intl";
 import { Dialog as SheetPrimitive } from "@base-ui/react/dialog";
 
 import { cn } from "@/lib/utils";
@@ -95,7 +96,9 @@ function SheetContent({
             }
           >
             <XIcon />
-            <span className="sr-only">Close</span>
+            <span className="sr-only">
+              <FormattedMessage id="actions.close" defaultMessage="Close" />
+            </span>
           </SheetPrimitive.Close>
         )}
       </SheetPrimitive.Popup>

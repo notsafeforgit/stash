@@ -62,7 +62,7 @@ function TempDurationDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onCancel()}>
-      <DialogContent>
+      <DialogContent showCloseButton={false}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Clock className="size-4" />

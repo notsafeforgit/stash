@@ -1,5 +1,5 @@
 import type React from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useIntl } from "react-intl";
 import { useLazyQuery } from "@apollo/client/react";
 import { useDebouncedValue } from "src/hooks/debounce";
@@ -38,6 +38,7 @@ export function StashBoxSceneSearchDialog({
   onSelect,
 }: StashBoxSceneSearchDialogProps) {
   const intl = useIntl();
+  const searchInput = useRef<HTMLInputElement>(null);
   const toast = useToast();
   const { stashBoxes } = useAvailableSceneScrapers();
 
@@ -90,7 +91,7 @@ export function StashBoxSceneSearchDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent initialFocus={searchInput} className="max-w-lg">
         <DialogHeader>
           <DialogTitle>
             {intl.formatMessage({
@@ -132,7 +133,7 @@ export function StashBoxSceneSearchDialog({
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              autoFocus
+              ref={searchInput}
               placeholder={intl.formatMessage({
                 id: "scrape.stash_box_search_placeholder_scene",
                 defaultMessage: "Scene title or stash-id",

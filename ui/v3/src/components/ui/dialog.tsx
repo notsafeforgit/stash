@@ -1,4 +1,5 @@
 import type * as React from "react";
+import { FormattedMessage } from "react-intl";
 import { useOverlayContainer } from "./overlay-container";
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 
@@ -77,6 +78,7 @@ function DialogContent({
   showCloseButton = true,
   ...props
 }: DialogPrimitive.Popup.Props & {
+  /** Disable when the content already provides Cancel or Close. */
   showCloseButton?: boolean;
   /** Optional layer override for the portaled backdrop. */
   overlayClassName?: string;
@@ -105,7 +107,9 @@ function DialogContent({
             }
           >
             <XIcon />
-            <span className="sr-only">Close</span>
+            <span className="sr-only">
+              <FormattedMessage id="actions.close" defaultMessage="Close" />
+            </span>
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Popup>
@@ -143,7 +147,7 @@ function DialogFooter({
       {children}
       {showCloseButton && (
         <DialogPrimitive.Close render={<Button variant="outline" />}>
-          Close
+          <FormattedMessage id="actions.close" defaultMessage="Close" />
         </DialogPrimitive.Close>
       )}
     </div>

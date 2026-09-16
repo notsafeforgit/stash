@@ -63,7 +63,7 @@ function StashBoxDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onCancel()}>
-      <DialogContent>
+      <DialogContent showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>
             {msg("config.stashbox.title", "Stash-box endpoints")}

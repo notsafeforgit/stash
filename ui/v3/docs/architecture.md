@@ -417,6 +417,24 @@ AirPlay uses Video.js 10's `AirPlayButton` and built-in HLS AirPlay bridge; PiP
 uses its existing feature store. Unavailable controls stay hidden, and local
 blob media disables remote playback. Receivers must be able to fetch the source.
 
+## Dialog dismissal
+
+Form and confirmation dialogs have one visible dismissal action: Cancel beside
+Save, Create, Apply, or the destructive action. Set `showCloseButton={false}`
+when supplying that action; do not add a second corner X or Close footer.
+Informational and immediately applied controls keep one Close action, while
+search dialogs without footer actions retain their labelled corner close.
+Escape, backdrop dismissal, focus management, and busy-state guards remain
+owned by the dialog primitive and its caller.
+Use `DialogContent.initialFocus` for a specific initial field instead of the
+input's `autoFocus`, so the dialog can capture and restore the previous focus.
+
+TV's `TvDialogContent` uses `variant="form"` when its child owns the scrolling
+fields and pinned actions. Its default content variant provides a bounded
+scroller and one Close footer. `MarkerEditForm`'s dialog layout requires an
+`onCancel` handler and keeps Cancel/Save visible on small screens; its inline
+layout also offers Discard to reset fields without leaving the editor.
+
 ## Entity editing
 
 All seven single-entity edit sheets use `components/detail/entity-edit-sheet.tsx`.

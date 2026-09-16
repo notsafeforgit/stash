@@ -158,7 +158,7 @@ const TagSaveDialog: React.FC<ITagSaveDialogProps> = ({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent>
+      <DialogContent showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>
             {intl.formatMessage(
@@ -315,7 +315,7 @@ const BatchAddDialog: React.FC<IBatchAddDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
+      <DialogContent showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>
             {intl.formatMessage({

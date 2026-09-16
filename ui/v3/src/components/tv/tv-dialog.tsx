@@ -32,7 +32,8 @@ export function TvDialogContent({
       // focus handler would steal focus and close a tag picker's popup.
       onPointerUp={(event) => event.stopPropagation()}
       className={cn(
-        "min-w-0 max-h-[calc(100dvh-2rem)] grid-cols-[minmax(0,1fr)] overflow-hidden sm:max-w-lg",
+        // Percentage height follows the TV surface when presentation rotates.
+        "min-w-0 max-h-[calc(100%-2rem)] grid-cols-[minmax(0,1fr)] overflow-hidden sm:max-w-lg",
         variant === "form"
           ? "grid-rows-[auto_minmax(0,1fr)]"
           : "grid-rows-[auto_minmax(0,1fr)_auto]",

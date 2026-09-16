@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { parseStartPosition, suspendHlsBuffering } from "./hls";
 
 const scene = "https://stash.test/scene/1/stream.master.m3u8";
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe("HLS scrub loading", () => {
   const engine = (bufferingEnabled = true) => ({
@@ -35,6 +37,17 @@ describe("HLS scrub loading", () => {
     expect(media.engine.pauseBuffering).not.toHaveBeenCalled();
     expect(media.engine.resumeBuffering).not.toHaveBeenCalled();
     expect(() => suspendHlsBuffering(null)()).not.toThrow();
+  });
+
+  it("leaves ManagedMediaSource in control of loading throughout a drag", () => {
+    vi.stubGlobal("ManagedMediaSource", class {});
+    const media = { engine: engine() };
+    const resume = suspendHlsBuffering(media);
+    expect(media.engine.pauseBuffering).not.toHaveBeenCalled();
+    // Safari can withdraw its loading window before the drag is released.
+    media.engine.bufferingEnabled = false;
+    resume();
+    expect(media.engine.resumeBuffering).not.toHaveBeenCalled();
   });
 });
 

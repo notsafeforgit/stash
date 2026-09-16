@@ -371,8 +371,9 @@ operations out of the planner so it remains testable without a media element.
 `PositionScrubber` separates its draft position from committed seeks. A drag
 temporarily pauses playback and previews decoded frames only inside the native
 buffered ranges, rechecking for eviction before each write. Preview seeks are
-coalesced and serialized, and hls.js fragment loading is suspended until the drag
-ends. Release uses the normal seek policy and restores the previous playback
+coalesced and serialized. Classic MSE hls.js fragment loading is suspended until
+the drag ends; Safari MMS and native HLS retain their browser-owned loading
+policy. Release uses the normal seek policy and restores the previous playback
 intent; cancellation restores the original position too. A simple tap does not
 pause. The independent draft position also supports generated sprite previews
 without seeking into unbuffered media.

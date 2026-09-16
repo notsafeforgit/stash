@@ -326,8 +326,13 @@ export function getHlsEngine(media: unknown): HlsEngineLike | null {
 }
 
 /** Keep buffered scrub previews from scheduling fragments at each position.
- * Native HLS keeps its own loading policy; previews still require real buffers. */
+ * Native HLS and MMS keep their own loading policy; previews still require
+ * real buffers. MMS start/endstreaming uses these same hls.js methods, so a
+ * drag must not restore loading over a newer browser-imposed suspension. */
 export function suspendHlsBuffering(media: unknown): () => void {
+  // The configured hls.js engine prefers MMS wherever it is available.
+  if (typeof window !== "undefined" && "ManagedMediaSource" in window)
+    return () => {};
   const engine = getHlsEngine(media);
   if (
     engine?.bufferingEnabled === true &&

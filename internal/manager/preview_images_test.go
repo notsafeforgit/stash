@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"image/jpeg"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -38,6 +39,84 @@ func coverTestManager(t *testing.T) (*Manager, *mocks.Database) {
 		Paths: &testPaths, ReadLockManager: fsutil.NewReadLockManager(),
 	}
 	return mgr, db
+}
+
+func TestMarkerScreenshotBackfillsHDRAndLegacyJPEG(t *testing.T) {
+	ffmpegPath, err := exec.LookPath("ffmpeg")
+	if err != nil {
+		t.Skip("ffmpeg is required for marker regeneration")
+	}
+	probePath, err := exec.LookPath("ffprobe")
+	if err != nil {
+		t.Skip("ffprobe is required for marker regeneration")
+	}
+	filters, _ := exec.Command(ffmpegPath, "-hide_banner", "-filters").CombinedOutput()
+	encoders, _ := exec.Command(ffmpegPath, "-hide_banner", "-encoders").CombinedOutput()
+	_, avifErr := exec.LookPath("avifenc")
+	if !strings.Contains(string(filters), " zscale ") || (avifErr != nil && !strings.Contains(string(encoders), "libaom-av1")) {
+		t.Skip("HDR round-trip requires zscale and an AVIF encoder")
+	}
+	for _, transfer := range []string{"smpte2084", "arib-std-b67"} {
+		t.Run(transfer, func(t *testing.T) {
+			mgr, db := coverTestManager(t)
+			mgr.FFMpeg, mgr.FFProbe = ffmpeg.NewEncoder(ffmpegPath), ffmpeg.NewFFProbe(probePath)
+			previous := instance
+			instance = mgr
+			t.Cleanup(func() { instance = previous })
+			source := filepath.Join(t.TempDir(), "source.mkv")
+			out, err := exec.Command(ffmpegPath, "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=64x48:rate=8:duration=3",
+				"-vf", "format=yuv420p10le,setparams=color_primaries=bt2020:color_trc="+transfer+":colorspace=bt2020nc", "-c:v", "ffv1", source).CombinedOutput()
+			if err != nil {
+				t.Fatalf("fixture: %v: %s", err, out)
+			}
+			file := &models.VideoFile{BaseFile: &models.BaseFile{Path: source}, Width: 64, Height: 48, Duration: 3}
+			scene := &models.Scene{ID: 1, Path: source, Checksum: "marker-test", Files: models.NewRelatedVideoFiles([]*models.VideoFile{file})}
+			marker := &models.SceneMarker{ID: 2, SceneID: scene.ID, Seconds: 1.125}
+			task := &GenerateMarkersTask{repository: db.Repository(), Scene: scene, Screenshot: true, fileNamingAlgorithm: models.HashAlgorithmMd5}
+			db.SceneMarker.On("FindBySceneID", mock.Anything, scene.ID).Return([]*models.SceneMarker{marker}, nil)
+			legacyPath := mgr.Paths.SceneMarkers.GetScreenshotPath(scene.Checksum, int(marker.Seconds))
+			if err := os.MkdirAll(filepath.Dir(legacyPath), 0755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(legacyPath, []byte("old screenshot"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if task.markersNeeded(context.Background()) != 1 {
+				t.Fatal("existing legacy screenshot prevented HDR backfill")
+			}
+			if err := task.generateMarkerScreenshot(context.Background(), scene, marker, file); err != nil {
+				t.Fatal(err)
+			}
+			manifest := mgr.MarkerPreviewImage(scene, marker)
+			if manifest == nil || manifest.At != marker.Seconds {
+				t.Fatalf("marker timestamp was not preserved: %v", manifest)
+			}
+			legacy, err := os.ReadFile(legacyPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := jpeg.Decode(bytes.NewReader(legacy)); err != nil {
+				t.Fatalf("legacy screenshot is not a valid JPEG: %v", err)
+			}
+			hasHDR := false
+			for _, variant := range manifest.Variants {
+				if variant.MIMEType == "image/avif" && (variant.DynamicRange == previewimage.HDR || variant.DynamicRange == previewimage.Adaptive) {
+					hasHDR = true
+				}
+				if variant.MIMEType == "image/jpeg" {
+					path, _ := mgr.PreviewImageStore().File(scene.ID, "marker", manifest, variant.File)
+					data, err := os.ReadFile(path)
+					if err != nil || !bytes.Equal(legacy, data) || variant.DynamicRange != previewimage.SDR {
+						t.Fatal("v2.5 screenshot differs from the SDR fallback")
+					}
+				}
+			}
+			if !hasHDR || task.markersNeeded(context.Background()) != 0 {
+				t.Fatal("marker backfill did not finish with an HDR rendition")
+			}
+			db.AssertExpectations(t)
+		})
+	}
 }
 
 func saveCoverTestMetadata(t *testing.T, mgr *Manager, scene *models.Scene, at float64) {

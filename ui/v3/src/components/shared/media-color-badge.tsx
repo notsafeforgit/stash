@@ -1,4 +1,4 @@
-import { FormattedMessage } from "react-intl";
+import { FormattedMessage, useIntl, type IntlShape } from "react-intl";
 import { Badge } from "src/components/ui/badge";
 import {
   Tooltip,
@@ -17,11 +17,17 @@ export type MediaColorMetadata = {
 
 type MediaColorMode = "hdr" | "sdr" | "unknown";
 
+const COLOR_MODE_MESSAGES = {
+  hdr: { id: "media_info.hdr", defaultMessage: "HDR" },
+  sdr: { id: "media_info.sdr", defaultMessage: "SDR" },
+  unknown: { id: "unknown", defaultMessage: "Unknown" },
+};
+
 const HDR_COLOR_TRANSFERS = new Set(["smpte2084", "arib-std-b67"]);
 const UNKNOWN_COLOR_VALUES = new Set(["", "unknown", "unspecified", "n/a"]);
 
 function normalizeColorValue(value: string | null | undefined): string {
-  return value?.trim().toLocaleLowerCase() ?? "";
+  return value?.trim().toLowerCase() ?? "";
 }
 
 function hasKnownColorValue(value: string | null | undefined): boolean {
@@ -52,31 +58,55 @@ function mediaColorModeRank(
   }
 }
 
-function mediaColorLabel(file: MediaColorMetadata | null | undefined): string {
-  const bitDepth = file?.bit_depth;
-  const bitDepthLabel = bitDepth ? `${bitDepth}-bit` : "";
-
-  switch (mediaColorMode(file)) {
-    case "hdr":
-      return ["HDR", bitDepthLabel].filter(Boolean).join(" ");
-    case "sdr":
-      return ["SDR", bitDepthLabel].filter(Boolean).join(" ");
-    case "unknown":
-      return bitDepthLabel;
-  }
+function bitDepthLabel(
+  file: MediaColorMetadata | null | undefined,
+  intl: IntlShape,
+): string {
+  return file?.bit_depth
+    ? intl.formatMessage(
+        { id: "media_info.bit_depth_value", defaultMessage: "{depth}-bit" },
+        { depth: file.bit_depth },
+      )
+    : "";
 }
 
-function mediaColorDetails(file: MediaColorMetadata | null | undefined) {
+function mediaColorLabel(
+  file: MediaColorMetadata | null | undefined,
+  intl: IntlShape,
+): string {
+  return [
+    intl.formatMessage(COLOR_MODE_MESSAGES[mediaColorMode(file)]),
+    bitDepthLabel(file, intl),
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+export function mediaColorDetails(
+  file: MediaColorMetadata | null | undefined,
+  intl: IntlShape,
+) {
   return [
     {
       id: "media_info.bit_depth",
       defaultMessage: "Bit Depth",
-      value: file?.bit_depth ? `${file.bit_depth}-bit` : undefined,
+      value: bitDepthLabel(file, intl),
     },
     {
       id: "media_info.color_transfer",
       defaultMessage: "Transfer",
-      value: file?.color_transfer,
+      value:
+        normalizeColorValue(file?.color_transfer) === "smpte2084"
+          ? intl.formatMessage({
+              id: "media_info.transfer_pq",
+              defaultMessage: "PQ (SMPTE ST 2084)",
+            })
+          : normalizeColorValue(file?.color_transfer) === "arib-std-b67"
+            ? intl.formatMessage({
+                id: "media_info.transfer_hlg",
+                defaultMessage: "HLG (ARIB STD-B67)",
+              })
+            : file?.color_transfer,
     },
     {
       id: "media_info.color_primaries",
@@ -127,20 +157,18 @@ export function MediaColorBadge({
   file: MediaColorMetadata | null | undefined;
   className?: string;
 }) {
-  const label = mediaColorLabel(file);
-  const details = mediaColorDetails(file);
+  const intl = useIntl();
+  const mode = mediaColorMode(file);
+  const label = mediaColorLabel(file, intl);
+  const details = mediaColorDetails(file, intl);
   const badge = (
     <Badge
       variant={
-        mediaColorMode(file) === "hdr"
-          ? "default"
-          : label
-            ? "outline"
-            : "secondary"
+        mode === "hdr" ? "default" : mode === "sdr" ? "outline" : "secondary"
       }
       className={cn(details.length > 0 && "cursor-help", className)}
     >
-      {label || <FormattedMessage id="unknown" defaultMessage="Unknown" />}
+      {label}
     </Badge>
   );
 

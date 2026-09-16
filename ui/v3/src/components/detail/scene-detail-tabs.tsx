@@ -49,6 +49,7 @@ import { DateInput } from "src/components/ui/date-input";
 import { useMutation } from "@apollo/client/react";
 import { SceneFileActionsMenu } from "src/components/detail/scene-file-actions";
 import { MetaRow } from "src/components/detail/meta-row";
+import { MediaColorMetaRows } from "@/components/detail/media-color-meta-rows";
 import { FingerprintMetaRows } from "src/components/detail/fingerprint-meta-rows";
 import { FilterUrlLink } from "src/components/shared/filter-url-link";
 import NavUtils from "src/utils/navigation";
@@ -120,6 +121,7 @@ export function SceneDetailsTab({ scene }: { scene: SceneData }) {
           {scene.code}
         </MetaRow>
       )}
+      {scene.files[0] && <MediaColorMetaRows file={scene.files[0]} />}
       {scene.director && (
         <MetaRow
           label={intl.formatMessage({
@@ -369,6 +371,7 @@ export function SceneFileInfoTab({ scene }: { scene: SceneData }) {
               >
                 {file.video_codec}
               </MetaRow>
+              <MediaColorMetaRows file={file} expanded />
               <MetaRow
                 label={intl.formatMessage({
                   id: "audio_codec",

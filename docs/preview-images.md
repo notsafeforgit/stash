@@ -6,6 +6,12 @@ The same source frame also produces a tone-mapped sRGB JPEG. SDR sources produce
 SDR AVIF and JPEG. A 10-bit source is not considered HDR unless its transfer
 function identifies it as HDR.
 
+Scene **Details** shows the primary file's dynamic range. **File Info** shows it
+for each file, alongside bit depth, transfer, primaries, colour space and range.
+These describe the source file, not the selected playback transcode. Missing
+transfer metadata is shown as **Unknown**, even for 10-bit files; rescanning the
+source fills in metadata that was not recorded by an older scan.
+
 Cards, scene and marker tables, scene-marker detail thumbnails, lightbox posters
 and the player poster consume the additive `preview_image` GraphQL field through
 `PreviewImage`. AVIF gain maps can render the authored SDR base on an SDR display

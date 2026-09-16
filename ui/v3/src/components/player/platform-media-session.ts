@@ -12,6 +12,8 @@ export interface PlatformMediaOptions {
   duration?: number;
   suspended: boolean;
   seek(time: number): void;
+  /** Restore the retained pause position before resuming the media clock. */
+  play?: () => void;
   /** Share explicit pause intent and frame preservation with the app controls. */
   pause?: () => void;
   next?: () => void;
@@ -105,7 +107,9 @@ export function createPlatformMediaSession(
     }
     session.playbackState = playing ? "playing" : "paused";
     handle("play", () => {
-      void Promise.resolve(playback.play()).catch(() => {});
+      const handler = options().play;
+      if (handler) handler();
+      else void Promise.resolve(playback.play()).catch(() => {});
     });
     handle("pause", pause);
     handle("stop", () => {

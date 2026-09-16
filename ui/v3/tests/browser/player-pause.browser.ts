@@ -2,6 +2,86 @@ import { test, expect } from "./test";
 import { serveSceneMedia } from "./scene-media";
 
 for (const hls of [false, true]) {
+  test(`TV ${hls ? "HLS" : "direct"} restores its pause frame after a late renderer clock update`, async ({
+    page,
+  }) => {
+    await serveSceneMedia(page);
+    await page.goto(`/tv-fixture/tv?paused${hls ? "&low" : ""}`);
+    const video = page.locator("video");
+    const surface = page.locator("[data-tv-play-surface]");
+    await expect(page.locator("[data-scene-player]")).toHaveAttribute(
+      "data-playback-ready",
+      "true",
+    );
+    const frames = await video.evaluateHandle((v: HTMLVideoElement) => {
+      const state = { times: [] as number[] };
+      const observe = (_now: number, metadata: VideoFrameCallbackMetadata) => {
+        state.times.push(metadata.mediaTime);
+        v.requestVideoFrameCallback(observe);
+      };
+      v.requestVideoFrameCallback(observe);
+      return state;
+    });
+    await surface.tap({ position: { x: 150, y: 250 } });
+    await expect
+      .poll(() => frames.evaluate((s) => s.times.at(-1) ?? 0))
+      .toBeGreaterThan(0.5);
+    await surface.tap({ position: { x: 150, y: 250 } });
+    await expect(video).toHaveJSProperty("paused", true);
+    await expect(video).toHaveJSProperty("seeking", false);
+    await page.waitForTimeout(250);
+    const last = await frames.evaluate((s) => s.times.at(-1));
+    if (last === undefined) throw new Error("Missing paused frame");
+    const count = await frames.evaluate((s) => s.times.length);
+    await video.evaluate((v: HTMLVideoElement) => {
+      const descriptor = Object.getOwnPropertyDescriptor(
+        HTMLMediaElement.prototype,
+        "currentTime",
+      );
+      if (!descriptor?.get || !descriptor.set)
+        throw new Error("Missing media clock accessors");
+      const read = () => {
+        const value: unknown = descriptor.get?.call(v);
+        if (typeof value !== "number") throw new Error("Invalid media clock");
+        return value;
+      };
+      const play = v.play.bind(v);
+      let lateClock = 0.5;
+      // Model the recorded iOS failure: the renderer finishes pausing half a
+      // second later, while the paused picture remains unchanged. Unless the
+      // next Play repositions it, the renderer resumes from that newer clock.
+      Object.defineProperty(v, "currentTime", {
+        configurable: true,
+        get: () => read() + lateClock,
+        set: (value: number) => {
+          lateClock = 0;
+          descriptor.set?.call(v, value);
+        },
+      });
+      v.play = () => {
+        if (lateClock) {
+          const target = read() + lateClock;
+          lateClock = 0;
+          descriptor.set?.call(v, target);
+        }
+        return play();
+      };
+      v.dispatchEvent(new Event("timeupdate"));
+    });
+    await page.waitForTimeout(250);
+    await surface.tap({ position: { x: 150, y: 250 } });
+    await expect(video).toHaveJSProperty("paused", false);
+    await expect
+      .poll(() => frames.evaluate((s) => s.times.length))
+      .toBeGreaterThan(count + 4);
+    const resumed = await frames.evaluate(
+      (s, n) => s.times.slice(n, n + 5),
+      count,
+    );
+    expect(resumed[0]).toBeGreaterThanOrEqual(last - 0.001);
+    expect(resumed[0]).toBeLessThanOrEqual(last + 1 / 30 + 0.001);
+  });
+
   test(`scene detail ${hls ? "HLS" : "direct"} resumes from the paused frame before and after a seek`, async ({
     page,
   }) => {

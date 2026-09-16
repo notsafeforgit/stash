@@ -120,6 +120,7 @@ describe("explicit pause frame preservation", () => {
     f.controller.preserveOnPause(f.pause);
     expect(f.seeks).toEqual([]);
     f.play();
+    f.state.currentTime = 15.5;
     f.frame(15);
     f.controller.preserveOnPause(f.pause);
     expect(f.seeks).toEqual([15.000001]);
@@ -207,8 +208,79 @@ describe("explicit pause frame preservation", () => {
     f.controller.preserveOnPause(f.pause);
     expect(f.seeks).toEqual([]);
     f.play();
+    f.state.currentTime = 15.5;
     f.frame(15);
     f.controller.preserveOnPause(f.pause);
     expect(f.seeks).toEqual([15.000001]);
+  });
+
+  it("restores the saved frame when the media clock advances after pause settles", () => {
+    const f = fixture();
+    f.frame(12);
+    f.controller.preserveOnPause(f.pause);
+    f.video.dispatchEvent(new Event("seeking"));
+    f.video.dispatchEvent(new Event("seeked"));
+    // The audio renderer finishes pausing later than the visible frame.
+    // It reports a newer clock while the DOM still correctly says paused.
+    f.state.currentTime = 12.5;
+    f.video.dispatchEvent(new Event("timeupdate"));
+    // A queued play event from an earlier command cannot discard this pause.
+    f.video.dispatchEvent(new Event("play"));
+    f.controller.restoreBeforePlay();
+    f.play();
+    expect(f.seeks).toEqual([12.000001, 12.000001]);
+    expect(f.state.currentTime).toBe(12.000001);
+    expect(f.state.paused).toBe(false);
+    // The anchor is consumed; another Play never rewinds active playback.
+    f.state.currentTime = 13;
+    f.controller.restoreBeforePlay();
+    expect(f.state.currentTime).toBe(13);
+  });
+
+  it("retains the pre-pause clock when presentation callbacks are unavailable", () => {
+    const f = fixture();
+    f.controller.preserveOnPause(f.pause);
+    f.state.currentTime = 13;
+    f.controller.restoreBeforePlay();
+    expect(f.seeks).toEqual([12.5]);
+  });
+
+  it("retains the displayed frame when the native clock slightly trails it", () => {
+    const f = fixture();
+    f.frame(12.51);
+    f.controller.preserveOnPause(f.pause);
+    expect(f.seeks).toHaveLength(1);
+    expect(f.seeks[0]).toBeCloseTo(12.510001, 6);
+    f.video.dispatchEvent(new Event("seeking"));
+    f.state.currentTime = 13;
+    f.controller.restoreBeforePlay();
+    expect(f.seeks).toHaveLength(2);
+    expect(f.seeks[1]).toBe(f.seeks[0]);
+  });
+
+  it.each([
+    "user seek",
+    "source",
+    "selection",
+    "native play",
+    "remote",
+  ])("does not restore an obsolete pause after %s", (change) => {
+    const f = fixture();
+    f.frame(12);
+    f.controller.preserveOnPause(f.pause);
+    // A new seek can precede the pending event for our own pause correction.
+    f.state.currentTime = 18;
+    if (change === "user seek") f.video.dispatchEvent(new Event("seeking"));
+    if (change === "source") f.state.currentSrc = "blob:replacement";
+    if (change === "selection") f.controller.reset();
+    if (change === "native play") {
+      f.play();
+      f.video.dispatchEvent(new Event("play"));
+      f.pause();
+    }
+    if (change === "remote") f.state.remote.state = "connected";
+    f.controller.restoreBeforePlay();
+    expect(f.state.currentTime).toBe(18);
+    expect(f.seeks).toEqual([12.000001]);
   });
 });

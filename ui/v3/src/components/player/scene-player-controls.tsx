@@ -105,6 +105,7 @@ export function ScenePlayerControlsProvider({
   seek: (position: number) => void;
   previewSeek: (position: number | null) => void;
   seekBy: (seconds: number) => void;
+  play: () => void;
   pause: () => void;
   togglePaused: () => void;
   selectSource: (source: PlayerSource) => void;
@@ -165,9 +166,7 @@ export function ScenePlayerControlsProvider({
           error: store.state.error?.message ?? null,
           canPip: store.state.pipAvailability === "available",
         }),
-        play: () => {
-          if (store.state.paused) latest.current.togglePaused();
-        },
+        play: () => latest.current.play(),
         pause: () => latest.current.pause(),
         togglePaused: () => latest.current.togglePaused(),
         seekBy: (seconds) => latest.current.seekBy(seconds),

@@ -379,14 +379,18 @@ intent; cancellation restores the original position too. A simple tap does not
 pause. The independent draft position also supports generated sprite previews
 without seeking into unbuffered media.
 
-Explicit pause commands preserve the latest displayed, buffered frame with a
-precise native seek while paused. Two `requestVideoFrameCallback` timestamps
+Explicit pause commands retain the latest displayed, buffered frame and correct
+the native position while paused. Two `requestVideoFrameCallback` timestamps
 distinguish the visible frame from one queued for a future display refresh;
-there are no per-frame React updates or pixel copies. Source/selection changes
-discard those timestamps. Stale, hidden, unbuffered, remote, and in-flight seek
-states use the original pause behavior. Automatic marker completion and temporary
-scrub pauses retain their own exact positions. Resume calls `play()` within the
-input gesture and handles cancellation by a newer pause or seek. Browser tests
+there are no per-frame React updates or pixel copies. Without a fresh presentation
+timestamp, retain the pre-pause native clock. A late audio-renderer update can
+advance that clock again after Pause; restore the retained position immediately
+before Play if it has drifted. User seeks, source/selection changes, and external
+native playback invalidate the retained position. Hidden, unbuffered, remote,
+and in-flight seek states use the original pause behavior. Automatic marker
+completion and temporary scrub pauses retain their own exact positions. Resume
+calls `play()` within the input gesture and handles cancellation by a newer
+pause or seek. Browser tests
 compare continuously observed presentation timestamps across pause/resume;
 native media time alone cannot establish displayed-frame continuity.
 

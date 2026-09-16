@@ -783,57 +783,43 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     },
     [previewSeek],
   );
-  const handleTogglePaused = useCallback(() => {
-    const s = storeRef.current;
-    if (!s) return;
-    // Native intent updates synchronously; the store's pause event may still
-    // be queued when another tap arrives. Remote targets retain store ownership.
-    const video = fullscreenContainerRef.current?.querySelector("video");
-    const paused =
-      s.state.remotePlaybackState === "disconnected" &&
-      video instanceof HTMLVideoElement
-        ? video.paused
-        : s.state.paused;
-    // Every toggle is an explicit user gesture — from here on the user
-    // owns the playback state, so the play-delay gate must neither
-    // suppress the resulting play nor auto-resume at its deadline.
+  const handlePlay = useCallback(() => {
+    const store = storeRef.current;
+    if (!store) return;
     userPlaybackIntentRef.current = true;
-    // Replay-from-stop fast path: if the user is unpausing after the
-    // marker auto-stop, restart from clip start. `handleRestart` keeps
-    // the seek+play in the click-handler stack when the current playlist
-    // covers the target (preserves Safari's gesture context, and dodges
-    // iOS's backward-seek-during-startup A/V desync — the decode
-    // pipelines initialise from `currentTime` rather than racing the
-    // seek into mid-startup). When the playlist's trim is past
-    // `clipRange.start` (post-quality-swap), `handleRestart` issues a
-    // fresh playlist with `?start=clipRange.start` (in-place src swap)
-    // so playback genuinely begins at the marker's start frame instead
-    // of the swap-point segment boundary.
-    if (clipRange && stoppedAtEndRef.current && paused) {
+    setPendingPaused(false);
+    // Replay is a new playthrough. Keep its seek and play in the original
+    // gesture, including sources trimmed past the start of a marker/scene.
+    if (clipRange && stoppedAtEndRef.current) {
       stoppedAtEndRef.current = false;
+      pausedFrame.reset();
       handleRestart(clipRange.start);
       return;
     }
-    // Scene-mode replay: HTML5's default for `play()` on an `ended`
-    // video is to seek to the start of the *currently loaded* media.
-    // After a quality swap, the loaded media's start is the swap
-    // scene-time (not 0), so the default would replay from there.
-    // Force a real restart from scene-time 0 — `handleRestart` issues
-    // a fresh playlist when the trim is past 0.
-    if (!clipRange && s.state.ended) {
+    if (!clipRange && store.state.ended) {
       endedHandledRef.current = false;
+      pausedFrame.reset();
       handleRestart(0);
       return;
     }
-    setPendingPaused(!paused);
-    if (paused) {
-      // A subsequent pause/seek can cancel play before its promise settles.
-      // The library's toggle discards that promise, leaking AbortError.
-      void s.play().catch(() => {});
-    } else {
-      preservePausedFrame(() => s.pause());
-    }
-  }, [clipRange, handleRestart, setPendingPaused, preservePausedFrame]);
+    pausedFrame.restoreBeforePlay();
+    // A subsequent pause/seek can cancel play before its promise settles.
+    void store.play().catch(() => {});
+  }, [clipRange, handleRestart, setPendingPaused, pausedFrame]);
+  const handleTogglePaused = useCallback(() => {
+    const store = storeRef.current;
+    if (!store) return;
+    // Native intent updates synchronously; another tap may precede the
+    // store's queued pause event. Remote targets retain store ownership.
+    const video = fullscreenContainerRef.current?.querySelector("video");
+    const paused =
+      store.state.remotePlaybackState === "disconnected" &&
+      video instanceof HTMLVideoElement
+        ? video.paused
+        : store.state.paused;
+    if (paused) handlePlay();
+    else handlePause();
+  }, [handlePause, handlePlay]);
 
   // Initial-load autoplay covers three triggers: caller-driven autoplay,
   // a resume-time on the scene, and a deep-link `?t=` timestamp. All
@@ -1029,6 +1015,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
             offsetStart={effectiveOffsetStart}
             suspended={suspended}
             seek={effectiveOnSeek}
+            play={handlePlay}
             pause={handlePause}
             next={onNext}
             previous={onPrevious}
@@ -1153,6 +1140,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
               seek={handleSeek}
               previewSeek={handleSeekPreview}
               seekBy={handleSeekBy}
+              play={handlePlay}
               pause={handlePause}
               togglePaused={handleTogglePaused}
               selectSource={handleSourceChange}

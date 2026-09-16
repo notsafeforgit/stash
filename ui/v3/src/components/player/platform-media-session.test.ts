@@ -144,3 +144,15 @@ it("routes OS pause and stop through the player's current explicit pause handler
   expect(p.playback.pause).not.toHaveBeenCalled();
   expect(session.playbackState).toBe("none");
 });
+
+it("routes OS resume through the player so it can restore the saved pause frame", () => {
+  const p = player();
+  p.playback.state.paused = false;
+  p.refresh();
+  p.playback.state.paused = true;
+  p.options.play = vi.fn();
+  p.refresh();
+  action("play");
+  expect(p.options.play).toHaveBeenCalledOnce();
+  expect(p.playback.play).not.toHaveBeenCalled();
+});

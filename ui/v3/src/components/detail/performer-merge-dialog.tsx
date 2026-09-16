@@ -370,9 +370,9 @@ export function PerformerMergeDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        // Wider than the default `sm:max-w-sm` so the per-field
-        // resolution rows have room for side-by-side previews.
-        className="sm:max-w-2xl"
+        // Cap the whole dialog so the header and actions remain visible
+        // when the resolution fields scroll, including with mobile chrome.
+        className="max-h-[calc(100dvh-2rem)] grid-cols-1 grid-rows-[auto_minmax(0,1fr)_auto] sm:max-w-2xl"
       >
         <DialogHeader>
           <DialogTitle>
@@ -422,7 +422,7 @@ export function PerformerMergeDialog({
             e.preventDefault();
             form.handleSubmit();
           }}
-          className="overflow-y-auto max-h-[calc(100vh-12rem)]"
+          className="-m-1 min-h-0 min-w-0 overflow-x-hidden overflow-y-auto p-1"
         >
           <FieldGroup>
             <form.Field name="destinationId">

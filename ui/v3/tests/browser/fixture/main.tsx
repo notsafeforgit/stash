@@ -42,6 +42,7 @@ import { VideoSourcesFixture } from "./video-sources";
 import { SceneLightboxFixture } from "./scene-lightbox";
 import { SceneDetailFixture } from "./scene-detail";
 import { MarkerEditorFixture } from "./marker-editor";
+import { MergeDialogsFixture } from "./merge-dialogs";
 import { EntityCardsFixture } from "./entity-cards";
 import { RouteTransitionsFixture } from "./route-transitions";
 import { HomeFixture } from "./home";
@@ -338,6 +339,11 @@ const router = createRouter({
       getParentRoute: () => rootRoute,
       path: "/marker-editor",
       component: MarkerEditorFixture,
+    }),
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/merge-dialogs",
+      component: MergeDialogsFixture,
     }),
     createRoute({
       getParentRoute: () => rootRoute,

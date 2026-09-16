@@ -54,8 +54,10 @@ export function MergeFieldRow({
 }: MergeFieldRowProps) {
   const intl = useIntl();
   const isSingleSource = sources.length === 1;
+  const choiceClassName =
+    "h-auto min-h-8 max-w-full rounded-md whitespace-normal wrap-anywhere data-[variant=outline]:border-l";
   return (
-    <Field>
+    <Field className="min-w-0">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <FieldLabel htmlFor={htmlId} className="text-sm font-medium">
           {label}
@@ -73,9 +75,9 @@ export function MergeFieldRow({
             if (!next) return;
             onChange(next as MergeChoice);
           }}
-          className="shrink-0"
+          className="max-w-full flex-wrap gap-1"
         >
-          <ToggleGroupItem value="keep">
+          <ToggleGroupItem value="keep" className={choiceClassName}>
             {intl.formatMessage({
               id: "dialogs.merge.choice_keep",
               defaultMessage: "Keep",
@@ -86,6 +88,7 @@ export function MergeFieldRow({
               key={src.id}
               value={`source:${src.id}` satisfies MergeChoice}
               title={src.label}
+              className={choiceClassName}
             >
               {isSingleSource
                 ? intl.formatMessage({
@@ -96,7 +99,7 @@ export function MergeFieldRow({
             </ToggleGroupItem>
           ))}
           {canCombine && (
-            <ToggleGroupItem value="combine">
+            <ToggleGroupItem value="combine" className={choiceClassName}>
               {intl.formatMessage({
                 id: "dialogs.merge.choice_combine",
                 defaultMessage: "Combine",
@@ -108,7 +111,8 @@ export function MergeFieldRow({
       <div
         className={cn(
           "rounded-md border border-border/60 bg-muted/30 px-3 py-2",
-          "text-sm min-w-0 break-words",
+          "text-sm min-w-0 wrap-anywhere",
+          "[&_[data-slot=badge]]:h-auto [&_[data-slot=badge]]:max-w-full [&_[data-slot=badge]]:whitespace-normal",
         )}
       >
         {resolvedPreview}

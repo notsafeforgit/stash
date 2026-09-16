@@ -350,12 +350,9 @@ export function SceneMergeDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        // Override the default `sm:max-w-sm` — the per-field
-        // resolution panel needs room for side-by-side previews on
-        // multi-source merges. Height is capped with `overflow-auto`
-        // on the form so the toolbar + footer stay visible while the
-        // conflict rows scroll.
-        className="sm:max-w-2xl"
+        // Cap the whole dialog so the header and actions remain visible
+        // when the resolution fields scroll, including with mobile chrome.
+        className="max-h-[calc(100dvh-2rem)] grid-cols-1 grid-rows-[auto_minmax(0,1fr)_auto] sm:max-w-2xl"
       >
         <DialogHeader>
           <DialogTitle>
@@ -409,7 +406,7 @@ export function SceneMergeDialog({
             e.preventDefault();
             form.handleSubmit();
           }}
-          className="overflow-y-auto max-h-[calc(100vh-12rem)]"
+          className="-m-1 min-h-0 min-w-0 overflow-x-hidden overflow-y-auto p-1"
         >
           <FieldGroup>
             <form.Field name="destinationId">

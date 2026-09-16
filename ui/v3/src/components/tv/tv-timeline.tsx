@@ -123,6 +123,9 @@ export function TvTimeline({
           setPreviewVisible(visible);
         }}
         onScrubChange={setDraft}
+        onSeekPreview={(next) =>
+          controls.previewSeek(next === null ? null : range.start + next)
+        }
         onSeek={(next) => controls.seek(range.start + next)}
         markers={
           <svg

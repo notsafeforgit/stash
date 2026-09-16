@@ -159,6 +159,7 @@ interface PositionSliderProps {
   fileDuration: number;
   markers: IMarker[];
   onSeek: (trueTime: number) => void;
+  onSeekPreview?: (time: number | null) => void;
   reloading: boolean;
   seekDisplayTarget: number | null;
   /**
@@ -178,6 +179,7 @@ function PositionSlider({
   fileDuration,
   markers,
   onSeek,
+  onSeekPreview,
   reloading,
   seekDisplayTarget,
   clipBoundsEdit,
@@ -221,6 +223,7 @@ function PositionSlider({
       markers={<PlayerMarkers markers={markers} duration={fileDuration} />}
       clipBoundsEdit={clipBoundsEdit}
       onSeek={onSeek}
+      onSeekPreview={onSeekPreview}
     />
   );
 }
@@ -501,6 +504,7 @@ interface ControlBarProps {
   fileDuration: number;
   offsetStart: number;
   onSeek: (t: number) => void;
+  onSeekPreview?: (time: number | null) => void;
   onSeekBy: (seconds: number) => void;
   reloading: boolean;
   seekDisplayTarget: number | null;
@@ -542,6 +546,7 @@ function ControlBar({
   fileDuration,
   offsetStart,
   onSeek,
+  onSeekPreview,
   onSeekBy,
   reloading,
   seekDisplayTarget,
@@ -681,6 +686,7 @@ function ControlBar({
           fileDuration={fileDuration}
           markers={markers}
           onSeek={onSeek}
+          onSeekPreview={onSeekPreview}
           reloading={reloading}
           seekDisplayTarget={seekDisplayTarget}
           clipBoundsEdit={clipBoundsEdit}
@@ -837,6 +843,7 @@ export interface PlayerControlsProps {
   frameRate?: number;
   offsetStart: number;
   onSeek: (trueTime: number) => void;
+  onSeekPreview?: (time: number | null) => void;
   onSeekBy: (seconds: number) => void;
   onPause: () => void;
   disableSeekArrows?: boolean;
@@ -920,6 +927,7 @@ export function PlayerControls({
   frameRate,
   offsetStart,
   onSeek,
+  onSeekPreview,
   onSeekBy,
   onPause,
   disableSeekArrows,
@@ -1490,6 +1498,7 @@ export function PlayerControls({
           fileDuration={duration}
           offsetStart={offsetStart}
           onSeek={onSeek}
+          onSeekPreview={onSeekPreview}
           onSeekBy={onSeekBy}
           reloading={reloading}
           seekDisplayTarget={seekDisplayTarget}

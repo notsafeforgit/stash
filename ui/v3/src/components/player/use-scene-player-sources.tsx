@@ -31,8 +31,9 @@ import { usePlayerTransitionFeedback } from "./use-player-transition-feedback";
 import { usePlayerTranscodeSession } from "./use-player-transcode-session";
 import { usePlayerRecovery } from "./use-player-recovery";
 import { planSceneSeek, planSourceResume } from "./scene-player-transitions";
-import { getHlsEngine, flushAndRestartAt } from "./hls";
+import { getHlsEngine, flushAndRestartAt, suspendHlsBuffering } from "./hls";
 import { isTimeBuffered, readTimeRanges } from "./buffered-ranges";
+import { createBufferedSeekPreview } from "./buffered-seek-preview";
 import {
   BEST_QUALITY_LABELS,
   QUALITY_STORAGE_KEY,
@@ -141,6 +142,7 @@ interface UseScenePlayerSourcesResult {
   freezeFrameCanvas: ReactNode;
   handleSourceChange: (source: PlayerSource) => void;
   handleSeek: (targetTrueTime: number) => void;
+  handleSeekPreview: (targetTrueTime: number | null) => void;
   handleSeekBy: (seconds: number) => void;
   /** Preserve explicit user intent through an internal source-reload pause. */
   setPendingPaused: (paused: boolean) => void;
@@ -184,6 +186,7 @@ export function useScenePlayerSources({
   allowAutoplay,
   clipRange,
 }: UseScenePlayerSourcesArgs): UseScenePlayerSourcesResult {
+  const [seekPreview] = useState(createBufferedSeekPreview);
   // Presence of `clipRange` selects the trimmed-playlist code path
   // (URL gets `?end=`, hlsStrategy keeps offsetStart bookkeeping).
   // Without it we ride the full-playlist path (no `?end=`, offsetStart
@@ -330,6 +333,8 @@ export function useScenePlayerSources({
     setLoad({ playbackKey, src: finalSrc });
   }
   const currentLoadRef = useCommittedRef(load);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Each media load owns its preview lifecycle; never resume a replaced video from a drag.
+  useLayoutEffect(() => () => seekPreview.dispose(), [seekPreview, load]);
   const [readyLoad, setReadyLoad] = useState<typeof load | null>(null);
   const mountedRef = useRef(false);
   useLayoutEffect(() => {
@@ -384,8 +389,9 @@ export function useScenePlayerSources({
       return;
     }
 
+    const preview = seekPreview.take();
     const trueTime = offsetStart + s.state.currentTime;
-    const wasPaused = s.state.paused;
+    const wasPaused = preview?.wasPaused ?? s.state.paused;
     const playbackRate = s.state.playbackRate;
     armSeekDisplay(trueTime);
     beginSourceRemount(() => {
@@ -405,6 +411,7 @@ export function useScenePlayerSources({
       setFragmentTime(resume.fragmentTime);
       setReloadNonce((nonce) => nonce + 1);
     });
+    preview?.resumeBuffering();
   }, [
     activeSrc,
     armSeekDisplay,
@@ -416,6 +423,7 @@ export function useScenePlayerSources({
     scene.id,
     sourceRevision,
     storeRef,
+    seekPreview,
   ]);
 
   const handleSourceChange = useCallback(
@@ -464,12 +472,15 @@ export function useScenePlayerSources({
       // display — `offsetStart + currentTime` — then reads sceneDuration
       // + N and ticks upward past the actual duration.
       const endedAtSwitch = s.state.ended;
+      const preview = seekPreview.take();
       const trueTime =
         endedAtSwitch && !qualityPreference
           ? 0
           : offsetStart + s.state.currentTime;
       const wasPaused =
-        endedAtSwitch && !qualityPreference ? false : s.state.paused;
+        endedAtSwitch && !qualityPreference
+          ? false
+          : (preview?.wasPaused ?? s.state.paused);
       const playbackRate = s.state.playbackRate;
 
       // Pin the seekbar / time display at the current scene-time
@@ -505,6 +516,7 @@ export function useScenePlayerSources({
         setFragmentTime(resume.fragmentTime);
         setManualSource(source);
       });
+      preview?.resumeBuffering();
     },
     [
       qualityPreference,
@@ -516,18 +528,24 @@ export function useScenePlayerSources({
       isClipped,
       clipRange,
       armSeekDisplay,
+      seekPreview,
     ],
   );
 
   // Effects apply the selected transition in a fixed order. The root and video
   // remain mounted; only a source reload asks the bridge for a fresh engine.
   const performSeek = useCallback(
-    (targetTime: number, intent: "seek" | "restart") => {
+    (
+      targetTime: number,
+      intent: "seek" | "restart",
+      restorePaused?: boolean,
+    ) => {
       if (!Number.isFinite(targetTime)) return;
       const store = storeRef.current;
       if (!store || !activeSrc) return;
       const engine = getHlsEngine(mediaRef.current);
       const video = rootRef.current?.querySelector("video");
+      const preview = seekPreview.take();
       // Consult the current native ranges: the store's most recent progress
       // event may predate buffer eviction (especially on ManagedMediaSource).
       const mediaState = video
@@ -552,7 +570,9 @@ export function useScenePlayerSources({
       const wasPaused =
         intent === "restart"
           ? false
-          : (pendingResumeRef.current?.wasPaused ??
+          : (restorePaused ??
+            preview?.wasPaused ??
+            pendingResumeRef.current?.wasPaused ??
             video?.paused ??
             store.state.paused);
       const playbackRate =
@@ -573,6 +593,7 @@ export function useScenePlayerSources({
           // A reload must change the URL even if the requested time is unchanged.
           setReloadNonce((nonce) => nonce + 1);
         });
+        preview?.resumeBuffering();
         return;
       }
 
@@ -614,7 +635,12 @@ export function useScenePlayerSources({
       }
       // Replay is an explicit play request. Keep it in the gesture call stack;
       // readiness feedback never issues a delayed play that could undo a pause.
-      if (intent === "restart") void store.play().catch(() => {});
+      preview?.resumeBuffering();
+      if (
+        intent === "restart" ||
+        ((preview || restorePaused !== undefined) && !wasPaused)
+      )
+        void store.play().catch(() => {});
     },
     [
       activeSrc,
@@ -629,6 +655,7 @@ export function useScenePlayerSources({
       clipRange,
       rootRef,
       beginSeekFeedback,
+      seekPreview,
     ],
   );
   const handleSeek = useCallback(
@@ -638,6 +665,41 @@ export function useScenePlayerSources({
   const handleRestart = useCallback(
     (time: number) => performSeek(time, "restart"),
     [performSeek],
+  );
+  const handleSeekPreview = useCallback(
+    (time: number | null) => {
+      if (time === null) {
+        const preview = seekPreview.take();
+        if (!preview) return;
+        performSeek(preview.mediaTime + offsetStart, "seek", preview.wasPaused);
+        preview.resumeBuffering();
+        return;
+      }
+      if (!Number.isFinite(time) || readyLoad !== load) return;
+      const start = clipRange?.start ?? 0;
+      const end = clipRange?.end ?? fileDuration ?? Infinity;
+      const frameDuration = 1 / (frameRate && frameRate > 0 ? frameRate : 30);
+      // Preview the last frame inside the range, without crossing the marker
+      // completion boundary or advancing to another scene during the drag.
+      const target = Math.max(start, Math.min(time, end - frameDuration));
+      const video = rootRef.current?.querySelector("video");
+      if (video)
+        seekPreview.preview(video, target - offsetStart, () =>
+          suspendHlsBuffering(mediaRef.current),
+        );
+    },
+    [
+      seekPreview,
+      performSeek,
+      offsetStart,
+      clipRange,
+      fileDuration,
+      frameRate,
+      readyLoad,
+      load,
+      rootRef,
+      mediaRef,
+    ],
   );
   const handleSeekBy = useCallback(
     (seconds: number) => {
@@ -665,9 +727,13 @@ export function useScenePlayerSources({
       handleSeek,
     ],
   );
-  const setPendingPaused = useCallback((paused: boolean) => {
-    if (pendingResumeRef.current) pendingResumeRef.current.wasPaused = paused;
-  }, []);
+  const setPendingPaused = useCallback(
+    (paused: boolean) => {
+      if (pendingResumeRef.current) pendingResumeRef.current.wasPaused = paused;
+      seekPreview.setPaused(paused);
+    },
+    [seekPreview],
+  );
 
   // Force a URL-change remount at `targetTrueTime` (scene-time)
   // regardless of whether the current playlist could cover the seek
@@ -878,6 +944,7 @@ export function useScenePlayerSources({
     freezeFrameCanvas,
     handleSourceChange,
     handleSeek,
+    handleSeekPreview,
     handleSeekBy,
     setPendingPaused,
     handleRestart,

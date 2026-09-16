@@ -35,6 +35,8 @@ export interface ScenePlayerCommands {
   pause: () => void;
   togglePaused: () => void;
   seek: (sceneTime: number) => void;
+  /** Preview buffered frames while dragging; null cancels the preview. */
+  previewSeek: (sceneTime: number | null) => void;
   seekBy: (seconds: number) => void;
   setVolume: (volume: number) => void;
   toggleMuted: () => void;
@@ -101,6 +103,7 @@ export function ScenePlayerControlsProvider({
   sources: PlayerSource[];
   activeSource: PlayerSource | null;
   seek: (position: number) => void;
+  previewSeek: (position: number | null) => void;
   seekBy: (seconds: number) => void;
   pause: () => void;
   togglePaused: () => void;
@@ -168,6 +171,7 @@ export function ScenePlayerControlsProvider({
         pause: () => latest.current.pause(),
         togglePaused: () => latest.current.togglePaused(),
         seekBy: (seconds) => latest.current.seekBy(seconds),
+        previewSeek: (position) => latest.current.previewSeek(position),
         seek: (position) => {
           if (!Number.isFinite(position)) return;
           const { range, duration, seek } = latest.current;

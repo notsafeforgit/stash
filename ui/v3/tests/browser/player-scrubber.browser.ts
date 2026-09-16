@@ -161,8 +161,36 @@ for (const mobile of [true, false]) {
                 Number(await scrubber.getAttribute("aria-valuenow")),
               )
               .toBeCloseTo(duration / 2, 1);
-            const settled = await video.evaluate(
-              (element: HTMLVideoElement) => element.currentTime,
+            const target = mediaStart + duration * 0.75;
+            await expect
+              .poll(() =>
+                video.evaluate(
+                  (element: HTMLVideoElement, time) =>
+                    Array.from(
+                      { length: element.buffered.length },
+                      (_, index) =>
+                        time >= element.buffered.start(index) &&
+                        time < element.buffered.end(index),
+                    ).some(Boolean),
+                  target,
+                ),
+              )
+              .toBe(true);
+            // Observe a compositor-bound frame, not just currentTime's
+            // optimistic setter. It must arrive while the pointer stays down.
+            const frame = await video.evaluateHandle(
+              (element: HTMLVideoElement) => {
+                const state = { time: -1 };
+                const observe = (
+                  _now: number,
+                  metadata: VideoFrameCallbackMetadata,
+                ) => {
+                  state.time = metadata.mediaTime;
+                  element.requestVideoFrameCallback(observe);
+                };
+                element.requestVideoFrameCallback(observe);
+                return state;
+              },
             );
             const start = point(0.25);
             const end = point(0.75);
@@ -174,12 +202,24 @@ for (const mobile of [true, false]) {
                 Number(await scrubber.getAttribute("aria-valuenow")),
               )
               .toBeCloseTo(duration * 0.75, 1);
-            // Dragging previews a position; the media seeks once on release.
-            expect(
-              await video.evaluate(
-                (element: HTMLVideoElement) => element.currentTime,
-              ),
-            ).toBeCloseTo(settled, 1);
+            await expect
+              .poll(() => frame.evaluate((state) => state.time))
+              .toBeCloseTo(target, 1);
+            await expect(video).toHaveJSProperty("paused", true);
+            if (marker) {
+              // Holding at the segment's right edge must show its last frame
+              // without completing, looping or advancing the active marker.
+              const last = point(1);
+              await page.mouse.move(last.x, last.y);
+              await expect
+                .poll(() => frame.evaluate((state) => state.time))
+                .toBeCloseTo(mediaStart + duration - 1 / 30, 1);
+              await expect(video).toHaveJSProperty("paused", true);
+              await page.mouse.move(end.x, end.y);
+              await expect
+                .poll(() => frame.evaluate((state) => state.time))
+                .toBeCloseTo(target, 1);
+            }
             await page.mouse.up();
             await expect
               .poll(() =>

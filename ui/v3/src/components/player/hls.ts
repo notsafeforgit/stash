@@ -300,6 +300,9 @@ export interface HlsEngineLike {
   stopLoad(): void;
   startLoad(startPosition?: number): void;
   trigger(event: string, data: unknown): void;
+  readonly bufferingEnabled?: boolean;
+  pauseBuffering?: () => void;
+  resumeBuffering?: () => void;
 }
 
 /**
@@ -320,6 +323,23 @@ export function getHlsEngine(media: unknown): HlsEngineLike | null {
     return engine as HlsEngineLike;
   }
   return null;
+}
+
+/** Keep buffered scrub previews from scheduling fragments at each position.
+ * Native HLS keeps its own loading policy; previews still require real buffers. */
+export function suspendHlsBuffering(media: unknown): () => void {
+  const engine = getHlsEngine(media);
+  if (
+    engine?.bufferingEnabled === true &&
+    engine.pauseBuffering &&
+    engine.resumeBuffering
+  ) {
+    engine.pauseBuffering();
+    return () => {
+      if (getHlsEngine(media) === engine) engine.resumeBuffering?.();
+    };
+  }
+  return () => {};
 }
 
 /**

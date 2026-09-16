@@ -1,8 +1,42 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from "vitest";
-import { parseStartPosition } from "./hls";
+import { describe, expect, it, vi } from "vitest";
+import { parseStartPosition, suspendHlsBuffering } from "./hls";
 
 const scene = "https://stash.test/scene/1/stream.master.m3u8";
+
+describe("HLS scrub loading", () => {
+  const engine = (bufferingEnabled = true) => ({
+    bufferingEnabled,
+    stopLoad: vi.fn(),
+    startLoad: vi.fn(),
+    trigger: vi.fn(),
+    pauseBuffering: vi.fn(),
+    resumeBuffering: vi.fn(),
+  });
+
+  it("suspends new fragments without aborting or flushing existing media", () => {
+    const media = { engine: engine() };
+    const resume = suspendHlsBuffering(media);
+    expect(media.engine.pauseBuffering).toHaveBeenCalledOnce();
+    expect(media.engine.stopLoad).not.toHaveBeenCalled();
+    expect(media.engine.trigger).not.toHaveBeenCalled();
+    resume();
+    expect(media.engine.resumeBuffering).toHaveBeenCalledOnce();
+  });
+
+  it("does not start a loader that was already suspended or has been replaced", () => {
+    const old = engine();
+    const media = { engine: old };
+    const resume = suspendHlsBuffering(media);
+    media.engine = engine(false);
+    resume();
+    suspendHlsBuffering(media)();
+    expect(old.resumeBuffering).not.toHaveBeenCalled();
+    expect(media.engine.pauseBuffering).not.toHaveBeenCalled();
+    expect(media.engine.resumeBuffering).not.toHaveBeenCalled();
+    expect(() => suspendHlsBuffering(null)()).not.toThrow();
+  });
+});
 
 describe("HLS initial playback position", () => {
   it("keeps scene-time startup hints for full-scene playlists", () => {

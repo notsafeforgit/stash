@@ -1,6 +1,7 @@
 import type React from "react";
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useMsg } from "@/hooks/message";
+import { useCommittedRef } from "@/hooks/use-committed-ref";
 import { cn } from "@/lib/utils";
 import type { PlaybackRange } from "@/core/marker-range";
 
@@ -12,7 +13,7 @@ export interface ClipBoundsEdit {
 
 /** The video scrubber shared by standard controls and TV. All times are in
  * the caller's display coordinates; seeking into a scene stays at its boundary.
- * Pointer drags are continuous and commit once, including on rotated video. */
+ * Pointer drags can preview buffered frames and commit once, including when rotated. */
 export function PositionScrubber({
   value,
   duration,
@@ -23,6 +24,7 @@ export function PositionScrubber({
   markers,
   clipBoundsEdit,
   onSeek,
+  onSeekPreview,
   onScrubChange,
   onPreviewChange,
 }: {
@@ -36,12 +38,23 @@ export function PositionScrubber({
   markers?: ReactNode;
   clipBoundsEdit?: ClipBoundsEdit;
   onSeek: (time: number) => void;
+  /** Preview a drag position; null cancels and restores the pre-drag position. */
+  onSeekPreview?: (time: number | null) => void;
   onScrubChange?: (time: number | null) => void;
   onPreviewChange?: (visible: boolean) => void;
 }) {
   const msg = useMsg();
   const trackRef = useRef<HTMLDivElement>(null);
   const pointer = useRef<number | null>(null);
+  const origin = useRef({ x: 0, y: 0 });
+  const previewing = useRef(false);
+  const previewCallback = useCommittedRef(onSeekPreview);
+  useEffect(
+    () => () => {
+      if (previewing.current) previewCallback.current?.(null);
+    },
+    [],
+  );
   const [dragTime, setDragTime] = useState<number | null>(null);
   const unavailable = disabled || duration <= 0;
   const clamp = (time: number) => Math.max(0, Math.min(duration, time));
@@ -61,10 +74,15 @@ export function PositionScrubber({
             : rect.bottom - event.clientY) / Math.max(1, rect.height);
     return clamp(ratio * duration);
   };
-  const cancel = () => {
+  const finish = () => {
     pointer.current = null;
+    previewing.current = false;
     change(null);
     onPreviewChange?.(false);
+  };
+  const cancel = () => {
+    if (previewing.current) onSeekPreview?.(null);
+    finish();
   };
   return (
     // The hit area sits above the thin bar, leaving the video unobstructed.
@@ -84,7 +102,10 @@ export function PositionScrubber({
       data-dragging={dragTime !== null || undefined}
       className="group/scrubber relative flex h-3 w-full min-w-[4em] cursor-pointer touch-none select-none items-end pointer-coarse:h-5"
       onFocus={() => onPreviewChange?.(true)}
-      onBlur={() => onPreviewChange?.(false)}
+      onBlur={() => {
+        if (pointer.current !== null) cancel();
+        onPreviewChange?.(false);
+      }}
       onPointerDown={(event) => {
         // Hidden standard controls keep the first tap free to reveal them.
         if (unavailable || event.button !== 0 || pointer.current !== null)
@@ -92,6 +113,7 @@ export function PositionScrubber({
         event.stopPropagation();
         event.preventDefault();
         pointer.current = event.pointerId;
+        origin.current = { x: event.clientX, y: event.clientY };
         event.currentTarget.focus({ preventScroll: true });
         event.currentTarget.setPointerCapture(event.pointerId);
         onPreviewChange?.(true);
@@ -100,13 +122,22 @@ export function PositionScrubber({
       onPointerMove={(event) => {
         if (pointer.current !== event.pointerId) return;
         event.stopPropagation();
-        change(position(event));
+        const next = position(event);
+        change(next);
+        // A tap retains uninterrupted playback. Only an actual drag starts
+        // the temporary preview pause, after allowing for touch jitter.
+        previewing.current ||=
+          Math.hypot(
+            event.clientX - origin.current.x,
+            event.clientY - origin.current.y,
+          ) >= 3;
+        if (previewing.current) onSeekPreview?.(next);
       }}
       onPointerUp={(event) => {
         if (pointer.current !== event.pointerId) return;
         event.stopPropagation();
         const next = position(event);
-        cancel();
+        finish();
         if (event.currentTarget.hasPointerCapture(event.pointerId))
           event.currentTarget.releasePointerCapture(event.pointerId);
         onSeek(next);

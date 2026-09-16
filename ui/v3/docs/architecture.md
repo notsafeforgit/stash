@@ -327,6 +327,7 @@ pins an older hls.js, so a version-scoped pnpm override preserves the existing
 | `scene-player-transitions.ts` | Pure seek/restart decisions and resume plans |
 | `scene-player-source-url.ts` | Stream URLs, clip bounds, fragments, reload nonce |
 | `hls.ts` | HLS timeline policy and engine helpers |
+| `buffered-seek-preview.ts` | Coalesced, buffered frame previews during a scrub drag |
 | `use-player-transition-feedback.tsx` | Freeze frame, loading feedback, seek readiness |
 | `use-player-transcode-session.ts` | Renew visible HLS sessions during playback and pause; release on exit |
 | `use-player-recovery.ts` | Native fullscreen seeking and stalled-playback recovery |
@@ -366,6 +367,15 @@ initial scrolling do not depend on this optional warm-up.
 Transition plans consume plain buffered/seekable state and return an in-place
 seek, engine restart, or source reload. Browser effects apply the plan; keep DOM
 operations out of the planner so it remains testable without a media element.
+
+`PositionScrubber` separates its draft position from committed seeks. A drag
+temporarily pauses playback and previews decoded frames only inside the native
+buffered ranges, rechecking for eviction before each write. Preview seeks are
+coalesced and serialized, and hls.js fragment loading is suspended until the drag
+ends. Release uses the normal seek policy and restores the previous playback
+intent; cancellation restores the original position too. A simple tap does not
+pause. The independent draft position also supports generated sprite previews
+without seeking into unbuffered media.
 
 Preserve these invariants:
 

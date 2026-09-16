@@ -644,6 +644,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     freezeFrameCanvas,
     handleSourceChange,
     handleSeek,
+    handleSeekPreview: previewSeek,
     handleSeekBy,
     setPendingPaused,
     handleRestart,
@@ -754,6 +755,15 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     setPendingPaused(true);
     storeRef.current?.pause();
   }, [setPendingPaused]);
+  const handleSeekPreview = useCallback(
+    (time: number | null) => {
+      // A drag owns playback even during the lightbox's opening animation.
+      // Its delayed autoplay must not undo the temporary preview pause.
+      if (time !== null) userPlaybackIntentRef.current = true;
+      previewSeek(time);
+    },
+    [previewSeek],
+  );
   const handleTogglePaused = useCallback(() => {
     const s = storeRef.current;
     if (!s) return;
@@ -867,6 +877,11 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     [handleSeek, clipStart],
   );
   const effectiveOnSeek = clipRange ? handleClipSeek : handleSeek;
+  const handleClipSeekPreview = useCallback(
+    (clipTime: number | null) =>
+      handleSeekPreview(clipTime === null ? null : clipTime + clipStart),
+    [handleSeekPreview, clipStart],
+  );
   // Hide the scene's other markers in clip mode — the slide is dedicated
   // to one marker, and other markers' tick-positions have no meaning on a
   // timeline that no longer represents the whole scene.
@@ -1061,6 +1076,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
                 sourceResolution={sourceResolution}
                 offsetStart={effectiveOffsetStart}
                 onSeek={effectiveOnSeek}
+                onSeekPreview={handleClipSeekPreview}
                 onSeekBy={handleSeekBy}
                 onPause={handlePause}
                 disableSeekArrows={disableSeekArrows}
@@ -1100,6 +1116,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
               sources={sources}
               activeSource={activeSource}
               seek={handleSeek}
+              previewSeek={handleSeekPreview}
               seekBy={handleSeekBy}
               pause={handlePause}
               togglePaused={handleTogglePaused}

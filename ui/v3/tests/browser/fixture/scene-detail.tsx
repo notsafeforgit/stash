@@ -22,7 +22,7 @@ export function SceneDetailFixture() {
         studio_id: null,
         performers: [],
         tags: [],
-        duration: hls ? 600 : 12,
+        duration: hls && !params.has("short") ? 600 : 12,
         width: landscape ? 160 : 90,
         height: landscape ? 90 : 160,
         date: null,

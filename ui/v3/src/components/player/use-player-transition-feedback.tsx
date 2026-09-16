@@ -116,10 +116,14 @@ export function usePlayerTransitionFeedback({
   const [seekDisplayTarget, setSeekDisplayTarget] = useState<number | null>(
     null,
   );
+  // Relative commands can arrive before React commits, or while the native
+  // playhead is zero during a reload. Keep the accepted target synchronous.
+  const seekTargetRef = useRef<number | null>(null);
   const seekDisplayClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
   const armSeekDisplay = useCallback((target: number) => {
+    seekTargetRef.current = target;
     if (seekDisplayClearTimerRef.current) {
       clearTimeout(seekDisplayClearTimerRef.current);
       seekDisplayClearTimerRef.current = null;
@@ -129,6 +133,7 @@ export function usePlayerTransitionFeedback({
   // biome-ignore lint/correctness/useExhaustiveDependencies: Scene/marker selection starts a fresh visual transition lifecycle.
   useLayoutEffect(() => {
     setReloadingRaw(false);
+    seekTargetRef.current = null;
     setSeekDisplayTarget(null);
     reloadingStartTsRef.current = null;
     clearCapturedFrame();
@@ -153,6 +158,7 @@ export function usePlayerTransitionFeedback({
     }
     seekDisplayClearTimerRef.current = setTimeout(() => {
       seekDisplayClearTimerRef.current = null;
+      seekTargetRef.current = null;
       setSeekDisplayTarget(null);
     }, 100);
     return () => {
@@ -226,6 +232,7 @@ export function usePlayerTransitionFeedback({
     clearCapturedFrame,
     beginSourceRemount,
     seekDisplayTarget,
+    seekTargetRef,
     armSeekDisplay,
     beginSeekFeedback,
   };

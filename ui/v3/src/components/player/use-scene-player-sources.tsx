@@ -141,6 +141,9 @@ interface UseScenePlayerSourcesResult {
   freezeFrameCanvas: ReactNode;
   handleSourceChange: (source: PlayerSource) => void;
   handleSeek: (targetTrueTime: number) => void;
+  handleSeekBy: (seconds: number) => void;
+  /** Preserve explicit user intent through an internal source-reload pause. */
+  setPendingPaused: (paused: boolean) => void;
   /** Restart playback from `targetTrueTime` (scene-time). Used when the
    *  user presses play after the natural `ended` event (scene mode) or
    *  the clip auto-stop (marker mode). Issues a fresh playlist URL with
@@ -353,6 +356,7 @@ export function useScenePlayerSources({
     clearCapturedFrame,
     beginSourceRemount,
     seekDisplayTarget,
+    seekTargetRef,
     armSeekDisplay,
     beginSeekFeedback,
   } = usePlayerTransitionFeedback({
@@ -519,6 +523,7 @@ export function useScenePlayerSources({
   // remain mounted; only a source reload asks the bridge for a fresh engine.
   const performSeek = useCallback(
     (targetTime: number, intent: "seek" | "restart") => {
+      if (!Number.isFinite(targetTime)) return;
       const store = storeRef.current;
       if (!store || !activeSrc) return;
       const engine = getHlsEngine(mediaRef.current);
@@ -545,9 +550,15 @@ export function useScenePlayerSources({
       });
       if (intent === "seek") armSeekDisplay(transition.sceneTime);
       const wasPaused =
-        intent === "restart" ? false : (video?.paused ?? store.state.paused);
+        intent === "restart"
+          ? false
+          : (pendingResumeRef.current?.wasPaused ??
+            video?.paused ??
+            store.state.paused);
       const playbackRate =
-        intent === "seek" ? store.state.playbackRate : undefined;
+        intent === "seek"
+          ? (pendingResumeRef.current?.playbackRate ?? store.state.playbackRate)
+          : undefined;
       if (transition.kind === "reload-source") {
         store.pause();
         beginSourceRemount(() => {
@@ -563,6 +574,16 @@ export function useScenePlayerSources({
           setReloadNonce((nonce) => nonce + 1);
         });
         return;
+      }
+
+      // Metadata/canplay must use the newest target even when another seek
+      // supersedes a source reload before that source is ready.
+      if (pendingResumeRef.current) {
+        pendingResumeRef.current = {
+          wasPaused,
+          playbackRate,
+          seekTo: transition.sceneTime,
+        };
       }
 
       if (transition.kind === "restart-engine") captureFrame();
@@ -618,6 +639,35 @@ export function useScenePlayerSources({
     (time: number) => performSeek(time, "restart"),
     [performSeek],
   );
+  const handleSeekBy = useCallback(
+    (seconds: number) => {
+      const store = storeRef.current;
+      if (!store || !Number.isFinite(seconds)) return;
+      const video = rootRef.current?.querySelector("video");
+      const position =
+        seekTargetRef.current ??
+        pendingResumeRef.current?.seekTo ??
+        offsetStart + (video?.currentTime ?? store.state.currentTime);
+      const end =
+        clipRange?.end ??
+        (fileDuration && fileDuration > 0 ? fileDuration : Infinity);
+      handleSeek(
+        Math.max(clipRange?.start ?? 0, Math.min(position + seconds, end)),
+      );
+    },
+    [
+      storeRef,
+      rootRef,
+      seekTargetRef,
+      offsetStart,
+      clipRange,
+      fileDuration,
+      handleSeek,
+    ],
+  );
+  const setPendingPaused = useCallback((paused: boolean) => {
+    if (pendingResumeRef.current) pendingResumeRef.current.wasPaused = paused;
+  }, []);
 
   // Force a URL-change remount at `targetTrueTime` (scene-time)
   // regardless of whether the current playlist could cover the seek
@@ -757,7 +807,6 @@ export function useScenePlayerSources({
       if (pending.playbackRate != null && pending.playbackRate !== 1) {
         s.setPlaybackRate(pending.playbackRate);
       }
-      pendingResumeRef.current = null;
     }
 
     if (seekPromise) {
@@ -770,11 +819,12 @@ export function useScenePlayerSources({
       // populated pendingResumeRef again. Its own canplay handler
       // owns the overlay teardown — bail so we don't tear down
       // through it.
-      if (pendingResumeRef.current != null) {
+      if (pendingResumeRef.current !== pending) {
         return;
       }
     }
     if (!mountedRef.current || currentLoadRef.current !== load) return;
+    pendingResumeRef.current = null;
     setReadyLoad(load);
     clearCapturedFrame();
     setReloading(false);
@@ -828,6 +878,8 @@ export function useScenePlayerSources({
     freezeFrameCanvas,
     handleSourceChange,
     handleSeek,
+    handleSeekBy,
+    setPendingPaused,
     handleRestart,
     retrySource: forceRemountAt,
     handleCanPlay,

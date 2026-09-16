@@ -35,6 +35,7 @@ export interface ScenePlayerCommands {
   pause: () => void;
   togglePaused: () => void;
   seek: (sceneTime: number) => void;
+  seekBy: (seconds: number) => void;
   setVolume: (volume: number) => void;
   toggleMuted: () => void;
   setRate: (rate: number) => void;
@@ -100,6 +101,7 @@ export function ScenePlayerControlsProvider({
   sources: PlayerSource[];
   activeSource: PlayerSource | null;
   seek: (position: number) => void;
+  seekBy: (seconds: number) => void;
   pause: () => void;
   togglePaused: () => void;
   selectSource: (source: PlayerSource) => void;
@@ -165,6 +167,7 @@ export function ScenePlayerControlsProvider({
         },
         pause: () => latest.current.pause(),
         togglePaused: () => latest.current.togglePaused(),
+        seekBy: (seconds) => latest.current.seekBy(seconds),
         seek: (position) => {
           if (!Number.isFinite(position)) return;
           const { range, duration, seek } = latest.current;

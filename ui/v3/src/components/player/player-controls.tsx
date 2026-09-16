@@ -225,57 +225,31 @@ function PositionSlider({
   );
 }
 
-// ── Relative-seek helpers ─────────────────────────────────────────────────────
-// `useRelSeek` exists because we seek in *scene time* (via the parent's
-// `onSeek`), not media time — and on live-transcode sources scene time is
-// `offsetStart + media.currentTime`. Both the control-bar `RelSeekButton`
-// and the touch-overlay buttons need this math; the hook centralises the
-// `currentTime` subscription so callers just invoke `seekRel(±N)`.
-
-function useRelSeek(
-  Player: PlayerInstance,
-  offsetStart: number,
-  fileDuration: number,
-  onSeek: (trueTime: number) => void,
-): (seconds: number) => void {
-  const mediaCurrentTime = Player.usePlayer((s) => s.currentTime);
-  return (seconds: number) => {
-    const trueTime = offsetStart + mediaCurrentTime;
-    const max = fileDuration > 0 ? fileDuration : Infinity;
-    onSeek(Math.max(0, Math.min(trueTime + seconds, max)));
-  };
-}
-
 // ── Seek button ───────────────────────────────────────────────────────────────
 
 interface RelSeekButtonProps {
-  Player: PlayerInstance;
   seconds: number;
   children: React.ReactNode;
   className?: string;
-  offsetStart: number;
-  fileDuration: number;
-  onSeek: (trueTime: number) => void;
+  onSeekBy: (seconds: number) => void;
+  label: string;
 }
 
 function RelSeekButton({
-  Player,
   seconds,
   children,
   className,
-  offsetStart,
-  fileDuration,
-  onSeek,
+  onSeekBy,
+  label,
 }: RelSeekButtonProps) {
-  const seekRel = useRelSeek(Player, offsetStart, fileDuration, onSeek);
-
   return (
     <Button
       type="button"
       variant="ghost"
       size="icon"
       className={cn("bg-transparent hover:bg-transparent", className)}
-      onClick={() => seekRel(seconds)}
+      onClick={() => onSeekBy(seconds)}
+      aria-label={label}
     >
       {children}
     </Button>
@@ -286,37 +260,26 @@ function RelSeekButton({
 
 function useHotkeys({
   Player,
-  offsetStart,
-  fileDuration,
   frameRate,
-  onSeek,
+  onSeekBy,
+  onPause,
   onToggleFullscreen,
   onTogglePaused,
-  seekDisplayTarget,
   disableSeekArrows,
 }: {
   Player: PlayerInstance;
-  offsetStart: number;
-  fileDuration: number;
   frameRate: number;
-  onSeek: (t: number) => void;
+  onSeekBy: (seconds: number) => void;
+  onPause: () => void;
   onToggleFullscreen: () => void;
   /** Resolved play/pause toggle — already wraps the marker replay-from-stop
    *  case where applicable, so the spacebar shortcut shares the same path
    *  as the play button. */
   onTogglePaused: () => void;
-  seekDisplayTarget: number | null;
   disableSeekArrows?: boolean;
 }) {
   const store = Player.usePlayer();
-  const mediaCurrentTime = Player.usePlayer((s) => s.currentTime);
   const volume = Player.usePlayer((s) => s.volume);
-
-  const trueTime =
-    seekDisplayTarget != null
-      ? seekDisplayTarget
-      : offsetStart + mediaCurrentTime;
-  const max = fileDuration > 0 ? fileDuration : Infinity;
   const frameStep = 1 / (frameRate > 0 ? frameRate : 30);
 
   const handler = useCallback(
@@ -343,20 +306,18 @@ function useHotkeys({
         return;
       const hasModifier = e.altKey || e.ctrlKey || e.metaKey || e.shiftKey;
 
-      const seekBy = (step: number) =>
-        onSeek(Math.max(0, Math.min(trueTime + step, max)));
       const adjustVolume = (delta: number) =>
         store.setVolume(Math.max(0, Math.min(1, volume + delta)));
       const frameStepAndPause = (direction: 1 | -1) => {
-        store.pause();
-        seekBy(direction * frameStep);
+        onPause();
+        onSeekBy(direction * frameStep);
       };
 
       if (key === "arrowleft" || key === "arrowright") {
         if (disableSeekArrows) return;
         const sign = key === "arrowright" ? 1 : -1;
         const step = e.shiftKey ? 5 : e.ctrlKey || e.altKey ? 60 : 10;
-        seekBy(sign * step);
+        onSeekBy(sign * step);
         e.preventDefault();
         return;
       }
@@ -372,10 +333,10 @@ function useHotkeys({
           break;
 
         case "j":
-          seekBy(-10);
+          onSeekBy(-10);
           break;
         case "l":
-          seekBy(10);
+          onSeekBy(10);
           break;
 
         case ",":
@@ -405,10 +366,9 @@ function useHotkeys({
     },
     [
       store,
-      trueTime,
-      max,
       volume,
-      onSeek,
+      onSeekBy,
+      onPause,
       onToggleFullscreen,
       onTogglePaused,
       frameStep,
@@ -440,22 +400,15 @@ const TOUCH_BTN_CLASS =
 
 function TouchOverlay({
   Player,
-  offsetStart,
-  fileDuration,
-  onSeek,
+  onSeekBy,
   onTogglePaused,
 }: {
   Player: PlayerInstance;
-  offsetStart: number;
-  fileDuration: number;
-  onSeek: (t: number) => void;
+  onSeekBy: (seconds: number) => void;
   onTogglePaused: () => void;
 }) {
   const paused = Player.usePlayer((s) => s.paused);
-  const started = Player.usePlayer((s) => s.started);
-  const seekRel = useRelSeek(Player, offsetStart, fileDuration, onSeek);
-
-  if (!started) return null;
+  const intl = useIntl();
 
   return (
     <>
@@ -463,8 +416,11 @@ function TouchOverlay({
         type="button"
         variant="ghost"
         size="icon-xl"
-        onClick={() => seekRel(-10)}
-        aria-label="Skip back 10 seconds"
+        onClick={() => onSeekBy(-10)}
+        aria-label={intl.formatMessage({
+          id: "media_player.skip_back",
+          defaultMessage: "Skip back 10 seconds",
+        })}
         className={TOUCH_BTN_CLASS}
       >
         <RotateCcw />
@@ -483,8 +439,11 @@ function TouchOverlay({
         type="button"
         variant="ghost"
         size="icon-xl"
-        onClick={() => seekRel(10)}
-        aria-label="Skip forward 10 seconds"
+        onClick={() => onSeekBy(10)}
+        aria-label={intl.formatMessage({
+          id: "media_player.skip_forward",
+          defaultMessage: "Skip forward 10 seconds",
+        })}
         className={TOUCH_BTN_CLASS}
       >
         <RotateCw />
@@ -542,6 +501,7 @@ interface ControlBarProps {
   fileDuration: number;
   offsetStart: number;
   onSeek: (t: number) => void;
+  onSeekBy: (seconds: number) => void;
   reloading: boolean;
   seekDisplayTarget: number | null;
   isFullscreen: boolean;
@@ -582,6 +542,7 @@ function ControlBar({
   fileDuration,
   offsetStart,
   onSeek,
+  onSeekBy,
   reloading,
   seekDisplayTarget,
   isFullscreen,
@@ -596,6 +557,7 @@ function ControlBar({
   onMenuOpenChange,
   clipBoundsEdit,
 }: ControlBarProps) {
+  const intl = useIntl();
   const paused = Player.usePlayer((s) => s.paused);
   const muted = Player.usePlayer((s) => s.muted);
   const pip = Player.usePlayer((s) => s.pip);
@@ -753,29 +715,31 @@ function ControlBar({
             </Button>
 
             <RelSeekButton
-              Player={Player}
               seconds={-10}
+              label={intl.formatMessage({
+                id: "media_player.skip_back",
+                defaultMessage: "Skip back 10 seconds",
+              })}
               className={cn(
                 "hidden text-white/80 hover:text-white",
                 !onClose && "lg:flex",
               )}
-              offsetStart={offsetStart}
-              fileDuration={fileDuration}
-              onSeek={onSeek}
+              onSeekBy={onSeekBy}
             >
               <RotateCcw size={14} />
             </RelSeekButton>
 
             <RelSeekButton
-              Player={Player}
               seconds={10}
+              label={intl.formatMessage({
+                id: "media_player.skip_forward",
+                defaultMessage: "Skip forward 10 seconds",
+              })}
               className={cn(
                 "hidden text-white/80 hover:text-white",
                 !onClose && "lg:flex",
               )}
-              offsetStart={offsetStart}
-              fileDuration={fileDuration}
-              onSeek={onSeek}
+              onSeekBy={onSeekBy}
             >
               <RotateCw size={14} />
             </RelSeekButton>
@@ -873,6 +837,8 @@ export interface PlayerControlsProps {
   frameRate?: number;
   offsetStart: number;
   onSeek: (trueTime: number) => void;
+  onSeekBy: (seconds: number) => void;
+  onPause: () => void;
   disableSeekArrows?: boolean;
   hasEverStarted?: boolean;
   reloading?: boolean;
@@ -954,6 +920,8 @@ export function PlayerControls({
   frameRate,
   offsetStart,
   onSeek,
+  onSeekBy,
+  onPause,
   disableSeekArrows,
   hasEverStarted,
   reloading: reloadingProp,
@@ -1054,13 +1022,11 @@ export function PlayerControls({
 
   useHotkeys({
     Player,
-    offsetStart,
-    fileDuration: duration,
     frameRate: frameRate ?? 0,
-    onSeek,
+    onSeekBy,
+    onPause,
     onToggleFullscreen: toggleFullscreen,
     onTogglePaused: togglePaused,
-    seekDisplayTarget,
     disableSeekArrows,
   });
   const controlsVisible = Player.usePlayer((s) => s.controlsVisible);
@@ -1246,9 +1212,9 @@ export function PlayerControls({
           className={cn(
             "[@media(pointer:coarse)]:flex hidden absolute inset-0 items-center justify-around",
             controlsFadeClass(controlsHidden),
-            !started && "invisible pointer-events-none",
+            !started && !hasEverStarted && "invisible pointer-events-none",
           )}
-          inert={!started}
+          inert={!started && !hasEverStarted}
           onPointerDownCapture={(e) => {
             controlsVisibleAtPointerDownRef.current = controlsVisible;
             completedTouchTapRef.current = e.pointerType !== "touch";
@@ -1448,9 +1414,7 @@ export function PlayerControls({
         >
           <TouchOverlay
             Player={Player}
-            offsetStart={offsetStart}
-            fileDuration={duration}
-            onSeek={onSeek}
+            onSeekBy={onSeekBy}
             onTogglePaused={togglePaused}
           />
         </Controls.Group>
@@ -1483,7 +1447,10 @@ export function PlayerControls({
                   : { id: "accessibility.pause", defaultMessage: "Pause" },
               )}
               className={cn(
-                "absolute inset-0 size-full rounded-none p-0 flex items-center justify-center pointer-events-auto active:translate-y-0",
+                "absolute inset-0 size-full rounded-none p-0 flex items-center justify-center active:translate-y-0",
+                mode === "reloading"
+                  ? "pointer-events-none"
+                  : "pointer-events-auto",
                 controlsFadeClass(controlsHidden),
                 mode === "pre-start" && "cursor-pointer",
                 mode === "playing" &&
@@ -1523,6 +1490,7 @@ export function PlayerControls({
           fileDuration={duration}
           offsetStart={offsetStart}
           onSeek={onSeek}
+          onSeekBy={onSeekBy}
           reloading={reloading}
           seekDisplayTarget={seekDisplayTarget}
           isFullscreen={isFullscreen}

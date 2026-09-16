@@ -121,7 +121,7 @@ export function useTvInputs({
               endHold();
               return;
             }
-            controls.seek(controls.read().position - active.speed * 0.2);
+            controls.seekBy(-active.speed * 0.2);
           }, 200);
         }
       }, delay);

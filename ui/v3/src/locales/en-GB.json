@@ -1623,6 +1623,8 @@
   "markers_count_summary": "{count, plural, =0 {No markers} one {# marker} other {# markers}}",
   "measurements": "Measurements",
   "media_player": {
+    "skip_back": "Skip back 10 seconds",
+    "skip_forward": "Skip forward 10 seconds",
     "position": "Playback position"
   },
   "media_info": {

@@ -43,3 +43,15 @@ and repeated natural `ended` transitions. The fixture uses no B-frames to keep d
 timestamps near the requested segment boundary; an initial buffer gap can leave
 WebKit waiting at the seek target. Headless WebKit does not establish physical
 iPhone autoplay policy or ManagedMediaSource behavior.
+
+`seek/stream.m3u8` describes a ten-minute slate-gray video without audio. Its
+byte-range segments share one small file. Relative-seek tests withhold later
+segments so rapid inputs cannot depend on the media playhead or a fast network:
+
+```sh
+ffmpeg -f lavfi -i color=c=slategray:s=160x90:r=10:d=600 -an \
+  -c:v libx264 -profile:v main -pix_fmt yuv420p -bf 0 -g 20 -keyint_min 20 \
+  -sc_threshold 0 -hls_time 2 -hls_list_size 0 -hls_segment_type fmp4 \
+  -hls_playlist_type vod -hls_flags single_file \
+  -hls_segment_filename seek/stream.m4s seek/stream.m3u8
+```

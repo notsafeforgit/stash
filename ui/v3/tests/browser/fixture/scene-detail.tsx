@@ -11,8 +11,10 @@ export function SceneDetailFixture() {
   const viewerButtonRef = useRef<HTMLButtonElement>(null);
   const desktop = useMediaQuery("(min-width: 1024px)");
   const scene = useMemo(() => {
-    const landscape = new URLSearchParams(location.search).has("landscape");
-    return offlineEntryToSceneData(
+    const params = new URLSearchParams(location.search);
+    const hls = params.has("hls");
+    const landscape = hls || params.has("landscape");
+    const scene = offlineEntryToSceneData(
       {
         scene_id: "detail",
         title: "Example scene",
@@ -20,14 +22,14 @@ export function SceneDetailFixture() {
         studio_id: null,
         performers: [],
         tags: [],
-        duration: 12,
+        duration: hls ? 600 : 12,
         width: landscape ? 160 : 90,
         height: landscape ? 90 : 160,
         date: null,
         paths: { screenshot: null, preview: null, sprite: null, vtt: null },
         format: "h264",
         source_video_codec: "h264",
-        source_audio_codec: "aac",
+        source_audio_codec: hls ? "" : "aac",
         resolution: "ORIGINAL",
         width_actual: landscape ? 160 : 90,
         height_actual: landscape ? 90 : 160,
@@ -39,6 +41,16 @@ export function SceneDetailFixture() {
       },
       new URL("/scene/detail/stream", location.href).href,
     );
+    if (hls) {
+      scene.sceneStreams = [
+        {
+          url: new URL("/scene/detail/stream.master.m3u8", location.href).href,
+          mime_type: "application/vnd.apple.mpegurl",
+          label: "HLS",
+        },
+      ];
+    }
+    return scene;
   }, []);
 
   return (

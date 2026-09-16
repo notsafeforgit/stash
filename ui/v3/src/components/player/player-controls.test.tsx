@@ -33,6 +33,8 @@ function PlayerSession() {
             fileDuration={60}
             offsetStart={0}
             onSeek={noop}
+            onSeekBy={noop}
+            onPause={noop}
             playbackMode="advance"
             canAdvance
             onCyclePlaybackMode={noop}

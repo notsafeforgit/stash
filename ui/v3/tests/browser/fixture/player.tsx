@@ -61,6 +61,8 @@ export function PlayerFixture() {
                 fileDuration={3661}
                 offsetStart={0}
                 onSeek={noop}
+                onSeekBy={noop}
+                onPause={noop}
                 playbackMode={mode}
                 canAdvance
                 onCyclePlaybackMode={() =>

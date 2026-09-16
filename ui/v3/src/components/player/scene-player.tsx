@@ -644,6 +644,8 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     freezeFrameCanvas,
     handleSourceChange,
     handleSeek,
+    handleSeekBy,
+    setPendingPaused,
     handleRestart,
     retrySource,
     handleCanPlay,
@@ -749,8 +751,9 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     // Explicit pause commands own playback just like the play/pause toggle.
     // The animation autoplay gate must not resume a deferred TV pause.
     userPlaybackIntentRef.current = true;
+    setPendingPaused(true);
     storeRef.current?.pause();
-  }, []);
+  }, [setPendingPaused]);
   const handleTogglePaused = useCallback(() => {
     const s = storeRef.current;
     if (!s) return;
@@ -785,8 +788,9 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
       handleRestart(0);
       return;
     }
+    setPendingPaused(!s.state.paused);
     s.togglePaused();
-  }, [clipRange, handleRestart]);
+  }, [clipRange, handleRestart, setPendingPaused]);
 
   // Initial-load autoplay covers three triggers: caller-driven autoplay,
   // a resume-time on the scene, and a deep-link `?t=` timestamp. All
@@ -825,7 +829,8 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
 
   const handleUserPlaybackGesture = useCallback(() => {
     userPlaybackIntentRef.current = true;
-  }, []);
+    setPendingPaused(false);
+  }, [setPendingPaused]);
 
   // Memoized so the array reference is stable when only an unrelated state
   // change re-renders ScenePlayer — keeps `SceneVideo`'s shallow equality
@@ -1056,6 +1061,8 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
                 sourceResolution={sourceResolution}
                 offsetStart={effectiveOffsetStart}
                 onSeek={effectiveOnSeek}
+                onSeekBy={handleSeekBy}
+                onPause={handlePause}
                 disableSeekArrows={disableSeekArrows}
                 hasEverStarted={hasEverStarted}
                 reloading={reloading}
@@ -1093,6 +1100,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
               sources={sources}
               activeSource={activeSource}
               seek={handleSeek}
+              seekBy={handleSeekBy}
               pause={handlePause}
               togglePaused={handleTogglePaused}
               selectSource={handleSourceChange}

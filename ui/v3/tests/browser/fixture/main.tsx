@@ -41,6 +41,7 @@ import { PlayerFixture } from "./player";
 import { VideoSourcesFixture } from "./video-sources";
 import { SceneLightboxFixture } from "./scene-lightbox";
 import { SceneDetailFixture } from "./scene-detail";
+import { SceneCoverFixture } from "./scene-cover";
 import { MarkerEditorFixture } from "./marker-editor";
 import { MergeDialogsFixture } from "./merge-dialogs";
 import { EntityCardsFixture } from "./entity-cards";
@@ -366,9 +367,17 @@ const root = document.getElementById("root");
 if (!root) throw new Error("Missing fixture root");
 createRoot(root).render(
   <StrictMode>
-    <IntlProvider locale="en-GB" messages={flattenMessages(messages)}>
+    <IntlProvider
+      locale="en-GB"
+      messages={flattenMessages(messages)}
+      formats={{
+        date: { long: { year: "numeric", month: "long", day: "numeric" } },
+      }}
+    >
       <ShortcutProvider>
-        {location.pathname.startsWith("/tv-fixture") ? (
+        {location.pathname.startsWith("/scene-cover-fixture") ? (
+          <SceneCoverFixture />
+        ) : location.pathname.startsWith("/tv-fixture") ? (
           <TvFixture />
         ) : location.pathname.startsWith("/home-fixture") ? (
           <HomeFixture />

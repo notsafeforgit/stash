@@ -87,7 +87,7 @@ function TransitionDetail() {
         <Button
           onClick={() =>
             transitionRouter.navigate({
-              to: "/transitions",
+              href: "/transitions",
               state: { navigationDirection: "back" },
             })
           }
@@ -104,10 +104,7 @@ function TransitionDetail() {
         <Button
           onClick={() =>
             transitionRouter.navigate({
-              to: "/transitions/$entityId",
-              params: { entityId },
-              search: { tab: "details" },
-              hash: "metadata",
+              href: `/transitions/${encodeURIComponent(entityId)}?tab=details#metadata`,
             })
           }
         >
@@ -117,8 +114,7 @@ function TransitionDetail() {
         <Button
           onClick={() =>
             transitionRouter.navigate({
-              to: "/transitions/$entityId",
-              params: { entityId: "3" },
+              href: "/transitions/3",
               replace: true,
             })
           }
@@ -128,8 +124,7 @@ function TransitionDetail() {
         <Button
           onClick={() =>
             transitionRouter.navigate({
-              to: "/transitions/$entityId",
-              params: { entityId: "1" },
+              href: "/transitions/1",
               state: { navigationDirection: "back" },
             })
           }
@@ -139,8 +134,7 @@ function TransitionDetail() {
         <Button
           onClick={() =>
             transitionRouter.navigate({
-              to: "/transitions/$entityId",
-              params: { entityId: "3" },
+              href: "/transitions/3",
               state: { routeMotion: false },
             })
           }

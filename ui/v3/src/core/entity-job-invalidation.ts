@@ -1,5 +1,5 @@
 import type { ApolloClient, DocumentNode } from "@apollo/client";
-import { FindJobDocument, JobStatus } from "./generated-graphql";
+import { monitorJobCompletion } from "./monitor-job";
 import { affectedActiveQueries } from "./mutation-invalidation";
 
 export type EntityJobAcknowledgment =
@@ -42,80 +42,20 @@ export function invalidateAfterEntityJob(
   const existing = jobs.get(id);
   if (existing) return existing;
   const pending = jobs;
-  let disposed = false;
-  let failures = 0;
-  let stopAttempt: (() => void) | undefined;
-  let retryTimer: ReturnType<typeof setTimeout> | undefined;
-
-  function dispose() {
-    if (disposed) return;
-    disposed = true;
+  const dispose = monitorJobCompletion(client, id, (result) => {
     pending.delete(id);
-    clearTimeout(retryTimer);
-    stopAttempt?.();
-  }
-  function finish() {
-    if (disposed) return;
-    dispose();
+    if (result.kind === "unavailable")
+      console.error("Could not monitor bulk update", result.error);
     void client
       .refetchQueries({ include: affectedActiveQueries(client, mutation) })
       .catch((error: unknown) =>
         console.error("Could not refresh library after bulk update", error),
       );
-  }
-  function start() {
-    if (disposed) return;
-    let settled = false;
-    const query = client.watchQuery({
-      query: FindJobDocument,
-      variables: { input: { id } },
-      fetchPolicy: "network-only",
-      pollInterval: 1000,
-    });
-    function failed(error: unknown) {
-      if (disposed || settled) return;
-      settled = true;
-      queueMicrotask(() => {
-        if (disposed) return;
-        stopAttempt?.();
-        failures++;
-        if (failures >= 3) {
-          console.error("Could not monitor bulk update", error);
-          finish();
-        } else retryTimer = setTimeout(start, 1000 * 2 ** (failures - 1));
-      });
-    }
-    const subscription = query.subscribe({
-      next: (result) => {
-        if (disposed || settled || result.loading) return;
-        if (result.error) {
-          failed(result.error);
-          return;
-        }
-        if (!result.data || result.dataState !== "complete") {
-          failed(new Error("Incomplete job response"));
-          return;
-        }
-        failures = 0;
-        const job = result.data.findJob;
-        if (
-          job &&
-          ![JobStatus.Finished, JobStatus.Failed, JobStatus.Cancelled].includes(
-            job.status,
-          )
-        )
-          return;
-        settled = true;
-        queueMicrotask(finish);
-      },
-      error: failed,
-    });
-    stopAttempt = () => {
-      query.stopPolling();
-      subscription.unsubscribe();
-    };
-  }
-  pending.set(id, dispose);
-  start();
-  return dispose;
+  });
+  const stop = () => {
+    if (pending.get(id) === stop) pending.delete(id);
+    dispose();
+  };
+  pending.set(id, stop);
+  return stop;
 }

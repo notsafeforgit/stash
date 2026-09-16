@@ -42,6 +42,12 @@ upstream's numeric migrations and primary schema version unchanged. See
   Query failures retry with bounded backoff; three consecutive failures dispose
   the watcher and refresh once. Unrelated configuration,
   plugin, status, and job queries are excluded from library refreshes.
+- `core/monitor-job.ts` owns completion polling independently of mounted views.
+  `core/scene-cover-job.ts` uses it to refresh only normalized scene artwork
+  after screenshot or cover generation, including JPEG and HDR descriptors.
+  Do not refetch scene details for artwork changes: freshly signed stream URLs
+  can reload active playback. List queries observe the same normalized scenes
+  without a list refetch or loss of scroll/edit state.
 
 `core/motion.ts` defines the shared motion timings. `core/content-reveal.ts`
 owns interruptible Web Animations on the empty surface in

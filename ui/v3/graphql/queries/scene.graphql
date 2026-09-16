@@ -95,6 +95,21 @@ query FindScene($id: ID!, $checksum: String) {
   }
 }
 
+# Refresh generated covers without replacing playback sources or editing data.
+query FindSceneCovers($ids: [ID!]!) {
+  findScenes(ids: $ids, filter: { per_page: -1 }) {
+    scenes {
+      id
+      paths {
+        screenshot
+      }
+      preview_image {
+        ...PreviewImageData
+      }
+    }
+  }
+}
+
 query FindFullScenes($ids: [Int!]) {
   findScenes(scene_ids: $ids) {
     scenes {

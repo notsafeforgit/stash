@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useIntl } from "react-intl";
-import { useMutation } from "@apollo/client/react";
+import { useApolloClient, useMutation } from "@apollo/client/react";
+import { refreshSceneCoversAfterJob } from "@/core/scene-cover-job";
 import { Cog } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
 import { Button } from "src/components/ui/button";
@@ -129,6 +130,7 @@ export function SceneGenerateDialog({
   hasMarkers = true,
   hasInteractive = true,
 }: SceneGenerateDialogProps) {
+  const client = useApolloClient();
   const intl = useIntl();
   const toast = useToast();
   // Single-entity generates force overwrite on — see image-generate-dialog
@@ -160,7 +162,7 @@ export function SceneGenerateDialog({
   async function handleGenerate() {
     setSubmitting(true);
     try {
-      await generate({
+      const result = await generate({
         variables: {
           input: {
             sceneIDs: sceneIds,
@@ -181,6 +183,15 @@ export function SceneGenerateDialog({
           },
         },
       });
+      const jobId = result.data?.metadataGenerate;
+      if (options.covers && jobId) {
+        void refreshSceneCoversAfterJob(client, sceneIds, jobId)
+          .then((completion) => {
+            if (completion.kind === "unavailable")
+              toast.error(completion.error);
+          })
+          .catch((error: unknown) => toast.error(error));
+      }
       toast.success(
         intl.formatMessage(
           {

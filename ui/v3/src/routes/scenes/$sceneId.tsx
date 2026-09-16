@@ -84,7 +84,6 @@ interface SceneToolbarProps {
   onToggleOrganized: () => void;
   getPlayerPosition?: () => number | undefined;
   onDeleted?: () => void;
-  onScreenshotGenerated?: () => void | Promise<void>;
 }
 
 function SceneToolbar({
@@ -95,7 +94,6 @@ function SceneToolbar({
   onToggleOrganized,
   getPlayerPosition,
   onDeleted,
-  onScreenshotGenerated,
 }: SceneToolbarProps) {
   const intl = useIntl();
 
@@ -177,7 +175,6 @@ function SceneToolbar({
           scene={scene}
           getPlayerPosition={getPlayerPosition}
           onDeleted={onDeleted}
-          onScreenshotGenerated={onScreenshotGenerated}
         />
       </div>
     </div>
@@ -548,9 +545,6 @@ function SceneDetailPage() {
       onToggleOrganized={handleToggleOrganized}
       getPlayerPosition={getPlayerPosition}
       onDeleted={goBack}
-      onScreenshotGenerated={async () => {
-        await refetch();
-      }}
     />
   );
 

@@ -1,6 +1,6 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { useIntl } from "react-intl";
-import { useMutation } from "@apollo/client/react";
+import { useApolloClient, useMutation } from "@apollo/client/react";
 import { removeEntitiesFromCache, useEntityMutation } from "src/core/client";
 import {
   Camera,
@@ -30,7 +30,7 @@ import { useToast } from "src/hooks/toast";
 import { useConfigurationContext } from "src/hooks/config";
 import { objectPath, objectTitle } from "src/core/files";
 import { useSceneDownloadAction } from "@/components/offline/download-action";
-import { type MonitoredJob, useMonitorJob } from "src/hooks/use-monitor-job";
+import { refreshSceneCoversAfterJob } from "@/core/scene-cover-job";
 import { supportsSceneVideoRotation } from "./scene-video-rotation";
 
 export interface SceneActionsMenuProps {
@@ -39,16 +39,14 @@ export interface SceneActionsMenuProps {
   getPlayerPosition?: () => number | undefined;
   /** Called once the scene has been deleted so the page can navigate away */
   onDeleted?: () => void;
-  /** Refreshes the scene after a generated screenshot replaces its cover. */
-  onScreenshotGenerated?: () => void | Promise<void>;
 }
 
 export function SceneActionsMenu({
   scene,
   getPlayerPosition,
   onDeleted,
-  onScreenshotGenerated,
 }: SceneActionsMenuProps) {
+  const client = useApolloClient();
   const intl = useIntl();
   const toast = useToast();
   const { configuration } = useConfigurationContext();
@@ -58,13 +56,11 @@ export function SceneActionsMenu({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
   const [mergeOpen, setMergeOpen] = useState(false);
-  const [screenshotJobId, setScreenshotJobId] = useState<string | null>(null);
+  const [coverBusy, setCoverBusy] = useState(false);
   const download = useSceneDownloadAction({ scene });
 
   const [scan] = useMutation(GQL.MetadataScanDocument);
-  const [generateScreenshot, { loading: screenshotPending }] = useMutation(
-    GQL.SceneGenerateScreenshotDocument,
-  );
+  const [generateScreenshot] = useMutation(GQL.SceneGenerateScreenshotDocument);
   const [rotateVideo, { loading: rotationPending }] = useMutation(
     GQL.SceneVideoRotateDocument,
   );
@@ -73,40 +69,6 @@ export function SceneActionsMenu({
 
   const sceneFilePath = scene.files.length > 0 ? objectPath(scene) : null;
   const rotationSupported = supportsSceneVideoRotation(sceneFilePath);
-  const coverBusy = screenshotJobId !== null || screenshotPending;
-
-  const handleScreenshotJobComplete = useCallback(
-    async (job?: MonitoredJob) => {
-      setScreenshotJobId(null);
-      if (job?.status === GQL.JobStatus.Failed) {
-        toast.error(
-          job.error ||
-            intl.formatMessage({
-              id: "toast.screenshot_generation_failed",
-              defaultMessage: "Screenshot generation failed",
-            }),
-        );
-        return;
-      }
-      if (job?.status === GQL.JobStatus.Cancelled) return;
-
-      try {
-        await onScreenshotGenerated?.();
-        toast.success(
-          intl.formatMessage({
-            id: "toast.screenshot_generated",
-            defaultMessage: "Screenshot generated",
-          }),
-        );
-      } catch (error) {
-        toast.error(error);
-      }
-    },
-    [intl, onScreenshotGenerated, toast],
-  );
-
-  useMonitorJob(screenshotJobId, handleScreenshotJobComplete);
-
   async function handleRescan() {
     if (!sceneFilePath) return;
     try {
@@ -131,24 +93,52 @@ export function SceneActionsMenu({
   }
 
   async function handleGenerateScreenshot(at?: number) {
+    setCoverBusy(true);
     try {
       const result = await generateScreenshot({
         variables: { id: scene.id, at },
       });
       const jobId = result.data?.sceneGenerateScreenshot;
-      if (jobId) {
-        setScreenshotJobId(jobId);
-      } else {
-        await onScreenshotGenerated?.();
-      }
+      if (!jobId)
+        throw new Error(
+          intl.formatMessage({
+            id: "toast.screenshot_generation_failed",
+            defaultMessage: "Screenshot generation failed",
+          }),
+        );
       toast.success(
         intl.formatMessage({
           id: "toast.generating_screenshot",
           defaultMessage: "Generating screenshot",
         }),
       );
+      // This promise remains responsible for the cache after this menu unmounts.
+      const completion = await refreshSceneCoversAfterJob(
+        client,
+        [scene.id],
+        jobId,
+      );
+      if (completion.kind === "unavailable") throw completion.error;
+      if (completion.job?.status === GQL.JobStatus.Cancelled) return;
+      if (completion.job?.status === GQL.JobStatus.Failed) {
+        throw new Error(
+          completion.job.error ||
+            intl.formatMessage({
+              id: "toast.screenshot_generation_failed",
+              defaultMessage: "Screenshot generation failed",
+            }),
+        );
+      }
+      toast.success(
+        intl.formatMessage({
+          id: "toast.screenshot_generated",
+          defaultMessage: "Screenshot generated",
+        }),
+      );
     } catch (e) {
       toast.error(e);
+    } finally {
+      setCoverBusy(false);
     }
   }
 

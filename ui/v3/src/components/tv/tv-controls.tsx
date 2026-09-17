@@ -588,7 +588,12 @@ export function TvControls({
                 />
               </Button>
             ) : null}
-            <TvTimeline key={item.key} scene={scene} range={range} />
+            <TvTimeline
+              key={item.key}
+              scene={scene}
+              range={range}
+              showSceneMarkers={item.kind === "scene"}
+            />
           </>
         )}
         <div className="flex min-w-0 items-center gap-1">

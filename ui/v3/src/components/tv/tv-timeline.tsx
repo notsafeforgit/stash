@@ -19,9 +19,11 @@ export function tvTime(seconds: number): string {
 export function TvTimeline({
   scene,
   range,
+  showSceneMarkers,
 }: {
   scene: TvScene;
   range: PlaybackRange;
+  showSceneMarkers: boolean;
 }) {
   const msg = useMsg();
   const position = useScenePlayerValue("displayPosition");
@@ -128,20 +130,22 @@ export function TvTimeline({
         }
         onSeek={(next) => controls.seek(range.start + next)}
         markers={
-          <svg
-            aria-hidden
-            className="h-2 w-full text-white/40"
-            viewBox="0 0 1000 8"
-            preserveAspectRatio="none"
-          >
-            <title>{msg("tv.timeline_markers", "Scene markers")}</title>
-            <path
-              d={markerPath}
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            />
-          </svg>
+          showSceneMarkers && (
+            <svg
+              aria-hidden
+              className="h-2 w-full text-white/40"
+              viewBox="0 0 1000 8"
+              preserveAspectRatio="none"
+            >
+              <title>{msg("tv.timeline_markers", "Scene markers")}</title>
+              <path
+                d={markerPath}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              />
+            </svg>
+          )
         }
       />
     </div>

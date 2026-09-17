@@ -406,14 +406,7 @@ export function VideoFrameZoom({
     }
 
     /** Returns true if the tap completed a zoom toggle. */
-    function tryDoubleTap(e: TouchEvent, t: Touch): boolean {
-      // Skip when the tap landed on a player control (skip-back,
-      // play/pause, skip-forward, the position slider, etc.) so
-      // those keep their double-tap-as-double-click semantics.
-      if (isInteractive(e.target)) {
-        lastTapAt = 0;
-        return false;
-      }
+    function tryDoubleTap(t: Touch): boolean {
       const now = Date.now();
       const close =
         Math.hypot(t.clientX - lastTapPos.x, t.clientY - lastTapPos.y) <
@@ -443,6 +436,13 @@ export function VideoFrameZoom({
     // ── Touch handlers ────────────────────────────────────────────
     function onTouchStart(e: TouchEvent) {
       if (!isInside(e.target)) return;
+      // A control owns the whole drag, just as it does for mouse input.
+      // Merely excluding double-taps still arms touchPan and steals the
+      // scrubber's pointer moves/capture as soon as a zoomed drag begins.
+      if (isInteractive(e.target)) {
+        lastTapAt = 0;
+        return;
+      }
       if (e.touches.length === 2) {
         const [first, second] = Array.from(e.touches);
         if (!first || !second) return;
@@ -454,7 +454,7 @@ export function VideoFrameZoom({
       if (e.touches.length === 1 && !pinching) {
         const t = e.touches[0];
         if (!t) return;
-        if (tryDoubleTap(e, t)) {
+        if (tryDoubleTap(t)) {
           // Suppress the synthesized click of the second tap so the
           // double-tap doesn't also toggle mute / hit any underlying
           // handler. The first tap of the pair already flowed through.

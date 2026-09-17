@@ -100,7 +100,10 @@ export function PositionScrubber({
       aria-orientation={direction === "right" ? "horizontal" : "vertical"}
       data-position-scrubber
       data-dragging={dragTime !== null || undefined}
-      className="group/scrubber relative flex h-3 w-full min-w-[4em] cursor-pointer touch-none select-none items-end pointer-coarse:h-5"
+      className="group/scrubber relative flex h-3 w-full min-w-[4em] cursor-pointer select-none items-end pointer-coarse:h-5"
+      // Override the unlayered page-zoom guard; a Tailwind touch-none utility
+      // loses to it and lets native scrolling cancel this pointer drag.
+      style={{ touchAction: "none" }}
       onFocus={() => onPreviewChange?.(true)}
       onBlur={() => {
         if (pointer.current !== null) cancel();
@@ -319,10 +322,10 @@ function ClipBoundHandle({
       // handle on iOS Safari otherwise triggers text-selection / the
       // callout menu before our pointer-drag completes, which both hijacks
       // the gesture and surfaces a "Copy / Look Up" affordance over the
-      // player. `touch-none` already disables panning/zooming gestures
+      // player. `touchAction` already disables panning/zooming gestures
       // here, but iOS treats text selection as a separate concern.
-      className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-7 cursor-ew-resize touch-none select-none [-webkit-touch-callout:none] z-10"
-      style={{ left: `${progress * 100}%` }}
+      className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-7 cursor-ew-resize select-none [-webkit-touch-callout:none] z-10"
+      style={{ left: `${progress * 100}%`, touchAction: "none" }}
       data-clip-bound={boundary}
       title={`${boundary === "start" ? "Start" : "End"}: ${formatDurationMs(time)}`}
     >

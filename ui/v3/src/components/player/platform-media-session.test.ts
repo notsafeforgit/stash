@@ -145,7 +145,7 @@ it("routes OS pause and stop through the player's current explicit pause handler
   expect(session.playbackState).toBe("none");
 });
 
-it("routes OS resume through the player so it can restore the saved pause frame", () => {
+it("routes OS resume through the player's current explicit play handler", () => {
   const p = player();
   p.playback.state.paused = false;
   p.refresh();

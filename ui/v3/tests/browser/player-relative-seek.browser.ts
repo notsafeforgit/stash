@@ -84,6 +84,12 @@ for (const mobile of [true, false]) {
             await player.locator("[data-player-native-button]").click();
             await expect(video).toHaveJSProperty("paused", false);
             await expect(player).toHaveAttribute("data-playback-ready", "true");
+            // The expanded viewer enables the same zoom recognizer as the
+            // lightbox. Rapid button taps must remain seeks, never zooms.
+            if (mobile)
+              await player
+                .getByRole("button", { name: "Open scene viewer" })
+                .tap();
             if (paused) {
               await player
                 .locator("[data-player-control-bar]")
@@ -145,6 +151,16 @@ for (const mobile of [true, false]) {
                 Number(await position.getAttribute("aria-valuenow")),
               )
               .toBeCloseTo(target, 1);
+            if (mobile)
+              expect(
+                await player
+                  .locator("[data-video-frame-zoom] > div")
+                  .evaluate(
+                    (element) =>
+                      new DOMMatrixReadOnly(getComputedStyle(element).transform)
+                        .a,
+                  ),
+              ).toBe(1);
 
             release();
             await expect

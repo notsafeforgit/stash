@@ -405,16 +405,23 @@ function TouchOverlay({
   Player,
   onSeekBy,
   onTogglePaused,
+  hidden,
 }: {
   Player: PlayerInstance;
   onSeekBy: (seconds: number) => void;
   onTogglePaused: () => void;
+  hidden: boolean;
 }) {
   const paused = Player.usePlayer((s) => s.paused);
   const intl = useIntl();
 
   return (
-    <>
+    <div
+      data-player-touch-controls=""
+      className="contents"
+      inert={hidden || undefined}
+      aria-hidden={hidden || undefined}
+    >
       <Button
         type="button"
         variant="ghost"
@@ -451,7 +458,7 @@ function TouchOverlay({
       >
         <RotateCw />
       </Button>
-    </>
+    </div>
   );
 }
 
@@ -1040,7 +1047,6 @@ export function PlayerControls({
   const controlsVisible = Player.usePlayer((s) => s.controlsVisible);
   const started = Player.usePlayer((s) => s.started);
   const seeking = Player.usePlayer((s) => s.seeking);
-  const muted = Player.usePlayer((s) => s.muted);
   const [pendingPlay, setPendingPlay] = useState(false);
 
   // Hold `pendingPlay` (and therefore the pre-start spinner) until the
@@ -1103,7 +1109,6 @@ export function PlayerControls({
   // full recognition window. Imported (rather than redeclared) so the two
   // can't drift.
   const tapToggleTimerRef = useRef<number | null>(null);
-  const controlsVisibleAtPointerDownRef = useRef(false);
   const activeTouchPointerIdRef = useRef<number | null>(null);
   const touchTapCandidateRef = useRef<
     (TouchTapCandidate & { pointerId: number }) | null
@@ -1217,6 +1222,7 @@ export function PlayerControls({
         {/* Keep the gesture target mounted while sources load so a held
             speed gesture can receive touchend after auto-advance. */}
         <Controls.Group
+          data-player-touch-surface=""
           className={cn(
             "[@media(pointer:coarse)]:flex hidden absolute inset-0 items-center justify-around",
             controlsFadeClass(controlsHidden),
@@ -1224,7 +1230,6 @@ export function PlayerControls({
           )}
           inert={!started && !hasEverStarted}
           onPointerDownCapture={(e) => {
-            controlsVisibleAtPointerDownRef.current = controlsVisible;
             completedTouchTapRef.current = e.pointerType !== "touch";
             activeTouchPointerIdRef.current =
               e.pointerType === "touch" ? e.pointerId : null;
@@ -1401,27 +1406,18 @@ export function PlayerControls({
             // before controls can be revealed.
             if (!completedTouchTapRef.current) return;
             completedTouchTapRef.current = false;
-            const wasVisible = controlsVisibleAtPointerDownRef.current;
             clearPendingTapToggle();
             tapToggleTimerRef.current = window.setTimeout(() => {
               tapToggleTimerRef.current = null;
-              // `wasVisible` captured at pointerdown is the pre-tap
-              // state — vjs's setActive was suppressed above, so the
-              // store's current `controlsVisible` still matches. Toggle
-              // flips it: hidden → setActive (reveal), visible →
-              // setInactive (dismiss).
-              if (!wasVisible && muted) {
-                // Tap-to-unmute on the reveal tap: clears an autoplay-
-                // fallback mute alongside the controls reveal. One-way —
-                // re-muting is via the explicit mute button in the bar.
-                store.toggleMuted();
-              }
+              // The container's activity handler was suppressed above.
+              // A single tap only reveals or dismisses the controls.
               store.toggleControls();
             }, DOUBLE_TAP_MAX_MS);
           }}
         >
           <TouchOverlay
             Player={Player}
+            hidden={controlsHidden}
             onSeekBy={onSeekBy}
             onTogglePaused={togglePaused}
           />

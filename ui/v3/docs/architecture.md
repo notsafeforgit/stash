@@ -328,7 +328,6 @@ pins an older hls.js, so a version-scoped pnpm override preserves the existing
 | `scene-player-source-url.ts` | Stream URLs, clip bounds, fragments, reload nonce |
 | `hls.ts` | HLS timeline policy and engine helpers |
 | `buffered-seek-preview.ts` | Coalesced, buffered frame previews during a scrub drag |
-| `paused-frame.ts` | Explicit pause preserves the last displayed buffered frame |
 | `use-player-transition-feedback.tsx` | Freeze frame, loading feedback, seek readiness |
 | `use-player-transcode-session.ts` | Renew visible HLS sessions during playback and pause; release on exit |
 | `use-player-recovery.ts` | Native fullscreen seeking and stalled-playback recovery |
@@ -379,20 +378,12 @@ intent; cancellation restores the original position too. A simple tap does not
 pause. The independent draft position also supports generated sprite previews
 without seeking into unbuffered media.
 
-Explicit pause commands retain the latest displayed, buffered frame and correct
-the native position while paused. Two `requestVideoFrameCallback` timestamps
-distinguish the visible frame from one queued for a future display refresh;
-there are no per-frame React updates or pixel copies. Without a fresh presentation
-timestamp, retain the pre-pause native clock. A late audio-renderer update can
-advance that clock again after Pause; restore the retained position immediately
-before Play if it has drifted. User seeks, source/selection changes, and external
-native playback invalidate the retained position. Hidden, unbuffered, remote,
-and in-flight seek states use the original pause behavior. Automatic marker
-completion and temporary scrub pauses retain their own exact positions. Resume
-calls `play()` within the input gesture and handles cancellation by a newer
-pause or seek. Browser tests
-compare continuously observed presentation timestamps across pause/resume;
-native media time alone cannot establish displayed-frame continuity.
+Explicit play and pause commands share user intent across scene detail,
+lightboxes, TV and OS media controls. Ordinary pause/resume delegates to native
+playback without adjusting media time or observing frames to correct the browser's
+clock. Play remains in the input gesture and handles cancellation by a newer
+pause or seek. Marker replay and temporary scrub pauses retain their own seek
+behavior. Browser tests verify pause/resume does not introduce seeks or reloads.
 
 Preserve these invariants:
 
@@ -421,8 +412,11 @@ Preserve these invariants:
   inert ancestor. Close captures pointer and focus activity before Video.js's
   native container listeners can reveal controls and consume Safari's first tap;
   its normal click remains the sole dismissal handler for touch and keyboard.
-  Hidden playback controls remain inert and let taps through to
-  the gesture surface to reveal them without activating an action.
+  Hidden playback controls, including the central play and skip buttons, remain
+  inert and let taps through to the gesture surface. A single tap reveals controls
+  without changing playback or audio; a rapid double tap zooms without revealing
+  them. Visible buttons accept every tap immediately, while double taps on the
+  surrounding video or control-bar gaps still zoom.
   Time and available PiP/Cast controls sit above a full-width timeline, preserving
   scrubbing space and direct speed, quality, playback-mode, fullscreen, and Close
   access with 44px targets.

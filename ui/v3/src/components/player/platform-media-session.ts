@@ -12,9 +12,9 @@ export interface PlatformMediaOptions {
   duration?: number;
   suspended: boolean;
   seek(time: number): void;
-  /** Restore the retained pause position before resuming the media clock. */
+  /** Share explicit play intent and replay behavior with the app controls. */
   play?: () => void;
-  /** Share explicit pause intent and frame preservation with the app controls. */
+  /** Share explicit pause intent with the app controls. */
   pause?: () => void;
   next?: () => void;
   previous?: () => void;

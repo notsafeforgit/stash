@@ -389,11 +389,9 @@ export function VideoFrameZoom({
     // ── Double-tap (touch) ────────────────────────────────────────
     // Track the previous tap's wall-clock time + position so a
     // second tap close in time and space toggles zoom. The first
-    // tap of a pair flows through unintercepted — its synthesized
-    // click reaches the player's mute-toggle / no-op handler — so
-    // the only quirk is that on a muted player a double-tap also
-    // unmutes; that's a rare overlap and the fix would cost a 300ms
-    // click delay which feels worse.
+    // tap of a pair flows through to the gesture surface, which defers its
+    // single-tap action for the same recognition window. Recognizing the
+    // second tap cancels that action before toggling the zoom.
     let lastTapAt = 0;
     let lastTapPos = { x: 0, y: 0 };
 

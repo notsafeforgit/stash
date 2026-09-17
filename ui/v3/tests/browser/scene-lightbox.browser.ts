@@ -313,9 +313,7 @@ test("swipe drag tracks the pointer and the center player survives the animation
   const video = await open(page);
   const original = await video.elementHandle();
   if (!original) throw new Error("Missing video");
-  const surface = page
-    .getByRole("button", { name: "Skip back 10 seconds", exact: true })
-    .locator("..");
+  const surface = page.locator("[data-player-touch-surface]");
   const origin = await video.boundingBox();
   if (!origin) throw new Error("Missing video bounds");
   await surface.dispatchEvent("pointerdown", {
@@ -374,9 +372,7 @@ test("a held 2x gesture continues through auto-advance and restores its original
   await page.getByRole("button", { name: "Playback speed" }).click();
   await page.getByRole("menuitemradio", { name: "1.5x", exact: true }).click();
   await expect(video).toHaveJSProperty("playbackRate", 1.5);
-  const surface = page
-    .getByRole("button", { name: "Skip back 10 seconds", exact: true })
-    .locator("..");
+  const surface = page.locator("[data-player-touch-surface]");
   const original = await surface.elementHandle();
   if (!original) throw new Error("Missing gesture surface");
   await surface.evaluate((element) => {

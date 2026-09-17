@@ -1,4 +1,8 @@
-import type { ApolloClient, DocumentNode } from "@apollo/client";
+import type {
+  ApolloClient,
+  DocumentNode,
+  ObservableQuery,
+} from "@apollo/client";
 import type { SelectionSetNode } from "graphql";
 
 const queryFields = {
@@ -108,10 +112,27 @@ export function affectedActiveQueries(
   client: ApolloClient,
   mutation: DocumentNode,
 ): DocumentNode[] {
-  const fields = affectedQueryFields(mutation);
-  return [...client.getObservableQueries("active")]
-    .filter((query) =>
-      rootFields(query.query).some((field) => fields.has(field)),
-    )
-    .map((query) => query.query);
+  return activeQueriesForFields(client, affectedQueryFields(mutation)).map(
+    (query) => query.query,
+  );
+}
+
+const libraryFields: ReadonlySet<string> = new Set([
+  "stats",
+  "customFieldNames",
+  ...Object.values(queryFields).flat(),
+]);
+
+/** Refresh library views without reloading app configuration or plugins. */
+export function activeLibraryQueries(client: ApolloClient): ObservableQuery[] {
+  return activeQueriesForFields(client, libraryFields);
+}
+
+function activeQueriesForFields(
+  client: ApolloClient,
+  fields: ReadonlySet<string>,
+): ObservableQuery[] {
+  return [...client.getObservableQueries("active")].filter((query) =>
+    rootFields(query.query).some((field) => fields.has(field)),
+  );
 }

@@ -42,6 +42,7 @@ import { VideoSourcesFixture } from "./video-sources";
 import { SceneLightboxFixture } from "./scene-lightbox";
 import { SceneDetailFixture } from "./scene-detail";
 import { SceneCoverFixture } from "./scene-cover";
+import { SceneDeletionFixture } from "./scene-deletion";
 import { MarkerEditorFixture } from "./marker-editor";
 import { MergeDialogsFixture } from "./merge-dialogs";
 import { DialogDismissalFixture } from "./dialog-dismissal";
@@ -381,7 +382,9 @@ createRoot(root).render(
       }}
     >
       <ShortcutProvider>
-        {location.pathname.startsWith("/scene-cover-fixture") ? (
+        {location.pathname.startsWith("/scene-deletion-fixture") ? (
+          <SceneDeletionFixture />
+        ) : location.pathname.startsWith("/scene-cover-fixture") ? (
           <SceneCoverFixture />
         ) : location.pathname.startsWith("/tv-fixture") ? (
           <TvFixture />

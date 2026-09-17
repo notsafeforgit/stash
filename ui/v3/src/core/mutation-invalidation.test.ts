@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import {
   affectedActiveQueries,
   affectedQueryFields,
+  activeLibraryQueries,
   rootFields,
 } from "./mutation-invalidation";
 
@@ -51,8 +52,9 @@ describe("entity mutation invalidation", () => {
     });
     const scenes = gql`query Scenes { findScenes { count } }`;
     const config = gql`query Config { configuration { ui } }`;
+    const images = gql`query Images { findImages { count } }`;
     const inactive = gql`query Tags { findTags { count } }`;
-    const subscriptions = [scenes, config].map((query) =>
+    const subscriptions = [scenes, images, config].map((query) =>
       client.watchQuery({ query }).subscribe({}),
     );
     client.watchQuery({ query: inactive });
@@ -62,6 +64,9 @@ describe("entity mutation invalidation", () => {
         gql`mutation { sceneDestroy(input: {}) }`,
       ).map(rootFields),
     ).toEqual([["findScenes"]]);
+    expect(
+      activeLibraryQueries(client).map((query) => rootFields(query.query)),
+    ).toEqual([["findScenes"], ["findImages"]]);
     for (const subscription of subscriptions) subscription.unsubscribe();
     client.stop();
   });

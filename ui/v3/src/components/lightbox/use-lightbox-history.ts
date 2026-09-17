@@ -39,15 +39,22 @@ export function useLightboxHistory(
     const id = ++nextLightboxHistoryId;
     activeIdRef.current = id;
     dismissingRef.current = false;
-    const currentState =
-      typeof window.history.state === "object" && window.history.state !== null
-        ? window.history.state
-        : {};
-    window.history.pushState(
-      { ...currentState, [LIGHTBOX_HISTORY_KEY]: { id } },
-      "",
-      window.location.href,
-    );
+    // Effect replay must not push an entry and asynchronously pop the next
+    // setup's entry. Commit after replay, before the next user input event.
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      const currentState =
+        typeof window.history.state === "object" &&
+        window.history.state !== null
+          ? window.history.state
+          : {};
+      window.history.pushState(
+        { ...currentState, [LIGHTBOX_HISTORY_KEY]: { id } },
+        "",
+        window.location.href,
+      );
+    });
 
     function handlePopState(event: PopStateEvent) {
       if (activeIdRef.current !== id) return;
@@ -67,6 +74,7 @@ export function useLightboxHistory(
 
     window.addEventListener("popstate", handlePopState);
     return () => {
+      cancelled = true;
       window.removeEventListener("popstate", handlePopState);
 
       // Programmatic closure (for example deleting the final slide) can

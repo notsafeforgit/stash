@@ -8,10 +8,17 @@ import { PluginLoader } from "@/components/plugin-loader";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SaveIndicatorProvider } from "@/hooks/save-indicator";
 import { ShortcutProvider } from "@/components/shortcut-provider";
+import { useLibraryRestore } from "@/hooks/use-library-restore";
+
+function LibraryRestore() {
+  useLibraryRestore();
+  return null;
+}
 
 export function App() {
   return (
     <ApolloProvider client={getClient()}>
+      <LibraryRestore />
       <ThemeProvider>
         <TooltipProvider>
           <ShortcutProvider>

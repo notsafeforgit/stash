@@ -30,6 +30,7 @@ import { offlineEntryToSceneData } from "src/components/offline/offline-scene-ad
 import type { OfflineEntry } from "src/components/offline/offline-db";
 import { useOpfsBlobUrl } from "src/components/offline/use-opfs-blob";
 import { useOfflineResumeWriter } from "src/components/offline/use-offline-resume-writer";
+import { useLightboxLink } from "./use-lightbox-link";
 
 interface SceneSlideContentProps {
   slide: SceneSlide;
@@ -301,6 +302,7 @@ function SceneTitleLink({
   className?: string;
 }) {
   const [ref, truncated] = useIsTruncated<HTMLAnchorElement>();
+  const link = useLightboxLink();
   return (
     <Tooltip disabled={!truncated}>
       <TooltipTrigger
@@ -309,8 +311,7 @@ function SceneTitleLink({
             ref={ref}
             to="/scenes/$sceneId"
             params={{ sceneId }}
-            target="_blank"
-            rel="noreferrer"
+            {...link}
             className={cn(
               "text-sm font-medium hover:underline truncate",
               className,
@@ -339,6 +340,7 @@ function SceneOverlay({
   const title = objectTitle(scene).trim();
   const performers = scene.performers ?? [];
   const oCounter = scene.o_counter ?? 0;
+  const link = useLightboxLink();
 
   const [addO] = useMutation(GQL.SceneAddODocument, {
     variables: { id: scene.id },
@@ -367,7 +369,9 @@ function SceneOverlay({
       {title && (
         <div className="flex items-center gap-1.5 pointer-events-auto min-w-0">
           <SceneTitleLink sceneId={scene.id} title={title} />
-          <ExternalLinkIcon className="size-3 shrink-0 opacity-60" />
+          {link.target && (
+            <ExternalLinkIcon className="size-3 shrink-0 opacity-60" />
+          )}
         </div>
       )}
 
@@ -384,8 +388,7 @@ function SceneOverlay({
                 <Link
                   to="/performers/$performerId"
                   params={{ performerId: p.id }}
-                  target="_blank"
-                  rel="noreferrer"
+                  {...link}
                 />
               }
             >
@@ -433,6 +436,7 @@ function MarkerOverlay({
   const performers = scene.performers ?? [];
   const otherTags = marker.tags.filter((t) => t.id !== marker.primaryTag.id);
   const orderedTags = [marker.primaryTag, ...otherTags];
+  const link = useLightboxLink();
   return (
     <LightboxOverlay
       position="top"
@@ -445,7 +449,9 @@ function MarkerOverlay({
     >
       <div className="flex items-center gap-1.5 pointer-events-auto min-w-0">
         <MarkerTitleLink sceneId={scene.id} title={marker.title} />
-        <ExternalLinkIcon className="size-3 shrink-0 opacity-60" />
+        {link.target && (
+          <ExternalLinkIcon className="size-3 shrink-0 opacity-60" />
+        )}
       </div>
 
       {sceneTitle && (
@@ -455,7 +461,9 @@ function MarkerOverlay({
             title={sceneTitle}
             className="text-xs font-normal text-white/75 hover:text-white"
           />
-          <ExternalLinkIcon className="size-3 shrink-0 opacity-60" />
+          {link.target && (
+            <ExternalLinkIcon className="size-3 shrink-0 opacity-60" />
+          )}
         </div>
       )}
 
@@ -472,8 +480,7 @@ function MarkerOverlay({
                 <Link
                   to="/performers/$performerId"
                   params={{ performerId: p.id }}
-                  target="_blank"
-                  rel="noreferrer"
+                  {...link}
                 />
               }
             >
@@ -490,12 +497,7 @@ function MarkerOverlay({
             variant="secondary"
             className="bg-white/15 text-white border-0 hover:bg-white/25"
             render={
-              <Link
-                to="/tags/$tagId"
-                params={{ tagId: t.id }}
-                target="_blank"
-                rel="noreferrer"
-              />
+              <Link to="/tags/$tagId" params={{ tagId: t.id }} {...link} />
             }
           >
             {t.name}
@@ -517,6 +519,7 @@ function MarkerTitleLink({
   title: string;
 }) {
   const [ref, truncated] = useIsTruncated<HTMLAnchorElement>();
+  const link = useLightboxLink();
   return (
     <Tooltip disabled={!truncated}>
       <TooltipTrigger
@@ -526,8 +529,7 @@ function MarkerTitleLink({
             to="/scenes/$sceneId"
             params={{ sceneId }}
             search={{ tab: "markers" }}
-            target="_blank"
-            rel="noreferrer"
+            {...link}
             className="text-sm font-medium hover:underline truncate"
           >
             {title}

@@ -240,7 +240,9 @@
     "go": "Go",
     "close_search": "Close search",
     "edit_search": "Edit search",
-    "clear_search": "Clear search"
+    "clear_search": "Clear search",
+    "copy_image": "Copy image",
+    "save_image": "Save image"
   },
   "actions_name": "Actions",
   "add_row": "Add row",
@@ -2705,5 +2707,13 @@
   "rating_control": {
     "clear": "Clear rating",
     "stars": "{count, plural, one {# star} other {# stars}}"
+  },
+  "image_file": {
+    "copying": "Copying image…",
+    "saving": "Preparing image…",
+    "copied": "Image copied",
+    "saved": "Image download started",
+    "copy_failed": "Could not copy the image. Try Save image instead.",
+    "save_failed": "Could not save the image. Please try again."
   }
 }

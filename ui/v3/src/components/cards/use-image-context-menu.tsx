@@ -25,14 +25,12 @@ import {
 import { OpenInNewTabMenuItem } from "./open-in-new-tab-menu-item";
 import { SelectAllMenuItem } from "./select-all-menu-item";
 import { EntityContextMenuContent } from "./entity-context-menu-content";
+import { useImageFileActions } from "@/hooks/use-image-file-actions";
 
-// Local re-declaration of the image shape SceneCard uses. We can't import
-// `ImageCardImage` from image-card.tsx without creating a circular runtime
-// dependency, but the type is structural — only `id` and `visual_files`
-// are read here. The wider shape (paths/studio/etc.) is supplied by the
-// caller via the generic.
+// Minimal structural image shape shared by cards and table rows.
 export interface ImageContextMenuItem {
   id: string;
+  paths: { image?: string | null };
   visual_files: Array<{ path: string }>;
 }
 
@@ -67,6 +65,11 @@ export function useImageContextMenu({
   const intl = useIntl();
   const navigate = useNavigate();
   const router = useRouter();
+  const fileActions = useImageFileActions(
+    image.paths.image
+      ? { src: image.paths.image, filePath: image.visual_files[0]?.path }
+      : undefined,
+  );
 
   const [destroyImage] = useEntityMutation(GQL.ImageDestroyDocument, {
     update(cache) {
@@ -169,6 +172,13 @@ export function useImageContextMenu({
           )}
           <SelectAllMenuItem />
           <OpenInNewTabMenuItem href={`/images/${image.id}`} />
+          <ContextMenuSeparator />
+          {fileActions.map(({ key, icon: Icon, label, onSelect, disabled }) => (
+            <ContextMenuItem key={key} onClick={onSelect} disabled={disabled}>
+              <Icon />
+              {label}
+            </ContextMenuItem>
+          ))}
           <ContextMenuSeparator />
           {onSetGalleryCover && (
             <ContextMenuItem onClick={onSetGalleryCover}>

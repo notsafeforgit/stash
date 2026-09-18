@@ -86,7 +86,9 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "src/components/ui/dropdown-menu";
 import { useToast } from "src/hooks/toast";
@@ -95,6 +97,7 @@ import { LightboxMotionSurface } from "./lightbox-motion-surface";
 import { motion } from "@/core/motion";
 import { inverseImageRotationDirection } from "./image-rotation";
 import { useMediaQuery } from "@/utils/screen";
+import { useImageFileActions } from "@/hooks/use-image-file-actions";
 
 // ── Module augmentation ────────────────────────────────────────────────────────
 
@@ -664,22 +667,32 @@ function LightboxRotateButton({
   );
 }
 
-function LightboxImageActionsButton({
+export function LightboxImageActionsButton({
   onRotate,
   zoomRef,
-  atOriginal,
-  zoomEnabled,
+  atOriginal = false,
+  zoomEnabled = false,
 }: {
-  onRotate: (imageId: string, direction: GQL.ImageRotateDirection) => void;
-  zoomRef: React.RefObject<ZoomRef | null>;
-  atOriginal: boolean;
-  zoomEnabled: boolean;
+  onRotate?: (imageId: string, direction: GQL.ImageRotateDirection) => void;
+  zoomRef?: React.RefObject<ZoomRef | null>;
+  atOriginal?: boolean;
+  zoomEnabled?: boolean;
 }) {
   const intl = useIntl();
+  const mobile = useMediaQuery("(max-width: 767px)");
+  const toasterId = useId();
   const { slides, currentIndex } = useLightboxState();
   const slide = getImageSlide(slides[currentIndex]);
   const imageId = slide?.imageId;
-  if (!imageId && !zoomEnabled) return null;
+  const fileActions = useImageFileActions(
+    slide?.src && !slide.loading
+      ? { src: slide.src, filePath: slide.filePaths?.[0] }
+      : undefined,
+    toasterId,
+  );
+  const showZoom = mobile && zoomEnabled && zoomRef;
+  const showRotate = mobile && imageId && onRotate;
+  if (!slide || slide.loading) return null;
 
   const actionsLabel = intl.formatMessage({
     id: "lightbox.image_actions",
@@ -687,78 +700,103 @@ function LightboxImageActionsButton({
   });
 
   return (
-    <DropdownMenu modal={false}>
-      <DropdownMenuTrigger
-        className="yarl__button md:hidden"
-        title={actionsLabel}
-        aria-label={actionsLabel}
-      >
-        <MoreHorizontalIcon className="yarl__icon" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        side="top"
-        align="end"
-        sideOffset={8}
-        positionerClassName="z-[10001]"
-        className="min-w-52 border-0 bg-black/90 text-white shadow-lg ring-1 ring-white/15"
-      >
-        {zoomEnabled && (
-          <>
-            <DropdownMenuItem
-              className="min-h-11 text-white/80 focus:bg-white/10 focus:text-white"
-              onClick={() => zoomRef.current?.zoomIn()}
-            >
-              <ZoomInIcon />
-              {intl.formatMessage({
-                id: "zoom_in",
-                defaultMessage: "Zoom in",
-              })}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="min-h-11 text-white/80 focus:bg-white/10 focus:text-white"
-              onClick={() => zoomRef.current?.zoomOut()}
-            >
-              <ZoomOutIcon />
-              {intl.formatMessage({
-                id: "zoom_out",
-                defaultMessage: "Zoom out",
-              })}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="min-h-11 text-white/80 focus:bg-white/10 focus:text-white"
-              onClick={() => toggleOriginalSize(zoomRef.current, atOriginal)}
-            >
-              {atOriginal ? <Minimize2Icon /> : <Maximize2Icon />}
-              {intl.formatMessage(originalSizeLabel(atOriginal))}
-            </DropdownMenuItem>
-          </>
-        )}
-        {imageId && (
-          <>
-            <DropdownMenuItem
-              className="min-h-11 text-white/80 focus:bg-white/10 focus:text-white"
-              onClick={() => onRotate(imageId, GQL.ImageRotateDirection.Ccw)}
-            >
-              <RotateCcwIcon />
-              {intl.formatMessage({
-                id: "actions.rotate_ccw",
-                defaultMessage: "Rotate counter-clockwise",
-              })}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="min-h-11 text-white/80 focus:bg-white/10 focus:text-white"
-              onClick={() => onRotate(imageId, GQL.ImageRotateDirection.Cw)}
-            >
-              <RotateCwIcon />
-              {intl.formatMessage({
-                id: "actions.rotate_cw",
-                defaultMessage: "Rotate clockwise",
-              })}
-            </DropdownMenuItem>
-          </>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      <Toaster id={toasterId} />
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger
+          className="yarl__button"
+          title={actionsLabel}
+          aria-label={actionsLabel}
+        >
+          <MoreHorizontalIcon className="yarl__icon" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          side="top"
+          align="end"
+          sideOffset={8}
+          positionerClassName="z-[10001]"
+          className="min-w-52 border-0 bg-black/90 text-white shadow-lg ring-1 ring-white/15"
+        >
+          <DropdownMenuGroup>
+            {fileActions.map(
+              ({ key, icon: Icon, label, onSelect, disabled }) => (
+                <DropdownMenuItem
+                  key={key}
+                  className="min-h-11 text-white/80 focus:bg-white/10 focus:text-white"
+                  onClick={onSelect}
+                  disabled={disabled}
+                >
+                  <Icon />
+                  {label}
+                </DropdownMenuItem>
+              ),
+            )}
+          </DropdownMenuGroup>
+          {(showZoom || showRotate) && <DropdownMenuSeparator />}
+          <DropdownMenuGroup>
+            {showZoom && (
+              <>
+                <DropdownMenuItem
+                  className="min-h-11 text-white/80 focus:bg-white/10 focus:text-white"
+                  onClick={() => zoomRef.current?.zoomIn()}
+                >
+                  <ZoomInIcon />
+                  {intl.formatMessage({
+                    id: "zoom_in",
+                    defaultMessage: "Zoom in",
+                  })}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="min-h-11 text-white/80 focus:bg-white/10 focus:text-white"
+                  onClick={() => zoomRef.current?.zoomOut()}
+                >
+                  <ZoomOutIcon />
+                  {intl.formatMessage({
+                    id: "zoom_out",
+                    defaultMessage: "Zoom out",
+                  })}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="min-h-11 text-white/80 focus:bg-white/10 focus:text-white"
+                  onClick={() =>
+                    toggleOriginalSize(zoomRef.current, atOriginal)
+                  }
+                >
+                  {atOriginal ? <Minimize2Icon /> : <Maximize2Icon />}
+                  {intl.formatMessage(originalSizeLabel(atOriginal))}
+                </DropdownMenuItem>
+              </>
+            )}
+            {showRotate && (
+              <>
+                <DropdownMenuItem
+                  className="min-h-11 text-white/80 focus:bg-white/10 focus:text-white"
+                  onClick={() =>
+                    onRotate(imageId, GQL.ImageRotateDirection.Ccw)
+                  }
+                >
+                  <RotateCcwIcon />
+                  {intl.formatMessage({
+                    id: "actions.rotate_ccw",
+                    defaultMessage: "Rotate counter-clockwise",
+                  })}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="min-h-11 text-white/80 focus:bg-white/10 focus:text-white"
+                  onClick={() => onRotate(imageId, GQL.ImageRotateDirection.Cw)}
+                >
+                  <RotateCwIcon />
+                  {intl.formatMessage({
+                    id: "actions.rotate_cw",
+                    defaultMessage: "Rotate clockwise",
+                  })}
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
   );
 }
 

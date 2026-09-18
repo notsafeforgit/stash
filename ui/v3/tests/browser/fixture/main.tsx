@@ -41,6 +41,7 @@ import { PlayerFixture } from "./player";
 import { VideoSourcesFixture } from "./video-sources";
 import { SceneLightboxFixture } from "./scene-lightbox";
 import { ImageLightboxFixture } from "./image-lightbox";
+import { ImageFilesFixture } from "./image-files";
 import { SceneDetailFixture } from "./scene-detail";
 import { SceneCoverFixture } from "./scene-cover";
 import { SceneDeletionFixture } from "./scene-deletion";
@@ -328,6 +329,11 @@ const router = createRouter({
       getParentRoute: () => rootRoute,
       path: "/image-lightbox",
       component: ImageLightboxFixture,
+    }),
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/image-files",
+      component: ImageFilesFixture,
     }),
     createRoute({
       getParentRoute: () => rootRoute,

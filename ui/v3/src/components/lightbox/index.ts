@@ -2,6 +2,7 @@ export {
   Lightbox,
   LIGHTBOX_ZOOM_TUNING,
   OriginalSizeButton,
+  LightboxImageActionsButton,
   useAtOriginalSize,
   type LightboxProps,
   type LightboxSlide,

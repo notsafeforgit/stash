@@ -13,7 +13,7 @@ const artwork = `data:image/svg+xml,${encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1200"><rect width="900" height="1200" fill="#264653"/><circle cx="450" cy="400" r="250" fill="#2a9d8f"/><path d="M0 1200L450 600L900 1200Z" fill="#e9c46a"/></svg>',
 )}`;
 
-const images: GQL.SlimImageDataFragment[] = ["1", "2"].map((id) => ({
+export const images: GQL.SlimImageDataFragment[] = ["1", "2"].map((id) => ({
   __typename: "Image",
   id,
   title: `Image ${id}: ${"A long image title without room to fit ".repeat(6)}`,
@@ -101,6 +101,7 @@ export function ImageLightboxFixture() {
       height: 1200,
       imageId: image.id,
       imageTitle: image.title ?? "",
+      filePaths: image.visual_files.map((file) => file.path),
     }));
   const configuration = {
     ...playerConfiguration,

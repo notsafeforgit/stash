@@ -42,6 +42,7 @@ import { DetailEditorLayout } from "@/components/detail/detail-editor-layout";
 import {
   LIGHTBOX_ZOOM_TUNING,
   OriginalSizeButton,
+  LightboxImageActionsButton,
   lightboxIconRenders,
   useAtOriginalSize,
 } from "src/components/lightbox";
@@ -58,7 +59,7 @@ const searchSchema = z.object({
 
 type ImageData = NonNullable<GQL.FindImageQuery["findImage"]>;
 
-function ImageViewer({ image }: { image: ImageData }) {
+export function ImageViewer({ image }: { image: ImageData }) {
   const src = image.paths.image ?? image.paths.preview ?? undefined;
   const file = image.visual_files[0];
   const [open, setOpen] = useState(false);
@@ -92,6 +93,7 @@ function ImageViewer({ image }: { image: ImageData }) {
               alt: imageTitle(image) || undefined,
               width: file?.width ?? undefined,
               height: file?.height ?? undefined,
+              filePaths: image.visual_files.map((f) => f.path),
             },
           ]
         : [],
@@ -135,6 +137,7 @@ function ImageViewer({ image }: { image: ImageData }) {
         on={inlineZoomCallbacks}
         toolbar={{
           buttons: [
+            <LightboxImageActionsButton key="image-actions" />,
             "zoom",
             <OriginalSizeButton
               key="original-size"
@@ -201,6 +204,7 @@ function ImageViewer({ image }: { image: ImageData }) {
         on={modalZoomCallbacks}
         toolbar={{
           buttons: [
+            <LightboxImageActionsButton key="image-actions" />,
             "zoom",
             <OriginalSizeButton
               key="original-size"

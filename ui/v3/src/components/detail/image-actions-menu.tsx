@@ -15,6 +15,7 @@ import {
 import { ImageGenerateDialog } from "src/components/detail/image-generate-dialog";
 import { useToast } from "src/hooks/toast";
 import { imagePath, imageTitle } from "src/core/files";
+import { useImageFileActions } from "@/hooks/use-image-file-actions";
 
 export interface ImageActionsMenuProps {
   image: NonNullable<GQL.FindImageQuery["findImage"]>;
@@ -32,6 +33,11 @@ export function ImageActionsMenu({ image, onDeleted }: ImageActionsMenuProps) {
   const [destroyImage] = useEntityMutation(GQL.ImageDestroyDocument);
 
   const filePath = image.visual_files.length > 0 ? imagePath(image) : null;
+  const fileActions = useImageFileActions(
+    image.paths.image
+      ? { src: image.paths.image, filePath: filePath ?? undefined }
+      : undefined,
+  );
 
   async function handleRescan() {
     if (!filePath) return;
@@ -83,7 +89,10 @@ export function ImageActionsMenu({ image, onDeleted }: ImageActionsMenuProps) {
     onDeleted?.();
   }
 
-  const items: EntityActionItem[] = [];
+  const items: EntityActionItem[] = [
+    ...fileActions,
+    { key: "file-separator", separator: true },
+  ];
   if (filePath)
     items.push({
       key: "rescan",

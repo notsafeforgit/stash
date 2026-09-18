@@ -226,6 +226,7 @@ function SourceFeedback({ openQuality }: { openQuality: () => void }) {
   const { activeSource } = useScenePlayerSourcesMenu();
   const error = useScenePlayerValue("error");
   const ready = useScenePlayerValue("ready");
+  const paused = useScenePlayerValue("paused");
   if (!activeSource || error)
     return (
       <div className="pointer-events-auto absolute left-1/2 top-1/2 w-[min(28rem,calc(100%-8rem))] -translate-x-1/2 -translate-y-1/2">
@@ -263,8 +264,17 @@ function SourceFeedback({ openQuality }: { openQuality: () => void }) {
         </Alert>
       </div>
     );
-  return !ready ? (
-    <Spinner className="pointer-events-none absolute left-1/2 top-1/2 size-10 -translate-x-1/2 -translate-y-1/2" />
+  if (!ready)
+    return (
+      <Spinner className="pointer-events-none absolute left-1/2 top-1/2 size-10 -translate-x-1/2 -translate-y-1/2" />
+    );
+  return paused ? (
+    <div
+      className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white/80 drop-shadow-[0_1px_2px_rgb(0_0_0/0.85)]"
+      aria-hidden
+    >
+      <Play className="size-12 fill-current" />
+    </div>
   ) : null;
 }
 
@@ -500,14 +510,6 @@ export function TvControls({
         className="pointer-events-auto absolute inset-0 size-full touch-none rounded-none p-0 active:translate-y-0 [-webkit-touch-callout:none]"
         onClick={input.tap}
       />
-      {paused && (
-        <div
-          className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white/80 drop-shadow-[0_1px_2px_rgb(0_0_0/0.85)]"
-          aria-hidden
-        >
-          <Play className="size-12 fill-current" />
-        </div>
-      )}
       <SourceFeedback openQuality={() => action("quality")} />
       {visible && (
         <div

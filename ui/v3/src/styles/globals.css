@@ -946,14 +946,56 @@ html [data-sonner-toaster][data-sonner-theme="system"] {
   .image-lightbox .yarl__thumbnails_container {
     display: none;
   }
+  .image-lightbox {
+    --image-lightbox-toolbar-height: 44px;
+    --image-lightbox-toolbar-bottom: max(0.5rem, var(--safe-area-bottom));
+  }
+  .image-lightbox .yarl__toolbar {
+    left: max(var(--mobile-control-gutter), var(--safe-area-left));
+    bottom: var(--image-lightbox-toolbar-bottom);
+    height: var(--image-lightbox-toolbar-height);
+    gap: 0.25rem;
+    padding: 0;
+  }
+  .image-lightbox .yarl__toolbar > .yarl__button {
+    min-width: 44px;
+    min-height: var(--image-lightbox-toolbar-height);
+    flex-shrink: 0;
+  }
+  /* Metadata and actions occupy their own space above the toolbar, including
+     when mobile ratings are enabled or the phone has a bottom safe area. */
+  .image-lightbox .lightbox-overlay-bottom {
+    bottom: calc(
+      var(--image-lightbox-toolbar-bottom) +
+      var(--image-lightbox-toolbar-height) +
+      0.5rem
+    );
+    max-height: calc(
+      100% -
+      var(--image-lightbox-toolbar-bottom) -
+      var(--image-lightbox-toolbar-height) -
+      4rem
+    );
+    padding-top: 0.75rem;
+    padding-left: max(1rem, var(--safe-area-left));
+    padding-right: max(1rem, var(--safe-area-right));
+  }
+  .image-lightbox .image-lightbox-metadata {
+    max-height: 40dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    pointer-events: auto;
+    touch-action: pan-y;
+  }
   /* Keep the primary exit affordance distinct from image mutations and large
      enough for a thumb. Rotation lives behind the adjacent overflow menu. */
-  .image-lightbox .lightbox-close-button {
+  .image-lightbox .yarl__toolbar > .lightbox-close-button {
     display: flex;
     min-height: 44px;
     align-items: center;
     gap: 0.375rem;
-    margin-left: 0.5rem;
+    min-width: 0;
+    flex-shrink: 1;
     padding: 0.5rem 0.75rem;
     border-left: 1px solid rgb(255 255 255 / 20%);
     border-radius: 9999px;
@@ -962,6 +1004,9 @@ html [data-sonner-toaster][data-sonner-theme="system"] {
   .image-lightbox .lightbox-close-label {
     font-size: 0.75rem;
     line-height: 1rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 

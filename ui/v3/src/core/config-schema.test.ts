@@ -65,7 +65,12 @@ it("supplies real defaults for missing and invalid persisted settings", () => {
       slideshowDelay: -1,
       scrollToZoom: "true",
     }),
-  ).toEqual({ displayMode: "fitXY", slideshowDelay: 5, scrollToZoom: false });
+  ).toEqual({
+    displayMode: "fitXY",
+    slideshowDelay: 5,
+    scrollToZoom: false,
+    showRatingOnMobile: false,
+  });
 });
 
 it("repairs task defaults while retaining unknown settings from other clients", () => {

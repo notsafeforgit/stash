@@ -53,6 +53,8 @@ import {
   RotateCcwIcon,
   Trash2Icon,
   XIcon,
+  ZoomInIcon,
+  ZoomOutIcon,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import type { LinkProps } from "@tanstack/react-router";
@@ -92,6 +94,7 @@ import { lightboxAnimation, useLightboxMotion } from "./use-lightbox-motion";
 import { LightboxMotionSurface } from "./lightbox-motion-surface";
 import { motion } from "@/core/motion";
 import { inverseImageRotationDirection } from "./image-rotation";
+import { useMediaQuery } from "@/utils/screen";
 
 // ── Module augmentation ────────────────────────────────────────────────────────
 
@@ -321,9 +324,13 @@ function LightboxDeleteShortcut({
 function ImageEntityFooter({
   imageId,
   onRequestDelete,
+  showRating,
+  mobile,
 }: {
   imageId: string;
   onRequestDelete?: (target: DeleteTarget) => void;
+  showRating: boolean;
+  mobile: boolean;
 }) {
   const intl = useIntl();
 
@@ -350,109 +357,113 @@ function ImageEntityFooter({
 
   return (
     <LightboxOverlay position="bottom">
-      {/* Title — `pointer-events-auto` on the link itself (not the
+      <div
+        className="image-lightbox-metadata flex min-h-0 flex-col gap-2 wrap-anywhere"
+        onWheel={(event) => event.stopPropagation()}
+      >
+        {/* Title — `pointer-events-auto` on the link itself (not the
           flex row) so gaps past the truncated link text fall through
           to YARL's tap handler instead of being absorbed by the row. */}
-      {title && (
-        <div className="flex items-center gap-1.5 min-w-0">
-          <TruncatingLink
-            to="/images/$imageId"
-            params={{ imageId }}
-            className="text-sm font-medium hover:underline truncate pointer-events-auto"
-            text={title}
-          >
-            {title}
-          </TruncatingLink>
-          <ExternalLinkIcon className="size-3 shrink-0 opacity-60" />
-          {onRequestDelete && (
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              className="pointer-events-auto h-6 w-6 shrink-0 text-red-300 hover:bg-red-500/15 hover:text-red-200"
-              title={intl.formatMessage({
-                id: "actions.delete",
-                defaultMessage: "Delete",
-              })}
-              onClick={() =>
-                onRequestDelete({
-                  imageId,
-                  title,
-                  filePaths,
+        {title && (
+          <div className="flex items-center gap-1.5 min-w-0">
+            <TruncatingLink
+              to="/images/$imageId"
+              params={{ imageId }}
+              className="min-w-0 text-sm font-medium hover:underline truncate pointer-events-auto"
+              text={title}
+            >
+              {title}
+            </TruncatingLink>
+            <ExternalLinkIcon className="size-3 shrink-0 opacity-60" />
+            {onRequestDelete && (
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                className="pointer-events-auto size-11 shrink-0 text-red-300 hover:bg-red-500/15 hover:text-red-200 md:size-6"
+                aria-label={intl.formatMessage({
+                  id: "actions.delete",
+                  defaultMessage: "Delete",
+                })}
+                title={intl.formatMessage({
+                  id: "actions.delete",
+                  defaultMessage: "Delete",
+                })}
+                onClick={() =>
+                  onRequestDelete({
+                    imageId,
+                    title,
+                    filePaths,
+                  })
+                }
+              >
+                <Trash2Icon className="size-3.5" />
+              </Button>
+            )}
+          </div>
+        )}
+
+        <LightboxDate date={image.date} />
+
+        {/* Galleries — see Title note. */}
+        {galleries.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {galleries.map((g) => {
+              const label = galleryLabel(g);
+              return (
+                <TruncatingLink
+                  key={g.id}
+                  to="/galleries/$galleryId"
+                  params={{ galleryId: g.id }}
+                  className="text-xs bg-white/15 hover:bg-white/25 rounded px-1.5 py-0.5 truncate max-w-[200px] pointer-events-auto"
+                  text={label}
+                >
+                  {label}
+                </TruncatingLink>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Performers — see Title note. */}
+        {performers.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {performers.map((p) => (
+              <TruncatingLink
+                key={p.id}
+                to="/performers/$performerId"
+                params={{ performerId: p.id }}
+                className="text-xs bg-white/15 hover:bg-white/25 rounded px-1.5 py-0.5 truncate max-w-[200px] pointer-events-auto"
+                text={p.name}
+              >
+                {p.name}
+              </TruncatingLink>
+            ))}
+          </div>
+        )}
+
+        {details && <LightboxDetails text={details} position="bottom" />}
+      </div>
+
+      {/* The whole footer clears the toolbar; rating visibility must not
+          determine how much clearance the other controls receive. */}
+      <div className="flex shrink-0 flex-wrap items-center gap-2 md:gap-4">
+        {showRating && (
+          <div className="pointer-events-auto w-full min-w-0 md:w-auto md:min-w-40">
+            <RatingSystem
+              size={mobile ? "touch" : "default"}
+              value={rating100}
+              onSetRating={(v) =>
+                updateImage({
+                  variables: { input: { id: imageId, rating100: v } },
                 })
               }
-            >
-              <Trash2Icon className="size-3.5" />
-            </Button>
-          )}
-        </div>
-      )}
-
-      <LightboxDate date={image.date} />
-
-      {/* Galleries — see Title note. */}
-      {galleries.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {galleries.map((g) => {
-            const label = galleryLabel(g);
-            return (
-              <TruncatingLink
-                key={g.id}
-                to="/galleries/$galleryId"
-                params={{ galleryId: g.id }}
-                className="text-xs bg-white/15 hover:bg-white/25 rounded px-1.5 py-0.5 truncate max-w-[200px] pointer-events-auto"
-                text={label}
-              >
-                {label}
-              </TruncatingLink>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Performers — see Title note. */}
-      {performers.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {performers.map((p) => (
-            <TruncatingLink
-              key={p.id}
-              to="/performers/$performerId"
-              params={{ performerId: p.id }}
-              className="text-xs bg-white/15 hover:bg-white/25 rounded px-1.5 py-0.5 truncate max-w-[200px] pointer-events-auto"
-              text={p.name}
-            >
-              {p.name}
-            </TruncatingLink>
-          ))}
-        </div>
-      )}
-
-      {/* Details — sits between performers and the rating/O-counter row
-          so the action buttons remain physically last (tab order +
-          mobile YARL toolbar clearance, see note below). */}
-      {details && <LightboxDetails text={details} position="bottom" />}
-
-      {/* Rating + O-counter — stacked on mobile so the O button (last
-          in tab order) clears the YARL toolbar that sits at bottom-right
-          on small screens. Inline on >= md where the toolbar is back at
-          its default top-right. `pointer-events-auto` lives on the
-          interactive children (RatingSystem stars + the O button), not
-          the row container, so taps in the gap between them fall
-          through to YARL's tap handler. */}
-      <div className="flex flex-col items-start gap-2 md:flex-row md:flex-wrap md:items-center md:gap-4">
-        <div className="pointer-events-auto">
-          <RatingSystem
-            value={rating100}
-            onSetRating={(v) =>
-              updateImage({
-                variables: { input: { id: imageId, rating100: v } },
-              })
-            }
-          />
-        </div>
+            />
+          </div>
+        )}
 
         <Button
           variant="outline"
-          className="h-auto bg-transparent px-2 py-1 text-[0.8125rem] gap-1 text-white/80 hover:text-white border-white/20 hover:bg-white/10 pointer-events-auto"
+          className="min-h-11 bg-transparent px-2 py-1 text-[0.8125rem] tabular-nums gap-1 text-white/80 hover:text-white border-white/20 hover:bg-white/10 pointer-events-auto md:h-auto md:min-h-0"
           onClick={() => incrementO()}
           title={intl.formatMessage({
             id: "actions.increment_o",
@@ -476,6 +487,7 @@ interface SettingsButtonProps {
 
 function SettingsButton({ settings, onSettingsChange }: SettingsButtonProps) {
   const scrollZoomId = useId();
+  const mobileRatingId = useId();
   const intl = useIntl();
 
   function update(partial: Partial<LightboxSettings>) {
@@ -525,6 +537,23 @@ function SettingsButton({ settings, onSettingsChange }: SettingsButtonProps) {
               checked={settings.scrollToZoom}
               onCheckedChange={(v) => update({ scrollToZoom: v })}
               disabled={settings.displayMode !== "fitXY"}
+            />
+          </Label>
+
+          <Label
+            htmlFor={mobileRatingId}
+            className="flex min-h-11 items-center justify-between gap-3 cursor-pointer"
+          >
+            <span>
+              {intl.formatMessage({
+                id: "lightbox.show_rating_on_mobile",
+                defaultMessage: "Show rating on mobile",
+              })}
+            </span>
+            <Switch
+              id={mobileRatingId}
+              checked={settings.showRatingOnMobile}
+              onCheckedChange={(value) => update({ showRatingOnMobile: value })}
             />
           </Label>
 
@@ -637,14 +666,20 @@ function LightboxRotateButton({
 
 function LightboxImageActionsButton({
   onRotate,
+  zoomRef,
+  atOriginal,
+  zoomEnabled,
 }: {
   onRotate: (imageId: string, direction: GQL.ImageRotateDirection) => void;
+  zoomRef: React.RefObject<ZoomRef | null>;
+  atOriginal: boolean;
+  zoomEnabled: boolean;
 }) {
   const intl = useIntl();
   const { slides, currentIndex } = useLightboxState();
   const slide = getImageSlide(slides[currentIndex]);
   const imageId = slide?.imageId;
-  if (!imageId) return null;
+  if (!imageId && !zoomEnabled) return null;
 
   const actionsLabel = intl.formatMessage({
     id: "lightbox.image_actions",
@@ -667,26 +702,61 @@ function LightboxImageActionsButton({
         positionerClassName="z-[10001]"
         className="min-w-52 border-0 bg-black/90 text-white shadow-lg ring-1 ring-white/15"
       >
-        <DropdownMenuItem
-          className="min-h-11 text-white/80 focus:bg-white/10 focus:text-white"
-          onClick={() => onRotate(imageId, GQL.ImageRotateDirection.Ccw)}
-        >
-          <RotateCcwIcon />
-          {intl.formatMessage({
-            id: "actions.rotate_ccw",
-            defaultMessage: "Rotate counter-clockwise",
-          })}
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          className="min-h-11 text-white/80 focus:bg-white/10 focus:text-white"
-          onClick={() => onRotate(imageId, GQL.ImageRotateDirection.Cw)}
-        >
-          <RotateCwIcon />
-          {intl.formatMessage({
-            id: "actions.rotate_cw",
-            defaultMessage: "Rotate clockwise",
-          })}
-        </DropdownMenuItem>
+        {zoomEnabled && (
+          <>
+            <DropdownMenuItem
+              className="min-h-11 text-white/80 focus:bg-white/10 focus:text-white"
+              onClick={() => zoomRef.current?.zoomIn()}
+            >
+              <ZoomInIcon />
+              {intl.formatMessage({
+                id: "zoom_in",
+                defaultMessage: "Zoom in",
+              })}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="min-h-11 text-white/80 focus:bg-white/10 focus:text-white"
+              onClick={() => zoomRef.current?.zoomOut()}
+            >
+              <ZoomOutIcon />
+              {intl.formatMessage({
+                id: "zoom_out",
+                defaultMessage: "Zoom out",
+              })}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="min-h-11 text-white/80 focus:bg-white/10 focus:text-white"
+              onClick={() => toggleOriginalSize(zoomRef.current, atOriginal)}
+            >
+              {atOriginal ? <Minimize2Icon /> : <Maximize2Icon />}
+              {intl.formatMessage(originalSizeLabel(atOriginal))}
+            </DropdownMenuItem>
+          </>
+        )}
+        {imageId && (
+          <>
+            <DropdownMenuItem
+              className="min-h-11 text-white/80 focus:bg-white/10 focus:text-white"
+              onClick={() => onRotate(imageId, GQL.ImageRotateDirection.Ccw)}
+            >
+              <RotateCcwIcon />
+              {intl.formatMessage({
+                id: "actions.rotate_ccw",
+                defaultMessage: "Rotate counter-clockwise",
+              })}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="min-h-11 text-white/80 focus:bg-white/10 focus:text-white"
+              onClick={() => onRotate(imageId, GQL.ImageRotateDirection.Cw)}
+            >
+              <RotateCwIcon />
+              {intl.formatMessage({
+                id: "actions.rotate_cw",
+                defaultMessage: "Rotate clockwise",
+              })}
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -744,15 +814,7 @@ export function OriginalSizeButton({
   atOriginal: boolean;
 }) {
   const intl = useIntl();
-  const label = atOriginal
-    ? intl.formatMessage({
-        id: "actions.fit_to_screen",
-        defaultMessage: "Fit to screen",
-      })
-    : intl.formatMessage({
-        id: "actions.original_size",
-        defaultMessage: "Original size",
-      });
+  const label = intl.formatMessage(originalSizeLabel(atOriginal));
   const Icon = atOriginal ? Minimize2Icon : Maximize2Icon;
   return (
     <button
@@ -760,19 +822,24 @@ export function OriginalSizeButton({
       className="yarl__button"
       title={label}
       aria-label={label}
-      onClick={() => {
-        const ref = zoomRef.current;
-        if (!ref || ref.disabled) return;
-        // maxZoom is computed as natural-pixel-ratio × maxZoomPixelRatio,
-        // so dividing by maxZoomPixelRatio yields true 1:1 display.
-        const originalTarget =
-          ref.maxZoom / LIGHTBOX_ZOOM_TUNING.maxZoomPixelRatio;
-        ref.changeZoom(atOriginal ? ref.minZoom : originalTarget);
-      }}
+      onClick={() => toggleOriginalSize(zoomRef.current, atOriginal)}
     >
       <Icon className="yarl__icon" />
     </button>
   );
+}
+
+function originalSizeLabel(atOriginal: boolean) {
+  return atOriginal
+    ? { id: "actions.fit_to_screen", defaultMessage: "Fit to screen" }
+    : { id: "actions.original_size", defaultMessage: "Original size" };
+}
+
+function toggleOriginalSize(zoom: ZoomRef | null, atOriginal: boolean) {
+  if (!zoom || zoom.disabled) return;
+  // maxZoom is natural-pixel-ratio × maxZoomPixelRatio.
+  const originalTarget = zoom.maxZoom / LIGHTBOX_ZOOM_TUNING.maxZoomPixelRatio;
+  zoom.changeZoom(atOriginal ? zoom.minZoom : originalTarget);
 }
 
 // ── Lightbox component ─────────────────────────────────────────────────────────
@@ -822,6 +889,7 @@ export function Lightbox({
     onExiting,
   } = useLightboxMotion(open, onClose);
   const [settings, setSettings] = useState<LightboxSettings>(loadSettings);
+  const mobile = useMediaQuery("(max-width: 767px)");
   const slideshowPlayingRef = useRef(false);
   const resumeSlideshowRef = useRef(false);
   const slideshowRef = useRef<SlideshowRef>(null);
@@ -1040,9 +1108,8 @@ export function Lightbox({
   const isSingleSlide = slides.length === 1;
   const isSingleSlideMode = isSingleSlide && !finite;
 
-  // Settings + slideshow + thumbnails are meaningless with one slide and
-  // no boundary sentinels (single-image detail viewer); skip the plugin
-  // wiring there to keep the toolbar tidy.
+  // Slideshow + thumbnails are unnecessary with one slide and no boundary
+  // sentinels; display and rating preferences still apply to that viewer.
   const plugins = [
     Fullscreen,
     ...(settings.displayMode === "fitXY" ? [Zoom] : []),
@@ -1085,11 +1152,13 @@ export function Lightbox({
       return (
         <ImageEntityFooter
           imageId={s.imageId}
+          mobile={mobile}
+          showRating={!mobile || settings.showRatingOnMobile}
           onRequestDelete={onDeleteImage ? setDeleteTarget : undefined}
         />
       );
     },
-    [onDeleteImage],
+    [mobile, onDeleteImage, settings.showRatingOnMobile],
   );
 
   const renderControls = useCallback(
@@ -1154,17 +1223,13 @@ export function Lightbox({
         }}
         toolbar={{
           buttons: [
-            ...(isSingleSlideMode
-              ? []
-              : [
-                  <SettingsButton
-                    key="settings"
-                    settings={settings}
-                    onSettingsChange={setSettings}
-                  />,
-                  "slideshow" as const,
-                ]),
-            ...(settings.displayMode === "fitXY"
+            <SettingsButton
+              key="settings"
+              settings={settings}
+              onSettingsChange={setSettings}
+            />,
+            ...(isSingleSlideMode ? [] : ["slideshow" as const]),
+            ...(settings.displayMode === "fitXY" && !mobile
               ? [
                   "zoom" as const,
                   <OriginalSizeButton
@@ -1187,6 +1252,9 @@ export function Lightbox({
             <LightboxImageActionsButton
               key="image-actions"
               onRotate={handleRotate}
+              zoomRef={zoomRef}
+              atOriginal={atOriginalSize}
+              zoomEnabled={settings.displayMode === "fitXY"}
             />,
             "fullscreen",
             <LightboxCloseButton key="close" />,
@@ -1213,6 +1281,7 @@ export function Lightbox({
         }}
         render={{
           ...lightboxIconRenders,
+          ...(mobile && { buttonZoom: () => null }),
           iconLoading: () => <Spinner className="size-10 text-white/70" />,
           slide: renderSlide,
           slideHeader: renderSlideHeader,

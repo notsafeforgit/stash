@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const lightboxSettingsSchema = z.looseObject({
   scrollToZoom: z.boolean().catch(false),
+  showRatingOnMobile: z.boolean().catch(false),
   displayMode: z.enum(["fitXY", "fitX", "original"]).catch("fitXY"),
   slideshowDelay: z.number().positive().finite().catch(5),
 });

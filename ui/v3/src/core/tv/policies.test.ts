@@ -30,6 +30,21 @@ const scene: SceneTiming = {
 };
 
 describe("TV media policies", () => {
+  it("defaults existing settings to five prepared items and accepts only bounded capacities", () => {
+    const { preloadCount: _, ...old } = defaultTvSettings;
+    expect(decodeTvSettings(old)).toMatchObject({
+      kind: "ready",
+      settings: { preloadCount: 5 },
+    });
+    for (const count of [1, 3, 5])
+      expect(
+        tvSettingsSchema.safeParse({ ...old, preloadCount: count }).success,
+      ).toBe(true);
+    for (const count of [0, 2, 4, 6, 100, "5"])
+      expect(
+        tvSettingsSchema.safeParse({ ...old, preloadCount: count }).success,
+      ).toBe(false);
+  });
   it("bounds marker playback by explicit end, next distinct start or real scene duration", () => {
     expect(markerRange(scene, { id: "1", seconds: 0 })).toEqual({
       start: 10,

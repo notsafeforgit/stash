@@ -574,6 +574,7 @@ type v3WaitingSegment struct {
 
 type v3RunningStream struct {
 	dir              string
+	session          string
 	streamType       *V3StreamType
 	vf               *models.VideoFile
 	maxTranscodeSize int
@@ -816,6 +817,9 @@ func serveV3HLSManifestFMP4(sm *StreamManager, w http.ResponseWriter, r *http.Re
 	urlQuery := url.Values{}
 
 	copyAuthParams(urlQuery, r.URL.Query())
+	if session := r.URL.Query().Get("stream_session"); session != "" {
+		urlQuery.Set("stream_session", session)
+	}
 
 	if resolution != "" {
 		urlQuery.Set(resolutionParamKey, resolution)
@@ -1299,19 +1303,29 @@ func (sm *StreamManager) ServeV3Segment(w http.ResponseWriter, r *http.Request, 
 		maxTranscodeSize = models.StreamingResolutionEnum(options.Resolution).GetMaxResolution()
 	}
 
-	dir := options.StreamType.FileDir(options.Hash, maxTranscodeSize)
+	session, err := ParseV3StreamSession(r.URL.Query().Get("stream_session"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	dir := options.StreamType.SessionDir(options.Hash, maxTranscodeSize, session)
 	outputDir := filepath.Join(sm.cacheDir, dir)
 
 	name := streamType.SegmentType.MakeFilename(options.Track, segment)
 	file := filepath.Join(dir, name)
 
 	sm.streamsMutex.Lock()
+	if sm.v3SessionClosed(options.VideoFile.ID, session, time.Now()) {
+		sm.streamsMutex.Unlock()
+		http.Error(w, "stream session released", http.StatusGone)
+		return
+	}
 
 	stream := sm.v3RunningStreams[dir]
 	if stream == nil {
-		// New stream for this (hash, resolution, codec) combination.
-		// Eagerly tear down any sibling streams for the SAME source
-		// scene that haven't been accessed recently — quality swaps
+		// New stream for this (hash, resolution, codec, session) combination.
+		// Eagerly tear down sibling variants for the SAME source and
+		// session that haven't been accessed recently — quality swaps
 		// (e.g. STANDARD → STANDARD_HD) and engine swaps
 		// (direct ↔ HLS) leave the previous transcode running until
 		// `v3MaxIdleTime` (60 s) elapses, unnecessarily holding ffmpeg
@@ -1331,7 +1345,7 @@ func (sm *StreamManager) ServeV3Segment(w http.ResponseWriter, r *http.Request, 
 			if siblingDir == dir || sibling.vf == nil {
 				continue
 			}
-			if sibling.vf.ID != newFileID {
+			if sibling.vf.ID != newFileID || sibling.session != session {
 				continue
 			}
 			if sibling.lastAccessed.After(cutoff) {
@@ -1360,6 +1374,7 @@ func (sm *StreamManager) ServeV3Segment(w http.ResponseWriter, r *http.Request, 
 		}
 		stream = &v3RunningStream{
 			dir:              dir,
+			session:          session,
 			streamType:       options.StreamType,
 			vf:               options.VideoFile,
 			maxTranscodeSize: maxTranscodeSize,
@@ -1531,7 +1546,7 @@ func (sm *StreamManager) checkV3Transcode(stream *v3RunningStream, now time.Time
 		return
 	}
 
-	// Supersession kill: if a sibling stream for the SAME file has been
+	// Supersession kill: if a sibling for the SAME file and session has been
 	// accessed significantly more recently than this one, the client has
 	// almost certainly swapped resolution/codec and this stream is
 	// orphaned. The `ServeV3Segment` sibling-kill only fires on new-stream
@@ -1552,7 +1567,7 @@ func (sm *StreamManager) checkV3Transcode(stream *v3RunningStream, now time.Time
 			if siblingDir == stream.dir || sibling.vf == nil {
 				continue
 			}
-			if sibling.vf.ID != fileID {
+			if sibling.vf.ID != fileID || sibling.session != stream.session {
 				continue
 			}
 			if sibling.lastAccessed.After(stream.lastAccessed.Add(supersededIdle)) {
@@ -1704,26 +1719,6 @@ func (sm *StreamManager) removeV3TranscodeFiles(stream *v3RunningStream) {
 	}
 }
 
-// StopV3StreamsForFile tears down every `v3RunningStream` for the given
-// video file, except optionally one whose dir matches `exceptDir`.
-// Called from the explicit "stop streaming" endpoint that the v3
-// frontend fires via `navigator.sendBeacon` on:
-//
-//   - HLS → direct stream swap (sibling-kill in `ServeV3Segment` doesn't
-//     fire because direct stream never hits that path; `exceptDir`
-//     empty, kills all).
-//   - HLS → HLS swap (different streamType / resolution; `exceptDir`
-//     is the new stream's dir so the freshly-starting transcode
-//     survives, only the previous-resolution stream is reaped).
-//   - Player unmount (tab close, page navigation; `exceptDir` empty).
-//
-// Without this, the previous HLS transcode lingers for `v3MaxIdleTime`
-// (60 s) holding ffmpeg + GPU resources. The 2 s grace window from
-// the sibling-kill doesn't apply here — the client has explicitly
-// signalled "I'm done with these streams" so we tear them down
-// regardless of recent activity. If a second client happens to be
-// actively streaming the same file, their next segment request will
-// recreate a fresh `v3RunningStream` and restart ffmpeg.
 // BumpV3LastAccessed refreshes the `lastAccessed` timestamp on the
 // running stream at `dir` so it survives the next `v3MaxIdleTime`
 // cleanup pass. Called by the client-side keepalive ping while an
@@ -1740,32 +1735,50 @@ func (sm *StreamManager) BumpV3LastAccessed(dir string) {
 	}
 }
 
+// StopV3StreamsForFile invalidates all sessions after a file change, such as
+// rotation. Player departures use StopV3StreamsForSession instead.
 func (sm *StreamManager) StopV3StreamsForFile(fileID models.FileID, exceptDir string) {
 	sm.streamsMutex.Lock()
 	defer sm.streamsMutex.Unlock()
+	for dir, stream := range sm.v3RunningStreams {
+		if stream.vf != nil && stream.vf.ID == fileID && dir != exceptDir {
+			sm.stopAndRemoveV3Stream(stream)
+		}
+	}
+}
+
+// StopV3StreamsForSession releases only the caller's prepared item. A quality
+// switch can retain the incoming variant without disturbing adjacent items.
+func (sm *StreamManager) StopV3StreamsForSession(fileID models.FileID, session, exceptDir string, release bool) {
+	sm.streamsMutex.Lock()
+	defer sm.streamsMutex.Unlock()
+	if release && exceptDir == "" {
+		sm.closeV3Session(fileID, session)
+	}
 
 	for dir, stream := range sm.v3RunningStreams {
-		if stream.vf == nil || stream.vf.ID != fileID {
+		if stream.vf == nil || stream.vf.ID != fileID || stream.session != session {
 			continue
 		}
 		if exceptDir != "" && dir == exceptDir {
 			continue
 		}
-		TranscodeDebugf(
-			"[transcode] explicit stop for stream %s (file ID %d)",
-			dir, fileID,
-		)
-		// Drain any waiting segments so their HTTP handlers don't
-		// hang waiting for files that will never appear.
-		for _, segment := range stream.waitingSegments {
-			if len(segment.available) == 0 {
-				segment.available <- context.Canceled
-			}
-		}
-		sm.stopV3Transcode(stream)
-		sm.removeV3TranscodeFiles(stream)
-		delete(sm.v3RunningStreams, dir)
+		sm.stopAndRemoveV3Stream(stream)
 	}
+}
+
+// Caller holds streamsMutex.
+func (sm *StreamManager) stopAndRemoveV3Stream(stream *v3RunningStream) {
+	TranscodeDebugf("[transcode] explicit stop for stream %s", stream.dir)
+	// Drain waiting segments so HTTP handlers cannot wait for deleted files.
+	for _, segment := range stream.waitingSegments {
+		if len(segment.available) == 0 {
+			segment.available <- context.Canceled
+		}
+	}
+	sm.stopV3Transcode(stream)
+	sm.removeV3TranscodeFiles(stream)
+	delete(sm.v3RunningStreams, stream.dir)
 }
 
 // stopAndRemoveAllV3 stops all current streams and removes all cache files

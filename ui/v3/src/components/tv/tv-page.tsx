@@ -43,6 +43,14 @@ import { useTvNavigation } from "./use-tv-navigation";
 import { TvControls } from "./tv-controls";
 import { TvNavigationButton } from "./tv-navigation-button";
 import { TvRotationProvider } from "./tv-slider";
+import { useScenePlayerValue } from "@/components/player/scene-player-controls";
+import { useTvMediaWindow } from "./use-tv-media-window";
+
+function TvMediaReady({ onReady }: { onReady: (ready: boolean) => void }) {
+  const ready = useScenePlayerValue("ready");
+  useEffect(() => onReady(ready), [ready, onReady]);
+  return null;
+}
 
 function ScenePoster({ item }: { item: TvFeedItem }) {
   const { data, complete } = useFragment({
@@ -173,6 +181,29 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
   if (scene && scene !== retainedScene) setRetainedScene(scene);
   const playerScene = scene ?? retainedScene;
   const currentKey = `${identity}:${active?.key ?? "pending"}`;
+  const [mediaReady, setMediaReady] = useState<{
+    key: string;
+    ready: boolean;
+  }>();
+  const onMediaReady = useCallback(
+    (ready: boolean) => {
+      setMediaReady((previous) =>
+        previous?.key === currentKey && previous.ready === ready
+          ? previous
+          : { key: currentKey, ready },
+      );
+    },
+    [currentKey],
+  );
+  const transcodeSession = useTvMediaWindow({
+    items: snapshot.items,
+    selected: snapshot.selected,
+    settings,
+    seed,
+    identity,
+    leaving,
+    ready: mediaReady?.key === currentKey && mediaReady.ready,
+  });
   const marker =
     active?.kind === "marker"
       ? scene?.scene_markers.find((marker) => marker.id === active.id)
@@ -237,25 +268,6 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
     if (leaving) controller.dispose();
   }, [leaving, controller]);
   const next = snapshot.items[snapshot.selected + 1];
-  const prefetchRequest = useRef<Promise<void> | null>(null);
-  useEffect(() => {
-    if (!next || leaving || prefetchRequest.current) return;
-    // One upcoming detail only. This resolves metadata, never a media URL load.
-    const request = client
-      .query({
-        query: GQL.FindSceneDocument,
-        variables: { id: next.sceneId },
-        fetchPolicy: "cache-first",
-      })
-      .then(
-        () => {},
-        () => {},
-      )
-      .finally(() => {
-        if (prefetchRequest.current === request) prefetchRequest.current = null;
-      });
-    prefetchRequest.current = request;
-  }, [client, next, leaving]);
   const remember = useCallback(
     (position: number) => {
       if (!active || !plan || !Number.isFinite(position)) return;
@@ -319,6 +331,7 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
                     scene={playerScene}
                     playbackKey={currentKey}
                     suspended={pending || leaving}
+                    transcodeSession={transcodeSession}
                     controls="external"
                     nativeFullscreenAllowed={false}
                     presentationRotation={
@@ -369,35 +382,38 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
                     }
                     topOverlay={
                       active && (
-                        <TvControls
-                          scene={playerScene}
-                          item={active}
-                          range={range}
-                          settings={settings}
-                          surface={presentationSurface}
-                          root={presentationRoot}
-                          rotation={rotation}
-                          setRotation={setRotation}
-                          togglePresentation={togglePresentation}
-                          canFullscreen={canFullscreen}
-                          fullscreen={presentationMode === "fullscreen"}
-                          exitPresentation={exitPresentation}
-                          openNavigation={openNavigation}
-                          navigateItem={selection.move}
-                          drag={selection.drag}
-                          cancelDrag={selection.cancel}
-                          snapshot={snapshot}
-                          changed={changed}
-                          retry={() => {
-                            void controller.load();
-                          }}
-                          reshuffle={reshuffle}
-                          completion={completion}
-                          setCompletion={setCompletion}
-                          remember={remember}
-                          leaving={leaving}
-                          onInteractionBlockedChange={setInteractionBlocked}
-                        />
+                        <>
+                          <TvMediaReady onReady={onMediaReady} />
+                          <TvControls
+                            scene={playerScene}
+                            item={active}
+                            range={range}
+                            settings={settings}
+                            surface={presentationSurface}
+                            root={presentationRoot}
+                            rotation={rotation}
+                            setRotation={setRotation}
+                            togglePresentation={togglePresentation}
+                            canFullscreen={canFullscreen}
+                            fullscreen={presentationMode === "fullscreen"}
+                            exitPresentation={exitPresentation}
+                            openNavigation={openNavigation}
+                            navigateItem={selection.move}
+                            drag={selection.drag}
+                            cancelDrag={selection.cancel}
+                            snapshot={snapshot}
+                            changed={changed}
+                            retry={() => {
+                              void controller.load();
+                            }}
+                            reshuffle={reshuffle}
+                            completion={completion}
+                            setCompletion={setCompletion}
+                            remember={remember}
+                            leaving={leaving}
+                            onInteractionBlockedChange={setInteractionBlocked}
+                          />
+                        </>
                       )
                     }
                   />

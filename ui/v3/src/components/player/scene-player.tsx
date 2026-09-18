@@ -65,6 +65,7 @@ import {
 } from "./player-overlays";
 import { usePlayDelay } from "./use-play-delay";
 import { useScenePlayerSources } from "./use-scene-player-sources";
+import type { PlayerTranscodeSession } from "./player-transcode-session";
 import { VideoFrameZoom, IDENTITY_TRANSFORM } from "./video-frame-zoom";
 import type { ZoomTransform } from "./video-frame-zoom";
 import "./player.css";
@@ -104,6 +105,8 @@ interface ScenePlayerProps {
   playbackKey?: string;
   /** Release the current source while its replacement is being resolved. */
   suspended?: boolean;
+  /** An optional queue owner retains this item's encoder beyond visibility. */
+  transcodeSession?: PlayerTranscodeSession;
   initialTimestamp?: number;
   autoplay?: boolean;
   /**
@@ -317,6 +320,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   scene,
   playbackKey: playbackKeyProp,
   suspended = false,
+  transcodeSession,
   initialTimestamp,
   autoplay = false,
   autostartEnabled,
@@ -444,12 +448,17 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   const canDecodeVideoSnapshot = useVideoCodecDecodableInMp4(file?.video_codec);
   const [decodeSnapshot, setDecodeSnapshot] = useState({
     sceneId: scene.id,
+    playbackKey,
     canDecode: canDecodeSnapshot,
     canDecodeVideo: canDecodeVideoSnapshot,
   });
-  if (decodeSnapshot.sceneId !== scene.id) {
+  if (
+    decodeSnapshot.sceneId !== scene.id ||
+    decodeSnapshot.playbackKey !== playbackKey
+  ) {
     setDecodeSnapshot({
       sceneId: scene.id,
+      playbackKey,
       canDecode: canDecodeSnapshot,
       canDecodeVideo: canDecodeVideoSnapshot,
     });
@@ -652,6 +661,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     handleCanPlay,
     handleLoadedMetadata,
   } = useScenePlayerSources({
+    transcodeSession,
     qualityPreference,
     nativeFullscreenAllowed,
     scene,

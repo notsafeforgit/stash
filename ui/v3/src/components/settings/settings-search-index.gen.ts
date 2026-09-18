@@ -1354,6 +1354,22 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
       defaultMessage: "Playback",
     },
     label: {
+      id: "tv.settings.preload_count",
+      defaultMessage: "Prepared videos",
+    },
+    description: {
+      id: "tv.settings.preload_count_description",
+      defaultMessage:
+        "Keep nearby scenes and markers ready at the selected quality. Preparing more videos can use more GPU, memory and bandwidth. Leaving TV releases them all.",
+    },
+  },
+  {
+    to: "/settings/tv",
+    section: {
+      id: "tv.settings.playback",
+      defaultMessage: "Playback",
+    },
+    label: {
       id: "tv.settings.autoplay",
       defaultMessage: "Autoplay",
     },

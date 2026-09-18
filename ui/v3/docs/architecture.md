@@ -329,7 +329,8 @@ pins an older hls.js, so a version-scoped pnpm override preserves the existing
 | `hls.ts` | HLS timeline policy and engine helpers |
 | `buffered-seek-preview.ts` | Coalesced, buffered frame previews during a scrub drag |
 | `use-player-transition-feedback.tsx` | Freeze frame, loading feedback, seek readiness |
-| `use-player-transcode-session.ts` | Renew visible HLS sessions during playback and pause; release on exit |
+| `player-transcode-session.ts`, `use-player-transcode-session.ts` | Own scoped HLS leases across playback and pause; TV retains nearby leases until window eviction or exit |
+| `prepare-player-source.ts` | Cancellable, bounded startup fetching for TV's nearby direct/HLS sources |
 | `use-player-recovery.ts` | Native fullscreen seeking and stalled-playback recovery |
 
 The scene lightbox uses `scene-carousel.tsx`, a YARL carousel module with three

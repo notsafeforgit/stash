@@ -22,11 +22,15 @@ import {
   type SyntheticEvent,
 } from "react";
 import { useCommittedRef } from "@/hooks/use-committed-ref";
-import { selectFixedQuality, type PlayerQuality } from "@/core/player-quality";
+import type { PlayerQuality } from "@/core/player-quality";
 import type { VideoPlayerStore } from "@videojs/react";
 import { useConfigurationContextOptional } from "src/hooks/config";
 import { isIOS, type PlayerSource } from "./player-utils";
-import { scenePlayerSourceURL } from "./scene-player-source-url";
+import {
+  injectStreamSession,
+  scenePlayerSourceURL,
+} from "./scene-player-source-url";
+import type { PlayerTranscodeSession } from "./player-transcode-session";
 import { usePlayerTransitionFeedback } from "./use-player-transition-feedback";
 import { usePlayerTranscodeSession } from "./use-player-transcode-session";
 import { usePlayerRecovery } from "./use-player-recovery";
@@ -39,7 +43,7 @@ import {
   QUALITY_STORAGE_KEY,
   computeInitialResume,
   filterSources,
-  getPreferredSource,
+  selectScenePlayerSource,
   isDirectStreamSrc,
   startOffsetStrategyFor,
   type RawStream,
@@ -52,6 +56,7 @@ interface SourceScene {
 }
 
 interface UseScenePlayerSourcesArgs {
+  transcodeSession?: PlayerTranscodeSession;
   qualityPreference?: PlayerQuality;
   nativeFullscreenAllowed?: boolean;
   scene: SourceScene;
@@ -165,6 +170,7 @@ interface UseScenePlayerSourcesResult {
 }
 
 export function useScenePlayerSources({
+  transcodeSession,
   qualityPreference,
   nativeFullscreenAllowed = true,
   scene,
@@ -221,13 +227,10 @@ export function useScenePlayerSources({
     isClipped,
     nativeFullscreenAllowed,
   ]);
-  const preferredSource =
-    qualityPreference?.kind === "fixed"
-      ? selectFixedQuality(sources, qualityPreference, {
-          width: fileWidth,
-          height: fileHeight,
-        })
-      : getPreferredSource(sources, qualityPreference === undefined);
+  const preferredSource = selectScenePlayerSource(sources, qualityPreference, {
+    width: fileWidth,
+    height: fileHeight,
+  });
 
   // Honour the `alwaysStartFromBeginning` UI preference for full-scene
   // playback only. When set, the player ignores the scene's persisted
@@ -325,8 +328,23 @@ export function useScenePlayerSources({
     () =>
       suspended
         ? undefined
-        : scenePlayerSourceURL(activeSrc, fragmentTime, clipRange, reloadNonce),
-    [activeSrc, fragmentTime, clipRange, reloadNonce, suspended],
+        : injectStreamSession(
+            scenePlayerSourceURL(
+              activeSrc,
+              fragmentTime,
+              clipRange,
+              reloadNonce,
+            ),
+            transcodeSession?.id,
+          ),
+    [
+      activeSrc,
+      fragmentTime,
+      clipRange,
+      reloadNonce,
+      suspended,
+      transcodeSession,
+    ],
   );
   const [load, setLoad] = useState({ playbackKey, src: finalSrc });
   if (load.playbackKey !== playbackKey || load.src !== finalSrc) {
@@ -921,7 +939,7 @@ export function useScenePlayerSources({
     load,
   ]);
 
-  usePlayerTranscodeSession(scene.id, finalSrc);
+  usePlayerTranscodeSession(scene.id, finalSrc, transcodeSession);
   usePlayerRecovery({
     finalSrc,
     rootRef,

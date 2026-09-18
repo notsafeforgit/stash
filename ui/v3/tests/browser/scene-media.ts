@@ -26,6 +26,10 @@ export async function serveSceneMedia(
       });
       await route.fulfill({ response });
     } else if (url.pathname.endsWith("/stream.master.m3u8")) {
+      const session = url.searchParams.get("stream_session");
+      const query = session
+        ? `?stream_session=${encodeURIComponent(session)}`
+        : "";
       const clipped = url.searchParams.has("end");
       const first = clipped
         ? Math.floor(Number(url.searchParams.get("start")) / 2)
@@ -41,11 +45,11 @@ export async function serveSceneMedia(
           "#EXT-X-TARGETDURATION:2",
           `#EXT-X-MEDIA-SEQUENCE:${first}`,
           "#EXT-X-PLAYLIST-TYPE:VOD",
-          '#EXT-X-MAP:URI="/media/hls/init.mp4"',
+          `#EXT-X-MAP:URI="/media/hls/init.mp4${query}"`,
           ...Array.from(
             { length: end - first },
             (_, index) =>
-              `#EXTINF:2.000000,\n/media/hls/segment-${first + index}.m4s`,
+              `#EXTINF:2.000000,\n/media/hls/segment-${first + index}.m4s${query}`,
           ),
           "#EXT-X-ENDLIST",
           "",

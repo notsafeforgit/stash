@@ -16,6 +16,7 @@ export {
 
 import { isHlsPlaylist } from "./hls";
 import { canPlaySource, type PlayerSource } from "./player-utils";
+import { selectFixedQuality, type PlayerQuality } from "@/core/player-quality";
 
 export const QUALITY_STORAGE_KEY = "stash-player-quality";
 
@@ -205,6 +206,16 @@ export function getPreferredSource(
   if (originalHls) return originalHls;
   if (hls) return hls;
   return sources[0] ?? null;
+}
+
+export function selectScenePlayerSource(
+  sources: PlayerSource[],
+  quality: PlayerQuality | undefined,
+  dimensions: { width: number | undefined; height: number | undefined },
+) {
+  return quality?.kind === "fixed"
+    ? selectFixedQuality(sources, quality, dimensions)
+    : getPreferredSource(sources, quality === undefined);
 }
 
 export function computeInitialResume(

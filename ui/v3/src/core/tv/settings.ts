@@ -38,6 +38,7 @@ export const tvSettingsSchema = z.object({
   autoplay: z.boolean(),
   // Additive preference: existing saved settings retain their muted startup.
   startMuted: z.boolean().default(true),
+  preloadCount: z.union([z.literal(1), z.literal(3), z.literal(5)]).default(5),
   start: z.enum(["resume", "beginning", "random-marker", "random-position"]),
   window: tvWindowSchema,
   completion: z.enum(["normal", "advance", "loop"]),
@@ -99,6 +100,7 @@ export const defaultTvSettings: TvSettings = {
   direction: "ASC",
   autoplay: true,
   startMuted: true,
+  preloadCount: 5,
   start: "resume",
   window: { kind: "full" },
   completion: "advance",

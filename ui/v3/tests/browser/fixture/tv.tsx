@@ -149,6 +149,10 @@ const settings: TvSettings = {
   mode,
   autoplay: !params.has("paused"),
   startMuted: !params.has("unmuted"),
+  // Existing interaction cases exercise the one-item policy; window tests
+  // opt into each larger capacity explicitly.
+  preloadCount:
+    params.get("preload") === "5" ? 5 : params.get("preload") === "3" ? 3 : 1,
   start: start.success ? start.data : defaultTvSettings.start,
   window:
     params.get("window") === "fixed"

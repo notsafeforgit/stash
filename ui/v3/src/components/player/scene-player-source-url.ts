@@ -140,6 +140,14 @@ export function injectReloadNonce(src: string, nonce: number): string {
   return `${base}${separator}_r=${nonce}${fragment}`;
 }
 
+/** The same URL identity is used for warming, playback and scoped cleanup. */
+export function injectStreamSession(src: string | undefined, session?: string) {
+  if (!src || !session || !isHlsPlaylist(src)) return src;
+  const url = new URL(src);
+  url.searchParams.set("stream_session", session);
+  return url.toString();
+}
+
 export function scenePlayerSourceURL(
   activeSrc: string | undefined,
   fragmentTime: number | null,

@@ -51,6 +51,18 @@ time and playback state. It does not change the shared player's saved quality.
 Transcodes are generated on demand by Stash; no generated video preview mode
 is involved. Posters and timeline sprite images remain available.
 
+**Prepared videos** defaults to **5**: the current item, two before it and two
+after it. Choose **3** for one on each side, or **1** to load only the current
+item. The window has fewer items at the start and end of the feed. Preparation
+starts after the active video is ready and uses the same default quality and
+playback range. Direct files preload media; HLS streams prepare their first
+segments and retain an independent server session, including adjacent markers
+from the same scene. Existing server lookahead limits still apply: encoders
+suspend when their buffer is full instead of transcoding the whole scene.
+Items leaving the window release their session. Leaving TV releases all of them;
+background items never play audio or record activity. Preparing more items can
+use more GPU, memory and bandwidth.
+
 **Start muted** in Settings → TV controls the initial audio when entering TV
 (enabled by default). The visible mute/unmute control in the bottom dock changes
 audio for the current viewing session and carries across item changes. Browsers
@@ -127,7 +139,8 @@ retired rules are removed. Version 1 settings with Shuffle enabled load as Rando
 other saved sort choices remain intact. Saving writes the new format without
 rules or a shuffle flag. Sort labels use the same translations as the library menus.
 Saved versions without a startup mute preference default to muted without
-resetting their other preferences.
+resetting their other preferences. Versions without a prepared-video preference
+default to five without resetting any other settings.
 
 ## Activity and ownership
 
@@ -159,9 +172,14 @@ never write server activity; offline playback keeps its existing local resume.
 
 Apollo owns entity data. The feed stores IDs, paging state, tombstones, and a
 small playback snapshot; its constructor is pure and effects own requests.
-There is one active page request, bounded refill bursts, one upcoming detail
-prefetch, one stable player/video, and three presentation slots. Adjacent slots
-use still images. Timelines subscribe to scalar player state, and playback ticks
+There is one active page request, bounded refill bursts, one stable player/video,
+and three presentation slots. Adjacent slots use still images. The configured
+media window owns cancellable metadata/media preparation and transcode leases;
+it does not mount additional shared players. `use-tv-media-window.ts` retains
+entries across scrolling and `tv-prepared-item.ts` prepares each one. The shared
+`player-transcode-session.ts` scopes keepalive, quality changes and cleanup to
+each owner. Released server sessions reject late requests so an aborted preload
+cannot restart an evicted encoder. Timelines subscribe to scalar player state, and playback ticks
 do not publish feed state. Settings editors and action dialogs mount on demand.
 The existing content reveal, media attachment, deferred freeze-frame canvas,
 route handoff, and offline download behavior are retained.
@@ -176,6 +194,10 @@ settings persistence/failure, and activity. The lightbox browser fixture also
 verifies shared online activity. Existing app/player/browser regressions remain
 part of the gate. `TestMarkerQueryASTOrientation` verifies the additive marker
 AST orientation condition against parent video dimensions and nested criteria.
+`tv-preload.browser.ts` checks the 1/3/5 window for scenes and same-scene markers,
+direct file preparation, rapid-scroll cancellation, exit cleanup and autosaving
+the setting. Unit tests cover window ownership and bounded startup fetching;
+Go tests cover session isolation, cleanup and late-request rejection.
 
 Automated WebKit coverage is not a physical iPhone Safari test. Device-specific
 casting, AirPlay, picture-in-picture, and iOS browser chrome still depend on the

@@ -2505,6 +2505,11 @@
     "title": "TV",
     "open": "Open TV",
     "settings": {
+      "preload_count": "Prepared videos",
+      "preload_count_description": "Keep nearby scenes and markers ready at the selected quality. Preparing more videos can use more GPU, memory and bandwidth. Leaving TV releases them all.",
+      "preload_five": "5 — current, 2 before and 2 after",
+      "preload_three": "3 — current, 1 before and 1 after",
+      "preload_one": "1 — current video only",
       "feed": "Feed",
       "mode": "Default feed",
       "scene_filter": "Scene filter",

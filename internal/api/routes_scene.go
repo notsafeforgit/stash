@@ -435,8 +435,8 @@ func (rs sceneRoutes) streamV3SegmentNamed(w http.ResponseWriter, r *http.Reques
 	streamManager.ServeV3Segment(w, r, options)
 }
 
-// StreamsStop tears down any HLS/transcode v3RunningStream for this
-// scene's primary file. Called by the v3 frontend via
+// StreamsStop tears down HLS/transcode streams for this scene's primary file
+// within the caller's optional stream_session. Called by the v3 frontend via
 // `navigator.sendBeacon` when:
 //   - The active source switches from HLS to direct stream (the
 //     direct stream path doesn't go through `ServeV3Segment`, so the
@@ -457,6 +457,11 @@ func (rs sceneRoutes) streamV3SegmentNamed(w http.ResponseWriter, r *http.Reques
 // already gone away.
 func (rs sceneRoutes) StreamsStop(w http.ResponseWriter, r *http.Request) {
 	scene := r.Context().Value(sceneKey).(*models.Scene)
+	session, err := ffmpeg.ParseV3StreamSession(r.URL.Query().Get("stream_session"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	streamManager := manager.GetInstance().StreamManager
 	if streamManager == nil {
@@ -480,10 +485,10 @@ func (rs sceneRoutes) StreamsStop(w http.ResponseWriter, r *http.Request) {
 		}
 		// `FileDir` uses only `t.Name`, so a value-only struct is
 		// sufficient — no need to look up the canonical pointer.
-		exceptDir = ffmpeg.V3StreamType{Name: keepType}.FileDir(sceneHash, maxTranscodeSize)
+		exceptDir = ffmpeg.V3StreamType{Name: keepType}.SessionDir(sceneHash, maxTranscodeSize, session)
 	}
 
-	streamManager.StopV3StreamsForFile(f.ID, exceptDir)
+	streamManager.StopV3StreamsForSession(f.ID, session, exceptDir, r.URL.Query().Get("release") == "1")
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -498,6 +503,11 @@ func (rs sceneRoutes) StreamsStop(w http.ResponseWriter, r *http.Request) {
 // for a fire-and-forget keepalive.
 func (rs sceneRoutes) StreamsKeepalive(w http.ResponseWriter, r *http.Request) {
 	scene := r.Context().Value(sceneKey).(*models.Scene)
+	session, err := ffmpeg.ParseV3StreamSession(r.URL.Query().Get("stream_session"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	streamManager := manager.GetInstance().StreamManager
 	if streamManager == nil {
@@ -516,7 +526,7 @@ func (rs sceneRoutes) StreamsKeepalive(w http.ResponseWriter, r *http.Request) {
 	if keepResolution := r.URL.Query().Get("keep_resolution"); keepResolution != "" {
 		maxTranscodeSize = models.StreamingResolutionEnum(keepResolution).GetMaxResolution()
 	}
-	dir := ffmpeg.V3StreamType{Name: keepType}.FileDir(sceneHash, maxTranscodeSize)
+	dir := ffmpeg.V3StreamType{Name: keepType}.SessionDir(sceneHash, maxTranscodeSize, session)
 
 	streamManager.BumpV3LastAccessed(dir)
 	w.WriteHeader(http.StatusNoContent)

@@ -186,6 +186,40 @@ function TvSettingsForm({ initial }: { initial: TvSettings }) {
         />
       </SettingsSection>
       <SettingsSection title={msg("tv.settings.playback", "Playback")}>
+        <SettingSelect
+          label={msg("tv.settings.preload_count", "Prepared videos")}
+          description={msg(
+            "tv.settings.preload_count_description",
+            "Keep nearby scenes and markers ready at the selected quality. Preparing more videos can use more GPU, memory and bandwidth. Leaving TV releases them all.",
+          )}
+          value={String(values.preloadCount)}
+          options={[
+            {
+              value: "5",
+              label: msg(
+                "tv.settings.preload_five",
+                "5 — current, 2 before and 2 after",
+              ),
+            },
+            {
+              value: "3",
+              label: msg(
+                "tv.settings.preload_three",
+                "3 — current, 1 before and 1 after",
+              ),
+            },
+            {
+              value: "1",
+              label: msg("tv.settings.preload_one", "1 — current video only"),
+            },
+          ]}
+          onChange={(value) => {
+            const parsed = tvSettingsSchema.shape.preloadCount.safeParse(
+              Number(value),
+            );
+            if (parsed.success) set("preloadCount", parsed.data);
+          }}
+        />
         <SettingSwitch
           label={msg("tv.settings.autoplay", "Autoplay")}
           description={msg(

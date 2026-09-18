@@ -984,7 +984,6 @@ html [data-sonner-toaster][data-sonner-theme="system"] {
     max-height: 40dvh;
     overflow-y: auto;
     overscroll-behavior: contain;
-    pointer-events: auto;
     touch-action: pan-y;
   }
   /* Keep the primary exit affordance distinct from image mutations and large

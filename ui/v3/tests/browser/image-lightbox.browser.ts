@@ -15,6 +15,11 @@ async function revealMetadata(page: Page) {
     .locator("img")
     .tap({ position: { x: 100, y: 80 } });
   await expect(page.locator(".image-lightbox")).toHaveClass(/chrome-revealed/);
+  // Finish the reveal before another single tap; an immediate tap belongs to
+  // the double-tap zoom gesture instead.
+  await expect(
+    currentSlide(page).locator(".lightbox-overlay-bottom"),
+  ).toHaveCSS("opacity", "1");
 }
 
 async function expectMobileLayout(page: Page, safeBottom = 0) {
@@ -82,6 +87,10 @@ for (const width of [320, 390]) {
     await page.screenshot({
       path: test.info().outputPath("mobile-image-lightbox.png"),
     });
+    const date = await currentSlide(page).locator("time").boundingBox();
+    if (!date) throw new Error("Missing image date");
+    await page.touchscreen.tap(date.x + 30, date.y + date.height / 2);
+    await expect(page.locator(".image-lightbox")).toHaveClass(/chrome-hidden/);
     await toolbar(page)
       .getByRole("button", { name: "Close", exact: true })
       .tap();

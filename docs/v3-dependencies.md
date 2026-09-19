@@ -13,12 +13,18 @@ The 2026-09-19 refresh applies to v3, the shared Go backend, and runtime images.
 | Tables | TanStack Table 9.2 with explicit features and server-controlled sorting |
 | GraphQL | Apollo 4.3; GraphQL 17; current Code Generator plugins |
 | Playback | Video.js 10.0.0-rc.2; scoped hls.js 1.7.3 override |
-| Tooling | Node 24 LTS (24.15 minimum); pnpm 12.4.2; TypeScript 6.0.3; Vite 8.3; Vitest 5; Biome 2.5 |
+| Tooling | Node 24 LTS (24.15 minimum); pnpm 12.4.2; TypeScript 7.0.2; Vite 8.3; Vitest 5; Biome 2.5 |
 
-TypeScript 7 is available, but the current ESLint parser supports versions below
-6.1. Keep the compiler within that supported range until the parser can be
-upgraded with it. Node types follow the 24 LTS runtime. Video.js packages remain
-on the same current release; reassess the HLS override when updating its adapter.
+v3 uses TypeScript 7 for builds and app/browser type checks. Following
+[Microsoft's compatibility setup](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-6-0),
+`@typescript/native` aliases `typescript@7.0.2`, while `typescript` aliases
+`@typescript/typescript6`. The latter supplies the supported 6.0.3 JavaScript
+API to ESLint and code-generation tools. `tsc` runs 7.0.2; `tsc6` is only the
+compatibility executable. Keep both aliases until those tools support the
+native compiler API. See the [v3 compiler workflow](../ui/v3/docs/development.md#typescript-7).
+
+Node types follow the 24 LTS runtime. Video.js packages remain on the same
+current release; reassess the HLS override when updating its adapter.
 Go updates keep the existing major import paths for libraries such as JWT v4,
 nullable database values, and mockery v2. Moving these to new APIs or generator
 configuration is a separate migration; the runtime vulnerability scan has no
@@ -104,6 +110,12 @@ fix and is not imported by Stash.
 
 ### 2026-09-19 validation
 
+- The TypeScript 7 migration passed the full v3 validation/build, embedded-UI
+  tests, and Chromium/WebKit PWA tests. Native watch detected and recovered from
+  an intentionally introduced type error. On this workstation, one comparison
+  of the same configuration took 10.39s / 10.01s with TypeScript 6 and
+  1.48s / 1.62s with TypeScript 7 for app / browser checks respectively. All 289
+  production JS/CSS chunk names and hashes remained unchanged.
 - `make validate-fork` passed, including Go lint/integration tests, v3 lint and
   type checks, 378 unit tests, and the v2.5 compatibility baseline. The unchanged
   v2.5 UI also passed its own validation and production build.

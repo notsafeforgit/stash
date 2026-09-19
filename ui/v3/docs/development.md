@@ -66,6 +66,7 @@ with `STASH_ENABLE_V3_UI=false` to exercise the embedded v2.5 fallback.
 | `make generate` | Go bindings and **v2.5** GraphQL types |
 | `pnpm --dir ui/v3 gqlgen` | v3 GraphQL types and typed operation documents |
 | `pnpm --dir ui/v3 check` | v3 GraphQL/settings generation and TypeScript |
+| `pnpm --dir ui/v3 check:watch` | Generate v3 bindings, then watch app types with TypeScript 7 |
 | `make ui` | v2.5 bundle and login locales |
 | `make ui-v3-only` | v3 generation, TypeScript, and production bundle |
 | `make stash` | Main binary, embedding the bundles already on disk |
@@ -75,6 +76,35 @@ After schema changes, run `make generate` and regenerate v3 as well. v3's `dev`,
 plugin generates `src/routeTree.gen.ts` during dev/build; rebuild after route-file
 changes before standalone type checks if the generated tree is stale. Never
 hand-edit generated bindings, route trees, or the settings search index.
+
+### TypeScript 7
+
+v3's `tsc` runs the native TypeScript 7.0.2 compiler. The `@typescript/native`
+package alias supplies it; the separate `typescript` compatibility alias
+supplies the TypeScript 6 API needed by ESLint and code-generation tools.
+Both are intentional. Check the active compiler with
+`pnpm --dir ui/v3 exec tsc --version`.
+
+Run `pnpm --dir ui/v3 check:watch` alongside Vite for continuous app diagnostics.
+It generates bindings once at startup; rerun `gqlgen` after schema changes.
+`pnpm --dir ui/v3 check` also checks browser fixtures and tooling configuration.
+
+The bundler configuration preserves module syntax and requires explicit
+`import type` / `export type` for types. GraphQL code generation uses the same
+convention. Side-effect imports are checked for resolution errors.
+
+For native editor diagnostics, open `ui/v3` as a VS Code workspace and enable
+the official [TypeScript 7 extension](https://marketplace.visualstudio.com/items?itemName=TypeScriptTeam.native-preview).
+Its local workspace settings can select the installed compiler:
+
+```json
+{
+  "js/ts.experimental.useTsgo": true,
+  "js/ts.tsdk.path": "./node_modules/@typescript/native"
+}
+```
+
+Keep these editor settings scoped to v3. v2.5 retains its upstream toolchain.
 
 ## Validation
 

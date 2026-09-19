@@ -7,6 +7,7 @@ const config: CodegenConfig = {
   ],
   config: {
     strictScalars: true,
+    useTypeImports: true,
     scalars: {
       ID: "string",
       Time: "string",

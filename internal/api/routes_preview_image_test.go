@@ -61,6 +61,11 @@ func TestPreviewImageDelivery(t *testing.T) {
 			if test.want == http.StatusOK && (rec.Header().Get("Content-Type") != "image/avif" || rec.Body.String() != "image/avif" || !strings.Contains(rec.Header().Get("Cache-Control"), "private")) {
 				t.Fatalf("incorrect AVIF delivery: %v %s", rec.Header(), rec.Body.String())
 			}
+			if test.want == http.StatusOK {
+				if rec.Header().Get("X-Content-Type-Options") != "nosniff" || rec.Header().Get("Content-Security-Policy") != "default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox" {
+					t.Fatalf("missing preview image security headers: %v", rec.Header())
+				}
+			}
 		})
 	}
 }

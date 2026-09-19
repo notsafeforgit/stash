@@ -113,12 +113,12 @@ func sceneASTConditionHandler(condition *models.FilterASTCondition) (criterionHa
 			return nil, err
 		}
 		return qb.duplicatedCriterionHandler(&input), nil
-	case "date":
+	case "date", "production_date":
 		input, err := decodeASTValue[models.DateCriterionInput](condition.Value)
 		if err != nil {
 			return nil, err
 		}
-		return &dateCriterionHandler{c: &input, column: "scenes.date"}, nil
+		return &dateCriterionHandler{c: &input, column: "scenes." + condition.Field}, nil
 	case "created_at":
 		input, err := decodeASTValue[models.TimestampCriterionInput](condition.Value)
 		if err != nil {

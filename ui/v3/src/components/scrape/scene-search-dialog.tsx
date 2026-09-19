@@ -1,6 +1,7 @@
 import type React from "react";
 import { useEffect, useState, useRef } from "react";
 import { useIntl } from "react-intl";
+import { formatFuzzyDate } from "@/utils/date";
 import { useLazyQuery } from "@apollo/client/react";
 import { useDebouncedValue } from "src/hooks/debounce";
 import { useToast } from "src/hooks/toast";
@@ -105,6 +106,11 @@ export function SceneSearchDialog({
             const subs: React.ReactNode[] = [];
             const meta = [s.studio?.name, s.date].filter(Boolean).join(" · ");
             if (meta) subs.push(meta);
+            if (s.production_date) {
+              subs.push(
+                `${intl.formatMessage({ id: "production_date" })}: ${formatFuzzyDate(intl, s.production_date)}`,
+              );
+            }
             if (s.performers && s.performers.length > 0) {
               subs.push(
                 s.performers

@@ -1,6 +1,7 @@
 import type React from "react";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useIntl } from "react-intl";
+import { formatFuzzyDate } from "@/utils/date";
 import { useLazyQuery } from "@apollo/client/react";
 import { useDebouncedValue } from "src/hooks/debounce";
 import { useToast } from "src/hooks/toast";
@@ -150,6 +151,11 @@ export function StashBoxSceneSearchDialog({
                   .filter(Boolean)
                   .join(" · ");
                 if (meta) subs.push(meta);
+                if (s.production_date) {
+                  subs.push(
+                    `${intl.formatMessage({ id: "production_date" })}: ${formatFuzzyDate(intl, s.production_date)}`,
+                  );
+                }
                 if (s.performers && s.performers.length > 0) {
                   subs.push(
                     s.performers

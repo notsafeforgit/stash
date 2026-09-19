@@ -63,6 +63,14 @@ export function useSceneTableColumns(): ColumnDef<SceneItem>[] {
           "tabular-nums text-muted-foreground text-xs whitespace-nowrap",
       }),
 
+      textColumn<SceneItem>({
+        id: "production_date",
+        header: intl.formatMessage({ id: "production_date" }),
+        getValue: (scene) => scene.production_date,
+        className:
+          "tabular-nums text-muted-foreground text-xs whitespace-nowrap",
+      }),
+
       {
         id: "duration",
         accessorFn: (scene) => scene.files[0]?.duration ?? null,

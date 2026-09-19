@@ -68,3 +68,17 @@ export function selectAllButRetained<T extends Identified>(
     return group.filter((item) => item.id !== retained.id);
   });
 }
+
+/** Keep every preferred encoding. A group without one must remain untouched. */
+export function selectAllButPreferredCodec<T extends Identified>(
+  groups: readonly (readonly T[])[],
+  preferredCodec: string | undefined,
+  codecOf: (item: T) => string | null | undefined,
+): T[] {
+  if (!preferredCodec) return [];
+  return groups.flatMap((group) =>
+    group.some((item) => codecOf(item) === preferredCodec)
+      ? group.filter((item) => codecOf(item) !== preferredCodec)
+      : [],
+  );
+}

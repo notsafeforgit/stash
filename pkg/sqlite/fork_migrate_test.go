@@ -1,8 +1,10 @@
 package sqlite_test
 
 import (
+	"context"
 	"database/sql"
 	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -71,21 +73,46 @@ func TestForkMigrationsRunOutsideUpstreamSchemaVersion(t *testing.T) {
 
 func TestLegacyForkSchemaVersionIsAdopted(t *testing.T) {
 	config.InitializeEmpty()
+	t.Cleanup(func() { config.InitializeEmpty() })
 
 	db := sqlite.NewDatabase()
 	dbPath := filepath.Join(t.TempDir(), "stash-go.sqlite")
 
-	if err := db.Open(dbPath); err != nil {
-		t.Fatalf("Open: %v", err)
+	// Private schemas 998/999 were based on upstream 85. Build that actual
+	// historical schema, rather than relabelling the latest database: doing
+	// the latter pre-applies every new upstream migration under test.
+	initial, err := os.ReadFile("migrations/1_initial.up.sql")
+	if err != nil {
+		t.Fatal(err)
 	}
-	if err := db.Close(); err != nil {
-		t.Fatalf("Close: %v", err)
-	}
-
 	raw := openRawDB(t, dbPath)
-	if _, err := raw.Exec("DROP TABLE fork_schema_migrations"); err != nil {
-		t.Fatalf("dropping fork schema table: %v", err)
+	if _, err := raw.Exec(string(initial)); err != nil {
+		t.Fatal(err)
 	}
+	if _, err := raw.Exec("CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, dirty BOOLEAN NOT NULL); INSERT INTO schema_migrations VALUES (1, false)"); err != nil {
+		t.Fatal(err)
+	}
+	if err := raw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	var migrationErr *sqlite.MigrationNeededError
+	if err := db.Open(dbPath); !errors.As(err, &migrationErr) {
+		t.Fatalf("Open initial schema = %v, want MigrationNeededError", err)
+	}
+	migrator, err := sqlite.NewMigrator(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(migrator.Close)
+	const legacyBase = uint(85)
+	for current := migrator.CurrentSchemaVersion(); current < legacyBase; current = migrator.CurrentSchemaVersion() {
+		if err := migrator.RunMigration(context.Background(), migrator.GetNextMigrationVersion(current)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	migrator.Close()
+
+	raw = openRawDB(t, dbPath)
 	if _, err := raw.Exec("DELETE FROM schema_migrations"); err != nil {
 		t.Fatalf("clearing schema_migrations: %v", err)
 	}
@@ -97,13 +124,15 @@ func TestLegacyForkSchemaVersionIsAdopted(t *testing.T) {
 	}
 
 	adopted := sqlite.NewDatabase()
-	err := adopted.Open(dbPath)
-	var migrationErr *sqlite.MigrationNeededError
+	err = adopted.Open(dbPath)
 	if !errors.As(err, &migrationErr) {
 		t.Fatalf("Open error = %v, want MigrationNeededError", err)
 	}
-	if got, want := adopted.Version(), adopted.AppSchemaVersion(); got != want {
+	if got, want := adopted.Version(), legacyBase; got != want {
 		t.Fatalf("adopted upstream schema version = %d, want %d", got, want)
+	}
+	if got, want := migrationErr.RequiredSchemaVersion, adopted.AppSchemaVersion(); got != want {
+		t.Fatalf("required upstream schema version = %d, want %d", got, want)
 	}
 	if got, want := adopted.ForkSchemaVersion(), uint(0); got != want {
 		t.Fatalf("adopted fork schema version = %d, want %d", got, want)
@@ -122,6 +151,9 @@ func TestLegacyForkSchemaVersionIsAdopted(t *testing.T) {
 	if rawTableExists(t, raw, "fork_schema_migrations") {
 		t.Fatal("fork_schema_migrations should not be written during Open")
 	}
+	if rawColumnExists(t, raw, "scenes", "production_date") {
+		t.Fatal("legacy schema must not have production_date before migration")
+	}
 	if err := raw.Close(); err != nil {
 		t.Fatalf("closing raw db: %v", err)
 	}
@@ -137,6 +169,11 @@ func TestLegacyForkSchemaVersionIsAdopted(t *testing.T) {
 	}
 	if got, want := queryUint(t, raw, "SELECT MAX(version) FROM fork_schema_migrations"), adopted.RequiredForkSchemaVersion(); got != want {
 		t.Fatalf("stored adopted fork schema version after migration = %d, want %d", got, want)
+	}
+	for _, column := range []string{"production_date", "production_date_precision"} {
+		if !rawColumnExists(t, raw, "scenes", column) {
+			t.Fatalf("upstream migration did not create scenes.%s", column)
+		}
 	}
 }
 

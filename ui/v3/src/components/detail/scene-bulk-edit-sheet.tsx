@@ -1,6 +1,6 @@
 import { useBulkCustomFields } from "@/components/forms/use-bulk-custom-fields";
 import { useCommittedRef } from "@/hooks/use-committed-ref";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useForm, useStore } from "@tanstack/react-form";
 import { BulkCustomFieldsField } from "@/components/forms/bulk-custom-fields-field";
 import {
@@ -55,6 +55,7 @@ interface SceneBulkFormValues {
   custom_fields: BulkCustomFieldsValue;
   code: string | null | undefined;
   date: string | null | undefined;
+  production_date: string | null | undefined;
   director: string | null | undefined;
   rating100: number | null | undefined;
   organized: boolean | undefined;
@@ -75,6 +76,7 @@ function buildInitialValues(_items: SceneBulkItem[]): SceneBulkFormValues {
     custom_fields: undefined,
     code: undefined,
     date: undefined,
+    production_date: undefined,
     director: undefined,
     rating100: undefined,
     organized: undefined,
@@ -97,6 +99,7 @@ function buildMutationInput(
     custom_fields: bulkCustomFieldsInput(v.custom_fields),
     code: v.code,
     date: v.date,
+    production_date: v.production_date,
     director: v.director,
     rating100: v.rating100,
     organized: v.organized,
@@ -134,6 +137,7 @@ export function SceneBulkEditSheet({
   totalCount,
   onSaved,
 }: SceneBulkEditSheetProps) {
+  const productionDateId = useId();
   const intl = useIntl();
   const [applyToAll, setApplyToAll] = useState(false);
   const [sheetItems, setSheetItems] = useState(items);
@@ -387,6 +391,25 @@ export function SceneBulkEditSheet({
                   defaultMessage: "Set each from file mtime",
                 })}
               </Button>
+            </Field>
+          )}
+        </form.Field>
+
+        <form.Field name="production_date">
+          {(field) => (
+            <Field data-disabled={saving}>
+              <FieldLabel htmlFor={productionDateId}>
+                {intl.formatMessage({
+                  id: "production_date",
+                  defaultMessage: "Production date",
+                })}
+              </FieldLabel>
+              <BulkTextField
+                id={productionDateId}
+                value={field.state.value}
+                onChange={field.handleChange}
+                disabled={saving}
+              />
             </Field>
           )}
         </form.Field>

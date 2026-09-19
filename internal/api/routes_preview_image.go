@@ -53,6 +53,7 @@ func servePreviewImage(w http.ResponseWriter, r *http.Request, store previewimag
 		return
 	}
 	w.Header().Set("Content-Type", variant.MIMEType)
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
 	http.ServeFile(w, r, path)

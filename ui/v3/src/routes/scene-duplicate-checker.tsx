@@ -9,6 +9,7 @@ import {
   compareText,
   groupValueTints,
   selectAllButRetained,
+  selectAllButPreferredCodec,
 } from "@/components/duplicates/groups";
 import { useId, type ReactNode, useEffect, useMemo, useState } from "react";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
@@ -66,13 +67,16 @@ import { Checkbox } from "src/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "src/components/ui/dropdown-menu";
 import { Label } from "src/components/ui/label";
+import { Field, FieldLabel } from "@/components/ui/field";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -145,6 +149,7 @@ const searchSchema = z.object({
   durationDiff: z.coerce.number().min(-1).optional(),
   fa: z.string().optional(),
   filterScope: z.enum(DUPLICATE_FILTER_SCOPES).optional().catch(undefined),
+  selectedCodec: z.string().optional(),
 });
 
 type SceneDuplicate =
@@ -573,6 +578,23 @@ function SceneDuplicateCheckerPage() {
   const totalPages = pageCount(duplicateCount, pageSize);
   const page = Math.min(currentPage, totalPages);
   const pagedGroups = allGroups;
+
+  const codecOptions = useMemo(
+    () =>
+      [
+        ...new Set(
+          allGroups.flat().flatMap((scene) => {
+            const codec = primaryFile(scene)?.video_codec;
+            return codec ? [codec] : [];
+          }),
+        ),
+      ].sort(),
+    [allGroups],
+  );
+  const selectedCodec =
+    search.selectedCodec && codecOptions.includes(search.selectedCodec)
+      ? search.selectedCodec
+      : codecOptions[0];
 
   const selectedScenes = useMemo(
     () => allGroups.flat().filter((scene) => checkedScenes[scene.id]),
@@ -1010,6 +1032,43 @@ function SceneDuplicateCheckerPage() {
                     </Select>
                   </Label>
 
+                  {selectedCodec && (
+                    <Field orientation="horizontal" className="w-auto">
+                      <FieldLabel htmlFor={`${controlId}-codec`}>
+                        <FormattedMessage
+                          id="dupe_check.preferred_codec_label"
+                          defaultMessage="Preferred codec"
+                        />
+                      </FieldLabel>
+                      <Select
+                        value={selectedCodec}
+                        onValueChange={(value) => {
+                          if (!value) return;
+                          setCheckedScenes({});
+                          void navigate({
+                            search: (prev) => ({
+                              ...prev,
+                              selectedCodec: value,
+                            }),
+                          });
+                        }}
+                      >
+                        <SelectTrigger id={`${controlId}-codec`} size="sm">
+                          <SelectValue>{selectedCodec}</SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            {codecOptions.map((codec) => (
+                              <SelectItem key={codec} value={codec}>
+                                {codec}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  )}
+
                   <DropdownMenu>
                     <DropdownMenuTrigger
                       render={<Button variant="outline" size="sm" />}
@@ -1021,75 +1080,97 @@ function SceneDuplicateCheckerPage() {
                       />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="min-w-56">
-                      <DropdownMenuItem onClick={() => setCheckedScenes({})}>
-                        <XSquare />
-                        <FormattedMessage
-                          id="dupe_check.select_none"
-                          defaultMessage="Select none"
-                        />
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() =>
-                          selectAllButByGroup((group) =>
-                            sameResolution(group)
-                              ? undefined
-                              : group.reduce((best, scene) =>
-                                  sceneResolution(scene) > sceneResolution(best)
-                                    ? scene
-                                    : best,
+                      <DropdownMenuGroup>
+                        <DropdownMenuItem onClick={() => setCheckedScenes({})}>
+                          <XSquare />
+                          <FormattedMessage
+                            id="dupe_check.select_none"
+                            defaultMessage="Select none"
+                          />
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            selectAllButByGroup((group) =>
+                              sameResolution(group)
+                                ? undefined
+                                : group.reduce((best, scene) =>
+                                    sceneResolution(scene) >
+                                    sceneResolution(best)
+                                      ? scene
+                                      : best,
+                                  ),
+                            )
+                          }
+                        >
+                          <Ruler />
+                          <FormattedMessage
+                            id="dupe_check.select_all_but_largest_resolution"
+                            defaultMessage="All but largest resolution"
+                          />
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            selectAllButByGroup((group) =>
+                              group.reduce((best, scene) =>
+                                sceneFileSize(scene) > sceneFileSize(best)
+                                  ? scene
+                                  : best,
+                              ),
+                            )
+                          }
+                        >
+                          <FileVideo />
+                          <FormattedMessage
+                            id="dupe_check.select_all_but_largest_file"
+                            defaultMessage="All but largest file"
+                          />
+                        </DropdownMenuItem>
+                        {selectedCodec && (
+                          <DropdownMenuItem
+                            onClick={() =>
+                              checkScenes(
+                                selectAllButPreferredCodec(
+                                  pagedGroups,
+                                  selectedCodec,
+                                  (scene) => primaryFile(scene)?.video_codec,
                                 ),
-                          )
-                        }
-                      >
-                        <Ruler />
-                        <FormattedMessage
-                          id="dupe_check.select_all_but_largest_resolution"
-                          defaultMessage="All but largest resolution"
-                        />
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() =>
-                          selectAllButByGroup((group) =>
-                            group.reduce((best, scene) =>
-                              sceneFileSize(scene) > sceneFileSize(best)
-                                ? scene
-                                : best,
-                            ),
-                          )
-                        }
-                      >
-                        <FileVideo />
-                        <FormattedMessage
-                          id="dupe_check.select_all_but_largest_file"
-                          defaultMessage="All but largest file"
-                        />
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() =>
-                          selectAllButByGroup((group) =>
-                            newestOrOldestScene(group, true),
-                          )
-                        }
-                      >
-                        <CalendarArrowDown />
-                        <FormattedMessage
-                          id="dupe_check.select_oldest"
-                          defaultMessage="Oldest"
-                        />
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() =>
-                          selectAllButByGroup((group) =>
-                            newestOrOldestScene(group, false),
-                          )
-                        }
-                      >
-                        <CalendarArrowUp />
-                        <FormattedMessage
-                          id="dupe_check.select_youngest"
-                          defaultMessage="Youngest"
-                        />
-                      </DropdownMenuItem>
+                              )
+                            }
+                          >
+                            <FileVideo data-icon="inline-start" />
+                            <FormattedMessage
+                              id="dupe_check.select_all_but_preferred_codec"
+                              defaultMessage="All but preferred codec"
+                            />
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem
+                          onClick={() =>
+                            selectAllButByGroup((group) =>
+                              newestOrOldestScene(group, true),
+                            )
+                          }
+                        >
+                          <CalendarArrowDown />
+                          <FormattedMessage
+                            id="dupe_check.select_oldest"
+                            defaultMessage="Oldest"
+                          />
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            selectAllButByGroup((group) =>
+                              newestOrOldestScene(group, false),
+                            )
+                          }
+                        >
+                          <CalendarArrowUp />
+                          <FormattedMessage
+                            id="dupe_check.select_youngest"
+                            defaultMessage="Youngest"
+                          />
+                        </DropdownMenuItem>
+                      </DropdownMenuGroup>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>

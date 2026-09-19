@@ -32,6 +32,10 @@ interface LocaleProviderProps extends PropsWithChildren {
 }
 
 export function LocaleProvider(props: LocaleProviderProps) {
+  useEffect(() => {
+    document.documentElement.lang = props.language;
+  }, [props.language]);
+
   const [attempt, setAttempt] = useState(0);
   const retry = useCallback(async () => setAttempt((n) => n + 1), []);
   return <LocaleLoader key={attempt} {...props} retry={retry} />;

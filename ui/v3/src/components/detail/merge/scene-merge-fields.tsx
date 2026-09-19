@@ -131,6 +131,19 @@ export const SCENE_MERGE_FIELDS: readonly AnyMergeFieldDef<
       i.date = v;
     },
   }),
+  defineMergeField<Scene, SceneUpdate, string>({
+    key: "production_date",
+    labelId: "production_date",
+    defaultLabel: "Production date",
+    read: (s) => s.production_date ?? "",
+    isEmpty: (v) => trimmed(v).length === 0,
+    isEqual: sameStr,
+    preview: (v) =>
+      v ? <span className="tabular-nums">{v}</span> : <MergeEmptyPreview />,
+    toUpdate: (i, v) => {
+      i.production_date = v;
+    },
+  }),
   defineMergeField<Scene, SceneUpdate, number | null>({
     key: "rating100",
     labelId: "rating",

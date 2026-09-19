@@ -49,3 +49,27 @@ it.each([
   const filter = new ListFilterModel(FilterMode.Scenes);
   expect(() => filter.configureFromDecodedParams({ fa })).toThrow();
 });
+
+it("round trips production dates through saved filters, URLs and query criteria", () => {
+  const original = new ListFilterModel(FilterMode.Scenes);
+  original.configureFromSavedFilter({
+    object_filter: {
+      production_date: {
+        modifier: CriterionModifier.Equals,
+        value: { value: "2010-06-15" },
+      },
+    },
+  });
+  expect(original.count()).toBe(1);
+  expect(JSON.stringify(original.makeFilterAST())).toContain(
+    '"production_date"',
+  );
+  const restored = new ListFilterModel(FilterMode.Scenes);
+  restored.configureFromDecodedParams({
+    fa: original.getEncodedParams().fa ?? undefined,
+  });
+  expect(restored.makeFilterAST()).toEqual(original.makeFilterAST());
+  const saved = new ListFilterModel(FilterMode.Scenes);
+  saved.configureFromSavedFilter({ filter_ast: restored.makeFilterAst() });
+  expect(saved.makeFilterAST()).toEqual(original.makeFilterAST());
+});

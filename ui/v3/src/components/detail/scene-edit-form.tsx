@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import { useLazyQuery } from "@apollo/client/react";
 import { useIntl } from "react-intl";
@@ -61,6 +61,7 @@ export interface SceneFormValues {
   director: string;
   details: string;
   date: string;
+  production_date: string;
   rating100: number | null;
   organized: boolean;
   urls: string[];
@@ -82,6 +83,7 @@ export function emptySceneFormValues(): SceneFormValues {
     director: "",
     details: "",
     date: "",
+    production_date: "",
     rating100: null,
     organized: false,
     urls: [],
@@ -102,6 +104,7 @@ export function sceneToFormValues(scene: SceneData): SceneFormValues {
     director: scene.director ?? "",
     details: scene.details ?? "",
     date: scene.date ?? "",
+    production_date: scene.production_date ?? "",
     rating100: scene.rating100 ?? null,
     organized: scene.organized,
     urls: scene.urls,
@@ -138,6 +141,7 @@ function formValuesToInput(
     director: v.director || null,
     details: v.details || null,
     date: v.date || null,
+    production_date: v.production_date || null,
     rating100: v.rating100,
     organized: v.organized,
     urls: v.urls.filter(Boolean),
@@ -163,6 +167,7 @@ function formValuesToCreateInput(v: SceneFormValues): GQL.SceneCreateInput {
     director: v.director || undefined,
     details: v.details || undefined,
     date: v.date || undefined,
+    production_date: v.production_date || undefined,
     rating100: v.rating100 ?? undefined,
     organized: v.organized,
     urls: v.urls.filter(Boolean),
@@ -205,6 +210,7 @@ export type SceneEditFormProps =
     };
 
 export function SceneEditForm(props: SceneEditFormProps) {
+  const productionDateId = useId();
   const isCreate = props.mode === "create";
   const scene = isCreate ? null : props.scene;
   const intl = useIntl();
@@ -473,6 +479,30 @@ export function SceneEditForm(props: SceneEditFormProps) {
                     </Button>
                   )}
                 </div>
+              </Field>
+            )}
+          </form.Field>
+
+          <form.Field name="production_date">
+            {(field) => (
+              <Field data-disabled={busy}>
+                <FieldLabel htmlFor={productionDateId}>
+                  {intl.formatMessage({
+                    id: "production_date",
+                    defaultMessage: "Production date",
+                  })}
+                </FieldLabel>
+                <Input
+                  id={productionDateId}
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(event) => field.handleChange(event.target.value)}
+                  placeholder={intl.formatMessage({
+                    id: "fuzzy_date_format",
+                    defaultMessage: "YYYY, YYYY-MM or YYYY-MM-DD",
+                  })}
+                  disabled={busy}
+                />
               </Field>
             )}
           </form.Field>

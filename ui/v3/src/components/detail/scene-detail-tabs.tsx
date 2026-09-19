@@ -9,6 +9,7 @@ import type React from "react";
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useIntl } from "react-intl";
+import { formatFuzzyDate } from "@/utils/date";
 import { galleryLabel } from "src/lib/gallery-utils";
 import type * as GQL from "src/core/generated-graphql";
 import * as GQLM from "src/core/generated-graphql";
@@ -108,6 +109,16 @@ export function SceneDetailsTab({ scene }: { scene: SceneData }) {
           label={intl.formatMessage({ id: "date", defaultMessage: "Date" })}
         >
           {scene.date}
+        </MetaRow>
+      )}
+      {scene.production_date && (
+        <MetaRow
+          label={intl.formatMessage({
+            id: "production_date",
+            defaultMessage: "Production date",
+          })}
+        >
+          {formatFuzzyDate(intl, scene.production_date)}
         </MetaRow>
       )}
       {scene.code && (

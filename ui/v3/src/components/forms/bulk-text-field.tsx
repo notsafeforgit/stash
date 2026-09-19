@@ -10,6 +10,7 @@ import {
 } from "./bulk-field-mode";
 
 interface BulkTextFieldProps {
+  id?: string;
   /** undefined = no change, null = clear, string = set */
   value: string | null | undefined;
   onChange: (v: string | null | undefined) => void;
@@ -27,6 +28,7 @@ interface BulkTextFieldProps {
  * Mode is driven by the Keep/Clear/Set toggle above the input.
  */
 export function BulkTextField({
+  id,
   value,
   onChange,
   multiline = false,
@@ -64,6 +66,7 @@ export function BulkTextField({
       />
       {multiline ? (
         <Textarea
+          id={id}
           value={inputValue}
           placeholder={placeholder}
           onChange={(e) => emit(e.target.value)}
@@ -72,6 +75,7 @@ export function BulkTextField({
         />
       ) : (
         <Input
+          id={id}
           value={inputValue}
           placeholder={placeholder}
           onChange={(e) => emit(e.target.value)}

@@ -90,6 +90,14 @@ export function SceneScrapeMergeDialog({
         scrapedValue: scraped.director,
       },
       { field: "date", label: "Date", scrapedValue: scraped.date },
+      {
+        field: "production_date",
+        label: intl.formatMessage({
+          id: "production_date",
+          defaultMessage: "Production date",
+        }),
+        scrapedValue: scraped.production_date,
+      },
       { field: "details", label: "Details", scrapedValue: scraped.details },
     ];
 
@@ -122,7 +130,7 @@ export function SceneScrapeMergeDialog({
         } satisfies PreparedRow,
       ];
     });
-  }, [scraped, current]);
+  }, [scraped, current, intl]);
 
   // ── URLs (multi-value, merge or overwrite) ──
   const urlRow = useMemo<PreparedRow | null>(() => {

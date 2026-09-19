@@ -14,7 +14,11 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { FilterMode, CriterionModifier } from "@/core/generated-graphql";
 import { ListFilterModel } from "@/models/list-filter/filter";
 import { useDuplicateFilter, useDuplicateSelection } from "./controller";
-import { groupValueTints, selectAllButRetained } from "./groups";
+import {
+  groupValueTints,
+  selectAllButRetained,
+  selectAllButPreferredCodec,
+} from "./groups";
 
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -164,4 +168,24 @@ it("keeps one valid retained entity per safe group and groups equal values by ti
   const tints = groupValueTints([[a, b, c]], "value", (item) => item.value);
   expect(tints.get(a.id)).toBe(tints.get(b.id));
   expect(tints.get(a.id)).not.toBe(tints.get(c.id));
+});
+
+it("selects other codecs only in groups containing a preferred copy", () => {
+  const preferred = { id: "1", codec: "hevc" };
+  const secondPreferred = { id: "2", codec: "hevc" };
+  const other = { id: "3", codec: "h264" };
+  const unknown = { id: "4", codec: null };
+  const noPreferred = { id: "5", codec: "av1" };
+  const groups = [
+    [preferred, secondPreferred, other, unknown],
+    [noPreferred],
+    [],
+  ];
+  const codecOf = (scene: { codec: string | null }) => scene.codec;
+  expect(selectAllButPreferredCodec(groups, "hevc", codecOf)).toEqual([
+    other,
+    unknown,
+  ]);
+  expect(selectAllButPreferredCodec(groups, "vp9", codecOf)).toEqual([]);
+  expect(selectAllButPreferredCodec(groups, undefined, codecOf)).toEqual([]);
 });

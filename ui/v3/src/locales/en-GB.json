@@ -1175,6 +1175,8 @@
   },
   "customise": "Customise",
   "date": "Date",
+  "production_date": "Production Date",
+  "fuzzy_date_format": "YYYY, YYYY-MM or YYYY-MM-DD",
   "date_format": "YYYY-MM-DD",
   "datetime_format": "YYYY-MM-DD HH:MM",
   "death_date": "Death Date",
@@ -1403,6 +1405,8 @@
   "distance": "Distance",
   "donate": "Donate",
   "dupe_check": {
+    "select_all_but_preferred_codec": "Select every file in each duplicated group, except the file with the preferred codec",
+    "preferred_codec_label": "Preferred Video Codec",
     "description": "Levels below 'Exact' can take longer to calculate. False positives might also be returned on lower accuracy levels.",
     "duration_diff": "Maximum Duration Difference",
     "duration_options": {

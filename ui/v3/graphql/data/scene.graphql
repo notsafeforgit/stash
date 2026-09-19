@@ -9,6 +9,7 @@ fragment SceneData on Scene {
   director
   urls
   date
+  production_date
   rating100
   o_counter
   organized

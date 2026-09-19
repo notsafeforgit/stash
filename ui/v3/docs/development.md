@@ -178,10 +178,14 @@ pnpm --dir ui/v3 exec playwright install chromium webkit
 make test-ui-v3-browser
 ```
 
-The [browser workflow](../../../.github/workflows/v3-browser-tests.yml) installs
-the browser system libraries with `playwright install --with-deps chromium webkit`
-on Ubuntu. It runs for relevant pushes and pull requests and saves traces and
-screenshots on failure. To inspect a local failure, run
+The [browser workflow](../../../.github/workflows/v3-browser-tests.yml) runs
+Chromium on Ubuntu and WebKit on macOS, with two shards per browser. WebKit uses
+Apple's media stack for Safari playback coverage; Linux WebKit's GStreamer
+backend can deadlock or crash on HLS seeks and EOF loops. Playwright
+[recommends macOS for Safari video testing](https://playwright.dev/docs/browsers#webkit).
+Each job installs its browser with `playwright install --with-deps`. The workflow
+runs for relevant pushes and pull requests and saves traces and screenshots on
+failure. To inspect a local failure, run
 `pnpm --dir ui/v3 exec playwright show-report`.
 
 [tests/browser](../tests/browser) starts and stops its own Vite server on

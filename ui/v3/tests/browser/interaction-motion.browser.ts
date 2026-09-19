@@ -444,19 +444,45 @@ test.describe("lightbox painting at phone pixel density", () => {
       page,
     }) => {
       await page.goto("/motion?busy");
+      // Check paint sequencing directly and sample the animation's own clock;
+      // a busy CI worker can skip frames without changing that sequencing.
+      await page.evaluate(() => {
+        const animate = Element.prototype.animate;
+        Element.prototype.animate = function (...args) {
+          const animation = animate.apply(this, args);
+          if (animation.id === "lightbox-enter") {
+            this.setAttribute(
+              "data-first-frame-at-animation-start",
+              this.closest(".yarl__portal")?.getAttribute(
+                "data-first-frame-work",
+              ) ?? "pending",
+            );
+            animation.pause();
+            animation.currentTime = 0;
+          }
+          return animation;
+        };
+      });
       await page
         .getByRole("button", { name: `Open ${kind}`, exact: true })
         .tap();
-      await expect(page.locator("[data-lightbox-reveal]")).toHaveCSS(
-        "opacity",
-        "0",
+      const surface = page.locator("[data-lightbox-reveal]");
+      await expect(surface).toHaveAttribute(
+        "data-first-frame-at-animation-start",
+        "done",
       );
-      const frames = await page.evaluate(
-        () => window.lightboxMotion[0]?.entering,
-      );
-      expect(
-        frames?.filter((value) => value > 0.05 && value < 0.95).length,
-      ).toBeGreaterThan(2);
+      await expect(surface).toHaveCSS("opacity", "0.99");
+      const partialOpacity = await surface.evaluate((element) => {
+        const animation = element.getAnimations()[0];
+        if (!animation) throw new Error("Missing lightbox reveal");
+        animation.currentTime =
+          Number(animation.effect?.getTiming().duration) / 2;
+        return Number(getComputedStyle(element).opacity);
+      });
+      expect(partialOpacity).toBeGreaterThan(0);
+      expect(partialOpacity).toBeLessThan(0.99);
+      await surface.evaluate((element) => element.getAnimations()[0]?.finish());
+      await expect(surface).toHaveCSS("opacity", "0");
     });
   }
 });

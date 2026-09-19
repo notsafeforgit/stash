@@ -124,6 +124,14 @@ test("drawers track a downward drag and dismiss", async ({ page }) => {
       )
       .toBeCloseTo(distance, 0);
   }
+  // Cross the distance threshold so dismissal does not depend on how quickly
+  // the CI worker delivered the pointer movements above.
+  const dismissDistance = await drawer.evaluate(
+    (element) => element.getBoundingClientRect().height * 0.75,
+  );
+  await page.mouse.move(x, dragY + Math.max(180, dismissDistance), {
+    steps: 4,
+  });
   await page.mouse.up();
   await expect(drawer).toBeHidden();
 });

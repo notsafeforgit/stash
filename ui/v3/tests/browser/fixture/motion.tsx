@@ -60,11 +60,13 @@ export function MotionFixture() {
       // The entrance must still be visible once the main thread is available.
       requestAnimationFrame(() => {
         const portal = document.querySelector(".yarl__portal");
+        portal?.setAttribute("data-first-frame-work", "running");
         if (portal) getComputedStyle(portal).opacity;
         const until = performance.now() + 350;
         while (performance.now() < until) {
           /* intentional startup work */
         }
+        portal?.setAttribute("data-first-frame-work", "done");
       });
     }
   };

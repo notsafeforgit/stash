@@ -110,15 +110,18 @@ test("tapping a hidden playback button reveals controls without activating it", 
   await page.getByRole("button", { name: "Open player" }).click();
   const player = page.getByTestId("player");
   const playbackControls = player.locator("[data-player-playback-controls]");
-  const pause = playbackControls.getByRole("button", {
-    name: "Pause",
-    exact: true,
-  });
-  const bounds = await pause.boundingBox();
-  if (!bounds) throw new Error("Missing pause control bounds");
   await expect(playbackControls).toHaveAttribute("inert", "", {
     timeout: 10000,
   });
+  // Measure the hidden control deliberately. Auto-hide can remove it from
+  // accessible role queries before a slow runner reaches boundingBox().
+  const pause = playbackControls.getByRole("button", {
+    name: "Pause",
+    exact: true,
+    includeHidden: true,
+  });
+  const bounds = await pause.boundingBox();
+  if (!bounds) throw new Error("Missing pause control bounds");
   await page.touchscreen.tap(
     bounds.x + bounds.width / 2,
     bounds.y + bounds.height / 2,

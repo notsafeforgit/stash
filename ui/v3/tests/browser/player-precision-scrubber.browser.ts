@@ -16,6 +16,7 @@ for (const mode of [
     context,
     browserName,
   }, testInfo) => {
+    await page.clock.install({ time: new Date("2026-01-01T00:00:00Z") });
     await serveSceneMedia(page);
     const tv = mode.startsWith("TV");
     const lightbox = mode.startsWith("lightbox");
@@ -60,6 +61,7 @@ for (const mode of [
       rotated
         ? { x: bar.x + 2, y: bar.y + bar.height * ratio }
         : { x: bar.x + bar.width * ratio, y: bar.y + bar.height - 2 };
+    await page.clock.pauseAt(new Date("2026-01-01T00:01:00Z"));
     const drag = await dragInput(
       page,
       context,
@@ -68,10 +70,24 @@ for (const mode of [
       point(0.5),
     );
     try {
+      await page.clock.runFor(650);
       await expect(scrubber).toHaveAttribute("data-precision", "true");
       await expect(video).toHaveJSProperty("paused", true);
-      // Let progressive dwelling reach its one-second window in these clips.
-      await page.waitForTimeout(1500);
+      const initialSpan = Math.max(1, Math.min(60, duration / 4));
+      const readout = scrubber.locator("[data-position-scrubber-precision]");
+      // Small, slow seeking movements must keep the initial zoom level. Use
+      // explicit gesture time so CI input latency cannot become another dwell.
+      for (let step = 1; step <= 4; step++) {
+        await page.clock.runFor(300);
+        const ratio = 0.5 + (step * 3) / (rotated ? bar.height : bar.width);
+        await drag.move(point(ratio));
+        await expect(readout).toContainText(
+          new RegExp(` · ${Math.round(duration / initialSpan)}×$`),
+        );
+      }
+      await drag.move(point(0.5));
+      // A deliberate fresh pause reaches the one-second window in these clips.
+      await page.clock.runFor(1200);
       expect(Number(await scrubber.getAttribute("aria-valuenow"))).toBeCloseTo(
         duration / 2,
         1,
@@ -88,6 +104,7 @@ for (const mode of [
       ).toContainText("Fine seeking");
     } finally {
       await drag.end();
+      await page.clock.resume();
     }
     await expect(scrubber).not.toHaveAttribute("data-precision");
     await expect(scrubber).not.toHaveAttribute("data-dragging");

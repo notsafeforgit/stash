@@ -100,7 +100,7 @@ for (const direction of ["right", "down", "up"] as const) {
     expect(slider.hasAttribute("data-precision")).toBe(true);
     expect(preview).toHaveBeenLastCalledWith(60);
     expect(seek).not.toHaveBeenCalled();
-    await wait(650);
+    await wait(1200);
     // 120 seconds -> 30 -> 7.5. A quarter-width move now seeks 1.875s.
     const x = direction === "right" ? 300 : 200;
     const y = direction === "down" ? 300 : direction === "up" ? 100 : 200;
@@ -131,8 +131,62 @@ it("tolerates jitter but restarts the dwell after cumulative deliberate movement
   await pointer(slider, "pointermove", 209);
   await wait(250);
   expect(vibrate).toHaveBeenCalledTimes(1);
-  await wait(400);
+  await wait(950);
   expect(vibrate).toHaveBeenCalledTimes(2);
+});
+
+it("requires a longer pause before each additional zoom", async () => {
+  const slider = await render({ duration: 132 });
+  await pointer(slider, "pointerdown");
+  await wait(650);
+  expect(vibrate).toHaveBeenCalledTimes(1);
+  await wait(650);
+  expect(vibrate).toHaveBeenCalledTimes(1);
+  await wait(550);
+  expect(vibrate).toHaveBeenCalledTimes(2);
+  expect(time(slider)).toBe(66);
+});
+
+for (const direction of ["right", "down", "up"] as const) {
+  it(`keeps the magnified scale while making one-pixel adjustments ${direction}`, async () => {
+    const slider = await render({ duration: 132, direction });
+    await pointer(slider, "pointerdown");
+    await wait(650);
+    await wait(1200);
+    // At 16x, small movements are deliberate seeks, not a continuing hold.
+    for (let step = 1; step <= 12; step++) {
+      await wait(300);
+      await pointer(
+        slider,
+        "pointermove",
+        direction === "right" ? 200 + step : 200,
+        direction === "down"
+          ? 200 + step
+          : direction === "up"
+            ? 200 - step
+            : 200,
+      );
+      expect(vibrate).toHaveBeenCalledTimes(2);
+      expect(time(slider)).toBeCloseTo(66 + (step / 400) * 8.25);
+    }
+    // A fresh stationary pause can still request the next level.
+    await wait(1199);
+    expect(vibrate).toHaveBeenCalledTimes(2);
+    await wait(1);
+    expect(vibrate).toHaveBeenCalledTimes(3);
+  });
+}
+
+it("allows subpixel jitter while holding a magnified timeline", async () => {
+  const slider = await render({ duration: 132 });
+  await pointer(slider, "pointerdown");
+  await wait(650);
+  await wait(1200);
+  await wait(400);
+  await pointer(slider, "pointermove", 200.5);
+  await wait(800);
+  expect(vibrate).toHaveBeenCalledTimes(3);
+  expect(time(slider)).toBeCloseTo(66.0103125);
 });
 
 it("caps a long scene at a minute initially and a second at maximum precision", async () => {
@@ -141,7 +195,7 @@ it("caps a long scene at a minute initially and a second at maximum precision", 
   await wait(650);
   await pointer(slider, "pointermove", 300);
   expect(time(slider)).toBe(3615);
-  await wait(650 * 6);
+  await wait(1200 * 6);
   expect(vibrate).toHaveBeenCalledTimes(4);
   await pointer(slider, "pointermove", 200);
   expect(time(slider)).toBe(3614.75);

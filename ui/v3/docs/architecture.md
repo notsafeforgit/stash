@@ -396,8 +396,11 @@ pause. The independent draft position also supports generated sprite previews
 without seeking into unbuffered media.
 
 Touch scrubbing supports precision seeking in scene detail, both lightboxes and
-TV (including rotated controls). A 650 ms dwell within an 8 px radius zooms the
-timeline around the time under the finger. Each dwell narrows the visible range
+TV (including rotated controls). A 650 ms dwell within a 4 px radius zooms the
+timeline around the time under the finger. Further zooms require a 1200 ms pause;
+the movement allowance tightens to 2 px at 4× and 1 px from 16× onward, so fine
+adjustments restart the dwell. Each new window anchors its dwell at the current
+finger position. Each dwell narrows the visible range
 fourfold, capped at 60 seconds on entry and one second at maximum precision.
 Markers and buffered ranges follow the same window; a fine-seeking readout shows
 milliseconds. Release commits once and restores the full timeline; cancellation

@@ -12,12 +12,13 @@ export interface ClipBoundsEdit {
 }
 
 const DWELL_MS = 650;
-const DWELL_SLOP = 8;
+const PRECISION_DWELL_MS = 1200;
+const DWELL_SLOP = 4;
 const MIN_WINDOW_SECONDS = 1;
 
 interface TouchScrub {
-  x: number;
-  y: number;
+  point: { x: number; y: number };
+  dwellOrigin: { x: number; y: number };
   ratio: number;
   range: PlaybackRange;
 }
@@ -121,26 +122,31 @@ export function PositionScrubber({
     const touch = touchScrub.current;
     if (!touch || touch.range.end - touch.range.start <= MIN_WINDOW_SECONDS)
       return;
-    dwellTimer.current = setTimeout(() => {
-      if (touchScrub.current !== touch) return;
-      const previousSpan = touch.range.end - touch.range.start;
-      // Long scenes enter a useful minute-wide window on the first dwell.
-      // Further dwells refine it down to a second, including short marker clips.
-      const nextSpan = Math.max(
-        MIN_WINDOW_SECONDS,
-        Math.min(60, previousSpan / 4),
-      );
-      const time = touch.range.start + touch.ratio * previousSpan;
-      const start = time - touch.ratio * nextSpan;
-      touch.range = { start, end: start + nextSpan };
-      setPrecisionRange(touch.range);
-      // A stationary hold also starts the buffered preview pause. Zooming
-      // changes only the scale: the time under the finger stays anchored.
-      previewing.current = true;
-      callbacks.current.onSeekPreview?.(time);
-      navigator.vibrate?.(10);
-      scheduleDwell();
-    }, DWELL_MS);
+    touch.dwellOrigin = touch.point;
+    const zoomed = touch.range.end - touch.range.start < duration;
+    dwellTimer.current = setTimeout(
+      () => {
+        if (touchScrub.current !== touch) return;
+        const previousSpan = touch.range.end - touch.range.start;
+        // Long scenes enter a useful minute-wide window on the first dwell.
+        // Further dwells refine it down to a second, including short marker clips.
+        const nextSpan = Math.max(
+          MIN_WINDOW_SECONDS,
+          Math.min(60, previousSpan / 4),
+        );
+        const time = touch.range.start + touch.ratio * previousSpan;
+        const start = time - touch.ratio * nextSpan;
+        touch.range = { start, end: start + nextSpan };
+        setPrecisionRange(touch.range);
+        // A stationary hold also starts the buffered preview pause. Zooming
+        // changes only the scale: the time under the finger stays anchored.
+        previewing.current = true;
+        callbacks.current.onSeekPreview?.(time);
+        navigator.vibrate?.(10);
+        scheduleDwell();
+      },
+      zoomed ? PRECISION_DWELL_MS : DWELL_MS,
+    );
   };
   const finish = () => {
     clearDwell();
@@ -198,8 +204,8 @@ export function PositionScrubber({
         change(position(event));
         if (event.pointerType === "touch") {
           touchScrub.current = {
-            x: event.clientX,
-            y: event.clientY,
+            point: { x: event.clientX, y: event.clientY },
+            dwellOrigin: { x: event.clientX, y: event.clientY },
             ratio: pointerRatio(event),
             range: { start: 0, end: duration },
           };
@@ -213,15 +219,21 @@ export function PositionScrubber({
         change(next);
         const touch = touchScrub.current;
         if (touch) {
+          touch.point = { x: event.clientX, y: event.clientY };
           touch.ratio = pointerRatio(event);
+          const zoom = duration / (touch.range.end - touch.range.start);
+          // Allow less jitter as the timeline magnifies: 4 px at full scale,
+          // 2 px at 4x, and 1 px from 16x onward. Fine adjustments must reset
+          // the next zoom instead of quickly cascading to maximum precision.
+          const slop = Math.max(1, DWELL_SLOP / Math.sqrt(zoom));
           // Compare against the dwell origin, not the previous event, so
           // slow deliberate movement cannot masquerade as finger jitter.
           if (
-            Math.hypot(event.clientX - touch.x, event.clientY - touch.y) >
-            DWELL_SLOP
+            Math.hypot(
+              event.clientX - touch.dwellOrigin.x,
+              event.clientY - touch.dwellOrigin.y,
+            ) >= slop
           ) {
-            touch.x = event.clientX;
-            touch.y = event.clientY;
             scheduleDwell();
           }
         }

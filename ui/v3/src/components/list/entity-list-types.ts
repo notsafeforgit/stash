@@ -1,7 +1,7 @@
 import type React from "react";
 import type { OperationVariables } from "@apollo/client";
 import type { TypedDocumentNode } from "@graphql-typed-document-node/core";
-import type { ColumnDef } from "@tanstack/react-table";
+import type { EntityColumnDef as ColumnDef } from "@/components/list/entity-table";
 import type * as GQL from "@/core/generated-graphql";
 import type { IHasID } from "@/utils/data";
 import type { ListFilterModel } from "@/models/list-filter/filter";

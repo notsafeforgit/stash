@@ -284,24 +284,27 @@ it("reports storage exhaustion without fetching and can retry after space is fre
   expect(mocks.fetch).toHaveBeenCalledOnce();
 });
 
-it.each([
-  200, 206,
-])("uses the correct offset when a resume receives HTTP %s", async (status) => {
-  mocks.size.mockResolvedValue(20);
-  mocks.fetch.mockResolvedValue(
-    new Response("bytes", {
-      status,
-      headers: status === 206 ? { "content-range": "bytes 20-24/25" } : {},
-    }),
-  );
-  const queue = new DownloadQueueStore();
-  await queue.enqueue(args);
-  await vi.waitFor(() => expect(mocks.rows.get("1")?.status).toBe("complete"));
-  expect(mocks.fetch.mock.calls[0]?.[1].headers).toEqual({
-    Range: "bytes=20-",
-  });
-  expect(mocks.write.mock.calls[0]?.[4]).toBe(status === 206 ? 20 : 0);
-});
+it.each([200, 206])(
+  "uses the correct offset when a resume receives HTTP %s",
+  async (status) => {
+    mocks.size.mockResolvedValue(20);
+    mocks.fetch.mockResolvedValue(
+      new Response("bytes", {
+        status,
+        headers: status === 206 ? { "content-range": "bytes 20-24/25" } : {},
+      }),
+    );
+    const queue = new DownloadQueueStore();
+    await queue.enqueue(args);
+    await vi.waitFor(() =>
+      expect(mocks.rows.get("1")?.status).toBe("complete"),
+    );
+    expect(mocks.fetch.mock.calls[0]?.[1].headers).toEqual({
+      Range: "bytes=20-",
+    });
+    expect(mocks.write.mock.calls[0]?.[4]).toBe(status === 206 ? 20 : 0);
+  },
+);
 
 it("cancels a queued item while another scene owns the writer", async () => {
   let release: (response: Response) => void = () => {};

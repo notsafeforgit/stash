@@ -29,28 +29,26 @@ describe("public mount point", () => {
     history.back();
     expect(history.location.href).toBe("/stash/scenes");
   });
-  it.each([
-    "/",
-    "/stash",
-    "/stash/",
-    "/apps/stash/",
-  ])("joins API, assets, and downloads below %s", (prefix) => {
-    const base = applicationBaseURL("https://example.test", prefix);
-    const normalized = `${prefix.replace(/\/+$/, "")}/`;
-    for (const path of [
-      "graphql",
-      "/css",
-      "javascript",
-      "scene/12/download.mp4?mode=ORIGINAL&x=1",
-    ]) {
-      expect(joinPlatformURL(base, path).href).toBe(
-        `https://example.test${normalized}${path.replace(/^\//, "")}`,
+  it.each(["/", "/stash", "/stash/", "/apps/stash/"])(
+    "joins API, assets, and downloads below %s",
+    (prefix) => {
+      const base = applicationBaseURL("https://example.test", prefix);
+      const normalized = `${prefix.replace(/\/+$/, "")}/`;
+      for (const path of [
+        "graphql",
+        "/css",
+        "javascript",
+        "scene/12/download.mp4?mode=ORIGINAL&x=1",
+      ]) {
+        expect(joinPlatformURL(base, path).href).toBe(
+          `https://example.test${normalized}${path.replace(/^\//, "")}`,
+        );
+      }
+      expect(applicationPath(`${base}scenes?sort=date#top`, base)).toBe(
+        "/scenes?sort=date#top",
       );
-    }
-    expect(applicationPath(`${base}scenes?sort=date#top`, base)).toBe(
-      "/scenes?sort=date#top",
-    );
-  });
+    },
+  );
 
   it("does not strip a different route prefix", () => {
     expect(
@@ -71,7 +69,7 @@ describe("public mount point", () => {
     });
     await router.load();
     expect(router.state.matches.at(-1)?.routeId).toBe("/scenes");
-    expect(router.state.matches[0]?.globalNotFound).not.toBe(true);
+    expect(router.state.matches.at(-1)?.status).toBe("success");
     expect(router.buildLocation({ to: "/scenes" }).href).toBe("/stash/scenes");
   });
 });

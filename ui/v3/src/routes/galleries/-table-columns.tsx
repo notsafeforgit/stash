@@ -1,7 +1,7 @@
 import { entityDestination } from "@/core/navigation";
 import { useMemo } from "react";
 import { useIntl } from "react-intl";
-import type { ColumnDef } from "@tanstack/react-table";
+import type { EntityColumnDef as ColumnDef } from "@/components/list/entity-table";
 import type * as GQL from "src/core/generated-graphql";
 import { galleryLabel } from "src/lib/gallery-utils";
 import {

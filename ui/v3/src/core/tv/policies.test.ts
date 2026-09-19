@@ -98,47 +98,44 @@ describe("TV media policies", () => {
     ).toEqual({ kind: "ready", range: { start: 80, end: 100 } });
   });
 
-  it.each([
-    "beginning",
-    "resume",
-    "random-marker",
-    "random-position",
-  ] as const)("bounds the full window from the %s start to scene end", (start) => {
-    const plan = tvPlaybackPlan(
-      scene,
-      { ...defaultTvSettings, start },
-      42,
-      "scene:1",
-    );
-    if (plan.kind !== "ready") throw new Error("Expected a playable segment");
-    expect(plan.range.end).toBe(100);
-    if (start === "beginning") expect(plan.range.start).toBe(0);
-    else if (start === "resume") expect(plan.range.start).toBe(80);
-    else if (start === "random-marker")
-      expect([10, 40]).toContain(plan.range.start);
-    else {
-      expect(plan.range.start).toBeGreaterThan(0);
-      expect(plan.range.start).toBeLessThan(99);
-    }
-    expect(plan).toEqual(
-      tvPlaybackPlan(scene, { ...defaultTvSettings, start }, 42, "scene:1"),
-    );
-  });
-
-  it.each([
-    NaN,
-    -1,
-    100,
-  ])("resets an invalid resume position %s to scene start", (resume_time) => {
-    expect(
-      tvPlaybackPlan(
-        { ...scene, resume_time },
-        defaultTvSettings,
+  it.each(["beginning", "resume", "random-marker", "random-position"] as const)(
+    "bounds the full window from the %s start to scene end",
+    (start) => {
+      const plan = tvPlaybackPlan(
+        scene,
+        { ...defaultTvSettings, start },
         42,
         "scene:1",
-      ),
-    ).toEqual({ kind: "ready", range: { start: 0, end: 100 } });
-  });
+      );
+      if (plan.kind !== "ready") throw new Error("Expected a playable segment");
+      expect(plan.range.end).toBe(100);
+      if (start === "beginning") expect(plan.range.start).toBe(0);
+      else if (start === "resume") expect(plan.range.start).toBe(80);
+      else if (start === "random-marker")
+        expect([10, 40]).toContain(plan.range.start);
+      else {
+        expect(plan.range.start).toBeGreaterThan(0);
+        expect(plan.range.start).toBeLessThan(99);
+      }
+      expect(plan).toEqual(
+        tvPlaybackPlan(scene, { ...defaultTvSettings, start }, 42, "scene:1"),
+      );
+    },
+  );
+
+  it.each([NaN, -1, 100])(
+    "resets an invalid resume position %s to scene start",
+    (resume_time) => {
+      expect(
+        tvPlaybackPlan(
+          { ...scene, resume_time },
+          defaultTvSettings,
+          42,
+          "scene:1",
+        ),
+      ).toEqual({ kind: "ready", range: { start: 0, end: 100 } });
+    },
+  );
 
   it("preserves marker bounds independently of scene start and window settings", () => {
     expect(
@@ -203,24 +200,25 @@ describe("TV settings validation", () => {
     action: createTvAction("settings", "settings"),
   };
 
-  it.each([
-    1, 2, 3,
-  ])("retires the default gear from version %i without resetting the rail or audio", (version) => {
-    const settings = {
-      ...defaultTvSettings,
-      startMuted: false,
-      rail: [...defaultTvRail].reverse(),
-    };
-    const result = decodeTvSettings({
-      ...settings,
-      version,
-      shuffle: false,
-      rail: [legacySettingsEntry, ...settings.rail],
-    });
-    expect(result).toEqual({ kind: "ready", settings });
-    if (result.kind === "ready")
-      expect(decodeTvSettings(result.settings)).toEqual(result);
-  });
+  it.each([1, 2, 3])(
+    "retires the default gear from version %i without resetting the rail or audio",
+    (version) => {
+      const settings = {
+        ...defaultTvSettings,
+        startMuted: false,
+        rail: [...defaultTvRail].reverse(),
+      };
+      const result = decodeTvSettings({
+        ...settings,
+        version,
+        shuffle: false,
+        rail: [legacySettingsEntry, ...settings.rail],
+      });
+      expect(result).toEqual({ kind: "ready", settings });
+      if (result.kind === "ready")
+        expect(decodeTvSettings(result.settings)).toEqual(result);
+    },
+  );
 
   it.each([
     { ...legacySettingsEntry, pinned: false },
@@ -244,47 +242,49 @@ describe("TV settings validation", () => {
     });
   });
 
-  it.each([
-    4, 5,
-  ])("keeps explicitly added settings shortcuts from version %i", (version) => {
-    const settings = {
-      ...defaultTvSettings,
-      rail: [legacySettingsEntry, ...defaultTvRail],
-    };
-    expect(decodeTvSettings({ ...settings, version })).toEqual({
-      kind: "ready",
-      settings,
-    });
-  });
+  it.each([4, 5])(
+    "keeps explicitly added settings shortcuts from version %i",
+    (version) => {
+      const settings = {
+        ...defaultTvSettings,
+        rail: [legacySettingsEntry, ...defaultTvRail],
+      };
+      expect(decodeTvSettings({ ...settings, version })).toEqual({
+        kind: "ready",
+        settings,
+      });
+    },
+  );
 
-  it.each([
-    1, 2, 3, 4,
-  ])("adds the startup mute default to version %i without resetting preferences", (version) => {
-    const previous = {
-      ...defaultTvSettings,
-      version,
-      shuffle: false,
-      startMuted: undefined,
-      autoplay: false,
-      sceneFilter: { kind: "saved", id: "12" },
-    };
-    const expected = {
-      ...defaultTvSettings,
-      autoplay: false,
-      sceneFilter: { kind: "saved", id: "12" },
-    };
-    expect(decodeTvSettings(previous)).toEqual({
-      kind: "ready",
-      settings: expected,
-    });
-    expect(decodeTvSettings({ ...previous, startMuted: false })).toEqual({
-      kind: "ready",
-      settings: { ...expected, startMuted: false },
-    });
-    expect(decodeTvSettings({ ...previous, startMuted: "false" }).kind).toBe(
-      "invalid",
-    );
-  });
+  it.each([1, 2, 3, 4])(
+    "adds the startup mute default to version %i without resetting preferences",
+    (version) => {
+      const previous = {
+        ...defaultTvSettings,
+        version,
+        shuffle: false,
+        startMuted: undefined,
+        autoplay: false,
+        sceneFilter: { kind: "saved", id: "12" },
+      };
+      const expected = {
+        ...defaultTvSettings,
+        autoplay: false,
+        sceneFilter: { kind: "saved", id: "12" },
+      };
+      expect(decodeTvSettings(previous)).toEqual({
+        kind: "ready",
+        settings: expected,
+      });
+      expect(decodeTvSettings({ ...previous, startMuted: false })).toEqual({
+        kind: "ready",
+        settings: { ...expected, startMuted: false },
+      });
+      expect(decodeTvSettings({ ...previous, startMuted: "false" }).kind).toBe(
+        "invalid",
+      );
+    },
+  );
 
   it.each([
     { shuffle: true, sort: "created_at", expected: "random" },
@@ -292,27 +292,26 @@ describe("TV settings validation", () => {
     { shuffle: false, sort: "created_at", expected: "created_at" },
     { shuffle: false, sort: "random", expected: "random" },
     { shuffle: false, sort: null, expected: null },
-  ])("migrates legacy sort $sort with shuffle $shuffle", ({
-    shuffle,
-    sort,
-    expected,
-  }) => {
-    const result = decodeTvSettings({
-      ...defaultTvSettings,
-      version: 1,
-      shuffle,
-      sort,
-      rules: [],
-    });
-    expect(result).toEqual({
-      kind: "ready",
-      settings: { ...defaultTvSettings, sort: expected },
-    });
-    if (result.kind === "ready") {
-      expect(result.settings).not.toHaveProperty("shuffle");
-      expect(decodeTvSettings(result.settings)).toEqual(result);
-    }
-  });
+  ])(
+    "migrates legacy sort $sort with shuffle $shuffle",
+    ({ shuffle, sort, expected }) => {
+      const result = decodeTvSettings({
+        ...defaultTvSettings,
+        version: 1,
+        shuffle,
+        sort,
+        rules: [],
+      });
+      expect(result).toEqual({
+        kind: "ready",
+        settings: { ...defaultTvSettings, sort: expected },
+      });
+      if (result.kind === "ready") {
+        expect(result.settings).not.toHaveProperty("shuffle");
+        expect(decodeTvSettings(result.settings)).toEqual(result);
+      }
+    },
+  );
 
   it("removes legacy rules while preserving saved filters and playback preferences", () => {
     const settings = {
@@ -334,28 +333,29 @@ describe("TV settings validation", () => {
     }
   });
 
-  it.each([
-    1, 2, 3, 4,
-  ])("retires paging and session caps from version %i without resetting preferences", (version) => {
-    const settings = {
-      ...defaultTvSettings,
-      sceneFilter: { kind: "saved", id: "12" },
-      markerFilter: { kind: "saved", id: "34" },
-      startMuted: false,
-      autoplay: false,
-      sort: "random",
-    };
-    expect(
-      decodeTvSettings({
-        ...settings,
-        version,
-        shuffle: false,
-        pageSize: 5,
-        prefetch: 5,
-        itemLimit: 1,
-      }),
-    ).toEqual({ kind: "ready", settings });
-  });
+  it.each([1, 2, 3, 4])(
+    "retires paging and session caps from version %i without resetting preferences",
+    (version) => {
+      const settings = {
+        ...defaultTvSettings,
+        sceneFilter: { kind: "saved", id: "12" },
+        markerFilter: { kind: "saved", id: "34" },
+        startMuted: false,
+        autoplay: false,
+        sort: "random",
+      };
+      expect(
+        decodeTvSettings({
+          ...settings,
+          version,
+          shuffle: false,
+          pageSize: 5,
+          prefetch: 5,
+          itemLimit: 1,
+        }),
+      ).toEqual({ kind: "ready", settings });
+    },
+  );
 
   it("retains invalid and future envelopes without silently resetting them", () => {
     expect(decodeTvSettings(undefined)).toEqual({

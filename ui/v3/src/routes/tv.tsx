@@ -31,7 +31,9 @@ export const Route = createFileRoute("/tv")({
   ),
   errorComponent: ({ error, reset }) => (
     <div className="flex flex-col items-start gap-4 p-6">
-      <p role="alert">{error.message}</p>
+      <p role="alert">
+        {error instanceof Error ? error.message : String(error)}
+      </p>
       <Button onClick={reset}>
         <FormattedMessage id="tv.text.retry" defaultMessage="Retry" />
       </Button>

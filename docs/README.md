@@ -9,6 +9,7 @@ v3 route paths may differ, but existing v2.5 clients must keep working.
 | Guide | Use it for |
 | --- | --- |
 | [v3 development](../ui/v3/docs/development.md) | Local setup, generation, builds, and validation order |
+| [v3 dependencies](v3-dependencies.md) | Dependency versions, native security updates, and shadcn maintenance |
 | [v3 architecture](../ui/v3/docs/architecture.md) | Module boundaries, extension points, compatibility, and interaction policies |
 | [Feature development plan](../ui/v3/docs/plan.md) | Expectations for new feature work |
 | [Fork maintenance](../FORK.md) | Upstream syncs, additive API changes, migrations, and rollback compatibility |

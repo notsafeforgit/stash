@@ -95,11 +95,13 @@ const scenes: GQL.SceneDataFragment[] = Array.from(
       },
       sceneStreams: [
         {
+          __typename: "SceneStreamEndpoint" as const,
           url: new URL(`/scene/${id}/stream`, location.href).href,
           mime_type: "video/mp4",
           label: "Direct stream",
         },
         {
+          __typename: "SceneStreamEndpoint" as const,
           url: new URL(
             `/scene/${id}/stream.master.m3u8?resolution=LOW`,
             location.href,
@@ -234,6 +236,7 @@ const scenePage: MockedResponse<GQL.TvScenesQuery, GQL.TvScenesQueryVariables> =
       return {
         data: {
           findScenes: {
+            __typename: "FindScenesResultType",
             count: params.has("empty") ? 0 : scenes.length,
             scenes: params.has("empty")
               ? []
@@ -257,6 +260,7 @@ const markerPage: MockedResponse<
     return {
       data: {
         findSceneMarkers: {
+          __typename: "FindSceneMarkersResultType",
           count: markers.length,
           scene_markers: markers.slice((page - 1) * size, page * size),
         },
@@ -301,7 +305,15 @@ const play: MockedResponse<
   delay: 0,
   result: (variables) => {
     record("SceneAddPlay", variables);
-    return { data: { sceneAddPlay: { count: 1, history: [] } } };
+    return {
+      data: {
+        sceneAddPlay: {
+          __typename: "HistoryMutationResult",
+          count: 1,
+          history: [],
+        },
+      },
+    };
   },
 };
 const cache = createCache();
@@ -309,7 +321,15 @@ const tags: MockedResponse<GQL.FindTagsQuery, GQL.FindTagsQueryVariables> = {
   request: { query: GQL.FindTagsDocument, variables: () => true },
   maxUsageCount: Infinity,
   delay: 0,
-  result: { data: { findTags: { count: 1, tags: [markerTag] } } },
+  result: {
+    data: {
+      findTags: {
+        __typename: "FindTagsResultType",
+        count: 1,
+        tags: [markerTag],
+      },
+    },
+  },
 };
 const tagsForSelect: MockedResponse<
   GQL.FindTagsForSelectQuery,
@@ -318,7 +338,15 @@ const tagsForSelect: MockedResponse<
   request: { query: GQL.FindTagsForSelectDocument, variables: () => true },
   maxUsageCount: Infinity,
   delay: 0,
-  result: { data: { findTags: { count: 1, tags: [markerTag] } } },
+  result: {
+    data: {
+      findTags: {
+        __typename: "FindTagsResultType",
+        count: 1,
+        tags: [markerTag],
+      },
+    },
+  },
 };
 const createMarker: MockedResponse<
   GQL.SceneMarkerCreateMutation,
@@ -381,7 +409,15 @@ const addO: MockedResponse<
     }
     const scene = targetScene(variables.id);
     scene.o_counter = (scene.o_counter ?? 0) + 1;
-    return { data: { sceneAddO: { count: scene.o_counter, history: [] } } };
+    return {
+      data: {
+        sceneAddO: {
+          __typename: "HistoryMutationResult",
+          count: scene.o_counter,
+          history: [],
+        },
+      },
+    };
   },
 };
 const deleteO: MockedResponse<
@@ -395,7 +431,15 @@ const deleteO: MockedResponse<
     record("SceneDeleteO", variables);
     const scene = targetScene(variables.id);
     scene.o_counter = Math.max(0, (scene.o_counter ?? 0) - 1);
-    return { data: { sceneDeleteO: { count: scene.o_counter, history: [] } } };
+    return {
+      data: {
+        sceneDeleteO: {
+          __typename: "HistoryMutationResult",
+          count: scene.o_counter,
+          history: [],
+        },
+      },
+    };
   },
 };
 const resetO: MockedResponse<

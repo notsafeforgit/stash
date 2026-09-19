@@ -16,13 +16,14 @@ const scene = (id: number): GQL.TvSceneSummaryFragment => ({
   __typename: "Scene",
   id: String(id),
   title: `Scene ${id}`,
-  paths: { screenshot: null },
+  paths: { __typename: "ScenePathsType", screenshot: null },
   preview_image: null,
 });
 function fixture(repeated = false, delay = 0) {
   const result = vi.fn((variables: GQL.TvScenesQueryVariables) => ({
     data: {
       findScenes: {
+        __typename: "FindScenesResultType" as const,
         count: 100,
         scenes: Array.from({ length: 5 }, (_, index) =>
           scene(

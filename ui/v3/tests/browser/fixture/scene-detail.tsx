@@ -44,6 +44,7 @@ export function SceneDetailFixture() {
     if (hls) {
       scene.sceneStreams = [
         {
+          __typename: "SceneStreamEndpoint" as const,
           url: new URL("/scene/detail/stream.master.m3u8", location.href).href,
           mime_type: "application/vnd.apple.mpegurl",
           label: "HLS",

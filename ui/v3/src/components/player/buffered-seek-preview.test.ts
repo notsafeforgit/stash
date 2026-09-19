@@ -101,24 +101,24 @@ describe("buffered frame scrubbing", () => {
     f.preview.dispose();
   });
 
-  it.each([
-    true,
-    false,
-  ])("hands the original position and paused=%s intent to the commit owner", (paused) => {
-    const f = mediaFixture(paused);
-    f.preview.preview(5);
-    f.frame();
-    f.preview.preview(8);
-    const state = f.preview.take();
-    expect(state).toMatchObject({ wasPaused: paused, mediaTime: 2 });
-    f.settle();
-    f.frame();
-    expect(f.seeks).toEqual([5]);
-    expect(f.resume).not.toHaveBeenCalled();
-    state?.resumeBuffering();
-    expect(f.resume).toHaveBeenCalledTimes(1);
-    expect(f.preview.take()).toBeNull();
-  });
+  it.each([true, false])(
+    "hands the original position and paused=%s intent to the commit owner",
+    (paused) => {
+      const f = mediaFixture(paused);
+      f.preview.preview(5);
+      f.frame();
+      f.preview.preview(8);
+      const state = f.preview.take();
+      expect(state).toMatchObject({ wasPaused: paused, mediaTime: 2 });
+      f.settle();
+      f.frame();
+      expect(f.seeks).toEqual([5]);
+      expect(f.resume).not.toHaveBeenCalled();
+      state?.resumeBuffering();
+      expect(f.resume).toHaveBeenCalledTimes(1);
+      expect(f.preview.take()).toBeNull();
+    },
+  );
 
   it("respects a new explicit pause instead of restoring old playback intent", () => {
     const f = mediaFixture();

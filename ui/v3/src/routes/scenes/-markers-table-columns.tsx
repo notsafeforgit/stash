@@ -1,6 +1,6 @@
 import { entityDestination } from "@/core/navigation";
 import { Link } from "@tanstack/react-router";
-import type { ColumnDef } from "@tanstack/react-table";
+import type { EntityColumnDef as ColumnDef } from "@/components/list/entity-table";
 import type * as GQL from "src/core/generated-graphql";
 import { objectTitle } from "src/core/files";
 import { secondsToTimestamp } from "src/utils/duration";

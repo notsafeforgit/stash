@@ -44,7 +44,9 @@ function TagsForm({
         id: tag.id,
         name: tag.name,
       })),
-      primary: marker?.primary_tag ?? null,
+      primary: marker
+        ? { id: marker.primary_tag.id, name: marker.primary_tag.name }
+        : null,
     },
     onSubmit: async ({ value }) => {
       if (target.item.kind === "marker" && !value.primary) return;

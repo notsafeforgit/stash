@@ -32,6 +32,7 @@ export function offlineEntryToSceneCardScene(
     title: entry.title,
     date: entry.date ?? null,
     details: null,
+    preview_image: null,
     rating100: null,
     resume_time: entry.last_position_seconds ?? 0,
     paths: {
@@ -69,14 +70,15 @@ export function offlineEntryToSceneCardScene(
       __typename: "Performer",
       id: p.id,
       name: p.name,
+      disambiguation: null,
       gender: null,
       favorite: false,
       image_path: null,
-    })) as SceneCardScene["performers"],
+    })),
     tags: entry.tags.map((t) => ({
       __typename: "Tag",
       id: t.id,
       name: t.name,
-    })) as SceneCardScene["tags"],
+    })),
   };
 }

@@ -168,7 +168,7 @@ export function useTvInputs({
   }, [selectionKey, endHold, cancelTap]);
   useEffect(() => {
     const element = surface.current;
-    if (!element) return;
+    if (!element || blocked) return;
     const ignored = (target: EventTarget | null) => {
       if (!(target instanceof Element)) return false;
       const control = target.closest(

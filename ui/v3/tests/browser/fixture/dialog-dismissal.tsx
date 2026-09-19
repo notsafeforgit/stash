@@ -15,6 +15,7 @@ export function DialogDismissalFixture() {
   }
   return (
     <MockedProvider mocks={[]}>
+      {/* biome-ignore lint/complexity/noUselessFragments: MockedProvider requires a single React element child. */}
       <>
         <div className="flex flex-col items-start gap-3 p-4">
           <Button onClick={() => setOpen("confirm")}>Open confirmation</Button>

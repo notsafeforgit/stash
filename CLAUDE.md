@@ -126,13 +126,13 @@ Active development target. A ground-up rewrite sharing the same GraphQL API.
 **Video player — Video.js v10 RC.2 (`@videojs/react`)**
 - `createPlayer({ features: videoFeatures })` is called once at module scope to produce a typed `Player` root plus `usePlayer` / `useMedia` hooks. State lives in the root's internal store; access it via `Player.usePlayer(selector)` from any descendant. Import the shared `Container` separately from `@videojs/react`.
 - `SceneVideo` configures the packaged `<HlsJsVideo>` from `@videojs/react/media/hlsjs-video` for both direct and HLS sources. Its `HlsJsAdapter` retains one native video element while switching playback engines. Pass the direct source MIME type explicitly, including for blob URLs. The playback adapter and casting extension now live in separate, version-aligned `@videojs/hlsjs-video` and `@videojs/google-cast` packages. Compose `<GoogleCast>` from `@videojs/react/extensions/google-cast`.
-- RC.2’s split HLS package pins hls.js 1.6.7. A version-scoped pnpm override retains this fork’s existing 1.6.16 engine; remove/reassess it when upgrading the adapter rather than silently downgrading playback fixes.
+- RC.2’s split HLS package pins hls.js 1.6.7. A version-scoped pnpm override retains this fork’s 1.7.3 engine; remove/reassess it when upgrading the adapter rather than silently downgrading playback fixes.
 - Controls use a renderless `<Controls.Root>` around `<Controls.Content>`, which owns DOM props, styling and layout.
 - Player implementation: `src/components/player/scene-player.tsx` (player shell) and `src/components/player/player-controls.tsx` (controls overlay).
 
-**Tables — TanStack Table v8**
-- Use `useReactTable` with `getCoreRowModel` for all data tables.
-- Column definitions typed as `ColumnDef<TItem>`. Column visibility persisted to `localStorage` per entity type.
+**Tables — TanStack Table v9**
+- Use `useTable` with `entityTableFeatures` from `src/components/list/entity-table.ts`. Core rows are included by default; sorting and pagination remain server controlled.
+- Type columns with `EntityColumnDef<TItem>` so feature and metadata types stay aligned. Column visibility and order are persisted to `localStorage` per entity type.
 
 **Drag and drop — dnd-kit**
 - Use `@dnd-kit/core` + `@dnd-kit/sortable` for any drag-to-reorder UI.

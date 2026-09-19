@@ -52,18 +52,18 @@ async function mount() {
   return video;
 }
 
-it.each([
-  "AbortError",
-  "NotSupportedError",
-])("does not mute or retry after %s", async (name) => {
-  const video = await mount();
-  const play = vi
-    .spyOn(video, "play")
-    .mockRejectedValue(new DOMException("Playback failed", name));
-  await act(async () => vi.advanceTimersByTime(500));
-  expect(play).toHaveBeenCalledOnce();
-  expect(video.muted).toBe(false);
-});
+it.each(["AbortError", "NotSupportedError"])(
+  "does not mute or retry after %s",
+  async (name) => {
+    const video = await mount();
+    const play = vi
+      .spyOn(video, "play")
+      .mockRejectedValue(new DOMException("Playback failed", name));
+    await act(async () => vi.advanceTimersByTime(500));
+    expect(play).toHaveBeenCalledOnce();
+    expect(video.muted).toBe(false);
+  },
+);
 
 it("retries muted only when audible autoplay is denied", async () => {
   const video = await mount();

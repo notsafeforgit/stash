@@ -4,7 +4,7 @@ import {
   type PreviewImageData,
 } from "@/components/shared/preview-image";
 import { Link } from "@tanstack/react-router";
-import type { ColumnDef } from "@tanstack/react-table";
+import type { EntityColumnDef as ColumnDef } from "@/components/list/entity-table";
 import type { IHasID } from "src/utils/data";
 import { DataTableColumnHeader } from "./data-table-column-header";
 import { selectionColumn } from "./entity-data-table";

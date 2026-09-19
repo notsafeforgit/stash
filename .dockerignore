@@ -56,3 +56,9 @@ dist
 !dist/stash-linux
 
 docker
+!docker/native/
+!docker/native/build-libheif.sh
+!docker/native/build-vips.sh
+
+ui/v3/node_modules
+ui/v3/build

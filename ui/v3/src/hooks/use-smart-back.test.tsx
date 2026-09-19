@@ -90,17 +90,17 @@ async function mount(initial = "/tags", prefix = "") {
   return { router, visit, back };
 }
 
-it.each([
-  "",
-  "/stash",
-])("returns to Home after Tags → Home → performer name under %s", async (prefix) => {
-  const { router, visit, back } = await mount("/tags?q=example", prefix);
-  await visit("/");
-  // Performer-name and table links have no explicit returnTo state.
-  await visit("/performers/1");
-  await back();
-  expect(router.history.location.href).toBe(`${prefix}/`);
-});
+it.each(["", "/stash"])(
+  "returns to Home after Tags → Home → performer name under %s",
+  async (prefix) => {
+    const { router, visit, back } = await mount("/tags?q=example", prefix);
+    await visit("/");
+    // Performer-name and table links have no explicit returnTo state.
+    await visit("/performers/1");
+    await back();
+    expect(router.history.location.href).toBe(`${prefix}/`);
+  },
+);
 
 it("retains the exact initial filtered list as a return destination", async () => {
   const href = "/tags?q=example&p=3&sortby=name";

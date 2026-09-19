@@ -57,16 +57,19 @@ for (const mobile of [true, false]) {
             }
           }
         };
-        await page.route("**/media/hls/segment-*.m4s", async (route) => {
-          const match = /segment-(\d+)\.m4s/.exec(route.request().url());
-          if (!match) throw new Error("Missing HLS fragment index");
-          const index = Number(match[1]);
-          if (index >= allowed)
-            await new Promise<void>((resolve) =>
-              pending.add({ index, resolve }),
-            );
-          await route.fallback();
-        });
+        await page.route(
+          /\/media\/hls\/segment-\d+\.m4s(?:\?.*)?$/,
+          async (route) => {
+            const match = /segment-(\d+)\.m4s/.exec(route.request().url());
+            if (!match) throw new Error("Missing HLS fragment index");
+            const index = Number(match[1]);
+            if (index >= allowed)
+              await new Promise<void>((resolve) =>
+                pending.add({ index, resolve }),
+              );
+            await route.fallback();
+          },
+        );
         try {
           await page.goto(item.path);
           if (item.mode === "lightbox")

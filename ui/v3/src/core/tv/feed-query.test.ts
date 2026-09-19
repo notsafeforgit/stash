@@ -33,6 +33,7 @@ function clientWithFilter(
         filter_ast,
         ui_options: {},
         find_filter: {
+          __typename: "SavedFindFilterType",
           q: "example",
           sort: "date",
           direction: GQL.SortDirectionEnum.Desc,

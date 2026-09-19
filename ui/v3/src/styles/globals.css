@@ -358,15 +358,10 @@ body.mobile-list-view .bottom-tab-bar {
   z-index: 2;
 }
 
-/* Visible when the item is selected */
-.entity-card:focus-within .entity-card-checkbox,
-.entity-card-checkbox.visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-/* Visible when the list container is in selecting mode */
-[data-selecting] .entity-card-checkbox {
+/* Visible for keyboard focus, selected items, and selecting mode. */
+.entity-card-checkbox.visible,
+[data-selecting] .entity-card-checkbox,
+.entity-card:focus-within .entity-card-checkbox {
   opacity: 1;
   pointer-events: auto;
 }
@@ -388,9 +383,9 @@ body.mobile-list-view .bottom-tab-bar {
   cursor: pointer;
 }
 
-.entity-card:focus-within .entity-card-select-overlay,
 [data-selecting] .entity-card-select-overlay,
-[data-selected="true"] .entity-card-select-overlay {
+[data-selected="true"] .entity-card-select-overlay,
+.entity-card:focus-within .entity-card-select-overlay {
   display: block;
 }
 

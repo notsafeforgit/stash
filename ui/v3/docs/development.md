@@ -9,10 +9,11 @@ architecture, compatibility, feature guides, and operations.
 
 Run the commands below from the Git root. Use Go matching
 [go.mod](../../../go.mod), a C compiler for SQLite/CGO, Make, Git, FFmpeg/ffprobe,
-and Node.js 24 (the compiler image's Node major). Both UI manifests pin pnpm
-10.33.0, matching the [v2.5 manifest used by CI](../../v2.5/package.json); each UI
-has its own lockfile. Honor that package-manager pin: v3’s scoped HLS dependency
-override uses pnpm 10’s manifest configuration. `make lint` runs the CI-pinned Go linter through
+and Node.js 24.15 or newer in the 24 LTS line. v3 pins pnpm 12.4.2;
+v2.5 retains upstream's pnpm 10.33.0 and its unchanged lockfile. Let pnpm select
+the version from each UI's `packageManager` field. v3's build-script policy and
+scoped dependency overrides live in `pnpm-workspace.yaml`. `make lint` runs the
+CI-pinned Go linter through
 `go run`, so a separate golangci-lint installation is unnecessary.
 
 ## First checkout and local development

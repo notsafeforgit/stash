@@ -106,18 +106,20 @@ export function IdentifyDialog({ open, onOpenChange, selectedIds }: IProps) {
           if (!found) return null;
           const out: IScraperSource = { ...found };
           if (s.options) {
-            const sopts = withoutTypename(s.options);
-            sopts.fieldOptions = sopts.fieldOptions?.map(withoutTypename);
-            out.options = sopts;
+            out.options = {
+              ...withoutTypename(s.options),
+              fieldOptions: s.options.fieldOptions?.map(withoutTypename),
+            };
           }
           return out;
         })
         .filter((s): s is IScraperSource => s !== null);
       setSources(mappedSources);
       if (id.options) {
-        const defaults = withoutTypename(id.options);
-        defaults.fieldOptions = defaults.fieldOptions?.map(withoutTypename);
-        setOptions(defaults);
+        setOptions({
+          ...withoutTypename(id.options),
+          fieldOptions: id.options.fieldOptions?.map(withoutTypename),
+        });
       }
     } else {
       const stashBox = allSources.find((s) => s.stash_box_endpoint);

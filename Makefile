@@ -315,7 +315,7 @@ generate-dataloaders:
 # Regenerates stash-box client files
 .PHONY: generate-stash-box-client
 generate-stash-box-client:
-	go run github.com/Yamashou/gqlgenc
+	go run github.com/gqlgo/gqlgenc
 
 # Runs gofmt -w on the project's source code, modifying any files that do not match its style.
 .PHONY: fmt
@@ -323,7 +323,7 @@ fmt:
 	go fmt ./...
 
 .PHONY: lint
-GOLANGCI_LINT_VERSION ?= v2.11.4
+GOLANGCI_LINT_VERSION ?= v2.13.2
 lint:
 	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run
 
@@ -413,7 +413,7 @@ validate-ui:
 .PHONY: pre-ui-v3
 pre-ui-v3:
 ifdef CI
-	cd ui/v3 && pnpm config set store-dir ~/.pnpm-store && pnpm install --frozen-lockfile
+	cd ui/v3 && pnpm install --frozen-lockfile --store-dir ~/.pnpm-store
 else
 	cd ui/v3 && pnpm install --frozen-lockfile
 endif

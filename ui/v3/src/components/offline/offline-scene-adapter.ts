@@ -15,10 +15,8 @@
  * mutate those empties (edit form, marker editor, mutating actions),
  * so the holes are invisible to the user.
  *
- * The cast to `SceneDataFragment` is the price for not snapshotting
- * the full graph at download time. If we ever do that snapshot — to
- * support, say, full marker / performer detail in the offline view —
- * the adapter shrinks to almost nothing and the cast can come off.
+ * Keep the synthetic graph checked against the generated fragment so
+ * new server fields receive explicit offline defaults.
  */
 
 import type * as GQL from "src/core/generated-graphql";
@@ -54,7 +52,7 @@ export function offlineEntryToSceneData(
     created_at: downloadedAtIso,
     updated_at: downloadedAtIso,
     disambiguation: null,
-    urls: null,
+    urls: [],
     gender: null,
     birthdate: null,
     ethnicity: null,
@@ -118,7 +116,7 @@ export function offlineEntryToSceneData(
         favorite: false,
         ignore_auto_tag: false,
         organized: false,
-        o_counter: null,
+        o_counter: 0,
         stash_ids: [],
         parent_studio: null,
         tags: [],
@@ -141,11 +139,18 @@ export function offlineEntryToSceneData(
     mod_time: downloadedAtIso,
     updated_at: downloadedAtIso,
     duration: entry.duration || 0,
+    video_stream_duration: null,
     video_codec: entry.source_video_codec || "",
     audio_codec: entry.source_audio_codec || "",
+    frame_count: null,
     duration_mismatch: false,
     width: entry.width_actual || entry.width || 0,
     height: entry.height_actual || entry.height || 0,
+    bit_depth: null,
+    color_range: null,
+    color_space: null,
+    color_transfer: null,
+    color_primaries: null,
     frame_rate: 0,
     bit_rate: 0,
     fingerprints: [],
@@ -160,6 +165,8 @@ export function offlineEntryToSceneData(
     director: null,
     urls: [],
     date: entry.date,
+    production_date: null,
+    preview_image: null,
     rating100: null,
     o_counter: null,
     organized: false,
@@ -203,9 +210,5 @@ export function offlineEntryToSceneData(
         label: "Offline",
       },
     ],
-    // SceneDataFragment includes a `__typename` inferred from the
-    // root selection; the cast below covers any drift between the
-    // snapshot's nested entity shape (Performer/Tag/Studio counts,
-    // stash_ids, etc.) and the live GraphQL shape.
-  } as GQL.SceneDataFragment;
+  };
 }

@@ -15,9 +15,6 @@ concurrency:
   group: ${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  COMPILER_IMAGE: ghcr.io/stashapp/compiler:14
-
 jobs:
   # Job 1: Generate code and build UI
   # Runs natively (no Docker) — go generate/gqlgen and node don't need cross-compilers.
@@ -137,11 +134,8 @@ jobs:
     - name: Test Backend
       run: make it
 
-  # Job 3: Cross-compile for all platforms
-  # Each platform gets its own runner and Docker container.
-  # Each build-cc-* make target is self-contained (sets its own GOOS/GOARCH/CC),
-  # so running them in separate containers is functionally identical to one container.
-  # Runs in parallel with the test job.
+  # Job 3: Build the active Linux target in parallel with backend tests.
+  # Other cross-compilation targets require the updated compiler Dockerfile.
   build:
     needs: generate
     runs-on: ubuntu-24.04
@@ -200,25 +194,20 @@ jobs:
     - name: Cache Go build
       uses: actions/cache@v5
       with:
-        path: .go-cache
+        path: ~/.cache/go-build
         key: ${{ runner.os }}-go-cache-${{ matrix.platform }}-${{ hashFiles('go.mod', '**/go.sum') }}
 
-    # kept separate to test timings
-    - name: pull compiler image
-      run: docker pull $COMPILER_IMAGE
-
-    - name: Start build container
-      env:
-        official-build: ${{ github.repository == 'stashapp/stash' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'release' && github.ref != 'refs/tags/latest_develop')) }}
-      run: |
-        mkdir -p .go-cache
-        docker run -d --name build --mount type=bind,source="$(pwd)",target=/stash,consistency=delegated --mount type=bind,source="$(pwd)/.go-cache",target=/root/.cache/go-build,consistency=delegated --env OFFICIAL_BUILD=${{ env.official-build }} --env UPDATE_REPO=${{ github.repository }} -w /stash $COMPILER_IMAGE tail -f /dev/null
+    # This fork currently publishes linux/amd64. Use the version in go.mod;
+    # the upstream compiler image predates the v3 dependency requirements.
+    - uses: actions/setup-go@v6
+      with:
+        go-version-file: go.mod
 
     - name: Build (${{ matrix.platform }})
-      run: docker exec -t build /bin/bash -c "make ${{ matrix.make-target }}"
-
-    - name: Cleanup build container
-      run: docker rm -f -v build
+      env:
+        OFFICIAL_BUILD: ${{ github.repository == 'stashapp/stash' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'release' && github.ref != 'refs/tags/latest_develop')) }}
+        UPDATE_REPO: ${{ github.repository }}
+      run: make ${{ matrix.make-target }}
 
     - name: Upload build artifact
       uses: actions/upload-artifact@v7

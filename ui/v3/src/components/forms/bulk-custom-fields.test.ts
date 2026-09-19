@@ -6,6 +6,7 @@ import {
 } from "./bulk-custom-fields";
 
 const summary = {
+  __typename: "BulkCustomFieldSummary" as const,
   count: 2,
   shared_names: ["score", "old", "blank", "keep"],
   partial_names: ["private"],
@@ -55,18 +56,14 @@ describe("bulk custom-field updates", () => {
     );
   });
 
-  it.each([
-    "",
-    " ",
-    " leading",
-    "trailing ",
-    "x".repeat(65),
-    "é".repeat(33),
-  ])("rejects invalid new field names: %j", (name) => {
-    expect(
-      schema.safeParse({ shared: [], added: [{ name, value: "x" }] }).success,
-    ).toBe(false);
-  });
+  it.each(["", " ", " leading", "trailing ", "x".repeat(65), "é".repeat(33)])(
+    "rejects invalid new field names: %j",
+    (name) => {
+      expect(
+        schema.safeParse({ shared: [], added: [{ name, value: "x" }] }).success,
+      ).toBe(false);
+    },
+  );
 
   it("rejects duplicate actions and set/remove conflicts on the same name", () => {
     for (const action of ["set", "clear", "remove"] as const) {

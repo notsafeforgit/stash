@@ -39,7 +39,6 @@ export function UserMenu() {
         <DropdownMenuSeparator />
         <DropdownMenuItem
           render={
-            // biome-ignore lint/a11y/useAnchorContent: DropdownMenuItem supplies visible text through the Base UI render prop.
             <a
               aria-label={intl.formatMessage({ id: "help" })}
               href="https://docs.stashapp.cc"
@@ -54,7 +53,6 @@ export function UserMenu() {
         </DropdownMenuItem>
         <DropdownMenuItem
           render={
-            // biome-ignore lint/a11y/useAnchorContent: DropdownMenuItem supplies visible text through the Base UI render prop.
             <a
               aria-label={intl.formatMessage({ id: "donate" })}
               href="https://opencollective.com/stashapp"

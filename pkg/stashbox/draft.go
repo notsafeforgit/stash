@@ -9,8 +9,8 @@ import (
 	"mime/multipart"
 	"net/http"
 
-	"github.com/Yamashou/gqlgenc/clientv2"
-	"github.com/Yamashou/gqlgenc/graphqljson"
+	"github.com/gqlgo/gqlgenc/clientv2"
+	"github.com/gqlgo/gqlgenc/graphqljson"
 )
 
 func (c *Client) submitDraft(ctx context.Context, query string, input interface{}, image io.Reader, ret interface{}) error {
@@ -93,7 +93,7 @@ func (c *Client) submitDraft(ctx context.Context, query string, input interface{
 	return err
 }
 
-// we can't currently use this due to https://github.com/Yamashou/gqlgenc/issues/109
+// we can't currently use this due to https://github.com/gqlgo/gqlgenc/issues/109
 // func uploadImage(image io.Reader) client.HTTPRequestOption {
 // 	return func(req *http.Request) {
 // 		if image == nil {

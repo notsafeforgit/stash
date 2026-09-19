@@ -579,7 +579,7 @@ func serveDASHManifest(sm *StreamManager, w http.ResponseWriter, r *http.Request
 
 	baseUrl := r.URL.JoinPath("/")
 	baseUrl.RawQuery = ""
-	m.BaseURL = prefix + baseUrl.String()
+	m.BaseURL = []string{prefix + baseUrl.String()}
 
 	video, _ := m.AddNewAdaptationSetVideo(MimeWebmVideo, "progressive", true, 1)
 

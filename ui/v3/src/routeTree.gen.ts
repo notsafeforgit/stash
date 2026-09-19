@@ -9,67 +9,47 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as TvRouteImport } from './routes/tv'
-import { Route as TestRouteImport } from './routes/test'
-import { Route as StatsRouteImport } from './routes/stats'
-import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as SceneDuplicateCheckerRouteImport } from './routes/scene-duplicate-checker'
-import { Route as ImageDuplicateCheckerRouteImport } from './routes/image-duplicate-checker'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as TagsIndexRouteImport } from './routes/tags/index'
-import { Route as StudiosIndexRouteImport } from './routes/studios/index'
-import { Route as SettingsIndexRouteImport } from './routes/settings/index'
-import { Route as ScenesIndexRouteImport } from './routes/scenes/index'
-import { Route as PerformersIndexRouteImport } from './routes/performers/index'
-import { Route as OfflineIndexRouteImport } from './routes/offline/index'
-import { Route as ImagesIndexRouteImport } from './routes/images/index'
-import { Route as GroupsIndexRouteImport } from './routes/groups/index'
+import { Route as ImageDuplicateCheckerRouteImport } from './routes/image-duplicate-checker'
+import { Route as SceneDuplicateCheckerRouteImport } from './routes/scene-duplicate-checker'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as StatsRouteImport } from './routes/stats'
+import { Route as TestRouteImport } from './routes/test'
+import { Route as TvRouteImport } from './routes/tv'
 import { Route as GalleriesIndexRouteImport } from './routes/galleries/index'
-import { Route as TagsTagIdRouteImport } from './routes/tags/$tagId'
-import { Route as StudiosStudioIdRouteImport } from './routes/studios/$studioId'
-import { Route as SettingsTvRouteImport } from './routes/settings/tv'
-import { Route as SettingsToolsRouteImport } from './routes/settings/tools'
-import { Route as SettingsTasksRouteImport } from './routes/settings/tasks'
-import { Route as SettingsSystemRouteImport } from './routes/settings/system'
-import { Route as SettingsServicesRouteImport } from './routes/settings/services'
-import { Route as SettingsSecurityRouteImport } from './routes/settings/security'
-import { Route as SettingsPluginsRouteImport } from './routes/settings/plugins'
-import { Route as SettingsMetadataProvidersRouteImport } from './routes/settings/metadata-providers'
-import { Route as SettingsLogsRouteImport } from './routes/settings/logs'
-import { Route as SettingsLibraryRouteImport } from './routes/settings/library'
-import { Route as SettingsInterfaceRouteImport } from './routes/settings/interface'
-import { Route as SettingsAboutRouteImport } from './routes/settings/about'
-import { Route as ScenesMarkersRouteImport } from './routes/scenes/markers'
-import { Route as ScenesSceneIdRouteImport } from './routes/scenes/$sceneId'
-import { Route as PerformersPerformerIdRouteImport } from './routes/performers/$performerId'
-import { Route as OfflineSceneIdRouteImport } from './routes/offline/$sceneId'
-import { Route as ImagesImageIdRouteImport } from './routes/images/$imageId'
-import { Route as GroupsGroupIdRouteImport } from './routes/groups/$groupId'
 import { Route as GalleriesGalleryIdRouteImport } from './routes/galleries/$galleryId'
+import { Route as GroupsIndexRouteImport } from './routes/groups/index'
+import { Route as GroupsGroupIdRouteImport } from './routes/groups/$groupId'
+import { Route as ImagesIndexRouteImport } from './routes/images/index'
+import { Route as ImagesImageIdRouteImport } from './routes/images/$imageId'
+import { Route as OfflineIndexRouteImport } from './routes/offline/index'
+import { Route as OfflineSceneIdRouteImport } from './routes/offline/$sceneId'
+import { Route as PerformersIndexRouteImport } from './routes/performers/index'
+import { Route as PerformersPerformerIdRouteImport } from './routes/performers/$performerId'
+import { Route as ScenesIndexRouteImport } from './routes/scenes/index'
+import { Route as ScenesSceneIdRouteImport } from './routes/scenes/$sceneId'
+import { Route as ScenesMarkersRouteImport } from './routes/scenes/markers'
+import { Route as SettingsIndexRouteImport } from './routes/settings/index'
+import { Route as SettingsAboutRouteImport } from './routes/settings/about'
+import { Route as SettingsInterfaceRouteImport } from './routes/settings/interface'
+import { Route as SettingsLibraryRouteImport } from './routes/settings/library'
+import { Route as SettingsLogsRouteImport } from './routes/settings/logs'
+import { Route as SettingsMetadataProvidersRouteImport } from './routes/settings/metadata-providers'
+import { Route as SettingsPluginsRouteImport } from './routes/settings/plugins'
+import { Route as SettingsSecurityRouteImport } from './routes/settings/security'
+import { Route as SettingsServicesRouteImport } from './routes/settings/services'
+import { Route as SettingsSystemRouteImport } from './routes/settings/system'
+import { Route as SettingsTasksRouteImport } from './routes/settings/tasks'
+import { Route as SettingsToolsRouteImport } from './routes/settings/tools'
+import { Route as SettingsTvRouteImport } from './routes/settings/tv'
+import { Route as StudiosIndexRouteImport } from './routes/studios/index'
+import { Route as StudiosStudioIdRouteImport } from './routes/studios/$studioId'
+import { Route as TagsIndexRouteImport } from './routes/tags/index'
+import { Route as TagsTagIdRouteImport } from './routes/tags/$tagId'
 
-const TvRoute = TvRouteImport.update({
-  id: '/tv',
-  path: '/tv',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TestRoute = TestRouteImport.update({
-  id: '/test',
-  path: '/test',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const StatsRoute = StatsRouteImport.update({
-  id: '/stats',
-  path: '/stats',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SceneDuplicateCheckerRoute = SceneDuplicateCheckerRouteImport.update({
-  id: '/scene-duplicate-checker',
-  path: '/scene-duplicate-checker',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ImageDuplicateCheckerRoute = ImageDuplicateCheckerRouteImport.update({
@@ -77,49 +57,29 @@ const ImageDuplicateCheckerRoute = ImageDuplicateCheckerRouteImport.update({
   path: '/image-duplicate-checker',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const SceneDuplicateCheckerRoute = SceneDuplicateCheckerRouteImport.update({
+  id: '/scene-duplicate-checker',
+  path: '/scene-duplicate-checker',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TagsIndexRoute = TagsIndexRouteImport.update({
-  id: '/tags/',
-  path: '/tags/',
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
-const StudiosIndexRoute = StudiosIndexRouteImport.update({
-  id: '/studios/',
-  path: '/studios/',
+const StatsRoute = StatsRouteImport.update({
+  id: '/stats',
+  path: '/stats',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SettingsIndexRoute = SettingsIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => SettingsRoute,
-} as any)
-const ScenesIndexRoute = ScenesIndexRouteImport.update({
-  id: '/scenes/',
-  path: '/scenes/',
+const TestRoute = TestRouteImport.update({
+  id: '/test',
+  path: '/test',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PerformersIndexRoute = PerformersIndexRouteImport.update({
-  id: '/performers/',
-  path: '/performers/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OfflineIndexRoute = OfflineIndexRouteImport.update({
-  id: '/offline/',
-  path: '/offline/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ImagesIndexRoute = ImagesIndexRouteImport.update({
-  id: '/images/',
-  path: '/images/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const GroupsIndexRoute = GroupsIndexRouteImport.update({
-  id: '/groups/',
-  path: '/groups/',
+const TvRoute = TvRouteImport.update({
+  id: '/tv',
+  path: '/tv',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GalleriesIndexRoute = GalleriesIndexRouteImport.update({
@@ -127,49 +87,89 @@ const GalleriesIndexRoute = GalleriesIndexRouteImport.update({
   path: '/galleries/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TagsTagIdRoute = TagsTagIdRouteImport.update({
-  id: '/tags/$tagId',
-  path: '/tags/$tagId',
+const GalleriesGalleryIdRoute = GalleriesGalleryIdRouteImport.update({
+  id: '/galleries/$galleryId',
+  path: '/galleries/$galleryId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const StudiosStudioIdRoute = StudiosStudioIdRouteImport.update({
-  id: '/studios/$studioId',
-  path: '/studios/$studioId',
+const GroupsIndexRoute = GroupsIndexRouteImport.update({
+  id: '/groups/',
+  path: '/groups/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SettingsTvRoute = SettingsTvRouteImport.update({
-  id: '/tv',
-  path: '/tv',
+const GroupsGroupIdRoute = GroupsGroupIdRouteImport.update({
+  id: '/groups/$groupId',
+  path: '/groups/$groupId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ImagesIndexRoute = ImagesIndexRouteImport.update({
+  id: '/images/',
+  path: '/images/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ImagesImageIdRoute = ImagesImageIdRouteImport.update({
+  id: '/images/$imageId',
+  path: '/images/$imageId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OfflineIndexRoute = OfflineIndexRouteImport.update({
+  id: '/offline/',
+  path: '/offline/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OfflineSceneIdRoute = OfflineSceneIdRouteImport.update({
+  id: '/offline/$sceneId',
+  path: '/offline/$sceneId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PerformersIndexRoute = PerformersIndexRouteImport.update({
+  id: '/performers/',
+  path: '/performers/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PerformersPerformerIdRoute = PerformersPerformerIdRouteImport.update({
+  id: '/performers/$performerId',
+  path: '/performers/$performerId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ScenesIndexRoute = ScenesIndexRouteImport.update({
+  id: '/scenes/',
+  path: '/scenes/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ScenesSceneIdRoute = ScenesSceneIdRouteImport.update({
+  id: '/scenes/$sceneId',
+  path: '/scenes/$sceneId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ScenesMarkersRoute = ScenesMarkersRouteImport.update({
+  id: '/scenes/markers',
+  path: '/scenes/markers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsIndexRoute = SettingsIndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => SettingsRoute,
 } as any)
-const SettingsToolsRoute = SettingsToolsRouteImport.update({
-  id: '/tools',
-  path: '/tools',
+const SettingsAboutRoute = SettingsAboutRouteImport.update({
+  id: '/about',
+  path: '/about',
   getParentRoute: () => SettingsRoute,
 } as any)
-const SettingsTasksRoute = SettingsTasksRouteImport.update({
-  id: '/tasks',
-  path: '/tasks',
+const SettingsInterfaceRoute = SettingsInterfaceRouteImport.update({
+  id: '/interface',
+  path: '/interface',
   getParentRoute: () => SettingsRoute,
 } as any)
-const SettingsSystemRoute = SettingsSystemRouteImport.update({
-  id: '/system',
-  path: '/system',
+const SettingsLibraryRoute = SettingsLibraryRouteImport.update({
+  id: '/library',
+  path: '/library',
   getParentRoute: () => SettingsRoute,
 } as any)
-const SettingsServicesRoute = SettingsServicesRouteImport.update({
-  id: '/services',
-  path: '/services',
-  getParentRoute: () => SettingsRoute,
-} as any)
-const SettingsSecurityRoute = SettingsSecurityRouteImport.update({
-  id: '/security',
-  path: '/security',
-  getParentRoute: () => SettingsRoute,
-} as any)
-const SettingsPluginsRoute = SettingsPluginsRouteImport.update({
-  id: '/plugins',
-  path: '/plugins',
+const SettingsLogsRoute = SettingsLogsRouteImport.update({
+  id: '/logs',
+  path: '/logs',
   getParentRoute: () => SettingsRoute,
 } as any)
 const SettingsMetadataProvidersRoute =
@@ -178,59 +178,59 @@ const SettingsMetadataProvidersRoute =
     path: '/metadata-providers',
     getParentRoute: () => SettingsRoute,
   } as any)
-const SettingsLogsRoute = SettingsLogsRouteImport.update({
-  id: '/logs',
-  path: '/logs',
+const SettingsPluginsRoute = SettingsPluginsRouteImport.update({
+  id: '/plugins',
+  path: '/plugins',
   getParentRoute: () => SettingsRoute,
 } as any)
-const SettingsLibraryRoute = SettingsLibraryRouteImport.update({
-  id: '/library',
-  path: '/library',
+const SettingsSecurityRoute = SettingsSecurityRouteImport.update({
+  id: '/security',
+  path: '/security',
   getParentRoute: () => SettingsRoute,
 } as any)
-const SettingsInterfaceRoute = SettingsInterfaceRouteImport.update({
-  id: '/interface',
-  path: '/interface',
+const SettingsServicesRoute = SettingsServicesRouteImport.update({
+  id: '/services',
+  path: '/services',
   getParentRoute: () => SettingsRoute,
 } as any)
-const SettingsAboutRoute = SettingsAboutRouteImport.update({
-  id: '/about',
-  path: '/about',
+const SettingsSystemRoute = SettingsSystemRouteImport.update({
+  id: '/system',
+  path: '/system',
   getParentRoute: () => SettingsRoute,
 } as any)
-const ScenesMarkersRoute = ScenesMarkersRouteImport.update({
-  id: '/scenes/markers',
-  path: '/scenes/markers',
+const SettingsTasksRoute = SettingsTasksRouteImport.update({
+  id: '/tasks',
+  path: '/tasks',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsToolsRoute = SettingsToolsRouteImport.update({
+  id: '/tools',
+  path: '/tools',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsTvRoute = SettingsTvRouteImport.update({
+  id: '/tv',
+  path: '/tv',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const StudiosIndexRoute = StudiosIndexRouteImport.update({
+  id: '/studios/',
+  path: '/studios/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ScenesSceneIdRoute = ScenesSceneIdRouteImport.update({
-  id: '/scenes/$sceneId',
-  path: '/scenes/$sceneId',
+const StudiosStudioIdRoute = StudiosStudioIdRouteImport.update({
+  id: '/studios/$studioId',
+  path: '/studios/$studioId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PerformersPerformerIdRoute = PerformersPerformerIdRouteImport.update({
-  id: '/performers/$performerId',
-  path: '/performers/$performerId',
+const TagsIndexRoute = TagsIndexRouteImport.update({
+  id: '/tags/',
+  path: '/tags/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const OfflineSceneIdRoute = OfflineSceneIdRouteImport.update({
-  id: '/offline/$sceneId',
-  path: '/offline/$sceneId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ImagesImageIdRoute = ImagesImageIdRouteImport.update({
-  id: '/images/$imageId',
-  path: '/images/$imageId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const GroupsGroupIdRoute = GroupsGroupIdRouteImport.update({
-  id: '/groups/$groupId',
-  path: '/groups/$groupId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const GalleriesGalleryIdRoute = GalleriesGalleryIdRouteImport.update({
-  id: '/galleries/$galleryId',
-  path: '/galleries/$galleryId',
+const TagsTagIdRoute = TagsTagIdRouteImport.update({
+  id: '/tags/$tagId',
+  path: '/tags/$tagId',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -499,39 +499,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/tv': {
-      id: '/tv'
-      path: '/tv'
-      fullPath: '/tv'
-      preLoaderRoute: typeof TvRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/test': {
-      id: '/test'
-      path: '/test'
-      fullPath: '/test'
-      preLoaderRoute: typeof TestRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/stats': {
-      id: '/stats'
-      path: '/stats'
-      fullPath: '/stats'
-      preLoaderRoute: typeof StatsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/scene-duplicate-checker': {
-      id: '/scene-duplicate-checker'
-      path: '/scene-duplicate-checker'
-      fullPath: '/scene-duplicate-checker'
-      preLoaderRoute: typeof SceneDuplicateCheckerRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/image-duplicate-checker': {
@@ -541,67 +513,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ImageDuplicateCheckerRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/scene-duplicate-checker': {
+      id: '/scene-duplicate-checker'
+      path: '/scene-duplicate-checker'
+      fullPath: '/scene-duplicate-checker'
+      preLoaderRoute: typeof SceneDuplicateCheckerRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/tags/': {
-      id: '/tags/'
-      path: '/tags'
-      fullPath: '/tags/'
-      preLoaderRoute: typeof TagsIndexRouteImport
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/studios/': {
-      id: '/studios/'
-      path: '/studios'
-      fullPath: '/studios/'
-      preLoaderRoute: typeof StudiosIndexRouteImport
+    '/stats': {
+      id: '/stats'
+      path: '/stats'
+      fullPath: '/stats'
+      preLoaderRoute: typeof StatsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/settings/': {
-      id: '/settings/'
-      path: '/'
-      fullPath: '/settings/'
-      preLoaderRoute: typeof SettingsIndexRouteImport
-      parentRoute: typeof SettingsRoute
-    }
-    '/scenes/': {
-      id: '/scenes/'
-      path: '/scenes'
-      fullPath: '/scenes/'
-      preLoaderRoute: typeof ScenesIndexRouteImport
+    '/test': {
+      id: '/test'
+      path: '/test'
+      fullPath: '/test'
+      preLoaderRoute: typeof TestRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/performers/': {
-      id: '/performers/'
-      path: '/performers'
-      fullPath: '/performers/'
-      preLoaderRoute: typeof PerformersIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/offline/': {
-      id: '/offline/'
-      path: '/offline'
-      fullPath: '/offline/'
-      preLoaderRoute: typeof OfflineIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/images/': {
-      id: '/images/'
-      path: '/images'
-      fullPath: '/images/'
-      preLoaderRoute: typeof ImagesIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/groups/': {
-      id: '/groups/'
-      path: '/groups'
-      fullPath: '/groups/'
-      preLoaderRoute: typeof GroupsIndexRouteImport
+    '/tv': {
+      id: '/tv'
+      path: '/tv'
+      fullPath: '/tv'
+      preLoaderRoute: typeof TvRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/galleries/': {
@@ -611,137 +555,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GalleriesIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/tags/$tagId': {
-      id: '/tags/$tagId'
-      path: '/tags/$tagId'
-      fullPath: '/tags/$tagId'
-      preLoaderRoute: typeof TagsTagIdRouteImport
+    '/galleries/$galleryId': {
+      id: '/galleries/$galleryId'
+      path: '/galleries/$galleryId'
+      fullPath: '/galleries/$galleryId'
+      preLoaderRoute: typeof GalleriesGalleryIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/studios/$studioId': {
-      id: '/studios/$studioId'
-      path: '/studios/$studioId'
-      fullPath: '/studios/$studioId'
-      preLoaderRoute: typeof StudiosStudioIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/settings/tv': {
-      id: '/settings/tv'
-      path: '/tv'
-      fullPath: '/settings/tv'
-      preLoaderRoute: typeof SettingsTvRouteImport
-      parentRoute: typeof SettingsRoute
-    }
-    '/settings/tools': {
-      id: '/settings/tools'
-      path: '/tools'
-      fullPath: '/settings/tools'
-      preLoaderRoute: typeof SettingsToolsRouteImport
-      parentRoute: typeof SettingsRoute
-    }
-    '/settings/tasks': {
-      id: '/settings/tasks'
-      path: '/tasks'
-      fullPath: '/settings/tasks'
-      preLoaderRoute: typeof SettingsTasksRouteImport
-      parentRoute: typeof SettingsRoute
-    }
-    '/settings/system': {
-      id: '/settings/system'
-      path: '/system'
-      fullPath: '/settings/system'
-      preLoaderRoute: typeof SettingsSystemRouteImport
-      parentRoute: typeof SettingsRoute
-    }
-    '/settings/services': {
-      id: '/settings/services'
-      path: '/services'
-      fullPath: '/settings/services'
-      preLoaderRoute: typeof SettingsServicesRouteImport
-      parentRoute: typeof SettingsRoute
-    }
-    '/settings/security': {
-      id: '/settings/security'
-      path: '/security'
-      fullPath: '/settings/security'
-      preLoaderRoute: typeof SettingsSecurityRouteImport
-      parentRoute: typeof SettingsRoute
-    }
-    '/settings/plugins': {
-      id: '/settings/plugins'
-      path: '/plugins'
-      fullPath: '/settings/plugins'
-      preLoaderRoute: typeof SettingsPluginsRouteImport
-      parentRoute: typeof SettingsRoute
-    }
-    '/settings/metadata-providers': {
-      id: '/settings/metadata-providers'
-      path: '/metadata-providers'
-      fullPath: '/settings/metadata-providers'
-      preLoaderRoute: typeof SettingsMetadataProvidersRouteImport
-      parentRoute: typeof SettingsRoute
-    }
-    '/settings/logs': {
-      id: '/settings/logs'
-      path: '/logs'
-      fullPath: '/settings/logs'
-      preLoaderRoute: typeof SettingsLogsRouteImport
-      parentRoute: typeof SettingsRoute
-    }
-    '/settings/library': {
-      id: '/settings/library'
-      path: '/library'
-      fullPath: '/settings/library'
-      preLoaderRoute: typeof SettingsLibraryRouteImport
-      parentRoute: typeof SettingsRoute
-    }
-    '/settings/interface': {
-      id: '/settings/interface'
-      path: '/interface'
-      fullPath: '/settings/interface'
-      preLoaderRoute: typeof SettingsInterfaceRouteImport
-      parentRoute: typeof SettingsRoute
-    }
-    '/settings/about': {
-      id: '/settings/about'
-      path: '/about'
-      fullPath: '/settings/about'
-      preLoaderRoute: typeof SettingsAboutRouteImport
-      parentRoute: typeof SettingsRoute
-    }
-    '/scenes/markers': {
-      id: '/scenes/markers'
-      path: '/scenes/markers'
-      fullPath: '/scenes/markers'
-      preLoaderRoute: typeof ScenesMarkersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/scenes/$sceneId': {
-      id: '/scenes/$sceneId'
-      path: '/scenes/$sceneId'
-      fullPath: '/scenes/$sceneId'
-      preLoaderRoute: typeof ScenesSceneIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/performers/$performerId': {
-      id: '/performers/$performerId'
-      path: '/performers/$performerId'
-      fullPath: '/performers/$performerId'
-      preLoaderRoute: typeof PerformersPerformerIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/offline/$sceneId': {
-      id: '/offline/$sceneId'
-      path: '/offline/$sceneId'
-      fullPath: '/offline/$sceneId'
-      preLoaderRoute: typeof OfflineSceneIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/images/$imageId': {
-      id: '/images/$imageId'
-      path: '/images/$imageId'
-      fullPath: '/images/$imageId'
-      preLoaderRoute: typeof ImagesImageIdRouteImport
+    '/groups/': {
+      id: '/groups/'
+      path: '/groups'
+      fullPath: '/groups/'
+      preLoaderRoute: typeof GroupsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/groups/$groupId': {
@@ -751,11 +576,186 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GroupsGroupIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/galleries/$galleryId': {
-      id: '/galleries/$galleryId'
-      path: '/galleries/$galleryId'
-      fullPath: '/galleries/$galleryId'
-      preLoaderRoute: typeof GalleriesGalleryIdRouteImport
+    '/images/': {
+      id: '/images/'
+      path: '/images'
+      fullPath: '/images/'
+      preLoaderRoute: typeof ImagesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/images/$imageId': {
+      id: '/images/$imageId'
+      path: '/images/$imageId'
+      fullPath: '/images/$imageId'
+      preLoaderRoute: typeof ImagesImageIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/offline/': {
+      id: '/offline/'
+      path: '/offline'
+      fullPath: '/offline/'
+      preLoaderRoute: typeof OfflineIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/offline/$sceneId': {
+      id: '/offline/$sceneId'
+      path: '/offline/$sceneId'
+      fullPath: '/offline/$sceneId'
+      preLoaderRoute: typeof OfflineSceneIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/performers/': {
+      id: '/performers/'
+      path: '/performers'
+      fullPath: '/performers/'
+      preLoaderRoute: typeof PerformersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/performers/$performerId': {
+      id: '/performers/$performerId'
+      path: '/performers/$performerId'
+      fullPath: '/performers/$performerId'
+      preLoaderRoute: typeof PerformersPerformerIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/scenes/': {
+      id: '/scenes/'
+      path: '/scenes'
+      fullPath: '/scenes/'
+      preLoaderRoute: typeof ScenesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/scenes/$sceneId': {
+      id: '/scenes/$sceneId'
+      path: '/scenes/$sceneId'
+      fullPath: '/scenes/$sceneId'
+      preLoaderRoute: typeof ScenesSceneIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/scenes/markers': {
+      id: '/scenes/markers'
+      path: '/scenes/markers'
+      fullPath: '/scenes/markers'
+      preLoaderRoute: typeof ScenesMarkersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/': {
+      id: '/settings/'
+      path: '/'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof SettingsIndexRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/about': {
+      id: '/settings/about'
+      path: '/about'
+      fullPath: '/settings/about'
+      preLoaderRoute: typeof SettingsAboutRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/interface': {
+      id: '/settings/interface'
+      path: '/interface'
+      fullPath: '/settings/interface'
+      preLoaderRoute: typeof SettingsInterfaceRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/library': {
+      id: '/settings/library'
+      path: '/library'
+      fullPath: '/settings/library'
+      preLoaderRoute: typeof SettingsLibraryRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/logs': {
+      id: '/settings/logs'
+      path: '/logs'
+      fullPath: '/settings/logs'
+      preLoaderRoute: typeof SettingsLogsRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/metadata-providers': {
+      id: '/settings/metadata-providers'
+      path: '/metadata-providers'
+      fullPath: '/settings/metadata-providers'
+      preLoaderRoute: typeof SettingsMetadataProvidersRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/plugins': {
+      id: '/settings/plugins'
+      path: '/plugins'
+      fullPath: '/settings/plugins'
+      preLoaderRoute: typeof SettingsPluginsRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/security': {
+      id: '/settings/security'
+      path: '/security'
+      fullPath: '/settings/security'
+      preLoaderRoute: typeof SettingsSecurityRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/services': {
+      id: '/settings/services'
+      path: '/services'
+      fullPath: '/settings/services'
+      preLoaderRoute: typeof SettingsServicesRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/system': {
+      id: '/settings/system'
+      path: '/system'
+      fullPath: '/settings/system'
+      preLoaderRoute: typeof SettingsSystemRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/tasks': {
+      id: '/settings/tasks'
+      path: '/tasks'
+      fullPath: '/settings/tasks'
+      preLoaderRoute: typeof SettingsTasksRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/tools': {
+      id: '/settings/tools'
+      path: '/tools'
+      fullPath: '/settings/tools'
+      preLoaderRoute: typeof SettingsToolsRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/tv': {
+      id: '/settings/tv'
+      path: '/tv'
+      fullPath: '/settings/tv'
+      preLoaderRoute: typeof SettingsTvRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/studios/': {
+      id: '/studios/'
+      path: '/studios'
+      fullPath: '/studios/'
+      preLoaderRoute: typeof StudiosIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/studios/$studioId': {
+      id: '/studios/$studioId'
+      path: '/studios/$studioId'
+      fullPath: '/studios/$studioId'
+      preLoaderRoute: typeof StudiosStudioIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tags/': {
+      id: '/tags/'
+      path: '/tags'
+      fullPath: '/tags/'
+      preLoaderRoute: typeof TagsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tags/$tagId': {
+      id: '/tags/$tagId'
+      path: '/tags/$tagId'
+      fullPath: '/tags/$tagId'
+      preLoaderRoute: typeof TagsTagIdRouteImport
       parentRoute: typeof rootRouteImport
     }
   }

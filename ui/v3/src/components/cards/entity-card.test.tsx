@@ -28,37 +28,39 @@ import { EntityCard } from "./entity-card";
 import { CardLayoutContext } from "../list/card-layout-context";
 
 describe("entity card actions", () => {
-  it.each([
-    "grid",
-    "wall",
-  ] as const)("names navigation, preview, and selection in %s layout", (layout) => {
-    const markup = renderToStaticMarkup(
-      <IntlProvider locale="en" messages={{ "actions.preview": "Preview" }}>
-        <CardLayoutContext.Provider value={layout}>
-          <EntityCard
-            id="17"
-            destination={{
-              to: "/scenes/$sceneId",
-              params: { sceneId: "17" },
-              search: undefined,
-            }}
-            label="A named scene"
-            selected
-            onSelectedChanged={() => {}}
-            onPreviewClick={() => {}}
-          >
-            <EntityCard.SelectCheckbox />
-            <EntityCard.Preview image="https://stash.test/thumbnail.jpg" />
-          </EntityCard>
-        </CardLayoutContext.Provider>
-      </IntlProvider>,
-    );
+  it.each(["grid", "wall"] as const)(
+    "names navigation, preview, and selection in %s layout",
+    (layout) => {
+      const markup = renderToStaticMarkup(
+        <IntlProvider locale="en" messages={{ "actions.preview": "Preview" }}>
+          <CardLayoutContext.Provider value={layout}>
+            <EntityCard
+              id="17"
+              destination={{
+                to: "/scenes/$sceneId",
+                params: { sceneId: "17" },
+                search: undefined,
+              }}
+              label="A named scene"
+              selected
+              onSelectedChanged={() => {}}
+              onPreviewClick={() => {}}
+            >
+              <EntityCard.SelectCheckbox />
+              <EntityCard.Preview image="https://stash.test/thumbnail.jpg" />
+            </EntityCard>
+          </CardLayoutContext.Provider>
+        </IntlProvider>,
+      );
 
-    expect(markup).toMatch(/<a\b[^>]*aria-label="A named scene"/);
-    expect(markup).toMatch(/<button\b[^>]*aria-label="Preview A named scene"/);
-    expect(markup).toMatch(
-      /<button\b[^>]*aria-pressed="true"[^>]*aria-label="Select A named scene"/,
-    );
-    expect(markup).not.toContain('aria-label="/scenes/17"');
-  });
+      expect(markup).toMatch(/<a\b[^>]*aria-label="A named scene"/);
+      expect(markup).toMatch(
+        /<button\b[^>]*aria-label="Preview A named scene"/,
+      );
+      expect(markup).toMatch(
+        /<button\b[^>]*aria-pressed="true"[^>]*aria-label="Select A named scene"/,
+      );
+      expect(markup).not.toContain('aria-label="/scenes/17"');
+    },
+  );
 });

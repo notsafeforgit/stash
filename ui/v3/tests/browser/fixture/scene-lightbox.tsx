@@ -41,7 +41,15 @@ const playMock: MockedResponse<
   delay: 0,
   result: () => {
     window.lightboxActivity.plays++;
-    return { data: { sceneAddPlay: { count: 1, history: [] } } };
+    return {
+      data: {
+        sceneAddPlay: {
+          __typename: "HistoryMutationResult",
+          count: 1,
+          history: [],
+        },
+      },
+    };
   },
 };
 
@@ -95,12 +103,14 @@ export const scenes = ["1", "2", "3", "slow"].map(
           ? []
           : [
               {
+                __typename: "SceneStreamEndpoint" as const,
                 url: url(`/scene/${id}/stream`),
                 mime_type: "video/mp4",
                 label: "Direct stream",
               },
             ]),
         {
+          __typename: "SceneStreamEndpoint" as const,
           url: url(`/scene/${id}/stream.master.m3u8?resolution=LOW`),
           mime_type: "application/vnd.apple.mpegurl",
           label: "HLS (240p)",
@@ -114,7 +124,7 @@ export const scenes = ["1", "2", "3", "slow"].map(
         seconds,
         end_seconds: index === 2 ? 10 : seconds + 2,
         scene,
-        primary_tag: { id: "tag", name: "Example" },
+        primary_tag: { __typename: "Tag", id: "tag", name: "Example" },
         tags: [],
         screenshot: "",
         stream: "",
@@ -122,7 +132,13 @@ export const scenes = ["1", "2", "3", "slow"].map(
         created_at: "",
         updated_at: "",
       })),
-      captions: [{ language_code: "en", caption_type: "srt" }],
+      captions: [
+        {
+          __typename: "VideoCaption",
+          language_code: "en",
+          caption_type: "srt",
+        },
+      ],
       paths: { ...scene.paths, caption: url(`/scene/${id}/caption`) },
     };
   },

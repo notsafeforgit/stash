@@ -4,26 +4,16 @@ import { getFrontPageContent } from "./config";
 import { interfacePreferencesSchema } from "@/hooks/interface-preferences";
 import { lightboxSettingsSchema } from "@/components/lightbox/settings";
 
-it.each([
-  "",
-  " ",
-  "0",
-  "-1",
-  "1.5",
-  "1e2",
-  "12junk",
-  0,
-  -1,
-  1.5,
-  true,
-  null,
-])("rejects malformed saved-filter IDs without coercing %j", (savedFilterId) => {
-  expect(
-    frontPageContentSchema.safeParse([
-      { __typename: "SavedFilter", savedFilterId },
-    ]).success,
-  ).toBe(false);
-});
+it.each(["", " ", "0", "-1", "1.5", "1e2", "12junk", 0, -1, 1.5, true, null])(
+  "rejects malformed saved-filter IDs without coercing %j",
+  (savedFilterId) => {
+    expect(
+      frontPageContentSchema.safeParse([
+        { __typename: "SavedFilter", savedFilterId },
+      ]).success,
+    ).toBe(false);
+  },
+);
 
 it("preserves an intentionally empty Home Screen", () => {
   expect(getFrontPageContent(parseUIConfig({ frontPageContent: [] }))).toEqual(

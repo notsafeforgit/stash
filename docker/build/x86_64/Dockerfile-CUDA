@@ -1,8 +1,20 @@
 # This dockerfile should be built with `make docker-cuda-build` from the stash root.
 ARG CUDA_VERSION=13.2.1
 
+# Build patched HEIF/AVIF support against the runtime distribution.
+FROM ubuntu:24.04 AS heif
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential cmake pkg-config curl ca-certificates libaom-dev libdav1d-dev libde265-dev libx265-dev libjpeg-dev libpng-dev
+RUN sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/*.sources \
+    && apt-get update \
+    && apt-get build-dep -y --no-install-recommends vips \
+    && apt-get install -y --no-install-recommends meson ninja-build xz-utils
+COPY docker/native/build-libheif.sh /build-libheif.sh
+COPY docker/native/build-vips.sh /build-vips.sh
+RUN export LIBHEIF_LIBDIR=lib/$(dpkg-architecture -qDEB_HOST_MULTIARCH) \
+    && sh /build-libheif.sh && sh /build-vips.sh
+
 # Build Frontend
-FROM node:24-alpine AS frontend
+FROM node:24-alpine3.24 AS frontend
 RUN apk add --no-cache make git
 ## cache node_modules separately
 COPY ./ui/v2.5/package.json ./ui/v2.5/pnpm-lock.yaml /stash/ui/v2.5/
@@ -19,8 +31,8 @@ ARG STASH_VERSION
 RUN BUILD_DATE=$(date +"%Y-%m-%d %H:%M:%S") make ui-only
 
 # Build Backend
-FROM golang:1.25.9-bullseye AS backend
-RUN apt update && apt install -y build-essential golang
+FROM golang:1.27.1-bookworm AS backend
+RUN apt update && apt install -y build-essential
 WORKDIR /stash
 COPY ./go* ./*.go Makefile gqlgen.yml .gqlgenc.yml /stash/
 COPY ./graphql /stash/graphql/
@@ -40,7 +52,7 @@ RUN make flags-release flags-pie stash
 FROM nvidia/cuda:${CUDA_VERSION}-base-ubuntu24.04
 RUN apt update && apt upgrade -y && apt install -y \
     # stash dependencies
-    ca-certificates libvips-tools ffmpeg \
+    ca-certificates libvips-tools ffmpeg libavif-bin libaom3 libdav1d7 libde265-0 libx265-199 libjpeg-turbo8 libpng16-16t64 \
     # intel dependencies
     intel-media-va-driver-non-free vainfo \
     # python tools
@@ -48,12 +60,21 @@ RUN apt update && apt upgrade -y && apt install -y \
   # cleanup
   apt autoremove -y && apt clean && \
   rm -rf /var/lib/apt/lists/*
+# Keep Debian-owned files in place; the distro pip has no uninstall RECORD.
+RUN python3 -m pip install --break-system-packages --ignore-installed "pip>=26.2" setuptools wheel
 COPY --from=backend --chmod=555 /stash/stash /usr/bin/
 
 # NVENC Patch
 RUN mkdir -p /usr/local/bin /patched-lib
 ADD --chmod=555 https://raw.githubusercontent.com/keylase/nvidia-patch/master/patch.sh /usr/local/bin/patch.sh
 ADD --chmod=555 https://raw.githubusercontent.com/keylase/nvidia-patch/master/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+
+# Replace distro libraries and modules with the matching security builds.
+RUN find /usr/lib \( -name 'libheif.so*' -o -name 'libvips.so*' -o -name 'libvips-cpp.so*' \) -delete \
+    && rm -rf /usr/lib/vips-modules-* /usr/lib/*-linux-gnu/vips-modules-*
+COPY --from=heif /out/ /
+RUN heif-info --version | grep -F '1.23.4' \
+    && vips --version | grep -F '8.18.6'
 
 ENV LANG=C.UTF-8
 ENV NVIDIA_VISIBLE_DEVICES=all

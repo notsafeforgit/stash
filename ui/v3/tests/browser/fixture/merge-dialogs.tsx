@@ -64,6 +64,7 @@ const scenes: GQL.SlimSceneDataFragment[] = performers.map((performer) => ({
   director: null,
   urls: performer.urls ?? [],
   date: null,
+  production_date: null,
   rating100: null,
   o_counter: 0,
   organized: false,

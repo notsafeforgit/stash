@@ -88,10 +88,11 @@ const performers: GQL.PerformerDataFragment[] = ["1", "2"].map((id) => ({
   custom_fields: {},
 }));
 function artwork(): Pick<GQL.SceneDataFragment, "paths" | "preview_image"> {
+  if (!base) throw new Error("Missing cover fixture scene");
   const revision = window.coverFixture.finished ? "new" : "old";
   const fallback = url(`/covers/${revision}.jpg`);
   return {
-    paths: { ...base?.paths, screenshot: fallback },
+    paths: { ...base.paths, screenshot: fallback },
     preview_image: {
       __typename: "PreviewImage",
       fallback,
@@ -131,6 +132,7 @@ const detailMock: MockedResponse<
         // A real authenticated refetch issues a fresh signature, even for the same file.
         sceneStreams: [
           {
+            __typename: "SceneStreamEndpoint" as const,
             url: url(`/scene/1/stream?signature=${++streamRevision}`),
             mime_type: "video/mp4",
             label: "Direct stream",
@@ -274,7 +276,14 @@ const capabilitiesMock: MockedResponse<GQL.ServerCapabilitiesQuery> = {
   request: { query: GQL.ServerCapabilitiesDocument },
   maxUsageCount: Infinity,
   delay: 0,
-  result: { data: { serverCapabilities: { downloadFormats: [] } } },
+  result: {
+    data: {
+      serverCapabilities: {
+        __typename: "ServerCapabilities",
+        downloadFormats: [],
+      },
+    },
+  },
 };
 const configurationMock: MockedResponse<GQL.ConfigurationQuery> = {
   request: { query: GQL.ConfigurationDocument },

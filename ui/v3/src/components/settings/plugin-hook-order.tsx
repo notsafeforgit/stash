@@ -246,7 +246,7 @@ export function PluginHookOrder() {
   );
 
   const sections = useMemo(
-    () => buildSections(plugins, orderData ?? []),
+    () => buildSections(plugins ?? null, orderData ?? []),
     [plugins, orderData],
   );
 

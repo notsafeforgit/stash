@@ -700,7 +700,10 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     sendGetCurrentTime(() => {
       const store = storeRef.current;
       if (!store) return undefined;
-      return offsetStart + store.state.currentTime;
+      // Frame capture and marker bounds need the playhead at the click, while
+      // the reactive store can still contain an earlier timeupdate sample.
+      const video = fullscreenContainerRef.current?.querySelector("video");
+      return offsetStart + (video?.currentTime ?? store.state.currentTime);
     });
   }, [sendGetCurrentTime, offsetStart]);
 

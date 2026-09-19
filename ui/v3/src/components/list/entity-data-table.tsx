@@ -6,31 +6,21 @@ import { useListActivity } from "./list-activity-context";
 import { useListScrollRestoration } from "./use-list-scroll-restoration";
 
 import {
-  type Column,
-  type ColumnDef,
-  type ColumnFiltersState,
   type ColumnOrderState,
   type OnChangeFn,
-  type RowData,
   type RowSelectionState,
   type SortingState,
-  type VisibilityState,
+  type ColumnVisibilityState as VisibilityState,
   flexRender,
-  getCoreRowModel,
-  useReactTable,
+  useTable,
 } from "@tanstack/react-table";
 
-// Extend TanStack Table's column meta type so `meta.label` is typed.
-// TypeScript's declaration-merging rule requires the augmented interface
-// to restate the original type parameters verbatim (TData, TValue).
-// `_typeAnchor` is a never-set phantom field whose only purpose is to
-// reference those parameters so ESLint's no-unused-vars stays quiet.
-declare module "@tanstack/react-table" {
-  interface ColumnMeta<TData extends RowData, TValue> {
-    label?: string;
-    readonly _typeAnchor?: readonly [TData, TValue];
-  }
-}
+import {
+  type EntityColumn as Column,
+  type EntityColumnDef as ColumnDef,
+  type EntityTable,
+  entityTableFeatures,
+} from "./entity-table";
 import { GripVertical, Settings2 } from "lucide-react";
 import { SearchXIcon } from "lucide-react";
 import {
@@ -132,7 +122,7 @@ export function selectionColumn<T extends IHasID>(): ColumnDef<T> {
     id: "select",
     header: ({ table }) => (
       <Checkbox
-        checked={table.getIsAllPageRowsSelected() || undefined}
+        checked={table.getIsAllPageRowsSelected()}
         indeterminate={table.getIsSomePageRowsSelected()}
         onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
         aria-label="Select all"
@@ -156,7 +146,7 @@ export function selectionColumn<T extends IHasID>(): ColumnDef<T> {
 
 // ── Sheet-based column manager (visibility + drag-to-reorder) ─────────────────
 
-function SortableColumnRow<TData>({
+function SortableColumnRow<TData extends object>({
   column,
 }: {
   column: Column<TData, unknown>;
@@ -207,10 +197,10 @@ function SortableColumnRow<TData>({
   );
 }
 
-function SheetColumnManager<TData>({
+function SheetColumnManager<TData extends object>({
   table,
 }: {
-  table: ReturnType<typeof useReactTable<TData>>;
+  table: EntityTable<TData>;
 }) {
   const intl = useIntl();
   const sensors = useSensors(useSensor(PointerSensor));
@@ -218,7 +208,7 @@ function SheetColumnManager<TData>({
   const hideable = table.getAllColumns().filter((col) => col.getCanHide());
   if (hideable.length === 0) return null;
 
-  const savedOrder = table.getState().columnOrder;
+  const savedOrder = table.state.columnOrder;
   const orderedHideable: Column<TData, unknown>[] =
     savedOrder.length > 0
       ? (savedOrder
@@ -458,18 +448,15 @@ export function EntityDataTable<TItem extends IHasID>({
     });
   };
 
-  // ── Column filters state (unused but required by type) ─────────────────────
-  const [columnFilters] = useState<ColumnFiltersState>([]);
-
   // ── Table instance ─────────────────────────────────────────────────────────
-  const table = useReactTable<TItem>({
+  const table = useTable({
+    features: entityTableFeatures,
     data: items,
     columns,
     state: {
       sorting,
       rowSelection,
       columnVisibility: effectiveColumnVisibility,
-      columnFilters,
       columnOrder,
     },
     manualSorting: true,
@@ -478,7 +465,6 @@ export function EntityDataTable<TItem extends IHasID>({
     onRowSelectionChange,
     onColumnVisibilityChange,
     onColumnOrderChange,
-    getCoreRowModel: getCoreRowModel(),
     getRowId: (row) => row.id,
   });
 

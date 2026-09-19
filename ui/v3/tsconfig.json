@@ -16,11 +16,12 @@
     "isolatedModules": true,
     "noFallthroughCasesInSwitch": true,
     "useDefineForClassFields": true,
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"],
+      "src/*": ["./src/*"]
     },
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    "allowImportingTsExtensions": true
   },
   "include": ["src"]
 }

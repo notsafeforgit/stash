@@ -4,7 +4,7 @@ import viteCompression from "vite-plugin-compression";
 import tailwindcss from "@tailwindcss/vite";
 import { TanStackRouterVite } from "@tanstack/router-plugin/vite";
 import { VitePWA } from "vite-plugin-pwa";
-import { collectOfflineAssets } from "./scripts/offline-assets";
+import { collectOfflineAssets } from "./scripts/offline-assets.ts";
 
 const sourcemap = process.env.VITE_APP_SOURCEMAPS === "true";
 const offlineAssets = new Set<string>();

@@ -32,7 +32,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
         with:
-          package_json_file: ui/v2.5/package.json
+          package_json_file: ui/v3/package.json
       - uses: actions/setup-node@v6
         with:
           node-version: "24"

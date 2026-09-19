@@ -46,7 +46,7 @@ function DetailRouteError({ error, reset }: ErrorComponentProps) {
     <CollectionDetailLayout title="" onBack={goBack}>
       <DetailSidebarBack onBack={goBack} />
       <QueryError
-        error={error}
+        error={error instanceof Error ? error : new Error(String(error))}
         retrying={retrying}
         retry={async () => {
           await router.invalidate();

@@ -55,7 +55,15 @@ const tags: MockedResponse<GQL.FindTagsQuery, GQL.FindTagsQueryVariables> = {
   request: { query: GQL.FindTagsDocument, variables: () => true },
   delay: 0,
   maxUsageCount: Infinity,
-  result: { data: { findTags: { count: 1, tags: [markerTag] } } },
+  result: {
+    data: {
+      findTags: {
+        __typename: "FindTagsResultType",
+        count: 1,
+        tags: [markerTag],
+      },
+    },
+  },
 };
 function save(variables: GQL.SceneMarkerCreateMutationVariables) {
   savedMarker = {

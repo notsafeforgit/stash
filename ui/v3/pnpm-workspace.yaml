@@ -1,0 +1,52 @@
+allowBuilds:
+  esbuild: false
+  msw: false
+
+# Exact versions reviewed in the 2026-09-19 refresh, published within 24 hours.
+minimumReleaseAgeExclude:
+  - '@apollo/client@4.3.1'
+  - '@asamuzakjp/dom-selector@9.2.0'
+  - '@babel/parser@7.29.9'
+  - '@babel/plugin-transform-typescript@7.29.9'
+  - '@formatjs/intl@6.1.1'
+  - '@rollup/rollup-android-arm-eabi@4.63.4'
+  - '@rollup/rollup-android-arm64@4.63.4'
+  - '@rollup/rollup-darwin-arm64@4.63.4'
+  - '@rollup/rollup-darwin-x64@4.63.4'
+  - '@rollup/rollup-freebsd-arm64@4.63.4'
+  - '@rollup/rollup-freebsd-x64@4.63.4'
+  - '@rollup/rollup-linux-arm-gnueabihf@4.63.4'
+  - '@rollup/rollup-linux-arm-musleabihf@4.63.4'
+  - '@rollup/rollup-linux-arm64-gnu@4.63.4'
+  - '@rollup/rollup-linux-arm64-musl@4.63.4'
+  - '@rollup/rollup-linux-loong64-gnu@4.63.4'
+  - '@rollup/rollup-linux-loong64-musl@4.63.4'
+  - '@rollup/rollup-linux-ppc64-gnu@4.63.4'
+  - '@rollup/rollup-linux-ppc64-musl@4.63.4'
+  - '@rollup/rollup-linux-riscv64-gnu@4.63.4'
+  - '@rollup/rollup-linux-riscv64-musl@4.63.4'
+  - '@rollup/rollup-linux-s390x-gnu@4.63.4'
+  - '@rollup/rollup-linux-x64-gnu@4.63.4'
+  - '@rollup/rollup-linux-x64-musl@4.63.4'
+  - '@rollup/rollup-openbsd-x64@4.63.4'
+  - '@rollup/rollup-openharmony-arm64@4.63.4'
+  - '@rollup/rollup-win32-arm64-msvc@4.63.4'
+  - '@rollup/rollup-win32-ia32-msvc@4.63.4'
+  - '@rollup/rollup-win32-x64-gnu@4.63.4'
+  - '@rollup/rollup-win32-x64-msvc@4.63.4'
+  - '@types/node@24.13.6 || 26.6.2'
+  - electron-to-chromium@1.5.433
+  - eslint@10.11.0
+  - intl-messageformat@12.1.1
+  - lru-cache@11.5.3
+  - react-intl@12.1.1
+  - rollup@4.63.4
+  - systeminformation@5.33.12
+  - regjsparser@0.13.3
+  - which-typed-array@1.1.24
+
+# RC.2 pins an older playback engine; keep its security fixes.
+overrides:
+  "@videojs/hlsjs-video@10.0.0-rc.2>hls.js": 1.7.3
+  "unplugin>esbuild": ^0.28.1
+  "tsx>esbuild": ^0.28.1

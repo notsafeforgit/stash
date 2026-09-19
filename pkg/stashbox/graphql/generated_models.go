@@ -1614,7 +1614,7 @@ func (e *BreastTypeEnum) UnmarshalGQL(v any) error {
 }
 
 func (e BreastTypeEnum) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *BreastTypeEnum) UnmarshalJSON(b []byte) error {
@@ -1690,7 +1690,7 @@ func (e *CriterionModifier) UnmarshalGQL(v any) error {
 }
 
 func (e CriterionModifier) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *CriterionModifier) UnmarshalJSON(b []byte) error {
@@ -1747,7 +1747,7 @@ func (e *DateAccuracyEnum) UnmarshalGQL(v any) error {
 }
 
 func (e DateAccuracyEnum) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *DateAccuracyEnum) UnmarshalJSON(b []byte) error {
@@ -1804,7 +1804,7 @@ func (e *EditSortEnum) UnmarshalGQL(v any) error {
 }
 
 func (e EditSortEnum) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *EditSortEnum) UnmarshalJSON(b []byte) error {
@@ -1871,7 +1871,7 @@ func (e *EthnicityEnum) UnmarshalGQL(v any) error {
 }
 
 func (e EthnicityEnum) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *EthnicityEnum) UnmarshalJSON(b []byte) error {
@@ -1940,7 +1940,7 @@ func (e *EthnicityFilterEnum) UnmarshalGQL(v any) error {
 }
 
 func (e EthnicityFilterEnum) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *EthnicityFilterEnum) UnmarshalJSON(b []byte) error {
@@ -2003,7 +2003,7 @@ func (e *EyeColorEnum) UnmarshalGQL(v any) error {
 }
 
 func (e EyeColorEnum) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *EyeColorEnum) UnmarshalJSON(b []byte) error {
@@ -2060,7 +2060,7 @@ func (e *FavoriteFilter) UnmarshalGQL(v any) error {
 }
 
 func (e FavoriteFilter) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *FavoriteFilter) UnmarshalJSON(b []byte) error {
@@ -2117,7 +2117,7 @@ func (e *FingerprintAlgorithm) UnmarshalGQL(v any) error {
 }
 
 func (e FingerprintAlgorithm) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *FingerprintAlgorithm) UnmarshalJSON(b []byte) error {
@@ -2177,7 +2177,7 @@ func (e *FingerprintSubmissionType) UnmarshalGQL(v any) error {
 }
 
 func (e FingerprintSubmissionType) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *FingerprintSubmissionType) UnmarshalJSON(b []byte) error {
@@ -2240,7 +2240,7 @@ func (e *GenderEnum) UnmarshalGQL(v any) error {
 }
 
 func (e GenderEnum) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *GenderEnum) UnmarshalJSON(b []byte) error {
@@ -2305,7 +2305,7 @@ func (e *GenderFilterEnum) UnmarshalGQL(v any) error {
 }
 
 func (e GenderFilterEnum) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *GenderFilterEnum) UnmarshalJSON(b []byte) error {
@@ -2376,7 +2376,7 @@ func (e *HairColorEnum) UnmarshalGQL(v any) error {
 }
 
 func (e HairColorEnum) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *HairColorEnum) UnmarshalJSON(b []byte) error {
@@ -2435,7 +2435,7 @@ func (e *ModAuditActionEnum) UnmarshalGQL(v any) error {
 }
 
 func (e ModAuditActionEnum) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *ModAuditActionEnum) UnmarshalJSON(b []byte) error {
@@ -2510,7 +2510,7 @@ func (e *NotificationEnum) UnmarshalGQL(v any) error {
 }
 
 func (e NotificationEnum) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *NotificationEnum) UnmarshalJSON(b []byte) error {
@@ -2565,7 +2565,7 @@ func (e *NotificationLevel) UnmarshalGQL(v any) error {
 }
 
 func (e NotificationLevel) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *NotificationLevel) UnmarshalJSON(b []byte) error {
@@ -2624,7 +2624,7 @@ func (e *OperationEnum) UnmarshalGQL(v any) error {
 }
 
 func (e OperationEnum) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *OperationEnum) UnmarshalJSON(b []byte) error {
@@ -2695,7 +2695,7 @@ func (e *PerformerSortEnum) UnmarshalGQL(v any) error {
 }
 
 func (e PerformerSortEnum) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *PerformerSortEnum) UnmarshalJSON(b []byte) error {
@@ -2770,7 +2770,7 @@ func (e *RoleEnum) UnmarshalGQL(v any) error {
 }
 
 func (e RoleEnum) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *RoleEnum) UnmarshalJSON(b []byte) error {
@@ -2835,7 +2835,7 @@ func (e *SceneSortEnum) UnmarshalGQL(v any) error {
 }
 
 func (e SceneSortEnum) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *SceneSortEnum) UnmarshalJSON(b []byte) error {
@@ -2890,7 +2890,7 @@ func (e *SortDirectionEnum) UnmarshalGQL(v any) error {
 }
 
 func (e SortDirectionEnum) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *SortDirectionEnum) UnmarshalJSON(b []byte) error {
@@ -2947,7 +2947,7 @@ func (e *StudioSortEnum) UnmarshalGQL(v any) error {
 }
 
 func (e StudioSortEnum) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *StudioSortEnum) UnmarshalJSON(b []byte) error {
@@ -3004,7 +3004,7 @@ func (e *TagGroupEnum) UnmarshalGQL(v any) error {
 }
 
 func (e TagGroupEnum) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *TagGroupEnum) UnmarshalJSON(b []byte) error {
@@ -3061,7 +3061,7 @@ func (e *TagSortEnum) UnmarshalGQL(v any) error {
 }
 
 func (e TagSortEnum) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *TagSortEnum) UnmarshalJSON(b []byte) error {
@@ -3120,7 +3120,7 @@ func (e *TargetTypeEnum) UnmarshalGQL(v any) error {
 }
 
 func (e TargetTypeEnum) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *TargetTypeEnum) UnmarshalJSON(b []byte) error {
@@ -3183,7 +3183,7 @@ func (e *UserChangeEmailStatus) UnmarshalGQL(v any) error {
 }
 
 func (e UserChangeEmailStatus) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *UserChangeEmailStatus) UnmarshalJSON(b []byte) error {
@@ -3242,7 +3242,7 @@ func (e *UserVotedFilterEnum) UnmarshalGQL(v any) error {
 }
 
 func (e UserVotedFilterEnum) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *UserVotedFilterEnum) UnmarshalJSON(b []byte) error {
@@ -3299,7 +3299,7 @@ func (e *ValidSiteTypeEnum) UnmarshalGQL(v any) error {
 }
 
 func (e ValidSiteTypeEnum) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *ValidSiteTypeEnum) UnmarshalJSON(b []byte) error {
@@ -3364,7 +3364,7 @@ func (e *VoteStatusEnum) UnmarshalGQL(v any) error {
 }
 
 func (e VoteStatusEnum) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *VoteStatusEnum) UnmarshalJSON(b []byte) error {
@@ -3427,7 +3427,7 @@ func (e *VoteTypeEnum) UnmarshalGQL(v any) error {
 }
 
 func (e VoteTypeEnum) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *VoteTypeEnum) UnmarshalJSON(b []byte) error {

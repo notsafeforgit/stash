@@ -14,6 +14,30 @@ function mergeField(key: string) {
 }
 
 const performer: PerformerDataFragment = {
+  __typename: "Performer",
+  disambiguation: null,
+  urls: [],
+  gender: null,
+  birthdate: null,
+  death_date: null,
+  ethnicity: null,
+  country: null,
+  eye_color: null,
+  hair_color: null,
+  height_cm: null,
+  weight: null,
+  measurements: null,
+  fake_tits: null,
+  penis_length: null,
+  circumcised: null,
+  career_start: null,
+  career_end: null,
+  tattoos: null,
+  piercings: null,
+  rating100: null,
+  o_counter: null,
+  details: null,
+  image_path: null,
   id: "1",
   name: "Name",
   favorite: false,
@@ -90,6 +114,7 @@ describe("performer merge fields", () => {
       {
         stash_ids: [
           {
+            __typename: "StashID",
             endpoint: "https://shared.example/graphql",
             stash_id: "destination-id",
             updated_at: "2026-01-01T00:00:00Z",
@@ -99,11 +124,13 @@ describe("performer merge fields", () => {
       {
         stash_ids: [
           {
+            __typename: "StashID",
             endpoint: "https://shared.example/graphql",
             stash_id: "source-conflict",
             updated_at: "2026-01-02T00:00:00Z",
           },
           {
+            __typename: "StashID",
             endpoint: "https://source.example/graphql",
             stash_id: "source-id",
             updated_at: "2026-01-03T00:00:00Z",

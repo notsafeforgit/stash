@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.4.16/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.5.14/schema.json",
   "json": {
     "parser": {
       "allowComments": true
@@ -23,6 +23,7 @@
       "!.tanstack",
       "!.vite",
       "!src/core/generated-graphql.ts",
+      "!src/core/generated-schema.ts",
       "!src/routeTree.gen.ts",
       "!src/locales/*.json"
     ]
@@ -38,13 +39,13 @@
       "types": "recommended"
     },
     "rules": {
-      "recommended": true,
-      "a11y": { "recommended": true },
+      "preset": "recommended",
+      "a11y": { "preset": "recommended" },
       "complexity": {
-        "recommended": true
+        "preset": "recommended"
       },
       "correctness": {
-        "recommended": true,
+        "preset": "recommended",
         "useExhaustiveDependencies": {
           "level": "warn",
           "options": {
@@ -53,13 +54,13 @@
         }
       },
       "performance": {
-        "recommended": true
+        "preset": "recommended"
       },
       "security": {
-        "recommended": true
+        "preset": "recommended"
       },
       "style": {
-        "recommended": true,
+        "preset": "recommended",
         "noCommonJs": "warn",
         "noNonNullAssertion": "off",
         "noParameterAssign": "warn",
@@ -70,7 +71,7 @@
         "useTemplate": "off"
       },
       "suspicious": {
-        "recommended": true,
+        "preset": "recommended",
         "noArrayIndexKey": "off",
         "noDuplicateProperties": "warn",
         "noExplicitAny": "warn",

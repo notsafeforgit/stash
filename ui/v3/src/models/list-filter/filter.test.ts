@@ -18,37 +18,34 @@ function titleFilter(mode: FilterMode, title: string) {
   return filter;
 }
 
-it.each([
-  "ASCII",
-  "café",
-  "Ã©",
-  "日本語 🎬",
-])("round trips filter URLs and saved filters for %s", (title) => {
-  const original = titleFilter(FilterMode.Scenes, title);
-  expect(original.count()).toBe(1);
-  const encoded = original.getEncodedParams().fa;
-  expect(encoded).toMatch(/^u\./);
-  const restored = new ListFilterModel(FilterMode.Scenes);
-  restored.configureFromDecodedParams({ fa: encoded ?? undefined });
-  expect(restored.makeFilterAST()).toEqual(original.makeFilterAST());
-  const saved = new ListFilterModel(FilterMode.Scenes);
-  saved.configureFromSavedFilter({ filter_ast: restored.makeFilterAst() });
-  expect(saved.makeFilterAST()).toEqual(original.makeFilterAST());
-  if (title !== "日本語 🎬" && encoded) {
-    const legacy = btoa(JSON.stringify(decodeURLJSON(encoded)));
-    restored.configureFromDecodedParams({ fa: legacy });
+it.each(["ASCII", "café", "Ã©", "日本語 🎬"])(
+  "round trips filter URLs and saved filters for %s",
+  (title) => {
+    const original = titleFilter(FilterMode.Scenes, title);
+    expect(original.count()).toBe(1);
+    const encoded = original.getEncodedParams().fa;
+    expect(encoded).toMatch(/^u\./);
+    const restored = new ListFilterModel(FilterMode.Scenes);
+    restored.configureFromDecodedParams({ fa: encoded ?? undefined });
     expect(restored.makeFilterAST()).toEqual(original.makeFilterAST());
-  }
-});
+    const saved = new ListFilterModel(FilterMode.Scenes);
+    saved.configureFromSavedFilter({ filter_ast: restored.makeFilterAst() });
+    expect(saved.makeFilterAST()).toEqual(original.makeFilterAST());
+    if (title !== "日本語 🎬" && encoded) {
+      const legacy = btoa(JSON.stringify(decodeURLJSON(encoded)));
+      restored.configureFromDecodedParams({ fa: legacy });
+      expect(restored.makeFilterAST()).toEqual(original.makeFilterAST());
+    }
+  },
+);
 
-it.each([
-  "u.%%%",
-  "u.e30",
-  "not-base64",
-])("fails closed for malformed filters: %s", (fa) => {
-  const filter = new ListFilterModel(FilterMode.Scenes);
-  expect(() => filter.configureFromDecodedParams({ fa })).toThrow();
-});
+it.each(["u.%%%", "u.e30", "not-base64"])(
+  "fails closed for malformed filters: %s",
+  (fa) => {
+    const filter = new ListFilterModel(FilterMode.Scenes);
+    expect(() => filter.configureFromDecodedParams({ fa })).toThrow();
+  },
+);
 
 it("round trips production dates through saved filters, URLs and query criteria", () => {
   const original = new ListFilterModel(FilterMode.Scenes);

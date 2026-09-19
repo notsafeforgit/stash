@@ -1,18 +1,18 @@
 import type React from "react";
-import type { Column } from "@tanstack/react-table";
+import type { EntityColumn as Column } from "@/components/list/entity-table";
 import { ArrowUpDown } from "lucide-react";
 import { Button } from "src/components/ui/button";
 import { cn } from "src/lib/utils";
 import { SortDirectionEnum } from "src/core/generated-graphql";
 import { getSortDirectionIcon } from "./sort-icon";
 
-interface DataTableColumnHeaderProps<TData, TValue>
+interface DataTableColumnHeaderProps<TData extends object, TValue>
   extends React.HTMLAttributes<HTMLDivElement> {
   column: Column<TData, TValue>;
   title: string;
 }
 
-export function DataTableColumnHeader<TData, TValue>({
+export function DataTableColumnHeader<TData extends object, TValue>({
   column,
   title,
   className,

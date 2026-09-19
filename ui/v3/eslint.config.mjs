@@ -8,6 +8,7 @@ export default [
     ignores: [
       "**/*.gen.*",
       "src/core/generated-graphql.ts",
+      "src/core/generated-schema.ts",
       "**/*.test.*",
       "**/*.d.ts",
     ],

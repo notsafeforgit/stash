@@ -21,6 +21,9 @@ export default defineConfig({
   use: {
     baseURL: origin,
     trace: "retain-on-failure",
+    // Background Fetch needs Chromium's full browser download service; the
+    // minimal headless shell leaves browser-managed downloads unfinished.
+    ...(browserName === "chromium" && !websocket && { channel: "chromium" }),
     ...(websocket &&
       browserName === "chromium" && {
         connectOptions: { wsEndpoint: `${websocket}?launch=${launch}` },

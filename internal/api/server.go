@@ -27,7 +27,6 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/go-chi/httplog"
-	"github.com/gorilla/websocket"
 	"github.com/vearutop/statigz"
 	"github.com/vektah/gqlparser/v2/ast"
 
@@ -225,14 +224,7 @@ func Initialize() (*Server, error) {
 
 	gqlSrv := gqlHandler.New(NewExecutableSchema(Config{Resolvers: resolver}))
 	gqlSrv.SetRecoverFunc(recoverFunc)
-	gqlSrv.AddTransport(gqlTransport.Websocket{
-		Upgrader: websocket.Upgrader{
-			CheckOrigin: func(r *http.Request) bool {
-				return true
-			},
-		},
-		KeepAlivePingInterval: 10 * time.Second,
-	})
+	gqlSrv.AddTransport(graphQLWebsocketTransport())
 	gqlSrv.AddTransport(gqlTransport.Options{})
 	gqlSrv.AddTransport(gqlTransport.GET{})
 	gqlSrv.AddTransport(gqlTransport.POST{})

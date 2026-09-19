@@ -86,7 +86,15 @@ const studioMock: MockedResponse<
   request: { query: GQL.FindStudiosDocument, variables: () => true },
   result: (variables) => {
     window.homeFixtureQueries.push(variables.filter?.sort ?? "studios");
-    return { data: { findStudios: { count: studios.length, studios } } };
+    return {
+      data: {
+        findStudios: {
+          __typename: "FindStudiosResultType",
+          count: studios.length,
+          studios,
+        },
+      },
+    };
   },
   delay: 150,
   maxUsageCount: Number.POSITIVE_INFINITY,

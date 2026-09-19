@@ -44,30 +44,32 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-it.each([
-  false,
-  true,
-])("keeps the transcode lease alive beyond the idle timeout with paused=%s", async (paused) => {
-  vi.spyOn(HTMLMediaElement.prototype, "paused", "get").mockReturnValue(paused);
-  let lastContact = Date.now();
-  fetchMock.mockImplementation(async () => {
-    lastContact = Date.now();
-    return new Response(null, { status: 204 });
-  });
-  await act(async () => root.render(<Session />));
-  // A fast connection can fill more than a minute of buffer. Playing from
-  // that buffer makes no segment requests, but still owns the transcode.
-  for (let elapsed = 0; elapsed < 90000; elapsed += 15000) {
-    await act(async () => vi.advanceTimersByTime(15000));
-    expect(Date.now() - lastContact).toBeLessThan(60000);
-  }
-  expect(fetchMock).toHaveBeenCalledWith(
-    expect.stringContaining(
-      "/scene/1/streams.keepalive?keep_type=hls&keep_resolution=LOW",
-    ),
-    { method: "POST", keepalive: true },
-  );
-});
+it.each([false, true])(
+  "keeps the transcode lease alive beyond the idle timeout with paused=%s",
+  async (paused) => {
+    vi.spyOn(HTMLMediaElement.prototype, "paused", "get").mockReturnValue(
+      paused,
+    );
+    let lastContact = Date.now();
+    fetchMock.mockImplementation(async () => {
+      lastContact = Date.now();
+      return new Response(null, { status: 204 });
+    });
+    await act(async () => root.render(<Session />));
+    // A fast connection can fill more than a minute of buffer. Playing from
+    // that buffer makes no segment requests, but still owns the transcode.
+    for (let elapsed = 0; elapsed < 90000; elapsed += 15000) {
+      await act(async () => vi.advanceTimersByTime(15000));
+      expect(Date.now() - lastContact).toBeLessThan(60000);
+    }
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "/scene/1/streams.keepalive?keep_type=hls&keep_resolution=LOW",
+      ),
+      { method: "POST", keepalive: true },
+    );
+  },
+);
 
 it("suspends heartbeats while hidden and renews immediately on return", async () => {
   await act(async () => root.render(<Session />));

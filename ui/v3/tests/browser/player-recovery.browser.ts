@@ -6,12 +6,15 @@ test("a quality change loads at the marker playhead without narrowing its range"
 }) => {
   await serveSceneMedia(page);
   const fragments: number[] = [];
-  await page.route("**/media/hls/segment-*.m4s", async (route) => {
-    const match = /segment-(\d+)\.m4s/.exec(route.request().url());
-    if (!match) throw new Error("Missing fragment index");
-    fragments.push(Number(match[1]));
-    await route.fallback();
-  });
+  await page.route(
+    /\/media\/hls\/segment-\d+\.m4s(?:\?.*)?$/,
+    async (route) => {
+      const match = /segment-(\d+)\.m4s/.exec(route.request().url());
+      if (!match) throw new Error("Missing fragment index");
+      fragments.push(Number(match[1]));
+      await route.fallback();
+    },
+  );
   await page.goto("/tv-fixture/tv?paused&markers&long-marker");
   const video = page.locator("video");
   const slider = page.getByRole("slider", { name: "Playback position" });
@@ -66,17 +69,20 @@ for (const marker of [false, true]) {
       }
       await route.fallback();
     });
-    await page.route("**/media/hls/segment-*.m4s", async (route) => {
-      const match = /segment-(\d+)\.m4s/.exec(route.request().url());
-      if (!match) throw new Error("Missing fragment index");
-      const index = Number(match[1]);
-      if (recovering) recoveredFragments.push(index);
-      else if (index === 3)
-        await new Promise<void>((resolve) => {
-          release = resolve;
-        });
-      await route.fallback();
-    });
+    await page.route(
+      /\/media\/hls\/segment-\d+\.m4s(?:\?.*)?$/,
+      async (route) => {
+        const match = /segment-(\d+)\.m4s/.exec(route.request().url());
+        if (!match) throw new Error("Missing fragment index");
+        const index = Number(match[1]);
+        if (recovering) recoveredFragments.push(index);
+        else if (index === 3)
+          await new Promise<void>((resolve) => {
+            release = resolve;
+          });
+        await route.fallback();
+      },
+    );
     try {
       await page.goto(
         `/tv-fixture/tv?low${marker ? "&markers&long-marker" : ""}`,

@@ -26,26 +26,29 @@ it.each([
   [null, "Unknown 10-bit", null],
   ["unspecified", "Unknown 10-bit", null],
   ["unknown", "Unknown 10-bit", null],
-])("displays %s from the transfer, never bit depth alone", async (transfer, label, detail) => {
-  await act(async () =>
-    root.render(
-      <IntlProvider locale="en">
-        <dl>
-          <MediaColorMetaRows
-            file={{ bit_depth: 10, color_transfer: transfer }}
-            expanded
-          />
-        </dl>
-      </IntlProvider>,
-    ),
-  );
-  expect(container.querySelector("dd")?.textContent).toBe(label);
-  const rows = Array.from(container.querySelectorAll("dl > div"));
-  const transferRow = rows.find(
-    (row) => row.querySelector("dt")?.textContent === "Transfer",
-  );
-  expect(transferRow?.querySelector("dd")?.textContent ?? null).toBe(detail);
-});
+])(
+  "displays %s from the transfer, never bit depth alone",
+  async (transfer, label, detail) => {
+    await act(async () =>
+      root.render(
+        <IntlProvider locale="en">
+          <dl>
+            <MediaColorMetaRows
+              file={{ bit_depth: 10, color_transfer: transfer }}
+              expanded
+            />
+          </dl>
+        </IntlProvider>,
+      ),
+    );
+    expect(container.querySelector("dd")?.textContent).toBe(label);
+    const rows = Array.from(container.querySelectorAll("dl > div"));
+    const transferRow = rows.find(
+      (row) => row.querySelector("dt")?.textContent === "Transfer",
+    );
+    expect(transferRow?.querySelector("dd")?.textContent ?? null).toBe(detail);
+  },
+);
 
 it("localizes the dynamic range and bit-depth labels", async () => {
   await act(async () =>

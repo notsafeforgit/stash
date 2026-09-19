@@ -12,11 +12,8 @@ describe("URL JSON encoding", () => {
     expect(decodeURLJSON(btoa(JSON.stringify(value)))).toEqual(value);
   });
 
-  it.each([
-    "not!base64",
-    "u./w==",
-    "u.e30=garbage",
-    btoa("not json"),
-  ])("rejects invalid input %s", (value) =>
-    expect(() => decodeURLJSON(value)).toThrow());
+  it.each(["not!base64", "u./w==", "u.e30=garbage", btoa("not json")])(
+    "rejects invalid input %s",
+    (value) => expect(() => decodeURLJSON(value)).toThrow(),
+  );
 });

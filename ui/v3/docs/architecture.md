@@ -317,8 +317,8 @@ automatic activity mutations. Explicit marker, offline, and disabled scopes
 exclude server accounting. See [TV mode](tv-mode.md) for feed ownership,
 quality policy, inline presentation, and the full feature map.
 The Video.js packages are pinned together at 10.0.0-rc.2. Its split HLS adapter
-pins an older hls.js, so a version-scoped pnpm override preserves the existing
-1.6.16 engine. Reassess that override with the next adapter upgrade.
+pins an older hls.js, so a version-scoped pnpm override uses the updated
+1.7.3 engine. Reassess that override with the next adapter upgrade.
 
 | Module | Responsibility |
 | --- | --- |

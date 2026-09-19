@@ -16,3 +16,5 @@
 # Browser test artifacts
 /playwright-report
 /test-results
+
+/src/core/generated-schema.ts

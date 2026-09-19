@@ -77,7 +77,7 @@ local container after validation.
    `make validate-fork` regenerates the backend, validates v3, runs
    integration tests, and runs the CI-pinned linter without requiring a local
    install. For lint alone, use `make lint`, which executes
-   `go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4 run`.
+   `go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2 run`.
    Keep that version synchronized with `.github/workflows/golangci-lint.yml`.
    During iteration, use `make test`, `make validate-ui-v3`, and focused
    integration tests such as

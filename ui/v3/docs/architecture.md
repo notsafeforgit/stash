@@ -354,7 +354,7 @@ release. Animation deadlines and asynchronous seeks belong to their playback/loa
 obsolete work cannot resume or mute a later scene. Deferred freeze-frame JPEG
 exports are also cancelled when cleared or superseded. Loop mode restarts on the
 existing media just before the boundary (at most 5 ms or a quarter frame early),
-avoiding native EOF's decoder drain and WebKit's native-loop first-frame stalls.
+reducing the interruption from native EOF and the application's restart path.
 The deadline rechecks media time and respects pause, seeking, buffering, rate
 changes and visibility. Native EOF remains the fallback when timers run late.
 Buffered loops do not capture a frame or enter user-seek/loading feedback; a tiny
@@ -364,6 +364,15 @@ completion and EOF fallback, while auto-advance fires once. The explicit WebKit 
 resume remains necessary. Chromium/WebKit fixtures exercise the actual lightbox
 and its source machinery, but physical iPhone autoplay permission and MMS still
 need device testing.
+
+Audible Direct loops are not guaranteed to be seamless on Safari. A
+[plain-video diagnostic on macOS 26](https://github.com/notsafeforgit/stash/actions/runs/35467017314)
+measured roughly 380–400 ms between the first and next advancing frame with
+audio, versus 50–70 ms muted; physical iPhone feedback also reported smoother
+muted loops. Native `loop`, early seeking, `fastSeek`, a small positive seek
+target and temporary muting did not reliably remove the audible delay.
+[Routing through Web Audio](https://github.com/notsafeforgit/stash/actions/runs/35467312555)
+also retained it. Linux browser checks do not establish this Apple media behavior.
 
 Freeze-frame canvases start with a minimal backing buffer. Texture allocation
 and synchronous GPU readback wait for playable video data, a paint and idle time

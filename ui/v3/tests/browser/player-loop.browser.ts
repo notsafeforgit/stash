@@ -9,6 +9,7 @@ const cases = [
   { mode: "lightbox", hls: true },
   { mode: "TV", hls: true },
   { mode: "marker lightbox", hls: true },
+  { mode: "marker lightbox", hls: true, background: true },
   { mode: "lightbox", hls: false, rate: 2 },
   { mode: "lightbox", hls: false, background: true },
 ] as const;
@@ -17,11 +18,16 @@ for (const scenario of cases) {
   const { mode, hls } = scenario;
   const rate = "rate" in scenario ? scenario.rate : 1;
   const background = "background" in scenario;
+  const markerEof = mode === "marker lightbox" && background;
   test(`${mode} ${hls ? "HLS" : "Direct"} loops in place at ${rate}×${background ? " with the EOF fallback" : ""}`, async ({
     page,
   }, testInfo) => {
     test.setTimeout(45000);
-    await serveSceneMedia(page);
+    // The encoded marker ends before its metadata boundary, so the fallback
+    // must handle actual native EOF instead of the range's timeupdate gate.
+    await serveSceneMedia(page, "landscape", {
+      clipEnd: markerEof ? 8 : undefined,
+    });
     if (!hls)
       await page.route("**/scene/*/stream", async (route) => {
         // Reordered frames exercise the Direct native-loop failure in WebKit.
@@ -40,7 +46,7 @@ for (const scenario of cases) {
       mode === "TV"
         ? `/tv-fixture/tv?loop${hls ? "&low" : ""}`
         : mode === "marker lightbox"
-          ? "/scene-lightbox?mode=markers"
+          ? `/scene-lightbox?mode=markers${markerEof ? "&late-marker-end" : ""}`
           : mode === "lightbox"
             ? `/scene-lightbox${hls ? "?mode=hls" : ""}`
             : `/scene-detail?landscape&short${hls ? "&hls" : ""}`,
@@ -66,19 +72,26 @@ for (const scenario of cases) {
         loops: [] as {
           lastTime: number;
           firstTime: number;
+          missedFrames: number;
           wall: number;
           gapMs: number;
           firstFrameMs: number | null;
           progressing: boolean;
         }[],
       };
-      let previous: { wall: number; media: number } | undefined;
+      let previous:
+        | { wall: number; media: number; presentedFrames: number }
+        | undefined;
       const frame = (now: number, metadata: VideoFrameCallbackMetadata) => {
         const media = metadata.mediaTime;
         if (previous && media < previous.media - 0.5)
           data.loops.push({
             lastTime: previous.media,
             firstTime: media,
+            missedFrames: Math.max(
+              0,
+              metadata.presentedFrames - previous.presentedFrames - 1,
+            ),
             wall: now,
             gapMs: now - previous.wall,
             firstFrameMs: null,
@@ -89,7 +102,11 @@ for (const scenario of cases) {
           loop.firstFrameMs ??= now - loop.wall;
           if (media > loop.firstTime + 0.5) loop.progressing = true;
         }
-        previous = { wall: now, media };
+        previous = {
+          wall: now,
+          media,
+          presentedFrames: metadata.presentedFrames,
+        };
         v.requestVideoFrameCallback(frame);
       };
       v.requestVideoFrameCallback(frame);
@@ -117,10 +134,11 @@ for (const scenario of cases) {
       contentType: "application/json",
     });
     for (const loop of data.loops.filter((loop) => loop.progressing)) {
-      // Frame callbacks can miss a presentation under load. Allow the same
-      // few-frame tolerance at the beginning and end of the media.
+      // All fixtures are 30 fps. A callback can miss frames the compositor
+      // presented under load; use its counter instead of assuming the first
+      // observed frame was the first displayed frame after the loop.
       expect(loop.lastTime).toBeGreaterThan(data.duration - 0.15);
-      expect(loop.firstTime).toBeLessThan(0.15);
+      expect(loop.firstTime).toBeLessThan(0.15 + loop.missedFrames / 30);
       // The background fallback restarts a decoder that has reached EOF.
       // Keep the visible transition budget on the foreground path, and
       // check that both paths advance promptly after their first frame.
@@ -131,7 +149,10 @@ for (const scenario of cases) {
     expect(data.events.filter((event) => event === "seeking").length).toBe(
       data.loops.length,
     );
-    if (background) expect(data.events).toContain("ended");
+    if (background)
+      expect(data.events.filter((event) => event === "ended").length).toBe(
+        data.loops.length,
+      );
     await expect(video).toHaveJSProperty("paused", false);
     await expect(video).toHaveJSProperty("playbackRate", rate);
     expect(

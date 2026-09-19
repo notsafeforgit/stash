@@ -504,23 +504,3 @@ test("marker boundaries advance once per clip on the persistent player", async (
     await expect(video).toHaveJSProperty("muted", false);
   }
 });
-
-test("a marker loop resumes at the clip start even after native EOF pauses the element", async ({
-  page,
-}) => {
-  await page.addInitScript(() =>
-    localStorage.setItem("stash-lightbox-loop", "true"),
-  );
-  const video = await open(page, "?mode=markers");
-  for (let iteration = 0; iteration < 2; iteration += 1) {
-    await expect(video).toHaveJSProperty("paused", false);
-    await video.evaluate((v: HTMLVideoElement) => {
-      v.currentTime = v.duration - 0.1;
-    });
-    await expect
-      .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
-      .toBeLessThan(0.5);
-    await expect(video).toHaveJSProperty("paused", false);
-    await expect(page.getByTestId("view")).toHaveText("0");
-  }
-});

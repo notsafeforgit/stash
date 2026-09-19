@@ -78,6 +78,11 @@ const entry: OfflineEntry = {
   server_status: "present",
 };
 const url = (path: string) => new URL(path, location.href).href;
+const markerEndOffset = new URLSearchParams(location.search).has(
+  "late-marker-end",
+)
+  ? 0.25
+  : 0;
 export const scenes = ["1", "2", "3", "slow"].map(
   (id): GQL.SceneDataFragment => {
     const scene = offlineEntryToSceneData(
@@ -122,7 +127,7 @@ export const scenes = ["1", "2", "3", "slow"].map(
         id: `marker-${index}`,
         title: `Marker ${index + 1}`,
         seconds,
-        end_seconds: index === 2 ? 10 : seconds + 2,
+        end_seconds: (index === 2 ? 10 : seconds + 2) + markerEndOffset,
         scene,
         primary_tag: { __typename: "Tag", id: "tag", name: "Example" },
         tags: [],

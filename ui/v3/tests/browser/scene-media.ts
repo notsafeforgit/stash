@@ -5,6 +5,7 @@ import type { Page } from "@playwright/test";
 export async function serveSceneMedia(
   page: Page,
   orientation: "landscape" | "portrait" = "landscape",
+  { clipEnd }: { clipEnd?: number } = {},
 ) {
   await page.route("**/scene/*/**", async (route) => {
     const url = new URL(route.request().url());
@@ -35,7 +36,7 @@ export async function serveSceneMedia(
         ? Math.floor(Number(url.searchParams.get("start")) / 2)
         : 0;
       const end = clipped
-        ? Math.ceil(Number(url.searchParams.get("end")) / 2)
+        ? Math.ceil((clipEnd ?? Number(url.searchParams.get("end"))) / 2)
         : 6;
       await route.fulfill({
         contentType: "application/vnd.apple.mpegurl",

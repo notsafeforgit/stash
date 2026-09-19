@@ -3,4 +3,12 @@ input EntityImageInput {
   data: String
   "Existing image ID to copy into the stored entity image."
   image_id: ID
+  "Copy a scene cover or generate a frame without changing the scene."
+  scene: SceneImageInput
+}
+
+input SceneImageInput {
+  id: ID!
+  "Scene time in seconds. Omit to copy the existing scene cover."
+  at: Float
 }

@@ -10,6 +10,9 @@ import {
   RouterProvider,
 } from "@tanstack/react-router";
 import { SceneCard } from "@/components/cards/scene-card";
+import { SceneRowContextMenu } from "@/components/cards/use-scene-context-menu";
+import { ScenePlayer } from "@/components/player/scene-player";
+import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table";
 import { MobileNavigationProvider } from "@/components/layout/mobile-navigation";
 import { Toaster } from "@/components/ui/sonner";
 import { ConfigurationProvider } from "@/hooks/config";
@@ -26,6 +29,8 @@ declare global {
       requests: string[];
       screenshots: GQL.SceneGenerateScreenshotMutationVariables[];
       generations: GQL.MetadataGenerateMutationVariables[];
+      performerUpdates: GQL.PerformerUpdateImageMutationVariables[];
+      failPerformerUpdate: boolean;
     };
   }
 }
@@ -34,10 +39,54 @@ window.coverFixture = {
   requests: [],
   screenshots: [],
   generations: [],
+  performerUpdates: [],
+  failPerformerUpdate: false,
 };
 const base = scenes[0];
 if (!base) throw new Error("Missing synthetic scene");
 const url = (path: string) => new URL(path, location.href).href;
+const performers: GQL.PerformerDataFragment[] = ["1", "2"].map((id) => ({
+  __typename: "Performer",
+  id,
+  name: `Performer ${id}`,
+  disambiguation: null,
+  image_path: url(`/covers/performer-${id}-old.jpg`),
+  urls: [],
+  gender: null,
+  birthdate: null,
+  ethnicity: null,
+  country: null,
+  eye_color: null,
+  height_cm: null,
+  measurements: null,
+  fake_tits: null,
+  penis_length: null,
+  circumcised: null,
+  career_start: null,
+  career_end: null,
+  tattoos: null,
+  piercings: null,
+  aliases: [],
+  favorite: false,
+  ignore_auto_tag: false,
+  ignore_primary_name_auto_tag: false,
+  scene_count: 1,
+  image_count: 0,
+  gallery_count: 0,
+  group_count: 0,
+  performer_count: 0,
+  o_counter: 0,
+  created_at: "2026-09-19",
+  updated_at: "2026-09-19",
+  tags: [],
+  stash_ids: [],
+  rating100: null,
+  details: null,
+  death_date: null,
+  hair_color: null,
+  weight: null,
+  custom_fields: {},
+}));
 function artwork(): Pick<GQL.SceneDataFragment, "paths" | "preview_image"> {
   const revision = window.coverFixture.finished ? "new" : "old";
   const fallback = url(`/covers/${revision}.jpg`);
@@ -64,6 +113,7 @@ const scene: GQL.SceneDataFragment = {
   ...artwork(),
   captions: [],
   scene_markers: [],
+  performers,
 };
 let streamRevision = 0;
 const detailMock: MockedResponse<
@@ -122,6 +172,39 @@ const screenshotMock: MockedResponse<
   result: (variables) => {
     window.coverFixture.screenshots.push(variables);
     return { data: { sceneGenerateScreenshot: "7" } };
+  },
+};
+const scenePerformersMock: MockedResponse<GQL.FindSceneImagePerformersQuery> = {
+  request: {
+    query: GQL.FindSceneImagePerformersDocument,
+    variables: { id: scene.id },
+  },
+  maxUsageCount: Infinity,
+  delay: 0,
+  result: () => ({
+    data: { findScene: { __typename: "Scene", id: scene.id, performers } },
+  }),
+};
+const performerImageMock: MockedResponse<
+  GQL.PerformerUpdateImageMutation,
+  GQL.PerformerUpdateImageMutationVariables
+> = {
+  request: { query: GQL.PerformerUpdateImageDocument, variables: () => true },
+  maxUsageCount: Infinity,
+  delay: 300,
+  result: (variables) => {
+    window.coverFixture.performerUpdates.push(variables);
+    if (window.coverFixture.failPerformerUpdate)
+      return { errors: [{ message: "Image update failed" }] };
+    return {
+      data: {
+        performerUpdate: {
+          __typename: "Performer",
+          id: variables.id,
+          image_path: url(`/covers/performer-${variables.id}-new.jpg`),
+        },
+      },
+    };
   },
 };
 const generateMock: MockedResponse<
@@ -214,6 +297,8 @@ const client = new ApolloClient({
       detailMock,
       listMock,
       screenshotMock,
+      scenePerformersMock,
+      performerImageMock,
       generateMock,
       jobMock,
       coversMock,
@@ -225,16 +310,59 @@ const client = new ApolloClient({
 });
 function SceneList() {
   const { data } = useQuery(GQL.FindScenesMobileDocument);
+  const { data: imageData } = useQuery(GQL.FindSceneImagePerformersDocument, {
+    variables: { id: scene.id },
+  });
+  const params = new URL(location.href).searchParams;
+  const target = params.has("performer") ? "1" : undefined;
   return (
     <div className="p-4">
       <h1>Scenes</h1>
+      {imageData?.findScene?.performers.map((performer) => (
+        <img
+          key={performer.id}
+          data-testid={`performer-image-${performer.id}`}
+          src={performer.image_path ?? undefined}
+          alt={performer.name}
+          width={48}
+          height={48}
+        />
+      ))}
       <div className="max-w-80" data-testid="scene-card">
         {data?.findScenes.scenes.map((item) => (
-          <SceneCard key={item.id} scene={item} />
+          <SceneCard
+            key={item.id}
+            scene={item}
+            performerImageTargetId={target}
+          />
         ))}
       </div>
+      <Table>
+        <TableBody>
+          {data?.findScenes.scenes.map((item) => (
+            <SceneRowContextMenu
+              key={item.id}
+              scene={item}
+              performerImageTargetId={target}
+            >
+              <TableRow data-testid="scene-row">
+                <TableCell>{item.title}</TableCell>
+              </TableRow>
+            </SceneRowContextMenu>
+          ))}
+        </TableBody>
+      </Table>
+      {params.has("playing") && <PlayingScene />}
     </div>
   );
+}
+function PlayingScene() {
+  const { data } = useQuery(GQL.FindSceneDocument, {
+    variables: { id: scene.id },
+  });
+  return data?.findScene ? (
+    <ScenePlayer scene={data.findScene} autostartEnabled={false} />
+  ) : null;
 }
 const root = createRootRoute({
   component: () => (

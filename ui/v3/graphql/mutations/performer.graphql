@@ -10,6 +10,13 @@ mutation PerformerUpdate($input: PerformerUpdateInput!) {
   }
 }
 
+mutation PerformerUpdateImage($id: ID!, $image: EntityImageInput!) {
+  performerUpdate(input: { id: $id, image_input: $image }) {
+    id
+    image_path
+  }
+}
+
 mutation BulkPerformerUpdate($input: BulkPerformerUpdateInput!) {
   bulkPerformerUpdate(input: $input) {
     ...PerformerData

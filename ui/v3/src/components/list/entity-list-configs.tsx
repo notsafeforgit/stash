@@ -284,6 +284,7 @@ export function useImageLightbox() {
 export function useSceneListConfig(
   onEdit: (id: string) => void,
   hidePerformers?: boolean,
+  performerImageTargetId?: string,
 ): {
   config: EntityListPageConfig<
     GQL.FindScenesQuery,
@@ -318,9 +319,10 @@ export function useSceneListConfig(
         onPreviewClick={onPreviewClick}
         onEdit={() => onEdit(scene.id)}
         hidePerformers={hidePerformers}
+        performerImageTargetId={performerImageTargetId}
       />
     ),
-    [onEdit, hidePerformers],
+    [onEdit, hidePerformers, performerImageTargetId],
   );
 
   const renderTableRow = useCallback(
@@ -331,13 +333,14 @@ export function useSceneListConfig(
     ) => (
       <SceneRowContextMenu
         scene={scene}
+        performerImageTargetId={performerImageTargetId}
         onEdit={() => onEdit(scene.id)}
         onSelectedChanged={onSelectedChanged}
       >
         {defaultRow}
       </SceneRowContextMenu>
     ),
-    [onEdit],
+    [onEdit, performerImageTargetId],
   );
 
   // Keep tableColumns inside the config hook so embedded scene lists

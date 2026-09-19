@@ -55,6 +55,7 @@ interface SceneCardProps {
   onSelectedChanged?: (selected: boolean, shiftKey: boolean) => void;
   onPreviewClick?: () => void;
   onEdit?: () => void;
+  performerImageTargetId?: string;
   zoomIndex?: number;
   hidePerformers?: boolean;
   /** Link target. Defaults to `/scenes/{id}`. Override for views that
@@ -127,6 +128,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({
   onSelectedChanged,
   onPreviewClick,
   onEdit,
+  performerImageTargetId,
   hidePerformers = false,
   destination,
   contextMenu: contextMenuOverride,
@@ -159,6 +161,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({
     scene,
     onSelectedChanged,
     onEdit,
+    performerImageTargetId,
   });
 
   const contextMenu = contextMenuOverride ?? menuContent;

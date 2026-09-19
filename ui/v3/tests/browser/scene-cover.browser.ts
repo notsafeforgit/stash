@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { expect, test as fixtureTest } from "./test";
+import { expect, holdForContextMenu, test as fixtureTest } from "./test";
 
 declare global {
   interface Window {
@@ -145,6 +145,284 @@ for (const width of [390, 1280]) {
             ).toBe(1);
           },
         );
+      }
+
+      fixtureTest(
+        "performer frame preserves playback, captures the selected time and keeps unsaved edits",
+        async ({ page }) => {
+          await page.goto("/scene-cover-fixture/scenes/1");
+          const video = page.locator("video");
+          await page
+            .locator("[data-scene-player]")
+            .getByRole("button", { name: "Play", exact: true })
+            .first()
+            .click();
+          await expect
+            .poll(() =>
+              video.evaluate(
+                (element: HTMLVideoElement) => element.currentTime,
+              ),
+            )
+            .toBeGreaterThan(0.5);
+          if (!mobile)
+            await page
+              .getByRole("button", { name: "Edit", exact: true })
+              .click();
+          const title = page.getByRole("textbox", {
+            name: "Title",
+            exact: true,
+          });
+          if (!mobile) await title.fill("Unfinished title");
+          const before = await video.evaluate((element: HTMLVideoElement) => {
+            window.coverPlayback = { video: element, events: [] };
+            for (const name of ["emptied", "loadstart", "pause", "seeking"]) {
+              element.addEventListener(name, () =>
+                window.coverPlayback.events.push(name),
+              );
+            }
+            return {
+              time: element.currentTime,
+              src: element.currentSrc,
+              requests: window.coverFixture.requests.filter(
+                (name) => name === "FindScene",
+              ).length,
+            };
+          });
+          await action(page, mobile, "Generate performer image from current");
+          const dialog = page.getByRole("dialog", {
+            name: "Set as performer image",
+          });
+          await expect(dialog).toBeVisible();
+          const selectedBefore = await video.evaluate(
+            (element: HTMLVideoElement) => element.currentTime,
+          );
+          // Choosing a performer later must not change which frame is generated.
+          await expect
+            .poll(() =>
+              video.evaluate(
+                (element: HTMLVideoElement) => element.currentTime,
+              ),
+            )
+            .toBeGreaterThan(selectedBefore + 0.75);
+          await dialog
+            .getByRole("button", { name: "Performer 2", exact: true })
+            .click();
+          await expect(dialog).not.toBeVisible();
+          const updates = await page.evaluate(
+            () => window.coverFixture.performerUpdates,
+          );
+          expect(updates).toHaveLength(1);
+          expect(updates[0]?.id).toBe("2");
+          expect(updates[0]?.image.scene?.id).toBe("1");
+          expect(updates[0]?.image.scene?.at).toBeGreaterThanOrEqual(
+            before.time,
+          );
+          expect(updates[0]?.image.scene?.at).toBeLessThanOrEqual(
+            selectedBefore,
+          );
+          await expect
+            .poll(() =>
+              video.evaluate(
+                (element: HTMLVideoElement) => element.currentTime,
+              ),
+            )
+            .toBeGreaterThan(selectedBefore + 1.5);
+          expect(
+            await video.evaluate((element: HTMLVideoElement) => ({
+              same: window.coverPlayback.video === element,
+              events: window.coverPlayback.events,
+              src: element.currentSrc,
+              paused: element.paused,
+              requests: window.coverFixture.requests.filter(
+                (name) => name === "FindScene",
+              ).length,
+              screenshots: window.coverFixture.screenshots.length,
+              generations: window.coverFixture.generations.length,
+            })),
+          ).toEqual({
+            same: true,
+            events: [],
+            src: before.src,
+            paused: false,
+            requests: before.requests,
+            screenshots: 0,
+            generations: 0,
+          });
+          if (!mobile) await expect(title).toHaveValue("Unfinished title");
+          await expect(page).toHaveURL(/\/scenes\/1/);
+        },
+      );
+
+      fixtureTest(
+        "performer frame at zero can be retried without resuming paused playback",
+        async ({ page }) => {
+          await page.goto("/scene-cover-fixture/scenes/1");
+          const video = page.locator("video");
+          await expect
+            .poll(() =>
+              video.evaluate((element: HTMLVideoElement) => element.readyState),
+            )
+            .toBeGreaterThanOrEqual(2);
+          await page.evaluate(() => {
+            window.coverFixture.failPerformerUpdate = true;
+          });
+          await action(page, mobile, "Generate performer image from current");
+          const dialog = page.getByRole("dialog", {
+            name: "Set as performer image",
+          });
+          await dialog
+            .getByRole("button", { name: "Performer 1", exact: true })
+            .click();
+          await expect(
+            page.getByText("Image update failed", { exact: true }),
+          ).toBeVisible();
+          await expect(dialog).toBeVisible();
+          await page.evaluate(() => {
+            window.coverFixture.failPerformerUpdate = false;
+          });
+          await dialog
+            .getByRole("button", { name: "Performer 1", exact: true })
+            .click();
+          await expect(dialog).not.toBeVisible();
+          expect(
+            await page.evaluate(() => window.coverFixture.performerUpdates),
+          ).toEqual([
+            { id: "1", image: { scene: { id: "1", at: 0 } } },
+            { id: "1", image: { scene: { id: "1", at: 0 } } },
+          ]);
+          expect(
+            await video.evaluate((element: HTMLVideoElement) => ({
+              paused: element.paused,
+              time: element.currentTime,
+            })),
+          ).toEqual({ paused: true, time: 0 });
+        },
+      );
+
+      for (const target of ["choose", "performer"] as const) {
+        for (const view of ["card", "row"] as const) {
+          fixtureTest(
+            `scene ${view} cover updates the ${target} performer in place`,
+            async ({ page }) => {
+              await page.goto(
+                `/scene-cover-fixture/scenes?playing${target === "performer" ? "&performer" : ""}`,
+              );
+              const video = page.locator("video");
+              await page
+                .locator("[data-scene-player]")
+                .getByRole("button", { name: "Play", exact: true })
+                .first()
+                .click();
+              await expect
+                .poll(() =>
+                  video.evaluate(
+                    (element: HTMLVideoElement) => element.currentTime,
+                  ),
+                )
+                .toBeGreaterThan(0.5);
+              const before = await video.evaluate(
+                (element: HTMLVideoElement) => {
+                  window.coverPlayback = { video: element, events: [] };
+                  for (const name of [
+                    "emptied",
+                    "loadstart",
+                    "pause",
+                    "seeking",
+                  ]) {
+                    element.addEventListener(name, () =>
+                      window.coverPlayback.events.push(name),
+                    );
+                  }
+                  return {
+                    time: element.currentTime,
+                    src: element.currentSrc,
+                    requests: window.coverFixture.requests.filter(
+                      (name) => name === "FindScene",
+                    ).length,
+                  };
+                },
+              );
+              const source =
+                view === "card"
+                  ? page
+                      .getByTestId("scene-card")
+                      .locator('[data-slot="context-menu-trigger"]')
+                  : page.getByTestId("scene-row");
+              const firstImage = page.getByTestId("performer-image-1");
+              const secondImage = page.getByTestId("performer-image-2");
+              await expect(firstImage).toHaveAttribute(
+                "src",
+                /performer-1-old/,
+              );
+              const menu = page.getByRole("menu");
+              if (mobile) await holdForContextMenu(source, menu);
+              else await source.click({ button: "right" });
+              await menu
+                .getByRole("menuitem", {
+                  name: "Set as performer image",
+                  exact: true,
+                })
+                .click();
+              const dialog = page.getByRole("dialog", {
+                name: "Set as performer image",
+              });
+              if (target === "choose") {
+                await dialog
+                  .getByRole("button", { name: "Performer 2", exact: true })
+                  .click();
+              } else {
+                await expect(dialog).not.toBeVisible();
+              }
+              const id = target === "choose" ? "2" : "1";
+              await expect(
+                page.getByTestId(`performer-image-${id}`),
+              ).toHaveAttribute("src", new RegExp(`performer-${id}-new`));
+              await expect(
+                target === "choose" ? firstImage : secondImage,
+              ).toHaveAttribute("src", /old\.jpg/);
+              expect(
+                await page.evaluate(() => window.coverFixture.performerUpdates),
+              ).toEqual([{ id, image: { scene: { id: "1" } } }]);
+              expect(
+                await page.evaluate(() =>
+                  window.coverFixture.requests.filter(
+                    (name) => name === "FindScenesMobile",
+                  ),
+                ),
+              ).toHaveLength(1);
+              await expect(
+                page.getByTestId("scene-card").locator("img"),
+              ).toHaveAttribute("src", /old\.jpg/);
+              await expect
+                .poll(() =>
+                  video.evaluate(
+                    (element: HTMLVideoElement) => element.currentTime,
+                  ),
+                )
+                .toBeGreaterThan(before.time + 1);
+              expect(
+                await video.evaluate((element: HTMLVideoElement) => ({
+                  same: window.coverPlayback.video === element,
+                  events: window.coverPlayback.events,
+                  src: element.currentSrc,
+                  paused: element.paused,
+                  requests: window.coverFixture.requests.filter(
+                    (name) => name === "FindScene",
+                  ).length,
+                })),
+              ).toEqual({
+                same: true,
+                events: [],
+                src: before.src,
+                paused: false,
+                requests: before.requests,
+              });
+              await expect(page).toHaveURL(
+                /\/scenes\?playing=?(?:&performer=?)?$/,
+              );
+            },
+          );
+        }
       }
 
       fixtureTest(

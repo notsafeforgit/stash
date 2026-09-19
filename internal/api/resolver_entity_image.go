@@ -31,8 +31,14 @@ func (r *mutationResolver) processEntityImageInputObject(ctx context.Context, in
 		return nil, false, nil
 	}
 
-	if input.Data != nil && input.ImageID != nil {
-		return nil, false, fmt.Errorf("data and image_id cannot both be set")
+	sources := 0
+	for _, present := range []bool{input.Data != nil, input.ImageID != nil, input.Scene != nil} {
+		if present {
+			sources++
+		}
+	}
+	if sources != 1 {
+		return nil, false, fmt.Errorf("exactly one of data, image_id or scene must be set")
 	}
 
 	if input.Data != nil {
@@ -49,7 +55,12 @@ func (r *mutationResolver) processEntityImageInputObject(ctx context.Context, in
 		return imageData, true, err
 	}
 
-	return nil, false, fmt.Errorf("one of data or image_id must be set")
+	imageData, err := r.entityImageDataFromScene(ctx, *input.Scene)
+	if err != nil {
+		return nil, true, err
+	}
+	imageData, err = r.processEntityImageBytes(ctx, imageData, false)
+	return imageData, true, err
 }
 
 func (r *mutationResolver) processEntityImageInput(ctx context.Context, imageInput string, allowHEIC bool) ([]byte, error) {

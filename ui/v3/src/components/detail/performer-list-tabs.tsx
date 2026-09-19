@@ -95,6 +95,7 @@ export function PerformerScenesTab({
   const { config, lightboxElement, lightboxOpen } = useSceneListConfig(
     setEditingId,
     true,
+    performerId,
   );
   return (
     <>

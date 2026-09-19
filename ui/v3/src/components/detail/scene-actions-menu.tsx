@@ -14,6 +14,7 @@ import {
   Send,
   Trash2,
   Undo2,
+  UserRound,
 } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
 import {
@@ -32,6 +33,7 @@ import { objectPath, objectTitle } from "src/core/files";
 import { useSceneDownloadAction } from "@/components/offline/download-action";
 import { refreshSceneCoversAfterJob } from "@/core/scene-cover-job";
 import { supportsSceneVideoRotation } from "./scene-video-rotation";
+import { useScenePerformerImage } from "./use-scene-performer-image";
 
 export interface SceneActionsMenuProps {
   scene: NonNullable<GQL.FindSceneQuery["findScene"]>;
@@ -58,6 +60,7 @@ export function SceneActionsMenu({
   const [mergeOpen, setMergeOpen] = useState(false);
   const [coverBusy, setCoverBusy] = useState(false);
   const download = useSceneDownloadAction({ scene });
+  const performerImage = useScenePerformerImage(scene.id);
 
   const [scan] = useMutation(GQL.MetadataScanDocument);
   const [generateScreenshot] = useMutation(GQL.SceneGenerateScreenshotDocument);
@@ -249,6 +252,22 @@ export function SceneActionsMenu({
     disabled: () => coverBusy || getPlayerPosition?.() === undefined,
   });
   items.push({
+    key: "performer-current-frame",
+    icon: UserRound,
+    label: intl.formatMessage({
+      id: "actions.generate_performer_image_from_current",
+      defaultMessage: "Generate performer image from current",
+    }),
+    onSelect: () => {
+      const at = getPlayerPosition?.();
+      if (at !== undefined) performerImage.setFromScene(at);
+    },
+    disabled: () =>
+      performerImage.pending ||
+      scene.performers.length === 0 ||
+      getPlayerPosition?.() === undefined,
+  });
+  items.push({
     key: "default-thumbnail",
     icon: CameraOff,
     label: intl.formatMessage({
@@ -372,6 +391,7 @@ export function SceneActionsMenu({
   return (
     <>
       <EntityActionsMenu items={items} busy={rotationPending} />
+      {performerImage.dialog}
 
       <DeleteDialog
         open={deleteOpen}

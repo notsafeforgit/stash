@@ -111,6 +111,7 @@ local container after validation.
 | `internal/api/resolver_query_bulk_custom_fields.go` + `graphql/schema/types/bulk_custom_fields.graphql` | shared/partial custom-field names for the complete bulk-edit target | low (new files) |
 | `internal/api/resolver_mutation_default_filter.go` + `internal/manager/default_filter_update.go` | atomic per-view default-filter updates | low (new files) |
 | `internal/api/json_values.go` | recursive JSON-number conversion for configuration persistence; shared helper/resolver call sites stay small | low (new file) |
+| `internal/api/resolver_entity_image*.go`, `internal/manager/scene_frame_image.go` | normalized entity images from uploads, images, scene covers or independent scene frames | low (new files) |
 | `internal/api/job_subscription.go` | cancel-aware job subscription forwarding | low (new file) |
 | `internal/api/performer_merge_*.go` | canonical-name retention and opt-in loss-aware performer merge validation | low (new files) |
 | `pkg/models/filter_ast*.go` | AST model + v2.5 compat layer | none (new files) |

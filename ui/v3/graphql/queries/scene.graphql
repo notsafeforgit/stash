@@ -186,3 +186,14 @@ query FindScenesForSelect(
     }
   }
 }
+query FindSceneImagePerformers($id: ID!) {
+  findScene(id: $id) {
+    id
+    performers {
+      id
+      name
+      disambiguation
+      image_path
+    }
+  }
+}

@@ -29,6 +29,7 @@ import { OpenInNewTabMenuItem } from "./open-in-new-tab-menu-item";
 import { SelectAllMenuItem } from "./select-all-menu-item";
 import { EntityContextMenuContent } from "./entity-context-menu-content";
 import type { SceneCardScene } from "./scene-card";
+import { useScenePerformerImage } from "@/components/detail/use-scene-performer-image";
 
 interface UseSceneContextMenuProps {
   scene: SceneCardScene;
@@ -36,6 +37,7 @@ interface UseSceneContextMenuProps {
   onSelectedChanged?: (selected: boolean, shiftKey: boolean) => void;
   /** Edit handler. When absent, falls back to navigating to the detail page. */
   onEdit?: () => void;
+  performerImageTargetId?: string;
 }
 
 /**
@@ -48,10 +50,15 @@ export function useSceneContextMenu({
   scene,
   onSelectedChanged,
   onEdit,
+  performerImageTargetId,
 }: UseSceneContextMenuProps) {
   const intl = useIntl();
   const navigate = useNavigate();
   const router = useRouter();
+  const performerImage = useScenePerformerImage(
+    scene.id,
+    performerImageTargetId,
+  );
 
   const [destroyScene] = useEntityMutation(GQL.SceneDestroyDocument);
   const [destroyScenes] = useEntityMutation(GQL.ScenesDestroyDocument);
@@ -156,6 +163,15 @@ export function useSceneContextMenu({
           <OpenInNewTabMenuItem href={`/scenes/${scene.id}`} />
           <ContextMenuSeparator />
           <ContextMenuItem
+            onClick={() => performerImage.setFromScene()}
+            disabled={performerImage.pending || !scene.paths.screenshot}
+          >
+            {intl.formatMessage({
+              id: "actions.set_as_performer_image",
+              defaultMessage: "Set as performer image",
+            })}
+          </ContextMenuItem>
+          <ContextMenuItem
             onClick={
               onEdit ??
               (() =>
@@ -202,6 +218,7 @@ export function useSceneContextMenu({
 
   const dialogs = (
     <>
+      {performerImage.dialog}
       <DeleteDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
@@ -327,6 +344,7 @@ interface SceneRowContextMenuProps {
   /** The trigger element — typically a `<TableRow>`. */
   children: React.ReactElement;
   onEdit?: () => void;
+  performerImageTargetId?: string;
   /**
    * Called when the user picks "Select" from the menu. Wires the row into
    * the same selection flow the card view uses, so picking it puts the user
@@ -346,11 +364,13 @@ export function SceneRowContextMenu({
   children,
   onEdit,
   onSelectedChanged,
+  performerImageTargetId,
 }: SceneRowContextMenuProps) {
   const { menuContent, dialogs, onContextMenuOpen } = useSceneContextMenu({
     scene,
     onEdit,
     onSelectedChanged,
+    performerImageTargetId,
   });
   return (
     <>

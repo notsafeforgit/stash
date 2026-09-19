@@ -105,8 +105,16 @@ for (const [index, label] of [
 test("visible controls accept rapid pause taps and leave their gaps available for zoom", async ({
   page,
 }) => {
+  await page.clock.install({ time: new Date("2026-01-01T00:00:00Z") });
   const { player, video, controls, surface, transform } =
     await openLightbox(page);
+  // Start with a fresh visibility interval, then advance gesture time ourselves.
+  // Protocol latency must not turn the visible-control case into an idle hide.
+  await page.clock.pauseAt(new Date("2026-01-01T00:01:00Z"));
+  await expect(controls).toHaveAttribute("inert", "");
+  await surface.tap({ position: { x: 180, y: 250 } });
+  await page.clock.runFor(350);
+  await expect(controls).not.toHaveAttribute("inert");
   const pause = controls.getByRole("button", { name: "Pause", exact: true });
   const point = await center(pause);
   const events = await video.evaluateHandle((v: HTMLVideoElement) => {
@@ -138,9 +146,11 @@ test("visible controls accept rapid pause taps and leave their gaps available fo
     { x: bottom.x - 4, y: bottom.y + bottom.height / 2 },
   ]) {
     await doubleTap(page, gap);
+    await page.clock.runFor(350);
     await expect.poll(() => scale(transform)).toBeCloseTo(2.5, 1);
     await expect(controls).not.toHaveAttribute("inert");
     await doubleTap(page, gap);
+    await page.clock.runFor(350);
     await expect.poll(() => scale(transform)).toBeCloseTo(1, 2);
     await expect(controls).not.toHaveAttribute("inert");
   }
@@ -148,5 +158,6 @@ test("visible controls accept rapid pause taps and leave their gaps available fo
   await expect(video).toHaveJSProperty("paused", false);
   // Empty-space singles still dismiss and reveal without activating buttons.
   await surface.tap({ position: { x: 180, y: 250 } });
+  await page.clock.runFor(350);
   await expect(controls).toHaveAttribute("inert", "");
 });

@@ -779,12 +779,20 @@ test.describe("desktop TV", () => {
   test("wheel momentum advances once and keyboard returns to the previous video", async ({
     page,
   }) => {
+    await page.clock.install({ time: new Date("2026-01-01T00:00:00Z") });
     await open(page);
     await expect(
       page.getByRole("button", { name: /^(Previous TV item|Next TV item)$/ }),
     ).toHaveCount(0);
     await page.mouse.move(500, 350);
-    for (let step = 0; step < 5; step++) await page.mouse.wheel(0, 120);
+    // Keep the real wheel events within one momentum gesture even when CI
+    // takes longer than the gesture's quiet interval to deliver an input.
+    await page.clock.pauseAt(new Date("2026-01-01T00:01:00Z"));
+    for (let step = 0; step < 5; step++) {
+      await page.mouse.wheel(0, 120);
+      await page.clock.runFor(16);
+    }
+    await page.clock.resume();
     await expect(page.locator("[data-scene-player]")).toHaveAttribute(
       "data-playback-key",
       /scene:2$/,

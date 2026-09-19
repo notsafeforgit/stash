@@ -109,6 +109,7 @@ export function TvTimeline({
         </span>
       </div>
       <PositionScrubber
+        key={`${scene.id}:${range.start}:${range.end}:${rotation}`}
         value={value}
         duration={duration}
         bufferedRanges={bufferedRanges}

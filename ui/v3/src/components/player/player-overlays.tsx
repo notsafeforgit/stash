@@ -234,9 +234,8 @@ export function PlaybackRangeEffect({
   end: number;
   offsetStart: number;
   loopEnabled: boolean;
-  /** Seek the player to `start`. Caller forwards to the parent's `handleSeek`
-   *  so the seek goes through the same scene-time pipeline as user-driven
-   *  scrubs (handles transcode-source offset bookkeeping). */
+  /** Restart at `start` through the scene-time source pipeline, retaining
+   *  the current media and buffer whenever possible. */
   onLoop: (start: number) => void;
   /** Advance to the next slide / scene. When omitted, reaching `end`
    *  with loop off falls through to `onStop`. */

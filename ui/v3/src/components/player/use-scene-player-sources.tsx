@@ -160,6 +160,8 @@ interface UseScenePlayerSourcesResult {
    *  default would replay from there instead of from the requested
    *  target. The src swap is in-place (no player-root remount). */
   handleRestart: (targetTrueTime: number) => void;
+  /** Automatic repeat: use the loaded media without user-seek feedback. */
+  handleLoop: (targetTrueTime: number) => void;
   retrySource: (targetTrueTime: number) => void;
   handleCanPlay: () => Promise<void>;
   /** Wire as `onLoadedMetadata` on the `<video>` element. Pins the
@@ -555,7 +557,7 @@ export function useScenePlayerSources({
   const performSeek = useCallback(
     (
       targetTime: number,
-      intent: "seek" | "restart",
+      intent: "seek" | "restart" | "loop",
       restorePaused?: boolean,
     ) => {
       if (!Number.isFinite(targetTime)) return;
@@ -586,7 +588,7 @@ export function useScenePlayerSources({
       });
       if (intent === "seek") armSeekDisplay(transition.sceneTime);
       const wasPaused =
-        intent === "restart"
+        intent !== "seek"
           ? false
           : (restorePaused ??
             preview?.wasPaused ??
@@ -625,6 +627,17 @@ export function useScenePlayerSources({
         };
       }
 
+      if (intent === "loop" && transition.kind === "seek" && video) {
+        // Stay on the loaded media and resume immediately after native EOF.
+        // Looping needs no seek overlay, preview capture, or canplay gate.
+        // In-range loops keep playing without a pause/play cycle.
+        void store.seek(transition.mediaTime).catch(() => {});
+        if (video.paused || store.state.paused)
+          void store.play().catch(() => {});
+        preview?.resumeBuffering();
+        return;
+      }
+
       if (transition.kind === "restart-engine") captureFrame();
       const finish = video
         ? beginSeekFeedback(
@@ -655,7 +668,7 @@ export function useScenePlayerSources({
       // readiness feedback never issues a delayed play that could undo a pause.
       preview?.resumeBuffering();
       if (
-        intent === "restart" ||
+        intent !== "seek" ||
         ((preview || restorePaused !== undefined) && !wasPaused)
       )
         void store.play().catch(() => {});
@@ -682,6 +695,10 @@ export function useScenePlayerSources({
   );
   const handleRestart = useCallback(
     (time: number) => performSeek(time, "restart"),
+    [performSeek],
+  );
+  const handleLoop = useCallback(
+    (time: number) => performSeek(time, "loop"),
     [performSeek],
   );
   const handleSeekPreview = useCallback(
@@ -966,6 +983,7 @@ export function useScenePlayerSources({
     handleSeekBy,
     setPendingPaused,
     handleRestart,
+    handleLoop,
     retrySource: forceRemountAt,
     handleCanPlay,
     handleLoadedMetadata,

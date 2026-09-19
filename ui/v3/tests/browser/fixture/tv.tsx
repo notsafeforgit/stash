@@ -162,7 +162,11 @@ const settings: TvSettings = {
       : params.get("window") === "random"
         ? { kind: "random", min: 2, max: 3 }
         : { kind: "full" },
-  completion: params.has("advance") ? "advance" : "normal",
+  completion: params.has("loop")
+    ? "loop"
+    : params.has("advance")
+      ? "advance"
+      : "normal",
   defaultQuality: params.has("low")
     ? { kind: "fixed", resolution: GQL.StreamingResolutionEnum.Low }
     : { kind: "best" },

@@ -11,6 +11,17 @@ export interface ClipBoundsEdit {
   onChange: (next: { start?: number | null; end?: number | null }) => void;
 }
 
+const DWELL_MS = 650;
+const DWELL_SLOP = 8;
+const MIN_WINDOW_SECONDS = 1;
+
+interface TouchScrub {
+  x: number;
+  y: number;
+  ratio: number;
+  range: PlaybackRange;
+}
+
 /** The video scrubber shared by standard controls and TV. All times are in
  * the caller's display coordinates; seeking into a scene stays at its boundary.
  * Pointer drags can preview buffered frames and commit once, including when rotated. */
@@ -48,23 +59,40 @@ export function PositionScrubber({
   const pointer = useRef<number | null>(null);
   const origin = useRef({ x: 0, y: 0 });
   const previewing = useRef(false);
-  const previewCallback = useCommittedRef(onSeekPreview);
+  const touchScrub = useRef<TouchScrub | null>(null);
+  const dwellTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const callbacks = useCommittedRef({
+    onSeekPreview,
+    onScrubChange,
+    onPreviewChange,
+  });
   useEffect(
     () => () => {
-      if (previewing.current) previewCallback.current?.(null);
+      if (dwellTimer.current !== null) clearTimeout(dwellTimer.current);
+      touchScrub.current = null;
+      if (previewing.current) callbacks.current.onSeekPreview?.(null);
+      if (pointer.current !== null) {
+        callbacks.current.onScrubChange?.(null);
+        callbacks.current.onPreviewChange?.(false);
+      }
     },
     [],
   );
   const [dragTime, setDragTime] = useState<number | null>(null);
+  const [precisionRange, setPrecisionRange] = useState<PlaybackRange | null>(
+    null,
+  );
   const unavailable = disabled || duration <= 0;
   const clamp = (time: number) => Math.max(0, Math.min(duration, time));
   const displayTime = clamp(dragTime ?? value);
-  const progress = duration > 0 ? displayTime / duration : 0;
+  const range = precisionRange ?? { start: 0, end: duration };
+  const span = range.end - range.start;
+  const progress = span > 0 ? (displayTime - range.start) / span : 0;
   const change = (time: number | null) => {
     setDragTime(time);
     onScrubChange?.(time);
   };
-  const position = (event: React.PointerEvent<HTMLDivElement>) => {
+  const pointerRatio = (event: React.PointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     const ratio =
       direction === "right"
@@ -72,9 +100,52 @@ export function PositionScrubber({
         : (direction === "down"
             ? event.clientY - rect.top
             : rect.bottom - event.clientY) / Math.max(1, rect.height);
-    return clamp(ratio * duration);
+    return Math.max(0, Math.min(1, ratio));
+  };
+  const position = (event: React.PointerEvent<HTMLDivElement>) => {
+    const visibleRange = touchScrub.current?.range ?? {
+      start: 0,
+      end: duration,
+    };
+    return clamp(
+      visibleRange.start +
+        pointerRatio(event) * (visibleRange.end - visibleRange.start),
+    );
+  };
+  const clearDwell = () => {
+    if (dwellTimer.current !== null) clearTimeout(dwellTimer.current);
+    dwellTimer.current = null;
+  };
+  const scheduleDwell = () => {
+    clearDwell();
+    const touch = touchScrub.current;
+    if (!touch || touch.range.end - touch.range.start <= MIN_WINDOW_SECONDS)
+      return;
+    dwellTimer.current = setTimeout(() => {
+      if (touchScrub.current !== touch) return;
+      const previousSpan = touch.range.end - touch.range.start;
+      // Long scenes enter a useful minute-wide window on the first dwell.
+      // Further dwells refine it down to a second, including short marker clips.
+      const nextSpan = Math.max(
+        MIN_WINDOW_SECONDS,
+        Math.min(60, previousSpan / 4),
+      );
+      const time = touch.range.start + touch.ratio * previousSpan;
+      const start = time - touch.ratio * nextSpan;
+      touch.range = { start, end: start + nextSpan };
+      setPrecisionRange(touch.range);
+      // A stationary hold also starts the buffered preview pause. Zooming
+      // changes only the scale: the time under the finger stays anchored.
+      previewing.current = true;
+      callbacks.current.onSeekPreview?.(time);
+      navigator.vibrate?.(10);
+      scheduleDwell();
+    }, DWELL_MS);
   };
   const finish = () => {
+    clearDwell();
+    touchScrub.current = null;
+    setPrecisionRange(null);
     pointer.current = null;
     previewing.current = false;
     change(null);
@@ -95,12 +166,16 @@ export function PositionScrubber({
       aria-valuemin={0}
       aria-valuemax={duration}
       aria-valuenow={displayTime}
-      aria-valuetext={`${formatTime(displayTime)} / ${formatTime(duration)}`}
+      aria-valuetext={`${precisionRange ? formatDurationMs(displayTime) : formatTime(displayTime)} / ${formatTime(duration)}`}
       aria-disabled={unavailable}
       aria-orientation={direction === "right" ? "horizontal" : "vertical"}
       data-position-scrubber
       data-dragging={dragTime !== null || undefined}
-      className="group/scrubber relative flex h-3 w-full min-w-[4em] cursor-pointer select-none items-end pointer-coarse:h-5"
+      data-precision={precisionRange ? true : undefined}
+      className={cn(
+        "group/scrubber relative flex h-3 w-full min-w-[4em] cursor-pointer select-none items-end pointer-coarse:h-5 [-webkit-touch-callout:none]",
+        precisionRange && "h-16 pointer-coarse:h-16",
+      )}
       // Override the unlayered page-zoom guard; a Tailwind touch-none utility
       // loses to it and lets native scrolling cancel this pointer drag.
       style={{ touchAction: "none" }}
@@ -121,12 +196,35 @@ export function PositionScrubber({
         event.currentTarget.setPointerCapture(event.pointerId);
         onPreviewChange?.(true);
         change(position(event));
+        if (event.pointerType === "touch") {
+          touchScrub.current = {
+            x: event.clientX,
+            y: event.clientY,
+            ratio: pointerRatio(event),
+            range: { start: 0, end: duration },
+          };
+          scheduleDwell();
+        }
       }}
       onPointerMove={(event) => {
         if (pointer.current !== event.pointerId) return;
         event.stopPropagation();
         const next = position(event);
         change(next);
+        const touch = touchScrub.current;
+        if (touch) {
+          touch.ratio = pointerRatio(event);
+          // Compare against the dwell origin, not the previous event, so
+          // slow deliberate movement cannot masquerade as finger jitter.
+          if (
+            Math.hypot(event.clientX - touch.x, event.clientY - touch.y) >
+            DWELL_SLOP
+          ) {
+            touch.x = event.clientX;
+            touch.y = event.clientY;
+            scheduleDwell();
+          }
+        }
         // A tap retains uninterrupted playback. Only an actual drag starts
         // the temporary preview pause, after allowing for touch jitter.
         previewing.current ||=
@@ -153,6 +251,9 @@ export function PositionScrubber({
       onLostPointerCapture={() => {
         if (pointer.current !== null) cancel();
       }}
+      onContextMenu={(event) => {
+        if (pointer.current !== null) event.preventDefault();
+      }}
       // Claim seek keys before the player's native keyboard listener can
       // interpret them as playback or lightbox navigation shortcuts.
       onKeyDownCapture={(event) => {
@@ -160,6 +261,12 @@ export function PositionScrubber({
         const step = event.shiftKey ? 10 : 5;
         let next: number;
         switch (event.key) {
+          case "Escape":
+            if (pointer.current === null) return;
+            event.preventDefault();
+            event.stopPropagation();
+            cancel();
+            return;
           case "ArrowRight":
           case "ArrowUp":
             next = displayTime + step;
@@ -188,14 +295,38 @@ export function PositionScrubber({
         onSeek(clamp(next));
       }}
     >
+      {precisionRange && (
+        <div
+          data-position-scrubber-precision
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 bottom-3 flex flex-col items-center gap-1 text-xs text-foreground"
+        >
+          <span className="rounded bg-background/90 px-2 py-1 tabular-nums">
+            {msg("media_player.fine_seeking", "Fine seeking")} ·{" "}
+            {formatDurationMs(displayTime)} · {Math.round(duration / span)}×
+          </span>
+          <div className="flex w-full justify-between" aria-hidden="true">
+            {Array.from({ length: 11 }, (_, index) => (
+              <span
+                key={index}
+                className={cn(
+                  "w-px bg-white/60",
+                  index % 5 === 0 ? "h-2" : "h-1",
+                )}
+              />
+            ))}
+          </div>
+        </div>
+      )}
       <div
         data-position-scrubber-track
         className="relative h-1 w-full rounded-sm bg-white/25 transition-[height] group-hover/scrubber:h-1.5 group-focus-visible/scrubber:h-1.5 group-data-[dragging]/scrubber:h-1.5"
+        style={{ clipPath: precisionRange ? "inset(-100vh 0)" : undefined }}
       >
         {duration > 0 &&
           bufferedRanges.map(({ start, end }) => {
-            const left = clamp(start + bufferedOffset);
-            const right = clamp(end + bufferedOffset);
+            const left = Math.max(range.start, clamp(start + bufferedOffset));
+            const right = Math.min(range.end, clamp(end + bufferedOffset));
             if (right <= left) return null;
             return (
               <div
@@ -203,8 +334,8 @@ export function PositionScrubber({
                 data-position-scrubber-buffer
                 className="absolute inset-y-0 rounded-sm bg-white/40"
                 style={{
-                  left: `${(left / duration) * 100}%`,
-                  width: `${((right - left) / duration) * 100}%`,
+                  left: `${((left - range.start) / span) * 100}%`,
+                  width: `${((right - left) / span) * 100}%`,
                 }}
               />
             );
@@ -214,7 +345,13 @@ export function PositionScrubber({
           className="absolute inset-y-0 left-0 rounded-sm bg-white"
           style={{ width: `${progress * 100}%` }}
         />
-        <div className="pointer-events-none absolute inset-x-0 bottom-[calc(100%+2px)]">
+        <div
+          className="pointer-events-none absolute bottom-[calc(100%+2px)] transition-[left,width] duration-150 motion-reduce:transition-none"
+          style={{
+            left: span > 0 ? `${(-range.start / span) * 100}%` : "0%",
+            width: span > 0 ? `${(duration / span) * 100}%` : "100%",
+          }}
+        >
           {markers}
         </div>
         <div
@@ -229,7 +366,7 @@ export function PositionScrubber({
                 trackRef={trackRef}
                 boundary="start"
                 time={clipBoundsEdit.start}
-                fileDuration={duration}
+                range={range}
                 onDrag={(t) => clipBoundsEdit.onChange({ start: t })}
               />
             )}
@@ -238,7 +375,7 @@ export function PositionScrubber({
                 trackRef={trackRef}
                 boundary="end"
                 time={clipBoundsEdit.end}
-                fileDuration={duration}
+                range={range}
                 onDrag={(t) => clipBoundsEdit.onChange({ end: t })}
               />
             )}
@@ -266,25 +403,25 @@ function ClipBoundHandle({
   trackRef,
   boundary,
   time,
-  fileDuration,
+  range,
   onDrag,
 }: {
   trackRef: React.RefObject<HTMLDivElement | null>;
   boundary: "start" | "end";
   time: number;
-  fileDuration: number;
+  range: PlaybackRange;
   onDrag: (t: number) => void;
 }) {
   const draggingRef = useRef(false);
-  const progress =
-    fileDuration > 0 ? Math.max(0, Math.min(1, time / fileDuration)) : 0;
+  const span = range.end - range.start;
+  const progress = span > 0 ? (time - range.start) / span : 0;
 
   function timeFromPointer(clientX: number): number {
     const track = trackRef.current;
-    if (!track || fileDuration <= 0) return 0;
+    if (!track || span <= 0) return 0;
     const rect = track.getBoundingClientRect();
     const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    return ratio * fileDuration;
+    return range.start + ratio * span;
   }
 
   function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {

@@ -1635,7 +1635,8 @@
   "media_player": {
     "skip_back": "Skip back 10 seconds",
     "skip_forward": "Skip forward 10 seconds",
-    "position": "Playback position"
+    "position": "Playback position",
+    "fine_seeking": "Fine seeking"
   },
   "media_info": {
     "audio_codec": "Audio Codec",

@@ -503,6 +503,7 @@ function TimeDisplay({
 
 interface ControlBarProps {
   Player: PlayerInstance;
+  playbackKey?: string;
   sources: PlayerSource[];
   activeSource: PlayerSource | null;
   onSourceChange: (source: PlayerSource) => void;
@@ -545,6 +546,7 @@ interface ControlBarProps {
 
 function ControlBar({
   Player,
+  playbackKey,
   sources,
   activeSource,
   onSourceChange,
@@ -688,6 +690,7 @@ function ControlBar({
         className={cn("pointer-events-auto", fadeClass)}
       >
         <PositionSlider
+          key={`${playbackKey}:${fileDuration}:${offsetStart}`}
           Player={Player}
           offsetStart={offsetStart}
           fileDuration={fileDuration}
@@ -841,6 +844,8 @@ function ControlBar({
 
 export interface PlayerControlsProps {
   Player: PlayerInstance;
+  /** End an outgoing scene/marker's scrub without interrupting held speed. */
+  playbackKey?: string;
   sources: PlayerSource[];
   activeSource: PlayerSource | null;
   onSourceChange: (source: PlayerSource) => void;
@@ -925,6 +930,7 @@ export interface PlayerControlsProps {
 
 export function PlayerControls({
   Player,
+  playbackKey,
   sources,
   activeSource,
   onSourceChange,
@@ -1486,6 +1492,7 @@ export function PlayerControls({
 
         <ControlBar
           Player={Player}
+          playbackKey={playbackKey}
           sources={sources}
           activeSource={activeSource}
           onSourceChange={onSourceChange}

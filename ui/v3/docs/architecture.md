@@ -332,6 +332,7 @@ pins an older hls.js, so a version-scoped pnpm override uses the updated
 | `player-transcode-session.ts`, `use-player-transcode-session.ts` | Own scoped HLS leases across playback and pause; TV retains nearby leases until window eviction or exit |
 | `prepare-player-source.ts` | Cancellable, bounded startup fetching for TV's nearby direct/HLS sources |
 | `use-player-recovery.ts` | Native fullscreen seeking and stalled-playback recovery |
+| `use-player-loop.ts` | Media-clock loop deadline, cancelled by pause, seek and source changes |
 
 The scene lightbox uses `scene-carousel.tsx`, a YARL carousel module with three
 stable slots: one active player and two poster previews. YARL's controller still
@@ -351,9 +352,15 @@ Audio and playback rate belong to the persistent media element. A held 2× gestu
 keeps its touch target through automatic advance and restores the prior rate on
 release. Animation deadlines and asynchronous seeks belong to their playback/load;
 obsolete work cannot resume or mute a later scene. Deferred freeze-frame JPEG
-exports are also cancelled when cleared or superseded. One clip-range effect
-owns both marker boundaries and native EOF; loops explicitly seek and resume,
-while auto-advance fires once. The explicit WebKit `canplay`
+exports are also cancelled when cleared or superseded. Loop mode restarts on the
+existing media just before the boundary (at most 5 ms or a quarter frame early),
+avoiding native EOF's decoder drain and WebKit's native-loop first-frame stalls.
+The deadline rechecks media time and respects pause, seeking, buffering, rate
+changes and visibility. Native EOF remains the fallback when timers run late.
+Buffered loops do not capture a frame or enter user-seek/loading feedback; a tiny
+HLS timestamp gap at zero resolves to the first buffered sample, while an evicted
+opening segment still uses source recovery. One clip-range effect owns marker
+completion and EOF fallback, while auto-advance fires once. The explicit WebKit `canplay`
 resume remains necessary. Chromium/WebKit fixtures exercise the actual lightbox
 and its source machinery, but physical iPhone autoplay permission and MMS still
 need device testing.
@@ -378,6 +385,16 @@ policy. Release uses the normal seek policy and restores the previous playback
 intent; cancellation restores the original position too. A simple tap does not
 pause. The independent draft position also supports generated sprite previews
 without seeking into unbuffered media.
+
+Touch scrubbing supports precision seeking in scene detail, both lightboxes and
+TV (including rotated controls). A 650 ms dwell within an 8 px radius zooms the
+timeline around the time under the finger. Each dwell narrows the visible range
+fourfold, capped at 60 seconds on entry and one second at maximum precision.
+Markers and buffered ranges follow the same window; a fine-seeking readout shows
+milliseconds. Release commits once and restores the full timeline; cancellation
+or a scene/marker change disposes the gesture. Mouse and keyboard input retain
+the full scale. Zoom steps request a short vibration where supported; Safari on
+iOS has no standard vibration API, so its feedback is visual.
 
 Explicit play and pause commands share user intent across scene detail,
 lightboxes, TV and OS media controls. Ordinary pause/resume delegates to native

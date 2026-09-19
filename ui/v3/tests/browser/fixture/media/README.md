@@ -13,6 +13,18 @@ ffmpeg -i audio.mp4 -c copy -hls_time 2 -hls_list_size 0 \
 ffmpeg -i audio.mp4 -t 2 -c copy -movflags +faststart short.mp4
 ```
 
+`loop-bframes.mp4` is a three-second moving pattern with reordered AVC frames.
+It reproduces a native-loop first-frame stall in WebKit. Loop tests wait for
+natural EOF and advancing frames on repeated returns, including when the actual
+media duration is shorter than the fixture's library metadata:
+
+```sh
+ffmpeg -f lavfi -i testsrc2=s=320x180:r=30:d=3 \
+  -f lavfi -i sine=frequency=440:sample_rate=48000:duration=3 \
+  -c:v libx264 -profile:v high -pix_fmt yuv420p -bf 3 -g 60 -keyint_min 60 \
+  -sc_threshold 0 -c:a aac -b:a 32k -movflags +faststart loop-bframes.mp4
+```
+
 `portrait.mp4` is a synthetic 180×320 pattern with the same duration and audio.
 TV's portrait fixture describes its actual dimensions and uses it to check
 control visibility, unobstructed video, and touch targets on phones and desktops:

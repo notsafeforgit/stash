@@ -93,7 +93,7 @@ export function planSceneSeek({
   ios,
   hasHlsEngine,
 }: {
-  intent: "seek" | "restart";
+  intent: "seek" | "restart" | "loop";
   targetTime: number;
   duration: number | undefined;
   offsetStart: number;
@@ -106,23 +106,37 @@ export function planSceneSeek({
 }): SceneSeekTransition {
   // Preserve the restart behavior for a file whose duration is not yet known.
   const max =
-    intent === "restart" && (duration == null || duration <= 0)
+    intent !== "seek" && (duration == null || duration <= 0)
       ? Infinity
       : (duration ?? Infinity);
   const sceneTime = Math.max(0, Math.min(targetTime, max));
   const targetInternal = sceneTime - offsetStart;
-  const mediaTime =
-    intent === "restart" ? Math.max(0, targetInternal) : targetInternal;
+  let mediaTime =
+    intent !== "seek" ? Math.max(0, targetInternal) : targetInternal;
   const strategy = startOffsetStrategyFor(
     src,
     frameRate,
     clipRange !== undefined,
     clipRange,
   );
+  // AAC priming / reordered video can leave a small timestamp gap at the
+  // playlist origin. Loop into its first available sample instead of waiting
+  // at zero for hls.js gap recovery (or reloading an already buffered clip).
+  // A missing/evicted opening segment still takes the usual recovery path.
+  const firstBufferedStart = mediaState.buffered?.[0]?.[0];
+  if (
+    intent === "loop" &&
+    strategy &&
+    targetInternal === 0 &&
+    firstBufferedStart !== undefined &&
+    firstBufferedStart > 0 &&
+    firstBufferedStart <= 0.1
+  )
+    mediaTime = firstBufferedStart;
   if (
     !strategy ||
     ((intent === "seek" || targetInternal >= 0) &&
-      strategy.canSeekDirectly(targetInternal, mediaState))
+      strategy.canSeekDirectly(mediaTime, mediaState))
   ) {
     return { kind: "seek", sceneTime, mediaTime };
   }

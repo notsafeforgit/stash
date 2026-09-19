@@ -64,6 +64,7 @@ import {
   StartedEffect,
 } from "./player-overlays";
 import { usePlayDelay } from "./use-play-delay";
+import { usePlayerLoop } from "./use-player-loop";
 import { useScenePlayerSources } from "./use-scene-player-sources";
 import type { PlayerTranscodeSession } from "./player-transcode-session";
 import { VideoFrameZoom, IDENTITY_TRANSFORM } from "./video-frame-zoom";
@@ -230,8 +231,7 @@ interface ScenePlayerProps {
    *     time, so resume / source-switch bookkeeping is unaffected.
    *   - When the playhead reaches `end`, the player either seeks back to
    *     `start` (if `loopEnabled`) or calls `onNext` (if auto-advance is
-   *     on). The native `loop` attribute is suppressed so it doesn't
-   *     fight the manual range-loop.
+   *     on). Full scenes and clips share the same in-place loop restart.
    *   - Other markers on the scene are hidden from the timeline; the
    *     lightbox slide is focused on the one marker that owns the clip.
    *
@@ -468,7 +468,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
   // Auto-detected: true for short clips that should loop by default. The
   // user-controllable `loopEnabled` state below seeds itself from this
   // value on each scene mount; thereafter the user's toggle in the
-  // settings menu drives the video element's `loop` attribute.
+  // settings menu drives the player's completion behavior.
   const looping = useMemo(
     () =>
       !!fileDuration &&
@@ -657,6 +657,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     handleSeekBy,
     setPendingPaused,
     handleRestart,
+    handleLoop,
     retrySource,
     handleCanPlay,
     handleLoadedMetadata,
@@ -682,6 +683,17 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     mediaRef,
     allowAutoplay,
     clipRange,
+  });
+
+  usePlayerLoop({
+    enabled: loopEnabled && sourceReady && !suspended,
+    rootRef: fullscreenContainerRef,
+    source: finalSrc,
+    start: clipRange?.start ?? 0,
+    end: clipRange?.end,
+    offsetStart,
+    frameRate: file?.frame_rate ?? undefined,
+    onLoop: handleLoop,
   });
 
   // Hand the parent `handleRestart` (seek + play) rather than `handleSeek`
@@ -922,13 +934,22 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
         )
           endedHandledRef.current = false;
       }}
-      loop={loopEnabled && !clipRange}
       playsInline
       disableRemotePlayback={finalSrc?.startsWith("blob:")}
       preload={preload}
       // PlaybackRangeEffect owns clip completion, including native EOF.
       // Handling both here would advance twice when a clip ends at EOF.
-      onEnded={sourceReady && !clipRange ? handleEnded : undefined}
+      // Explicitly restart full scenes too: WebKit's native loop can stick
+      // on the first frame of a Direct file after seeking back to zero.
+      onEnded={
+        sourceReady && !clipRange
+          ? loopEnabled
+            ? (event) => {
+                if (event.currentTarget.ended) handleLoop(0);
+              }
+            : handleEnded
+          : undefined
+      }
       onLoadedMetadata={handleLoadedMetadata}
       onRateChange={(event) => {
         const video = event.currentTarget;
@@ -1034,7 +1055,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
               end={clipRange.end}
               offsetStart={offsetStart}
               loopEnabled={loopEnabled}
-              onLoop={handleRestart}
+              onLoop={handleLoop}
               onAdvance={autoAdvance ? onNext : undefined}
               onStop={handleClipStop}
               onClipResume={handleClipResume}
@@ -1077,6 +1098,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
             {controls === "standard" && (
               <PlayerControls
                 Player={Player}
+                playbackKey={playbackKey}
                 sources={sources}
                 activeSource={activeSource}
                 onSourceChange={handleSourceChange}

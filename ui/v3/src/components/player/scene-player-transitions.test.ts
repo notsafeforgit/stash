@@ -132,6 +132,61 @@ describe("scene seek transitions", () => {
     });
   });
 
+  it("loops into the first buffered HLS sample without restarting the source", () => {
+    for (const ios of [true, false]) {
+      for (const origin of [0, 6]) {
+        expect(
+          planSceneSeek({
+            ...fullScene,
+            intent: "loop",
+            ios,
+            targetTime: origin,
+            offsetStart: origin,
+            clipRange: origin ? { start: origin, end: origin + 4 } : undefined,
+            mediaState: { buffered: [[0.021, 4]], seekable: [[0, 4]] },
+          }),
+        ).toEqual({ kind: "seek", sceneTime: origin, mediaTime: 0.021 });
+      }
+    }
+  });
+
+  it("still recovers an HLS loop whose opening segment was evicted", () => {
+    for (const buffered of [[[0.5, 4]], [[10, 20]]] satisfies [
+      number,
+      number,
+    ][][]) {
+      expect(
+        planSceneSeek({
+          ...fullScene,
+          intent: "loop",
+          targetTime: 0,
+          ios: true,
+          mediaState: { buffered, seekable: [[0, 600]] },
+        }).kind,
+      ).toBe("reload-source");
+    }
+  });
+
+  it("does not move Direct loop targets or user seeks to HLS sample boundaries", () => {
+    const nearStart = {
+      ...fullScene,
+      targetTime: 0,
+      mediaState: { buffered: [[0.021, 4]] as [number, number][] },
+    };
+    expect(
+      planSceneSeek({
+        ...nearStart,
+        intent: "loop",
+        src: "https://stash.test/scene/1/stream",
+      }),
+    ).toEqual({ kind: "seek", sceneTime: 0, mediaTime: 0 });
+    expect(planSceneSeek(nearStart)).toEqual({
+      kind: "restart-engine",
+      sceneTime: 0,
+      mediaTime: 0,
+    });
+  });
+
   it("restarts before a clip's seekable origin with a source reload", () => {
     expect(
       planSceneSeek({

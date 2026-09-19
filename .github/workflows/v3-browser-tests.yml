@@ -33,10 +33,10 @@ jobs:
         include:
           - browser: chromium
             os: ubuntu-24.04
-          # Safari video coverage needs Apple's media stack. Linux WebKit's
-          # GStreamer backend can deadlock or crash when looping HLS at EOF.
+          # Use GStreamer 1.28: Noble's 1.24 media backend can deadlock or
+          # crash during HLS EOF seeks, including with a bare video element.
           - browser: webkit
-            os: macos-15
+            os: ubuntu-26.04
     defaults:
       run:
         working-directory: ui/v3

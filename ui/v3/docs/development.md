@@ -179,14 +179,19 @@ make test-ui-v3-browser
 ```
 
 The [browser workflow](../../../.github/workflows/v3-browser-tests.yml) runs
-Chromium on Ubuntu and WebKit on macOS, with two shards per browser. WebKit uses
-Apple's media stack for Safari playback coverage; Linux WebKit's GStreamer
-backend can deadlock or crash on HLS seeks and EOF loops. Playwright
-[recommends macOS for Safari video testing](https://playwright.dev/docs/browsers#webkit).
+Chromium on Ubuntu 24.04 and WebKit on Ubuntu 26.04, with two shards per browser.
+WebKit needs the newer GStreamer media runtime: the 1.24 backend on Ubuntu 24.04
+can deadlock or crash during HLS EOF seeks even with a bare video element.
+For matching local Linux coverage, use Playwright's version-matched
+[`-resolute` container image](https://playwright.dev/docs/docker#image-tags).
 Each job installs its browser with `playwright install --with-deps`. The workflow
 runs for relevant pushes and pull requests and saves traces and screenshots on
 failure. To inspect a local failure, run
 `pnpm --dir ui/v3 exec playwright show-report`.
+
+Linux WebKit coverage does not verify Apple's media stack or physical iPhone
+behavior. Playwright [recommends macOS for Safari video testing](https://playwright.dev/docs/browsers#webkit);
+use a supported Mac environment and physical iOS checks for those differences.
 
 [tests/browser](../tests/browser) starts and stops its own Vite server on
 `127.0.0.1:3025`. It renders the real collection/media and settings layouts,

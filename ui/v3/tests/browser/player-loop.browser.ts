@@ -68,6 +68,7 @@ for (const scenario of cases) {
     const observation = await video.evaluateHandle((v: HTMLVideoElement) => {
       const data = {
         duration: v.duration,
+        nativeEnds: 0,
         events: [] as string[],
         loops: [] as {
           lastTime: number;
@@ -79,6 +80,20 @@ for (const scenario of cases) {
           progressing: boolean;
         }[],
       };
+      let atNativeEnd = false;
+      const observeNativeEnd = () => {
+        // Video.js samples `ended` on timeupdate too. A loop can seek back
+        // before the browser dispatches its queued ended event; observe EOF
+        // before the player's handlers rather than counting event delivery.
+        if (v.ended) {
+          if (!atNativeEnd) data.nativeEnds++;
+          atNativeEnd = true;
+        } else if (!v.seeking && v.currentTime < v.duration - 0.25) {
+          atNativeEnd = false;
+        }
+      };
+      for (const type of ["timeupdate", "pause", "ended", "seeked"])
+        v.addEventListener(type, observeNativeEnd, { capture: true });
       let previous:
         | { wall: number; media: number; presentedFrames: number }
         | undefined;
@@ -149,10 +164,7 @@ for (const scenario of cases) {
     expect(data.events.filter((event) => event === "seeking").length).toBe(
       data.loops.length,
     );
-    if (background)
-      expect(data.events.filter((event) => event === "ended").length).toBe(
-        data.loops.length,
-      );
+    if (background) expect(data.nativeEnds).toBe(data.loops.length);
     await expect(video).toHaveJSProperty("paused", false);
     await expect(video).toHaveJSProperty("playbackRate", rate);
     expect(

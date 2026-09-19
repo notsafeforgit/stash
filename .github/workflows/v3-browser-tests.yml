@@ -5,7 +5,11 @@ permissions:
   contents: read
 jobs:
   media-probe:
-    runs-on: macos-15
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-15-intel, macos-26]
     timeout-minutes: 7
     defaults:
       run:
@@ -24,3 +28,8 @@ jobs:
       - run: pnpm exec playwright install --with-deps webkit
       - run: pnpm run check
       - run: node scripts/diagnose-macos-media.mjs
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: native-stacks-${{ matrix.os }}
+          path: ui/v3/native-stacks/

@@ -1,4 +1,5 @@
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
+import { mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { webkit } from "@playwright/test";
@@ -19,12 +20,8 @@ for (let n = 0; n < 100; n++) {
   await delay(100);
 }
 const cases = [
-  { name: "bare-hls-frames", preload: "auto", hls: true, frames: true },
   { name: "bare-hls-no-frames", preload: "auto", hls: true, frames: false },
-  { name: "app-hls-no-frames", app: "markers", frames: false },
-  { name: "bare-hls-headed", preload: "auto", hls: true, frames: true, headed: true },
-  { name: "app-hls-headed", app: "markers", frames: true, headed: true },
-  { name: "direct-native-headed", preload: "auto", nativeLoop: true, frames: true, headed: true },
+  { name: "direct-native-loop", preload: "auto", nativeLoop: true, frames: true },
 ];
 
 for (const scenario of cases) {
@@ -134,6 +131,14 @@ for (const scenario of cases) {
     console.log("SNAPSHOT_AFTER " + scenario.name + " " + JSON.stringify(await deadline(snapshot(), "snapshot after")));
   } catch (error) {
     console.log("CASE_ERROR " + scenario.name + " " + error.stack);
+    mkdirSync("native-stacks", { recursive: true });
+    const processes = execFileSync("ps", ["-axo", "pid,command"], { encoding: "utf8" });
+    for (const line of processes.split("\n").filter((line) => /WebKit\.(WebContent|GPU)\.Development/.test(line))) {
+      const pid = line.trim().split(/\s+/)[0];
+      console.log("SAMPLE_PROCESS " + line.trim());
+      try { console.log(execFileSync("sample", [pid, "2", "-file", `native-stacks/${scenario.name}-${pid}.txt`], { encoding: "utf8", timeout: 10000 })); }
+      catch (error) { console.log("SAMPLE_ERROR " + error.message); }
+    }
   } finally {
     await deadline(browser.close(), "browser close", 3000).catch((error) => console.log(error.message));
   }

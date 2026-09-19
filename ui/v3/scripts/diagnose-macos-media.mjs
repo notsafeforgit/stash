@@ -19,26 +19,24 @@ for (let n = 0; n < 100; n++) {
   await delay(100);
 }
 const cases = [
-  { name: "direct-metadata", preload: "metadata" },
-  { name: "direct-auto", preload: "auto" },
-  { name: "bare-hls-auto", preload: "auto", hls: true },
-  { name: "bare-hls-metadata", preload: "metadata", hls: true },
-  { name: "app-hls", app: "markers" },
-  { name: "app-direct", app: "direct" },
-  { name: "direct-native-loop", preload: "auto", nativeLoop: true },
-  { name: "direct-early-loop", preload: "auto", early: 0.05 },
+  { name: "bare-hls-frames", preload: "auto", hls: true, frames: true },
+  { name: "bare-hls-no-frames", preload: "auto", hls: true, frames: false },
+  { name: "app-hls-no-frames", app: "markers", frames: false },
+  { name: "bare-hls-headed", preload: "auto", hls: true, frames: true, headed: true },
+  { name: "app-hls-headed", app: "markers", frames: true, headed: true },
+  { name: "direct-native-headed", preload: "auto", nativeLoop: true, frames: true, headed: true },
 ];
 
 for (const scenario of cases) {
   console.log("CASE_START " + JSON.stringify(scenario));
-  const browser = await webkit.launch({ headless: true });
+  const browser = await webkit.launch({ headless: !scenario.headed });
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = await context.newPage();
   page.on("console", (message) => console.log(scenario.name + " " + message.text()));
   page.on("pageerror", (error) => console.log(scenario.name + " PAGE_ERROR " + error.message));
   page.on("crash", () => console.log(scenario.name + " PAGE_CRASH"));
   page.on("requestfailed", (request) => console.log(scenario.name + " REQUEST_FAILED " + request.url() + " " + request.failure()?.errorText));
-  await page.addInitScript(() => {
+  await page.addInitScript((frames) => {
     localStorage.setItem("stash-lightbox-loop", "true");
     const emit = (type, detail = {}) => console.log("MEDIA " + JSON.stringify({ type, wall: performance.now(), ...detail }));
     for (const method of ["play", "pause", "load"]) {
@@ -87,8 +85,8 @@ for (const scenario of cases) {
       };
       v.requestVideoFrameCallback(frame);
     };
-    new MutationObserver(installFrames).observe(document, { childList: true, subtree: true });
-  });
+    if (frames) new MutationObserver(installFrames).observe(document, { childList: true, subtree: true });
+  }, scenario.frames);
   try {
     if (scenario.app) {
       await page.route("**/scene/*/**", async (route) => {
@@ -105,7 +103,7 @@ for (const scenario of cases) {
     } else {
       await page.route("**/native-media", (route) => route.fulfill({ contentType: "text/html", body: '<!doctype html><video playsinline></video><button>Play</button>' }));
       await page.goto("http://127.0.0.1:3025/native-media");
-      if (scenario.hls) await page.addScriptTag({ path: join(dirname(require.resolve("hls.js")), "hls.min.js") });
+      if (scenario.hls) await page.addScriptTag({ path: join(dirname(createRequire(require.resolve("@videojs/hlsjs-video")).resolve("hls.js")), "hls.min.js") });
       await deadline(page.evaluate((scenario) => {
         const v = document.querySelector("video");
         v.preload = scenario.preload;
@@ -114,6 +112,7 @@ for (const scenario of cases) {
         if (scenario.hls) {
           const hls = new Hls({ startPosition: 0 });
           hls.on(Hls.Events.ERROR, (_, data) => console.log("HLS_ERROR " + JSON.stringify({ details: data.details, fatal: data.fatal, message: data.error?.message })));
+          for (const name of ["MEDIA_ATTACHED", "BUFFER_CREATED", "BUFFER_APPENDING", "BUFFER_APPENDED", "FRAG_LOADED"]) hls.on(Hls.Events[name], () => console.log("HLS_EVENT " + name));
           hls.attachMedia(v);
           hls.loadSource("/media/clip/stream.m3u8");
           window.probeHls = hls;

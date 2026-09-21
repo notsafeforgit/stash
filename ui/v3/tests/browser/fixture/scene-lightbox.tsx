@@ -164,6 +164,18 @@ export function SceneLightboxFixture() {
   const [resolved, setResolved] = useState(false);
   const params = new URLSearchParams(location.search);
   const mode = params.get("mode");
+  const preloadPlayer = params.has("preload");
+  const [playerPreloaded, setPlayerPreloaded] = useState(false);
+  useEffect(() => {
+    if (!preloadPlayer) return;
+    let active = true;
+    void SceneLightbox.preload().then(() => {
+      if (active) setPlayerPreloaded(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, [preloadPlayer]);
   const autostart = !params.has("paused");
   const trackActivity = params.has("activity");
   const configuration = useMemo(
@@ -234,6 +246,11 @@ export function SceneLightboxFixture() {
           Open scenes
         </Button>
         <output data-testid="view">{index}</output>
+        {preloadPlayer && (
+          <output data-testid="player-preloaded">
+            {String(playerPreloaded)}
+          </output>
+        )}
         <SceneLightbox
           open={open}
           onClose={() => setOpen(false)}

@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import { serveSceneMedia } from "./scene-media";
 import { test, expect, expectTouchTargets, expectCompactRow } from "./test";
 
 interface Insets {
@@ -193,3 +194,78 @@ test("the lightbox Close control clears the home indicator and landscape cutouts
   await close.tap();
   await expect(close).toBeHidden();
 });
+
+for (const marker of [false, true]) {
+  test(`${marker ? "marker" : "scene"} lightbox metadata clears iPhone portrait and landscape safe areas`, async ({
+    page,
+  }) => {
+    await serveSceneMedia(page);
+    await page.setViewportSize({ width: 430, height: 932 });
+    await page.goto(`/scene-lightbox?paused${marker ? "&mode=markers" : ""}`);
+    await setSafeArea(page, { top: 59, bottom: 34, left: 0, right: 0 });
+    await page
+      .getByRole("button", { name: "Open scenes", exact: true })
+      .click();
+    const player = page.locator("[data-scene-player]");
+    await expect(player).toHaveAttribute("data-playback-ready", "true");
+    const overlay = player.locator(".lightbox-overlay-top");
+    for (const profile of [
+      {
+        width: 430,
+        height: 932,
+        insets: { top: 59, bottom: 34, left: 0, right: 0 },
+      },
+      {
+        width: 932,
+        height: 430,
+        insets: { top: 0, bottom: 21, left: 59, right: 59 },
+      },
+      {
+        width: 430,
+        height: 820,
+        insets: { top: 0, bottom: 0, left: 0, right: 0 },
+      },
+    ]) {
+      await page.setViewportSize({
+        width: profile.width,
+        height: profile.height,
+      });
+      await setSafeArea(page, profile.insets);
+      await player.hover();
+      const links = overlay.getByRole("link");
+      await expect(links.first()).toBeVisible();
+      const boxes = await links.evaluateAll((elements) =>
+        elements.map((element) => {
+          const { top, left, right } = element.getBoundingClientRect();
+          return { top, left, right };
+        }),
+      );
+      for (const box of boxes) {
+        expect(Math.round(box.top)).toBeGreaterThanOrEqual(
+          profile.insets.top + 12,
+        );
+        expect(Math.round(box.left)).toBeGreaterThanOrEqual(
+          profile.insets.left + 16,
+        );
+        expect(Math.round(box.right)).toBeLessThanOrEqual(
+          profile.width - profile.insets.right - 16,
+        );
+      }
+      // Only the chrome is inset; video retains its full viewport surface.
+      const surface = await player.boundingBox();
+      if (!surface) throw new Error("Missing player surface");
+      // The carousel's percentage transforms can differ by a fraction of a pixel.
+      expect(surface.x).toBeCloseTo(0, 0);
+      expect(surface.y).toBeCloseTo(0, 0);
+      expect(surface.width).toBeCloseTo(profile.width, 0);
+      expect(surface.height).toBeCloseTo(profile.height, 0);
+      await page.screenshot({
+        path: test
+          .info()
+          .outputPath(
+            `lightbox-safe-area-${profile.width}-${profile.height}.png`,
+          ),
+      });
+    }
+  });
+}

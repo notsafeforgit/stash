@@ -923,6 +923,15 @@ html [data-sonner-toaster][data-sonner-theme="system"] {
   --normal-text: var(--color-popover-foreground);
 }
 
+/* Lightbox metadata is portaled outside the inset app shell. Move its
+   content below the status bar and inside landscape cutouts while the media
+   continues to fill the entire viewport. Keep the overlay's normal gutters. */
+.lightbox-overlay-top {
+  top: var(--safe-area-top);
+  left: var(--safe-area-left);
+  right: var(--safe-area-right);
+}
+
 /* Image lightboxes (single-image detail + multi-image list): on mobile,
    move the toolbar (close + zoom) to the bottom of the viewport for
    easier thumb reach, and hide the thumbnail strip — phones swipe-

@@ -11,43 +11,68 @@ interface OverlayState {
   onClose: () => void;
 }
 
-/** Defer code until first use, then retain the original component's lifetime
- * (drafts, closing animations, and the scene lightbox's stable player). */
+export type OverlayPendingProps = Pick<OverlayState, "onClose"> & {
+  error?: Error;
+};
+
+/** Load on first use or explicit preload, then retain the original component's
+ * lifetime (drafts, closing animations, and the scene lightbox's stable player). */
 export function deferredOverlay<Props extends object>(
   load: () => Promise<{ default: FC<Props> }>,
   getState: (props: Props) => OverlayState,
+  Pending: FC<OverlayPendingProps> = OverlayPending,
 ) {
-  const Component = lazyComponent(load);
-  return function DeferredOverlay(props: Props) {
+  let loaded: FC<Props> | undefined;
+  let pending: Promise<{ default: FC<Props> }> | undefined;
+  const preload = () => {
+    pending ??= Promise.resolve()
+      .then(load)
+      .then((module) => {
+        loaded = module.default;
+        return module;
+      })
+      .catch((error: unknown) => {
+        // A failed background preload must still allow a normal open to retry.
+        pending = undefined;
+        throw error;
+      });
+    return pending;
+  };
+  const LazyComponent = lazyComponent(preload);
+  function DeferredOverlay(props: Props) {
     const { open, onClose } = getState(props);
-    const [activated, setActivated] = useState(open);
-    if (open && !activated) setActivated(true);
-    if (!activated) return null;
+    // Pick the component once, when first opened. A completed preload renders
+    // synchronously; a cold open retains its lazy identity after resolution so
+    // subsequent prop changes and reopening do not remount the player or form.
+    const [active, setActive] = useState<{ Component: FC<Props> } | null>(() =>
+      open ? { Component: loaded ?? LazyComponent } : null,
+    );
+    if (open && !active) setActive({ Component: loaded ?? LazyComponent });
+    if (!active) return null;
+    const { Component } = active;
 
     return (
       <CatchBoundary
         getResetKey={() => open}
         errorComponent={({ error }) =>
           open ? (
-            <OverlayPending
+            <Pending
               onClose={onClose}
               error={error instanceof Error ? error : new Error(String(error))}
             />
           ) : null
         }
       >
-        <Suspense fallback={open ? <OverlayPending onClose={onClose} /> : null}>
+        <Suspense fallback={open ? <Pending onClose={onClose} /> : null}>
           <Component {...props} />
         </Suspense>
       </CatchBoundary>
     );
-  };
+  }
+  return Object.assign(DeferredOverlay, { preload });
 }
 
-function OverlayPending({
-  onClose,
-  error,
-}: Pick<OverlayState, "onClose"> & { error?: Error }) {
+function OverlayPending({ onClose, error }: OverlayPendingProps) {
   return (
     <Dialog
       open

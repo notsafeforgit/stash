@@ -167,6 +167,7 @@ var (
 		Args: func(codec VideoCodec, segment int, videoFilter VideoFilter, videoOnly bool, outputDir string, frameRate float64) (args Args) {
 			args = CodecInit(codec)
 			gop := hlsGopSize(frameRate)
+			segDur := hlsSegmentDuration(frameRate)
 			// Pin the output frame rate. Without an explicit `-r` here,
 			// libx264 falls back to the muxer/codec default (25 fps) when
 			// the input demuxer can't surface a frame rate the encoder
@@ -186,10 +187,8 @@ var (
 			// to 2 decimals); for NTSC fractionals (59.94) the tiny
 			// rounding vs the true 60000/1001 yields ~1 frame drop per
 			// hour — well below visual threshold.
-			// Match hlsGopSize's 30 fps fallback so an unknown rate still
-			// produces the two-second segments declared in the playlist.
-			rateArg := "30"
-			if frameRate > 0 && !math.IsInf(frameRate, 0) && !math.IsNaN(frameRate) {
+			rateArg := "25"
+			if frameRate > 0 {
 				rateArg = fmt.Sprintf("%g", frameRate)
 			}
 			args = append(args,
@@ -204,11 +203,15 @@ var (
 				// stay a consistent length.
 				"-g", fmt.Sprint(gop),
 				"-keyint_min", fmt.Sprint(gop),
-				// Count output frames instead of comparing floating-point
-				// timestamps. At fractional rates the time expression can
-				// miss a boundary by one frame, producing a longer segment
-				// whose frames overlap a cached segment from another run.
-				"-force_key_frames", fmt.Sprintf("expr:gte(n,n_forced*%d)", gop),
+				// libx264 honours this expression; HW encoders ignore it
+				// silently. Kept because it tightens libx264's IDR placement
+				// relative to the GOP boundary (`-g` is a maximum), and the
+				// HW encoders are unaffected. `segDur` (not `segmentLength`)
+				// because for non-integer NTSC frame rates the actual segment
+				// duration drifts: 59.94 fps → 120-frame GOP → 2.0020 s
+				// segments. Passing 2.0 here would push libx264's IDR target
+				// 0.002 s before the GOP boundary on each segment.
+				"-force_key_frames", fmt.Sprintf("expr:gte(t,n_forced*%g)", segDur),
 			)
 			// Normalize per-track PTS to zero at the encoder so the two
 			// tracks align inside each segment. Source files (especially
@@ -348,14 +351,6 @@ func hlsSegmentArgs(segment int, videoOnly bool, outputDir string, frameRate flo
 	// its actual PTS by `N · 0.002 s` and the player's seek + buffer
 	// math diverges from what's on disk.
 	segDur := hlsSegmentDuration(frameRate)
-	// Re-encoded video has a stable encoder delay in the MP4 edit list.
-	// Shifting negative DTS only on the run at zero moves its frames later
-	// than restarted runs. The shared init/edit list already handles that
-	// delay; keep the muxer's timeline unchanged for full transcodes.
-	negativeTimestamps := "make_non_negative"
-	if videoNeedsOffset {
-		negativeTimestamps = "disabled"
-	}
 	args := Args{
 		"-sn",
 		// `-copyts` keeps input demuxer timestamps flowing through the
@@ -367,8 +362,13 @@ func hlsSegmentArgs(segment int, videoOnly bool, outputDir string, frameRate flo
 		// pin the per-track baseline to 0 (iOS edit-list skew fix); the
 		// frame-to-frame deltas are what -copyts preserves.
 		"-copyts",
-		// Codec-copy paths retain their existing negative-timestamp policy.
-		"-avoid_negative_ts", negativeTimestamps,
+		// `make_non_negative` (NOT `make_zero`): only shift when PTS
+		// goes negative. `make_zero` nullifies -output_ts_offset on
+		// every fresh ffmpeg run, producing each run's segments at PTS
+		// 0 regardless of index — fine in isolation but causes a PTS
+		// discontinuity across run boundaries that Safari's native HLS
+		// can't reconcile without EXT-X-DISCONTINUITY markers.
+		"-avoid_negative_ts", "make_non_negative",
 	}
 	// Align each segment's output PTS to its manifest position so PTS
 	// stays consistent across segments produced by different transcode

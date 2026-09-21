@@ -931,6 +931,7 @@ func (qb *ImageStore) makeQuery(ctx context.Context, imageFilter *models.ImageFi
 	if err := qb.setImageSortAndPagination(&query, findFilter); err != nil {
 		return nil, err
 	}
+	query.useMediaBrowseIndex(findFilter)
 
 	return &query, query.prefilterMediaSearch(ctx, imageTable, findFilter, filter)
 }
@@ -1071,6 +1072,7 @@ func (qb *ImageStore) makeASTQuery(ctx context.Context, filterAST *models.Filter
 	if err := qb.setImageSortAndPagination(&query, findFilter); err != nil {
 		return nil, err
 	}
+	query.useMediaBrowseIndex(findFilter)
 
 	return &query, query.prefilterMediaSearch(ctx, imageTable, findFilter, filter)
 }

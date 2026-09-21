@@ -116,7 +116,7 @@ local container after validation.
 | `internal/api/performer_merge_*.go` | canonical-name retention and opt-in loss-aware performer merge validation | low (new files) |
 | `pkg/models/filter_ast*.go` | AST model + v2.5 compat layer | none (new files) |
 | `pkg/sqlite/fork_migrate.go` + `pkg/sqlite/migrations/fork_*.go` | consolidated fork migration and roll-forward reconcilers | low |
-| `pkg/sqlite/media_search.go` + `pkg/sqlite/migrations/fork_read_indexes.go` | bounded search candidates and ordinary covering indexes for browsing | low (small query-builder calls; no upstream table changes) |
+| `pkg/sqlite/media_search.go`, `media_browse.go` + `pkg/sqlite/migrations/fork_read_indexes.go` | bounded search candidates and ordinary covering indexes for browsing | low (small query-builder calls; no upstream table changes) |
 | `fork_performer_autotag_ignored_names` | case-insensitive auto-tag opt-outs keyed by performer and name text | none (fork-owned table) |
 | `fork_saved_filter_state` | canonical filter AST plus upstream compatibility shadow | none (fork-owned table) |
 | `fork_video_file_metadata` / `fork_image_file_metadata` | ffprobe metadata plus source fingerprints | none (fork-owned tables) |

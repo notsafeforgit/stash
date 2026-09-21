@@ -1077,6 +1077,7 @@ func (qb *SceneStore) makeQuery(ctx context.Context, sceneFilter *models.SceneFi
 		return nil, err
 	}
 	query.sortAndPagination += getPagination(findFilter)
+	query.useMediaBrowseIndex(findFilter)
 
 	return &query, query.prefilterMediaSearch(ctx, sceneTable, findFilter, filter)
 }
@@ -1127,6 +1128,7 @@ func (qb *SceneStore) makeASTQuery(ctx context.Context, filterAST *models.Filter
 		return nil, err
 	}
 	query.sortAndPagination += getPagination(findFilter)
+	query.useMediaBrowseIndex(findFilter)
 
 	return &query, query.prefilterMediaSearch(ctx, sceneTable, findFilter, filter)
 }

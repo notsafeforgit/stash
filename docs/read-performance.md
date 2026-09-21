@@ -32,6 +32,15 @@ Queries retain natural title ordering and the explicit ID tie-breaker. The
 natural comparator now returns equality for equal titles, allowing that ID
 tie-breaker to work consistently with either a table scan or an index scan.
 
+After a full `ANALYZE`, production SQLite's STAT4 estimates can choose a full
+table scan and sort for an unfiltered timestamp page despite these indexes.
+`pkg/sqlite/media_browse.go` explicitly selects the covering index for bounded,
+unfiltered `created_at` pages, including the AST path. Queries with criteria,
+joins, CTEs, other sorts, or unbounded exports retain the planner's choice.
+The check happens when rendering SQL, after aggregate fields can add joins.
+Regression checks run after `ANALYZE` with the production SQLite build tags and
+compare both sort directions, timestamp/title ties, counts, and page boundaries.
+
 These indexes require no custom collations, columns, triggers, or virtual tables.
 Upstream writes maintain them normally; an idempotent fork reconciler recreates
 them if an upstream table migration drops them. Upstream's `schema_migrations`
@@ -61,6 +70,13 @@ a consistent backup obtained through a read-only connection. Only that temporary
 copy received the indexes/migration. Medians below cover five warm runs of the
 count plus 40 IDs, with identical IDs/counts checked against the original SQL.
 They exclude GraphQL serialization, record hydration, and image transfer.
+
+Deployment exposed a STAT4 plan regression after migration's full `ANALYZE`.
+A fresh snapshot of the deployed database (267,302 scenes and 492,854 images),
+tested with `sqlite_stat4 sqlite_math_functions` and another full `ANALYZE`,
+confirmed the bounded-page index selection above: scene page 1 took 174 → 26 ms
+and page 1,000 took 327 → 39 ms; image page 1 took 302 → 53 ms and page 1,000
+took 540 → 72 ms. All returned IDs and counts matched the reference queries.
 
 | Query | Before | After |
 | --- | ---: | ---: |

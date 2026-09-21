@@ -26,6 +26,7 @@ type queryBuilder struct {
 	havingArgs []interface{}
 
 	sortAndPagination string
+	browseIndex       string
 }
 
 func (qb queryBuilder) allArgs() []interface{} {
@@ -38,7 +39,7 @@ func (qb queryBuilder) allArgs() []interface{} {
 }
 
 func (qb queryBuilder) body(includeSortPagination bool) string {
-	return fmt.Sprintf("SELECT %s FROM %s%s", strings.Join(qb.columns, ", "), qb.from, qb.joins.toSQL(includeSortPagination))
+	return fmt.Sprintf("SELECT %s FROM %s%s", strings.Join(qb.columns, ", "), qb.mediaBrowseFrom(includeSortPagination), qb.joins.toSQL(includeSortPagination))
 }
 
 func (qb *queryBuilder) addColumn(column string) {

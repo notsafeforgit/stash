@@ -69,7 +69,8 @@ type GenerateJob struct {
 	overwrite      bool
 	fileNamingAlgo models.HashAlgorithm
 
-	totals totalsGenerate
+	totals        totalsGenerate
+	coverFailures coverGenerationFailures
 }
 
 type totalsGenerate struct {
@@ -287,7 +288,7 @@ func (j *GenerateJob) Execute(ctx context.Context, progress *job.Progress) error
 
 	elapsed := time.Since(start)
 	logger.Info(fmt.Sprintf("Generate finished (%s)", elapsed))
-	return nil
+	return j.coverFailures.Err()
 }
 
 func (j *GenerateJob) queueTasks(ctx context.Context, g *generate.Generator, paths []string, queue chan<- Task) {
@@ -420,6 +421,7 @@ func (j *GenerateJob) queueSceneJobs(ctx context.Context, g *generate.Generator,
 			repository: r,
 			Scene:      *scene,
 			Overwrite:  j.overwrite,
+			onError:    j.coverFailures.Add,
 		}
 
 		if task.required(ctx) {

@@ -252,15 +252,15 @@ func (s *Manager) Generate(ctx context.Context, input GenerateMetadataInput) (in
 }
 
 func (s *Manager) GenerateDefaultScreenshot(ctx context.Context, sceneId string) int {
-	return s.generateScreenshot(ctx, sceneId, nil)
+	return s.generateScreenshot(ctx, sceneId, nil, false)
 }
 
 func (s *Manager) GenerateScreenshot(ctx context.Context, sceneId string, at float64) int {
-	return s.generateScreenshot(ctx, sceneId, &at)
+	return s.generateScreenshot(ctx, sceneId, &at, false)
 }
 
 // generate default screenshot if at is nil
-func (s *Manager) generateScreenshot(ctx context.Context, sceneId string, at *float64) int {
+func (s *Manager) generateScreenshot(ctx context.Context, sceneId string, at *float64, preserveSelection bool) int {
 	if err := instance.Paths.Generated.EnsureTmpDir(); err != nil {
 		logger.Warnf("failure generating screenshot: %v", err)
 	}
@@ -287,10 +287,11 @@ func (s *Manager) generateScreenshot(ctx context.Context, sceneId string, at *fl
 		}
 
 		task := GenerateCoverTask{
-			repository:   s.Repository,
-			Scene:        *scene,
-			ScreenshotAt: at,
-			Overwrite:    true,
+			repository:     s.Repository,
+			Scene:          *scene,
+			ScreenshotAt:   at,
+			Overwrite:      true,
+			ResetToDefault: at == nil && !preserveSelection,
 		}
 
 		if err := task.generate(ctx); err != nil {

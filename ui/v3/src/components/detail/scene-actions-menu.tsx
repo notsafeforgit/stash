@@ -66,6 +66,7 @@ export function SceneActionsMenu({
 
   const [scan] = useMutation(GQL.MetadataScanDocument);
   const [generateScreenshot] = useMutation(GQL.SceneGenerateScreenshotDocument);
+  const [regenerateCover] = useMutation(GQL.SceneRegenerateCoverDocument);
   const [rotateVideo, { loading: rotationPending }] = useMutation(
     GQL.SceneVideoRotateDocument,
   );
@@ -97,13 +98,23 @@ export function SceneActionsMenu({
     }
   }
 
-  async function handleGenerateScreenshot(at?: number) {
+  async function handleGenerateScreenshot(
+    selection: number | "default" | "saved",
+  ) {
     setCoverBusy(true);
     try {
-      const result = await generateScreenshot({
-        variables: { id: scene.id, at },
-      });
-      const jobId = result.data?.sceneGenerateScreenshot;
+      const jobId =
+        selection === "saved"
+          ? (await regenerateCover({ variables: { id: scene.id } })).data
+              ?.sceneRegenerateCover
+          : (
+              await generateScreenshot({
+                variables: {
+                  id: scene.id,
+                  at: selection === "default" ? undefined : selection,
+                },
+              })
+            ).data?.sceneGenerateScreenshot;
       if (!jobId)
         throw new Error(
           intl.formatMessage({
@@ -270,13 +281,25 @@ export function SceneActionsMenu({
       getPlayerPosition?.() === undefined,
   });
   items.push({
+    key: "regenerate-cover",
+    icon: RefreshCcw,
+    label: intl.formatMessage({
+      id: "actions.regenerate_scene_cover",
+      defaultMessage: "Regenerate selected cover",
+    }),
+    onSelect: () => handleGenerateScreenshot("saved"),
+    disabled:
+      coverBusy ||
+      scene.cover_origin?.status !== GQL.SceneCoverOriginStatus.Available,
+  });
+  items.push({
     key: "default-thumbnail",
     icon: CameraOff,
     label: intl.formatMessage({
       id: "actions.generate_thumb_default",
       defaultMessage: "Generate default thumbnail",
     }),
-    onSelect: () => handleGenerateScreenshot(),
+    onSelect: () => handleGenerateScreenshot("default"),
     disabled: coverBusy,
   });
   if (rotationSupported)

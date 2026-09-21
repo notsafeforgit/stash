@@ -189,6 +189,8 @@ export function SceneGenerateDialog({
           .then((completion) => {
             if (completion.kind === "unavailable")
               toast.error(completion.error);
+            else if (completion.job?.status === GQL.JobStatus.Failed)
+              toast.error(completion.job.error);
           })
           .catch((error: unknown) => toast.error(error));
       }
@@ -244,6 +246,11 @@ export function SceneGenerateDialog({
             label={intl.formatMessage({
               id: "dialogs.scene_gen.covers",
               defaultMessage: "Scene covers",
+            })}
+            description={intl.formatMessage({
+              id: "scene_cover.generate_description",
+              defaultMessage:
+                "Reuse selected frames. Covers with changed, missing or unknown sources are kept and reported in the task log.",
             })}
             checked={options.covers}
             onChange={(v) => set("covers", v)}

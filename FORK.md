@@ -120,6 +120,7 @@ local container after validation.
 | `fork_performer_autotag_ignored_names` | case-insensitive auto-tag opt-outs keyed by performer and name text | none (fork-owned table) |
 | `fork_saved_filter_state` | canonical filter AST plus upstream compatibility shadow | none (fork-owned table) |
 | `fork_video_file_metadata` / `fork_image_file_metadata` | ffprobe metadata plus source fingerprints | none (fork-owned tables) |
+| `fork_scene_cover_sources`, `internal/manager/scene_cover_source.go` | durable cover frame selections, source validity and guarded regeneration | low (sidecar and small generation hooks) |
 | `forkDefaultFilterState` UI config key | canonical default-filter AST, legacy shadow, and pending conflict | none (ignored by v2.5) |
 | `pkg/ffmpeg` HLS changes | segmented streaming, PTS normalization | **high** |
 
@@ -128,7 +129,9 @@ upstream-only server at the same upstream schema version ignores the sidecars.
 Migration 6 adds optional `fork_scenes_created_at` and `fork_images_created_at`
 indexes on `(created_at, title)`. They use standard SQLite columns and collation,
 so upstream writes maintain them without fork code. The fork recreates missing
-indexes after an upstream table rebuild. Neither migration changes upstream's
+indexes after an upstream table rebuild. Migration 7 stores scene cover origins
+in a sidecar, retaining source identity after file deletion and invalidating
+provenance when upstream changes the cover. These migrations do not change upstream's
 schema version. Search acceleration is transaction-local query work, with no
 persisted search cache, virtual tables, or maintenance triggers.
 Rolling forward to v3 recreates missing sidecars and imports compatible

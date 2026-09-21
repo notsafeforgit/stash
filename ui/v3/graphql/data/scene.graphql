@@ -1,4 +1,7 @@
 fragment SceneData on Scene {
+  cover_origin {
+    ...SceneCoverOriginData
+  }
   preview_image {
     ...PreviewImageData
   }
@@ -85,6 +88,12 @@ fragment SceneData on Scene {
   }
 
   custom_fields
+}
+
+fragment SceneCoverOriginData on SceneCoverOrigin {
+  at
+  source_file_id
+  status
 }
 
 fragment SelectSceneData on Scene {

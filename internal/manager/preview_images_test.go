@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/pkg/ffmpeg"
@@ -69,7 +70,7 @@ func TestMarkerScreenshotBackfillsHDRAndLegacyJPEG(t *testing.T) {
 			if err != nil {
 				t.Fatalf("fixture: %v: %s", err, out)
 			}
-			file := &models.VideoFile{BaseFile: &models.BaseFile{Path: source}, Width: 64, Height: 48, Duration: 3}
+			file := &models.VideoFile{BaseFile: &models.BaseFile{ID: 1, Path: source}, Width: 64, Height: 48, Duration: 3}
 			scene := &models.Scene{ID: 1, Path: source, Checksum: "marker-test", Files: models.NewRelatedVideoFiles([]*models.VideoFile{file})}
 			marker := &models.SceneMarker{ID: 2, SceneID: scene.ID, Seconds: 1.125}
 			task := &GenerateMarkersTask{repository: db.Repository(), Scene: scene, Screenshot: true, fileNamingAlgorithm: models.HashAlgorithmMd5}
@@ -189,7 +190,7 @@ func TestGenerateScreenshotPublishesPreviewAndReportsWriteFailure(t *testing.T) 
 			if err != nil {
 				t.Fatalf("fixture: %v: %s", err, out)
 			}
-			file := &models.VideoFile{BaseFile: &models.BaseFile{Path: source}, Width: 64, Height: 48, Duration: 3}
+			file := &models.VideoFile{BaseFile: &models.BaseFile{ID: 1, Path: source}, Width: 64, Height: 48, Duration: 3}
 			scene := models.Scene{ID: 1, Path: source, Files: models.NewRelatedVideoFiles([]*models.VideoFile{file})}
 			original, err := mgr.generatePreviewImage(context.Background(), &scene, "cover", "", at)
 			if err != nil {
@@ -218,7 +219,23 @@ func TestGenerateScreenshotPublishesPreviewAndReportsWriteFailure(t *testing.T) 
 			if mgr.ScenePreviewImage(&scene) != nil {
 				t.Fatal("advertised deleted renditions")
 			}
-			db.Scene.On("Find", mock.Anything, scene.ID).Return(&scene, nil)
+			var duringGeneration func()
+			reads := 0
+			db.Scene.On("Find", mock.Anything, scene.ID).Return(func(context.Context, int) *models.Scene {
+				reads++
+				if reads == 3 && duringGeneration != nil {
+					duringGeneration()
+				}
+				return &scene
+			}, nil)
+			files := []*models.VideoFile{file}
+			db.Scene.On("GetFiles", mock.Anything, scene.ID).Return(func(context.Context, int) []*models.VideoFile { return files }, nil)
+			var saved *models.SceneCoverSource
+			db.Scene.On("GetCoverSource", mock.Anything, scene.ID).Return(func(context.Context, int) *models.SceneCoverSource { return saved }, nil)
+			db.Scene.On("SetCoverSource", mock.Anything, scene.ID, mock.Anything).Run(func(args mock.Arguments) {
+				selection := *args.Get(2).(*models.SceneCoverSource)
+				saved = &selection
+			}).Return(nil)
 			db.Scene.On("UpdateCover", mock.Anything, scene.ID, mock.Anything).Run(func(args mock.Arguments) {
 				data := args.Get(2).([]byte)
 				if !bytes.Equal(data, original) {
@@ -234,6 +251,30 @@ func TestGenerateScreenshotPublishesPreviewAndReportsWriteFailure(t *testing.T) 
 			if manifest := mgr.ScenePreviewImage(&scene); manifest == nil || manifest.At != at {
 				t.Fatalf("generation lost the requested timestamp: %v", manifest)
 			}
+			if saved == nil || saved.At != at || saved.FileID != file.ID || saved.CoverChecksum != scene.CoverChecksum {
+				t.Fatalf("selection was not persisted: %+v", saved)
+			}
+
+			// Durable provenance survives deleting every generated rendition and
+			// changing the primary file. The original attached video is reused.
+			if err := os.RemoveAll(store.SceneDirectory(scene.ID)); err != nil {
+				t.Fatal(err)
+			}
+			files = []*models.VideoFile{{BaseFile: &models.BaseFile{ID: 2, Path: "different-primary"}, Duration: 3}, file}
+			db.Scene.On("UpdateCover", mock.Anything, scene.ID, mock.Anything).Run(func(args mock.Arguments) {
+				if !bytes.Equal(args.Get(2).([]byte), original) {
+					t.Error("regeneration did not reproduce the saved frame")
+				}
+			}).Return(nil).Once()
+			db.Scene.On("UpdatePartial", mock.Anything, scene.ID, mock.Anything).Return(&scene, nil).Once()
+			id = mgr.RegenerateSceneCover(context.Background(), "1")
+			if state := mgr.JobManager.GetJob(id); state.Status != job.StatusFinished {
+				t.Fatalf("saved selection could not be regenerated: %+v", state)
+			}
+			if saved.At != at || saved.FileID != file.ID {
+				t.Fatalf("regeneration changed the cover origin: %+v", saved)
+			}
+			files = []*models.VideoFile{file}
 
 			db.Scene.On("UpdateCover", mock.Anything, scene.ID, mock.Anything).Return(errors.New("cover write failed")).Once()
 			id = mgr.GenerateScreenshot(context.Background(), "1", at)
@@ -253,6 +294,40 @@ func TestGenerateScreenshotPublishesPreviewAndReportsWriteFailure(t *testing.T) 
 			}
 			if manifest := mgr.ScenePreviewImage(&scene); manifest == nil || manifest.At != file.Duration*0.2 {
 				t.Fatalf("legacy default generation did not select the default frame: %v", manifest)
+			}
+
+			// Simulate concurrent changes after extraction but before the write
+			// transaction. None may be overwritten, even identical cover pixels
+			// with a newer selection timestamp.
+			for _, change := range []string{"cover", "selection", "source"} {
+				oldChecksum, oldSource := scene.CoverChecksum, saved
+				stat, err := os.Stat(file.Path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				reads = 0
+				duringGeneration = func() {
+					switch change {
+					case "cover":
+						scene.CoverChecksum = "newer cover"
+					case "selection":
+						selection := *saved
+						selection.At += 0.1
+						saved = &selection
+					case "source":
+						if err := os.Chtimes(file.Path, stat.ModTime(), stat.ModTime().Add(time.Second)); err != nil {
+							t.Fatal(err)
+						}
+					}
+				}
+				id = mgr.RegenerateSceneCover(context.Background(), "1")
+				if state := mgr.JobManager.GetJob(id); state.Status != job.StatusFailed || state.Error == nil || !strings.Contains(*state.Error, "kept") {
+					t.Fatalf("concurrent %s was not preserved: %+v", change, state)
+				}
+				scene.CoverChecksum, saved = oldChecksum, oldSource
+				if err := os.Chtimes(file.Path, stat.ModTime(), stat.ModTime()); err != nil {
+					t.Fatal(err)
+				}
 			}
 			db.AssertExpectations(t)
 		})

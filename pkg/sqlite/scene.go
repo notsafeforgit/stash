@@ -1502,7 +1502,10 @@ func (qb *SceneStore) GetManyHasCover(ctx context.Context, ids []int) ([]bool, e
 }
 
 func (qb *SceneStore) UpdateCover(ctx context.Context, sceneID int, image []byte) error {
-	return qb.UpdateImage(ctx, sceneID, sceneCoverBlobColumn, image)
+	if err := qb.UpdateImage(ctx, sceneID, sceneCoverBlobColumn, image); err != nil {
+		return err
+	}
+	return qb.invalidateCoverSource(ctx, sceneID)
 }
 
 func (qb *SceneStore) destroyCover(ctx context.Context, sceneID int) error {

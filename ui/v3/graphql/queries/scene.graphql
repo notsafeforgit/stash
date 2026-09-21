@@ -94,6 +94,9 @@ query FindSceneCovers($ids: [ID!]!) {
   findScenes(ids: $ids, filter: { per_page: -1 }) {
     scenes {
       id
+      cover_origin {
+        ...SceneCoverOriginData
+      }
       paths {
         screenshot
       }

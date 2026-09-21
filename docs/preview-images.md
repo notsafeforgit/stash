@@ -33,13 +33,24 @@ without thumbnails remain readable and fall back to their existing covers.
 Enable v3 using `--enable-v3-ui` / `STASH_ENABLE_V3_UI=true`. Generate a scene
 cover, use **Set cover** at a player timestamp, or generate marker screenshots.
 Existing covers need explicit regeneration to acquire HDR or stored card
-thumbnails. Use **Set cover**
-at a selected frame or **Generate default thumbnail** (20% into the video).
+thumbnails. **Regenerate selected cover** reuses the original file and exact
+timestamp. **Generate thumbnail from current** saves a new selection;
+**Generate default thumbnail** explicitly replaces it with the frame 20% into
+the primary video. Scene Details shows the saved time and source status.
 For a batch refresh, select scenes and use **Generate…** with only **Scene
-covers** selected and **Replace existing artifacts** enabled. This replaces the
-selected covers, including uploaded or scraped artwork. The legacy generator
-did not persist cover timestamps, so matching a previously chosen frame requires
-selecting it again.
+covers** selected and **Replace existing artifacts** enabled. The same applies
+to Settings → Tasks → Generate with **Overwrite existing**. This regenerates
+renditions while preserving known frame selections. A changed, missing or
+detached source keeps its existing cover and requires a new selection (or
+restoring an unavailable original). Individual scene IDs are logged; the job
+reports a bounded failure summary after processing the remaining scenes.
+
+Older v3 manifests can supply the timestamp when they still match both the
+source video and saved cover, even when their rendition files are missing.
+Legacy, uploaded and scraped covers without trustworthy frame provenance are
+kept and reported as unknown. They require a new frame selection before video
+regeneration; the timestamp cannot be reconstructed from a JPEG alone. Scenes
+without any cover still receive a default frame.
 
 Generating missing marker screenshots also backfills their v3 renditions because
 marker timestamps are known. Regenerating with overwrite can upgrade a plain
@@ -77,16 +88,36 @@ pipelines in this change.
 `pkg/previewimage` owns encoding, rendition metadata and storage independently
 of the legacy paths. Generated files live below
 `generated/preview_images/<recipe>/<scene-id>/<kind>/<source-key>/`.
-The source key includes path, size, modification time and the artwork identity:
-the existing cover blob checksum or the exact fractional marker timestamp.
-An unchanged source's unrelated scene metadata edits do not invalidate artwork.
-Replacing the source, switching primary files or replacing a cover in v2.5
-invalidates its v3 renditions. No fork database migration is needed; scene reads
-expose the already-stored cover checksum as transient internal metadata.
+New cover keys bind to the existing cover blob checksum. Already-generated
+artwork remains visible when its source video changes or disappears. Marker
+keys continue to include source path, size, modification time and the exact
+fractional timestamp. Original path-based cover entries remain readable.
+Replacing the cover itself invalidates its previous renditions.
 
-The manifest records the source timestamp in seconds as generation metadata
-alongside its renditions. It lives with the generated files and adds no database
-table or persistent scene field.
+Fork migration 7 adds `fork_scene_cover_sources`, independently of upstream's
+schema version. It stores the cover checksum, historical source file ID, exact
+timestamp and a versioned source fingerprint. File size and modification time
+are checked against the filesystem, plus any MD5/oshash available at selection
+time from a current scan. This avoids hashing entire videos during a backfill;
+it is a source-change guard, not a cryptographic proof against edits that keep
+all those properties unchanged. Derived phashes and newly added scan hashes
+do not invalidate the selection. Paths and thumbnail recipe versions are not
+part of this authored record: moving a file is safe, and removing the generated
+cache does not remove the selection. A still-attached original file can be
+used even after another file becomes primary.
+
+Cover and origin writes share a transaction. Generation rechecks the artwork
+and source before committing, so a concurrent cover edit or source replacement
+is preserved. Ordinary cover edits invalidate mismatched provenance, and the
+fork reconciles upstream-only edits when reopening the database. The upstream
+scene schema and JPEG cover remain unchanged; an upstream server at the same
+upstream schema version can continue using the database. The historical file
+ID deliberately survives file deletion so v3 can explain why regeneration is
+unavailable. No video or lossless-frame duplicate is stored.
+
+The rendition manifest still records its timestamp for inspection, but the
+database record owns future regenerations, independently of image format,
+dimensions, encoder policy or cache lifetime.
 
 Rendition filenames are content hashes. An atomic manifest publishes only a
 complete generation, and its revision appears in every URL. Regenerating after

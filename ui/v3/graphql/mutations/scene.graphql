@@ -122,6 +122,10 @@ mutation SceneGenerateScreenshot($id: ID!, $at: Float) {
   sceneGenerateScreenshot(id: $id, at: $at)
 }
 
+mutation SceneRegenerateCover($id: ID!) {
+  sceneRegenerateCover(id: $id)
+}
+
 mutation SceneVideoRotate($id: ID!, $direction: SceneVideoRotationDirection!) {
   sceneVideoRotate(input: { id: $id, direction: $direction }) {
     ...SceneData

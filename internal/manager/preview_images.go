@@ -28,6 +28,9 @@ func (s *Manager) ScenePreviewImage(scene *models.Scene) *previewimage.Manifest 
 	if !s.Config.GetEnableV3UI() || scene.CoverChecksum == "" {
 		return nil
 	}
+	if m, err := s.PreviewImageStore().Load(scene.ID, "cover", previewimage.CoverKey(scene.CoverChecksum)); err == nil {
+		return m
+	}
 	return s.loadPreviewImage(scene, "cover", scene.CoverChecksum)
 }
 
@@ -85,12 +88,14 @@ func (s *Manager) generatePreviewImage(ctx context.Context, scene *models.Scene,
 	if err != nil {
 		return nil, err
 	}
+	var revision string
 	if kind == "cover" {
-		identity = md5.FromBytes(data)
-	}
-	revision, err := previewimage.SourceKey(scene.Path, identity)
-	if err != nil {
-		return nil, err
+		revision = previewimage.CoverKey(md5.FromBytes(data))
+	} else {
+		revision, err = previewimage.SourceKey(scene.Path, identity)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if err := store.Publish(scene.ID, kind, revision, at, result); err != nil {
 		return nil, err

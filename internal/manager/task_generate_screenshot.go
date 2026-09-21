@@ -10,10 +10,12 @@ import (
 )
 
 type GenerateCoverTask struct {
-	repository   models.Repository
-	Scene        models.Scene
-	ScreenshotAt *float64
-	Overwrite    bool
+	repository     models.Repository
+	Scene          models.Scene
+	ScreenshotAt   *float64
+	Overwrite      bool
+	ResetToDefault bool
+	onError        func(error)
 }
 
 func (t *GenerateCoverTask) GetDescription() string {
@@ -24,11 +26,17 @@ func (t *GenerateCoverTask) Start(ctx context.Context) {
 	if err := t.generate(ctx); err != nil && ctx.Err() == nil {
 		logger.Error(err)
 		logErrorOutput(err)
+		if t.onError != nil && instance.Config.GetEnableV3UI() {
+			t.onError(err)
+		}
 	}
 }
 
 // generate returns failures to callers that expose the task as a monitored job.
 func (t *GenerateCoverTask) generate(ctx context.Context) error {
+	if instance.Config.GetEnableV3UI() {
+		return t.generateWithCoverSource(ctx)
+	}
 	scenePath := t.Scene.Path
 
 	r := t.repository
@@ -98,6 +106,9 @@ func (t *GenerateCoverTask) generate(ctx context.Context) error {
 // required returns true if the sprite needs to be generated
 // assumes in a transaction
 func (t *GenerateCoverTask) required(ctx context.Context) bool {
+	if t.Overwrite && instance.Config.GetEnableV3UI() {
+		return true
+	}
 	if t.Scene.Path == "" {
 		return false
 	}

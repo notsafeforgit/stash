@@ -7,6 +7,9 @@ import {
   JobStatus,
   PreviewImageDynamicRange,
   PreviewImageDataFragmentDoc,
+  SceneCoverOriginDataFragmentDoc,
+  SceneCoverOriginStatus,
+  type SceneCoverOriginDataFragment,
   type FindSceneCoversQuery,
   type PreviewImageDataFragment,
 } from "./generated-graphql";
@@ -34,10 +37,12 @@ const detail = {
     sprite: "/sprite.jpg",
   },
   preview_image: null,
+  cover_origin: null,
 };
 const detailQuery: TypedDocumentNode<{
-  findScene: Omit<typeof detail, "preview_image"> & {
+  findScene: Omit<typeof detail, "preview_image" | "cover_origin"> & {
     preview_image: PreviewImageDataFragment | null;
+    cover_origin: SceneCoverOriginDataFragment | null;
   };
 }> = gql`
   query CoverTestScene {
@@ -46,9 +51,11 @@ const detailQuery: TypedDocumentNode<{
       sceneStreams: sceneStreamsV3 { url mime_type label }
       paths { screenshot stream sprite }
       preview_image { ...PreviewImageData }
+      cover_origin { ...SceneCoverOriginData }
     }
   }
   ${print(PreviewImageDataFragmentDoc)}
+  ${print(SceneCoverOriginDataFragmentDoc)}
 `;
 const listQuery: TypedDocumentNode<FindSceneCoversQuery> = gql`
   query CoverTestList {
@@ -56,10 +63,12 @@ const listQuery: TypedDocumentNode<FindSceneCoversQuery> = gql`
       scenes {
         id paths { screenshot }
         preview_image { ...PreviewImageData }
+        cover_origin { ...SceneCoverOriginData }
       }
     }
   }
   ${print(PreviewImageDataFragmentDoc)}
+  ${print(SceneCoverOriginDataFragmentDoc)}
 `;
 const covers: FindSceneCoversQuery = {
   findScenes: {
@@ -68,6 +77,12 @@ const covers: FindSceneCoversQuery = {
       {
         __typename: "Scene",
         id: "1",
+        cover_origin: {
+          __typename: "SceneCoverOrigin",
+          at: 0,
+          source_file_id: "7",
+          status: SceneCoverOriginStatus.Available,
+        },
         paths: { __typename: "ScenePathsType", screenshot: "/new.jpg" },
         preview_image: {
           thumbnail: {
@@ -175,6 +190,9 @@ it.each([JobStatus.Finished, JobStatus.Failed, JobStatus.Cancelled, null])(
     expect(after?.title).toBe(detail.title);
     expect(after?.resume_time).toBe(detail.resume_time);
     expect(after?.paths).toEqual({ ...detail.paths, screenshot: "/new.jpg" });
+    expect(after?.cover_origin).toEqual(
+      covers.findScenes.scenes[0]?.cover_origin,
+    );
     expect(requests).toEqual(["FindJob", "FindJob", "FindSceneCovers"]);
     await vi.advanceTimersByTimeAsync(5000);
     expect(requests).toHaveLength(3);

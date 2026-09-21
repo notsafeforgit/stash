@@ -96,6 +96,7 @@ type SceneReader interface {
 	SceneFinder
 	SceneQueryer
 	SceneCounter
+	SceneCoverSourceReader
 
 	URLLoader
 	ViewDateReader
@@ -136,6 +137,7 @@ type SceneWriter interface {
 	SceneCreator
 	SceneUpdater
 	SceneDestroyer
+	SceneCoverSourceWriter
 
 	AddFileID(ctx context.Context, id int, fileID FileID) error
 	AddGalleryIDs(ctx context.Context, sceneID int, galleryIDs []int) error

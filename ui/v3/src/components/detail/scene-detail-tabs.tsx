@@ -50,6 +50,7 @@ import { DateInput } from "src/components/ui/date-input";
 import { useMutation } from "@apollo/client/react";
 import { SceneFileActionsMenu } from "src/components/detail/scene-file-actions";
 import { MetaRow } from "src/components/detail/meta-row";
+import { SceneCoverOrigin } from "./scene-cover-origin";
 import { MediaColorMetaRows } from "@/components/detail/media-color-meta-rows";
 import { FingerprintMetaRows } from "src/components/detail/fingerprint-meta-rows";
 import { FilterUrlLink } from "src/components/shared/filter-url-link";
@@ -133,6 +134,7 @@ export function SceneDetailsTab({ scene }: { scene: SceneData }) {
         </MetaRow>
       )}
       {scene.files[0] && <MediaColorMetaRows file={scene.files[0]} />}
+      <SceneCoverOrigin scene={scene} />
       {scene.director && (
         <MetaRow
           label={intl.formatMessage({

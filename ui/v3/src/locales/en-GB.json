@@ -96,6 +96,7 @@
     "generate": "Generate",
     "generate_count": "Generate {count} {noun}",
     "generate_thumb_default": "Generate default thumbnail",
+    "regenerate_scene_cover": "Regenerate selected cover",
     "generate_thumb_from_current": "Generate thumbnail from current",
     "generate_performer_image_from_current": "Generate performer image from current",
     "hash_migration": "hash migration",
@@ -1989,6 +1990,14 @@
   "front_page_row_label": "{objects} – {sort}",
   "saved_filters": "Saved filters",
   "saving": "Saving…",
+  "scene_cover": {
+    "available": "Regeneration reuses this frame from the original video.",
+    "changed": "The original video has changed or was removed. The cover is kept; select a new frame to regenerate it.",
+    "frame": "Cover frame",
+    "generate_description": "Reuse selected frames. Covers with changed, missing or unknown sources are kept and reported in the task log.",
+    "unavailable": "The original video is unavailable. The cover is kept; restore the video or select a new frame.",
+    "unknown": "The original frame is unknown. The cover is kept; select a frame to enable regeneration."
+  },
   "scene": "Scene",
   "sceneTagger": "Scene Tagger",
   "scene_code": "Studio Code",

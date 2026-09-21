@@ -1,0 +1,24 @@
+enum SceneCoverOriginStatus {
+  AVAILABLE
+  CHANGED
+  UNAVAILABLE
+  UNKNOWN
+}
+
+"The selected frame and whether its original video can still reproduce it."
+type SceneCoverOrigin {
+  "Exact seconds in the original source video; null for untracked artwork."
+  at: Float
+  "Historical file ID, retained even if the file has been removed."
+  source_file_id: ID
+  status: SceneCoverOriginStatus!
+}
+
+extend type Scene {
+  cover_origin: SceneCoverOrigin # Resolver
+}
+
+extend type Mutation {
+  "Regenerate the saved cover frame. Keeps existing artwork if its source is invalid."
+  sceneRegenerateCover(id: ID!): ID!
+}

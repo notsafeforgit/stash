@@ -160,6 +160,7 @@ export function offlineEntryToSceneData(
     date: entry.date,
     production_date: null,
     preview_image: null,
+    cover_origin: null,
     rating100: null,
     o_counter: null,
     organized: false,

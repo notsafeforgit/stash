@@ -28,6 +28,7 @@ declare global {
       finished: boolean;
       requests: string[];
       screenshots: GQL.SceneGenerateScreenshotMutationVariables[];
+      regenerations: GQL.SceneRegenerateCoverMutationVariables[];
       generations: GQL.MetadataGenerateMutationVariables[];
       performerUpdates: GQL.PerformerUpdateImageMutationVariables[];
       failPerformerUpdate: boolean;
@@ -38,6 +39,7 @@ window.coverFixture = {
   finished: false,
   requests: [],
   screenshots: [],
+  regenerations: [],
   generations: [],
   performerUpdates: [],
   failPerformerUpdate: false,
@@ -87,11 +89,22 @@ const performers: GQL.PerformerDataFragment[] = ["1", "2"].map((id) => ({
   weight: null,
   custom_fields: {},
 }));
-function artwork(): Pick<GQL.SceneDataFragment, "paths" | "preview_image"> {
+function artwork(): Pick<
+  GQL.SceneDataFragment,
+  "paths" | "preview_image" | "cover_origin"
+> {
   if (!base) throw new Error("Missing cover fixture scene");
   const revision = window.coverFixture.finished ? "new" : "old";
   const fallback = url(`/covers/${revision}.jpg`);
   return {
+    cover_origin: {
+      __typename: "SceneCoverOrigin",
+      at: 1.125,
+      source_file_id: "1",
+      status: new URLSearchParams(location.search).has("stale")
+        ? GQL.SceneCoverOriginStatus.Changed
+        : GQL.SceneCoverOriginStatus.Available,
+    },
     paths: { ...base.paths, screenshot: fallback },
     preview_image: {
       thumbnail:
@@ -191,6 +204,18 @@ const screenshotMock: MockedResponse<
   result: (variables) => {
     window.coverFixture.screenshots.push(variables);
     return { data: { sceneGenerateScreenshot: "7" } };
+  },
+};
+const regenerateMock: MockedResponse<
+  GQL.SceneRegenerateCoverMutation,
+  GQL.SceneRegenerateCoverMutationVariables
+> = {
+  request: { query: GQL.SceneRegenerateCoverDocument, variables: { id: "1" } },
+  maxUsageCount: Infinity,
+  delay: 0,
+  result: (variables) => {
+    window.coverFixture.regenerations.push(variables);
+    return { data: { sceneRegenerateCover: "7" } };
   },
 };
 const scenePerformersMock: MockedResponse<GQL.FindSceneImagePerformersQuery> = {
@@ -323,6 +348,7 @@ const client = new ApolloClient({
       detailMock,
       listMock,
       screenshotMock,
+      regenerateMock,
       scenePerformersMock,
       performerImageMock,
       generateMock,

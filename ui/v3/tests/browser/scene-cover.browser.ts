@@ -1,5 +1,10 @@
 import type { Page } from "@playwright/test";
-import { expect, holdForContextMenu, test as fixtureTest } from "./test";
+import {
+  expect,
+  holdForContextMenu,
+  chooseSection,
+  test as fixtureTest,
+} from "./test";
 
 declare global {
   interface Window {
@@ -47,7 +52,39 @@ for (const width of [390, 1280]) {
     () => {
       fixtureTest.use({ viewport: { width, height: 844 } });
 
-      for (const kind of ["current", "default", "dialog"] as const) {
+      fixtureTest(
+        "changed source keeps its timestamp and requires a new selection",
+        async ({ page }) => {
+          await page.goto("/scene-cover-fixture/scenes/1?stale");
+          if (mobile) await chooseSection(page, "Details");
+          await expect(
+            page.getByText("0:01.125", { exact: true }),
+          ).toBeVisible();
+          await expect(
+            page.getByText(
+              "The original video has changed or was removed. The cover is kept; select a new frame to regenerate it.",
+              { exact: true },
+            ),
+          ).toBeVisible();
+          await page
+            .getByRole("button", {
+              name: mobile ? "Entity actions" : "Operations",
+              exact: true,
+            })
+            .click();
+          await expect(
+            page.getByRole(mobile ? "button" : "menuitem", {
+              name: "Regenerate selected cover",
+              exact: true,
+            }),
+          ).toBeDisabled();
+          expect(
+            await page.evaluate(() => window.coverFixture.regenerations),
+          ).toEqual([]);
+        },
+      );
+
+      for (const kind of ["current", "default", "dialog", "saved"] as const) {
         fixtureTest(
           `${kind} cover updates the cached list after leaving details`,
           async ({ page }) => {
@@ -83,6 +120,16 @@ for (const width of [390, 1280]) {
                   page.evaluate(() => window.coverFixture.generations.length),
                 )
                 .toBe(1);
+            } else if (kind === "saved") {
+              await action(page, mobile, "Regenerate selected cover");
+              await expect
+                .poll(() =>
+                  page.evaluate(() => window.coverFixture.regenerations),
+                )
+                .toEqual([{ id: "1" }]);
+              expect(
+                await page.evaluate(() => window.coverFixture.screenshots),
+              ).toEqual([]);
             } else {
               await action(
                 page,

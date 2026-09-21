@@ -31,6 +31,10 @@ type Manifest struct {
 // Replacing a file, changing the primary file or editing a cover in v2.5 makes
 // a previous rendition unreachable without a database migration or reconciler.
 func SourceKey(source, identity string) (string, error) {
+	return sourceKey(RecipeVersion, source, identity)
+}
+
+func sourceKey(version int, source, identity string) (string, error) {
 	stat, err := os.Stat(source)
 	if err != nil {
 		return "", err
@@ -38,7 +42,40 @@ func SourceKey(source, identity string) (string, error) {
 	if !stat.Mode().IsRegular() {
 		return "", fmt.Errorf("preview source is not a regular file")
 	}
-	return fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprintf("%d\x00%s\x00%d\x00%d\x00%s", RecipeVersion, source, stat.Size(), stat.ModTime().UnixNano(), identity)))), nil
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprintf("%d\x00%s\x00%d\x00%d\x00%s", version, source, stat.Size(), stat.ModTime().UnixNano(), identity)))), nil
+}
+
+// CoverKey binds renditions to saved artwork, independently of the source
+// video's availability. Source validity controls regeneration, not display.
+func CoverKey(checksum string) string {
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprintf("%d\x00cover\x00%s", RecipeVersion, checksum))))
+}
+
+// LegacyCoverTimestamp recovers the selection from the original v1 manifest
+// only when both its source fingerprint and cover checksum still match. It
+// deliberately ignores missing renditions and the current encoding recipe:
+// those are precisely why a user may need to regenerate the cover.
+func (s Store) LegacyCoverTimestamp(sceneID int, source, checksum string) (float64, error) {
+	key, err := sourceKey(1, source, checksum)
+	if err != nil {
+		return 0, err
+	}
+	data, err := os.ReadFile(filepath.Join(s.Root, "1", strconv.Itoa(sceneID), "cover", key, "manifest.json"))
+	if err != nil {
+		return 0, err
+	}
+	var saved struct {
+		Version int      `json:"version"`
+		Key     string   `json:"key"`
+		At      *float64 `json:"at"`
+	}
+	if err := json.Unmarshal(data, &saved); err != nil {
+		return 0, err
+	}
+	if saved.Version != 1 || saved.Key != key || saved.At == nil || !validTimestamp(*saved.At) {
+		return 0, fmt.Errorf("invalid legacy cover source")
+	}
+	return *saved.At, nil
 }
 
 func (s Store) SceneDirectory(sceneID int) string {

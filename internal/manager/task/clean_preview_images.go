@@ -53,6 +53,7 @@ func (j *CleanGeneratedJob) cleanPreviewImages(ctx context.Context, kind string)
 				continue
 			}
 			if kind == "cover" && scene.CoverChecksum != "" {
+				keep[previewimage.CoverKey(scene.CoverChecksum)] = true
 				key, err := previewimage.SourceKey(scene.Path, scene.CoverChecksum)
 				if err != nil {
 					return err

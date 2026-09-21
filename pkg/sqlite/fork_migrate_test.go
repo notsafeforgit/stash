@@ -48,7 +48,7 @@ func TestForkMigrationsRunOutsideUpstreamSchemaVersion(t *testing.T) {
 	if !rawTableExists(t, raw, "fork_performer_autotag_ignored_names") {
 		t.Fatal("fork_performer_autotag_ignored_names table was not created")
 	}
-	for _, tableName := range []string{"fork_saved_filter_state", "fork_video_file_metadata", "fork_image_file_metadata"} {
+	for _, tableName := range []string{"fork_saved_filter_state", "fork_video_file_metadata", "fork_image_file_metadata", "fork_scene_cover_sources"} {
 		if !rawTableExists(t, raw, tableName) {
 			t.Fatalf("%s table was not created", tableName)
 		}
@@ -66,7 +66,7 @@ func TestForkMigrationsRunOutsideUpstreamSchemaVersion(t *testing.T) {
 			t.Fatalf("image_files.%s column was not removed", column)
 		}
 	}
-	if got, want := queryUint(t, raw, "SELECT COUNT(*) FROM fork_schema_migrations"), uint(2); got != want {
+	if got, want := queryUint(t, raw, "SELECT COUNT(*) FROM fork_schema_migrations"), uint(3); got != want {
 		t.Fatalf("fork migration count = %d, want %d", got, want)
 	}
 }
@@ -283,7 +283,7 @@ func TestPrivateForkVersionFourUpgradesToConsolidatedMigration(t *testing.T) {
 	if got, want := queryUint(t, raw, "SELECT MAX(version) FROM fork_schema_migrations"), upgrade.RequiredForkSchemaVersion(); got != want {
 		t.Fatalf("consolidated fork version = %d, want %d", got, want)
 	}
-	if got, want := queryUint(t, raw, "SELECT COUNT(*) FROM fork_schema_migrations"), uint(2); got != want {
+	if got, want := queryUint(t, raw, "SELECT COUNT(*) FROM fork_schema_migrations"), uint(3); got != want {
 		t.Fatalf("consolidated migration count = %d, want %d", got, want)
 	}
 	if rawColumnExists(t, raw, "performer_aliases", "ignore_auto_tag") || rawColumnExists(t, raw, "saved_filters", "filter_ast") {

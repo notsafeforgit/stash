@@ -2798,6 +2798,13 @@
     "delivery": "Share delivery",
     "media_count": "{count, plural, one {# media item} other {# media items}}",
     "openings": "{count, plural, one {# link opening} other {# link openings}}",
-    "last_opened": "Last opened {date}"
+    "last_opened": "Last opened {date}",
+    "status": "Share status",
+    "inactive": "Inactive",
+    "empty_active": "No active shares",
+    "empty_inactive": "No inactive shares",
+    "inactive_description": "Revoked and expired shares appear here. Delete them when you no longer need their history.",
+    "delete": "Delete share",
+    "delete_description": "Permanently delete this share and its history. The link will remain unavailable. Your library media will be kept."
   }
 }

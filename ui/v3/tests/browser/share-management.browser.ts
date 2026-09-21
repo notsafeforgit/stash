@@ -1,7 +1,8 @@
 import * as GQL from "../../src/core/generated-graphql";
 import { test, expect } from "./test";
+import { z } from "zod";
 
-test("create a mixed share, edit expiry and revoke through existing dialogs", async ({
+test("create, edit, revoke and delete a share through the active and inactive views", async ({
   page,
 }) => {
   let shares: GQL.MediaShareFieldsFragment[] = [];
@@ -12,8 +13,23 @@ test("create a mixed share, edit expiry and revoke through existing dialogs", as
       throw new Error("Missing operation");
     const name = body.operationName;
     if (name === "MediaShares") {
+      const { status, limit, offset } = z
+        .object({
+          variables: z.object({
+            status: z.enum(GQL.MediaShareStatus),
+            limit: z.number(),
+            offset: z.number(),
+          }),
+        })
+        .parse(body).variables;
       const data: GQL.MediaSharesQuery = {
-        mediaShares: shares,
+        mediaShares: shares
+          .filter((share) => {
+            const active =
+              !share.revoked_at && Date.parse(share.expires_at) > Date.now();
+            return active === (status === GQL.MediaShareStatus.Active);
+          })
+          .slice(offset, offset + limit),
         sharingConfiguration: {
           __typename: "SharingConfiguration",
           public_url: "https://shares.test/share",
@@ -116,6 +132,13 @@ test("create a mixed share, edit expiry and revoke through existing dialogs", as
         revoked_at: new Date().toISOString(),
       }));
       await route.fulfill({ json: { data: { mediaShareRevoke: true } } });
+    } else if (name === "MediaShareDelete") {
+      const { id } = z
+        .object({ variables: z.object({ id: z.string() }) })
+        .parse(body).variables;
+      expect(shares.find((share) => share.id === id)?.revoked_at).toBeTruthy();
+      shares = shares.filter((share) => share.id !== id);
+      await route.fulfill({ json: { data: { mediaShareDelete: true } } });
     } else throw new Error(`Unexpected operation ${name}`);
   });
   await page.goto("/share-management.html");
@@ -152,5 +175,28 @@ test("create a mixed share, edit expiry and revoke through existing dialogs", as
     .getByRole("menuitem", { name: "Revoke share", exact: true })
     .click();
   await page.getByRole("button", { name: "Confirm", exact: true }).click();
+  await expect(
+    page.getByText("No active shares", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("Updated share", { exact: true })).toBeHidden();
+  await page.getByRole("button", { name: "Inactive", exact: true }).click();
   await expect(page.getByText("Revoked", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Operations", exact: true }).click();
+  await page
+    .getByRole("menuitem", { name: "Delete share", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  expect(shares).toHaveLength(1);
+  await page.getByRole("button", { name: "Operations", exact: true }).click();
+  await page
+    .getByRole("menuitem", { name: "Delete share", exact: true })
+    .click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Delete", exact: true })
+    .click();
+  await expect(
+    page.getByText("No inactive shares", { exact: true }),
+  ).toBeVisible();
+  expect(shares).toEqual([]);
 });

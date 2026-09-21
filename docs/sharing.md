@@ -6,6 +6,12 @@ toolbar, or in **Settings → Shares**. The settings page can combine scenes,
 images and galleries in one link. It also supports editing expiry and display
 options, previewing the recipient view, regenerating a link and revoking access.
 
+The settings list shows **Active** shares by default. **Inactive** contains
+revoked and expired shares; its **Delete share** action permanently removes the
+grant, its history and guest/preview sessions without deleting library media.
+Active shares must be revoked before deletion. Status filtering happens before
+pagination, so inactive history cannot hide active links on later pages.
+
 The default lifetime is 24 hours; presets include one hour and seven days.
 Custom expiry is limited to the next 30 days. The public label is always shown.
 Saved titles and original-file downloads require separate opt-ins. The link

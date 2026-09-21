@@ -19,10 +19,28 @@ func (*ShareStore) Find(ctx context.Context, id string) (*models.ShareRecord, er
 	return &row, err
 }
 
-func (*ShareStore) List(ctx context.Context, limit, offset int) ([]*models.ShareRecord, error) {
+func (*ShareStore) List(ctx context.Context, options models.ShareListOptions) ([]*models.ShareRecord, error) {
 	ret := []*models.ShareRecord{}
-	err := dbWrapper.Select(ctx, &ret, `SELECT * FROM fork_shares ORDER BY created_at DESC, id LIMIT ? OFFSET ?`, limit, offset)
+	query := `SELECT * FROM fork_shares`
+	args := []any{}
+	if options.Active != nil {
+		if *options.Active {
+			query += ` WHERE revoked_at = 0 AND expires_at > ?`
+		} else {
+			query += ` WHERE revoked_at <> 0 OR expires_at <= ?`
+		}
+		args = append(args, options.Now)
+	}
+	query += ` ORDER BY created_at DESC, id LIMIT ? OFFSET ?`
+	args = append(args, options.Limit, options.Offset)
+	err := dbWrapper.Select(ctx, &ret, query, args...)
 	return ret, err
+}
+
+func (*ShareStore) Delete(ctx context.Context, id string) error {
+	// The foreign key removes guest and preview sessions in the same transaction.
+	_, err := dbWrapper.Exec(ctx, `DELETE FROM fork_shares WHERE id = ?`, id)
+	return err
 }
 
 func (*ShareStore) Create(ctx context.Context, s *models.ShareRecord) error {

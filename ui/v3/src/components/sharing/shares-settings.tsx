@@ -3,7 +3,15 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import { useForm } from "@tanstack/react-form";
 import { useIntl } from "react-intl";
 import { z } from "zod";
-import { Eye, Link, Pencil, Plus, RotateCcw, ShieldOff } from "lucide-react";
+import {
+  Eye,
+  Link,
+  Pencil,
+  Plus,
+  RotateCcw,
+  ShieldOff,
+  Trash2,
+} from "lucide-react";
 import * as GQL from "@/core/generated-graphql";
 import { SettingsSection } from "@/components/settings/setting-row";
 import { EntityActionsMenu } from "@/components/detail/entity-actions-menu";
@@ -33,6 +41,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Spinner } from "@/components/ui/spinner";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useMsg } from "@/hooks/message";
 import { useToast } from "@/hooks/toast";
 import { ShareDialog } from "./share-dialog";
@@ -140,13 +149,13 @@ function ShareCard({
   refresh,
 }: {
   share: GQL.MediaShareFieldsFragment;
-  refresh: () => void;
+  refresh: () => Promise<void>;
 }) {
   const msg = useMsg();
   const intl = useIntl();
   const toast = useToast();
   const [editing, setEditing] = useState(false);
-  const [confirm, setConfirm] = useState<"revoke" | "rotate">();
+  const [confirm, setConfirm] = useState<"revoke" | "rotate" | "delete">();
   const [link, setLink] = useState<{ id: string; url: string }>();
   const [revoke, { loading: revoking }] = useMutation(
     GQL.MediaShareRevokeDocument,
@@ -154,6 +163,38 @@ function ShareCard({
   const [rotate, { loading: rotating }] = useMutation(
     GQL.MediaShareRotateDocument,
   );
+  const [deleteShare, { loading: deleting }] = useMutation(
+    GQL.MediaShareDeleteDocument,
+    {
+      update: (cache) => {
+        cache.evict({ id: cache.identify(share) });
+        cache.gc();
+      },
+    },
+  );
+  const confirmations = {
+    revoke: {
+      title: msg("sharing.revoke", "Revoke share"),
+      description: msg(
+        "sharing.revoke_description",
+        "The link and every active session will stop working. Media already saved by recipients cannot be removed.",
+      ),
+    },
+    rotate: {
+      title: msg("sharing.regenerate", "Regenerate link"),
+      description: msg(
+        "sharing.rotate_description",
+        "The old link and every active session will stop working. You will receive a new link to copy.",
+      ),
+    },
+    delete: {
+      title: msg("sharing.delete", "Delete share"),
+      description: msg(
+        "sharing.delete_description",
+        "Permanently delete this share and its history. The link will remain unavailable. Your library media will be kept.",
+      ),
+    },
+  };
   const preview = useSharePreview();
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
@@ -165,13 +206,15 @@ function ShareCard({
   async function confirmAction() {
     try {
       if (confirm === "revoke") await revoke({ variables: { id: share.id } });
+      else if (confirm === "delete")
+        await deleteShare({ variables: { id: share.id } });
       else if (confirm === "rotate") {
         const result = await rotate({ variables: { id: share.id } });
         if (result.data)
           setLink({ id: share.id, url: result.data.mediaShareRotate });
       }
       setConfirm(undefined);
-      refresh();
+      await refresh();
     } catch (error) {
       toast.error(error);
     }
@@ -202,7 +245,7 @@ function ShareCard({
                   : msg("sharing.expired", "Expired")}
             </Badge>
             <EntityActionsMenu
-              busy={revoking || rotating || preview.loading}
+              busy={revoking || rotating || deleting || preview.loading}
               items={[
                 {
                   key: "preview",
@@ -233,6 +276,17 @@ function ShareCard({
                   disabled: !!share.revoked_at,
                   destructive: true,
                 },
+                ...(!active
+                  ? [
+                      {
+                        key: "delete",
+                        icon: Trash2,
+                        label: msg("sharing.delete", "Delete share"),
+                        onSelect: () => setConfirm("delete"),
+                        destructive: true,
+                      },
+                    ]
+                  : []),
               ]}
             />
           </div>
@@ -298,26 +352,15 @@ function ShareCard({
           onOpenChange={(open) => {
             if (!open) setConfirm(undefined);
           }}
-          title={
-            confirm === "revoke"
-              ? msg("sharing.revoke", "Revoke share")
-              : msg("sharing.regenerate", "Regenerate link")
+          title={confirmations[confirm].title}
+          confirmText={
+            confirm === "delete" ? msg("actions.delete", "Delete") : undefined
           }
           onConfirm={() => {
-            if (!revoking && !rotating) void confirmAction();
+            if (!revoking && !rotating && !deleting) void confirmAction();
           }}
         >
-          <p className="text-sm">
-            {confirm === "revoke"
-              ? msg(
-                  "sharing.revoke_description",
-                  "The link and every active session will stop working. Media already saved by recipients cannot be removed.",
-                )
-              : msg(
-                  "sharing.rotate_description",
-                  "The old link and every active session will stop working. You will receive a new link to copy.",
-                )}
-          </p>
+          <p className="text-sm">{confirmations[confirm].description}</p>
         </DestructiveConfirmDialog>
       )}
       {link && (
@@ -330,12 +373,20 @@ function ShareCard({
 export function SharesSettings() {
   const msg = useMsg();
   const [offset, setOffset] = useState(0);
+  const [status, setStatus] = useState<GQL.MediaShareStatus>(
+    GQL.MediaShareStatus.Active,
+  );
   const [creating, setCreating] = useState(false);
   const { data, error, loading, refetch } = useQuery(GQL.MediaSharesDocument, {
-    variables: { limit: 50, offset },
+    variables: { limit: 50, offset, status },
     fetchPolicy: "cache-and-network",
     pollInterval: 30_000,
   });
+  async function refresh() {
+    const result = await refetch();
+    if (offset > 0 && result.data?.mediaShares.length === 0)
+      setOffset((value) => Math.max(0, value - 50));
+  }
   return (
     <div className="max-w-4xl space-y-8 p-6">
       <SettingsSection
@@ -345,11 +396,28 @@ export function SharesSettings() {
           "Manage anonymous, expiring access to selected media. Revoke access at any time.",
         )}
       >
-        <div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <Button onClick={() => setCreating(true)}>
-            <Plus />
+            <Plus data-icon="inline-start" />
             {msg("sharing.create", "Create share")}
           </Button>
+          <ToggleGroup<GQL.MediaShareStatus>
+            variant="outline"
+            aria-label={msg("sharing.status", "Share status")}
+            value={[status]}
+            onValueChange={([value]) => {
+              if (!value || value === status) return;
+              setStatus(value);
+              setOffset(0);
+            }}
+          >
+            <ToggleGroupItem value={GQL.MediaShareStatus.Active}>
+              {msg("sharing.active", "Active")}
+            </ToggleGroupItem>
+            <ToggleGroupItem value={GQL.MediaShareStatus.Inactive}>
+              {msg("sharing.inactive", "Inactive")}
+            </ToggleGroupItem>
+          </ToggleGroup>
         </div>
         {error && (
           <QueryError
@@ -366,23 +434,28 @@ export function SharesSettings() {
               <EmptyMedia variant="icon">
                 <Link />
               </EmptyMedia>
-              <EmptyTitle>{msg("sharing.empty", "No shares yet")}</EmptyTitle>
+              <EmptyTitle>
+                {status === GQL.MediaShareStatus.Active
+                  ? msg("sharing.empty_active", "No active shares")
+                  : msg("sharing.empty_inactive", "No inactive shares")}
+              </EmptyTitle>
               <EmptyDescription>
-                {msg(
-                  "sharing.empty_description",
-                  "Create a share here, from a media page, or from a selection in your library.",
-                )}
+                {status === GQL.MediaShareStatus.Active
+                  ? msg(
+                      "sharing.empty_description",
+                      "Create a share here, from a media page, or from a selection in your library.",
+                    )
+                  : msg(
+                      "sharing.inactive_description",
+                      "Revoked and expired shares appear here. Delete them when you no longer need their history.",
+                    )}
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
         )}
         <div className="space-y-4">
           {data?.mediaShares.map((share) => (
-            <ShareCard
-              key={share.id}
-              share={share}
-              refresh={() => void refetch()}
-            />
+            <ShareCard key={share.id} share={share} refresh={refresh} />
           ))}
         </div>
         {(offset > 0 || data?.mediaShares.length === 50) && (

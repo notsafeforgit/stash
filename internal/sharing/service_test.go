@@ -17,12 +17,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func testService(t *testing.T) (*Service, *mocks.Database, *models.VideoFile, *sqlite.Database) {
+func testShareDatabase(t *testing.T) *sqlite.Database {
 	t.Helper()
 	config.InitializeEmpty()
 	db := sqlite.NewDatabase()
 	require.NoError(t, db.Open(filepath.Join(t.TempDir(), "shares.sqlite")))
 	t.Cleanup(func() { _ = db.Close() })
+	return db
+}
+
+func testService(t *testing.T) (*Service, *mocks.Database, *models.VideoFile, *sqlite.Database) {
+	t.Helper()
+	db := testShareDatabase(t)
 	m := mocks.NewDatabase()
 	repo := db.Repository()
 	repo.Scene, repo.Image, repo.Gallery = m.Scene, m.Image, m.Gallery

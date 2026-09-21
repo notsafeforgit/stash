@@ -43,13 +43,18 @@ func shareLink(ctx context.Context, id, secret string) string {
 	return base + "/" + url.PathEscape(id) + "/#" + secret
 }
 
-func (r *queryResolver) MediaShares(ctx context.Context, limit int, offset int) ([]*MediaShare, error) {
+func (r *queryResolver) MediaShares(ctx context.Context, limit int, offset int, status *MediaShareStatus) ([]*MediaShare, error) {
 	if limit < 1 || limit > 100 || offset < 0 {
 		return nil, fmt.Errorf("invalid share pagination")
 	}
 	ret := []*MediaShare{}
+	options := models.ShareListOptions{Limit: limit, Offset: offset, Now: time.Now().Unix()}
+	if status != nil {
+		active := *status == MediaShareStatusActive
+		options.Active = &active
+	}
 	err := r.withReadTxn(ctx, func(ctx context.Context) error {
-		rows, err := r.repository.Share.List(ctx, limit, offset)
+		rows, err := r.repository.Share.List(ctx, options)
 		if err != nil {
 			return err
 		}
@@ -124,6 +129,10 @@ func (r *mutationResolver) MediaShareUpdate(ctx context.Context, input MediaShar
 
 func (r *mutationResolver) MediaShareRevoke(ctx context.Context, id string) (bool, error) {
 	err := r.shares.Revoke(ctx, id)
+	return err == nil, err
+}
+func (r *mutationResolver) MediaShareDelete(ctx context.Context, id string) (bool, error) {
+	err := r.shares.Delete(ctx, id)
 	return err == nil, err
 }
 func (r *mutationResolver) MediaShareRotate(ctx context.Context, id string) (string, error) {

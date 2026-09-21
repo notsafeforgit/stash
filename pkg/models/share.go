@@ -29,6 +29,13 @@ type ShareSession struct {
 	ExchangeOnly bool   `db:"exchange_only"`
 }
 
+type ShareListOptions struct {
+	Limit, Offset int
+	// Nil includes all shares. Filtering happens before pagination.
+	Active *bool
+	Now    int64
+}
+
 // ShareSnapshot freezes membership, ordering and the small metadata allowlist.
 // File identities are pinned too: replacing an entity's file does not expand an
 // existing grant. No filesystem paths, owner activity or free-form notes appear
@@ -62,9 +69,10 @@ type ShareMedia struct {
 
 type ShareReaderWriter interface {
 	Find(context.Context, string) (*ShareRecord, error)
-	List(context.Context, int, int) ([]*ShareRecord, error)
+	List(context.Context, ShareListOptions) ([]*ShareRecord, error)
 	Create(context.Context, *ShareRecord) error
 	Update(context.Context, *ShareRecord) error
+	Delete(context.Context, string) error
 	PutSession(context.Context, *ShareSession) error
 	FindSession(context.Context, []byte) (*ShareSession, error)
 	DeleteSession(context.Context, []byte) error

@@ -21,6 +21,7 @@ import (
 const MaxItems = 2000
 
 var ErrUnavailable = errors.New("share unavailable")
+var ErrActive = errors.New("revoke an active share before deleting it")
 
 type Target struct {
 	Kind string
@@ -149,6 +150,26 @@ func (s *Service) Revoke(ctx context.Context, id string) error {
 			return err
 		}
 		return s.Repo.Share.DeleteSessions(ctx, id)
+	})
+	if err == nil {
+		s.Cancel(id)
+	}
+	return err
+}
+
+func (s *Service) Delete(ctx context.Context, id string) error {
+	err := s.Repo.WithTxn(ctx, func(ctx context.Context) error {
+		row, err := s.Repo.Share.Find(ctx, id)
+		if err != nil {
+			return err
+		}
+		if row == nil {
+			return nil
+		}
+		if Active(row, time.Now()) {
+			return ErrActive
+		}
+		return s.Repo.Share.Delete(ctx, id)
 	})
 	if err == nil {
 		s.Cancel(id)

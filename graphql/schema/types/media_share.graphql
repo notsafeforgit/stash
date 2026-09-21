@@ -5,6 +5,12 @@ enum ShareEntityKind {
   GALLERY
 }
 
+enum MediaShareStatus {
+  ACTIVE
+  "Revoked or expired shares."
+  INACTIVE
+}
+
 input MediaShareTargetInput {
   kind: ShareEntityKind!
   id: ID!
@@ -61,7 +67,7 @@ type SharingConfiguration {
 }
 
 extend type Query {
-  mediaShares(limit: Int! = 100, offset: Int! = 0): [MediaShare!]!
+  mediaShares(limit: Int! = 100, offset: Int! = 0, status: MediaShareStatus): [MediaShare!]!
   mediaShare(id: ID!): MediaShare
   sharingConfiguration: SharingConfiguration!
 }
@@ -70,6 +76,8 @@ extend type Mutation {
   mediaShareCreate(input: MediaShareCreateInput!): MediaShareCreated!
   mediaShareUpdate(input: MediaShareUpdateInput!): MediaShare!
   mediaShareRevoke(id: ID!): Boolean!
+  "Permanently remove a revoked or expired share and its sessions. Media is kept."
+  mediaShareDelete(id: ID!): Boolean!
   mediaShareRotate(id: ID!): String!
   "Short-lived, single-use preview link; does not change the recipient's link."
   mediaSharePreview(id: ID!): String!

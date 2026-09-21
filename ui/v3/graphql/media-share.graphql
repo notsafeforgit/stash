@@ -16,8 +16,8 @@ fragment MediaShareFields on MediaShare {
     media_count
   }
 }
-query MediaShares($limit: Int!, $offset: Int!) {
-  mediaShares(limit: $limit, offset: $offset) {
+query MediaShares($limit: Int!, $offset: Int!, $status: MediaShareStatus) {
+  mediaShares(limit: $limit, offset: $offset, status: $status) {
     ...MediaShareFields
   }
   sharingConfiguration {
@@ -41,6 +41,9 @@ mutation MediaShareUpdate($input: MediaShareUpdateInput!) {
 }
 mutation MediaShareRevoke($id: ID!) {
   mediaShareRevoke(id: $id)
+}
+mutation MediaShareDelete($id: ID!) {
+  mediaShareDelete(id: $id)
 }
 mutation MediaShareRotate($id: ID!) {
   mediaShareRotate(id: $id)

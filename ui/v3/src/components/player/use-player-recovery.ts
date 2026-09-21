@@ -1,6 +1,6 @@
 import { useCommittedRef } from "@/hooks/use-committed-ref";
-import { useEffect, type RefObject } from "react";
-import { isHlsPlaylist } from "./hls";
+import { useEffect, useRef, type RefObject } from "react";
+import { isHlsPlaylist, isIOSNativeFullscreen } from "./hls";
 
 /** Native fullscreen seeks and stalled playback feed the same transition handlers
  * as the custom controls. They do not decide how a source is restarted. */
@@ -121,7 +121,7 @@ export function usePlayerRecovery({
   //      socket). The user hits play, the resume request goes
   //      nowhere, no bytes flow.
   //
-  //   2. `totalVideoFrames` not advancing while `currentTime` is —
+  //   2. Presented video frames not advancing while `currentTime` is —
   //      iOS Safari's "ghost playback" state. After a screen
   //      lock / unlock cycle, ManagedMediaSource can leave the audio
   //      clock running but the video decoder detached: the seek bar
@@ -144,6 +144,8 @@ export function usePlayerRecovery({
   // doesn't loop. `reloadingRef` additionally suppresses the
   // watchdog during the React-side source-change window.
   const forceRemountAtRef = useCommittedRef(forceRemountAt);
+  // A recovery changes finalSrc. Keep its cooldown across that effect restart.
+  const lastRecoveryAtRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!finalSrc) return;
@@ -161,17 +163,42 @@ export function usePlayerRecovery({
     let lastProgressAt = 0;
     let lastFrameCount = 0;
     let lastFrameAt = 0;
-    let lastRecoveryAt = 0;
+    let lastPresentedTime: number | null = null;
+    let frameRequest: number | null = null;
+    let usesFrameCallbacks = false;
 
     const readFrameCount = (v: HTMLVideoElement): number | null => {
-      // `getVideoPlaybackQuality` is the standard spec name; iOS
-      // Safari 15+ and every desktop engine implement it. Returns
-      // `null` on the rare browser that doesn't, which disables the
-      // frame-stall check while keeping the time-stall check active.
       try {
-        return v.getVideoPlaybackQuality?.().totalVideoFrames ?? null;
+        const quality = v.getVideoPlaybackQuality?.();
+        if (!quality) return null;
+        // totalVideoFrames includes dropped frames. A decoder can keep
+        // discarding frames while the displayed picture stays frozen.
+        const displayed = quality.totalVideoFrames - quality.droppedVideoFrames;
+        return Number.isFinite(displayed) ? Math.max(0, displayed) : null;
       } catch {
         return null;
+      }
+    };
+
+    const cancelFrame = (v: HTMLVideoElement) => {
+      if (frameRequest !== null) v.cancelVideoFrameCallback?.(frameRequest);
+      frameRequest = null;
+    };
+    const observeNextFrame = (v: HTMLVideoElement) => {
+      if (frameRequest !== null || !v.requestVideoFrameCallback) return;
+      try {
+        usesFrameCallbacks = true;
+        // One sample per watchdog tick is sufficient; no per-frame render or
+        // React state update. Audio/timeupdate cannot refresh this timestamp.
+        frameRequest = v.requestVideoFrameCallback((_now, metadata) => {
+          frameRequest = null;
+          if (attachedVideo === v && metadata.mediaTime !== lastPresentedTime) {
+            lastPresentedTime = metadata.mediaTime;
+            lastFrameAt = Date.now();
+          }
+        });
+      } catch {
+        usesFrameCallbacks = false;
       }
     };
 
@@ -181,6 +208,7 @@ export function usePlayerRecovery({
       const frames = readFrameCount(v);
       if (frames != null) lastFrameCount = frames;
       lastFrameAt = Date.now();
+      lastPresentedTime = null;
     };
 
     const onLoadStart = (e: Event) => {
@@ -189,12 +217,19 @@ export function usePlayerRecovery({
       // doesn't trigger recovery; will re-arm on the next `playing`.
       armed = false;
       const v = e.currentTarget;
-      if (v instanceof HTMLVideoElement) resetBaseline(v);
+      if (v instanceof HTMLVideoElement) {
+        cancelFrame(v);
+        resetBaseline(v);
+        observeNextFrame(v);
+      }
     };
     const onPlaying = (e: Event) => {
       armed = true;
       const v = e.currentTarget;
-      if (v instanceof HTMLVideoElement) resetBaseline(v);
+      if (v instanceof HTMLVideoElement) {
+        resetBaseline(v);
+        observeNextFrame(v);
+      }
     };
     const onPlay = (e: Event) => {
       const v = e.currentTarget;
@@ -204,7 +239,8 @@ export function usePlayerRecovery({
       const v = e.currentTarget;
       if (!(v instanceof HTMLVideoElement)) return;
       if (Math.abs(v.currentTime - lastProgressTime) > PROGRESS_EPSILON_S) {
-        resetBaseline(v);
+        lastProgressTime = v.currentTime;
+        lastProgressAt = Date.now();
       }
     };
     const onSeeking = (e: Event) => {
@@ -217,7 +253,11 @@ export function usePlayerRecovery({
 
     const intervalId = setInterval(() => {
       const v = attachedVideo;
-      if (!v || !armed || v.paused || reloadingRef.current) return;
+      if (!v || !armed || reloadingRef.current) return;
+      if (v.paused || v.ended || isSeekPreviewActiveRef.current()) {
+        resetBaseline(v);
+        return;
+      }
       // Skip while the page is hidden (iPhone screen locked / tab
       // backgrounded). Frame-count progress legitimately stalls
       // there because the compositor isn't drawing, and
@@ -226,26 +266,51 @@ export function usePlayerRecovery({
       // `visibilitychange` handler below resets the baselines on
       // resume so the 4 s grace window applies after the user comes
       // back, not from when they left.
-      if (typeof document !== "undefined" && document.hidden) return;
+      if (document.hidden) {
+        resetBaseline(v);
+        return;
+      }
       const now = Date.now();
-      // Refresh the frame-count baseline. Done in-loop rather than
-      // via an event because there's no DOM event for decoded-frame
-      // progress — iOS only exposes the cumulative counter.
-      const frames = readFrameCount(v);
-      if (frames != null && frames > lastFrameCount) {
+      observeNextFrame(v);
+      const frames = usesFrameCallbacks ? null : readFrameCount(v);
+      if (frames != null && frames !== lastFrameCount) {
         lastFrameCount = frames;
         lastFrameAt = now;
       }
       const timeStalledMs = now - lastProgressAt;
-      const framesStalledMs = frames != null ? now - lastFrameAt : 0;
+      // Browsers may stop presenting an offscreen video while its audio
+      // continues. Only diagnose the picture when it can be seen.
+      const bounds = v.getBoundingClientRect();
+      const visible =
+        bounds.width > 0 &&
+        bounds.height > 0 &&
+        bounds.bottom > 0 &&
+        bounds.right > 0 &&
+        bounds.top < window.innerHeight &&
+        bounds.left < window.innerWidth;
+      const externalPresentation =
+        isIOSNativeFullscreen(v) ||
+        document.pictureInPictureElement === v ||
+        ("webkitPresentationMode" in v &&
+          v.webkitPresentationMode === "picture-in-picture");
+      const observesVideo =
+        v.videoWidth > 0 &&
+        (visible || externalPresentation) &&
+        (usesFrameCallbacks || frames != null);
+      if (!observesVideo) lastFrameAt = now;
+      const framesStalledMs = observesVideo ? now - lastFrameAt : 0;
       if (
         timeStalledMs < STALL_THRESHOLD_MS &&
         framesStalledMs < STALL_THRESHOLD_MS
       ) {
         return;
       }
-      if (now - lastRecoveryAt < RECOVERY_COOLDOWN_MS) return;
-      lastRecoveryAt = now;
+      if (
+        lastRecoveryAtRef.current !== null &&
+        now - lastRecoveryAtRef.current < RECOVERY_COOLDOWN_MS
+      )
+        return;
+      lastRecoveryAtRef.current = now;
       const sceneTime = v.currentTime + offsetStartRef.current;
       forceRemountAtRef.current(sceneTime);
     }, CHECK_INTERVAL_MS);
@@ -255,14 +320,17 @@ export function usePlayerRecovery({
       if (attachedVideo) detach(attachedVideo);
       attachedVideo = video;
       armed = false;
+      usesFrameCallbacks = false;
       video.addEventListener("loadstart", onLoadStart);
       video.addEventListener("playing", onPlaying);
       video.addEventListener("play", onPlay);
       video.addEventListener("timeupdate", onTimeUpdate);
       video.addEventListener("seeking", onSeeking);
       resetBaseline(video);
+      observeNextFrame(video);
     };
     const detach = (video: HTMLVideoElement) => {
+      cancelFrame(video);
       video.removeEventListener("loadstart", onLoadStart);
       video.removeEventListener("playing", onPlaying);
       video.removeEventListener("play", onPlay);
@@ -292,7 +360,11 @@ export function usePlayerRecovery({
     // cases where the engine recovers on its own within a second.
     const onVisibility = () => {
       if (document.hidden) return;
-      if (attachedVideo) resetBaseline(attachedVideo);
+      if (attachedVideo) {
+        cancelFrame(attachedVideo);
+        resetBaseline(attachedVideo);
+        observeNextFrame(attachedVideo);
+      }
     };
     document.addEventListener("visibilitychange", onVisibility);
 
@@ -301,6 +373,7 @@ export function usePlayerRecovery({
       clearInterval(intervalId);
       document.removeEventListener("visibilitychange", onVisibility);
       if (attachedVideo) detach(attachedVideo);
+      attachedVideo = null;
     };
   }, [rootRef, finalSrc]);
 }

@@ -31,6 +31,17 @@ export const offlineEntrySchema = z.looseObject({
   source_video_codec: z.string(),
   source_audio_codec: z.string(),
   source_file_path: z.string().optional(),
+  source_file_metadata: z
+    .object({
+      frame_rate: z.number().nonnegative().nullable(),
+      bit_rate: z.number().nonnegative().nullable(),
+      bit_depth: z.number().nonnegative().nullable(),
+      color_range: z.string().nullable(),
+      color_space: z.string().nullable(),
+      color_transfer: z.string().nullable(),
+      color_primaries: z.string().nullable(),
+    })
+    .optional(),
   resolution: z.string(),
   width_actual: z.number(),
   height_actual: z.number(),

@@ -20,6 +20,7 @@ import {
 } from "./offline-scope";
 import { offlineEntrySchema } from "./offline-entry-schema";
 import { legacyEntryDeployment } from "./offline-migration-policy";
+import type { SourceFileMetadata } from "./offline-file-metadata";
 
 const DB_VERSION = 1;
 const STORE = "offline_scenes";
@@ -80,6 +81,9 @@ export interface OfflineEntry {
    *  pre-existing entries downloaded before this field was added
    *  fall back to the OPFS path. */
   source_file_path?: string;
+  /** Optional for older downloads. Backfilled only from a matching source;
+   * subsequent metadata refreshes must not rewrite the download snapshot. */
+  source_file_metadata?: SourceFileMetadata;
   /** `StreamingResolutionEnum` value the user requested at download time. */
   resolution: string;
   /** Post-scale dimensions of the file actually on disk. For copy

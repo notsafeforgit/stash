@@ -54,6 +54,7 @@ import { HomeFixture } from "./home";
 import { TvFixture } from "./tv";
 import { MotionFixture, MotionViewerFixture } from "./motion";
 import { MobileNavigationProvider } from "@/components/layout/mobile-navigation";
+import { DownloadsFixture } from "./downloads";
 
 const params = new URLSearchParams(location.search);
 const items = Array.from({ length: 40 }, (_, index) => ({
@@ -305,6 +306,11 @@ const settingsRoute = createRoute({
 });
 const router = createRouter({
   routeTree: rootRoute.addChildren([
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/downloads",
+      component: DownloadsFixture,
+    }),
     createRoute({
       getParentRoute: () => rootRoute,
       path: "/",

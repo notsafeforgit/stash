@@ -397,7 +397,12 @@ export function SceneFileInfoTab({ scene }: { scene: SceneData }) {
                   defaultMessage: "Frame rate",
                 })}
               >
-                {file.frame_rate.toFixed(2)} fps
+                {file.frame_rate > 0
+                  ? `${file.frame_rate.toFixed(2)} fps`
+                  : intl.formatMessage({
+                      id: "unknown",
+                      defaultMessage: "Unknown",
+                    })}
               </MetaRow>
               <MetaRow
                 label={intl.formatMessage({
@@ -405,7 +410,12 @@ export function SceneFileInfoTab({ scene }: { scene: SceneData }) {
                   defaultMessage: "Bitrate",
                 })}
               >
-                {(file.bit_rate / 1000).toFixed(0)} kbps
+                {file.bit_rate > 0
+                  ? `${(file.bit_rate / 1000).toFixed(0)} kbps`
+                  : intl.formatMessage({
+                      id: "unknown",
+                      defaultMessage: "Unknown",
+                    })}
               </MetaRow>
               <FingerprintMetaRows
                 fingerprints={file.fingerprints}

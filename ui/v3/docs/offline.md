@@ -11,6 +11,10 @@ Scenes can be downloaded into browser-managed storage, played from the local
 file, and exported with **Save to Files**. The download queue survives route
 navigation, persists its entries across reloads, and supports retry, cancellation,
 and deletion. The Offline view reuses the shared list and lightbox components.
+The Downloads tray is available in the desktop header and in a compact mobile
+row while downloads are active, queued, or failed. It shows received bytes,
+percentage when the server supplies a total, and cancel/retry controls. Streaming
+transcodes have no known total, so their progress remains indeterminate.
 
 A service worker precaches a small standalone offline library and its player
 assets. After its first successful online installation, a cold launch or reload
@@ -112,6 +116,17 @@ OPFS path, server-presence state, and the local playback position. Optional
 fields allow older rows to remain readable. `width_actual`/`height_actual`
 currently start from source dimensions; completion does not probe the downloaded
 file, so these fields are not verified output measurements.
+
+New downloads snapshot source frame rate, bitrate, bit depth, and colour tags
+from both mobile/list and detail queries. File info uses the selected output
+codecs and computes the completed file's average bitrate from its size and
+duration. Copied video retains source colour metadata; HEVC/AV1 HDR conversion
+uses the download encoder's PQ/HLG preservation policy. Other converted colour
+metadata remains unknown rather than labelling the output with source HDR tags.
+Frame rate is the source rate, not a probe of the saved file. Older entries gain
+the snapshot during online metadata refresh only when their saved source path,
+dimensions, duration, and known codecs match a server file. Existing snapshots
+are retained, and unavailable frame rate/bitrate display as Unknown.
 
 Use `offline-db.ts` for all metadata transactions and `opfs-storage.ts` for file
 access. OPFS receives a stream rather than an accumulated multi-gigabyte Blob.

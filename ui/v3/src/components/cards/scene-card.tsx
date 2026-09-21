@@ -35,6 +35,13 @@ export type SceneCardScene = Omit<
     size?: number;
     video_codec?: string | null;
     audio_codec?: string | null;
+    frame_rate?: number | null;
+    bit_rate?: number | null;
+    bit_depth?: number | null;
+    color_range?: string | null;
+    color_space?: string | null;
+    color_transfer?: string | null;
+    color_primaries?: string | null;
     fingerprints?: Array<{ type: string; value: string }>;
   }>;
   interactive?: boolean | null;

@@ -22,6 +22,7 @@
 
 import type { SceneCardScene } from "src/components/cards/scene-card";
 import type { OfflineEntry } from "./offline-db";
+import { offlineFileMetadata } from "./offline-file-metadata";
 
 export function offlineEntryToSceneCardScene(
   entry: OfflineEntry,
@@ -62,8 +63,7 @@ export function offlineEntryToSceneCardScene(
         width: entry.width_actual || entry.width,
         height: entry.height_actual || entry.height,
         size: entry.bytes,
-        video_codec: entry.source_video_codec,
-        audio_codec: entry.source_audio_codec,
+        ...offlineFileMetadata(entry),
       },
     ],
     performers: entry.performers.map((p) => ({

@@ -1,4 +1,8 @@
 import type { SceneSnapshot } from "./use-download-queue";
+import {
+  snapshotFileMetadata,
+  type SourceFileMetadata,
+} from "./offline-file-metadata";
 
 /** Capabilities read by downloads. Both mobile/list and detail query projections
  * satisfy this contract without pretending they fetched each other's fields. */
@@ -15,14 +19,14 @@ export interface DownloadableScene {
     preview?: string | null;
     vtt?: string | null;
   };
-  files: readonly {
+  files: readonly (Partial<SourceFileMetadata> & {
     path: string;
     duration?: number | null;
     width?: number | null;
     height?: number | null;
     video_codec?: string | null;
     audio_codec?: string | null;
-  }[];
+  })[];
 }
 
 export function sceneDownloadSnapshot(
@@ -51,5 +55,6 @@ export function sceneDownloadSnapshot(
     source_video_codec: file.video_codec ?? "",
     source_audio_codec: file.audio_codec ?? "",
     source_file_path: file.path,
+    source_file_metadata: snapshotFileMetadata(file),
   };
 }

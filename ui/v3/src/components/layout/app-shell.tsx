@@ -6,6 +6,7 @@ import { RouteViewport } from "./route-viewport";
 import { useNavHotkeys } from "src/hooks/use-nav-hotkeys";
 import { useTrackBrowsePage } from "src/hooks/use-smart-back";
 import { DownloadProgressBar } from "src/components/offline/download-progress-bar";
+import { DownloadTray } from "src/components/offline/download-tray";
 import { DownloadNotifications } from "src/components/offline/download-notifications";
 
 // Detail routes have their own bottom bar. Settings also owns its navigation.
@@ -40,6 +41,7 @@ export function AppShell() {
         >
           <Header />
         </div>
+        <DownloadTray mobile />
         <DownloadProgressBar />
         <DownloadNotifications />
         <RouteViewport>

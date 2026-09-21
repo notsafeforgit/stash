@@ -36,6 +36,7 @@ import {
 } from "./opfs-storage";
 import { downloadQueryString, type DownloadMode } from "./pick-download-format";
 import { StreamingResolutionEnum } from "src/core/generated-graphql";
+import type { SourceFileMetadata } from "./offline-file-metadata";
 
 export interface QueueSnapshot {
   /** Scene ids waiting their turn, in order. Excludes the active one. */
@@ -79,6 +80,7 @@ export interface SceneSnapshot {
   /** Source file's server-side path. Used by the offline view as the
    *  title fallback for untitled scenes — see OfflineEntry. */
   source_file_path?: string;
+  source_file_metadata?: SourceFileMetadata;
 }
 
 export interface EnqueueArgs {
@@ -419,7 +421,11 @@ export class DownloadQueueStore {
         queued: this.snapshot.queued.filter((id) => id !== sceneId),
         active: { sceneId, bytesDownloaded: 0, bytesTotal: null },
       });
-      await patchEntry(sceneId, { status: "downloading", bytes_downloaded: 0 });
+      await patchEntry(sceneId, {
+        status: "downloading",
+        bytes_downloaded: 0,
+        bytes: 0,
+      });
       abort.signal.throwIfAborted();
       const estimate = await storageEstimate();
       abort.signal.throwIfAborted();
@@ -472,8 +478,13 @@ export class DownloadQueueStore {
         const length = response.headers.get("content-length");
         if (length !== null) total = Number(length);
       }
+      if (total !== null && (!Number.isFinite(total) || total <= 0))
+        total = null;
       this.updateActive({ bytesDownloaded: startOffset, bytesTotal: total });
-      await patchEntry(sceneId, { bytes_downloaded: startOffset });
+      await patchEntry(sceneId, {
+        bytes_downloaded: startOffset,
+        bytes: total ?? 0,
+      });
       abort.signal.throwIfAborted();
       let lastCheckpoint = performance.now();
       const bytes = await writeScene(

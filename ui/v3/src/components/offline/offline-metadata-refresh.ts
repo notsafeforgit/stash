@@ -25,6 +25,7 @@ import {
   type SlimSceneDataFragment,
 } from "src/core/generated-graphql";
 import { patchEntry, type OfflineEntry } from "./offline-db";
+import { snapshotFileMetadata } from "./offline-file-metadata";
 
 interface RefreshDeps {
   entries: OfflineEntry[];
@@ -99,6 +100,29 @@ function diffEntry(
   live: SlimSceneDataFragment,
 ): Partial<OfflineEntry> | null {
   const patch: Partial<OfflineEntry> = {};
+  // Older downloads did not retain technical metadata. Match the snapshotted
+  // path and media properties, including non-primary files; a replacement
+  // source must not silently describe bytes already saved on this device.
+  if (!entry.source_file_metadata && entry.source_file_path) {
+    const source = live.files.find(
+      (file) =>
+        file.path === entry.source_file_path &&
+        file.width === entry.width &&
+        file.height === entry.height &&
+        file.duration === entry.duration &&
+        (!entry.source_video_codec ||
+          file.video_codec === entry.source_video_codec) &&
+        (!entry.source_audio_codec ||
+          file.audio_codec === entry.source_audio_codec),
+    );
+    if (source) {
+      patch.source_file_metadata = snapshotFileMetadata(source);
+      if (!entry.source_video_codec)
+        patch.source_video_codec = source.video_codec;
+      if (!entry.source_audio_codec)
+        patch.source_audio_codec = source.audio_codec;
+    }
+  }
   if ((live.title ?? "") !== entry.title) {
     patch.title = live.title ?? "";
   }

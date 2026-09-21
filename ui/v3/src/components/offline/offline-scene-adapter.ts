@@ -21,6 +21,7 @@
 
 import type * as GQL from "src/core/generated-graphql";
 import type { OfflineEntry } from "./offline-db";
+import { offlineFileMetadata } from "./offline-file-metadata";
 
 /**
  * Build a `SceneDataFragment` from an `OfflineEntry` plus a resolved
@@ -140,19 +141,11 @@ export function offlineEntryToSceneData(
     updated_at: downloadedAtIso,
     duration: entry.duration || 0,
     video_stream_duration: null,
-    video_codec: entry.source_video_codec || "",
-    audio_codec: entry.source_audio_codec || "",
+    ...offlineFileMetadata(entry),
     frame_count: null,
     duration_mismatch: false,
     width: entry.width_actual || entry.width || 0,
     height: entry.height_actual || entry.height || 0,
-    bit_depth: null,
-    color_range: null,
-    color_space: null,
-    color_transfer: null,
-    color_primaries: null,
-    frame_rate: 0,
-    bit_rate: 0,
     fingerprints: [],
   };
 

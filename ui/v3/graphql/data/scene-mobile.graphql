@@ -15,6 +15,15 @@ fragment MobileSceneData on Scene {
     duration
     width
     height
+    video_codec
+    audio_codec
+    frame_rate
+    bit_rate
+    bit_depth
+    color_range
+    color_space
+    color_transfer
+    color_primaries
   }
 
   paths {

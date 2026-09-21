@@ -19,7 +19,7 @@
  */
 
 import type React from "react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useIntl } from "react-intl";
 import { Link } from "@tanstack/react-router";
 import {
@@ -53,6 +53,7 @@ import { cn } from "src/lib/utils";
 import { useDownloadQueue } from "./use-download-queue";
 import { useOfflineEntries } from "./use-offline-entries";
 import { entryDisplayTitle, type OfflineEntry } from "./offline-db";
+import "./download-progress-bar.css";
 
 function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes < 0) return "0 B";
@@ -66,8 +67,9 @@ function formatBytes(bytes: number): string {
   return `${n < 10 && i > 0 ? n.toFixed(1) : Math.round(n)} ${units[i]}`;
 }
 
-export function DownloadTray() {
+export function DownloadTray({ mobile = false }: { mobile?: boolean }) {
   const intl = useIntl();
+  const [open, setOpen] = useState(false);
   const queue = useDownloadQueue();
   const { entries } = useOfflineEntries();
 
@@ -97,15 +99,25 @@ export function DownloadTray() {
   // Badge count: in-flight + queued (errors are shown separately and
   // don't read as "in progress" so they're excluded from the count).
   const inProgressCount = (queue.state.active ? 1 : 0) + queuedEntries.length;
+  const active = queue.state.active;
+  const progressSummary = active
+    ? active.bytesTotal != null && active.bytesTotal > 0
+      ? `${formatBytes(active.bytesDownloaded)} / ${formatBytes(active.bytesTotal)} · ${Math.min(100, Math.round((active.bytesDownloaded / active.bytesTotal) * 100))}%`
+      : formatBytes(active.bytesDownloaded)
+    : null;
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         render={
           <Button
             variant="ghost"
-            size="icon-sm"
-            className="relative"
+            size={mobile ? "default" : "icon-sm"}
+            className={cn(
+              "relative",
+              mobile &&
+                "viewport-controls min-h-11 h-auto w-full shrink-0 justify-start rounded-none px-3 pt-[max(0.5rem,var(--safe-area-top))] pb-2 md:hidden",
+            )}
             aria-label={intl.formatMessage({
               id: "offline.tray.label",
               defaultMessage: "Downloads",
@@ -113,13 +125,33 @@ export function DownloadTray() {
           />
         }
       >
-        <CloudDownloadIcon />
+        <CloudDownloadIcon data-icon="inline-start" />
+        {mobile && (
+          <>
+            <span>{intl.formatMessage({ id: "offline.tray.label" })}</span>
+            <span className="ml-auto min-w-0 truncate tabular-nums">
+              {progressSummary ??
+                intl.formatMessage(
+                  {
+                    id:
+                      inProgressCount > 0
+                        ? "offline.tray.queued_count"
+                        : "offline.tray.errored_count",
+                  },
+                  { count: inProgressCount || errored.length },
+                )}
+            </span>
+          </>
+        )}
         {inProgressCount > 0 && (
           <Badge
             // Override Badge's default size to a notification-pip
             // overlay (~16px). The default `h-5 w-fit` is sized for
             // inline labels, not as an icon-corner notification dot.
-            className="absolute -right-0.5 -top-0.5 size-4 min-w-0 px-1 text-[0.625rem] leading-none"
+            className={cn(
+              !mobile &&
+                "absolute -right-0.5 -top-0.5 size-4 min-w-0 px-1 text-[0.625rem] leading-none",
+            )}
           >
             {inProgressCount > 9 ? "9+" : inProgressCount}
           </Badge>
@@ -127,7 +159,10 @@ export function DownloadTray() {
         {inProgressCount === 0 && errored.length > 0 && (
           <Badge
             variant="destructive"
-            className="absolute -right-0.5 -top-0.5 size-4 min-w-0 px-1 text-[0.625rem] leading-none"
+            className={cn(
+              !mobile &&
+                "absolute -right-0.5 -top-0.5 size-4 min-w-0 px-1 text-[0.625rem] leading-none",
+            )}
           >
             {errored.length > 9 ? "9+" : errored.length}
           </Badge>
@@ -135,7 +170,8 @@ export function DownloadTray() {
       </PopoverTrigger>
       <PopoverContent
         align="end"
-        className="w-80 max-h-[28rem] overflow-y-auto p-0 gap-0"
+        data-base-ui-swipe-ignore=""
+        className="w-80 max-w-[calc(100vw-1rem)] max-h-[min(28rem,var(--available-height))] overflow-y-auto p-0 gap-0"
       >
         <PopoverHeader className="flex flex-row items-center justify-between gap-2 border-b border-border px-3 py-2">
           <PopoverTitle>
@@ -146,6 +182,7 @@ export function DownloadTray() {
           </PopoverTitle>
           <Link
             to="/offline"
+            onClick={() => setOpen(false)}
             className="text-xs text-muted-foreground hover:text-foreground hover:underline"
           >
             {intl.formatMessage({
@@ -246,6 +283,7 @@ function ActiveRow({
         <Button
           variant="ghost"
           size="icon-sm"
+          className="size-11 shrink-0 md:size-8"
           onClick={onCancel}
           aria-label={intl.formatMessage({
             id: "offline.actions.cancel_download",
@@ -268,7 +306,13 @@ function ActiveRow({
           sweep takes over). Composed via Track + Indicator so the
           indeterminate variant can apply the sweep class to the
           indicator only — width=auto on the Track. */}
-      <Progress value={determinate ? pct : null} className="block w-full">
+      <Progress
+        value={determinate ? pct : null}
+        aria-label={intl.formatMessage({
+          id: "offline.notifications.progress_aria",
+        })}
+        className="block w-full"
+      >
         <ProgressTrack className="relative block h-1 w-full overflow-hidden rounded-full bg-primary/10">
           <ProgressIndicator
             className={cn(
@@ -298,6 +342,7 @@ function QueuedRow({
       <Button
         variant="ghost"
         size="icon-sm"
+        className="size-11 shrink-0 md:size-8"
         onClick={onCancel}
         aria-label={intl.formatMessage({
           id: "offline.actions.cancel_download",
@@ -332,6 +377,7 @@ function ErrorRow({
         <Button
           variant="ghost"
           size="icon-sm"
+          className="size-11 shrink-0 md:size-8"
           onClick={onRetry}
           aria-label={intl.formatMessage({
             id: "offline.actions.retry_download",
@@ -343,6 +389,7 @@ function ErrorRow({
         <Button
           variant="ghost"
           size="icon-sm"
+          className="size-11 shrink-0 md:size-8"
           onClick={onDismiss}
           aria-label={intl.formatMessage({
             id: "offline.actions.delete_from_device",

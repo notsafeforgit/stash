@@ -179,6 +179,30 @@ it("a second page cannot recover a live owner's download or enqueue it twice", a
   await vi.waitFor(() => expect(second.getSnapshot().active).toBeNull());
 });
 
+it("publishes the known transfer total to another page for determinate progress", async () => {
+  let finish: (bytes: number) => void = () => {};
+  mocks.fetch.mockResolvedValue(
+    new Response("test", { headers: { "Content-Length": "1000" } }),
+  );
+  mocks.write.mockImplementation(
+    () =>
+      new Promise<number>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const owner = new DownloadQueueStore();
+  const observer = new DownloadQueueStore();
+  await observer.init();
+  await owner.enqueue(args);
+  await vi.waitFor(() => expect(mocks.write).toHaveBeenCalledOnce());
+  await vi.waitFor(() =>
+    expect(observer.getSnapshot().active?.bytesTotal).toBe(1000),
+  );
+  expect(mocks.rows.get("1")?.bytes).toBe(1000);
+  finish(1000);
+  await vi.waitFor(() => expect(mocks.rows.get("1")?.status).toBe("complete"));
+});
+
 it("remote removal waits for the aborted writer to finish before deleting", async () => {
   let release: () => void = () => {};
   let signal: AbortSignal | undefined;

@@ -46,6 +46,7 @@ import {
 import { offlineEntryToSceneData } from "src/components/offline/offline-scene-adapter";
 import { useOpfsBlobUrl } from "src/components/offline/use-opfs-blob";
 import { useOfflineResumeWriter } from "src/components/offline/use-offline-resume-writer";
+import { useOfflineMetadataRefresh } from "src/components/offline/offline-metadata-refresh";
 import { useSmartBack } from "src/hooks/use-smart-back";
 
 function OfflineScenePage() {
@@ -56,6 +57,7 @@ function OfflineScenePage() {
   const [entry, setEntry] = useState<OfflineEntry | null | undefined>(
     undefined,
   );
+  useOfflineMetadataRefresh({ entries: entry ? [entry] : [] });
 
   // Only resolve the OPFS file once the entry exists and is complete.
   // Passing `null` keeps the hook idle until then so we don't fire a

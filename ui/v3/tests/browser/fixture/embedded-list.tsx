@@ -6,9 +6,9 @@ import { EntityList } from "@/components/list/entity-list";
 import { CardAspectContext } from "@/components/list/card-aspect-context";
 import { VirtualizedItemList } from "@/components/list/virtualized-item-list";
 import { useListSelect } from "@/components/list/use-list-select";
+import { useFilterState } from "@/components/list/use-filter-state";
 import { Button } from "@/components/ui/button";
 import { FilterMode, PreviewImageDynamicRange } from "@/core/generated-graphql";
-import { ListFilterModel } from "@/models/list-filter/filter";
 import { DisplayMode } from "@/models/list-filter/types";
 import { useMediaQuery } from "@/utils/screen";
 
@@ -17,9 +17,9 @@ const items = Array.from({ length: 40 }, (_, index) => ({
 }));
 
 function CardList() {
-  const [filter, setFilter] = useState(
-    () => new ListFilterModel(FilterMode.Scenes),
-  );
+  const { filter, setFilter } = useFilterState({
+    filterMode: FilterMode.Scenes,
+  });
   const mobile = useMediaQuery("(max-width: 767px)");
   const selection = useListSelect(items);
   return (
@@ -74,7 +74,7 @@ function CardList() {
                     sources: [],
                     thumbnail: {
                       __typename: "PreviewImage",
-                      fallback: `/fixture-cover/fallback-${item.id}.svg`,
+                      fallback: `/fixture-cover/thumbnail-fallback-${item.id}.svg`,
                       sources: [
                         {
                           __typename: "PreviewImageSource",

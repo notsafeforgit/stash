@@ -247,6 +247,11 @@ resizes, and renders only viewport rows plus overscan. The list's content-sized
 inner wrapper must not become the virtualizer's viewport: doing so mounts and
 fetches the entire page of cards. Desktop lists keep their bounded inner
 scroller. Embedded pagination returns to the list start below the header.
+Filter URL updates use `router.navigate` with `resetScroll: false` so the
+router cannot subsequently restore the previous page's offset over that reset.
+Virtual row measurements also require the observed offset to match the current
+DOM offset before adjusting scroll: a programmatic reset can precede its scroll
+event, especially in WebKit.
 
 The retained URL and pending restoration are React state snapshots. Adjust them
 conditionally when their identity changes, following React's

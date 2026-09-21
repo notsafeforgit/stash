@@ -100,9 +100,12 @@ to the older running backend and supplied null for it in responses. Existing
 artwork therefore used the same full-size fallback in both builds. The live
 backend did not receive the SQLite changes, and the live library was not mutated.
 
-Validation passed: 431 v3 unit tests plus type/lint/format/locale checks, the
-61-operation v2.5 compatibility check, affected Go integration tests and vet,
+Validation passed: 432 v3 unit tests plus type/lint/format/locale checks, the
+61-operation v2.5 compatibility check, full Go integration tests and lint,
 and production builds. All 63 Chromium regressions passed through the deferred
 media and merge-dialog entry points, navigation, and embedded lists. Four
-production PWA tests passed, including cold offline playback. Physical iPhone
-playback and memory behavior still require device verification.
+production PWA tests passed, including cold offline playback. Deployment checks
+also passed 18 repeated embedded-list tests under a two-core limit and 56
+navigation/deletion/embedded-list checks across Chromium and WebKit. These cover
+URL-based pagination, browser Back between pages, and stale virtualizer offsets.
+Physical iPhone playback and memory behavior still require device verification.

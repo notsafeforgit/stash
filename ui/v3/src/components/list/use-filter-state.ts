@@ -150,11 +150,14 @@ function useFilterURL(
           newFilter.currentPage !== prevFilter.currentPage &&
           stripPageParam(newFilter.makeQueryParameters()) ===
             stripPageParam(prevFilter.makeQueryParameters());
-        if (isPageOnlyChange) {
-          router.history.push(applicationHref(newHref));
-        } else {
-          router.history.replace(applicationHref(newHref));
-        }
+        // The list owns pagination offsets, including the header above an
+        // embedded list. A raw history write lets the router restore the
+        // previous page's offset after the list has already reset its scroll.
+        void router.navigate({
+          href: applicationHref(newHref),
+          replace: !isPageOnlyChange,
+          resetScroll: false,
+        });
       }
     },
     [router, active, setFilterState, location],

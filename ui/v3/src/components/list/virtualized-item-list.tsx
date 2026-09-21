@@ -295,6 +295,7 @@ export function VirtualizedItemList<TItem extends IHasID>({
       instance.scrollOffset ?? 0,
       instance.isScrolling,
       preserveScrollDuringRefill,
+      instance.scrollElement?.scrollTop ?? 0,
     );
 
   // The route can stay mounted when its URL or layout changes. Seed those

@@ -20,6 +20,7 @@ import { MobileListBar } from "@/components/list/mobile-list-bar";
 import { useListSelect } from "@/components/list/use-list-select";
 import { ListFilterModel } from "@/models/list-filter/filter";
 import { FilterMode } from "@/core/generated-graphql";
+import { getScrollRestorationKey } from "@/core/scroll-restoration";
 import { Button } from "@/components/ui/button";
 import { CollectionDetailLayout } from "@/components/detail/collection-detail-layout";
 import { MediaDetailLayout } from "@/components/detail/media-detail-layout";
@@ -398,6 +399,7 @@ const router = createRouter({
     ),
   ]),
   scrollRestoration: true,
+  getScrollRestorationKey,
 });
 const root = document.getElementById("root");
 if (!root) throw new Error("Missing fixture root");

@@ -27,6 +27,8 @@ test("embedded cards fetch only viewport thumbnails and remain bounded while scr
   await expect.poll(() => covers.size).toBeGreaterThan(0);
   await expect.poll(() => cards.count()).toBeLessThan(16);
   expect(covers.size).toBeLessThan(16);
+  // WebKit may preload the thumbnail's fallback before selecting <source>.
+  // Both are bounded card renditions; full-size and legacy covers stay unused.
   expect([...covers].every((url) => url.includes("/thumbnail-"))).toBe(true);
 
   await scroller.evaluate((el) => {
@@ -57,6 +59,7 @@ test("embedded pagination starts at the list and Back restores its visible cards
     el.scrollTop = el.scrollHeight;
   });
   await page.getByRole("button", { name: "Next", exact: true }).tap();
+  await expect(page).toHaveURL(/(?:\?|&)p=2(?:&|$)/);
   await expect(page.locator('[data-card-id="1"]')).toHaveAttribute(
     "data-card-page",
     "2",
@@ -66,12 +69,6 @@ test("embedded pagination starts at the list and Back restores its visible cards
     .poll(() => scroller.evaluate((el) => el.scrollTop))
     .toBeGreaterThanOrEqual(900);
 
-  // Return to page one before testing route restoration (this fixture keeps
-  // its filter local, whereas production filters also round-trip through URLs).
-  await scroller.evaluate((el) => {
-    el.scrollTop = el.scrollHeight;
-  });
-  await page.getByRole("button", { name: "Prev", exact: true }).tap();
   await scroller.evaluate((el) => {
     el.scrollTop = 2100;
   });
@@ -82,6 +79,8 @@ test("embedded pagination starts at the list and Back restores its visible cards
   await card.tap();
   await expect(page.getByText("Fixture scene", { exact: true })).toBeVisible();
   await page.goBack();
+  await expect(page).toHaveURL(/(?:\?|&)p=2(?:&|$)/);
+  await expect(card).toHaveAttribute("data-card-page", "2");
   await expect(card).toBeInViewport();
   await expect
     .poll(() => scroller.evaluate((el) => el.scrollTop))
@@ -89,6 +88,12 @@ test("embedded pagination starts at the list and Back restores its visible cards
   await expect
     .poll(() => card.evaluate((el) => el.getBoundingClientRect().top))
     .toBeCloseTo(cardTop, 0);
+
+  await page.goBack();
+  await expect(page).not.toHaveURL(/(?:\?|&)p=2(?:&|$)/);
+  const previousPageEnd = page.locator('[data-card-id="40"]');
+  await expect(previousPageEnd).toHaveAttribute("data-card-page", "1");
+  await expect(previousPageEnd).toBeInViewport();
 });
 
 test("header resizing, tab changes and desktop resizing keep the correct scroll owner", async ({

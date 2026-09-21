@@ -52,15 +52,22 @@ export function clampListScrollTop(
  * TanStack Virtual can compensate by writing a corrected scroll offset, but a
  * programmatic scroll during native touch momentum stops that momentum. Only
  * correct an idle viewport, and leave deletion-refill preservation in sole
- * control while a page is temporarily short.
+ * control while a page is temporarily short. A pagination/restoration write
+ * may also precede the next scroll event; stale offsets cannot anchor a resize.
  */
 export function shouldAdjustVirtualizedListScrollPosition(
   itemStart: number,
   scrollOffset: number,
   isScrolling: boolean,
   preserveDuringRefill: boolean,
+  elementScrollTop: number,
 ): boolean {
-  return !isScrolling && !preserveDuringRefill && itemStart < scrollOffset;
+  return (
+    !isScrolling &&
+    !preserveDuringRefill &&
+    Math.abs(elementScrollTop - scrollOffset) < 1 &&
+    itemStart < scrollOffset
+  );
 }
 
 export function usePreservedListScrollPosition(

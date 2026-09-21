@@ -35,19 +35,28 @@ describe("entity-list scroll state", () => {
 
   it("does not interrupt active scrolling for virtual row measurements", () => {
     expect(
-      shouldAdjustVirtualizedListScrollPosition(400, 800, true, false),
+      shouldAdjustVirtualizedListScrollPosition(400, 800, true, false, 800),
     ).toBe(false);
   });
 
   it("only corrects idle measurements above the viewport", () => {
     expect(
-      shouldAdjustVirtualizedListScrollPosition(400, 800, false, false),
+      shouldAdjustVirtualizedListScrollPosition(400, 800, false, false, 800),
     ).toBe(true);
     expect(
-      shouldAdjustVirtualizedListScrollPosition(900, 800, false, false),
+      shouldAdjustVirtualizedListScrollPosition(900, 800, false, false, 800),
     ).toBe(false);
     expect(
-      shouldAdjustVirtualizedListScrollPosition(400, 800, false, true),
+      shouldAdjustVirtualizedListScrollPosition(400, 800, false, true, 800),
     ).toBe(false);
+  });
+
+  it("does not undo a programmatic scroll before its scroll event arrives", () => {
+    expect(
+      shouldAdjustVirtualizedListScrollPosition(1800, 4001, false, false, 900),
+    ).toBe(false);
+    expect(
+      shouldAdjustVirtualizedListScrollPosition(400, 800.4, false, false, 800),
+    ).toBe(true);
   });
 });

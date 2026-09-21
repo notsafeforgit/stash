@@ -442,8 +442,10 @@ adjustments restart the dwell. Each new window anchors its dwell at the current
 finger position. Each dwell narrows the visible range
 fourfold, capped at 60 seconds on entry and one second at maximum precision.
 Markers and buffered ranges follow the same window; a fine-seeking readout shows
-milliseconds. Release commits once and restores the full timeline; cancellation
-or a scene/marker change disposes the gesture. Mouse and keyboard input retain
+milliseconds above the thumb. The standard playback clock and TV clock follow
+the same draft position during a drag, including while a frame is decoding or
+the target is not buffered. Release commits once and restores the full timeline;
+cancellation or a scene/marker change disposes the gesture. Mouse and keyboard input retain
 the full scale. Zoom steps request a short vibration where supported; Safari on
 iOS has no standard vibration API, so its feedback is visual.
 

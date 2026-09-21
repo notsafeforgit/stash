@@ -104,7 +104,7 @@ export function TvTimeline({
             ? `${currentMarker.title} · ${currentMarker.primary_tag.name}`
             : ""}
         </span>
-        <span className="shrink-0 tabular-nums">
+        <span data-player-time-display className="shrink-0 tabular-nums">
           {tvTime(value)} / {tvTime(duration)}
         </span>
       </div>

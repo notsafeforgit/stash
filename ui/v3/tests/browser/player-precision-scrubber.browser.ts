@@ -69,12 +69,32 @@ for (const mode of [
       true,
       point(0.5),
     );
+    const clock = player.locator("[data-player-time-display]");
+    const displayTime = (time: number) =>
+      `${Math.floor(time / 60)}:${String(Math.floor(time) % 60).padStart(2, "0")}`;
     try {
+      // The draft reaches both readouts before any preview seek runs.
+      await expect(clock).toHaveText(
+        new RegExp(
+          `^${displayTime(duration / 2)}\\s*/\\s*${displayTime(duration)}$`,
+        ),
+      );
       await page.clock.runFor(650);
       await expect(scrubber).toHaveAttribute("data-precision", "true");
       await expect(video).toHaveJSProperty("paused", true);
       const initialSpan = Math.max(1, Math.min(60, duration / 4));
       const readout = scrubber.locator("[data-position-scrubber-precision]");
+      const label = await readout.boundingBox();
+      const thumb = await scrubber
+        .locator("[data-position-scrubber-thumb]")
+        .boundingBox();
+      if (!label || !thumb) throw new Error("Missing precision readout");
+      // Keep the time and zoom clear of the thumb, including rotated TV.
+      expect(
+        rotated
+          ? label.x - (thumb.x + thumb.width / 2)
+          : thumb.y + thumb.height / 2 - (label.y + label.height),
+      ).toBeGreaterThanOrEqual(60);
       // Small, slow seeking movements must keep the initial zoom level. Use
       // explicit gesture time so CI input latency cannot become another dwell.
       for (let step = 1; step <= 4; step++) {
@@ -99,9 +119,12 @@ for (const mode of [
       await expect
         .poll(async () => Number(await scrubber.getAttribute("aria-valuenow")))
         .toBeCloseTo(duration / 2 + 0.25, 1);
-      await expect(
-        scrubber.locator("[data-position-scrubber-precision]"),
-      ).toContainText("Fine seeking");
+      await expect(clock).toHaveText(
+        new RegExp(
+          `^${displayTime(duration / 2 + 0.25)}\\s*/\\s*${displayTime(duration)}$`,
+        ),
+      );
+      await expect(readout).toContainText("Fine seeking");
     } finally {
       await drag.end();
       await page.clock.resume();

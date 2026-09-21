@@ -308,16 +308,21 @@ export function PositionScrubber({
       }}
     >
       {precisionRange && (
-        <div
-          data-position-scrubber-precision
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 bottom-3 flex flex-col items-center gap-1 text-xs text-foreground"
-        >
-          <span className="rounded bg-background/90 px-2 py-1 tabular-nums">
-            {msg("media_player.fine_seeking", "Fine seeking")} ·{" "}
-            {formatDurationMs(displayTime)} · {Math.round(duration / span)}×
-          </span>
-          <div className="flex w-full justify-between" aria-hidden="true">
+        <>
+          <div
+            data-position-scrubber-precision
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 bottom-16 flex justify-center text-xs text-foreground"
+          >
+            <span className="rounded bg-background/90 px-2 py-1 tabular-nums">
+              {msg("media_player.fine_seeking", "Fine seeking")} ·{" "}
+              {formatDurationMs(displayTime)} · {Math.round(duration / span)}×
+            </span>
+          </div>
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-between"
+            aria-hidden="true"
+          >
             {Array.from({ length: 11 }, (_, index) => (
               <span
                 key={index}
@@ -328,7 +333,7 @@ export function PositionScrubber({
               />
             ))}
           </div>
-        </div>
+        </>
       )}
       <div
         data-position-scrubber-track

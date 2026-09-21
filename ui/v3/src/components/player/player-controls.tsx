@@ -154,6 +154,7 @@ function formatDuration(secs: number): string {
 // Infinity.
 
 interface PositionSliderProps {
+  onScrubChange: (time: number | null) => void;
   Player: PlayerInstance;
   offsetStart: number;
   fileDuration: number;
@@ -174,6 +175,7 @@ interface PositionSliderProps {
 }
 
 function PositionSlider({
+  onScrubChange,
   Player,
   offsetStart,
   fileDuration,
@@ -224,6 +226,7 @@ function PositionSlider({
       clipBoundsEdit={clipBoundsEdit}
       onSeek={onSeek}
       onSeekPreview={onSeekPreview}
+      onScrubChange={onScrubChange}
     />
   );
 }
@@ -491,7 +494,10 @@ function TimeDisplay({
   );
 
   return (
-    <div className="flex items-center gap-1 text-white/80 text-xs tabular-nums shrink-0 px-1">
+    <div
+      data-player-time-display
+      className="flex items-center gap-1 text-white/80 text-xs tabular-nums shrink-0 px-1"
+    >
       <span className="text-white">{formatDuration(trueTime)}</span>
       <span className="text-white/50">/</span>
       {fileDuration > 0 && <span>{formatDuration(fileDuration)}</span>}
@@ -573,6 +579,8 @@ function ControlBar({
   onMenuOpenChange,
   clipBoundsEdit,
 }: ControlBarProps) {
+  // Both readouts follow the draft even while a buffered frame is decoding.
+  const [scrubTime, setScrubTime] = useState<number | null>(null);
   const intl = useIntl();
   const paused = Player.usePlayer((s) => s.paused);
   const muted = Player.usePlayer((s) => s.muted);
@@ -591,7 +599,7 @@ function ControlBar({
       offsetStart={offsetStart}
       fileDuration={fileDuration}
       reloading={reloading}
-      seekDisplayTarget={seekDisplayTarget}
+      seekDisplayTarget={scrubTime ?? seekDisplayTarget}
     />
   );
   const deviceControls = (
@@ -703,6 +711,7 @@ function ControlBar({
           markers={markers}
           onSeek={onSeek}
           onSeekPreview={onSeekPreview}
+          onScrubChange={setScrubTime}
           reloading={reloading}
           seekDisplayTarget={seekDisplayTarget}
           clipBoundsEdit={clipBoundsEdit}

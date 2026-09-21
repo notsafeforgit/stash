@@ -53,6 +53,14 @@ for (const hls of [false, true]) {
       await expect
         .poll(() => observation.evaluate((state) => state.frame))
         .toBeCloseTo(8, 1);
+      const clock = player.locator("[data-player-time-display]");
+      // WebKit rounds input coordinates, so the target can be just below 8s.
+      const seconds = Math.floor(
+        Number(await scrubber.getAttribute("aria-valuenow")),
+      );
+      await expect(clock).toHaveText(
+        new RegExp(`^0:${String(seconds).padStart(2, "0")}\\s*/\\s*0:12$`),
+      );
       await page.waitForTimeout(300);
       expect(
         await video.evaluate((v: HTMLVideoElement) => v.currentTime),
@@ -71,6 +79,9 @@ for (const hls of [false, true]) {
           .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
           .toBeGreaterThan(8.2);
       }
+      if (completion === "cancel")
+        await expect(clock).toHaveText(/^0:0[0-3]\s*\/\s*0:12$/);
+      else await expect(clock).toHaveText(/^0:0[89]\s*\/\s*0:12$/);
       expect(await observation.evaluate((state) => state.events)).toEqual([
         "pause",
         "play",

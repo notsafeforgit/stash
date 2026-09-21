@@ -92,7 +92,7 @@ func (r *queryResolver) FindImages(
 					result.TotalSize += float64(f.Base().Size)
 				}
 			}
-		case imageFilterAST != nil:
+		case imageFilterAST != nil && (slices.Contains(fields, "megapixels") || slices.Contains(fields, "filesize")):
 			var total int
 			images, total, err = r.repository.Image.QueryAST(ctx, imageFilterAST, filter)
 			if err == nil {
@@ -104,11 +104,13 @@ func (r *queryResolver) FindImages(
 					FindFilter: filter,
 					Count:      slices.Contains(fields, "count"),
 				},
-				ImageFilter: imageFilter,
-				Megapixels:  slices.Contains(fields, "megapixels"),
-				TotalSize:   slices.Contains(fields, "filesize"),
+				ImageFilter:    imageFilter,
+				ImageFilterAST: imageFilterAST,
+				SkipItems:      !slices.Contains(fields, "images"),
+				Megapixels:     slices.Contains(fields, "megapixels"),
+				TotalSize:      slices.Contains(fields, "filesize"),
 			})
-			if err == nil {
+			if err == nil && slices.Contains(fields, "images") {
 				images, err = result.Resolve(ctx)
 			}
 		}

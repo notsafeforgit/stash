@@ -53,7 +53,7 @@ const studios: GQL.StudioDataFragment[] = Array.from(
     child_studios: [],
     ignore_auto_tag: false,
     organized: false,
-    image_path: "",
+    image_path: `/home-covers/${index}.svg`,
     scene_count: 1,
     scene_count_all: 1,
     image_count: 0,

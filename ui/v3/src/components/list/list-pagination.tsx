@@ -8,6 +8,7 @@ import {
   ChevronsRight,
 } from "lucide-react";
 import { Button } from "src/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { NumberInput } from "src/components/filters/number-input";
 import {
   Popover,
@@ -95,7 +96,7 @@ function getPageWindow(
 interface ListPaginationProps {
   currentPage: number;
   itemsPerPage: number;
-  totalItems: number;
+  totalItems: number | undefined;
   onChangePage: (page: number) => void;
 }
 
@@ -106,7 +107,8 @@ export const ListPagination: React.FC<ListPaginationProps> = ({
   onChangePage,
 }) => {
   const intl = useIntl();
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const totalPages =
+    totalItems === undefined ? 0 : Math.ceil(totalItems / itemsPerPage);
   const [showJump, setShowJump] = useState(false);
 
   if (totalPages <= 1) return null;
@@ -228,7 +230,7 @@ export const ListPagination: React.FC<ListPaginationProps> = ({
 interface PaginationMetaProps {
   currentPage: number;
   itemsPerPage: number;
-  totalItems: number;
+  totalItems: number | undefined;
   metadataByline?: React.ReactNode;
 }
 
@@ -239,6 +241,14 @@ export const PaginationMeta: React.FC<PaginationMetaProps> = ({
   metadataByline,
 }) => {
   const intl = useIntl();
+
+  if (totalItems === undefined)
+    return (
+      <Skeleton
+        className="h-4 w-28"
+        aria-label={intl.formatMessage({ id: "loading.generic" })}
+      />
+    );
 
   // Hide only when we have nothing to show. During reloads (sort, filter
   // change) the previously-cached totalItems flows through, so keeping the

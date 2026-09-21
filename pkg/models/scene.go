@@ -156,7 +156,10 @@ type SceneFilterType struct {
 
 type SceneQueryOptions struct {
 	QueryOptions
-	SceneFilter *SceneFilterType
+	SceneFilter    *SceneFilterType
+	SceneFilterAST *FilterAST
+	// SkipItems allows a count request to avoid selecting and hydrating a page.
+	SkipItems bool
 
 	TotalDuration bool
 	TotalSize     bool

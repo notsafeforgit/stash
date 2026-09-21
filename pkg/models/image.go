@@ -112,7 +112,10 @@ type ImagesDestroyInput struct {
 
 type ImageQueryOptions struct {
 	QueryOptions
-	ImageFilter *ImageFilterType
+	ImageFilter    *ImageFilterType
+	ImageFilterAST *FilterAST
+	// SkipItems allows a count request to avoid selecting and hydrating a page.
+	SkipItems bool
 
 	Megapixels bool
 	TotalSize  bool

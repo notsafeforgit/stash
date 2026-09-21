@@ -19,7 +19,7 @@ export function useListPageRefill({
   setFilter: (
     next: ListFilterModel | ((prev: ListFilterModel) => ListFilterModel),
   ) => void;
-  count: number;
+  count: number | undefined;
   items: readonly unknown[];
   isLoading: boolean;
   error?: Error;
@@ -27,7 +27,9 @@ export function useListPageRefill({
 }) {
   const totalPagesAfterDataChange = Math.max(
     1,
-    Math.ceil(count / filter.itemsPerPage),
+    count === undefined
+      ? filter.currentPage
+      : Math.ceil(count / filter.itemsPerPage),
   );
   const preserveScrollDuringRefill =
     remote &&
@@ -38,7 +40,7 @@ export function useListPageRefill({
       items.length,
     );
   useEffect(() => {
-    if (isLoading || error || !remote) return;
+    if (isLoading || error || !remote || count === undefined) return;
 
     if (filter.currentPage > totalPagesAfterDataChange) {
       setFilter((f) => f.changePage(totalPagesAfterDataChange));
@@ -57,6 +59,7 @@ export function useListPageRefill({
     setFilter,
     totalPagesAfterDataChange,
     error,
+    count,
   ]);
 
   return preserveScrollDuringRefill;

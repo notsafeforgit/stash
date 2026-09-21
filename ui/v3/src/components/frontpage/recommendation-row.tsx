@@ -340,6 +340,7 @@ const SnapCard = React.forwardRef<
       className={cn("shrink-0 [scroll-snap-align:start]", SNAP_WIDTHS[kind])}
     >
       <DeferredMount
+        releaseDistantMedia
         eager={eager}
         scrollRoot={carousel?.scrollRef}
         rootMargin="0px 320px"

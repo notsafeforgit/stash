@@ -17,9 +17,10 @@ const mediaSearchCandidateLimit = 4096
 // prefilterMediaSearch only narrows the candidate entities. Keep every original
 // join and predicate: terms must still match the same file/fingerprint/marker
 // row, and aggregate fields must still include precisely the matching files.
-// Existing entity criteria may already be selective, so leave those plans alone.
+// Existing entity criteria may already be selective, so only add a prefilter to
+// those plans when the auxiliary index is available (never a global SQL scan).
 func (qb *queryBuilder) prefilterMediaSearch(ctx context.Context, table string, find *models.FindFilterType, filter *filterBuilder) error {
-	if find == nil || find.Q == nil || !filter.empty() {
+	if find == nil || find.Q == nil {
 		return nil
 	}
 	if _, err := getTx(ctx); err != nil {
@@ -36,10 +37,17 @@ func (qb *queryBuilder) prefilterMediaSearch(ctx context.Context, table string, 
 		return nil // Negative-only searches have no necessary positive candidate set.
 	}
 
-	sql, args := mediaSearchCandidates(table, terms)
-	ids, err := qb.repository.runIdsQuery(ctx, sql, args)
-	if err != nil {
-		return fmt.Errorf("finding media search candidates: %w", err)
+	ids, indexed := indexedMediaCandidates(ctx, table, *find.Q)
+	if !indexed {
+		if !filter.empty() {
+			return nil
+		}
+		sql, args := mediaSearchCandidates(table, terms)
+		var err error
+		ids, err = qb.repository.runIdsQuery(ctx, sql, args)
+		if err != nil {
+			return fmt.Errorf("finding media search candidates: %w", err)
+		}
 	}
 	if len(ids) > mediaSearchCandidateLimit {
 		return nil

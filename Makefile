@@ -43,7 +43,7 @@ GO_BUILD_FLAGS := $(GO_BUILD_FLAGS)
 
 # set GO_BUILD_TAGS environment variable to any extra build tags required
 GO_BUILD_TAGS := $(GO_BUILD_TAGS)
-GO_BUILD_TAGS += sqlite_stat4 sqlite_math_functions
+GO_BUILD_TAGS += sqlite_stat4 sqlite_math_functions sqlite_fts5
 
 # set STASH_SOURCEMAPS environment variable or uncomment to enable UI sourcemaps
 # STASH_SOURCEMAPS := true

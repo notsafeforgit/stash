@@ -1134,7 +1134,13 @@ func (qb *SceneStore) makeASTQuery(ctx context.Context, filterAST *models.Filter
 }
 
 func (qb *SceneStore) Query(ctx context.Context, options models.SceneQueryOptions) (*models.SceneQueryResult, error) {
-	query, err := qb.makeQuery(ctx, options.SceneFilter, options.FindFilter)
+	var query *queryBuilder
+	var err error
+	if options.SceneFilterAST != nil {
+		query, err = qb.makeASTQuery(ctx, options.SceneFilterAST, options.FindFilter)
+	} else {
+		query, err = qb.makeQuery(ctx, options.SceneFilter, options.FindFilter)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -1142,6 +1148,9 @@ func (qb *SceneStore) Query(ctx context.Context, options models.SceneQueryOption
 	result, err := qb.queryGroupedFields(ctx, options, *query)
 	if err != nil {
 		return nil, fmt.Errorf("error querying aggregate fields: %w", err)
+	}
+	if options.SkipItems {
+		return result, nil
 	}
 
 	idsResult, err := query.findIDs(ctx)
@@ -1173,6 +1182,12 @@ func (qb *SceneStore) QueryAST(ctx context.Context, filterAST *models.FilterAST,
 }
 
 func (qb *SceneStore) queryGroupedFields(ctx context.Context, options models.SceneQueryOptions, query queryBuilder) (*models.SceneQueryResult, error) {
+	if options.Count && !options.TotalDuration && !options.TotalSize {
+		ret := models.NewSceneQueryResult(qb)
+		var err error
+		ret.Count, err = query.executeCount(ctx)
+		return ret, err
+	}
 	if !options.Count && !options.TotalDuration && !options.TotalSize {
 		// nothing to do - return empty result
 		return models.NewSceneQueryResult(qb), nil

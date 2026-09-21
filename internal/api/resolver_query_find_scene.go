@@ -116,7 +116,7 @@ func (r *queryResolver) FindScenes(
 					result.TotalSize += float64(f.Size)
 				}
 			}
-		case sceneFilterAST != nil:
+		case sceneFilterAST != nil && (slices.Contains(fields, "duration") || slices.Contains(fields, "filesize")):
 			var total int
 			scenes, total, err = r.repository.Scene.QueryAST(ctx, sceneFilterAST, filter)
 			if err != nil {
@@ -149,11 +149,13 @@ func (r *queryResolver) FindScenes(
 					FindFilter: filter,
 					Count:      slices.Contains(fields, "count"),
 				},
-				SceneFilter:   sceneFilter,
-				TotalDuration: slices.Contains(fields, "duration"),
-				TotalSize:     slices.Contains(fields, "filesize"),
+				SceneFilter:    sceneFilter,
+				SceneFilterAST: sceneFilterAST,
+				SkipItems:      !slices.Contains(fields, "scenes"),
+				TotalDuration:  slices.Contains(fields, "duration"),
+				TotalSize:      slices.Contains(fields, "filesize"),
 			})
-			if err == nil {
+			if err == nil && slices.Contains(fields, "scenes") {
 				scenes, err = result.Resolve(ctx)
 			}
 		}

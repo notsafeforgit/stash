@@ -92,6 +92,7 @@ type Database struct {
 	readDB  *sqlx.DB
 	writeDB *sqlx.DB
 	dbPath  string
+	reads   *readAcceleration
 
 	schemaVersion           uint
 	forkSchemaVersion       uint
@@ -245,6 +246,10 @@ func (db *Database) unlock() {
 func (db *Database) Close() error {
 	db.lock()
 	defer db.unlock()
+	if db.reads != nil {
+		db.reads.close()
+		db.reads = nil
+	}
 
 	if db.readDB != nil {
 		if err := db.readDB.Close(); err != nil {
@@ -299,6 +304,11 @@ func (db *Database) initialise() error {
 	if err := db.openWriteDB(); err != nil {
 		return fmt.Errorf("opening write database: %w", err)
 	}
+	var err error
+	db.reads, err = newReadAcceleration(db.readDB, db.dbPath)
+	if err != nil {
+		logger.Warnf("Read cache unavailable; using database queries: %v", err)
+	}
 
 	return nil
 }
@@ -343,7 +353,7 @@ func (db *Database) Remove() error {
 	}
 
 	// remove the -shm, -wal files ( if they exist )
-	walFiles := []string{databasePath + "-shm", databasePath + "-wal"}
+	walFiles := []string{databasePath + "-shm", databasePath + "-wal", databasePath + ".search.sqlite", databasePath + ".search.sqlite-shm", databasePath + ".search.sqlite-wal"}
 	for _, wf := range walFiles {
 		if exists, _ := fsutil.FileExists(wf); exists {
 			err = os.Remove(wf)

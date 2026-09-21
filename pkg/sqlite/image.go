@@ -937,7 +937,13 @@ func (qb *ImageStore) makeQuery(ctx context.Context, imageFilter *models.ImageFi
 }
 
 func (qb *ImageStore) Query(ctx context.Context, options models.ImageQueryOptions) (*models.ImageQueryResult, error) {
-	query, err := qb.makeQuery(ctx, options.ImageFilter, options.FindFilter)
+	var query *queryBuilder
+	var err error
+	if options.ImageFilterAST != nil {
+		query, err = qb.makeASTQuery(ctx, options.ImageFilterAST, options.FindFilter)
+	} else {
+		query, err = qb.makeQuery(ctx, options.ImageFilter, options.FindFilter)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -945,6 +951,9 @@ func (qb *ImageStore) Query(ctx context.Context, options models.ImageQueryOption
 	result, err := qb.queryGroupedFields(ctx, options, *query)
 	if err != nil {
 		return nil, fmt.Errorf("error querying aggregate fields: %w", err)
+	}
+	if options.SkipItems {
+		return result, nil
 	}
 
 	idsResult, err := query.findIDs(ctx)
@@ -957,6 +966,12 @@ func (qb *ImageStore) Query(ctx context.Context, options models.ImageQueryOption
 }
 
 func (qb *ImageStore) queryGroupedFields(ctx context.Context, options models.ImageQueryOptions, query queryBuilder) (*models.ImageQueryResult, error) {
+	if options.Count && !options.Megapixels && !options.TotalSize {
+		ret := models.NewImageQueryResult(qb)
+		var err error
+		ret.Count, err = query.executeCount(ctx)
+		return ret, err
+	}
 	if !options.Count && !options.Megapixels && !options.TotalSize {
 		// nothing to do - return empty result
 		return models.NewImageQueryResult(qb), nil

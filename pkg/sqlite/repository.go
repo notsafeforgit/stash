@@ -67,6 +67,13 @@ func (r *repository) buildCountQuery(query string) string {
 }
 
 func (r *repository) runCountQuery(ctx context.Context, query string, args []interface{}) (int, error) {
+	snapshot := snapshotFromContext(ctx)
+	cacheKey, cacheable := countCacheKey(query, args)
+	if cacheable && snapshot != nil {
+		if count, ok := snapshot.count(cacheKey); ok {
+			return count, nil
+		}
+	}
 	result := struct {
 		Int int `db:"count"`
 	}{0}
@@ -76,6 +83,9 @@ func (r *repository) runCountQuery(ctx context.Context, query string, args []int
 		return 0, err
 	}
 
+	if cacheable && snapshot != nil {
+		snapshot.rememberCount(cacheKey, result.Int)
+	}
 	return result.Int, nil
 }
 

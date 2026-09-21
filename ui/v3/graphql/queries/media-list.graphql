@@ -1,0 +1,42 @@
+# Lists render their page independently of the exact total. Both operations
+# share arguments and Apollo's result object; the backend caches counts across
+# pages and invalidates them whenever the library changes.
+query FindSceneList(
+  $filter: FindFilterType
+  $scene_filter_ast: FilterASTInput
+) {
+  findScenes(filter: $filter, scene_filter_ast: $scene_filter_ast) {
+    scenes {
+      ...SlimSceneData
+    }
+  }
+}
+
+query FindSceneListCount(
+  $filter: FindFilterType
+  $scene_filter_ast: FilterASTInput
+) {
+  result: findScenes(filter: $filter, scene_filter_ast: $scene_filter_ast) {
+    count
+  }
+}
+
+query FindImageList(
+  $filter: FindFilterType
+  $image_filter_ast: FilterASTInput
+) {
+  findImages(filter: $filter, image_filter_ast: $image_filter_ast) {
+    images {
+      ...SlimImageData
+    }
+  }
+}
+
+query FindImageListCount(
+  $filter: FindFilterType
+  $image_filter_ast: FilterASTInput
+) {
+  result: findImages(filter: $filter, image_filter_ast: $image_filter_ast) {
+    count
+  }
+}

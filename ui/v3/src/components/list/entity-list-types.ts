@@ -16,7 +16,7 @@ export interface PageNavHandle {
   currentPage: number;
   totalPages: number;
   itemsPerPage: number;
-  totalCount: number;
+  totalCount: number | undefined;
   nextPage: () => void;
   prevPage: () => void;
 }
@@ -28,7 +28,7 @@ export interface LocalDataSource<TItem extends IHasID> {
   /**
    * Project the raw items down to the current page using the live
    * `ListFilterModel`. Implementations apply search, sort, and
-   * pagination locally — the chrome calls this once per debounced
+   * pagination locally — the chrome calls this once per committed
    * filter change.
    */
   filter: (
@@ -41,16 +41,31 @@ export interface LocalDataSource<TItem extends IHasID> {
   refresh?: () => void;
 }
 
-export interface GraphQLDataSource<
+export type ListCountData = { result: { count: number } };
+
+export type GraphQLDataSource<
   TData,
   TItem extends IHasID,
   TVariables extends OperationVariables,
-> {
+> = {
   kind: "graphql";
   query: TypedDocumentNode<TData, TVariables>;
   makeVariables: (filter: ListFilterModel) => TVariables;
-  extractResult: (data: TData | undefined) => { count: number; items: TItem[] };
-}
+} & (
+  | {
+      /** Fetch the exact total independently so it never delays the first cards. */
+      countQuery: TypedDocumentNode<ListCountData, TVariables>;
+      extractResult: (data: TData | undefined) => { items: TItem[] };
+    }
+  | {
+      countQuery?: undefined;
+      /** A combined query must supply its own total. */
+      extractResult: (data: TData | undefined) => {
+        count: number;
+        items: TItem[];
+      };
+    }
+);
 
 export type ListDataSource<
   TData,

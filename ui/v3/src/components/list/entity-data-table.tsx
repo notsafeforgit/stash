@@ -257,7 +257,7 @@ export interface EntityDataTableProps<TItem extends IHasID> {
   visibilityKey?: string;
   /** When true the query is in-flight — suppress the "no results" state */
   isPending?: boolean;
-  totalCount: number;
+  totalCount: number | undefined;
   preserveScrollDuringRefill: boolean;
   /**
    * Optional per-row wrapper. Receives the item, the default `<TableRow>`

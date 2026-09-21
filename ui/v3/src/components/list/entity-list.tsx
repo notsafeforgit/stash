@@ -66,7 +66,7 @@ export interface EntityListProps {
   /** Persisted list view name exposed to plugin filter extensions. */
   view?: View;
   /** Total number of matching items (for pagination) */
-  totalCount: number;
+  totalCount: number | undefined;
   /** Retain the current viewport while a cache deletion leaves this page
    *  temporarily short and a refetch pulls later items into the gap. */
   preserveScrollDuringRefill?: boolean;

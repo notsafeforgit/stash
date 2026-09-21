@@ -51,6 +51,7 @@ import { MergeDialogsFixture } from "./merge-dialogs";
 import { DialogDismissalFixture } from "./dialog-dismissal";
 import { EntityCardsFixture } from "./entity-cards";
 import { EmbeddedListFixture } from "./embedded-list";
+import { DeferredListFixture } from "./deferred-list";
 import { RouteTransitionsFixture } from "./route-transitions";
 import { HomeFixture } from "./home";
 import { TvFixture } from "./tv";
@@ -308,6 +309,11 @@ const settingsRoute = createRoute({
 });
 const router = createRouter({
   routeTree: rootRoute.addChildren([
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/deferred-list",
+      component: DeferredListFixture,
+    }),
     createRoute({
       getParentRoute: () => rootRoute,
       path: "/embedded-list",

@@ -114,7 +114,11 @@ export function removeEntitiesFromCache({
         return {
           ...page,
           [itemsField]: filtered,
-          count: Math.max(0, (page.count ?? 0) - removed),
+          // A separately loading total must stay unknown, rather than become
+          // a fabricated zero when a card is deleted before it arrives.
+          ...(page.count === undefined
+            ? {}
+            : { count: Math.max(0, page.count - removed) }),
         };
       },
     },

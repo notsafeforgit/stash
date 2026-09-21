@@ -116,6 +116,7 @@ export function FrontPage() {
               value={visit.rows[i]}
             >
               <DeferredMount
+                releaseDistantMedia
                 eager={i === 0 || visit.rows[i]?.mounted}
                 scrollRoot={scrollRef}
                 fallback={

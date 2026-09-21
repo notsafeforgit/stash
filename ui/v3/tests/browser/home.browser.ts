@@ -1,5 +1,14 @@
 import { test, expect } from "./test";
 
+test.beforeEach(async ({ page }) => {
+  await page.route("**/home-covers/*.svg", (route) =>
+    route.fulfill({
+      contentType: "image/svg+xml",
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#746"/></svg>',
+    }),
+  );
+});
+
 interface NavigationMotion {
   drawersAtStart: number;
   frames: number;
@@ -135,6 +144,7 @@ test("the drawer preloads Home and offscreen rows wait until approached", async 
     .locator("section")
     .filter({ has: page.getByRole("heading", { name: "Row 1", exact: true }) });
   await expect(firstRow.locator(".studio-card").first()).toBeVisible();
+  await expect(firstRow.locator(".studio-card img").first()).toBeVisible();
   expect(await firstRow.locator(".studio-card").count()).toBeLessThan(10);
   expect(
     await page.evaluate(() => window.homeFixtureQueries.length),
@@ -152,8 +162,10 @@ test("the drawer preloads Home and offscreen rows wait until approached", async 
   await expect(lastRow.locator(".studio-card")).toHaveCount(0);
   await lastRow.scrollIntoViewIfNeeded();
   await expect(lastRow.locator(".studio-card").first()).toBeVisible();
+  await expect(firstRow.locator(".studio-card img")).toHaveCount(0);
   expect(await lastRow.locator(".studio-card").count()).toBeLessThan(10);
   await firstRow.scrollIntoViewIfNeeded();
+  await expect(firstRow.locator(".studio-card img").first()).toBeVisible();
   expect(await firstCard?.evaluate((element) => element.isConnected)).toBe(
     true,
   );
@@ -307,6 +319,9 @@ test("a Home carousel keeps its full snap range while mounting nearby cards", as
     .locator(".overflow-x-auto");
   await expect(strip.locator("article").first()).toBeVisible();
   const width = await strip.evaluate((element) => element.scrollWidth);
+  const height = await strip.evaluate((element) => element.clientHeight);
+  const firstCard = strip.locator('article[data-id="0"]');
+  await expect(firstCard.locator("img")).toHaveCount(1);
   expect(await strip.locator("article").count()).toBeLessThan(10);
   await strip.evaluate((element) => {
     element.scrollLeft = element.scrollWidth;
@@ -315,6 +330,10 @@ test("a Home carousel keeps its full snap range while mounting nearby cards", as
     .poll(() => strip.locator("article").last().getAttribute("data-id"))
     .toBe("24");
   await expect(strip.locator("article").last()).toBeInViewport();
+  await expect(firstCard).toHaveCount(1);
+  await expect(firstCard.locator("img")).toHaveCount(0);
+  await expect(strip.locator("article").last().locator("img")).toHaveCount(1);
   expect(await strip.evaluate((element) => element.scrollWidth)).toBe(width);
+  expect(await strip.evaluate((element) => element.clientHeight)).toBe(height);
   expect(await strip.locator("article").count()).toBeLessThan(15);
 });

@@ -18,6 +18,7 @@ const (
 	txnKey key = iota + 1
 	dbKey
 	writableKey
+	writeConnectionKey
 )
 
 func (db *Database) WithDatabase(ctx context.Context) (context.Context, error) {
@@ -50,12 +51,32 @@ func (db *Database) Begin(ctx context.Context, writable bool) (context.Context, 
 		dbtx = db.writeDB
 	}
 
-	tx, err := dbtx.BeginTxx(ctx, nil)
+	var tx *sqlx.Tx
+	var err error
+	if writable && db.reads != nil {
+		// Keep the writer connection through Commit so its data_version can
+		// distinguish our commit from an external writer racing the observer.
+		var conn *sqlx.Conn
+		conn, err = dbtx.Connx(ctx)
+		if err == nil {
+			tx, err = conn.BeginTxx(ctx, nil)
+			if err != nil {
+				conn.Close()
+			} else {
+				ctx = context.WithValue(ctx, writeConnectionKey, conn)
+			}
+		}
+	} else {
+		tx, err = dbtx.BeginTxx(ctx, nil)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("beginning transaction: %w", err)
 	}
 
 	ctx = context.WithValue(ctx, writableKey, writable)
+	if db.reads != nil {
+		ctx = db.reads.begin(ctx, tx, writable)
+	}
 
 	return context.WithValue(ctx, txnKey, tx), nil
 }
@@ -67,6 +88,9 @@ func (db *Database) Commit(ctx context.Context) error {
 	}
 
 	defer db.txnComplete(ctx)
+	if snapshot, _ := ctx.Value(readAccelerationKey).(*readSnapshot); snapshot != nil && snapshot.writable {
+		return snapshot.cache.commit(ctx, tx, snapshot)
+	}
 
 	if err := tx.Commit(); err != nil {
 		return err
@@ -91,6 +115,9 @@ func (db *Database) Rollback(ctx context.Context) error {
 }
 
 func (db *Database) txnComplete(ctx context.Context) {
+	if conn, _ := ctx.Value(writeConnectionKey).(*sqlx.Conn); conn != nil {
+		conn.Close()
+	}
 }
 
 func getTx(ctx context.Context) (*sqlx.Tx, error) {

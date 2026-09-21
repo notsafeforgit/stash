@@ -217,7 +217,7 @@ export function EntityListPage<
     () => ({
       selectable: true,
       totalCount: count,
-      applyToAllTarget,
+      applyToAllTarget: count === undefined ? undefined : applyToAllTarget,
       getSelectedIds: listSelect.getSelectedIds,
       onSelectAll: listSelect.onSelectAll,
       onSelectNone: listSelect.onSelectNone,
@@ -237,7 +237,10 @@ export function EntityListPage<
     filter.filterAst?.kind === "group" ? filter.filterAst : undefined;
   const activeFilterCount = filter.count();
 
-  const totalPages = Math.ceil(count / filter.itemsPerPage);
+  const totalPages =
+    count === undefined
+      ? filter.currentPage
+      : Math.ceil(count / filter.itemsPerPage);
 
   // Populate the pageNavRef with the current navigation state so consumers
   // can drive page changes imperatively (e.g. from inside a lightbox).

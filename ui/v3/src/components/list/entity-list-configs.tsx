@@ -63,7 +63,7 @@ import {
 // ── Item types ─────────────────────────────────────────────────────────────────
 
 type SceneItem = GQL.SlimSceneDataFragment;
-type ImageItem = GQL.FindImagesQuery["findImages"]["images"][number];
+type ImageItem = GQL.FindImageListQuery["findImages"]["images"][number];
 type GalleryItem = GQL.FindGalleriesQuery["findGalleries"]["galleries"][number];
 type PerformerItem =
   GQL.FindPerformersQuery["findPerformers"]["performers"][number];
@@ -287,9 +287,9 @@ export function useSceneListConfig(
   performerImageTargetId?: string,
 ): {
   config: EntityListPageConfig<
-    GQL.FindScenesQuery,
+    GQL.FindSceneListQuery,
     SceneItem,
-    GQL.FindScenesQueryVariables
+    GQL.FindSceneListQueryVariables
   >;
   lightboxElement: React.ReactNode;
   lightboxOpen: boolean;
@@ -350,9 +350,9 @@ export function useSceneListConfig(
 
   const config = useMemo<
     EntityListPageConfig<
-      GQL.FindScenesQuery,
+      GQL.FindSceneListQuery,
       SceneItem,
-      GQL.FindScenesQueryVariables
+      GQL.FindSceneListQueryVariables
     >
   >(
     () => ({
@@ -360,13 +360,13 @@ export function useSceneListConfig(
       ItemsProvider: SceneListItems.Provider,
       source: {
         kind: "graphql",
-        query: GQL.FindScenesDocument,
+        query: GQL.FindSceneListDocument,
+        countQuery: GQL.FindSceneListCountDocument,
         makeVariables: (filter) => ({
           filter: filter.makeFindFilter(),
           scene_filter_ast: filter.makeFilterAST(),
         }),
         extractResult: (data) => ({
-          count: data?.findScenes.count ?? 0,
           items: data?.findScenes.scenes ?? [],
         }),
       },
@@ -419,9 +419,9 @@ export function useImageListConfig(
   hidePerformers?: boolean,
 ): {
   config: EntityListPageConfig<
-    GQL.FindImagesQuery,
+    GQL.FindImageListQuery,
     ImageItem,
-    GQL.FindImagesQueryVariables
+    GQL.FindImageListQueryVariables
   >;
   lightboxElement: React.ReactNode;
   lightboxOpen: boolean;
@@ -520,9 +520,9 @@ export function useImageListConfig(
 
   const config = useMemo<
     EntityListPageConfig<
-      GQL.FindImagesQuery,
+      GQL.FindImageListQuery,
       ImageItem,
-      GQL.FindImagesQueryVariables
+      GQL.FindImageListQueryVariables
     >
   >(
     () => ({
@@ -530,13 +530,13 @@ export function useImageListConfig(
       ItemsProvider: ImageListItems.Provider,
       source: {
         kind: "graphql",
-        query: GQL.FindImagesDocument,
+        query: GQL.FindImageListDocument,
+        countQuery: GQL.FindImageListCountDocument,
         makeVariables: (filter) => ({
           filter: filter.makeFindFilter(),
           image_filter_ast: filter.makeFilterAST(),
         }),
         extractResult: (data) => ({
-          count: data?.findImages.count ?? 0,
           items: data?.findImages.images ?? [],
         }),
       },

@@ -31,6 +31,8 @@ const readDanglingNull: FieldReadFunction = (existing, { canRead }) => {
 };
 
 const typePolicies: TypePolicies = {
+  FindScenesResultType: { merge: true },
+  FindImagesResultType: { merge: true },
   ConfigResult: {
     fields: {
       ui: { merge: (_existing, incoming: unknown) => parseUIConfig(incoming) },

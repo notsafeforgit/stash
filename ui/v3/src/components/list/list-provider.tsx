@@ -16,7 +16,7 @@ export type BulkApplyTarget = {
  */
 export type ListContextState = {
   selectable: boolean;
-  totalCount: number;
+  totalCount: number | undefined;
   applyToAllTarget?: BulkApplyTarget;
   /** Stable getter — returns the current selected-id set without subscribing. */
   getSelectedIds: () => Set<string>;

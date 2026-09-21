@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import {
   Popover,
@@ -37,7 +38,7 @@ import { MobileSearchButton } from "./mobile-search-button";
 export interface MobileListControlsProps {
   filter: ListFilterModel;
   setFilter: Dispatch<SetStateAction<ListFilterModel>>;
-  totalCount: number;
+  totalCount: number | undefined;
   activeFilterCount: number;
   selecting: boolean;
   hasSelection: boolean;
@@ -76,7 +77,8 @@ export function MobileListControls({
   const mode =
     selecting || hasSelection ? "selection" : search.isOpen ? "search" : null;
   useMobileDetailInteraction(mode);
-  const pageCount = Math.ceil(totalCount / filter.itemsPerPage);
+  const pageCount =
+    totalCount === undefined ? 0 : Math.ceil(totalCount / filter.itemsPerPage);
 
   function runAction(action: () => void) {
     setPagesOpen(false);
@@ -236,7 +238,16 @@ export function MobileListControls({
                       </Popover>
                     ) : (
                       <span className="text-sm text-muted-foreground tabular-nums">
-                        {intl.formatNumber(totalCount)}
+                        {totalCount === undefined ? (
+                          <Skeleton
+                            className="h-4 w-10"
+                            aria-label={intl.formatMessage({
+                              id: "loading.generic",
+                            })}
+                          />
+                        ) : (
+                          intl.formatNumber(totalCount)
+                        )}
                       </span>
                     )}
                   </div>

@@ -10,9 +10,10 @@ export type ListPageChangeScrollTarget = "start" | "end" | null;
 export function shouldPreserveListScrollDuringRefill(
   currentPage: number,
   itemsPerPage: number,
-  totalCount: number,
+  totalCount: number | undefined,
   itemCount: number,
 ): boolean {
+  if (totalCount === undefined) return false;
   const totalPages = Math.max(1, Math.ceil(totalCount / itemsPerPage));
   if (currentPage < 1 || currentPage > totalPages) return false;
 
@@ -122,14 +123,17 @@ export function useListPageChangeScrollPosition(
   scrollElement: HTMLElement | null,
   currentPage: number,
   itemsPerPage: number,
-  totalCount: number,
+  totalCount: number | undefined,
   contentElement: HTMLElement | null = null,
 ): void {
   const lastScrolledPageRef = useRef(currentPage);
 
   useLayoutEffect(() => {
     if (!scrollElement) return;
-    const totalPages = Math.max(1, Math.ceil(totalCount / itemsPerPage));
+    const totalPages =
+      totalCount === undefined
+        ? Number.POSITIVE_INFINITY
+        : Math.max(1, Math.ceil(totalCount / itemsPerPage));
     const target = getListPageChangeScrollTarget(
       lastScrolledPageRef.current,
       currentPage,

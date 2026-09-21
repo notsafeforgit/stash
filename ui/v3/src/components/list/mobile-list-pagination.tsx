@@ -5,6 +5,7 @@ import { z } from "zod";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Field,
   FieldError,
@@ -15,7 +16,7 @@ import {
 export interface MobileListPaginationProps {
   currentPage: number;
   itemsPerPage: number;
-  totalItems: number;
+  totalItems: number | undefined;
   onChangePage: (page: number) => void;
 }
 
@@ -27,7 +28,8 @@ export function MobileListPagination({
   onChangePage,
 }: MobileListPaginationProps) {
   const intl = useIntl();
-  const pages = Math.ceil(totalItems / itemsPerPage);
+  const pages =
+    totalItems === undefined ? 0 : Math.ceil(totalItems / itemsPerPage);
   if (pages <= 1) return null;
   return (
     <nav
@@ -69,6 +71,13 @@ export function MobileListPagination({
 export function MobileListPagePicker(props: MobileListPaginationProps) {
   const { currentPage, itemsPerPage, totalItems, onChangePage } = props;
   const intl = useIntl();
+  if (totalItems === undefined)
+    return (
+      <Skeleton
+        className="h-4 w-28"
+        aria-label={intl.formatMessage({ id: "loading.generic" })}
+      />
+    );
   const pages = Math.ceil(totalItems / itemsPerPage);
   const first =
     totalItems > 0

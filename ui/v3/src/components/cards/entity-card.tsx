@@ -21,6 +21,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { cn } from "src/lib/utils";
 import { Check, Droplets } from "lucide-react";
 import { HoverScrubber } from "./hover-scrubber";
+import { CardMediaContext } from "./card-media-context";
 import { useCardPress } from "./use-card-press";
 import { useSpriteInfo } from "src/hooks/use-sprite-info";
 import { useIsTruncated } from "src/hooks/use-is-truncated";
@@ -425,6 +426,7 @@ function EntityCardPreview({
   oCounter,
   children,
 }: EntityCardPreviewProps) {
+  const mediaActive = useContext(CardMediaContext);
   const image = legacyImage || previewImage?.fallback;
   const videoPoster = previewImage?.thumbnail?.fallback ?? image ?? undefined;
   // Card preview behaviour is driven by two interface settings:
@@ -471,7 +473,9 @@ function EntityCardPreview({
 
   // VTT sprite scrubber: hover-only UI, gated on pointer type — touch
   // devices don't get hover, so don't bother fetching the sprite sheet.
-  const sprites = useSpriteInfo(!isTouch ? (vtt ?? undefined) : undefined);
+  const sprites = useSpriteInfo(
+    mediaActive && !isTouch ? (vtt ?? undefined) : undefined,
+  );
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
 
   const handleScrubIndex = useCallback(
@@ -490,6 +494,7 @@ function EntityCardPreview({
   // non-touch devices (see the `!isTouch` guard at the render site), so
   // this effect is a no-op when the ref is unset on touch.
   useEffect(() => {
+    if (!mediaActive) return;
     const el = videoRef.current;
     if (!el) return;
     const shouldPlay = idleMode === "video" || isHovered;
@@ -499,10 +504,18 @@ function EntityCardPreview({
       el.pause();
       el.currentTime = 0;
     }
-  }, [isHovered, idleMode]);
+    return () => {
+      el.pause();
+      if (videoRef.current !== el) {
+        // A detached preview must stop decoding/downloading as well as disappear.
+        el.removeAttribute("src");
+        el.load();
+      }
+    };
+  }, [isHovered, idleMode, mediaActive]);
 
   const currentSprite =
-    sprites && scrubIndex != null ? sprites[scrubIndex] : null;
+    mediaActive && sprites && scrubIndex != null ? sprites[scrubIndex] : null;
 
   // Track the natural aspect ratio of the loaded image so we only apply
   // blur pillarbox/letterbox when the image actually mismatches the forced aspect.
@@ -576,7 +589,7 @@ function EntityCardPreview({
         )}
       >
         {previewButton}
-        {image && (
+        {mediaActive && image && (
           <FadeInImage
             className={cn(
               "absolute inset-0 h-full w-full",
@@ -588,7 +601,7 @@ function EntityCardPreview({
             alt=""
           />
         )}
-        {idleMode === "animated" && animated && (
+        {mediaActive && idleMode === "animated" && animated && (
           <FadeInImage
             className={cn(
               "absolute inset-0 h-full w-full",
@@ -598,7 +611,7 @@ function EntityCardPreview({
             alt=""
           />
         )}
-        {wantsVideoEl && video && !isTouch && (
+        {mediaActive && wantsVideoEl && video && !isTouch && (
           <video
             ref={videoRef}
             className={cn(
@@ -636,7 +649,8 @@ function EntityCardPreview({
     >
       {previewButton}
       {/* Static screenshot — hidden when actively scrubbing */}
-      {image &&
+      {mediaActive &&
+        image &&
         !currentSprite &&
         (hasMismatch ? (
           <>
@@ -703,7 +717,7 @@ function EntityCardPreview({
       {/* Animated WebP idle overlay — fades over the static screenshot
           when `previewDefault` is "animated" (or "video" with no video
           but an animated fallback exists). Hidden while scrubbing. */}
-      {idleMode === "animated" && animated && !currentSprite && (
+      {mediaActive && idleMode === "animated" && animated && !currentSprite && (
         <FadeInImage
           className={cn(
             "absolute inset-0 h-full w-full",
@@ -717,7 +731,7 @@ function EntityCardPreview({
       {/* Video preview — stacked on top of the idle layer. Only mounts
           when there is a video URL AND the config wants it (hover-swap
           enabled, or idle mode is "video"). */}
-      {wantsVideoEl && video && !isTouch && (
+      {mediaActive && wantsVideoEl && video && !isTouch && (
         <video
           className={cn(
             "absolute inset-0 h-full w-full transition-opacity duration-200",
@@ -770,7 +784,7 @@ function EntityCardPreview({
       {/* Bottom row: studio logo (left) + duration badge (right) */}
       <div className="pointer-events-none absolute inset-x-0 bottom-1.5 flex items-end justify-between gap-1 px-1.5">
         <div>
-          {studioImagePath && !isMobile && (
+          {mediaActive && studioImagePath && !isMobile && (
             <img
               className="max-w-[2.5rem] rounded bg-black/60 object-contain px-0.5 py-0.5"
               style={{ height: "1.1rem" }}

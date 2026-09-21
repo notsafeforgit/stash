@@ -117,6 +117,7 @@ local container after validation.
 | `pkg/models/filter_ast*.go` | AST model + v2.5 compat layer | none (new files) |
 | `pkg/sqlite/fork_migrate.go` + `pkg/sqlite/migrations/fork_*.go` | consolidated fork migration and roll-forward reconcilers | low |
 | `pkg/sqlite/media_search.go`, `media_browse.go` + `pkg/sqlite/migrations/fork_read_indexes.go` | bounded search candidates and ordinary covering indexes for browsing | low (small query-builder calls; no upstream table changes) |
+| `pkg/sqlite/read_acceleration.go`, `search_index.go`, `search_changes.go` | disposable substring index and snapshot-scoped count cache | low (separate database; connection-local tracking only) |
 | `fork_performer_autotag_ignored_names` | case-insensitive auto-tag opt-outs keyed by performer and name text | none (fork-owned table) |
 | `fork_saved_filter_state` | canonical filter AST plus upstream compatibility shadow | none (fork-owned table) |
 | `fork_video_file_metadata` / `fork_image_file_metadata` | ffprobe metadata plus source fingerprints | none (fork-owned tables) |
@@ -132,8 +133,26 @@ so upstream writes maintain them without fork code. The fork recreates missing
 indexes after an upstream table rebuild. Migration 7 stores scene cover origins
 in a sidecar, retaining source identity after file deletion and invalidating
 provenance when upstream changes the cover. These migrations do not change upstream's
-schema version. Search acceleration is transaction-local query work, with no
-persisted search cache, virtual tables, or maintenance triggers.
+schema version. Substring search uses a rebuildable `<database>.search.sqlite`
+cache with FTS5 trigram tables. No search virtual tables or persistent tracking
+triggers are added to the library database. Connection-local TEMP triggers
+collect changed titles, details, paths, fingerprints, markers and file links;
+their journal rolls back with the write. A pinned `PRAGMA data_version` observer
+detects other writers, invalidates counts and schedules a full index rebuild.
+Each read pins its library snapshot before accepting cached results. Search
+always rechecks the original joined-row predicates and falls back to ordinary
+SQL for stale/unavailable indexes, short terms and overly broad candidate sets.
+The index rebuilds in the background at startup, including after an upstream
+round trip, so no upstream-maintained metadata or migration is required.
+
+The auxiliary file contains searchable library text and is created with mode
+0600. It can be excluded from backups and deleted with Stash stopped; the next
+start rebuilds it automatically. Builds enable `sqlite_fts5` alongside the
+existing SQLite build tags. Builds without FTS5 or without a writable cache
+directory retain ordinary search. Exact counts use a bounded in-memory cache
+and are invalidated after library commits; time-dependent counts bypass it.
+v3 scene/image lists request cards and totals independently, rendering cards
+while totals load. v2.5 retains its existing operations and UI.
 Rolling forward to v3 recreates missing sidecars and imports compatible
 upstream changes; fork-only data remains available when its sidecar was kept.
 Saved-filter edits are imported automatically only when the stored AST is

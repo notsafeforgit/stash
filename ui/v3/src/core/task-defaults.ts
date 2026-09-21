@@ -56,7 +56,11 @@ const generateMetadataInputSchema = z.looseObject({
   phashes: z.boolean().nullish().catch(undefined),
   previewOptions: generatePreviewOptionsInputSchema.nullish().catch(undefined),
   previews: z.boolean().nullish().catch(undefined),
+  // Replacing authored frame selections must always be an explicit action.
+  resetCoversToDefault: z.preprocess(() => undefined, z.boolean().nullish()),
   sceneIDs: z.array(z.string()).nullish().catch(undefined),
+  // A list scope belongs only to the action that explicitly selected it.
+  sceneSelection: z.preprocess(() => undefined, z.undefined()),
   sprites: z.boolean().nullish().catch(undefined),
   transcodes: z.boolean().nullish().catch(undefined),
 } satisfies InputShape<GQL.GenerateMetadataInput>);

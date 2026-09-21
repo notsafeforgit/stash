@@ -236,6 +236,18 @@ func (s *Manager) RunSingleTask(ctx context.Context, t Task) int {
 }
 
 func (s *Manager) Generate(ctx context.Context, input GenerateMetadataInput) (int, error) {
+	input, err := s.resolveGenerateSceneSelection(ctx, input)
+	if err != nil {
+		return 0, err
+	}
+	if input.ResetCoversToDefault {
+		if !s.Config.GetEnableV3UI() {
+			return 0, fmt.Errorf("resetting scene covers requires v3")
+		}
+		if !input.Covers {
+			return 0, fmt.Errorf("covers must be selected when resetting to default")
+		}
+	}
 	if err := s.validateFFmpeg(); err != nil {
 		return 0, err
 	}

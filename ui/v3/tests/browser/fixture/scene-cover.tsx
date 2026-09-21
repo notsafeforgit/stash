@@ -1,6 +1,7 @@
 import type {} from "@/router";
 import { ApolloClient, ApolloLink } from "@apollo/client";
 import { ApolloProvider, useQuery } from "@apollo/client/react";
+import { useState } from "react";
 import { MockLink, type MockedResponse } from "@apollo/client/testing";
 import {
   createRootRoute,
@@ -15,6 +16,11 @@ import { ScenePlayer } from "@/components/player/scene-player";
 import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table";
 import { MobileNavigationProvider } from "@/components/layout/mobile-navigation";
 import { Toaster } from "@/components/ui/sonner";
+import { Button } from "@/components/ui/button";
+import { SceneGenerateDialog } from "@/components/detail/scene-generate-dialog";
+import { LibraryTasks } from "@/components/settings/tasks/library-tasks";
+import { FilterBuilder } from "@/components/filters/filter-builder";
+import { ListFilterModel } from "@/models/list-filter/filter";
 import { ConfigurationProvider } from "@/hooks/config";
 import { Route as SceneDetailRoute } from "@/routes/scenes/$sceneId";
 import { createCache } from "@/core/create-client";
@@ -99,11 +105,13 @@ function artwork(): Pick<
   return {
     cover_origin: {
       __typename: "SceneCoverOrigin",
-      at: 1.125,
+      at: new URLSearchParams(location.search).has("unknown") ? null : 1.125,
       source_file_id: "1",
-      status: new URLSearchParams(location.search).has("stale")
-        ? GQL.SceneCoverOriginStatus.Changed
-        : GQL.SceneCoverOriginStatus.Available,
+      status: new URLSearchParams(location.search).has("unknown")
+        ? GQL.SceneCoverOriginStatus.Unknown
+        : new URLSearchParams(location.search).has("stale")
+          ? GQL.SceneCoverOriginStatus.Changed
+          : GQL.SceneCoverOriginStatus.Available,
     },
     paths: { ...base.paths, screenshot: fallback },
     preview_image: {
@@ -337,6 +345,18 @@ const configurationMock: MockedResponse<GQL.ConfigurationQuery> = {
     },
   },
 };
+const savedFiltersMock: MockedResponse<
+  GQL.FindSavedFiltersQuery,
+  GQL.FindSavedFiltersQueryVariables
+> = {
+  request: {
+    query: GQL.FindSavedFiltersDocument,
+    variables: { mode: GQL.FilterMode.Scenes },
+  },
+  maxUsageCount: Infinity,
+  delay: 0,
+  result: { data: { findSavedFilters: [] } },
+};
 const client = new ApolloClient({
   cache: createCache(),
   link: ApolloLink.from([
@@ -357,6 +377,7 @@ const client = new ApolloClient({
       scrapersMock,
       capabilitiesMock,
       configurationMock,
+      savedFiltersMock,
     ]),
   ]),
 });
@@ -423,9 +444,67 @@ const root = createRootRoute({
     </MobileNavigationProvider>
   ),
 });
+
+function GenerateSelectedScenes() {
+  const [open, setOpen] = useState(false);
+  const matching = new URLSearchParams(location.search).has("matching");
+  const [filter, setFilter] = useState(
+    () => new ListFilterModel(GQL.FilterMode.Scenes),
+  );
+  return (
+    <>
+      {matching && (
+        <div className="max-w-md">
+          <FilterBuilder
+            mode={GQL.FilterMode.Scenes}
+            filter={filter}
+            setFilter={setFilter}
+            root={
+              filter.filterAst?.kind === "group" ? filter.filterAst : undefined
+            }
+            onChange={(root) => {
+              const next = filter.clone();
+              next.filterAst = root;
+              setFilter(next);
+            }}
+            onCurrentSavedFilterChange={() => {}}
+          />
+        </div>
+      )}
+      <Button onClick={() => setOpen(true)}>Generate selected scenes</Button>
+      <SceneGenerateDialog
+        open={open}
+        onOpenChange={setOpen}
+        sceneIds={
+          new URLSearchParams(location.search).has("empty") ? [] : ["1", "2"]
+        }
+        totalCount={matching ? 200 : undefined}
+        applyToAllTarget={
+          matching
+            ? {
+                findFilter: filter.makeFindFilter(),
+                filterAST: filter.makeFilterAST(),
+              }
+            : undefined
+        }
+      />
+    </>
+  );
+}
+
 const router = createRouter({
   basepath: "/scene-cover-fixture",
   routeTree: root.addChildren([
+    createRoute({
+      getParentRoute: () => root,
+      path: "/generate",
+      component: GenerateSelectedScenes,
+    }),
+    createRoute({
+      getParentRoute: () => root,
+      path: "/tasks",
+      component: LibraryTasks,
+    }),
     createRoute({
       getParentRoute: () => root,
       path: "/scenes",

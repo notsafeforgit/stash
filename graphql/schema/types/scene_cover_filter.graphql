@@ -1,0 +1,14 @@
+enum SceneCoverFrame {
+  "Recorded frame at 20% of the current primary video."
+  DEFAULT
+  "Recorded frame at another time or from another source video."
+  SPECIFIC
+  "No matching recorded frame, including legacy/uploaded artwork and missing covers."
+  UNKNOWN
+}
+
+"Value for the scene AST's cover_frame condition. Supports EQUALS and NOT_EQUALS."
+input SceneCoverFrameCriterionInput {
+  value: SceneCoverFrame!
+  modifier: CriterionModifier!
+}

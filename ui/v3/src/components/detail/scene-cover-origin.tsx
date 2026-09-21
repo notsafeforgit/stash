@@ -32,7 +32,7 @@ export function SceneCoverOrigin({
     [SceneCoverOriginStatus.Unknown]: {
       id: "scene_cover.unknown",
       defaultMessage:
-        "The original frame is unknown. The cover is kept; select a frame to enable regeneration.",
+        "No frame timestamp is recorded. Regeneration uses the default frame at 20% of the primary video.",
     },
   } satisfies Record<
     SceneCoverOriginStatus,

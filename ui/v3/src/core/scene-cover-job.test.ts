@@ -12,6 +12,9 @@ import {
   type SceneCoverOriginDataFragment,
   type FindSceneCoversQuery,
   type PreviewImageDataFragment,
+  FindSceneListCountDocument,
+  FilterGroupOperator,
+  type FindSceneListCountQueryVariables,
 } from "./generated-graphql";
 import { refreshSceneCoversAfterJob } from "./scene-cover-job";
 
@@ -117,9 +120,16 @@ const covers: FindSceneCoversQuery = {
   },
 };
 
-it.each([JobStatus.Finished, JobStatus.Failed, JobStatus.Cancelled, null])(
-  "publishes only artwork after %s, even after the initiating view leaves",
-  async (status) => {
+it.each(
+  [JobStatus.Finished, JobStatus.Failed, JobStatus.Cancelled, null].flatMap(
+    (status) => [
+      { status, scope: "selected" },
+      { status, scope: "cached" },
+    ],
+  ),
+)(
+  "publishes only $scope artwork after $status, even after the initiating view leaves",
+  async ({ status, scope }) => {
     vi.useFakeTimers();
     let finished = false;
     const requests: string[] = [];
@@ -160,6 +170,13 @@ it.each([JobStatus.Finished, JobStatus.Failed, JobStatus.Cancelled, null])(
           }),
       ),
     });
+    // These scenes enter the cache after the job starts, as when returning
+    // from Settings while a library-wide reset is running.
+    const task = refreshSceneCoversAfterJob(
+      client,
+      scope === "cached" ? "cached" : ["1", "1"],
+      "7",
+    );
     client.writeQuery({ query: detailQuery, data: { findScene: detail } });
     client.writeQuery({
       query: listQuery,
@@ -172,7 +189,6 @@ it.each([JobStatus.Finished, JobStatus.Failed, JobStatus.Cancelled, null])(
     });
     const page = client.watchQuery({ query: detailQuery }).subscribe({});
     const before = client.readQuery({ query: detailQuery })?.findScene;
-    const task = refreshSceneCoversAfterJob(client, ["1", "1"], "7");
     page.unsubscribe();
     let visible: FindSceneCoversQuery | undefined;
     const list = client.watchQuery({ query: listQuery }).subscribe((result) => {
@@ -200,3 +216,96 @@ it.each([JobStatus.Finished, JobStatus.Failed, JobStatus.Cancelled, null])(
     client.stop();
   },
 );
+
+it("refreshes active cover-filtered counts after a job without refetching playback or unrelated lists", async () => {
+  const variables: FindSceneListCountQueryVariables = {
+    scene_filter_ast: {
+      root: {
+        group: {
+          operator: FilterGroupOperator.Or,
+          children: [
+            {
+              condition: {
+                field: "cover_frame",
+                value: { modifier: "EQUALS", value: "SPECIFIC" },
+              },
+            },
+          ],
+        },
+      },
+    },
+  };
+  const requests: string[] = [];
+  const client = new ApolloClient({
+    cache: createCache(),
+    link: new ApolloLink(
+      (operation) =>
+        new Observable((observer) => {
+          requests.push(operation.operationName ?? "");
+          if (operation.operationName === "FindJob")
+            observer.next({
+              data: {
+                findJob: {
+                  __typename: "Job",
+                  id: "7",
+                  status: JobStatus.Finished,
+                  description: "Generating",
+                  addTime: "2026-09-16T00:00:00Z",
+                  subTasks: [],
+                  progress: 1,
+                  error: null,
+                  startTime: null,
+                  endTime: null,
+                },
+              },
+            });
+          else if (operation.operationName === "FindSceneListCount") {
+            expect(operation.variables).toEqual(variables);
+            observer.next({
+              data: {
+                result: { __typename: "FindScenesResultType", count: 0 },
+              },
+            });
+          } else
+            observer.error(
+              new Error(`Unexpected query ${operation.operationName}`),
+            );
+          observer.complete();
+        }),
+    ),
+  });
+  for (const scope of [variables, {}])
+    client.writeQuery({
+      query: FindSceneListCountDocument,
+      variables: scope,
+      data: { result: { __typename: "FindScenesResultType", count: 2 } },
+    });
+  client.writeQuery({ query: detailQuery, data: { findScene: detail } });
+  const subscriptions = [
+    client.watchQuery({ query: detailQuery }).subscribe({}),
+    client
+      .watchQuery({ query: FindSceneListCountDocument, variables })
+      .subscribe({}),
+    client
+      .watchQuery({ query: FindSceneListCountDocument, variables: {} })
+      .subscribe({}),
+  ];
+  try {
+    await refreshSceneCoversAfterJob(client, [], "7");
+    expect(
+      client.readQuery({ query: FindSceneListCountDocument, variables })?.result
+        .count,
+    ).toBe(0);
+    expect(
+      client.readQuery({ query: FindSceneListCountDocument, variables: {} })
+        ?.result.count,
+    ).toBe(2);
+    expect(
+      client.readQuery({ query: detailQuery })?.findScene.sceneStreams,
+    ).toEqual(detail.sceneStreams);
+    expect(requests).toEqual(["FindJob", "FindSceneListCount"]);
+  } finally {
+    for (const subscription of subscriptions) subscription.unsubscribe();
+    client.stop();
+  }
+});

@@ -421,7 +421,7 @@ func (a *FilterAST) FlatObjectFilter() (map[string]interface{}, bool) {
 	ret := make(map[string]interface{})
 
 	if a.Root.Condition != nil {
-		if a.Root.Condition.Field == "names" {
+		if forkOnlySavedCriterion(a.Root.Condition.Field) {
 			return ret, false
 		}
 		ret[a.Root.Condition.Field] = flatConditionValue(a.Root.Condition.Value)
@@ -443,7 +443,7 @@ func (a *FilterAST) FlatObjectFilter() (map[string]interface{}, bool) {
 			lossless = false
 			continue
 		}
-		if child.Condition.Field == "names" {
+		if forkOnlySavedCriterion(child.Condition.Field) {
 			lossless = false
 			continue
 		}
@@ -455,6 +455,10 @@ func (a *FilterAST) FlatObjectFilter() (map[string]interface{}, bool) {
 	}
 
 	return ret, lossless
+}
+
+func forkOnlySavedCriterion(field string) bool {
+	return field == "names" || field == "cover_frame"
 }
 
 // flatConditionValue renders a persisted condition value in the v2.5 saved

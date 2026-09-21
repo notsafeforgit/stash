@@ -298,7 +298,8 @@ export function SceneActionsMenu({
     onSelect: () => handleGenerateScreenshot("saved"),
     disabled:
       coverBusy ||
-      scene.cover_origin?.status !== GQL.SceneCoverOriginStatus.Available,
+      (scene.cover_origin?.status !== GQL.SceneCoverOriginStatus.Available &&
+        scene.cover_origin?.status !== GQL.SceneCoverOriginStatus.Unknown),
   });
   items.push({
     key: "default-thumbnail",

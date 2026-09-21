@@ -1997,12 +1997,21 @@
   "saved_filters": "Saved filters",
   "saving": "Saving…",
   "scene_cover": {
+    "frame_filter": "Cover frame",
+    "frame_default": "Default frame (20%)",
+    "frame_specific": "Specific frame",
+    "frame_unknown": "Unknown / unrecorded",
+    "reset_matching": "Reset covers for all {count, plural, one {# matching scene} other {# matching scenes}} across every page?",
     "available": "Regeneration reuses this frame from the original video.",
     "changed": "The original video has changed or was removed. The cover is kept; select a new frame to regenerate it.",
     "frame": "Cover frame",
-    "generate_description": "Reuse selected frames. Covers with changed, missing or unknown sources are kept and reported in the task log.",
+    "generate_description": "Reuse recorded frames. Covers without a recorded timestamp use the default frame at 20% of the primary video. Changed or unavailable recorded sources are reported in the task log.",
+    "reset": "Reset covers to default",
+    "reset_description": "Replace custom, uploaded and scraped covers with the frame 20% into each primary video, then rebuild their thumbnails. A failed generation keeps the existing cover. This cannot be undone.",
+    "reset_library": "Reset covers for every scene in your library?",
+    "reset_selected": "Reset covers for {count, plural, one {# selected scene} other {# selected scenes}}?",
     "unavailable": "The original video is unavailable. The cover is kept; restore the video or select a new frame.",
-    "unknown": "The original frame is unknown. The cover is kept; select a frame to enable regeneration."
+    "unknown": "No frame timestamp is recorded. Regeneration uses the default frame at 20% of the primary video."
   },
   "scene": "Scene",
   "sceneTagger": "Scene Tagger",

@@ -10,6 +10,7 @@ import { useTaskOptions } from "src/hooks/use-task-options";
 import { withoutTypename } from "src/utils/data";
 import { AutoTagWarning } from "src/components/shared/auto-tag-warning";
 import { DestructiveConfirmDialog } from "src/components/shared/destructive-confirm-dialog";
+import { SceneCoverResetDialog } from "@/components/detail/deferred-overlays";
 import {
   VideoPreviewInput,
   type VideoPreviewSettingsInput,
@@ -137,6 +138,7 @@ function GenerateOptionsForm({
   options: GQL.GenerateMetadataInput;
   setOptions: (s: GQL.GenerateMetadataInput) => void;
 }) {
+  const intl = useIntl();
   function set(input: Partial<GQL.GenerateMetadataInput>) {
     setOptions({ ...options, ...input });
   }
@@ -145,6 +147,11 @@ function GenerateOptionsForm({
       <TaskOptionToggle
         id="gen-covers"
         label="Scene covers"
+        description={intl.formatMessage({
+          id: "scene_cover.generate_description",
+          defaultMessage:
+            "Reuse recorded frames. Covers without a recorded timestamp use the default frame at 20% of the primary video. Changed or unavailable recorded sources are reported in the task log.",
+        })}
         checked={options.covers ?? false}
         onChange={(v) => set({ covers: v })}
       />
@@ -262,6 +269,7 @@ export function LibraryTasks() {
 
   const [autoTagConfirmOpen, setAutoTagConfirmOpen] = useState(false);
   const [identifyOpen, setIdentifyOpen] = useState(false);
+  const [resetCoversOpen, setResetCoversOpen] = useState(false);
   const [generatePreviewOverrides, setGeneratePreviewOverrides] =
     useState<VideoPreviewSettingsInput>({});
   const [overridePreviewOptions, setOverridePreviewOptions] = useState(false);
@@ -489,6 +497,16 @@ export function LibraryTasks() {
                   defaultMessage="Generate"
                 />
               </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setResetCoversOpen(true)}
+              >
+                <FormattedMessage
+                  id="scene_cover.reset"
+                  defaultMessage="Reset covers to default"
+                />
+              </Button>
               <SelectivePathsButton
                 buttonLabel={
                   <FormattedMessage
@@ -552,6 +570,11 @@ export function LibraryTasks() {
       </TaskGroup>
 
       <IdentifyDialog open={identifyOpen} onOpenChange={setIdentifyOpen} />
+      <SceneCoverResetDialog
+        open={resetCoversOpen}
+        onOpenChange={setResetCoversOpen}
+        target={{ kind: "library" }}
+      />
 
       <DestructiveConfirmDialog
         open={autoTagConfirmOpen}

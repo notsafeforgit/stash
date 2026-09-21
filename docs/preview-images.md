@@ -34,7 +34,8 @@ Enable v3 using `--enable-v3-ui` / `STASH_ENABLE_V3_UI=true`. Generate a scene
 cover, use **Set cover** at a player timestamp, or generate marker screenshots.
 Existing covers need explicit regeneration to acquire HDR or stored card
 thumbnails. **Regenerate selected cover** reuses the original file and exact
-timestamp. **Generate thumbnail from current** saves a new selection;
+timestamp, or falls back to the default frame when no timestamp is known.
+**Generate thumbnail from current** saves a new selection;
 **Generate default thumbnail** explicitly replaces it with the frame 20% into
 the primary video. Scene Details shows the saved time and source status.
 For a batch refresh, select scenes and use **Generate…** with only **Scene
@@ -47,10 +48,38 @@ reports a bounded failure summary after processing the remaining scenes.
 
 Older v3 manifests can supply the timestamp when they still match both the
 source video and saved cover, even when their rendition files are missing.
-Legacy, uploaded and scraped covers without trustworthy frame provenance are
-kept and reported as unknown. They require a new frame selection before video
-regeneration; the timestamp cannot be reconstructed from a JPEG alone. Scenes
-without any cover still receive a default frame.
+Legacy, uploaded and scraped covers without a recorded frame are shown as
+unknown. Explicit regeneration with overwrite uses the frame 20% into the
+primary video and records it for future refreshes. Scenes without any cover
+receive the same default. Existing covers stay intact if extraction fails.
+
+To discard custom frame selections in bulk, open **Generate… → Reset covers to
+default** for selected scenes, or **Settings → Tasks → Generate → Reset covers
+to default** for the whole library. The confirmation identifies the scope.
+This queues a cover-only job that replaces selected, uploaded and scraped
+covers with the default frame and regenerates full-size artwork and thumbnails.
+It does not inherit other generation options or change their overwrite policy.
+The reset is an explicit action, never a remembered generation default. Covers
+and their timestamps are replaced together after successful generation; a
+cancelled or failed run can leave some scenes completed and others unchanged.
+
+Scene filters include **Cover frame** with **Default frame (20%)**, **Specific
+frame**, and **Unknown / unrecorded**. Default means the recorded timestamp is
+20% into the current primary video; another recorded timestamp or source is
+specific, including frame zero. These describe the frame, not whether someone
+picked it manually. Unrecorded legacy/uploaded artwork and scenes without a
+cover are unknown, rather than assumed to use the default. Classification uses
+the durable cover record and checksum; it does not inspect videos or rendition
+manifests during list queries. These conditions compose with other filters and
+can be saved or negated.
+
+After filtering and selecting scenes, **Generate…** also offers **Apply to all
+N matching**. This applies generation or a confirmed cover reset across every
+page, including the list's search and context filters. The server freezes IDs
+before queueing: scenes leaving the filter as their covers reset cannot cause
+later rows to be skipped. Invalid filters and empty results fail without
+expanding to the library. Active cover-filtered lists and counts refresh when
+the job ends. The next operation starts with the explicit selection again.
 
 Generating missing marker screenshots also backfills their v3 renditions because
 marker timestamps are known. Regenerating with overwrite can upgrade a plain

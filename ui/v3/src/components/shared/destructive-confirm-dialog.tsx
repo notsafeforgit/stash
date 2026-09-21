@@ -1,5 +1,6 @@
 import { FormattedMessage } from "react-intl";
 import { Button } from "src/components/ui/button";
+import { Spinner } from "src/components/ui/spinner";
 import {
   Dialog,
   DialogClose,
@@ -20,6 +21,8 @@ interface IProps {
   confirmText?: React.ReactNode;
   /** Called when the user clicks the destructive confirm button. */
   onConfirm: () => void;
+  busy?: boolean;
+  disabled?: boolean;
 }
 
 /**
@@ -35,9 +38,16 @@ export function DestructiveConfirmDialog({
   children,
   confirmText,
   onConfirm,
+  busy = false,
+  disabled = false,
 }: IProps) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!busy) onOpenChange(next);
+      }}
+    >
       <DialogContent showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
@@ -46,12 +56,18 @@ export function DestructiveConfirmDialog({
         <DialogFooter>
           <DialogClose
             render={
-              <Button type="button" variant="outline">
+              <Button type="button" variant="outline" disabled={busy}>
                 <FormattedMessage id="actions.cancel" defaultMessage="Cancel" />
               </Button>
             }
           />
-          <Button type="button" variant="destructive" onClick={onConfirm}>
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={onConfirm}
+            disabled={busy || disabled}
+          >
+            {busy && <Spinner data-icon="inline-start" />}
             {confirmText ?? (
               <FormattedMessage id="actions.confirm" defaultMessage="Confirm" />
             )}

@@ -53,6 +53,270 @@ for (const width of [390, 1280]) {
       fixtureTest.use({ viewport: { width, height: 844 } });
 
       fixtureTest(
+        "unknown cover can regenerate using the default frame",
+        async ({ page }) => {
+          await page.goto("/scene-cover-fixture/scenes/1?unknown");
+          if (mobile) await chooseSection(page, "Details");
+          await expect(
+            page.getByText(
+              "No frame timestamp is recorded. Regeneration uses the default frame at 20% of the primary video.",
+              { exact: true },
+            ),
+          ).toBeVisible();
+          await action(page, mobile, "Regenerate selected cover");
+          await expect
+            .poll(() => page.evaluate(() => window.coverFixture.regenerations))
+            .toEqual([{ id: "1" }]);
+        },
+      );
+
+      fixtureTest(
+        "cover frame filter scopes a reset to all matches across pages",
+        async ({ page }) => {
+          await page.goto("/scene-cover-fixture/generate?matching");
+          await page
+            .getByRole("button", { name: "Add first condition", exact: true })
+            .click();
+          await page
+            .getByRole("combobox", { name: "Title", exact: true })
+            .click();
+          await page.getByPlaceholder("Search fields…").fill("Cover frame");
+          await page.getByRole("option", { name: /^Cover frame\b/ }).click();
+          const value = page
+            .getByRole("combobox")
+            .filter({ hasText: "Specific frame" });
+          await value.click();
+          await page
+            .getByRole("option", { name: "Default frame (20%)", exact: true })
+            .click();
+          await page
+            .getByRole("combobox")
+            .filter({ hasText: "Default frame (20%)" })
+            .click();
+          await page
+            .getByRole("option", { name: "Unknown / unrecorded", exact: true })
+            .click();
+          await page
+            .getByRole("combobox")
+            .filter({ hasText: "Unknown / unrecorded" })
+            .click();
+          await page
+            .getByRole("option", { name: "Specific frame", exact: true })
+            .click();
+          await page
+            .getByRole("button", {
+              name: "Generate selected scenes",
+              exact: true,
+            })
+            .click();
+          const generate = page.getByRole("dialog", {
+            name: "Generate",
+            exact: true,
+          });
+          const all = generate.getByRole("switch", {
+            name: "Apply to all 200 matching",
+            exact: true,
+          });
+          await expect(all).not.toBeChecked();
+          await all.check();
+          await generate
+            .getByRole("button", {
+              name: "Reset covers to default",
+              exact: true,
+            })
+            .click();
+          const confirmation = page.getByRole("dialog", {
+            name: "Reset covers to default",
+            exact: true,
+          });
+          await expect(confirmation).toContainText(
+            "Reset covers for all 200 matching scenes across every page?",
+          );
+          await confirmation
+            .getByRole("button", { name: "Cancel", exact: true })
+            .click();
+          await expect(confirmation).toBeHidden();
+          expect(
+            await page.evaluate(() => window.coverFixture.generations),
+          ).toEqual([]);
+          await generate
+            .getByRole("button", {
+              name: "Reset covers to default",
+              exact: true,
+            })
+            .click();
+          await confirmation
+            .getByRole("button", {
+              name: "Reset covers to default",
+              exact: true,
+            })
+            .click();
+          await expect(confirmation).toBeHidden();
+          await expect
+            .poll(() => page.evaluate(() => window.coverFixture.generations))
+            .toEqual([
+              {
+                input: {
+                  covers: true,
+                  resetCoversToDefault: true,
+                  sceneSelection: {
+                    find_filter: expect.any(Object),
+                    scene_filter_ast: {
+                      root: {
+                        group: {
+                          operator: "AND",
+                          children: [
+                            {
+                              condition: {
+                                field: "cover_frame",
+                                value: {
+                                  value: "SPECIFIC",
+                                  modifier: "EQUALS",
+                                },
+                              },
+                            },
+                          ],
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            ]);
+          // The next operation starts with the explicit selection again.
+          await page
+            .getByRole("button", {
+              name: "Generate selected scenes",
+              exact: true,
+            })
+            .click();
+          await expect(all).not.toBeChecked();
+          await generate
+            .getByRole("button", { name: "Generate", exact: true })
+            .click();
+          await expect
+            .poll(() =>
+              page.evaluate(() => window.coverFixture.generations.length),
+            )
+            .toBe(2);
+          const next = await page.evaluate(
+            () => window.coverFixture.generations[1]?.input,
+          );
+          expect(next?.sceneIDs).toEqual(["1", "2"]);
+          expect(next?.sceneSelection).toBeUndefined();
+          expect(next?.resetCoversToDefault).toBeUndefined();
+        },
+      );
+
+      fixtureTest(
+        "an empty selection cannot start library generation",
+        async ({ page }) => {
+          await page.goto("/scene-cover-fixture/generate?empty");
+          await page
+            .getByRole("button", {
+              name: "Generate selected scenes",
+              exact: true,
+            })
+            .click();
+          const generate = page.getByRole("dialog", {
+            name: "Generate",
+            exact: true,
+          });
+          await expect(
+            generate.getByRole("button", { name: "Generate", exact: true }),
+          ).toBeDisabled();
+          await expect(
+            generate.getByRole("button", {
+              name: "Reset covers to default",
+              exact: true,
+            }),
+          ).toBeDisabled();
+          expect(
+            await page.evaluate(() => window.coverFixture.generations),
+          ).toEqual([]);
+        },
+      );
+
+      for (const scope of ["selected", "library"] as const) {
+        fixtureTest(
+          `${scope} cover reset confirms its scope and only regenerates covers`,
+          async ({ page }) => {
+            await page.goto(
+              `/scene-cover-fixture/${scope === "selected" ? "generate" : "tasks"}`,
+            );
+            if (scope === "selected")
+              await page
+                .getByRole("button", {
+                  name: "Generate selected scenes",
+                  exact: true,
+                })
+                .click();
+            const trigger = page.getByRole("button", {
+              name: "Reset covers to default",
+              exact: true,
+            });
+            await trigger.click();
+            const confirmation = page.getByRole("dialog", {
+              name: "Reset covers to default",
+              exact: true,
+            });
+            await expect(confirmation).toContainText(
+              scope === "selected"
+                ? "Reset covers for 2 selected scenes?"
+                : "Reset covers for every scene in your library?",
+            );
+            await confirmation
+              .getByRole("button", { name: "Cancel", exact: true })
+              .click();
+            await expect(confirmation).toBeHidden();
+            expect(
+              await page.evaluate(() => window.coverFixture.generations),
+            ).toEqual([]);
+            await trigger.click();
+            await confirmation
+              .getByRole("button", {
+                name: "Reset covers to default",
+                exact: true,
+              })
+              .click();
+            await expect(confirmation).toBeHidden();
+            await expect
+              .poll(() => page.evaluate(() => window.coverFixture.generations))
+              .toEqual([
+                {
+                  input: {
+                    covers: true,
+                    resetCoversToDefault: true,
+                    ...(scope === "selected" ? { sceneIDs: ["1", "2"] } : {}),
+                  },
+                },
+              ]);
+            if (scope === "selected") {
+              await page
+                .getByRole("button", {
+                  name: "Generate selected scenes",
+                  exact: true,
+                })
+                .click();
+              await page
+                .getByRole("dialog", { name: "Generate", exact: true })
+                .getByRole("button", { name: "Generate", exact: true })
+                .click();
+              await expect
+                .poll(() =>
+                  page.evaluate(() => window.coverFixture.generations.length),
+                )
+                .toBe(2);
+              expect(
+                (await page.evaluate(() => window.coverFixture.generations[1]))
+                  ?.input.resetCoversToDefault,
+              ).toBeUndefined();
+            }
+          },
+        );
+      }
+
+      fixtureTest(
         "changed source keeps its timestamp and requires a new selection",
         async ({ page }) => {
           await page.goto("/scene-cover-fixture/scenes/1?stale");

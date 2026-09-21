@@ -315,3 +315,16 @@ func TestFlatObjectFilterOmitsV3AllNamesCriterion(t *testing.T) {
 		t.Fatalf("all-names criterion leaked into v2.5 projection: %#v", flat)
 	}
 }
+
+func TestFlatObjectFilterPreservesForkCoverFrameCriterion(t *testing.T) {
+	condition := &FilterASTNode{Condition: &FilterASTCondition{Field: "cover_frame", Value: map[string]interface{}{
+		"value": "SPECIFIC", "modifier": "EQUALS",
+	}}}
+	for _, root := range []*FilterASTNode{condition, {Group: &FilterASTGroup{Operator: FilterGroupOperatorAnd, Children: []*FilterASTNode{condition}}}} {
+		ast := &FilterAST{Root: root}
+		flat, lossless := ast.FlatObjectFilter()
+		if lossless || len(flat) != 0 {
+			t.Fatalf("cover frame must stay in the canonical fork AST, got %v (lossless=%v)", flat, lossless)
+		}
+	}
+}

@@ -253,6 +253,8 @@ func sceneASTConditionHandler(condition *models.FilterASTCondition) (criterionHa
 			return nil, err
 		}
 		return qb.hasMarkersCriterionHandler(&input), nil
+	case "cover_frame":
+		return sceneCoverFrameCriterionHandler(condition.Value)
 	case "is_missing":
 		input, err := decodeASTValue[string](condition.Value)
 		if err != nil {

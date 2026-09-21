@@ -311,6 +311,8 @@ export function useSceneContextMenu({
             open={bulkGenerateOpen}
             onOpenChange={setBulkGenerateOpen}
             sceneIds={selectedItems.map((i) => i.id)}
+            applyToAllTarget={applyToAllTarget}
+            totalCount={totalCount}
           />
           <SceneMergeDialog
             open={bulkMergeOpen}

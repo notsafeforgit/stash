@@ -9,8 +9,7 @@ import {
 } from "src/components/ui/sheet";
 import { Button } from "src/components/ui/button";
 import { Spinner } from "src/components/ui/spinner";
-import { Switch } from "src/components/ui/switch";
-import { Field, FieldTitle } from "src/components/ui/field";
+import { BulkApplyToggle } from "@/components/list/bulk-apply-toggle";
 import type { BulkApplyTarget } from "src/components/list/list-provider";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -88,23 +87,12 @@ export function BulkEditSheet({
 
           {showApplyToAll && (
             <div className="shrink-0 border-t bg-popover px-4 py-3">
-              <Field orientation="horizontal">
-                <FieldTitle>
-                  {intl.formatMessage(
-                    {
-                      id: "dialogs.bulk_edit.apply_to_all",
-                      defaultMessage: "Apply to all {count} matching",
-                    },
-                    { count: totalCount },
-                  )}
-                </FieldTitle>
-                <Switch
-                  checked={applyToAll}
-                  onCheckedChange={onApplyToAllChange}
-                  disabled={saving}
-                  size="sm"
-                />
-              </Field>
+              <BulkApplyToggle
+                totalCount={totalCount}
+                checked={applyToAll}
+                onCheckedChange={onApplyToAllChange}
+                disabled={saving}
+              />
             </div>
           )}
 

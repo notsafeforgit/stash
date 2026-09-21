@@ -1,0 +1,10 @@
+"All scenes matching a list filter, across pages. An empty object selects all scenes."
+input GenerateSceneSelectionInput {
+  find_filter: FindFilterType
+  scene_filter_ast: FilterASTInput
+}
+
+extend input GenerateMetadataInput {
+  "Freeze the matching scene IDs before queuing. Requires v3. Cannot be combined with paths or explicit entity IDs. An empty result is an error."
+  sceneSelection: GenerateSceneSelectionInput
+}

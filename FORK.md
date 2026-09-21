@@ -108,6 +108,7 @@ local container after validation.
 | `pkg/previewimage/`, `internal/manager/preview_images.go`, and `internal/api/*preview_image*` | standalone still-image renditions, HDR AVIF, and legacy JPEG adapters; see [preview images](docs/preview-images.md) | low (new files) |
 | `graphql/schema/` | additive v3 API fields, including filter ASTs and loss-aware performer merge opt-in | low (additive) |
 | `internal/api/resolver_mutation_bulk_*.go` + `bulk_update.go` | fork bulk-job orchestration; legacy synchronous adapters remain in shared resolvers | low (new files) |
+| `internal/manager/generate_scene_selection.go` | opt-in generation for frozen scene-filter matches, including cover resets across pages | low (new file and small generation hook) |
 | `internal/api/resolver_query_bulk_custom_fields.go` + `graphql/schema/types/bulk_custom_fields.graphql` | shared/partial custom-field names for the complete bulk-edit target | low (new files) |
 | `internal/api/resolver_mutation_default_filter.go` + `internal/manager/default_filter_update.go` | atomic per-view default-filter updates | low (new files) |
 | `internal/api/json_values.go` | recursive JSON-number conversion for configuration persistence; shared helper/resolver call sites stay small | low (new file) |

@@ -144,8 +144,8 @@ func retainedCoverError(sceneID int, status CoverSourceStatus) error {
 }
 
 // generateWithCoverSource keeps authored selection separate from rendition
-// recipes. Only explicit frame/default actions may replace an unknown or stale
-// selection. Bulk generation and the regenerate action preserve it.
+// recipes. Untracked artwork falls back to the primary video's default frame.
+// Known selections are preserved unless a frame/default action replaces them.
 func (t *GenerateCoverTask) generateWithCoverSource(ctx context.Context) error {
 	s, r := instance, t.repository
 	var scene models.Scene
@@ -179,17 +179,23 @@ func (t *GenerateCoverTask) generateWithCoverSource(ctx context.Context) error {
 		}
 		if t.ScreenshotAt == nil && !t.ResetToDefault && scene.CoverChecksum != "" {
 			origin := s.coverOrigin(&scene, previousSource)
-			if origin.Status != CoverSourceAvailable {
+			switch origin.Status {
+			case CoverSourceAvailable:
+				source = *origin.Source
+				file = coverSourceFile(&scene, source.FileID)
+			case CoverSourceUnknown:
+				// Legacy, uploaded and scraped artwork has no reproducible frame.
+				// An explicit regeneration selects and records the default below.
+			default:
 				return retainedCoverError(scene.ID, origin.Status)
 			}
-			source = *origin.Source
-			file = coverSourceFile(&scene, source.FileID)
-		} else {
+		}
+		if file == nil {
 			file = scene.Files.Primary()
 			if file == nil {
 				return fmt.Errorf("scene %d has no primary video file", scene.ID)
 			}
-			source = models.SceneCoverSource{CoverChecksum: scene.CoverChecksum, FileID: file.ID, At: file.Duration * 0.2}
+			source = models.SceneCoverSource{CoverChecksum: scene.CoverChecksum, FileID: file.ID, At: file.Duration * models.DefaultSceneCoverFraction}
 			if t.ScreenshotAt != nil {
 				source.At = *t.ScreenshotAt
 			}

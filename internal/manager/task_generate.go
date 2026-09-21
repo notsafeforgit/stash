@@ -17,15 +17,16 @@ import (
 )
 
 type GenerateMetadataInput struct {
-	Covers              bool                         `json:"covers"`
-	Sprites             bool                         `json:"sprites"`
-	Previews            bool                         `json:"previews"`
-	ImagePreviews       bool                         `json:"imagePreviews"`
-	PreviewOptions      *GeneratePreviewOptionsInput `json:"previewOptions"`
-	Markers             bool                         `json:"markers"`
-	MarkerImagePreviews bool                         `json:"markerImagePreviews"`
-	MarkerScreenshots   bool                         `json:"markerScreenshots"`
-	Transcodes          bool                         `json:"transcodes"`
+	Covers               bool                         `json:"covers"`
+	ResetCoversToDefault bool                         `json:"resetCoversToDefault"`
+	Sprites              bool                         `json:"sprites"`
+	Previews             bool                         `json:"previews"`
+	ImagePreviews        bool                         `json:"imagePreviews"`
+	PreviewOptions       *GeneratePreviewOptionsInput `json:"previewOptions"`
+	Markers              bool                         `json:"markers"`
+	MarkerImagePreviews  bool                         `json:"markerImagePreviews"`
+	MarkerScreenshots    bool                         `json:"markerScreenshots"`
+	Transcodes           bool                         `json:"transcodes"`
 	// Generate transcodes even if not required
 	ForceTranscodes           bool `json:"forceTranscodes"`
 	Phashes                   bool `json:"phashes"`
@@ -35,6 +36,8 @@ type GenerateMetadataInput struct {
 	ImageThumbnails           bool `json:"imageThumbnails"`
 	// scene ids to generate for
 	SceneIDs []string `json:"sceneIDs"`
+	// optional v3 scene list scope, resolved to IDs before queuing
+	SceneSelection *models.GenerateSceneSelectionInput `json:"sceneSelection"`
 	// marker ids to generate for
 	MarkerIDs []string `json:"markerIDs"`
 	// image ids to generate for
@@ -418,10 +421,11 @@ func (j *GenerateJob) queueSceneJobs(ctx context.Context, g *generate.Generator,
 
 	if j.input.Covers {
 		task := &GenerateCoverTask{
-			repository: r,
-			Scene:      *scene,
-			Overwrite:  j.overwrite,
-			onError:    j.coverFailures.Add,
+			repository:     r,
+			Scene:          *scene,
+			Overwrite:      j.overwrite || j.input.ResetCoversToDefault,
+			ResetToDefault: j.input.ResetCoversToDefault,
+			onError:        j.coverFailures.Add,
 		}
 
 		if task.required(ctx) {

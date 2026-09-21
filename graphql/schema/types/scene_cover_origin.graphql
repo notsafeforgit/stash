@@ -19,6 +19,11 @@ extend type Scene {
 }
 
 extend type Mutation {
-  "Regenerate the saved cover frame. Keeps existing artwork if its source is invalid."
+  "Regenerate the saved cover frame, or the default frame when no timestamp is known. Keeps existing artwork if a recorded source is invalid."
   sceneRegenerateCover(id: ID!): ID!
+}
+
+extend input GenerateMetadataInput {
+  "With covers selected, replace their frame selections with the default at 20% of the primary video. Regenerates covers regardless of overwrite. Requires v3."
+  resetCoversToDefault: Boolean
 }

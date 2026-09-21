@@ -48,6 +48,9 @@ export const TagBulkEditSheet = deferredDialog(async () => ({
 export const SceneGenerateDialog = deferredDialog(async () => ({
   default: (await import("./scene-generate-dialog")).SceneGenerateDialog,
 }));
+export const SceneCoverResetDialog = deferredDialog(async () => ({
+  default: (await import("./scene-cover-reset-dialog")).SceneCoverResetDialog,
+}));
 export const ImageGenerateDialog = deferredDialog(async () => ({
   default: (await import("./image-generate-dialog")).ImageGenerateDialog,
 }));

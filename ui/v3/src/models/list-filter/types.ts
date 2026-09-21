@@ -163,6 +163,7 @@ export type CriterionType =
   | "filter_favorites"
   | "favorite"
   | "has_markers"
+  | "cover_frame"
   | "is_missing"
   | "tags"
   | "scene_tags"

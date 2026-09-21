@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/stashapp/stash/pkg/ffmpeg"
+	"github.com/stashapp/stash/pkg/hash/md5"
 	"github.com/stashapp/stash/pkg/job"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/previewimage"
@@ -96,7 +99,7 @@ func TestCoverFingerprintUsesScanTimestampPrecision(t *testing.T) {
 }
 
 func TestRegenerateSceneCoverKeepsUnreproducibleArtwork(t *testing.T) {
-	for _, mode := range []string{"unknown", "changed", "missing", "detached"} {
+	for _, mode := range []string{"changed", "missing", "detached"} {
 		t.Run(mode, func(t *testing.T) {
 			mgr, db := coverTestManager(t)
 			previous := instance
@@ -105,8 +108,6 @@ func TestRegenerateSceneCoverKeepsUnreproducibleArtwork(t *testing.T) {
 			scene, file, source := coverSourceFixture(t)
 			files := scene.Files.List()
 			switch mode {
-			case "unknown":
-				source = nil
 			case "changed":
 				require.NoError(t, os.WriteFile(file.Path, []byte("new source"), 0600))
 			case "missing":
@@ -172,7 +173,8 @@ func TestBulkCoverGenerationReportsRetainedCovers(t *testing.T) {
 	previous := instance
 	instance = mgr
 	t.Cleanup(func() { instance = previous })
-	scene, _, _ := coverSourceFixture(t)
+	scene, file, source := coverSourceFixture(t)
+	require.NoError(t, os.Remove(file.Path))
 	other := *scene
 	other.ID = 2
 	scenes := []*models.Scene{scene, &other}
@@ -180,7 +182,7 @@ func TestBulkCoverGenerationReportsRetainedCovers(t *testing.T) {
 	for _, scene := range scenes {
 		db.Scene.On("Find", mock.Anything, scene.ID).Return(scene, nil)
 		db.Scene.On("GetFiles", mock.Anything, scene.ID).Return(scene.Files.List(), nil)
-		db.Scene.On("GetCoverSource", mock.Anything, scene.ID).Return(nil, nil)
+		db.Scene.On("GetCoverSource", mock.Anything, scene.ID).Return(source, nil)
 	}
 	j := &GenerateJob{repository: db.Repository(), input: GenerateMetadataInput{SceneIDs: []string{"1", "2"}, Covers: true, Overwrite: true}}
 	id := mgr.JobManager.Add(context.Background(), "Regenerate scene covers", j)
@@ -190,4 +192,96 @@ func TestBulkCoverGenerationReportsRetainedCovers(t *testing.T) {
 	require.Contains(t, *state.Error, "2 scene covers could not be regenerated")
 	require.Contains(t, *state.Error, "select a new cover frame")
 	db.AssertExpectations(t)
+}
+
+func TestBulkCoverDefaultSelection(t *testing.T) {
+	ffmpegPath, err := exec.LookPath("ffmpeg")
+	if err != nil {
+		t.Skip("ffmpeg is required for cover generation")
+	}
+	probePath, err := exec.LookPath("ffprobe")
+	if err != nil {
+		t.Skip("ffprobe is required for cover generation")
+	}
+	path := filepath.Join(t.TempDir(), "source.mkv")
+	output, err := exec.Command(ffmpegPath, "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=64x48:rate=8:duration=3", "-c:v", "ffv1", path).CombinedOutput()
+	require.NoError(t, err, string(output))
+	for _, tc := range []struct {
+		name      string
+		recorded  bool
+		at        float64
+		reset     bool
+		overwrite bool
+		detached  bool
+		want      float64
+	}{
+		{name: "unknown falls back to default", overwrite: true, want: 0.6},
+		{name: "recorded frame is preserved", recorded: true, at: 1.125, overwrite: true, want: 1.125},
+		{name: "recorded zero is preserved", recorded: true, at: 0, overwrite: true, want: 0},
+		{name: "reset overrides recorded frame without global overwrite", recorded: true, at: 1.125, reset: true, want: 0.6},
+		{name: "reset uses primary instead of detached source", recorded: true, at: 1.125, reset: true, detached: true, want: 0.6},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mgr, db := coverTestManager(t)
+			mgr.FFMpeg, mgr.FFProbe = ffmpeg.NewEncoder(ffmpegPath), ffmpeg.NewFFProbe(probePath)
+			previous := instance
+			instance = mgr
+			t.Cleanup(func() { instance = previous })
+			file := &models.VideoFile{BaseFile: &models.BaseFile{ID: 1, Path: path}, Width: 64, Height: 48, Duration: 3}
+			scene := &models.Scene{ID: 1, Path: path, CoverChecksum: "old-cover", Files: models.NewRelatedVideoFiles([]*models.VideoFile{file})}
+			var saved *models.SceneCoverSource
+			if tc.recorded {
+				fingerprint, err := coverFingerprint(file)
+				require.NoError(t, err)
+				saved = &models.SceneCoverSource{CoverChecksum: scene.CoverChecksum, FileID: file.ID, At: tc.at, Fingerprint: fingerprint}
+				if tc.detached {
+					saved.FileID = 99
+				}
+			}
+			db.Scene.On("FindMany", mock.Anything, []int{1}).Return([]*models.Scene{scene}, nil)
+			db.Scene.On("Find", mock.Anything, scene.ID).Return(scene, nil)
+			db.Scene.On("GetFiles", mock.Anything, scene.ID).Return(scene.Files.List(), nil)
+			db.Scene.On("GetCoverSource", mock.Anything, scene.ID).Return(func(context.Context, int) *models.SceneCoverSource { return saved }, nil)
+			db.Scene.On("UpdateCover", mock.Anything, scene.ID, mock.Anything).Run(func(args mock.Arguments) {
+				scene.CoverChecksum = md5.FromBytes(args.Get(2).([]byte))
+			}).Return(nil).Once()
+			db.Scene.On("SetCoverSource", mock.Anything, scene.ID, mock.Anything).Run(func(args mock.Arguments) {
+				selection := *args.Get(2).(*models.SceneCoverSource)
+				saved = &selection
+			}).Return(nil).Once()
+			db.Scene.On("UpdatePartial", mock.Anything, scene.ID, mock.Anything).Return(scene, nil).Once()
+			j := &GenerateJob{repository: db.Repository(), input: GenerateMetadataInput{SceneIDs: []string{"1"}, Covers: true, Overwrite: tc.overwrite, ResetCoversToDefault: tc.reset}}
+			id := mgr.JobManager.Add(context.Background(), "Generate covers", j)
+			state := mgr.JobManager.GetJob(id)
+			require.Equal(t, job.StatusFinished, state.Status, "%+v", state.Error)
+			require.NotNil(t, saved)
+			require.InDelta(t, tc.want, saved.At, 0.000001)
+			require.Equal(t, file.ID, saved.FileID)
+			require.Equal(t, scene.CoverChecksum, saved.CoverChecksum)
+			require.Equal(t, CoverSourceAvailable, coverSourceStatus(scene, saved))
+			manifest := mgr.ScenePreviewImage(scene)
+			require.NotNil(t, manifest)
+			require.InDelta(t, tc.want, manifest.At, 0.000001)
+			require.NotEmpty(t, manifest.Thumbnail)
+			db.AssertExpectations(t)
+		})
+	}
+}
+
+func TestResetCoverKeepsArtworkWhenPrimaryIsMissing(t *testing.T) {
+	mgr, db := coverTestManager(t)
+	previous := instance
+	instance = mgr
+	t.Cleanup(func() { instance = previous })
+	scene, file, source := coverSourceFixture(t)
+	require.NoError(t, os.Remove(file.Path))
+	db.Scene.On("Find", mock.Anything, scene.ID).Return(scene, nil)
+	db.Scene.On("GetFiles", mock.Anything, scene.ID).Return(scene.Files.List(), nil)
+	db.Scene.On("GetCoverSource", mock.Anything, scene.ID).Return(source, nil)
+	task := GenerateCoverTask{repository: db.Repository(), Scene: *scene, Overwrite: true, ResetToDefault: true}
+	require.Error(t, task.generate(context.Background()))
+	require.Equal(t, "cover", scene.CoverChecksum)
+	require.Equal(t, 12.345, source.At)
+	db.Scene.AssertNotCalled(t, "UpdateCover", mock.Anything, mock.Anything, mock.Anything)
+	db.Scene.AssertNotCalled(t, "SetCoverSource", mock.Anything, mock.Anything, mock.Anything)
 }

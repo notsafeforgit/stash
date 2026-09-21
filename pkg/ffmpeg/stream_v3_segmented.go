@@ -573,6 +573,7 @@ type v3WaitingSegment struct {
 }
 
 type v3RunningStream struct {
+	private          bool
 	dir              string
 	session          string
 	streamType       *V3StreamType
@@ -683,6 +684,9 @@ func (s *v3RunningStream) makeStreamArgs(sm *StreamManager, segment int) Args {
 
 	args = displayRotationInputArgs(args, displayRotation, fullhw)
 	args = args.Input(s.vf.Path)
+	if s.private {
+		args = append(args, privateV3MetadataArgs()...)
+	}
 
 	videoFilter := sm.encoder.hwMaxResFilter(codec, s.vf, s.maxTranscodeSize, fullhw)
 	if fullhw {
@@ -1315,6 +1319,10 @@ func (sm *StreamManager) ServeV3Segment(w http.ResponseWriter, r *http.Request, 
 	file := filepath.Join(dir, name)
 
 	sm.streamsMutex.Lock()
+	if r.Context().Err() != nil {
+		sm.streamsMutex.Unlock()
+		return
+	}
 	if sm.v3SessionClosed(options.VideoFile.ID, session, time.Now()) {
 		sm.streamsMutex.Unlock()
 		http.Error(w, "stream session released", http.StatusGone)
@@ -1373,6 +1381,7 @@ func (sm *StreamManager) ServeV3Segment(w http.ResponseWriter, r *http.Request, 
 			TranscodeDebugf("[transcode] error clearing stale cache for %s: %v", dir, err)
 		}
 		stream = &v3RunningStream{
+			private:          privateV3Stream(r.Context()),
 			dir:              dir,
 			session:          session,
 			streamType:       options.StreamType,

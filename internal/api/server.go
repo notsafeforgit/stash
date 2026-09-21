@@ -34,6 +34,7 @@ import (
 	"github.com/stashapp/stash/internal/build"
 	"github.com/stashapp/stash/internal/manager"
 	"github.com/stashapp/stash/internal/manager/config"
+	"github.com/stashapp/stash/internal/sharing"
 	"github.com/stashapp/stash/pkg/fsutil"
 	"github.com/stashapp/stash/pkg/logger"
 	"github.com/stashapp/stash/pkg/plugin"
@@ -54,6 +55,7 @@ type Server struct {
 	displayAddress string
 
 	manager *manager.Manager
+	shares  *sharing.Service
 }
 
 // TODO - os.DirFS doesn't implement ReadDir, so re-implement it here
@@ -168,6 +170,7 @@ func Initialize() (*Server, error) {
 		},
 		displayAddress: displayAddress,
 		manager:        mgr,
+		shares:         sharing.New(mgr.Repository),
 	}
 
 	r.Use(middleware.Heartbeat("/healthz"))
@@ -212,6 +215,7 @@ func Initialize() (*Server, error) {
 	galleryService := mgr.GalleryService
 	groupService := mgr.GroupService
 	resolver := &Resolver{
+		shares:            server.shares,
 		scraperCacheStore: mgr.ScraperCache,
 		repository:        repo,
 		sceneService:      sceneService,
@@ -339,6 +343,9 @@ func Initialize() (*Server, error) {
 	})
 
 	logger.Infof("stash version: %s", build.VersionString())
+	if cfg.GetEnableV3UI() {
+		server.Handler = server.withShareRoutes(r)
+	}
 	go printLatestVersion(context.TODO())
 
 	return server, nil

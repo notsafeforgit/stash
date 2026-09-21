@@ -38,6 +38,8 @@ import { VirtualizedItemList } from "./virtualized-item-list";
 import { useListPageFilter } from "./use-list-page-filter";
 import { useListData } from "./use-list-data";
 import { useListPageRefill } from "./use-list-page-refill";
+import { FilterMode, ShareEntityKind } from "@/core/generated-graphql";
+import { ShareSelectionButton } from "@/components/sharing/share-action";
 
 export type {
   EntityListPageConfig,
@@ -190,6 +192,26 @@ export function EntityListPage<
   if (!firstPaintReady) isLoading = true;
 
   const listSelect = useListSelect(items);
+  const shareKind =
+    source.kind !== "graphql"
+      ? undefined
+      : filterMode === FilterMode.Scenes
+        ? ShareEntityKind.Scene
+        : filterMode === FilterMode.Images
+          ? ShareEntityKind.Image
+          : filterMode === FilterMode.Galleries
+            ? ShareEntityKind.Gallery
+            : undefined;
+  const shareSelection =
+    shareKind && listSelect.hasSelection ? (
+      <ShareSelectionButton
+        targets={listSelect.selectedItems.map((item) => ({
+          kind: shareKind,
+          id: item.id,
+          name: item.id,
+        }))}
+      />
+    ) : undefined;
 
   const preserveScrollDuringRefill = useListPageRefill({
     remote: source.kind === "graphql",
@@ -325,6 +347,7 @@ export function EntityListPage<
       hasSelection={listSelect.hasSelection}
       selecting={listSelect.selecting}
       selectedCount={listSelect.selectedItems.length}
+      selectionActions={shareSelection}
       onSelectAll={listSelect.onSelectAll}
       onSelectNone={listSelect.onSelectNone}
       onTaggerMode={renderTagger ? () => setTaggerActive((v) => !v) : undefined}
@@ -359,6 +382,7 @@ export function EntityListPage<
       setCardAspect={supportsCardAspect ? setCardAspect : undefined}
       sortOptions={sortOptionsOverride}
       pageActions={pageActions}
+      operationComponent={shareSelection}
       mobileGridCols={mobileGridCols}
     >
       {error && (

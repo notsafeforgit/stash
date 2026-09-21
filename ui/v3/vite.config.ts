@@ -15,7 +15,13 @@ export default defineConfig({
     outDir: "build",
     sourcemap,
     reportCompressedSize: false,
-    rollupOptions: { input: { app: "index.html", offline: "offline.html" } },
+    rollupOptions: {
+      input: {
+        app: "index.html",
+        offline: "offline.html",
+        share: "share.html",
+      },
+    },
   },
   resolve: {
     tsconfigPaths: true,
@@ -36,6 +42,7 @@ export default defineConfig({
         process.env.VITE_APP_PLATFORM_URL ?? "http://127.0.0.1:8010";
       return {
         "/graphql": { target: backend, ws: true },
+        "/share": backend,
         "/scene/": backend,
         "/image/": backend,
         "/gallery/": backend,

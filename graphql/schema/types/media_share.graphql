@@ -1,0 +1,77 @@
+"Anonymous shares always freeze the selected media and never grant owner access."
+enum ShareEntityKind {
+  SCENE
+  IMAGE
+  GALLERY
+}
+
+input MediaShareTargetInput {
+  kind: ShareEntityKind!
+  id: ID!
+}
+
+input MediaShareCreateInput {
+  label: String!
+  expires_at: Time!
+  allow_download: Boolean! = false
+  show_metadata: Boolean! = false
+  targets: [MediaShareTargetInput!]!
+}
+
+input MediaShareUpdateInput {
+  id: ID!
+  label: String!
+  expires_at: Time!
+  allow_download: Boolean!
+  show_metadata: Boolean!
+}
+
+type MediaShareEntry {
+  kind: ShareEntityKind!
+  id: ID!
+  title: String!
+  media_count: Int!
+}
+
+type MediaShare {
+  id: ID!
+  label: String!
+  created_at: Time!
+  expires_at: Time!
+  revoked_at: Time
+  allow_download: Boolean!
+  show_metadata: Boolean!
+  access_count: Int!
+  last_accessed_at: Time
+  items: [MediaShareEntry!]!
+  media_count: Int!
+}
+
+type MediaShareCreated {
+  share: MediaShare!
+  "Only returned on creation or regeneration; secrets are stored as hashes."
+  url: String!
+}
+
+type SharingConfiguration {
+  "Absolute HTTPS URL ending in /share, or empty to use this application's URL."
+  public_url: String!
+  max_items: Int!
+  max_days: Int!
+}
+
+extend type Query {
+  mediaShares(limit: Int! = 100, offset: Int! = 0): [MediaShare!]!
+  mediaShare(id: ID!): MediaShare
+  sharingConfiguration: SharingConfiguration!
+}
+
+extend type Mutation {
+  mediaShareCreate(input: MediaShareCreateInput!): MediaShareCreated!
+  mediaShareUpdate(input: MediaShareUpdateInput!): MediaShare!
+  mediaShareRevoke(id: ID!): Boolean!
+  mediaShareRotate(id: ID!): String!
+  "Short-lived, single-use preview link; does not change the recipient's link."
+  mediaSharePreview(id: ID!): String!
+  configureSharing(public_url: String!): SharingConfiguration!
+}

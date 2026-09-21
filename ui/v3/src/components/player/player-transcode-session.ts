@@ -15,10 +15,13 @@ export class PlayerTranscodeSession {
   constructor(
     readonly sceneId: string,
     readonly id?: string,
+    private readonly endpointBase?: URL,
   ) {}
 
   private url(action: "stop" | "keepalive", keep?: string, release = false) {
-    const url = getPlatformURL(`scene/${this.sceneId}/streams.${action}`);
+    const url = this.endpointBase
+      ? new URL(`streams.${action}`, this.endpointBase)
+      : getPlatformURL(`scene/${this.sceneId}/streams.${action}`);
     if (this.id) url.searchParams.set("stream_session", this.id);
     const type = keep && hlsStreamTypeName(keep);
     if (type) {

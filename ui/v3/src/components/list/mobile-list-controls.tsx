@@ -49,6 +49,7 @@ export interface MobileListControlsProps {
   openFilterSidebar: () => void;
   onSearch: (value: string) => void;
   onViewOptions: () => void;
+  selectionActions?: React.ReactNode;
 }
 
 /** One row, with explicit replacement modes instead of stacked toolbars. */
@@ -66,6 +67,7 @@ export function MobileListControls({
   openFilterSidebar,
   onSearch,
   onViewOptions,
+  selectionActions,
 }: MobileListControlsProps) {
   const intl = useIntl();
   const chrome = useMobileDetailChrome();
@@ -152,6 +154,7 @@ export function MobileListControls({
                   { count: selectedCount },
                 )}
               </span>
+              {selectionActions}
               <Button
                 variant="ghost"
                 size="icon-lg"

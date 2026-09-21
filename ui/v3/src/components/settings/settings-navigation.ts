@@ -20,6 +20,11 @@ export const SETTINGS_NAV_ITEMS = [
     defaultLabel: "TV",
   },
   {
+    to: "/settings/shares",
+    labelId: "sharing.shares",
+    defaultLabel: "Shares",
+  },
+  {
     to: "/settings/security",
     labelId: "config.categories.security",
     defaultLabel: "Security",

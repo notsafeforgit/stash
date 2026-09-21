@@ -91,7 +91,34 @@ const AUTO_ADVANCE_STORAGE_KEY = "stash-player-auto-advance";
 
 export type ScenePlayerScene = NonNullable<GQL.FindSceneQuery["findScene"]>;
 
+/** Playback needs no library relationships, owner history or filesystem data. */
+export type ScenePlaybackData = Pick<
+  ScenePlayerScene,
+  "id" | "title" | "sceneStreams" | "captions" | "preview_image" | "resume_time"
+> & {
+  files: Pick<
+    ScenePlayerScene["files"][number],
+    | "path"
+    | "width"
+    | "height"
+    | "duration"
+    | "frame_rate"
+    | "video_codec"
+    | "audio_codec"
+    | "updated_at"
+  >[];
+  paths: Pick<ScenePlayerScene["paths"], "screenshot" | "caption">;
+  scene_markers: Pick<
+    ScenePlayerScene["scene_markers"][number],
+    "title" | "seconds" | "end_seconds" | "primary_tag"
+  >[];
+  performers: { name: string }[];
+  studio?: { name: string } | null;
+};
+
 interface ScenePlayerProps {
+  /** Guest sessions cannot transfer their cookie-bound access to a cast device. */
+  castingAllowed?: boolean;
   activityScope?: SceneActivityScope;
   qualityPreference?: PlayerQuality;
   nativeFullscreenAllowed?: boolean;
@@ -101,7 +128,7 @@ interface ScenePlayerProps {
   controls?: "standard" | "external";
   completionMode?: "normal" | "loop" | "advance";
   onCompletionModeChange?: (mode: "normal" | "loop" | "advance") => void;
-  scene: ScenePlayerScene;
+  scene: ScenePlaybackData;
   /** Resets scene/marker state while preserving the player and media element. */
   playbackKey?: string;
   /** Release the current source while its replacement is being resolved. */
@@ -309,6 +336,7 @@ function MediaBridge({
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export const ScenePlayer: React.FC<ScenePlayerProps> = ({
+  castingAllowed = true,
   activityScope,
   qualityPreference,
   nativeFullscreenAllowed = true,
@@ -935,7 +963,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
           endedHandledRef.current = false;
       }}
       playsInline
-      disableRemotePlayback={finalSrc?.startsWith("blob:")}
+      disableRemotePlayback={!castingAllowed || finalSrc?.startsWith("blob:")}
       preload={preload}
       // PlaybackRangeEffect owns clip completion, including native EOF.
       // Handling both here would advance twice when a clip ends at EOF.
@@ -1097,6 +1125,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
 
             {controls === "standard" && (
               <PlayerControls
+                castingAllowed={castingAllowed}
                 Player={Player}
                 playbackKey={playbackKey}
                 sources={sources}
@@ -1186,7 +1215,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
               </Badge>
             )}
           </Container>
-          {!finalSrc?.startsWith("blob:") && <GoogleCast />}
+          {castingAllowed && !finalSrc?.startsWith("blob:") && <GoogleCast />}
         </Player.Player>
 
         {/* Freeze-frame canvas masks the engine-detach gap between

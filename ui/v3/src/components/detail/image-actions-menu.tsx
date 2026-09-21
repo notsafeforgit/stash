@@ -16,6 +16,7 @@ import { ImageGenerateDialog } from "@/components/detail/deferred-overlays";
 import { useToast } from "src/hooks/toast";
 import { imagePath, imageTitle } from "src/core/files";
 import { useImageFileActions } from "@/hooks/use-image-file-actions";
+import { useShareAction } from "@/components/sharing/share-action";
 
 export interface ImageActionsMenuProps {
   image: NonNullable<GQL.FindImageQuery["findImage"]>;
@@ -25,6 +26,13 @@ export interface ImageActionsMenuProps {
 export function ImageActionsMenu({ image, onDeleted }: ImageActionsMenuProps) {
   const intl = useIntl();
   const toast = useToast();
+  const share = useShareAction([
+    {
+      kind: GQL.ShareEntityKind.Image,
+      id: image.id,
+      name: imageTitle(image) || image.id,
+    },
+  ]);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
@@ -90,6 +98,7 @@ export function ImageActionsMenu({ image, onDeleted }: ImageActionsMenuProps) {
   }
 
   const items: EntityActionItem[] = [
+    share.action,
     ...fileActions,
     { key: "file-separator", separator: true },
   ];
@@ -133,6 +142,7 @@ export function ImageActionsMenu({ image, onDeleted }: ImageActionsMenuProps) {
   return (
     <>
       <EntityActionsMenu items={items} />
+      {share.dialog}
 
       <DeleteDialog
         open={deleteOpen}

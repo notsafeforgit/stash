@@ -113,6 +113,8 @@ local container after validation.
 | `internal/api/json_values.go` | recursive JSON-number conversion for configuration persistence; shared helper/resolver call sites stay small | low (new file) |
 | `internal/api/resolver_entity_image*.go`, `internal/manager/scene_frame_image.go` | normalized entity images from uploads, images, scene covers or independent scene frames | low (new files) |
 | `internal/api/job_subscription.go` | cancel-aware job subscription forwarding | low (new file) |
+| `internal/sharing/`, `internal/api/*share*`, `pkg/sqlite/share.go`, `graphql/schema/types/media_share.graphql` | expiring media capabilities, isolated guest router and additive owner management; see [sharing](docs/sharing.md) | low (new files, small server/repository hooks) |
+| `fork_shares`, `fork_share_sessions`, `internal/manager/config/sharing.go` | grants, frozen membership, hashed guest sessions and public share URL | none (fork-owned tables/key) |
 | `internal/api/performer_merge_*.go` | canonical-name retention and opt-in loss-aware performer merge validation | low (new files) |
 | `pkg/models/filter_ast*.go` | AST model + v2.5 compat layer | none (new files) |
 | `pkg/sqlite/fork_migrate.go` + `pkg/sqlite/migrations/fork_*.go` | consolidated fork migration and roll-forward reconcilers | low |
@@ -132,7 +134,8 @@ indexes on `(created_at, title)`. They use standard SQLite columns and collation
 so upstream writes maintain them without fork code. The fork recreates missing
 indexes after an upstream table rebuild. Migration 7 stores scene cover origins
 in a sidecar, retaining source identity after file deletion and invalidating
-provenance when upstream changes the cover. These migrations do not change upstream's
+provenance when upstream changes the cover. Migration 8 adds expiring media share
+grants and guest sessions in two independent sidecars. These migrations do not change upstream's
 schema version. Substring search uses a rebuildable `<database>.search.sqlite`
 cache with FTS5 trigram tables. No search virtual tables or persistent tracking
 triggers are added to the library database. Connection-local TEMP triggers

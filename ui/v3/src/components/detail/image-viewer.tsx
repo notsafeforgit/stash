@@ -16,9 +16,19 @@ import {
 } from "@/components/lightbox/lightbox";
 import { lightboxIconRenders } from "@/components/lightbox/lightbox-icons";
 
-type ImageData = NonNullable<GQL.FindImageQuery["findImage"]>;
+type LibraryImage = NonNullable<GQL.FindImageQuery["findImage"]>;
+export type ImageViewerData = Pick<LibraryImage, "title"> & {
+  paths: Pick<LibraryImage["paths"], "image" | "preview">;
+  visual_files: { path: string; width: number; height: number }[];
+};
 
-export function ImageViewer({ image }: { image: ImageData }) {
+export function ImageViewer({
+  image,
+  actions = true,
+}: {
+  image: ImageViewerData;
+  actions?: boolean;
+}) {
   const src = image.paths.image ?? image.paths.preview ?? undefined;
   const file = image.visual_files[0];
   const [open, setOpen] = useState(false);
@@ -96,7 +106,9 @@ export function ImageViewer({ image }: { image: ImageData }) {
         on={inlineZoomCallbacks}
         toolbar={{
           buttons: [
-            <LightboxImageActionsButton key="image-actions" />,
+            ...(actions
+              ? [<LightboxImageActionsButton key="image-actions" />]
+              : []),
             "zoom",
             <OriginalSizeButton
               key="original-size"
@@ -163,7 +175,9 @@ export function ImageViewer({ image }: { image: ImageData }) {
         on={modalZoomCallbacks}
         toolbar={{
           buttons: [
-            <LightboxImageActionsButton key="image-actions" />,
+            ...(actions
+              ? [<LightboxImageActionsButton key="image-actions" />]
+              : []),
             "zoom",
             <OriginalSizeButton
               key="original-size"

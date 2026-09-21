@@ -10,6 +10,7 @@ import (
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/stashapp/stash/internal/build"
 	"github.com/stashapp/stash/internal/manager"
+	"github.com/stashapp/stash/internal/sharing"
 	"github.com/stashapp/stash/pkg/logger"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/plugin/hook"
@@ -33,6 +34,7 @@ type hookExecutor interface {
 }
 
 type Resolver struct {
+	shares            *sharing.Service
 	scraperCacheStore *scraper.Cache
 	repository        models.Repository
 	sceneService      manager.SceneService

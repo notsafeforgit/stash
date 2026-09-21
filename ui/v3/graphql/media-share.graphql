@@ -1,0 +1,92 @@
+fragment MediaShareFields on MediaShare {
+  id
+  label
+  created_at
+  expires_at
+  revoked_at
+  allow_download
+  show_metadata
+  access_count
+  last_accessed_at
+  media_count
+  items {
+    kind
+    id
+    title
+    media_count
+  }
+}
+query MediaShares($limit: Int!, $offset: Int!) {
+  mediaShares(limit: $limit, offset: $offset) {
+    ...MediaShareFields
+  }
+  sharingConfiguration {
+    public_url
+    max_items
+    max_days
+  }
+}
+mutation MediaShareCreate($input: MediaShareCreateInput!) {
+  mediaShareCreate(input: $input) {
+    share {
+      ...MediaShareFields
+    }
+    url
+  }
+}
+mutation MediaShareUpdate($input: MediaShareUpdateInput!) {
+  mediaShareUpdate(input: $input) {
+    ...MediaShareFields
+  }
+}
+mutation MediaShareRevoke($id: ID!) {
+  mediaShareRevoke(id: $id)
+}
+mutation MediaShareRotate($id: ID!) {
+  mediaShareRotate(id: $id)
+}
+mutation MediaSharePreview($id: ID!) {
+  mediaSharePreview(id: $id)
+}
+mutation ConfigureSharing($public_url: String!) {
+  configureSharing(public_url: $public_url) {
+    public_url
+    max_items
+    max_days
+  }
+}
+query ShareTargetSearch($q: String!) {
+  findScenes(filter: { q: $q, per_page: 20 }) {
+    scenes {
+      id
+      title
+      files {
+        path
+      }
+    }
+  }
+  findImages(filter: { q: $q, per_page: 20 }) {
+    images {
+      id
+      title
+      visual_files {
+        ... on VideoFile {
+          path
+        }
+        ... on ImageFile {
+          path
+        }
+      }
+    }
+  }
+  findGalleries(filter: { q: $q, per_page: 20 }) {
+    galleries {
+      id
+      title
+      image_count
+      files {
+        path
+      }
+    }
+  }
+}

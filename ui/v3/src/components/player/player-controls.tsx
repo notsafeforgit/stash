@@ -502,6 +502,7 @@ function TimeDisplay({
 // ── Control bar ────────────────────────────────────────────────────────────────
 
 interface ControlBarProps {
+  castingAllowed: boolean;
   Player: PlayerInstance;
   playbackKey?: string;
   sources: PlayerSource[];
@@ -545,6 +546,7 @@ interface ControlBarProps {
 }
 
 function ControlBar({
+  castingAllowed,
   Player,
   playbackKey,
   sources,
@@ -608,37 +610,41 @@ function ControlBar({
           {pip ? <PictureInPicture2 /> : <PictureInPicture />}
         </Button>
       )}
-      <AirPlayButton
-        aria-label="AirPlay"
-        className={(state) =>
-          cn(
-            OVERLAY_BTN,
-            state.state === "connected" ? "text-primary" : "text-white/80",
-            onClose && "size-11",
-          )
-        }
-        render={
-          <Button type="button" variant="ghost" size="icon">
-            <Airplay data-icon="inline-start" />
-          </Button>
-        }
-      />
-      <CastButton
-        className={(state) =>
-          cn(
-            OVERLAY_BTN,
-            state.connection === "connected"
-              ? "text-blue-400"
-              : "text-white/80",
-            onClose && "size-11",
-          )
-        }
-        render={
-          <Button type="button" variant="ghost" size="icon">
-            <Cast />
-          </Button>
-        }
-      />
+      {castingAllowed && (
+        <AirPlayButton
+          aria-label="AirPlay"
+          className={(state) =>
+            cn(
+              OVERLAY_BTN,
+              state.state === "connected" ? "text-primary" : "text-white/80",
+              onClose && "size-11",
+            )
+          }
+          render={
+            <Button type="button" variant="ghost" size="icon">
+              <Airplay data-icon="inline-start" />
+            </Button>
+          }
+        />
+      )}
+      {castingAllowed && (
+        <CastButton
+          className={(state) =>
+            cn(
+              OVERLAY_BTN,
+              state.connection === "connected"
+                ? "text-blue-400"
+                : "text-white/80",
+              onClose && "size-11",
+            )
+          }
+          render={
+            <Button type="button" variant="ghost" size="icon">
+              <Cast />
+            </Button>
+          }
+        />
+      )}
     </>
   );
 
@@ -843,6 +849,7 @@ function ControlBar({
 // ── Main export ────────────────────────────────────────────────────────────────
 
 export interface PlayerControlsProps {
+  castingAllowed?: boolean;
   Player: PlayerInstance;
   /** End an outgoing scene/marker's scrub without interrupting held speed. */
   playbackKey?: string;
@@ -929,6 +936,7 @@ export interface PlayerControlsProps {
 }
 
 export function PlayerControls({
+  castingAllowed = true,
   Player,
   playbackKey,
   sources,
@@ -1491,6 +1499,7 @@ export function PlayerControls({
         })()}
 
         <ControlBar
+          castingAllowed={castingAllowed}
           Player={Player}
           playbackKey={playbackKey}
           sources={sources}

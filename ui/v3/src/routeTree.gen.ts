@@ -38,6 +38,7 @@ import { Route as SettingsMetadataProvidersRouteImport } from './routes/settings
 import { Route as SettingsPluginsRouteImport } from './routes/settings/plugins'
 import { Route as SettingsSecurityRouteImport } from './routes/settings/security'
 import { Route as SettingsServicesRouteImport } from './routes/settings/services'
+import { Route as SettingsSharesRouteImport } from './routes/settings/shares'
 import { Route as SettingsSystemRouteImport } from './routes/settings/system'
 import { Route as SettingsTasksRouteImport } from './routes/settings/tasks'
 import { Route as SettingsToolsRouteImport } from './routes/settings/tools'
@@ -193,6 +194,11 @@ const SettingsServicesRoute = SettingsServicesRouteImport.update({
   path: '/services',
   getParentRoute: () => SettingsRoute,
 } as any)
+const SettingsSharesRoute = SettingsSharesRouteImport.update({
+  id: '/shares',
+  path: '/shares',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const SettingsSystemRoute = SettingsSystemRouteImport.update({
   id: '/system',
   path: '/system',
@@ -257,6 +263,7 @@ export interface FileRoutesByFullPath {
   '/settings/plugins': typeof SettingsPluginsRoute
   '/settings/security': typeof SettingsSecurityRoute
   '/settings/services': typeof SettingsServicesRoute
+  '/settings/shares': typeof SettingsSharesRoute
   '/settings/system': typeof SettingsSystemRoute
   '/settings/tasks': typeof SettingsTasksRoute
   '/settings/tools': typeof SettingsToolsRoute
@@ -295,6 +302,7 @@ export interface FileRoutesByTo {
   '/settings/plugins': typeof SettingsPluginsRoute
   '/settings/security': typeof SettingsSecurityRoute
   '/settings/services': typeof SettingsServicesRoute
+  '/settings/shares': typeof SettingsSharesRoute
   '/settings/system': typeof SettingsSystemRoute
   '/settings/tasks': typeof SettingsTasksRoute
   '/settings/tools': typeof SettingsToolsRoute
@@ -335,6 +343,7 @@ export interface FileRoutesById {
   '/settings/plugins': typeof SettingsPluginsRoute
   '/settings/security': typeof SettingsSecurityRoute
   '/settings/services': typeof SettingsServicesRoute
+  '/settings/shares': typeof SettingsSharesRoute
   '/settings/system': typeof SettingsSystemRoute
   '/settings/tasks': typeof SettingsTasksRoute
   '/settings/tools': typeof SettingsToolsRoute
@@ -376,6 +385,7 @@ export interface FileRouteTypes {
     | '/settings/plugins'
     | '/settings/security'
     | '/settings/services'
+    | '/settings/shares'
     | '/settings/system'
     | '/settings/tasks'
     | '/settings/tools'
@@ -414,6 +424,7 @@ export interface FileRouteTypes {
     | '/settings/plugins'
     | '/settings/security'
     | '/settings/services'
+    | '/settings/shares'
     | '/settings/system'
     | '/settings/tasks'
     | '/settings/tools'
@@ -453,6 +464,7 @@ export interface FileRouteTypes {
     | '/settings/plugins'
     | '/settings/security'
     | '/settings/services'
+    | '/settings/shares'
     | '/settings/system'
     | '/settings/tasks'
     | '/settings/tools'
@@ -702,6 +714,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsServicesRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/settings/shares': {
+      id: '/settings/shares'
+      path: '/shares'
+      fullPath: '/settings/shares'
+      preLoaderRoute: typeof SettingsSharesRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/settings/system': {
       id: '/settings/system'
       path: '/system'
@@ -770,6 +789,7 @@ interface SettingsRouteChildren {
   SettingsPluginsRoute: typeof SettingsPluginsRoute
   SettingsSecurityRoute: typeof SettingsSecurityRoute
   SettingsServicesRoute: typeof SettingsServicesRoute
+  SettingsSharesRoute: typeof SettingsSharesRoute
   SettingsSystemRoute: typeof SettingsSystemRoute
   SettingsTasksRoute: typeof SettingsTasksRoute
   SettingsToolsRoute: typeof SettingsToolsRoute
@@ -786,6 +806,7 @@ const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsPluginsRoute: SettingsPluginsRoute,
   SettingsSecurityRoute: SettingsSecurityRoute,
   SettingsServicesRoute: SettingsServicesRoute,
+  SettingsSharesRoute: SettingsSharesRoute,
   SettingsSystemRoute: SettingsSystemRoute,
   SettingsTasksRoute: SettingsTasksRoute,
   SettingsToolsRoute: SettingsToolsRoute,

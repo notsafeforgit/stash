@@ -19,5 +19,18 @@ export default defineConfig({
     },
   },
   server: { host: "127.0.0.1", port: 3025, strictPort: true },
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    {
+      name: "sharing-fixture",
+      configureServer(server) {
+        server.middlewares.use((request, _response, next) => {
+          if (/^\/share\/[A-Za-z0-9_-]{22}\/?$/.test(request.url ?? ""))
+            request.url = "/share.html";
+          next();
+        });
+      },
+    },
+  ],
 });

@@ -12,6 +12,7 @@ import {
   DeleteFilesList,
 } from "src/components/detail/delete-dialog";
 import { galleryLabel } from "src/lib/gallery-utils";
+import { useShareAction } from "@/components/sharing/share-action";
 
 interface GalleryActionsMenuProps {
   gallery: NonNullable<GQL.FindGalleryQuery["findGallery"]>;
@@ -24,6 +25,13 @@ export function GalleryActionsMenu({
   onDeleted,
 }: GalleryActionsMenuProps) {
   const intl = useIntl();
+  const share = useShareAction([
+    {
+      kind: GQL.ShareEntityKind.Gallery,
+      id: gallery.id,
+      name: galleryLabel(gallery),
+    },
+  ]);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const [destroyGallery] = useEntityMutation(GQL.GalleryDestroyDocument);
@@ -55,6 +63,7 @@ export function GalleryActionsMenu({
   }
 
   const items: EntityActionItem[] = [
+    share.action,
     {
       key: "delete",
       icon: Trash2,
@@ -78,6 +87,7 @@ export function GalleryActionsMenu({
   return (
     <>
       <EntityActionsMenu items={items} />
+      {share.dialog}
 
       <DeleteDialog
         open={deleteOpen}

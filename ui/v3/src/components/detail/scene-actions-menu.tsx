@@ -36,6 +36,7 @@ import { useSceneDownloadAction } from "@/components/offline/download-action";
 import { refreshSceneCoversAfterJob } from "@/core/scene-cover-job";
 import { supportsSceneVideoRotation } from "./scene-video-rotation";
 import { useScenePerformerImage } from "./use-scene-performer-image";
+import { useShareAction } from "@/components/sharing/share-action";
 
 export interface SceneActionsMenuProps {
   scene: NonNullable<GQL.FindSceneQuery["findScene"]>;
@@ -63,6 +64,13 @@ export function SceneActionsMenu({
   const [coverBusy, setCoverBusy] = useState(false);
   const download = useSceneDownloadAction({ scene });
   const performerImage = useScenePerformerImage(scene.id);
+  const share = useShareAction([
+    {
+      kind: GQL.ShareEntityKind.Scene,
+      id: scene.id,
+      name: objectTitle(scene) || scene.id,
+    },
+  ]);
 
   const [scan] = useMutation(GQL.MetadataScanDocument);
   const [generateScreenshot] = useMutation(GQL.SceneGenerateScreenshotDocument);
@@ -230,7 +238,7 @@ export function SceneActionsMenu({
     onDeleted?.();
   }
 
-  const items: EntityActionItem[] = [];
+  const items: EntityActionItem[] = [share.action];
   if (sceneFilePath)
     items.push({
       key: "rescan",
@@ -417,6 +425,7 @@ export function SceneActionsMenu({
     <>
       <EntityActionsMenu items={items} busy={rotationPending} />
       {performerImage.dialog}
+      {share.dialog}
 
       <DeleteDialog
         open={deleteOpen}

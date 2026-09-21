@@ -63,6 +63,13 @@ upstream's numeric migrations and primary schema version unchanged. See
   Do not refetch scene details for artwork changes: freshly signed stream URLs
   can reload active playback. List queries observe the same normalized scenes
   without a list refetch or loss of scroll/edit state.
+- `core/job-queue.ts` combines task lifecycle/progress subscriptions with
+  authoritative HTTP snapshots. The mounted task list reconciles on foreground,
+  restored pages, connectivity and WebSocket connections, plus every 30 seconds
+  while visible. Resume restarts a potentially suspended socket. Missing active
+  jobs are removed; known terminal outcomes retain only their original 10-second
+  display window. Events received during a snapshot take precedence over it.
+  Failed snapshots preserve the list, and disposal cancels requests and timers.
 
 `core/motion.ts` defines the shared motion timings. `core/content-reveal.ts`
 owns interruptible Web Animations on the empty surface in

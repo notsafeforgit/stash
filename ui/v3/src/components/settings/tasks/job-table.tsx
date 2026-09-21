@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
-import { useMutation, useQuery, useSubscription } from "@apollo/client/react";
+import { useMutation } from "@apollo/client/react";
 import { Ban, Check, CircleAlert, Cog, Hourglass, X } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
 import { Button } from "src/components/ui/button";
@@ -8,8 +8,8 @@ import { Progress } from "src/components/ui/progress";
 import { ScrollArea } from "src/components/ui/scroll-area";
 import { cn } from "src/lib/utils";
 import { humanizeSeconds } from "src/utils/duration";
-
-type JobFragment = GQL.JobDataFragment;
+import type { QueueJob } from "@/core/job-queue";
+import { useJobQueue } from "@/hooks/use-job-queue";
 
 function statusIcon(status: GQL.JobStatus) {
   switch (status) {
@@ -27,7 +27,7 @@ function statusIcon(status: GQL.JobStatus) {
   }
 }
 
-function Task({ job }: { job: JobFragment }) {
+function Task({ job }: { job: QueueJob }) {
   const [stopping, setStopping] = useState(false);
   const [fadeState, setFadeState] = useState<"in" | "out" | null>(null);
   const [stopJob] = useMutation(GQL.StopJobDocument);
@@ -182,89 +182,7 @@ function Task({ job }: { job: JobFragment }) {
 
 export function JobTable() {
   const intl = useIntl();
-  const { data } = useQuery(GQL.JobQueueDocument, {
-    fetchPolicy: "cache-and-network",
-  });
-  const [queue, setQueue] = useState<JobFragment[]>([]);
-
-  useEffect(() => {
-    if (!data?.jobQueue) return;
-    // Merge rather than replace. In normal use the initial query fires
-    // once and seeds the queue; the subscriptions take over from there.
-    // But if some future caller triggers a refetch of JobQueue (Apollo
-    // cache invalidation, navigation re-mount, etc.) we don't want to
-    // wipe out "ghost" entries — terminal-status jobs still inside the
-    // 10 s fade-out window after their lifecycle Remove arrived.
-    const serverJobs = data.jobQueue;
-    setQueue((q) => {
-      const serverIds = new Set(serverJobs.map((j) => j.id));
-      const ghosts = q.filter((j) => !serverIds.has(j.id));
-      return [...serverJobs, ...ghosts];
-    });
-  }, [data]);
-
-  // Two-subscription design (mirrors the backend split):
-  //
-  //   - JobsLifecycleSubscribe streams ADD / REMOVE only. The server
-  //     guarantees these are never dropped: they ride a dedicated
-  //     pipeline that can't be starved by progress traffic. Anything
-  //     correctness-sensitive (does this job exist? is it gone?) reads
-  //     from here.
-  //   - JobsProgressSubscribe streams UPDATE only. The server drops
-  //     these under backpressure by design — each tick supersedes the
-  //     prior one, so a missed tick just means the next one re-syncs us.
-  //
-  // `onData` is used (not the hook's `data` return) because Apollo
-  // coalesces `data` to the latest event between renders, which would
-  // lose intermediate events arriving back-to-back. `onData` fires once
-  // per subscription payload.
-  useSubscription(GQL.JobsLifecycleSubscribeDocument, {
-    onData: ({ data: payload }) => {
-      const event = payload.data?.jobsLifecycleSubscribe;
-      if (!event) return;
-      setQueue((q) => {
-        switch (event.type) {
-          case GQL.JobStatusUpdateType.Add:
-            if (q.some((j) => j.id === event.job.id)) return q;
-            return q.concat([event.job as JobFragment]);
-          case GQL.JobStatusUpdateType.Remove: {
-            // Apply the final status immediately so the row can
-            // render its terminal icon (✓ / ✗ / 🚫), then evict
-            // after 10 s so the user has a moment to read the
-            // outcome before it disappears.
-            const next = q.map((j) =>
-              j.id === event.job.id ? (event.job as JobFragment) : j,
-            );
-            window.setTimeout(() => {
-              setQueue((current) =>
-                current.filter((j) => j.id !== event.job.id),
-              );
-            }, 10000);
-            return next;
-          }
-          default:
-            // The server filters out UPDATE on this channel, but be
-            // defensive: drop any unexpected type silently rather
-            // than crashing the reducer.
-            return q;
-        }
-      });
-    },
-  });
-
-  useSubscription(GQL.JobsProgressSubscribeDocument, {
-    onData: ({ data: payload }) => {
-      const event = payload.data?.jobsProgressSubscribe;
-      if (!event) return;
-      setQueue((q) =>
-        // Only patch jobs we already know about. If the lifecycle
-        // ADD for this id hasn't landed yet (or it landed and was
-        // since removed), ignore the tick — the next ADD will be
-        // sourced from the lifecycle stream, not from here.
-        q.map((j) => (j.id === event.job.id ? (event.job as JobFragment) : j)),
-      );
-    },
-  });
+  const queue = useJobQueue();
 
   return (
     <div className="overflow-hidden rounded-lg border bg-card">

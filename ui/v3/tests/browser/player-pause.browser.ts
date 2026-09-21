@@ -22,7 +22,11 @@ for (const hls of [false, true]) {
       const bar = player.locator("[data-player-control-bar]");
       if (mode === "TV") await surface.tap({ position: { x: 150, y: 250 } });
       else await player.locator("[data-player-native-button]").click();
-      await expect(player).toHaveAttribute("data-playback-ready", "true");
+      // Cold media startup has its own budget; pause/resume checks below
+      // still use the normal interaction timeout once playback is ready.
+      await expect(player).toHaveAttribute("data-playback-ready", "true", {
+        timeout: 15_000,
+      });
       await expect(video).toHaveJSProperty("seeking", false);
       await expect
         .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))

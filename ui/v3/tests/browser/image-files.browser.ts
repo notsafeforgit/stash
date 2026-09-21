@@ -179,6 +179,11 @@ test.describe("desktop image file actions", () => {
     await page
       .getByRole("button", { name: "Open images", exact: true })
       .click();
+    // Wait for the lazy lightbox module before checking its controls. A cold
+    // fixture server can still be showing the loading dialog on slower CI.
+    await expect(
+      page.getByRole("dialog", { name: "Lightbox", exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
     await expect(
       page.getByRole("button", { name: "Zoom in", exact: true }),
     ).toBeVisible();

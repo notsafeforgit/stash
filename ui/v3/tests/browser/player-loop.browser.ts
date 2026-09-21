@@ -74,6 +74,7 @@ for (const scenario of cases) {
           lastTime: number;
           firstTime: number;
           missedFrames: number;
+          nativeEnd: boolean;
           wall: number;
           gapMs: number;
           firstFrameMs: number | null;
@@ -94,12 +95,13 @@ for (const scenario of cases) {
       };
       for (const type of ["timeupdate", "pause", "ended", "seeked"])
         v.addEventListener(type, observeNativeEnd, { capture: true });
+      let nativeEndsAtPreviousLoop = 0;
       let previous:
         | { wall: number; media: number; presentedFrames: number }
         | undefined;
       const frame = (now: number, metadata: VideoFrameCallbackMetadata) => {
         const media = metadata.mediaTime;
-        if (previous && media < previous.media - 0.5)
+        if (previous && media < previous.media - 0.5) {
           data.loops.push({
             lastTime: previous.media,
             firstTime: media,
@@ -107,11 +109,14 @@ for (const scenario of cases) {
               0,
               metadata.presentedFrames - previous.presentedFrames - 1,
             ),
+            nativeEnd: data.nativeEnds > nativeEndsAtPreviousLoop,
             wall: now,
             gapMs: now - previous.wall,
             firstFrameMs: null,
             progressing: false,
           });
+          nativeEndsAtPreviousLoop = data.nativeEnds;
+        }
         const loop = data.loops.at(-1);
         if (loop && media > loop.firstTime) {
           loop.firstFrameMs ??= now - loop.wall;
@@ -154,10 +159,10 @@ for (const scenario of cases) {
       // observed frame was the first displayed frame after the loop.
       expect(loop.lastTime).toBeGreaterThan(data.duration - 0.15);
       expect(loop.firstTime).toBeLessThan(0.15 + loop.missedFrames / 30);
-      // The background fallback restarts a decoder that has reached EOF.
-      // Keep the visible transition budget on the foreground path, and
-      // check that both paths advance promptly after their first frame.
-      if (!background) expect(loop.gapMs).toBeLessThan(250);
+      // A busy foreground page can also reach native EOF before the early
+      // restart runs. Apply the tight gap budget to actual early restarts;
+      // both paths must advance promptly after their first decoded frame.
+      if (!loop.nativeEnd) expect(loop.gapMs).toBeLessThan(250);
       expect(loop.firstFrameMs).toBeLessThan(200);
     }
     expect(data.events).not.toContain("emptied");

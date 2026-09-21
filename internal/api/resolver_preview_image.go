@@ -33,9 +33,17 @@ func previewImageModel(base string, manifest *previewimage.Manifest) *PreviewIma
 	if manifest == nil {
 		return nil
 	}
+	ret := previewImageRenditionModel(base, manifest.Revision, manifest.Variants)
+	if ret != nil {
+		ret.Thumbnail = previewImageRenditionModel(base, manifest.Revision, manifest.Thumbnail)
+	}
+	return ret
+}
+
+func previewImageRenditionModel(base, revision string, variants []previewimage.Variant) *PreviewImage {
 	ret := &PreviewImage{Sources: []*PreviewImageSource{}}
-	for _, v := range manifest.Variants {
-		url := base + "/" + v.File + "?revision=" + manifest.Revision
+	for _, v := range variants {
+		url := base + "/" + v.File + "?revision=" + revision
 		if v.MIMEType == "image/jpeg" {
 			ret.Fallback = url
 			continue

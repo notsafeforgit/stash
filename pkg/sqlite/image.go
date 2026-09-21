@@ -932,7 +932,7 @@ func (qb *ImageStore) makeQuery(ctx context.Context, imageFilter *models.ImageFi
 		return nil, err
 	}
 
-	return &query, nil
+	return &query, query.prefilterMediaSearch(ctx, imageTable, findFilter, filter)
 }
 
 func (qb *ImageStore) Query(ctx context.Context, options models.ImageQueryOptions) (*models.ImageQueryResult, error) {
@@ -1072,7 +1072,7 @@ func (qb *ImageStore) makeASTQuery(ctx context.Context, filterAST *models.Filter
 		return nil, err
 	}
 
-	return &query, nil
+	return &query, query.prefilterMediaSearch(ctx, imageTable, findFilter, filter)
 }
 
 func (qb *ImageStore) QueryAST(ctx context.Context, filterAST *models.FilterAST, findFilter *models.FindFilterType) ([]*models.Image, int, error) {

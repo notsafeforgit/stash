@@ -16,8 +16,10 @@ import {
   DeleteDialog,
   DeleteFilesList,
 } from "src/components/detail/delete-dialog";
-import { ImageGenerateDialog } from "src/components/detail/image-generate-dialog";
-import { ImageBulkEditSheet } from "src/components/detail/image-bulk-edit-sheet";
+import {
+  ImageGenerateDialog,
+  ImageBulkEditSheet,
+} from "@/components/detail/deferred-overlays";
 import {
   useBulkCardActions,
   BulkContextMenuItems,

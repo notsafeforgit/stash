@@ -116,6 +116,7 @@ export function useListPageChangeScrollPosition(
   currentPage: number,
   itemsPerPage: number,
   totalCount: number,
+  contentElement: HTMLElement | null = null,
 ): void {
   const lastScrolledPageRef = useRef(currentPage);
 
@@ -136,6 +137,11 @@ export function useListPageChangeScrollPosition(
             scrollElement.scrollHeight,
             scrollElement.clientHeight,
           )
-        : 0;
-  }, [currentPage, itemsPerPage, scrollElement, totalCount]);
+        : contentElement
+          ? contentElement.getBoundingClientRect().top -
+            scrollElement.getBoundingClientRect().top +
+            scrollElement.scrollTop -
+            scrollElement.clientTop
+          : 0;
+  }, [currentPage, itemsPerPage, scrollElement, totalCount, contentElement]);
 }

@@ -12,7 +12,7 @@ import {
   DeleteDialog,
   DeleteFilesList,
 } from "src/components/detail/delete-dialog";
-import { ImageGenerateDialog } from "src/components/detail/image-generate-dialog";
+import { ImageGenerateDialog } from "@/components/detail/deferred-overlays";
 import { useToast } from "src/hooks/toast";
 import { imagePath, imageTitle } from "src/core/files";
 import { useImageFileActions } from "@/hooks/use-image-file-actions";

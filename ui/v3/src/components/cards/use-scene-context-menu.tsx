@@ -16,9 +16,11 @@ import {
   DeleteDialog,
   DeleteFilesList,
 } from "src/components/detail/delete-dialog";
-import { SceneGenerateDialog } from "src/components/detail/scene-generate-dialog";
-import { SceneMergeDialog } from "src/components/detail/scene-merge-dialog";
-import { SceneBulkEditSheet } from "src/components/detail/scene-bulk-edit-sheet";
+import {
+  SceneGenerateDialog,
+  SceneMergeDialog,
+  SceneBulkEditSheet,
+} from "@/components/detail/deferred-overlays";
 import { SceneCardDownloadMenuItem } from "src/components/offline/scene-card-download-menu-item";
 import { useBulkSceneDownload } from "src/components/offline/download-action";
 import {

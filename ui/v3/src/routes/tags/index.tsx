@@ -8,8 +8,10 @@ import { useTagListConfig } from "src/components/list/entity-list-configs";
 import { View } from "src/components/list/views";
 import { Button } from "src/components/ui/button";
 import { useTagTableColumns } from "./-table-columns";
-import { TagEditSheet } from "src/components/detail/tag-edit-sheet";
-import { TagCreateSheet } from "src/components/detail/tag-create-sheet";
+import {
+  TagEditSheet,
+  TagCreateSheet,
+} from "@/components/detail/deferred-overlays";
 import { TagTagger } from "src/components/tagger/tag-tagger";
 import type * as GQL from "src/core/generated-graphql";
 

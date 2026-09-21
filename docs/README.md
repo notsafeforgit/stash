@@ -19,6 +19,7 @@ v3 route paths may differ, but existing v2.5 clients must keep working.
 | [Offline downloads](../ui/v3/docs/offline.md) | Implemented download/storage/playback behavior and remaining limits |
 | [TV mode](../ui/v3/docs/tv-mode.md) | Scene and marker feeds, quality settings, controls, shared activity, and implementation boundaries |
 | [Preview images](preview-images.md) | HDR AVIF, SDR fallbacks, generation requirements, and the v2.5 compatibility boundary |
+| [Read performance](read-performance.md) | Lazy browsing dependencies, compatible SQLite indexes/search, and library-scale measurements |
 | [Locales](../ui/v3/src/locales/README.md) | Translation files and message conventions |
 
 ## Operations

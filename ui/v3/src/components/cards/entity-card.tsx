@@ -426,6 +426,7 @@ function EntityCardPreview({
   children,
 }: EntityCardPreviewProps) {
   const image = legacyImage || previewImage?.fallback;
+  const videoPoster = previewImage?.thumbnail?.fallback ?? image ?? undefined;
   // Card preview behaviour is driven by two interface settings:
   //   - previewDefault: which asset to show when the card is idle
   //   - playVideoOnHover: whether hover swaps to the video preview
@@ -582,6 +583,8 @@ function EntityCardPreview({
               fit === "contain" ? "object-contain" : "object-cover",
             )}
             src={image}
+            preview={previewImage}
+            thumbnail
             alt=""
           />
         )}
@@ -604,7 +607,7 @@ function EntityCardPreview({
               idleMode === "video" || isHovered ? "opacity-100" : "opacity-0",
             )}
             src={video}
-            poster={image ?? undefined}
+            poster={videoPoster}
             muted
             loop
             playsInline
@@ -637,16 +640,12 @@ function EntityCardPreview({
         !currentSprite &&
         (hasMismatch ? (
           <>
-            {/* Plain <img> for the blur backdrop: it's already 60%
-                opacity + heavily blurred, so its pop-in is barely
-                perceptible. Wrapping it in FadeInImage would force its
-                opacity to 0/100, fighting the static `opacity-60`. The
-                foreground below shares the same src, so both finish at
-                roughly the same time and the foreground's fade is what
-                the eye actually tracks. */}
-            <img
+            {/* Share the foreground's rendition without its opacity fade. */}
+            <PreviewImage
               className="absolute inset-0 h-full w-full object-cover scale-110 blur-md opacity-60"
               src={image}
+              preview={previewImage}
+              thumbnail
               alt=""
               aria-hidden
             />
@@ -654,6 +653,7 @@ function EntityCardPreview({
               className="absolute inset-0 h-full w-full object-contain"
               src={image}
               preview={previewImage}
+              thumbnail
               alt=""
               onLoad={
                 naturalIsPortraitProp === undefined
@@ -671,6 +671,7 @@ function EntityCardPreview({
             className={cn("absolute inset-0 h-full w-full", mediaFitClass)}
             src={image}
             preview={previewImage}
+            thumbnail
             alt=""
             onLoad={
               naturalIsPortraitProp === undefined
@@ -725,7 +726,7 @@ function EntityCardPreview({
           )}
           ref={videoRef}
           src={video}
-          poster={image ?? undefined}
+          poster={videoPoster}
           muted
           loop
           playsInline

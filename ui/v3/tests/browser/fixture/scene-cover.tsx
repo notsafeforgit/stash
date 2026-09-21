@@ -94,6 +94,23 @@ function artwork(): Pick<GQL.SceneDataFragment, "paths" | "preview_image"> {
   return {
     paths: { ...base.paths, screenshot: fallback },
     preview_image: {
+      thumbnail:
+        revision === "new"
+          ? {
+              __typename: "PreviewImage",
+              fallback: url("/covers/new-thumbnail.jpg"),
+              sources: [
+                {
+                  __typename: "PreviewImageSource",
+                  url: url("/covers/new-thumbnail.avif"),
+                  mime_type: "image/avif",
+                  dynamic_range: GQL.PreviewImageDynamicRange.Adaptive,
+                  width: 80,
+                  height: 45,
+                },
+              ],
+            }
+          : null,
       __typename: "PreviewImage",
       fallback,
       sources: [

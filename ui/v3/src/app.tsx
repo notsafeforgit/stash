@@ -3,7 +3,7 @@ import { Toaster } from "src/components/ui/sonner";
 import { getClient } from "src/core/client";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ConfigLoader } from "@/components/config-loader";
-import { SystemStatusGate } from "@/components/migration-gate";
+import { SystemStatusGate } from "@/components/system-status-gate";
 import { PluginLoader } from "@/components/plugin-loader";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SaveIndicatorProvider } from "@/hooks/save-indicator";

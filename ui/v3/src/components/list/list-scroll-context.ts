@@ -1,5 +1,11 @@
 import { createContext } from "react";
 
+/** Mobile detail pages scroll the header and embedded list together. */
+export const EmbeddedListScrollContext = createContext<{
+  element: HTMLElement | null;
+  restorationId: string;
+} | null>(null);
+
 /**
  * Exposes the `EntityList` scroll container element to descendants. The
  * virtualizer in `EntityListPage`'s grid mode uses this to observe scroll

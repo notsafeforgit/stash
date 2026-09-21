@@ -41,8 +41,6 @@ const listResult = (): { data: GQL.FindScenesQuery } => ({
     findScenes: {
       __typename: "FindScenesResultType",
       count: remaining().length,
-      filesize: 1,
-      duration: remaining().length * 12,
       scenes: remaining(),
     },
   },

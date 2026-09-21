@@ -42,9 +42,10 @@ func (d *CustomSQLiteDriver) Open(dsn string) (driver.Conn, error) {
 			err := conn.RegisterCollation("NATURAL_CI", func(s string, s2 string) int {
 				if casefolded.NaturalLess(s, s2) {
 					return -1
-				} else {
+				} else if casefolded.NaturalLess(s2, s) {
 					return 1
 				}
+				return 0
 			})
 
 			if err != nil {

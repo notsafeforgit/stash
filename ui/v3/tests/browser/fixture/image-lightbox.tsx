@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { InMemoryCache } from "@apollo/client";
 import { MockedProvider } from "@apollo/client/testing/react";
 import type { MockedResponse } from "@apollo/client/testing";
-import { Lightbox, type LightboxSlide } from "@/components/lightbox/lightbox";
+import { Lightbox, type LightboxSlide } from "@/components/lightbox";
 import { Button } from "@/components/ui/button";
 import { ConfigurationProvider } from "@/hooks/config";
 import * as GQL from "@/core/generated-graphql";

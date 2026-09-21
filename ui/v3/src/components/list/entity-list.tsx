@@ -2,6 +2,7 @@ import type React from "react";
 import {
   startTransition,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useState,
@@ -26,7 +27,10 @@ import {
   BottomSheetTitle,
 } from "src/components/ui/bottom-sheet";
 import { Button } from "src/components/ui/button";
-import { ListScrollContext } from "./list-scroll-context";
+import {
+  EmbeddedListScrollContext,
+  ListScrollContext,
+} from "./list-scroll-context";
 import {
   useListPageChangeScrollPosition,
   usePreservedListScrollPosition,
@@ -147,6 +151,8 @@ export const EntityList: React.FC<EntityListProps> = ({
     isActive,
   );
   const detailFooter = useMobileDetailChrome()?.mobile ?? false;
+  const detailScroll = useContext(EmbeddedListScrollContext);
+  const embeddedScroll = detailFooter ? detailScroll : null;
   const {
     showSidebar,
     sectionOpen,
@@ -191,7 +197,12 @@ export const EntityList: React.FC<EntityListProps> = ({
   // available in render so `getScrollElement()` returns non-null on the second
   // commit. `useState`'s setter doubles as a callback ref: React calls it with
   // the DOM element on attach and `null` on detach.
-  const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
+  const [contentEl, setContentEl] = useState<HTMLDivElement | null>(null);
+  const scrollEl = isActive
+    ? embeddedScroll
+      ? embeddedScroll.element
+      : contentEl
+    : null;
 
   // A cache deletion broadcasts a temporarily short page before Apollo's
   // refetch pulls replacements forward from later pages. Keep the same
@@ -205,14 +216,16 @@ export const EntityList: React.FC<EntityListProps> = ({
     filter.currentPage,
     filter.itemsPerPage,
     totalCount,
+    embeddedScroll ? contentEl : null,
   );
 
-  const restorationId = `entity-list-${view ?? filter.mode}`;
+  const restorationId =
+    embeddedScroll?.restorationId ?? `entity-list-${view ?? filter.mode}`;
   const { restorationKey, initialOffset } = useListScrollRestoration(
     restorationId,
     scrollEl,
-    scrollRestorationReady,
-    filter.makeQueryParameters(),
+    isActive && scrollRestorationReady,
+    JSON.stringify([view ?? filter.mode, filter.makeQueryParameters()]),
   );
   const scrollContext = useMemo(
     () => ({ element: scrollEl, restorationId, restorationKey, initialOffset }),
@@ -373,10 +386,15 @@ export const EntityList: React.FC<EntityListProps> = ({
                 stays consistent across the grid / details / wall modes. */}
               <div className="relative flex-1 min-h-0">
                 <div
-                  ref={setScrollEl}
-                  data-scroll-restoration-id={restorationId}
+                  ref={setContentEl}
+                  data-scroll-restoration-id={
+                    embeddedScroll ? undefined : restorationId
+                  }
                   className={cn(
-                    "relative h-full overflow-y-auto overflow-x-hidden",
+                    "relative",
+                    embeddedScroll
+                      ? "overflow-clip"
+                      : "h-full overflow-y-auto overflow-x-hidden",
                     mobileChromeFixed &&
                       !detailFooter &&
                       isMobileSidebar &&

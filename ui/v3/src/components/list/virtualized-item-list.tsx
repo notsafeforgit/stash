@@ -114,8 +114,7 @@ const MemoCard = React.memo(MemoCardInner) as <TItem extends IHasID>(
 // initial reconcile (back-nav from detail pages no longer waits for 40 cards
 // to mount) and keeps interactions smooth as the user scrolls.
 //
-// Wall mode is excluded — `PhotoAlbumWall` already does its own justified-row
-// virtualization via `react-photo-album`.
+// Wall mode uses a separate justified-row layout in `PhotoAlbumWall`.
 
 // Min card width for grid mode (auto-fill semantics) per zoom index.
 const GRID_MIN_PX = [420, 320, 240, 180, 140] as const;
@@ -162,6 +161,9 @@ export function VirtualizedItemList<TItem extends IHasID>({
   // computes 0 rows on the first commit and the actual rows on the second.
   const scrollContext = useContext(ListScrollContext);
   const scrollEl = scrollContext?.element ?? null;
+  const gap = isMobile ? 8 : 16;
+  const pad = isMobile ? 8 : 16;
+  const [scrollMargin, setScrollMargin] = useState(0);
   const cardAspect = useCardAspect();
   const measurementKey = JSON.stringify([
     scrollContext?.restorationKey,
@@ -197,19 +199,30 @@ export function VirtualizedItemList<TItem extends IHasID>({
     const sync = () => {
       const w = el.getBoundingClientRect().width;
       if (w > 0) setContainerWidth(w);
+      if (scrollEl && el.getClientRects().length) {
+        setScrollMargin(
+          el.getBoundingClientRect().top -
+            scrollEl.getBoundingClientRect().top +
+            scrollEl.scrollTop -
+            scrollEl.clientTop +
+            pad,
+        );
+      }
     };
     sync();
     const ro = new ResizeObserver(sync);
-    ro.observe(el);
+    // The list can follow a tall, asynchronously sized profile header. Watch
+    // its containing blocks as well as its width so the offset stays current.
+    let ancestor: HTMLElement | null = el;
+    while (ancestor) {
+      ro.observe(ancestor);
+      if (ancestor === scrollEl) break;
+      ancestor = ancestor.parentElement;
+    }
     return () => ro.disconnect();
-  }, []);
+  }, [scrollEl, pad]);
 
   const isDetails = displayMode === DisplayMode.Details;
-  // Tailwind `gap-2 p-2 md:gap-4 md:p-4`. `md` breakpoint is 768px; we proxy
-  // via `isMobile` (the sidebar's narrow-screen flag) since `md` ≈ "not narrow".
-  const gap = isMobile ? 8 : 16;
-  const pad = isMobile ? 8 : 16;
-
   const lanes = useMemo(() => {
     if (isDetails) return 1;
     if (isMobile) return mobileGridCols;
@@ -257,6 +270,7 @@ export function VirtualizedItemList<TItem extends IHasID>({
   const virtualizer = useVirtualizer<HTMLElement, HTMLDivElement>({
     count: rowCount,
     getScrollElement: () => scrollEl,
+    scrollMargin,
     initialOffset: scrollContext?.initialOffset,
     initialMeasurementsCache: measurements?.rows,
     estimateSize,
@@ -346,7 +360,7 @@ export function VirtualizedItemList<TItem extends IHasID>({
                 top: 0,
                 left: 0,
                 right: 0,
-                transform: `translateY(${vRow.start}px)`,
+                transform: `translateY(${vRow.start - scrollMargin}px)`,
                 paddingBottom: gap,
                 display: isDetails ? "flex" : "grid",
                 flexDirection: isDetails ? "column" : undefined,

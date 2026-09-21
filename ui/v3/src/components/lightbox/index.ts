@@ -1,18 +1,9 @@
-export {
-  Lightbox,
-  LIGHTBOX_ZOOM_TUNING,
-  OriginalSizeButton,
-  LightboxImageActionsButton,
-  useAtOriginalSize,
-  type LightboxProps,
-  type LightboxSlide,
-  type DisplayMode,
-} from "./lightbox";
-export {
-  SceneLightbox,
-  type SceneLightboxProps,
-  type SceneSlide,
-  type SceneSlideMarker,
+export { Lightbox, SceneLightbox } from "./deferred-lightboxes";
+export type { LightboxProps, LightboxSlide, DisplayMode } from "./lightbox";
+export type {
+  SceneLightboxProps,
+  SceneSlide,
+  SceneSlideMarker,
 } from "./scene-lightbox";
 export { useSceneLightbox } from "./use-scene-lightbox";
 export { useMarkerLightbox } from "./use-marker-lightbox";

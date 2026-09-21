@@ -1,10 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { MockedProvider } from "@apollo/client/testing/react";
 import type { MockedResponse } from "@apollo/client/testing";
-import {
-  SceneLightbox,
-  type SceneSlide,
-} from "@/components/lightbox/scene-lightbox";
+import { SceneLightbox, type SceneSlide } from "@/components/lightbox";
 import { offlineEntryToSceneData } from "@/components/offline/offline-scene-adapter";
 import type { OfflineEntry } from "@/components/offline/offline-db";
 import { ConfigurationProvider } from "@/hooks/config";

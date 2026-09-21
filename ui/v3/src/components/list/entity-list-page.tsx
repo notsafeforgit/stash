@@ -26,7 +26,7 @@ import { CardLayoutContext } from "./card-layout-context";
 import { useListActivity } from "./list-activity-context";
 import { CardAspectContext } from "./card-aspect-context";
 import { ZoomIndexContext } from "./zoom-index-context";
-import { EntityDataTable } from "./entity-data-table";
+import { EntityDataTable } from "./deferred-entity-data-table";
 import {
   ListStateContext,
   type ListContextState,

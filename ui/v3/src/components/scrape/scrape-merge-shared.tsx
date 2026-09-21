@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "src/components/ui/button";
 import { Checkbox } from "src/components/ui/checkbox";
 import { ToggleGroup, ToggleGroupItem } from "src/components/ui/toggle-group";
-import { Lightbox, type LightboxSlide } from "src/components/lightbox/lightbox";
+import { Lightbox, type LightboxSlide } from "src/components/lightbox";
 
 // Pieces shared by every per-entity scrape merge dialog (performer, scene,
 // future image/gallery). Kept thin: only the UI primitives that are

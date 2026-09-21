@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type * as GQL from "src/core/generated-graphql";
 import { objectTitle } from "src/core/files";
 import type { PageNavHandle } from "src/components/list";
-import { SceneLightbox, type SceneSlide } from "./scene-lightbox";
+import type { SceneSlide } from "./scene-lightbox";
+import { SceneLightbox } from "./deferred-lightboxes";
 
 type SceneItem = GQL.SlimSceneDataFragment;
 

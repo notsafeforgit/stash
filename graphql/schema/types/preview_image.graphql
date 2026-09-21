@@ -19,6 +19,8 @@ type PreviewImageSource {
 type PreviewImage {
   fallback: String!
   sources: [PreviewImageSource!]!
+  "Bounded card renditions, when generated; the parent retains full-size artwork."
+  thumbnail: PreviewImage
 }
 
 extend type Scene {

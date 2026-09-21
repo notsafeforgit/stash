@@ -7,8 +7,10 @@ import { EntityListPage } from "src/components/list";
 import { useGroupListConfig } from "src/components/list/entity-list-configs";
 import { View } from "src/components/list/views";
 import { Button } from "src/components/ui/button";
-import { GroupEditSheet } from "src/components/detail/group-edit-sheet";
-import { GroupCreateSheet } from "src/components/detail/group-create-sheet";
+import {
+  GroupEditSheet,
+  GroupCreateSheet,
+} from "@/components/detail/deferred-overlays";
 
 function GroupsPage() {
   const intl = useIntl();

@@ -5,7 +5,11 @@ interface LazyComponentError {
 }
 
 export const isLazyComponentError = (e: unknown) => {
-  return !!(e as LazyComponentError).__lazyComponentError;
+  return (
+    e instanceof Error &&
+    "__lazyComponentError" in e &&
+    e.__lazyComponentError === true
+  );
 };
 
 export const lazyComponent = <Props extends object>(
@@ -16,8 +20,10 @@ export const lazyComponent = <Props extends object>(
       return await factory();
     } catch (e) {
       // set flag to identify lazy component loading errors
-      (e as LazyComponentError).__lazyComponentError = true;
-      throw e;
+      const error = e instanceof Error ? e : new Error(String(e), { cause: e });
+      throw Object.assign(error, {
+        __lazyComponentError: true,
+      } satisfies LazyComponentError);
     }
   });
 };

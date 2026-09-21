@@ -1,5 +1,6 @@
-import { useQuery } from "@apollo/client/react";
-import type { PropsWithChildren } from "react";
+import { useApolloClient, useQuery } from "@apollo/client/react";
+import { type PropsWithChildren, useEffect } from "react";
+import { prefetchPluginMetadata } from "@/plugins/loader";
 import { ConfigurationDocument } from "@/core/generated-graphql";
 import { ConfigurationProvider } from "src/hooks/config";
 import { LocaleProvider, DEFAULT_LOCALE } from "./locale-provider";
@@ -12,7 +13,11 @@ import { QueryError, StartupError } from "./query-error";
  * initial configuration cannot be fetched.
  */
 export function ConfigLoader({ children }: PropsWithChildren) {
+  const apollo = useApolloClient();
   const { data, error, loading, refetch } = useQuery(ConfigurationDocument);
+  useEffect(() => {
+    void prefetchPluginMetadata(apollo);
+  }, [apollo]);
 
   if (!data) {
     if (error)

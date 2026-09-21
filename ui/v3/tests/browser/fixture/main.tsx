@@ -49,6 +49,7 @@ import { MarkerEditorFixture } from "./marker-editor";
 import { MergeDialogsFixture } from "./merge-dialogs";
 import { DialogDismissalFixture } from "./dialog-dismissal";
 import { EntityCardsFixture } from "./entity-cards";
+import { EmbeddedListFixture } from "./embedded-list";
 import { RouteTransitionsFixture } from "./route-transitions";
 import { HomeFixture } from "./home";
 import { TvFixture } from "./tv";
@@ -306,6 +307,16 @@ const settingsRoute = createRoute({
 });
 const router = createRouter({
   routeTree: rootRoute.addChildren([
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/embedded-list",
+      component: EmbeddedListFixture,
+    }),
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/scenes/$sceneId",
+      component: () => <div>Fixture scene</div>,
+    }),
     createRoute({
       getParentRoute: () => rootRoute,
       path: "/downloads",

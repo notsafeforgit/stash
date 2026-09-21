@@ -31,7 +31,7 @@ import {
   recordRoute,
   recordSavedFilterLoadedListener,
 } from "./registry";
-import * as ui from "./ui-exports";
+import type { StashPluginUI } from "./ui-exports";
 
 interface PluginToLoad {
   id: string;
@@ -75,6 +75,7 @@ function buildHost(
   apollo: ApolloClient,
   intl: IntlShape,
   stage: (registration: () => void) => void,
+  ui: StashPluginUI,
 ): StashPluginHost {
   return Object.freeze({
     version: HOST_VERSION,
@@ -100,7 +101,7 @@ function buildHost(
     },
     router: Object.freeze({ Link, useNavigate }),
     ui,
-  }) as StashPluginHost;
+  });
 }
 
 export interface LoadPluginsOpts {
@@ -111,6 +112,32 @@ export interface LoadPluginsOpts {
 export const PLUGIN_TIMEOUT_MS = 5000;
 export const PLUGIN_BOOT_TIMEOUT_MS = 30000;
 let loadPromise: Promise<PluginLoadIssue[]> | null = null;
+
+// Configuration and plugin discovery are independent once SystemStatus is ready.
+// Share the bounded request across prefetch, StrictMode, and registration; plugin
+// code still runs only after configuration has supplied the user's locale.
+const pluginLists = new WeakMap<ApolloClient, Promise<PluginToLoad[]>>();
+
+export function prefetchPluginMetadata(apollo: ApolloClient) {
+  let pending = pluginLists.get(apollo);
+  if (!pending) {
+    pending = withTimeout(
+      apollo.query({ query: GQL.PluginsDocument, fetchPolicy: "network-only" }),
+      PLUGIN_TIMEOUT_MS,
+      "Plugin list",
+    ).then((result) =>
+      (result.data?.plugins ?? []).flatMap((plugin) =>
+        plugin.enabled && plugin.paths.entry
+          ? [{ id: plugin.id, name: plugin.name, entry: plugin.paths.entry }]
+          : [],
+      ),
+    );
+    pluginLists.set(apollo, pending);
+    // The loader reports failures when it mounts, even if prefetch fails first.
+    void pending.catch(() => {});
+  }
+  return pending;
+}
 
 export interface PluginLoadIssue {
   pluginId?: string;
@@ -128,14 +155,23 @@ export async function registerPlugin(
 ): Promise<void> {
   const registrations: (() => void)[] = [];
   let accepting = true;
-  const host = buildHost(plugin.id, opts.apollo, opts.intl, (registration) => {
-    if (accepting) registrations.push(registration);
-  });
   try {
     await withTimeout(
       (async () => {
-        const mod = await importModule(plugin.entry);
+        const [mod, ui] = await Promise.all([
+          importModule(plugin.entry),
+          import("./ui-exports"),
+        ]);
         if (!accepting) return;
+        const host = buildHost(
+          plugin.id,
+          opts.apollo,
+          opts.intl,
+          (registration) => {
+            if (accepting) registrations.push(registration);
+          },
+          ui,
+        );
         const register: PluginRegister | undefined =
           mod.default ?? mod.register;
         if (typeof register !== "function")
@@ -174,22 +210,7 @@ export async function loadPlugins(
 
   let pluginsList: PluginToLoad[] = [];
   try {
-    const result = await withTimeout(
-      apollo.query<GQL.PluginsQuery>({
-        query: GQL.PluginsDocument,
-        fetchPolicy: "network-only",
-      }),
-      PLUGIN_TIMEOUT_MS,
-      "Plugin list",
-    );
-    const plugins = result.data?.plugins ?? [];
-    pluginsList = plugins
-      .filter((p) => p.enabled && p.paths.entry)
-      .map((p) => ({
-        id: p.id,
-        name: p.name,
-        entry: p.paths.entry as string,
-      }));
+    pluginsList = await prefetchPluginMetadata(apollo);
   } catch (err) {
     console.error("[stash-plugins] failed to query plugin list", err);
     freezeRegistry();

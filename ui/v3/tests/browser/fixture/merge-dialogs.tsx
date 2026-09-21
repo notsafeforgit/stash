@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { MockedProvider } from "@apollo/client/testing/react";
-import { PerformerMergeDialog } from "@/components/detail/performer-merge-dialog";
-import { SceneMergeDialog } from "@/components/detail/scene-merge-dialog";
+import {
+  PerformerMergeDialog,
+  SceneMergeDialog,
+} from "@/components/detail/deferred-overlays";
 import * as GQL from "@/core/generated-graphql";
 
 const longValue = "LongUnbrokenName".repeat(8);

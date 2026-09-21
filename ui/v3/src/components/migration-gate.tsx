@@ -1,17 +1,11 @@
+import { FullPageSpinner } from "./full-page-spinner";
 import { useMutation, useQuery, useSubscription } from "@apollo/client/react";
 import {
   AlertTriangleIcon,
   DatabaseZapIcon,
   RefreshCwIcon,
 } from "lucide-react";
-import {
-  type PropsWithChildren,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,24 +26,13 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
-import { DEFAULT_LOCALE, LocaleProvider } from "@/components/locale-provider";
-import { SetupWizard } from "@/components/setup-wizard";
 import * as GQL from "@/core/generated-graphql";
-import { StartupError } from "./query-error";
 
 type SystemStatus = GQL.SystemStatusQuery["systemStatus"];
 type MigrationJob = Pick<
   GQL.Job,
   "id" | "status" | "subTasks" | "description" | "progress" | "error"
 >;
-
-function FullPageSpinner() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
-      <Spinner className="size-10 text-muted-foreground" />
-    </div>
-  );
-}
 
 function backupTimestamp() {
   return new Date()
@@ -156,7 +139,7 @@ function useMigrationJob(
   return job;
 }
 
-function MigrationRequiredDialog({
+export function MigrationRequiredDialog({
   status,
   onComplete,
 }: {
@@ -363,46 +346,4 @@ function MigrationRequiredDialog({
       </Dialog>
     </>
   );
-}
-
-export function SystemStatusGate({ children }: PropsWithChildren) {
-  const { data, loading, error, refetch } = useQuery(GQL.SystemStatusDocument, {
-    fetchPolicy: "network-only",
-  });
-
-  if (!data && error) {
-    return <StartupError error={error} retry={refetch} retrying={loading} />;
-  }
-
-  if (!data) {
-    return <FullPageSpinner />;
-  }
-
-  if (data?.systemStatus.status === GQL.SystemStatusEnum.NeedsMigration) {
-    return (
-      <LocaleProvider language={DEFAULT_LOCALE}>
-        <MigrationRequiredDialog
-          status={data.systemStatus}
-          onComplete={async () => {
-            await refetch();
-          }}
-        />
-      </LocaleProvider>
-    );
-  }
-
-  if (data?.systemStatus.status === GQL.SystemStatusEnum.Setup) {
-    return (
-      <LocaleProvider language={DEFAULT_LOCALE}>
-        <SetupWizard
-          status={data.systemStatus}
-          onComplete={async () => {
-            await refetch();
-          }}
-        />
-      </LocaleProvider>
-    );
-  }
-
-  return <>{children}</>;
 }

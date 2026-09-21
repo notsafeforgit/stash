@@ -9,7 +9,7 @@ import {
 } from "./entity-actions-menu";
 import { AutoTagDialog } from "src/components/detail/auto-tag-dialog";
 import { DeleteDialog } from "src/components/detail/delete-dialog";
-import { PerformerMergeDialog } from "src/components/detail/performer-merge-dialog";
+import { PerformerMergeDialog } from "@/components/detail/deferred-overlays";
 
 interface PerformerActionsMenuProps {
   performer: NonNullable<GQL.FindPerformerQuery["findPerformer"]>;

@@ -5,7 +5,7 @@ import { EntityListPage } from "src/components/list";
 import { useGalleryListConfig } from "src/components/list/entity-list-configs";
 import { View } from "src/components/list/views";
 import { useGalleryTableColumns } from "./-table-columns";
-import { GalleryEditSheet } from "src/components/detail/gallery-edit-sheet";
+import { GalleryEditSheet } from "@/components/detail/deferred-overlays";
 import { useDocumentTitle } from "src/hooks/title";
 
 function GalleriesPage() {

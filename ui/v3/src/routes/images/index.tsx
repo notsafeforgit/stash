@@ -4,7 +4,7 @@ import { useIntl } from "react-intl";
 import { EntityListPage } from "src/components/list";
 import { useImageListConfig } from "src/components/list/entity-list-configs";
 import { View } from "src/components/list/views";
-import { ImageEditSheet } from "src/components/detail/image-edit-sheet";
+import { ImageEditSheet } from "@/components/detail/deferred-overlays";
 import { useDocumentTitle } from "src/hooks/title";
 
 function ImagesPage() {

@@ -100,7 +100,7 @@ import {
   DeleteFilesList,
   type DeleteOptions,
 } from "src/components/detail/delete-dialog";
-import { ImageBulkEditSheet } from "src/components/detail/image-bulk-edit-sheet";
+import { ImageBulkEditSheet } from "@/components/detail/deferred-overlays";
 import { useToast } from "src/hooks/toast";
 import { useDocumentTitle } from "src/hooks/title";
 

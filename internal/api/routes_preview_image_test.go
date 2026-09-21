@@ -20,10 +20,13 @@ func TestPreviewImageDelivery(t *testing.T) {
 	result := &previewimage.Result{Directory: stage, Variants: []previewimage.Variant{
 		{File: "preview.jpg", MIMEType: "image/jpeg", DynamicRange: previewimage.SDR, Width: 64, Height: 48},
 		{File: "preview.avif", MIMEType: "image/avif", DynamicRange: previewimage.Adaptive, Width: 64, Height: 48},
+	}, Thumbnail: []previewimage.Variant{
+		{File: "thumbnail.jpg", MIMEType: "image/jpeg", DynamicRange: previewimage.SDR, Width: 32, Height: 24},
+		{File: "thumbnail.avif", MIMEType: "image/avif", DynamicRange: previewimage.Adaptive, Width: 32, Height: 24},
 	}}
 	defer result.Close()
-	for _, v := range result.Variants {
-		if err := os.WriteFile(filepath.Join(stage, v.File), []byte(v.MIMEType), 0600); err != nil {
+	for _, v := range append(result.Variants, result.Thumbnail...) {
+		if err := os.WriteFile(filepath.Join(stage, v.File), []byte(v.File), 0600); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -39,6 +42,9 @@ func TestPreviewImageDelivery(t *testing.T) {
 	if image == nil || len(image.Sources) != 1 || image.Sources[0].DynamicRange != PreviewImageDynamicRangeAdaptive || !strings.HasPrefix(image.Fallback, "https://example.test/stash/") {
 		t.Fatalf("incorrect image catalog: %+v", image)
 	}
+	if image.Thumbnail == nil || len(image.Thumbnail.Sources) != 1 || image.Thumbnail.Sources[0].Width != 32 || image.Thumbnail.Fallback == image.Fallback {
+		t.Fatalf("missing independent thumbnail catalog: %+v", image.Thumbnail)
+	}
 	for _, test := range []struct {
 		name     string
 		revision string
@@ -47,6 +53,7 @@ func TestPreviewImageDelivery(t *testing.T) {
 		want     int
 	}{
 		{"avif", manifest.Revision, manifest.Variants[1].File, manifest, http.StatusOK},
+		{"thumbnail", manifest.Revision, manifest.Thumbnail[1].File, manifest, http.StatusOK},
 		{"stale revision", "old", manifest.Variants[1].File, manifest, http.StatusNotFound},
 		{"obsolete cover", manifest.Revision, manifest.Variants[1].File, nil, http.StatusNotFound},
 		{"traversal", manifest.Revision, "../manifest.json", manifest, http.StatusNotFound},
@@ -58,7 +65,11 @@ func TestPreviewImageDelivery(t *testing.T) {
 			if rec.Code != test.want {
 				t.Fatalf("status = %d, want %d", rec.Code, test.want)
 			}
-			if test.want == http.StatusOK && (rec.Header().Get("Content-Type") != "image/avif" || rec.Body.String() != "image/avif" || !strings.Contains(rec.Header().Get("Cache-Control"), "private")) {
+			wantBody := "preview.avif"
+			if test.name == "thumbnail" {
+				wantBody = "thumbnail.avif"
+			}
+			if test.want == http.StatusOK && (rec.Header().Get("Content-Type") != "image/avif" || rec.Body.String() != wantBody || !strings.Contains(rec.Header().Get("Cache-Control"), "private")) {
 				t.Fatalf("incorrect AVIF delivery: %v %s", rec.Header(), rec.Body.String())
 			}
 			if test.want == http.StatusOK {
@@ -67,5 +78,10 @@ func TestPreviewImageDelivery(t *testing.T) {
 				}
 			}
 		})
+	}
+	// Old manifests remain usable without a thumbnail or new URL format.
+	manifest.Thumbnail = nil
+	if old := previewImageModel("https://example.test/preview", manifest); old == nil || old.Thumbnail != nil {
+		t.Fatalf("older cover is not backwards compatible: %+v", old)
 	}
 }

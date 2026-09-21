@@ -11,8 +11,6 @@ query FindScenes(
     scene_ids: $scene_ids
   ) {
     count
-    filesize
-    duration
     scenes {
       ...SlimSceneData
     }
@@ -30,8 +28,6 @@ query FindScenesMobile(
     scene_filter_ast: $scene_filter_ast
   ) {
     count
-    filesize
-    duration
     scenes {
       ...MobileSceneData
     }
@@ -41,8 +37,6 @@ query FindScenesMobile(
 query FindScenesByPathRegex($filter: FindFilterType) {
   findScenesByPathRegex(filter: $filter) {
     count
-    filesize
-    duration
     scenes {
       ...SlimSceneData
     }

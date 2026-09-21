@@ -1,10 +1,12 @@
 import { ApolloClient, ApolloLink, Observable, gql } from "@apollo/client";
 import type { TypedDocumentNode } from "@graphql-typed-document-node/core";
+import { print } from "graphql";
 import { afterEach, expect, it, vi } from "vitest";
 import { createCache } from "./create-client";
 import {
   JobStatus,
   PreviewImageDynamicRange,
+  PreviewImageDataFragmentDoc,
   type FindSceneCoversQuery,
   type PreviewImageDataFragment,
 } from "./generated-graphql";
@@ -43,19 +45,21 @@ const detailQuery: TypedDocumentNode<{
       id title resume_time files { id updated_at }
       sceneStreams: sceneStreamsV3 { url mime_type label }
       paths { screenshot stream sprite }
-      preview_image { fallback sources { url mime_type dynamic_range width height } }
+      preview_image { ...PreviewImageData }
     }
   }
+  ${print(PreviewImageDataFragmentDoc)}
 `;
 const listQuery: TypedDocumentNode<FindSceneCoversQuery> = gql`
   query CoverTestList {
     findScenes {
       scenes {
         id paths { screenshot }
-        preview_image { fallback sources { url mime_type dynamic_range width height } }
+        preview_image { ...PreviewImageData }
       }
     }
   }
+  ${print(PreviewImageDataFragmentDoc)}
 `;
 const covers: FindSceneCoversQuery = {
   findScenes: {
@@ -66,6 +70,20 @@ const covers: FindSceneCoversQuery = {
         id: "1",
         paths: { __typename: "ScenePathsType", screenshot: "/new.jpg" },
         preview_image: {
+          thumbnail: {
+            __typename: "PreviewImage",
+            fallback: "/thumbnail.jpg",
+            sources: [
+              {
+                __typename: "PreviewImageSource",
+                url: "/thumbnail.avif",
+                mime_type: "image/avif",
+                dynamic_range: PreviewImageDynamicRange.Adaptive,
+                width: 80,
+                height: 45,
+              },
+            ],
+          },
           __typename: "PreviewImage",
           fallback: "/new.jpg",
           sources: [

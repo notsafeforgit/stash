@@ -108,8 +108,10 @@ import {
   DeleteFilesList,
   type DeleteOptions,
 } from "src/components/detail/delete-dialog";
-import { SceneBulkEditSheet } from "src/components/detail/scene-bulk-edit-sheet";
-import { SceneMergeDialog } from "src/components/detail/scene-merge-dialog";
+import {
+  SceneBulkEditSheet,
+  SceneMergeDialog,
+} from "@/components/detail/deferred-overlays";
 import { useToast } from "src/hooks/toast";
 import { useDocumentTitle } from "src/hooks/title";
 

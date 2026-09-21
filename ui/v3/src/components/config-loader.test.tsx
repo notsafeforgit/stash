@@ -9,6 +9,7 @@ const { useQueryMock } = vi.hoisted(() => ({
 
 vi.mock("@apollo/client/react", () => ({
   useQuery: useQueryMock,
+  useApolloClient: vi.fn(),
 }));
 
 vi.mock("./locale-provider", () => ({

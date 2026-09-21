@@ -11,8 +11,10 @@ import { StudioRowContextMenu } from "src/components/cards/use-studio-context-me
 import { View } from "src/components/list/views";
 import { Button } from "src/components/ui/button";
 import { useStudioTableColumns } from "./-table-columns";
-import { StudioEditSheet } from "src/components/detail/studio-edit-sheet";
-import { StudioCreateSheet } from "src/components/detail/studio-create-sheet";
+import {
+  StudioEditSheet,
+  StudioCreateSheet,
+} from "@/components/detail/deferred-overlays";
 
 type StudiosQuery = GQL.FindStudiosQuery;
 type StudioItem = GQL.FindStudiosQuery["findStudios"]["studios"][number];

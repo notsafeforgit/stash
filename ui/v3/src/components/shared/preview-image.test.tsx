@@ -25,6 +25,7 @@ function preview(dynamicRange: PreviewImageDynamicRange): PreviewImageData {
   return {
     __typename: "PreviewImage",
     fallback: "/tone-mapped.jpg",
+    thumbnail: null,
     sources: [
       {
         __typename: "PreviewImageSource",
@@ -39,6 +40,43 @@ function preview(dynamicRange: PreviewImageDynamicRange): PreviewImageData {
 }
 
 describe("preview image rendering", () => {
+  it("uses stored card renditions only when requested and accepts older covers", async () => {
+    const full = preview(PreviewImageDynamicRange.Adaptive);
+    const thumbnail = {
+      ...full,
+      fallback: "/thumbnail.jpg",
+      sources: full.sources.map((source) => ({
+        ...source,
+        url: "/thumbnail.avif",
+        width: 1280,
+        height: 720,
+      })),
+    };
+    const render = async (card: boolean, available: boolean) => {
+      await act(async () =>
+        root.render(
+          <PreviewImage
+            preview={{ ...full, thumbnail: available ? thumbnail : null }}
+            thumbnail={card}
+            src="/legacy.jpg"
+            alt=""
+          />,
+        ),
+      );
+    };
+    await render(true, true);
+    expect(container.querySelector("source")?.srcset).toBe("/thumbnail.avif");
+    expect(container.querySelector("source")?.getAttribute("width")).toBe(
+      "1280",
+    );
+    expect(container.querySelector("img")?.getAttribute("src")).toBe(
+      "/thumbnail.jpg",
+    );
+    await render(false, true);
+    expect(container.querySelector("source")?.srcset).toBe("/hdr.avif");
+    await render(true, false);
+    expect(container.querySelector("source")?.srcset).toBe("/hdr.avif");
+  });
   it("renders a complete preview without any legacy screenshot URL", async () => {
     await act(async () =>
       root.render(

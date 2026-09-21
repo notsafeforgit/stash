@@ -1,21 +1,32 @@
 import { useState, type ComponentProps } from "react";
-import type { PreviewImageDataFragment } from "@/core/generated-graphql";
+import type {
+  PreviewImageDataFragment,
+  PreviewImageRenditionDataFragment,
+} from "@/core/generated-graphql";
 
 export type PreviewImageData = PreviewImageDataFragment;
 
 export type PreviewImageProps = ComponentProps<"img"> & {
   preview?: PreviewImageData | null;
+  /** Prefer stored card renditions, falling back to existing full-size covers. */
+  thumbnail?: boolean;
   alt: string;
 };
 
 /** One rendering policy for covers, markers and player posters. Adaptive AVIF
  * contains its SDR rendering; plain HDR is selected only on HDR displays. The
  * browser handles format support, display changes and colour management. */
-export function PreviewImage(props: PreviewImageProps) {
+export function PreviewImage({
+  thumbnail,
+  preview,
+  ...props
+}: PreviewImageProps) {
+  const rendition = (thumbnail && preview?.thumbnail) || preview;
   return (
     <PreviewImageContent
-      key={`${props.preview?.fallback ?? ""}\n${props.src ?? ""}`}
+      key={`${rendition?.fallback ?? ""}\n${props.src ?? ""}`}
       {...props}
+      preview={rendition}
     />
   );
 }
@@ -26,7 +37,9 @@ function PreviewImageContent({
   onError,
   alt,
   ...props
-}: PreviewImageProps) {
+}: Omit<PreviewImageProps, "preview" | "thumbnail"> & {
+  preview?: PreviewImageRenditionDataFragment | null;
+}) {
   const [fallbackLevel, setFallbackLevel] = useState(0);
   const fallback = fallbackLevel < 2 ? (preview?.fallback ?? src) : src;
   return (

@@ -14,7 +14,7 @@ import {
 } from "src/components/ui/context-menu";
 import { DeleteDialog } from "src/components/detail/delete-dialog";
 import { AutoTagDialog } from "src/components/detail/auto-tag-dialog";
-import { StudioBulkEditSheet } from "src/components/detail/studio-bulk-edit-sheet";
+import { StudioBulkEditSheet } from "@/components/detail/deferred-overlays";
 import {
   useBulkCardActions,
   BulkContextMenuItems,

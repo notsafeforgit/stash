@@ -25,9 +25,24 @@ upstream's numeric migrations and primary schema version unchanged. See
   another client for a feature.
 - Configuration and system-status gates expose errors and retry actions. Bundled
   locale messages load before optional server overrides.
+- `system-status-gate.tsx` loads migration/setup screens only when required.
+  Once the database is ready, configuration and bounded plugin discovery start
+  together; plugin registration still waits for configuration and locale setup.
+  The plugin UI catalog loads only when an enabled v3 plugin needs it.
 - Plugin registration is staged and time limited. Only completed registrations
   enter the router; core routes remain available if plugin startup fails. Route
   collisions are rejected explicitly.
+- Cards and list routes import editors through `detail/deferred-overlays.ts`
+  and lightboxes through the lightbox barrel. Closed overlays fetch no feature
+  code. After first opening, wrappers preserve the component lifetime, drafts,
+  and closing animations. A pending or failed download remains dismissible.
+  Generic tables use `lazyModule` to preserve item/column types across the lazy
+  boundary without casting. Keep route-independent viewers in components:
+  exporting them from a route can pull media code into the eager route tree.
+- Ordinary scene lists and Home request count and card data, not duration or
+  size aggregates. The backend aggregate fields remain available to other
+  clients, including v2.5. See [read performance](../../../docs/read-performance.md)
+  for the database strategy and measurement boundaries.
 - `core/platform-url.ts` derives the deployment prefix from the server's base
   element. Use `getPlatformURL` for backend requests, `applicationHref` for raw
   history writes, and `applicationPath` to convert a public URL to a TanStack
@@ -224,6 +239,14 @@ layouts in memory, keyed by list URL and layout preferences; changed widths or
 ordered item IDs invalidate it. Loading virtual rows retain the full page height
 without measuring skeletons as real cards. Do not duplicate scroll tracking or
 restoration in individual routes.
+
+On mobile collection detail pages, `EmbeddedListScrollContext` supplies the
+outer page scroller to the active list. Its grid/details virtualizer measures
+the list's offset below the profile header as `scrollMargin`, including header
+resizes, and renders only viewport rows plus overscan. The list's content-sized
+inner wrapper must not become the virtualizer's viewport: doing so mounts and
+fetches the entire page of cards. Desktop lists keep their bounded inner
+scroller. Embedded pagination returns to the list start below the header.
 
 The retained URL and pending restoration are React state snapshots. Adjust them
 conditionally when their identity changes, following React's

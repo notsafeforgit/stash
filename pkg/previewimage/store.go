@@ -22,6 +22,8 @@ type Manifest struct {
 	Revision string    `json:"revision"`
 	At       float64   `json:"at"`
 	Variants []Variant `json:"variants"`
+	// Optional for manifests generated before card thumbnails were introduced.
+	Thumbnail []Variant `json:"thumbnail,omitempty"`
 }
 
 // SourceKey binds an image to both its source file and the current artwork
@@ -79,12 +81,14 @@ func (s Store) Load(sceneID int, kind, revision string) (*Manifest, error) {
 	if ret.Version != RecipeVersion || ret.Key != revision || len(ret.Revision) != 64 || len(ret.Variants) == 0 {
 		return nil, fmt.Errorf("invalid preview image manifest")
 	}
-	for _, v := range ret.Variants {
-		if !validVariant(v) {
-			return nil, fmt.Errorf("invalid preview image variant")
-		}
-		if stat, err := os.Stat(filepath.Join(dir, v.File)); err != nil || stat.Size() == 0 {
-			return nil, fmt.Errorf("missing preview image variant %s", v.File)
+	for _, variants := range [][]Variant{ret.Variants, ret.Thumbnail} {
+		for _, v := range variants {
+			if !validVariant(v) {
+				return nil, fmt.Errorf("invalid preview image variant")
+			}
+			if stat, err := os.Stat(filepath.Join(dir, v.File)); err != nil || stat.Size() == 0 {
+				return nil, fmt.Errorf("missing preview image variant %s", v.File)
+			}
 		}
 	}
 	return &ret, nil
@@ -124,28 +128,37 @@ func (s Store) Publish(sceneID int, kind, revision string, at float64, result *R
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
-	manifest := Manifest{Version: RecipeVersion, Key: revision, At: at, Variants: append([]Variant(nil), result.Variants...)}
-	hasFallback := false
-	for i, v := range manifest.Variants {
-		if !validVariant(v) {
-			return fmt.Errorf("invalid preview image variant")
+	manifest := Manifest{Version: RecipeVersion, Key: revision, At: at,
+		Variants: append([]Variant(nil), result.Variants...), Thumbnail: append([]Variant(nil), result.Thumbnail...)}
+	for _, variants := range [][]Variant{manifest.Variants, manifest.Thumbnail} {
+		if variants == nil {
+			continue
 		}
-		data, err := os.ReadFile(filepath.Join(result.Directory, v.File))
-		if err != nil {
-			return err
+		hasFallback := false
+		for i, v := range variants {
+			if !validVariant(v) {
+				return fmt.Errorf("invalid preview image variant")
+			}
+			data, err := os.ReadFile(filepath.Join(result.Directory, v.File))
+			if err != nil {
+				return err
+			}
+			if len(data) == 0 {
+				return fmt.Errorf("empty preview image variant")
+			}
+			name := fmt.Sprintf("%x%s", sha256.Sum256(data), filepath.Ext(v.File))
+			if err := os.Rename(filepath.Join(result.Directory, v.File), filepath.Join(dir, name)); err != nil {
+				return err
+			}
+			variants[i].File = name
+			hasFallback = hasFallback || v.MIMEType == "image/jpeg"
 		}
-		if len(data) == 0 {
-			return fmt.Errorf("empty preview image variant")
+		if !hasFallback {
+			return fmt.Errorf("preview image requires an SDR fallback")
 		}
-		name := fmt.Sprintf("%x%s", sha256.Sum256(data), filepath.Ext(v.File))
-		if err := os.Rename(filepath.Join(result.Directory, v.File), filepath.Join(dir, name)); err != nil {
-			return err
-		}
-		manifest.Variants[i].File = name
-		hasFallback = hasFallback || v.MIMEType == "image/jpeg"
 	}
-	if !hasFallback {
-		return fmt.Errorf("preview image requires an SDR fallback")
+	if len(manifest.Variants) == 0 {
+		return fmt.Errorf("preview image requires full-size renditions")
 	}
 	data, err := json.Marshal(manifest)
 	if err != nil {
@@ -169,9 +182,11 @@ func (s Store) File(sceneID int, kind string, manifest *Manifest, name string) (
 	if err != nil {
 		return "", nil
 	}
-	for _, v := range manifest.Variants {
-		if v.File == name {
-			return filepath.Join(dir, name), &v
+	for _, variants := range [][]Variant{manifest.Variants, manifest.Thumbnail} {
+		for _, v := range variants {
+			if v.File == name {
+				return filepath.Join(dir, name), &v
+			}
 		}
 	}
 	return "", nil

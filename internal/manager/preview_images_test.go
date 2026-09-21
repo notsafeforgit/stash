@@ -201,6 +201,14 @@ func TestGenerateScreenshotPublishesPreviewAndReportsWriteFailure(t *testing.T) 
 			if manifest == nil {
 				t.Fatal("original cover was not published")
 			}
+			if len(manifest.Thumbnail) < 1 || manifest.Thumbnail[0].Width != 64 || manifest.Thumbnail[0].Height != 48 {
+				t.Fatalf("missing thumbnail or upscaled small source: %+v", manifest.Thumbnail)
+			}
+			legacyPath, _ := store.File(scene.ID, "cover", manifest, manifest.Variants[0].File)
+			legacyJPEG, err := os.ReadFile(legacyPath)
+			if err != nil || !bytes.Equal(legacyJPEG, original) {
+				t.Fatal("legacy cover is no longer the full-size SDR fallback")
+			}
 			for _, variant := range manifest.Variants {
 				path, _ := store.File(scene.ID, "cover", manifest, variant.File)
 				if err := os.Remove(path); err != nil {

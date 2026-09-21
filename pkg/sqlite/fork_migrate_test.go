@@ -66,7 +66,7 @@ func TestForkMigrationsRunOutsideUpstreamSchemaVersion(t *testing.T) {
 			t.Fatalf("image_files.%s column was not removed", column)
 		}
 	}
-	if got, want := queryUint(t, raw, "SELECT COUNT(*) FROM fork_schema_migrations"), uint(1); got != want {
+	if got, want := queryUint(t, raw, "SELECT COUNT(*) FROM fork_schema_migrations"), uint(2); got != want {
 		t.Fatalf("fork migration count = %d, want %d", got, want)
 	}
 }
@@ -280,10 +280,10 @@ func TestPrivateForkVersionFourUpgradesToConsolidatedMigration(t *testing.T) {
 
 	raw = openRawDB(t, dbPath)
 	defer raw.Close()
-	if got, want := queryUint(t, raw, "SELECT MAX(version) FROM fork_schema_migrations"), uint(5); got != want {
+	if got, want := queryUint(t, raw, "SELECT MAX(version) FROM fork_schema_migrations"), upgrade.RequiredForkSchemaVersion(); got != want {
 		t.Fatalf("consolidated fork version = %d, want %d", got, want)
 	}
-	if got, want := queryUint(t, raw, "SELECT COUNT(*) FROM fork_schema_migrations"), uint(1); got != want {
+	if got, want := queryUint(t, raw, "SELECT COUNT(*) FROM fork_schema_migrations"), uint(2); got != want {
 		t.Fatalf("consolidated migration count = %d, want %d", got, want)
 	}
 	if rawColumnExists(t, raw, "performer_aliases", "ignore_auto_tag") || rawColumnExists(t, raw, "saved_filters", "filter_ast") {

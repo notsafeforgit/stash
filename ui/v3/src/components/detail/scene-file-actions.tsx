@@ -25,7 +25,7 @@ import {
   SceneSelectDialog,
   type SceneSummary,
 } from "src/components/detail/scene-select-dialog";
-import { SceneCreateSheet } from "src/components/detail/scene-create-sheet";
+import { SceneCreateSheet } from "@/components/detail/deferred-overlays";
 import {
   type SceneData,
   sceneToFormValues,

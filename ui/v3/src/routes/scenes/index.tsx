@@ -4,7 +4,7 @@ import { useIntl } from "react-intl";
 import { EntityListPage } from "src/components/list";
 import { useSceneListConfig } from "src/components/list/entity-list-configs";
 import { View } from "src/components/list/views";
-import { SceneEditSheet } from "src/components/detail/scene-edit-sheet";
+import { SceneEditSheet } from "@/components/detail/deferred-overlays";
 import { useDocumentTitle } from "src/hooks/title";
 
 function ScenesPage() {

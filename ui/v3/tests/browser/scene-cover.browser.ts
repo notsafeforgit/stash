@@ -121,11 +121,11 @@ for (const width of [390, 1280]) {
             });
             await expect(card.locator("img")).toHaveAttribute(
               "src",
-              /new\.jpg/,
+              /new-thumbnail\.jpg/,
             );
             await expect(card.locator("source").first()).toHaveAttribute(
               "srcset",
-              /new\.avif/,
+              /new-thumbnail\.avif/,
             );
             expect(
               await page.evaluate(

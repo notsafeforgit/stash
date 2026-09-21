@@ -14,8 +14,10 @@ import {
 } from "src/components/ui/context-menu";
 import { DeleteDialog } from "src/components/detail/delete-dialog";
 import { AutoTagDialog } from "src/components/detail/auto-tag-dialog";
-import { PerformerMergeDialog } from "src/components/detail/performer-merge-dialog";
-import { PerformerBulkEditSheet } from "src/components/detail/performer-bulk-edit-sheet";
+import {
+  PerformerMergeDialog,
+  PerformerBulkEditSheet,
+} from "@/components/detail/deferred-overlays";
 import {
   useBulkCardActions,
   BulkContextMenuItems,

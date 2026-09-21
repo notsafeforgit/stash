@@ -8,8 +8,10 @@ import { usePerformerListConfig } from "src/components/list/entity-list-configs"
 import { View } from "src/components/list/views";
 import { Button } from "src/components/ui/button";
 import { usePerformerTableColumns } from "./-table-columns";
-import { PerformerEditSheet } from "src/components/detail/performer-edit-sheet";
-import { PerformerCreateSheet } from "src/components/detail/performer-create-sheet";
+import {
+  PerformerEditSheet,
+  PerformerCreateSheet,
+} from "@/components/detail/deferred-overlays";
 
 function PerformersPage() {
   const intl = useIntl();

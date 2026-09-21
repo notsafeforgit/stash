@@ -7,7 +7,7 @@ import { Link } from "@tanstack/react-router";
 import type { EntityColumnDef as ColumnDef } from "@/components/list/entity-table";
 import type { IHasID } from "src/utils/data";
 import { DataTableColumnHeader } from "./data-table-column-header";
-import { selectionColumn } from "./entity-data-table";
+import { selectionColumn } from "./selection-column";
 
 // ── Re-export selection column for convenience ────────────────────────────────
 export { selectionColumn };
@@ -36,6 +36,7 @@ export function thumbnailColumn<T extends IHasID>(
             <PreviewImage
               src={src}
               preview={preview}
+              thumbnail
               alt=""
               className="h-10 w-10 rounded object-cover"
               loading="lazy"

@@ -21,11 +21,19 @@ offered only under `(dynamic-range: high)`; other displays receive the separatel
 tone-mapped JPEG. Browsers without AVIF support select JPEG automatically. A
 failed rendition falls back to JPEG and then to the existing screenshot URL.
 
+New scene cover generations also store card thumbnails bounded to **1280 pixels
+on the longest edge**, without upscaling. They use the same AVIF/HDR policy and
+have their own SDR JPEG fallback. Cards (including wall views and blurred
+backgrounds) and table cells prefer `preview_image.thumbnail`; detail views,
+lightboxes and player posters retain the full-size rendition. Older manifests
+without thumbnails remain readable and fall back to their existing covers.
+
 ## Generation and requirements
 
 Enable v3 using `--enable-v3-ui` / `STASH_ENABLE_V3_UI=true`. Generate a scene
 cover, use **Set cover** at a player timestamp, or generate marker screenshots.
-Existing covers need explicit regeneration to acquire HDR. Use **Set cover**
+Existing covers need explicit regeneration to acquire HDR or stored card
+thumbnails. Use **Set cover**
 at a selected frame or **Generate default thumbnail** (20% into the video).
 For a batch refresh, select scenes and use **Generate…** with only **Scene
 covers** selected and **Replace existing artifacts** enabled. This replaces the
@@ -55,6 +63,8 @@ reference white, Mobius tone mapping and BT.709 primaries with sRGB transfer.
 Gain maps encode that SDR rendition as their base. The pipeline preserves the
 source's ordinary HDR image signal, not Dolby Vision RPU or HDR10+ dynamic
 grading metadata. Dolby Vision sources require a usable HDR10/HLG base layer.
+Card thumbnails resize the same 16-bit SDR and HDR intermediates before
+encoding, without decoding the video again or reducing HDR to an 8-bit JPEG.
 
 Browser/OS HDR support and display headroom still determine visible highlight
 brightness. Automated encoding tests verify depth, transfer and gain-map
@@ -86,7 +96,8 @@ ownership, and serve only manifest-listed files under normal authentication.
 URLs honour the server's public mount point and responses use private caching.
 
 `internal/manager/preview_images.go` is the compatibility adapter: it writes the
-new pipeline's JPEG to the existing scene cover blob or legacy marker path.
+new pipeline's full-size JPEG to the existing scene cover blob or legacy marker
+path. Thumbnails are additional files; existing screenshot URLs are unchanged.
 V2.5 operations, fields and URLs keep their existing types and behaviour. The
 shared v3 renderer also accepts legacy-only artwork while libraries transition.
 Deleting generated scene files includes the new store. Generated-file cleanup

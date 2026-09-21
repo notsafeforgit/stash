@@ -1,4 +1,11 @@
 fragment PreviewImageData on PreviewImage {
+  ...PreviewImageRenditionData
+  thumbnail {
+    ...PreviewImageRenditionData
+  }
+}
+
+fragment PreviewImageRenditionData on PreviewImage {
   fallback
   sources {
     url

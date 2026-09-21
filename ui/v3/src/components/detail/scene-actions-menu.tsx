@@ -25,8 +25,10 @@ import {
   DeleteDialog,
   DeleteFilesList,
 } from "src/components/detail/delete-dialog";
-import { SceneGenerateDialog } from "src/components/detail/scene-generate-dialog";
-import { SceneMergeDialog } from "src/components/detail/scene-merge-dialog";
+import {
+  SceneGenerateDialog,
+  SceneMergeDialog,
+} from "@/components/detail/deferred-overlays";
 import { useToast } from "src/hooks/toast";
 import { useConfigurationContext } from "src/hooks/config";
 import { objectPath, objectTitle } from "src/core/files";

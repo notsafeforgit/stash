@@ -66,7 +66,11 @@ func (s *Manager) generatePreviewImage(ctx context.Context, scene *models.Scene,
 	avifTool, _ := exec.LookPath("avifenc")
 	encoder := previewimage.Encoder{FFmpeg: s.FFMpeg, GainMapTool: tool, AVIFTool: avifTool}
 	store := s.PreviewImageStore()
-	result, err := encoder.Generate(lock, store.Root, previewimage.Request{Video: video, At: at})
+	req := previewimage.Request{Video: video, At: at}
+	if kind == "cover" {
+		req.ThumbnailMaxDimension = previewimage.CardThumbnailMaxDimension
+	}
+	result, err := encoder.Generate(lock, store.Root, req)
 	if err != nil {
 		return nil, err
 	}

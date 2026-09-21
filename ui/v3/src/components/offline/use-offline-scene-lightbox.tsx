@@ -19,10 +19,7 @@
  */
 
 import { useCallback, useState } from "react";
-import {
-  SceneLightbox,
-  type SceneSlide,
-} from "src/components/lightbox/scene-lightbox";
+import { SceneLightbox, type SceneSlide } from "src/components/lightbox";
 import type { OfflineCardItem } from "./offline-list-source";
 
 function offlineItemToSlide(item: OfflineCardItem): SceneSlide {

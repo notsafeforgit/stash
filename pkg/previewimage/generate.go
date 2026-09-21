@@ -22,6 +22,10 @@ const (
 	SDR      DynamicRange = "SDR"
 	HDR      DynamicRange = "HDR"
 	Adaptive DynamicRange = "ADAPTIVE"
+
+	// CardThumbnailMaxDimension covers a full-width mobile card at 3x density
+	// without retaining the source video's potentially 4K/8K dimensions.
+	CardThumbnailMaxDimension = 1280
 )
 
 type Variant struct {
@@ -46,11 +50,15 @@ type Request struct {
 	At    float64
 	// MaxDimension bounds the longest edge; zero retains the source size.
 	MaxDimension int
+	// ThumbnailMaxDimension additionally generates bounded card renditions from
+	// the same high-bit-depth frame. Zero omits them; neither size is upscaled.
+	ThumbnailMaxDimension int
 }
 
 type Result struct {
 	Directory string
 	Variants  []Variant
+	Thumbnail []Variant
 	// Warnings describe optional encoders that failed. The SDR JPEG is always
 	// complete when Generate succeeds, including when AVIF isn't available.
 	Warnings []error
@@ -67,7 +75,7 @@ func (r *Result) JPEG() ([]byte, error) {
 }
 
 func (e Encoder) Generate(ctx context.Context, parent string, req Request) (_ *Result, err error) {
-	if req.Video == nil || req.Video.Path == "" || req.At < 0 || math.IsNaN(req.At) || math.IsInf(req.At, 0) || req.MaxDimension < 0 {
+	if req.Video == nil || req.Video.Path == "" || req.At < 0 || math.IsNaN(req.At) || math.IsInf(req.At, 0) || req.MaxDimension < 0 || req.ThumbnailMaxDimension < 0 {
 		return nil, fmt.Errorf("invalid preview image request")
 	}
 	if err := os.MkdirAll(parent, 0755); err != nil {
@@ -95,13 +103,57 @@ func (e Encoder) Generate(ctx context.Context, parent string, req Request) (_ *R
 	if err != nil {
 		return nil, err
 	}
+	hdr := IsHDR(req.Video.ColorTransfer)
+	if err := e.encodeRenditions(ctx, ret, hdr); err != nil {
+		return nil, err
+	}
+	if req.ThumbnailMaxDimension > 0 {
+		thumbDir := filepath.Join(dir, "thumbnail")
+		if err := os.Mkdir(thumbDir, 0755); err != nil {
+			return nil, err
+		}
+		files := []string{"sdr.png"}
+		if hdr {
+			files = append(files, "hdr.png")
+		}
+		for _, file := range files {
+			// Resize the 16-bit intermediates, not the 8-bit JPEG fallback. Both
+			// the SDR base and HDR alternate keep their original colour space.
+			args := ffmpeg.Args{"-hide_banner", "-loglevel", "error", "-y", "-i", filepath.Join(dir, file),
+				"-vf", boundedScale(req.ThumbnailMaxDimension) + ",format=rgb48be", "-frames:v", "1", "-update", "1", filepath.Join(thumbDir, file)}
+			if err := e.run(ctx, args); err != nil {
+				return nil, err
+			}
+		}
+		thumb := &Result{Directory: thumbDir}
+		if err := e.encodeRenditions(ctx, thumb, hdr); err != nil {
+			return nil, err
+		}
+		for _, variant := range thumb.Variants {
+			name := "thumbnail-" + variant.File
+			if err := os.Rename(filepath.Join(thumbDir, variant.File), filepath.Join(dir, name)); err != nil {
+				return nil, err
+			}
+			variant.File = name
+			ret.Thumbnail = append(ret.Thumbnail, variant)
+		}
+		ret.Warnings = append(ret.Warnings, thumb.Warnings...)
+		thumb.Close()
+	}
+	// The intermediates are not published or retained in the generated cache.
+	_ = os.Remove(filepath.Join(dir, "sdr.png"))
+	_ = os.Remove(filepath.Join(dir, "hdr.png"))
+	return ret, nil
+}
+
+func (e Encoder) encodeRenditions(ctx context.Context, ret *Result, hdr bool) error {
+	dir := ret.Directory
 	width, height, err := writeJPEG(dir)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	ret.Variants = []Variant{{"preview.jpg", "image/jpeg", SDR, width, height}}
 
-	hdr := IsHDR(req.Video.ColorTransfer)
 	avif := filepath.Join(dir, "preview.avif")
 	if hdr && e.GainMapTool != "" {
 		args := []string{"combine", filepath.Join(dir, "sdr.png"), filepath.Join(dir, "hdr.png"), avif,
@@ -140,13 +192,7 @@ func (e Encoder) Generate(ctx context.Context, parent string, req Request) (_ *R
 			ret.Variants = append(ret.Variants, Variant{"preview.avif", "image/avif", dr, width, height})
 		}
 	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	// The intermediates are not published or retained in the generated cache.
-	_ = os.Remove(filepath.Join(dir, "sdr.png"))
-	_ = os.Remove(filepath.Join(dir, "hdr.png"))
-	return ret, nil
+	return ctx.Err()
 }
 
 func (e Encoder) run(ctx context.Context, args ffmpeg.Args) error {
@@ -194,7 +240,7 @@ func frameArgs(req Request, dir string, slowSeek bool) ffmpeg.Args {
 	// aspect ratio into the dimensions before bounding the display size.
 	filters = append(filters, "scale=w='max(1,round(iw*sar))':h=ih:flags=lanczos", "setsar=1")
 	if req.MaxDimension > 0 {
-		filters = append(filters, fmt.Sprintf("scale=w='min(iw,%d)':h='min(ih,%d)':force_original_aspect_ratio=decrease:flags=lanczos", req.MaxDimension, req.MaxDimension))
+		filters = append(filters, boundedScale(req.MaxDimension))
 	}
 	if IsHDR(req.Video.ColorTransfer) {
 		// Fill only missing tags. HDR detection is based on transfer, never bit
@@ -214,6 +260,10 @@ func frameArgs(req Request, dir string, slowSeek bool) ffmpeg.Args {
 		args = append(args, "-map", "0:v:0", "-vf", strings.Join(filters, ","), "-frames:v", "1", "-update", "1", filepath.Join(dir, "sdr.png"))
 	}
 	return args
+}
+
+func boundedScale(maxDimension int) string {
+	return fmt.Sprintf("scale=w='min(iw,%d)':h='min(ih,%d)':force_original_aspect_ratio=decrease:flags=lanczos", maxDimension, maxDimension)
 }
 
 func colorTag(value, fallback string) string {

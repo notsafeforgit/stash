@@ -12,7 +12,7 @@ import {
   ContextMenuTrigger,
 } from "src/components/ui/context-menu";
 import { DeleteDialog } from "src/components/detail/delete-dialog";
-import { GroupBulkEditSheet } from "src/components/detail/group-bulk-edit-sheet";
+import { GroupBulkEditSheet } from "@/components/detail/deferred-overlays";
 import {
   useBulkCardActions,
   BulkContextMenuItems,

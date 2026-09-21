@@ -18,7 +18,14 @@ export default defineConfig({
   },
   projects: [
     { name: "chromium", use: { browserName: "chromium" } },
-    { name: "webkit", use: { browserName: "webkit" } },
+    {
+      name: "webkit",
+      use: { browserName: "webkit" },
+      // Linux WebKit can hang while loading media after many contexts. A
+      // single retry starts a fresh worker; timing assertions stay unchanged
+      // and a repeated failure still fails CI.
+      retries: process.env.CI ? 1 : 0,
+    },
   ],
   webServer: {
     command:

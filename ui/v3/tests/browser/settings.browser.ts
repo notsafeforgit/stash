@@ -177,7 +177,7 @@ test("settings retains the desktop sidebar and unsaved fields across a mobile re
     page
       .getByRole("navigation", { name: "Settings sections" })
       .getByRole("link"),
-  ).toHaveCount(12);
+  ).toHaveCount(13);
   await expect(page.locator("[data-mobile-settings-footer]")).toHaveCount(0);
   await page
     .getByRole("searchbox", { name: "Search settings" })

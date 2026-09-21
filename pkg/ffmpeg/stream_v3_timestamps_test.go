@@ -125,7 +125,7 @@ func TestV3HLSFrameContinuityAcrossAV1OpusSeeks(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
-	run := func(command string, args ...string) []byte {
+	run := func(t *testing.T, command string, args ...string) []byte {
 		t.Helper()
 		output, err := exec.CommandContext(ctx, command, args...).CombinedOutput()
 		if err != nil {
@@ -133,15 +133,13 @@ func TestV3HLSFrameContinuityAcrossAV1OpusSeeks(t *testing.T) {
 		}
 		return output
 	}
-	encoders := string(run(ffmpegPath, "-hide_banner", "-encoders"))
+	encoders := string(run(t, ffmpegPath, "-hide_banner", "-encoders"))
 	if !strings.Contains(encoders, "libaom-av1") || !strings.Contains(encoders, "libopus") {
 		t.Skip("libaom-av1 and libopus are required to generate the seek fixture")
 	}
 
-	const frameRate = 29.97
-	segmentDuration := hlsSegmentDuration(frameRate)
 	source := filepath.Join(t.TempDir(), "source.mkv")
-	run(ffmpegPath,
+	run(t, ffmpegPath,
 		"-hide_banner", "-loglevel", "error",
 		"-f", "lavfi", "-i", "testsrc2=size=160x90:rate=30000/1001",
 		"-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000",
@@ -149,122 +147,132 @@ func TestV3HLSFrameContinuityAcrossAV1OpusSeeks(t *testing.T) {
 		"-crf", "40", "-g", "60", "-c:a", "libopus", source,
 	)
 
-	type packet struct {
-		PTS      string `json:"pts_time"`
-		DTS      string `json:"dts_time"`
-		Duration string `json:"duration_time"`
-		Flags    string `json:"flags"`
-	}
-	type span struct{ firstPTS, lastPTS, firstDTS, lastDTS, duration float64 }
-	initialization := make(map[Track][]byte)
-	cached := make(map[int]span)
-	// Forward, backward, forward again, then fill the final cache gap.
-	for _, start := range []int{0, 5, 2, 4} {
-		dir := t.TempDir()
-		stream := &v3RunningStream{
-			streamType: V3StreamTypeHLS,
-			vf: &models.VideoFile{
-				BaseFile: &models.BaseFile{Path: source},
-				Width:    160, Height: 90, FrameRate: frameRate,
-				VideoCodec: "av1", AudioCodec: "opus",
-			},
-			outputDir: dir,
-		}
-		sm := &StreamManager{
-			encoder: &FFMpeg{}, config: rotationTestStreamConfig{}, context: ctx,
-		}
-		// Rotation is irrelevant to this fixture; avoid an extra probe.
-		stream.displayRotationOnce.Do(func() {})
-		args := stream.makeStreamArgs(sm, start)
-		args = append(args[:len(args)-1], "-t", "6.2", args[len(args)-1])
-		run(ffmpegPath, args...)
-		for _, track := range []Track{TrackVideo, TrackAudio} {
-			if start == 0 {
-				initialization[track], err = os.ReadFile(filepath.Join(dir, ".init_"+string(track)+".mp4"))
-				if err != nil {
-					t.Fatal(err)
+	for _, frameRate := range []float64{29.97, 0} {
+		t.Run(fmt.Sprint(frameRate), func(t *testing.T) {
+			segmentDuration := hlsSegmentDuration(frameRate)
+			outputFrameRate := frameRate
+			if outputFrameRate == 0 {
+				outputFrameRate = 30
+			}
+
+			type packet struct {
+				PTS      string `json:"pts_time"`
+				DTS      string `json:"dts_time"`
+				Duration string `json:"duration_time"`
+				Flags    string `json:"flags"`
+			}
+			type span struct{ firstPTS, lastPTS, firstDTS, lastDTS, duration float64 }
+			initialization := make(map[Track][]byte)
+			cached := make(map[int]span)
+			// Forward, backward, forward again, then fill the final cache gap.
+			for _, start := range []int{0, 5, 2, 4} {
+				dir := t.TempDir()
+				stream := &v3RunningStream{
+					streamType: V3StreamTypeHLS,
+					vf: &models.VideoFile{
+						BaseFile: &models.BaseFile{Path: source},
+						Width:    160, Height: 90, FrameRate: frameRate,
+						VideoCodec: "av1", AudioCodec: "opus",
+					},
+					outputDir: dir,
+				}
+				sm := &StreamManager{
+					encoder: &FFMpeg{}, config: rotationTestStreamConfig{}, context: ctx,
+				}
+				// Rotation is irrelevant to this fixture; avoid an extra probe.
+				stream.displayRotationOnce.Do(func() {})
+				args := stream.makeStreamArgs(sm, start)
+				args = append(args[:len(args)-1], "-t", "6.2", args[len(args)-1])
+				run(t, ffmpegPath, args...)
+				for _, track := range []Track{TrackVideo, TrackAudio} {
+					if start == 0 {
+						initialization[track], err = os.ReadFile(filepath.Join(dir, ".init_"+string(track)+".mp4"))
+						if err != nil {
+							t.Fatal(err)
+						}
+					}
+					for segment := start; segment < start+3; segment++ {
+						data, err := os.ReadFile(filepath.Join(dir, fmt.Sprintf(".%s_%d.m4s", track, segment)))
+						if err != nil {
+							t.Fatal(err)
+						}
+						media := append(append([]byte(nil), initialization[track]...), data...)
+						path := filepath.Join(dir, "probe.mp4")
+						if err := os.WriteFile(path, media, 0o600); err != nil {
+							t.Fatal(err)
+						}
+						var probe struct {
+							Packets []packet `json:"packets"`
+						}
+						if err := json.Unmarshal(run(t, ffprobePath, "-v", "error", "-show_entries", "packet=pts_time,dts_time,duration_time,flags", "-of", "json", path), &probe); err != nil {
+							t.Fatal(err)
+						}
+						if len(probe.Packets) == 0 {
+							t.Fatalf("run %d: no packets in %s segment %d", start, track, segment)
+						}
+						if track == TrackAudio {
+							// AAC's packet grid need not coincide with video keyframes,
+							// but must stay within one audio packet of scene time.
+							first, err := strconv.ParseFloat(probe.Packets[0].PTS, 64)
+							if err != nil {
+								t.Fatal(err)
+							}
+							if math.Abs(first-float64(segment)*segmentDuration) > 1024.0/48000+0.0001 {
+								t.Errorf("run %d: audio segment %d starts at %f", start, segment, first)
+							}
+							continue
+						}
+						if len(probe.Packets) != hlsGopSize(frameRate) {
+							t.Errorf("run %d: video segment %d has %d frames, want %d", start, segment, len(probe.Packets), hlsGopSize(frameRate))
+						}
+						if !strings.Contains(probe.Packets[0].Flags, "K") {
+							t.Errorf("run %d: video segment %d does not start with a keyframe", start, segment)
+						}
+						pts := make([]float64, 0, len(probe.Packets))
+						dts := make([]float64, 0, len(probe.Packets))
+						for _, p := range probe.Packets {
+							pt, err := strconv.ParseFloat(p.PTS, 64)
+							if err != nil {
+								t.Fatal(err)
+							}
+							dt, err := strconv.ParseFloat(p.DTS, 64)
+							if err != nil {
+								t.Fatal(err)
+							}
+							pts = append(pts, pt)
+							dts = append(dts, dt)
+						}
+						sort.Float64s(pts)
+						for i, pt := range pts {
+							want := float64(segment)*segmentDuration + float64(i)/outputFrameRate
+							if math.Abs(pt-want) > 0.0001 {
+								t.Errorf("run %d: segment %d frame %d PTS %.6f, want %.6f", start, segment, i, pt, want)
+								break
+							}
+						}
+						for i := 1; i < len(dts); i++ {
+							if math.Abs(dts[i]-dts[i-1]-1/outputFrameRate) > 0.0001 {
+								t.Errorf("run %d: segment %d has nonuniform decode timing at frame %d", start, segment, i)
+								break
+							}
+						}
+						if _, exists := cached[segment]; !exists {
+							cached[segment] = span{pts[0], pts[len(pts)-1], dts[0], dts[len(dts)-1], 1 / outputFrameRate}
+						}
+					}
 				}
 			}
-			for segment := start; segment < start+3; segment++ {
-				data, err := os.ReadFile(filepath.Join(dir, fmt.Sprintf(".%s_%d.m4s", track, segment)))
-				if err != nil {
-					t.Fatal(err)
+			for segment := 1; segment < 8; segment++ {
+				previous, previousOK := cached[segment-1]
+				next, nextOK := cached[segment]
+				if !previousOK || !nextOK {
+					t.Fatalf("missing cached segments at boundary %d", segment)
 				}
-				media := append(append([]byte(nil), initialization[track]...), data...)
-				path := filepath.Join(dir, "probe.mp4")
-				if err := os.WriteFile(path, media, 0o600); err != nil {
-					t.Fatal(err)
-				}
-				var probe struct {
-					Packets []packet `json:"packets"`
-				}
-				if err := json.Unmarshal(run(ffprobePath, "-v", "error", "-show_entries", "packet=pts_time,dts_time,duration_time,flags", "-of", "json", path), &probe); err != nil {
-					t.Fatal(err)
-				}
-				if len(probe.Packets) == 0 {
-					t.Fatalf("run %d: no packets in %s segment %d", start, track, segment)
-				}
-				if track == TrackAudio {
-					// AAC's packet grid need not coincide with video keyframes,
-					// but must stay within one audio packet of scene time.
-					first, err := strconv.ParseFloat(probe.Packets[0].PTS, 64)
-					if err != nil {
-						t.Fatal(err)
-					}
-					if math.Abs(first-float64(segment)*segmentDuration) > 1024.0/48000+0.0001 {
-						t.Errorf("run %d: audio segment %d starts at %f", start, segment, first)
-					}
-					continue
-				}
-				if len(probe.Packets) != hlsGopSize(frameRate) {
-					t.Errorf("run %d: video segment %d has %d frames, want %d", start, segment, len(probe.Packets), hlsGopSize(frameRate))
-				}
-				if !strings.Contains(probe.Packets[0].Flags, "K") {
-					t.Errorf("run %d: video segment %d does not start with a keyframe", start, segment)
-				}
-				pts := make([]float64, 0, len(probe.Packets))
-				dts := make([]float64, 0, len(probe.Packets))
-				for _, p := range probe.Packets {
-					pt, err := strconv.ParseFloat(p.PTS, 64)
-					if err != nil {
-						t.Fatal(err)
-					}
-					dt, err := strconv.ParseFloat(p.DTS, 64)
-					if err != nil {
-						t.Fatal(err)
-					}
-					pts = append(pts, pt)
-					dts = append(dts, dt)
-				}
-				sort.Float64s(pts)
-				for i, pt := range pts {
-					want := float64(segment)*segmentDuration + float64(i)/frameRate
-					if math.Abs(pt-want) > 0.0001 {
-						t.Errorf("run %d: segment %d frame %d PTS %.6f, want %.6f", start, segment, i, pt, want)
-						break
-					}
-				}
-				for i := 1; i < len(dts); i++ {
-					if math.Abs(dts[i]-dts[i-1]-1/frameRate) > 0.0001 {
-						t.Errorf("run %d: segment %d has nonuniform decode timing at frame %d", start, segment, i)
-						break
-					}
-				}
-				if _, exists := cached[segment]; !exists {
-					cached[segment] = span{pts[0], pts[len(pts)-1], dts[0], dts[len(dts)-1], 1 / frameRate}
+				if math.Abs(next.firstPTS-previous.lastPTS-previous.duration) > 0.0001 ||
+					math.Abs(next.firstDTS-previous.lastDTS-previous.duration) > 0.0001 {
+					t.Errorf("cached video timeline is discontinuous at segment %d: %+v -> %+v", segment, previous, next)
 				}
 			}
-		}
-	}
-	for segment := 1; segment < 8; segment++ {
-		previous, previousOK := cached[segment-1]
-		next, nextOK := cached[segment]
-		if !previousOK || !nextOK {
-			t.Fatalf("missing cached segments at boundary %d", segment)
-		}
-		if math.Abs(next.firstPTS-previous.lastPTS-previous.duration) > 0.0001 ||
-			math.Abs(next.firstDTS-previous.lastDTS-previous.duration) > 0.0001 {
-			t.Errorf("cached video timeline is discontinuous at segment %d: %+v -> %+v", segment, previous, next)
-		}
+		})
 	}
 }

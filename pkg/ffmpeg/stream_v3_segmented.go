@@ -186,8 +186,10 @@ var (
 			// to 2 decimals); for NTSC fractionals (59.94) the tiny
 			// rounding vs the true 60000/1001 yields ~1 frame drop per
 			// hour — well below visual threshold.
-			rateArg := "25"
-			if frameRate > 0 {
+			// Match hlsGopSize's 30 fps fallback so an unknown rate still
+			// produces the two-second segments declared in the playlist.
+			rateArg := "30"
+			if frameRate > 0 && !math.IsInf(frameRate, 0) && !math.IsNaN(frameRate) {
 				rateArg = fmt.Sprintf("%g", frameRate)
 			}
 			args = append(args,

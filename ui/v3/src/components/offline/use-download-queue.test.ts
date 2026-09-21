@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   write: vi.fn(),
   remove: vi.fn(),
   fetch: vi.fn(),
+  progressFetch: vi.fn(),
   size: vi.fn(),
   canWrite: vi.fn(),
   persistence: vi.fn(),
@@ -118,7 +119,12 @@ beforeEach(() => {
   mocks.remove.mockResolvedValue(undefined);
   mocks.write.mockResolvedValue(10);
   mocks.fetch.mockImplementation(async () => new Response("test"));
-  vi.stubGlobal("fetch", mocks.fetch);
+  mocks.progressFetch.mockResolvedValue(new Response(null, { status: 404 }));
+  vi.stubGlobal("fetch", (url: RequestInfo | URL, options?: RequestInit) =>
+    String(url).includes("/download/progress")
+      ? mocks.progressFetch(url, options)
+      : mocks.fetch(url, options),
+  );
   vi.stubGlobal("BroadcastChannel", class {});
   const locks = new Map<string, Promise<unknown>>();
   vi.stubGlobal("navigator", {
@@ -201,6 +207,61 @@ it("publishes the known transfer total to another page for determinate progress"
   expect(mocks.rows.get("1")?.bytes).toBe(1000);
   finish(1000);
   await vi.waitFor(() => expect(mocks.rows.get("1")?.status).toBe("complete"));
+});
+
+it("shows processing progress in both pages while the streamed file is still being written", async () => {
+  let finish: (bytes: number) => void = () => {};
+  mocks.write.mockImplementation(
+    () =>
+      new Promise<number>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  mocks.progressFetch.mockImplementation(async (url: URL) =>
+    Response.json({
+      request_id: url.searchParams.get("request_id"),
+      state: "processing",
+      processed_seconds: 25,
+      duration_seconds: 100,
+    }),
+  );
+  const owner = new DownloadQueueStore();
+  const observer = new DownloadQueueStore();
+  await observer.init();
+  await owner.enqueue(args);
+  await vi.waitFor(() => expect(mocks.write).toHaveBeenCalledOnce());
+  for (const queue of [owner, observer]) {
+    await vi.waitFor(() =>
+      expect(queue.getSnapshot().active?.processing?.processed_seconds).toBe(
+        25,
+      ),
+    );
+  }
+  expect(mocks.rows.get("1")?.status).toBe("downloading");
+  const url = new URL(mocks.fetch.mock.calls[0]?.[0]);
+  expect(url.searchParams.get("request_id")).toBe(
+    mocks.rows.get("1")?.request_id,
+  );
+  finish(100);
+  await vi.waitFor(() => expect(owner.getSnapshot().active).toBeNull());
+  await vi.waitFor(() => expect(observer.getSnapshot().active).toBeNull());
+});
+
+it("does not publish a completed scene when the encoder failed after sending bytes", async () => {
+  mocks.progressFetch.mockImplementation(async (url: URL) =>
+    Response.json({
+      request_id: url.searchParams.get("request_id"),
+      state: "failed",
+      processed_seconds: 1,
+      duration_seconds: 100,
+    }),
+  );
+  const queue = new DownloadQueueStore();
+  await queue.enqueue(args);
+  await vi.waitFor(() => expect(mocks.rows.get("1")?.status).toBe("error"));
+  expect(mocks.rows.get("1")?.error).toBe("Video processing failed");
+  expect(mocks.remove).toHaveBeenCalledWith("1");
+  await vi.waitFor(() => expect(queue.getSnapshot().active).toBeNull());
 });
 
 it("remote removal waits for the aborted writer to finish before deleting", async () => {

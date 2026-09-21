@@ -35,6 +35,7 @@ type StreamManager struct {
 	v3RunningStreams map[string]*v3RunningStream
 	v3ClosedSessions map[v3StreamSessionKey]time.Time
 	streamsMutex     sync.Mutex
+	downloadProgress downloadProgressStore
 }
 
 type StreamManagerConfig interface {

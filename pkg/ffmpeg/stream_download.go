@@ -167,6 +167,9 @@ type DownloadOptions struct {
 	// Filename, sans extension, becomes the suggested name in the
 	// Content-Disposition header. The handler always appends ".mp4".
 	Filename string
+	// Optional per-attempt progress identity, scoped to the authenticated scene.
+	SceneID   int
+	RequestID string
 }
 
 // encDownload selects which output encoding the download path
@@ -264,6 +267,10 @@ func canCopyToMP4(videoCodec string, audioCodec ProbeAudioCodec) bool {
 // CommandContext and the encoder process exits. The lockCtx.Cancel
 // in the deferred path also waits up to 5s for the process to exit.
 func (sm *StreamManager) ServeDownload(w http.ResponseWriter, r *http.Request, options DownloadOptions) {
+	if options.RequestID != "" && !ValidDownloadRequestID(options.RequestID) {
+		http.Error(w, "invalid download request ID", http.StatusBadRequest)
+		return
+	}
 	vf := options.VideoFile
 	if vf == nil || vf.Path == "" {
 		http.Error(w, "scene has no file", http.StatusNotFound)
@@ -388,6 +395,13 @@ func (sm *StreamManager) ServeDownload(w http.ResponseWriter, r *http.Request, o
 	if r.Method == http.MethodHead {
 		return
 	}
+	progress, accepted := sm.downloadProgress.begin(options.SceneID, options.RequestID, vf.Duration)
+	if !accepted {
+		http.Error(w, "download request is already active", http.StatusConflict)
+		return
+	}
+	succeeded := false
+	defer func() { sm.downloadProgress.finish(progress, succeeded) }()
 
 	// Read-lock the source so a rescan / file move during the download
 	// doesn't pull the rug out. Lock context inherits from r.Context()
@@ -396,6 +410,9 @@ func (sm *StreamManager) ServeDownload(w http.ResponseWriter, r *http.Request, o
 	defer lockCtx.Cancel()
 
 	args := sm.downloadArgs(vf, encoding, options.Resolution, videoOnly, srcColor)
+	if progress != nil {
+		args = append(Args{"-nostats", "-stats_period", "0.5", "-progress", "pipe:2"}, args...)
+	}
 	cmd := sm.encoder.Command(lockCtx, args)
 
 	stdout, err := cmd.StdoutPipe()
@@ -403,7 +420,10 @@ func (sm *StreamManager) ServeDownload(w http.ResponseWriter, r *http.Request, o
 		http.Error(w, "ffmpeg pipe setup error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	stderr, _ := cmd.StderrPipe()
+	stderr := &downloadProgressWriter{advance: func(seconds float64) {
+		sm.downloadProgress.advance(progress, seconds)
+	}}
+	cmd.Stderr = stderr
 
 	logger.Tracef("[download] running %s", cmd)
 	if err := cmd.Start(); err != nil {
@@ -411,39 +431,20 @@ func (sm *StreamManager) ServeDownload(w http.ResponseWriter, r *http.Request, o
 		return
 	}
 
-	// Drain stderr so ffmpeg doesn't block on it. Capture a bounded
-	// tail so we can include it in error logs if Wait reports
-	// non-zero exit.
-	var stderrTail strings.Builder
-	go func() {
-		const maxLen = 16 * 1024
-		buf := make([]byte, 4*1024)
-		for {
-			n, rerr := stderr.Read(buf)
-			if n > 0 {
-				if stderrTail.Len()+n > maxLen {
-					s := stderrTail.String()
-					stderrTail.Reset()
-					stderrTail.WriteString(s[len(s)/2:])
-				}
-				stderrTail.Write(buf[:n])
-			}
-			if rerr != nil {
-				return
-			}
-		}
-	}()
-
-	if _, err := io.Copy(w, stdout); err != nil {
+	_, copyErr := io.Copy(w, stdout)
+	if copyErr != nil {
 		// Client disconnect (broken pipe) is the typical case; ffmpeg
 		// gets killed by the deferred lockCtx.Cancel.
-		logger.Tracef("[download] response copy ended: %v", err)
+		logger.Tracef("[download] response copy ended: %v", copyErr)
+		lockCtx.Cancel()
 	}
 
-	if err := cmd.Wait(); err != nil && r.Context().Err() == nil {
+	err = cmd.Wait()
+	succeeded = err == nil && copyErr == nil && r.Context().Err() == nil
+	if err != nil && r.Context().Err() == nil {
 		// Only worth logging if the client didn't disconnect — in the
 		// disconnect case the non-zero exit is just our own SIGKILL.
-		logger.Warnf("[download] ffmpeg exited with error for %s: %v\nstderr tail:\n%s", vf.Path, err, stderrTail.String())
+		logger.Warnf("[download] ffmpeg exited with error for %s: %v\nstderr tail:\n%s", vf.Path, err, stderr.tail)
 	}
 }
 

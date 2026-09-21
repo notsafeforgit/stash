@@ -1,6 +1,6 @@
 # Offline scene downloads
 
-This guide describes the implementation on `v3-rewrite`, checked on 2026-09-14.
+This guide describes the implementation on `v3-rewrite`, checked on 2026-09-21.
 The earlier phased proposal has been replaced by current behavior and explicit
 limits. See the [architecture guide](architecture.md) for shared list/player
 contracts and the [documentation index](../../../docs/README.md) for other guides.
@@ -13,8 +13,12 @@ navigation, persists its entries across reloads, and supports retry, cancellatio
 and deletion. The Offline view reuses the shared list and lightbox components.
 The Downloads tray is available in the desktop header and in a compact mobile
 row while downloads are active, queued, or failed. It shows received bytes,
-percentage when the server supplies a total, and cancel/retry controls. Streaming
-transcodes have no known total, so their progress remains indeterminate.
+progress, and cancel/retry controls. Downloads with a known byte total show
+transfer percentage. Streaming transcodes and remuxes show the percentage of
+video processed by the server, then **Saving to device** while the browser
+finishes receiving and storing the file. Progress stays below 100% until the
+local file is complete. When neither total is available, including with older
+servers, the bar remains indeterminate and received bytes still update.
 
 A service worker precaches a small standalone offline library and its player
 assets. After its first successful online installation, a cold launch or reload
@@ -80,8 +84,8 @@ Unsupported integrations do not add mobile-only controls to desktop pages.
 2. The shared queue writes an IndexedDB row, then its single active worker
    hands the transfer to Background Fetch or streams a foreground response to OPFS.
 3. The tray and list show queued, downloading, complete, or error state. A known
-   `Content-Length`/`Content-Range` total enables percentage progress; otherwise
-   the UI shows bytes transferred.
+   `Content-Length`/`Content-Range` total enables byte-based percentage progress;
+   otherwise the UI combines server processing progress with bytes received.
 4. Completed scenes open at `/offline/$sceneId` or in the list's lightbox. The
    player uses a `blob:` URL backed by the OPFS file and a scene adapter built
    from the metadata snapshot. The URL is revoked when no longer needed.
@@ -93,6 +97,16 @@ Unsupported integrations do not add mobile-only controls to desktop pages.
 
 Paths above are router paths relative to the application's deployment prefix.
 Backend requests use `getPlatformURL`; do not hard-code origin-root URLs.
+
+For unknown-length downloads, each active page polls the authenticated v3
+`/scene/<id>/download/progress?request_id=<attempt>` endpoint about once per
+second, with backoff on missing records or network failures. The existing
+download request ID isolates retries and concurrent devices. FFmpeg reports
+processed video time; successful process exit marks server processing finished,
+not the browser file complete. After EOF, the writer checks the final server
+result so a reported encoder failure does not become a saved, truncated video.
+Unavailable progress telemetry is nonfatal. Progress lives only in server memory
+with bounded, short-lived completed records; it adds no database migration.
 
 The list filters, sorts, and paginates its local entries in memory. Its
 `EntityListPageConfig.source` has `kind: "local"`; list data does not require a

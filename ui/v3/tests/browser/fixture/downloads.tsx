@@ -66,7 +66,9 @@ async function prepareDownloads() {
     ...saved,
     title: "Active download with a long title that should fit on a small phone",
     status: "downloading",
-    bytes: params.has("unknown") ? 0 : 100 * 1024 * 1024,
+    request_id: params.has("processing") ? "fixture-download" : undefined,
+    bytes:
+      params.has("unknown") || params.has("processing") ? 0 : 100 * 1024 * 1024,
     bytes_downloaded: 25 * 1024 * 1024,
   });
   await putEntry({

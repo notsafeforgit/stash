@@ -65,6 +65,61 @@ for (const width of [320, 390]) {
   });
 }
 
+for (const width of [320, 1280]) {
+  test(`streaming downloads show processing and saving progress at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    let processedSeconds = 25;
+    let state = "processing";
+    await page.route("**/scene/1/download/progress?*", (route) =>
+      route.fulfill({
+        contentType: "application/json",
+        headers: {
+          "Access-Control-Allow-Origin": "http://127.0.0.1:3025",
+          "Access-Control-Allow-Credentials": "true",
+        },
+        body: JSON.stringify({
+          request_id: "fixture-download",
+          state,
+          processed_seconds: processedSeconds,
+          duration_seconds: 100,
+        }),
+      }),
+    );
+    await page.goto("/downloads?processing");
+    const trigger = page.getByRole("button", {
+      name: "Downloads",
+      exact: true,
+    });
+    if (width < 768)
+      await expect(trigger).toContainText("25% processed · 25 MB");
+    await trigger.click();
+    const tray = page.getByRole("dialog", { name: "Downloads" });
+    const progress = tray.getByRole("progressbar");
+    await expect(progress).toHaveAttribute("aria-valuenow", "25");
+    await expect(
+      tray.getByText("25% processed · 25 MB", { exact: true }),
+    ).toBeVisible();
+    processedSeconds = 65;
+    await expect(progress).toHaveAttribute("aria-valuenow", "65");
+    await expect(
+      tray.getByText("65% processed · 25 MB", { exact: true }),
+    ).toBeVisible();
+    state = "finished";
+    processedSeconds = 100;
+    await expect(progress).toHaveAttribute("aria-valuenow", "99");
+    await expect(
+      tray.getByText("Saving to device · 25 MB", { exact: true }),
+    ).toBeVisible();
+    await expect(progress).not.toHaveAttribute("aria-valuenow", "100");
+    if (width < 768) await expectTouchTargets(tray);
+    await page.screenshot({
+      path: test.info().outputPath("download-processing.png"),
+    });
+  });
+}
+
 test("unknown totals show received bytes without a misleading percentage", async ({
   page,
 }) => {

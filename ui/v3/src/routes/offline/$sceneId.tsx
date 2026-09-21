@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useIntl } from "react-intl";
+import { downloadErrorMessage } from "@/components/offline/download-error";
 import { toast } from "sonner";
 import {
   Download,
@@ -400,9 +401,7 @@ function IncompleteOfflineEntry({
       return intl.formatMessage(
         { id: "offline.player.download_failed_status" },
         {
-          error:
-            entry.error ??
-            intl.formatMessage({ id: "offline.card.error_unknown" }),
+          error: downloadErrorMessage(intl, entry.error),
         },
       );
     }

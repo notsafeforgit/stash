@@ -10,6 +10,7 @@ import {
   subscribeToEntries,
 } from "@/components/offline/offline-db";
 import { getOfflineScope } from "@/components/offline/offline-scope";
+import { checkDownloadProcessing } from "@/components/offline/download-processing";
 import {
   removeScene,
   storageEstimate,
@@ -82,6 +83,7 @@ export async function finishBackgroundDownload(
             abort.signal.throwIfAborted();
             if (expected > 0 && bytes !== expected)
               throw new Error("Incomplete video download");
+            await checkDownloadProcessing(current, abort.signal);
             let committed = false;
             await patchEntry(entry.scene_id, (latest) => {
               if (

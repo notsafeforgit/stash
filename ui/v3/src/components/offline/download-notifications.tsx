@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { fileStemFromPath } from "src/utils/file";
 import { useDownloadQueue } from "./use-download-queue";
 import { getEntry, type OfflineEntry } from "./offline-db";
+import { downloadErrorMessage } from "./download-error";
 
 function toastId(sceneId: string): string {
   return `offline-download-${sceneId}`;
@@ -67,9 +68,7 @@ export function DownloadNotifications() {
             intl.formatMessage(
               { id: "offline.notifications.download_failed" },
               {
-                error:
-                  entry.error ??
-                  intl.formatMessage({ id: "offline.card.error_unknown" }),
+                error: downloadErrorMessage(intl, entry.error),
               },
             ),
             { id: toastId(prev) },

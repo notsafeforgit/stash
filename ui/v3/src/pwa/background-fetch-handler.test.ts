@@ -101,6 +101,10 @@ beforeEach(() => {
   mocks.rows.clear();
   mocks.listeners.clear();
   vi.clearAllMocks();
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response(null, { status: 204 })),
+  );
   mocks.estimate.mockResolvedValue({});
   mocks.remove.mockResolvedValue(undefined);
   mocks.write.mockImplementation(
@@ -134,6 +138,35 @@ beforeEach(() => {
   });
 });
 afterEach(() => vi.unstubAllGlobals());
+
+it("keeps the progress identity on the browser-owned request", async () => {
+  const next = entry("1");
+  await startBackgroundDownload(next, manager);
+  const request: Request = mocks.fetch.mock.calls[0]?.[1][0];
+  expect(new URL(request.url).searchParams.get("request_id")).toBe(
+    next.request_id,
+  );
+});
+
+it("rejects a browser-completed response when server-side processing failed", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      Response.json({
+        request_id: "request",
+        state: "failed",
+        processed_seconds: 0.5,
+        duration_seconds: 1,
+      }),
+    ),
+  );
+  await finishBackgroundDownload(new Transfer(), { backgroundFetch: manager });
+  expect(mocks.rows.get("1")).toMatchObject({
+    status: "error",
+    error: "Video processing failed",
+  });
+  expect(mocks.remove).toHaveBeenCalledWith("1");
+});
 
 it("streams completion to local storage and advances the queue without a page worker", async () => {
   mocks.rows.set("2", entry("2"));

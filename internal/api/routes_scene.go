@@ -103,6 +103,7 @@ func (rs sceneRoutes) Routes() chi.Router {
 
 			r.Get("/download.mp4", rs.DownloadMP4)
 			r.Head("/download.mp4", rs.DownloadMP4)
+			r.Get("/download/progress", rs.DownloadProgress)
 		}
 
 		r.Get("/screenshot", rs.Screenshot)
@@ -572,6 +573,8 @@ func (rs sceneRoutes) DownloadMP4(w http.ResponseWriter, r *http.Request) {
 		Mode:       mode,
 		Resolution: resolution,
 		Filename:   filename,
+		SceneID:    scene.ID,
+		RequestID:  r.Form.Get("request_id"),
 	})
 }
 

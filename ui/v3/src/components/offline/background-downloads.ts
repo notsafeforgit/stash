@@ -17,10 +17,12 @@ export async function downloadURL(entry: OfflineEntry) {
     throw new Error(
       "Unknown download resolution; select a resolution and download again.",
     );
-  return joinPlatformURL(
+  const url = joinPlatformURL(
     (await getOfflineScope()).deploymentURL,
     `scene/${entry.scene_id}/download.mp4?${downloadQueryString({ mode: entry.format, resolution, effectiveHeight: 0 })}`,
   );
+  if (entry.request_id) url.searchParams.set("request_id", entry.request_id);
+  return url;
 }
 
 /** Called under the deployment and scene locks. Persist ownership before the
@@ -31,12 +33,14 @@ export async function startBackgroundDownload(
   signal?: AbortSignal,
 ): Promise<boolean> {
   signal?.throwIfAborted();
-  const id = `scene-${entry.scene_id}-${entry.request_id ?? crypto.randomUUID()}`;
-  const url = await downloadURL(entry);
+  const requestId = entry.request_id ?? crypto.randomUUID();
+  const id = `scene-${entry.scene_id}-${requestId}`;
+  const url = await downloadURL({ ...entry, request_id: requestId });
   await patchEntry(entry.scene_id, {
     background_fetch_id: id,
     status: "downloading",
     bytes_downloaded: 0,
+    request_id: requestId,
   });
   try {
     signal?.throwIfAborted();

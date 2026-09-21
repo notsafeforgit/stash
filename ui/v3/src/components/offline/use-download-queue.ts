@@ -2,8 +2,8 @@ import {
   abortBackgroundDownload,
   resumeBackgroundDownload,
   tryBackgroundDownload,
+  downloadURL,
 } from "./background-downloads";
-import { joinPlatformURL } from "@/core/platform-url";
 import { canCoordinateOfflineStorage, getOfflineScope } from "./offline-scope";
 import { migrateLegacyDownloads } from "./offline-migration";
 /** Offline download commands are coordinated with Web Locks. IndexedDB owns
@@ -34,9 +34,14 @@ import {
   storageEstimate,
   writeScene,
 } from "./opfs-storage";
-import { downloadQueryString, type DownloadMode } from "./pick-download-format";
-import { StreamingResolutionEnum } from "src/core/generated-graphql";
+import type { DownloadMode } from "./pick-download-format";
+import type { StreamingResolutionEnum } from "src/core/generated-graphql";
 import type { SourceFileMetadata } from "./offline-file-metadata";
+import {
+  checkDownloadProcessing,
+  watchDownloadProcessing,
+  type DownloadProcessing,
+} from "./download-processing";
 
 export interface QueueSnapshot {
   /** Scene ids waiting their turn, in order. Excludes the active one. */
@@ -50,6 +55,7 @@ export interface ActiveDownload {
   bytesDownloaded: number;
   /** From `Content-Length` if the server sent it; else null. */
   bytesTotal: number | null;
+  processing?: DownloadProcessing;
 }
 
 /**
@@ -129,6 +135,7 @@ export class DownloadQueueStore {
   private initialization: Promise<void> | undefined;
   private unsubscribe: (() => void) | undefined;
   private refreshVersion = 0;
+  private processingWatch: { key: string; stop: () => void } | undefined;
   private task:
     | { sceneId: string; requestId?: string; abort: AbortController }
     | undefined;
@@ -167,17 +174,32 @@ export class DownloadQueueStore {
     )
       this.task?.abort.abort();
     const downloading = entries.find((entry) => entry.status === "downloading");
+    const progressKey =
+      downloading?.request_id &&
+      !downloading.cancel_requested &&
+      !downloading.bytes
+        ? `${downloading.scene_id}:${downloading.request_id}`
+        : undefined;
+    if (this.processingWatch?.key !== progressKey) {
+      this.processingWatch?.stop();
+      this.processingWatch = undefined;
+    }
     const active = downloading
       ? {
           sceneId: downloading.scene_id,
           bytesDownloaded: downloading.bytes_downloaded ?? 0,
           bytesTotal: downloading.bytes || null,
+          processing: this.processingWatch
+            ? this.snapshot.active?.processing
+            : undefined,
         }
       : null;
     // The owner has finer progress than the periodically persisted checkpoint.
     const localActive =
-      this.task && this.snapshot.active?.sceneId === downloading?.scene_id
-        ? this.snapshot.active
+      this.task &&
+      this.snapshot.active &&
+      this.snapshot.active.sceneId === downloading?.scene_id
+        ? { ...this.snapshot.active, processing: active?.processing }
         : active;
     this.publish({
       queued: entries
@@ -186,6 +208,15 @@ export class DownloadQueueStore {
         .map((entry) => entry.scene_id),
       active: localActive,
     });
+    if (progressKey && downloading && !this.processingWatch) {
+      this.processingWatch = {
+        key: progressKey,
+        stop: watchDownloadProcessing(downloading, (processing) => {
+          if (this.processingWatch?.key === progressKey)
+            this.updateActive({ processing });
+        }),
+      };
+    }
   }
 
   init(): Promise<void> {
@@ -412,8 +443,9 @@ export class DownloadQueueStore {
     let checkpoint: Promise<unknown> = Promise.resolve();
     let discardPartial = false;
     try {
-      const entry = await getEntry(sceneId);
+      let entry = await getEntry(sceneId);
       if (entry?.status !== "queued") return false;
+      entry = { ...entry, request_id: entry.request_id ?? crypto.randomUUID() };
       task.requestId = entry.request_id;
       if (entry.cancel_requested) abort.abort();
       abort.signal.throwIfAborted();
@@ -425,6 +457,7 @@ export class DownloadQueueStore {
         status: "downloading",
         bytes_downloaded: 0,
         bytes: 0,
+        request_id: entry.request_id,
       });
       abort.signal.throwIfAborted();
       const estimate = await storageEstimate();
@@ -444,17 +477,7 @@ export class DownloadQueueStore {
       await patchEntry(sceneId, { bytes_downloaded: resumeOffset });
       this.updateActive({ bytesDownloaded: resumeOffset });
       abort.signal.throwIfAborted();
-      const resolution = Object.values(StreamingResolutionEnum).find(
-        (value) => value === entry.resolution,
-      );
-      if (!resolution)
-        throw new Error(
-          "Unknown download resolution; select a resolution and download again.",
-        );
-      const url = joinPlatformURL(
-        (await getOfflineScope()).deploymentURL,
-        `scene/${sceneId}/download.mp4?${downloadQueryString({ mode: entry.format, resolution, effectiveHeight: 0 })}`,
-      ).href;
+      const url = await downloadURL(entry);
       const response = await fetch(url, {
         signal: abort.signal,
         headers: resumeOffset ? { Range: `bytes=${resumeOffset}-` } : {},
@@ -506,6 +529,7 @@ export class DownloadQueueStore {
       );
       await checkpoint;
       abort.signal.throwIfAborted();
+      if (total === null) await checkDownloadProcessing(entry, abort.signal);
       let committed = false;
       await patchEntry(sceneId, (current) => {
         if (current.cancel_requested || current.request_id !== task.requestId)

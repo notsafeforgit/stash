@@ -50,22 +50,13 @@ import {
   ProgressIndicator,
 } from "src/components/ui/progress";
 import { cn } from "src/lib/utils";
-import { useDownloadQueue } from "./use-download-queue";
+import { useDownloadQueue, type ActiveDownload } from "./use-download-queue";
+import { downloadProgressValue } from "./download-processing";
+import { downloadProgressSummary } from "./download-progress-summary";
+import { downloadErrorMessage } from "./download-error";
 import { useOfflineEntries } from "./use-offline-entries";
 import { entryDisplayTitle, type OfflineEntry } from "./offline-db";
 import "./download-progress-bar.css";
-
-function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes < 0) return "0 B";
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  let i = 0;
-  let n = bytes;
-  while (n >= 1024 && i < units.length - 1) {
-    n /= 1024;
-    i++;
-  }
-  return `${n < 10 && i > 0 ? n.toFixed(1) : Math.round(n)} ${units[i]}`;
-}
 
 export function DownloadTray({ mobile = false }: { mobile?: boolean }) {
   const intl = useIntl();
@@ -100,11 +91,7 @@ export function DownloadTray({ mobile = false }: { mobile?: boolean }) {
   // don't read as "in progress" so they're excluded from the count).
   const inProgressCount = (queue.state.active ? 1 : 0) + queuedEntries.length;
   const active = queue.state.active;
-  const progressSummary = active
-    ? active.bytesTotal != null && active.bytesTotal > 0
-      ? `${formatBytes(active.bytesDownloaded)} / ${formatBytes(active.bytesTotal)} · ${Math.min(100, Math.round((active.bytesDownloaded / active.bytesTotal) * 100))}%`
-      : formatBytes(active.bytesDownloaded)
-    : null;
+  const progressSummary = active ? downloadProgressSummary(intl, active) : null;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -196,8 +183,7 @@ export function DownloadTray({ mobile = false }: { mobile?: boolean }) {
           {queue.state.active && activeEntry && (
             <ActiveRow
               entry={activeEntry}
-              bytesDownloaded={queue.state.active.bytesDownloaded}
-              bytesTotal={queue.state.active.bytesTotal}
+              active={queue.state.active}
               onCancel={() => void queue.cancel(queue.state.active!.sceneId)}
             />
           )}
@@ -252,20 +238,16 @@ export function DownloadTray({ mobile = false }: { mobile?: boolean }) {
 
 function ActiveRow({
   entry,
-  bytesDownloaded,
-  bytesTotal,
+  active,
   onCancel,
 }: {
   entry: OfflineEntry;
-  bytesDownloaded: number;
-  bytesTotal: number | null;
+  active: ActiveDownload;
   onCancel: () => void;
 }) {
   const intl = useIntl();
-  const determinate = bytesTotal != null && bytesTotal > 0;
-  const pct = determinate
-    ? Math.min(100, Math.round((bytesDownloaded / bytesTotal!) * 100))
-    : 0;
+  const { percent } = downloadProgressValue(active);
+  const summary = downloadProgressSummary(intl, active);
 
   return (
     <div className="flex flex-col gap-1.5 border-b border-border px-3 py-2.5">
@@ -275,9 +257,7 @@ function ActiveRow({
             {entryDisplayTitle(entry)}
           </div>
           <div className="text-xs text-muted-foreground tabular-nums">
-            {determinate
-              ? `${formatBytes(bytesDownloaded)} / ${formatBytes(bytesTotal!)} · ${pct}%`
-              : formatBytes(bytesDownloaded)}
+            {summary}
           </div>
         </div>
         <Button
@@ -307,7 +287,8 @@ function ActiveRow({
           indeterminate variant can apply the sweep class to the
           indicator only — width=auto on the Track. */}
       <Progress
-        value={determinate ? pct : null}
+        value={percent}
+        aria-valuetext={summary}
         aria-label={intl.formatMessage({
           id: "offline.notifications.progress_aria",
         })}
@@ -317,7 +298,7 @@ function ActiveRow({
           <ProgressIndicator
             className={cn(
               "h-full bg-primary",
-              !determinate && "download-progress-indeterminate",
+              percent === null && "download-progress-indeterminate",
             )}
           />
         </ProgressTrack>
@@ -370,7 +351,9 @@ function ErrorRow({
       <div className="min-w-0 flex-1">
         <div className="truncate font-medium">{entryDisplayTitle(entry)}</div>
         {entry.error && (
-          <div className="truncate text-xs text-destructive">{entry.error}</div>
+          <div className="truncate text-xs text-destructive">
+            {downloadErrorMessage(intl, entry.error)}
+          </div>
         )}
       </div>
       <div className="flex shrink-0 items-center gap-0.5">

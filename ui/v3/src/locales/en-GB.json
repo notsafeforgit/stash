@@ -1800,7 +1800,13 @@
       "view_all": "View all"
     },
     "errors": {
-      "coordination_unavailable": "Offline library changes are unavailable in this browser. Existing downloads can still be played."
+      "coordination_unavailable": "Offline library changes are unavailable in this browser. Existing downloads can still be played.",
+      "processing_failed": "Video processing failed. Retry the download."
+    },
+    "progress": {
+      "processing": "{percent}% processed · {received}",
+      "processing_unknown": "Processing video · {received}",
+      "saving": "Saving to device · {received}"
     },
     "recovery": {
       "action": "Restore saved downloads",

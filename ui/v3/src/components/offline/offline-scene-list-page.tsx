@@ -1,5 +1,6 @@
 import { entityDestination } from "@/core/navigation";
 import { OfflineRecoveryControl } from "./offline-recovery-control";
+import { downloadErrorMessage } from "./download-error";
 import { createListItemsContext } from "@/components/list/list-items-context";
 /**
  * Offline scene list page. Reuses the streaming list chrome
@@ -36,7 +37,12 @@ import { objectTitle } from "@/core/files";
 import { useBulkCardActions } from "src/components/cards/use-bulk-card-actions";
 import { offlineEntryToSceneCardScene } from "./offline-scene-card-data";
 import { useOfflineEntries } from "./use-offline-entries";
-import { useDownloadQueue, useDownloadCommands } from "./use-download-queue";
+import {
+  useDownloadQueue,
+  useDownloadCommands,
+  type ActiveDownload,
+} from "./use-download-queue";
+import { downloadProgressSummary } from "./download-progress-summary";
 import { useOfflineMetadataRefresh } from "./offline-metadata-refresh";
 import { useOfflineSceneLightbox } from "./use-offline-scene-lightbox";
 import { saveToFiles, FileMissingError } from "./save-to-files";
@@ -111,9 +117,11 @@ export function OfflineSceneListPage() {
         selected={selected}
         onSelectedChanged={onSelectedChanged}
         onPreviewClick={onPreviewClick}
-        isActive={queue.state.active?.sceneId === item.entry.scene_id}
-        activeBytesDownloaded={queue.state.active?.bytesDownloaded}
-        activeBytesTotal={queue.state.active?.bytesTotal ?? null}
+        active={
+          queue.state.active?.sceneId === item.entry.scene_id
+            ? queue.state.active
+            : undefined
+        }
         onSaveToFiles={() => onSaveToFiles(item.entry)}
         onRedownload={() => void queue.retry(item.entry.scene_id)}
         onCancel={() => void queue.cancel(item.entry.scene_id)}
@@ -219,9 +227,7 @@ interface OfflineSceneCardCellProps {
   selected: boolean;
   onSelectedChanged: (s: boolean, shift: boolean) => void;
   onPreviewClick?: () => void;
-  isActive: boolean;
-  activeBytesDownloaded?: number;
-  activeBytesTotal: number | null;
+  active: ActiveDownload | undefined;
   onSaveToFiles: () => void;
   onRedownload: () => void;
   onCancel: () => void;
@@ -234,9 +240,7 @@ const OfflineSceneCardCell = React.memo(function OfflineSceneCardCell({
   selected,
   onSelectedChanged,
   onPreviewClick,
-  isActive,
-  activeBytesDownloaded,
-  activeBytesTotal,
+  active,
   onSaveToFiles,
   onRedownload,
   onCancel,
@@ -246,7 +250,7 @@ const OfflineSceneCardCell = React.memo(function OfflineSceneCardCell({
   const cardScene = useMemo(() => offlineEntryToSceneCardScene(entry), [entry]);
   const canPreviewPlay = entry.status === "complete";
   const showStatus =
-    isActive ||
+    !!active ||
     entry.status === "queued" ||
     entry.status === "error" ||
     entry.server_status === "missing";
@@ -334,46 +338,22 @@ const OfflineSceneCardCell = React.memo(function OfflineSceneCardCell({
         contextMenu={contextMenu}
         onContextMenuOpen={onContextMenuOpen}
       />
-      {showStatus && (
-        <CardStatusOverlay
-          entry={entry}
-          isActive={isActive}
-          bytesDownloaded={activeBytesDownloaded}
-          bytesTotal={activeBytesTotal}
-        />
-      )}
+      {showStatus && <CardStatusOverlay entry={entry} active={active} />}
     </div>
   );
 });
 
 function CardStatusOverlay({
   entry,
-  isActive,
-  bytesDownloaded,
-  bytesTotal,
+  active,
 }: {
   entry: OfflineEntry;
-  isActive: boolean;
-  bytesDownloaded?: number;
-  bytesTotal: number | null;
+  active: ActiveDownload | undefined;
 }) {
   const intl = useIntl();
   let body: React.ReactNode;
-  if (isActive) {
-    const pct =
-      bytesTotal && bytesTotal > 0 && bytesDownloaded != null
-        ? Math.round((bytesDownloaded / bytesTotal) * 100)
-        : null;
-    body = (
-      <span>
-        {pct != null
-          ? intl.formatMessage({ id: "offline.card.downloading_pct" }, { pct })
-          : intl.formatMessage(
-              { id: "offline.card.downloading_bytes" },
-              { bytes: formatBytes(bytesDownloaded ?? 0) },
-            )}
-      </span>
-    );
+  if (active) {
+    body = <span>{downloadProgressSummary(intl, active)}</span>;
   } else if (entry.status === "queued") {
     body = <span>{intl.formatMessage({ id: "offline.card.queued" })}</span>;
   } else if (entry.status === "error") {
@@ -382,9 +362,7 @@ function CardStatusOverlay({
         {intl.formatMessage(
           { id: "offline.card.error" },
           {
-            error:
-              entry.error ??
-              intl.formatMessage({ id: "offline.card.error_unknown" }),
+            error: downloadErrorMessage(intl, entry.error),
           },
         )}
       </span>
@@ -406,18 +384,6 @@ function CardStatusOverlay({
       {body}
     </div>
   );
-}
-
-function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes < 0) return "0 B";
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  let i = 0;
-  let n = bytes;
-  while (n >= 1024 && i < units.length - 1) {
-    n /= 1024;
-    i++;
-  }
-  return `${n < 10 && i > 0 ? n.toFixed(1) : Math.round(n)} ${units[i]}`;
 }
 
 // ── Bulk context menu ────────────────────────────────────────────────────────

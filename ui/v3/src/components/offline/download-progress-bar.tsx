@@ -4,10 +4,9 @@
  * the queue is idle so it costs no visual real estate the rest of
  * the time.
  *
- * Determinate vs indeterminate: when `bytesTotal` is known (Content-
- * Length header from the server) we fill proportionally; when not (a
- * live-transcoded stream has no length up-front) we show an
- * indeterminate sliding bar.
+ * Known byte totals use transfer progress; streaming transcodes/remuxes
+ * use processed video time. Without either total, the bar is indeterminate.
+ * Progress stays below 100% until the local file has finished saving.
  *
  * Position: a 2 px strip glued to the very top of the page main area
  * (just under the header). Visible on both desktop and mobile because
@@ -23,6 +22,8 @@ import {
 } from "src/components/ui/progress";
 import { cn } from "src/lib/utils";
 import { useDownloadQueue } from "./use-download-queue";
+import { downloadProgressValue } from "./download-processing";
+import { downloadProgressSummary } from "./download-progress-summary";
 import "./download-progress-bar.css";
 
 export function DownloadProgressBar() {
@@ -31,17 +32,12 @@ export function DownloadProgressBar() {
   const active = queue.state.active;
   if (!active) return null;
 
-  const determinate = active.bytesTotal != null && active.bytesTotal > 0;
-  const pct = determinate
-    ? Math.min(
-        100,
-        Math.round((active.bytesDownloaded / active.bytesTotal!) * 100),
-      )
-    : 0;
+  const { percent } = downloadProgressValue(active);
 
   return (
     <Progress
-      value={determinate ? pct : null}
+      value={percent}
+      aria-valuetext={downloadProgressSummary(intl, active)}
       aria-label={intl.formatMessage({
         id: "offline.notifications.progress_aria",
       })}
@@ -51,7 +47,7 @@ export function DownloadProgressBar() {
         <ProgressIndicator
           className={cn(
             "h-full bg-primary",
-            !determinate && "download-progress-indeterminate",
+            percent === null && "download-progress-indeterminate",
           )}
         />
       </ProgressTrack>

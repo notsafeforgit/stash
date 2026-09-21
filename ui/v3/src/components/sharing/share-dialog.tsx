@@ -2,10 +2,12 @@ import { useId, useState } from "react";
 import { useMutation } from "@apollo/client/react";
 import { useForm } from "@tanstack/react-form";
 import { z } from "zod";
+import { startOfDay } from "date-fns";
 import * as GQL from "@/core/generated-graphql";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +23,8 @@ import {
   FieldError,
   FieldGroup,
   FieldLabel,
+  FieldLegend,
+  FieldSet,
 } from "@/components/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Spinner } from "@/components/ui/spinner";
@@ -109,6 +113,8 @@ function ShareForm({
           .max(200, msg("sharing.label_long", "Use at most 200 characters.")),
         expiry: z.string().refine(
           (value) => {
+            if (!z.iso.datetime({ local: true }).safeParse(value).success)
+              return false;
             const time = new Date(value).getTime();
             return (
               Number.isFinite(time) &&
@@ -166,21 +172,20 @@ function ShareForm({
   });
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl max-h-[90dvh] overflow-y-auto">
+      <DialogContent
+        showCloseButton={false}
+        className="max-h-[calc(100dvh-2rem)] grid-cols-1 grid-rows-[auto_minmax(0,1fr)_auto] sm:max-w-xl"
+      >
         <DialogHeader>
           <DialogTitle>
             {share
               ? msg("sharing.edit", "Edit share")
               : msg("sharing.create", "Create share")}
           </DialogTitle>
-          <DialogDescription>
-            {msg(
-              "sharing.fixed_scope",
-              "Only selected scenes, images and the current images in each gallery are included. Future additions and related entities are never added automatically. Up to 2,000 media items per share.",
-            )}
-          </DialogDescription>
         </DialogHeader>
         <form
+          id={`${id}-form`}
+          className="-m-1 min-h-0 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain p-1"
           onSubmit={(event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -188,6 +193,12 @@ function ShareForm({
           }}
         >
           <FieldGroup>
+            <DialogDescription>
+              {msg(
+                "sharing.fixed_scope",
+                "Only selected scenes, images and the current images in each gallery are included. Future additions and related entities are never added automatically. Up to 2,000 media items per share.",
+              )}
+            </DialogDescription>
             <form.Field name="label">
               {(field) => (
                 <Field data-invalid={field.state.meta.errors.length > 0}>
@@ -215,7 +226,7 @@ function ShareForm({
                     {msg("sharing.selection", "Included items")}
                   </FieldLabel>
                   {share ? (
-                    <ul className="max-h-32 overflow-y-auto text-sm text-muted-foreground">
+                    <ul className="max-h-32 min-w-0 overflow-y-auto text-sm text-muted-foreground [overflow-wrap:anywhere]">
                       {field.state.value.map((item) => (
                         <li key={`${item.kind}:${item.id}`}>{item.name}</li>
                       ))}
@@ -232,10 +243,13 @@ function ShareForm({
             </form.Field>
             <form.Field name="expiry">
               {(field) => (
-                <Field data-invalid={field.state.meta.errors.length > 0}>
-                  <FieldLabel htmlFor={`${id}-expiry`}>
+                <FieldSet
+                  className="grid min-w-0"
+                  data-invalid={field.state.meta.errors.length > 0}
+                >
+                  <FieldLegend variant="label">
                     {msg("sharing.expires", "Expires")}
-                  </FieldLabel>
+                  </FieldLegend>
                   <ToggleGroup
                     value={[preset]}
                     onValueChange={(values) => {
@@ -265,18 +279,22 @@ function ShareForm({
                       {msg("sharing.custom", "Custom")}
                     </ToggleGroupItem>
                   </ToggleGroup>
-                  <Input
-                    id={`${id}-expiry`}
-                    type="datetime-local"
+                  <DateInput
+                    isTime
+                    captionLayout="label"
                     value={field.state.value}
-                    onChange={(event) => {
+                    invalid={field.state.meta.errors.length > 0}
+                    disabledDays={(date) =>
+                      date < startOfDay(now) ||
+                      date > startOfDay(now + 30 * 86_400_000)
+                    }
+                    onValueChange={(value) => {
                       setPreset("custom");
-                      field.handleChange(event.target.value);
+                      field.handleChange(value.replace(" ", "T"));
                     }}
-                    onBlur={field.handleBlur}
                   />
                   <FieldError errors={field.state.meta.errors} />
-                </Field>
+                </FieldSet>
               )}
             </form.Field>
             <form.Field name="showMetadata">
@@ -294,7 +312,7 @@ function ShareForm({
                     <FieldDescription>
                       {msg(
                         "sharing.metadata_description",
-                        "Share saved titles. File paths, notes, tags, performers and other library metadata stay private.",
+                        "Add saved titles to the recipient view. Without them, media uses generic labels. The share label, expiry and basic playback information remain visible; other library metadata stays private.",
                       )}
                     </FieldDescription>
                   </FieldContent>
@@ -319,7 +337,7 @@ function ShareForm({
                     <FieldDescription>
                       {msg(
                         "sharing.download_description",
-                        "Original files may contain embedded metadata. Recipients can always save or record media they can view.",
+                        "Permit downloading the original files, which may contain embedded metadata. When off, originals are blocked, but recipients can still save or record the media shown to them.",
                       )}
                     </FieldDescription>
                   </FieldContent>
@@ -327,28 +345,32 @@ function ShareForm({
               )}
             </form.Field>
           </FieldGroup>
-          <DialogFooter className="mt-6">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              {msg("actions.cancel", "Cancel")}
-            </Button>
-            <form.Subscribe
-              selector={(state) => [state.canSubmit, state.isSubmitting]}
-            >
-              {([canSubmit, submitting]) => (
-                <Button type="submit" disabled={!canSubmit || submitting}>
-                  {submitting && <Spinner />}
-                  {share
-                    ? msg("actions.save", "Save")
-                    : msg("sharing.create", "Create share")}
-                </Button>
-              )}
-            </form.Subscribe>
-          </DialogFooter>
         </form>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
+            {msg("actions.cancel", "Cancel")}
+          </Button>
+          <form.Subscribe
+            selector={(state) => [state.canSubmit, state.isSubmitting]}
+          >
+            {([canSubmit, submitting]) => (
+              <Button
+                type="submit"
+                form={`${id}-form`}
+                disabled={!canSubmit || submitting}
+              >
+                {submitting && <Spinner data-icon="inline-start" />}
+                {share
+                  ? msg("actions.save", "Save")
+                  : msg("sharing.create", "Create share")}
+              </Button>
+            )}
+          </form.Subscribe>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

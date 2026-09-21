@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import {
   Popover,
   PopoverContent,
@@ -16,9 +17,11 @@ import {
 interface Props {
   className?: string;
   disabled?: boolean;
+  invalid?: boolean;
   disabledDays?: (date: Date) => boolean;
   value: string;
   isTime?: boolean;
+  captionLayout?: React.ComponentProps<typeof Calendar>["captionLayout"];
   onValueChange(value: string): void;
   placeholder?: string;
   error?: string;
@@ -40,10 +43,13 @@ function formatDate(d: Date): string {
 }
 
 export const DateInput: React.FC<Props> = ({
+  className,
   disabled,
+  invalid,
   disabledDays,
   value,
   isTime,
+  captionLayout = "dropdown",
   onValueChange,
   placeholder,
   error,
@@ -83,22 +89,27 @@ export const DateInput: React.FC<Props> = ({
             variant="outline"
             id={dateId}
             disabled={disabled}
-            className="w-full justify-between font-normal"
+            aria-invalid={invalid}
+            className={cn(
+              "min-w-0 w-full justify-between",
+              !isTime && className,
+            )}
           />
         }
       >
-        {selected ? (
-          format(selected, "PP")
-        ) : (
-          <span className="text-muted-foreground">{placeholderText}</span>
-        )}
+        <span className="truncate">
+          {selected ? format(selected, "PP") : placeholderText}
+        </span>
         <ChevronDownIcon data-icon="inline-end" />
       </PopoverTrigger>
-      <PopoverContent className="w-auto overflow-hidden p-0" align="start">
+      <PopoverContent
+        className="w-auto max-h-(--available-height) max-w-(--available-width) overflow-y-auto overscroll-contain p-0"
+        align="start"
+      >
         <Calendar
           mode="single"
           selected={selected}
-          captionLayout="dropdown"
+          captionLayout={captionLayout}
           defaultMonth={selected}
           onSelect={handleDaySelect}
           disabled={disabledDays}
@@ -110,14 +121,19 @@ export const DateInput: React.FC<Props> = ({
   if (isTime) {
     return (
       <>
-        <FieldGroup className="flex-row gap-2">
-          <Field>
+        <FieldGroup
+          className={cn(
+            "flex-row flex-wrap gap-2 [container-type:normal]",
+            className,
+          )}
+        >
+          <Field className="min-w-0 flex-1 basis-40" data-invalid={invalid}>
             <FieldLabel htmlFor={dateId}>
               {intl.formatMessage({ id: "date", defaultMessage: "Date" })}
             </FieldLabel>
             {datePicker}
           </Field>
-          <Field className="w-32 shrink-0">
+          <Field className="min-w-0 flex-1 basis-40" data-invalid={invalid}>
             <FieldLabel htmlFor={timeId}>
               {intl.formatMessage({ id: "time", defaultMessage: "Time" })}
             </FieldLabel>
@@ -127,6 +143,7 @@ export const DateInput: React.FC<Props> = ({
               step="60"
               value={timePart}
               disabled={disabled || !selected}
+              aria-invalid={invalid}
               onChange={handleTimeChange}
               className="appearance-none bg-background [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
             />

@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { useMsg } from "@/hooks/message";
 import { useToast } from "@/hooks/toast";
 
@@ -71,41 +71,43 @@ export function ShareLinkDialog({
         if (!open) onClose();
       }}
     >
-      <DialogContent>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] grid-cols-1 grid-rows-[auto_minmax(0,1fr)_auto]">
         <DialogHeader>
           <DialogTitle>
             {msg("sharing.link_ready", "Your share link is ready")}
           </DialogTitle>
+        </DialogHeader>
+        <FieldGroup className="-m-1 min-h-0 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain p-1">
           <DialogDescription>
             {msg(
               "sharing.link_secret",
               "Anyone with this link can view the selected media until it expires or you revoke it. Copy it now; the secret is not stored and cannot be shown again.",
             )}
           </DialogDescription>
-        </DialogHeader>
-        <Field>
-          <FieldLabel htmlFor="share-result-link">
-            {msg("sharing.link", "Share link")}
-          </FieldLabel>
-          <Input
-            id="share-result-link"
-            value={link.url}
-            readOnly
-            autoComplete="off"
-            onFocus={(event) => event.currentTarget.select()}
-          />
-        </Field>
+          <Field>
+            <FieldLabel htmlFor="share-result-link">
+              {msg("sharing.link", "Share link")}
+            </FieldLabel>
+            <Input
+              id="share-result-link"
+              value={link.url}
+              readOnly
+              autoComplete="off"
+              onFocus={(event) => event.currentTarget.select()}
+            />
+          </Field>
+        </FieldGroup>
         <DialogFooter>
           <Button
             variant="outline"
             disabled={preview.loading}
             onClick={() => void preview.open(link.id)}
           >
-            <Eye />
+            <Eye data-icon="inline-start" />
             {msg("sharing.preview", "Recipient preview")}
           </Button>
           <Button onClick={() => void copy()}>
-            <Copy />
+            <Copy data-icon="inline-start" />
             {copied
               ? msg("sharing.copied", "Copied")
               : msg("sharing.copy", "Copy link")}

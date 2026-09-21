@@ -1,4 +1,26 @@
-import { expect, test, expectTouchTargets } from "./test";
+import { expect, test as base, expectTouchTargets } from "./test";
+
+const test = base.extend({
+  context: async (
+    { browserName, playwright, context, baseURL, viewport, isMobile, hasTouch },
+    use,
+    info,
+  ) => {
+    if (browserName !== "webkit") return use(context);
+    // Cancellation removes partial OPFS files. WebKit's ephemeral profile
+    // rejects OPFS access, so use the same isolated disk profile as the PWA
+    // storage suite rather than replacing the real cancellation command.
+    const persistent = await playwright.webkit.launchPersistentContext(
+      info.outputPath("webkit-profile"),
+      { baseURL, viewport, isMobile, hasTouch, headless: true },
+    );
+    try {
+      await use(persistent);
+    } finally {
+      await persistent.close();
+    }
+  },
+});
 
 for (const width of [320, 390]) {
   test(`mobile downloads expose live progress and queue controls at ${width}px`, async ({

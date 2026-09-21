@@ -25,6 +25,11 @@ export const SETTINGS_NAV_ITEMS = [
     defaultLabel: "Shares",
   },
   {
+    to: "/settings/offline",
+    labelId: "offline.title",
+    defaultLabel: "Offline",
+  },
+  {
     to: "/settings/security",
     labelId: "config.categories.security",
     defaultLabel: "Security",

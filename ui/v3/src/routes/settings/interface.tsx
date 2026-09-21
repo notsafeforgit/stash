@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useIntl } from "react-intl";
 import { useTheme } from "src/components/theme-provider";
-import { OfflineSettingsSection } from "src/components/offline/offline-settings-section";
 import {
   useConfigurationContext,
   useConfigureInterface,
@@ -340,8 +339,6 @@ function SettingsInterfacePage() {
           />
         )}
       </SettingsSection>
-
-      <OfflineSettingsSection />
     </div>
   );
 }

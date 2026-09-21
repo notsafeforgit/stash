@@ -1,5 +1,45 @@
 import { test, expect, expectCompactRow, expectTouchTargets } from "./test";
 
+test("offline has its own settings area and searchable download controls", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/settings/interface");
+  const footer = page.locator("[data-mobile-settings-footer]");
+  await footer.getByRole("button", { name: "Settings sections" }).click();
+  await page.getByRole("menuitem", { name: "Offline", exact: true }).click();
+  await expect(page).toHaveURL(/\/settings\/offline$/);
+  await expect(
+    footer.getByRole("button", { name: "Settings sections" }),
+  ).toHaveText("Offline");
+  const resolution = page.getByRole("combobox", {
+    name: "Maximum download resolution",
+  });
+  await expect(resolution).toBeVisible();
+  await resolution.click();
+  await page.getByRole("option", { name: "720p", exact: true }).click();
+  await expect(resolution.locator('[data-slot="select-value"]')).toHaveText(
+    "720p",
+  );
+  await expect(page.getByText("Storage usage", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Persistent storage", { exact: true }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(resolution.locator('[data-slot="select-value"]')).toHaveText(
+    "720p",
+  );
+  await footer.getByRole("button", { name: "Search settings" }).click();
+  await footer
+    .getByRole("searchbox", { name: "Search settings" })
+    .fill("maximum download");
+  const result = page.getByRole("link", {
+    name: /Maximum download resolution Offline/,
+  });
+  await expect(result).toBeVisible();
+  await expect(result).toHaveAttribute("href", /\/settings\/offline\?/);
+});
+
 for (const width of [320, 390]) {
   test(`settings navigation stays in one reachable row at ${width}px`, async ({
     page,
@@ -177,7 +217,12 @@ test("settings retains the desktop sidebar and unsaved fields across a mobile re
     page
       .getByRole("navigation", { name: "Settings sections" })
       .getByRole("link"),
-  ).toHaveCount(13);
+  ).toHaveCount(14);
+  await expect(
+    page
+      .getByRole("navigation", { name: "Settings sections" })
+      .getByRole("link", { name: "Offline", exact: true }),
+  ).toHaveAttribute("href", "/settings/offline");
   await expect(page.locator("[data-mobile-settings-footer]")).toHaveCount(0);
   await page
     .getByRole("searchbox", { name: "Search settings" })

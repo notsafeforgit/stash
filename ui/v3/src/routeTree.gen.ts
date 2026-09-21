@@ -35,6 +35,7 @@ import { Route as SettingsInterfaceRouteImport } from './routes/settings/interfa
 import { Route as SettingsLibraryRouteImport } from './routes/settings/library'
 import { Route as SettingsLogsRouteImport } from './routes/settings/logs'
 import { Route as SettingsMetadataProvidersRouteImport } from './routes/settings/metadata-providers'
+import { Route as SettingsOfflineRouteImport } from './routes/settings/offline'
 import { Route as SettingsPluginsRouteImport } from './routes/settings/plugins'
 import { Route as SettingsSecurityRouteImport } from './routes/settings/security'
 import { Route as SettingsServicesRouteImport } from './routes/settings/services'
@@ -179,6 +180,11 @@ const SettingsMetadataProvidersRoute =
     path: '/metadata-providers',
     getParentRoute: () => SettingsRoute,
   } as any)
+const SettingsOfflineRoute = SettingsOfflineRouteImport.update({
+  id: '/offline',
+  path: '/offline',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const SettingsPluginsRoute = SettingsPluginsRouteImport.update({
   id: '/plugins',
   path: '/plugins',
@@ -260,6 +266,7 @@ export interface FileRoutesByFullPath {
   '/settings/library': typeof SettingsLibraryRoute
   '/settings/logs': typeof SettingsLogsRoute
   '/settings/metadata-providers': typeof SettingsMetadataProvidersRoute
+  '/settings/offline': typeof SettingsOfflineRoute
   '/settings/plugins': typeof SettingsPluginsRoute
   '/settings/security': typeof SettingsSecurityRoute
   '/settings/services': typeof SettingsServicesRoute
@@ -299,6 +306,7 @@ export interface FileRoutesByTo {
   '/settings/library': typeof SettingsLibraryRoute
   '/settings/logs': typeof SettingsLogsRoute
   '/settings/metadata-providers': typeof SettingsMetadataProvidersRoute
+  '/settings/offline': typeof SettingsOfflineRoute
   '/settings/plugins': typeof SettingsPluginsRoute
   '/settings/security': typeof SettingsSecurityRoute
   '/settings/services': typeof SettingsServicesRoute
@@ -340,6 +348,7 @@ export interface FileRoutesById {
   '/settings/library': typeof SettingsLibraryRoute
   '/settings/logs': typeof SettingsLogsRoute
   '/settings/metadata-providers': typeof SettingsMetadataProvidersRoute
+  '/settings/offline': typeof SettingsOfflineRoute
   '/settings/plugins': typeof SettingsPluginsRoute
   '/settings/security': typeof SettingsSecurityRoute
   '/settings/services': typeof SettingsServicesRoute
@@ -382,6 +391,7 @@ export interface FileRouteTypes {
     | '/settings/library'
     | '/settings/logs'
     | '/settings/metadata-providers'
+    | '/settings/offline'
     | '/settings/plugins'
     | '/settings/security'
     | '/settings/services'
@@ -421,6 +431,7 @@ export interface FileRouteTypes {
     | '/settings/library'
     | '/settings/logs'
     | '/settings/metadata-providers'
+    | '/settings/offline'
     | '/settings/plugins'
     | '/settings/security'
     | '/settings/services'
@@ -461,6 +472,7 @@ export interface FileRouteTypes {
     | '/settings/library'
     | '/settings/logs'
     | '/settings/metadata-providers'
+    | '/settings/offline'
     | '/settings/plugins'
     | '/settings/security'
     | '/settings/services'
@@ -693,6 +705,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsMetadataProvidersRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/settings/offline': {
+      id: '/settings/offline'
+      path: '/offline'
+      fullPath: '/settings/offline'
+      preLoaderRoute: typeof SettingsOfflineRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/settings/plugins': {
       id: '/settings/plugins'
       path: '/plugins'
@@ -786,6 +805,7 @@ interface SettingsRouteChildren {
   SettingsLibraryRoute: typeof SettingsLibraryRoute
   SettingsLogsRoute: typeof SettingsLogsRoute
   SettingsMetadataProvidersRoute: typeof SettingsMetadataProvidersRoute
+  SettingsOfflineRoute: typeof SettingsOfflineRoute
   SettingsPluginsRoute: typeof SettingsPluginsRoute
   SettingsSecurityRoute: typeof SettingsSecurityRoute
   SettingsServicesRoute: typeof SettingsServicesRoute
@@ -803,6 +823,7 @@ const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsLibraryRoute: SettingsLibraryRoute,
   SettingsLogsRoute: SettingsLogsRoute,
   SettingsMetadataProvidersRoute: SettingsMetadataProvidersRoute,
+  SettingsOfflineRoute: SettingsOfflineRoute,
   SettingsPluginsRoute: SettingsPluginsRoute,
   SettingsSecurityRoute: SettingsSecurityRoute,
   SettingsServicesRoute: SettingsServicesRoute,

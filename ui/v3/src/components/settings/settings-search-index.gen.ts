@@ -455,6 +455,44 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     },
   },
   {
+    to: "/settings/offline",
+    section: {
+      id: "offline.settings.heading",
+      defaultMessage: "Offline downloads",
+    },
+    label: {
+      id: "offline.settings.max_resolution",
+      defaultMessage: "Maximum download resolution",
+    },
+    description: {
+      id: "offline.settings.max_resolution_description",
+      defaultMessage:
+        "Cap on the resolution downloaded for offline playback. Source files shorter than the cap are downloaded at original.",
+    },
+  },
+  {
+    to: "/settings/offline",
+    section: {
+      id: "offline.settings.heading",
+      defaultMessage: "Offline downloads",
+    },
+    label: {
+      id: "offline.settings.storage_usage",
+      defaultMessage: "Storage usage",
+    },
+  },
+  {
+    to: "/settings/offline",
+    section: {
+      id: "offline.settings.heading",
+      defaultMessage: "Offline downloads",
+    },
+    label: {
+      id: "offline.settings.persistent_storage",
+      defaultMessage: "Persistent storage",
+    },
+  },
+  {
     to: "/settings/security",
     section: {
       id: "config.general.auth.authentication",

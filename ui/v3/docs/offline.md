@@ -162,7 +162,8 @@ Changing its prefix creates a new namespace; use recovery below to copy the
 old downloads. Another origin or browser profile has separate storage that this
 app cannot inspect.
 
-Settings expose storage usage, clear-all, and a persistent-storage request where
+**Settings → Offline** groups maximum download resolution, recovery, storage
+usage, clear-all, and a persistent-storage request where
 supported. The first explicit download/retry per page also requests persistence
 without delaying the download; bulk downloads do not repeatedly ask. Refusal or
 failure is nonfatal, and the settings request can be retried later. Unavailable

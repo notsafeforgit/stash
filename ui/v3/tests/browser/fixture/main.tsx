@@ -34,6 +34,7 @@ import { EntityList } from "@/components/list/entity-list";
 import { useMediaQuery } from "@/utils/screen";
 import { SettingsLayout } from "@/components/settings/settings-layout";
 import { SETTINGS_NAV_ITEMS } from "@/components/settings/settings-navigation";
+import { OfflineSettingsPage } from "@/components/offline/offline-settings-section";
 import { Input } from "@/components/ui/input";
 import messages from "@/locales/en-GB.json";
 import flattenMessages from "@/utils/flatten-messages";
@@ -399,7 +400,10 @@ const router = createRouter({
         createRoute({
           getParentRoute: () => settingsRoute,
           path: item.to.slice("/settings/".length),
-          component: FixtureSettingsPage,
+          component:
+            item.to === "/settings/offline"
+              ? OfflineSettingsPage
+              : FixtureSettingsPage,
         }),
       ),
     ),

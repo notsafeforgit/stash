@@ -2,7 +2,7 @@ import { canDownloadScenes, useDownloadCommands } from "./use-download-queue";
 import { registerOfflineWorker } from "@/pwa/register";
 import { OfflineRecoveryControl } from "./offline-recovery-control";
 /**
- * Offline-feature settings section, mounted on the Settings page.
+ * Per-device controls shared by the dedicated Offline settings area.
  *
  * Three controls:
  *   - Maximum download resolution (per-device, localStorage)
@@ -12,15 +12,13 @@ import { OfflineRecoveryControl } from "./offline-recovery-control";
 
 import { useCallback, useEffect, useState } from "react";
 import { useIntl } from "react-intl";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "src/components/ui/select";
 import { Button } from "src/components/ui/button";
+import {
+  SettingsSection,
+  SettingSelect,
+  SettingDisplay,
+} from "@/components/settings/setting-row";
+import { useMsg } from "@/hooks/message";
 import type { StreamingResolutionEnum } from "src/core/generated-graphql";
 import {
   loadOfflineMaxResolution,
@@ -34,11 +32,20 @@ import {
   storageEstimate,
 } from "./opfs-storage";
 
+export function OfflineSettingsPage() {
+  return (
+    <div className="max-w-2xl p-6">
+      <OfflineSettingsSection />
+    </div>
+  );
+}
+
 export function OfflineSettingsSection() {
   const intl = useIntl();
+  const msg = useMsg();
   const downloads = useDownloadCommands();
   const [maxRes, setMaxRes] = useState<StreamingResolutionEnum>(
-    loadOfflineMaxResolution(),
+    loadOfflineMaxResolution,
   );
   const [estimate, setEstimate] = useState<{
     usage?: number;
@@ -77,21 +84,10 @@ export function OfflineSettingsSection() {
     };
   }, []);
 
-  const onResolutionChange = (value: StreamingResolutionEnum | null) => {
-    if (!value) return;
-    setMaxRes(value);
-    saveOfflineMaxResolution(value);
-  };
-
-  // Base UI's Select.Value defaults to rendering `String(value)` (the raw
-  // enum) when closed; build a value→localised-label map so the trigger
-  // and the items use the same string.
-  const resolutionLabels = Object.fromEntries(
-    OFFLINE_RESOLUTION_OPTIONS.map((opt) => [
-      opt.value,
-      intl.formatMessage({ id: opt.intl_id }),
-    ]),
-  ) as Record<StreamingResolutionEnum, string>;
+  const resolutionOptions = OFFLINE_RESOLUTION_OPTIONS.map((option) => ({
+    value: option.value,
+    label: intl.formatMessage({ id: option.intl_id }),
+  }));
 
   const onRequestPersistent = async () => {
     setBusy(true);
@@ -124,11 +120,9 @@ export function OfflineSettingsSection() {
   };
 
   return (
-    <section className="flex flex-col gap-4">
-      <h2 className="text-base font-medium">
-        {intl.formatMessage({ id: "offline.settings.heading" })}
-      </h2>
-
+    <SettingsSection
+      title={msg("offline.settings.heading", "Offline downloads")}
+    >
       <p className="text-sm text-muted-foreground">
         {intl.formatMessage({
           id: !canDownloadScenes()
@@ -142,89 +136,79 @@ export function OfflineSettingsSection() {
       </p>
       <OfflineRecoveryControl />
 
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <p className="text-sm font-medium">
-            {intl.formatMessage({ id: "offline.settings.max_resolution" })}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {intl.formatMessage({
-              id: "offline.settings.max_resolution_description",
-            })}
-          </p>
-        </div>
-        <Select value={maxRes} onValueChange={onResolutionChange}>
-          <SelectTrigger className="w-40">
-            <SelectValue>{resolutionLabels[maxRes]}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              {OFFLINE_RESOLUTION_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {resolutionLabels[opt.value]}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-      </div>
+      <SettingSelect
+        label={msg(
+          "offline.settings.max_resolution",
+          "Maximum download resolution",
+        )}
+        description={msg(
+          "offline.settings.max_resolution_description",
+          "Cap on the resolution downloaded for offline playback. Source files shorter than the cap are downloaded at original.",
+        )}
+        value={maxRes}
+        options={resolutionOptions}
+        onChange={(value) => {
+          const option = resolutionOptions.find(
+            (candidate) => candidate.value === value,
+          );
+          if (!option) return;
+          setMaxRes(option.value);
+          saveOfflineMaxResolution(option.value);
+        }}
+        triggerClassName="w-40"
+      />
 
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <p className="text-sm font-medium">
-            {intl.formatMessage({ id: "offline.settings.storage_usage" })}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {estimate.usage != null && estimate.quota != null
-              ? intl.formatMessage(
-                  { id: "offline.header.storage_used" },
-                  {
-                    usage: formatBytes(estimate.usage),
-                    quota: formatBytes(estimate.quota),
-                  },
-                )
-              : intl.formatMessage({
-                  id: "offline.settings.storage_estimate_unavailable",
-                })}
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={busy}
-          onClick={onClearAll}
-        >
-          {intl.formatMessage({ id: "offline.actions.clear_all" })}
-        </Button>
-      </div>
-
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <p className="text-sm font-medium">
-            {intl.formatMessage({ id: "offline.settings.persistent_storage" })}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {intl.formatMessage({
-              id: persisted
-                ? "offline.settings.persistent_granted"
-                : persistenceSupported
-                  ? "offline.settings.persistent_not_granted"
-                  : "offline.settings.persistent_unavailable",
-            })}
-          </p>
-        </div>
-        {!persisted && persistenceSupported && (
+      <SettingDisplay
+        label={msg("offline.settings.storage_usage", "Storage usage")}
+        description={
+          estimate.usage != null && estimate.quota != null
+            ? intl.formatMessage(
+                { id: "offline.header.storage_used" },
+                {
+                  usage: formatBytes(estimate.usage),
+                  quota: formatBytes(estimate.quota),
+                },
+              )
+            : intl.formatMessage({
+                id: "offline.settings.storage_estimate_unavailable",
+              })
+        }
+        actions={
           <Button
             variant="outline"
             size="sm"
             disabled={busy}
-            onClick={onRequestPersistent}
+            onClick={onClearAll}
           >
-            {intl.formatMessage({ id: "offline.actions.request" })}
+            {intl.formatMessage({ id: "offline.actions.clear_all" })}
           </Button>
-        )}
-      </div>
-    </section>
+        }
+      />
+
+      <SettingDisplay
+        label={msg("offline.settings.persistent_storage", "Persistent storage")}
+        description={intl.formatMessage({
+          id: persisted
+            ? "offline.settings.persistent_granted"
+            : persistenceSupported
+              ? "offline.settings.persistent_not_granted"
+              : "offline.settings.persistent_unavailable",
+        })}
+        actions={
+          !persisted &&
+          persistenceSupported && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              onClick={onRequestPersistent}
+            >
+              {intl.formatMessage({ id: "offline.actions.request" })}
+            </Button>
+          )
+        }
+      />
+    </SettingsSection>
   );
 }
 

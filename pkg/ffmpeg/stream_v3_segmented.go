@@ -1482,8 +1482,9 @@ func (sm *StreamManager) startV3Transcode(stream *v3RunningStream, segment int, 
 
 		var err error
 
-		// don't log error if cancelled
-		if !tp.cancelled {
+		// Drivers may write diagnostics even at FFmpeg's error log level.
+		// Only a failed process exit makes those diagnostics an error.
+		if !tp.cancelled && errCmd != nil {
 			e := string(errStr)
 			if e == "" {
 				e = string(outStr)

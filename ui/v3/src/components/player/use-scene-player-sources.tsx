@@ -653,11 +653,12 @@ export function useScenePlayerSources({
         transition.kind === "seek" &&
         video &&
         video.readyState > 0 &&
-        !video.seeking &&
         Math.abs(video.currentTime - transition.mediaTime) < 0.001
       ) {
-        // A no-op seek need not emit seeked. Do not wait on that event.
-        finish?.();
+        // Release can commit a preview whose last frame is still decoding.
+        // Reuse that native seek instead of restarting it at the same target.
+        // A settled no-op need not emit seeked, so finish its feedback now.
+        if (!video.seeking) finish?.();
       } else {
         // A normal seek keeps the browser's paused/playing state. Pausing here
         // would make another seek capture that temporary pause as user intent,
@@ -962,6 +963,7 @@ export function useScenePlayerSources({
     rootRef,
     reloading,
     offsetStart,
+    isSeekPreviewActive: seekPreview.isActive,
     handleSeek,
     forceRemountAt,
   });

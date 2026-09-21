@@ -9,6 +9,7 @@ export function usePlayerRecovery({
   rootRef,
   reloading,
   offsetStart,
+  isSeekPreviewActive,
   handleSeek,
   forceRemountAt,
 }: {
@@ -16,6 +17,7 @@ export function usePlayerRecovery({
   rootRef: RefObject<HTMLDivElement | null>;
   reloading: boolean;
   offsetStart: number;
+  isSeekPreviewActive: () => boolean;
   handleSeek: (time: number) => void;
   forceRemountAt: (time: number) => void;
 }) {
@@ -40,6 +42,7 @@ export function usePlayerRecovery({
   const offsetStartRef = useCommittedRef(offsetStart);
 
   const handleSeekRef = useCommittedRef(handleSeek);
+  const isSeekPreviewActiveRef = useCommittedRef(isSeekPreviewActive);
 
   useEffect(() => {
     if (!finalSrc || !isHlsPlaylist(finalSrc)) return;
@@ -58,13 +61,16 @@ export function usePlayerRecovery({
     };
 
     const onSeeking = (e: Event) => {
-      if (reloadingRef.current) return;
+      if (timer) clearTimeout(timer);
+      timer = null;
+      // A held scrub owns these native seeks until release. Buffer eviction
+      // during a pause between preview frames must not commit or reload it.
+      if (reloadingRef.current || isSeekPreviewActiveRef.current()) return;
       const video = e.currentTarget;
       if (!(video instanceof HTMLVideoElement)) return;
-      if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         timer = null;
-        if (reloadingRef.current) return;
+        if (reloadingRef.current || isSeekPreviewActiveRef.current()) return;
         const target = video.currentTime;
         if (isInBuffered(target, video.buffered)) return;
         // `target` is MSE-time. handleSeek expects scene-time. For

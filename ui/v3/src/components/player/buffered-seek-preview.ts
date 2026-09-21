@@ -44,6 +44,8 @@ export function createBufferedSeekPreview() {
   };
 
   return {
+    /** Native seek events from this preview belong to the held gesture. */
+    isActive: () => session !== null,
     preview(
       video: HTMLVideoElement,
       mediaTime: number,

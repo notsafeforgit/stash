@@ -120,3 +120,118 @@ for (const mode of [
       .toBeCloseTo(origin + duration / 4, 1);
   });
 }
+
+for (const condition of ["buffer changes", "preview still seeking"] as const) {
+  test(`precision HLS release retains its buffered preview when ${condition}`, async ({
+    page,
+    context,
+    browserName,
+  }) => {
+    // Exercise the application's iOS reload policy on both browser engines.
+    // Native Apple buffering is represented by the changing range snapshot.
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "userAgent", {
+        value: `${navigator.userAgent} iPhone`,
+      });
+    });
+    await page.clock.install({ time: new Date("2026-01-01T00:00:00Z") });
+    await serveSceneMedia(page);
+    await page.goto("/scene-detail?landscape&short&hls");
+    const player = page.locator("[data-scene-player]");
+    const video = player.locator("video");
+    await player.locator("[data-player-native-button]").click();
+    await expect(player).toHaveAttribute("data-playback-ready", "true");
+    await expect
+      .poll(() =>
+        video.evaluate((v: HTMLVideoElement) =>
+          v.buffered.length ? v.buffered.end(v.buffered.length - 1) : 0,
+        ),
+      )
+      .toBeGreaterThan(10);
+    await video.evaluate((v: HTMLVideoElement) => v.pause());
+    const observation = await video.evaluateHandle((v: HTMLVideoElement) => {
+      const state = { seeks: [] as number[], loads: [] as string[] };
+      const time = Object.getOwnPropertyDescriptor(
+        HTMLMediaElement.prototype,
+        "currentTime",
+      );
+      if (!time?.get || !time.set) throw new Error("Missing media time");
+      Object.defineProperty(v, "currentTime", {
+        configurable: true,
+        get: () => time.get?.call(v),
+        set: (value: number) => {
+          state.seeks.push(value);
+          time.set?.call(v, value);
+        },
+      });
+      for (const event of ["emptied", "loadstart"])
+        v.addEventListener(event, () => state.loads.push(event));
+      return state;
+    });
+    const scrubber = player.getByRole("slider", { name: "Playback position" });
+    await player.hover();
+    await scrubber.focus();
+    const bounds = await scrubber.boundingBox();
+    if (!bounds) throw new Error("Missing scrubber");
+    await page.clock.pauseAt(new Date("2026-01-01T00:01:00Z"));
+    const drag = await dragInput(
+      page,
+      context,
+      browserName === "chromium",
+      true,
+      { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height - 2 },
+    );
+    try {
+      await page.clock.runFor(700);
+      await expect(scrubber).toHaveAttribute("data-precision", "true");
+      await expect(video).toHaveJSProperty("seeking", false);
+      await expect
+        .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
+        .toBeCloseTo(6, 2);
+      if (condition === "buffer changes") {
+        // MMS can change ranges during a long held gesture. A preview's
+        // native seeking event must not become an independent seek command.
+        await video.evaluate((v: HTMLVideoElement) => {
+          Object.defineProperty(v, "buffered", {
+            configurable: true,
+            get: (): TimeRanges => ({
+              length: 1,
+              start: () => 8,
+              end: () => 12,
+            }),
+          });
+        });
+        await page.clock.runFor(300);
+        await video.evaluate((v: HTMLVideoElement) => {
+          Reflect.deleteProperty(v, "buffered");
+          v.dispatchEvent(new Event("progress"));
+        });
+      } else {
+        // Delay the completion signal while retaining the preview's native
+        // target, as when the last frame is still being decoded on release.
+        await video.evaluate((v: HTMLVideoElement) => {
+          Object.defineProperty(v, "seeking", {
+            configurable: true,
+            get: () => true,
+          });
+        });
+      }
+    } finally {
+      await drag.end();
+      await video.evaluate((v: HTMLVideoElement) => {
+        Reflect.deleteProperty(v, "buffered");
+        Reflect.deleteProperty(v, "seeking");
+        v.dispatchEvent(new Event("seeked"));
+      });
+      await page.clock.resume();
+    }
+    await expect(player).toHaveAttribute("data-playback-ready", "true");
+    await expect(video).toHaveJSProperty("paused", true);
+    await expect(scrubber).not.toHaveAttribute("data-precision");
+    await expect
+      .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
+      .toBeCloseTo(6, 2);
+    expect(await observation.evaluate((state) => state.loads)).toEqual([]);
+    expect(await observation.evaluate((state) => state.seeks)).toHaveLength(1);
+  });
+}

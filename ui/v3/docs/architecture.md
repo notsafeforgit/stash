@@ -422,6 +422,10 @@ policy. Release uses the normal seek policy and restores the previous playback
 intent; cancellation restores the original position too. A simple tap does not
 pause. The independent draft position also supports generated sprite previews
 without seeking into unbuffered media.
+Native seek recovery ignores an active preview, including recovery queued before
+the drag started, so buffer changes during a hold cannot commit or reload it.
+Releasing at a preview target still being decoded reuses the pending native seek;
+it does not issue a second seek to the same time.
 
 Touch scrubbing supports precision seeking in scene detail, both lightboxes and
 TV (including rotated controls). A 650 ms dwell within a 4 px radius zooms the

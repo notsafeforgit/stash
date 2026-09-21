@@ -2,14 +2,37 @@ package ffmpeg
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/stashapp/stash/pkg/models"
 	"github.com/stretchr/testify/require"
 )
+
+func TestPrivateV3SegmentsUseServerSession(t *testing.T) {
+	sm := &StreamManager{cacheDir: t.TempDir(), config: rotationTestStreamConfig{}}
+	file := &models.VideoFile{BaseFile: &models.BaseFile{ID: 42}, Duration: 10, FrameRate: 30}
+	sm.StopV3StreamsForSession(file.ID, "server-owned", "", true)
+	for _, segment := range []string{"init", "0"} {
+		r := httptest.NewRequest(http.MethodGet, "/stream.m3u8/video/"+segment+"?stream_session=browser", nil)
+		r = r.WithContext(WithPrivateV3Stream(r.Context(), "server-owned"))
+		w := httptest.NewRecorder()
+		sm.ServeV3Segment(w, r, V3StreamOptions{
+			StreamType: V3StreamTypeHLS, VideoFile: file, Hash: "scene", Track: TrackVideo, Segment: segment,
+		})
+		require.Equal(t, http.StatusGone, w.Code, "released guest encoders must reject late initialization and segment requests")
+		require.Empty(t, sm.v3RunningStreams)
+	}
+	r := httptest.NewRequest(http.MethodGet, "/stream?stream_session=owner", nil)
+	session, err := V3StreamSessionFromRequest(r)
+	require.NoError(t, err)
+	require.Equal(t, "owner", session)
+}
 
 func TestPrivateV3StreamsStripSourceMetadata(t *testing.T) {
 	encoder, err := exec.LookPath("ffmpeg")

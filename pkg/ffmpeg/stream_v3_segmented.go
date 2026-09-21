@@ -1307,7 +1307,7 @@ func (sm *StreamManager) ServeV3Segment(w http.ResponseWriter, r *http.Request, 
 		maxTranscodeSize = models.StreamingResolutionEnum(options.Resolution).GetMaxResolution()
 	}
 
-	session, err := ParseV3StreamSession(r.URL.Query().Get("stream_session"))
+	session, err := V3StreamSessionFromRequest(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

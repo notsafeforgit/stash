@@ -386,7 +386,7 @@ func (rs *shareRoutes) stream(handler http.HandlerFunc) http.HandlerFunc {
 		}
 		row := shareGrant(r)
 		// Separate encoder sessions from the owner's sessions and from every
-		// other grant. Ignore client-supplied session identifiers entirely.
+		// other grant. Never use a browser's identifier directly for an encoder.
 		cookie, _ := r.Cookie(shareCookieName(row.ID))
 		clientSession, err := ffmpeg.ParseV3StreamSession(r.URL.Query().Get("stream_session"))
 		if err != nil {
@@ -395,7 +395,7 @@ func (rs *shareRoutes) stream(handler http.HandlerFunc) http.HandlerFunc {
 		}
 		sessionID := "share-" + hex.EncodeToString(sharing.Hash(cookie.Value + "/" + item.Key + "/" + clientSession))[:32]
 		q := r.URL.Query()
-		clean := url.Values{"stream_session": {sessionID}}
+		clean := url.Values{"stream_session": {clientSession}}
 		for _, key := range []string{"start", "end"} {
 			if value := q.Get(key); value != "" {
 				n, err := strconv.ParseFloat(value, 64)
@@ -454,7 +454,7 @@ func (rs *shareRoutes) stream(handler http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		r.URL.RawQuery = clean.Encode()
-		r = r.WithContext(ffmpeg.WithPrivateV3Stream(context.WithValue(r.Context(), sceneKey, scene)))
+		r = r.WithContext(ffmpeg.WithPrivateV3Stream(context.WithValue(r.Context(), sceneKey, scene), sessionID))
 		stopCancellation := context.AfterFunc(r.Context(), func() { rs.budget.releaseSession(sessionID) })
 		defer stopCancellation()
 		if r.Context().Err() != nil {

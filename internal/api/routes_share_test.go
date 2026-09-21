@@ -15,8 +15,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/internal/sharing"
+	"github.com/stashapp/stash/pkg/ffmpeg"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/models/mocks"
 	"github.com/stashapp/stash/pkg/sqlite"
@@ -26,6 +28,10 @@ import (
 )
 
 func shareHTTPFixture(t *testing.T) (*shareRoutes, http.Handler, *models.ShareRecord, string) {
+	return shareHTTPMediaFixture(t, false)
+}
+
+func shareHTTPMediaFixture(t *testing.T, video bool) (*shareRoutes, http.Handler, *models.ShareRecord, string) {
 	t.Helper()
 	config.InitializeEmpty()
 	db := sqlite.NewDatabase()
@@ -36,13 +42,61 @@ func shareHTTPFixture(t *testing.T) (*shareRoutes, http.Handler, *models.ShareRe
 	repo.Image = m.Image
 	filePath := filepath.Join(t.TempDir(), "secret-image-name.jpg")
 	require.NoError(t, os.WriteFile(filePath, []byte("original image bytes"), 0o600))
-	f := &models.ImageFile{BaseFile: &models.BaseFile{ID: 2, Path: filePath, Basename: "secret-image-name.jpg"}, Width: 100, Height: 80}
+	base := &models.BaseFile{ID: 2, Path: filePath, Basename: "secret-image-name.jpg"}
+	var f models.File = &models.ImageFile{BaseFile: base, Width: 100, Height: 80}
+	if video {
+		f = &models.VideoFile{BaseFile: base, Width: 100, Height: 80, Duration: 10, FrameRate: 30, VideoCodec: "h264"}
+	}
 	m.Image.On("Find", mock.Anything, 1).Return(&models.Image{ID: 1, Title: "Private title", Files: models.NewRelatedFiles([]models.File{f})}, nil)
 	service := sharing.New(repo)
 	row, secret, err := service.Create(context.Background(), "owner", sharing.Options{Label: "Example share", ExpiresAt: time.Now().Add(time.Hour)}, []sharing.Target{{Kind: "IMAGE", ID: 1}})
 	require.NoError(t, err)
 	rs := &shareRoutes{service: service, budget: newShareBudget()}
 	return rs, rs.router(), row, secret
+}
+
+func TestShareHLSPlaylistsKeepBrowserSessionAndEncoderLease(t *testing.T) {
+	rs, router, row, secret := shareHTTPMediaFixture(t, true)
+	t.Cleanup(func() { rs.budget.releaseShare(row.ID) })
+	cookie := exchangeShareHTTP(t, router, row, secret)
+	var sessions []string
+	handler := rs.authorize(rs.stream(func(w http.ResponseWriter, r *http.Request) {
+		session, err := ffmpeg.V3StreamSessionFromRequest(r)
+		require.NoError(t, err)
+		sessions = append(sessions, session)
+		require.Equal(t, "browser-a", r.URL.Query().Get("stream_session"))
+		if strings.HasSuffix(r.URL.Path, ".master.m3u8") {
+			scene := r.Context().Value(sceneKey).(*models.Scene)
+			new(ffmpeg.StreamManager).ServeV3MasterManifest(w, r, ffmpeg.V3StreamTypeHLS, scene.Files.Primary(), "LOW")
+		} else {
+			w.WriteHeader(http.StatusNoContent)
+		}
+	}))
+	request := func(target string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(http.MethodGet, target, nil)
+		r.AddCookie(cookie)
+		params := chi.NewRouteContext()
+		params.URLParams.Add("shareID", row.ID)
+		params.URLParams.Add("mediaKey", "image-1")
+		r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, params))
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, r)
+		return w
+	}
+	base := "/share/" + row.ID + "/media/image-1/"
+	master := request(base + "stream.master.m3u8?stream_session=browser-a")
+	require.Equal(t, http.StatusOK, master.Code)
+	lines := strings.Split(strings.TrimSpace(master.Body.String()), "\n")
+	trackURL := lines[len(lines)-1]
+	require.Contains(t, trackURL, "stream_session=browser-a")
+	require.NotContains(t, trackURL, sessions[0])
+	require.Equal(t, http.StatusNoContent, request(trackURL).Code)
+	require.Len(t, sessions, 2)
+	require.NotEqual(t, "browser-a", sessions[0])
+	require.Equal(t, sessions[0], sessions[1])
+	require.Len(t, rs.budget.streams, 1, "a playlist chain must retain one encoder lease")
+	require.Equal(t, http.StatusNoContent, request(base+"streams.stop?stream_session=browser-a").Code)
+	require.Len(t, rs.budget.streams, 0, "stop must release the same internal session")
 }
 
 func exchangeShareHTTP(t *testing.T, handler http.Handler, row *models.ShareRecord, secret string) *http.Cookie {

@@ -458,7 +458,7 @@ func (rs sceneRoutes) streamV3SegmentNamed(w http.ResponseWriter, r *http.Reques
 // already gone away.
 func (rs sceneRoutes) StreamsStop(w http.ResponseWriter, r *http.Request) {
 	scene := r.Context().Value(sceneKey).(*models.Scene)
-	session, err := ffmpeg.ParseV3StreamSession(r.URL.Query().Get("stream_session"))
+	session, err := ffmpeg.V3StreamSessionFromRequest(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -504,7 +504,7 @@ func (rs sceneRoutes) StreamsStop(w http.ResponseWriter, r *http.Request) {
 // for a fire-and-forget keepalive.
 func (rs sceneRoutes) StreamsKeepalive(w http.ResponseWriter, r *http.Request) {
 	scene := r.Context().Value(sceneKey).(*models.Scene)
-	session, err := ffmpeg.ParseV3StreamSession(r.URL.Query().Get("stream_session"))
+	session, err := ffmpeg.V3StreamSessionFromRequest(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

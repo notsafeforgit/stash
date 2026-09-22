@@ -179,7 +179,7 @@ make test-ui-v3-browser
 ```
 
 The [browser workflow](../../../.github/workflows/v3-browser-tests.yml) runs
-Chromium on Ubuntu 24.04 and WebKit on Ubuntu 26.04, with two shards per browser.
+Chromium on Ubuntu 24.04 with two shards and WebKit on Ubuntu 26.04 with four.
 WebKit needs the newer GStreamer media runtime: the 1.24 backend on Ubuntu 24.04
 can deadlock or crash during HLS EOF seeks even with a bare video element.
 Chromium uses two workers per shard. WebKit uses one to avoid competing media

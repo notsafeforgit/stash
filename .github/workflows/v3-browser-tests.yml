@@ -33,10 +33,22 @@ jobs:
         include:
           - browser: chromium
             os: ubuntu-24.04
+            shards: 2
           # Use GStreamer 1.28: Noble's 1.24 media backend can deadlock or
           # crash during HLS EOF seeks, including with a bare video element.
           - browser: webkit
             os: ubuntu-26.04
+            shards: 4
+          # Each WebKit shard runs one worker so media timing checks do not
+          # compete for the same runner. Keep the per-job test count bounded.
+          - browser: webkit
+            os: ubuntu-26.04
+            shard: 3
+            shards: 4
+          - browser: webkit
+            os: ubuntu-26.04
+            shard: 4
+            shards: 4
     defaults:
       run:
         working-directory: ui/v3
@@ -52,7 +64,7 @@ jobs:
           cache-dependency-path: ui/v3/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
-      - run: pnpm run test:browser --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/2
+      - run: pnpm run test:browser --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/${{ matrix.shards }}
       - uses: actions/upload-artifact@v7
         if: failure()
         with:

@@ -130,6 +130,10 @@ func TestShareGeneratedPreviewsStayScoped(t *testing.T) {
 	mgr.Config.SetBool(config.SharingUseExistingPreviews, false)
 	require.Nil(t, content().Media[0].PreviewImage)
 	require.Equal(t, http.StatusNotFound, get(assetURL).Code, "previous catalog URLs must stop working when reuse is disabled")
+	mgr.Config.SetBool(config.SharingServeOriginalMedia, true)
+	require.NotNil(t, content().Media[0].PreviewImage, "as-is delivery also reuses HDR previews")
+	require.Equal(t, "unchanged cover.avif", get(assetURL).Body.String())
+	mgr.Config.SetBool(config.SharingServeOriginalMedia, false)
 	mgr.Config.SetBool(config.SharingUseExistingPreviews, true)
 	oldID := vf.ID
 	vf.ID++
@@ -182,20 +186,20 @@ func TestSharingPreviewConfigurationPersistsAndPreservesOmittedOption(t *testing
 	r := &mutationResolver{}
 	require.False(t, sharingConfiguration().UseExistingPreviews)
 	enabled := true
-	result, err := r.ConfigureSharing(context.Background(), "https://shares.test/share", &enabled)
+	result, err := r.ConfigureSharing(context.Background(), "https://shares.test/share", &enabled, nil)
 	require.NoError(t, err)
 	require.True(t, result.UseExistingPreviews)
 	data, err := os.ReadFile(c.GetConfigFile())
 	require.NoError(t, err)
 	require.Contains(t, string(data), "sharing_use_existing_previews: true")
-	result, err = r.ConfigureSharing(context.Background(), "https://other.test/share", nil)
+	result, err = r.ConfigureSharing(context.Background(), "https://other.test/share", nil, nil)
 	require.NoError(t, err)
 	require.True(t, result.UseExistingPreviews)
 	enabled = false
-	_, err = r.ConfigureSharing(context.Background(), "http://invalid.test/share", &enabled)
+	_, err = r.ConfigureSharing(context.Background(), "http://invalid.test/share", &enabled, nil)
 	require.Error(t, err)
 	require.True(t, sharingConfiguration().UseExistingPreviews)
-	result, err = r.ConfigureSharing(context.Background(), "", &enabled)
+	result, err = r.ConfigureSharing(context.Background(), "", &enabled, nil)
 	require.NoError(t, err)
 	require.False(t, result.UseExistingPreviews)
 }

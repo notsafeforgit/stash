@@ -337,7 +337,7 @@ function ShareForm({
                     <FieldDescription>
                       {msg(
                         "sharing.download_description",
-                        "Permit downloading the original files, which may contain embedded metadata. When off, originals are blocked, but recipients can still save or record the media shown to them.",
+                        "Permit original-file downloads, including embedded metadata. In As-is delivery, originals are already used for viewing; this option only adds a download button. Recipients can always save or record the media shown to them.",
                       )}
                     </FieldDescription>
                   </FieldContent>

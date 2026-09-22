@@ -19,12 +19,10 @@ import { DestructiveConfirmDialog } from "@/components/shared/destructive-confir
 import { QueryError } from "@/components/query-error";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import {
   Field,
   FieldDescription,
-  FieldContent,
   FieldGroup,
   FieldError,
   FieldLabel,
@@ -50,6 +48,9 @@ import { useToast } from "@/hooks/toast";
 import { ShareDialog } from "./share-dialog";
 import { ShareLinkDialog, useSharePreview } from "./share-link-dialog";
 
+const deliveryModeSchema = z.enum(["stripped", "previews", "originals"]);
+type DeliveryMode = z.infer<typeof deliveryModeSchema>;
+
 function ShareDelivery({
   value,
 }: {
@@ -61,14 +62,19 @@ function ShareDelivery({
   const [save] = useMutation(GQL.ConfigureSharingDocument, {
     refetchQueries: [GQL.MediaSharesDocument],
   });
+  const deliveryMode: DeliveryMode = value.serve_original_media
+    ? "originals"
+    : value.use_existing_previews
+      ? "previews"
+      : "stripped";
   const form = useForm({
     defaultValues: {
       address: value.public_url,
-      useExistingPreviews: value.use_existing_previews,
+      deliveryMode,
     },
     validators: {
       onChange: z.object({
-        useExistingPreviews: z.boolean(),
+        deliveryMode: deliveryModeSchema,
         address: z.string().refine(
           (address) => {
             if (!address.trim()) return true;
@@ -98,7 +104,8 @@ function ShareDelivery({
         await save({
           variables: {
             public_url: next.address.trim(),
-            use_existing_previews: next.useExistingPreviews,
+            use_existing_previews: next.deliveryMode !== "stripped",
+            serve_original_media: next.deliveryMode === "originals",
           },
         });
         toast.success(msg("sharing.saved", "Share updated"));
@@ -139,29 +146,48 @@ function ShareDelivery({
             </Field>
           )}
         </form.Field>
-        <form.Field name="useExistingPreviews">
+        <form.Field name="deliveryMode">
           {(field) => (
-            <Field orientation="horizontal">
-              <FieldContent>
-                <FieldLabel htmlFor={`${id}-previews`}>
-                  {msg(
-                    "sharing.use_existing_previews",
-                    "Use existing previews",
-                  )}
-                </FieldLabel>
-                <FieldDescription>
-                  {msg(
-                    "sharing.existing_previews_description",
-                    "Reuse generated scene covers and image thumbnails for all shares, preserving HDR where available. Embedded metadata is retained. Missing previews and full-size image views still use metadata-stripped renditions. Original downloads remain a separate permission.",
-                  )}
-                </FieldDescription>
-              </FieldContent>
-              <Switch
-                id={`${id}-previews`}
-                checked={field.state.value}
-                onCheckedChange={field.handleChange}
+            <Field>
+              <FieldLabel id={`${id}-delivery`}>
+                {msg("sharing.media_delivery", "Media delivery")}
+              </FieldLabel>
+              <ToggleGroup<DeliveryMode>
+                variant="outline"
+                aria-labelledby={`${id}-delivery`}
+                aria-describedby={`${id}-delivery-description`}
+                value={[field.state.value]}
+                onValueChange={([mode]) => {
+                  if (mode) field.handleChange(mode);
+                }}
                 onBlur={field.handleBlur}
-              />
+              >
+                <ToggleGroupItem value="stripped">
+                  {msg("sharing.delivery_stripped", "Stripped")}
+                </ToggleGroupItem>
+                <ToggleGroupItem value="previews">
+                  {msg("sharing.delivery_previews", "Previews")}
+                </ToggleGroupItem>
+                <ToggleGroupItem value="originals">
+                  {msg("sharing.delivery_originals", "As-is")}
+                </ToggleGroupItem>
+              </ToggleGroup>
+              <FieldDescription id={`${id}-delivery-description`}>
+                {field.state.value === "originals"
+                  ? msg(
+                      "sharing.original_media_description",
+                      "Serve original images and videos unchanged for all shares, and reuse existing thumbnails and HDR covers. No resizing, re-encoding or metadata stripping. Playback requires browser support for the original format. Recipients can save originals even without the download button.",
+                    )
+                  : field.state.value === "previews"
+                    ? msg(
+                        "sharing.existing_previews_description",
+                        "Reuse generated scene covers and image thumbnails for all shares, preserving HDR where available. Embedded metadata is retained. Missing previews and full-size image views still use metadata-stripped renditions. Original downloads remain a separate permission.",
+                      )
+                    : msg(
+                        "sharing.stripped_media_description",
+                        "Create metadata-stripped images and video streams for all shares. Original files are available only when a share allows original downloads. Recipients can still save or record the media shown to them.",
+                      )}
+              </FieldDescription>
             </Field>
           )}
         </form.Field>

@@ -25,11 +25,12 @@ type shareBudget struct {
 	streams    map[string]shareStreamLease
 	writes     map[string]time.Time
 	renders    chan struct{}
+	archives   chan struct{}
 	stopStream func(models.FileID, string)
 }
 
 func newShareBudget() *shareBudget {
-	return &shareBudget{exchanges: make(map[string]shareWindow), streams: make(map[string]shareStreamLease), writes: make(map[string]time.Time), renders: make(chan struct{}, 2)}
+	return &shareBudget{exchanges: make(map[string]shareWindow), streams: make(map[string]shareStreamLease), writes: make(map[string]time.Time), renders: make(chan struct{}, 2), archives: make(chan struct{}, 2)}
 }
 
 func (b *shareBudget) exchange(peer string) bool {

@@ -181,9 +181,10 @@ relocating v3 assets or changing their display selection contract.
 ## Anonymous sharing
 
 Shares default to separate metadata-stripped JPEG renditions. The instance-wide
-**Use existing previews** setting reuses this manifest and its existing files through
+**Previews** and **As-is** delivery modes reuse this manifest and its existing files through
 a share-authorized route, with the same `PreviewImage` rendering component for
 cards, lightbox posters and playback. Each variant request checks the share and
 pinned file as well as the current manifest revision; public responses remain
-`no-store`. Turning reuse off denies those variant URLs. See [sharing](sharing.md)
-for retained metadata, fallback behavior and the separate original-download option.
+`no-store`. Selecting **Stripped** denies those variant URLs. **As-is** also serves
+original images and videos without conversion. See [sharing](sharing.md) for retained
+metadata, fallback behavior and what the original-download control permits in each mode.

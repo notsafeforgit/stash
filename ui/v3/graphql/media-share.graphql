@@ -23,6 +23,7 @@ query MediaShares($limit: Int!, $offset: Int!, $status: MediaShareStatus) {
   sharingConfiguration {
     public_url
     use_existing_previews
+    serve_original_media
     max_items
     max_days
   }
@@ -55,13 +56,16 @@ mutation MediaSharePreview($id: ID!) {
 mutation ConfigureSharing(
   $public_url: String!
   $use_existing_previews: Boolean
+  $serve_original_media: Boolean
 ) {
   configureSharing(
     public_url: $public_url
     use_existing_previews: $use_existing_previews
+    serve_original_media: $serve_original_media
   ) {
     public_url
     use_existing_previews
+    serve_original_media
     max_items
     max_days
   }

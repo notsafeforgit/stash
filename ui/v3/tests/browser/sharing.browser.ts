@@ -35,6 +35,7 @@ async function serveShare(
   video: boolean,
   expiresIn = 3600,
   options?: {
+    originalVideo?: boolean;
     media?: SharedMedia[];
     entries?: SharedContent["entries"];
   },
@@ -92,9 +93,15 @@ async function serveShare(
           streams: item.video
             ? [
                 {
-                  url: `${base}media/${item?.key}/stream.master.m3u8?resolution=LOW`,
-                  mime_type: "application/vnd.apple.mpegurl",
-                  label: "HLS Low (240p)",
+                  url: options?.originalVideo
+                    ? `${base}media/${item.key}/stream`
+                    : `${base}media/${item.key}/stream.master.m3u8?resolution=LOW`,
+                  mime_type: options?.originalVideo
+                    ? "video/mp4"
+                    : "application/vnd.apple.mpegurl",
+                  label: options?.originalVideo
+                    ? "Direct stream"
+                    : "HLS Low (240p)",
                 },
               ]
             : [],
@@ -108,6 +115,13 @@ async function serveShare(
       await route.fulfill({ contentType: "image/png", body: png });
     } else if (/\/streams\.(stop|keepalive)$/.test(endpoint)) {
       await route.fulfill({ status: 204 });
+    } else if (endpoint.endsWith("/stream") && options?.originalVideo) {
+      await route.fulfill({
+        contentType: "video/mp4",
+        body: await readFile(
+          new URL("fixture/media/short.mp4", import.meta.url),
+        ),
+      });
     } else if (endpoint.endsWith("/stream.master.m3u8")) {
       await route.fulfill({
         contentType: "application/vnd.apple.mpegurl",
@@ -433,4 +447,35 @@ test("shared cards and lightbox reuse scoped HDR preview catalogs", async ({
     fixture.requests.some((request) => request.includes("/preview-image/")),
   ).toBe(true);
   expect(fixture.requests).not.toContain("graphql");
+});
+
+test("As-is shares play original video with the existing player and no encoder requests", async ({
+  page,
+}) => {
+  const fixture = await serveShare(page, true, 3600, { originalVideo: true });
+  await page.goto(`${base}#test-capability`);
+  await page
+    .locator('.entity-card[data-id="scene-1"] [data-entity-card-preview]')
+    .click();
+  const video = page.locator("video");
+  await expect(video).toBeVisible();
+  await expect
+    .poll(() =>
+      video.evaluate((element) =>
+        element instanceof HTMLVideoElement ? element.currentTime : 0,
+      ),
+    )
+    .toBeGreaterThan(0.1);
+  await expect(video).toHaveJSProperty(
+    "currentSrc",
+    new URL(`${base}media/scene-1/stream`, page.url()).href,
+  );
+  await expect(
+    page.getByRole("link", { name: "Download original" }),
+  ).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".yarl__portal")).toHaveCount(0);
+  expect(
+    fixture.requests.some((url) => /\.m3u8|\.m4s|streams\./.test(url)),
+  ).toBe(false);
 });

@@ -13,7 +13,7 @@ import (
 )
 
 func (rs *shareRoutes) useExistingPreviews() bool {
-	return config.GetInstance().GetSharingUseExistingPreviews()
+	return rs.serveOriginalMedia() || config.GetInstance().GetSharingUseExistingPreviews()
 }
 
 // Batch only the selected scenes for the public catalog. Each asset request
@@ -62,8 +62,8 @@ func (rs *shareRoutes) previewImage(w http.ResponseWriter, r *http.Request) {
 	servePreviewImage(w, r, mgr.PreviewImageStore(), scene.ID, "cover", mgr.ScenePreviewImage(scene), chi.URLParam(r, "previewFile"))
 }
 
-// Reuse previews, never original media. Missing previews fall back to the
-// existing metadata-stripped rendition, independent of download permission.
+// Reuse an available preview. The caller chooses how to handle a missing one
+// according to the configured delivery mode.
 func (rs *shareRoutes) existingRendition(w http.ResponseWriter, r *http.Request, item *models.ShareMedia, f models.File, scene *models.Scene, thumbnail bool) bool {
 	mgr := rs.server.manager
 	if item.Kind == "SCENE" && scene != nil {

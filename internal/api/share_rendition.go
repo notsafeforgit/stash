@@ -14,10 +14,12 @@ import (
 	"time"
 
 	"github.com/stashapp/stash/internal/sharing"
+	"github.com/stashapp/stash/internal/static"
 	"github.com/stashapp/stash/pkg/ffmpeg"
 	"github.com/stashapp/stash/pkg/ffmpeg/transcoder"
 	"github.com/stashapp/stash/pkg/file"
 	"github.com/stashapp/stash/pkg/models"
+	"github.com/stashapp/stash/pkg/utils"
 )
 
 func (rs *shareRoutes) rendition(w http.ResponseWriter, r *http.Request) {
@@ -31,6 +33,15 @@ func (rs *shareRoutes) rendition(w http.ResponseWriter, r *http.Request) {
 		size = 4096
 	}
 	if rs.useExistingPreviews() && rs.existingRendition(w, r, item, f, scene, size == 640) {
+		return
+	}
+	if rs.serveOriginalMedia() {
+		if _, ok := f.(*models.ImageFile); ok {
+			rs.serveOriginal(w, r, item, f, false)
+		} else {
+			// No generation in as-is mode, including when a video has no cover.
+			utils.ServeImage(w, r, static.ReadAll(static.DefaultSceneImage))
+		}
 		return
 	}
 	identity, err := json.Marshal(struct {

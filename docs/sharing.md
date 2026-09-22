@@ -47,31 +47,44 @@ The existing video player and image viewer are composed with owner activity,
 casting and library actions disabled. The standalone entrypoint loads no plugin
 scripts, custom JavaScript, owner configuration, analytics or service worker.
 
-By default, covers and images are decoded into metadata-free JPEG renditions:
-640-pixel thumbnails and up to 4,096-pixel full views. Animated image files currently get a still rendition;
-video-backed images play as video.
+**Settings → Shares → Share delivery → Media delivery** applies to all existing
+and new shares:
 
-**Settings → Shares → Share delivery → Use existing previews** is an instance-wide
-opt-in (`sharing_use_existing_previews: true`). It reuses generated scene covers,
-including HDR/adaptive AVIF and their card thumbnails, and stored image thumbnails
-without another encode. The shared cards, lightbox and player use the same preview
-selection component as the library, with JPEG fallback. Embedded metadata in those
-assets is retained. This applies to existing and new shares; it does not expose
-library metadata or change original-download permission. A missing generated
-scene preview uses its stored cover, then a stripped rendition if no cover exists.
-Missing image thumbnails and full-size image views still use stripped renditions;
-original media is never an implicit fallback. Turn the option off to return to
-stripped previews and deny previously issued generated-preview URLs. Bytes already
-delivered cannot be recalled. Scene covers follow the current cover selection,
-while the share's media membership and pinned primary-file checks remain intact.
+- **Stripped** (default): covers and images are decoded into metadata-free JPEGs
+  (640-pixel thumbnails and up to 4,096-pixel full views). Animated images become
+  stills; video-backed images play as video. Playback uses HLS with container and
+  track metadata removed. Transcoding is limited to 1080p; compatible codec-copy
+  streams can retain source resolution.
+- **Previews** (`sharing_use_existing_previews: true`): reuse generated scene
+  covers, HDR/adaptive AVIF, card thumbnails and stored image thumbnails unchanged.
+  Embedded metadata in these assets is retained. Missing scene previews use the
+  stored cover, then a stripped rendition. Missing image thumbnails and full-size
+  images still use stripped renditions; videos still use the metadata-stripped HLS
+  pipeline. This option alone never enables original-file viewing.
+- **As-is** (`sharing_serve_original_media: true`): serve the original image and
+  video bytes, including embedded metadata, animation and original resolution.
+  No resizing, re-encoding, remuxing or metadata stripping occurs. Regular files
+  stream directly, without a copy or rendition cache. Archive images decompress
+  only the selected member, with bounded memory and unchanged image bytes; the
+  containing archive and unshared members remain inaccessible. Existing thumbnails
+  and HDR covers are reused. A missing image thumbnail uses the original image;
+  a missing video cover uses a placeholder. Playback requires browser support for
+  the original container and codecs; no conversion fallback is offered.
 
-Scene playback uses the existing HLS pipeline, with guest sessions separated
-from owner sessions and source container/track
-metadata removed. Transcoding is limited to 1080p; compatible codec-copy streams
-can retain the source resolution. Captions and scene markers are not exposed.
-The optional original download is the original file and may contain embedded
-metadata. Recipients can save or record anything they can view; revocation cannot
-remove bytes already delivered to them.
+Preview reuse uses the same selection component as the library, with JPEG fallback.
+Scene covers follow the current cover selection; frozen membership and pinned
+primary-file checks still apply. Switching to **Stripped** denies previously issued
+generated-preview URLs. Switching away from **As-is** denies the original streaming
+route and returns image views to stripped renditions. Bytes already delivered
+cannot be recalled.
+
+**Allow original downloads** permits the download endpoint and displays its button.
+In **As-is** mode, recipients already receive originals for viewing, even when that
+button is disabled. In the other modes, originals require the download permission.
+Recipients can save or record anything they can view. Embedded metadata retained in
+originals or existing previews is separate from saved library titles controlled by
+**Show titles**. Library captions and scene markers are not exposed as player controls;
+tracks embedded in an original file remain part of that file.
 
 ## Credentials and enforcement
 
@@ -82,7 +95,7 @@ host-only cookie scoped to that share's path. Only SHA-256 digests of secrets an
 session tokens are persisted. A share credential is never an owner/API session.
 
 Every content request checks the current grant, session, expiry and version. Every
-thumbnail, generated-preview variant, image, stream manifest, segment and original
+thumbnail, generated-preview variant, image, original stream/range, manifest, segment and original
 download also checks the pinned item. Generated previews accept only files in the
 current cover manifest with its current revision, through share-scoped URLs; no
 owner media URL or API key is exposed.
@@ -99,17 +112,22 @@ access counts. Counts are successful recipient link exchanges, not distinct
 people, media requests or watch history.
 
 Public responses use no-store, no-referrer, noindex, nosniff, same-origin resource
-policy and a restrictive CSP. Embedded original downloads are an explicit opt-in.
+policy and a restrictive CSP. Original media documents also receive a sandboxed
+CSP that prevents scripts and external resource loading. Originals require the
+instance-wide As-is opt-in or the share’s original-download permission.
 The public router has no GraphQL, plugins, arbitrary files, directory listing,
 CORS exemption or general application fallback. Malformed/encoded traversal
 paths are rejected, and invalid, expired or revoked credentials look alike.
 
 Budgets bound concurrent responses (12 per share, 64 total), encoder variants
-(three per share, 12 total), image generators (two total), guest sessions (1,000
+(three per share, 12 total), image generators (two total), archive deliveries (two
+total), guest sessions (1,000
 per share) and throughput (20 MiB/s per share). Exchanges are limited to 30 per
 minute per direct peer; behind a single proxy this is a shared limit. Proxy
 headers are not trusted for this limiter. Image generation has a 30-second
-deadline; archive members are bounded to 256 MiB. Generated image renditions
+deadline; archives used for stripped renditions are bounded to 256 MiB. As-is
+archive delivery streams without a file-size cap or whole-file memory buffer;
+seeking accepts one byte range per request to bound decompression work. Generated image renditions
 live under `<generated>/shares` and may be removed while Stash is stopped; they
 are regenerated on demand. Apply the host's usual storage and backup policy.
 

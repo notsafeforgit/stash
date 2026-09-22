@@ -10,11 +10,14 @@ import (
 const (
 	SharingPublicURL           = "sharing_public_url"
 	SharingUseExistingPreviews = "sharing_use_existing_previews"
+	SharingServeOriginalMedia  = "sharing_serve_original_media"
 )
 
 func (i *Config) GetSharingPublicURL() string { return i.getString(SharingPublicURL) }
 
 func (i *Config) GetSharingUseExistingPreviews() bool { return i.getBool(SharingUseExistingPreviews) }
+
+func (i *Config) GetSharingServeOriginalMedia() bool { return i.getBool(SharingServeOriginalMedia) }
 
 func ValidateSharingPublicURL(value string) error {
 	if value == "" {

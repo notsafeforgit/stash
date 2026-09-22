@@ -19,6 +19,7 @@ test("share target search uses library titles, filenames and gallery folders", a
           __typename: "SharingConfiguration",
           public_url: "https://shares.test/share",
           use_existing_previews: false,
+          serve_original_media: false,
           max_days: 30,
           max_items: 2000,
         },
@@ -188,6 +189,7 @@ for (const viewport of [
             __typename: "SharingConfiguration",
             public_url: "https://shares.test/share",
             use_existing_previews: false,
+            serve_original_media: false,
             max_days: 30,
             max_items: 2000,
           },
@@ -419,13 +421,14 @@ for (const viewport of [
   });
 }
 
-test("persists instance-wide preview reuse independently of share permissions", async ({
+test("persists all media delivery modes without silently enabling originals", async ({
   page,
 }) => {
   let configuration: GQL.MediaSharesQuery["sharingConfiguration"] = {
     __typename: "SharingConfiguration",
     public_url: "https://shares.test/share",
     use_existing_previews: false,
+    serve_original_media: false,
     max_days: 30,
     max_items: 2000,
   };
@@ -442,7 +445,11 @@ test("persists instance-wide preview reuse independently of share permissions", 
       await route.fulfill({ json: { data } });
     } else if (request.operationName === "ConfigureSharing") {
       const variables = z
-        .object({ public_url: z.string(), use_existing_previews: z.boolean() })
+        .object({
+          public_url: z.string(),
+          use_existing_previews: z.boolean(),
+          serve_original_media: z.boolean(),
+        })
         .parse(request.variables);
       updates.push(variables);
       configuration = { ...configuration, ...variables };
@@ -453,23 +460,52 @@ test("persists instance-wide preview reuse independently of share permissions", 
     } else throw new Error(`Unexpected operation ${request.operationName}`);
   });
   await page.goto("/share-management.html");
-  const toggle = page.getByRole("switch", { name: "Use existing previews" });
   const save = page.getByRole("button", { name: "Save", exact: true });
-  await expect(toggle).not.toBeChecked();
+  const stripped = page.getByRole("button", { name: "Stripped", exact: true });
+  const previews = page.getByRole("button", { name: "Previews", exact: true });
+  const originals = page.getByRole("button", { name: "As-is", exact: true });
+  await expect(stripped).toHaveAttribute("aria-pressed", "true");
   await expect(save).toBeDisabled();
-  await toggle.click();
+  await previews.click();
   await save.click();
   await expect
-    .poll(() => updates)
-    .toEqual([
-      { public_url: "https://shares.test/share", use_existing_previews: true },
-    ]);
+    .poll(() => updates.at(-1))
+    .toEqual({
+      public_url: "https://shares.test/share",
+      use_existing_previews: true,
+      serve_original_media: false,
+    });
   await expect(save).toBeDisabled();
   await page.reload();
-  await expect(toggle).toBeChecked();
+  await expect(previews).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByText(/Embedded metadata is retained/)).toBeVisible();
-  await toggle.click();
+  await originals.click();
+  await expect(
+    page.getByText(/Recipients can save originals even without/),
+  ).toBeVisible();
   await save.click();
-  await expect.poll(() => updates.at(-1)?.use_existing_previews).toBe(false);
+  await expect
+    .poll(() => updates.at(-1))
+    .toEqual({
+      public_url: "https://shares.test/share",
+      use_existing_previews: true,
+      serve_original_media: true,
+    });
+  await expect(save).toBeDisabled();
+  await page.reload();
+  await expect(originals).toHaveAttribute("aria-pressed", "true");
+  await page.setViewportSize({ width: 320, height: 700 });
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(320);
+  await stripped.click();
+  await save.click();
+  await expect
+    .poll(() => updates.at(-1))
+    .toEqual({
+      public_url: "https://shares.test/share",
+      use_existing_previews: false,
+      serve_original_media: false,
+    });
   await expect(save).toBeDisabled();
 });

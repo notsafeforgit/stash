@@ -21,7 +21,9 @@ createRoot(root).render(
     <IntlProvider locale="en-GB" messages={flattenMessages(messages)}>
       <ThemeProvider>
         <TooltipProvider>
-          <SharesSettings />
+          <div className="h-dvh overflow-y-auto">
+            <SharesSettings />
+          </div>
           <Toaster />
         </TooltipProvider>
       </ThemeProvider>

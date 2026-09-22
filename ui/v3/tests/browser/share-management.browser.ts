@@ -18,6 +18,7 @@ test("share target search uses library titles, filenames and gallery folders", a
         sharingConfiguration: {
           __typename: "SharingConfiguration",
           public_url: "https://shares.test/share",
+          use_existing_previews: false,
           max_days: 30,
           max_items: 2000,
         },
@@ -186,6 +187,7 @@ for (const viewport of [
           sharingConfiguration: {
             __typename: "SharingConfiguration",
             public_url: "https://shares.test/share",
+            use_existing_previews: false,
             max_days: 30,
             max_items: 2000,
           },
@@ -416,3 +418,58 @@ for (const viewport of [
     expect(shares).toEqual([]);
   });
 }
+
+test("persists instance-wide preview reuse independently of share permissions", async ({
+  page,
+}) => {
+  let configuration: GQL.MediaSharesQuery["sharingConfiguration"] = {
+    __typename: "SharingConfiguration",
+    public_url: "https://shares.test/share",
+    use_existing_previews: false,
+    max_days: 30,
+    max_items: 2000,
+  };
+  const updates: GQL.ConfigureSharingMutationVariables[] = [];
+  await page.route("**/graphql", async (route) => {
+    const request = z
+      .object({ operationName: z.string(), variables: z.unknown() })
+      .parse(route.request().postDataJSON());
+    if (request.operationName === "MediaShares") {
+      const data: GQL.MediaSharesQuery = {
+        mediaShares: [],
+        sharingConfiguration: configuration,
+      };
+      await route.fulfill({ json: { data } });
+    } else if (request.operationName === "ConfigureSharing") {
+      const variables = z
+        .object({ public_url: z.string(), use_existing_previews: z.boolean() })
+        .parse(request.variables);
+      updates.push(variables);
+      configuration = { ...configuration, ...variables };
+      const data: GQL.ConfigureSharingMutation = {
+        configureSharing: configuration,
+      };
+      await route.fulfill({ json: { data } });
+    } else throw new Error(`Unexpected operation ${request.operationName}`);
+  });
+  await page.goto("/share-management.html");
+  const toggle = page.getByRole("switch", { name: "Use existing previews" });
+  const save = page.getByRole("button", { name: "Save", exact: true });
+  await expect(toggle).not.toBeChecked();
+  await expect(save).toBeDisabled();
+  await toggle.click();
+  await save.click();
+  await expect
+    .poll(() => updates)
+    .toEqual([
+      { public_url: "https://shares.test/share", use_existing_previews: true },
+    ]);
+  await expect(save).toBeDisabled();
+  await page.reload();
+  await expect(toggle).toBeChecked();
+  await expect(page.getByText(/Embedded metadata is retained/)).toBeVisible();
+  await toggle.click();
+  await save.click();
+  await expect.poll(() => updates.at(-1)?.use_existing_previews).toBe(false);
+  await expect(save).toBeDisabled();
+});

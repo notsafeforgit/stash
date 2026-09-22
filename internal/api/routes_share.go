@@ -82,6 +82,8 @@ func (rs *shareRoutes) router() http.Handler {
 				r.Head("/thumbnail", rs.rendition)
 				r.Get("/image", rs.rendition)
 				r.Head("/image", rs.rendition)
+				r.Get("/preview-image/{previewFile}", rs.previewImage)
+				r.Head("/preview-image/{previewFile}", rs.previewImage)
 				r.Get("/download", rs.download)
 				r.Head("/download", rs.download)
 				scene := sceneRoutes{routes: routes{txnManager: rs.service.Repo.TxnManager}, sceneFinder: rs.service.Repo.Scene, fileGetter: rs.service.Repo.File}
@@ -263,16 +265,17 @@ type publicShareEntry struct {
 	MediaKeys []string `json:"media_keys"`
 }
 type publicShareMedia struct {
-	Key       string  `json:"key"`
-	Kind      string  `json:"kind"`
-	Title     string  `json:"title"`
-	Width     int     `json:"width"`
-	Height    int     `json:"height"`
-	Duration  float64 `json:"duration"`
-	Video     bool    `json:"video"`
-	Thumbnail string  `json:"thumbnail"`
-	Image     string  `json:"image"`
-	Download  string  `json:"download"`
+	Key          string        `json:"key"`
+	Kind         string        `json:"kind"`
+	Title        string        `json:"title"`
+	Width        int           `json:"width"`
+	Height       int           `json:"height"`
+	Duration     float64       `json:"duration"`
+	Video        bool          `json:"video"`
+	Thumbnail    string        `json:"thumbnail"`
+	Image        string        `json:"image"`
+	Download     string        `json:"download"`
+	PreviewImage *PreviewImage `json:"preview_image,omitempty"`
 }
 type publicShareContent struct {
 	Label      string             `json:"label"`
@@ -289,9 +292,12 @@ type publicShareDetail struct {
 	Streams    []*manager.SceneStreamEndpoint `json:"streams"`
 }
 
-func publicMedia(r *http.Request, row *models.ShareRecord, item models.ShareMedia) publicShareMedia {
+func (rs *shareRoutes) publicMedia(r *http.Request, row *models.ShareRecord, item models.ShareMedia, scene *models.Scene) publicShareMedia {
 	base := shareBase(r, row.ID) + "media/" + item.Key + "/"
 	ret := publicShareMedia{Key: item.Key, Kind: item.Kind, Width: item.Width, Height: item.Height, Duration: item.Duration, Video: item.Duration > 0, Thumbnail: base + "thumbnail", Image: base + "image"}
+	if item.Kind == "SCENE" && scene != nil && rs.useExistingPreviews() {
+		ret.PreviewImage = previewImageModel(base+"preview-image", rs.server.manager.ScenePreviewImage(scene))
+	}
 	if row.ShowMetadata {
 		ret.Title = item.Title
 	}
@@ -316,8 +322,9 @@ func (rs *shareRoutes) content(w http.ResponseWriter, r *http.Request) {
 		}
 		ret.Entries = append(ret.Entries, publicShareEntry{Kind: entry.Kind, Title: title, MediaKeys: entry.MediaKeys})
 	}
+	scenes := rs.previewScenes(r.Context(), snapshot.Media)
 	for _, media := range snapshot.Media {
-		ret.Media = append(ret.Media, publicMedia(r, row, media))
+		ret.Media = append(ret.Media, rs.publicMedia(r, row, media, scenes[media.EntityID]))
 	}
 	shareJSON(w, ret)
 }
@@ -349,7 +356,7 @@ func (rs *shareRoutes) detail(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	ret := publicShareDetail{Media: publicMedia(r, row, *item), VideoCodec: item.VideoCodec, AudioCodec: item.AudioCodec, FrameRate: item.FrameRate, Streams: []*manager.SceneStreamEndpoint{}}
+	ret := publicShareDetail{Media: rs.publicMedia(r, row, *item, scene), VideoCodec: item.VideoCodec, AudioCodec: item.AudioCodec, FrameRate: item.FrameRate, Streams: []*manager.SceneStreamEndpoint{}}
 	if scene != nil {
 		base := &url.URL{Path: shareBase(r, row.ID) + "media/" + item.Key + "/stream"}
 		streams, err := manager.GetV3SceneStreamPaths(scene, base, models.StreamingResolutionEnumFullHd)

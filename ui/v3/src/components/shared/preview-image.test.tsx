@@ -23,12 +23,10 @@ afterEach(async () => {
 
 function preview(dynamicRange: PreviewImageDynamicRange): PreviewImageData {
   return {
-    __typename: "PreviewImage",
     fallback: "/tone-mapped.jpg",
     thumbnail: null,
     sources: [
       {
-        __typename: "PreviewImageSource",
         url: "/hdr.avif",
         mime_type: "image/avif",
         dynamic_range: dynamicRange,

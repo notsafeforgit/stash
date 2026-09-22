@@ -1,10 +1,20 @@
 import { useState, type ComponentProps } from "react";
-import type {
-  PreviewImageDataFragment,
-  PreviewImageRenditionDataFragment,
-} from "@/core/generated-graphql";
+import type { PreviewImageRenditionDataFragment } from "@/core/generated-graphql";
 
-export type PreviewImageData = PreviewImageDataFragment;
+// Rendering needs the same fields from GraphQL and the scoped sharing API,
+// without requiring Apollo's transport-specific __typename properties.
+type PreviewImageRenditionData = Pick<
+  PreviewImageRenditionDataFragment,
+  "fallback"
+> & {
+  sources: Pick<
+    PreviewImageRenditionDataFragment["sources"][number],
+    "url" | "mime_type" | "dynamic_range" | "width" | "height"
+  >[];
+};
+export type PreviewImageData = PreviewImageRenditionData & {
+  thumbnail?: PreviewImageRenditionData | null;
+};
 
 export type PreviewImageProps = ComponentProps<"img"> & {
   preview?: PreviewImageData | null;
@@ -38,7 +48,7 @@ function PreviewImageContent({
   alt,
   ...props
 }: Omit<PreviewImageProps, "preview" | "thumbnail"> & {
-  preview?: PreviewImageRenditionDataFragment | null;
+  preview?: PreviewImageRenditionData | null;
 }) {
   const [fallbackLevel, setFallbackLevel] = useState(0);
   const fallback = fallbackLevel < 2 ? (preview?.fallback ?? src) : src;

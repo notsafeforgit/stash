@@ -2801,6 +2801,8 @@
     "download_original": "Download original",
     "address_invalid": "Use an HTTPS address ending in /share, or leave blank.",
     "public_address": "Public share address",
+    "use_existing_previews": "Use existing previews",
+    "existing_previews_description": "Reuse generated scene covers and image thumbnails for all shares, preserving HDR where available. Embedded metadata is retained. Missing previews and full-size image views still use metadata-stripped renditions. Original downloads remain a separate permission.",
     "address_description": "Use the address served by your sharing proxy. Leave blank to use this server’s /share path. Changing this setting affects newly generated links.",
     "revoked": "Revoked",
     "active": "Active",

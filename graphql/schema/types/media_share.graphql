@@ -62,6 +62,8 @@ type MediaShareCreated {
 type SharingConfiguration {
   "Absolute HTTPS URL ending in /share, or empty to use this application's URL."
   public_url: String!
+  "Reuse generated previews without stripping embedded metadata. Defaults to false."
+  use_existing_previews: Boolean!
   max_items: Int!
   max_days: Int!
 }
@@ -81,5 +83,5 @@ extend type Mutation {
   mediaShareRotate(id: ID!): String!
   "Short-lived, single-use preview link; does not change the recipient's link."
   mediaSharePreview(id: ID!): String!
-  configureSharing(public_url: String!): SharingConfiguration!
+  configureSharing(public_url: String!, use_existing_previews: Boolean): SharingConfiguration!
 }

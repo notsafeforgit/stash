@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PreviewImageDynamicRange } from "@/core/generated-graphql";
 
 const localURL = z
   .string()
@@ -8,6 +9,21 @@ const localURL = z
   );
 const optionalURL = z.union([z.literal(""), localURL]);
 const kind = z.enum(["SCENE", "IMAGE", "GALLERY"]);
+const previewRenditionSchema = z.object({
+  fallback: localURL,
+  sources: z.array(
+    z.object({
+      url: localURL,
+      mime_type: z.enum(["image/avif"]),
+      dynamic_range: z.enum(PreviewImageDynamicRange),
+      width: z.number().int().positive(),
+      height: z.number().int().positive(),
+    }),
+  ),
+});
+const previewImageSchema = previewRenditionSchema.extend({
+  thumbnail: previewRenditionSchema.nullish(),
+});
 const mediaSchema = z.object({
   key: z.string().regex(/^(scene|image)-[1-9][0-9]*$/),
   kind: z.enum(["SCENE", "IMAGE"]),
@@ -17,6 +33,7 @@ const mediaSchema = z.object({
   duration: z.number().nonnegative(),
   video: z.boolean(),
   thumbnail: localURL,
+  preview_image: previewImageSchema.nullish(),
   image: localURL,
   download: optionalURL,
 });

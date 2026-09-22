@@ -21,7 +21,7 @@ import (
 )
 
 func (rs *shareRoutes) rendition(w http.ResponseWriter, r *http.Request) {
-	item, f, _, err := rs.item(r)
+	item, f, scene, err := rs.item(r)
 	if err != nil {
 		http.NotFound(w, r)
 		return
@@ -29,6 +29,9 @@ func (rs *shareRoutes) rendition(w http.ResponseWriter, r *http.Request) {
 	size := 640
 	if strings.HasSuffix(r.URL.Path, "/image") {
 		size = 4096
+	}
+	if rs.useExistingPreviews() && rs.existingRendition(w, r, item, f, scene, size == 640) {
+		return
 	}
 	identity, err := json.Marshal(struct {
 		File        models.FileID

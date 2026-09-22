@@ -7,9 +7,14 @@ import (
 	"strings"
 )
 
-const SharingPublicURL = "sharing_public_url"
+const (
+	SharingPublicURL           = "sharing_public_url"
+	SharingUseExistingPreviews = "sharing_use_existing_previews"
+)
 
 func (i *Config) GetSharingPublicURL() string { return i.getString(SharingPublicURL) }
+
+func (i *Config) GetSharingUseExistingPreviews() bool { return i.getBool(SharingUseExistingPreviews) }
 
 func ValidateSharingPublicURL(value string) error {
 	if value == "" {

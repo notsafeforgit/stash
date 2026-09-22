@@ -78,7 +78,7 @@ export function SharedPlayback({
       captions: [],
       performers: [],
       studio: null,
-      preview_image: null,
+      preview_image: detail.media.preview_image ?? null,
     }),
     [detail, base],
   );

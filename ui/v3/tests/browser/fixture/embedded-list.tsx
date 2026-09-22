@@ -69,15 +69,12 @@ function CardList() {
                   image={`/fixture-cover/legacy-${item.id}.svg`}
                   naturalIsPortrait
                   previewImage={{
-                    __typename: "PreviewImage",
                     fallback: `/fixture-cover/full-${item.id}.svg`,
                     sources: [],
                     thumbnail: {
-                      __typename: "PreviewImage",
                       fallback: `/fixture-cover/thumbnail-fallback-${item.id}.svg`,
                       sources: [
                         {
-                          __typename: "PreviewImageSource",
                           url: `/fixture-cover/thumbnail-${item.id}.svg`,
                           mime_type: "image/svg+xml",
                           dynamic_range: PreviewImageDynamicRange.Adaptive,

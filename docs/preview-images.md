@@ -177,3 +177,13 @@ relocating v3 assets or changing their display selection contract.
 - [libavif gain-map utility](https://github.com/AOMediaCodec/libavif/tree/main/apps/avifgainmaputil)
 - [AVIF 1.2 specification](https://aomedia.org/docs/AV1%20Image%20File%20Format%20%28AVIF%29%20v1.2.0.pdf)
 - [CSS dynamic-range media feature](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/At-rules/@media/dynamic-range)
+
+## Anonymous sharing
+
+Shares default to separate metadata-stripped JPEG renditions. The instance-wide
+**Use existing previews** setting reuses this manifest and its existing files through
+a share-authorized route, with the same `PreviewImage` rendering component for
+cards, lightbox posters and playback. Each variant request checks the share and
+pinned file as well as the current manifest revision; public responses remain
+`no-store`. Turning reuse off denies those variant URLs. See [sharing](sharing.md)
+for retained metadata, fallback behavior and the separate original-download option.

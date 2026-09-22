@@ -4,6 +4,7 @@ import {
   shareDeadline,
   shareRequest,
   shareStatusSchema,
+  shareDetailSchema,
   ShareUnavailableError,
 } from "./share-contract";
 
@@ -81,4 +82,68 @@ describe("share capabilities in the browser", () => {
       ShareUnavailableError,
     );
   });
+});
+
+it("accepts scoped HDR renditions and rejects external preview URLs", () => {
+  const preview = {
+    fallback: "/share/example/media/scene-1/preview-image/cover.jpg",
+    sources: [
+      {
+        url: "/share/example/media/scene-1/preview-image/cover.avif",
+        mime_type: "image/avif",
+        dynamic_range: "HDR",
+        width: 640,
+        height: 360,
+      },
+    ],
+  };
+  const detail = {
+    media: {
+      key: "scene-1",
+      kind: "SCENE",
+      title: "",
+      width: 640,
+      height: 360,
+      duration: 1,
+      video: true,
+      thumbnail: "/thumbnail",
+      image: "/image",
+      download: "",
+      preview_image: { ...preview, thumbnail: preview },
+    },
+    video_codec: "h264",
+    audio_codec: "",
+    frame_rate: 30,
+    streams: [],
+  };
+  expect(shareDetailSchema.parse(detail).media.preview_image).toEqual(
+    detail.media.preview_image,
+  );
+  for (const url of [
+    "https://owner.test/secret",
+    "//owner.test/secret",
+    "/\\owner.test/secret",
+  ]) {
+    expect(
+      shareDetailSchema.safeParse({
+        ...detail,
+        media: {
+          ...detail.media,
+          preview_image: { ...preview, fallback: url },
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      shareDetailSchema.safeParse({
+        ...detail,
+        media: {
+          ...detail.media,
+          preview_image: {
+            ...preview,
+            sources: [{ ...preview.sources[0], url }],
+          },
+        },
+      }).success,
+    ).toBe(false);
+  }
 });

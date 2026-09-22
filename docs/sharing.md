@@ -47,10 +47,26 @@ The existing video player and image viewer are composed with owner activity,
 casting and library actions disabled. The standalone entrypoint loads no plugin
 scripts, custom JavaScript, owner configuration, analytics or service worker.
 
-Images are decoded into metadata-free JPEG renditions: 640-pixel thumbnails and
-up to 4,096-pixel full views. Animated image files currently get a still rendition;
-video-backed images play as video. Scene playback uses the existing HLS pipeline,
-with guest sessions separated from owner sessions and source container/track
+By default, covers and images are decoded into metadata-free JPEG renditions:
+640-pixel thumbnails and up to 4,096-pixel full views. Animated image files currently get a still rendition;
+video-backed images play as video.
+
+**Settings → Shares → Share delivery → Use existing previews** is an instance-wide
+opt-in (`sharing_use_existing_previews: true`). It reuses generated scene covers,
+including HDR/adaptive AVIF and their card thumbnails, and stored image thumbnails
+without another encode. The shared cards, lightbox and player use the same preview
+selection component as the library, with JPEG fallback. Embedded metadata in those
+assets is retained. This applies to existing and new shares; it does not expose
+library metadata or change original-download permission. A missing generated
+scene preview uses its stored cover, then a stripped rendition if no cover exists.
+Missing image thumbnails and full-size image views still use stripped renditions;
+original media is never an implicit fallback. Turn the option off to return to
+stripped previews and deny previously issued generated-preview URLs. Bytes already
+delivered cannot be recalled. Scene covers follow the current cover selection,
+while the share's media membership and pinned primary-file checks remain intact.
+
+Scene playback uses the existing HLS pipeline, with guest sessions separated
+from owner sessions and source container/track
 metadata removed. Transcoding is limited to 1080p; compatible codec-copy streams
 can retain the source resolution. Captions and scene markers are not exposed.
 The optional original download is the original file and may contain embedded
@@ -65,8 +81,11 @@ via same-origin JSON POST, and keeps access in a Secure, HttpOnly, SameSite=Stri
 host-only cookie scoped to that share's path. Only SHA-256 digests of secrets and
 session tokens are persisted. A share credential is never an owner/API session.
 
-Every content, thumbnail, image, stream manifest, segment and original download
-request checks the current grant, session, expiry, version and pinned item.
+Every content request checks the current grant, session, expiry and version. Every
+thumbnail, generated-preview variant, image, stream manifest, segment and original
+download also checks the pinned item. Generated previews accept only files in the
+current cover manifest with its current revision, through share-scoped URLs; no
+owner media URL or API key is exposed.
 Revocation and rotation remove sessions, cancel active responses and stop that
 grant's encoders. Expiry cancels responses and encoder leases. The viewer checks
 status every 15 seconds and removes its player at expiry. Owner changes cancel

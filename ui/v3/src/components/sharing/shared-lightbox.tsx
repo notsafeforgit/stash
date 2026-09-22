@@ -115,6 +115,7 @@ export function SharedLightbox({
         sceneId: item.key,
         title: item.title,
         posterSrc: item.thumbnail,
+        posterImage: item.preview_image,
       })),
     [items],
   );

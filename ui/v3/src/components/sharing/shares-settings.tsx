@@ -19,10 +19,13 @@ import { DestructiveConfirmDialog } from "@/components/shared/destructive-confir
 import { QueryError } from "@/components/query-error";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import {
   Field,
   FieldDescription,
+  FieldContent,
+  FieldGroup,
   FieldError,
   FieldLabel,
 } from "@/components/ui/field";
@@ -47,7 +50,11 @@ import { useToast } from "@/hooks/toast";
 import { ShareDialog } from "./share-dialog";
 import { ShareLinkDialog, useSharePreview } from "./share-link-dialog";
 
-function ShareAddress({ value }: { value: string }) {
+function ShareDelivery({
+  value,
+}: {
+  value: GQL.MediaSharesQuery["sharingConfiguration"];
+}) {
   const msg = useMsg();
   const toast = useToast();
   const id = useId();
@@ -55,9 +62,13 @@ function ShareAddress({ value }: { value: string }) {
     refetchQueries: [GQL.MediaSharesDocument],
   });
   const form = useForm({
-    defaultValues: { address: value },
+    defaultValues: {
+      address: value.public_url,
+      useExistingPreviews: value.use_existing_previews,
+    },
     validators: {
       onChange: z.object({
+        useExistingPreviews: z.boolean(),
         address: z.string().refine(
           (address) => {
             if (!address.trim()) return true;
@@ -84,7 +95,12 @@ function ShareAddress({ value }: { value: string }) {
     },
     onSubmit: async ({ value: next }) => {
       try {
-        await save({ variables: { public_url: next.address.trim() } });
+        await save({
+          variables: {
+            public_url: next.address.trim(),
+            use_existing_previews: next.useExistingPreviews,
+          },
+        });
         toast.success(msg("sharing.saved", "Share updated"));
       } catch (error) {
         toast.error(error);
@@ -93,53 +109,81 @@ function ShareAddress({ value }: { value: string }) {
   });
   return (
     <form
-      className="space-y-4"
       onSubmit={(event) => {
         event.preventDefault();
         void form.handleSubmit();
       }}
     >
-      <form.Field name="address">
-        {(field) => (
-          <Field data-invalid={field.state.meta.errors.length > 0}>
-            <FieldLabel htmlFor={id}>
-              {msg("sharing.public_address", "Public share address")}
-            </FieldLabel>
-            <Input
-              id={id}
-              type="url"
-              value={field.state.value}
-              onChange={(event) => field.handleChange(event.target.value)}
-              onBlur={field.handleBlur}
-              placeholder="https://nsfw.ak.codes/share"
-            />
-            <FieldDescription>
-              {msg(
-                "sharing.address_description",
-                "Use the address served by your sharing proxy. Leave blank to use this server’s /share path. Changing this setting affects newly generated links.",
-              )}
-            </FieldDescription>
-            <FieldError errors={field.state.meta.errors} />
-          </Field>
-        )}
-      </form.Field>
-      <form.Subscribe
-        selector={(state) => [
-          state.canSubmit,
-          state.isSubmitting,
-          state.isDirty,
-        ]}
-      >
-        {([canSubmit, submitting, dirty]) => (
-          <Button
-            type="submit"
-            variant="outline"
-            disabled={!canSubmit || submitting || !dirty}
-          >
-            {msg("actions.save", "Save")}
-          </Button>
-        )}
-      </form.Subscribe>
+      <FieldGroup>
+        <form.Field name="address">
+          {(field) => (
+            <Field data-invalid={field.state.meta.errors.length > 0}>
+              <FieldLabel htmlFor={id}>
+                {msg("sharing.public_address", "Public share address")}
+              </FieldLabel>
+              <Input
+                id={id}
+                type="url"
+                value={field.state.value}
+                onChange={(event) => field.handleChange(event.target.value)}
+                onBlur={field.handleBlur}
+                placeholder="https://nsfw.ak.codes/share"
+              />
+              <FieldDescription>
+                {msg(
+                  "sharing.address_description",
+                  "Use the address served by your sharing proxy. Leave blank to use this server’s /share path. Changing this setting affects newly generated links.",
+                )}
+              </FieldDescription>
+              <FieldError errors={field.state.meta.errors} />
+            </Field>
+          )}
+        </form.Field>
+        <form.Field name="useExistingPreviews">
+          {(field) => (
+            <Field orientation="horizontal">
+              <FieldContent>
+                <FieldLabel htmlFor={`${id}-previews`}>
+                  {msg(
+                    "sharing.use_existing_previews",
+                    "Use existing previews",
+                  )}
+                </FieldLabel>
+                <FieldDescription>
+                  {msg(
+                    "sharing.existing_previews_description",
+                    "Reuse generated scene covers and image thumbnails for all shares, preserving HDR where available. Embedded metadata is retained. Missing previews and full-size image views still use metadata-stripped renditions. Original downloads remain a separate permission.",
+                  )}
+                </FieldDescription>
+              </FieldContent>
+              <Switch
+                id={`${id}-previews`}
+                checked={field.state.value}
+                onCheckedChange={field.handleChange}
+                onBlur={field.handleBlur}
+              />
+            </Field>
+          )}
+        </form.Field>
+        <form.Subscribe
+          selector={(state) => [
+            state.canSubmit,
+            state.isSubmitting,
+            state.isDirty,
+          ]}
+        >
+          {([canSubmit, submitting, dirty]) => (
+            <Button
+              type="submit"
+              className="self-start"
+              variant="outline"
+              disabled={!canSubmit || submitting || !dirty}
+            >
+              {msg("actions.save", "Save")}
+            </Button>
+          )}
+        </form.Subscribe>
+      </FieldGroup>
     </form>
   );
 }
@@ -479,9 +523,9 @@ export function SharesSettings() {
       </SettingsSection>
       {data && (
         <SettingsSection title={msg("sharing.delivery", "Share delivery")}>
-          <ShareAddress
-            key={data.sharingConfiguration.public_url}
-            value={data.sharingConfiguration.public_url}
+          <ShareDelivery
+            key={JSON.stringify(data.sharingConfiguration)}
+            value={data.sharingConfiguration}
           />
         </SettingsSection>
       )}

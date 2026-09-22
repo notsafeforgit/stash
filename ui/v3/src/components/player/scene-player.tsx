@@ -98,8 +98,9 @@ export type ScenePlayerScene = NonNullable<GQL.FindSceneQuery["findScene"]>;
 /** Playback needs no library relationships, owner history or filesystem data. */
 export type ScenePlaybackData = Pick<
   ScenePlayerScene,
-  "id" | "title" | "sceneStreams" | "captions" | "preview_image" | "resume_time"
+  "id" | "title" | "sceneStreams" | "captions" | "resume_time"
 > & {
+  preview_image: PreviewImageData | null;
   files: Pick<
     ScenePlayerScene["files"][number],
     | "path"

@@ -77,6 +77,7 @@ function SharedGrid({
         >
           <EntityCard.Preview
             image={preview?.thumbnail}
+            previewImage={preview?.preview_image}
             duration={!gallery && item.video ? item.duration : undefined}
             isPortrait={item.kind === "IMAGE" && item.height > item.width}
             naturalIsPortrait={preview ? preview.height > preview.width : false}

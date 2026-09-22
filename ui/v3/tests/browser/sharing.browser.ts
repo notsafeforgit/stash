@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { PreviewImageDynamicRange } from "../../src/core/generated-graphql";
 import type { Page } from "@playwright/test";
 import { test, expect } from "./test";
 import type {
@@ -99,7 +100,11 @@ async function serveShare(
             : [],
         },
       });
-    } else if (endpoint.endsWith("/thumbnail") || endpoint.endsWith("/image")) {
+    } else if (
+      endpoint.endsWith("/thumbnail") ||
+      endpoint.endsWith("/image") ||
+      endpoint.includes("/preview-image/")
+    ) {
       await route.fulfill({ contentType: "image/png", body: png });
     } else if (/\/streams\.(stop|keepalive)$/.test(endpoint)) {
       await route.fulfill({ status: 204 });
@@ -381,4 +386,51 @@ test("only granted items and download actions are exposed through public details
   await expect(
     page.getByRole("button", { name: /Edit|Delete|Rotate/ }),
   ).toHaveCount(0);
+});
+
+test("shared cards and lightbox reuse scoped HDR preview catalogs", async ({
+  page,
+}) => {
+  const media = ["scene-1", "scene-2"].map((key) => {
+    const previewBase = `${base}media/${key}/preview-image/`;
+    const rendition = (name: string) => ({
+      fallback: `${previewBase}${name}.jpg?revision=example`,
+      sources: [
+        {
+          url: `${previewBase}${name}.avif?revision=example`,
+          mime_type: "image/avif" as const,
+          dynamic_range: PreviewImageDynamicRange.Adaptive,
+          width: 640,
+          height: 360,
+        },
+      ],
+    });
+    return {
+      ...sharedMedia(key),
+      preview_image: {
+        ...rendition("cover"),
+        thumbnail: rendition("thumbnail"),
+      },
+    };
+  });
+  const fixture = await serveShare(page, true, 3600, { media });
+  await page.goto(`${base}#test-capability`);
+  const card = page.locator('.entity-card[data-id="scene-1"]');
+  await expect(
+    card.locator('source[type="image/avif"]').first(),
+  ).toHaveAttribute("srcset", /preview-image\/thumbnail\.avif/);
+  await expect(card.locator("img").first()).toHaveAttribute(
+    "src",
+    /preview-image\/thumbnail\.jpg/,
+  );
+  await card.locator("[data-entity-card-preview]").click();
+  const lightbox = page.locator(".yarl__portal");
+  await expect(lightbox).toBeVisible();
+  await expect(
+    lightbox.locator('source[type="image/avif"]').first(),
+  ).toHaveAttribute("srcset", /preview-image\/cover\.avif/);
+  expect(
+    fixture.requests.some((request) => request.includes("/preview-image/")),
+  ).toBe(true);
+  expect(fixture.requests).not.toContain("graphql");
 });

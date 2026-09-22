@@ -8,7 +8,6 @@ import { TvDialogContent } from "./tv-dialog";
 export const tvModeLabels = {
   scenes: { id: "tv.text.scenes", defaultMessage: "Scenes" },
   markers: { id: "tv.text.markers", defaultMessage: "Markers" },
-  both: { id: "tv.text.both", defaultMessage: "Both" },
 } satisfies Record<TvMode, { id: string; defaultMessage: string }>;
 
 export function TvFeedMenu({
@@ -29,7 +28,7 @@ export function TvFeedMenu({
         title={msg("tv.action.feed", "Feed")}
         description={msg(
           "tv.feed.description",
-          "Both alternates scenes and markers using each feed’s filters and order. This choice applies to this viewing session.",
+          "Switch between scenes and markers for this viewing session.",
         )}
       >
         <ToggleGroup<TvMode>

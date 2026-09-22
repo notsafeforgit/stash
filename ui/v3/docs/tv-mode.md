@@ -8,17 +8,12 @@ It needs no Stash TV plugin or separate application.
 
 ## Playback and controls
 
-Choose a scene, marker, or mixed (**Both**) feed, an app default, saved filter, or all items.
+Choose a scene or marker feed, an app default, saved filter, or all items.
 Saved search, criteria groups and sort retain the library's filter semantics.
 Build include/exclude combinations in the app's saved-filter editor and select
 that filter in TV. Choose **Random** in **Sort order** for a seeded order
 that stays stable as you keep scrolling. Matching orientation
 uses the viewing surface, including forced rotation, and includes square videos.
-
-**Both** alternates scenes and markers while preserving each source's filters
-and order. Each source uses its own scene or marker filter setting. If one
-source runs out, the other continues. The explicit sort menu offers orders
-supported by both sources; saved-filter order keeps each source's own sort.
 
 The feed loads more items automatically as you scroll, until the matching
 library is exhausted. Request sizing and loading thresholds are internal;
@@ -100,7 +95,7 @@ tag/performer labels wrap without horizontal overflow.
 ## Actions and settings
 
 Add the optional **Feed** action in **Settings → TV → Action rail** to switch
-between **Scenes**, **Markers**, and **Both** while watching. It can be pinned
+between **Scenes** and **Markers** while watching. It can be pinned
 or placed in a folder. The choice applies to the current viewing URL; the saved
 default changes only in settings. Returning to a recent feed restores its
 selection and playback position. Switching clears source-specific URL filters
@@ -187,7 +182,7 @@ never write server activity; offline playback keeps its existing local resume.
 
 Apollo owns entity data. The feed stores IDs, paging state, tombstones, and a
 small playback snapshot; its constructor is pure and effects own requests.
-There is one active page request (including both source pages for mixed feeds), bounded refill bursts, one stable player/video,
+There is one active page request, bounded refill bursts, one stable player/video,
 and three presentation slots. Adjacent slots use still images. The configured
 media window owns cancellable metadata/media preparation and transcode leases;
 it does not mount additional shared players. `use-tv-media-window.ts` retains

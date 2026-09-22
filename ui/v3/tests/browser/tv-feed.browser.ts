@@ -14,10 +14,13 @@ async function next(page: Page) {
   });
   await page.keyboard.press("ArrowDown");
 }
-async function choose(page: Page, label: "Scenes" | "Markers" | "Both") {
+async function choose(page: Page, label: "Scenes" | "Markers") {
   await page.getByRole("button", { name: "Feed", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Feed", exact: true });
   await expectTouchTargets(dialog);
+  await expect(
+    dialog.getByRole("button", { name: "Both", exact: true }),
+  ).toHaveCount(0);
   await dialog.getByRole("button", { name: label, exact: true }).click();
   await expect(dialog).toBeHidden();
 }
@@ -35,7 +38,7 @@ for (const mobile of [true, false]) {
         ? { width: 390, height: 844 }
         : { width: 1280, height: 800 },
     });
-    test("switches all three feeds and restores the previous scene selection", async ({
+    test("switches between scenes and markers and restores the previous scene selection", async ({
       page,
     }) => {
       await page.goto("/tv-fixture/tv?paused&feed-action");
@@ -48,13 +51,6 @@ for (const mobile of [true, false]) {
       await choose(page, "Markers");
       await expect(page).toHaveURL(/mode=markers/);
       await ready(page, /marker:\d+$/);
-      await choose(page, "Both");
-      await expect(page).toHaveURL(/mode=both/);
-      await ready(page, /scene:1$/);
-      await next(page);
-      await ready(page, /marker:\d+$/);
-      await next(page);
-      await ready(page, /scene:2$/);
       await choose(page, "Scenes");
       await ready(page, /scene:2$/);
       await expect(page.locator("video")).toHaveCount(1);
@@ -70,7 +66,7 @@ for (const mobile of [true, false]) {
   });
 }
 
-test("adds and pins Feed through the existing rail editor and saves Both as a default", async ({
+test("adds and pins Feed through the existing rail editor and saves Markers as a default", async ({
   page,
 }) => {
   await page.goto("/tv-fixture/settings/tv?paused");
@@ -81,13 +77,13 @@ test("adds and pins Feed through the existing rail editor and saves Both as a de
   await page
     .getByRole("combobox", { name: "Default feed", exact: true })
     .click();
-  await page.getByRole("option", { name: "Both", exact: true }).click();
+  await page.getByRole("option", { name: "Markers", exact: true }).click();
   await expect
     .poll(() => page.evaluate(() => window.tvFixtureSaveAttempts.at(-1)))
     .toMatchObject({
       key: "tv",
       value: {
-        mode: "both",
+        mode: "markers",
         rail: expect.arrayContaining([
           {
             type: "action",
@@ -103,13 +99,15 @@ test("adds and pins Feed through the existing rail editor and saves Both as a de
       },
     });
   await page.getByRole("link", { name: "Return to TV", exact: true }).click();
-  await ready(page, /scene:1$/);
+  await ready(page, /marker:\d+$/);
   await page
     .locator("[data-tv-dock]")
     .getByRole("button", { name: "Feed", exact: true })
     .click();
   await expect(
-    page.getByRole("dialog").getByRole("button", { name: "Both", exact: true }),
+    page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Markers", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
 });
 

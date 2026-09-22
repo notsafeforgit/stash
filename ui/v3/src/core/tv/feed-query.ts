@@ -5,12 +5,7 @@ import {
   ListFilterModel,
   type SavedFilterLike,
 } from "@/models/list-filter/filter";
-import type {
-  TvFilterChoice,
-  TvMode,
-  TvSourceMode,
-  TvSettings,
-} from "./settings";
+import type { TvFilterChoice, TvMode, TvSettings } from "./settings";
 import type { FilterASTNode } from "@/models/list-filter/filter-ast";
 import { getFilterOptions } from "@/models/list-filter/factory";
 
@@ -19,35 +14,19 @@ import { getFilterOptions } from "@/models/list-filter/factory";
 const PAGE_SIZE = 20;
 const PREFETCH_REMAINING = 2;
 
-interface TvQueryPolicy {
+export interface TvFeedQuery {
   seed: number;
+  mode: TvMode;
+  filter: GQL.FindFilterType;
+  ast?: GQL.FilterAstInput;
   pageSize: number;
   prefetch: number;
 }
-interface TvSourceQuery {
-  filter: GQL.FindFilterType;
-  ast?: GQL.FilterAstInput;
-}
-export interface TvSingleFeedQuery extends TvQueryPolicy, TvSourceQuery {
-  mode: TvSourceMode;
-}
-export type TvFeedQuery =
-  | TvSingleFeedQuery
-  | (TvQueryPolicy & {
-      mode: "both";
-      scenes: TvSourceQuery;
-      markers: TvSourceQuery;
-    });
-export const tvFilterMode = (mode: TvSourceMode) =>
+export const tvFilterMode = (mode: TvMode) =>
   mode === "scenes" ? GQL.FilterMode.Scenes : GQL.FilterMode.SceneMarkers;
 
 export function tvSortOptions(mode: TvMode) {
-  if (mode !== "both")
-    return getFilterOptions(tvFilterMode(mode)).sortByOptions;
-  const markers = getFilterOptions(GQL.FilterMode.SceneMarkers).sortByOptions;
-  return getFilterOptions(GQL.FilterMode.Scenes).sortByOptions.filter(
-    (option) => markers.some((marker) => marker.value === option.value),
-  );
+  return getFilterOptions(tvFilterMode(mode)).sortByOptions;
 }
 const conflictSchema = z.object({
   forkDefaultFilterState: z
@@ -83,7 +62,7 @@ function validCriteria(node: FilterASTNode): boolean {
 }
 
 function filterModel(
-  mode: TvSourceMode,
+  mode: TvMode,
   config: GQL.ConfigDataFragment,
   saved?: SavedFilterLike,
 ) {
@@ -106,24 +85,6 @@ function filterModel(
   return model;
 }
 
-export function resolveTvQuery(
-  client: ApolloClient,
-  configuration: GQL.ConfigDataFragment,
-  settings: TvSettings,
-  mode: TvSourceMode,
-  choice: TvFilterChoice | undefined,
-  seed: number,
-  orientation: "portrait" | "landscape",
-): Promise<TvSingleFeedQuery>;
-export function resolveTvQuery(
-  client: ApolloClient,
-  configuration: GQL.ConfigDataFragment,
-  settings: TvSettings,
-  mode: TvMode,
-  choice: TvFilterChoice | undefined,
-  seed: number,
-  orientation: "portrait" | "landscape",
-): Promise<TvFeedQuery>;
 export async function resolveTvQuery(
   client: ApolloClient,
   configuration: GQL.ConfigDataFragment,
@@ -143,40 +104,6 @@ export async function resolveTvQuery(
     )
       ? { ...requestedSettings, sort: null }
       : requestedSettings;
-  if (mode === "both") {
-    if (choice?.kind === "saved")
-      throw new Error(
-        "Choose scene and marker filters separately in TV settings",
-      );
-    const [scenes, markers] = await Promise.all([
-      resolveTvQuery(
-        client,
-        configuration,
-        settings,
-        "scenes",
-        choice ?? settings.sceneFilter,
-        seed,
-        orientation,
-      ),
-      resolveTvQuery(
-        client,
-        configuration,
-        settings,
-        "markers",
-        choice ?? settings.markerFilter,
-        seed,
-        orientation,
-      ),
-    ]);
-    return {
-      mode,
-      seed,
-      scenes: { filter: scenes.filter, ast: scenes.ast },
-      markers: { filter: markers.filter, ast: markers.ast },
-      pageSize: PAGE_SIZE,
-      prefetch: PREFETCH_REMAINING,
-    };
-  }
   const filterChoice =
     choice ??
     (mode === "scenes" ? settings.sceneFilter : settings.markerFilter);
@@ -266,9 +193,8 @@ export function tvQueryIdentity(query: TvFeedQuery): string {
   return JSON.stringify([
     query.seed,
     query.mode,
-    query.mode === "both"
-      ? [query.scenes, query.markers]
-      : [query.filter, query.ast],
+    query.filter,
+    query.ast,
     query.pageSize,
   ]);
 }

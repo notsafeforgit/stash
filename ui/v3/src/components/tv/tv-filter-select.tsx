@@ -1,7 +1,7 @@
 import { useQuery } from "@apollo/client/react";
 import { FindSavedFiltersDocument } from "@/core/generated-graphql";
 import { tvFilterMode } from "@/core/tv/feed-query";
-import type { TvFilterChoice, TvSourceMode } from "@/core/tv/settings";
+import type { TvFilterChoice, TvMode } from "@/core/tv/settings";
 import { TvSelect } from "./tv-select";
 import { useMsg } from "@/hooks/message";
 
@@ -11,7 +11,7 @@ export function TvFilterSelect({
   onChange,
   label,
 }: {
-  mode: TvSourceMode;
+  mode: TvMode;
   value: TvFilterChoice;
   onChange: (choice: TvFilterChoice) => void;
   label: string;

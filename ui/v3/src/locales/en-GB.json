@@ -2732,14 +2732,13 @@
       "reset_tv_settings_2": "Reset TV settings",
       "replace_unreadable_tv_settings": "Replace unreadable TV settings?",
       "this_replaces_the_saved_tv_document_with_defaults_other_app": "This replaces the saved TV document with defaults. Other app settings are preserved.",
-      "current_o_count": "Current count: {count, number}",
-      "both": "Both"
+      "current_o_count": "Current count: {count, number}"
     },
     "pip": "Picture in picture",
     "cast": "Cast",
     "timeline_markers": "Scene markers",
     "feed": {
-      "description": "Both alternates scenes and markers using each feed’s filters and order. This choice applies to this viewing session."
+      "description": "Switch between scenes and markers for this viewing session."
     }
   },
   "marker_save_failed": "The marker could not be saved",

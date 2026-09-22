@@ -20,19 +20,6 @@ const markerItem = (marker: GQL.TvMarkerSummaryFragment): TvFeedItem => ({
   sceneId: marker.scene.id,
 });
 
-function interleave(
-  scenes: readonly TvFeedItem[],
-  markers: readonly TvFeedItem[],
-) {
-  const items: TvFeedItem[] = [];
-  for (let i = 0; i < Math.max(scenes.length, markers.length); i++) {
-    const scene = scenes[i];
-    const marker = markers[i];
-    if (scene) items.push(scene);
-    if (marker) items.push(marker);
-  }
-  return items;
-}
 export interface TvFeedSnapshot {
   items: readonly TvFeedItem[];
   selected: number;
@@ -171,36 +158,7 @@ export class TvFeedController {
         const context = { fetchOptions: { signal: request.signal } };
         let items: TvFeedItem[];
         let total: number;
-        let mixedExhausted: boolean | undefined;
-        if (this.query.mode === "both") {
-          // One request owns both source pages. Do not commit either half if
-          // the request fails; retries retain both ordering and page offsets.
-          const response = await this.client.query({
-            query: GQL.TvMixedDocument,
-            variables: {
-              scene_filter: pageFilter(this.query.scenes.filter),
-              scene_filter_ast: this.query.scenes.ast,
-              marker_filter: pageFilter(this.query.markers.filter),
-              scene_marker_filter_ast: this.query.markers.ast,
-            },
-            context,
-            fetchPolicy: "network-only",
-          });
-          if (!response.data) throw new Error("No mixed page was returned");
-          const { findScenes: scenes, findSceneMarkers: markers } =
-            response.data;
-          items = interleave(
-            scenes.scenes.map(sceneItem),
-            markers.scene_markers.map(markerItem),
-          );
-          total = scenes.count + markers.count;
-          const offset = this.state.nextPage * this.query.pageSize;
-          mixedExhausted =
-            (scenes.scenes.length < this.query.pageSize ||
-              offset >= scenes.count) &&
-            (markers.scene_markers.length < this.query.pageSize ||
-              offset >= markers.count);
-        } else if (this.query.mode === "scenes") {
+        if (this.query.mode === "scenes") {
           const response = await this.client.query({
             query: GQL.TvScenesDocument,
             variables: {
@@ -231,8 +189,6 @@ export class TvFeedController {
         }
         if (!this.active || generation !== this.generation) return;
         let next = appendTvPage(this.state, items, total, this.query.pageSize);
-        if (mixedExhausted !== undefined)
-          next = { ...next, exhausted: mixedExhausted };
         if (this.requestedKey) {
           const selected = next.items.findIndex(
             (item) => item.key === this.requestedKey,

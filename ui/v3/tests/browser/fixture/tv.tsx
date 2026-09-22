@@ -286,36 +286,6 @@ const markerPage: MockedResponse<
     };
   },
 };
-const mixedPage: MockedResponse<GQL.TvMixedQuery, GQL.TvMixedQueryVariables> = {
-  request: { query: GQL.TvMixedDocument, variables: () => true },
-  maxUsageCount: Infinity,
-  delay: 0,
-  result: (variables) => {
-    record("TvMixed", variables);
-    const scenePage = variables.scene_filter?.page ?? 1;
-    const markerPage = variables.marker_filter?.page ?? 1;
-    const size = variables.scene_filter?.per_page ?? 5;
-    return {
-      data: {
-        findScenes: {
-          __typename: "FindScenesResultType",
-          count: params.has("empty") ? 0 : scenes.length,
-          scenes: params.has("empty")
-            ? []
-            : scenes.slice((scenePage - 1) * size, scenePage * size),
-        },
-        findSceneMarkers: {
-          __typename: "FindSceneMarkersResultType",
-          count: markers.length,
-          scene_markers: markers.slice(
-            (markerPage - 1) * size,
-            markerPage * size,
-          ),
-        },
-      },
-    };
-  },
-};
 const detail: MockedResponse<GQL.FindSceneQuery, GQL.FindSceneQueryVariables> =
   {
     request: { query: GQL.FindSceneDocument, variables: () => true },
@@ -568,7 +538,6 @@ const client = new ApolloClient({
   link: new MockLink([
     scenePage,
     markerPage,
-    mixedPage,
     detail,
     activity,
     play,
@@ -604,10 +573,7 @@ function FixtureTvPage() {
   const source = {
     filter: { sort: "title", direction: GQL.SortDirectionEnum.Asc },
   };
-  const query: TvFeedQuery =
-    mode === "both"
-      ? { ...policy, mode, scenes: source, markers: source }
-      : { ...policy, mode, ...source };
+  const query: TvFeedQuery = { ...policy, mode, ...source };
   return (
     <TvPage
       query={query}

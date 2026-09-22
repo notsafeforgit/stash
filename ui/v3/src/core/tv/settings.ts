@@ -2,9 +2,8 @@ import { z } from "zod";
 import { playerQualitySchema } from "../player-quality";
 import { defaultTvRail, tvRailSchema } from "./action-config";
 
-export const tvModeSchema = z.enum(["scenes", "markers", "both"]);
+export const tvModeSchema = z.enum(["scenes", "markers"]);
 export type TvMode = z.infer<typeof tvModeSchema>;
-export type TvSourceMode = Exclude<TvMode, "both">;
 export const tvFilterSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("default") }),
   z.object({ kind: z.literal("all") }),

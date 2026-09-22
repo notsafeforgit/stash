@@ -106,7 +106,9 @@ Need help or want to get involved? Start with the documentation, then reach out 
 
 ## Architecture
 
-You can find an overview of Stash's architecture in the [ARCHITECTURE.md](docs/ARCHITECTURE.md) document.
+The [system architecture](docs/ARCHITECTURE.md) describes this branch's runtime,
+backend, storage, and compatibility boundaries. The [v3 frontend architecture](ui/v3/docs/architecture.md)
+maps UI modules, state ownership, and extension points.
 
 ## Contributing
 

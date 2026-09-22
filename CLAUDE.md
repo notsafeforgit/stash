@@ -57,6 +57,11 @@ To run a single Go test: `go test ./pkg/models/... -run TestFilterAST`.
 
 ## Architecture
 
+Start with the [system overview](docs/ARCHITECTURE.md) and
+[v3 frontend module map](ui/v3/docs/architecture.md). Detailed player and layout
+contracts live in [player.md](ui/v3/docs/player.md) and
+[interactions.md](ui/v3/docs/interactions.md).
+
 ### Request path
 
 Browser → Vite dev server (dev) / embedded HTTP server (prod) → Chi router (`internal/api/server.go`) → GraphQL handler → resolvers (`internal/api/resolver_*.go`)
@@ -94,7 +99,7 @@ Active development target. A ground-up rewrite sharing the same GraphQL API.
 - `useQuery` / `useMutation` from `@apollo/client/react`.
 - Generated TypeScript types and operation documents live in `src/core/generated-graphql.ts`; run `pnpm --dir ui/v3 gqlgen` after schema changes (also included in v3 dev/build/check scripts).
 - Generated operations use `TypedDocumentNode` from `@graphql-typed-document-node/core`; import the generated documents at call sites.
-- List pages use `use-list-data.ts` for debounce and GraphQL/local dispatch, and `useCachedQueryResult` to retain usable data during refreshes. Preserve pending/error/retry state without treating stale data from another filter as a successful result. See the [list module map](ui/v3/docs/architecture.md#lists).
+- List pages use `use-list-data.ts` for GraphQL/local dispatch and independent count queries, and `useCachedQueryResult` to retain usable data during refreshes. SearchInput owns typing debounce; the data hook adds no further delay. Preserve pending/error/retry state without treating stale data from another filter as a successful result. See the [list module map](ui/v3/docs/architecture.md#lists).
 
 **Forms — TanStack Form v1**
 - Use `useForm` from `@tanstack/react-form` for all forms.

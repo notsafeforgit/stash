@@ -1,420 +1,272 @@
-# Architecture
+# v3 rewrite architecture
 
-> Upstream backend/v2.5 reference. For this fork's active frontend and extension
-> points, read the [v3 architecture](../ui/v3/docs/architecture.md). The
-> [documentation index](README.md) distinguishes current guides from future plans
-> and historical material.
+This is the system overview for the `v3-rewrite` tracking fork. Stash runs one
+Go backend with a shared GraphQL API, a SQLite library, filesystem media, and
+embedded browser applications. Active frontend work belongs in `ui/v3/`;
+`ui/v2.5/` remains the read-only fallback and client compatibility baseline.
 
-This document provides an overview of the Stash codebase architecture for new contributors.
+Start here for runtime and storage boundaries. The [v3 frontend guide](../ui/v3/docs/architecture.md)
+maps UI modules and state ownership; the [development guide](../ui/v3/docs/development.md)
+owns setup and validation commands. [FORK.md](../FORK.md) is authoritative for
+upstream syncs and migration policy. See the [documentation index](README.md)
+for feature guides and explicitly labelled future plans.
 
-## Project Overview
+## Runtime map
 
-Stash is a self-hosted web application written in Go that organizes and serves diverse media collections, catering to both SFW and NSFW needs. It gathers information about videos and images from the internet through extensible community-built plugins and scrapers, supports a wide variety of formats, enables tagging and filtering, and provides statistics about performers, tags, studios, and more.
-
-**Core purpose**: Manage local media libraries with automatic metadata scraping, tagging, and organization.
-
-**Key design philosophy**: 
-- Backend: Go with GraphQL API and SQLite database
-- Frontend: React/TypeScript with Apollo Client
-- Extensibility: Plugin and scraper systems for community contributions
-- Self-hosted: Single binary deployment with embedded frontend assets
-
-## Repository Structure
-
-```
-stash/
-├── cmd/               # Application entry points
-│   ├── phasher/       # Perceptual hash utility
-│   └── stash/         # Main application (cmd/stash/main.go)
-├── docker/            # Docker configuration
-│   ├── build/         # Build configurations
-│   ├── ci/            # CI configurations
-│   ├── compiler/      # Compiler Docker setup
-│   └── production/    # Production Docker setup
-├── graphql/           # GraphQL schema definitions
-│   ├── schema/        # Main schema files
-│   │   └── types/     # GraphQL type definitions
-│   └── stash-box/     # Stash-box integration schema
-├── internal/          # Internal application code
-│   ├── api/           # GraphQL API layer (resolvers, server)
-│   ├── autotag/       # Auto-tagging functionality
-│   ├── desktop/       # Desktop integration
-│   ├── dlna/          # DLNA media server
-│   ├── identify/      # Scene identification
-│   ├── log/           # Implementation of log system
-│   ├── manager/       # Core application manager and services
-│   └── static/        # Static asset serving
-├── pkg/               # Reusable Go packages
-│   ├── ffmpeg/        # FFmpeg integration for media processing
-│   ├── file/          # File system operations and scanning
-│   ├── gallery/       # Gallery-specific business logic
-│   ├── group/         # Group (movie) business logic
-│   ├── hash/          # Hashing utilities (MD5, oshash, phash)
-│   ├── image/         # Image-specific business logic
-│   ├── job/           # Background job management
-│   ├── logger/        # Logging utilities
-│   ├── models/        # Interface definitions for data entities
-│   ├── performer/     # Performer-specific business logic
-│   ├── plugin/        # Plugin system
-│   ├── scene/         # Scene-specific business logic
-│   ├── scraper/       # Metadata scraping system
-│   ├── sqlite/        # SQLite implementations of datalayer interfaces
-│   ├── studio/        # Studio-specific business logic
-│   ├── tag/           # Tag-specific business logic
-│   └── ...            # Other utility packages
-├── ui/                # React/TypeScript frontend
-│   ├── login/         # Login page
-│   └── v2.5/          # Main frontend application
-├── docs/              # Documentation
-├── scripts/           # Utility scripts
-├── go.mod             # Go module definition
-├── go.sum             # Go dependency checksums
-├── gqlgen.yml         # GraphQL code generation config
-└── Makefile           # Build automation
+```mermaid
+flowchart TD
+    owner["v3 app / v2.5 client"] --> private["Private Chi router: sessions and API authentication"]
+    private --> graphql["/graphql: gqlgen resolvers and dataloaders"]
+    private --> media["Media HTTP routes"]
+    guest["Standalone share viewer"] --> shares["/share: isolated capability router"]
+    shares --> mediaService["Media services / FFmpeg stream manager"]
+    shares --> repo["Repository interfaces and transactions"]
+    graphql --> repo
+    graphql --> jobs["Manager services and background jobs"]
+    jobs --> repo
+    jobs --> files["Source media and generated files"]
+    media --> mediaService
+    mediaService --> files
+    repo --> db["SQLite library and fork sidecars"]
+    db -. "derived search data" .-> search["Disposable .search.sqlite index"]
+    offline["Standalone offline library"] --> browser["Browser IndexedDB and OPFS"]
 ```
 
-## Backend Architecture
-
-### Go Package Organization
-
-The backend follows a layered architecture with clear separation of concerns:
-
-**`pkg/models/` - Interface Layer**
-- Defines interfaces for each entity (Scene, Image, Gallery, Performer, Studio, Tag, etc.)
-- Each entity has `Reader`, `Writer`, and `ReaderWriter` interfaces
-- Contains data model structs and query/filter types
-- Example: `repository.go` defines the main `Repository` struct with all entity repositories
-- Example: `repository_scene.go` defines `SceneReaderWriter` interface
-
-**`pkg/sqlite/` - Implementation of datalayer interfaces**
-- Implements the interfaces defined in `pkg/models/`
-- Uses `goqu` for CRUD operations and standard queries, and a custom query builder for complex filtering/listing
-- Contains all database access logic
-- Example: `scene.go` implements `SceneStore` with CRUD operations
-- Example: `scene_filter.go` implements filtering logic
-- Handles transactions and connection pooling
-
-**`internal/api/` - API Layer**
-- GraphQL resolvers that implement the schema
-- Each resolver method calls repository methods
-- Handles authentication, authorization, and validation
-- Example: `resolver_query_find_scene.go` implements scene query resolvers
-- Example: `resolver_mutation_scene.go` implements scene mutation resolvers
-- `server.go` sets up the HTTP server and GraphQL handler
-
-### Layering Pattern
-
-```
-GraphQL Query/Mutation
-    ↓
-Resolver (internal/api/resolver_*.go)
-    ↓ (complex entities: Scene, Gallery, Image, Group)
-Service Layer (pkg/scene/, pkg/gallery/, pkg/image/, pkg/group/)
-    ↓ (simpler entities: Performer, Studio, Tag)
-Validation (pkg/performer/, pkg/studio/, pkg/tag/)
-    ↓
-Repository Interface (pkg/models/repository_*.go)
-    ↓
-SQLite Implementation (pkg/sqlite/*.go)
-    ↓
-SQLite Database
-```
-
-Note: `gqlgen.yml` maps GraphQL types to Go structs and controls code generation. Update it when adding new types or fields.
-
-### GraphQL Request Lifecycle
-
-1. **Request**: Frontend sends GraphQL query to `/graphql` endpoint
-2. **Routing**: `internal/api/server.go` routes to GraphQL handler (gqlgen)
-3. **Parsing**: gqlgen parses the query and validates against schema
-4. **Resolver Execution**: Appropriate resolver method in `internal/api/` is called
-5. **Transaction**: Resolver wraps operation in read or write transaction via `withReadTxn()` or `withTxn()`
-6. **Business Logic** (mutations only):
-   - Complex entities (Scene, Gallery, Image, Group): resolver delegates to service layer (`pkg/scene/`, `pkg/gallery/`, etc.)
-   - Simpler entities (Performer, Studio, Tag): resolver calls validation functions (`pkg/performer/`, `pkg/studio/`, etc.) then proceeds directly to repository
-   - Queries and model field resolvers skip this step entirely
-7. **Repository Call**: Resolver or service calls repository method (e.g., `r.repository.Scene.Find()`)
-8. **SQL Execution**: SQLite implementation executes SQL query using a mix of goqu and a custom query builder
-9. **Response**: Data flows back through layers to frontend as JSON
-
-### Plugin System
-
-**Location**: `pkg/plugin/`
-
-- Defines the plugin spec for UI-based plugins (including JavaScript), and supports executing external scripts, commands, and binaries via raw or RPC interface
-- Plugins are configured via YAML files in the plugins directory
-- Support for hooks that trigger on events (e.g., `Scene.Create.Post`)
-- Plugin cache in manager for performance
-- RPC communication between Go and JavaScript plugins
-- Example hooks: `Scene.Create.Post`, `Scene.Update.Post`, `Scan.Post`
-
-Key files:
-- `plugins.go` - Plugin loading and execution
-- `hooks.go` - Hook system implementation
-- `config.go` - Plugin configuration parsing
-
-### Scraper System
-
-**Location**: `pkg/scraper/`
-
-- YAML-configured scrapers for fetching metadata from websites
-- Supports multiple scraper types: XPath, JSON, GraphQL, script-based
-- Scrapers can fetch performers, scenes, galleries, studios, tags
-- Stash-box integration for crowd-sourced metadata
-- Cache for scraper definitions
-- Post-processing for transforming scraped data
-
-Key files:
-- `cache.go` - Scraper caching
-- `definition.go` - Scraper configuration parsing
-- `xpath.go` - XPath-based scraping
-- `json.go` - JSON-based scraping
-- `mapped.go` - Mapping scraped data to Stash models
-
-### Task/Job System
-
-**Location**: `pkg/job/`
-
-- Background job management for long-running operations
-- Progress reporting via GraphQL subscriptions
-- Task queue with parallel execution
-- Cancellation support
-- Job types: Scan, Generate, Clean, Auto-tag, Identify, Export, Import
-
-Key files:
-- `manager.go` - Job manager implementation
-- `job.go` - Job interface and progress tracking
-- `subscribe.go` - Subscription support for job updates
-
-Task implementations in `internal/manager/task/`:
-- `task_scan.go` - File scanning
-- `task_generate.go` - Thumbnail/sprite generation
-- `task_clean.go` - Orphaned file cleanup
-- `task_autotag.go` - Automatic tagging
-- `task_identify.go` - Scene identification
-
-## Frontend Architecture
-
-### React/TypeScript Structure
-
-**Location**: `ui/v2.5/`
-
-```
-ui/v2.5/
-├── src/
-│   ├── core/              # Core services and GraphQL client
-│   │   ├── StashService.ts      # Main GraphQL client
-│   │   ├── generated-graphql.ts # Auto-generated TypeScript types
-│   │   ├── createClient.ts      # Apollo client setup
-│   │   ├── config.ts            # Configuration
-│   │   ├── scenes.ts            # Scene-specific queries
-│   │   ├── performers.ts       # Performer-specific queries
-│   │   └── ...
-│   ├── components/       # React components
-│   │   ├── Scenes/            # Scene-related components
-│   │   ├── Performers/        # Performer-related components
-│   │   ├── Galleries/         # Gallery-related components
-│   │   ├── Images/            # Image-related components
-│   │   ├── Studios/           # Studio-related components
-│   │   ├── Tags/              # Tag-related components
-│   │   ├── Settings/          # Settings components
-│   │   ├── Shared/            # Shared/reusable components
-│   │   └── ...
-│   ├── hooks/            # Custom React hooks
-│   │   ├── data.ts           # Data fetching hooks
-│   │   ├── LocalForage.ts    # Local storage hooks
-│   │   ├── Toast.tsx         # Toast notifications
-│   │   └── ...
-│   ├── models/           # Frontend data models
-│   │   └── list-filter/      # Filter and list models
-│   ├── locales/          # i18n translations
-│   │   ├── en-GB.json        # English
-│   │   ├── de-DE.json        # German
-│   │   └── ...
-│   ├── utils/            # Utility functions
-│   ├── App.tsx           # Main application component
-│   └── index.tsx         # Application entry point
-├── graphql/              # GraphQL queries and fragments
-├── public/               # Static assets
-├── package.json          # Dependencies and scripts
-├── codegen.ts            # GraphQL codegen configuration
-└── vite.config.js        # Vite build configuration
-```
-
-### Communication with Backend
-
-**GraphQL via Apollo Client**:
-- Frontend uses Apollo Client (`@apollo/client`) for GraphQL communication
-- GraphQL queries defined in `graphql/` directory
-- Code generation via `@graphql-codegen/cli` generates TypeScript types
-- Generated types in `src/core/generated-graphql.ts`
-- WebSocket subscriptions for real-time updates (job progress, logging)
-
-
-**Service Layer** (`src/core/`):
-- `StashService.ts` - Main GraphQL client with typed queries/mutations
-- Domain-specific files (scenes.ts, performers.ts, etc.) - Organized queries
-- `createClient.ts` - Apollo client setup with authentication and uploads
-
-## Database Layer
-
-### SQLite Usage
-
-**Database**: Single SQLite database file (default: `stash-go.sqlite`)
-- WAL (Write-Ahead Logging) mode for concurrency
-- Connection pooling: 1 write connection, 10 read connections
-- 30-second idle connection timeout
-- Configurable cache size via `STASH_SQLITE_CACHE_SIZE` environment variable
-
-**Blob Storage**:
-- Configurable storage for cover images and other binary data
-- Options: Database (BLOB columns) or Filesystem (separate directory)
-- Managed via `BlobStore` in `pkg/sqlite/blob.go`
-
-### Migration System
-
-**Location**: `pkg/sqlite/migrations/`
-
-**Migration Files**:
-- Numbered `.up.sql` files (e.g., `32_files.up.sql`)
-- Current schema version is defined in `pkg/sqlite/database.go`
-- Migrations embedded via `//go:embed migrations/*.sql`
-- Uses `golang-migrate/migrate` library
-
-**Custom Migrations**:
-- Pre-migration Go files (e.g., `32_premigrate.go`) - Run before SQL
-- Post-migration Go files (e.g., `32_postmigrate.go`) - Run after SQL
-- Used for data transformations that SQL cannot handle
-
-**Migration Process** (`pkg/sqlite/migrate.go`):
-- The migrator runs pre-migration Go code, executes the SQL migration, then runs post-migration Go code for each version increment.
-
-**Key Migrations**:
-- `32_files.up.sql` - Introduced file/folder abstraction
-- `45_blobs.up.sql` - Blob storage system
-- `71_custom_fields.up.sql` - Custom fields support
-
-### Query Patterns
-
-**Repository Pattern**:
-- All database access goes through repository interfaces
-- SQLite implementations use a mix of goqu and a custom query builder within the `sqlite` package
-- Transactions managed via `txn.Manager`
-
-**Example Query** (`pkg/sqlite/scene.go`):
-```go
-func (qb *SceneStore) Find(ctx context.Context, id int) (*models.Scene, error) {
-    var scene models.Scene
-    err := qb.repository.queryStruct(ctx, qb.sceneQuery(), []interface{}{id}, &scene)
-    if err != nil {
-        return nil, err
-    }
-    return &scene, nil
-}
-```
-
-**Filtering**:
-- Complex filtering via a custom query builder system (`query.go`, `filter.go`) that constructs raw SQL
-- Criterion handlers in `criterion_handlers.go` dynamically build WHERE, HAVING, and WITH clauses
-- Supports hierarchical filters (tags, studios) via recursive CTEs
-- Simpler queries (CRUD, join-table lookups) use `goqu` via the `table` abstraction
-
-## Key Data Flows
-
-### Example 1: GraphQL Query (findScene)
-
-**Flow**:
-1. Frontend sends GraphQL query requesting scene data by ID
-
-2. Request hits `internal/api/server.go` at `/graphql` endpoint
-
-3. gqlgen routes to the appropriate resolver in `resolver_query_find_scene.go`
-
-4. Resolver wraps the operation in a read transaction using `withReadTxn()` to ensure consistent database access
-
-5. Repository calls the SQLite implementation in `pkg/sqlite/scene.go` to execute the query
-
-6. SQLite generates and executes the SQL query (using goqu or the custom queryBuilder depending on operation) to fetch the scene record
-
-7. Scene object flows back through layers: SQLite → Repository → Resolver → GraphQL → Frontend
-
-8. Frontend receives JSON response with the requested scene data
-
-### Example 2: Scanning a File
-
-**Flow**:
-1. User triggers scan via UI (Settings → Metadata → Scan)
-
-2. Frontend sends GraphQL mutation to start the scan job
-
-3. Mutation resolver in `internal/api/resolver_mutation_metadata.go` creates a background job
-
-4. Job manager queues `ScanJob` from `internal/manager/task_scan.go`
-
-5. `ScanJob.Execute()` runs the scan operation with progress tracking
-
-6. Filesystem walk traverses configured paths using `file.SymWalk`, queues files for processing, and filters based on modification time and .stashignore
-
-7. File handlers process each file type: videos become Scenes, images become Images, zip files become Galleries, and folders get Folder records
-
-8. For each video file, the system calculates checksums (MD5, oshash, phash), extracts metadata via FFmpeg, creates File and Scene records, and generates thumbnails, sprites, previews, and interactive heatmaps
-
-9. Progress updates flow via GraphQL subscription with real-time updates on files processed
-
-10. Scan completes with updated statistics, subscription notifies completion, and UI refreshes with new content
-
-**Key Files**:
-- `internal/manager/task_scan.go` - Main scan logic
-- `pkg/file/` - File system operations
-- `pkg/scene/scan.go` - Scene-specific scan logic
-- `pkg/image/scan.go` - Image-specific scan logic
-- `pkg/gallery/scan.go` - Gallery-specific scan logic
-
-## Development Workflow
-
-### Adding a New GraphQL Field
-
-1. Define field in `graphql/schema/schema.graphql`
-2. Run `make generate-backend` to regenerate types
-3. Implement resolver in `internal/api/resolver_*.go`
-4. If query requires new repository method:
-   - Add interface to `pkg/models/repository_*.go`
-   - Implement in `pkg/sqlite/*.go`
-5. Add frontend query in `ui/v2.5/graphql/`
-6. Run `make generate-ui` to regenerate frontend types
-   - Frontend type checking runs in CI — you do not need to run `tsc` locally.
-
-### Adding a Database Migration
-
-1. Create new migration file: `pkg/sqlite/migrations/{version}_description.up.sql`
-2. If needed, create `{version}_premigrate.go` for pre-migration logic
-3. If needed, create `{version}_postmigrate.go` for post-migration logic
-4. Update `appSchemaVersion` in `pkg/sqlite/database.go`
-5. Test migration on development database
-
-### Running Tests
-
-```bash
-# Backend test
-make it
-```
-
-### Building
-
-```bash
-# Build frontend
-make ui
-# Develop frontend with hot-reload
-make ui-start
-# Build backend (requires frontend to be built first)
-make build
-```
-
-## Additional Resources
-
-- **Development Guide**: See `docs/DEVELOPMENT.md`
-- **Contributing**: See `docs/CONTRIBUTING.md`
-- **GraphQL Schema**: `graphql/schema/schema.graphql`
-- **In-app Manual**: Available in-app via Shift+?
-- **GraphQL Playground**: Available at `/playground`
-- **Community**: [Discord](https://discord.gg/2TsNFKt) and [Discourse](https://discourse.stashapp.cc)
+[cmd/stash/main.go](../cmd/stash/main.go) initializes configuration, the
+singleton [Manager](../internal/manager/init.go), then the
+[HTTP server](../internal/api/server.go). The manager assembles repositories,
+entity services, sessions, plugin/scraper caches, jobs, and media processing.
+Setup and migration-required states leave the HTTP API available so the browser
+can complete setup before entering the library.
+
+Production serves embedded assets from [ui/ui.go](../ui/ui.go) and
+[ui/ui_v3.go](../ui/ui_v3.go). `--enable-v3-ui` / `STASH_ENABLE_V3_UI=true`
+selects v3 at the application mount point and enables supporting HTTP routes,
+including v3 segmented streaming, preview images, and shares. It does not add a
+`/v3` URL prefix. A configured custom UI directory overrides the embedded UI
+selection. The GraphQL schema is shared; the flag is **not** a separate API
+version or a switch that disables fork database migrations.
+
+| Browser entry point | Responsibility and boundary |
+| --- | --- |
+| [main.tsx](../ui/v3/src/main.tsx) → [app.tsx](../ui/v3/src/app.tsx) | Main v3 app: Apollo, system status, configuration/locales, plugin registration, then TanStack Router |
+| [offline-main.tsx](../ui/v3/src/pwa/offline-main.tsx) | Standalone offline library/player; boots from bundled assets and local downloads without the main app's server or plugin gates |
+| [share-main.tsx](../ui/v3/src/share-main.tsx) | Guest viewer; uses scoped share JSON/media endpoints without owner configuration, plugins, or the owner's Apollo session |
+| [ui/v2.5](../ui/v2.5/) | Upstream UI, served when v3 is disabled; its operations continue to work against the same backend when v3 is enabled |
+
+[vite.config.ts](../ui/v3/vite.config.ts) builds the three v3 HTML entries and
+their shared chunks. During development, Vite serves the UI on port 3002 and
+proxies backend paths; client URL helpers can also address the configured
+backend directly. In production, the server inserts the public proxy prefix
+into the HTML `<base>` element. [platform-url.ts](../ui/v3/src/core/platform-url.ts)
+derives API URLs and router paths from it. Preserve this boundary when adding
+links, worker scopes, or media requests.
+
+## Backend responsibilities
+
+| Area | Owns |
+| --- | --- |
+| [graphql/schema](../graphql/schema/) and [gqlgen.yml](../gqlgen.yml) | Public schema and Go type/resolver generation |
+| [internal/api](../internal/api/) | HTTP routes, GraphQL resolvers, input translation, authentication, and response shaping |
+| [internal/api/loaders](../internal/api/loaders/) | Request-scoped batching of related entity reads to avoid N+1 queries |
+| [internal/manager](../internal/manager/) | Application lifecycle and service wiring; scan/generate/import jobs in `task_*.go`; stream and download coordination |
+| [pkg/models](../pkg/models/) | Domain values, filter/query models, and repository interfaces; `Repository` supplies entity stores and a transaction manager |
+| [pkg/scene](../pkg/scene/), [pkg/image](../pkg/image/), [pkg/gallery](../pkg/gallery/), [pkg/group](../pkg/group/) | Entity operations that coordinate related records, files, and validation; other entity packages supply their own validation/update helpers |
+| [pkg/sqlite](../pkg/sqlite/) and [pkg/txn](../pkg/txn/) | Repository implementation, query builders, connection pools, migrations, transaction context, and commit hooks |
+| [pkg/ffmpeg](../pkg/ffmpeg/), [pkg/file](../pkg/file/), [pkg/previewimage](../pkg/previewimage/) | Probing, transcoding/streaming, file scanning, and still-image renditions |
+| [pkg/job](../pkg/job/) | In-memory job queue, progress, cancellation, and subscriptions |
+| [internal/sharing](../internal/sharing/) | Frozen share membership, credentials, expiry, and revocation |
+| [pkg/plugin](../pkg/plugin/), [pkg/scraper](../pkg/scraper/), [internal/identify](../internal/identify/) | Backend extensions, metadata retrieval, and identification |
+
+Resolvers receive their repository and service dependencies from
+`api.Initialize`. Ordinary entity operations go through repository interfaces;
+resolvers can call a store directly or delegate to an entity service. These
+packages are collaborators, not successive stages every request must traverse.
+
+`withReadTxn` / `withTxn` in [resolver.go](../internal/api/resolver.go) delegate
+to repository transaction helpers. Use the callback's context for repository
+calls so they share that transaction. Transactions are scoped by individual
+operations and loaders; a whole GraphQL response is not automatically one
+database snapshot. Filesystem and FFmpeg work have separate lifecycles and are
+not made atomic by a SQLite transaction.
+
+## Data and compatibility
+
+| Data | Owner and lifetime |
+| --- | --- |
+| Library metadata and relationships | Main SQLite file, normally `stash-go.sqlite`; authoritative upstream tables plus fork sidecars |
+| Server/UI configuration | YAML configuration managed by [internal/manager/config](../internal/manager/config/); includes UI defaults and plugin settings |
+| Original media | Configured library paths and archive contents; database file/folder records describe these files |
+| Stored artwork blobs | [BlobStore](../pkg/sqlite/blob.go), configured for database blobs or a separate filesystem location |
+| Generated media | Configured generated paths: covers, previews, sprites, transcodes, temporary downloads; generation and cleanup belong to manager/media services |
+| Search acceleration | Separate `<database>.search.sqlite` plus an in-memory exact-count cache; derived and rebuildable |
+| Browser state | Apollo entity cache, URL/filter state, device preferences, and deployment-scoped offline IndexedDB/OPFS; detailed ownership is in the [frontend guide](../ui/v3/docs/architecture.md#state-configuration-and-type-boundaries) |
+
+[database.go](../pkg/sqlite/database.go) uses WAL mode with one write connection
+and up to ten read connections. [read_acceleration.go](../pkg/sqlite/read_acceleration.go)
+pins read snapshots before accepting cached counts or search candidates. The
+FTS5 trigram index narrows candidates; the original SQL predicates still check
+them. Missing, stale, unsupported, or overly broad index results fall back to
+ordinary SQL. External writes invalidate caches, and startup rebuilds the search
+index. No FTS tables or persistent search tracking triggers are added to the
+library database. See [read performance](read-performance.md) for details.
+
+### Two migration tracks
+
+Upstream SQL migrations in [pkg/sqlite/migrations](../pkg/sqlite/migrations/)
+own `schema_migrations` and `appSchemaVersion`. Fork Go migrations register
+through [fork_migrate.go](../pkg/sqlite/fork_migrate.go) and record their version
+in `fork_schema_migrations`. Fork changes must not advance the upstream numeric
+sequence or add columns to upstream-owned tables.
+
+Fork-only values live in `fork_*` sidecars: canonical saved filters, performer
+name policies, extended file metadata, scene-cover provenance, and shares.
+Migration 5 consolidated the earlier private schema changes into compatible
+sidecars; subsequent migrations add ordinary browsing indexes, cover origins,
+and share grants/sessions. Idempotent reconcilers run after migration and when a
+current database opens, importing compatible upstream edits and invalidating
+derived state. These paths run in the fork binary regardless of the UI flag.
+
+An upstream-only binary at the matching upstream schema version can use the
+base representation while ignoring fork sidecars. This does not promise that
+any older Stash release can open the database. [Retiring compatibility](v3-schema-promotion.md)
+is a conditional future transition, not current migration policy.
+
+### Shared API, richer v3 state
+
+Keep GraphQL additions compatible with existing operation shapes, argument
+defaults, and mutation behavior. In particular:
+
+- Saved filters keep their v2.5 `object_filter` projection while a sidecar holds
+  the canonical v3 AST and a legacy shadow. Complex conflicting edits preserve
+  both values for resolution; they are not silently flattened into a new AST.
+- Default filters use the equivalent `defaultFilters` / `forkDefaultFilterState`
+  configuration bridge. `configureDefaultFilter` updates one view atomically;
+  changing a default must not replace the entire UI configuration.
+- `Scene.sceneStreams` keeps the legacy stream catalogue.
+  [sceneStreamsV3](../internal/api/resolver_model_scene_v3.go) supplies v3's
+  separate catalogue. The [legacy adapter](../internal/manager/scene_stream_legacy_compat.go)
+  preserves v2.5 behavior even with v3 enabled.
+- Legacy bulk mutations retain their synchronous return contract; additive
+  `bulk*UpdateJob` mutations support v3's background workflow.
+
+[FORK.md](../FORK.md) documents the storage bridges and fork-owned extension
+files. [check-compatibility.mjs](../ui/v3/scripts/check-compatibility.mjs) checks
+the schema, mainline operations, and upstream migration track against a pinned
+baseline. It cannot prove every runtime behavior of an external client.
+
+## Request and work flows
+
+### Browsing a library
+
+The main UI's generated typed documents go through the shared Apollo client to
+`/graphql`. gqlgen dispatches to resolvers such as
+[FindScenes](../internal/api/resolver_query_find_scene.go); repository queries
+run inside read transactions, and model field resolvers/loaders hydrate requested
+relationships. The selected GraphQL fields determine which count, page, or
+aggregate work is needed.
+
+v3 scene/image lists request cards and exact counts separately. Cards can render
+while the total is unknown; count-dependent pagination and bulk actions wait
+for the total. Apollo merges the selections, and mutation invalidation refreshes
+the affected queries. Other entities can use combined item/count queries.
+[The list contract](../ui/v3/docs/architecture.md#lists) owns this distinction.
+
+### Editing and background jobs
+
+A normal edit validates inputs, writes through the appropriate service/store
+in a transaction, and returns data for Apollo normalization. Relationship,
+membership, and count changes use targeted query invalidation; scalar changes
+can propagate through the normalized entity without a full list refetch.
+
+Long-running work goes through `pkg/job.Manager`. `Add` queues jobs for serial
+execution; `Start` explicitly starts a concurrent job. Individual jobs may also
+parallelize their own tasks. The queue is in memory and does not survive a
+server restart. Scan entry points live in
+[manager_tasks.go](../internal/manager/manager_tasks.go), with walking and
+per-file processing in [task_scan.go](../internal/manager/task_scan.go).
+Probing, hashing, and generation depend on scan options; a scan does not
+unconditionally generate every derivative.
+
+For v3 bulk edits, [bulk resolvers](../internal/api/resolver_mutation_bulk_scene.go)
+resolve the affected IDs, removing pagination from a filter selection, then
+enqueue the operation. [task_bulk_update.go](../internal/manager/task_bulk_update.go)
+commits each item independently and runs enabled post-hooks after successful
+writes. Failed items roll back and are reported; cancellation or an error does
+not undo already committed items.
+
+[Job subscriptions](../internal/api/resolver_subscription_job.go) retain the
+legacy combined stream and add separate lifecycle/progress streams. The API
+forwarder preserves received lifecycle events and may drop progress under
+backpressure. Upstream job-manager buffers and disconnected clients can still
+miss events, so subscriptions are not a durable event log.
+[core/job-queue.ts](../ui/v3/src/core/job-queue.ts) reconciles visible tasks with
+HTTP snapshots; [monitor-job.ts](../ui/v3/src/core/monitor-job.ts) watches
+completion independently of an edit sheet remaining mounted.
+
+### Playback and downloads
+
+GraphQL supplies scene metadata and stream descriptors; media bytes use HTTP
+routes under `/scene/`, `/image/`, and related namespaces. Scene routes delegate
+to manager/media services and the FFmpeg stream manager for direct files,
+remuxing, or transcoding. v3 adds fMP4 HLS endpoint families and scoped transcode
+sessions while retaining legacy endpoints.
+
+The UI's shared `ScenePlayer` separates source selection, pure seek/transition
+policy, and browser effects. Scene detail, lightboxes, and TV reuse it; offline
+playback adapts stored metadata to a local `blob:` source. Keep the player/store
+and native video stable through source changes. Session leases control encoder
+lifetime separately from URL reloads. The [player guide](../ui/v3/docs/player.md)
+maps both sides of this contract, including clip timelines and recovery.
+[Preview images](preview-images.md) and [offline downloads](../ui/v3/docs/offline.md)
+cover their distinct generation and storage paths.
+
+## Extension and trust boundaries
+
+Backend plugins in [pkg/plugin](../pkg/plugin/) support external raw/RPC tasks
+and embedded JavaScript through Goja, plus configured hooks. Scrapers in
+[pkg/scraper](../pkg/scraper/) use YAML definitions and XPath, JSON, GraphQL, or
+scripts to retrieve metadata. Identification coordinates these sources and
+stash-box matching.
+
+v3 UI plugins are a separate browser extension surface. The
+[plugin host](../ui/v3/docs/plugin-host.md) stages timed registrations before
+building the router and exposes shared Apollo, navigation, UI, and locale
+capabilities. Failed registrations cannot block core routing. Plugins and
+custom JavaScript run as trusted application code, not in a security sandbox;
+runtime CSS/JavaScript customization is covered by [theming](../ui/v3/docs/theming.md).
+
+Shares use [routes_share.go](../internal/api/routes_share.go), an isolated
+`/share` router selected before owner authentication. A link secret is exchanged
+for a path-scoped guest session. Each request is checked against the current
+grant and frozen media membership. Guest credentials do not authorize GraphQL
+or the ordinary library routes, and the guest entry point does not boot the
+owner app. [Sharing](sharing.md) owns the public-host proxy configuration,
+credential lifecycle, rendition policy, and limits.
+
+The [service worker](../ui/v3/src/pwa/service-worker.ts) precaches the standalone
+offline entry and its dependency graph. Selected application navigations fall
+back to it on network failure, timeout, or server 5xx; authentication responses
+remain unchanged. API responses and streamed media are not a general-purpose
+worker cache. Saved video bytes belong to OPFS, with metadata and queue state in
+IndexedDB, scoped by backend mount URL. This is a device copy, not a synchronized
+replica of the server library.
+
+## Making a change
+
+| Change | Start with |
+| --- | --- |
+| Add or extend a GraphQL field | Schema → gqlgen mapping/resolver → repository/service if needed → v3 operation; preserve the v2.5 contract |
+| Add persisted fork data | [FORK.md](../FORK.md), a sidecar migration/reconciler, and close/upstream-write/reopen compatibility fixtures |
+| Add a list or detail view | [Frontend module map](../ui/v3/docs/architecture.md#module-map), typed list configuration, and shared detail layouts |
+| Change playback | [Player guide](../ui/v3/docs/player.md), frontend transition tests, and backend stream/timestamp tests |
+| Change navigation, gestures, or overlays | [Interaction guide](../ui/v3/docs/interactions.md) and browser regression fixtures |
+| Change guest or offline behavior | [Sharing](sharing.md) or [offline](../ui/v3/docs/offline.md); preserve their independent startup/data boundaries |
+
+Regenerate bindings instead of editing generated files. `make generate` updates
+Go and v2.5 GraphQL output; v3 generation is separate and included in its
+dev/build/check scripts. TanStack generates the route tree during Vite dev/build.
+Build both embedded UIs before full Go validation. The
+[development guide](../ui/v3/docs/development.md#validation) gives the validation
+sequence and browser/device limits; [deployment](v3-deployment.md) covers
+publication. Update the owning current guide when a documented contract changes.

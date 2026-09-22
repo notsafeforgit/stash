@@ -129,7 +129,7 @@ generate → build UIs → validate → compile order.
 | `make validate-ui-v3` | Biome lint (including accessibility), React purity/type-contract lint, generation, TypeScript, formatting, locales, Vitest, and pinned v2.5 compatibility |
 | `make validate-fork` | Backend generation, v3 validation, Go lint, and Go unit/integration tests |
 | `make lint` | CI-pinned golangci-lint via `go run` |
-| `make it` | Go tests with `sqlite_stat4 sqlite_math_functions integration` build tags |
+| `make it` | Go tests with `sqlite_stat4 sqlite_math_functions sqlite_fts5 integration` build tags |
 | `pnpm --dir ui/v3 test --run` | Generate v3 GraphQL types and run Vitest once |
 | `make test-ui-v3-browser` | Generate/check v3 and run the Chromium/WebKit toolbar regression suite |
 | `make fmt-ui-v3` | Format v3 source with Biome |

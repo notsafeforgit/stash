@@ -1,145 +1,114 @@
 # v3 architecture
 
-Current foundation, checked against the implementation on 2026-09-07.
-Use the [development guide](development.md) for setup and validation and the
-[documentation index](../../../docs/README.md) for feature and operations guides.
-The [original plan](archive/rewrite-plan.md)
-and [early evaluation](archive/rewrite-plan-evaluation.md) are historical snapshots.
+This guide describes the implemented frontend on `v3-rewrite`. The
+[system overview](../../../docs/ARCHITECTURE.md) covers backend services, storage,
+and request flows. Use the [development guide](development.md) for setup and
+validation and the [documentation index](../../../docs/README.md) for feature
+guides. The [original plan](archive/rewrite-plan.md) and
+[early evaluation](archive/rewrite-plan-evaluation.md) are historical snapshots.
 
 ## Compatibility boundary
 
-v3 uses React 19, TypeScript, TanStack Router, Apollo Client 4, shadcn components
-built on Base UI, Tailwind 4, and Video.js 10. It shares the Go backend with v2.5
-and is enabled with `--enable-v3-ui` or `STASH_ENABLE_V3_UI=true`.
+v3 uses React, TypeScript, TanStack Router, Apollo Client, shadcn components
+built on Base UI, Tailwind, and Video.js. [package.json](../package.json) and
+[pnpm-workspace.yaml](../pnpm-workspace.yaml) own versions and overrides.
+It shares the Go backend with v2.5. `--enable-v3-ui` or
+`STASH_ENABLE_V3_UI=true` selects the embedded v3 app and supporting HTTP routes.
 
 v3 route paths may evolve independently. Existing v2.5 clients must retain their
 GraphQL operations, response shapes, mutation semantics, and compatible database
 representation. Treat `ui/v2.5/` as a read-only reference. Keep GraphQL changes
 additive and store fork data in sidecars and idempotent reconcilers, leaving
-upstream's numeric migrations and primary schema version unchanged. See
+upstream's numeric migrations and primary schema version unchanged. Disabling
+the UI flag does not disable the fork's database migration track. See
 [FORK.md](../../../FORK.md).
+
+## Module map
+
+Paths in this guide are relative to `ui/v3/src/` unless indicated otherwise.
+
+| Area | Responsibility |
+| --- | --- |
+| [main.tsx](../src/main.tsx), [app.tsx](../src/app.tsx) | Main entry, shared providers, and startup gates |
+| [router.tsx](../src/router.tsx), [routes/](../src/routes/) | File-based routes, search validation, route loaders, base path, and plugin route composition |
+| [core/](../src/core/) | Shared Apollo transport/cache, typed navigation, configuration codecs, job monitoring, and mutation invalidation |
+| [graphql/](../graphql/), [codegen.ts](../codegen.ts) | Authored operations/fragments and generated schema types / `TypedDocumentNode` operations |
+| [components/list/](../src/components/list/), [models/list-filter/](../src/models/list-filter/) | Entity list composition, source contracts, filter AST/URL conversion, selection, and layouts |
+| [components/detail/](../src/components/detail/), [components/forms/](../src/components/forms/) | Shared detail/editing shells and TanStack Form/Zod form contracts |
+| [components/player/](../src/components/player/), [components/lightbox/](../src/components/lightbox/) | Stable media ownership, playback policy, and viewer sessions; see [player](player.md) |
+| [components/layout/](../src/components/layout/) | Shell, navigation, footer slots, and visual transitions; see [interactions](interactions.md) |
+| [components/ui/](../src/components/ui/), [styles/](../src/styles/) | Repository UI wrappers, semantic theme tokens, and global interaction policy |
+| [hooks/](../src/hooks/), [locales/](../src/locales/) | Shared lifecycles/preferences and react-intl messages |
+| [plugins/](../src/plugins/) | Timed plugin registration, registry, and explicit browser host capabilities |
+| [components/offline/](../src/components/offline/), [pwa/](../src/pwa/) | Download queue, storage adapters, service worker, and standalone offline entry |
+| [components/sharing/](../src/components/sharing/), [share-main.tsx](../src/share-main.tsx) | Share management and standalone guest presentation with a separate JSON contract |
+| [components/tv/](../src/components/tv/) | TV feed/window/input ownership around the shared player; see [TV mode](tv-mode.md) |
+
+Routes compose feature components; reusable viewers and editors belong under
+`components/` so importing one does not import a route into the eager tree.
+Shared UI wrappers own primitive behavior. Domain/query helpers belong in
+`core/` and filter models, with public browser/plugin inputs narrowed at their
+boundaries. Keep generated files out of manual edits: GraphQL output,
+`routeTree.gen.ts`, and `settings-search-index.gen.ts` have separate generators
+described in [development](development.md#generation-and-builds).
 
 ## Startup, routing, and data ownership
 
-- `core/client.ts` owns the shared lazy Apollo/WebSocket client. Do not create
-  another client for a feature.
-- Configuration and system-status gates expose errors and retry actions. Bundled
-  locale messages load before optional server overrides.
-- `system-status-gate.tsx` loads migration/setup screens only when required.
-  Once the database is ready, configuration and bounded plugin discovery start
-  together; plugin registration still waits for configuration and locale setup.
-  The plugin UI catalog loads only when an enabled v3 plugin needs it.
-- Plugin registration is staged and time limited. Only completed registrations
-  enter the router; core routes remain available if plugin startup fails. Route
-  collisions are rejected explicitly.
-- Cards and list routes import editors through `detail/deferred-overlays.ts`
-  and lightboxes through the lightbox barrel. Closed overlays fetch no feature
-  code. After first opening, wrappers preserve the component lifetime, drafts,
-  and closing animations. A pending or failed download remains dismissible.
-  Generic tables use `lazyModule` to preserve item/column types across the lazy
-  boundary without casting. Keep route-independent viewers in components:
-  exporting them from a route can pull media code into the eager route tree.
-- Ordinary scene lists and Home request count and card data, not duration or
-  size aggregates. The backend aggregate fields remain available to other
-  clients, including v2.5. See [read performance](../../../docs/read-performance.md)
-  for the database strategy and measurement boundaries.
-- `core/platform-url.ts` derives the deployment prefix from the server's base
-  element. Use `getPlatformURL` for backend requests, `applicationHref` for raw
-  history writes, and `applicationPath` to convert a public URL to a TanStack
-  destination. Router destinations are relative to its configured base path.
-  Core cards/table links use the checked descriptors in `core/navigation.ts`
-  (`to`, `params`, and `search`). Stored return URLs pass through
-  `localNavigationHref` before the router's public `href` navigation API.
-- `core/mutation-invalidation.ts` defines affected library query roots.
-  `core/entity-job-invalidation.ts` refreshes after bulk jobs finish, including
-  partial failures, and survives the edit sheet closing. The legacy `"sync"`
-  acknowledgment causes an immediate refresh; only numeric job IDs are monitored.
-  Query failures retry with bounded backoff; three consecutive failures dispose
-  the watcher and refresh once. Unrelated configuration,
-  plugin, status, and job queries are excluded from library refreshes.
-- `core/monitor-job.ts` owns completion polling independently of mounted views.
-  `core/scene-cover-job.ts` uses it to refresh only normalized scene artwork
-  after screenshot or cover generation, including JPEG and HDR descriptors.
-  Do not refetch scene details for artwork changes: freshly signed stream URLs
-  can reload active playback. List queries observe the same normalized scenes
-  without a list refetch or loss of scroll/edit state.
-- `core/job-queue.ts` combines task lifecycle/progress subscriptions with
-  authoritative HTTP snapshots. The mounted task list reconciles on foreground,
-  restored pages, connectivity and WebSocket connections, plus every 30 seconds
-  while visible. Resume restarts a potentially suspended socket. Missing active
-  jobs are removed; known terminal outcomes retain only their original 10-second
-  display window. Events received during a snapshot take precedence over it.
-  Failed snapshots preserve the list, and disposal cancels requests and timers.
+### Main application startup
 
-`core/motion.ts` defines the shared motion timings. `core/content-reveal.ts`
-owns interruptible Web Animations on the empty surface in
-`layout/content-reveal.tsx`; it never animates the image/player subtree.
-`core/route-transitions.ts` uses this for the 200ms committed-page reveal in
-`layout/route-viewport.tsx`.
-The viewport prepares the 12% cover in its layout effect before the destination's
-first paint, then fades it to transparent. Starting from `onResolved` could dim
-an already visible destination. The transparent final frame is held through
-cleanup so the inline starting opacity cannot flash at animation completion.
-Browser Back/Forward traversal gets no extra reveal: Safari already animates its
-restored swipe snapshot. App navigation, including Smart Back, still reveals.
-The image/video/scroller subtree stays opaque and untransformed. It does not
-take snapshots or wait before committing navigation.
-WebKit profiling with real Home thumbnails found native snapshot capture could
-add 0.6–1.1 seconds. A separate paint surface also avoids promoting that whole
-subtree during rapid navigation. Shell controls and portaled overlays stay
-still. No keyed wrappers or forced remounts are involved.
-Search/filter/hash changes and initial load do not reveal the whole page.
-Reduced Motion skips the reveals and cancels a running one.
-Smart Back supplies typed `state.navigationDirection: "back"`; exceptional
-navigations can set `state.routeMotion: false`. Rapid navigation cancels the
-previous animation, as does a visibility or Reduce Motion change. A pending
-reveal belongs to its destination and is consumed once by the viewport commit.
-Finished effects are canceled and their paint surface is hidden. Browsers without Web
-Animations navigate normally. `layout/mobile-navigation.tsx` owns one persistent
-navigation drawer for all toolbars. Its lease holds only the visual reveal until
-the drawer exits; navigation and loading continue immediately. This drawer uses
-a dimmed backdrop to avoid filtering a changing image-heavy page.
-Local view changes use the same empty surface with a 140ms reveal. `EntityList`
-observes layout mode, zoom, aspect ratio, mobile columns and pagination; its
-surface sits outside the list scroller. Detail layouts reveal only the selected
-tab panel or the focused/inline viewer area, preserving visited panels, media,
-focus and scroll state. Background data refreshes and selection changes do not
-restart motion. Surfaces are capped at a viewport's height, and only an active
-list can animate. Grid zoom commits immediately on all devices; it no longer
-captures native View Transition snapshots.
+1. `main.tsx` starts offline worker registration and installs page-zoom/chunk-error
+   handling, then renders `App` in React Strict Mode.
+2. [core/client.ts](../src/core/client.ts) lazily creates the shared Apollo and
+   WebSocket clients. [create-client.ts](../src/core/create-client.ts) owns the
+   normalized cache and splits HTTP queries/mutations/uploads from subscriptions.
+   Main-app features reuse this client.
+3. [SystemStatusGate](../src/components/system-status-gate.tsx) checks the server
+   before configuration and plugin startup. Setup/migration screens load only when
+   needed; failures expose retry actions.
+4. [ConfigLoader](../src/components/config-loader.tsx) starts configuration and
+   bounded plugin discovery together. Bundled locale messages load before
+   optional server overrides.
+5. [PluginLoader](../src/components/plugin-loader.tsx) waits for configuration
+   and locale setup, then stages time-limited registrations. The UI export
+   catalogue loads only for an enabled v3 plugin.
+6. [createAppRouter](../src/router.tsx) combines file routes with completed plugin
+   registrations. Route collisions are rejected; core routing remains available
+   if plugin startup fails. See the [plugin host](plugin-host.md) for the contract.
 
-Image and scene lightboxes share `lightbox/use-lightbox-motion.ts`: a 240ms
-entrance reveal, 180ms exit, 240ms swipe settling and 180ms button/keyboard
-navigation. Image zoom keeps its 250ms timing. An empty black surface in YARL's
-controls slot fades away to reveal the media and fades back for dismissal.
-The media stays opaque and untransformed, preserving video and swipe geometry
-and avoiding dropped frames from compositing the whole lightbox in WebKit at
-phone pixel densities. `core/paint-animation.ts` prepares a temporary layer
-and holds the first frame through a paint before starting the clock, so startup
-work cannot consume the entrance unseen. The cover starts at 99% opacity to
-allow initial media rasterization. YARL's root CSS opacity transition is disabled
-when Web Animations are available; unsupported browsers retain the native fade.
-YARL owns gestures and exit completion.
-Mobile Close, Escape and browser Back use the library's exit before
-disposing the player, consuming exactly one history entry. The optional visual
-dismissal callback in `use-lightbox-history.ts` also preserves the existing
-history-only contract for the focused scene viewer.
+The offline and guest entries are independent of this sequence. The worker can
+boot the standalone offline library without configuration, plugins, or GraphQL;
+the guest viewer uses share-scoped JSON/media requests without an owner session.
+Their data is adapted to reusable lists/viewers at narrow boundaries. See
+[offline](offline.md) and [sharing](../../../docs/sharing.md).
 
-`cards/use-card-press.ts` uses the same interruptible animation owner to enlarge
-the entire card slightly on primary-pointer down and ease it back on release.
-It does not rerender the card or delay navigation/playback. Scrolling, pointer
-cancellation, context menus, selection and nested controls cancel or bypass
-this feedback. Neither path captures native View Transition snapshots. Effects,
-pending frames and temporary listeners are released on completion, unmount,
-visibility changes or Reduce Motion changes.
+### Routing and loading
+
+[core/platform-url.ts](../src/core/platform-url.ts) derives the deployment prefix
+from the server's base element. Use `getPlatformURL` for backend requests,
+`applicationHref` for raw history writes, and `applicationPath` to convert a
+public URL to a TanStack destination. Router destinations are relative to its
+configured base path. Cards/table links use checked descriptors in
+[core/navigation.ts](../src/core/navigation.ts) (`to`, `params`, `search`).
+Stored return URLs pass through `localNavigationHref` before public `href`
+navigation.
+
+TanStack's Vite plugin splits route components. Editors use
+[detail/deferred-overlays.ts](../src/components/detail/deferred-overlays.ts);
+lightboxes use [deferred-lightboxes.tsx](../src/components/lightbox/deferred-lightboxes.tsx).
+Most closed overlays load code on first use, but `main.tsx` deliberately warms
+the scene lightbox and its shared player asynchronously on every launch.
+Preloading does not mount the player or load scene media. After first opening,
+deferred wrappers preserve component lifetime, drafts, and closing animations;
+pending or failed downloads of feature code remain dismissible. Generic tables
+use `lazyModule` to preserve item/column types across the lazy boundary.
 
 Home mounts its first carousel immediately and uses `DeferredMount` to start
 other rows when they approach its scroll viewport. Mounted rows retain their
 cards, filters and lightbox state when scrolled away. The drawer preloads Home's
 route code when its link becomes visible; the customisation sheet loads on first
 use and queries saved filters only while open.
-`frontpage/front-page-state.ts` retains random seeds, mounted-row flags and
-vertical/horizontal scroll positions for the current Home configuration and
+[front-page-state.ts](../src/components/frontpage/front-page-state.ts) retains
+random seeds, mounted-row flags, and vertical/horizontal scroll positions for the current Home configuration and
 Apollo client. Each carousel keeps all native snap targets but mounts cards
 only near the visible horizontal range. Returning Home eagerly restores that
 range and its saved row height, without rebuilding every offscreen card. Touch
@@ -161,6 +130,39 @@ Back. The loader returns no entity data, leaving Apollo as its sole cache.
 Performer portraits contain the uncropped image in a stable frame during decode, and scene
 refreshes retain the existing player, including when a refresh fails.
 
+### Mutation and job refresh
+
+- Apollo normalizes mutation results through the shared client. Scalar updates
+  generally need no list refetch; `useEntityMutation` uses `core/mutation-invalidation.ts` for
+  membership, relationship, and count changes. `removeEntitiesFromCache` removes
+  deleted references immediately. It decrements a cached total only when that
+  page proves all deleted IDs belonged to it; other totals are invalidated while
+  retained rows remain usable. This includes independently fetched totals.
+- `core/mutation-invalidation.ts` defines affected library query roots.
+  `core/entity-job-invalidation.ts` refreshes after bulk jobs finish, including
+  partial failures, and survives the edit sheet closing. The legacy `"sync"`
+  acknowledgment causes an immediate refresh; only numeric job IDs are monitored.
+  Query failures retry with bounded backoff; three consecutive failures dispose
+  the watcher and refresh once. Unrelated configuration,
+  plugin, status, and job queries are excluded from library refreshes.
+- `core/monitor-job.ts` owns completion polling independently of mounted views.
+  `core/scene-cover-job.ts` uses it to refresh only normalized scene artwork
+  after screenshot or cover generation, including JPEG and HDR descriptors.
+  Do not refetch scene details for artwork changes: freshly signed stream URLs
+  can reload active playback. List queries observe the same normalized scenes
+  without a list refetch or loss of scroll/edit state.
+- `core/job-queue.ts` combines task lifecycle/progress subscriptions with
+  authoritative HTTP snapshots. The mounted task list reconciles on foreground,
+  restored pages, connectivity and WebSocket connections, plus every 30 seconds
+  while visible. Resume restarts a potentially suspended socket. Missing active
+  jobs are removed; known terminal outcomes retain only their original 10-second
+  display window. Events received during a snapshot take precedence over it.
+  Failed snapshots preserve the list, and disposal cancels requests and timers.
+
+Motion belongs to empty reveal surfaces that preserve mounted media and
+scrollers. See [interaction contracts](interactions.md#motion-and-visual-lifetime)
+for route, local-view, card, lightbox, and mobile drawer behavior.
+
 ## Lists
 
 `components/list/entity-list-page.tsx` composes list chrome, selection, sidebar,
@@ -169,28 +171,42 @@ than copying a page implementation.
 
 | Module | Responsibility |
 | --- | --- |
-| `entity-list-types.ts` | Configuration and discriminated `source` contract |
-| `use-list-data.ts` | Debounce, GraphQL/local dispatch, normalized query state |
-| `use-cached-query-result.ts` | Preserve usable data on failed refreshes without treating another filter's data as a successful result |
-| `use-list-page-filter.ts` | Layout preferences and filter/URL synchronization |
-| `use-filter-state.ts` | Parse and persist filters, including per-view defaults |
-| `use-list-page-refill.ts` | Refill shortened remote pages while preserving scroll |
-| `use-list-scroll-restoration.ts` | Apply TanStack's cached position once the active list's content is ready |
-| `list-virtualizer-measurements.ts` | Bound and validate reusable row geometry for returning virtualized lists |
-| `use-list-select.ts` | Selection and stable selection accessors |
-| `virtualized-item-list.tsx` | Grid/details row virtualization and skeletons |
-| `photo-album-wall.tsx` | Justified wall layout and selection synchronization |
-| `entity-data-table.tsx` | Table layout and column preferences |
-| `entity-list-configs.tsx` | Reusable per-entity configurations |
+| [entity-list-types.ts](../src/components/list/entity-list-types.ts) | Configuration and discriminated `source` contract |
+| [use-list-data.ts](../src/components/list/use-list-data.ts) | GraphQL/local dispatch, independent totals, normalized query state |
+| [use-cached-query-result.ts](../src/components/list/use-cached-query-result.ts) | Preserve usable data on failed refreshes without treating another filter's data as a successful result |
+| [use-list-page-filter.ts](../src/components/list/use-list-page-filter.ts) | Layout preferences and filter/URL synchronization |
+| [use-filter-state.ts](../src/components/list/use-filter-state.ts) | Parse and persist filters, including per-view defaults |
+| [use-list-page-refill.ts](../src/components/list/use-list-page-refill.ts) | Refill shortened remote pages while preserving scroll |
+| [use-list-scroll-restoration.ts](../src/components/list/use-list-scroll-restoration.ts) | Apply TanStack's cached position once the active list's content is ready |
+| [list-virtualizer-measurements.ts](../src/components/list/list-virtualizer-measurements.ts) | Bound and validate reusable row geometry for returning virtualized lists |
+| [use-list-select.ts](../src/components/list/use-list-select.ts) | Selection and stable selection accessors |
+| [virtualized-item-list.tsx](../src/components/list/virtualized-item-list.tsx) | Grid/details row virtualization and skeletons |
+| [photo-album-wall.tsx](../src/components/list/photo-album-wall.tsx) | Justified wall layout and selection synchronization |
+| [entity-data-table.tsx](../src/components/list/entity-data-table.tsx) | Table layout and column preferences |
+| [entity-list-configs.tsx](../src/components/list/entity-list-configs.tsx) | Reusable per-entity configurations |
 
-Choose exactly one source. A GraphQL source requires `kind: "graphql"`, a typed
-`query`, `makeVariables(filter)`, and `extractResult(data)` returning
-`{ count, items }`. Carry the generated variables type as the third
-`EntityListPageConfig` type parameter. A local source requires `kind: "local"`,
-raw `items`, and `filter(items, filterModel)` returning the page slice and total;
-it may expose `loading`, `error`, and `refresh`. Local lists never send a GraphQL
-list query. Remote list extraction receives complete generated operation data;
-partial Apollo results are not asserted to be complete.
+Choose exactly one source, defined in
+[entity-list-types.ts](../src/components/list/entity-list-types.ts):
+
+| Source | Required contract |
+| --- | --- |
+| GraphQL, combined total | `kind: "graphql"`, typed `query`, `makeVariables(filter)`, and `extractResult(data)` returning `{ count, items }` |
+| GraphQL, independent total | Same typed query/variables contract plus `countQuery` returning `{ result: { count } }`; `extractResult(data)` returns only `{ items }` |
+| Local | `kind: "local"`, raw `items`, and `filter(items, filterModel)` returning the page slice and total; optional `loading`, `error`, and `refresh` |
+
+Carry the generated variables type as the third `EntityListPageConfig` type
+parameter; the page and count documents use that same type. Scene/image lists
+use independent totals, so cards render before counts arrive. An unknown count
+is `undefined`, not zero; count-dependent pagination, clamping, and bulk actions
+wait for it. Both queries participate in refresh/error handling. Ordinary list
+and Home queries omit unused duration/filesize aggregates; the backend retains
+those fields for other callers. See [read performance](../../../docs/read-performance.md).
+
+`extractResult` receives complete generated operation data or `undefined`;
+it must handle the initial empty state. Partial Apollo results are not asserted
+to be complete. Local sources skip both GraphQL queries. SearchInput debounces
+typing before committing filter state; `useListData` adds no further delay, so
+Enter, clearing, and page changes dispatch immediately.
 
 Layout preferences must not change query variables or flash loading states.
 Only active embedded panels synchronize shared URL parameters. Selection stores
@@ -281,6 +297,17 @@ transition: the visible cards must stay in place until the list unmounts.
 
 ## State, configuration, and type boundaries
 
+| State | Owner |
+| --- | --- |
+| Server entities and query results | Shared Apollo cache; route loaders warm it rather than returning duplicate entity data |
+| Shareable filters, pagination, selected detail tab | Validated TanStack search state plus the shared list/filter models |
+| Selection, open overlays, gestures | The owning list/viewer/component session |
+| Form drafts and validation | TanStack Form with Zod; editors serialize mutations at submission |
+| Server UI defaults and configuration | Typed configuration hooks/codecs and server mutations |
+| Device preferences | Subscribed localStorage snapshots in `hooks/stored-state.ts` |
+| Downloaded files, queue, and local resume | Deployment-scoped IndexedDB/OPFS adapters; see [offline](offline.md#storage-contract) |
+| Active media/playhead | Video.js store/native media; transition hooks carry pending resumes |
+
 React Strict Mode is enabled at the application root. Render snapshots belong
 to state; conditional same-component state adjustment handles changed inputs.
 `useCommittedRef` is for imperative listeners and cleanup that need the latest
@@ -341,316 +368,46 @@ same calculation for the preview and mutation input.
 
 ## Player
 
-`components/player/scene-player.tsx` owns the stable player shell.
-`use-scene-player-sources.tsx` coordinates selected sources and pending resumes.
+[ScenePlayer](../src/components/player/scene-player.tsx) owns the stable player
+root, store, and native video. Source selection, pure transition decisions,
+browser recovery, and transcode leases remain separate modules. Scene detail,
+lightboxes, and TV reuse this shell; offline and guest viewers adapt their
+sources and disable owner activity where appropriate.
 
-TV uses this same shell through the semantic commands and scalar subscriptions
-in `scene-player-controls.tsx`. Automatic activity for scene detail, online
-scene lightbox, and TV is owned by `scene-activity-effects.tsx` and the
-per-client coordinator in `core/scene-activity.ts`. Do not add route-owned
-automatic activity mutations. Explicit marker, offline, and disabled scopes
-exclude server accounting. See [TV mode](tv-mode.md) for feed ownership,
-quality policy, inline presentation, and the full feature map.
-The Video.js packages are pinned together at 10.0.0-rc.2. Its split HLS adapter
-pins an older hls.js, so a version-scoped pnpm override uses the updated
-1.7.3 engine. Reassess that override with the next adapter upgrade.
-
-| Module | Responsibility |
-| --- | --- |
-| `scene-video.tsx` | One native video element; typed direct/HLS source configuration |
-| `scene-player-sources.ts` | Source eligibility, quality preferences, initial resume |
-| `scene-player-transitions.ts` | Pure seek/restart decisions and resume plans |
-| `scene-player-source-url.ts` | Stream URLs, clip bounds, fragments, reload nonce |
-| `hls.ts` | HLS timeline policy and engine helpers |
-| `buffered-seek-preview.ts` | Coalesced, buffered frame previews during a scrub drag |
-| `use-player-transition-feedback.tsx` | Freeze frame, loading feedback, seek readiness |
-| `player-transcode-session.ts`, `use-player-transcode-session.ts` | Own scoped HLS leases across playback and pause; TV retains nearby leases until window eviction or exit |
-| `prepare-player-source.ts` | Cancellable, bounded startup fetching for TV's nearby direct/HLS sources |
-| `use-player-recovery.ts` | Native fullscreen seeking and stalled-playback recovery |
-| `use-player-load-timeout.ts` | Deadline for a source that never becomes ready, including failed recovery loads |
-| `use-player-loop.ts` | Media-clock loop deadline, cancelled by pause, seek and source changes |
-
-The scene lightbox uses `scene-carousel.tsx`, a YARL carousel module with three
-keyed posters and one persistent player above the track. YARL's controller still
-owns pointer/wheel navigation, drag offsets and swipe animations. The decoded
-incoming poster stays mounted while the outgoing player keeps its visual position
-and source until the actual animation finishes. Only then does the player move
-to the center and load the selected scene; interrupted swipes cannot load obsolete
-selections. The same player/store/video survives scenes, markers and loading
-sentinels; closing the lightbox disposes that session. No media DOM is moved
-between slides. Only the initial entrance uses a fixed autoplay delay, and a late
-EOF from an outgoing scene cannot advance the new selection.
-
-`playbackKey` identifies the selected scene/marker independently of media ownership.
-Selection changes reset source preferences, clip offsets, poster/started latches,
-zoom and recovery state before the new playback becomes active. Quality changes
-within that selection retain their existing playhead/resume behavior. Pending
-queries, missing scenes and OPFS reads suspend the retained player, clear its
-source and release the outgoing transcode. Late query results are checked against
-the selected scene. Offline resume writes flush before the shared playhead changes.
-
-Audio and playback rate belong to the persistent media element. A held 2× gesture
-keeps its touch target through automatic advance and restores the prior rate on
-release. Animation deadlines and asynchronous seeks belong to their playback/load;
-obsolete work cannot resume or mute a later scene. Deferred freeze-frame JPEG
-exports are also cancelled when cleared or superseded. Loop mode restarts on the
-existing media just before the boundary (at most 5 ms or a quarter frame early),
-reducing the interruption from native EOF and the application's restart path.
-The deadline rechecks media time and respects pause, seeking, buffering, rate
-changes and visibility. Native EOF remains the fallback when timers run late.
-Buffered loops do not capture a frame or enter user-seek/loading feedback; a tiny
-HLS timestamp gap at zero resolves to the first buffered sample, while an evicted
-opening segment still uses source recovery. One clip-range effect owns marker
-completion and EOF fallback, while auto-advance fires once. The explicit WebKit `canplay`
-resume remains necessary. Chromium/WebKit fixtures exercise the actual lightbox
-and its source machinery, but physical iPhone autoplay permission and MMS still
-need device testing.
-
-Recovery observes presented video frames separately from the audio clock.
-Source changes, recovery and Retry retain the native video element along with
-the player root and controls. A source reload has a 30-second readiness deadline,
-reset after returning from the background. It gets one source retry, then stops
-HLS loading and presents Retry. The deadline also covers a resume seek whose
-completion event never arrives. Recovery is a fallback; it does not establish
-that the underlying repeated-seek failure is resolved on physical iOS.
-
-Audible Direct loops are not guaranteed to be seamless on Safari. A
-[plain-video diagnostic on macOS 26](https://github.com/notsafeforgit/stash/actions/runs/35467017314)
-measured roughly 380–400 ms between the first and next advancing frame with
-audio, versus 50–70 ms muted; physical iPhone feedback also reported smoother
-muted loops. Native `loop`, early seeking, `fastSeek`, a small positive seek
-target and temporary muting did not reliably remove the audible delay.
-[Routing through Web Audio](https://github.com/notsafeforgit/stash/actions/runs/35467312555)
-also retained it. Linux browser checks do not establish this Apple media behavior.
-
-Freeze-frame canvases start with a minimal backing buffer. Texture allocation
-and synchronous GPU readback wait for playable video data, a paint and idle time
-(a timer after paint where idle callbacks are unavailable). An early capture
-prepares the buffer on demand. Warm-up is cancelled on departure, and an already
-prepared buffer is reused without clearing a captured frame. Page mounting and
-initial scrolling do not depend on this optional warm-up.
-
-Transition plans consume plain buffered/seekable state and return an in-place
-seek, engine restart, or source reload. Browser effects apply the plan; keep DOM
-operations out of the planner so it remains testable without a media element.
-
-`PositionScrubber` separates its draft position from committed seeks. A drag
-temporarily pauses playback and previews decoded frames only inside the native
-buffered ranges, rechecking for eviction before each write. Preview seeks are
-coalesced and serialized. Classic MSE hls.js fragment loading is suspended until
-the drag ends; Safari MMS and native HLS retain their browser-owned loading
-policy. Release uses the normal seek policy and restores the previous playback
-intent; cancellation restores the original position too. A simple tap does not
-pause. The independent draft position also supports generated sprite previews
-without seeking into unbuffered media.
-Native seek recovery ignores an active preview, including recovery queued before
-the drag started, so buffer changes during a hold cannot commit or reload it.
-Releasing at a preview target still being decoded reuses the pending native seek;
-it does not issue a second seek to the same time.
-
-Touch scrubbing supports precision seeking in scene detail, both lightboxes and
-TV (including rotated controls). A 650 ms dwell within a 4 px radius zooms the
-timeline around the time under the finger. Further zooms require a 1200 ms pause;
-the movement allowance tightens to 2 px at 4× and 1 px from 16× onward, so fine
-adjustments restart the dwell. Each new window anchors its dwell at the current
-finger position. Each dwell narrows the visible range
-fourfold, capped at 60 seconds on entry and one second at maximum precision.
-Markers and buffered ranges follow the same window; a fine-seeking readout shows
-milliseconds above the thumb. The standard playback clock and TV clock follow
-the same draft position during a drag, including while a frame is decoding or
-the target is not buffered. Release commits once and restores the full timeline;
-cancellation or a scene/marker change disposes the gesture. Mouse and keyboard input retain
-the full scale. Zoom steps request a short vibration where supported; Safari on
-iOS has no standard vibration API, so its feedback is visual.
-
-Explicit play and pause commands share user intent across scene detail,
-lightboxes, TV and OS media controls. Ordinary pause/resume delegates to native
-playback without adjusting media time or observing frames to correct the browser's
-clock. Play remains in the input gesture and handles cancellation by a newer
-pause or seek. Marker replay and temporary scrub pauses retain their own seek
-behavior. Browser tests verify pause/resume does not introduce seeks or reloads.
-
-Preserve these invariants:
-
-- Scene time is absolute. A clip's media time is relative to its segment-aligned
-  origin; convert only at the media seek boundary.
-- The player root and native video element survive source changes, including
-  direct/HLS engine switches. `SceneVideo` configures Video.js 10 RC.2’s packaged
-  `HlsJsVideo` through a typed source, with an explicit MIME type for direct files.
-  Retain playhead, paused state and playback rate through the pending-resume path,
-  including WebKit’s explicit resume after `canplay`.
-- Muted autoplay fallback is only for `NotAllowedError` on a current request.
-  Source-change aborts and obsolete requests must not change the audio state.
-- Buffered seeks stay in place. Distant desktop HLS seeks can flush the engine;
-  iOS ManagedMediaSource and clipped playlists use source reloads.
-- Every forced reload changes the URL, even a repeated target at zero.
-- Clip URL bounds stay fixed through quality changes so earlier portions remain
-  reachable. Retain freeze-frame masking and native fullscreen behavior.
-- Temporary press-and-hold speed belongs to the current player. Release restores
-  its previous rate while the media is attached. Scene or marker auto-advance can
-  unmount the player mid-hold; cleanup must clear the gesture without sending
-  playback commands to a detached store.
-- Touch scene lightboxes pass their history-aware dismissal callback into the
-  player. Close occupies the right end of the playback row and remains subtly
-  visible and tappable when playback controls fade. It has one stable 44px target;
-  the fading controls and gradient are separate, so Close has no invisible or
-  inert ancestor. Close captures pointer and focus activity before Video.js's
-  native container listeners can reveal controls and consume Safari's first tap;
-  its normal click remains the sole dismissal handler for touch and keyboard.
-  Hidden playback controls, including the central play and skip buttons, remain
-  inert and let taps through to the gesture surface. A single tap reveals controls
-  without changing playback or audio; a rapid double tap zooms without revealing
-  them. Visible buttons accept every tap immediately, while double taps on the
-  surrounding video or control-bar gaps still zoom.
-  Time and available PiP/Cast controls sit above a full-width timeline, preserving
-  scrubbing space and direct speed, quality, playback-mode, fullscreen, and Close
-  access with 44px targets.
-  Mobile slides fill the viewport; control padding respects the home indicator
-  and landscape display cutouts.
-  Pending/error slides provide bottom dismissal until a player is available.
-  Desktop retains the lightbox toolbar and Escape behavior.
-
-Root [CLAUDE.md](../../../CLAUDE.md) describes the backend HLS constraints.
-
-`PlatformMediaEffects` binds the active Video.js store to Media Session and
-screen wake locks. OS seeks use the same offset/clip-aware seek callback as the
-player timeline. The most recently started player owns metadata and actions;
-paused previews and stale cleanup cannot replace a newer owner. Session state
-clears on suspension/unmount. Wake locks cover visible, local playback only,
-release on pause/end/PiP/casting/hidden state, and handle late requests and browser
-refusal without interrupting playback. Visibility return can reacquire a lock.
-AirPlay uses Video.js 10's `AirPlayButton` and built-in HLS AirPlay bridge; PiP
-uses its existing feature store. Unavailable controls stay hidden, and local
-blob media disables remote playback. Receivers must be able to fetch the source.
+The [player guide](player.md) owns the module map, media lifetime, clip/seek
+invariants, recovery, platform integrations, and backend HLS boundary.
+[TV mode](tv-mode.md) and [offline downloads](offline.md) describe their distinct
+feed and storage lifecycles.
 
 ## Dialog dismissal
 
-Form and confirmation dialogs have one visible dismissal action: Cancel beside
-Save, Create, Apply, or the destructive action. Set `showCloseButton={false}`
-when supplying that action; do not add a second corner X or Close footer.
-Informational and immediately applied controls keep one Close action, while
-search dialogs without footer actions retain their labelled corner close.
-Escape, backdrop dismissal, focus management, and busy-state guards remain
-owned by the dialog primitive and its caller.
-Use `DialogContent.initialFocus` for a specific initial field instead of the
-input's `autoFocus`, so the dialog can capture and restore the previous focus.
-
-TV's `TvDialogContent` uses `variant="form"` when its child owns the scrolling
-fields and pinned actions. Its default content variant provides a bounded
-scroller and one Close footer. `MarkerEditForm`'s dialog layout requires an
-`onCancel` handler and keeps Cancel/Save visible on small screens; its inline
-layout also offers Discard to reset fields without leaving the editor.
+Form/confirmation dialogs provide Cancel alongside their primary action and
+disable the duplicate corner close button. Informational dialogs retain one
+Close action. Focus capture/restoration belongs to the dialog primitive; use
+`DialogContent.initialFocus` for a specific initial field.
+See [dialog contracts](interactions.md#dialog-dismissal).
 
 ## Entity editing
 
-All seven single-entity edit sheets use `components/detail/entity-edit-sheet.tsx`.
-Its fixed header provides the title. Close stays in the bottom action area on
-mobile and in the header on desktop, including while data is loading or
-unavailable. Inline detail editors use `detail-editor-layout.tsx` with the same
-placement. Forms own their scrolling fields and
-pinned action bars inside the remaining height. Close, Escape, and backdrop
-dismissal leave without saving; Discard resets the form and keeps the pane open.
-Successful saves close the sheet through the existing form callback.
+Single-entity sheets share `detail/entity-edit-sheet.tsx`; forms own their
+scrolling fields and pinned actions. Close leaves without saving, while Discard
+resets the draft and leaves the editor open.
+See [entity editing](interactions.md#entity-editing).
 
 ## Settings navigation
 
-`SettingsLayout` keeps the settings page mounted in its own scroller. Desktop
-uses a sidebar with section links and inline search results. Mobile reserves one
-56px bottom row for Navigation, the current section, and Search, replacing the
-global bottom navigation bar. Its top header contains only the Settings title.
-Section links open in an upward menu with 44px targets and bounded scrolling.
-They remain TanStack Router links, so deep links and browser Back select the
-correct section.
-
-Search replaces the mobile row and focuses inside the opening touch handler.
-It reuses the generated, locale-resolved settings index and navigates with the
-existing `hl` parameter to reveal the chosen setting. Both layouts render results
-as ordinary route links with native touch and keyboard activation. Mobile results
-appear above the input, bounded to half the visible viewport, while the shared
-keyboard layout hook reserves space below the footer. Closing search
-restores its trigger's focus. Search state belongs to the navigation, so a
-breakpoint change preserves the query without remounting the settings form.
+Settings share one navigation/search state across desktop and mobile layouts.
+The generated settings index resolves localized results and the `hl` route
+parameter reveals the target setting.
+See [settings navigation](interactions.md#settings-navigation).
 
 ## Mobile detail navigation
 
-Collection and media detail layouts keep the entity title above the scroller
-and navigation below it on mobile. `mobile-detail-chrome.tsx` provides a shared
-56px toolbar with direct Navigation, section picker, Search, Filters, View options,
-Entity actions, and Back controls. All targets stay at least 44px at 320px width;
-the section label truncates and becomes an icon on the narrowest screens. Search
-and selection replace that row, with their dismissal control at its right edge. Navigation,
-Filters, View options, and Entity actions open bottom drawers with scrollable
-content and dismiss through swipe-down, outside taps, or Escape. They omit Close
-rows; the shared drawer primitive supplies bottom safe-area padding. The section
-picker includes page navigation and a page-jump form. Previous/next controls also
-appear at the end of list results, and single-page lists omit pagination. Standalone mobile lists use the same
-row modes with navigation and a page picker. Desktop retains
-its sidebar controls and tab strip. Collection pages use the `md` breakpoint;
-media pages use `lg`, matching their existing split layouts.
-
-An active list query keeps Search highlighted even when its input is closed.
-Tap opens the input; long press opens the existing Base UI context menu anchored
-above the Search button, independent of the finger's position within it, with the
-full query and Edit search/Clear search actions. Clearing only changes the query
-and resets pagination, preserving sort and other filter criteria. Filters and
-View options also show the query beneath their drawer title, so its visibility
-does not depend on discovering the long-press shortcut. Long queries wrap within
-the popup or drawer width without widening the toolbar.
-
-List and settings search share `MobileSearchRow` and `useMobileSearch`. The outer
-chevron collapses search; the X inside the input clears its text. A short native
-Web Animation reveals the row from the measured Search button bounds and folds
-it back on close. Only clipping and opacity animate: the input keeps its final
-layout size and position throughout, and focus still happens inside the opening
-gesture. Blur flushes pending text before the exit animation; its completion
-restores the toolbar and focus. Interrupted animations cancel cleanly, unmount
-cancels pending work, and reduced-motion preference skips the animation.
-
-Drawer motion uses `transform` for dragging and enter/exit animations. Do not
-combine it with the separate CSS `translate` property on the popup: Base UI
-supplies an inline transform while dragging, and the two translations add
-together instead of tracking the pointer one-to-one.
-
-The footer participates in flex layout, reserving its actual height without
-fixed offsets or content overlays, including Home's bottom navigation. The shell
-owns top/side safe-area insets; footers own the bottom inset. Shared CSS tokens
-read Safari's current `env(safe-area-inset-*)` values in browser and Home Screen
-modes. Toolbar margins grow from 6px at 320px to 16px on wider phones while
-retaining every 44px touch target. Portaled drawers, sheets and full-screen player
-controls account for their own screen edges. The keyboard replaces the bottom
-safe-area padding rather than adding a second gap above its chrome. The shared
-`useMobileKeyboardLayout` hook reserves the portion of the layout viewport below
-the visual viewport as a bottom margin, shrinking the adjacent scroller so list
-content ends at the search row. It accounts for Safari's native viewport pan and
-updates a dedicated CSS variable synchronously on focus/viewport events, avoiding
-an extra animation frame or React render between the pan and layout correction.
-Do not translate only the footer: that leaves content under the keyboard chrome
-and can briefly compound the browser's pan. Opening search mounts and focuses in
-the same touch handler and permits native focus scrolling; restoring the trigger
-on close uses `preventScroll`. This applies to standalone lists, detail footers,
-and settings. Physical iPhone keyboard animation still requires device validation.
-React portals move controls into the footer's typed slots while preserving
-their tab, list, and action contexts. Only the active list publishes controls;
-previously visited panels stay mounted with their filters and state intact.
-The mobile picker uses the same Base UI tab state as desktop, with vertical
-triggers in an upward popover, and brings a chosen section into view. The
-section popover and action drawer keep their portal targets mounted so tabs
-and action dialogs survive closing them. `entity-actions-menu.tsx` renders shared
-typed action definitions as desktop dropdowns or direct mobile rows. Desktop
-submenus become labelled, flat groups on mobile; invoking an action closes the
-drawer before showing its form or confirmation. Search mounts and focuses
-within the opening touch handler, and flushes any pending debounce on blur
-before the row closes.
-List controls own their prop contract; the parent bar extends it with view
-settings. Page jumping uses TanStack Form with Zod validation and starts a new
-draft when the page or page count changes. Collection and media tab panels both
-publish their active state through `ListActivityContext`, so kept-mounted lists
-cannot leave duplicate controls in the footer.
-Tapping the current section also reveals it when the page is showing the
-entity information or media above it. The focused scene viewer keeps its
-existing player mounted and places Close below it on mobile.
-Collection panels use their scroller's container height as a minimum so a
-shorter list cannot clamp the viewport back into the entity information.
+Shared footer slots host controls from the active list or tab while retaining
+visited panels and their state. The shell, footer, and keyboard-layout hook
+coordinate safe areas and scrolling.
+See [mobile navigation](interactions.md#mobile-detail-navigation) for toolbar,
+search, drawer, portal, and focus contracts.
 
 ## Bulk custom fields
 
@@ -698,6 +455,10 @@ change is needed.
 
 ## Backend extension points
 
+Paths in this section are relative to the repository root. The
+[system overview](../../../docs/ARCHITECTURE.md#backend-responsibilities) maps
+the shared backend layers.
+
 `internal/api/resolver_mutation_bulk_*.go` owns fork bulk-job resolvers and their
 per-entity operations. Shared resolvers retain v2.5 synchronous adapters with
 explicit IDs. `internal/api/bulk_update.go` holds common selection/enqueue
@@ -709,11 +470,16 @@ Saved/default filters retain a v2.5 projection alongside canonical v3 state.
 legacy conflicts against current state. Do not replace the entire UI configuration
 to change one default. Complex conflicts preserve both versions for user review.
 
-`internal/api/job_subscription.go` owns cancel-aware forwarding. Lifecycle events
-remain lossless, progress can be dropped under backpressure, and cancellation
-releases blocked sends.
+`internal/api/job_subscription.go` owns cancel-aware forwarding. Received
+lifecycle events are forwarded without dropping; progress can be dropped under
+backpressure, and cancellation releases blocked sends. Job-manager buffers and
+disconnections can still lose events, so the task UI reconciles with HTTP
+snapshots. See the [backend job flow](../../../docs/ARCHITECTURE.md#editing-and-background-jobs).
 
 ## Interaction and accessibility
+
+Detailed motion, mobile layout, and dismissal contracts live in
+[interactions.md](interactions.md).
 
 Use repository controls, descriptive action names, native keyboard activation,
 and labels linked to unique control IDs. Cards expose navigation, preview, and

@@ -8,9 +8,12 @@ v3 route paths may differ, but existing v2.5 clients must keep working.
 
 | Guide | Use it for |
 | --- | --- |
+| [System architecture](ARCHITECTURE.md) | Runtime map, browser entry points, backend services, storage, compatibility, and request flows |
 | [v3 development](../ui/v3/docs/development.md) | Local setup, generation, builds, and validation order |
 | [v3 dependencies](v3-dependencies.md) | Dependency versions, native security updates, and shadcn maintenance |
-| [v3 architecture](../ui/v3/docs/architecture.md) | Module boundaries, extension points, compatibility, and interaction policies |
+| [v3 frontend architecture](../ui/v3/docs/architecture.md) | Startup, module/state ownership, typed list sources, cache updates, and extension points |
+| [Player architecture](../ui/v3/docs/player.md) | Media lifetime, source/seek policy, recovery, transcode sessions, and backend HLS boundaries |
+| [Interaction and layout contracts](../ui/v3/docs/interactions.md) | Motion, dialogs, editing shells, mobile navigation, keyboard layout, and focus |
 | [Feature development plan](../ui/v3/docs/plan.md) | Expectations for new feature work |
 | [Fork maintenance](../FORK.md) | Upstream syncs, additive API changes, migrations, and rollback compatibility |
 | [Repository guidance](../CLAUDE.md) and [v3 contributor guidance](../ui/v3/AGENTS.md) | Coding conventions and backend/player constraints |
@@ -32,9 +35,9 @@ v3 route paths may differ, but existing v2.5 clients must keep working.
 
 ## Upstream reference and contribution policies
 
-[Architecture](ARCHITECTURE.md) and [Building from Source](DEVELOPMENT.md) retain
-the upstream backend/v2.5 reference. Their frontend commands and stack are not
-the v3 quickstart; use the current guides above for this branch.
+[Building from Source](DEVELOPMENT.md) retains upstream platform setup and v2.5
+build instructions. Use the current development and architecture guides above
+for this branch.
 
 [Contributing](CONTRIBUTING.md) and [AI policy](AI_POLICY.md) describe upstream
 contribution requirements. The [root README](../README.md) retains upstream

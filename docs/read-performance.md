@@ -27,9 +27,11 @@ overlay state. Returning restores media without another list request.
 The system-status check still precedes database-dependent work. Configuration
 and plugin discovery then overlap. Plugin registration waits for the configured
 locale and completes before constructing the router. The optional plugin UI
-catalog, migration/setup screens, lightboxes, editors, and table engine load
-when needed. Deferred overlays retain their original lifetime after first use;
-they do not replace the player during scene navigation. Offline precaching
+catalog, migration/setup screens, image lightbox, editors, and table engine load
+when needed. The main entry asynchronously preloads the scene lightbox and shared
+player on every launch; this loads code without mounting media. Deferred overlays
+retain their original lifetime after first use; they do not replace the player
+during scene navigation. Offline precaching
 includes dynamic dependencies so opening a saved scene remains possible offline.
 
 ## SQLite compatibility and search semantics

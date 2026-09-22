@@ -17,7 +17,9 @@ import { FilterMode, type FindFilterType } from "@/core/generated-graphql";
 import { ListFilterModel } from "@/models/list-filter/filter";
 import type { GraphQLDataSource } from "./entity-list-types";
 import { SearchInput } from "./search-input";
+import { MobileListPagination } from "./mobile-list-pagination";
 import { useListData } from "./use-list-data";
+import { useListPageRefill } from "./use-list-page-refill";
 
 type Item = { __typename: "Scene"; id: string };
 type Rows = {
@@ -39,11 +41,21 @@ const source: GraphQLDataSource<Rows, Item, Variables> = {
   extractResult: (data) => ({ items: data?.findScenes.scenes ?? [] }),
 };
 
-function Harness() {
+function Harness({ refill = false }: { refill?: boolean }) {
   const [filter, setFilter] = useState(
     () => new ListFilterModel(FilterMode.Scenes),
   );
   const { items, count, loading, error, refetch } = useListData(source, filter);
+  useListPageRefill({
+    remote: refill,
+    filter,
+    setFilter,
+    count,
+    items,
+    isLoading: loading,
+    error,
+    refetch,
+  });
   return (
     <>
       <SearchInput
@@ -70,6 +82,7 @@ function Harness() {
         Refresh
       </button>
       <output
+        data-page={filter.currentPage}
         data-loading={loading}
         data-count={count ?? "unknown"}
         data-error={error?.message}
@@ -80,6 +93,14 @@ function Harness() {
           </span>
         ))}
       </output>
+      {refill && (
+        <MobileListPagination
+          currentPage={filter.currentPage}
+          itemsPerPage={filter.itemsPerPage}
+          totalItems={count}
+          onChangePage={(page) => setFilter(filter.changePage(page))}
+        />
+      )}
     </>
   );
 }
@@ -271,4 +292,58 @@ it("keeps the total unknown when deleting a card before the count arrives", asyn
   expect(container.querySelector('[data-item="1"]')).toBeNull();
   expect(container.querySelector('[data-item="2"]')).not.toBeNull();
   expect(container.querySelector("output")?.dataset.count).toBe("unknown");
+});
+
+it("refreshes a cached previous page's total after bulk deletion removes the last page", async () => {
+  await act(async () =>
+    root.render(
+      <ApolloProvider client={client}>
+        <IntlProvider locale="en">
+          <Harness refill />
+        </IntlProvider>
+      </ApolloProvider>,
+    ),
+  );
+  const pageSize = new ListFilterModel(FilterMode.Scenes).itemsPerPage;
+  const firstPageIds = Array.from({ length: pageSize }, (_, i) => String(i));
+  await act(async () => {
+    request("ListRows").rows(firstPageIds);
+    request("ListCount").count(pageSize + 2);
+  });
+  await act(async () => container.querySelector("button")?.click());
+  await act(async () => {
+    request("ListRows", "", 2).rows(["last-1", "last-2"]);
+    request("ListCount", "", 2).count(pageSize + 2);
+  });
+  expect(container.querySelector("nav")?.textContent).toContain("2 / 2");
+
+  await act(async () => {
+    removeEntitiesFromCache({
+      cache: client.cache,
+      typename: "Scene",
+      listFieldName: "findScenes",
+      itemsField: "scenes",
+      ids: ["last-1", "last-2"],
+    });
+    // Entity mutations also refresh the currently active page and count.
+    void client.refetchQueries({ include: "active" });
+  });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(0);
+  });
+  await act(async () => {
+    request("ListRows", "", 2).rows([]);
+    request("ListCount", "", 2).count(pageSize);
+  });
+
+  expect(container.querySelector("output")?.dataset.page).toBe("1");
+  expect(container.querySelector("output")?.dataset.count).not.toBe(
+    String(pageSize + 2),
+  );
+  expect(container.querySelectorAll("[data-item]")).toHaveLength(pageSize);
+  await act(async () => request("ListCount").count(pageSize));
+  expect(container.querySelector("output")?.dataset.count).toBe(
+    String(pageSize),
+  );
+  expect(container.querySelector("nav")).toBeNull();
 });

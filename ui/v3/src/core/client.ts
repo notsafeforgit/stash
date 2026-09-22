@@ -55,7 +55,7 @@ export function evictQueries(cache: ApolloCache, queries: DocumentNode[]) {
  *
  * Steps:
  *   1. `cache.modify` the root list query (e.g. `findScenes`) to drop
- *      the deleted ids from its `items` array and decrement `count`.
+ *      the deleted ids from its `items` array and update or invalidate `count`.
  *      Without this, the cached list keeps a dangling reference to
  *      the evicted entity — Apollo filters dangling refs from arrays
  *      automatically when reading, but `count` stays stale and the
@@ -103,22 +103,24 @@ export function removeEntitiesFromCache({
         if (existing == null || isReference(existing)) return existing;
         const page = existing as { count?: number } & Record<string, unknown>;
         const items = page[itemsField];
-        if (!Array.isArray(items)) return existing;
-        const refs = items as Reference[];
-        const filtered = refs.filter((ref) => {
+        const refs = Array.isArray(items) ? (items as Reference[]) : undefined;
+        const filtered = refs?.filter((ref) => {
           const id = readField<string>("id", ref);
           return id === undefined || !idSet.has(id);
         });
-        const removed = refs.length - filtered.length;
-        if (removed === 0) return existing;
+        const removed = (refs?.length ?? 0) - (filtered?.length ?? 0);
+        if (removed === 0 && page.count === undefined) return existing;
+        const { count, ...rest } = page;
         return {
-          ...page,
-          [itemsField]: filtered,
-          // A separately loading total must stay unknown, rather than become
-          // a fabricated zero when a card is deleted before it arrives.
-          ...(page.count === undefined
-            ? {}
-            : { count: Math.max(0, page.count - removed) }),
+          ...rest,
+          ...(filtered ? { [itemsField]: filtered } : {}),
+          // Only a page containing every deleted ID proves how much this
+          // filtered total shrank. Invalidate other cached totals so returning
+          // to a previous page fetches its current count. Keep rows available
+          // for split queries, and leave totals that have not arrived unknown.
+          ...(count !== undefined && removed === idSet.size
+            ? { count: Math.max(0, count - removed) }
+            : {}),
         };
       },
     },

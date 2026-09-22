@@ -18,8 +18,7 @@ for (const marker of [false, true]) {
         callback,
       ) {
         return requestFrame.call(this, (now, metadata) => {
-          if (document.documentElement.dataset.stallVideoFrames !== "true")
-            callback(now, metadata);
+          if (this.dataset.stallVideoFrames !== "true") callback(now, metadata);
         });
       };
     });
@@ -28,9 +27,6 @@ for (const marker of [false, true]) {
     await page.route("**/scene/*/stream.master.m3u8**", async (route) => {
       if (new URL(route.request().url()).searchParams.has("_r")) {
         reloads++;
-        await page.evaluate(() => {
-          delete document.documentElement.dataset.stallVideoFrames;
-        });
       }
       await route.fallback();
     });
@@ -41,6 +37,8 @@ for (const marker of [false, true]) {
     );
     const player = page.locator("[data-scene-player]");
     const video = player.locator("video");
+    const original = await video.elementHandle();
+    if (!original) throw new Error("Missing video");
     if (!marker) await player.locator("[data-player-native-button]").click();
     await expect(player).toHaveAttribute("data-playback-ready", "true");
     await expect(video).toHaveJSProperty("paused", false);
@@ -71,8 +69,11 @@ for (const marker of [false, true]) {
     try {
       await expect(scrubber).toHaveAttribute("data-precision", "true");
       await expect(video).toHaveJSProperty("paused", true);
-      await page.evaluate(() => {
-        document.documentElement.dataset.stallVideoFrames = "true";
+      await video.evaluate((v: HTMLVideoElement) => {
+        v.dataset.stallVideoFrames = "true";
+        v.muted = false;
+        v.volume = 0.4;
+        v.playbackRate = 0.75;
       });
       for (const delta of [2, -1, 3, 0]) {
         await drag.move({ ...point, x: point.x + delta });
@@ -94,6 +95,12 @@ for (const marker of [false, true]) {
     await expect.poll(() => reloads, { timeout: 10000 }).toBe(1);
     await expect(player).toHaveAttribute("data-playback-ready", "true");
     await expect(video).toHaveJSProperty("paused", false);
+    expect(await original.evaluate((v) => v.isConnected)).toBe(false);
+    await expect(video).toHaveJSProperty("muted", false);
+    await expect
+      .poll(() => video.evaluate((v: HTMLVideoElement) => v.volume))
+      .toBeCloseTo(0.4, 5);
+    await expect(video).toHaveJSProperty("playbackRate", 0.75);
     const frame = await video.evaluate(
       (v: HTMLVideoElement) =>
         new Promise<number>((resolve) =>

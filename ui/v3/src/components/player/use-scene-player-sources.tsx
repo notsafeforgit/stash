@@ -34,6 +34,7 @@ import type { PlayerTranscodeSession } from "./player-transcode-session";
 import { usePlayerTransitionFeedback } from "./use-player-transition-feedback";
 import { usePlayerTranscodeSession } from "./use-player-transcode-session";
 import { usePlayerRecovery } from "./use-player-recovery";
+import { usePlayerLoadTimeout } from "./use-player-load-timeout";
 import { planSceneSeek, planSourceResume } from "./scene-player-transitions";
 import { getHlsEngine, flushAndRestartAt, suspendHlsBuffering } from "./hls";
 import { isTimeBuffered, readTimeRanges } from "./buffered-ranges";
@@ -138,6 +139,8 @@ interface UseScenePlayerSourcesResult {
   offsetStart: number;
   initialResume: { offset: number; seekTo: number | null };
   reloading: boolean;
+  mediaRevision: number;
+  loadFailed: boolean;
   ready: boolean;
   seekDisplayTarget: number | null;
   /** Persistent canvas that masks the gap between the old MediaSource
@@ -195,6 +198,22 @@ export function useScenePlayerSources({
   clipRange,
 }: UseScenePlayerSourcesArgs): UseScenePlayerSourcesResult {
   const [seekPreview] = useState(createBufferedSeekPreview);
+  // Healthy seeks and source changes retain the authorized video element.
+  // Only a failed decoder or a timed-out reload replaces that element.
+  const [mediaReset, setMediaReset] = useState<{
+    revision: number;
+    muted: boolean;
+    volume: number;
+  } | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const loadRetryAttemptedRef = useRef(false);
+  useLayoutEffect(() => {
+    if (!mediaReset) return;
+    const video = rootRef.current?.querySelector("video");
+    if (!video) return;
+    video.muted = mediaReset.muted;
+    video.volume = mediaReset.volume;
+  }, [mediaReset, rootRef]);
   // Presence of `clipRange` selects the trimmed-playlist code path
   // (URL gets `?end=`, hlsStrategy keeps offsetStart bookkeeping).
   // Without it we ride the full-playlist path (no `?end=`, offsetStart
@@ -322,6 +341,7 @@ export function useScenePlayerSources({
     setFragmentTime(next.resume.seekTo);
     setManualSource(null);
     setReloadNonce(0);
+    setLoadFailed(false);
   }
 
   const activeSource = manualSource ?? preferredSource;
@@ -364,6 +384,7 @@ export function useScenePlayerSources({
     };
   }, []);
   useLayoutEffect(() => {
+    loadRetryAttemptedRef.current = false;
     pendingResumeRef.current = suspended
       ? null
       : {
@@ -480,6 +501,9 @@ export function useScenePlayerSources({
         return;
       }
 
+      loadRetryAttemptedRef.current = false;
+      setLoadFailed(false);
+
       if (persistedLabel && !qualityPreference) {
         localStorage.setItem(QUALITY_STORAGE_KEY, persistedLabel);
       }
@@ -563,6 +587,8 @@ export function useScenePlayerSources({
       if (!Number.isFinite(targetTime)) return;
       const store = storeRef.current;
       if (!store || !activeSrc) return;
+      loadRetryAttemptedRef.current = false;
+      setLoadFailed(false);
       const engine = getHlsEngine(mediaRef.current);
       const video = rootRef.current?.querySelector("video");
       const preview = seekPreview.take();
@@ -783,9 +809,13 @@ export function useScenePlayerSources({
   // target lands on the same segment-aligned `?start=` (HLS) or `#t=`
   // (direct).
   const forceRemountAt = useCallback(
-    (targetTrueTime: number) => {
+    (targetTrueTime: number, replaceMedia = false) => {
       const s = storeRef.current;
       if (!s || !activeSrc) return;
+      const video = rootRef.current?.querySelector("video");
+      const pending = pendingResumeRef.current;
+      const muted = video?.muted ?? false;
+      const volume = video?.volume ?? 1;
       const max =
         fileDuration != null && fileDuration > 0 ? fileDuration : Infinity;
       const clamped = Math.max(0, Math.min(targetTrueTime, max));
@@ -796,18 +826,28 @@ export function useScenePlayerSources({
         isClipped,
         clipRange,
       );
-      const playbackRate = s.state.playbackRate;
+      const playbackRate = pending?.playbackRate ?? s.state.playbackRate;
+      const wasPaused = pending?.wasPaused ?? false;
       s.pause();
+      setLoadFailed(false);
+      armSeekDisplay(clamped);
       beginSourceRemount(() => {
         const resume = planSourceResume(strategy, clamped);
         pendingResumeRef.current = {
-          wasPaused: false,
+          wasPaused,
           playbackRate,
           seekTo: resume.seekTo,
         };
         setOffsetStart(resume.offset);
         setFragmentTime(resume.fragmentTime);
         setReloadNonce((n) => n + 1);
+        if (replaceMedia) {
+          setMediaReset((previous) => ({
+            revision: (previous?.revision ?? 0) + 1,
+            muted,
+            volume,
+          }));
+        }
       });
     },
     [
@@ -818,8 +858,39 @@ export function useScenePlayerSources({
       frameRate,
       isClipped,
       clipRange,
+      rootRef,
+      armSeekDisplay,
     ],
   );
+
+  const retrySource = useCallback(
+    (targetTrueTime: number) => {
+      loadRetryAttemptedRef.current = false;
+      forceRemountAt(pendingResumeRef.current?.seekTo ?? targetTrueTime, true);
+    },
+    [forceRemountAt],
+  );
+
+  usePlayerLoadTimeout({
+    load,
+    pending: reloading && !!finalSrc && readyLoad !== load && !loadFailed,
+    onTimeout: () => {
+      if (!loadRetryAttemptedRef.current) {
+        loadRetryAttemptedRef.current = true;
+        // A reload resets currentTime to zero while waiting for metadata.
+        // Recover at the accepted seek target, not that temporary zero.
+        const target =
+          pendingResumeRef.current?.seekTo ?? fragmentTime ?? offsetStart;
+        forceRemountAt(target, true);
+        return;
+      }
+      getHlsEngine(mediaRef.current)?.stopLoad();
+      storeRef.current?.pause();
+      setLoadFailed(true);
+      setReloading(false);
+      clearCapturedFrame();
+    },
+  });
 
   // Pre-position the `<video>` synchronously inside `loadedmetadata`,
   // before the user agent's internal autoplay path can begin emitting
@@ -927,6 +998,8 @@ export function useScenePlayerSources({
     }
     if (!mountedRef.current || currentLoadRef.current !== load) return;
     pendingResumeRef.current = null;
+    loadRetryAttemptedRef.current = false;
+    setLoadFailed(false);
     setReadyLoad(load);
     clearCapturedFrame();
     setReloading(false);
@@ -976,6 +1049,8 @@ export function useScenePlayerSources({
     offsetStart,
     initialResume,
     reloading,
+    mediaRevision: mediaReset?.revision ?? 0,
+    loadFailed,
     ready: !!finalSrc && readyLoad === load,
     seekDisplayTarget,
     freezeFrameCanvas,
@@ -986,7 +1061,7 @@ export function useScenePlayerSources({
     setPendingPaused,
     handleRestart,
     handleLoop,
-    retrySource: forceRemountAt,
+    retrySource,
     handleCanPlay,
     handleLoadedMetadata,
   };

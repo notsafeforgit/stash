@@ -367,6 +367,7 @@ pins an older hls.js, so a version-scoped pnpm override uses the updated
 | `player-transcode-session.ts`, `use-player-transcode-session.ts` | Own scoped HLS leases across playback and pause; TV retains nearby leases until window eviction or exit |
 | `prepare-player-source.ts` | Cancellable, bounded startup fetching for TV's nearby direct/HLS sources |
 | `use-player-recovery.ts` | Native fullscreen seeking and stalled-playback recovery |
+| `use-player-load-timeout.ts` | Deadline for a source that never becomes ready, including failed recovery loads |
 | `use-player-loop.ts` | Media-clock loop deadline, cancelled by pause, seek and source changes |
 
 The scene lightbox uses `scene-carousel.tsx`, a YARL carousel module with three
@@ -399,6 +400,17 @@ completion and EOF fallback, while auto-advance fires once. The explicit WebKit 
 resume remains necessary. Chromium/WebKit fixtures exercise the actual lightbox
 and its source machinery, but physical iPhone autoplay permission and MMS still
 need device testing.
+
+Recovery observes presented video frames separately from the audio clock. A
+video-only stall replaces the native video element, since reloading a playlist
+on a failed Safari decoder can leave that decoder stuck. Normal source changes
+and seeks retain the element. Replacement preserves the accepted scene time,
+pause intent, rate, mute and volume, and leaves the player root and controls
+mounted. A source reload has a 30-second readiness deadline, reset after
+returning from the background. It gets one replacement attempt, then stops HLS
+loading and presents Retry. The deadline also covers a resume seek whose
+completion event never arrives. Physical iOS still needs verification; a new
+element may require a Play gesture or leave native fullscreen/Picture in Picture.
 
 Audible Direct loops are not guaranteed to be seamless on Safari. A
 [plain-video diagnostic on macOS 26](https://github.com/notsafeforgit/stash/actions/runs/35467017314)

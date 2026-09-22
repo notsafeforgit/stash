@@ -7,7 +7,7 @@ import type { SceneActivityScope } from "@/core/scene-activity";
 import { SceneActivityEffects } from "./scene-activity-effects";
 import { ScenePlayerControlsProvider } from "./scene-player-controls";
 /**
- * Scene player: one player root, store and native video element per session.
+ * Scene player: one player root and store per session.
  * SceneVideo passes direct and HLS sources to Video.js's HlsJsAdapter. Source
  * changes load in place; changes to type or engine configuration rebuild the
  * delegate without replacing the video element or resetting its audio state.
@@ -17,7 +17,10 @@ import { ScenePlayerControlsProvider } from "./scene-player-controls";
  * Buffered seeks stay in place. Distant desktop HLS seeks can restart the
  * fragment scheduler; MMS and clipped-playlist seeks reload the source URL.
  * Retain those reloads and the freeze frame that covers MediaSource teardown.
- * They do not require a new DOM element.
+ * Healthy transitions keep one native element. A video-only decoder stall or
+ * a source-load timeout can replace it while preserving the accepted position,
+ * playback intent, rate, mute and volume. Failed loads get one automatic retry
+ * before a visible Retry action replaces loading.
  *
  * The lightbox retains this session across selections. `playbackKey` resets
  * scene/marker state; `suspended` releases media during query/OPFS gaps.
@@ -47,6 +50,8 @@ import { objectTitle } from "@/core/files";
 import { cn } from "src/lib/utils";
 import { Badge } from "src/components/ui/badge";
 import { Spinner } from "src/components/ui/spinner";
+import { Button } from "@/components/ui/button";
+import { FormattedMessage } from "react-intl";
 import { languageMap } from "src/utils/caption";
 import { resolution as resolutionLabel } from "src/utils/file";
 import type * as GQL from "src/core/generated-graphql";
@@ -676,6 +681,8 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     offsetStart,
     initialResume,
     reloading,
+    mediaRevision,
+    loadFailed,
     ready: sourceReady,
     seekDisplayTarget,
     freezeFrameCanvas,
@@ -950,6 +957,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
 
   const mediaElement = (
     <SceneVideo
+      key={mediaRevision}
       src={finalSrc}
       startPosition={startPosition}
       sourceType={activeSource?.type}
@@ -1030,7 +1038,8 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
         )}
         style={!fill && videoAspect ? { aspectRatio: videoAspect } : undefined}
       >
-        {/* The root and SceneVideo keep their identity across source changes. */}
+        {/* Normal source changes retain both identities. Decoder recovery may
+            replace SceneVideo while keeping the player store and controls. */}
         <Player.Player>
           <StoreBridge storeRef={storeRef} />
           <MediaBridge mediaRef={mediaRef} />
@@ -1254,6 +1263,30 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
         >
           <Spinner className="size-12 text-white" />
         </div>
+        {loadFailed && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+            <div
+              role="alert"
+              className="pointer-events-auto flex max-w-xs flex-col items-center gap-3 rounded-lg bg-black/90 p-4 text-center text-white"
+            >
+              <FormattedMessage
+                id="errors.playback_resume_failed"
+                defaultMessage="Playback could not resume. Try again."
+              />
+              <Button
+                variant="secondary"
+                className="min-h-11"
+                onClick={() =>
+                  retrySource(
+                    offsetStart + (storeRef.current?.state.currentTime ?? 0),
+                  )
+                }
+              >
+                <FormattedMessage id="actions.retry" defaultMessage="Retry" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

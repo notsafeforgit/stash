@@ -117,8 +117,8 @@ export function CanPlayEffect({
   playbackKey?: string;
 }) {
   const firedRef = useRef(false);
-  // The readyState >= 3 fast-path below is only safe on the *first*
-  // run. On srcKey-driven re-runs the <video> element's readyState
+  // The readyState >= 3 fast-path below is safe for a newly attached video.
+  // On srcKey-driven re-runs of the same element its readyState
   // still reflects the *previous* source (HlsJsAdapter's source transition
   // and the resulting `emptied` event come a couple of microtasks after
   // the React effect runs), so the fast-path would otherwise
@@ -129,6 +129,7 @@ export function CanPlayEffect({
   const attachedForRef = useRef<{
     srcKey?: string;
     playbackKey?: string;
+    video: HTMLVideoElement;
   } | null>(null);
   useEffect(() => {
     firedRef.current = false;
@@ -143,14 +144,19 @@ export function CanPlayEffect({
     };
     // `readyState >= HAVE_FUTURE_DATA` (3) — first-mount race fix:
     // Safari can finish loading a warm-cache HLS playlist before this
-    // effect attaches, so we check up-front. Skip on re-runs: at that
-    // point readyState reflects the OLD source.
+    // effect attaches, so we check up-front, including an emergency decoder
+    // replacement. Skip a retained element's source-change fast path because
+    // readyState may still reflect the OLD source.
     const isFirstRun = attachedForRef.current === null;
+    const replacedVideo = attachedForRef.current?.video !== video;
     const sameSourceNewPlayback =
       attachedForRef.current?.srcKey === srcKey &&
       attachedForRef.current?.playbackKey !== playbackKey;
-    attachedForRef.current = { srcKey, playbackKey };
-    if ((isFirstRun || sameSourceNewPlayback) && video.readyState >= 3) {
+    attachedForRef.current = { srcKey, playbackKey, video };
+    if (
+      (isFirstRun || replacedVideo || sameSourceNewPlayback) &&
+      video.readyState >= 3
+    ) {
       handler();
       return;
     }

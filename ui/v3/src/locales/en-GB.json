@@ -1496,6 +1496,7 @@
     "loading_type": "Error loading {type}",
     "something_went_wrong": "Something went wrong.",
     "load_failed": "Could not load data.",
+    "playback_resume_failed": "Playback could not resume. Try again.",
     "refresh_failed": "Could not refresh. Showing previously loaded data."
   },
   "eta": "ETA",

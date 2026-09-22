@@ -95,6 +95,9 @@ export const SearchInput: React.FC<SearchInputProps> = ({
       <Input
         ref={inputRef}
         type="search"
+        autoCorrect="off"
+        autoCapitalize="none"
+        spellCheck={false}
         className={cn(
           // Suppress the WebKit/Chromium native clear button on
           // type=search inputs — we render our own × button below.
@@ -128,6 +131,9 @@ export const SearchInput: React.FC<SearchInputProps> = ({
           <Button
             variant="ghost"
             size="icon-xs"
+            // Keep the input focused so the keyboard and toolbar stay in place
+            // until click. Canceling pointerdown also suppresses WebKit's click.
+            onMouseDown={(e) => e.preventDefault()}
             onClick={clear}
             className={cn(
               "text-muted-foreground hover:text-foreground",

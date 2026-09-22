@@ -144,6 +144,9 @@ test("search commits on close and keeps its value across section changes", async
   await footer.getByRole("button", { name: "Search…", exact: true }).tap();
   const search = footer.getByRole("searchbox");
   await expect(search).toBeFocused();
+  await expect(search).toHaveAttribute("autocorrect", "off");
+  await expect(search).toHaveAttribute("autocapitalize", "none");
+  await expect(search).toHaveAttribute("spellcheck", "false");
   await expect(
     footer.getByRole("button", { name: "Back", exact: true }),
   ).toHaveCount(0);
@@ -159,7 +162,15 @@ test("search commits on close and keeps its value across section changes", async
   await chooseSection(page, "Scenes");
   await footer.getByRole("button", { name: "Search…", exact: true }).tap();
   await expect(search).toHaveValue("typed just before close");
+  expect(
+    await search.evaluate((element: HTMLInputElement) => ({
+      start: element.selectionStart,
+      end: element.selectionEnd,
+    })),
+  ).toEqual({ start: 0, end: "typed just before close".length });
   await footer.getByRole("button", { name: "Clear", exact: true }).tap();
+  await expect(search).toHaveValue("");
+  await expect(search).toBeFocused();
   await footer.getByRole("button", { name: "Close search" }).tap();
   await expect(
     page.getByTestId("scenes-list").getByTestId("list-state"),
@@ -609,6 +620,18 @@ for (const layout of ["standalone", "collection", "media"]) {
       );
       expect(bounds.listBottom).toBeLessThanOrEqual(bounds.footerTop + 1);
     }
+    // Clearing must keep focus: blur drops the keyboard inset and moves the
+    // clear button away before the touch's click can reach it.
+    const input = footer.getByRole("searchbox");
+    await input.fill("clear without hiding the keyboard");
+    await footer.getByRole("button", { name: "Clear", exact: true }).tap();
+    await expect(input).toHaveValue("");
+    await expect(input).toBeFocused();
+    expect(
+      await footer.evaluate(
+        (element) => element.getBoundingClientRect().bottom,
+      ),
+    ).toBeCloseTo(500, 0);
     // Dismiss the keyboard while keeping search open, then focus the same field.
     await footer.getByRole("searchbox").blur();
     await expectCompactRow(footer);

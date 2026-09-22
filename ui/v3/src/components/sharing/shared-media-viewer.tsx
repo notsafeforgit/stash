@@ -1,65 +1,105 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useIntl } from "react-intl";
-import { Download, ChevronLeft, ChevronRight } from "lucide-react";
+import { Download, Maximize } from "lucide-react";
 import {
   ScenePlayer,
   type ScenePlaybackData,
 } from "@/components/player/scene-player";
 import { PlayerTranscodeSession } from "@/components/player/player-transcode-session";
+import { LightboxScenePlayer } from "@/components/lightbox/lightbox-scene-player";
+import type { SceneLightboxSlideProps } from "@/components/lightbox/scene-lightbox";
 import { ImageViewer } from "@/components/detail/image-viewer";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  shareDetailSchema,
-  shareRequest,
-  type SharedDetail,
-} from "./share-contract";
+import type { SharedDetail, SharedMedia } from "./share-contract";
+import { useSharedMedia } from "./use-shared-media";
 
-function SharedPlayback({ detail, base }: { detail: SharedDetail; base: URL }) {
-  const [session] = useState(
-    () =>
-      new PlayerTranscodeSession(
+export function SharedPlayback({
+  detail,
+  base,
+  suspended = false,
+  lightbox,
+  onControlsVisibilityChange,
+}: {
+  detail: SharedDetail;
+  base: URL;
+  suspended?: boolean;
+  lightbox?: Omit<SceneLightboxSlideProps, "slide" | "isActive">;
+  onControlsVisibilityChange?: (visible: boolean) => void;
+}) {
+  const endpoint = new URL(`media/${detail.media.key}/`, base).href;
+  const [lease, setLease] = useState(() => ({
+    endpoint,
+    session: new PlayerTranscodeSession(
+      detail.media.key,
+      crypto.randomUUID(),
+      new URL(endpoint),
+    ),
+  }));
+  if (lease.endpoint !== endpoint) {
+    setLease({
+      endpoint,
+      session: new PlayerTranscodeSession(
         detail.media.key,
         crypto.randomUUID(),
-        new URL(`media/${detail.media.key}/`, base),
+        new URL(endpoint),
       ),
+    });
+  }
+  useEffect(() => () => lease.session.dispose(), [lease]);
+  useEffect(() => {
+    if (suspended) lease.session.selectSource(undefined);
+  }, [lease, suspended]);
+  const scene = useMemo<ScenePlaybackData>(
+    () => ({
+      id: detail.media.key,
+      title: detail.media.title,
+      resume_time: 0,
+      files: [
+        {
+          path: "",
+          width: detail.media.width,
+          height: detail.media.height,
+          duration: detail.media.duration,
+          frame_rate: detail.frame_rate,
+          video_codec: detail.video_codec,
+          audio_codec: detail.audio_codec,
+          updated_at: "",
+        },
+      ],
+      paths: { screenshot: detail.media.thumbnail, caption: null },
+      sceneStreams: detail.streams.map((stream) => ({
+        __typename: "SceneStreamEndpoint",
+        ...stream,
+        url: new URL(stream.url, base).href,
+      })),
+      scene_markers: [],
+      captions: [],
+      performers: [],
+      studio: null,
+      preview_image: null,
+    }),
+    [detail, base],
   );
-  useEffect(() => () => session.dispose(), [session]);
-  const scene: ScenePlaybackData = {
-    id: detail.media.key,
-    title: detail.media.title,
-    resume_time: 0,
-    files: [
-      {
-        path: "",
-        width: detail.media.width,
-        height: detail.media.height,
-        duration: detail.media.duration,
-        frame_rate: detail.frame_rate,
-        video_codec: detail.video_codec,
-        audio_codec: detail.audio_codec,
-        updated_at: "",
-      },
-    ],
-    paths: { screenshot: detail.media.thumbnail, caption: null },
-    sceneStreams: detail.streams.map((stream) => ({
-      __typename: "SceneStreamEndpoint",
-      ...stream,
-      url: new URL(stream.url, base).href,
-    })),
-    scene_markers: [],
-    captions: [],
-    performers: [],
-    studio: null,
-    preview_image: null,
-  };
-  return (
+  const common = {
+    scene,
+    transcodeSession: lease.session,
+    castingAllowed: false,
+    activityScope: { kind: "disabled" },
+    suspended,
+    playbackKey: detail.media.key,
+  } as const;
+  return lightbox ? (
+    <LightboxScenePlayer
+      {...common}
+      {...lightbox}
+      onControlsVisibilityChange={onControlsVisibilityChange}
+      autostartEnabled
+    />
+  ) : (
     <ScenePlayer
-      scene={scene}
-      transcodeSession={session}
-      castingAllowed={false}
-      activityScope={{ kind: "disabled" }}
+      {...common}
       autoplay={false}
       autostartEnabled={false}
       enablePinchZoom
@@ -68,117 +108,94 @@ function SharedPlayback({ detail, base }: { detail: SharedDetail; base: URL }) {
   );
 }
 
+export function ShareDownload({ media }: { media: SharedMedia }) {
+  const intl = useIntl();
+  if (!media.download) return null;
+  return (
+    <Button
+      variant="outline"
+      nativeButton={false}
+      role="link"
+      render={<a href={media.download} download />}
+    >
+      <Download data-icon="inline-start" />
+      {intl.formatMessage({
+        id: "sharing.download_original",
+        defaultMessage: "Download original",
+      })}
+    </Button>
+  );
+}
+
+export function SharedMediaStatus({ loading }: { loading: boolean }) {
+  const intl = useIntl();
+  return loading ? (
+    <Spinner />
+  ) : (
+    <Alert className="max-w-sm">
+      <AlertDescription>
+        {intl.formatMessage({
+          id: "sharing.media_unavailable",
+          defaultMessage: "This item is no longer available.",
+        })}
+      </AlertDescription>
+    </Alert>
+  );
+}
+
+/** A leaf detail view contains only the media and its grant's actions. */
 export function SharedMediaViewer({
-  mediaKey,
+  media,
   base,
-  previous,
-  next,
+  suspended,
+  onOpenViewer,
 }: {
-  mediaKey: string;
+  media: SharedMedia;
   base: URL;
-  previous?: () => void;
-  next?: () => void;
+  suspended: boolean;
+  onOpenViewer: () => void;
 }) {
   const intl = useIntl();
-  const [state, setState] = useState<
-    | { kind: "loading" }
-    | { kind: "ready"; detail: SharedDetail }
-    | { kind: "error" }
-  >({ kind: "loading" });
-  useEffect(() => {
-    const abort = new AbortController();
-    void shareRequest(
-      new URL(`media/${mediaKey}/`, base),
-      shareDetailSchema,
-      abort.signal,
-    ).then(
-      (detail) => {
-        if (!abort.signal.aborted) setState({ kind: "ready", detail });
-      },
-      () => {
-        if (!abort.signal.aborted) setState({ kind: "error" });
-      },
-    );
-    return () => abort.abort();
-  }, [mediaKey, base]);
+  const state = useSharedMedia(media.key, base);
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex min-h-80 h-[65dvh] items-center justify-center overflow-hidden rounded-lg bg-black">
-        {state.kind === "loading" && <Spinner />}
-        {state.kind === "error" && (
-          <Alert>
-            <AlertDescription>
-              {intl.formatMessage({
-                id: "sharing.media_unavailable",
-                defaultMessage: "This item is no longer available.",
-              })}
-            </AlertDescription>
-          </Alert>
-        )}
-        {state.kind === "ready" &&
-          (state.detail.media.video ? (
-            <SharedPlayback detail={state.detail} base={base} />
-          ) : (
-            <ImageViewer
-              actions={false}
-              image={{
-                title: state.detail.media.title,
-                paths: { image: state.detail.media.image, preview: null },
-                visual_files: [
-                  {
-                    path: "",
-                    width: state.detail.media.width,
-                    height: state.detail.media.height,
-                  },
-                ],
-              }}
-            />
-          ))}
-      </div>
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            disabled={!previous}
-            onClick={previous}
-            aria-label={intl.formatMessage({
-              id: "sharing.previous",
-              defaultMessage: "Previous item",
-            })}
-          >
-            <ChevronLeft />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            disabled={!next}
-            onClick={next}
-            aria-label={intl.formatMessage({
-              id: "sharing.next",
-              defaultMessage: "Next item",
-            })}
-          >
-            <ChevronRight />
-          </Button>
-        </div>
-        {state.kind === "ready" && (
-          <p className="min-w-0 flex-1 truncate">{state.detail.media.title}</p>
-        )}
-        {state.kind === "ready" && state.detail.media.download && (
-          <a
-            className={buttonVariants({ variant: "outline" })}
-            href={state.detail.media.download}
-            download
-          >
-            <Download data-icon="inline-start" />
-            {intl.formatMessage({
-              id: "sharing.download_original",
-              defaultMessage: "Download original",
-            })}
-          </a>
+    <section className="flex min-w-0 flex-col gap-3">
+      <div className="relative flex h-[65dvh] min-h-64 items-center justify-center overflow-hidden rounded-lg bg-black">
+        {state.kind !== "ready" ? (
+          <SharedMediaStatus loading={state.kind === "loading"} />
+        ) : state.detail.media.video ? (
+          <SharedPlayback
+            detail={state.detail}
+            base={base}
+            suspended={suspended}
+          />
+        ) : (
+          <ImageViewer
+            actions={false}
+            onOpenViewer={onOpenViewer}
+            image={{
+              title: state.detail.media.title,
+              paths: { image: state.detail.media.image, preview: null },
+              visual_files: [
+                {
+                  path: "",
+                  width: state.detail.media.width,
+                  height: state.detail.media.height,
+                },
+              ],
+            }}
+          />
         )}
       </div>
-    </div>
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button variant="outline" onClick={onOpenViewer}>
+          <Maximize data-icon="inline-start" />
+          {intl.formatMessage({
+            id: "sharing.open_viewer",
+            defaultMessage: "Open viewer",
+          })}
+        </Button>
+        <ShareDownload media={media} />
+      </div>
+    </section>
   );
 }

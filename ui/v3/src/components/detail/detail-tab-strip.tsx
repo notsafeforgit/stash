@@ -12,6 +12,7 @@ export interface DetailTabStripItem {
 export interface DetailTabStripProps {
   tabs: readonly DetailTabStripItem[];
   className?: string;
+  ariaLabel?: string;
 }
 
 /**
@@ -21,7 +22,11 @@ export interface DetailTabStripProps {
  * horizontally scrollable (`overflow-x-auto`) when 5+ labels exceed the
  * column width. This is the only place the scroll behaviour lives.
  */
-export function DetailTabStrip({ tabs, className }: DetailTabStripProps) {
+export function DetailTabStrip({
+  tabs,
+  className,
+  ariaLabel,
+}: DetailTabStripProps) {
   const intl = useIntl();
   return (
     // `w-full` overrides the shadcn TabsList's default `w-fit`: without
@@ -31,10 +36,13 @@ export function DetailTabStrip({ tabs, className }: DetailTabStripProps) {
     // `overflow-hidden`). Pinning to the container width is what makes
     // the horizontal scroll engage when 5+ labels exceed the column.
     <TabsList
-      aria-label={intl.formatMessage({
-        id: "accessibility.detail_sections",
-        defaultMessage: "Detail sections",
-      })}
+      aria-label={
+        ariaLabel ??
+        intl.formatMessage({
+          id: "accessibility.detail_sections",
+          defaultMessage: "Detail sections",
+        })
+      }
       className={cn(
         "w-full shrink-0 overflow-x-auto overflow-y-hidden",
         // Pack tabs shoulder-to-shoulder before overflowing:

@@ -486,9 +486,14 @@ function ImageEntityFooter({
 interface SettingsButtonProps {
   settings: LightboxSettings;
   onSettingsChange: (s: LightboxSettings) => void;
+  libraryActions: boolean;
 }
 
-function SettingsButton({ settings, onSettingsChange }: SettingsButtonProps) {
+function SettingsButton({
+  settings,
+  onSettingsChange,
+  libraryActions,
+}: SettingsButtonProps) {
   const scrollZoomId = useId();
   const mobileRatingId = useId();
   const intl = useIntl();
@@ -543,22 +548,26 @@ function SettingsButton({ settings, onSettingsChange }: SettingsButtonProps) {
             />
           </Label>
 
-          <Label
-            htmlFor={mobileRatingId}
-            className="flex min-h-11 items-center justify-between gap-3 cursor-pointer"
-          >
-            <span>
-              {intl.formatMessage({
-                id: "lightbox.show_rating_on_mobile",
-                defaultMessage: "Show rating on mobile",
-              })}
-            </span>
-            <Switch
-              id={mobileRatingId}
-              checked={settings.showRatingOnMobile}
-              onCheckedChange={(value) => update({ showRatingOnMobile: value })}
-            />
-          </Label>
+          {libraryActions && (
+            <Label
+              htmlFor={mobileRatingId}
+              className="flex min-h-11 items-center justify-between gap-3 cursor-pointer"
+            >
+              <span>
+                {intl.formatMessage({
+                  id: "lightbox.show_rating_on_mobile",
+                  defaultMessage: "Show rating on mobile",
+                })}
+              </span>
+              <Switch
+                id={mobileRatingId}
+                checked={settings.showRatingOnMobile}
+                onCheckedChange={(value) =>
+                  update({ showRatingOnMobile: value })
+                }
+              />
+            </Label>
+          )}
 
           {/* Display mode */}
           <div className="flex flex-col gap-1.5">
@@ -904,7 +913,31 @@ export interface LightboxProps {
   finite?: boolean;
 }
 
-export function Lightbox({
+/** Library adapter. The viewer itself also works with scoped, read-only media. */
+export function Lightbox(props: LightboxProps) {
+  const [imageRotate] = useMutation(GQL.ImageRotateDocument);
+  const onRotate = useCallback(
+    async (imageId: string, direction: GQL.ImageRotateDirection) => {
+      const { data } = await imageRotate({
+        variables: { id: imageId, direction },
+      });
+      return data?.imageRotate?.paths?.image ?? undefined;
+    },
+    [imageRotate],
+  );
+  return <ImageLightbox {...props} libraryActions onRotate={onRotate} />;
+}
+
+interface ImageLightboxProps extends LightboxProps {
+  libraryActions?: boolean;
+  onRotate?: (
+    imageId: string,
+    direction: GQL.ImageRotateDirection,
+  ) => Promise<string | undefined>;
+  renderFooter?: (slide: LightboxSlide) => React.ReactNode;
+}
+
+export function ImageLightbox({
   open,
   onClose,
   slides,
@@ -915,7 +948,10 @@ export function Lightbox({
   onDeleteImage,
   slideshowAutoplay = false,
   finite = false,
-}: LightboxProps) {
+  libraryActions = false,
+  onRotate,
+  renderFooter,
+}: ImageLightboxProps) {
   const intl = useIntl();
   const toast = useToast();
   const {
@@ -1023,21 +1059,17 @@ export function Lightbox({
   // so cache updates don't reach them. We track per-imageId src overrides
   // locally and apply the fresh URL from the mutation response — same end
   // result as relying on cache propagation, but reactive to the snapshot.
-  const [imageRotate] = useMutation(GQL.ImageRotateDocument);
   const [slideSrcOverrides, setSlideSrcOverrides] = useState<
     Record<string, string>
   >({});
   const rotateImage = useCallback(
     async (imageId: string, direction: GQL.ImageRotateDirection) => {
-      const { data } = await imageRotate({
-        variables: { id: imageId, direction },
-      });
-      const newSrc = data?.imageRotate?.paths?.image;
+      const newSrc = await onRotate?.(imageId, direction);
       if (newSrc) {
         setSlideSrcOverrides((prev) => ({ ...prev, [imageId]: newSrc }));
       }
     },
-    [imageRotate],
+    [onRotate],
   );
   const handleRotate = useCallback(
     (imageId: string, direction: GQL.ImageRotateDirection) => {
@@ -1186,7 +1218,8 @@ export function Lightbox({
     ({ slide }: RenderSlideFooterProps) => {
       const s = getImageSlide(slide);
       if (!s) return undefined;
-      if (!s.imageId) return null;
+      if (renderFooter) return renderFooter(s);
+      if (!libraryActions || !s.imageId) return null;
       return (
         <ImageEntityFooter
           imageId={s.imageId}
@@ -1196,7 +1229,13 @@ export function Lightbox({
         />
       );
     },
-    [mobile, onDeleteImage, settings.showRatingOnMobile],
+    [
+      mobile,
+      onDeleteImage,
+      settings.showRatingOnMobile,
+      libraryActions,
+      renderFooter,
+    ],
   );
 
   const renderControls = useCallback(
@@ -1265,6 +1304,7 @@ export function Lightbox({
               key="settings"
               settings={settings}
               onSettingsChange={setSettings}
+              libraryActions={libraryActions}
             />,
             ...(isSingleSlideMode ? [] : ["slideshow" as const]),
             ...(settings.displayMode === "fitXY" && !mobile
@@ -1277,23 +1317,27 @@ export function Lightbox({
                   />,
                 ]
               : []),
-            <LightboxRotateButton
-              key="rotate-ccw"
-              direction={GQL.ImageRotateDirection.Ccw}
-              onRotate={handleRotate}
-            />,
-            <LightboxRotateButton
-              key="rotate-cw"
-              direction={GQL.ImageRotateDirection.Cw}
-              onRotate={handleRotate}
-            />,
-            <LightboxImageActionsButton
-              key="image-actions"
-              onRotate={handleRotate}
-              zoomRef={zoomRef}
-              atOriginal={atOriginalSize}
-              zoomEnabled={settings.displayMode === "fitXY"}
-            />,
+            ...(libraryActions
+              ? [
+                  <LightboxRotateButton
+                    key="rotate-ccw"
+                    direction={GQL.ImageRotateDirection.Ccw}
+                    onRotate={handleRotate}
+                  />,
+                  <LightboxRotateButton
+                    key="rotate-cw"
+                    direction={GQL.ImageRotateDirection.Cw}
+                    onRotate={handleRotate}
+                  />,
+                  <LightboxImageActionsButton
+                    key="image-actions"
+                    onRotate={handleRotate}
+                    zoomRef={zoomRef}
+                    atOriginal={atOriginalSize}
+                    zoomEnabled={settings.displayMode === "fitXY"}
+                  />,
+                ]
+              : []),
             "fullscreen",
             <LightboxCloseButton key="close" />,
           ],

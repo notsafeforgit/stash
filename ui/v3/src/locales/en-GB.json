@@ -2751,6 +2751,10 @@
     "save_failed": "Could not save the image. Please try again."
   },
   "sharing": {
+    "open_viewer": "Open viewer",
+    "item_count": "{count, plural, one {# item} other {# items}}",
+    "empty": "No shared media",
+    "media_types": "Shared media types",
     "default_label": "Shared media",
     "label_required": "Enter a label.",
     "label_long": "Use at most 200 characters.",

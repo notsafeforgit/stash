@@ -1,7 +1,14 @@
 import type { PreviewImageData } from "@/components/shared/preview-image";
 import "yet-another-react-lightbox/styles.css";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ComponentProps,
+  type ComponentType,
+} from "react";
 import YARLightbox, {
   type GenericSlide,
   type RenderSlideProps,
@@ -67,7 +74,11 @@ export interface SceneLightboxProps {
   onView?: (index: number) => void;
   /** Finite carousel (no wrap-around). Used when boundary sentinel slides exist. */
   finite?: boolean;
+  /** Supply scoped playback without mounting the library's data providers. */
+  slideContent?: ComponentType<SceneLightboxSlideProps>;
 }
+
+export type SceneLightboxSlideProps = ComponentProps<typeof SceneSlideContent>;
 
 export function SceneLightbox({
   open,
@@ -76,6 +87,7 @@ export function SceneLightbox({
   index = 0,
   onView,
   finite = false,
+  slideContent: SlideContent = SceneSlideContent,
 }: SceneLightboxProps) {
   const {
     controllerRef,
@@ -269,7 +281,7 @@ export function SceneLightbox({
     ({ slide, offset }: RenderSlideProps) => {
       if (slide.type !== "scene") return undefined;
       return (
-        <SceneSlideContent
+        <SlideContent
           slide={slide}
           isActive={offset === 0}
           onToggleFullscreen={handleToggleLightboxFullscreen}
@@ -287,6 +299,7 @@ export function SceneLightbox({
       handleNext,
       touch,
       requestClose,
+      SlideContent,
     ],
   );
 

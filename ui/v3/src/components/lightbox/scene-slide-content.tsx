@@ -67,7 +67,7 @@ export function SceneSlideContent(props: SceneSlideContentProps) {
   );
 }
 
-function SceneSlidePoster({ slide }: { slide: SceneSlide }) {
+export function SceneSlidePoster({ slide }: { slide: SceneSlide }) {
   return (
     <div className="absolute inset-0 flex items-center justify-center bg-black">
       {(slide.posterSrc || slide.posterImage) && (

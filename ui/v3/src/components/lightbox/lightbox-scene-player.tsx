@@ -18,12 +18,16 @@ import type { SceneActivityScope } from "@/core/scene-activity";
 
 import type React from "react";
 import { ScenePlayer } from "src/components/player/scene-player";
-import type { ScenePlayerScene } from "src/components/player/scene-player";
-import { useConfigurationContext } from "src/hooks/config";
+import type { ScenePlaybackData } from "src/components/player/scene-player";
+import type { PlayerTranscodeSession } from "@/components/player/player-transcode-session";
+import { useConfigurationContextOptional } from "src/hooks/config";
 
 interface LightboxScenePlayerProps {
   activityScope?: SceneActivityScope;
-  scene: ScenePlayerScene;
+  scene: ScenePlaybackData;
+  transcodeSession?: PlayerTranscodeSession;
+  castingAllowed?: boolean;
+  autostartEnabled?: boolean;
   playbackKey: string;
   suspended: boolean;
   /** Lightbox preference, retained across closing and reopening. */
@@ -68,6 +72,9 @@ interface LightboxScenePlayerProps {
 export function LightboxScenePlayer({
   activityScope,
   scene,
+  transcodeSession,
+  castingAllowed,
+  autostartEnabled: autostartOverride,
   playbackKey,
   suspended,
   loopEnabled,
@@ -84,13 +91,16 @@ export function LightboxScenePlayer({
   sendGetCurrentTime,
   sendPause,
 }: LightboxScenePlayerProps) {
-  const { configuration } = useConfigurationContext();
-  const autostartEnabled = configuration.interface.autostartVideo ?? true;
+  const configuration = useConfigurationContextOptional()?.configuration;
+  const autostartEnabled =
+    autostartOverride ?? configuration?.interface.autostartVideo ?? true;
 
   return (
     <ScenePlayer
       activityScope={activityScope}
       scene={scene}
+      transcodeSession={transcodeSession}
+      castingAllowed={castingAllowed}
       playbackKey={playbackKey}
       suspended={suspended}
       autoplay

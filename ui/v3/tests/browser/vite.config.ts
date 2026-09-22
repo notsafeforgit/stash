@@ -26,7 +26,11 @@ export default defineConfig({
       name: "sharing-fixture",
       configureServer(server) {
         server.middlewares.use((request, _response, next) => {
-          if (/^\/share\/[A-Za-z0-9_-]{22}\/?$/.test(request.url ?? ""))
+          if (
+            /^\/share\/[A-Za-z0-9_-]{22}\/?$/.test(
+              new URL(request.url ?? "/", "http://localhost").pathname,
+            )
+          )
             request.url = "/share.html";
           next();
         });

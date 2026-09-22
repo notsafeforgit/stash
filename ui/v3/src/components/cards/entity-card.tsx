@@ -80,10 +80,9 @@ const EntityCardCtx = createContext<EntityCardCtx>({
 
 // ── Root ─────────────────────────────────────────────────────────────────────
 
-interface EntityCardRootProps {
+interface EntityCardBaseProps {
   id: string;
   label: string;
-  destination: EntityDestination;
   isMobile?: boolean;
   selected?: boolean;
   onSelectedChanged?: (selected: boolean, shiftKey: boolean) => void;
@@ -104,10 +103,47 @@ interface EntityCardRootProps {
   children: React.ReactNode;
 }
 
-function EntityCardRoot({
+type EntityCardRootProps = EntityCardBaseProps &
+  (
+    | { destination: EntityDestination; href?: never; onNavigate?: never }
+    | { destination?: never; href: string; onNavigate: () => void }
+  );
+
+function EntityCardRoot(props: EntityCardRootProps) {
+  if (props.destination)
+    return <RoutedEntityCard {...props} destination={props.destination} />;
+  return (
+    <EntityCardFrame
+      {...props}
+      onNavigate={props.onNavigate}
+      renderLink={(anchorProps) => <a {...anchorProps} href={props.href} />}
+    />
+  );
+}
+
+function RoutedEntityCard({
+  destination,
+  ...props
+}: EntityCardBaseProps & { destination: EntityDestination }) {
+  const navigate = useNavigate();
+  return (
+    <EntityCardFrame
+      {...props}
+      onNavigate={() => {
+        const returnTo = applicationPath(window.location.href);
+        void navigate({ ...destination, state: { returnTo } });
+      }}
+      renderLink={(anchorProps) => <Link {...anchorProps} {...destination} />}
+    />
+  );
+}
+
+/** Shared card presentation; routing and data access belong to its caller. */
+function EntityCardFrame({
   id,
   label,
-  destination,
+  onNavigate,
+  renderLink,
   isMobile = false,
   selected,
   onSelectedChanged,
@@ -117,13 +153,17 @@ function EntityCardRoot({
   prefetch,
   className,
   children,
-}: EntityCardRootProps) {
+}: EntityCardBaseProps & {
+  onNavigate: () => void;
+  renderLink: (
+    props: React.ComponentProps<"a"> & { "data-card-link": boolean },
+  ) => React.ReactNode;
+}) {
   const [isHovered, setIsHovered] = useState(false);
   const cardLayout = useCardLayout();
   const isDetails = cardLayout === "details";
   const isWall = cardLayout === "wall";
   const isTouch = useIsTouch();
-  const navigate = useNavigate();
   const press = useCardPress();
 
   // Prefetch fires at most once per card mount: `pointerenter` covers both
@@ -134,16 +174,6 @@ function EntityCardRoot({
     if (prefetchedRef.current) return;
     prefetchedRef.current = true;
     prefetch?.();
-  }
-
-  function doNavigate() {
-    // Capture returnTo from window.location at click time — always synchronously
-    // up-to-date, unlike useLocation() which lags behind router.history.replace().
-    const returnTo = applicationPath(window.location.href);
-    navigate({
-      ...destination,
-      state: { returnTo },
-    });
   }
 
   // Mouse clicks on the article body — skip if the click originated from a
@@ -175,7 +205,7 @@ function EntityCardRoot({
         return;
       }
     }
-    doNavigate();
+    onNavigate();
   }
 
   // Keyboard activation of the stretched anchor (Tab + Enter). stopPropagation
@@ -189,7 +219,7 @@ function EntityCardRoot({
       onSelectedChanged?.(!selected, e.shiftKey);
       return;
     }
-    doNavigate();
+    onNavigate();
   }
 
   const article = (
@@ -227,14 +257,14 @@ function EntityCardRoot({
         Keeping the link separate avoids nested anchors — performer/tag Link
         chips inside the body are siblings in the DOM, not descendants of this anchor.
       */}
-      <Link
-        data-card-link
-        className="absolute inset-0 z-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
-        {...destination}
-        onClick={handleAnchorClick}
-        tabIndex={0}
-        aria-label={label}
-      />
+      {renderLink({
+        "data-card-link": true,
+        className:
+          "absolute inset-0 z-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+        onClick: handleAnchorClick,
+        tabIndex: 0,
+        "aria-label": label,
+      })}
       {/* Content wrapper — z-[1] so performer/tag chips are above the stretched link */}
       <div
         className={cn(

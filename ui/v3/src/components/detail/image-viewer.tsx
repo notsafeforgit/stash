@@ -25,9 +25,12 @@ export type ImageViewerData = Pick<LibraryImage, "title"> & {
 export function ImageViewer({
   image,
   actions = true,
+  onOpenViewer,
 }: {
   image: ImageViewerData;
   actions?: boolean;
+  /** A collection can supply its own lightbox to retain neighboring items. */
+  onOpenViewer?: () => void;
 }) {
   const src = image.paths.image ?? image.paths.preview ?? undefined;
   const file = image.visual_files[0];
@@ -141,7 +144,7 @@ export function ImageViewer({
       <Button
         type="button"
         variant="ghost"
-        onClick={() => setOpen(true)}
+        onClick={() => (onOpenViewer ? onOpenViewer() : setOpen(true))}
         aria-label="Open image"
         className="relative block h-auto w-full bg-black p-0 cursor-zoom-in rounded-none border-0 overflow-hidden hover:bg-black"
       >

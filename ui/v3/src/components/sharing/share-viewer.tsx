@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useIntl } from "react-intl";
-import { Clock, Images, Play, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Spinner } from "@/components/ui/spinner";
-import { SharedMediaViewer } from "./shared-media-viewer";
+import { ShareBrowser } from "./share-browser";
 import {
   ShareUnavailableError,
   shareContentSchema,
@@ -27,7 +26,7 @@ async function openShare(
 ): Promise<SharedContent> {
   if (!target) throw new ShareUnavailableError();
   const secret = target.secret;
-  history.replaceState(null, "", location.pathname);
+  history.replaceState(history.state, "", location.pathname + location.search);
   if (secret) {
     const response = await fetch(new URL("exchange", target.base), {
       method: "POST",
@@ -48,7 +47,6 @@ export function ShareViewer() {
   const intl = useIntl();
   const [target] = useState(() => shareTarget(location.href, document.baseURI));
   const [state, setState] = useState<ViewerState>({ kind: "loading" });
-  const [selection, setSelection] = useState<string | null>(null);
   const bootstrap = useRef<{
     attempt: number;
     promise: Promise<SharedContent>;
@@ -171,103 +169,5 @@ export function ShareViewer() {
       </main>
     );
 
-  const { content } = state;
-  const selectedKey =
-    selection ?? (content.media.length === 1 ? content.media[0]?.key : null);
-  const index = content.media.findIndex((media) => media.key === selectedKey);
-  const mediaByKey = new Map(content.media.map((media) => [media.key, media]));
-  return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col gap-6 p-4 pb-12 sm:p-8">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <h1 className="text-2xl font-semibold">{content.label}</h1>
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Clock className="size-4" />
-          {intl.formatMessage(
-            { id: "sharing.expires_on", defaultMessage: "Expires {date}" },
-            {
-              date: intl.formatDate(content.expires_at, {
-                dateStyle: "medium",
-                timeStyle: "short",
-              }),
-            },
-          )}
-        </p>
-      </header>
-      {selectedKey && (
-        <SharedMediaViewer
-          key={selectedKey}
-          mediaKey={selectedKey}
-          base={target.base}
-          previous={
-            index > 0
-              ? () => setSelection(content.media[index - 1]?.key ?? null)
-              : undefined
-          }
-          next={
-            index < content.media.length - 1
-              ? () => setSelection(content.media[index + 1]?.key ?? null)
-              : undefined
-          }
-        />
-      )}
-      {content.media.length > 1 &&
-        content.entries.map((entry, entryIndex) => (
-          <section
-            key={`${entry.kind}-${entryIndex}`}
-            className="flex flex-col gap-3"
-          >
-            {entry.kind === "GALLERY" && (
-              <h2 className="flex items-center gap-2 text-lg font-medium">
-                <Images className="size-5" />
-                {entry.title ||
-                  intl.formatMessage({
-                    id: "gallery",
-                    defaultMessage: "Gallery",
-                  })}
-              </h2>
-            )}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {entry.media_keys.map((key) => {
-                const media = mediaByKey.get(key);
-                if (!media) return null;
-                const title =
-                  media.title ||
-                  intl.formatMessage({
-                    id: media.kind === "SCENE" ? "scene" : "image",
-                    defaultMessage: media.kind === "SCENE" ? "Scene" : "Image",
-                  });
-                return (
-                  <Card key={key} className="overflow-hidden py-0">
-                    <CardContent className="p-0">
-                      <Button
-                        variant="ghost"
-                        className="h-auto w-full flex-col gap-0 p-0"
-                        onClick={() => setSelection(key)}
-                        aria-label={title}
-                        aria-pressed={selectedKey === key}
-                      >
-                        <span className="relative block aspect-video w-full overflow-hidden">
-                          <img
-                            src={media.thumbnail}
-                            alt=""
-                            loading="lazy"
-                            className="h-full w-full object-cover"
-                          />
-                          {media.video && (
-                            <Play className="absolute left-2 top-2 size-5" />
-                          )}
-                        </span>
-                        <span className="w-full truncate p-3 text-left">
-                          {title}
-                        </span>
-                      </Button>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </section>
-        ))}
-    </main>
-  );
+  return <ShareBrowser content={state.content} base={target.base} />;
 }

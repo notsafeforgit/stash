@@ -55,7 +55,7 @@ interface MemoCardProps<TItem extends IHasID> {
   item: TItem;
   isMobile: boolean;
   isSelected: boolean;
-  onSelectChange: (id: string, selected: boolean, shiftKey: boolean) => void;
+  onSelectChange?: (id: string, selected: boolean, shiftKey: boolean) => void;
   onCardPreviewClick?: (item: TItem, allItems: TItem[], index: number) => void;
   allItems: TItem[];
   index: number;
@@ -80,7 +80,7 @@ function MemoCardInner<TItem extends IHasID>({
 }: MemoCardProps<TItem>) {
   const onSelectedChanged = useCallback(
     (selected: boolean, shiftKey: boolean) =>
-      onSelectChange(item.id, selected, shiftKey),
+      onSelectChange?.(item.id, selected, shiftKey),
     [item.id, onSelectChange],
   );
   const onPreviewClick = useMemo(
@@ -129,8 +129,8 @@ interface VirtualizedItemListProps<TItem extends IHasID> {
   itemsPerPage: number;
   preserveScrollDuringRefill: boolean;
   items: TItem[];
-  selectedIds: Set<string>;
-  onSelectChange: (id: string, selected: boolean, shiftKey: boolean) => void;
+  selectedIds?: ReadonlySet<string>;
+  onSelectChange?: (id: string, selected: boolean, shiftKey: boolean) => void;
   onCardPreviewClick?: (item: TItem, allItems: TItem[], index: number) => void;
   renderCard: (
     item: TItem,
@@ -389,7 +389,7 @@ export function VirtualizedItemList<TItem extends IHasID>({
                     key={item.id}
                     item={item}
                     isMobile={isMobile}
-                    isSelected={selectedIds.has(item.id)}
+                    isSelected={selectedIds?.has(item.id) ?? false}
                     onSelectChange={onSelectChange}
                     onCardPreviewClick={onCardPreviewClick}
                     allItems={items}

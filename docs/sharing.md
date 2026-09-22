@@ -32,6 +32,14 @@ source files fail closed. Archive images also pin the archive's identity.
 Titles are a snapshot: subsequent metadata edits do not change an existing share.
 Membership changes require creating a new share.
 
+Recipients browse the normal virtualized entity cards, with tabs for the media
+types present in the share and no filtering, sorting or selection controls.
+Previews open the existing image or scene lightbox; card titles open minimal
+detail views with media and the permitted download action. Gallery details show
+their frozen membership. Browser Back closes a lightbox or returns to the
+previous list and scroll position. Detail URLs use query parameters under the
+same share path and still require that share's guest session.
+
 The guest response contains only the share label, expiry, selected media,
 dimensions, duration, optional titles and scoped media URLs. It omits filesystem
 paths, notes, relationships, owner history, global API keys and mutation controls.

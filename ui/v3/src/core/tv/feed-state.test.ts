@@ -49,6 +49,101 @@ function fixture(repeated = false, delay = 0) {
 }
 
 describe("TV feed lifecycle", () => {
+  it.each([
+    [7, 1],
+    [1, 7],
+    [0, 7],
+    [7, 0],
+    [0, 0],
+  ])(
+    "pages both sources to exhaustion with %i scenes and %i markers",
+    async (sceneCount, markerCount) => {
+      const result = vi.fn((variables: GQL.TvMixedQueryVariables) => {
+        const page = variables.scene_filter?.page ?? 1;
+        expect(variables.marker_filter?.page).toBe(page);
+        const from = (page - 1) * 5;
+        return {
+          data: {
+            findScenes: {
+              __typename: "FindScenesResultType" as const,
+              count: sceneCount,
+              scenes: Array.from({ length: sceneCount }, (_, i) =>
+                scene(i + 1),
+              ).slice(from, from + 5),
+            },
+            findSceneMarkers: {
+              __typename: "FindSceneMarkersResultType" as const,
+              count: markerCount,
+              scene_markers: Array.from(
+                { length: markerCount },
+                (_, i): GQL.TvMarkerSummaryFragment => ({
+                  __typename: "SceneMarker",
+                  id: String(i + 1),
+                  title: `Marker ${i + 1}`,
+                  seconds: 2,
+                  end_seconds: 4,
+                  screenshot: "",
+                  preview_image: null,
+                  scene: { __typename: "Scene", id: "1" },
+                }),
+              ).slice(from, from + 5),
+            },
+          },
+        };
+      });
+      const mock: MockedResponse<GQL.TvMixedQuery, GQL.TvMixedQueryVariables> =
+        {
+          request: { query: GQL.TvMixedDocument, variables: () => true },
+          result,
+          delay: 0,
+          maxUsageCount: Infinity,
+        };
+      const client = new ApolloClient({
+        cache: new InMemoryCache(),
+        link: new MockLink([mock]),
+      });
+      const controller = new TvFeedController(client, {
+        seed: 1,
+        mode: "both",
+        scenes: { filter: { sort: "title" } },
+        markers: { filter: { sort: "title" } },
+        pageSize: 5,
+        prefetch: 2,
+      });
+      controller.start();
+      await vi.waitFor(() =>
+        expect(controller.getSnapshot().status).toBe("ready"),
+      );
+      expect(controller.getSnapshot().exhausted).toBe(
+        sceneCount === 0 && markerCount === 0,
+      );
+      if (sceneCount && markerCount)
+        expect(
+          controller
+            .getSnapshot()
+            .items.slice(0, 2)
+            .map((item) => item.key),
+        ).toEqual(["scene:1", "marker:1"]);
+      await controller.load();
+      const snapshot = controller.getSnapshot();
+      expect(snapshot.exhausted).toBe(true);
+      expect(snapshot.total).toBe(sceneCount + markerCount);
+      expect(new Set(snapshot.items.map((item) => item.key)).size).toBe(
+        sceneCount + markerCount,
+      );
+      if (sceneCount && markerCount) {
+        controller.reconcile(snapshot.items[0]);
+        await vi.waitFor(() =>
+          expect(controller.getSnapshot().status).not.toBe("loading"),
+        );
+        expect(
+          controller.getSnapshot().items.some((item) => item.sceneId === "1"),
+        ).toBe(false);
+      }
+      controller.dispose();
+    },
+  );
+
   it("starts at an effect boundary, prefetches once, and retains selection", async () => {
     const { controller, result } = fixture();
     expect(result).not.toHaveBeenCalled();

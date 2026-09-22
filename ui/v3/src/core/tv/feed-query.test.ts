@@ -3,7 +3,7 @@ import { MockLink } from "@apollo/client/testing";
 import { describe, expect, it } from "vitest";
 import * as GQL from "../generated-graphql";
 import { playerConfiguration } from "../../../tests/browser/fixture/player-configuration";
-import { resolveTvQuery, tvQueryIdentity } from "./feed-query";
+import { resolveTvQuery, tvQueryIdentity, tvSortOptions } from "./feed-query";
 import { decodeTvSettings, defaultTvSettings } from "./settings";
 
 const condition = {
@@ -47,6 +47,94 @@ function clientWithFilter(
 }
 
 describe("TV query construction", () => {
+  it("resolves independent filters and stable source orders for a mixed feed", async () => {
+    const config = {
+      ...playerConfiguration,
+      ui: {
+        ...playerConfiguration.ui,
+        defaultFilters: {
+          scene_markers: {
+            find_filter: {
+              q: "marker search",
+              sort: "title",
+              direction: GQL.SortDirectionEnum.Asc,
+            },
+          },
+        },
+      },
+    };
+    const settings = {
+      ...defaultTvSettings,
+      sceneFilter: { kind: "saved", id: "1" },
+    } as const;
+    const query = await resolveTvQuery(
+      clientWithFilter(),
+      config,
+      settings,
+      "both",
+      undefined,
+      37,
+      "portrait",
+    );
+    if (query.mode !== "both") throw new Error("Expected both sources");
+    expect(query.scenes.filter).toMatchObject({
+      q: "example",
+      sort: "date",
+      direction: "DESC",
+    });
+    expect(query.markers.filter).toMatchObject({
+      q: "marker search",
+      sort: "title",
+      direction: "ASC",
+    });
+    expect(tvQueryIdentity(query)).not.toBe(
+      tvQueryIdentity({
+        ...query,
+        markers: { ...query.markers, filter: { q: "changed" } },
+      }),
+    );
+    await expect(
+      resolveTvQuery(
+        clientWithFilter(),
+        config,
+        settings,
+        "both",
+        { kind: "saved", id: "1" },
+        37,
+        "portrait",
+      ),
+    ).rejects.toThrow("separately");
+  });
+
+  it("offers common sorts for Both and falls back when switching from a source-specific sort", async () => {
+    const scenes = tvSortOptions("scenes");
+    const markers = tvSortOptions("markers");
+    const both = tvSortOptions("both");
+    expect(both).toEqual(
+      scenes.filter((scene) =>
+        markers.some((marker) => marker.value === scene.value),
+      ),
+    );
+    expect(both.some((option) => option.value === "random")).toBe(true);
+    const sceneOnly = scenes.find(
+      (scene) => !markers.some((marker) => marker.value === scene.value),
+    );
+    if (!sceneOnly) throw new Error("Expected a scene-specific sort");
+    const settings = { ...defaultTvSettings, sort: sceneOnly.value };
+    const query = await resolveTvQuery(
+      clientWithFilter(),
+      playerConfiguration,
+      settings,
+      "both",
+      { kind: "all" },
+      37,
+      "portrait",
+    );
+    if (query.mode !== "both") throw new Error("Expected both sources");
+    expect(query.markers.filter.sort).not.toBe(sceneOnly.value);
+    expect(settings.sort).toBe(sceneOnly.value);
+  });
+
   it("preserves saved search and AST while composing orientation on the server", async () => {
     const query = await resolveTvQuery(
       clientWithFilter(),

@@ -10,12 +10,12 @@ import {
   type TvSettings,
 } from "@/core/tv/settings";
 import { qualityTiers, qualityHeight } from "@/core/player-quality";
-import { getFilterOptions } from "@/models/list-filter/factory";
 import {
   formatSortLabel,
   formatSortOptions,
 } from "@/models/list-filter/labels";
-import { tvFilterMode } from "@/core/tv/feed-query";
+import { tvSortOptions } from "@/core/tv/feed-query";
+import { tvModeLabels } from "./tv-feed-menu";
 import { TvFilterSelect } from "@/components/tv/tv-filter-select";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -50,14 +50,11 @@ function TvSettingsForm({ initial }: { initial: TvSettings }) {
       ...form.state.values.settings,
       [key]: value,
     });
-  const modes = [
-    { value: "scenes", label: msg("tv.text.scenes", "Scenes") },
-    { value: "markers", label: msg("tv.text.markers", "Markers") },
-  ];
-  const sortOptions = formatSortOptions(
-    intl,
-    getFilterOptions(tvFilterMode(values.mode)).sortByOptions,
-  );
+  const modes = tvModeSchema.options.map((value) => ({
+    value,
+    label: intl.formatMessage(tvModeLabels[value]),
+  }));
+  const sortOptions = formatSortOptions(intl, tvSortOptions(values.mode));
   if (
     values.sort &&
     !sortOptions.some((option) => option.value === values.sort)
@@ -89,14 +86,12 @@ function TvSettingsForm({ initial }: { initial: TvSettings }) {
           onChange={(next) => {
             const result = tvModeSchema.safeParse(next);
             if (result.success) {
-              const options = getFilterOptions(tvFilterMode(result.data));
+              const options = tvSortOptions(result.data);
               const previous = form.state.values.settings;
               update({
                 ...previous,
                 mode: result.data,
-                sort: options.sortByOptions.some(
-                  (option) => option.value === previous.sort,
-                )
+                sort: options.some((option) => option.value === previous.sort)
                   ? previous.sort
                   : null,
               });

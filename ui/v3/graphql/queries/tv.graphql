@@ -46,3 +46,26 @@ query TvMarkers(
     }
   }
 }
+
+query TvMixed(
+  $scene_filter: FindFilterType
+  $scene_filter_ast: FilterASTInput
+  $marker_filter: FindFilterType
+  $scene_marker_filter_ast: FilterASTInput
+) {
+  findScenes(filter: $scene_filter, scene_filter_ast: $scene_filter_ast) {
+    count
+    scenes {
+      ...TvSceneSummary
+    }
+  }
+  findSceneMarkers(
+    filter: $marker_filter
+    scene_marker_filter_ast: $scene_marker_filter_ast
+  ) {
+    count
+    scene_markers {
+      ...TvMarkerSummary
+    }
+  }
+}

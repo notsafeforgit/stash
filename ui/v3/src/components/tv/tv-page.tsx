@@ -45,6 +45,7 @@ import { TvNavigationButton } from "./tv-navigation-button";
 import { TvRotationProvider } from "./tv-slider";
 import { useScenePlayerValue } from "@/components/player/scene-player-controls";
 import { useTvMediaWindow } from "./use-tv-media-window";
+import { TvFeedMenu } from "./tv-feed-menu";
 
 function TvMediaReady({ onReady }: { onReady: (ready: boolean) => void }) {
   const ready = useScenePlayerValue("ready");
@@ -159,6 +160,7 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
   };
   const [leaving, setLeaving] = useState(false);
   const [interactionBlocked, setInteractionBlocked] = useState(false);
+  const [feedMenuOpen, setFeedMenuOpen] = useState(false);
   const [completion, setCompletion] = useState(settings.completion);
   const selection = useTvNavigation(
     strip,
@@ -398,6 +400,8 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
                             fullscreen={presentationMode === "fullscreen"}
                             exitPresentation={exitPresentation}
                             openNavigation={openNavigation}
+                            openFeedMenu={() => setFeedMenuOpen(true)}
+                            feedMenuOpen={feedMenuOpen}
                             navigateItem={selection.move}
                             drag={selection.drag}
                             cancelDrag={selection.cancel}
@@ -474,6 +478,15 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
                     </EmptyDescription>
                   </EmptyHeader>
                   <EmptyContent>
+                    <Button
+                      variant="outline"
+                      onClick={() => setFeedMenuOpen(true)}
+                    >
+                      <FormattedMessage
+                        id="tv.action.feed"
+                        defaultMessage="Feed"
+                      />
+                    </Button>
                     {snapshot.status === "loading" || loading ? (
                       <Spinner />
                     ) : (
@@ -513,6 +526,19 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
                 </Empty>
               </div>
             )}
+            <TvFeedMenu
+              mode={query.mode}
+              open={feedMenuOpen}
+              onOpenChange={setFeedMenuOpen}
+              onChange={(mode) => {
+                setFeedMenuOpen(false);
+                if (mode !== query.mode) {
+                  // Filters and item deep links belong to the old source.
+                  // Each destination reuses its configured filter and cache.
+                  void navigate({ to: "/tv", search: { mode, seed } });
+                }
+              }}
+            />
             <div
               ref={presentationPortals}
               className="absolute inset-0 pointer-events-none [&>*]:pointer-events-auto"

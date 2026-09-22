@@ -72,17 +72,16 @@ export const Route = createFileRoute("/tv")({
     const mode = search.mode ?? settings.mode;
     if (
       search.item &&
+      mode !== "both" &&
       !search.item.startsWith(mode === "scenes" ? "scene:" : "marker:")
     )
       throw new Error("The selected item belongs to another TV feed");
-    const choice: TvFilterChoice =
+    const choice: TvFilterChoice | undefined =
       search.filter === "default" || search.filter === "all"
         ? { kind: search.filter }
         : search.filter
           ? { kind: "saved" as const, id: search.filter }
-          : mode === "scenes"
-            ? settings.sceneFilter
-            : settings.markerFilter;
+          : undefined;
     const random = crypto.getRandomValues(new Uint32Array(1))[0] ?? 0;
     const seed = search.seed ?? random % 2147483647;
     const portrait = window.matchMedia("(orientation: portrait)").matches;

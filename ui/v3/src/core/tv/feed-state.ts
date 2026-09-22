@@ -6,6 +6,33 @@ import type { TvPlaybackPlan } from "./playback-policy";
 export type TvFeedItem =
   | { kind: "scene"; key: string; id: string; sceneId: string }
   | { kind: "marker"; key: string; id: string; sceneId: string };
+
+const sceneItem = (scene: GQL.TvSceneSummaryFragment): TvFeedItem => ({
+  kind: "scene",
+  key: `scene:${scene.id}`,
+  id: scene.id,
+  sceneId: scene.id,
+});
+const markerItem = (marker: GQL.TvMarkerSummaryFragment): TvFeedItem => ({
+  kind: "marker",
+  key: `marker:${marker.id}`,
+  id: marker.id,
+  sceneId: marker.scene.id,
+});
+
+function interleave(
+  scenes: readonly TvFeedItem[],
+  markers: readonly TvFeedItem[],
+) {
+  const items: TvFeedItem[] = [];
+  for (let i = 0; i < Math.max(scenes.length, markers.length); i++) {
+    const scene = scenes[i];
+    const marker = markers[i];
+    if (scene) items.push(scene);
+    if (marker) items.push(marker);
+  }
+  return items;
+}
 export interface TvFeedSnapshot {
   items: readonly TvFeedItem[];
   selected: number;
@@ -136,49 +163,76 @@ export class TvFeedController {
     this.publish({ ...this.state, status: "loading", error: undefined });
     try {
       for (let burst = 0; burst < 3; burst++) {
-        const filter = {
-          ...this.query.filter,
+        const pageFilter = (filter: GQL.FindFilterType) => ({
+          ...filter,
           page: this.state.nextPage,
           per_page: this.query.pageSize,
-        };
+        });
         const context = { fetchOptions: { signal: request.signal } };
         let items: TvFeedItem[];
         let total: number;
-        if (this.query.mode === "scenes") {
+        let mixedExhausted: boolean | undefined;
+        if (this.query.mode === "both") {
+          // One request owns both source pages. Do not commit either half if
+          // the request fails; retries retain both ordering and page offsets.
+          const response = await this.client.query({
+            query: GQL.TvMixedDocument,
+            variables: {
+              scene_filter: pageFilter(this.query.scenes.filter),
+              scene_filter_ast: this.query.scenes.ast,
+              marker_filter: pageFilter(this.query.markers.filter),
+              scene_marker_filter_ast: this.query.markers.ast,
+            },
+            context,
+            fetchPolicy: "network-only",
+          });
+          if (!response.data) throw new Error("No mixed page was returned");
+          const { findScenes: scenes, findSceneMarkers: markers } =
+            response.data;
+          items = interleave(
+            scenes.scenes.map(sceneItem),
+            markers.scene_markers.map(markerItem),
+          );
+          total = scenes.count + markers.count;
+          const offset = this.state.nextPage * this.query.pageSize;
+          mixedExhausted =
+            (scenes.scenes.length < this.query.pageSize ||
+              offset >= scenes.count) &&
+            (markers.scene_markers.length < this.query.pageSize ||
+              offset >= markers.count);
+        } else if (this.query.mode === "scenes") {
           const response = await this.client.query({
             query: GQL.TvScenesDocument,
-            variables: { filter, scene_filter_ast: this.query.ast },
+            variables: {
+              filter: pageFilter(this.query.filter),
+              scene_filter_ast: this.query.ast,
+            },
             context,
             fetchPolicy: "network-only",
           });
           if (!response.data) throw new Error("No scene page was returned");
           const page = response.data.findScenes;
-          items = page.scenes.map((scene) => ({
-            kind: "scene",
-            key: `scene:${scene.id}`,
-            id: scene.id,
-            sceneId: scene.id,
-          }));
+          items = page.scenes.map(sceneItem);
           total = page.count;
         } else {
           const response = await this.client.query({
             query: GQL.TvMarkersDocument,
-            variables: { filter, scene_marker_filter_ast: this.query.ast },
+            variables: {
+              filter: pageFilter(this.query.filter),
+              scene_marker_filter_ast: this.query.ast,
+            },
             context,
             fetchPolicy: "network-only",
           });
           if (!response.data) throw new Error("No marker page was returned");
           const page = response.data.findSceneMarkers;
-          items = page.scene_markers.map((marker) => ({
-            kind: "marker",
-            key: `marker:${marker.id}`,
-            id: marker.id,
-            sceneId: marker.scene.id,
-          }));
+          items = page.scene_markers.map(markerItem);
           total = page.count;
         }
         if (!this.active || generation !== this.generation) return;
         let next = appendTvPage(this.state, items, total, this.query.pageSize);
+        if (mixedExhausted !== undefined)
+          next = { ...next, exhausted: mixedExhausted };
         if (this.requestedKey) {
           const selected = next.items.findIndex(
             (item) => item.key === this.requestedKey,

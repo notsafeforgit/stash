@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const tvActionKinds = [
   "settings",
+  "feed",
   "visibility",
   "info",
   "rating",
@@ -44,6 +45,7 @@ export const tvActionSchema = z.discriminatedUnion("kind", [
     ...shared,
     kind: z.enum([
       "settings",
+      "feed",
       "visibility",
       "info",
       "rating",

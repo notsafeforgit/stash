@@ -292,6 +292,8 @@ export function TvControls({
   fullscreen,
   exitPresentation,
   openNavigation,
+  openFeedMenu,
+  feedMenuOpen,
   navigateItem,
   drag,
   cancelDrag,
@@ -318,6 +320,8 @@ export function TvControls({
   fullscreen: boolean;
   exitPresentation: () => void;
   openNavigation: () => void;
+  openFeedMenu: () => void;
+  feedMenuOpen: boolean;
   navigateItem: (direction: -1 | 1) => void;
   drag: (offset: number) => void;
   cancelDrag: () => void;
@@ -344,10 +348,19 @@ export function TvControls({
   const mutations = useTvMutations(changed);
   useLayoutEffect(() => {
     onInteractionBlockedChange(
-      panel.kind !== "closed" || folder !== null || mutations.busy,
+      panel.kind !== "closed" ||
+        folder !== null ||
+        mutations.busy ||
+        feedMenuOpen,
     );
     return () => onInteractionBlockedChange(false);
-  }, [panel.kind, folder, mutations.busy, onInteractionBlockedChange]);
+  }, [
+    panel.kind,
+    folder,
+    mutations.busy,
+    feedMenuOpen,
+    onInteractionBlockedChange,
+  ]);
   const latest = useCommittedRef({ remember, item, leaving });
   useEffect(() => {
     const save = () => {
@@ -373,6 +386,10 @@ export function TvControls({
   const run = (action: TvAction, anchor?: TvCounterAnchor) => {
     const position = controls.read().position;
     switch (action.kind) {
+      case "feed":
+        setFolder(null);
+        openFeedMenu();
+        return;
       case "info":
         setInfoVisible((value) => !value);
         return;
@@ -442,7 +459,11 @@ export function TvControls({
     selectionKey: item.key,
     rotation,
     blocked:
-      panel.kind !== "closed" || folder !== null || mutations.busy || leaving,
+      panel.kind !== "closed" ||
+      folder !== null ||
+      mutations.busy ||
+      leaving ||
+      feedMenuOpen,
     drag,
     cancelDrag,
     dispatch: (command) => {

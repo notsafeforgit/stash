@@ -5,24 +5,50 @@ import {
   ListFilterModel,
   type SavedFilterLike,
 } from "@/models/list-filter/filter";
-import type { TvFilterChoice, TvMode, TvSettings } from "./settings";
+import type {
+  TvFilterChoice,
+  TvMode,
+  TvSourceMode,
+  TvSettings,
+} from "./settings";
 import type { FilterASTNode } from "@/models/list-filter/filter-ast";
+import { getFilterOptions } from "@/models/list-filter/factory";
 
 // Internal metadata-fetch policy. Keep request size stable for the feed's
 // lifetime because the server uses page-based offsets. Media is never preloaded.
 const PAGE_SIZE = 20;
 const PREFETCH_REMAINING = 2;
 
-export interface TvFeedQuery {
+interface TvQueryPolicy {
   seed: number;
-  mode: TvMode;
-  filter: GQL.FindFilterType;
-  ast?: GQL.FilterAstInput;
   pageSize: number;
   prefetch: number;
 }
-export const tvFilterMode = (mode: TvMode) =>
+interface TvSourceQuery {
+  filter: GQL.FindFilterType;
+  ast?: GQL.FilterAstInput;
+}
+export interface TvSingleFeedQuery extends TvQueryPolicy, TvSourceQuery {
+  mode: TvSourceMode;
+}
+export type TvFeedQuery =
+  | TvSingleFeedQuery
+  | (TvQueryPolicy & {
+      mode: "both";
+      scenes: TvSourceQuery;
+      markers: TvSourceQuery;
+    });
+export const tvFilterMode = (mode: TvSourceMode) =>
   mode === "scenes" ? GQL.FilterMode.Scenes : GQL.FilterMode.SceneMarkers;
+
+export function tvSortOptions(mode: TvMode) {
+  if (mode !== "both")
+    return getFilterOptions(tvFilterMode(mode)).sortByOptions;
+  const markers = getFilterOptions(GQL.FilterMode.SceneMarkers).sortByOptions;
+  return getFilterOptions(GQL.FilterMode.Scenes).sortByOptions.filter(
+    (option) => markers.some((marker) => marker.value === option.value),
+  );
+}
 const conflictSchema = z.object({
   forkDefaultFilterState: z
     .record(
@@ -57,7 +83,7 @@ function validCriteria(node: FilterASTNode): boolean {
 }
 
 function filterModel(
-  mode: TvMode,
+  mode: TvSourceMode,
   config: GQL.ConfigDataFragment,
   saved?: SavedFilterLike,
 ) {
@@ -80,15 +106,80 @@ function filterModel(
   return model;
 }
 
-export async function resolveTvQuery(
+export function resolveTvQuery(
+  client: ApolloClient,
+  configuration: GQL.ConfigDataFragment,
+  settings: TvSettings,
+  mode: TvSourceMode,
+  choice: TvFilterChoice | undefined,
+  seed: number,
+  orientation: "portrait" | "landscape",
+): Promise<TvSingleFeedQuery>;
+export function resolveTvQuery(
   client: ApolloClient,
   configuration: GQL.ConfigDataFragment,
   settings: TvSettings,
   mode: TvMode,
-  choice: TvFilterChoice,
+  choice: TvFilterChoice | undefined,
+  seed: number,
+  orientation: "portrait" | "landscape",
+): Promise<TvFeedQuery>;
+export async function resolveTvQuery(
+  client: ApolloClient,
+  configuration: GQL.ConfigDataFragment,
+  requestedSettings: TvSettings,
+  mode: TvMode,
+  choice: TvFilterChoice | undefined,
   seed: number,
   orientation: "portrait" | "landscape",
 ): Promise<TvFeedQuery> {
+  // A rail switch keeps the saved default intact. A source-specific sort can
+  // fall back to the destination's saved order for this viewing session.
+  const settings =
+    mode !== requestedSettings.mode &&
+    requestedSettings.sort &&
+    !tvSortOptions(mode).some(
+      (option) => option.value === requestedSettings.sort,
+    )
+      ? { ...requestedSettings, sort: null }
+      : requestedSettings;
+  if (mode === "both") {
+    if (choice?.kind === "saved")
+      throw new Error(
+        "Choose scene and marker filters separately in TV settings",
+      );
+    const [scenes, markers] = await Promise.all([
+      resolveTvQuery(
+        client,
+        configuration,
+        settings,
+        "scenes",
+        choice ?? settings.sceneFilter,
+        seed,
+        orientation,
+      ),
+      resolveTvQuery(
+        client,
+        configuration,
+        settings,
+        "markers",
+        choice ?? settings.markerFilter,
+        seed,
+        orientation,
+      ),
+    ]);
+    return {
+      mode,
+      seed,
+      scenes: { filter: scenes.filter, ast: scenes.ast },
+      markers: { filter: markers.filter, ast: markers.ast },
+      pageSize: PAGE_SIZE,
+      prefetch: PREFETCH_REMAINING,
+    };
+  }
+  const filterChoice =
+    choice ??
+    (mode === "scenes" ? settings.sceneFilter : settings.markerFilter);
   const view = mode === "scenes" ? "scenes" : "scene_markers";
   const getSaved = async (id: string) => {
     const response = await client.query({
@@ -103,7 +194,7 @@ export async function resolveTvQuery(
       );
     return saved;
   };
-  if (choice.kind === "default") {
+  if (filterChoice.kind === "default") {
     const state = conflictSchema.safeParse(configuration.ui);
     if (
       state.success &&
@@ -115,9 +206,9 @@ export async function resolveTvQuery(
       );
   }
   const saved =
-    choice.kind === "saved"
-      ? await getSaved(choice.id)
-      : choice.kind === "default"
+    filterChoice.kind === "saved"
+      ? await getSaved(filterChoice.id)
+      : filterChoice.kind === "default"
         ? configuration.ui.defaultFilters?.[view]
         : undefined;
   const model = filterModel(mode, configuration, saved);
@@ -175,8 +266,9 @@ export function tvQueryIdentity(query: TvFeedQuery): string {
   return JSON.stringify([
     query.seed,
     query.mode,
-    query.filter,
-    query.ast,
+    query.mode === "both"
+      ? [query.scenes, query.markers]
+      : [query.filter, query.ast],
     query.pageSize,
   ]);
 }

@@ -10,6 +10,7 @@ import {
   Outlet,
   RouterProvider,
   Link,
+  useSearch,
 } from "@tanstack/react-router";
 import { TvPage } from "@/components/tv/tv-page";
 import { SettingsTvPage } from "@/components/tv/tv-settings";
@@ -20,6 +21,7 @@ import { installRouteTransitions } from "@/core/route-transitions";
 import {
   defaultTvSettings,
   tvSettingsSchema,
+  tvSearchSchema,
   type TvSettings,
 } from "@/core/tv/settings";
 import { createTvAction, type TvRailEntry } from "@/core/tv/action-config";
@@ -130,24 +132,36 @@ const start = tvSettingsSchema.shape.start.safeParse(params.get("start"));
 const settings: TvSettings = {
   ...defaultTvSettings,
   leftHanded: params.has("left-handed"),
-  rail: defaultTvSettings.rail.flatMap<TvRailEntry>((entry) => {
-    if (entry.type === "action" && entry.action.kind === "counter") {
-      if (params.get("counter") === "folder") return [];
-      return [{ ...entry, pinned: params.get("counter") === "pinned" }];
-    }
-    if (
-      entry.type === "folder" &&
-      entry.id === "edit" &&
-      params.get("counter") === "folder"
-    )
-      return [
-        {
-          ...entry,
-          actions: [createTvAction("counter", "counter"), ...entry.actions],
-        },
-      ];
-    return [entry];
-  }),
+  rail: defaultTvSettings.rail
+    .flatMap<TvRailEntry>((entry) => {
+      if (entry.type === "action" && entry.action.kind === "counter") {
+        if (params.get("counter") === "folder") return [];
+        return [{ ...entry, pinned: params.get("counter") === "pinned" }];
+      }
+      if (
+        entry.type === "folder" &&
+        entry.id === "edit" &&
+        params.get("counter") === "folder"
+      )
+        return [
+          {
+            ...entry,
+            actions: [createTvAction("counter", "counter"), ...entry.actions],
+          },
+        ];
+      return [entry];
+    })
+    .concat(
+      params.has("feed-action")
+        ? [
+            {
+              type: "action",
+              pinned: params.get("feed-action") === "pinned",
+              action: createTvAction("feed", "feed"),
+            },
+          ]
+        : [],
+    ),
   mode,
   autoplay: !params.has("paused"),
   startMuted: !params.has("unmuted"),
@@ -267,6 +281,36 @@ const markerPage: MockedResponse<
           __typename: "FindSceneMarkersResultType",
           count: markers.length,
           scene_markers: markers.slice((page - 1) * size, page * size),
+        },
+      },
+    };
+  },
+};
+const mixedPage: MockedResponse<GQL.TvMixedQuery, GQL.TvMixedQueryVariables> = {
+  request: { query: GQL.TvMixedDocument, variables: () => true },
+  maxUsageCount: Infinity,
+  delay: 0,
+  result: (variables) => {
+    record("TvMixed", variables);
+    const scenePage = variables.scene_filter?.page ?? 1;
+    const markerPage = variables.marker_filter?.page ?? 1;
+    const size = variables.scene_filter?.per_page ?? 5;
+    return {
+      data: {
+        findScenes: {
+          __typename: "FindScenesResultType",
+          count: params.has("empty") ? 0 : scenes.length,
+          scenes: params.has("empty")
+            ? []
+            : scenes.slice((scenePage - 1) * size, scenePage * size),
+        },
+        findSceneMarkers: {
+          __typename: "FindSceneMarkersResultType",
+          count: markers.length,
+          scene_markers: markers.slice(
+            (markerPage - 1) * size,
+            markerPage * size,
+          ),
         },
       },
     };
@@ -524,6 +568,7 @@ const client = new ApolloClient({
   link: new MockLink([
     scenePage,
     markerPage,
+    mixedPage,
     detail,
     activity,
     play,
@@ -547,22 +592,28 @@ function FixtureConfiguration({ children }: { children: ReactNode }) {
     </ConfigurationProvider>
   );
 }
-const query: TvFeedQuery = {
-  seed: 37,
-  mode,
-  filter: { sort: "title", direction: GQL.SortDirectionEnum.Asc },
-  pageSize: 5,
-  prefetch: 2,
-};
 function FixtureTvPage() {
   const { result } = useTvSettings();
+  const search = {
+    ...tvSearchSchema.parse(useSearch({ strict: false })),
+    seed: 37,
+  };
   if (result.kind !== "ready") throw new Error("Invalid fixture TV settings");
+  const mode = search.mode ?? result.settings.mode;
+  const policy = { seed: 37, pageSize: 5, prefetch: 2 };
+  const source = {
+    filter: { sort: "title", direction: GQL.SortDirectionEnum.Asc },
+  };
+  const query: TvFeedQuery =
+    mode === "both"
+      ? { ...policy, mode, scenes: source, markers: source }
+      : { ...policy, mode, ...source };
   return (
     <TvPage
       query={query}
       settings={result.settings}
       seed={37}
-      search={{ seed: 37 }}
+      search={search}
     />
   );
 }
@@ -613,6 +664,7 @@ const router = createRouter({
     createRoute({
       getParentRoute: () => root,
       path: "/tv",
+      validateSearch: (search) => tvSearchSchema.parse(search),
       component: FixtureTvPage,
     }),
     createRoute({

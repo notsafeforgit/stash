@@ -24,6 +24,7 @@ import {
   Sparkles,
   Plus,
   Folder,
+  ListVideo,
   type LucideIcon,
 } from "lucide-react";
 import type { TvAction, TvActionKind } from "@/core/tv/action-config";
@@ -43,6 +44,7 @@ export const tvIconLabels = {
 
 export const tvActionLabels: Record<TvActionKind, string> = {
   settings: "TV settings",
+  feed: "Feed",
   visibility: "Show or hide controls",
   info: "Information",
   rating: "Rating",
@@ -65,6 +67,7 @@ export const tvActionLabels: Record<TvActionKind, string> = {
 };
 const icons: Record<TvActionKind, LucideIcon> = {
   settings: Settings,
+  feed: ListVideo,
   visibility: Eye,
   info: Info,
   rating: Star,

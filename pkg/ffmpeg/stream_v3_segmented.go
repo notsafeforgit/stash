@@ -167,7 +167,6 @@ var (
 		Args: func(codec VideoCodec, segment int, videoFilter VideoFilter, videoOnly bool, outputDir string, frameRate float64) (args Args) {
 			args = CodecInit(codec)
 			gop := hlsGopSize(frameRate)
-			segDur := hlsSegmentDuration(frameRate)
 			// Pin the output frame rate. Without an explicit `-r` here,
 			// libx264 falls back to the muxer/codec default (25 fps) when
 			// the input demuxer can't surface a frame rate the encoder
@@ -203,15 +202,10 @@ var (
 				// stay a consistent length.
 				"-g", fmt.Sprint(gop),
 				"-keyint_min", fmt.Sprint(gop),
-				// libx264 honours this expression; HW encoders ignore it
-				// silently. Kept because it tightens libx264's IDR placement
-				// relative to the GOP boundary (`-g` is a maximum), and the
-				// HW encoders are unaffected. `segDur` (not `segmentLength`)
-				// because for non-integer NTSC frame rates the actual segment
-				// duration drifts: 59.94 fps → 120-frame GOP → 2.0020 s
-				// segments. Passing 2.0 here would push libx264's IDR target
-				// 0.002 s before the GOP boundary on each segment.
-				"-force_key_frames", fmt.Sprintf("expr:gte(t,n_forced*%g)", segDur),
+				// Count frames: floating-point time comparisons can miss an
+				// IDR boundary at fractional rates, producing an extra frame
+				// that overlaps a cached segment from a different seek/run.
+				"-force_key_frames", fmt.Sprintf("expr:gte(n,n_forced*%d)", gop),
 			)
 			// Normalize per-track PTS to zero at the encoder so the two
 			// tracks align inside each segment. Source files (especially
@@ -391,11 +385,17 @@ func hlsSegmentArgs(segment int, videoOnly bool, outputDir string, frameRate flo
 	// HLS players (iOS Safari) stall the seek at `readyState=1` because
 	// the fMP4 `baseMediaDecodeTime` doesn't match the playlist time.
 	tsOffset := fmt.Sprintf("%g", float64(segment)*segDur)
+	segmentOptions := "movflags=+frag_discont"
 	switch {
 	case videoNeedsOffset && (audioNeedsOffset || videoOnly):
-		// Both tracks (or video-only) — apply the un-qualified flag for
-		// brevity.
-		args = append(args, "-output_ts_offset", tsOffset)
+		// Normalize encoder delay BEFORE adding scene time. Applying the
+		// offset on the outer HLS muxer makes negative-DTS protection shift
+		// only the run at zero; later runs then overlap its cached frames.
+		// The child MP4 muxers receive already-normalized timestamps, so
+		// adding the offset here keeps the same origin across all runs.
+		// Keep make_non_negative above: disabling it wraps AAC's negative
+		// priming timestamp into an unsigned tfdt and breaks iOS startup.
+		segmentOptions += ":output_ts_offset=" + tsOffset
 	case videoNeedsOffset:
 		args = append(args, "-output_ts_offset:v", tsOffset)
 	case audioNeedsOffset && !videoOnly:
@@ -454,7 +454,7 @@ func hlsSegmentArgs(segment int, videoOnly bool, outputDir string, frameRate flo
 		// Keep edit lists enabled (the default): disabling them lets
 		// the muxer rebase to zero again. This is a muxer option, not an
 		// EXT-X-DISCONTINUITY in the client playlist.
-		"-hls_segment_options", "movflags=+frag_discont",
+		"-hls_segment_options", segmentOptions,
 		"-hls_playlist_type", "vod",
 		"-hls_fmp4_init_filename", initFilename,
 		"-hls_segment_filename", filepath.Join(outputDir, ".%v_%d.m4s"),
@@ -819,6 +819,10 @@ func serveV3HLSManifestFMP4(sm *StreamManager, w http.ResponseWriter, r *http.Re
 	baseURL := strings.TrimSuffix(prefix+baseUrl.String(), ".m3u8")
 
 	urlQuery := url.Values{}
+	// Segment responses are immutable for an hour. A new timeline must not
+	// splice those cached bytes into fragments produced by the corrected
+	// encoder after an upgrade; keep this revision stable across seeks.
+	urlQuery.Set("v3_hls", "2")
 
 	copyAuthParams(urlQuery, r.URL.Query())
 	if session := r.URL.Query().Get("stream_session"); session != "" {

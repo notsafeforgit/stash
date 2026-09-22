@@ -59,12 +59,11 @@
  *
  * Backend setup that makes both shapes work:
  *
- *   - The encoder always emits segments with
- *     `output_ts_offset = N·segmentLength` so segment K's fMP4 PTS is
- *     always K·segmentLength regardless of which ffmpeg run produced
- *     it (a far-forward seek's restart-at-K produces segments whose
- *     PTS matches what's already on disk for earlier segments — no
- *     overlap, no conflict).
+ *   - Full transcodes normalize encoder delay, then add
+ *     `output_ts_offset = N·segDur` in the child MP4 muxers. Every run
+ *     retains the same initial timestamp origin, so cached video frames
+ *     from separate seeks do not overlap. hls.js maps that common origin
+ *     onto the playlist timeline.
  *
  *   - For the clipped shape, `EXT-X-MEDIA-SEQUENCE = startSegment`
  *     identifies the first fragment; it does not offset playlist-time.

@@ -216,7 +216,6 @@ it.each([true, false])(
     f.advance(5000, { picture: false });
     expect(reload).toHaveBeenCalledOnce();
     expect(reload.mock.calls[0]?.[0]).toBeGreaterThanOrEqual(20);
-    expect(reload.mock.calls[0]?.[1]).toBe(true);
   },
 );
 
@@ -279,7 +278,6 @@ it("retains the recovery cooldown when the source URL changes", async () => {
   const f = await watchdogFixture();
   f.advance(4000, { picture: false, clock: false });
   expect(reload).toHaveBeenCalledOnce();
-  expect(reload.mock.calls[0]?.[1]).toBe(false);
   await f.replaceSource();
   f.advance(14000, { picture: false, clock: false });
   expect(reload).toHaveBeenCalledOnce();

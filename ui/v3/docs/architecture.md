@@ -401,16 +401,13 @@ resume remains necessary. Chromium/WebKit fixtures exercise the actual lightbox
 and its source machinery, but physical iPhone autoplay permission and MMS still
 need device testing.
 
-Recovery observes presented video frames separately from the audio clock. A
-video-only stall replaces the native video element, since reloading a playlist
-on a failed Safari decoder can leave that decoder stuck. Normal source changes
-and seeks retain the element. Replacement preserves the accepted scene time,
-pause intent, rate, mute and volume, and leaves the player root and controls
-mounted. A source reload has a 30-second readiness deadline, reset after
-returning from the background. It gets one replacement attempt, then stops HLS
-loading and presents Retry. The deadline also covers a resume seek whose
-completion event never arrives. Physical iOS still needs verification; a new
-element may require a Play gesture or leave native fullscreen/Picture in Picture.
+Recovery observes presented video frames separately from the audio clock.
+Source changes, recovery and Retry retain the native video element along with
+the player root and controls. A source reload has a 30-second readiness deadline,
+reset after returning from the background. It gets one source retry, then stops
+HLS loading and presents Retry. The deadline also covers a resume seek whose
+completion event never arrives. Recovery is a fallback; it does not establish
+that the underlying repeated-seek failure is resolved on physical iOS.
 
 Audible Direct loops are not guaranteed to be seamless on Safari. A
 [plain-video diagnostic on macOS 26](https://github.com/notsafeforgit/stash/actions/runs/35467017314)

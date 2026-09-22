@@ -17,10 +17,9 @@ import { ScenePlayerControlsProvider } from "./scene-player-controls";
  * Buffered seeks stay in place. Distant desktop HLS seeks can restart the
  * fragment scheduler; MMS and clipped-playlist seeks reload the source URL.
  * Retain those reloads and the freeze frame that covers MediaSource teardown.
- * Healthy transitions keep one native element. A video-only decoder stall or
- * a source-load timeout can replace it while preserving the accepted position,
- * playback intent, rate, mute and volume. Failed loads get one automatic retry
- * before a visible Retry action replaces loading.
+ * All transitions retain the native element, including recovery and Retry.
+ * Failed loads get one automatic source retry before a visible Retry action
+ * replaces loading.
  *
  * The lightbox retains this session across selections. `playbackKey` resets
  * scene/marker state; `suspended` releases media during query/OPFS gaps.
@@ -681,7 +680,6 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     offsetStart,
     initialResume,
     reloading,
-    mediaRevision,
     loadFailed,
     ready: sourceReady,
     seekDisplayTarget,
@@ -957,7 +955,6 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
 
   const mediaElement = (
     <SceneVideo
-      key={mediaRevision}
       src={finalSrc}
       startPosition={startPosition}
       sourceType={activeSource?.type}
@@ -1038,8 +1035,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
         )}
         style={!fill && videoAspect ? { aspectRatio: videoAspect } : undefined}
       >
-        {/* Normal source changes retain both identities. Decoder recovery may
-            replace SceneVideo while keeping the player store and controls. */}
+        {/* Source changes and recovery retain the player and native video. */}
         <Player.Player>
           <StoreBridge storeRef={storeRef} />
           <MediaBridge mediaRef={mediaRef} />

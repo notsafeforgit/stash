@@ -144,9 +144,8 @@ export function CanPlayEffect({
     };
     // `readyState >= HAVE_FUTURE_DATA` (3) — first-mount race fix:
     // Safari can finish loading a warm-cache HLS playlist before this
-    // effect attaches, so we check up-front, including an emergency decoder
-    // replacement. Skip a retained element's source-change fast path because
-    // readyState may still reflect the OLD source.
+    // effect attaches, so we check up-front. Skip a retained element's
+    // source-change fast path because readyState may reflect the OLD source.
     const isFirstRun = attachedForRef.current === null;
     const replacedVideo = attachedForRef.current?.video !== video;
     const sameSourceNewPlayback =

@@ -71,6 +71,13 @@ for (const marker of [false, true]) {
       await expect(video).toHaveJSProperty("paused", true);
       await video.evaluate((v: HTMLVideoElement) => {
         v.dataset.stallVideoFrames = "true";
+        v.addEventListener(
+          "loadstart",
+          () => {
+            delete v.dataset.stallVideoFrames;
+          },
+          { once: true },
+        );
         v.muted = false;
         v.volume = 0.4;
         v.playbackRate = 0.75;
@@ -95,7 +102,7 @@ for (const marker of [false, true]) {
     await expect.poll(() => reloads, { timeout: 10000 }).toBe(1);
     await expect(player).toHaveAttribute("data-playback-ready", "true");
     await expect(video).toHaveJSProperty("paused", false);
-    expect(await original.evaluate((v) => v.isConnected)).toBe(false);
+    expect(await original.evaluate((v) => v.isConnected)).toBe(true);
     await expect(video).toHaveJSProperty("muted", false);
     await expect
       .poll(() => video.evaluate((v: HTMLVideoElement) => v.volume))

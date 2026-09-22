@@ -19,7 +19,7 @@ export function usePlayerRecovery({
   offsetStart: number;
   isSeekPreviewActive: () => boolean;
   handleSeek: (time: number) => void;
-  forceRemountAt: (time: number, replaceMedia?: boolean) => void;
+  forceRemountAt: (time: number) => void;
 }) {
   // Intercept native `seeking` events on the `<video>` element. iOS
   // Safari's native fullscreen player drives `video.currentTime`
@@ -312,14 +312,7 @@ export function usePlayerRecovery({
         return;
       lastRecoveryAtRef.current = now;
       const sceneTime = v.currentTime + offsetStartRef.current;
-      // Reloading the stream on the same element can retain Safari's failed
-      // video decoder. A moving audio clock with no picture needs a fresh
-      // native element; ordinary buffering still uses the existing element.
-      forceRemountAtRef.current(
-        sceneTime,
-        framesStalledMs >= STALL_THRESHOLD_MS &&
-          timeStalledMs < STALL_THRESHOLD_MS,
-      );
+      forceRemountAtRef.current(sceneTime);
     }, CHECK_INTERVAL_MS);
 
     const attach = (video: HTMLVideoElement) => {

@@ -2,7 +2,7 @@ import { test, expect } from "./test";
 import { serveSceneMedia } from "./scene-media";
 
 for (const repeatedFailure of [false, true]) {
-  test(`a stuck seek reload ${repeatedFailure ? "offers Retry after one failed recovery" : "recovers with a new video at the accepted position"}`, async ({
+  test(`a stuck seek reload ${repeatedFailure ? "offers Retry after one failed recovery" : "retries on the existing video at the accepted position"}`, async ({
     page,
   }) => {
     await page.addInitScript(() => {
@@ -51,6 +51,11 @@ for (const repeatedFailure of [false, true]) {
             end: () => 12,
           }),
         });
+        v.addEventListener(
+          "loadstart",
+          () => Reflect.deleteProperty(v, "buffered"),
+          { once: true },
+        );
         v.dispatchEvent(new Event("progress"));
       });
       await page.clock.pauseAt(new Date("2026-01-01T00:01:00Z"));
@@ -72,7 +77,7 @@ for (const repeatedFailure of [false, true]) {
       await expect(player).toHaveAttribute("data-playback-ready", "false");
       await page.clock.fastForward(30_001);
       await expect.poll(() => reloads.length).toBe(2);
-      expect(await original.evaluate((v) => v.isConnected)).toBe(false);
+      expect(await original.evaluate((v) => v.isConnected)).toBe(true);
       expect(Number(reloads[1]?.searchParams.get("start"))).toBeCloseTo(
         target,
         2,
@@ -105,6 +110,7 @@ for (const repeatedFailure of [false, true]) {
         .poll(() => video.evaluate((v: HTMLVideoElement) => v.volume))
         .toBeCloseTo(0.4, 5);
       await expect(video).toHaveJSProperty("playbackRate", 0.75);
+      expect(await original.evaluate((v) => v.isConnected)).toBe(true);
       await expect
         .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
         .toBeCloseTo(target, 1);

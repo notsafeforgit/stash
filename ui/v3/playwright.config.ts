@@ -21,6 +21,9 @@ export default defineConfig({
     {
       name: "webkit",
       use: { browserName: "webkit" },
+      // Concurrent Linux media pipelines can stall each other on CI runners.
+      // Isolate playback/frame-timing checks while retaining browser shards.
+      workers: 1,
       // Linux WebKit can hang while loading media after many contexts. A
       // single retry starts a fresh worker; timing assertions stay unchanged
       // and a repeated failure still fails CI.

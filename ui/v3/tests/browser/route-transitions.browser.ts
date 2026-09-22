@@ -346,9 +346,15 @@ test("returning to a scrolled list restores its position with either Back action
 }) => {
   await page.goto("/stash/transitions");
   const list = page.locator('[data-scroll-restoration-id="transition-list"]');
-  await list.evaluate((element) => {
+  await list.evaluate(async (element) => {
+    // Font swaps can move the scroll anchor by a pixel before navigation.
+    // Establish the position only once the list's layout has settled.
+    await document.fonts.ready;
     element.scrollTop = 250;
   });
+  await expect
+    .poll(() => list.evaluate((element) => element.scrollTop))
+    .toBe(250);
   for (const back of ["browser", "app"]) {
     await page.getByRole("link", { name: "Entity 22", exact: true }).click();
     await expect(

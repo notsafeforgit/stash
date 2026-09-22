@@ -180,7 +180,29 @@ for (const width of [320, 390, 1280]) {
       // dnd-kit suppresses post-drag ghost clicks for 50ms. Start a separate
       // tap after that window, as a person moving to the arrow would.
       await page.waitForTimeout(60);
-      if (mobile) await moveUp.tap();
+      if (mobile && browserName === "chromium") {
+        await moveUp.tap({ trial: true });
+        const box = await moveUp.boundingBox();
+        if (!box) throw new Error("Missing arrow bounds");
+        const input = await context.newCDPSession(page);
+        try {
+          // Chromium can omit the click for a zero-duration tap after a CDP
+          // drag. Keep native touch input, with time to process the new press.
+          await input.send("Input.dispatchTouchEvent", {
+            type: "touchStart",
+            touchPoints: [
+              { x: box.x + box.width / 2, y: box.y + box.height / 2 },
+            ],
+          });
+          await page.waitForTimeout(100);
+          await input.send("Input.dispatchTouchEvent", {
+            type: "touchEnd",
+            touchPoints: [],
+          });
+        } finally {
+          await input.detach();
+        }
+      } else if (mobile) await moveUp.tap();
       else await moveUp.click();
       await expect(rows.nth(1)).toHaveAttribute("data-tv-rail-entry", "info");
 

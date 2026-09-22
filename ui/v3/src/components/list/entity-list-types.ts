@@ -86,6 +86,11 @@ export interface EntityListPageConfig<
   view?: View;
   defaultSort?: string;
   source: ListDataSource<TData, TItem, TVariables>;
+  /** Shareable library lists supply the same label formatter as their cards. */
+  sharing?: {
+    kind: GQL.ShareEntityKind;
+    getTitle: (item: TItem) => string;
+  };
   /**
    * Sidebar override. When set, replaces the default GraphQL
    * `FilterBuilder`. The offline view passes a custom sidebar with

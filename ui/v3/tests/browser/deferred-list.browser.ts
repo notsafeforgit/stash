@@ -1,5 +1,25 @@
 import { test, expect } from "./test";
 
+test("bulk sharing keeps selected scene titles and filename labels outside search results", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 932 });
+  await page.goto("/deferred-list");
+  await page.locator('article[data-id="1"] [data-entity-card-preview]').click({
+    modifiers: ["Control"],
+  });
+  await page.locator('article[data-id="2"] [data-entity-card-preview]').click();
+  await page.getByRole("button", { name: "Share…", exact: true }).click();
+  const form = page.getByRole("dialog", { name: "Create share", exact: true });
+  const chips = form.locator('[data-slot="combobox-chip"]');
+  await expect(chips).toHaveText(["Card 1", "Scene file 2"]);
+  await form
+    .getByPlaceholder("Search scenes, images and galleries…")
+    .fill("absent");
+  await expect(page.getByText("No results", { exact: true })).toBeVisible();
+  await expect(chips).toHaveText(["Card 1", "Scene file 2"]);
+});
+
 for (const width of [430, 1280]) {
   test(`cards remain usable while the total is pending at ${width}px`, async ({
     page,

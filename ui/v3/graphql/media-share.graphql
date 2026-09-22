@@ -87,6 +87,10 @@ query ShareTargetSearch($q: String!) {
       id
       title
       image_count
+      folder {
+        path
+        basename
+      }
       files {
         path
       }

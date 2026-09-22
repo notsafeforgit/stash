@@ -24,7 +24,8 @@ import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { useIntl } from "react-intl";
 import { useLazyQuery } from "@apollo/client/react";
 import * as GQL from "src/core/generated-graphql";
-import { imageTitle } from "src/core/files";
+import { imageTitle, objectTitle } from "src/core/files";
+import { galleryLabel } from "@/lib/gallery-utils";
 import type { EntityListPageConfig, PageNavHandle } from "src/components/list";
 import {
   SceneCard,
@@ -357,6 +358,7 @@ export function useSceneListConfig(
   >(
     () => ({
       filterMode: GQL.FilterMode.Scenes,
+      sharing: { kind: GQL.ShareEntityKind.Scene, getTitle: objectTitle },
       ItemsProvider: SceneListItems.Provider,
       source: {
         kind: "graphql",
@@ -527,6 +529,7 @@ export function useImageListConfig(
   >(
     () => ({
       filterMode: GQL.FilterMode.Images,
+      sharing: { kind: GQL.ShareEntityKind.Image, getTitle: imageTitle },
       ItemsProvider: ImageListItems.Provider,
       source: {
         kind: "graphql",
@@ -835,6 +838,7 @@ export function useGalleryListConfig(onEdit: (id: string) => void): {
   >(
     () => ({
       filterMode: GQL.FilterMode.Galleries,
+      sharing: { kind: GQL.ShareEntityKind.Gallery, getTitle: galleryLabel },
       ItemsProvider: GalleryListItems.Provider,
       source: {
         kind: "graphql",

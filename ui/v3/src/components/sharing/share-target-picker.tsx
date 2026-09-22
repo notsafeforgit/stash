@@ -7,6 +7,8 @@ import {
   type EntityOption,
 } from "@/components/forms/async-entity-select";
 import * as GQL from "@/core/generated-graphql";
+import { imageTitle, objectTitle } from "@/core/files";
+import { galleryLabel } from "@/lib/gallery-utils";
 import { useDebouncedValue } from "@/hooks/debounce";
 import { useMsg } from "@/hooks/message";
 import { QueryError } from "@/components/query-error";
@@ -66,13 +68,13 @@ export function ShareTargetPicker({
   };
   const options = [
     ...(data?.findScenes.scenes.map((item) =>
-      option(GQL.ShareEntityKind.Scene, item.id, item.title),
+      option(GQL.ShareEntityKind.Scene, item.id, objectTitle(item)),
     ) ?? []),
     ...(data?.findImages.images.map((item) =>
-      option(GQL.ShareEntityKind.Image, item.id, item.title),
+      option(GQL.ShareEntityKind.Image, item.id, imageTitle(item)),
     ) ?? []),
     ...(data?.findGalleries.galleries.map((item) =>
-      option(GQL.ShareEntityKind.Gallery, item.id, item.title),
+      option(GQL.ShareEntityKind.Gallery, item.id, galleryLabel(item)),
     ) ?? []),
   ];
   return (

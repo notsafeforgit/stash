@@ -5,6 +5,121 @@ import type { Locator } from "@playwright/test";
 
 test.use({ timezoneId: "America/Los_Angeles" });
 
+test("share target search uses library titles, filenames and gallery folders", async ({
+  page,
+}) => {
+  await page.route("**/graphql", async (route) => {
+    const { operationName } = z
+      .object({ operationName: z.string() })
+      .parse(route.request().postDataJSON());
+    if (operationName === "MediaShares") {
+      const data: GQL.MediaSharesQuery = {
+        mediaShares: [],
+        sharingConfiguration: {
+          __typename: "SharingConfiguration",
+          public_url: "https://shares.test/share",
+          max_days: 30,
+          max_items: 2000,
+        },
+      };
+      await route.fulfill({ json: { data } });
+    } else if (operationName === "ShareTargetSearch") {
+      const data: GQL.ShareTargetSearchQuery = {
+        findScenes: {
+          __typename: "FindScenesResultType",
+          scenes: [
+            {
+              __typename: "Scene",
+              id: "1",
+              title: "Saved scene title",
+              files: [
+                {
+                  __typename: "VideoFile",
+                  path: "/private/library/Unused filename.mp4",
+                },
+              ],
+            },
+            {
+              __typename: "Scene",
+              id: "2",
+              title: "",
+              files: [
+                {
+                  __typename: "VideoFile",
+                  path: "/private/library/Scene filename.mp4",
+                },
+              ],
+            },
+          ],
+        },
+        findImages: {
+          __typename: "FindImagesResultType",
+          images: [
+            {
+              __typename: "Image",
+              id: "3",
+              title: null,
+              visual_files: [
+                {
+                  __typename: "ImageFile",
+                  path: "C:\\private\\Photo filename.jpg",
+                },
+              ],
+            },
+          ],
+        },
+        findGalleries: {
+          __typename: "FindGalleriesResultType",
+          galleries: [
+            {
+              __typename: "Gallery",
+              id: "4",
+              title: "",
+              image_count: 1,
+              files: [],
+              folder: {
+                __typename: "Folder",
+                path: "/private/library/Album folder",
+                basename: "Album folder",
+              },
+            },
+            {
+              __typename: "Gallery",
+              id: "5",
+              title: null,
+              image_count: 1,
+              files: [
+                {
+                  __typename: "GalleryFile",
+                  path: "/private/library/Archive filename.zip",
+                },
+              ],
+              folder: null,
+            },
+          ],
+        },
+      };
+      await route.fulfill({ json: { data } });
+    } else throw new Error(`Unexpected operation ${operationName}`);
+  });
+  await page.goto("/share-management.html");
+  await page.getByRole("button", { name: "Create share", exact: true }).click();
+  const form = page.getByRole("dialog", { name: "Create share", exact: true });
+  const names = [
+    "Scene: Saved scene title",
+    "Scene: Scene filename",
+    "Image: Photo filename",
+    "Gallery: Album folder",
+    "Gallery: Archive filename",
+  ];
+  for (const name of names) {
+    await form.getByPlaceholder("Search scenes, images and galleries…").click();
+    await page.getByRole("option", { name, exact: true }).click();
+  }
+  await page.keyboard.press("Escape");
+  await expect(form.locator('[data-slot="combobox-chip"]')).toHaveText(names);
+});
+
 async function expectDialogFits(dialog: Locator) {
   await expect(dialog).toBeInViewport({ ratio: 1 });
   await expect

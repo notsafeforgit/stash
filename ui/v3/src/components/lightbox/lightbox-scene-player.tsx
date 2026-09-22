@@ -17,6 +17,7 @@ import type { SceneActivityScope } from "@/core/scene-activity";
  */
 
 import type React from "react";
+import { useState } from "react";
 import { ScenePlayer } from "src/components/player/scene-player";
 import type { ScenePlaybackData } from "src/components/player/scene-player";
 import type { PlayerTranscodeSession } from "@/components/player/player-transcode-session";
@@ -94,6 +95,14 @@ export function LightboxScenePlayer({
   const configuration = useConfigurationContextOptional()?.configuration;
   const autostartEnabled =
     autostartOverride ?? configuration?.interface.autostartVideo ?? true;
+  // The carousel now changes playback only after a swipe has finished. Keep
+  // the initial entrance gate, without adding another pause to every swipe.
+  const [openingPlaybackKey, setOpeningPlaybackKey] = useState<string | null>(
+    playbackKey,
+  );
+  if (openingPlaybackKey !== null && openingPlaybackKey !== playbackKey) {
+    setOpeningPlaybackKey(null);
+  }
 
   return (
     <ScenePlayer
@@ -105,7 +114,7 @@ export function LightboxScenePlayer({
       suspended={suspended}
       autoplay
       autostartEnabled={autostartEnabled}
-      playDelayMs={500}
+      playDelayMs={openingPlaybackKey === playbackKey ? 500 : 0}
       preload="auto"
       disableSeekArrows
       fill

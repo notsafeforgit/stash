@@ -157,9 +157,17 @@ export function SceneLightbox({
 
   // YARL controller — used to advance imperatively from the player's
   // auto-advance toggle (which fires on the video's `ended` event).
-  const handleNext = useCallback(() => {
-    controllerRef.current?.next();
-  }, [controllerRef]);
+  const handleNext = useCallback(
+    (slide: SceneSlide) => {
+      const controller = controllerRef.current;
+      // The outgoing video remains alive during a swipe. Its late EOF must not
+      // advance again after the user has already selected a different slide.
+      const state = controller?.getLightboxState();
+      if (state?.currentSlide === slide && !state.animation?.increment)
+        controller?.next();
+    },
+    [controllerRef],
+  );
 
   // Per-gesture wheel lockout — pin one trackpad swipe to one slide
   // advance, with an early-release escape hatch for deliberate
@@ -287,7 +295,7 @@ export function SceneLightbox({
           onToggleFullscreen={handleToggleLightboxFullscreen}
           loopEnabled={loopEnabled}
           onLoopToggle={handleLoopToggle}
-          onNext={handleNext}
+          onNext={() => handleNext(slide)}
           onClose={touch ? requestClose : undefined}
         />
       );

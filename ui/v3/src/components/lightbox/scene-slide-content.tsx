@@ -77,6 +77,7 @@ export function SceneSlidePoster({ slide }: { slide: SceneSlide }) {
           alt={slide.title ?? ""}
           className="max-w-full max-h-full object-contain select-none"
           draggable={false}
+          decoding="async"
         />
       )}
     </div>

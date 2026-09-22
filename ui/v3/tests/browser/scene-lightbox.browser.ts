@@ -84,10 +84,29 @@ async function open(page: Page, query = "") {
 async function next(page: Page, index: number) {
   await page.keyboard.press("ArrowRight");
   await expect(page.getByTestId("view")).toHaveText(String(index));
-  await expect(page.locator("[data-scene-player]")).toHaveAttribute(
-    "data-playback-ready",
-    "true",
-  );
+  await expect(
+    page.locator(".yarl__slide_current [data-scene-player]"),
+  ).toHaveAttribute("data-playback-ready", "true");
+}
+
+async function holdCarouselAnimations(page: Page) {
+  await page.evaluate(() => {
+    const animate = Element.prototype.animate;
+    Element.prototype.animate = function (...args) {
+      const animation = animate.apply(this, args);
+      if (this.classList.contains("yarl__carousel")) {
+        animation.pause();
+        animation.currentTime = 0;
+      }
+      return animation;
+    };
+  });
+}
+
+async function finishCarouselAnimations(page: Page) {
+  await page.locator(".yarl__carousel").evaluate((track) => {
+    for (const animation of track.getAnimations()) animation.finish();
+  });
 }
 
 async function revealControls(page: Page) {
@@ -307,58 +326,169 @@ test("ended-driven auto-advance preserves the same unmuted player", async ({
   }
 });
 
-test("swipe drag tracks the pointer and the center player survives the animation", async ({
+for (const direction of [-1, 1]) {
+  test(`swipe ${direction === -1 ? "forward" : "backward"} keeps the outgoing video and decoded incoming poster until the animation finishes`, async ({
+    page,
+  }) => {
+    const targetIndex = direction === -1 ? 1 : 2;
+    const startX = direction === -1 ? 300 : 90;
+    const video = await open(page);
+    const original = await video.elementHandle();
+    if (!original) throw new Error("Missing video");
+    const surface = page.locator("[data-player-touch-surface]");
+    const origin = await video.boundingBox();
+    if (!origin) throw new Error("Missing video bounds");
+    const source = await video.getAttribute("src");
+    const incoming = await page
+      .getByRole("img", {
+        name: `Scene ${targetIndex + 1}`,
+        includeHidden: true,
+      })
+      .elementHandle();
+    if (!incoming) throw new Error("Missing incoming poster");
+    await expect
+      .poll(() =>
+        incoming.evaluate(
+          (img) =>
+            img instanceof HTMLImageElement &&
+            img.complete &&
+            img.naturalWidth > 0,
+        ),
+      )
+      .toBe(true);
+    // Hold the real WAAPI animation beyond YARL's nominal cleanup timer. The
+    // player must wait for visual completion, including a busy browser frame.
+    await holdCarouselAnimations(page);
+    await surface.dispatchEvent("pointerdown", {
+      pointerId: 7,
+      pointerType: "touch",
+      isPrimary: true,
+      buttons: 1,
+      clientX: startX,
+      clientY: 250,
+    });
+    await surface.dispatchEvent("pointermove", {
+      pointerId: 7,
+      pointerType: "touch",
+      isPrimary: true,
+      buttons: 1,
+      clientX: startX + direction * 50,
+      clientY: 250,
+    });
+    await surface.dispatchEvent("pointermove", {
+      pointerId: 7,
+      pointerType: "touch",
+      isPrimary: true,
+      buttons: 1,
+      clientX: startX + direction * 200,
+      clientY: 250,
+    });
+    await expect
+      .poll(async () => (await video.boundingBox())?.x)
+      .toBeCloseTo(origin.x + direction * 150, 0);
+    const incomingBeforeRelease = await incoming.boundingBox();
+    if (!incomingBeforeRelease) throw new Error("Missing poster bounds");
+    await surface.dispatchEvent("pointerup", {
+      pointerId: 7,
+      pointerType: "touch",
+      isPrimary: true,
+      buttons: 0,
+      clientX: startX + direction * 200,
+      clientY: 250,
+    });
+    await expect(page.getByTestId("view")).toHaveText(String(targetIndex));
+    await expect
+      .poll(() => incoming.evaluate((img) => img.isConnected))
+      .toBe(true);
+    expect((await incoming.boundingBox())?.x).toBeCloseTo(
+      incomingBeforeRelease.x,
+      0,
+    );
+    expect((await video.boundingBox())?.x).toBeCloseTo(
+      origin.x + direction * 150,
+      0,
+    );
+    await page.waitForTimeout(300);
+    await expect(video).toHaveAttribute("src", source ?? "");
+    await expect(page.locator("[data-scene-player]")).toHaveAttribute(
+      "data-playback-key",
+      '["1",null,false]',
+    );
+    await finishCarouselAnimations(page);
+    await expect(page.locator("[data-scene-player]")).toHaveAttribute(
+      "data-playback-key",
+      JSON.stringify([String(targetIndex + 1), null, false]),
+    );
+    await expect
+      .poll(async () => (await video.boundingBox())?.x)
+      .toBeCloseTo(origin.x, 0);
+    await expect(video).toHaveJSProperty("paused", false);
+    expect(
+      await video.evaluate((v, previous) => v === previous, original),
+    ).toBe(true);
+  });
+}
+
+test("interrupted swipes load only the final scene and ignore the outgoing video's EOF", async ({
   page,
 }) => {
+  await page.addInitScript(() =>
+    localStorage.setItem("stash-player-auto-advance", "true"),
+  );
+  const requestedScenes: string[] = [];
+  page.on("request", (request) => {
+    const match = new URL(request.url()).pathname.match(
+      /^\/scene\/([^/]+)\/stream/,
+    );
+    if (match?.[1]) requestedScenes.push(match[1]);
+  });
+  const video = await open(page);
+  await holdCarouselAnimations(page);
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByTestId("view")).toHaveText("1");
+  await video.dispatchEvent("ended");
+  await page.waitForTimeout(50);
+  await expect(page.getByTestId("view")).toHaveText("1");
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByTestId("view")).toHaveText("2");
+  await finishCarouselAnimations(page);
+  await expect(page.locator("[data-scene-player]")).toHaveAttribute(
+    "data-playback-key",
+    '["3",null,false]',
+  );
+  await expect(video).toHaveJSProperty("paused", false);
+  expect(requestedScenes).toContain("3");
+  expect(requestedScenes).not.toContain("2");
+  // Closing during a subsequent held animation must not load its destination.
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByTestId("view")).toHaveText("1");
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".yarl__root")).toHaveCount(0);
+  expect(requestedScenes).not.toContain("2");
+});
+
+test("reduced motion switches scenes without waiting for a swipe animation", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   const video = await open(page);
   const original = await video.elementHandle();
   if (!original) throw new Error("Missing video");
-  const surface = page.locator("[data-player-touch-surface]");
-  const origin = await video.boundingBox();
-  if (!origin) throw new Error("Missing video bounds");
-  await surface.dispatchEvent("pointerdown", {
-    pointerId: 7,
-    pointerType: "touch",
-    isPrimary: true,
-    buttons: 1,
-    clientX: 300,
-    clientY: 250,
-  });
-  await surface.dispatchEvent("pointermove", {
-    pointerId: 7,
-    pointerType: "touch",
-    isPrimary: true,
-    buttons: 1,
-    clientX: 250,
-    clientY: 250,
-  });
-  await surface.dispatchEvent("pointermove", {
-    pointerId: 7,
-    pointerType: "touch",
-    isPrimary: true,
-    buttons: 1,
-    clientX: 100,
-    clientY: 250,
-  });
-  await expect
-    .poll(async () => (await video.boundingBox())?.x)
-    .toBeCloseTo(origin.x - 150, 0);
-  await surface.dispatchEvent("pointerup", {
-    pointerId: 7,
-    pointerType: "touch",
-    isPrimary: true,
-    buttons: 0,
-    clientX: 100,
-    clientY: 250,
-  });
-  await expect(page.getByTestId("view")).toHaveText("1");
-  await expect
-    .poll(async () => (await video.boundingBox())?.x)
-    .toBeCloseTo(origin.x, 0);
+  await holdCarouselAnimations(page);
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByTestId("view")).toHaveText("2");
+  await expect(
+    page.locator(".yarl__slide_current [data-scene-player]"),
+  ).toHaveAttribute("data-playback-key", '["3",null,false]');
   await expect(video).toHaveJSProperty("paused", false);
   expect(await video.evaluate((v, previous) => v === previous, original)).toBe(
     true,
   );
+  expect(
+    await page
+      .locator(".yarl__carousel")
+      .evaluate((track) => track.getAnimations().length),
+  ).toBe(0);
 });
 
 test("a held 2x gesture continues through auto-advance and restores its original rate on release", async ({

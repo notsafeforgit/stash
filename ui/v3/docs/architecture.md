@@ -371,10 +371,15 @@ pins an older hls.js, so a version-scoped pnpm override uses the updated
 | `use-player-loop.ts` | Media-clock loop deadline, cancelled by pause, seek and source changes |
 
 The scene lightbox uses `scene-carousel.tsx`, a YARL carousel module with three
-stable slots: one active player and two poster previews. YARL's controller still
-owns pointer/wheel navigation, drag offsets and swipe animations. The center slot
-keeps the same player/store/video across scenes, markers and loading sentinels;
-closing the lightbox disposes that session. No media DOM is moved between slides.
+keyed posters and one persistent player above the track. YARL's controller still
+owns pointer/wheel navigation, drag offsets and swipe animations. The decoded
+incoming poster stays mounted while the outgoing player keeps its visual position
+and source until the actual animation finishes. Only then does the player move
+to the center and load the selected scene; interrupted swipes cannot load obsolete
+selections. The same player/store/video survives scenes, markers and loading
+sentinels; closing the lightbox disposes that session. No media DOM is moved
+between slides. Only the initial entrance uses a fixed autoplay delay, and a late
+EOF from an outgoing scene cannot advance the new selection.
 
 `playbackKey` identifies the selected scene/marker independently of media ownership.
 Selection changes reset source preferences, clip offsets, poster/started latches,

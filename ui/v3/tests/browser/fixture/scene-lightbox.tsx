@@ -75,6 +75,10 @@ const entry: OfflineEntry = {
   server_status: "present",
 };
 const url = (path: string) => new URL(path, location.href).href;
+// Distinct, decoded posters make the swipe handoff observable without relying
+// on video frame timing or downloading external images.
+const poster = (id: string) =>
+  `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90"><rect width="160" height="90" fill="${id === "1" ? "#344" : id === "2" ? "#434" : "#443"}"/></svg>`)}`;
 const markerEndOffset = new URLSearchParams(location.search).has(
   "late-marker-end",
 )
@@ -141,7 +145,11 @@ export const scenes = ["1", "2", "3", "slow"].map(
           caption_type: "srt",
         },
       ],
-      paths: { ...scene.paths, caption: url(`/scene/${id}/caption`) },
+      paths: {
+        ...scene.paths,
+        screenshot: poster(id),
+        caption: url(`/scene/${id}/caption`),
+      },
     };
   },
 );
@@ -231,6 +239,7 @@ export function SceneLightboxFixture() {
       type: "scene",
       sceneId,
       title: `Scene ${sceneId}`,
+      posterSrc: poster(sceneId),
       loading: mode === "pending" && i === 1 && !resolved,
     }));
   }, [mode, resolved]);

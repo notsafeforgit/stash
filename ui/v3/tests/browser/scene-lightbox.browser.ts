@@ -117,6 +117,52 @@ async function revealControls(page: Page) {
   await expect(playbackControls).not.toHaveAttribute("inert");
 }
 
+test.describe("desktop scene margins", () => {
+  test.use({ isMobile: false, hasTouch: false });
+
+  for (const viewport of [
+    { width: 1280, height: 800 },
+    { width: 1600, height: 700 },
+  ]) {
+    test(`posters stay behind the player at ${viewport.width}×${viewport.height}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await open(page, "?paused");
+      for (const [step, index] of [0, 1, 2, 0].entries()) {
+        if (step > 0) await next(page, index);
+        const poster = page.getByRole("img", {
+          name: `Scene ${index + 1}`,
+          exact: true,
+          includeHidden: true,
+        });
+        await expect
+          .poll(() =>
+            poster.evaluate(
+              (image: HTMLImageElement) =>
+                image.complete && image.naturalWidth > 0,
+            ),
+          )
+          .toBe(true);
+        const playerBounds = await page
+          .locator("[data-scene-player]")
+          .boundingBox();
+        const posterBounds = await poster.boundingBox();
+        if (!playerBounds || !posterBounds)
+          throw new Error("Missing scene media bounds");
+        expect(posterBounds.x).toBeGreaterThanOrEqual(playerBounds.x - 1);
+        expect(posterBounds.y).toBeGreaterThanOrEqual(playerBounds.y - 1);
+        expect(posterBounds.x + posterBounds.width).toBeLessThanOrEqual(
+          playerBounds.x + playerBounds.width + 1,
+        );
+        expect(posterBounds.y + posterBounds.height).toBeLessThanOrEqual(
+          playerBounds.y + playerBounds.height + 1,
+        );
+      }
+    });
+  }
+});
+
 test("mobile Close owns the touch sequence before its native click", async ({
   page,
 }) => {

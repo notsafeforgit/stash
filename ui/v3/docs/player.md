@@ -184,7 +184,9 @@ behavior. Browser tests verify pause/resume does not introduce seeks or reloads.
   Mobile slides fill the viewport; control padding respects the home indicator
   and landscape display cutouts.
   Pending/error slides provide bottom dismissal until a player is available.
-  Desktop retains the lightbox toolbar and Escape behavior.
+  Desktop retains the lightbox toolbar and Escape behavior. The timeline has a
+  centered 32px hit area, allowing clicks above and below the visible track.
+  Visible desktop control-bar gaps absorb stray clicks without toggling playback.
 
 ## Platform integrations
 

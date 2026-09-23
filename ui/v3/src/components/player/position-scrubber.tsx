@@ -162,7 +162,8 @@ export function PositionScrubber({
     finish();
   };
   return (
-    // The hit area sits above the thin bar, leaving the video unobstructed.
+    // Center the desktop hit area on the thin bar to allow misses on either side.
+    // Touch keeps its bottom-aligned bar and expanding precision timeline.
     // Stop drag events before they reach the lightbox carousel / TV gestures.
     <div
       ref={trackRef}
@@ -179,7 +180,7 @@ export function PositionScrubber({
       data-dragging={dragTime !== null || undefined}
       data-precision={precisionRange ? true : undefined}
       className={cn(
-        "group/scrubber relative flex h-3 w-full min-w-[4em] cursor-pointer select-none items-end pointer-coarse:h-5 [-webkit-touch-callout:none]",
+        "group/scrubber relative flex h-8 w-full min-w-[4em] cursor-pointer select-none items-center pointer-coarse:h-5 pointer-coarse:items-end [-webkit-touch-callout:none]",
         precisionRange && "h-16 pointer-coarse:h-16",
       )}
       // Override the unlayered page-zoom guard; a Tailwind touch-none utility

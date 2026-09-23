@@ -675,6 +675,8 @@ function ControlBar({
       data-player-control-bar=""
       className={cn(
         "pointer-events-none relative z-10 mt-auto flex flex-col gap-1 px-2 py-1 w-full",
+        // Visible desktop gaps absorb seek misses before they hit play/pause.
+        !controlsHidden && "pointer-fine:pointer-events-auto",
         onClose && "viewport-controls",
       )}
     >

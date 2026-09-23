@@ -76,9 +76,10 @@ const entry: OfflineEntry = {
 };
 const url = (path: string) => new URL(path, location.href).href;
 // Distinct, decoded posters make the swipe handoff observable without relying
-// on video frame timing or downloading external images.
+// on video frame timing or downloading external images. Use full-size posters
+// so desktop tests also exercise images that reach the slide's padded edges.
 const poster = (id: string) =>
-  `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90"><rect width="160" height="90" fill="${id === "1" ? "#344" : id === "2" ? "#434" : "#443"}"/></svg>`)}`;
+  `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080"><rect width="1920" height="1080" fill="${id === "1" ? "#344" : id === "2" ? "#434" : "#443"}"/></svg>`)}`;
 const markerEndOffset = new URLSearchParams(location.search).has(
   "late-marker-end",
 )

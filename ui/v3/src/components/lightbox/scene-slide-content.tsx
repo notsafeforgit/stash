@@ -68,8 +68,9 @@ export function SceneSlideContent(props: SceneSlideContentProps) {
 }
 
 export function SceneSlidePoster({ slide }: { slide: SceneSlide }) {
+  // Respect the slide's padding so posters stay behind the persistent player.
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-black">
+    <div className="size-full flex items-center justify-center bg-black">
       {(slide.posterSrc || slide.posterImage) && (
         <PreviewImage
           preview={slide.posterImage}

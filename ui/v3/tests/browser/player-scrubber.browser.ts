@@ -1,6 +1,92 @@
 import { test, expect } from "./test";
 import { serveSceneMedia } from "./scene-media";
 
+test.describe("desktop seek hit area", () => {
+  test.use({
+    isMobile: false,
+    hasTouch: false,
+    viewport: { width: 1280, height: 800 },
+  });
+
+  for (const paused of [false, true]) {
+    test(`near-miss seeks and control-bar gaps keep the video ${paused ? "paused" : "playing"}`, async ({
+      page,
+    }) => {
+      await serveSceneMedia(page);
+      await page.goto(`/scene-lightbox${paused ? "?paused" : ""}`);
+      await page.getByRole("button", { name: "Open scenes" }).click();
+      const player = page.locator("[data-scene-player]");
+      const video = player.locator("video");
+      const bar = player.locator("[data-player-control-bar]");
+      const scrubber = page.getByRole("slider", { name: "Playback position" });
+      await expect(player).toHaveAttribute("data-playback-ready", "true");
+      await expect(video).toHaveJSProperty("paused", paused);
+      const toggles = await video.evaluateHandle((video: HTMLVideoElement) => {
+        const events: string[] = [];
+        for (const type of ["pause", "play"])
+          video.addEventListener(type, () => events.push(type));
+        return events;
+      });
+
+      // Exercise real mouse hits above and below the visible line, including
+      // the narrow gap below the old bottom-aligned scrubber.
+      for (const [offset, target] of [
+        [4, 3],
+        [14, 6],
+        [-14, 3],
+      ] as const) {
+        const track = await scrubber
+          .locator("[data-position-scrubber-track]")
+          .boundingBox();
+        if (!track) throw new Error("Missing seek track");
+        await page.mouse.click(
+          track.x + (track.width * target) / 12,
+          track.y + track.height / 2 + offset,
+        );
+        await expect(video).toHaveJSProperty("paused", paused);
+        await expect
+          .poll(() =>
+            video.evaluate((element: HTMLVideoElement) => element.currentTime),
+          )
+          .toBeCloseTo(target, 0);
+      }
+
+      const barBounds = await bar.boundingBox();
+      const scrubberBounds = await scrubber.boundingBox();
+      if (!barBounds || !scrubberBounds)
+        throw new Error("Missing player controls");
+      for (const point of [
+        // The remaining gap between the enlarged seek target and buttons.
+        {
+          x: scrubberBounds.x + scrubberBounds.width / 2,
+          y: scrubberBounds.y + scrubberBounds.height + 2,
+        },
+        { x: barBounds.x + 2, y: scrubberBounds.y + scrubberBounds.height / 2 },
+        { x: barBounds.x + barBounds.width / 2, y: barBounds.y + 1 },
+        {
+          x: barBounds.x + barBounds.width / 2,
+          y: barBounds.y + barBounds.height - 1,
+        },
+      ]) {
+        await page.mouse.click(point.x, point.y);
+        await expect(video).toHaveJSProperty("paused", paused);
+      }
+      expect(await toggles.jsonValue()).toEqual([]);
+      await toggles.dispose();
+
+      // Deliberate playback clicks still work on the video and toolbar.
+      await player
+        .locator("[data-player-native-button]")
+        .click({ position: { x: 200, y: 200 } });
+      await expect(video).toHaveJSProperty("paused", !paused);
+      await bar
+        .getByRole("button", { name: paused ? "Pause" : "Play", exact: true })
+        .click();
+      await expect(video).toHaveJSProperty("paused", paused);
+    });
+  }
+});
+
 for (const mode of ["tv", "lightbox"]) {
   for (const segment of [false, true]) {
     test(`${mode} ${segment ? "segment" : "scene"} paints separate buffered intervals and clears evicted data`, async ({

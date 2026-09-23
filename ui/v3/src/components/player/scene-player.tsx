@@ -686,6 +686,7 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
     seekDisplayTarget,
     freezeFrameCanvas,
     handleSourceChange,
+    handleMediaError,
     handleSeek,
     handleSeekPreview: previewSeek,
     handleSeekBy,
@@ -984,6 +985,8 @@ export const ScenePlayer: React.FC<ScenePlayerProps> = ({
             : handleEnded
           : undefined
       }
+      // Observe native failures before the media adapter processes the event.
+      onErrorCapture={handleMediaError}
       onLoadedMetadata={handleLoadedMetadata}
       onRateChange={(event) => {
         const video = event.currentTarget;

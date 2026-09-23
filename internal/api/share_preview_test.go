@@ -14,6 +14,7 @@ import (
 	"github.com/stashapp/stash/internal/manager"
 	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/internal/sharing"
+	"github.com/stashapp/stash/pkg/ffmpeg"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/models/mocks"
 	"github.com/stashapp/stash/pkg/models/paths"
@@ -28,7 +29,9 @@ func sharedPreviewManager(t *testing.T, rs *shareRoutes) *manager.Manager {
 	c.SetBool(config.EnableV3UI, true)
 	c.SetString(config.Generated, t.TempDir())
 	p := paths.NewPaths(c.GetGeneratedPath(), "")
-	mgr := &manager.Manager{Config: c, Paths: &p}
+	mgr := &manager.Manager{Config: c, Paths: &p, FFProbe: ffmpeg.NewFFProbe(filepath.Join(t.TempDir(), "no-ffprobe")), StreamManager: new(ffmpeg.StreamManager)}
+	manager.SetInstance(mgr)
+	t.Cleanup(func() { manager.SetInstance(nil) })
 	rs.server = &Server{manager: mgr}
 	return mgr
 }
@@ -92,8 +95,6 @@ func TestShareGeneratedPreviewsStayScoped(t *testing.T) {
 	}
 	require.NoError(t, store.Publish(scene.ID, "cover", previewimage.CoverKey(scene.CoverChecksum), 1, result))
 
-	require.Nil(t, content().Media[0].PreviewImage, "reuse must be opt-in")
-	mgr.Config.SetBool(config.SharingUseExistingPreviews, true)
 	preview := content().Media[0].PreviewImage
 	require.NotNil(t, preview)
 	require.NotNil(t, preview.Thumbnail)
@@ -127,14 +128,6 @@ func TestShareGeneratedPreviewsStayScoped(t *testing.T) {
 		require.Equal(t, http.StatusNotFound, get(url).Code, url)
 	}
 
-	mgr.Config.SetBool(config.SharingUseExistingPreviews, false)
-	require.Nil(t, content().Media[0].PreviewImage)
-	require.Equal(t, http.StatusNotFound, get(assetURL).Code, "previous catalog URLs must stop working when reuse is disabled")
-	mgr.Config.SetBool(config.SharingServeOriginalMedia, true)
-	require.NotNil(t, content().Media[0].PreviewImage, "as-is delivery also reuses HDR previews")
-	require.Equal(t, "unchanged cover.avif", get(assetURL).Body.String())
-	mgr.Config.SetBool(config.SharingServeOriginalMedia, false)
-	mgr.Config.SetBool(config.SharingUseExistingPreviews, true)
 	oldID := vf.ID
 	vf.ID++
 	require.Equal(t, http.StatusNotFound, get(assetURL).Code, "a replacement primary file cannot inherit the grant")
@@ -148,7 +141,7 @@ func TestShareGeneratedPreviewsStayScoped(t *testing.T) {
 	require.Equal(t, http.StatusNotFound, get(assetURL).Code)
 }
 
-func TestSharedImageThumbnailReuseDoesNotEnableOriginals(t *testing.T) {
+func TestSharedImageThumbnailReuseAndOriginalViewsStayScoped(t *testing.T) {
 	rs, handler, row, secret := shareHTTPFixture(t)
 	mgr := sharedPreviewManager(t, rs)
 	snapshot, err := sharing.Snapshot(row)
@@ -163,43 +156,33 @@ func TestSharedImageThumbnailReuseDoesNotEnableOriginals(t *testing.T) {
 	path := mgr.Paths.Generated.GetThumbnailPath(img.Checksum, models.DefaultGthumbWidth)
 	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o700))
 	require.NoError(t, os.WriteFile(path, []byte("stored image thumbnail"), 0o600))
-	mgr.Config.SetBool(config.SharingUseExistingPreviews, true)
 	cookie := exchangeShareHTTP(t, handler, row, secret)
 	base := "/share/" + row.ID + "/media/image-1/"
 	w := sharedPreviewRequest(handler, http.MethodGet, base+"thumbnail", cookie)
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Equal(t, "stored image thumbnail", w.Body.String())
 	require.Equal(t, http.StatusNotFound, sharedPreviewRequest(handler, http.MethodGet, base+"download", cookie).Code)
-	// Full-size views and missing thumbnails must return to the sanitizing path,
-	// never the source file, even with preview reuse enabled.
-	req := httptest.NewRequest(http.MethodGet, base+"image", nil)
-	require.False(t, rs.existingRendition(httptest.NewRecorder(), req, &snapshot.Media[0], f, nil, false))
+	require.Equal(t, "original image bytes", sharedPreviewRequest(handler, http.MethodGet, base+"image", cookie).Body.String())
 	require.NoError(t, os.Remove(path))
-	require.False(t, rs.existingRendition(httptest.NewRecorder(), req, &snapshot.Media[0], f, nil, true))
+	require.Equal(t, "original image bytes", sharedPreviewRequest(handler, http.MethodGet, base+"thumbnail", cookie).Body.String())
 	require.NoError(t, os.WriteFile(f.Base().Path, []byte("source changed"), 0o600))
 	require.Equal(t, http.StatusNotFound, sharedPreviewRequest(handler, http.MethodGet, base+"thumbnail", cookie).Code)
 }
 
-func TestSharingPreviewConfigurationPersistsAndPreservesOmittedOption(t *testing.T) {
+func TestSharingPublicAddressConfigurationPersists(t *testing.T) {
 	c := config.InitializeEmpty()
 	c.SetConfigFile(filepath.Join(t.TempDir(), "config.yml"))
 	r := &mutationResolver{}
-	require.False(t, sharingConfiguration().UseExistingPreviews)
-	enabled := true
-	result, err := r.ConfigureSharing(context.Background(), "https://shares.test/share", &enabled, nil)
+	result, err := r.ConfigureSharing(context.Background(), "https://shares.test/share/")
 	require.NoError(t, err)
-	require.True(t, result.UseExistingPreviews)
+	require.Equal(t, "https://shares.test/share", result.PublicURL)
 	data, err := os.ReadFile(c.GetConfigFile())
 	require.NoError(t, err)
-	require.Contains(t, string(data), "sharing_use_existing_previews: true")
-	result, err = r.ConfigureSharing(context.Background(), "https://other.test/share", nil, nil)
-	require.NoError(t, err)
-	require.True(t, result.UseExistingPreviews)
-	enabled = false
-	_, err = r.ConfigureSharing(context.Background(), "http://invalid.test/share", &enabled, nil)
+	require.Contains(t, string(data), "sharing_public_url: https://shares.test/share")
+	_, err = r.ConfigureSharing(context.Background(), "http://invalid.test/share")
 	require.Error(t, err)
-	require.True(t, sharingConfiguration().UseExistingPreviews)
-	result, err = r.ConfigureSharing(context.Background(), "", &enabled, nil)
+	require.Equal(t, "https://shares.test/share", sharingConfiguration().PublicURL)
+	result, err = r.ConfigureSharing(context.Background(), "")
 	require.NoError(t, err)
-	require.False(t, result.UseExistingPreviews)
+	require.Empty(t, result.PublicURL)
 }

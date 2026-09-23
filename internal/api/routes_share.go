@@ -296,7 +296,7 @@ type publicShareDetail struct {
 func (rs *shareRoutes) publicMedia(r *http.Request, row *models.ShareRecord, item models.ShareMedia, scene *models.Scene) publicShareMedia {
 	base := shareBase(r, row.ID) + "media/" + item.Key + "/"
 	ret := publicShareMedia{Key: item.Key, Kind: item.Kind, Width: item.Width, Height: item.Height, Duration: item.Duration, Video: item.Duration > 0, Thumbnail: base + "thumbnail", Image: base + "image"}
-	if item.Kind == "SCENE" && scene != nil && rs.useExistingPreviews() {
+	if item.Kind == "SCENE" && scene != nil {
 		ret.PreviewImage = previewImageModel(base+"preview-image", rs.server.manager.ScenePreviewImage(scene))
 	}
 	if row.ShowMetadata {
@@ -360,20 +360,21 @@ func (rs *shareRoutes) detail(w http.ResponseWriter, r *http.Request) {
 	ret := publicShareDetail{Media: rs.publicMedia(r, row, *item, scene), VideoCodec: item.VideoCodec, AudioCodec: item.AudioCodec, FrameRate: item.FrameRate, Streams: []*manager.SceneStreamEndpoint{}}
 	if scene != nil {
 		base := &url.URL{Path: shareBase(r, row.ID) + "media/" + item.Key + "/stream"}
-		if rs.serveOriginalMedia() {
-			mimeType, label := sharedOriginalMIME(f), "Direct stream"
-			ret.Streams = append(ret.Streams, &manager.SceneStreamEndpoint{URL: base.String(), MimeType: &mimeType, Label: &label})
-			shareJSON(w, ret)
-			return
-		}
-		streams, err := manager.GetV3SceneStreamPaths(scene, base, models.StreamingResolutionEnumFullHd)
+		streams, err := manager.GetV3OriginalSceneStreamPaths(scene, base, models.StreamingResolutionEnumFullHd)
 		if err != nil {
 			http.Error(w, "Media unavailable", http.StatusServiceUnavailable)
 			return
 		}
 		for _, stream := range streams {
 			u, err := url.Parse(stream.URL)
-			if err == nil && strings.HasSuffix(u.Path, ".master.m3u8") {
+			if err != nil {
+				continue
+			}
+			if u.Path == base.Path {
+				mimeType := sharedOriginalMIME(f)
+				stream.MimeType = &mimeType
+				ret.Streams = append(ret.Streams, stream)
+			} else if strings.HasSuffix(u.Path, ".master.m3u8") {
 				ret.Streams = append(ret.Streams, stream)
 			}
 		}
@@ -393,12 +394,6 @@ func shareJSON(w http.ResponseWriter, value any) {
 
 func (rs *shareRoutes) stream(handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// As-is delivery never creates or serves converted streams. Keep stop
-		// available to release a session started before the setting changed.
-		if rs.serveOriginalMedia() && !strings.HasSuffix(r.URL.Path, "/streams.stop") {
-			http.NotFound(w, r)
-			return
-		}
 		item, _, scene, err := rs.item(r)
 		if err != nil || scene == nil {
 			http.NotFound(w, r)

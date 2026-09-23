@@ -116,6 +116,11 @@ function findSourceByPath(
   });
 }
 
+/** A native decoding failure can recover through the existing H.264/AAC stream. */
+export function getCompatibilitySource(sources: PlayerSource[]) {
+  return findSourceByPath(sources, "/stream.master.m3u8");
+}
+
 /**
  * Find the source whose URL carries `?resolution=ORIGINAL` — i.e. a
  * transcode targeting the source's own resolution. This is the "full

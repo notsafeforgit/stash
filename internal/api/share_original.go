@@ -10,20 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/pkg/file"
 	"github.com/stashapp/stash/pkg/models"
 )
 
-func (rs *shareRoutes) serveOriginalMedia() bool {
-	return config.GetInstance().GetSharingServeOriginalMedia()
-}
-
 func (rs *shareRoutes) originalStream(w http.ResponseWriter, r *http.Request) {
-	if !rs.serveOriginalMedia() {
-		http.NotFound(w, r)
-		return
-	}
 	item, f, scene, err := rs.item(r)
 	if err != nil || scene == nil {
 		http.NotFound(w, r)

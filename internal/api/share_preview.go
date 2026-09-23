@@ -7,21 +7,13 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/utils"
 )
 
-func (rs *shareRoutes) useExistingPreviews() bool {
-	return rs.serveOriginalMedia() || config.GetInstance().GetSharingUseExistingPreviews()
-}
-
 // Batch only the selected scenes for the public catalog. Each asset request
 // still resolves and verifies its pinned primary file before delivering bytes.
 func (rs *shareRoutes) previewScenes(ctx context.Context, media []models.ShareMedia) map[int]*models.Scene {
-	if !rs.useExistingPreviews() {
-		return nil
-	}
 	var ids []int
 	for _, item := range media {
 		if item.Kind == "SCENE" {
@@ -47,10 +39,6 @@ func (rs *shareRoutes) previewScenes(ctx context.Context, media []models.ShareMe
 }
 
 func (rs *shareRoutes) previewImage(w http.ResponseWriter, r *http.Request) {
-	if !rs.useExistingPreviews() {
-		http.NotFound(w, r)
-		return
-	}
 	item, _, scene, err := rs.item(r)
 	if err != nil || item.Kind != "SCENE" || scene == nil {
 		http.NotFound(w, r)
@@ -62,8 +50,7 @@ func (rs *shareRoutes) previewImage(w http.ResponseWriter, r *http.Request) {
 	servePreviewImage(w, r, mgr.PreviewImageStore(), scene.ID, "cover", mgr.ScenePreviewImage(scene), chi.URLParam(r, "previewFile"))
 }
 
-// Reuse an available preview. The caller chooses how to handle a missing one
-// according to the configured delivery mode.
+// Reuse existing library artwork through the share-authorized route.
 func (rs *shareRoutes) existingRendition(w http.ResponseWriter, r *http.Request, item *models.ShareMedia, f models.File, scene *models.Scene, thumbnail bool) bool {
 	mgr := rs.server.manager
 	if item.Kind == "SCENE" && scene != nil {

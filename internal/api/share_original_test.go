@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/internal/sharing"
 	"github.com/stashapp/stash/internal/static"
 	"github.com/stashapp/stash/pkg/models"
@@ -46,7 +45,6 @@ func TestShareOriginalImagesKeepBytesAndScope(t *testing.T) {
 			cookie := exchangeShareHTTP(t, handler, row, secret)
 			otherCookie := exchangeShareHTTP(t, handler, old, oldSecret)
 			base := "/share/" + row.ID + "/media/image-1/"
-			mgr.Config.SetBool(config.SharingServeOriginalMedia, true)
 			for _, endpoint := range []string{"image", "thumbnail"} {
 				url := base + endpoint
 				w := sharedPreviewRequest(handler, http.MethodGet, url, cookie)
@@ -83,17 +81,18 @@ func TestShareOriginalImagesKeepBytesAndScope(t *testing.T) {
 	}
 }
 
-func TestShareOriginalVideoSupportsRangesWithoutTranscoding(t *testing.T) {
+func TestShareOriginalVideoAndCompatibilityStreamsStayScoped(t *testing.T) {
 	for _, kind := range []string{"SCENE", "IMAGE"} {
 		t.Run(kind, func(t *testing.T) {
 			rs, handler, old, _ := shareHTTPMediaFixture(t, true)
-			mgr := sharedPreviewManager(t, rs)
+			sharedPreviewManager(t, rs)
 			snapshot, err := sharing.Snapshot(old)
 			require.NoError(t, err)
 			f, _, err := rs.service.Resolve(context.Background(), snapshot.Media[0])
 			require.NoError(t, err)
 			vf := f.(*models.VideoFile)
 			vf.Basename = "private-name.mp4"
+			vf.Format = "mp4"
 			m := mocks.NewDatabase()
 			rs.service.Repo.Scene = m.Scene
 			scene := &models.Scene{ID: 1, Files: models.NewRelatedVideoFiles([]*models.VideoFile{vf})}
@@ -106,15 +105,12 @@ func TestShareOriginalVideoSupportsRangesWithoutTranscoding(t *testing.T) {
 			get := func(endpoint string) *httptest.ResponseRecorder {
 				return sharedPreviewRequest(handler, http.MethodGet, base+endpoint, cookie)
 			}
-			require.Equal(t, http.StatusNotFound, get("stream").Code)
-			mgr.Config.SetBool(config.SharingUseExistingPreviews, true)
-			require.Equal(t, http.StatusNotFound, get("stream").Code, "preview reuse alone must not enable originals")
-			mgr.Config.SetBool(config.SharingServeOriginalMedia, true)
 			w := get("")
 			require.Equal(t, http.StatusOK, w.Code)
 			var detail publicShareDetail
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &detail))
-			require.Len(t, detail.Streams, 1)
+			require.GreaterOrEqual(t, len(detail.Streams), 2)
+			require.Contains(t, detail.Streams[1].URL, base+"stream.master.m3u8")
 			require.Equal(t, base+"stream", detail.Streams[0].URL)
 			require.Equal(t, "video/mp4", *detail.Streams[0].MimeType)
 			require.Empty(t, detail.Media.Download)
@@ -129,22 +125,34 @@ func TestShareOriginalVideoSupportsRangesWithoutTranscoding(t *testing.T) {
 			require.Equal(t, "bytes 9-13/20", w.Header().Get("Content-Range"))
 			require.Contains(t, w.Header().Get("Cache-Control"), "no-store")
 			require.Empty(t, sharedPreviewRequest(handler, http.MethodHead, base+"stream", cookie).Body.String())
-			for _, endpoint := range []string{"stream.master.m3u8", "stream.fmp4.master.m3u8", "stream.fmp4.aac.master.m3u8", "stream.m3u8/video/0.m4s", "download"} {
-				require.Equal(t, http.StatusNotFound, get(endpoint).Code, endpoint)
-			}
+			require.Equal(t, http.StatusNotFound, get("download").Code)
+			require.Equal(t, http.StatusNotFound, sharedPreviewRequest(handler, http.MethodGet, base+"stream", nil).Code)
+			master := get("stream.master.m3u8?stream_session=guest")
+			require.Equal(t, http.StatusOK, master.Code)
+			require.Contains(t, master.Body.String(), "stream.m3u8/video.m3u8")
+			require.Contains(t, master.Header().Get("Cache-Control"), "no-store")
+			require.NotContains(t, master.Body.String(), "private-name")
+			t.Cleanup(func() { rs.budget.releaseShare(row.ID) })
 			require.Equal(t, static.ReadAll(static.DefaultSceneImage), get("thumbnail").Body.Bytes(), "missing video covers must not start a conversion")
-			mgr.Config.SetBool(config.SharingServeOriginalMedia, false)
-			require.Equal(t, http.StatusNotFound, get("stream").Code)
-			mgr.Config.SetBool(config.SharingServeOriginalMedia, true)
+			// Preserve the library's codec eligibility checks: an unsupported
+			// audio track needs a compatible stream rather than silent playback.
+			vf.AudioCodec = "dts"
+			require.NoError(t, json.Unmarshal(get("").Body.Bytes(), &detail))
+			require.NotEmpty(t, detail.Streams)
+			for _, stream := range detail.Streams {
+				require.NotEqual(t, base+"stream", stream.URL)
+			}
+			require.Equal(t, "original image bytes", get("stream").Body.String(), "original bytes remain available independently of playback compatibility")
 			require.NoError(t, os.WriteFile(vf.Path, []byte("source replaced"), 0o600))
 			require.Equal(t, http.StatusNotFound, get("stream").Code)
+			require.Equal(t, http.StatusNotFound, get("stream.master.m3u8?stream_session=guest").Code)
 		})
 	}
 }
 
 func TestShareOriginalArchiveOnlyServesFrozenGalleryMembers(t *testing.T) {
 	rs, handler, old, _ := shareHTTPFixture(t)
-	mgr := sharedPreviewManager(t, rs)
+	sharedPreviewManager(t, rs)
 	snapshot, err := sharing.Snapshot(old)
 	require.NoError(t, err)
 	f, _, err := rs.service.Resolve(context.Background(), snapshot.Media[0])
@@ -175,7 +183,6 @@ func TestShareOriginalArchiveOnlyServesFrozenGalleryMembers(t *testing.T) {
 	row, secret, err := rs.service.Create(context.Background(), "owner", sharing.Options{Label: "Gallery", ExpiresAt: time.Now().Add(time.Hour), AllowDownload: true}, []sharing.Target{{Kind: "GALLERY", ID: 4}})
 	require.NoError(t, err)
 	cookie := exchangeShareHTTP(t, handler, row, secret)
-	mgr.Config.SetBool(config.SharingServeOriginalMedia, true)
 	base := "/share/" + row.ID + "/media/image-1/"
 	for _, endpoint := range []string{"image", "thumbnail", "download"} {
 		w := sharedPreviewRequest(handler, http.MethodGet, base+endpoint, cookie)
@@ -216,30 +223,4 @@ func TestSharedArchiveReadHonorsCancellation(t *testing.T) {
 	reader := &sharedArchiveReader{ctx: ctx, size: 100}
 	_, err := reader.Read(make([]byte, 1))
 	require.ErrorIs(t, err, context.Canceled)
-}
-
-func TestSharingOriginalConfigurationIsExplicitAndPreservesOmittedOptions(t *testing.T) {
-	c := config.InitializeEmpty()
-	c.SetConfigFile(filepath.Join(t.TempDir(), "config.yml"))
-	r := &mutationResolver{}
-	enabled, disabled := true, false
-	result, err := r.ConfigureSharing(context.Background(), "", &enabled, nil)
-	require.NoError(t, err)
-	require.False(t, result.ServeOriginalMedia, "preview reuse does not opt in to originals")
-	result, err = r.ConfigureSharing(context.Background(), "", nil, &enabled)
-	require.NoError(t, err)
-	require.True(t, result.ServeOriginalMedia)
-	data, err := os.ReadFile(c.GetConfigFile())
-	require.NoError(t, err)
-	require.Contains(t, string(data), "sharing_serve_original_media: true")
-	result, err = r.ConfigureSharing(context.Background(), "", nil, nil)
-	require.NoError(t, err)
-	require.True(t, result.ServeOriginalMedia)
-	_, err = r.ConfigureSharing(context.Background(), "invalid", nil, &disabled)
-	require.Error(t, err)
-	require.True(t, sharingConfiguration().ServeOriginalMedia)
-	result, err = r.ConfigureSharing(context.Background(), "", nil, &disabled)
-	require.NoError(t, err)
-	require.False(t, result.ServeOriginalMedia)
-	require.True(t, result.UseExistingPreviews)
 }

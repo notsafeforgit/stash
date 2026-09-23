@@ -180,11 +180,10 @@ relocating v3 assets or changing their display selection contract.
 
 ## Anonymous sharing
 
-Shares default to separate metadata-stripped JPEG renditions. The instance-wide
-**Previews** and **As-is** delivery modes reuse this manifest and its existing files through
-a share-authorized route, with the same `PreviewImage` rendering component for
-cards, lightbox posters and playback. Each variant request checks the share and
-pinned file as well as the current manifest revision; public responses remain
-`no-store`. Selecting **Stripped** denies those variant URLs. **As-is** also serves
-original images and videos without conversion. See [sharing](sharing.md) for retained
-metadata, fallback behavior and what the original-download control permits in each mode.
+Shares reuse this manifest and its existing files through a share-authorized
+route, with the same `PreviewImage` rendering component for cards, lightbox
+posters and playback. Each variant request checks the share and pinned file as
+well as the current manifest revision; public responses remain `no-store`.
+Original images are served unchanged and videos retain the normal compatibility
+streaming options. Sharing creates no separate image rendition cache and does not
+strip embedded metadata. See [sharing](sharing.md) for access scope and downloads.

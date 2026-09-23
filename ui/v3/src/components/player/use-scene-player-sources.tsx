@@ -44,6 +44,7 @@ import {
   QUALITY_STORAGE_KEY,
   computeInitialResume,
   filterSources,
+  getCompatibilitySource,
   selectScenePlayerSource,
   isDirectStreamSrc,
   startOffsetStrategyFor,
@@ -148,6 +149,7 @@ interface UseScenePlayerSourcesResult {
    *  `<Player.Player>` (z-[5]). */
   freezeFrameCanvas: ReactNode;
   handleSourceChange: (source: PlayerSource) => void;
+  handleMediaError: (event: SyntheticEvent<HTMLVideoElement>) => void;
   handleSeek: (targetTrueTime: number) => void;
   handleSeekPreview: (targetTrueTime: number | null) => void;
   handleSeekBy: (seconds: number) => void;
@@ -453,7 +455,7 @@ export function useScenePlayerSources({
   ]);
 
   const handleSourceChange = useCallback(
-    (source: PlayerSource) => {
+    (source: PlayerSource, automatic = false) => {
       const s = storeRef.current;
       if (!s) {
         return;
@@ -480,7 +482,7 @@ export function useScenePlayerSources({
       // "Direct stream" entry locks in the user's preference even when
       // nothing else changes.
       if (source.src === activeSrc) {
-        if (persistedLabel && !qualityPreference) {
+        if (!automatic && persistedLabel && !qualityPreference) {
           localStorage.setItem(QUALITY_STORAGE_KEY, persistedLabel);
         }
         return;
@@ -489,7 +491,7 @@ export function useScenePlayerSources({
       loadRetryAttemptedRef.current = false;
       setLoadFailed(false);
 
-      if (persistedLabel && !qualityPreference) {
+      if (!automatic && persistedLabel && !qualityPreference) {
         localStorage.setItem(QUALITY_STORAGE_KEY, persistedLabel);
       }
 
@@ -502,12 +504,15 @@ export function useScenePlayerSources({
       // + N and ticks upward past the actual duration.
       const endedAtSwitch = s.state.ended;
       const preview = seekPreview.take();
-      const trueTime =
-        endedAtSwitch && !qualityPreference
+      const trueTime = automatic
+        ? (pendingResumeRef.current?.seekTo ??
+          offsetStart + s.state.currentTime)
+        : endedAtSwitch && !qualityPreference
           ? 0
           : offsetStart + s.state.currentTime;
-      const wasPaused =
-        endedAtSwitch && !qualityPreference
+      const wasPaused = automatic
+        ? (pendingResumeRef.current?.wasPaused ?? s.state.paused)
+        : endedAtSwitch && !qualityPreference
           ? false
           : (preview?.wasPaused ?? s.state.paused);
       const playbackRate = s.state.playbackRate;
@@ -866,6 +871,24 @@ export function useScenePlayerSources({
     },
   });
 
+  const handleMediaError = useCallback(
+    (event: SyntheticEvent<HTMLVideoElement>) => {
+      if (
+        !activeSrc ||
+        !isDirectStreamSrc(activeSrc) ||
+        currentLoadRef.current !== load
+      )
+        return;
+      const code = event.currentTarget.error?.code;
+      // Native codec/container support can be over-reported. Recover only
+      // decoding/format failures, not network errors or expired share access.
+      if (code !== 3 && code !== 4) return;
+      const fallback = getCompatibilitySource(sources);
+      if (fallback) handleSourceChange(fallback, true);
+    },
+    [activeSrc, load, sources, handleSourceChange],
+  );
+
   // Pre-position the `<video>` synchronously inside `loadedmetadata`,
   // before the user agent's internal autoplay path can begin emitting
   // frames. The URL already carries `#t=N` (direct stream) or `?start=N`
@@ -1028,6 +1051,7 @@ export function useScenePlayerSources({
     seekDisplayTarget,
     freezeFrameCanvas,
     handleSourceChange,
+    handleMediaError,
     handleSeek,
     handleSeekPreview,
     handleSeekBy,

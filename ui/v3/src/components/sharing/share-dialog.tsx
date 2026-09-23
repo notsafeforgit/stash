@@ -329,15 +329,12 @@ function ShareForm({
                   />
                   <FieldContent>
                     <FieldLabel htmlFor={`${id}-downloads`}>
-                      {msg(
-                        "sharing.allow_originals",
-                        "Allow original downloads",
-                      )}
+                      {msg("sharing.allow_originals", "Show download button")}
                     </FieldLabel>
                     <FieldDescription>
                       {msg(
                         "sharing.download_description",
-                        "Permit original-file downloads, including embedded metadata. In As-is delivery, originals are already used for viewing; this option only adds a download button. Recipients can always save or record the media shown to them.",
+                        "Show a button to download the original file. Playback may use a compatible video stream, but downloads keep the original format. Recipients can still save media without this button, including original files served for viewing.",
                       )}
                     </FieldDescription>
                   </FieldContent>

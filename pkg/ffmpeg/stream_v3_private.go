@@ -7,16 +7,11 @@ import (
 
 type privateV3StreamKey struct{}
 
-// WithPrivateV3Stream strips source container/track metadata from a guest's
-// rendition and assigns a server-owned encoder session. The request URL keeps
-// the browser's session so generated playlist URLs preserve the same identity.
+// WithPrivateV3Stream assigns a server-owned encoder session to a guest. The
+// request URL keeps the browser's session so generated playlists preserve that
+// identity without exposing or sharing the owner's encoder sessions.
 func WithPrivateV3Stream(ctx context.Context, session string) context.Context {
 	return context.WithValue(ctx, privateV3StreamKey{}, session)
-}
-
-func privateV3Stream(ctx context.Context) bool {
-	_, ok := ctx.Value(privateV3StreamKey{}).(string)
-	return ok
 }
 
 // V3StreamSessionFromRequest resolves the internal encoder identity without
@@ -26,8 +21,4 @@ func V3StreamSessionFromRequest(r *http.Request) (string, error) {
 		return ParseV3StreamSession(session)
 	}
 	return ParseV3StreamSession(r.URL.Query().Get("stream_session"))
-}
-
-func privateV3MetadataArgs() Args {
-	return Args{"-map_metadata", "-1", "-map_metadata:s", "-1", "-map_chapters", "-1"}
 }

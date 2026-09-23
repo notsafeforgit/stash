@@ -35,7 +35,7 @@ async function serveShare(
   video: boolean,
   expiresIn = 3600,
   options?: {
-    originalVideo?: boolean;
+    originalVideo?: "playable" | "unsupported" | "decode-error";
     media?: SharedMedia[];
     entries?: SharedContent["entries"];
   },
@@ -92,16 +92,22 @@ async function serveShare(
           frame_rate: item.video ? 30 : 0,
           streams: item.video
             ? [
+                ...(options?.originalVideo
+                  ? [
+                      {
+                        url: `${base}media/${item.key}/stream`,
+                        mime_type:
+                          options.originalVideo === "unsupported"
+                            ? "application/octet-stream"
+                            : "video/mp4",
+                        label: "Direct stream",
+                      },
+                    ]
+                  : []),
                 {
-                  url: options?.originalVideo
-                    ? `${base}media/${item.key}/stream`
-                    : `${base}media/${item.key}/stream.master.m3u8?resolution=LOW`,
-                  mime_type: options?.originalVideo
-                    ? "video/mp4"
-                    : "application/vnd.apple.mpegurl",
-                  label: options?.originalVideo
-                    ? "Direct stream"
-                    : "HLS Low (240p)",
+                  url: `${base}media/${item.key}/stream.master.m3u8?resolution=LOW`,
+                  mime_type: "application/vnd.apple.mpegurl",
+                  label: "HLS Low (240p)",
                 },
               ]
             : [],
@@ -118,9 +124,12 @@ async function serveShare(
     } else if (endpoint.endsWith("/stream") && options?.originalVideo) {
       await route.fulfill({
         contentType: "video/mp4",
-        body: await readFile(
-          new URL("fixture/media/short.mp4", import.meta.url),
-        ),
+        body:
+          options.originalVideo === "decode-error"
+            ? Buffer.from("original video the browser cannot decode")
+            : await readFile(
+                new URL("fixture/media/short.mp4", import.meta.url),
+              ),
       });
     } else if (endpoint.endsWith("/stream.master.m3u8")) {
       await route.fulfill({
@@ -449,10 +458,12 @@ test("shared cards and lightbox reuse scoped HDR preview catalogs", async ({
   expect(fixture.requests).not.toContain("graphql");
 });
 
-test("As-is shares play original video with the existing player and no encoder requests", async ({
+test("shares prefer playable original video without starting an encoder", async ({
   page,
 }) => {
-  const fixture = await serveShare(page, true, 3600, { originalVideo: true });
+  const fixture = await serveShare(page, true, 3600, {
+    originalVideo: "playable",
+  });
   await page.goto(`${base}#test-capability`);
   await page
     .locator('.entity-card[data-id="scene-1"] [data-entity-card-preview]')
@@ -479,3 +490,45 @@ test("As-is shares play original video with the existing player and no encoder r
     fixture.requests.some((url) => /\.m3u8|\.m4s|streams\./.test(url)),
   ).toBe(false);
 });
+
+for (const originalVideo of ["unsupported", "decode-error"] as const) {
+  test(`shared video handles ${originalVideo} originals and keeps original downloads`, async ({
+    page,
+  }) => {
+    const media = sharedMedia("scene-1", "Shared video");
+    media.download = `${base}media/scene-1/download`;
+    const fixture = await serveShare(page, true, 3600, {
+      originalVideo,
+      media: [media],
+    });
+    await page.goto(`${base}#test-capability`);
+    await page
+      .locator('.entity-card[data-id="scene-1"] [data-entity-card-preview]')
+      .click();
+    const video = page.locator("video");
+    await expect(video).toBeVisible();
+    await expect
+      .poll(() =>
+        video.evaluate((element) =>
+          element instanceof HTMLVideoElement ? element.currentTime : 0,
+        ),
+      )
+      .toBeGreaterThan(0.1);
+    expect(fixture.requests.some((url) => url.endsWith(".m4s"))).toBe(true);
+    expect(fixture.requests.includes("media/scene-1/stream")).toBe(
+      originalVideo === "decode-error",
+    );
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".yarl__portal")).toHaveCount(0);
+    await page
+      .getByRole("link", { name: "Shared video", exact: true })
+      .press("Enter");
+    await expect(
+      page.getByRole("link", { name: "Download original" }),
+    ).toHaveAttribute("href", media.download);
+    // Automatic compatibility recovery must not change the user's quality preference.
+    expect(
+      await page.evaluate(() => localStorage.getItem("stash-player-quality")),
+    ).toBeNull();
+  });
+}

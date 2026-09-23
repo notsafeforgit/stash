@@ -84,22 +84,16 @@ func (r *queryResolver) SharingConfiguration(ctx context.Context) (*SharingConfi
 
 func sharingConfiguration() *SharingConfiguration {
 	c := config.GetInstance()
-	return &SharingConfiguration{PublicURL: c.GetSharingPublicURL(), UseExistingPreviews: c.GetSharingUseExistingPreviews(), ServeOriginalMedia: c.GetSharingServeOriginalMedia(), MaxItems: sharing.MaxItems, MaxDays: 30}
+	return &SharingConfiguration{PublicURL: c.GetSharingPublicURL(), MaxItems: sharing.MaxItems, MaxDays: 30}
 }
 
-func (r *mutationResolver) ConfigureSharing(ctx context.Context, publicURL string, useExistingPreviews *bool, serveOriginalMedia *bool) (*SharingConfiguration, error) {
+func (r *mutationResolver) ConfigureSharing(ctx context.Context, publicURL string) (*SharingConfiguration, error) {
 	publicURL = strings.TrimRight(strings.TrimSpace(publicURL), "/")
 	if err := config.ValidateSharingPublicURL(publicURL); err != nil {
 		return nil, err
 	}
 	c := config.GetInstance()
 	c.SetString(config.SharingPublicURL, publicURL)
-	if useExistingPreviews != nil {
-		c.SetBool(config.SharingUseExistingPreviews, *useExistingPreviews)
-	}
-	if serveOriginalMedia != nil {
-		c.SetBool(config.SharingServeOriginalMedia, *serveOriginalMedia)
-	}
 	if err := c.Write(); err != nil {
 		return nil, err
 	}

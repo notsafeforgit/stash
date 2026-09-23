@@ -18,8 +18,6 @@ test("share target search uses library titles, filenames and gallery folders", a
         sharingConfiguration: {
           __typename: "SharingConfiguration",
           public_url: "https://shares.test/share",
-          use_existing_previews: false,
-          serve_original_media: false,
           max_days: 30,
           max_items: 2000,
         },
@@ -188,8 +186,6 @@ for (const viewport of [
           sharingConfiguration: {
             __typename: "SharingConfiguration",
             public_url: "https://shares.test/share",
-            use_existing_previews: false,
-            serve_original_media: false,
             max_days: 30,
             max_items: 2000,
           },
@@ -421,14 +417,12 @@ for (const viewport of [
   });
 }
 
-test("persists all media delivery modes without silently enabling originals", async ({
+test("persists the public share address without delivery controls", async ({
   page,
 }) => {
   let configuration: GQL.MediaSharesQuery["sharingConfiguration"] = {
     __typename: "SharingConfiguration",
     public_url: "https://shares.test/share",
-    use_existing_previews: false,
-    serve_original_media: false,
     max_days: 30,
     max_items: 2000,
   };
@@ -447,8 +441,6 @@ test("persists all media delivery modes without silently enabling originals", as
       const variables = z
         .object({
           public_url: z.string(),
-          use_existing_previews: z.boolean(),
-          serve_original_media: z.boolean(),
         })
         .parse(request.variables);
       updates.push(variables);
@@ -461,51 +453,21 @@ test("persists all media delivery modes without silently enabling originals", as
   });
   await page.goto("/share-management.html");
   const save = page.getByRole("button", { name: "Save", exact: true });
-  const stripped = page.getByRole("button", { name: "Stripped", exact: true });
-  const previews = page.getByRole("button", { name: "Previews", exact: true });
-  const originals = page.getByRole("button", { name: "As-is", exact: true });
-  await expect(stripped).toHaveAttribute("aria-pressed", "true");
-  await expect(save).toBeDisabled();
-  await previews.click();
-  await save.click();
-  await expect
-    .poll(() => updates.at(-1))
-    .toEqual({
-      public_url: "https://shares.test/share",
-      use_existing_previews: true,
-      serve_original_media: false,
-    });
-  await expect(save).toBeDisabled();
-  await page.reload();
-  await expect(previews).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByText(/Embedded metadata is retained/)).toBeVisible();
-  await originals.click();
+  const address = page.getByRole("textbox", { name: "Public share address" });
   await expect(
-    page.getByText(/Recipients can save originals even without/),
-  ).toBeVisible();
+    page.getByRole("group", { name: "Media delivery", exact: true }),
+  ).toHaveCount(0);
+  await expect(save).toBeDisabled();
+  await address.fill("https://other.test/share");
   await save.click();
   await expect
-    .poll(() => updates.at(-1))
-    .toEqual({
-      public_url: "https://shares.test/share",
-      use_existing_previews: true,
-      serve_original_media: true,
-    });
+    .poll(() => updates)
+    .toEqual([{ public_url: "https://other.test/share" }]);
   await expect(save).toBeDisabled();
   await page.reload();
-  await expect(originals).toHaveAttribute("aria-pressed", "true");
+  await expect(address).toHaveValue("https://other.test/share");
   await page.setViewportSize({ width: 320, height: 700 });
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth),
   ).toBeLessThanOrEqual(320);
-  await stripped.click();
-  await save.click();
-  await expect
-    .poll(() => updates.at(-1))
-    .toEqual({
-      public_url: "https://shares.test/share",
-      use_existing_previews: false,
-      serve_original_media: false,
-    });
-  await expect(save).toBeDisabled();
 });

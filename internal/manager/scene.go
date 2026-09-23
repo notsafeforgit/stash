@@ -111,6 +111,10 @@ func GetVideoFileContainer(file *models.VideoFile) (ffmpeg.Container, error) {
 // GetV3SceneStreamPaths returns the direct and segmented stream catalog used
 // exclusively by the v3 player.
 func GetV3SceneStreamPaths(scene *models.Scene, directStreamURL *url.URL, maxStreamingTranscodeSize models.StreamingResolutionEnum) ([]*SceneStreamEndpoint, error) {
+	return getV3SceneStreamPaths(scene, directStreamURL, maxStreamingTranscodeSize, true)
+}
+
+func getV3SceneStreamPaths(scene *models.Scene, directStreamURL *url.URL, maxStreamingTranscodeSize models.StreamingResolutionEnum, allowGeneratedTranscode bool) ([]*SceneStreamEndpoint, error) {
 	if scene == nil {
 		return nil, fmt.Errorf("nil scene")
 	}
@@ -190,7 +194,7 @@ func GetV3SceneStreamPaths(scene *models.Scene, directStreamURL *url.URL, maxStr
 	// don't care if we can't get the container
 	container, _ := GetVideoFileContainer(pf)
 
-	hasTranscode := HasTranscode(scene, config.GetInstance().GetVideoFileNamingAlgorithm())
+	hasTranscode := allowGeneratedTranscode && HasTranscode(scene, config.GetInstance().GetVideoFileNamingAlgorithm())
 	if hasTranscode || ffmpeg.IsValidAudioForContainer(audioCodec, container) {
 		actualDirectType := directEndpointType
 		if !hasTranscode {

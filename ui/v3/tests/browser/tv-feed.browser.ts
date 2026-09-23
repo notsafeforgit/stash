@@ -14,15 +14,14 @@ async function next(page: Page) {
   });
   await page.keyboard.press("ArrowDown");
 }
-async function choose(page: Page, label: "Scenes" | "Markers") {
-  await page.getByRole("button", { name: "Feed", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Feed", exact: true });
-  await expectTouchTargets(dialog);
-  await expect(
-    dialog.getByRole("button", { name: "Both", exact: true }),
-  ).toHaveCount(0);
-  await dialog.getByRole("button", { name: label, exact: true }).click();
-  await expect(dialog).toBeHidden();
+async function choose(page: Page, label: "Scenes" | "Markers", touch = false) {
+  const toggle = page.getByRole("button", {
+    name: label === "Scenes" ? "Switch to scenes" : "Switch to markers",
+    exact: true,
+  });
+  if (touch) await toggle.tap();
+  else await toggle.click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 }
 
 test.beforeEach(async ({ page }) => {
@@ -45,14 +44,32 @@ for (const mobile of [true, false]) {
       await ready(page, /scene:1$/);
       await next(page);
       await ready(page, /scene:2$/);
+      await expectTouchTargets(
+        page.getByRole("complementary", { name: "TV actions" }),
+      );
+      await expect(
+        page.getByRole("button", { name: "Switch to markers", exact: true }),
+      ).toHaveAccessibleDescription("Current feed: Scenes");
       await page.locator("video").evaluate((video: HTMLVideoElement) => {
         window.tvFixtureVideo = video;
+        video.currentTime = 2;
       });
-      await choose(page, "Markers");
+      await expect(page.locator("video")).toHaveJSProperty("seeking", false);
+      await choose(page, "Markers", mobile);
       await expect(page).toHaveURL(/mode=markers/);
       await ready(page, /marker:\d+$/);
-      await choose(page, "Scenes");
+      await expect(
+        page.getByRole("button", { name: "Switch to scenes", exact: true }),
+      ).toHaveAccessibleDescription("Current feed: Markers");
+      await choose(page, "Scenes", mobile);
       await ready(page, /scene:2$/);
+      await expect
+        .poll(() =>
+          page
+            .locator("video")
+            .evaluate((video: HTMLVideoElement) => video.currentTime),
+        )
+        .toBeCloseTo(2, 1);
       await expect(page.locator("video")).toHaveCount(1);
       expect(
         await page
@@ -66,9 +83,10 @@ for (const mobile of [true, false]) {
   });
 }
 
-test("adds and pins Feed through the existing rail editor and saves Markers as a default", async ({
+test("pins Feed, saves the default, and switches directly with reduced motion", async ({
   page,
 }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/tv-fixture/settings/tv?paused");
   await page.getByRole("combobox", { name: "New action", exact: true }).click();
   await page.getByRole("option", { name: "Feed", exact: true }).click();
@@ -100,15 +118,21 @@ test("adds and pins Feed through the existing rail editor and saves Markers as a
     });
   await page.getByRole("link", { name: "Return to TV", exact: true }).click();
   await ready(page, /marker:\d+$/);
-  await page
+  const toggle = page
     .locator("[data-tv-dock]")
-    .getByRole("button", { name: "Feed", exact: true })
-    .click();
+    .getByRole("button", { name: "Switch to scenes", exact: true });
+  await expect(toggle).toHaveAccessibleDescription("Current feed: Markers");
+  await expect(toggle.locator("svg.lucide-bookmark")).toBeVisible();
+  await toggle.click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await ready(page, /scene:1$/);
+  await expect(page.locator("[data-tv] [data-content-reveal]")).toBeHidden();
   await expect(
     page
-      .getByRole("dialog")
-      .getByRole("button", { name: "Markers", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
+      .locator("[data-tv-dock]")
+      .getByRole("button", { name: "Switch to markers", exact: true })
+      .locator("svg.lucide-list-video"),
+  ).toBeVisible();
 });
 
 test("can switch away from an empty scene feed", async ({ page }) => {

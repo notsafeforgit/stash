@@ -32,6 +32,10 @@ import {
 } from "@/components/ui/empty";
 import { OverlayContainerProvider } from "@/components/ui/overlay-container";
 import { useMobileNavigation } from "@/components/layout/mobile-navigation";
+import {
+  ContentReveal,
+  useContentReveal,
+} from "@/components/layout/content-reveal";
 import { useConfigurationContext } from "@/hooks/config";
 import { useTvSettings } from "@/hooks/use-tv-settings";
 import { useMsg } from "@/hooks/message";
@@ -45,7 +49,7 @@ import { TvNavigationButton } from "./tv-navigation-button";
 import { TvRotationProvider } from "./tv-slider";
 import { useScenePlayerValue } from "@/components/player/scene-player-controls";
 import { useTvMediaWindow } from "./use-tv-media-window";
-import { TvFeedMenu } from "./tv-feed-menu";
+import { tvFeedSwitchLabels } from "./tv-action-labels";
 
 function TvMediaReady({ onReady }: { onReady: (ready: boolean) => void }) {
   const ready = useScenePlayerValue("ready");
@@ -126,6 +130,7 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
   );
   const active = snapshot.items[snapshot.selected];
   const strip = useRef<HTMLDivElement>(null);
+  const feedReveal = useContentReveal(query.mode, "focused-view");
   const router = useRouter();
   const navigate = useNavigate();
   const {
@@ -160,7 +165,6 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
   };
   const [leaving, setLeaving] = useState(false);
   const [interactionBlocked, setInteractionBlocked] = useState(false);
-  const [feedMenuOpen, setFeedMenuOpen] = useState(false);
   const [completion, setCompletion] = useState(settings.completion);
   const selection = useTvNavigation(
     strip,
@@ -297,6 +301,15 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
       },
     });
   };
+  const toggleFeed = () => {
+    selection.cancel();
+    // Filters and item deep links belong to the old source. Each destination
+    // reuses its configured filter, cached selection and playback position.
+    void navigate({
+      to: "/tv",
+      search: { mode: query.mode === "scenes" ? "markers" : "scenes", seed },
+    });
+  };
   const msg = useMsg();
   const range = planReady ? plan.range : { start: 0, end: 0 };
   return (
@@ -400,8 +413,8 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
                             fullscreen={presentationMode === "fullscreen"}
                             exitPresentation={exitPresentation}
                             openNavigation={openNavigation}
-                            openFeedMenu={() => setFeedMenuOpen(true)}
-                            feedMenuOpen={feedMenuOpen}
+                            toggleFeed={toggleFeed}
+                            feedMode={query.mode}
                             navigateItem={selection.move}
                             drag={selection.drag}
                             cancelDrag={selection.cancel}
@@ -478,14 +491,8 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
                     </EmptyDescription>
                   </EmptyHeader>
                   <EmptyContent>
-                    <Button
-                      variant="outline"
-                      onClick={() => setFeedMenuOpen(true)}
-                    >
-                      <FormattedMessage
-                        id="tv.action.feed"
-                        defaultMessage="Feed"
-                      />
+                    <Button variant="outline" onClick={toggleFeed}>
+                      <FormattedMessage {...tvFeedSwitchLabels[query.mode]} />
                     </Button>
                     {snapshot.status === "loading" || loading ? (
                       <Spinner />
@@ -526,19 +533,7 @@ export function TvPage({ query, settings, seed, search }: TvPageProps) {
                 </Empty>
               </div>
             )}
-            <TvFeedMenu
-              mode={query.mode}
-              open={feedMenuOpen}
-              onOpenChange={setFeedMenuOpen}
-              onChange={(mode) => {
-                setFeedMenuOpen(false);
-                if (mode !== query.mode) {
-                  // Filters and item deep links belong to the old source.
-                  // Each destination reuses its configured filter and cache.
-                  void navigate({ to: "/tv", search: { mode, seed } });
-                }
-              }}
-            />
+            <ContentReveal ref={feedReveal} tone="media" />
             <div
               ref={presentationPortals}
               className="absolute inset-0 pointer-events-none [&>*]:pointer-events-auto"

@@ -43,7 +43,7 @@ import {
   type TvActionKind,
   type TvRailEntry,
 } from "@/core/tv/action-config";
-import type { TvRotation, TvSettings } from "@/core/tv/settings";
+import type { TvMode, TvRotation, TvSettings } from "@/core/tv/settings";
 import type { TvFeedItem, TvFeedSnapshot } from "@/core/tv/feed-state";
 import type { PlaybackRange } from "@/core/marker-range";
 import { useMsg } from "@/hooks/message";
@@ -52,6 +52,8 @@ import {
   tvActionIcon,
   tvActionLabels,
   tvCustomIcons,
+  tvFeedSwitchLabels,
+  tvModeLabels,
 } from "./tv-action-labels";
 import { TvTimeline } from "./tv-timeline";
 import { TvNavigationButton } from "./tv-navigation-button";
@@ -101,6 +103,7 @@ function RailEntry({
   counterEntry,
   infoVisible,
   leftHanded,
+  feedMode,
 }: {
   entry: TvRailEntry;
   run: (action: TvAction, anchor?: TvCounterAnchor) => void;
@@ -112,6 +115,7 @@ function RailEntry({
   counterEntry: string | null;
   infoVisible: boolean;
   leftHanded: boolean;
+  feedMode: TvMode;
 }) {
   const msg = useMsg();
   const intl = useIntl();
@@ -125,8 +129,19 @@ function RailEntry({
     },
     { count },
   );
+  const feedDescription = intl.formatMessage(
+    { id: "tv.feed.current", defaultMessage: "Current feed: {mode}" },
+    { mode: intl.formatMessage(tvModeLabels[feedMode]) },
+  );
+  const actionLabel = (action: TvAction) =>
+    action.label ||
+    (action.kind === "feed"
+      ? intl.formatMessage(tvFeedSwitchLabels[feedMode])
+      : action.kind === "fullscreen" && fullscreen
+        ? msg("tv.text.exit_fullscreen", "Exit fullscreen")
+        : msg(`tv.action.${action.kind}`, tvActionLabels[action.kind]));
   if (entry.type === "action") {
-    const Icon = tvActionIcon(entry.action);
+    const Icon = tvActionIcon(entry.action, feedMode);
     return (
       <TvIconButton
         className="relative"
@@ -135,17 +150,16 @@ function RailEntry({
           entry.action.kind === "counter" ? counterEntry === id : undefined
         }
         aria-description={
-          entry.action.kind === "counter" ? countDescription : undefined
+          entry.action.kind === "counter"
+            ? countDescription
+            : entry.action.kind === "feed"
+              ? feedDescription
+              : undefined
         }
         aria-pressed={entry.action.kind === "info" ? infoVisible : undefined}
-        aria-label={
-          entry.action.label ||
-          (entry.action.kind === "fullscreen" && fullscreen
-            ? msg("tv.text.exit_fullscreen", "Exit fullscreen")
-            : msg(
-                `tv.action.${entry.action.kind}`,
-                tvActionLabels[entry.action.kind],
-              ))
+        aria-label={actionLabel(entry.action)}
+        title={
+          entry.action.kind === "feed" ? actionLabel(entry.action) : undefined
         }
         disabled={
           busy &&
@@ -183,14 +197,18 @@ function RailEntry({
       >
         <DropdownMenuGroup>
           {entry.actions.map((action) => {
-            const Icon = tvActionIcon(action);
+            const Icon = tvActionIcon(action, feedMode);
             return (
               <DropdownMenuItem
                 key={action.id}
                 disabled={busy}
                 className="min-h-11"
                 aria-description={
-                  action.kind === "counter" ? countDescription : undefined
+                  action.kind === "counter"
+                    ? countDescription
+                    : action.kind === "feed"
+                      ? feedDescription
+                      : undefined
                 }
                 onClick={() => {
                   setFolder(null);
@@ -203,13 +221,7 @@ function RailEntry({
                 }}
               >
                 <Icon />
-                {action.label ||
-                  (action.kind === "fullscreen" && fullscreen
-                    ? msg("tv.text.exit_fullscreen", "Exit fullscreen")
-                    : msg(
-                        `tv.action.${action.kind}`,
-                        tvActionLabels[action.kind],
-                      ))}
+                {actionLabel(action)}
                 {action.kind === "counter" && <TvCounterBadge count={count} />}
               </DropdownMenuItem>
             );
@@ -292,8 +304,8 @@ export function TvControls({
   fullscreen,
   exitPresentation,
   openNavigation,
-  openFeedMenu,
-  feedMenuOpen,
+  toggleFeed,
+  feedMode,
   navigateItem,
   drag,
   cancelDrag,
@@ -320,8 +332,8 @@ export function TvControls({
   fullscreen: boolean;
   exitPresentation: () => void;
   openNavigation: () => void;
-  openFeedMenu: () => void;
-  feedMenuOpen: boolean;
+  toggleFeed: () => void;
+  feedMode: TvMode;
   navigateItem: (direction: -1 | 1) => void;
   drag: (offset: number) => void;
   cancelDrag: () => void;
@@ -348,19 +360,10 @@ export function TvControls({
   const mutations = useTvMutations(changed);
   useLayoutEffect(() => {
     onInteractionBlockedChange(
-      panel.kind !== "closed" ||
-        folder !== null ||
-        mutations.busy ||
-        feedMenuOpen,
+      panel.kind !== "closed" || folder !== null || mutations.busy,
     );
     return () => onInteractionBlockedChange(false);
-  }, [
-    panel.kind,
-    folder,
-    mutations.busy,
-    feedMenuOpen,
-    onInteractionBlockedChange,
-  ]);
+  }, [panel.kind, folder, mutations.busy, onInteractionBlockedChange]);
   const latest = useCommittedRef({ remember, item, leaving });
   useEffect(() => {
     const save = () => {
@@ -388,7 +391,7 @@ export function TvControls({
     switch (action.kind) {
       case "feed":
         setFolder(null);
-        openFeedMenu();
+        toggleFeed();
         return;
       case "info":
         setInfoVisible((value) => !value);
@@ -459,11 +462,7 @@ export function TvControls({
     selectionKey: item.key,
     rotation,
     blocked:
-      panel.kind !== "closed" ||
-      folder !== null ||
-      mutations.busy ||
-      leaving ||
-      feedMenuOpen,
+      panel.kind !== "closed" || folder !== null || mutations.busy || leaving,
     drag,
     cancelDrag,
     dispatch: (command) => {
@@ -514,6 +513,7 @@ export function TvControls({
       counterEntry={panel.kind === "counter" ? panel.anchor.entryId : null}
       infoVisible={infoVisible}
       leftHanded={settings.leftHanded}
+      feedMode={feedMode}
     />
   );
   return (

@@ -2738,7 +2738,9 @@
     "cast": "Cast",
     "timeline_markers": "Scene markers",
     "feed": {
-      "description": "Switch between scenes and markers for this viewing session."
+      "current": "Current feed: {mode}",
+      "switch_to_markers": "Switch to markers",
+      "switch_to_scenes": "Switch to scenes"
     }
   },
   "marker_save_failed": "The marker could not be saved",

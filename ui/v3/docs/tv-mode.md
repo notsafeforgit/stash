@@ -95,8 +95,10 @@ tag/performer labels wrap without horizontal overflow.
 ## Actions and settings
 
 Add the optional **Feed** action in **Settings → TV → Action rail** to switch
-between **Scenes** and **Markers** while watching. It can be pinned
-or placed in a folder. The choice applies to the current viewing URL; the saved
+between **Scenes** and **Markers** with one tap while watching. Its icon shows
+the current feed, and its label names the destination. Switching uses a brief
+fade that respects reduced motion. It can be pinned or placed in a folder.
+The choice applies to the current viewing URL; the saved
 default changes only in settings. Returning to a recent feed restores its
 selection and playback position. Switching clears source-specific URL filters
 and item links and uses the destination's configured filters. A sort unavailable

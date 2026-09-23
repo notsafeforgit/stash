@@ -15,7 +15,7 @@ import {
   formatSortOptions,
 } from "@/models/list-filter/labels";
 import { tvSortOptions } from "@/core/tv/feed-query";
-import { tvModeLabels } from "./tv-feed-menu";
+import { tvModeLabels } from "./tv-action-labels";
 import { TvFilterSelect } from "@/components/tv/tv-filter-select";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";

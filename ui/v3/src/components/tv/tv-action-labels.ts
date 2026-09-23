@@ -28,7 +28,24 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { TvAction, TvActionKind } from "@/core/tv/action-config";
+import type { TvMode } from "@/core/tv/settings";
 import type { MessageDescriptor } from "react-intl";
+
+export const tvModeLabels = {
+  scenes: { id: "tv.text.scenes", defaultMessage: "Scenes" },
+  markers: { id: "tv.text.markers", defaultMessage: "Markers" },
+} satisfies Record<TvMode, MessageDescriptor>;
+
+export const tvFeedSwitchLabels = {
+  scenes: {
+    id: "tv.feed.switch_to_markers",
+    defaultMessage: "Switch to markers",
+  },
+  markers: {
+    id: "tv.feed.switch_to_scenes",
+    defaultMessage: "Switch to scenes",
+  },
+} satisfies Record<TvMode, MessageDescriptor>;
 
 export const tvIconLabels = {
   default: { id: "tv.icon.default", defaultMessage: "Default" },
@@ -99,8 +116,8 @@ export const tvCustomIcons = {
   check: Check,
   plus: Plus,
 } satisfies Record<TvAction["icon"], LucideIcon>;
-export function tvActionIcon(action: TvAction): LucideIcon {
-  return action.icon === "default"
-    ? icons[action.kind]
-    : tvCustomIcons[action.icon];
+export function tvActionIcon(action: TvAction, feedMode?: TvMode): LucideIcon {
+  if (action.icon !== "default") return tvCustomIcons[action.icon];
+  if (action.kind === "feed" && feedMode === "markers") return Bookmark;
+  return icons[action.kind];
 }

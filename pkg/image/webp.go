@@ -10,6 +10,11 @@ const (
 )
 
 // https://developers.google.com/speed/webp/docs/riff_container
+// IsAnimatedWebP only needs the first 48 bytes of the file.
+func IsAnimatedWebP(buf []byte) bool {
+	return isWebPAnimated(buf)
+}
+
 func isWebPAnimated(buf []byte) bool {
 	const (
 		webPHeaderStart = 8

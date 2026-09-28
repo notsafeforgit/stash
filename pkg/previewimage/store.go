@@ -51,6 +51,16 @@ func CoverKey(checksum string) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprintf("%d\x00cover\x00%s", RecipeVersion, checksum))))
 }
 
+// ImageKey follows the primary image's content checksum, including images in
+// archives. Reading the catalog never probes or opens the original media.
+func ImageKey(checksum string) string {
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprintf("%d\x00image\x00%s", RecipeVersion, checksum))))
+}
+
+func (s Store) ImageDirectory(imageID int) string {
+	return filepath.Join(s.Root, "images", strconv.Itoa(RecipeVersion), strconv.Itoa(imageID))
+}
+
 // LegacyCoverTimestamp recovers the selection from the original v1 manifest
 // only when both its source fingerprint and cover checksum still match. It
 // deliberately ignores missing renditions and the current encoding recipe:
@@ -83,7 +93,7 @@ func (s Store) SceneDirectory(sceneID int) string {
 }
 
 func (s Store) directory(sceneID int, kind, revision string) (string, error) {
-	if sceneID <= 0 || (kind != "cover" && kind != "marker") || len(revision) != 64 {
+	if sceneID <= 0 || (kind != "cover" && kind != "marker" && kind != "image") || len(revision) != 64 {
 		return "", fmt.Errorf("invalid preview image identity")
 	}
 	for _, c := range revision {
@@ -91,7 +101,11 @@ func (s Store) directory(sceneID int, kind, revision string) (string, error) {
 			return "", fmt.Errorf("invalid preview image revision")
 		}
 	}
-	return filepath.Join(s.SceneDirectory(sceneID), kind, revision), nil
+	parent := s.SceneDirectory(sceneID)
+	if kind == "image" {
+		parent = s.ImageDirectory(sceneID)
+	}
+	return filepath.Join(parent, kind, revision), nil
 }
 
 func (s Store) Load(sceneID int, kind, revision string) (*Manifest, error) {
@@ -162,11 +176,14 @@ func (s Store) Publish(sceneID int, kind, revision string, at float64, result *R
 	if err != nil {
 		return err
 	}
+	lock := publicationLock(dir)
+	lock.Lock()
+	defer lock.Unlock()
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
 	manifest := Manifest{Version: RecipeVersion, Key: revision, At: at,
-		Variants: append([]Variant(nil), result.Variants...), Thumbnail: append([]Variant(nil), result.Thumbnail...)}
+		Variants: avifRenditions(result.Variants), Thumbnail: avifRenditions(result.Thumbnail)}
 	for _, variants := range [][]Variant{manifest.Variants, manifest.Thumbnail} {
 		if variants == nil {
 			continue
@@ -188,7 +205,7 @@ func (s Store) Publish(sceneID int, kind, revision string, at float64, result *R
 				return err
 			}
 			variants[i].File = name
-			hasFallback = hasFallback || v.MIMEType == "image/jpeg"
+			hasFallback = hasFallback || v.DynamicRange != HDR
 		}
 		if !hasFallback {
 			return fmt.Errorf("preview image requires an SDR fallback")
@@ -197,19 +214,7 @@ func (s Store) Publish(sceneID int, kind, revision string, at float64, result *R
 	if len(manifest.Variants) == 0 {
 		return fmt.Errorf("preview image requires full-size renditions")
 	}
-	data, err := json.Marshal(manifest)
-	if err != nil {
-		return err
-	}
-	manifest.Revision = fmt.Sprintf("%x", sha256.Sum256(data))
-	data, err = json.Marshal(manifest)
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(filepath.Join(result.Directory, "manifest.json"), data, 0644); err != nil {
-		return err
-	}
-	return os.Rename(filepath.Join(result.Directory, "manifest.json"), filepath.Join(dir, "manifest.json"))
+	return writeManifest(dir, manifest)
 }
 
 // File resolves only names present in a validated manifest, never arbitrary

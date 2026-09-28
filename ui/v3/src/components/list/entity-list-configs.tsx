@@ -443,6 +443,7 @@ export function useImageListConfig(
       thumbnailColumn<ImageItem>(
         (img) => img.paths.thumbnail,
         (img) => entityDestination.image(img.id),
+        (img) => img.preview_image,
       ),
       titleColumn<ImageItem>({
         id: "title",

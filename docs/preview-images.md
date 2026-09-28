@@ -1,10 +1,12 @@
 # V3 preview images
 
-V3 scene covers and marker stills use a shared image pipeline. HDR10/PQ and HLG
+V3 scene covers, marker stills and image thumbnails use a shared image pipeline. HDR10/PQ and HLG
 sources produce 10-bit AVIF, preferably with an SDR base and an HDR gain map.
-The same source frame also produces a tone-mapped sRGB JPEG. SDR sources produce
-SDR AVIF and JPEG. A 10-bit source is not considered HDR unless its transfer
-function identifies it as HDR.
+The v3 rendition cache stores AVIF only: one adaptive AVIF, or separate HDR and
+tone-mapped SDR AVIFs when gain-map encoding is unavailable. SDR sources produce
+one SDR AVIF. A 10-bit source is not considered HDR unless its transfer function
+identifies it as HDR. Temporary SDR JPEGs supply the existing compatibility
+paths; they are not duplicated in the v3 cache.
 
 Scene **Details** shows the primary file's dynamic range. **File Info** shows it
 for each file, alongside bit depth, transfer, primaries, colour space and range.
@@ -18,15 +20,33 @@ and the player poster consume the additive `preview_image` GraphQL field through
 or in a decoder without gain-map support. Supporting HDR decoders reconstruct
 the HDR rendition according to available display headroom. Plain HDR AVIF is
 offered only under `(dynamic-range: high)`; other displays receive the separately
-tone-mapped JPEG. Browsers without AVIF support select JPEG automatically. A
-failed rendition falls back to JPEG and then to the existing screenshot URL.
+tone-mapped SDR AVIF. A failed rendition retries the catalog's SDR fallback,
+then the existing legacy image URL. Old catalogs with JPEG fallbacks remain
+readable. Browsers without AVIF support reach the legacy URL through this error
+fallback; hardware AV1 decoding is not required for software AVIF decoding.
 
 New scene cover generations also store card thumbnails bounded to **1280 pixels
 on the longest edge**, without upscaling. They use the same AVIF/HDR policy and
-have their own SDR JPEG fallback. Cards (including wall views and blurred
+carry an SDR base or separate SDR AVIF. Cards (including wall views and blurred
 backgrounds) and table cells prefer `preview_image.thumbnail`; detail views,
 lightboxes and player posters retain the full-size rendition. Older manifests
 without thumbnails remain readable and fall back to their existing covers.
+
+Image thumbnails are bounded to **640 pixels on the longest edge**, without
+upscaling. Image cards, wall views, tables, duplicate comparison, gallery covers
+and shared-image cards use `Image.preview_image` with the same renderer and
+AVIF selection policy. Full image views and downloads still use the original.
+The legacy `paths.thumbnail` URL remains a JPEG for older clients; it is the
+SDR compatibility output produced alongside the AVIF, not the HDR rendition.
+
+Native PQ/HLG stills and HDR image clips enter the shared high-bit-depth encoder.
+Gain-map JPEGs (Ultra HDR) and AVIFs reconstruct both their SDR and HDR images
+before resizing; decoding only their base would discard HDR. AVIF crop,
+rotation and mirroring are applied before creating the thumbnail. Ordinary
+SDR photos retain libvips EXIF and ICC processing when it is installed, with
+FFmpeg as the existing fallback decoder. GIFs, animated WebP, APNG and other
+detected image sequences retain their original animation. Images inside ZIP
+galleries are staged temporarily for decoders that require a seekable file.
 
 ## Generation and requirements
 
@@ -85,6 +105,14 @@ Generating missing marker screenshots also backfills their v3 renditions because
 marker timestamps are known. Regenerating with overwrite can upgrade a plain
 AVIF after gain-map tooling is installed.
 
+For existing images, run **Generate → Image thumbnails** with v3 enabled.
+A missing rendition manifest triggers backfill even if the old JPEG exists or
+the original is already smaller than 640 pixels. **Overwrite existing** also
+replaces current renditions. Scan-time thumbnail generation and missing-cache
+requests with thumbnail persistence enabled use the same pipeline. Failed
+replacements retain existing renditions; image failures are logged by ID and
+included in the generation job's final error summary.
+
 The encoder uses FFmpeg with PNG support and `zscale`/`tonemap` for HDR.
 `avifenc` encodes plain AVIF, with FFmpeg's `libaom-av1` and AVIF muxer as a
 fallback. `avifgainmaputil` from libavif 1.2 or later, available on `PATH`, enables
@@ -92,9 +120,19 @@ adaptive AVIF. Runtime images need `libavif-apps` on Alpine or `libavif-bin` on
 Debian, including the separate stash-s6 wrapper, which copies only the Stash
 binary. Jellyfin FFmpeg does not need its own libaom encoder when these tools
 are installed. If gain-map encoding fails or is unavailable, the encoder tries
-plain AVIF. If AVIF encoding fails, the completed SDR JPEG
-remains usable. Failure of frame extraction falls back to the legacy generator
-and is logged; HDR colour fidelity then depends on the legacy path.
+plain AVIF, with a separate SDR AVIF for HDR sources. If all AVIF encoders fail,
+no replacement v3 catalog is published. Scene/marker compatibility adapters can
+fall back to the legacy generator and log the failure; HDR colour fidelity then
+depends on the legacy path.
+
+AVIF image input additionally requires `avifdec`. Gain-map JPEG/AVIF input
+requires `avifgainmaputil` to reconstruct HDR. Image generation reports a failure
+if these decoders or all AVIF encoders are unavailable, instead of publishing a
+JPEG-only replacement and reporting success. The runtime packages above provide
+these tools, but distro builds can omit JPEG gain-map conversion. The published
+images and stash-s6 wrapper build libavif 1.4.2 tools with libxml2 enabled and
+smoke-test HDR JPEG conversion and tone mapping during the image build.
+Installing tools alone does not change already-generated artwork.
 
 HDR frames are decoded once and split before tone mapping. Both renditions stay
 in floating point / 16-bit RGB intermediates until final encoding. HLG is
@@ -122,6 +160,16 @@ artwork remains visible when its source video changes or disappears. Marker
 keys continue to include source path, size, modification time and the exact
 fractional timestamp. Original path-based cover entries remain readable.
 Replacing the cover itself invalidates its previous renditions.
+
+Image thumbnails use the separate
+`generated/preview_images/images/<recipe>/<image-id>/image/<source-key>/`
+namespace, keyed by the image's primary-file checksum. Image and scene IDs cannot
+collide. Catalog reads inspect only the generated manifest, never the source;
+offline originals retain their cached thumbnails. Image deletion and generated
+image-thumbnail cleanup include this namespace, preserving current, recent and
+offline-source entries during cleanup, while removing redundant JPEGs from
+eligible current entries as described below. Shared rendition URLs remain scoped to
+the grant and its pinned file, with the same authorization as the original image.
 
 Fork migration 7 adds `fork_scene_cover_sources`, independently of upstream's
 schema version. It stores the cover checksum, historical source file ID, exact
@@ -163,6 +211,18 @@ shared v3 renderer also accepts legacy-only artwork while libraries transition.
 Deleting generated scene files includes the new store. Generated-file cleanup
 removes obsolete cover/marker entries with the matching category, retaining
 recent generations and entries whose source is temporarily offline.
+
+After upgrading, **Settings → Tasks → Clean generated files** can reclaim old
+v3 JPEG copies without decoding the originals or re-encoding AVIFs. Select
+**Scene previews**, **Marker previews** and/or **Image thumbnails** for the
+corresponding caches. Cleanup verifies the retained AVIFs' content hashes and
+atomically updates the catalog before deleting redundant JPEGs. An old plain
+HDR AVIF still needs its JPEG fallback until regeneration supplies an SDR AVIF
+or adaptive AVIF. Recent entries (under one hour), offline originals and entries
+with damaged AVIFs are left alone. **Dry run** reports the same candidates
+without changing catalogs or files. JPEGs left behind by regeneration are also
+reclaimed; legacy scene cover blobs, marker screenshots and image thumbnails
+remain for existing endpoints and clients.
 
 The replacement boundary is the rendition catalog, not an extension change to
 `Scene.paths.screenshot`. Additional image producers can use the same encoder,

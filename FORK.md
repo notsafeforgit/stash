@@ -105,7 +105,7 @@ local container after validation.
 |---|---|---|
 | `ui/v3/` | entire v3 UI | none (new directory) |
 | `ui/ui_v3.go` | v3 embedded UI selector; keep `ui/ui.go` upstream-shaped for v2.5 | low |
-| `pkg/previewimage/`, `internal/manager/preview_images.go`, and `internal/api/*preview_image*` | standalone still-image renditions, HDR AVIF, and legacy JPEG adapters; see [preview images](docs/preview-images.md) | low (new files) |
+| `pkg/previewimage/`, `internal/manager/*preview_images*`, and `internal/api/*preview_image*` | scene/marker stills and image thumbnails sharing HDR AVIF encoding, storage, and legacy JPEG adapters; see [preview images](docs/preview-images.md) | low (new files) |
 | `graphql/schema/` | additive v3 API fields, including filter ASTs and loss-aware performer merge opt-in | low (additive) |
 | `internal/api/resolver_mutation_bulk_*.go` + `bulk_update.go` | fork bulk-job orchestration; legacy synchronous adapters remain in shared resolvers | low (new files) |
 | `internal/manager/generate_scene_selection.go` | opt-in generation for frozen scene-filter matches, including cover resets across pages | low (new file and small generation hook) |

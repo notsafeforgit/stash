@@ -91,7 +91,7 @@ func (e *ThumbnailEncoder) GetThumbnail(f models.File, maxSize int) ([]byte, err
 
 		// #2266 - if image is webp, then determine if it is animated
 		if format == formatWebP {
-			animated = isWebPAnimated(data)
+			animated = IsAnimatedWebP(data)
 		}
 
 		// #2266 - don't generate a thumbnail for animated images

@@ -298,6 +298,9 @@ func (rs *shareRoutes) publicMedia(r *http.Request, row *models.ShareRecord, ite
 	ret := publicShareMedia{Key: item.Key, Kind: item.Kind, Width: item.Width, Height: item.Height, Duration: item.Duration, Video: item.Duration > 0, Thumbnail: base + "thumbnail", Image: base + "image"}
 	if item.Kind == "SCENE" && scene != nil {
 		ret.PreviewImage = previewImageModel(base+"preview-image", rs.server.manager.ScenePreviewImage(scene))
+	} else if item.Kind == "IMAGE" && item.Fingerprint.MD5 != "" {
+		img := &models.Image{ID: item.EntityID, Checksum: item.Fingerprint.MD5}
+		ret.PreviewImage = previewImageModel(base+"preview-image", rs.server.manager.ImagePreviewImage(img))
 	}
 	if row.ShowMetadata {
 		ret.Title = item.Title

@@ -12,6 +12,12 @@ import (
 )
 
 func TestPreviewImageDelivery(t *testing.T) {
+	for _, kind := range []string{"cover", "image"} {
+		t.Run(kind, func(t *testing.T) { testPreviewImageDelivery(t, kind) })
+	}
+}
+
+func testPreviewImageDelivery(t *testing.T, kind string) {
 	store := previewimage.Store{Root: t.TempDir()}
 	stage, err := os.MkdirTemp(store.Root, ".preview-*")
 	if err != nil {
@@ -31,10 +37,10 @@ func TestPreviewImageDelivery(t *testing.T) {
 		}
 	}
 	key := strings.Repeat("a", 64)
-	if err := store.Publish(12, "cover", key, 1, result); err != nil {
+	if err := store.Publish(12, kind, key, 1, result); err != nil {
 		t.Fatal(err)
 	}
-	manifest, err := store.Load(12, "cover", key)
+	manifest, err := store.Load(12, kind, key)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,16 +58,16 @@ func TestPreviewImageDelivery(t *testing.T) {
 		manifest *previewimage.Manifest
 		want     int
 	}{
-		{"avif", manifest.Revision, manifest.Variants[1].File, manifest, http.StatusOK},
-		{"thumbnail", manifest.Revision, manifest.Thumbnail[1].File, manifest, http.StatusOK},
-		{"stale revision", "old", manifest.Variants[1].File, manifest, http.StatusNotFound},
-		{"obsolete cover", manifest.Revision, manifest.Variants[1].File, nil, http.StatusNotFound},
+		{"avif", manifest.Revision, manifest.Variants[0].File, manifest, http.StatusOK},
+		{"thumbnail", manifest.Revision, manifest.Thumbnail[0].File, manifest, http.StatusOK},
+		{"stale revision", "old", manifest.Variants[0].File, manifest, http.StatusNotFound},
+		{"obsolete cover", manifest.Revision, manifest.Variants[0].File, nil, http.StatusNotFound},
 		{"traversal", manifest.Revision, "../manifest.json", manifest, http.StatusNotFound},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/preview?revision="+test.revision, nil)
 			rec := httptest.NewRecorder()
-			servePreviewImage(rec, req, store, 12, "cover", test.manifest, test.file)
+			servePreviewImage(rec, req, store, 12, kind, test.manifest, test.file)
 			if rec.Code != test.want {
 				t.Fatalf("status = %d, want %d", rec.Code, test.want)
 			}

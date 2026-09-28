@@ -102,9 +102,9 @@ func TestShareGeneratedPreviewsStayScoped(t *testing.T) {
 	require.Equal(t, PreviewImageDynamicRangeHdr, preview.Thumbnail.Sources[0].DynamicRange)
 	require.Empty(t, content().Media[0].Download)
 	for url, body := range map[string]string{
-		preview.Fallback: "unchanged cover.jpg", preview.Sources[0].URL: "unchanged cover.avif",
+		preview.Fallback: "unchanged cover.avif", preview.Sources[0].URL: "unchanged cover.avif",
 		preview.Thumbnail.Fallback: "unchanged thumbnail.jpg", preview.Thumbnail.Sources[0].URL: "unchanged thumbnail.avif",
-		mediaBase + "thumbnail": "unchanged thumbnail.jpg", mediaBase + "image": "unchanged cover.jpg",
+		mediaBase + "thumbnail": "unchanged thumbnail.jpg", mediaBase + "image": "\xff\xd8\xfflegacy cover",
 	} {
 		require.True(t, strings.HasPrefix(url, mediaBase))
 		w := get(url)
@@ -117,6 +117,7 @@ func TestShareGeneratedPreviewsStayScoped(t *testing.T) {
 	}
 	assetURL := preview.Sources[0].URL
 	require.Equal(t, "image/avif", get(assetURL).Header().Get("Content-Type"))
+	require.Equal(t, "image/jpeg", get(mediaBase+"image").Header().Get("Content-Type"))
 	head := sharedPreviewRequest(handler, http.MethodHead, assetURL, cookie)
 	require.Equal(t, http.StatusOK, head.Code)
 	require.Empty(t, head.Body.String())
@@ -156,9 +157,40 @@ func TestSharedImageThumbnailReuseAndOriginalViewsStayScoped(t *testing.T) {
 	path := mgr.Paths.Generated.GetThumbnailPath(img.Checksum, models.DefaultGthumbWidth)
 	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o700))
 	require.NoError(t, os.WriteFile(path, []byte("stored image thumbnail"), 0o600))
+	otherCookie := exchangeShareHTTP(t, handler, row, secret)
+	row, secret, err = rs.service.Create(context.Background(), "owner", sharing.Options{Label: "HDR image share", ExpiresAt: time.Now().Add(time.Hour)}, []sharing.Target{{Kind: "IMAGE", ID: 1}})
+	require.NoError(t, err)
 	cookie := exchangeShareHTTP(t, handler, row, secret)
 	base := "/share/" + row.ID + "/media/image-1/"
-	w := sharedPreviewRequest(handler, http.MethodGet, base+"thumbnail", cookie)
+	store := mgr.PreviewImageStore()
+	stage := t.TempDir()
+	result := &previewimage.Result{Directory: stage, Variants: []previewimage.Variant{
+		{File: "preview.jpg", MIMEType: "image/jpeg", DynamicRange: previewimage.SDR, Width: 640, Height: 480},
+		{File: "preview.avif", MIMEType: "image/avif", DynamicRange: previewimage.Adaptive, Width: 640, Height: 480},
+	}}
+	for _, v := range result.Variants {
+		require.NoError(t, os.WriteFile(filepath.Join(stage, v.File), []byte(v.File), 0600))
+	}
+	require.NoError(t, store.Publish(img.ID, "image", previewimage.ImageKey(img.Checksum), 0, result))
+	var content publicShareContent
+	w := sharedPreviewRequest(handler, http.MethodGet, "/share/"+row.ID+"/content", cookie)
+	require.Equal(t, http.StatusOK, w.Code)
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &content))
+	preview := content.Media[0].PreviewImage
+	require.NotNil(t, preview)
+	asset := preview.Sources[0].URL
+	require.True(t, strings.HasPrefix(asset, base+"preview-image/"))
+	w = sharedPreviewRequest(handler, http.MethodGet, asset, cookie)
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, "image/avif", w.Header().Get("Content-Type"))
+	require.Equal(t, "preview.avif", w.Body.String())
+	require.Contains(t, w.Header().Get("Cache-Control"), "no-store")
+	for _, invalid := range []string{asset + "stale", strings.Replace(asset, "image-1", "image-2", 1), strings.Replace(asset, "image-1", "scene-1", 1)} {
+		require.Equal(t, http.StatusNotFound, sharedPreviewRequest(handler, http.MethodGet, invalid, cookie).Code)
+	}
+	require.Equal(t, http.StatusNotFound, sharedPreviewRequest(handler, http.MethodGet, asset, nil).Code)
+	require.Equal(t, http.StatusNotFound, sharedPreviewRequest(handler, http.MethodGet, asset, otherCookie).Code)
+	w = sharedPreviewRequest(handler, http.MethodGet, base+"thumbnail", cookie)
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Equal(t, "stored image thumbnail", w.Body.String())
 	require.Equal(t, http.StatusNotFound, sharedPreviewRequest(handler, http.MethodGet, base+"download", cookie).Code)
@@ -167,6 +199,7 @@ func TestSharedImageThumbnailReuseAndOriginalViewsStayScoped(t *testing.T) {
 	require.Equal(t, "original image bytes", sharedPreviewRequest(handler, http.MethodGet, base+"thumbnail", cookie).Body.String())
 	require.NoError(t, os.WriteFile(f.Base().Path, []byte("source changed"), 0o600))
 	require.Equal(t, http.StatusNotFound, sharedPreviewRequest(handler, http.MethodGet, base+"thumbnail", cookie).Code)
+	require.Equal(t, http.StatusNotFound, sharedPreviewRequest(handler, http.MethodGet, asset, cookie).Code)
 }
 
 func TestSharingPublicAddressConfigurationPersists(t *testing.T) {

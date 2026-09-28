@@ -16,6 +16,12 @@ func (rs sceneRoutes) PreviewImage(w http.ResponseWriter, r *http.Request) {
 	rs.servePreviewImage(w, r, scene, "cover", manager.GetInstance().ScenePreviewImage(scene))
 }
 
+func (rs imageRoutes) PreviewImage(w http.ResponseWriter, r *http.Request) {
+	img := r.Context().Value(imageKey).(*models.Image)
+	mgr := manager.GetInstance()
+	servePreviewImage(w, r, mgr.PreviewImageStore(), img.ID, "image", mgr.ImagePreviewImage(img), chi.URLParam(r, "previewFile"))
+}
+
 func (rs sceneRoutes) MarkerPreviewImage(w http.ResponseWriter, r *http.Request) {
 	scene := r.Context().Value(sceneKey).(*models.Scene)
 	id, _ := strconv.Atoi(chi.URLParam(r, "sceneMarkerId"))
@@ -39,15 +45,15 @@ func (rs sceneRoutes) servePreviewImage(w http.ResponseWriter, r *http.Request, 
 	servePreviewImage(w, r, manager.GetInstance().PreviewImageStore(), scene.ID, kind, manifest, chi.URLParam(r, "previewFile"))
 }
 
-func servePreviewImage(w http.ResponseWriter, r *http.Request, store previewimage.Store, sceneID int, kind string, manifest *previewimage.Manifest, file string) {
+func servePreviewImage(w http.ResponseWriter, r *http.Request, store previewimage.Store, entityID int, kind string, manifest *previewimage.Manifest, file string) {
 	// Resolve through the current entity before serving cached bytes. A URL
-	// cannot resurrect an obsolete cover or another scene's marker artwork.
+	// cannot resurrect obsolete artwork or another entity's renditions.
 	if manifest == nil || manifest.Revision != r.URL.Query().Get("revision") {
 		w.Header().Set("Cache-Control", "no-store")
 		http.NotFound(w, r)
 		return
 	}
-	path, variant := store.File(sceneID, kind, manifest, file)
+	path, variant := store.File(entityID, kind, manifest, file)
 	if variant == nil {
 		http.NotFound(w, r)
 		return

@@ -2,6 +2,7 @@ package manager
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -74,6 +75,7 @@ type GenerateJob struct {
 
 	totals        totalsGenerate
 	coverFailures coverGenerationFailures
+	imageFailures imageGenerationFailures
 }
 
 type totalsGenerate struct {
@@ -291,7 +293,7 @@ func (j *GenerateJob) Execute(ctx context.Context, progress *job.Progress) error
 
 	elapsed := time.Since(start)
 	logger.Info(fmt.Sprintf("Generate finished (%s)", elapsed))
-	return j.coverFailures.Err()
+	return errors.Join(j.coverFailures.Err(), j.imageFailures.Err())
 }
 
 func (j *GenerateJob) queueTasks(ctx context.Context, g *generate.Generator, paths []string, queue chan<- Task) {
@@ -571,6 +573,7 @@ func (j *GenerateJob) queueImageJob(g *generate.Generator, image *models.Image, 
 		task := &GenerateImageThumbnailTask{
 			Image:     *image,
 			Overwrite: j.overwrite,
+			onError:   j.imageFailures.Add,
 		}
 
 		if task.required() {

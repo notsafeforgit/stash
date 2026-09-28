@@ -23,6 +23,7 @@ type GalleryCardGallery = Pick<
   | "image_count"
   | "organized"
   | "paths"
+  | "cover"
   | "studio"
   | "tags"
   | "files"
@@ -156,6 +157,7 @@ export const GalleryCard: React.FC<GalleryCardProps> = ({
   const preview = (
     <EntityCard.Preview
       image={scrubImage ?? gallery.paths.cover}
+      previewImage={scrubImage ? null : gallery.cover?.preview_image}
       isPortrait={isPortrait}
       organized={gallery.organized}
     >

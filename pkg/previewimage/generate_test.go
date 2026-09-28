@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"image"
 	"image/jpeg"
 	"image/png"
 	"math"
@@ -14,7 +15,22 @@ import (
 	"testing"
 
 	"github.com/stashapp/stash/pkg/ffmpeg"
+	"github.com/stretchr/testify/require"
 )
+
+func TestAVIFFailureDoesNotReportJPEGOnlySuccess(t *testing.T) {
+	dir := t.TempDir()
+	f, err := os.Create(filepath.Join(dir, "sdr.png"))
+	require.NoError(t, err)
+	require.NoError(t, png.Encode(f, image.NewNRGBA64(image.Rect(0, 0, 8, 8))))
+	require.NoError(t, f.Close())
+	result := &Result{Directory: dir}
+	encoder := Encoder{FFmpeg: ffmpeg.NewEncoder(filepath.Join(dir, "missing-ffmpeg")), AVIFTool: filepath.Join(dir, "missing-avifenc")}
+	err = encoder.encodeRenditions(context.Background(), result, false)
+	require.ErrorContains(t, err, "AVIF preview could not be generated")
+	_, err = result.JPEG()
+	require.NoError(t, err, "a completed compatibility JPEG must not hide AVIF failure")
+}
 
 func TestGenerateRenditions(t *testing.T) {
 	ffmpegPath, err := exec.LookPath("ffmpeg")
@@ -83,13 +99,23 @@ func TestGenerateRenditions(t *testing.T) {
 						t.Fatal(err)
 					}
 					defer result.Close()
-					if len(result.Warnings) != 0 || len(result.Variants) != 2 || len(result.Thumbnail) != 2 {
+					count := 2
+					if IsHDR(transfer) && !adaptive {
+						count = 3 // temporary JPEG, HDR AVIF, and SDR AVIF
+					}
+					if len(result.Warnings) != 0 || len(result.Variants) != count || len(result.Thumbnail) != count {
 						t.Fatalf("missing AVIF: %+v; %v", result.Variants, result.Warnings)
 					}
 					if _, err := result.JPEG(); err != nil {
 						t.Fatal(err)
 					}
 					for i, variants := range [][]Variant{result.Variants, result.Thumbnail} {
+						if count == 3 {
+							if variants[2].MIMEType != "image/avif" || variants[2].DynamicRange != SDR {
+								t.Fatal("plain HDR has no SDR AVIF fallback")
+							}
+							assertSDRBase(t, result.Directory, variants[0].File, variants[2].File)
+						}
 						variant := variants[1]
 						wantWidth := 64 / (i + 1)
 						wantRange, wantTransfer := SDR, "iec61966-2-1"
@@ -105,7 +131,7 @@ func TestGenerateRenditions(t *testing.T) {
 							// Older ffprobe versions don't expose CICP on gain-map
 							// image items. Validate the container with its native decoder.
 							info, err := exec.Command("avifdec", "--info", filepath.Join(result.Directory, variant.File)).CombinedOutput()
-							if err != nil || !strings.Contains(string(info), "Base Image is SDR") || !strings.Contains(string(info), "Transfer Char. : 16") || !strings.Contains(string(info), "Transfer Char. : 13") {
+							if err != nil || !avifHasGainMap(string(info)) || !strings.Contains(string(info), "Transfer Char. : 16") || !strings.Contains(string(info), "Transfer Char. : 13") {
 								t.Fatalf("invalid adaptive color metadata: %v: %s", err, info)
 							}
 							assertSDRBase(t, result.Directory, variants[0].File, variant.File)

@@ -15,6 +15,12 @@ func (r *sceneResolver) PreviewImage(ctx context.Context, obj *models.Scene) (*P
 	return previewImageModel(base, manager.GetInstance().ScenePreviewImage(obj)), nil
 }
 
+func (r *imageResolver) PreviewImage(ctx context.Context, obj *models.Image) (*PreviewImage, error) {
+	baseURL, _ := ctx.Value(BaseURLCtxKey).(string)
+	base := fmt.Sprintf("%s/image/%d/preview-image", baseURL, obj.ID)
+	return previewImageModel(base, manager.GetInstance().ImagePreviewImage(obj)), nil
+}
+
 func (r *sceneMarkerResolver) PreviewImage(ctx context.Context, obj *models.SceneMarker) (*PreviewImage, error) {
 	var scene *models.Scene
 	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
@@ -53,7 +59,15 @@ func previewImageRenditionModel(base, revision string, variants []previewimage.V
 		})
 	}
 	if ret.Fallback == "" {
-		return nil
+		for _, source := range ret.Sources {
+			if source.DynamicRange != PreviewImageDynamicRangeHdr {
+				ret.Fallback = source.URL
+				break
+			}
+		}
+		if ret.Fallback == "" {
+			return nil
+		}
 	}
 	return ret
 }

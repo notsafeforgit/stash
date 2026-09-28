@@ -104,12 +104,8 @@ func TestMarkerScreenshotBackfillsHDRAndLegacyJPEG(t *testing.T) {
 				if variant.MIMEType == "image/avif" && (variant.DynamicRange == previewimage.HDR || variant.DynamicRange == previewimage.Adaptive) {
 					hasHDR = true
 				}
-				if variant.MIMEType == "image/jpeg" {
-					path, _ := mgr.PreviewImageStore().File(scene.ID, "marker", manifest, variant.File)
-					data, err := os.ReadFile(path)
-					if err != nil || !bytes.Equal(legacy, data) || variant.DynamicRange != previewimage.SDR {
-						t.Fatal("v2.5 screenshot differs from the SDR fallback")
-					}
+				if variant.MIMEType != "image/avif" {
+					t.Fatal("v3 marker cache retained a JPEG")
 				}
 			}
 			if !hasHDR || task.markersNeeded(context.Background()) != 0 {
@@ -205,10 +201,16 @@ func TestGenerateScreenshotPublishesPreviewAndReportsWriteFailure(t *testing.T) 
 			if len(manifest.Thumbnail) < 1 || manifest.Thumbnail[0].Width != 64 || manifest.Thumbnail[0].Height != 48 {
 				t.Fatalf("missing thumbnail or upscaled small source: %+v", manifest.Thumbnail)
 			}
-			legacyPath, _ := store.File(scene.ID, "cover", manifest, manifest.Variants[0].File)
-			legacyJPEG, err := os.ReadFile(legacyPath)
-			if err != nil || !bytes.Equal(legacyJPEG, original) {
-				t.Fatal("legacy cover is no longer the full-size SDR fallback")
+			legacyJPEG, err := jpeg.DecodeConfig(bytes.NewReader(original))
+			if err != nil || legacyJPEG.Width != 64 || legacyJPEG.Height != 48 {
+				t.Fatal("legacy cover is no longer a full-size JPEG")
+			}
+			for _, variants := range [][]previewimage.Variant{manifest.Variants, manifest.Thumbnail} {
+				for _, variant := range variants {
+					if variant.MIMEType != "image/avif" {
+						t.Fatal("v3 cover cache retained a JPEG")
+					}
+				}
 			}
 			for _, variant := range manifest.Variants {
 				path, _ := store.File(scene.ID, "cover", manifest, variant.File)

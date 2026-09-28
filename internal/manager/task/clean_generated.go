@@ -178,6 +178,9 @@ func (j *CleanGeneratedJob) Execute(ctx context.Context, progress *job.Progress)
 
 	if j.Options.ImageThumbnails {
 		progress.ExecuteTask("Cleaning thumbnail files", func() {
+			if err := j.cleanImagePreviewImages(ctx); err != nil {
+				j.logError(err)
+			}
 			if err := j.cleanThumbnailFiles(ctx, progress); err != nil {
 				j.logError(fmt.Errorf("error cleaning thumbnail files: %w", err))
 			}

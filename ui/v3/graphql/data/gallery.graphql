@@ -15,6 +15,12 @@ fragment GalleryData on Gallery {
     cover
     preview
   }
+  cover {
+    id
+    preview_image {
+      ...PreviewImageData
+    }
+  }
 
   files {
     ...GalleryFileData

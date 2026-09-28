@@ -10,6 +10,10 @@ fragment SlimImageData on Image {
   organized
   o_counter
 
+  preview_image {
+    ...PreviewImageData
+  }
+
   paths {
     thumbnail
     preview

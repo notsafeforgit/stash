@@ -81,8 +81,12 @@ func (j *CleanGeneratedJob) cleanPreviewImages(ctx context.Context, kind string)
 			if err != nil {
 				return fmt.Errorf("reading preview cache: %w", err)
 			}
-			if cached.IsDir() && !keep[cached.Name()] && time.Since(info.ModTime()) > time.Hour {
-				j.deleteDir(filepath.Join(parent, cached.Name()))
+			if cached.IsDir() && time.Since(info.ModTime()) > time.Hour {
+				if keep[cached.Name()] {
+					j.compactPreviewImages(store, id, kind, cached.Name())
+				} else {
+					j.deleteDir(filepath.Join(parent, cached.Name()))
+				}
 			}
 		}
 	}

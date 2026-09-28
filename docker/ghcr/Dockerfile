@@ -6,20 +6,27 @@ COPY docker/native/build-libheif.sh /build-libheif.sh
 COPY docker/native/build-vips.sh /build-vips.sh
 RUN sh /build-libheif.sh && sh /build-vips.sh
 
+FROM alpine:3.24 AS avif
+RUN apk add --no-cache build-base cmake git pkgconf curl ca-certificates aom-dev dav1d-dev libjpeg-turbo-dev libpng-dev libxml2-dev libyuv-dev
+COPY docker/native/build-libavif.sh /build-libavif.sh
+RUN sh /build-libavif.sh
+
 FROM alpine:3.24
 
 # Copy the statically compiled amd64 binary from the dist folder into the alpine image
 COPY dist/stash-linux /usr/bin/stash
 
-RUN apk upgrade --no-cache && apk add --no-cache ca-certificates python3 py3-requests py3-requests-toolbelt py3-lxml py3-pip ffmpeg libavif-apps tzdata aom-libs libdav1d libde265 x265-libs libjpeg-turbo libpng vips vips-tools vips-heif vips-jxl vips-magick vips-poppler \
+RUN apk upgrade --no-cache && apk add --no-cache ca-certificates python3 py3-requests py3-requests-toolbelt py3-lxml py3-pip ffmpeg libavif-apps libxml2 tzdata aom-libs libdav1d libde265 x265-libs libjpeg-turbo libpng vips vips-tools vips-heif vips-jxl vips-magick vips-poppler \
     && python3 -m pip install --break-system-packages --upgrade "pip>=26.2" \
     && python3 -m pip install --break-system-packages mechanicalsoup cloudscraper stashapp-tools
 # Replace distro libraries and modules with the matching security builds.
 RUN find /usr/lib \( -name 'libheif.so*' -o -name 'libvips.so*' -o -name 'libvips-cpp.so*' \) -delete \
     && rm -rf /usr/lib/vips-modules-* /usr/lib/*-linux-gnu/vips-modules-*
 COPY --from=heif /out/ /
+COPY --from=avif /out/ /
 RUN heif-info --version | grep -F '1.23.4' \
-    && vips --version | grep -F '8.18.6'
+    && vips --version | grep -F '8.18.6' \
+    && avifenc --version | grep -F '1.4.2'
 ENV STASH_CONFIG_FILE=/root/.stash/config.yml
 
 # Basic build-time metadata as defined at https://github.com/opencontainers/image-spec/blob/main/annotations.md#pre-defined-annotation-keys

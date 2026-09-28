@@ -4,8 +4,10 @@ import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { IntlProvider } from "react-intl";
 import { describe, expect, it, vi } from "vitest";
+import { PreviewImageDynamicRange } from "@/core/generated-graphql";
 
-vi.mock("@tanstack/react-router", () => ({
+vi.mock("@tanstack/react-router", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@tanstack/react-router")>()),
   useNavigate: () => vi.fn(),
   Link: ({
     to,
@@ -25,12 +27,74 @@ vi.mock("src/utils/screen", () => ({ useIsTouch: () => false }));
 vi.mock("src/hooks/config", () => ({
   useConfigurationContextOptional: () => undefined,
 }));
+vi.mock("@apollo/client/react", () => ({
+  useApolloClient: () => ({ query: vi.fn() }),
+}));
+vi.mock("./use-image-context-menu", () => ({
+  useImageContextMenu: () => ({ menuContent: null, dialogs: null }),
+}));
+vi.mock("src/components/lightbox", () => ({ Lightbox: () => null }));
 
 import { EntityCard } from "./entity-card";
+import { ImageCard } from "./image-card";
 import { CardLayoutContext } from "../list/card-layout-context";
 import { CardMediaContext } from "./card-media-context";
 
 describe("entity card actions", () => {
+  it.each(["grid", "wall"] as const)(
+    "renders HDR image thumbnails and their SDR fallback in %s layout",
+    (layout) => {
+      const markup = renderToStaticMarkup(
+        <IntlProvider locale="en" messages={{ "actions.preview": "Preview" }}>
+          <CardLayoutContext value={layout}>
+            <ImageCard
+              onPreviewClick={() => {}}
+              image={{
+                id: "17",
+                title: "HDR photo",
+                date: null,
+                details: null,
+                rating100: null,
+                organized: false,
+                o_counter: 0,
+                paths: {
+                  __typename: "ImagePathsType",
+                  image: "/original.avif",
+                  thumbnail: "/legacy.jpg",
+                  preview: null,
+                },
+                preview_image: {
+                  __typename: "PreviewImage",
+                  fallback: "/image/17/preview-image/sdr.jpg",
+                  thumbnail: null,
+                  sources: [
+                    {
+                      __typename: "PreviewImageSource",
+                      url: "/image/17/preview-image/adaptive.avif",
+                      mime_type: "image/avif",
+                      dynamic_range: PreviewImageDynamicRange.Adaptive,
+                      width: 640,
+                      height: 480,
+                    },
+                  ],
+                },
+                studio: null,
+                performers: [],
+                tags: [],
+                visual_files: [],
+              }}
+            />
+          </CardLayoutContext>
+        </IntlProvider>,
+      );
+      expect(markup).toContain(
+        'srcSet="/image/17/preview-image/adaptive.avif"',
+      );
+      expect(markup).toContain('src="/image/17/preview-image/sdr.jpg"');
+      expect(markup).not.toContain('src="/legacy.jpg"');
+      expect(markup).not.toContain('src="/original.avif"');
+    },
+  );
   it("stops a distant video and resumes it on return without remounting controls", async () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     const play = vi

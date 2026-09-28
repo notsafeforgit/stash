@@ -25,6 +25,7 @@ export const images: GQL.SlimImageDataFragment[] = ["1", "2"].map((id) => ({
   rating100: 80,
   organized: false,
   o_counter: 9999,
+  preview_image: null,
   paths: {
     __typename: "ImagePathsType",
     thumbnail: artwork,

@@ -23,7 +23,7 @@ export type PreviewImageProps = ComponentProps<"img"> & {
   alt: string;
 };
 
-/** One rendering policy for covers, markers and player posters. Adaptive AVIF
+/** One rendering policy for covers, image thumbnails, markers and player posters. Adaptive AVIF
  * contains its SDR rendering; plain HDR is selected only on HDR displays. The
  * browser handles format support, display changes and colour management. */
 export function PreviewImage({
@@ -81,8 +81,8 @@ function PreviewImageContent({
               preview.fallback,
               image.ownerDocument.baseURI,
             ).href;
-            // If the browser already chose JPEG (unsupported AVIF or SDR
-            // display), changing only <source> won't retry that same URL.
+            // If the browser already chose the display-safe fallback,
+            // changing only <source> won't retry that same URL.
             setFallbackLevel(failedURL === fallbackURL ? 2 : fallbackLevel + 1);
           } else {
             onError?.(event);

@@ -22,6 +22,7 @@ type ImageCardImage = Pick<
   | "organized"
   | "o_counter"
   | "paths"
+  | "preview_image"
   | "studio"
   | "tags"
   | "performers"
@@ -122,6 +123,7 @@ export const ImageCard: React.FC<ImageCardProps> = ({
         <EntityCard.SelectCheckbox />
         <EntityCard.Preview
           image={image.paths.thumbnail}
+          previewImage={image.preview_image}
           isPortrait={isPortrait}
           naturalIsPortrait={
             file?.width && file?.height ? file.height > file.width : undefined

@@ -41,6 +41,7 @@ func (rs imageRoutes) Routes() chi.Router {
 		r.Get("/image", rs.Image)
 		r.Get("/thumbnail", rs.Thumbnail)
 		r.Get("/preview", rs.Preview)
+		r.Get("/preview-image/{previewFile}", rs.PreviewImage)
 	})
 
 	return r
@@ -57,6 +58,21 @@ func (rs imageRoutes) serveThumbnail(w http.ResponseWriter, r *http.Request, img
 
 	// if the thumbnail doesn't exist, encode on the fly
 	exists, _ := fsutil.FileExists(filepath)
+	if !exists && mgr.Config.GetEnableV3UI() && mgr.Config.IsWriteImageThumbnails() {
+		wg := &mgr.ImageThumbnailGenerateWaitGroup
+		wg.Add()
+		err := mgr.GenerateImagePreview(r.Context(), img)
+		wg.Done()
+		if err == nil {
+			exists = true
+		} else {
+			if !errors.Is(err, image.ErrNotSupportedForThumbnail) && r.Context().Err() == nil {
+				logger.Warnf("image %d preview: %v", img.ID, err)
+			}
+			rs.serveImage(w, r, img, true)
+			return
+		}
+	}
 	if exists {
 		if modTime == nil {
 			utils.ServeStaticFile(w, r, filepath)

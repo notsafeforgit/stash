@@ -30,3 +30,8 @@ extend type Scene {
 extend type SceneMarker {
   preview_image: PreviewImage # Resolver
 }
+
+extend type Image {
+  "Bounded image thumbnail renditions, with HDR-aware sources and an SDR fallback."
+  preview_image: PreviewImage # Resolver
+}

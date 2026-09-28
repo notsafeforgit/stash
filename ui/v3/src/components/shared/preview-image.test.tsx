@@ -38,6 +38,47 @@ function preview(dynamicRange: PreviewImageDynamicRange): PreviewImageData {
 }
 
 describe("preview image rendering", () => {
+  it("uses SDR AVIF when a plain HDR source needs a fallback", async () => {
+    const hdr = preview(PreviewImageDynamicRange.Hdr);
+    await act(async () =>
+      root.render(
+        <PreviewImage
+          preview={{
+            ...hdr,
+            fallback: "/sdr.avif",
+            sources: [
+              ...hdr.sources,
+              ...hdr.sources.map((source) => ({
+                ...source,
+                url: "/sdr.avif",
+                dynamic_range: PreviewImageDynamicRange.Sdr,
+              })),
+            ],
+          }}
+          src="/legacy.jpg"
+          alt=""
+        />,
+      ),
+    );
+    const sources = container.querySelectorAll("source");
+    expect(sources[0]?.media).toBe("(dynamic-range: high)");
+    expect(sources[1]?.hasAttribute("media")).toBe(false);
+    const image = container.querySelector("img");
+    expect(image?.getAttribute("src")).toBe("/sdr.avif");
+    if (!image) throw new Error("Missing preview image");
+    Object.defineProperty(image, "currentSrc", {
+      configurable: true,
+      value: "http://localhost/hdr.avif",
+    });
+    await act(async () => image.dispatchEvent(new Event("error")));
+    expect(container.querySelector("source")).toBeNull();
+    expect(image.getAttribute("src")).toBe("/sdr.avif");
+    Object.defineProperty(image, "currentSrc", {
+      value: "http://localhost/sdr.avif",
+    });
+    await act(async () => image.dispatchEvent(new Event("error")));
+    expect(image.getAttribute("src")).toBe("/legacy.jpg");
+  });
   it("uses stored card renditions only when requested and accepts older covers", async () => {
     const full = preview(PreviewImageDynamicRange.Adaptive);
     const thumbnail = {

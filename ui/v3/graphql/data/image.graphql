@@ -12,6 +12,10 @@ fragment ImageData on Image {
   created_at
   updated_at
 
+  preview_image {
+    ...PreviewImageData
+  }
+
   paths {
     thumbnail
     preview

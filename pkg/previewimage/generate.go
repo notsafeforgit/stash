@@ -4,6 +4,7 @@ package previewimage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"image/jpeg"
 	"image/png"
@@ -43,24 +44,33 @@ type Encoder struct {
 	FFmpeg      *ffmpeg.FFMpeg
 	GainMapTool string
 	AVIFTool    string
+	// VIPSTool optionally preserves ICC colour management for ordinary SDR
+	// photos. HDR sources always use the high-bit-depth extraction path.
+	VIPSTool string
 }
 
 type Request struct {
 	Video *ffmpeg.VideoFile
 	At    float64
+	// StillImage enables native still-image metadata and gain-map decoding.
+	// Video-backed image clips use the ordinary frame extraction path.
+	StillImage bool
 	// MaxDimension bounds the longest edge; zero retains the source size.
 	MaxDimension int
 	// ThumbnailMaxDimension additionally generates bounded card renditions from
 	// the same high-bit-depth frame. Zero omits them; neither size is upscaled.
 	ThumbnailMaxDimension int
+	// Decoded stills may need display transforms baked in before resizing.
+	rawImage     bool
+	imageFilters []string
 }
 
 type Result struct {
 	Directory string
 	Variants  []Variant
 	Thumbnail []Variant
-	// Warnings describe optional encoders that failed. The SDR JPEG is always
-	// complete when Generate succeeds, including when AVIF isn't available.
+	// Warnings describe optional encoders that failed before a working AVIF
+	// encoder was used. JPEGs are temporary compatibility outputs, not v3 assets.
 	Warnings []error
 }
 
@@ -96,14 +106,18 @@ func (e Encoder) Generate(ctx context.Context, parent string, req Request) (_ *R
 	// stays floating point / 16 bit until the final encoders, never Go's 8-bit
 	// montage pipeline. A failed seek retries accurately without relabeling HDR
 	// pixels as BT.709.
-	err = e.extractFrame(ctx, req, dir, false)
-	if err != nil && ctx.Err() == nil {
-		err = e.extractFrame(ctx, req, dir, true)
+	hdr := IsHDR(req.Video.ColorTransfer)
+	if req.StillImage {
+		hdr, err = e.extractImage(ctx, req, dir)
+	} else {
+		err = e.extractFrame(ctx, req, dir, false)
+		if err != nil && ctx.Err() == nil {
+			err = e.extractFrame(ctx, req, dir, true)
+		}
 	}
 	if err != nil {
 		return nil, err
 	}
-	hdr := IsHDR(req.Video.ColorTransfer)
 	if err := e.encodeRenditions(ctx, ret, hdr); err != nil {
 		return nil, err
 	}
@@ -167,32 +181,45 @@ func (e Encoder) encodeRenditions(ctx context.Context, ret *Result, hdr bool) er
 		}
 	}
 	if len(ret.Variants) == 1 && ctx.Err() == nil {
-		// Plain HDR AVIF is still useful on HDR displays when libavif's gain
-		// map utility is absent. The manifest marks it HDR-only so SDR clients
-		// select the independently tone-mapped JPEG instead.
-		var avifErr error
-		if e.AVIFTool != "" {
-			out, err := stashexec.CommandContext(ctx, e.AVIFTool, nativeAVIFArgs(dir, hdr)...).CombinedOutput()
-			avifErr = err
-			if err != nil {
-				ret.Warnings = append(ret.Warnings, fmt.Errorf("AVIF encoder: %w: %s", err, out))
-			}
+		// A plain HDR rendition needs a separate SDR AVIF when a gain map
+		// isn't available. Both display types can then avoid a stored JPEG.
+		if err := e.encodePlainAVIF(ctx, ret, hdr, "preview.avif"); err != nil {
+			return err
 		}
-		if (e.AVIFTool == "" || avifErr != nil) && ctx.Err() == nil {
-			avifErr = e.run(ctx, avifArgs(dir, hdr))
-			if avifErr != nil {
-				ret.Warnings = append(ret.Warnings, avifErr)
-			}
+		dr := SDR
+		if hdr {
+			dr = HDR
 		}
-		if avifErr == nil {
-			dr := SDR
-			if hdr {
-				dr = HDR
+		ret.Variants = append(ret.Variants, Variant{"preview.avif", "image/avif", dr, width, height})
+		if hdr {
+			if err := e.encodePlainAVIF(ctx, ret, false, "preview-sdr.avif"); err != nil {
+				return err
 			}
-			ret.Variants = append(ret.Variants, Variant{"preview.avif", "image/avif", dr, width, height})
+			ret.Variants = append(ret.Variants, Variant{"preview-sdr.avif", "image/avif", SDR, width, height})
 		}
 	}
 	return ctx.Err()
+}
+
+func (e Encoder) encodePlainAVIF(ctx context.Context, ret *Result, hdr bool, name string) error {
+	if e.AVIFTool != "" {
+		args := nativeAVIFArgs(ret.Directory, hdr)
+		args[len(args)-1] = filepath.Join(ret.Directory, name)
+		out, err := stashexec.CommandContext(ctx, e.AVIFTool, args...).CombinedOutput()
+		if err == nil {
+			return nil
+		}
+		ret.Warnings = append(ret.Warnings, fmt.Errorf("AVIF encoder: %w: %s", err, out))
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	args := avifArgs(ret.Directory, hdr)
+	args[len(args)-1] = filepath.Join(ret.Directory, name)
+	if err := e.run(ctx, args); err != nil {
+		return errors.Join(fmt.Errorf("AVIF preview could not be generated: %w", err), errors.Join(ret.Warnings...))
+	}
+	return nil
 }
 
 func (e Encoder) run(ctx context.Context, args ffmpeg.Args) error {
@@ -227,11 +254,30 @@ func (e Encoder) extractFrame(ctx context.Context, req Request, dir string, slow
 
 func frameArgs(req Request, dir string, slowSeek bool) ffmpeg.Args {
 	args := ffmpeg.Args{"-hide_banner", "-loglevel", "error", "-y", "-threads", "2"}
-	if !slowSeek {
+	if !slowSeek && !req.StillImage {
 		args = args.Seek(req.At)
+	}
+	if req.StillImage {
+		// Older FFmpeg versions do not expose AVIF item-level CICP. Native
+		// metadata has already been read by extractImage; use it for decoding.
+		for _, tag := range []struct{ option, value string }{
+			{"-color_primaries", req.Video.ColorPrimaries}, {"-color_trc", req.Video.ColorTransfer},
+			{"-colorspace", req.Video.ColorSpace}, {"-color_range", req.Video.ColorRange},
+		} {
+			if colorTag(tag.value, "") != "" {
+				if tag.option == "-colorspace" && tag.value == "gbr" {
+					tag.value = "rgb"
+				}
+				args = append(args, tag.option, tag.value)
+			}
+		}
+	}
+	if req.rawImage {
+		args = append(args, "-noautorotate")
 	}
 	args = args.Input(req.Video.Path)
 	var filters []string
+	filters = append(filters, req.imageFilters...)
 	if slowSeek {
 		// Apply accurate seek before the split so both outputs use one frame.
 		filters = append(filters, fmt.Sprintf("trim=start=%f", req.At), "setpts=PTS-STARTPTS")

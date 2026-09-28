@@ -43,4 +43,10 @@ fragment SlimGalleryData on Gallery {
     cover
     preview
   }
+  cover {
+    id
+    preview_image {
+      ...PreviewImageData
+    }
+  }
 }

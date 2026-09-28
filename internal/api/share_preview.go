@@ -39,15 +39,23 @@ func (rs *shareRoutes) previewScenes(ctx context.Context, media []models.ShareMe
 }
 
 func (rs *shareRoutes) previewImage(w http.ResponseWriter, r *http.Request) {
-	item, _, scene, err := rs.item(r)
-	if err != nil || item.Kind != "SCENE" || scene == nil {
+	item, file, scene, err := rs.item(r)
+	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
 	mgr := rs.server.manager
 	// Reuse the manifest's exact-file/revision checks. The enclosing shareResponse
 	// enforces no-store even though owner preview URLs are immutable and cached.
-	servePreviewImage(w, r, mgr.PreviewImageStore(), scene.ID, "cover", mgr.ScenePreviewImage(scene), chi.URLParam(r, "previewFile"))
+	switch {
+	case item.Kind == "SCENE" && scene != nil:
+		servePreviewImage(w, r, mgr.PreviewImageStore(), scene.ID, "cover", mgr.ScenePreviewImage(scene), chi.URLParam(r, "previewFile"))
+	case item.Kind == "IMAGE":
+		img := &models.Image{ID: item.EntityID, Checksum: file.Base().Fingerprints.GetString(models.FingerprintTypeMD5)}
+		servePreviewImage(w, r, mgr.PreviewImageStore(), img.ID, "image", mgr.ImagePreviewImage(img), chi.URLParam(r, "previewFile"))
+	default:
+		http.NotFound(w, r)
+	}
 }
 
 // Reuse existing library artwork through the share-authorized route.
@@ -60,6 +68,8 @@ func (rs *shareRoutes) existingRendition(w http.ResponseWriter, r *http.Request,
 				variants = manifest.Thumbnail
 			}
 			for _, variant := range variants {
+				// This legacy URL is the renderer's final fallback if AVIF
+				// decoding fails. New AVIF-only catalogs use the cover blob.
 				if variant.MIMEType == "image/jpeg" {
 					path, allowed := mgr.PreviewImageStore().File(scene.ID, "cover", manifest, variant.File)
 					if allowed != nil && serveSharedPreviewFile(w, r, path) {

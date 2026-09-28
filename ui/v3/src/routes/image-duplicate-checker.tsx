@@ -10,6 +10,7 @@ import {
   selectAllButRetained,
 } from "@/components/duplicates/groups";
 import { Label } from "@/components/ui/label";
+import { PreviewImage } from "@/components/shared/preview-image";
 import { useId, type ReactNode, useEffect, useMemo, useState } from "react";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
@@ -1220,7 +1221,8 @@ function DuplicateTable({
                         { entityType: imageTitle(image) },
                       )}
                     >
-                      <img
+                      <PreviewImage
+                        preview={image.preview_image}
                         src={image.paths.thumbnail ?? ""}
                         alt=""
                         className={cn(

@@ -16,7 +16,8 @@ type PluginSettingOption {
 extend type PluginSetting {
   default_value: Any
   editor: PluginSettingEditor
-  options: [PluginSettingOption!]!
+  "Optional so legacy generated PluginSetting values need not provide it."
+  options: [PluginSettingOption!]
 }
 
 type PluginSettings {

@@ -169,13 +169,13 @@ function SettingControl({
       >
         <SelectTrigger id={id} aria-describedby={descriptionId}>
           <SelectValue>
-            {setting.options.find((option) => option.value === text)?.label ??
+            {setting.options?.find((option) => option.value === text)?.label ??
               text}
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectGroup>
-            {setting.options.map((option) => (
+            {setting.options?.map((option) => (
               <SelectItem key={option.value} value={option.value}>
                 {option.label}
               </SelectItem>

@@ -162,6 +162,7 @@ func (r *mutationResolver) DeleteFiles(ctx context.Context, ids []string) (ret b
 	}
 
 	if err := r.withTxn(ctx, func(ctx context.Context) error {
+		fileDeleter.RegisterHooks(ctx)
 		qb := r.repository.File
 
 		for _, fileIDInt := range fileIDs {
@@ -204,12 +205,8 @@ func (r *mutationResolver) DeleteFiles(ctx context.Context, ids []string) (ret b
 
 		return nil
 	}); err != nil {
-		fileDeleter.Rollback()
 		return false, err
 	}
-
-	// perform the post-commit actions
-	fileDeleter.Commit()
 
 	return true, nil
 }

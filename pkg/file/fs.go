@@ -34,12 +34,16 @@ func (f *OsFS) MkdirAll(path string, perm fs.FileMode) error {
 	return os.MkdirAll(path, perm)
 }
 
+func (f *OsFS) MkdirTemp(dir, pattern string) (string, error) {
+	return os.MkdirTemp(dir, pattern)
+}
+
 func (f *OsFS) Remove(name string) error {
 	return os.Remove(name)
 }
 
 func (f *OsFS) Rename(oldpath, newpath string) error {
-	return os.Rename(oldpath, newpath)
+	return fsutil.RenameNoReplace(oldpath, newpath)
 }
 
 func (f *OsFS) RemoveAll(path string) error {

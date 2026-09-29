@@ -236,6 +236,7 @@ func (r *mutationResolver) ImageDestroy(ctx context.Context, input models.ImageD
 		Paths:   manager.GetInstance().Paths,
 	}
 	if err := r.withTxn(ctx, func(ctx context.Context) error {
+		fileDeleter.RegisterHooks(ctx)
 		i, err = r.repository.Image.Find(ctx, imageID)
 		if err != nil {
 			return err
@@ -247,12 +248,8 @@ func (r *mutationResolver) ImageDestroy(ctx context.Context, input models.ImageD
 
 		return r.imageService.Destroy(ctx, i, fileDeleter, utils.IsTrue(input.DeleteGenerated), utils.IsTrue(input.DeleteFile), utils.IsTrue(input.DestroyFileEntry))
 	}); err != nil {
-		fileDeleter.Rollback()
 		return false, err
 	}
-
-	// perform the post-commit actions
-	fileDeleter.Commit()
 
 	// call post hook after performing the other actions
 	r.hookExecutor.ExecutePostHooks(ctx, i.ID, hook.ImageDestroyPost, plugin.ImageDestroyInput{
@@ -278,6 +275,7 @@ func (r *mutationResolver) ImagesDestroy(ctx context.Context, input models.Image
 		Paths:   manager.GetInstance().Paths,
 	}
 	if err := r.withTxn(ctx, func(ctx context.Context) error {
+		fileDeleter.RegisterHooks(ctx)
 		qb := r.repository.Image
 
 		for _, imageID := range imageIDs {
@@ -299,12 +297,8 @@ func (r *mutationResolver) ImagesDestroy(ctx context.Context, input models.Image
 
 		return nil
 	}); err != nil {
-		fileDeleter.Rollback()
 		return false, err
 	}
-
-	// perform the post-commit actions
-	fileDeleter.Commit()
 
 	for _, image := range images {
 		// call post hook after performing the other actions
@@ -403,6 +397,7 @@ func (r *mutationResolver) ImageRotate(ctx context.Context, input ImageRotateInp
 
 	var ret *models.Image
 	if err := r.withTxn(ctx, func(ctx context.Context) error {
+		fileDeleter.RegisterHooks(ctx)
 		i, err := r.repository.Image.Find(ctx, imageID)
 		if err != nil {
 			return err
@@ -489,13 +484,8 @@ func (r *mutationResolver) ImageRotate(ctx context.Context, input ImageRotateInp
 		ret = i
 		return nil
 	}); err != nil {
-		fileDeleter.Rollback()
 		return nil, err
 	}
-
-	// Commit the deletion of stale generated files now that the txn
-	// succeeded.
-	fileDeleter.Commit()
 
 	// Refetch outside the txn so the response reflects committed state and
 	// post-hook plugins see the updated image.

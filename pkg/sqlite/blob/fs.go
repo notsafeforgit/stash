@@ -64,17 +64,11 @@ func (s *FilesystemReader) Read(ctx context.Context, checksum string) ([]byte, e
 
 type FilesystemStore struct {
 	FilesystemReader
-	deleter *file.Deleter
 }
 
 func NewFilesystemStore(path string, fs FS) *FilesystemStore {
-	deleter := &file.Deleter{
-		RenamerRemover: fs,
-	}
-
 	return &FilesystemStore{
 		FilesystemReader: *NewReadonlyFilesystemStore(path, fs),
-		deleter:          deleter,
 	}
 }
 
@@ -122,11 +116,18 @@ func (s *FilesystemStore) Delete(ctx context.Context, checksum string) error {
 		return fmt.Errorf("no path set")
 	}
 
-	s.deleter.RegisterHooks(ctx)
+	// A deleter belongs to one transaction; sharing it across blob writes can
+	// mix a new transaction's paths with the previous transaction's hooks.
+	fs, ok := s.fs.(FS)
+	if !ok {
+		return fmt.Errorf("internal error: fs is not an FS")
+	}
+	deleter := &file.Deleter{RenamerRemover: fs}
+	deleter.RegisterHooks(ctx)
 
 	fn := s.checksumToPath(checksum)
 
-	if err := s.deleter.Files([]string{fn}); err != nil {
+	if err := deleter.Files([]string{fn}); err != nil {
 		return fmt.Errorf("deleting file %q: %w", fn, err)
 	}
 

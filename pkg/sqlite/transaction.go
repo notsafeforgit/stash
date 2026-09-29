@@ -78,7 +78,8 @@ func (db *Database) Begin(ctx context.Context, writable bool) (context.Context, 
 		ctx = db.reads.begin(ctx, tx, writable)
 	}
 
-	return context.WithValue(ctx, txnKey, tx), nil
+	ctx = context.WithValue(ctx, txnKey, tx)
+	return db.withFileDeletionJournal(ctx, tx, writable), nil
 }
 
 func (db *Database) Commit(ctx context.Context) error {

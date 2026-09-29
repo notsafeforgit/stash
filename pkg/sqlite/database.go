@@ -272,7 +272,13 @@ func (db *Database) Close() error {
 func (db *Database) open(disableForeignKeys bool, writable bool) (*sqlx.DB, error) {
 	// https://github.com/mattn/go-sqlite3
 	// 5s timeout is the default.
-	url := "file:" + db.dbPath + "?_journal=WAL&_sync=NORMAL&_busy_timeout=5000"
+	synchronous := "NORMAL"
+	if writable {
+		// Deletion commit markers must survive power loss before filesystem
+		// cleanup runs. SQLite cannot change synchronous inside a transaction.
+		synchronous = "FULL"
+	}
+	url := "file:" + db.dbPath + "?_journal=WAL&_sync=" + synchronous + "&_busy_timeout=5000"
 	if !disableForeignKeys {
 		url += "&_fk=true"
 	}
@@ -308,6 +314,9 @@ func (db *Database) initialise() error {
 	db.reads, err = newReadAcceleration(db.readDB, db.dbPath)
 	if err != nil {
 		logger.Warnf("Read cache unavailable; using database queries: %v", err)
+	}
+	if err := db.RecoverFileDeletions(); err != nil {
+		logger.Warnf("File deletion recovery remains pending: %v", err)
 	}
 
 	return nil

@@ -400,6 +400,7 @@ func (r *mutationResolver) SceneDestroy(ctx context.Context, input models.SceneD
 	destroyFileEntry := utils.IsTrue(input.DestroyFileEntry)
 
 	if err := r.withTxn(ctx, func(ctx context.Context) error {
+		fileDeleter.RegisterHooks(ctx)
 		qb := r.repository.Scene
 		var err error
 		s, err = qb.Find(ctx, sceneID)
@@ -416,12 +417,8 @@ func (r *mutationResolver) SceneDestroy(ctx context.Context, input models.SceneD
 
 		return r.sceneService.Destroy(ctx, s, fileDeleter, deleteGenerated, deleteFile, destroyFileEntry)
 	}); err != nil {
-		fileDeleter.Rollback()
 		return false, err
 	}
-
-	// perform the post-commit actions
-	fileDeleter.Commit()
 
 	// call post hook after performing the other actions
 	r.hookExecutor.ExecutePostHooks(ctx, s.ID, hook.SceneDestroyPost, plugin.SceneDestroyInput{
@@ -455,6 +452,7 @@ func (r *mutationResolver) ScenesDestroy(ctx context.Context, input models.Scene
 	destroyFileEntry := utils.IsTrue(input.DestroyFileEntry)
 
 	if err := r.withTxn(ctx, func(ctx context.Context) error {
+		fileDeleter.RegisterHooks(ctx)
 		qb := r.repository.Scene
 
 		for _, id := range sceneIDs {
@@ -478,12 +476,8 @@ func (r *mutationResolver) ScenesDestroy(ctx context.Context, input models.Scene
 
 		return nil
 	}); err != nil {
-		fileDeleter.Rollback()
 		return false, err
 	}
-
-	// perform the post-commit actions
-	fileDeleter.Commit()
 
 	for _, scene := range scenes {
 		// call post hook after performing the other actions
@@ -571,6 +565,7 @@ func (r *mutationResolver) SceneMerge(ctx context.Context, input SceneMergeInput
 
 	var ret *models.Scene
 	if err := r.withTxn(ctx, func(ctx context.Context) error {
+		fileDeleter.RegisterHooks(ctx)
 		if err := r.Resolver.sceneService.Merge(ctx, srcIDs, destID, fileDeleter, scene.MergeOptions{
 			ScenePartial:       *values,
 			IncludePlayHistory: utils.IsTrue(input.PlayHistory),
@@ -729,6 +724,7 @@ func (r *mutationResolver) SceneMarkerUpdate(ctx context.Context, input SceneMar
 
 	// Start the transaction and save the scene marker
 	if err := r.withTxn(ctx, func(ctx context.Context) error {
+		fileDeleter.RegisterHooks(ctx)
 		qb := r.repository.SceneMarker
 		sqb := r.repository.Scene
 
@@ -793,12 +789,8 @@ func (r *mutationResolver) SceneMarkerUpdate(ctx context.Context, input SceneMar
 
 		return nil
 	}); err != nil {
-		fileDeleter.Rollback()
 		return nil, err
 	}
-
-	// perform the post-commit actions
-	fileDeleter.Commit()
 
 	r.hookExecutor.ExecutePostHooks(ctx, markerID, hook.SceneMarkerUpdatePost, input, translator.getFields())
 	return r.getSceneMarker(ctx, markerID)
@@ -893,6 +885,7 @@ func (r *mutationResolver) SceneMarkersDestroy(ctx context.Context, markerIDs []
 	}
 
 	if err := r.withTxn(ctx, func(ctx context.Context) error {
+		fileDeleter.RegisterHooks(ctx)
 		qb := r.repository.SceneMarker
 		sqb := r.repository.Scene
 
@@ -926,11 +919,8 @@ func (r *mutationResolver) SceneMarkersDestroy(ctx context.Context, markerIDs []
 
 		return nil
 	}); err != nil {
-		fileDeleter.Rollback()
 		return false, err
 	}
-
-	fileDeleter.Commit()
 
 	for _, marker := range markers {
 		r.hookExecutor.ExecutePostHooks(ctx, marker.ID, hook.SceneMarkerDestroyPost, markerIDs, nil)

@@ -62,6 +62,8 @@ func withTxn(ctx context.Context, m Manager, fn TxnFunc, writable bool, execComp
 		if p := recover(); p != nil {
 			// a panic occurred, rollback and repanic
 			rollback(txnCtx, m)
+			hookMgr.executePostRollbackHooks(ctx)
+			hookMgr.executePostCompleteHooks(ctx)
 			panic(p)
 		}
 

@@ -113,6 +113,20 @@ type ScannedFile struct {
 
 // AcceptEntry determines if the file entry should be accepted for scanning
 func (s *Scanner) AcceptEntry(ctx context.Context, path string, info fs.FileInfo, zipFilePath string) bool {
+	// Staged deletions retain their media extensions. Never import them during
+	// another scan, including files retained after a failed deletion or rollback.
+	if zipFilePath == "" {
+		dir := path
+		if !info.IsDir() {
+			dir = filepath.Dir(path)
+		}
+		for _, component := range strings.Split(filepath.Clean(dir), string(filepath.Separator)) {
+			if strings.HasPrefix(component, deleteDirPrefix) {
+				return false
+			}
+		}
+	}
+
 	// always accept if there's no filters
 	accept := len(s.ScanFilters) == 0
 	for _, filter := range s.ScanFilters {

@@ -35,6 +35,8 @@ v3 route paths may differ, but existing v2.5 clients must keep working.
   `stash-s6` wrapper, and verify a local rootless Quadlet restart.
 - [Video duration mismatch repair](video-duration-mismatch-repair.md): manual
   diagnosis and repair for affected media files.
+- [Recoverable file deletion](file-deletion.md): staging, crash recovery,
+  automatic journal cleanup and trash transfers.
 
 ## Upstream reference and contribution policies
 

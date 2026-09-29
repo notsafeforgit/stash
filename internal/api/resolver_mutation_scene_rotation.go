@@ -93,6 +93,7 @@ func (r *mutationResolver) SceneVideoRotate(ctx context.Context, input SceneVide
 	}
 	var impactedScenes []*models.Scene
 	if err := r.withTxn(ctx, func(ctx context.Context) error {
+		fileDeleter.RegisterHooks(ctx)
 		currentScene, err := r.repository.Scene.Find(ctx, sceneID)
 		if err != nil {
 			return err
@@ -131,12 +132,10 @@ func (r *mutationResolver) SceneVideoRotate(ctx context.Context, input SceneVide
 		}
 		return nil
 	}); err != nil {
-		fileDeleter.Rollback()
 		return nil, err
 	}
 
 	manager.InvalidateVideoProbeCaches(primaryFile.Path)
-	fileDeleter.Commit()
 	if err := rotationPatch.Commit(); err != nil {
 		// The database and installed file are already committed. Leaving the
 		// hidden original beside it is recoverable and safer than reporting a

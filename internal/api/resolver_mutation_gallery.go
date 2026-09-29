@@ -298,6 +298,7 @@ func (r *mutationResolver) GalleryDestroy(ctx context.Context, input models.Gall
 	destroyFileEntry := utils.IsTrue(input.DestroyFileEntry)
 
 	if err := r.withTxn(ctx, func(ctx context.Context) error {
+		fileDeleter.RegisterHooks(ctx)
 		qb := r.repository.Gallery
 
 		for _, id := range galleryIDs {
@@ -324,12 +325,8 @@ func (r *mutationResolver) GalleryDestroy(ctx context.Context, input models.Gall
 
 		return nil
 	}); err != nil {
-		fileDeleter.Rollback()
 		return false, err
 	}
-
-	// perform the post-commit actions
-	fileDeleter.Commit()
 
 	for _, gallery := range galleries {
 		// don't delete stash library paths

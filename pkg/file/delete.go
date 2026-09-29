@@ -2,22 +2,20 @@ package file
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"io/fs"
 	"os"
 
 	"github.com/stashapp/stash/pkg/fsutil"
-	"github.com/stashapp/stash/pkg/logger"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/txn"
 )
 
-const deleteFileSuffix = ".delete"
+const deleteDirPrefix = ".stash-delete-"
 
-// RenamerRemover provides access to the Rename and Remove functions.
+// RenamerRemover provides filesystem operations for staging and deleting paths.
 type RenamerRemover interface {
 	Renamer
+	MkdirTemp(dir, pattern string) (string, error)
 	Remove(name string) error
 	RemoveAll(path string) error
 	Statter
@@ -25,6 +23,7 @@ type RenamerRemover interface {
 
 type renamerRemoverImpl struct {
 	RenameFn    func(oldpath, newpath string) error
+	MkdirTempFn func(dir, pattern string) (string, error)
 	RemoveFn    func(name string) error
 	RemoveAllFn func(path string) error
 	StatFn      func(path string) (fs.FileInfo, error)
@@ -32,6 +31,10 @@ type renamerRemoverImpl struct {
 
 func (r renamerRemoverImpl) Rename(oldpath, newpath string) error {
 	return r.RenameFn(oldpath, newpath)
+}
+
+func (r renamerRemoverImpl) MkdirTemp(dir, pattern string) (string, error) {
+	return r.MkdirTempFn(dir, pattern)
 }
 
 func (r renamerRemoverImpl) Remove(name string) error {
@@ -50,202 +53,83 @@ func newRenamerRemoverImpl() renamerRemoverImpl {
 	return renamerRemoverImpl{
 		// use fsutil.SafeMove to support cross-device moves
 		RenameFn:    fsutil.SafeMove,
+		MkdirTempFn: os.MkdirTemp,
 		RemoveFn:    os.Remove,
 		RemoveAllFn: os.RemoveAll,
 		StatFn:      os.Stat,
 	}
 }
 
-// Deleter is used to safely delete files and directories from the filesystem.
-// During a transaction, files and directories are marked for deletion using
-// the Files and Dirs methods. If TrashPath is set, files are moved to trash
-// immediately. Otherwise, they are renamed with a .delete suffix. If the
-// transaction is rolled back, then the files/directories can be restored to
-// their original state with the Rollback method. If the transaction is
-// committed, the marked files are then deleted from the filesystem using the
-// Commit method.
+// Deleter stages files on their original filesystem until the database
+// transaction finishes. RegisterHooks enables persistent crash recovery when
+// the transaction supplies a DeletionJournal.
 type Deleter struct {
 	RenamerRemover RenamerRemover
-	files          []string
-	dirs           []string
-	TrashPath      string            // if set, files will be moved to this directory instead of being permanently deleted
-	trashedPaths   map[string]string // map of original path -> trash path (only used when TrashPath is set)
+	TrashPath      string
+	pending        []*deletionRecord
+	journal        *DeletionJournal
+	stagingErr     error
+	registered     bool
+}
+
+func newDeletionRenamerRemover() renamerRemoverImpl {
+	ret := newRenamerRemoverImpl()
+	ret.RenameFn = fsutil.RenameNoReplace
+	ret.StatFn = os.Lstat
+	return ret
 }
 
 func NewDeleter() *Deleter {
-	return &Deleter{
-		RenamerRemover: newRenamerRemoverImpl(),
-		TrashPath:      "",
-		trashedPaths:   make(map[string]string),
-	}
+	return &Deleter{RenamerRemover: newDeletionRenamerRemover()}
 }
 
 func NewDeleterWithTrash(trashPath string) *Deleter {
-	return &Deleter{
-		RenamerRemover: newRenamerRemoverImpl(),
-		TrashPath:      trashPath,
-		trashedPaths:   make(map[string]string),
-	}
+	ret := NewDeleter()
+	ret.TrashPath = trashPath
+	return ret
 }
 
-// RegisterHooks registers post-commit and post-rollback hooks.
+// RegisterHooks registers recovery after either transaction outcome. It must
+// be called inside the transaction before staging any files.
 func (d *Deleter) RegisterHooks(ctx context.Context) {
-	txn.AddPostCommitHook(ctx, func(ctx context.Context) {
-		d.Commit()
-	})
-
-	txn.AddPostRollbackHook(ctx, func(ctx context.Context) {
-		d.Rollback()
-	})
+	if d.registered {
+		return
+	}
+	d.registered = true
+	d.journal, _ = ctx.Value(deletionJournalKey{}).(*DeletionJournal)
+	txn.AddPreCommitHook(ctx, func(context.Context) error { return d.stagingErr })
+	txn.AddPostCommitHook(ctx, func(context.Context) { d.Commit() })
+	txn.AddPostRollbackHook(ctx, func(context.Context) { d.Rollback() })
 }
 
-// Files designates files to be deleted. Each file marked will be renamed to add
-// a `.delete` suffix. An error is returned if a file could not be renamed.
-// Note that if an error is returned, then some files may be left renamed.
-// Abort should be called to restore marked files if this function returns an
-// error.
+// Files stages files for deletion without lengthening their basenames.
+// Call Rollback if staging returns an error and hooks are not registered.
 func (d *Deleter) Files(paths []string) error {
-	return d.filesInternal(paths, false)
+	return d.stagePaths(paths, false, false)
 }
 
-// FilesWithoutTrash designates files to be deleted, bypassing the trash directory.
-// Files will be permanently deleted even if TrashPath is configured.
-// This is useful for deleting generated files that can be easily recreated.
+// FilesWithoutTrash permanently deletes generated files after commit.
 func (d *Deleter) FilesWithoutTrash(paths []string) error {
-	return d.filesInternal(paths, true)
+	return d.stagePaths(paths, false, true)
 }
 
-func (d *Deleter) filesInternal(paths []string, bypassTrash bool) error {
-	for _, p := range paths {
-		// fail silently if the file does not exist
-		if _, err := d.RenamerRemover.Stat(p); err != nil {
-			if errors.Is(err, fs.ErrNotExist) {
-				logger.Warnf("File %q does not exist and therefore cannot be deleted. Ignoring.", p)
-				continue
-			}
-
-			return fmt.Errorf("check file %q exists: %w", p, err)
-		}
-
-		if err := d.renameForDelete(p, bypassTrash); err != nil {
-			return fmt.Errorf("marking file %q for deletion: %w", p, err)
-		}
-		d.files = append(d.files, p)
-	}
-
-	return nil
-}
-
-// Dirs designates directories to be deleted. Each directory marked will be renamed to add
-// a `.delete` suffix. An error is returned if a directory could not be renamed.
-// Note that if an error is returned, then some directories may be left renamed.
-// Abort should be called to restore marked files/directories if this function returns an
-// error.
+// Dirs stages directories for deletion, preserving their contents for rollback.
 func (d *Deleter) Dirs(paths []string) error {
-	return d.dirsInternal(paths, false)
+	return d.stagePaths(paths, true, false)
 }
 
-// DirsWithoutTrash designates directories to be deleted, bypassing the trash directory.
-// Directories will be permanently deleted even if TrashPath is configured.
-// This is useful for deleting generated directories that can be easily recreated.
+// DirsWithoutTrash permanently deletes generated directories after commit.
 func (d *Deleter) DirsWithoutTrash(paths []string) error {
-	return d.dirsInternal(paths, true)
+	return d.stagePaths(paths, true, true)
 }
 
-func (d *Deleter) dirsInternal(paths []string, bypassTrash bool) error {
-	for _, p := range paths {
-		// fail silently if the file does not exist
-		if _, err := d.RenamerRemover.Stat(p); err != nil {
-			if errors.Is(err, fs.ErrNotExist) {
-				logger.Warnf("Directory %q does not exist and therefore cannot be deleted. Ignoring.", p)
-				continue
-			}
+// Rollback restores staged paths without overwriting replacement files.
+// Failures retain their recovery records and are logged.
+func (d *Deleter) Rollback() { d.complete(false) }
 
-			return fmt.Errorf("check directory %q exists: %w", p, err)
-		}
-
-		if err := d.renameForDelete(p, bypassTrash); err != nil {
-			return fmt.Errorf("marking directory %q for deletion: %w", p, err)
-		}
-		d.dirs = append(d.dirs, p)
-	}
-
-	return nil
-}
-
-// Rollback tries to rename all marked files and directories back to their
-// original names and clears the marked list. Any errors encountered are
-// logged. All files will be attempted regardless of any errors occurred.
-func (d *Deleter) Rollback() {
-	for _, f := range append(d.files, d.dirs...) {
-		if err := d.renameForRestore(f); err != nil {
-			logger.Warnf("Error restoring %q: %v", f, err)
-		}
-	}
-
-	d.files = nil
-	d.dirs = nil
-	d.trashedPaths = make(map[string]string)
-}
-
-// Commit deletes all files marked for deletion and clears the marked list.
-// When using trash, files have already been moved during renameForDelete, so
-// this just clears the tracking. Otherwise, permanently delete the .delete files.
-// Any errors encountered are logged. All files will be attempted, regardless
-// of the errors encountered.
-func (d *Deleter) Commit() {
-	if d.TrashPath != "" {
-		// Files were already moved to trash during renameForDelete, just clear tracking
-		logger.Debugf("Commit: %d files and %d directories already in trash, clearing tracking", len(d.files), len(d.dirs))
-	} else {
-		// Permanently delete files and directories marked with .delete suffix
-		for _, f := range d.files {
-			if err := d.RenamerRemover.Remove(f + deleteFileSuffix); err != nil {
-				logger.Warnf("Error deleting file %q: %v", f+deleteFileSuffix, err)
-			}
-		}
-
-		for _, f := range d.dirs {
-			if err := d.RenamerRemover.RemoveAll(f + deleteFileSuffix); err != nil {
-				logger.Warnf("Error deleting directory %q: %v", f+deleteFileSuffix, err)
-			}
-		}
-	}
-
-	d.files = nil
-	d.dirs = nil
-	d.trashedPaths = make(map[string]string)
-}
-
-func (d *Deleter) renameForDelete(path string, bypassTrash bool) error {
-	if d.TrashPath != "" && !bypassTrash {
-		// Move file to trash immediately
-		trashDest, err := fsutil.MoveToTrash(path, d.TrashPath)
-		if err != nil {
-			return err
-		}
-		d.trashedPaths[path] = trashDest
-		logger.Infof("Moved %q to trash at %s", path, trashDest)
-		return nil
-	}
-
-	// Standard behavior: rename with .delete suffix (or when bypassing trash)
-	return d.RenamerRemover.Rename(path, path+deleteFileSuffix)
-}
-
-func (d *Deleter) renameForRestore(path string) error {
-	if d.TrashPath != "" {
-		// Restore file from trash
-		trashPath, ok := d.trashedPaths[path]
-		if !ok {
-			return fmt.Errorf("no trash path found for %q", path)
-		}
-		return d.RenamerRemover.Rename(trashPath, path)
-	}
-
-	// Standard behavior: restore from .delete suffix
-	return d.RenamerRemover.Rename(path+deleteFileSuffix, path)
-}
+// Commit deletes staged paths or transfers them to trash. Completed recovery
+// records are removed immediately; failed work remains available for retry.
+func (d *Deleter) Commit() { d.complete(true) }
 
 func Destroy(ctx context.Context, destroyer models.FileDestroyer, f models.File, fileDeleter *Deleter, deleteFile bool) error {
 	if err := destroyer.Destroy(ctx, f.Base().ID); err != nil {

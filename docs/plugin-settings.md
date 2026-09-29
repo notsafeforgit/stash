@@ -4,7 +4,10 @@ Plugins declare settings in their YAML manifest. Backend and v3 browser plugins
 share the same definitions and persisted configuration; no `ui.entry` is needed.
 Expand a plugin in **Settings → Plugins**, edit, then **Save**. Failed saves
 preserve the draft. Expression previews evaluate sample JSON without saving or
-running hooks.
+running hooks. Settings with a declared entity preview also offer a scene or
+image picker and **Load entity data**. The loaded input remains editable;
+**Test expression** always uses the unsaved expression draft. Editing that draft
+or the input hides the previous result.
 
 Mapping settings use rows with separate **Target field** and **jq expression**
 inputs. Write jq directly, including quotes and line breaks; no surrounding JSON
@@ -77,6 +80,7 @@ query {
     definitions {
       name display_name description type default_value editor
       options { value label }
+      preview { entity description }
     }
     values
   }
@@ -103,6 +107,47 @@ replacement; its behavior and `configuration.plugins` are unchanged.
 introspection. Unversioned plugins are adapted into this API; their existing
 string-based JSON settings remain strings. Native mapping settings also read
 previously saved JSON text overrides, preserving them during migration.
+
+## Entity preview providers
+
+A v3 `JQ` or `JQ_MAP` setting can declare a read-only context provider:
+
+```yaml
+  scene_import_mappings:
+    type: JSON
+    editor: JQ_MAP
+    preview:
+      entity: SCENE # or IMAGE
+      description: Test custom mappings against the selected item and its catalog.
+    default: {}
+```
+
+The picker searches titles and file paths and shows the item ID. Loading data
+calls `pluginSettingPreviewV3(plugin_id: ID!, setting: String!, entity_id: ID!)`.
+The backend validates the plugin and declared setting, then runs its executable
+with these arguments (raw interface JSON):
+
+```json
+{"mode":"preview","setting":"scene_import_mappings","entity_type":"scene","entity_id":"42"}
+```
+
+The plugin must return its jq input as `{"output": <context>, "error": null}`.
+Return an error for missing entities, missing files or unavailable data sources.
+The handler must only read data: it must not invoke imports, exports, hooks,
+relation creation, configuration saves or other write paths. It loads context
+using saved settings; the expression draft is evaluated separately by the pure
+jq API and does not need to be saved or sent to the executable.
+
+Previews have a 30-second deadline and a 1 MiB serialized response limit.
+Disabled plugins and undeclared preview settings are rejected. This is a
+read-only provider contract for trusted plugin code, not an executable sandbox
+or an enforcement boundary on the plugin's filesystem/API permissions. The
+jq evaluator itself remains pure. Tests should verify that provider handlers
+never call their normal write paths.
+
+The result is expression output, not a complete import/export dry run or a
+validation of the destination field types. Provider descriptions should explain
+any simulated event inputs and any normal processing omitted from the preview.
 
 ## jq API
 
@@ -151,6 +196,7 @@ The host has additive APIs within version 1:
 
 ```js
 const { definitions, values } = await host.settings.get();
+const input = await host.settings.preview("scene_import_mappings", "42");
 await host.settings.update({ enabled: true });
 await host.settings.update({}, ["mappings"]); // reset
 const stream = await host.expressions.jq(".catalog.title", input);

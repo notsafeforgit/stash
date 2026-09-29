@@ -7,6 +7,10 @@ query PluginSettings($plugin_id: ID!) {
       type
       default_value
       editor
+      preview {
+        entity
+        description
+      }
       options {
         value
         label
@@ -22,4 +26,46 @@ query PluginEvaluateJQ($expression: String!, $input: Any) {
 
 query PluginEvaluateMappings($mappings: Map!, $input: Any) {
   pluginEvaluateMappings(mappings: $mappings, input: $input)
+}
+
+query PluginSettingPreview(
+  $plugin_id: ID!
+  $setting: String!
+  $entity_id: ID!
+) {
+  pluginSettingPreviewV3(
+    plugin_id: $plugin_id
+    setting: $setting
+    entity_id: $entity_id
+  )
+}
+
+query PluginPreviewScenes($query: String!) {
+  findScenes(
+    filter: { q: $query, per_page: 20, sort: "updated_at", direction: DESC }
+  ) {
+    scenes {
+      id
+      title
+      files {
+        path
+      }
+    }
+  }
+}
+
+query PluginPreviewImages($query: String!) {
+  findImages(
+    filter: { q: $query, per_page: 20, sort: "updated_at", direction: DESC }
+  ) {
+    images {
+      id
+      title
+      visual_files {
+        ... on BaseFile {
+          path
+        }
+      }
+    }
+  }
 }

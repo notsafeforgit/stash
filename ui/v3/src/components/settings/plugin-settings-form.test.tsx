@@ -13,6 +13,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import {
   PluginSettingEditorV3,
   PluginSettingTypeV3,
+  PluginPreviewEntityV3,
 } from "@/core/generated-graphql";
 import { PluginSettingsForm } from "./plugin-settings-form";
 
@@ -25,10 +26,17 @@ afterEach(async () => {
 async function fixture(
   saved: Record<string, unknown> = {},
   mappingType = PluginSettingTypeV3.Json,
+  previewEntity?: PluginPreviewEntityV3,
 ) {
   let currentSaved = saved;
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   const requests: { name: string; variables: Record<string, unknown> }[] = [];
+  let failPreview = false;
+  const previewContext = {
+    stash: { id: "42", title: "Current title" },
+    catalog: { title: "Catalog title" },
+    fields: ["title"],
+  };
   const apollo = new ApolloClient({
     cache: new InMemoryCache(),
     link: new ApolloLink(
@@ -38,6 +46,40 @@ async function fixture(
             name: operation.operationName ?? "",
             variables: operation.variables,
           });
+          if (
+            operation.operationName === "PluginPreviewScenes" ||
+            operation.operationName === "PluginPreviewImages"
+          ) {
+            const scene = operation.operationName === "PluginPreviewScenes";
+            observer.next({
+              data: {
+                [scene ? "findScenes" : "findImages"]: {
+                  [scene ? "scenes" : "images"]: [
+                    {
+                      id: "42",
+                      title: "Preview item",
+                      [scene ? "files" : "visual_files"]: [
+                        { __typename: "VideoFile", path: "/media/example.mp4" },
+                      ],
+                    },
+                  ],
+                },
+              },
+            });
+            observer.complete();
+            return;
+          }
+          if (operation.operationName === "PluginSettingPreview") {
+            if (failPreview)
+              observer.error(new Error("Catalog is unavailable"));
+            else {
+              observer.next({
+                data: { pluginSettingPreviewV3: previewContext },
+              });
+              observer.complete();
+            }
+            return;
+          }
           if (operation.operationName === "PluginEvaluateMappings") {
             observer.next({
               data: { pluginEvaluateMappings: { title: "A quoted title" } },
@@ -86,6 +128,13 @@ async function fixture(
       editor: PluginSettingEditorV3.JqMap,
       default_value: mappingType === PluginSettingTypeV3.Json ? {} : "{}",
       options: [],
+      preview: previewEntity
+        ? {
+            __typename: "PluginSettingPreviewV3",
+            entity: previewEntity,
+            description: "Preview only",
+          }
+        : null,
     },
     {
       __typename: "PluginSettingV3",
@@ -96,6 +145,7 @@ async function fixture(
       type: PluginSettingTypeV3.String,
       default_value: "original",
       options: [],
+      preview: null,
     },
     {
       __typename: "PluginSettingV3",
@@ -106,6 +156,7 @@ async function fixture(
       type: PluginSettingTypeV3.Boolean,
       default_value: false,
       options: [],
+      preview: null,
     },
   ];
   const render = async (next: Record<string, unknown>) => {
@@ -168,7 +219,19 @@ async function fixture(
         );
     });
   await render(saved);
-  return { container, requests, render, control, edit, click, submit };
+  return {
+    container,
+    requests,
+    render,
+    control,
+    edit,
+    click,
+    submit,
+    previewContext,
+    failPreview: () => {
+      failPreview = true;
+    },
+  };
 }
 
 const expression =
@@ -257,7 +320,7 @@ it("previews the raw mapping draft with sample JSON without saving it", async ()
     mappings: { title: ".catalog.title" },
   });
   await edit("jq expression", expression);
-  await click("Preview with sample data");
+  await click("Preview mappings");
   await edit(
     "Sample input (JSON)",
     '{"fields":["title"],"stash":{"title":"A quoted title"}}',
@@ -304,3 +367,94 @@ it("cancels row edits using the latest saved mappings", async () => {
   expect(control("jq expression").value).toBe(".catalog.details");
   expect(requests).toHaveLength(0);
 });
+
+it.each([PluginPreviewEntityV3.Scene, PluginPreviewEntityV3.Image])(
+  "loads %s context, tests unsaved mappings, hides stale output and handles failed reloads without writes",
+  async (entity) => {
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+    const {
+      container,
+      requests,
+      control,
+      edit,
+      click,
+      previewContext,
+      failPreview,
+    } = await fixture(
+      { mappings: { title: ".catalog.title" } },
+      PluginSettingTypeV3.Json,
+      entity,
+    );
+    await click("Preview mappings");
+    const label =
+      entity === PluginPreviewEntityV3.Scene
+        ? "Scene to preview"
+        : "Image to preview";
+    await act(async () => {
+      const input = control(label);
+      input.focus();
+      input.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
+      );
+    });
+    const option = document.querySelector<HTMLElement>('[role="option"]');
+    expect(option?.textContent).toContain("Preview item (#42)");
+    await act(async () => option?.click());
+    await click("Load entity data");
+    expect(JSON.parse(control("Sample input (JSON)").value)).toEqual(
+      previewContext,
+    );
+    const enter = new KeyboardEvent("keydown", {
+      key: "Enter",
+      bubbles: true,
+      cancelable: true,
+    });
+    await act(async () => {
+      control(label).dispatchEvent(enter);
+    });
+    expect(enter.defaultPrevented).toBe(true);
+    expect(
+      requests.find((request) => request.name === "PluginSettingPreview")
+        ?.variables,
+    ).toEqual({
+      plugin_id: "fixture",
+      setting: "mappings",
+      entity_id: "42",
+    });
+    await edit("jq expression", ".stash.title");
+    await click("Test expression");
+    expect(requests.at(-1)).toEqual({
+      name: "PluginEvaluateMappings",
+      variables: {
+        mappings: { title: ".stash.title" },
+        input: previewContext,
+      },
+    });
+    expect(container.querySelector("pre")).not.toBeNull();
+    await edit("jq expression", ".catalog.title");
+    expect(container.querySelector("pre")).toBeNull();
+    await click("Test expression");
+    await edit("Sample input (JSON)", "{ invalid");
+    expect(container.querySelector("pre")).toBeNull();
+    await click("Test expression");
+    expect(container.querySelector('[role="alert"]')).not.toBeNull();
+    failPreview();
+    await click("Load entity data");
+    expect(container.textContent).toContain("Catalog is unavailable");
+    expect(control("Sample input (JSON)").value).toBe("{}");
+    expect(
+      requests.some(
+        (request) =>
+          request.name.startsWith("Update") ||
+          request.name === "RunPluginOperation",
+      ),
+    ).toBe(false);
+  },
+);

@@ -92,6 +92,10 @@ func (r *queryResolver) PluginSettingsV3(ctx context.Context, pluginID string) (
 	return &PluginSettingsV3{Definitions: p.SettingsV3, Values: p.SettingsValuesV3(config.GetInstance().GetPluginConfiguration(pluginID))}, nil
 }
 
+func (r *queryResolver) PluginSettingPreviewV3(ctx context.Context, pluginID, setting, entityID string) (interface{}, error) {
+	return manager.GetInstance().PluginCache.SettingPreviewV3(ctx, pluginID, setting, entityID)
+}
+
 func (r *mutationResolver) UpdatePluginSettingsV3(ctx context.Context, pluginID string, input map[string]interface{}, reset []string) (map[string]interface{}, error) {
 	p := manager.GetInstance().PluginCache.GetPlugin(pluginID)
 	if p == nil {

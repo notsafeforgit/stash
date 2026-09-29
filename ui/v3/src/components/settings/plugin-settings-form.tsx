@@ -1,3 +1,4 @@
+import { PluginExpressionPreview } from "./plugin-expression-preview";
 import { useId, useState, type ReactNode } from "react";
 import { useApolloClient } from "@apollo/client/react";
 import { useForm } from "@tanstack/react-form";
@@ -5,10 +6,7 @@ import { z } from "zod";
 import * as GQL from "src/core/generated-graphql";
 import { useMsg } from "src/hooks/message";
 import { useSaveIndicator } from "src/hooks/save-indicator";
-import {
-  createPluginExpressionsAPI,
-  createPluginSettingsAPI,
-} from "src/plugins/settings-api";
+import { createPluginSettingsAPI } from "src/plugins/settings-api";
 import { Button } from "src/components/ui/button";
 import { Input } from "src/components/ui/input";
 import { Textarea } from "src/components/ui/textarea";
@@ -37,7 +35,7 @@ import {
   SelectValue,
 } from "src/components/ui/select";
 
-type Setting = NonNullable<
+export type Setting = NonNullable<
   NonNullable<GQL.PluginsQuery["plugins"]>[number]["settings"]
 >[number];
 
@@ -59,84 +57,14 @@ function settingDraft(setting: Setting, value: unknown): unknown {
   return JSON.stringify(value, null, 2);
 }
 
-function ExpressionPreview({
-  expression,
-  mapping,
-}: {
-  expression: unknown;
-  mapping: boolean;
-}) {
-  const msg = useMsg();
-  const id = useId();
-  const apollo = useApolloClient();
-  const mappingValue = useMappingValue();
-  const [input, setInput] = useState("{}");
-  const [output, setOutput] = useState<string>();
-  const [error, setError] = useState<string>();
-  const [pending, setPending] = useState(false);
-
-  async function evaluate() {
-    setPending(true);
-    setError(undefined);
-    setOutput(undefined);
-    try {
-      const data: unknown = JSON.parse(input);
-      const api = createPluginExpressionsAPI(apollo);
-      const result = mapping
-        ? await api.map(mappingValue(expression), data)
-        : await api.jq(typeof expression === "string" ? expression : "", data);
-      setOutput(JSON.stringify(result, null, 2));
-    } catch (error) {
-      setError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setPending(false);
-    }
-  }
-
-  return (
-    <div className="flex flex-col gap-2">
-      <Field data-invalid={!!error}>
-        <FieldLabel htmlFor={id}>
-          {msg("config.plugins.sample_input", "Sample input (JSON)")}
-        </FieldLabel>
-        <Textarea
-          id={id}
-          value={input}
-          onChange={(event) => setInput(event.target.value)}
-          aria-invalid={!!error}
-          aria-describedby={error ? `${id}-error` : undefined}
-        />
-        {error && <FieldError id={`${id}-error`}>{error}</FieldError>}
-      </Field>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        disabled={pending}
-        onClick={() => void evaluate()}
-      >
-        {pending && <Spinner data-icon="inline-start" />}
-        {msg("config.plugins.test_expression", "Test expression")}
-      </Button>
-      {output !== undefined && (
-        <pre
-          className="max-h-64 overflow-auto rounded-md bg-muted p-3 text-xs"
-          data-selectable-text
-          aria-live="polite"
-        >
-          {output}
-        </pre>
-      )}
-    </div>
-  );
-}
-
 function SettingControl({
+  pluginId,
   setting,
   value,
   onChange,
   disabled,
 }: {
+  pluginId: string;
   setting: Setting;
   value: unknown;
   onChange: (value: unknown) => void;
@@ -158,12 +86,13 @@ function SettingControl({
         onClick={() => setPreview(!preview)}
         aria-expanded={preview}
       >
-        {msg("config.plugins.preview_expression", "Preview with sample data")}
+        {msg("config.plugins.preview_expression", "Preview mappings")}
       </Button>
       {preview && (
-        <ExpressionPreview
+        <PluginExpressionPreview
+          pluginId={pluginId}
+          setting={setting}
           expression={value}
-          mapping={editor === GQL.PluginSettingEditorV3.JqMap}
         />
       )}
     </>
@@ -376,6 +305,7 @@ export function PluginSettingsForm({
                 {settings.map((setting) => (
                   <SettingControl
                     key={setting.name}
+                    pluginId={pluginId}
                     setting={setting}
                     value={field.state.value[setting.name]}
                     onChange={(value) =>

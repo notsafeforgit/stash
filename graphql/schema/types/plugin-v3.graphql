@@ -52,6 +52,17 @@ type PluginSettingOptionV3 {
   label: String!
 }
 
+enum PluginPreviewEntityV3 {
+  SCENE
+  IMAGE
+}
+
+"Declares a plugin's read-only provider of expression input for a selected entity."
+type PluginSettingPreviewV3 {
+  entity: PluginPreviewEntityV3!
+  description: String
+}
+
 type PluginSettingV3 {
   name: String!
   display_name: String
@@ -60,6 +71,7 @@ type PluginSettingV3 {
   default_value: Any
   editor: PluginSettingEditorV3
   options: [PluginSettingOptionV3!]!
+  preview: PluginSettingPreviewV3
 }
 
 type PluginSettingsV3 {
@@ -71,6 +83,8 @@ extend type Query {
   pluginsV3: [PluginV3!]!
   pluginTasksV3: [PluginTaskV3!]!
   pluginSettingsV3(plugin_id: ID!): PluginSettingsV3!
+  "Loads expression input using the setting's declared read-only preview handler."
+  pluginSettingPreviewV3(plugin_id: ID!, setting: String!, entity_id: ID!): Any
 }
 
 extend type Mutation {

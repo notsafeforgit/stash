@@ -26,6 +26,10 @@ query Plugins {
       type
       default_value
       editor
+      preview {
+        entity
+        description
+      }
       options {
         value
         label

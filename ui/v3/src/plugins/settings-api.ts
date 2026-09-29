@@ -8,6 +8,15 @@ export function createPluginSettingsAPI(
   pluginId: string,
 ) {
   return Object.freeze({
+    async preview(setting: string, entityId: string): Promise<unknown> {
+      const result = await apollo.query({
+        query: GQL.PluginSettingPreviewDocument,
+        variables: { plugin_id: pluginId, setting, entity_id: entityId },
+        fetchPolicy: "no-cache",
+      });
+      if (!result.data) throw new Error("Missing preview response");
+      return result.data.pluginSettingPreviewV3;
+    },
     async get(): Promise<PluginSettingsSnapshot> {
       const result = await apollo.query({
         query: GQL.PluginSettingsDocument,

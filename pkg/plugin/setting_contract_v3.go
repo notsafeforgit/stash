@@ -58,6 +58,7 @@ type SettingConfigV3 struct {
 	DefaultValue interface{}             `yaml:"default" json:"default_value"`
 	Editor       *PluginSettingEditorV3  `yaml:"editor" json:"editor"`
 	Options      []PluginSettingOptionV3 `yaml:"options" json:"options"`
+	Preview      *PluginSettingPreviewV3 `yaml:"preview" json:"preview"`
 }
 
 type PluginSettingV3 struct {
@@ -100,6 +101,14 @@ func (s *SettingConfigV3) normalizeAndValidate() error {
 	}
 	if s.Options == nil {
 		s.Options = []PluginSettingOptionV3{}
+	}
+	if s.Preview != nil {
+		if s.Editor == nil || (*s.Editor != "JQ" && *s.Editor != "JQ_MAP") {
+			return fmt.Errorf("preview requires a JQ or JQ_MAP editor")
+		}
+		if !s.Preview.Entity.IsValid() {
+			return fmt.Errorf("preview entity must be SCENE or IMAGE")
+		}
 	}
 	if s.DefaultValue != nil {
 		value, err := manifestJSON(s.DefaultValue)

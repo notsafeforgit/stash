@@ -57,7 +57,7 @@ settings:
 	require.Equal(t, map[string]interface{}{"enabled": false, "mappings": "{}"}, settings["values"])
 	definitions := settings["definitions"].([]interface{})
 	require.Equal(t, "JQ_MAP", definitions[1].(map[string]interface{})["editor"])
-	require.Contains(t, definitions[1].(map[string]interface{}), "options")
+	require.Equal(t, []interface{}{}, definitions[1].(map[string]interface{})["options"])
 	const update = `mutation($input: Map!, $reset: [String!]) { updatePluginSettings(plugin_id: "fixture", input: $input, reset: $reset) }`
 	cfg.SetPluginConfiguration("fixture", map[string]interface{}{"legacy": "preserved"})
 	response = request(update, map[string]interface{}{"input": map[string]interface{}{"enabled": true}})

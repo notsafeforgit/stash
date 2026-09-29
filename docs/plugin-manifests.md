@@ -61,6 +61,11 @@ do not change generated v2.5 plugin models. The original `plugins` and
 `pluginTasks` queries expose only unversioned plugins. Legacy settings
 endpoints direct versioned plugins to their v3 equivalents.
 
+The unversioned `pluginSettings` endpoint returns `PluginSettingDefinition`
+metadata with a required `options` list. This metadata does not extend the
+original v2.5 `PluginSetting` type, so neither settings contract needs nullable
+options to accommodate v2.5 generated clients.
+
 The v3 API adapts unversioned plugins so they remain manageable in v3. This
 adapter is the host's responsibility; v3 plugin authors do not write one.
 Shared task execution, entity mutations, jq evaluation, and committed hooks

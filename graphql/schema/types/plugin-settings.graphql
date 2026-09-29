@@ -13,15 +13,19 @@ type PluginSettingOption {
   label: String!
 }
 
-extend type PluginSetting {
+"Settings metadata for the unversioned endpoint, separate from v2.5 PluginSetting."
+type PluginSettingDefinition {
+  name: String!
+  display_name: String
+  description: String
+  type: PluginSettingTypeEnum!
   default_value: Any
   editor: PluginSettingEditor
-  "Optional so legacy generated PluginSetting values need not provide it."
-  options: [PluginSettingOption!]
+  options: [PluginSettingOption!]!
 }
 
 type PluginSettings {
-  definitions: [PluginSetting!]!
+  definitions: [PluginSettingDefinition!]!
   "Saved values merged over manifest defaults."
   values: Map!
 }

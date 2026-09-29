@@ -35,6 +35,8 @@ models:
     model: github.com/stashapp/stash/internal/api.BoolMap
   PluginConfigMap:
     model: github.com/stashapp/stash/internal/api.PluginConfigMap
+  PluginSettingDefinition:
+    model: github.com/stashapp/stash/pkg/plugin.PluginSetting
   File:
     model: github.com/stashapp/stash/internal/api.File
   VideoFile:

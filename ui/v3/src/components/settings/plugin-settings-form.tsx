@@ -37,9 +37,24 @@ const mappingsSchema = z.record(z.string().min(1), z.string().min(1));
 
 export function settingDefault(setting: Setting): unknown {
   if (setting.default_value != null) return setting.default_value;
-  if (setting.type === GQL.PluginSettingTypeEnum.Boolean) return false;
-  if (setting.type === GQL.PluginSettingTypeEnum.Number) return 0;
+  if (setting.type === GQL.PluginSettingTypeV3.Boolean) return false;
+  if (setting.type === GQL.PluginSettingTypeV3.Number) return 0;
+  if (setting.type === GQL.PluginSettingTypeV3.Json) {
+    return setting.editor === GQL.PluginSettingEditorV3.JqMap ? {} : null;
+  }
   return "";
+}
+
+function settingDraft(setting: Setting, value: unknown): unknown {
+  if (setting.type !== GQL.PluginSettingTypeV3.Json) return value;
+  // Saved mapping overrides from before apiVersion 3 contain JSON text.
+  if (
+    setting.editor === GQL.PluginSettingEditorV3.JqMap &&
+    typeof value === "string"
+  ) {
+    return value;
+  }
+  return JSON.stringify(value, null, 2);
 }
 
 function ExpressionPreview({
@@ -132,7 +147,7 @@ function SettingControl({
   const text = typeof value === "string" ? value : "";
   const descriptionId = setting.description ? `${id}-description` : undefined;
   let control: ReactNode;
-  if (setting.type === GQL.PluginSettingTypeEnum.Boolean) {
+  if (setting.type === GQL.PluginSettingTypeV3.Boolean) {
     control = (
       <Switch
         id={id}
@@ -142,7 +157,7 @@ function SettingControl({
         aria-describedby={descriptionId}
       />
     );
-  } else if (setting.type === GQL.PluginSettingTypeEnum.Number) {
+  } else if (setting.type === GQL.PluginSettingTypeV3.Number) {
     control = (
       <Input
         id={id}
@@ -158,7 +173,7 @@ function SettingControl({
         aria-describedby={descriptionId}
       />
     );
-  } else if (editor === GQL.PluginSettingEditor.Select) {
+  } else if (editor === GQL.PluginSettingEditorV3.Select) {
     control = (
       <Select
         value={text}
@@ -169,13 +184,13 @@ function SettingControl({
       >
         <SelectTrigger id={id} aria-describedby={descriptionId}>
           <SelectValue>
-            {setting.options?.find((option) => option.value === text)?.label ??
+            {setting.options.find((option) => option.value === text)?.label ??
               text}
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectGroup>
-            {setting.options?.map((option) => (
+            {setting.options.map((option) => (
               <SelectItem key={option.value} value={option.value}>
                 {option.label}
               </SelectItem>
@@ -184,16 +199,16 @@ function SettingControl({
         </SelectContent>
       </Select>
     );
-  } else if (editor && editor !== GQL.PluginSettingEditor.Text) {
+  } else if (editor && editor !== GQL.PluginSettingEditorV3.Text) {
     control = (
       <Textarea
         id={id}
         value={text}
-        rows={editor === GQL.PluginSettingEditor.JqMap ? 8 : 4}
+        rows={editor === GQL.PluginSettingEditorV3.JqMap ? 8 : 4}
         onChange={(event) => onChange(event.target.value)}
         disabled={disabled}
         aria-describedby={descriptionId}
-        spellCheck={editor === GQL.PluginSettingEditor.Textarea}
+        spellCheck={editor === GQL.PluginSettingEditorV3.Textarea}
       />
     );
   } else {
@@ -216,8 +231,8 @@ function SettingControl({
         </FieldDescription>
       )}
       {control}
-      {(editor === GQL.PluginSettingEditor.Jq ||
-        editor === GQL.PluginSettingEditor.JqMap) && (
+      {(editor === GQL.PluginSettingEditorV3.Jq ||
+        editor === GQL.PluginSettingEditorV3.JqMap) && (
         <>
           <Button
             type="button"
@@ -234,7 +249,7 @@ function SettingControl({
           {preview && (
             <ExpressionPreview
               expression={text}
-              mapping={editor === GQL.PluginSettingEditor.JqMap}
+              mapping={editor === GQL.PluginSettingEditorV3.JqMap}
             />
           )}
         </>
@@ -259,9 +274,12 @@ export function PluginSettingsForm({
   const values = Object.fromEntries(
     settings.map((setting) => [
       setting.name,
-      Object.hasOwn(saved, setting.name)
-        ? saved[setting.name]
-        : settingDefault(setting),
+      settingDraft(
+        setting,
+        Object.hasOwn(saved, setting.name)
+          ? saved[setting.name]
+          : settingDefault(setting),
+      ),
     ]),
   );
   // Diff against the values this draft started with, so saving one field cannot
@@ -273,9 +291,17 @@ export function PluginSettingsForm({
       setError(undefined);
       try {
         const patch = Object.fromEntries(
-          Object.entries(value.values).filter(
-            ([key, value]) => value !== baseline[key],
-          ),
+          settings
+            .filter(
+              (setting) =>
+                value.values[setting.name] !== baseline[setting.name],
+            )
+            .map((setting) => [
+              setting.name,
+              setting.type === GQL.PluginSettingTypeV3.Json
+                ? (JSON.parse(String(value.values[setting.name])) as unknown)
+                : value.values[setting.name],
+            ]),
         );
         const updated = await track(
           createPluginSettingsAPI(apollo, pluginId).update(patch),
@@ -283,7 +309,12 @@ export function PluginSettingsForm({
         const next = Object.fromEntries(
           settings.map((setting) => [
             setting.name,
-            updated[setting.name] ?? settingDefault(setting),
+            settingDraft(
+              setting,
+              Object.hasOwn(updated, setting.name)
+                ? updated[setting.name]
+                : settingDefault(setting),
+            ),
           ]),
         );
         setBaseline(next);

@@ -1,6 +1,7 @@
 query Plugins {
-  plugins {
+  plugins: pluginsV3 {
     id
+    api_version
     name
     enabled
     description
@@ -34,15 +35,13 @@ query Plugins {
     requires
 
     paths {
-      css
-      javascript
       entry
     }
   }
 }
 
 query PluginTasks {
-  pluginTasks {
+  pluginTasks: pluginTasksV3 {
     name
     description
     plugin {

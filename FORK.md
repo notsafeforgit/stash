@@ -21,6 +21,11 @@ local container after validation.
 - Mainline v2.5 API clients must keep working. Fork features add compatibility
   layers at the resolver level rather than changing existing API semantics
   (see "Saved filters" in CLAUDE.md for the pattern).
+- **New v3 plugins have no v2.5 plugin compatibility requirement.** Their
+  `apiVersion: 3` manifest and `PluginV3` / `PluginSettingV3` API types are
+  independent contracts. Extend those types instead of the legacy plugin types.
+  The host adapts existing unversioned plugins for v3 management and keeps
+  versioned plugins out of v2.5 discovery. See [plugin manifests](docs/plugin-manifests.md).
 - The v3 UI is currently gated by `--enable-v3-ui` / `STASH_ENABLE_V3_UI=true`.
   Keep the existing v2.5 UI and client contract available throughout the rewrite.
 
@@ -116,6 +121,7 @@ local container after validation.
 | `internal/api/job_subscription.go` | cancel-aware job subscription forwarding | low (new file) |
 | `pkg/plugin/file_hooks.go`, `internal/api/post_update_hooks.go`, `internal/manager/plugin_hooks.go` | committed file deletion/update notifications and specialized entity edit hooks; see [plugin events](docs/plugin-events.md) | low (new files, small service/resolver hooks) |
 | `pkg/plugin/settings_v3.go`, `pkg/plugin/jq.go`, `internal/api/resolver_plugin_settings.go`, `internal/manager/config/plugin_update.go` | additive settings metadata, atomic patches and embedded jq evaluation; see [plugin settings](docs/plugin-settings.md) | low (new files, small manifest additions) |
+| `pkg/plugin/manifest_v3.go`, `pkg/plugin/setting_contract_v3.go`, `internal/api/resolver_plugin_v3.go`, `graphql/schema/types/plugin-v3.graphql` | versioned v3 manifests and independent plugin/settings API, including native JSON settings; no v2.5 plugin compatibility obligation | low (new files and legacy adapter) |
 | `internal/sharing/`, `internal/api/*share*`, `pkg/sqlite/share.go`, `graphql/schema/types/media_share.graphql` | expiring media capabilities, isolated guest router and additive owner management; see [sharing](docs/sharing.md) | low (new files, small server/repository hooks) |
 | `fork_shares`, `fork_share_sessions`, `internal/manager/config/sharing.go` | grants, frozen membership, hashed guest sessions and public share URL | none (fork-owned tables/key) |
 | `internal/api/performer_merge_*.go` | canonical-name retention and opt-in loss-aware performer merge validation | low (new files) |

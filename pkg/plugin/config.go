@@ -18,6 +18,7 @@ import (
 // Config describes the configuration for a single plugin.
 type Config struct {
 	id string
+	v3 *ManifestV3
 
 	// path to the configuration file
 	path string
@@ -260,6 +261,8 @@ func (c Config) getName() string {
 
 func (c Config) toPlugin() *Plugin {
 	return &Plugin{
+		APIVersion:  c.apiVersion(),
+		SettingsV3:  c.settingsV3(),
 		ID:          c.id,
 		Name:        c.getName(),
 		Description: c.Description,
@@ -425,6 +428,10 @@ type HookConfig struct {
 }
 
 func loadPluginFromYAML(reader io.Reader) (*Config, error) {
+	return decodePluginManifest(reader)
+}
+
+func loadLegacyPluginFromYAML(reader io.Reader) (*Config, error) {
 	ret := &Config{}
 
 	parser := yaml.NewDecoder(reader)

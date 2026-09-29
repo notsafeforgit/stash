@@ -8,6 +8,8 @@ Stash is a self-hosted media organizer written in Go (backend) + React/TypeScrip
 
 This repository is a **tracking fork** of upstream stashapp/stash. Before syncing with upstream, adding database migrations, or changing the GraphQL schema, read [FORK.md](FORK.md) — it documents the rebase-based sync playbook, the separate fork migration track and its hazards, and the design rules that keep upstream rebases manageable (additive schema changes only; fork logic in fork-owned files). The [documentation index](docs/README.md) links current guides. [docs/v3-schema-promotion.md](docs/v3-schema-promotion.md) describes a conditional future transition; v2.5 compatibility remains required today.
 
+New plugins use the independent [`apiVersion: 3` contract](docs/plugin-manifests.md) and have no v2.5 plugin compatibility requirement. Extend the v3 manifest and `PluginV3` / `PluginSettingV3` API types; keep legacy plugin adaptation inside the host.
+
 ## Development quickstart
 
 ```bash

@@ -10,6 +10,8 @@ import (
 
 // SettingOptions extends the original three setting types without changing
 // their representation. In particular, JSON editors persist JSON text.
+// This is the transitional, unversioned contract; new plugin features belong
+// in SettingConfigV3 and PluginSettingV3, independent of legacy client models.
 type SettingOptions struct {
 	DefaultValue interface{}           `yaml:"default" json:"default_value"`
 	Editor       *PluginSettingEditor  `yaml:"editor" json:"editor"`

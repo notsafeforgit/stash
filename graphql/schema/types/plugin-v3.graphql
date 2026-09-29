@@ -1,0 +1,78 @@
+"The v3 plugin contract. Legacy manifests are adapted here for v3 management."
+type PluginV3 {
+  id: ID!
+  api_version: Int!
+  name: String!
+  description: String
+  url: String
+  version: String
+  enabled: Boolean!
+  tasks: [PluginTaskV3!]!
+  hooks: [PluginHookV3!]!
+  settings: [PluginSettingV3!]!
+  requires: [ID!]!
+  paths: PluginPathsV3!
+}
+
+type PluginPathsV3 {
+  entry: String
+}
+
+type PluginTaskV3 {
+  name: String!
+  description: String
+  plugin: PluginV3!
+}
+
+type PluginHookV3 {
+  name: String!
+  description: String
+  hooks: [String!]!
+  plugin: PluginV3!
+}
+
+enum PluginSettingTypeV3 {
+  STRING
+  NUMBER
+  BOOLEAN
+  JSON
+}
+
+enum PluginSettingEditorV3 {
+  TEXT
+  TEXTAREA
+  SELECT
+  JSON
+  JQ
+  JQ_MAP
+}
+
+type PluginSettingOptionV3 {
+  value: String!
+  label: String!
+}
+
+type PluginSettingV3 {
+  name: String!
+  display_name: String
+  description: String
+  type: PluginSettingTypeV3!
+  default_value: Any
+  editor: PluginSettingEditorV3
+  options: [PluginSettingOptionV3!]!
+}
+
+type PluginSettingsV3 {
+  definitions: [PluginSettingV3!]!
+  values: Map!
+}
+
+extend type Query {
+  pluginsV3: [PluginV3!]!
+  pluginTasksV3: [PluginTaskV3!]!
+  pluginSettingsV3(plugin_id: ID!): PluginSettingsV3!
+}
+
+extend type Mutation {
+  updatePluginSettingsV3(plugin_id: ID!, input: Map!, reset: [String!]): Map!
+}

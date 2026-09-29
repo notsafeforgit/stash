@@ -43,7 +43,7 @@ export function createPluginSettingsAPI(
       }
       apollo.cache.evict({
         id: "ROOT_QUERY",
-        fieldName: "pluginSettings",
+        fieldName: "pluginSettingsV3",
         args: { plugin_id: pluginId },
       });
       return values;

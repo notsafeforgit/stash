@@ -1,5 +1,5 @@
 query PluginSettings($plugin_id: ID!) {
-  pluginSettings(plugin_id: $plugin_id) {
+  pluginSettings: pluginSettingsV3(plugin_id: $plugin_id) {
     definitions {
       name
       display_name

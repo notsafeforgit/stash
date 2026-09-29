@@ -29,6 +29,10 @@ import (
 )
 
 type Plugin struct {
+	// V3 metadata is exposed through the independent PluginV3 API contract.
+	APIVersion int               `json:"-"`
+	SettingsV3 []PluginSettingV3 `json:"-"`
+
 	ID          string          `json:"id"`
 	Name        string          `json:"name"`
 	Description *string         `json:"description"`

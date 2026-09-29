@@ -18,6 +18,7 @@ v3 route paths may differ, but existing v2.5 clients must keep working.
 | [Fork maintenance](../FORK.md) | Upstream syncs, additive API changes, migrations, and rollback compatibility |
 | [Repository guidance](../CLAUDE.md) and [v3 contributor guidance](../ui/v3/AGENTS.md) | Coding conventions and backend/player constraints |
 | [Plugin host](../ui/v3/docs/plugin-host.md) | Current v3 UI plugin API, startup lifecycle, and failure handling |
+| [Versioned plugin manifests](plugin-manifests.md) | Independent v3 plugin contract, legacy adapter, and API generations |
 | [Backend plugin notifications](plugin-events.md) | Scene/file deletion, metadata and file edits, commit semantics, and event payloads |
 | [Plugin settings and jq](plugin-settings.md) | Manifest settings definitions, validated updates, expression previews, mappings, and browser host APIs |
 | [Theming](../ui/v3/docs/theming.md) | Runtime CSS, JavaScript, custom assets, and component selectors |

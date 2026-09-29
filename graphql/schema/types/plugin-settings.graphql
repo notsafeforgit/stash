@@ -1,4 +1,4 @@
-"Optional v3 editors. JSON and JQ_MAP values remain strings for older clients."
+"Editors for unversioned plugins. New manifests use PluginSettingEditorV3."
 enum PluginSettingEditor {
   TEXT
   TEXTAREA

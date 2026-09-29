@@ -9,6 +9,8 @@ running hooks.
 ## Manifest API
 
 ```yaml
+apiVersion: 3
+name: Example
 settings:
   enabled:
     type: BOOLEAN
@@ -28,32 +30,35 @@ settings:
     type: STRING
     editor: TEXTAREA
   mappings:
-    type: STRING
+    type: JSON
     editor: JQ_MAP
     description: Target fields mapped to jq expressions
-    default: '{"title": ".catalog.title // empty"}'
+    default:
+      title: .catalog.title // empty
 ```
 
 Existing `type`, `displayName`, and `description` retain their meanings. Optional
 `default` must match the type. Saved false, zero and empty strings override it.
 Defaults are resolved on read, not written to config.
 
-String editors: `TEXT`, `TEXTAREA`, `SELECT`, `JSON`, `JQ`, `JQ_MAP`. `SELECT`
-requires distinct options with string `value` and `label`. `JSON` validates JSON
-text; `JQ` compiles an expression; `JQ_MAP` validates a JSON object of nonempty
-target names and jq expressions. JSON and mappings remain **strings** in config,
-preserving the original three-type API and v2.5 client representation. Plugins
-still validate domain-specific values such as allowed target fields or ranges.
+V3 types are `STRING`, `NUMBER`, `BOOLEAN`, and `JSON`. JSON values persist as
+native objects, arrays, scalars or null, independently of the legacy settings
+contract. Editors are `TEXT`, `TEXTAREA`, `SELECT`, `JSON`, `JQ`, `JQ_MAP`.
+`SELECT` requires distinct options with string `value` and `label`. `JQ`
+compiles an expression; `JQ_MAP` validates an object of nonempty target names
+and jq expressions. JSON editors can also validate text for an explicitly
+declared `STRING` setting. Plugins still validate domain-specific values such
+as allowed target fields or ranges.
 
-These manifest extensions require this backend API. Older servers use strict
-YAML decoding and cannot load manifests with the new keys. Upgrade Stash before
-installing packages that declare them.
+Versioned manifests require the v3 backend and have no v2.5 plugin compatibility
+requirement. See [plugin manifest versions](plugin-manifests.md). Upgrade Stash
+before installing packages that declare `apiVersion: 3`.
 
 ## GraphQL API
 
 ```graphql
 query {
-  pluginSettings(plugin_id: "catalogMetadata") {
+  pluginSettingsV3(plugin_id: "catalogMetadata") {
     definitions {
       name display_name description type default_value editor
       options { value label }
@@ -63,7 +68,7 @@ query {
 }
 
 mutation {
-  updatePluginSettings(
+  updatePluginSettingsV3(
     plugin_id: "catalogMetadata"
     input: { dry_mode: true }
     reset: ["scene_import_mappings"]
@@ -71,15 +76,18 @@ mutation {
 }
 ```
 
-`updatePluginSettings` validates the whole patch, serializes updates, preserves
+`updatePluginSettingsV3` validates the whole patch, serializes updates, preserves
 unrelated settings, and persists the result. Failed validation or persistence
 leaves the previous configuration intact. `reset` removes saved overrides so
 defaults apply again. Unknown names and a name in both input and reset are errors.
 The result includes defaults. Existing `configurePlugin` remains a whole-map
 replacement; its behavior and `configuration.plugins` are unchanged.
 
-`plugins.settings` also exposes the new definition fields. API availability can
-be discovered through GraphQL introspection.
+`pluginsV3.settings` exposes these definitions through the independent
+`PluginSettingV3` type. API availability can be discovered through GraphQL
+introspection. Unversioned plugins are adapted into this API; their existing
+string-based JSON settings remain strings. Native mapping settings also read
+previously saved JSON text overrides, preserving them during migration.
 
 ## jq API
 

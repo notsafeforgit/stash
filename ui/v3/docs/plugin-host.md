@@ -24,15 +24,17 @@ A v3 plugin is an ESM module loaded at app boot. Stash's frontend dynamic-import
 
 The v3 UI uses this host instead of the v2.5 `window.PluginApi`/DOM-patching API.
 v3 does not load legacy UI scripts. Existing v2.5 UI plugins can still load in
-the v2.5 frontend, and backend plugin behavior remains shared. Declaring a v3
-entry does not authorize breaking the v2.5 client contract.
+the v2.5 frontend, and backend plugin behavior remains shared. The v3
+plugin contract has no v2.5 plugin compatibility requirement. The host keeps
+legacy discovery and settings types separate from its v3 API.
 
 ## Plugin manifest
 
-A plugin opts into v3 by declaring `ui.entry` in its `<plugin>.yml`:
+A plugin declares `apiVersion: 3` in its `<plugin-id>.yml`, and adds `ui.entry`
+if it needs a browser module. See [manifest versions](../../../docs/plugin-manifests.md).
 
 ```yaml
-id: stash-tv
+apiVersion: 3
 name: StashTV
 description: Vertical-scroll TikTok-style scene viewer.
 version: 1.0.0
@@ -45,11 +47,11 @@ ui:
 ```
 
 The backend resolves the entry beneath `/plugin/{id}/assets/`, including the
-deployment prefix, and returns it as `Plugin.paths.entry` from the `plugins`
+deployment prefix, and returns it as `PluginV3.paths.entry` from the `pluginsV3`
 GraphQL query. The entry is an **asset URL path**, not an independently resolved
 filesystem path: with `assets: { "/": "./dist" }`, use `entry: index.js`, not
 `dist/index.js`. v3 loads only enabled plugins with an entry. Plugins without one
-are skipped, so their legacy UI can continue loading in v2.5.
+have no browser module to load; their backend hooks and settings still work.
 
 ## Entry module
 

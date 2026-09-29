@@ -6,6 +6,21 @@ Expand a plugin in **Settings → Plugins**, edit, then **Save**. Failed saves
 preserve the draft. Expression previews evaluate sample JSON without saving or
 running hooks.
 
+Mapping settings use rows with separate **Target field** and **jq expression**
+inputs. Write jq directly, including quotes and line breaks; no surrounding JSON
+object or string escaping is needed. For example, target `title` can use:
+
+```jq
+select(.fields | index("title"))
+| .stash.title
+```
+
+Add or remove rows to change the map. Removing every row saves an empty object;
+it does not reset the setting to its manifest default. Each target must be unique
+and every row needs an expression. Existing native objects and saved JSON text
+open in the same editor. The API and persisted configuration retain their existing
+JSON representation.
+
 ## Manifest API
 
 ```yaml

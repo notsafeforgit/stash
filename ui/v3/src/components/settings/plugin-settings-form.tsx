@@ -20,7 +20,14 @@ import {
   FieldError,
   FieldGroup,
   FieldLabel,
+  FieldLegend,
+  FieldSet,
 } from "src/components/ui/field";
+import {
+  mappingDraft,
+  PluginMappingEditor,
+  useMappingValue,
+} from "./plugin-mapping-editor";
 import {
   Select,
   SelectContent,
@@ -33,7 +40,6 @@ import {
 type Setting = NonNullable<
   NonNullable<GQL.PluginsQuery["plugins"]>[number]["settings"]
 >[number];
-const mappingsSchema = z.record(z.string().min(1), z.string().min(1));
 
 export function settingDefault(setting: Setting): unknown {
   if (setting.default_value != null) return setting.default_value;
@@ -46,14 +52,10 @@ export function settingDefault(setting: Setting): unknown {
 }
 
 function settingDraft(setting: Setting, value: unknown): unknown {
-  if (setting.type !== GQL.PluginSettingTypeV3.Json) return value;
-  // Saved mapping overrides from before apiVersion 3 contain JSON text.
-  if (
-    setting.editor === GQL.PluginSettingEditorV3.JqMap &&
-    typeof value === "string"
-  ) {
-    return value;
+  if (setting.editor === GQL.PluginSettingEditorV3.JqMap) {
+    return mappingDraft(value);
   }
+  if (setting.type !== GQL.PluginSettingTypeV3.Json) return value;
   return JSON.stringify(value, null, 2);
 }
 
@@ -61,12 +63,13 @@ function ExpressionPreview({
   expression,
   mapping,
 }: {
-  expression: string;
+  expression: unknown;
   mapping: boolean;
 }) {
   const msg = useMsg();
   const id = useId();
   const apollo = useApolloClient();
+  const mappingValue = useMappingValue();
   const [input, setInput] = useState("{}");
   const [output, setOutput] = useState<string>();
   const [error, setError] = useState<string>();
@@ -80,8 +83,8 @@ function ExpressionPreview({
       const data: unknown = JSON.parse(input);
       const api = createPluginExpressionsAPI(apollo);
       const result = mapping
-        ? await api.map(mappingsSchema.parse(JSON.parse(expression)), data)
-        : await api.jq(expression, data);
+        ? await api.map(mappingValue(expression), data)
+        : await api.jq(typeof expression === "string" ? expression : "", data);
       setOutput(JSON.stringify(result, null, 2));
     } catch (error) {
       setError(error instanceof Error ? error.message : String(error));
@@ -146,6 +149,43 @@ function SettingControl({
   const editor = setting.editor;
   const text = typeof value === "string" ? value : "";
   const descriptionId = setting.description ? `${id}-description` : undefined;
+  const previewControl = (
+    <>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() => setPreview(!preview)}
+        aria-expanded={preview}
+      >
+        {msg("config.plugins.preview_expression", "Preview with sample data")}
+      </Button>
+      {preview && (
+        <ExpressionPreview
+          expression={value}
+          mapping={editor === GQL.PluginSettingEditorV3.JqMap}
+        />
+      )}
+    </>
+  );
+  if (editor === GQL.PluginSettingEditorV3.JqMap) {
+    return (
+      <FieldSet disabled={disabled} aria-describedby={descriptionId}>
+        <FieldLegend variant="label">{label}</FieldLegend>
+        {setting.description && (
+          <FieldDescription id={descriptionId}>
+            {setting.description}
+          </FieldDescription>
+        )}
+        <PluginMappingEditor
+          value={value}
+          onChange={onChange}
+          disabled={disabled}
+        />
+        {previewControl}
+      </FieldSet>
+    );
+  }
   let control: ReactNode;
   if (setting.type === GQL.PluginSettingTypeV3.Boolean) {
     control = (
@@ -204,7 +244,7 @@ function SettingControl({
       <Textarea
         id={id}
         value={text}
-        rows={editor === GQL.PluginSettingEditorV3.JqMap ? 8 : 4}
+        rows={4}
         onChange={(event) => onChange(event.target.value)}
         disabled={disabled}
         aria-describedby={descriptionId}
@@ -231,29 +271,7 @@ function SettingControl({
         </FieldDescription>
       )}
       {control}
-      {(editor === GQL.PluginSettingEditorV3.Jq ||
-        editor === GQL.PluginSettingEditorV3.JqMap) && (
-        <>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => setPreview(!preview)}
-            aria-expanded={preview}
-          >
-            {msg(
-              "config.plugins.preview_expression",
-              "Preview with sample data",
-            )}
-          </Button>
-          {preview && (
-            <ExpressionPreview
-              expression={text}
-              mapping={editor === GQL.PluginSettingEditorV3.JqMap}
-            />
-          )}
-        </>
-      )}
+      {editor === GQL.PluginSettingEditorV3.Jq && previewControl}
     </Field>
   );
 }
@@ -269,6 +287,7 @@ export function PluginSettingsForm({
 }) {
   const msg = useMsg();
   const apollo = useApolloClient();
+  const mappingValue = useMappingValue();
   const { track } = useSaveIndicator();
   const [error, setError] = useState<string>();
   const values = Object.fromEntries(
@@ -294,14 +313,27 @@ export function PluginSettingsForm({
           settings
             .filter(
               (setting) =>
-                value.values[setting.name] !== baseline[setting.name],
+                JSON.stringify(value.values[setting.name]) !==
+                JSON.stringify(baseline[setting.name]),
             )
-            .map((setting) => [
-              setting.name,
-              setting.type === GQL.PluginSettingTypeV3.Json
-                ? (JSON.parse(String(value.values[setting.name])) as unknown)
-                : value.values[setting.name],
-            ]),
+            .map((setting) => {
+              const draft = value.values[setting.name];
+              if (setting.editor === GQL.PluginSettingEditorV3.JqMap) {
+                const mappings = mappingValue(draft);
+                return [
+                  setting.name,
+                  setting.type === GQL.PluginSettingTypeV3.Json
+                    ? mappings
+                    : JSON.stringify(mappings),
+                ];
+              }
+              return [
+                setting.name,
+                setting.type === GQL.PluginSettingTypeV3.Json
+                  ? JSON.parse(String(draft))
+                  : draft,
+              ];
+            }),
         );
         const updated = await track(
           createPluginSettingsAPI(apollo, pluginId).update(patch),

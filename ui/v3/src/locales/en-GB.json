@@ -595,6 +595,15 @@
       "log_level": "Log level"
     },
     "plugins": {
+      "mapping_add": "Add mapping",
+      "mapping_duplicate": "Each target field can only appear once.",
+      "mapping_expression": "jq expression",
+      "mapping_help": "Write jq directly, including quotes and line breaks.",
+      "mapping_invalid": "Repair the saved mapping data before saving.",
+      "mapping_remove": "Remove mapping {field}",
+      "mapping_required": "Each mapping needs a target field and a jq expression.",
+      "mapping_stored_data": "Saved mapping data",
+      "mapping_target": "Target field",
       "sample_input": "Sample input (JSON)",
       "test_expression": "Test expression",
       "preview_expression": "Preview with sample data",

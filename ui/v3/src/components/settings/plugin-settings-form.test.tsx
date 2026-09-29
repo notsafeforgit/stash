@@ -9,144 +9,298 @@ import {
   Observable,
 } from "@apollo/client";
 import { ApolloProvider } from "@apollo/client/react";
-import { expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import {
   PluginSettingEditorV3,
   PluginSettingTypeV3,
-} from "src/core/generated-graphql";
+} from "@/core/generated-graphql";
 import { PluginSettingsForm } from "./plugin-settings-form";
 
-it.each([PluginSettingTypeV3.String, PluginSettingTypeV3.Json])(
-  "keeps invalid %s mapping drafts, retries saves, and patches only edited settings",
-  async (mappingType) => {
-    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-    const requests: Record<string, unknown>[] = [];
-    const apollo = new ApolloClient({
-      cache: new InMemoryCache(),
-      link: new ApolloLink(
-        (operation) =>
-          new Observable((observer) => {
-            requests.push(operation.variables);
-            const input = operation.variables.input as Record<string, unknown>;
-            if (input.mappings === "invalid")
-              observer.error(new Error("Expected a JSON object"));
-            else {
-              observer.next({
-                data: {
-                  updatePluginSettings: {
-                    other: "external",
-                    enabled: false,
-                    ...input,
-                  },
+let cleanup = async () => {};
+afterEach(async () => {
+  await cleanup();
+  vi.unstubAllGlobals();
+});
+
+async function fixture(
+  saved: Record<string, unknown> = {},
+  mappingType = PluginSettingTypeV3.Json,
+) {
+  let currentSaved = saved;
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const requests: { name: string; variables: Record<string, unknown> }[] = [];
+  const apollo = new ApolloClient({
+    cache: new InMemoryCache(),
+    link: new ApolloLink(
+      (operation) =>
+        new Observable((observer) => {
+          requests.push({
+            name: operation.operationName ?? "",
+            variables: operation.variables,
+          });
+          if (operation.operationName === "PluginEvaluateMappings") {
+            observer.next({
+              data: { pluginEvaluateMappings: { title: "A quoted title" } },
+            });
+            observer.complete();
+            return;
+          }
+          const input = operation.variables.input as Record<string, unknown>;
+          const mappings =
+            typeof input.mappings === "string"
+              ? (JSON.parse(input.mappings) as Record<string, string>)
+              : (input.mappings as Record<string, string> | undefined);
+          if (mappings?.title === ".[") {
+            observer.error(new Error("Invalid jq expression"));
+          } else {
+            observer.next({
+              data: {
+                updatePluginSettings: {
+                  other: "external",
+                  enabled: false,
+                  ...currentSaved,
+                  ...input,
                 },
-              });
-              observer.complete();
-            }
-          }),
-      ),
-    });
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-    const settings: Parameters<typeof PluginSettingsForm>[0]["settings"] = [
-      {
-        __typename: "PluginSettingV3",
-        name: "mappings",
-        display_name: null,
-        description: null,
-        type: mappingType,
-        editor: PluginSettingEditorV3.JqMap,
-        default_value: mappingType === PluginSettingTypeV3.Json ? {} : "{}",
-        options: [],
-      },
-      {
-        __typename: "PluginSettingV3",
-        name: "other",
-        display_name: null,
-        description: null,
-        editor: null,
-        type: PluginSettingTypeV3.String,
-        default_value: "original",
-        options: [],
-      },
-      {
-        __typename: "PluginSettingV3",
-        name: "enabled",
-        display_name: null,
-        description: null,
-        editor: null,
-        type: PluginSettingTypeV3.Boolean,
-        default_value: false,
-        options: [],
-      },
-    ];
-    const render = (saved: Record<string, unknown>) =>
+              },
+            });
+            observer.complete();
+          }
+        }),
+    ),
+  });
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  cleanup = async () => {
+    await act(async () => root.unmount());
+    apollo.stop();
+    container.remove();
+  };
+  const settings: Parameters<typeof PluginSettingsForm>[0]["settings"] = [
+    {
+      __typename: "PluginSettingV3",
+      name: "mappings",
+      display_name: "Field mappings",
+      description: "Map a field to a jq expression.",
+      type: mappingType,
+      editor: PluginSettingEditorV3.JqMap,
+      default_value: mappingType === PluginSettingTypeV3.Json ? {} : "{}",
+      options: [],
+    },
+    {
+      __typename: "PluginSettingV3",
+      name: "other",
+      display_name: null,
+      description: null,
+      editor: null,
+      type: PluginSettingTypeV3.String,
+      default_value: "original",
+      options: [],
+    },
+    {
+      __typename: "PluginSettingV3",
+      name: "enabled",
+      display_name: null,
+      description: null,
+      editor: null,
+      type: PluginSettingTypeV3.Boolean,
+      default_value: false,
+      options: [],
+    },
+  ];
+  const render = async (next: Record<string, unknown>) => {
+    currentSaved = next;
+    await act(async () =>
       root.render(
         <ApolloProvider client={apollo}>
           <IntlProvider locale="en">
             <PluginSettingsForm
               pluginId="fixture"
               settings={settings}
-              saved={saved}
+              saved={currentSaved}
             />
           </IntlProvider>
         </ApolloProvider>,
-      );
-    const setText = async (text: string) => {
-      const textarea = container.querySelector("textarea");
-      if (!textarea) throw new Error("Missing mapping editor");
-      await act(async () => {
-        Object.getOwnPropertyDescriptor(
-          HTMLTextAreaElement.prototype,
-          "value",
-        )?.set?.call(textarea, text);
-        textarea.dispatchEvent(new Event("input", { bubbles: true }));
-      });
-    };
-    const submit = () =>
-      act(async () => {
-        container
-          .querySelector("form")
-          ?.dispatchEvent(
-            new Event("submit", { bubbles: true, cancelable: true }),
-          );
-      });
-    try {
-      await act(async () => render({}));
-      expect(container.querySelector("textarea")?.value).toBe("{}");
-      expect(
-        container
-          .querySelector('[role="switch"]')
-          ?.getAttribute("aria-checked"),
-      ).toBe("false");
-      await setText("invalid");
-      await submit();
-      expect(container.querySelector('[role="alert"]')).not.toBeNull();
-      expect(container.querySelector("textarea")?.value).toBe("invalid");
-      await act(async () => render({ other: "external" }));
-      await setText('{"title":".catalog.title"}');
-      await submit();
-      expect(requests.at(-1)).toEqual({
-        plugin_id: "fixture",
-        input: {
-          mappings:
-            mappingType === PluginSettingTypeV3.Json
-              ? { title: ".catalog.title" }
-              : '{"title":".catalog.title"}',
-        },
-        reset: [],
-      });
-      expect(container.querySelector('[role="alert"]')).toBeNull();
-      expect(
-        container.querySelector<HTMLInputElement>(
-          'input[type="text"], input:not([type])',
-        )?.value,
-      ).toBe("external");
-    } finally {
-      await act(async () => root.unmount());
-      apollo.stop();
-      container.remove();
-      vi.unstubAllGlobals();
+      ),
+    );
+  };
+  const control = (label: string, index = 0) => {
+    const labels = Array.from(container.querySelectorAll("label")).filter(
+      (element) => element.textContent === label,
+    );
+    const element = document.getElementById(labels[index]?.htmlFor ?? "");
+    if (
+      !(
+        element instanceof HTMLInputElement ||
+        element instanceof HTMLTextAreaElement
+      )
+    ) {
+      throw new Error(`Missing control: ${label} ${index}`);
     }
+    return element;
+  };
+  const edit = async (label: string, value: string, index = 0) => {
+    const element = control(label, index);
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(
+        element instanceof HTMLTextAreaElement
+          ? HTMLTextAreaElement.prototype
+          : HTMLInputElement.prototype,
+        "value",
+      )?.set?.call(element, value);
+      element.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  };
+  const click = async (name: string) => {
+    const button = Array.from(container.querySelectorAll("button")).find(
+      (element) =>
+        (element.getAttribute("aria-label") ?? element.textContent) === name,
+    );
+    if (!button) throw new Error(`Missing button: ${name}`);
+    await act(async () => button.click());
+  };
+  const submit = () =>
+    act(async () => {
+      container
+        .querySelector("form")
+        ?.dispatchEvent(
+          new Event("submit", { bubbles: true, cancelable: true }),
+        );
+    });
+  await render(saved);
+  return { container, requests, render, control, edit, click, submit };
+}
+
+const expression =
+  'select(.fields | index("title"))\n| .stash.title // "Untitled"';
+
+it.each([PluginSettingTypeV3.String, PluginSettingTypeV3.Json])(
+  "edits raw jq in %s mappings, retains failed drafts, and patches only edited settings",
+  async (mappingType) => {
+    const { container, requests, render, control, edit, click, submit } =
+      await fixture({}, mappingType);
+    expect(
+      container.querySelector('[role="switch"]')?.getAttribute("aria-checked"),
+    ).toBe("false");
+    await click("Add mapping");
+    await edit("Target field", "title");
+    await edit("jq expression", ".[");
+    await submit();
+    expect(container.textContent).toContain("Invalid jq expression");
+    expect(control("jq expression").value).toBe(".[");
+    await render({ other: "external" });
+    await edit("jq expression", expression);
+    await submit();
+    expect(requests.at(-1)?.variables).toEqual({
+      plugin_id: "fixture",
+      input: {
+        mappings:
+          mappingType === PluginSettingTypeV3.Json
+            ? { title: expression }
+            : JSON.stringify({ title: expression }),
+      },
+      reset: [],
+    });
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(control("jq expression").value).toBe(expression);
+    expect(control("other").value).toBe("external");
   },
 );
+
+it.each([{ title: expression }, JSON.stringify({ title: expression })])(
+  "opens saved mappings as unescaped expressions without rewriting untouched settings: %j",
+  async (mappings) => {
+    const { control, edit, submit, requests } = await fixture({ mappings });
+    expect(control("Target field").value).toBe("title");
+    expect(control("jq expression").value).toBe(expression);
+    await edit("other", "changed");
+    await submit();
+    expect(requests.at(-1)?.variables.input).toEqual({ other: "changed" });
+    expect(control("jq expression").value).toBe(expression);
+  },
+);
+
+it("rejects incomplete and duplicate rows without losing them, and saves an empty map after removal", async () => {
+  const { container, requests, control, click, edit, submit } = await fixture({
+    mappings: { title: ".catalog.title" },
+  });
+  await click("Add mapping");
+  await edit("Target field", "title", 1);
+  await edit("jq expression", '"Replacement"', 1);
+  await submit();
+  expect(requests).toHaveLength(0);
+  expect(container.textContent).toContain(
+    "Each target field can only appear once.",
+  );
+  expect(control("Target field").getAttribute("aria-invalid")).toBe("true");
+  const retainedExpression = control("jq expression", 1);
+  await click("Remove mapping title");
+  expect(control("jq expression")).toBe(retainedExpression);
+  await edit("jq expression", "  ");
+  await submit();
+  expect(requests).toHaveLength(0);
+  expect(container.textContent).toContain(
+    "Each mapping needs a target field and a jq expression.",
+  );
+  await edit("jq expression", '"Replacement"');
+  await submit();
+  expect(requests.at(-1)?.variables.input).toEqual({
+    mappings: { title: '"Replacement"' },
+  });
+  await click("Remove mapping title");
+  await submit();
+  expect(requests.at(-1)?.variables.input).toEqual({ mappings: {} });
+});
+
+it("previews the raw mapping draft with sample JSON without saving it", async () => {
+  const { container, requests, click, edit, control } = await fixture({
+    mappings: { title: ".catalog.title" },
+  });
+  await edit("jq expression", expression);
+  await click("Preview with sample data");
+  await edit(
+    "Sample input (JSON)",
+    '{"fields":["title"],"stash":{"title":"A quoted title"}}',
+  );
+  await click("Test expression");
+  expect(requests).toEqual([
+    {
+      name: "PluginEvaluateMappings",
+      variables: {
+        mappings: { title: expression },
+        input: { fields: ["title"], stash: { title: "A quoted title" } },
+      },
+    },
+  ]);
+  expect(container.querySelector("pre")?.textContent).toContain(
+    "A quoted title",
+  );
+  expect(control("jq expression").value).toBe(expression);
+});
+
+it("preserves malformed saved data for repair, then switches to the mapping editor", async () => {
+  const { control, edit, submit, requests } = await fixture({
+    mappings: '{"title":42}',
+  });
+  expect(control("Saved mapping data").value).toBe('{"title":42}');
+  await edit("Saved mapping data", '{"title":".catalog.title"}');
+  expect(control("Target field").value).toBe("title");
+  expect(control("jq expression").value).toBe(".catalog.title");
+  await submit();
+  expect(requests.at(-1)?.variables.input).toEqual({
+    mappings: { title: ".catalog.title" },
+  });
+});
+
+it("cancels row edits using the latest saved mappings", async () => {
+  const { control, edit, click, render, requests } = await fixture({
+    mappings: { title: ".catalog.title" },
+  });
+  await edit("jq expression", expression);
+  await click("Add mapping");
+  await render({ mappings: { details: ".catalog.details" } });
+  await click("Cancel");
+  expect(control("Target field").value).toBe("details");
+  expect(control("jq expression").value).toBe(".catalog.details");
+  expect(requests).toHaveLength(0);
+});

@@ -51,6 +51,8 @@ const (
 )
 
 var AllHookTriggerEnum = []TriggerEnum{
+	FileDestroyPost,
+	FileUpdatePost,
 	SceneMarkerCreatePost,
 	SceneMarkerUpdatePost,
 	SceneMarkerDestroyPost,
@@ -74,6 +76,9 @@ var AllHookTriggerEnum = []TriggerEnum{
 	MovieCreatePost,
 	MovieUpdatePost,
 	MovieDestroyPost,
+	GroupCreatePost,
+	GroupUpdatePost,
+	GroupDestroyPost,
 
 	PerformerCreatePost,
 	PerformerUpdatePost,
@@ -92,7 +97,9 @@ var AllHookTriggerEnum = []TriggerEnum{
 func (e TriggerEnum) IsValid() bool {
 
 	switch e {
-	case SceneMarkerCreatePost,
+	case FileDestroyPost,
+		FileUpdatePost,
+		SceneMarkerCreatePost,
 		SceneMarkerUpdatePost,
 		SceneMarkerDestroyPost,
 
@@ -115,6 +122,9 @@ func (e TriggerEnum) IsValid() bool {
 		MovieCreatePost,
 		MovieUpdatePost,
 		MovieDestroyPost,
+		GroupCreatePost,
+		GroupUpdatePost,
+		GroupDestroyPost,
 
 		PerformerCreatePost,
 		PerformerUpdatePost,
@@ -126,6 +136,7 @@ func (e TriggerEnum) IsValid() bool {
 
 		TagCreatePost,
 		TagUpdatePost,
+		TagMergePost,
 		TagDestroyPost:
 		return true
 	}

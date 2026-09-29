@@ -352,6 +352,7 @@ func (r *mutationResolver) AddGroupSubGroups(ctx context.Context, input GroupSub
 		return false, err
 	}
 
+	r.groupFieldsUpdated(ctx, groupID, "sub_groups")
 	return true, nil
 }
 
@@ -372,6 +373,7 @@ func (r *mutationResolver) RemoveGroupSubGroups(ctx context.Context, input Group
 		return false, err
 	}
 
+	r.groupFieldsUpdated(ctx, groupID, "sub_groups")
 	return true, nil
 }
 
@@ -399,5 +401,6 @@ func (r *mutationResolver) ReorderSubGroups(ctx context.Context, input ReorderSu
 		return false, err
 	}
 
+	r.groupFieldsUpdated(ctx, groupID, "sub_groups")
 	return true, nil
 }

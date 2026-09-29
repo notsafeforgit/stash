@@ -229,6 +229,19 @@ and embedded JavaScript through Goja, plus configured hooks. Scrapers in
 scripts to retrieve metadata. Identification coordinates these sources and
 stash-box matching.
 
+[Backend plugin notifications](plugin-events.md) describe deletion and edit
+events. The file repository wrapper in
+[file_hooks.go](../pkg/plugin/file_hooks.go) captures file identities and update
+snapshots inside transactions, then dispatches after commit. API, entity
+services, scans, and cleanup share that wrapper. Entity metadata hooks also
+cover specialized activity, history, cover, and relationship edits.
+
+[Plugin settings and jq mappings](plugin-settings.md) share manifest definitions
+between backend and browser plugins. Additive GraphQL endpoints resolve defaults,
+validate atomic configuration patches, and evaluate JSON with an embedded jq
+interpreter. The v3 settings screen renders the declared editors and previews
+expressions without running plugin hooks.
+
 v3 UI plugins are a separate browser extension surface. The
 [plugin host](../ui/v3/docs/plugin-host.md) stages timed registrations before
 building the router and exposes shared Apollo, navigation, UI, and locale

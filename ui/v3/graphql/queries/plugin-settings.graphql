@@ -1,0 +1,25 @@
+query PluginSettings($plugin_id: ID!) {
+  pluginSettings(plugin_id: $plugin_id) {
+    definitions {
+      name
+      display_name
+      description
+      type
+      default_value
+      editor
+      options {
+        value
+        label
+      }
+    }
+    values
+  }
+}
+
+query PluginEvaluateJQ($expression: String!, $input: Any) {
+  pluginEvaluateJQ(expression: $expression, input: $input)
+}
+
+query PluginEvaluateMappings($mappings: Map!, $input: Any) {
+  pluginEvaluateMappings(mappings: $mappings, input: $input)
+}

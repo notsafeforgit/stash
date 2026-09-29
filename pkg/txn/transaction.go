@@ -49,7 +49,7 @@ func WithReadTxn(ctx context.Context, m Manager, fn TxnFunc) error {
 	return withTxn(ctx, m, fn, writable, execComplete)
 }
 
-func withTxn(ctx context.Context, m Manager, fn TxnFunc, writable bool, execCompleteOnLocked bool) error {
+func withTxn(ctx context.Context, m Manager, fn TxnFunc, writable bool, execCompleteOnLocked bool) (err error) {
 	// post-hooks should be executed with the outside context
 	txnCtx, err := begin(ctx, m, writable)
 	if err != nil {
@@ -65,6 +65,10 @@ func withTxn(ctx context.Context, m Manager, fn TxnFunc, writable bool, execComp
 			panic(p)
 		}
 
+		if err == nil {
+			err = commit(txnCtx, m)
+		}
+
 		if err != nil {
 			// something went wrong, rollback
 			rollback(txnCtx, m)
@@ -76,9 +80,6 @@ func withTxn(ctx context.Context, m Manager, fn TxnFunc, writable bool, execComp
 				hookMgr.executePostCompleteHooks(ctx)
 			}
 		} else {
-			// all good, commit
-			err = commit(txnCtx, m)
-
 			// execute post-hooks with outside context
 			hookMgr.executePostCommitHooks(ctx)
 			hookMgr.executePostCompleteHooks(ctx)

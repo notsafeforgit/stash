@@ -261,6 +261,9 @@ func (t *GenerateCoverTask) generateWithCoverSource(ctx context.Context) error {
 			return err
 		}
 		_, err = r.Scene.UpdatePartial(ctx, scene.ID, models.NewScenePartial())
+		if err == nil {
+			s.registerSceneCoverHook(ctx, scene.ID)
+		}
 		return err
 	})
 }

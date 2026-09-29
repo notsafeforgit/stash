@@ -45,9 +45,10 @@ func Initialize(cfg *config.Config, l *log.Logger) (*Manager, error) {
 	scraperCache := scraper.NewCache(cfg, scraperRepository)
 
 	pluginCache := plugin.NewCache(cfg)
+	repo.File = plugin.WithFileHooks(repo.File, pluginCache)
 
 	sceneService := &scene.Service{
-		File:             db.File,
+		File:             repo.File,
 		Repository:       db.Scene,
 		MarkerRepository: db.SceneMarker,
 		PluginCache:      pluginCache,
@@ -56,7 +57,7 @@ func Initialize(cfg *config.Config, l *log.Logger) (*Manager, error) {
 	}
 
 	imageService := &image.Service{
-		File:       db.File,
+		File:       repo.File,
 		Repository: db.Image,
 	}
 
@@ -64,7 +65,7 @@ func Initialize(cfg *config.Config, l *log.Logger) (*Manager, error) {
 		Repository:   db.Gallery,
 		ImageFinder:  db.Image,
 		ImageService: imageService,
-		File:         db.File,
+		File:         repo.File,
 		Folder:       db.Folder,
 	}
 

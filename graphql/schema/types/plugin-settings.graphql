@@ -1,0 +1,39 @@
+"Optional v3 editors. JSON and JQ_MAP values remain strings for older clients."
+enum PluginSettingEditor {
+  TEXT
+  TEXTAREA
+  SELECT
+  JSON
+  JQ
+  JQ_MAP
+}
+
+type PluginSettingOption {
+  value: String!
+  label: String!
+}
+
+extend type PluginSetting {
+  default_value: Any
+  editor: PluginSettingEditor
+  options: [PluginSettingOption!]!
+}
+
+type PluginSettings {
+  definitions: [PluginSetting!]!
+  "Saved values merged over manifest defaults."
+  values: Map!
+}
+
+extend type Query {
+  pluginSettings(plugin_id: ID!): PluginSettings!
+  "Evaluate jq against supplied JSON. No filesystem, environment or network access."
+  pluginEvaluateJQ(expression: String!, input: Any): [Any]!
+  "Map target keys to jq expressions. Each must emit zero or one value; empty omits a key."
+  pluginEvaluateMappings(mappings: Map!, input: Any): Map!
+}
+
+extend type Mutation {
+  "Validate and atomically patch declared settings. Reset removes saved overrides."
+  updatePluginSettings(plugin_id: ID!, input: Map!, reset: [String!]): Map!
+}

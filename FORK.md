@@ -114,6 +114,8 @@ local container after validation.
 | `internal/api/json_values.go` | recursive JSON-number conversion for configuration persistence; shared helper/resolver call sites stay small | low (new file) |
 | `internal/api/resolver_entity_image*.go`, `internal/manager/scene_frame_image.go` | normalized entity images from uploads, images, scene covers or independent scene frames | low (new files) |
 | `internal/api/job_subscription.go` | cancel-aware job subscription forwarding | low (new file) |
+| `pkg/plugin/file_hooks.go`, `internal/api/post_update_hooks.go`, `internal/manager/plugin_hooks.go` | committed file deletion/update notifications and specialized entity edit hooks; see [plugin events](docs/plugin-events.md) | low (new files, small service/resolver hooks) |
+| `pkg/plugin/settings_v3.go`, `pkg/plugin/jq.go`, `internal/api/resolver_plugin_settings.go`, `internal/manager/config/plugin_update.go` | additive settings metadata, atomic patches and embedded jq evaluation; see [plugin settings](docs/plugin-settings.md) | low (new files, small manifest additions) |
 | `internal/sharing/`, `internal/api/*share*`, `pkg/sqlite/share.go`, `graphql/schema/types/media_share.graphql` | expiring media capabilities, isolated guest router and additive owner management; see [sharing](docs/sharing.md) | low (new files, small server/repository hooks) |
 | `fork_shares`, `fork_share_sessions`, `internal/manager/config/sharing.go` | grants, frozen membership, hashed guest sessions and public share URL | none (fork-owned tables/key) |
 | `internal/api/performer_merge_*.go` | canonical-name retention and opt-in loss-aware performer merge validation | low (new files) |

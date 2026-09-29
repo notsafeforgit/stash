@@ -1,8 +1,18 @@
 # Stash v3 plugin host (host v1)
 
-This document describes the contract for v3 UI plugins — plugins that add new top-level pages, navigation entries, and other React-rendered UI to Stash. Backend plugin features (hooks, scrapers, jobs, packaged plugin sources) are unchanged.
+This document describes the contract for v3 UI plugins — plugins that add new top-level pages, navigation entries, and other React-rendered UI to Stash. Backend plugin features (hooks, scrapers, jobs, packaged plugin sources) are shared by both UIs.
 
-Checked against the implementation on 2026-09-07. The authoritative types are in
+Plugins that react to deletions or metadata edits use
+[backend notifications](../../../docs/plugin-events.md), independently of this
+browser host. They do not need `ui.entry`. The backend contract includes scene
+and file deletion, entity field updates, and file update snapshots.
+
+Plugins can also declare [settings and jq mappings](../../../docs/plugin-settings.md)
+in their manifests. v3 renders those settings without an entry module. Browser
+plugins use `host.settings.get/update` and `host.expressions.jq/map` to access
+the same backend APIs.
+
+Checked against the implementation on 2026-09-29. The authoritative types are in
 [host.ts](../src/plugins/host.ts), startup behavior in
 [loader.ts](../src/plugins/loader.ts), and exported components in
 [ui-exports.ts](../src/plugins/ui-exports.ts). See the

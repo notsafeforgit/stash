@@ -23,6 +23,12 @@ query Plugins {
       display_name
       description
       type
+      default_value
+      editor
+      options {
+        value
+        label
+      }
     }
 
     requires

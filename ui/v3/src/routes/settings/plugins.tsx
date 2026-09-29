@@ -8,71 +8,23 @@ import {
   RefreshCw,
 } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
-import { useConfigurationContext, useConfigurePlugin } from "src/hooks/config";
+import { useConfigurationContext } from "src/hooks/config";
 import { useToast } from "src/hooks/toast";
 import { useMsg } from "src/hooks/message";
 import { cn } from "src/lib/utils";
 import { Button } from "src/components/ui/button";
 import { Spinner } from "src/components/ui/spinner";
 import { Switch } from "src/components/ui/switch";
-import {
-  SettingNumber,
-  SettingsSection,
-  SettingSwitch,
-  SettingText,
-} from "src/components/settings/setting-row";
+import { SettingsSection } from "src/components/settings/setting-row";
+import { PluginSettingsForm } from "src/components/settings/plugin-settings-form";
 import { PackageManager } from "src/components/settings/package-manager";
 import { PluginHookOrder } from "src/components/settings/plugin-hook-order";
 
 type Plugin = NonNullable<GQL.PluginsQuery["plugins"]>[number];
 
-function PluginSettingRow({
-  setting,
-  value,
-  onChange,
-}: {
-  setting: NonNullable<Plugin["settings"]>[number];
-  value: unknown;
-  onChange: (value: unknown) => void;
-}) {
-  const label = setting.display_name || setting.name;
-  switch (setting.type) {
-    case GQL.PluginSettingTypeEnum.Boolean:
-      return (
-        <SettingSwitch
-          label={label}
-          description={setting.description}
-          checked={value === true}
-          onChange={(v) => onChange(v)}
-        />
-      );
-    case GQL.PluginSettingTypeEnum.Number:
-      return (
-        <SettingNumber
-          label={label}
-          description={setting.description}
-          value={typeof value === "number" ? value : 0}
-          onChange={(v) => onChange(v)}
-        />
-      );
-    case GQL.PluginSettingTypeEnum.String:
-      return (
-        <SettingText
-          label={label}
-          description={setting.description}
-          value={typeof value === "string" ? value : ""}
-          onChange={(v) => onChange(v)}
-        />
-      );
-    default:
-      return null;
-  }
-}
-
 function PluginCard({ plugin }: { plugin: Plugin }) {
   const Toast = useToast();
   const { configuration } = useConfigurationContext();
-  const [configurePlugin] = useConfigurePlugin();
   const [setPluginsEnabled] = useMutation(GQL.SetPluginsEnabledDocument, {
     refetchQueries: [{ query: GQL.PluginsDocument }],
   });
@@ -205,21 +157,11 @@ function PluginCard({ plugin }: { plugin: Plugin }) {
               <h4 className="text-sm font-medium">
                 {msg("settings", "Settings")}
               </h4>
-              {plugin.settings.map((setting) => (
-                <PluginSettingRow
-                  key={setting.name}
-                  setting={setting}
-                  value={pluginSettings[setting.name]}
-                  onChange={(v) =>
-                    void configurePlugin({
-                      variables: {
-                        plugin_id: plugin.id,
-                        input: { ...pluginSettings, [setting.name]: v },
-                      },
-                    })
-                  }
-                />
-              ))}
+              <PluginSettingsForm
+                pluginId={plugin.id}
+                settings={plugin.settings}
+                saved={pluginSettings}
+              />
             </div>
           )}
         </div>

@@ -165,6 +165,7 @@ func (c UIConfig) getExternalScripts() []string {
 }
 
 type SettingConfig struct {
+	SettingOptions `yaml:",inline"`
 	// defaults to string
 	Type PluginSettingTypeEnum `yaml:"type"`
 	// defaults to key name
@@ -236,10 +237,11 @@ func (c Config) getPluginSettings() []PluginSetting {
 		}
 
 		s := PluginSetting{
-			Name:        k,
-			DisplayName: o.DisplayName,
-			Description: o.Description,
-			Type:        t,
+			SettingOptions: o.SettingOptions,
+			Name:           k,
+			DisplayName:    o.DisplayName,
+			Description:    o.Description,
+			Type:           t,
 		}
 
 		ret = append(ret, s)
@@ -346,6 +348,9 @@ func (c Config) valid() error {
 	for k, o := range c.Settings {
 		if o.Type != "" && !o.Type.IsValid() {
 			return fmt.Errorf("invalid type %s for setting %s", k, o.Type)
+		}
+		if err := o.validateDefinition(); err != nil {
+			return fmt.Errorf("setting %s: %w", k, err)
 		}
 	}
 

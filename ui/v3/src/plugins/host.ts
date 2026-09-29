@@ -19,6 +19,10 @@ import type { Link, useNavigate } from "@tanstack/react-router";
 import type { SavedFilterDataFragment } from "src/core/generated-graphql";
 import type { ListFilterModel } from "src/models/list-filter/filter";
 import type { StashPluginUI } from "./ui-exports";
+import type {
+  createPluginExpressionsAPI,
+  createPluginSettingsAPI,
+} from "./settings-api";
 
 export const HOST_VERSION = "1" as const;
 
@@ -102,6 +106,12 @@ export interface StashPluginHost {
    * scoping local storage keys, etc.
    */
   readonly pluginId: string;
+
+  /** Read manifest definitions/defaults and atomically update this plugin's settings. */
+  readonly settings: ReturnType<typeof createPluginSettingsAPI>;
+
+  /** Backend jq evaluation, shared with backend plugins and mapping previews. */
+  readonly expressions: ReturnType<typeof createPluginExpressionsAPI>;
 
   /**
    * Add a top-level route. Must be called synchronously inside

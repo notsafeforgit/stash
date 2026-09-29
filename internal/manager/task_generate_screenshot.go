@@ -99,6 +99,7 @@ func (t *GenerateCoverTask) generate(ctx context.Context) error {
 			return fmt.Errorf("error updating scene: %v", err)
 		}
 
+		instance.registerSceneCoverHook(ctx, t.Scene.ID)
 		return nil
 	})
 }

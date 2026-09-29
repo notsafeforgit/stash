@@ -399,6 +399,7 @@ func (r *mutationResolver) AddGalleryImages(ctx context.Context, input GalleryAd
 		return false, err
 	}
 
+	r.galleryFieldsUpdated(ctx, galleryID, "image_ids")
 	return true, nil
 }
 
@@ -429,6 +430,7 @@ func (r *mutationResolver) RemoveGalleryImages(ctx context.Context, input Galler
 		return false, err
 	}
 
+	r.galleryFieldsUpdated(ctx, galleryID, "image_ids")
 	return true, nil
 }
 
@@ -459,6 +461,7 @@ func (r *mutationResolver) SetGalleryCover(ctx context.Context, input GallerySet
 		return false, err
 	}
 
+	r.galleryFieldsUpdated(ctx, galleryID, "cover_image_id")
 	return true, nil
 }
 
@@ -484,6 +487,7 @@ func (r *mutationResolver) ResetGalleryCover(ctx context.Context, input GalleryR
 		return false, err
 	}
 
+	r.galleryFieldsUpdated(ctx, galleryID, "cover_image_id")
 	return true, nil
 }
 

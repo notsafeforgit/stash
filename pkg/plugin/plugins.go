@@ -85,6 +85,7 @@ type PluginUI struct {
 }
 
 type PluginSetting struct {
+	SettingOptions
 	Name string `json:"name"`
 	// defaults to string
 	Type PluginSettingTypeEnum `json:"type"`
@@ -412,6 +413,7 @@ func waitForTask(ctx context.Context, task Task) error {
 
 func (c Cache) ExecutePostHooks(ctx context.Context, id int, hookType hook.TriggerEnum, input interface{}, inputFields []string) {
 	if err := c.executePostHooks(ctx, hookType, common.HookContext{
+		ParentHooks: parentHookSources(ctx),
 		ID:          id,
 		Type:        hookType.String(),
 		Input:       input,

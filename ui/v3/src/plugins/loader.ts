@@ -32,6 +32,10 @@ import {
   recordSavedFilterLoadedListener,
 } from "./registry";
 import type { StashPluginUI } from "./ui-exports";
+import {
+  createPluginExpressionsAPI,
+  createPluginSettingsAPI,
+} from "./settings-api";
 
 interface PluginToLoad {
   id: string;
@@ -80,6 +84,8 @@ function buildHost(
   return Object.freeze({
     version: HOST_VERSION,
     pluginId,
+    settings: createPluginSettingsAPI(apollo, pluginId),
+    expressions: createPluginExpressionsAPI(apollo),
     routes: Object.freeze({
       add: (route: PluginRouteOptions) =>
         stage(() => recordRoute(pluginId, route)),

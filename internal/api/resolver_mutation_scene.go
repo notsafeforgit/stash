@@ -515,6 +515,7 @@ func (r *mutationResolver) SceneAssignFile(ctx context.Context, input AssignScen
 		return false, fmt.Errorf("assigning file to scene: %w", err)
 	}
 
+	r.sceneFieldsUpdated(ctx, sceneID, "files")
 	return true, nil
 }
 
@@ -953,6 +954,9 @@ func (r *mutationResolver) SceneSaveActivity(ctx context.Context, id string, res
 		return false, err
 	}
 
+	if ret {
+		r.sceneActivityUpdated(ctx, sceneID, resumeTime != nil, playDuration != nil)
+	}
 	return ret, nil
 }
 
@@ -971,6 +975,9 @@ func (r *mutationResolver) SceneResetActivity(ctx context.Context, id string, re
 		return false, err
 	}
 
+	if ret {
+		r.sceneActivityUpdated(ctx, sceneID, utils.IsTrue(resetResume), utils.IsTrue(resetDuration))
+	}
 	return ret, nil
 }
 
@@ -992,6 +999,7 @@ func (r *mutationResolver) SceneIncrementPlayCount(ctx context.Context, id strin
 		return 0, err
 	}
 
+	r.sceneFieldsUpdated(ctx, sceneID, "play_count", "play_history", "last_played_at")
 	return len(updatedTimes), nil
 }
 
@@ -1019,6 +1027,7 @@ func (r *mutationResolver) SceneAddPlay(ctx context.Context, id string, t []*tim
 		return nil, err
 	}
 
+	r.sceneFieldsUpdated(ctx, sceneID, "play_count", "play_history", "last_played_at")
 	return &HistoryMutationResult{
 		Count:   len(updatedTimes),
 		History: sliceutil.ValuesToPtrs(updatedTimes),
@@ -1048,6 +1057,7 @@ func (r *mutationResolver) SceneDeletePlay(ctx context.Context, id string, t []*
 		return nil, err
 	}
 
+	r.sceneFieldsUpdated(ctx, sceneID, "play_count", "play_history", "last_played_at")
 	return &HistoryMutationResult{
 		Count:   len(updatedTimes),
 		History: sliceutil.ValuesToPtrs(updatedTimes),
@@ -1069,6 +1079,7 @@ func (r *mutationResolver) SceneResetPlayCount(ctx context.Context, id string) (
 		return 0, err
 	}
 
+	r.sceneFieldsUpdated(ctx, sceneID, "play_count", "play_history", "last_played_at")
 	return ret, nil
 }
 
@@ -1090,6 +1101,7 @@ func (r *mutationResolver) SceneIncrementO(ctx context.Context, id string) (ret 
 		return 0, err
 	}
 
+	r.sceneFieldsUpdated(ctx, sceneID, "o_counter", "o_history")
 	return len(updatedTimes), nil
 }
 
@@ -1111,6 +1123,7 @@ func (r *mutationResolver) SceneDecrementO(ctx context.Context, id string) (ret 
 		return 0, err
 	}
 
+	r.sceneFieldsUpdated(ctx, sceneID, "o_counter", "o_history")
 	return len(updatedTimes), nil
 }
 
@@ -1129,6 +1142,7 @@ func (r *mutationResolver) SceneResetO(ctx context.Context, id string) (ret int,
 		return 0, err
 	}
 
+	r.sceneFieldsUpdated(ctx, sceneID, "o_counter", "o_history")
 	return ret, nil
 }
 
@@ -1156,6 +1170,7 @@ func (r *mutationResolver) SceneAddO(ctx context.Context, id string, t []*time.T
 		return nil, err
 	}
 
+	r.sceneFieldsUpdated(ctx, sceneID, "o_counter", "o_history")
 	return &HistoryMutationResult{
 		Count:   len(updatedTimes),
 		History: sliceutil.ValuesToPtrs(updatedTimes),
@@ -1185,6 +1200,7 @@ func (r *mutationResolver) SceneDeleteO(ctx context.Context, id string, t []*tim
 		return nil, err
 	}
 
+	r.sceneFieldsUpdated(ctx, sceneID, "o_counter", "o_history")
 	return &HistoryMutationResult{
 		Count:   len(updatedTimes),
 		History: sliceutil.ValuesToPtrs(updatedTimes),

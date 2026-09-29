@@ -595,6 +595,9 @@
       "log_level": "Log level"
     },
     "plugins": {
+      "sample_input": "Sample input (JSON)",
+      "test_expression": "Test expression",
+      "preview_expression": "Preview with sample data",
       "available_plugins": "Available Plugins",
       "hooks": "Hooks",
       "installed_plugins": "Installed Plugins",

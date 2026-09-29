@@ -333,6 +333,7 @@ func (r *mutationResolver) ImageIncrementO(ctx context.Context, id string) (ret 
 		return 0, err
 	}
 
+	r.imageFieldsUpdated(ctx, imageID, "o_counter")
 	return ret, nil
 }
 
@@ -351,6 +352,7 @@ func (r *mutationResolver) ImageDecrementO(ctx context.Context, id string) (ret 
 		return 0, err
 	}
 
+	r.imageFieldsUpdated(ctx, imageID, "o_counter")
 	return ret, nil
 }
 
@@ -369,6 +371,7 @@ func (r *mutationResolver) ImageResetO(ctx context.Context, id string) (ret int,
 		return 0, err
 	}
 
+	r.imageFieldsUpdated(ctx, imageID, "o_counter")
 	return ret, nil
 }
 

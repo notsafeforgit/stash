@@ -1,0 +1,7 @@
+mutation UpdatePluginSettings(
+  $plugin_id: ID!
+  $input: Map!
+  $reset: [String!]
+) {
+  updatePluginSettings(plugin_id: $plugin_id, input: $input, reset: $reset)
+}

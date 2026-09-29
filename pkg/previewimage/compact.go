@@ -67,9 +67,10 @@ func writeManifest(dir string, manifest Manifest) error {
 	return os.Rename(f.Name(), filepath.Join(dir, "manifest.json"))
 }
 
-// Compact removes redundant JPEGs from an existing generated entry without
-// decoding the original or re-encoding AVIF. It retains JPEGs when an old plain
-// HDR AVIF still needs them for SDR. Dry runs inspect exactly the same files.
+// Compact removes redundant JPEGs and unreferenced AVIFs from an existing
+// generated entry without decoding the original or re-encoding AVIF. It retains
+// JPEGs when an old plain HDR AVIF still needs them for SDR. Dry runs inspect
+// exactly the same files.
 func (s Store) Compact(entityID int, kind, key string, dryRun bool) (int64, error) {
 	dir, err := s.directory(entityID, kind, key)
 	if err != nil {
@@ -85,7 +86,7 @@ func (s Store) Compact(entityID int, kind, key string, dryRun bool) (int64, erro
 	variants, thumbnails := avifRenditions(m.Variants), avifRenditions(m.Thumbnail)
 	changed := len(variants) != len(m.Variants) || len(thumbnails) != len(m.Thumbnail)
 	// Check the immutable assets' content hashes before discarding a fallback.
-	// A truncated/corrupt AVIF must leave the usable JPEG and manifest intact.
+	// A truncated/corrupt AVIF must leave the manifest and older renditions intact.
 	for _, group := range [][]Variant{variants, thumbnails} {
 		for _, v := range group {
 			if v.MIMEType == "image/avif" {
@@ -114,7 +115,8 @@ func (s Store) Compact(entityID int, kind, key string, dryRun bool) (int64, erro
 	var reclaimed int64
 	for _, entry := range entries {
 		name := entry.Name()
-		if keep[name] || !entry.Type().IsRegular() || !strings.HasSuffix(name, ".jpg") || !hashedAssetName(name) {
+		ext := filepath.Ext(name)
+		if keep[name] || !entry.Type().IsRegular() || (ext != ".jpg" && ext != ".avif") || !hashedAssetName(name) {
 			continue
 		}
 		info, err := entry.Info()

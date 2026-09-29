@@ -167,9 +167,10 @@ namespace, keyed by the image's primary-file checksum. Image and scene IDs canno
 collide. Catalog reads inspect only the generated manifest, never the source;
 offline originals retain their cached thumbnails. Image deletion and generated
 image-thumbnail cleanup include this namespace, preserving current, recent and
-offline-source entries during cleanup, while removing redundant JPEGs from
-eligible current entries as described below. Shared rendition URLs remain scoped to
-the grant and its pinned file, with the same authorization as the original image.
+offline-source entries during cleanup, while removing redundant JPEGs and
+obsolete AVIFs from eligible current entries as described below. Shared rendition
+URLs remain scoped to the grant and its pinned file, with the same authorization
+as the original image.
 
 Fork migration 7 adds `fork_scene_cover_sources`, independently of upstream's
 schema version. It stores the cover checksum, historical source file ID, exact
@@ -213,16 +214,19 @@ removes obsolete cover/marker entries with the matching category, retaining
 recent generations and entries whose source is temporarily offline.
 
 After upgrading, **Settings → Tasks → Clean generated files** can reclaim old
-v3 JPEG copies without decoding the originals or re-encoding AVIFs. Select
-**Scene previews**, **Marker previews** and/or **Image thumbnails** for the
-corresponding caches. Cleanup verifies the retained AVIFs' content hashes and
-atomically updates the catalog before deleting redundant JPEGs. An old plain
-HDR AVIF still needs its JPEG fallback until regeneration supplies an SDR AVIF
-or adaptive AVIF. Recent entries (under one hour), offline originals and entries
+v3 JPEG copies and AVIFs left by earlier generations without decoding the
+originals or re-encoding AVIFs. Select **Scene previews**, **Marker previews**
+and/or **Image thumbnails** for the corresponding caches. Cleanup verifies the
+retained AVIFs' content hashes and
+atomically updates the catalog before deleting redundant JPEGs. It also removes
+content-hashed AVIFs that neither the current full-size nor thumbnail catalog
+references, preserving all current HDR, SDR and adaptive renditions. Publication
+and cleanup share a lock so in-flight replacements cannot be mistaken for old
+files. An old plain HDR AVIF still needs its JPEG fallback until regeneration
+supplies an SDR AVIF or adaptive AVIF. Recent entries (under one hour), offline originals and entries
 with damaged AVIFs are left alone. **Dry run** reports the same candidates
-without changing catalogs or files. JPEGs left behind by regeneration are also
-reclaimed; legacy scene cover blobs, marker screenshots and image thumbnails
-remain for existing endpoints and clients.
+without changing catalogs or files. Legacy scene cover blobs, marker screenshots
+and image thumbnails remain for existing endpoints and clients.
 
 The replacement boundary is the rendition catalog, not an extension change to
 `Scene.paths.screenshot`. Additional image producers can use the same encoder,

@@ -81,6 +81,8 @@ func TestCompactPreservesFallbackOnCorruptAVIF(t *testing.T) {
 	store, dir, before := legacyCompactFixture(t, Adaptive, SDR)
 	manifest, err := os.ReadFile(filepath.Join(dir, "manifest.json"))
 	require.NoError(t, err)
+	obsolete := filepath.Join(dir, fmt.Sprintf("%x.avif", sha256.Sum256([]byte("older AVIF"))))
+	require.NoError(t, os.WriteFile(obsolete, []byte("older AVIF"), 0600))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, before.Thumbnail[1].File), []byte("corrupt avif"), 0600))
 	for _, dryRun := range []bool{true, false} {
 		bytes, err := store.Compact(1, "cover", before.Key, dryRun)
@@ -91,25 +93,67 @@ func TestCompactPreservesFallbackOnCorruptAVIF(t *testing.T) {
 		require.Equal(t, manifest, after)
 		require.FileExists(t, filepath.Join(dir, before.Variants[0].File))
 		require.FileExists(t, filepath.Join(dir, before.Thumbnail[0].File))
+		require.FileExists(t, obsolete)
 	}
 }
 
-func TestCompactReclaimsJPEGsLeftByRegeneration(t *testing.T) {
+func TestCompactReclaimsRenditionsLeftByRegeneration(t *testing.T) {
 	store, dir, old := legacyCompactFixture(t, Adaptive, SDR)
 	stage := t.TempDir()
-	result := &Result{Directory: stage, Variants: []Variant{{"new.jpg", "image/jpeg", SDR, 64, 32}, {"new.avif", "image/avif", SDR, 64, 32}}}
-	for _, v := range result.Variants {
-		require.NoError(t, os.WriteFile(filepath.Join(stage, v.File), []byte(v.File), 0600))
+	result := &Result{Directory: stage,
+		Variants:  []Variant{{"new.jpg", "image/jpeg", SDR, 1280, 640}, {"new-hdr.avif", "image/avif", HDR, 1280, 640}, {"new-sdr.avif", "image/avif", SDR, 1280, 640}},
+		Thumbnail: []Variant{{"new-thumb.avif", "image/avif", Adaptive, 640, 320}}}
+	for _, group := range [][]Variant{result.Variants, result.Thumbnail} {
+		for _, v := range group {
+			require.NoError(t, os.WriteFile(filepath.Join(stage, v.File), []byte(v.File), 0600))
+		}
 	}
 	require.NoError(t, store.Publish(1, "cover", old.Key, old.At, result))
 	m, err := store.Load(1, "cover", old.Key)
 	require.NoError(t, err)
-	require.Len(t, m.Variants, 1)
+	require.Len(t, m.Variants, 2)
 	require.Equal(t, "image/avif", m.Variants[0].MIMEType)
 	require.FileExists(t, filepath.Join(stage, "new.jpg"), "compatibility JPEG is temporary, not published")
+	manifest, err := os.ReadFile(filepath.Join(dir, "manifest.json"))
+	require.NoError(t, err)
+	for _, dryRun := range []bool{true, false} {
+		bytes, err := store.Compact(1, "cover", old.Key, dryRun)
+		require.NoError(t, err)
+		require.Equal(t, int64(38), bytes, "both old sizes and formats must be reclaimed")
+		for _, group := range [][]Variant{old.Variants, old.Thumbnail} {
+			for _, v := range group {
+				if dryRun {
+					require.FileExists(t, filepath.Join(dir, v.File))
+				} else {
+					require.NoFileExists(t, filepath.Join(dir, v.File))
+				}
+			}
+		}
+		for _, group := range [][]Variant{m.Variants, m.Thumbnail} {
+			for _, v := range group {
+				require.NoError(t, verifyAsset(dir, v.File), "current HDR, SDR and card renditions must survive")
+			}
+		}
+		after, err := os.ReadFile(filepath.Join(dir, "manifest.json"))
+		require.NoError(t, err)
+		require.Equal(t, manifest, after, "removing obsolete files must not change current URLs")
+	}
 	bytes, err := store.Compact(1, "cover", old.Key, false)
 	require.NoError(t, err)
-	require.Equal(t, int64(19), bytes)
-	require.NoFileExists(t, filepath.Join(dir, old.Variants[0].File))
-	require.NoFileExists(t, filepath.Join(dir, old.Thumbnail[0].File))
+	require.Zero(t, bytes, "repeated cleanup must be harmless")
+}
+
+func TestCompactPreservesUnmanagedEntries(t *testing.T) {
+	store, dir, m := legacyCompactFixture(t, HDR, HDR)
+	for _, name := range []string{"unmanaged.avif", "not-a-content-hash.avif", fmt.Sprintf("%x.png", sha256.Sum256([]byte("other format")))} {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte("keep"), 0600))
+	}
+	directory := filepath.Join(dir, fmt.Sprintf("%x.avif", sha256.Sum256([]byte("directory"))))
+	require.NoError(t, os.Mkdir(directory, 0755))
+	bytes, err := store.Compact(1, "cover", m.Key, false)
+	require.NoError(t, err)
+	require.Zero(t, bytes)
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, entries, 9, "only generated, unreferenced image files are eligible")
 }

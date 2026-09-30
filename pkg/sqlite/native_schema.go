@@ -185,6 +185,30 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 				}
 			}
 		}
+		if version >= NativeSchemaBaseline+7 {
+			var galleryColumn bool
+			if err := conn.Get(&galleryColumn, "SELECT EXISTS(SELECT 1 FROM pragma_table_info('archive_entities') WHERE name = 'gallery_id')"); err != nil {
+				return err
+			}
+			if !galleryColumn {
+				return errors.New("native database schema is incomplete: missing archive_entities.gallery_id")
+			}
+			required := []string{"archive_gallery_created", "archive_gallery_changed", "archive_gallery_deleted"}
+			for _, table := range []string{"galleries_images", "scenes_galleries", "galleries_files", "performers_galleries", "galleries_tags", "gallery_urls", "gallery_custom_fields", "galleries_chapters"} {
+				for _, action := range []string{"insert", "delete", "update"} {
+					required = append(required, "archive_gallery_"+table+"_"+action)
+				}
+			}
+			for _, name := range required {
+				var exists bool
+				if err := conn.Get(&exists, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'trigger' AND name = ?)", name); err != nil {
+					return err
+				}
+				if !exists {
+					return fmt.Errorf("native database schema is incomplete: missing %s", name)
+				}
+			}
+		}
 		return nil
 	}
 	if version >= NativeSchemaBaseline {

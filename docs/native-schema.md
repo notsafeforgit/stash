@@ -207,6 +207,25 @@ resurrection. Purge/forget commands, account/capture associations, media
 appearances, source merging, API/UI exposure, and actual catalog import remain
 subsequent work. Anonymised exports remove source evidence and vacuum free pages.
 
+Migration 1000007 extends the same archive identity registry to galleries.
+Existing gallery IDs, memberships, covers, names, and filesystem associations
+remain intact; each receives a portable UUID. The migration rebuilds the checked
+registry in one transaction, preserving all prior UUIDs and references while
+adding the typed `gallery_id` foreign key. Incoming ownership links and existing
+redirects survive the rebuild. Foreign-key deferral is scoped to that transaction.
+
+Gallery creation, rename, deletion, UUID adoption, and guarded redirects use the
+same lifecycle as other archive entities. Changes to images/covers, linked
+scenes, files, performers, tags, URLs, custom fields, and chapters advance the
+gallery revision. Moving a relation between galleries invalidates both revisions.
+A deleted gallery retains its identity tombstone, and a reused integer ID gets
+a different UUID. Anonymised exports rekey gallery identities too.
+
+This is a prerequisite for source-post albums, not automatic album creation.
+Ordered attachments, post-to-gallery associations, synchronization, manual
+membership decisions, and the mixed-media album UI remain subsequent work under
+the [album requirements](native-archive-transition-plan.md#source-post-albums-and-galleries).
+
 The filesystem deletion journal currently derives its directory from the
 database filename. Promotion in place retains that association, but a production
 path change must first drain pending deletions or transfer the exact journal

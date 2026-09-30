@@ -38,6 +38,7 @@ review. Production has not been migrated.
 | Stash `e4fa14045` | Native default filters, durable config publication, revision-checked review, full-copy reconciliation; complete validation gate passed |
 | Stash `bd7f2af84` | Portable archive UUIDs, transactional merge redirects and catalog UUID adoption; full-copy reconciliation and complete validation gate passed |
 | Stash `4d1c7571d` | Qualified source accounts, evidence replay, and audited ownership choices; full-copy reconciliation and complete validation gate passed |
+| Stash `02d3c67c2` | Shared post/profile evidence, lossless captures, versioned retention, replay and integrity checks; full-copy reconciliation, catalog size inventory, and complete validation gate passed |
 
 ## Phase status
 
@@ -247,3 +248,32 @@ directory; the all-catalog import rehearsal remains required.
 Source-account/capture associations, media appearances, gallery-dl API ingestion,
 actual catalog import, and UI exposure remain subsequent work. Production has
 not been migrated.
+
+## Source album requirement and gallery identities
+
+The owner's album request is included in the transition plan and acceptance
+matrix: one logical gallery per evidenced album post, source attachment order,
+mixed images/videos, partial and late downloads, and preservation of manual
+choices and existing galleries. Source grouping does not infer performers from
+an aggregator. Catalog backfill and standalone export/restore cover albums.
+
+Migration 1000007 gives existing and future galleries portable identities in the
+shared registry. Creation, renaming, deletion, UUID adoption, and redirects retain
+their semantics; gallery memberships and related metadata advance revisions so
+intervening edits invalidate stale review actions. Tests cover existing covers,
+image/scene/performer memberships, account links, redirect preservation, deletion,
+ID reuse, revision conflicts, and anonymised exports.
+The complete `make validate-fork` gate passed, including 528 UI tests, native
+contracts, Go lint, and all Go unit/integration tests.
+
+The full-copy migration took 9.56 seconds. All 1,540,475 prior identities and
+their UUIDs matched exactly, all 81 other retained tables matched, and all 1,328
+existing galleries received identities. Foreign-key checking found no violations.
+The rebuild grew the database file by 150,364,160 bytes (143.4 MiB), with
+150,929,408 bytes (143.9 MiB) on the reusable free-page list afterward; that space
+can serve subsequent native writes. The private receipt is
+`.local/native-archive-rehearsal-20260930/gallery-identity-reconciliation.json`.
+
+Automatic source-gallery construction, ordered attachment associations, and the
+native album UI are not implemented by this foundation checkpoint. They remain
+required work. No production galleries or files have been modified.

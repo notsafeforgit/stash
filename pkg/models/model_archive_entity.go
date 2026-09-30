@@ -13,6 +13,7 @@ const (
 	ArchiveScene     ArchiveEntityKind = "scene"
 	ArchiveImage     ArchiveEntityKind = "image"
 	ArchiveFile      ArchiveEntityKind = "file"
+	ArchiveGallery   ArchiveEntityKind = "gallery"
 )
 
 type ArchiveEntityState string

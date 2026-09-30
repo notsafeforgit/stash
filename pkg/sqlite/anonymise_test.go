@@ -79,6 +79,8 @@ UPDATE native_migration_history SET details = '{"private":"private-filter-value"
 func TestAnonymiserRekeysArchiveUUIDsAndKeepsRedirects(t *testing.T) {
 	source, repo := archiveTestDatabase(t)
 	ctx := context.Background()
+	gallery := createArchiveGallery(t, repo, "Private gallery")
+	galleryIdentity := archiveFind(t, repo, models.ArchiveGallery, gallery.ID)
 	before := archiveFind(t, repo, models.ArchivePerformer, 71)
 	survivor := archiveFind(t, repo, models.ArchivePerformer, 72)
 	require.NoError(t, repo.WithTxn(ctx, func(ctx context.Context) error { return repo.Performer.Merge(ctx, []int{71}, 72) }))
@@ -88,7 +90,7 @@ func TestAnonymiserRekeysArchiveUUIDsAndKeepsRedirects(t *testing.T) {
 	require.NoError(t, anonymiser.Anonymise(ctx))
 	contents, err := os.ReadFile(output)
 	require.NoError(t, err)
-	for _, value := range []string{before.UUID, survivor.UUID} {
+	for _, value := range []string{before.UUID, survivor.UUID, galleryIdentity.UUID} {
 		require.NotContains(t, string(contents), value)
 	}
 	raw := openRawDB(t, output)
@@ -102,6 +104,7 @@ WHERE source.original_id=71 AND source.kind='performer' AND source.state='redire
 	require.False(t, rows.Next())
 	require.NoError(t, rows.Err())
 	require.Equal(t, survivor.UUID, archiveFind(t, repo, models.ArchivePerformer, 72).UUID)
+	require.Equal(t, galleryIdentity.UUID, archiveFind(t, repo, models.ArchiveGallery, gallery.ID).UUID)
 }
 
 func TestAnonymiserRemovesSourceAccountEvidence(t *testing.T) {

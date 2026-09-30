@@ -100,6 +100,8 @@ func TestNativeLineageRejectsUnsafeInputsBeforeWriting(t *testing.T) {
 		{"missing source captures", "DROP TABLE source_captures", "missing source_captures"},
 		{"missing profile references", "DROP TABLE source_capture_profiles", "missing source_capture_profiles"},
 		{"missing evidence guard", "DROP TRIGGER source_post_revision_immutable", "missing source_post_revision_immutable"},
+		{"missing gallery identity guard", "DROP TRIGGER archive_gallery_created", "missing archive_gallery_created"},
+		{"missing gallery membership revision", "DROP TRIGGER archive_gallery_galleries_images_delete", "missing archive_gallery_galleries_images_delete"},
 		{"missing canonical name", "INSERT INTO performers(id, created_at, updated_at) VALUES (1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)", "performer has no canonical name"},
 		{"foreign primary version", "DROP TABLE native_schema; UPDATE schema_migrations SET version = 87", "unsupported legacy Stash schema"},
 		{"newer legacy fork", "DROP TABLE native_schema; UPDATE schema_migrations SET version = 86; CREATE TABLE fork_schema_migrations(version INTEGER); INSERT INTO fork_schema_migrations VALUES (10)", "unsupported legacy fork schema 10"},

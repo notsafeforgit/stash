@@ -28,7 +28,7 @@ the first implementation phase updates that policy for independent development.
 - Keep SQLite and the current scene, image, performer, and file abstractions.
   Add normalized source and provenance tables. This project does not require a
   PostgreSQL migration or a second authoritative media library.
-- Give performers, scenes, images, and file records portable UUIDs while keeping
+- Give performers, scenes, images, galleries, and file records portable UUIDs while keeping
   existing integer IDs for internal relationships and current library links.
   Existing catalog performer UUIDs take precedence over newly generated UUIDs.
 - Keep account ownership separate from depicted performers. Accounts and posts
@@ -117,6 +117,7 @@ foreign keys, uniqueness, indexes, and lifecycle rules before implementation.
 | Capture | Who observed which revision, when, with which extractor, source URL, and small attachment/profile-reference differences |
 | Attachment | Ordered post attachment and source media ID; references zero or more observed file variants |
 | Media appearance | Attachment-to-scene/image association, content identity, and provenance; many posts may reference one item |
+| Source album | Explicit post-to-gallery association with ordered attachments, download completeness, and preserved membership decisions |
 | Translation | Original revision/text identity, translated text, language, provider, and provenance; originals remain intact |
 | Retained document | Deduplicated original NFO bytes and parser results, with all original path/post references and selected heads |
 | Import policy | Typed source/folder defaults, mappings, title policy, entity-creation policy, and organized behavior |
@@ -161,6 +162,51 @@ Version normalization policies. Preserve old capture/observation IDs as legacy
 identifiers when canonical IDs change. Migration comparison must reconstruct the
 retained payload semantics, including capture patches and profile references.
 Do not promise recovery of fields the existing reduction policy already removed.
+
+### Source-post albums and galleries
+
+Create a logical Stash gallery when source evidence identifies an album or a
+multi-attachment post. Use the canonical post identity, never a caption, account
+name, filename prefix, or common download directory, to identify its gallery.
+Reddit gallery items and Twitter multi-media posts are initial fixtures; other
+extractors use the same ordered attachment contract when they supply evidence.
+Keep source-declared albums eligible even if only one attachment has downloaded.
+Ordinary single-media posts do not create galleries by default. Unknown counts
+or conflicting post membership remain unresolved rather than guessing.
+
+Preserve source attachment order independently of download order and filenames.
+Images become gallery images; video attachments link their scenes to that same
+gallery. Expose one ordered album view for mixed media. Missing, excluded,
+failed, or still-downloading attachments remain visible source states without
+fabricating playable entries. Add verified associations as files become
+available, using bounded work on the affected post and idempotent transactions.
+Track source-manifest completeness separately from local download completeness:
+a partial scrape must not remove previously known attachments. Repeated slots
+may reference the same media entity without copying its file; gallery membership
+and the ordered source attachment list are distinct relationships.
+
+An image or scene may belong to several source albums when it appears in several
+posts; share the existing entity where its identity is verified. A repeated
+delivery or rescan must not create another gallery or duplicate membership.
+Source reordering/revisions keep history and respect explicit ordering choices.
+Album title, date, description, URLs and cover selection follow the same
+field-decision rules as other metadata. Do not infer depicted performers from
+the publisher of an aggregator's album.
+
+Preserve existing folder/ZIP/manual galleries and all their memberships during
+import. Automatically created source galleries need durable identities and an
+explicit origin, rather than being mistaken for hand-curated galleries because
+they have no filesystem path. Adopt an existing gallery only with an exact
+recorded association or reviewed choice, never a matching title alone. Manual
+additions, removals, covers, and deliberate empty metadata must survive later
+scrapes. Explicit unlink or gallery deletion suppresses silent recreation;
+removing a gallery association does not delete its files or source evidence.
+
+Backfill album associations from retained catalog post/appearance data when the
+evidence is sufficient. Include dry preview, progress/retry, conflict reports,
+desktop/mobile navigation, and gallery/attachment relationships in native
+backup, standalone export, and restore verification. Purchased/manual batches
+may also form galleries without requiring a fictitious source post.
 
 ### Direct scans and purchased media
 
@@ -726,6 +772,7 @@ permanent dual-write mode between old catalogs and the native database.
 | Identity | Existing UUIDs and imelizabethtran merge, explicit unlink, canonical/alias ambiguity, native handle/ID equivalence, reused handles, mirror/native distinctions, concurrent link/merge plans |
 | Aggregators | Account linked as publisher without being assigned as performer; mixed known/unknown/multiple performers; source-default policy exceptions |
 | Media association | Reddit/Twitter multi-attachment posts, cross-posts, same content across services, differing encodings, existing duplicate Stash entities, zip members, renamed paths and mount prefixes |
+| Source albums | One gallery per evidenced album post, source order, mixed images/videos, partial and late downloads, replay/rescan, shared media across posts, manual membership/cover/order preservation, deletion suppression, existing folder/ZIP galleries, catalog backfill and export/restore |
 | Capture semantics | No new revision for redundant previews/profile noise, parent extractor context, meaningful profile changes retained, reduced payload reconstruction matches current policy |
 | Delivery | Duplicate/lost ACK, out-of-order events, replay after server/producer restart, conflicting event digest, partial batch, server outage, invalid root, full outbox, rejected protocol |
 | Filesystem | .part completion, postprocessor rename/conversion, unresolved archive skip, deletion before completion, replacement at same path, mount loss, interrupted staging/trash transfer |
@@ -802,6 +849,9 @@ The transition is complete when all of the following are demonstrated:
 - Manual media can acquire a UUID, filename title, and selected performer from
   a folder/batch rule without per-file metadata entry or a fabricated source.
 - Aggregator provenance and depicted performers remain distinct.
+- Evidenced album posts have idempotently maintained galleries with source order,
+  partial-download state, mixed media, and preserved manual choices; original
+  galleries and their memberships survive migration.
 - Existing IDs, performer UUIDs/merges, file associations, selected metadata,
   shares, and recovery semantics survive migration.
 - StashDB/stash-box, v3 plugins, and intentionally retained client contracts pass

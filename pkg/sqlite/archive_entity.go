@@ -24,6 +24,7 @@ type archiveEntityRow struct {
 	SceneID     sql.NullInt64             `db:"scene_id"`
 	ImageID     sql.NullInt64             `db:"image_id"`
 	FileID      sql.NullInt64             `db:"file_id"`
+	GalleryID   sql.NullInt64             `db:"gallery_id"`
 	OriginalID  sql.NullInt64             `db:"original_id"`
 	RedirectTo  sql.NullString            `db:"redirect_to"`
 	CreatedAt   Timestamp                 `db:"created_at"`
@@ -32,7 +33,7 @@ type archiveEntityRow struct {
 
 func (r archiveEntityRow) resolve() *models.ArchiveEntity {
 	ret := &models.ArchiveEntity{UUID: r.UUID, Kind: r.Kind, State: r.State, Revision: r.Revision, CreatedAt: r.CreatedAt.Timestamp}
-	for _, local := range []sql.NullInt64{r.PerformerID, r.SceneID, r.ImageID, r.FileID} {
+	for _, local := range []sql.NullInt64{r.PerformerID, r.SceneID, r.ImageID, r.FileID, r.GalleryID} {
 		if local.Valid {
 			id := int(local.Int64)
 			ret.LocalID = &id
@@ -69,6 +70,8 @@ func archiveLocalColumn(kind models.ArchiveEntityKind) (string, error) {
 		return "image_id", nil
 	case models.ArchiveFile:
 		return "file_id", nil
+	case models.ArchiveGallery:
+		return "gallery_id", nil
 	default:
 		return "", errors.New("invalid archive entity kind")
 	}
@@ -175,7 +178,7 @@ func (s *ArchiveEntityStore) Redirect(ctx context.Context, sourceUUID, destinati
 		return errors.New("merge requires distinct archive entities of the same kind")
 	}
 	result, err := dbWrapper.Exec(ctx, `UPDATE archive_entities SET state = 'redirected', revision = revision + 1,
-performer_id = NULL, scene_id = NULL, image_id = NULL, file_id = NULL, redirect_to = ?, retired_at = CURRENT_TIMESTAMP
+performer_id = NULL, scene_id = NULL, image_id = NULL, file_id = NULL, gallery_id = NULL, redirect_to = ?, retired_at = CURRENT_TIMESTAMP
 WHERE uuid = ? AND revision = ? AND state = 'active'`, destination.UUID, source.UUID, expectedRevision)
 	if err := checkArchiveIdentityUpdate(result, err); err != nil {
 		return err
@@ -187,6 +190,7 @@ WHERE uuid = ? AND revision = ? AND state = 'active'`, destination.UUID, source.
 	table := map[models.ArchiveEntityKind]string{
 		models.ArchivePerformer: "performers", models.ArchiveScene: "scenes",
 		models.ArchiveImage: "images", models.ArchiveFile: "files",
+		models.ArchiveGallery: "galleries",
 	}[source.Kind]
 	// The merge caller must remove the source record before commit. Refuse a
 	// partial merge that would leave a library row without a current UUID.

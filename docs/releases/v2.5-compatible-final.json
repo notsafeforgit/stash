@@ -1,0 +1,33 @@
+{
+  "source_commit": "0a603d07e9ec3dd9863a7340858a635525bb2c11",
+  "source_tag": "v2.5-compatible-final",
+  "version_revision": "g0a603d07e",
+  "primary_schema": 86,
+  "fork_schema": 9,
+  "images": [
+    {
+      "repository": "ghcr.io/notsafeforgit/stash",
+      "digest": "sha256:0faad6d2cffb19dc97421b0879e638c83e4fe245eda871505c5d913d3fc44805",
+      "entrypoint": "/usr/bin/stash",
+      "tags": ["v2.5-compatible-final", "v2.5-compatible-20260930"]
+    },
+    {
+      "repository": "ghcr.io/notsafeforgit/stash-s6",
+      "digest": "sha256:b9c30164d591cb9764f809505208fbf7d42d0bfdf209230b94f0dba69b46014b",
+      "entrypoint": "/app/stash",
+      "tags": ["hwaccel-v2.5-compatible-final", "hwaccel-v2.5-compatible-20260930"]
+    },
+    {
+      "repository": "ghcr.io/notsafeforgit/stash-s6",
+      "digest": "sha256:7f51d4a15f27d1439be8c84cd1046f1e5740bddc64535434b9dacc15b7afa880",
+      "entrypoint": "/app/stash",
+      "tags": ["alpine-v2.5-compatible-final", "alpine-v2.5-compatible-20260930"]
+    },
+    {
+      "repository": "ghcr.io/notsafeforgit/stash-s6",
+      "digest": "sha256:d62f457c496f6fdce6652984838c4741490653a567628747aca522cf0e83a2fc",
+      "entrypoint": "/app/stash",
+      "tags": ["hwaccel-alpine-v2.5-compatible-final", "hwaccel-alpine-v2.5-compatible-20260930"]
+    }
+  ]
+}

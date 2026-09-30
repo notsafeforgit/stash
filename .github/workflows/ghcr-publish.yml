@@ -6,13 +6,19 @@ on:
       - develop
       - v3-rewrite
   workflow_dispatch:
+    inputs:
+      preserve_compatible_release:
+        description: Preserve the frozen final v2.5-compatible images without rebuilding
+        type: boolean
+        default: false
 
 concurrency:
-  group: ${{ github.ref }}-ghcr
+  group: ${{ github.ref }}-ghcr-${{ inputs.preserve_compatible_release && 'preserve-compat' || 'publish' }}
   cancel-in-progress: true
 
 jobs:
   build-and-push:
+    if: ${{ !inputs.preserve_compatible_release }}
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -38,7 +44,11 @@ jobs:
       id: repository_owner
       run: |
         echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_OUTPUT
-        echo "branch=${GITHUB_REF_NAME//\//-}" >> $GITHUB_OUTPUT
+        if [ "$GITHUB_REF_NAME" = "v3-rewrite" ]; then
+          echo "branch=native-preview" >> $GITHUB_OUTPUT
+        else
+          echo "branch=${GITHUB_REF_NAME//\//-}" >> $GITHUB_OUTPUT
+        fi
         echo "short_sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
 
     - name: Install UI dependencies
@@ -85,6 +95,38 @@ jobs:
           ghcr.io/${{ steps.repository_owner.outputs.owner }}/stash:${{ steps.repository_owner.outputs.branch }}
           ghcr.io/${{ steps.repository_owner.outputs.owner }}/stash:${{ steps.repository_owner.outputs.branch }}-${{ steps.repository_owner.outputs.short_sha }}
 
+  preserve-compatible-release:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.preserve_compatible_release }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+    - uses: actions/checkout@v6
+    - name: Install registry copy tool
+      run: sudo apt-get update && sudo apt-get install -y skopeo
+    - name: Check preservation invariants
+      run: python3 -m unittest discover -s scripts -p test_preserve_compatible_images.py
+    - name: Authenticate registry tools
+      env:
+        GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        printf '%s' "$GHCR_TOKEN" | skopeo login --authfile "$RUNNER_TEMP/registry-auth.json" --username "$GITHUB_ACTOR" --password-stdin ghcr.io
+        printf '%s' "$GHCR_TOKEN" | docker login --username "$GITHUB_ACTOR" --password-stdin ghcr.io
+    - name: Preserve compatible image manifests
+      env:
+        REGISTRY_AUTH_FILE: ${{ runner.temp }}/registry-auth.json
+      run: |
+        python3 scripts/preserve_compatible_images.py \
+          --manifest docs/releases/v2.5-compatible-final.json \
+          --repository ghcr.io/notsafeforgit/stash \
+          --receipt compatible-release-receipt.json
+    - uses: actions/upload-artifact@v4
+      with:
+        name: compatible-stash-release-receipt
+        path: compatible-release-receipt.json
+        if-no-files-found: error
+
   cleanup-images:
     needs: build-and-push
     if: ${{ needs.build-and-push.result == 'success' }}
@@ -105,7 +147,7 @@ jobs:
           const ownerType = context.payload.repository.owner.type;
           const retentionDays = Number(process.env.RETENTION_DAYS ?? "14");
           const cutoff = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
-          const branchBuildTagPattern = /^(develop|v3-rewrite)-[0-9a-f]{7,}$/i;
+          const branchBuildTagPattern = /^(develop|v3-rewrite|native-preview)-[0-9a-f]{7,}$/i;
 
           const listPackageVersions =
             ownerType === "Organization"

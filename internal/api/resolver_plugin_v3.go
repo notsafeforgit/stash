@@ -21,6 +21,7 @@ type PluginV3 struct {
 	Tasks       []*PluginTaskV3
 	Hooks       []*PluginHookV3
 	Settings    []plugin.PluginSettingV3
+	Operations  []plugin.PluginOperationV3
 	Requires    []string
 	Paths       *PluginPathsV3
 }
@@ -50,7 +51,8 @@ func pluginV3(ctx context.Context, p *plugin.Plugin) *PluginV3 {
 	ret := &PluginV3{
 		ID: p.ID, APIVersion: p.APIVersion, Name: p.Name, Description: p.Description,
 		URL: p.URL, Version: p.Version, Enabled: p.Enabled, Settings: p.SettingsV3,
-		Requires: p.UI.Requires, Paths: &PluginPathsV3{Entry: (pluginURLBuilder{BaseURL: baseURL, Plugin: p}).entry()},
+		Operations: p.OperationsV3,
+		Requires:   p.UI.Requires, Paths: &PluginPathsV3{Entry: (pluginURLBuilder{BaseURL: baseURL, Plugin: p}).entry()},
 	}
 	for _, task := range p.Tasks {
 		ret.Tasks = append(ret.Tasks, &PluginTaskV3{Name: task.Name, Description: task.Description, Plugin: ret})
@@ -94,6 +96,14 @@ func (r *queryResolver) PluginSettingsV3(ctx context.Context, pluginID string) (
 
 func (r *queryResolver) PluginSettingPreviewV3(ctx context.Context, pluginID, setting, entityID string) (interface{}, error) {
 	return manager.GetInstance().PluginCache.SettingPreviewV3(ctx, pluginID, setting, entityID)
+}
+
+func (r *queryResolver) PluginQueryV3(ctx context.Context, pluginID, operation string, input map[string]interface{}) (interface{}, error) {
+	return manager.GetInstance().PluginCache.OperationV3(ctx, pluginID, operation, plugin.PluginOperationQueryV3, convertMapJSONNumbers(input))
+}
+
+func (r *mutationResolver) PluginMutationV3(ctx context.Context, pluginID, operation string, input map[string]interface{}) (interface{}, error) {
+	return manager.GetInstance().PluginCache.OperationV3(ctx, pluginID, operation, plugin.PluginOperationMutationV3, convertMapJSONNumbers(input))
 }
 
 func (r *mutationResolver) UpdatePluginSettingsV3(ctx context.Context, pluginID string, input map[string]interface{}, reset []string) (map[string]interface{}, error) {

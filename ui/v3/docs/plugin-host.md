@@ -99,6 +99,12 @@ plugin side effects, and cannot preempt JavaScript that blocks the main thread.
 interface StashPluginHost {
   readonly version: "1";
   readonly pluginId: string;            // your plugin's id, useful for logs
+  readonly react: typeof React;          // the host's runtime, including hooks
+  readonly forms: { useForm, z };        // TanStack Form and Zod
+  readonly operations: {
+    query(name: string, input?: Record<string, unknown>): Promise<unknown>;
+    mutate(name: string, input?: Record<string, unknown>): Promise<unknown>;
+  };
 
   readonly routes: {
     add(r: { path: string; component: ComponentType }): void;
@@ -201,8 +207,11 @@ The current set:
 | Buttons | `Button`, `buttonVariants` |
 | Cards | `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, `CardFooter` |
 | Form | `Input`, `Textarea`, `Label`, `Checkbox` |
+| Fields | `Field`, `FieldGroup`, `FieldSet`, `FieldLegend`, `FieldLabel`, `FieldTitle`, `FieldContent`, `FieldDescription`, `FieldError`, `FieldSeparator` |
 | Selects | `Select`, `SelectTrigger`, `SelectValue`, `SelectContent`, `SelectGroup`, `SelectItem` |
-| Comboboxes | `Combobox`, `ComboboxTrigger`, `ComboboxInput`, `ComboboxValue`, `ComboboxContent`, `ComboboxItem`, `ComboboxEmpty` |
+| Comboboxes | `Combobox`, `ComboboxTrigger`, `ComboboxInput`, `ComboboxValue`, `ComboboxContent`, `ComboboxList`, `ComboboxItem`, `ComboboxEmpty` |
+| Feedback | `Alert`, `AlertTitle`, `AlertDescription`, `Badge` |
+| Tabs | `Tabs`, `TabsList`, `TabsTrigger`, `TabsContent` |
 | Dialogs | `Dialog`, `DialogTrigger`, `DialogContent`, `DialogHeader`, `DialogTitle`, `DialogDescription`, `DialogFooter` |
 | Sheets | `Sheet`, `SheetTrigger`, `SheetContent`, `SheetHeader`, `SheetTitle`, `SheetDescription`, `SheetFooter` |
 | Menus | `DropdownMenu`, `DropdownMenuTrigger`, `DropdownMenuContent`, `DropdownMenuGroup`, `DropdownMenuItem`, `DropdownMenuLabel`, `DropdownMenuSeparator` |
@@ -210,17 +219,54 @@ The current set:
 
 Other libraries (charts, virtualization, drag-and-drop, etc.) are outside the
 host contract. The loader imports a browser ESM URL as-is: it does not compile
-JSX/TypeScript or resolve bare npm imports. Host v1 currently provides neither a
-React module export nor an import map. A plugin build must arrange resolvable
-imports and compatible shared React runtime access before using hooks or React
-libraries; marking `react` external alone is not sufficient. The example below
-avoids imports and hooks so it can be served directly.
+JSX/TypeScript or resolve bare npm imports. Use `const React = host.react` inside
+registration, and define components in that closure. Compile JSX with the classic
+`React.createElement` factory; do not bundle a second React or leave bare React
+imports in the output. `host.forms.useForm` and `host.forms.z` support form state
+and validation with the host's controls. Capability-check these additive host v1
+fields when an entry might run against an older Stash build.
+
+Plugin routes render inside the app's bounded flex viewport. Give the page a
+`flex: 1; min-height: 0; overflow-y: auto` scroll container and put long content
+inside it. Namespace plugin CSS, use theme tokens, and use `host.router.Link`
+for navigation so deployment prefixes work. Registered navigation pages also
+appear as links on their plugin's Settings card. Reload the UI after updating,
+enabling or disabling a browser plugin.
+
+### Backend queries and mutations
+
+Declare named `operations` in an `apiVersion: 3` manifest:
+
+```yaml
+operations:
+  review: {kind: QUERY, description: Read current data and propose changes}
+  apply: {kind: MUTATION, description: Apply an explicitly reviewed proposal}
+```
+
+Call `await host.operations.query("review", {id: "42"})` while loading a page or
+on a Preview action. Call `await host.operations.mutate("apply", input)` from an
+explicit Apply action. The host binds the plugin ID and sends native JSON through
+`pluginQueryV3` / `pluginMutationV3`; query results are not cached. Do data loading
+after the page mounts, outside the five-second registration window.
+
+The backend receives fixed arguments `{mode: "operation", operation: "review",
+operation_type: "query", input: {id: "42"}}`. Input keys cannot replace the routing
+arguments. Only enabled v3 plugins with the matching name and kind can run.
+Names begin with a letter and contain letters, digits or underscores. Queries
+have a 60-second deadline; mutations have 120 seconds. Input is limited to 1 MiB
+of JSON and output to 4 MiB; errors propagate to the caller.
+
+`QUERY` is a read-only contract for trusted executable code, not a sandbox.
+Authors must keep their query handlers free of writes, validate mutation inputs,
+and recheck a proposal before applying it. These APIs do not provide transactions
+across Stash and external stores. Catalog Metadata's review page demonstrates a
+read-only plan followed by a stale-data check and an explicit, scoped apply.
 
 ### Settings
 
 Manifest `settings:` entries already appear in **v3 Settings → Plugins**.
-Boolean, number, and string settings use the shared setting controls and persist
-through `configurePlugin`. This is separate from registering arbitrary React
+Boolean, number, string and JSON settings use the shared setting controls and persist
+through `host.settings.update` / `updatePluginSettingsV3`. This is separate from registering arbitrary React
 content inside the settings pages, which host v1 does not provide.
 
 ## Load order
@@ -281,7 +327,7 @@ error, or collision; registration is not a live update mechanism.
 `my-plugin.yml` in the plugins folder:
 
 ```yaml
-id: hello-world
+apiVersion: 3
 name: Hello World
 version: 0.1.0
 ui:

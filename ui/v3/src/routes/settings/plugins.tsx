@@ -19,6 +19,7 @@ import { SettingsSection } from "src/components/settings/setting-row";
 import { PluginSettingsForm } from "src/components/settings/plugin-settings-form";
 import { PackageManager } from "src/components/settings/package-manager";
 import { PluginHookOrder } from "src/components/settings/plugin-hook-order";
+import { PluginPageLinks, ReloadPluginPages } from "src/plugins/page-links";
 
 type Plugin = NonNullable<GQL.PluginsQuery["plugins"]>[number];
 
@@ -99,6 +100,9 @@ function PluginCard({ plugin }: { plugin: Plugin }) {
               {plugin.description}
             </p>
           )}
+          {plugin.enabled && !needsReload && (
+            <PluginPageLinks pluginId={plugin.id} />
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {needsReload && (
@@ -172,6 +176,7 @@ function PluginCard({ plugin }: { plugin: Plugin }) {
 
 function SettingsPluginsPage() {
   const Toast = useToast();
+  const [packagesChanged, setPackagesChanged] = useState(false);
   const { data, loading, refetch } = useQuery(GQL.PluginsDocument);
   const [reloadPlugins] = useMutation(GQL.ReloadPluginsDocument, {
     refetchQueries: [{ query: GQL.PluginsDocument }],
@@ -195,8 +200,12 @@ function SettingsPluginsPage() {
       >
         <PackageManager
           type="plugin"
-          onPackagesChanged={() => void refetch()}
+          onPackagesChanged={() => {
+            setPackagesChanged(true);
+            void refetch();
+          }}
         />
+        {packagesChanged && <ReloadPluginPages />}
       </SettingsSection>
 
       <SettingsSection title={msg("config.categories.plugins", "Plugins")}>

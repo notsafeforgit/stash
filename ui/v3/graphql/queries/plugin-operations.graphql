@@ -1,0 +1,3 @@
+query PluginQueryV3($plugin_id: ID!, $operation: String!, $input: Map) {
+  pluginQueryV3(plugin_id: $plugin_id, operation: $operation, input: $input)
+}

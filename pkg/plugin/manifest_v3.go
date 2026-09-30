@@ -13,18 +13,19 @@ import (
 // ManifestV3 is a separate contract, not an extension of the v2.5 manifest.
 // Shared execution details are adapted to Config only after strict decoding.
 type ManifestV3 struct {
-	APIVersion        int                        `yaml:"apiVersion"`
-	Name              string                     `yaml:"name"`
-	Description       *string                    `yaml:"description"`
-	URL               *string                    `yaml:"url"`
-	Version           *string                    `yaml:"version"`
-	Interface         interfaceEnum              `yaml:"interface"`
-	Exec              []string                   `yaml:"exec"`
-	PluginErrLogLevel string                     `yaml:"errLog"`
-	Tasks             []*OperationConfig         `yaml:"tasks"`
-	Hooks             []*HookConfig              `yaml:"hooks"`
-	UI                ManifestUIV3               `yaml:"ui"`
-	Settings          map[string]SettingConfigV3 `yaml:"settings"`
+	APIVersion        int                          `yaml:"apiVersion"`
+	Name              string                       `yaml:"name"`
+	Description       *string                      `yaml:"description"`
+	URL               *string                      `yaml:"url"`
+	Version           *string                      `yaml:"version"`
+	Interface         interfaceEnum                `yaml:"interface"`
+	Exec              []string                     `yaml:"exec"`
+	PluginErrLogLevel string                       `yaml:"errLog"`
+	Tasks             []*OperationConfig           `yaml:"tasks"`
+	Hooks             []*HookConfig                `yaml:"hooks"`
+	UI                ManifestUIV3                 `yaml:"ui"`
+	Settings          map[string]SettingConfigV3   `yaml:"settings"`
+	Operations        map[string]OperationConfigV3 `yaml:"operations"`
 }
 
 type ManifestUIV3 struct {
@@ -78,6 +79,11 @@ func decodePluginManifest(reader io.Reader) (*Config, error) {
 			return nil, fmt.Errorf("v3 setting %s: %w", key, err)
 		}
 		manifest.Settings[key] = setting
+	}
+	for name, operation := range manifest.Operations {
+		if !operationNameV3.MatchString(name) || !operation.Kind.IsValid() {
+			return nil, fmt.Errorf("v3 operation %q requires a name containing letters, digits or underscores and kind QUERY or MUTATION", name)
+		}
 	}
 	ret := &Config{
 		v3: &manifest, Name: manifest.Name, Description: manifest.Description,

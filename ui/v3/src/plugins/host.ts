@@ -13,6 +13,10 @@
  */
 
 import type { ApolloClient } from "@apollo/client";
+import type * as React from "react";
+import type { useForm } from "@tanstack/react-form";
+import type { z } from "zod";
+import type { createPluginOperationsAPI } from "./operations-api";
 import type { ComponentType, ReactNode } from "react";
 import type { IntlShape } from "react-intl";
 import type { Link, useNavigate } from "@tanstack/react-router";
@@ -107,6 +111,15 @@ export interface StashPluginHost {
    */
   readonly pluginId: string;
 
+  /** Shared React runtime. Use these hooks/createElement; do not bundle React. */
+  readonly react: typeof React;
+
+  /** Shared form state and validation for plugin pages. */
+  readonly forms: { readonly useForm: typeof useForm; readonly z: typeof z };
+
+  /** Invoke this plugin's declared backend queries and mutations. */
+  readonly operations: ReturnType<typeof createPluginOperationsAPI>;
+
   /** Read manifest definitions/defaults and atomically update this plugin's settings. */
   readonly settings: ReturnType<typeof createPluginSettingsAPI>;
 
@@ -171,8 +184,8 @@ export interface StashPluginHost {
   };
 
   /**
-   * Curated stable subset of shadcn/Base UI primitives. The set is
-   * frozen for the lifetime of host major version 1.
+   * Curated stable subset of shadcn/Base UI primitives. Additive exports
+   * may appear within a major version; existing exports remain compatible.
    */
   readonly ui: StashPluginUI;
 }

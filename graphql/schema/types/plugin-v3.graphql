@@ -10,12 +10,25 @@ type PluginV3 {
   tasks: [PluginTaskV3!]!
   hooks: [PluginHookV3!]!
   settings: [PluginSettingV3!]!
+  operations: [PluginOperationV3!]!
   requires: [ID!]!
   paths: PluginPathsV3!
 }
 
 type PluginPathsV3 {
   entry: String
+}
+
+enum PluginOperationKindV3 {
+  QUERY
+  MUTATION
+}
+
+"A declared backend operation callable by a plugin page. QUERY handlers must be read-only."
+type PluginOperationV3 {
+  name: String!
+  kind: PluginOperationKindV3!
+  description: String
 }
 
 type PluginTaskV3 {
@@ -85,8 +98,12 @@ extend type Query {
   pluginSettingsV3(plugin_id: ID!): PluginSettingsV3!
   "Loads expression input using the setting's declared read-only preview handler."
   pluginSettingPreviewV3(plugin_id: ID!, setting: String!, entity_id: ID!): Any
+  "Runs a declared read-only operation (60 second deadline, 1 MiB input, 4 MiB output)."
+  pluginQueryV3(plugin_id: ID!, operation: String!, input: Map): Any
 }
 
 extend type Mutation {
   updatePluginSettingsV3(plugin_id: ID!, input: Map!, reset: [String!]): Map!
+  "Runs a declared mutation (120 second deadline, 1 MiB input, 4 MiB output)."
+  pluginMutationV3(plugin_id: ID!, operation: String!, input: Map): Any
 }

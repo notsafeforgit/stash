@@ -11,6 +11,10 @@ import { withTimeout } from "@/utils/with-timeout";
  */
 
 import type { ApolloClient } from "@apollo/client";
+import * as React from "react";
+import { useForm } from "@tanstack/react-form";
+import { z } from "zod";
+import { createPluginOperationsAPI } from "./operations-api";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { IntlShape } from "react-intl";
 import * as GQL from "src/core/generated-graphql";
@@ -84,6 +88,9 @@ function buildHost(
   return Object.freeze({
     version: HOST_VERSION,
     pluginId,
+    react: React,
+    forms: Object.freeze({ useForm, z }),
+    operations: createPluginOperationsAPI(apollo, pluginId),
     settings: createPluginSettingsAPI(apollo, pluginId),
     expressions: createPluginExpressionsAPI(apollo),
     routes: Object.freeze({

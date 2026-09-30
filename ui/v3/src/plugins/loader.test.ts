@@ -7,6 +7,8 @@ import {
 import { createIntl } from "react-intl";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { StashPluginHost } from "./host";
+import * as React from "react";
+import { useForm } from "@tanstack/react-form";
 import { deferred } from "@/test-utils/deferred";
 
 vi.mock("./ui-exports", () => ({}));
@@ -18,6 +20,27 @@ afterEach(() => {
 });
 
 describe("plugin startup", () => {
+  it("passes the shared React and form runtimes to browser modules", async () => {
+    const { registerPlugin } = await import("./loader");
+    const pluginId = "review";
+    await registerPlugin(
+      { id: pluginId, name: "Review", entry: "review.js" },
+      {
+        apollo: {} as ApolloClient,
+        intl: createIntl({ locale: "en" }),
+      },
+      1000,
+      async () => ({
+        register: (host) => {
+          expect(host.react.useState).toBe(React.useState);
+          expect(host.react.createElement).toBe(React.createElement);
+          expect(host.forms.useForm).toBe(useForm);
+          expect(typeof host.operations.query).toBe("function");
+          expect(typeof host.operations.mutate).toBe("function");
+        },
+      }),
+    );
+  });
   it("shares discovery with configuration prefetch without freezing registration early", async () => {
     const { prefetchPluginMetadata, ensurePluginsLoaded } = await import(
       "./loader"

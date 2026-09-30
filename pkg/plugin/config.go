@@ -261,15 +261,16 @@ func (c Config) getName() string {
 
 func (c Config) toPlugin() *Plugin {
 	return &Plugin{
-		APIVersion:  c.apiVersion(),
-		SettingsV3:  c.settingsV3(),
-		ID:          c.id,
-		Name:        c.getName(),
-		Description: c.Description,
-		URL:         c.URL,
-		Version:     c.Version,
-		Tasks:       c.getPluginTasks(false),
-		Hooks:       c.getPluginHooks(false),
+		APIVersion:   c.apiVersion(),
+		SettingsV3:   c.settingsV3(),
+		OperationsV3: c.operationsV3(),
+		ID:           c.id,
+		Name:         c.getName(),
+		Description:  c.Description,
+		URL:          c.URL,
+		Version:      c.Version,
+		Tasks:        c.getPluginTasks(false),
+		Hooks:        c.getPluginHooks(false),
 		UI: PluginUI{
 			Requires:       c.UI.Requires,
 			Entry:          c.UI.Entry,

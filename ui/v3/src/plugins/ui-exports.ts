@@ -4,7 +4,7 @@
  * The signatures of these exports are part of the host major-version
  * contract — they will not break within host v1. Don't expand the set
  * casually; once an export is here, it's stuck here for the v1
- * lifetime. New primitives should land in v2 of the host contract.
+ * lifetime. Additions are compatible within a major version.
  */
 
 export { Button, buttonVariants } from "src/components/ui/button";
@@ -23,6 +23,7 @@ export {
   ComboboxEmpty,
   ComboboxInput,
   ComboboxItem,
+  ComboboxList,
   ComboboxTrigger,
   ComboboxValue,
 } from "src/components/ui/combobox";
@@ -46,6 +47,26 @@ export {
 } from "src/components/ui/dropdown-menu";
 export { Input } from "src/components/ui/input";
 export { Label } from "src/components/ui/label";
+export {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSeparator,
+  FieldSet,
+  FieldTitle,
+} from "src/components/ui/field";
+export { Alert, AlertTitle, AlertDescription } from "src/components/ui/alert";
+export { Badge } from "src/components/ui/badge";
+export {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "src/components/ui/tabs";
 export {
   Select,
   SelectContent,

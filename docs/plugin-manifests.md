@@ -80,3 +80,10 @@ contract. See [settings and jq mappings](plugin-settings.md) for examples.
 Older Stash servers reject `apiVersion: 3`; upgrade the backend before
 installing these packages. The plugin repository must select its v3 schema
 when validating a versioned manifest, independently of its legacy schema.
+
+V3 browser pages can share the host's React runtime, form controls and navigation,
+and call declared `operations` through `pluginQueryV3` / `pluginMutationV3`.
+`PluginV3.operations` exposes operation names, descriptions and `QUERY` / `MUTATION`
+kinds. This is part of the independent v3 contract; no legacy representation is
+required. See the [browser host guide](../ui/v3/docs/plugin-host.md#backend-queries-and-mutations)
+for manifest syntax, execution arguments, limits and the read-only authoring contract.

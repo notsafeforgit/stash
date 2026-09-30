@@ -621,7 +621,9 @@
       "installed_plugins": "Installed Plugins",
       "triggers_on": "Triggers on",
       "plugin_packages": "Plugin packages",
-      "no_plugins": "No plugins installed."
+      "no_plugins": "No plugins installed.",
+      "open_page": "Open {page}",
+      "reload_pages": "Reload the UI to load updated plugin pages."
     },
     "scrapers": "Scrapers",
     "scraping": {

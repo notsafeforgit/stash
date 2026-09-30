@@ -65,6 +65,14 @@ type PluginSettingOptionV3 {
   label: String!
 }
 
+"An allowed jq mapping destination. Type describes the destination value format."
+type PluginMappingTargetV3 {
+  name: String!
+  label: String!
+  type: String!
+  description: String
+}
+
 enum PluginPreviewEntityV3 {
   SCENE
   IMAGE
@@ -85,6 +93,8 @@ type PluginSettingV3 {
   editor: PluginSettingEditorV3
   options: [PluginSettingOptionV3!]!
   preview: PluginSettingPreviewV3
+  "When declared, only these destination fields can be saved in a JQ_MAP."
+  mapping_targets: [PluginMappingTargetV3!]
 }
 
 type PluginSettingsV3 {

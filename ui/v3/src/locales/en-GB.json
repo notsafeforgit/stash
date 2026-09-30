@@ -596,6 +596,7 @@
     },
     "plugins": {
       "mapping_add": "Add mapping",
+      "mapping_choose": "Choose a field",
       "mapping_duplicate": "Each target field can only appear once.",
       "mapping_expression": "jq expression",
       "mapping_help": "Write jq directly, including quotes and line breaks.",
@@ -604,6 +605,7 @@
       "mapping_required": "Each mapping needs a target field and a jq expression.",
       "mapping_stored_data": "Saved mapping data",
       "mapping_target": "Target field",
+      "mapping_unsupported": "Choose a supported target field or remove this mapping.",
       "sample_input": "Sample input (JSON)",
       "test_expression": "Test expression",
       "preview_expression": "Preview mappings",

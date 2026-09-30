@@ -26,6 +26,12 @@ query Plugins {
       type
       default_value
       editor
+      mapping_targets {
+        name
+        label
+        type
+        description
+      }
       preview {
         entity
         description

@@ -10,7 +10,12 @@ image picker and **Load entity data**. The loaded input remains editable;
 or the input hides the previous result.
 
 Mapping settings use rows with separate **Target field** and **jq expression**
-inputs. Write jq directly, including quotes and line breaks; no surrounding JSON
+controls. When the plugin declares destination fields, **Target field** is a
+dropdown with only those choices. The selected field shows its stored name,
+expected value format and help text. Already-used targets cannot be selected
+again. Unsupported targets saved by an older plugin remain visible for repair;
+they cannot be tested or saved until replaced or removed. Write jq directly,
+including quotes and line breaks; no surrounding JSON
 object or string escaping is needed. For example, target `title` can use:
 
 ```jq
@@ -23,6 +28,9 @@ it does not reset the setting to its manifest default. Each target must be uniqu
 and every row needs an expression. Existing native objects and saved JSON text
 open in the same editor. The API and persisted configuration retain their existing
 JSON representation.
+
+Preview sections use the shared Base UI collapsible. Opening a preview loads
+the picker; collapsing and reopening it preserves the sample and result.
 
 ## Manifest API
 
@@ -51,6 +59,11 @@ settings:
     type: JSON
     editor: JQ_MAP
     description: Target fields mapped to jq expressions
+    mappingTargets:
+      - name: title
+        label: Title
+        type: String
+        description: The destination title
     default:
       title: .catalog.title // empty
 ```
@@ -68,6 +81,16 @@ and jq expressions. JSON editors can also validate text for an explicitly
 declared `STRING` setting. Plugins still validate domain-specific values such
 as allowed target fields or ranges.
 
+`mappingTargets` is an optional, nonempty list for `JQ_MAP`. Each target has a
+distinct nonblank `name`, a human-readable `label`, a `type` describing the
+destination value format, and an optional `description`. Declaring this list
+restricts mapping keys in both defaults and settings updates, including direct
+API updates. An omitted list allows arbitrary destination keys for generic
+plugins. `type` is descriptive, not a general JSON Schema interpreter: the
+destination API still validates evaluated values. Plugins should derive these
+definitions from their destination schema and enforce their allowed fields
+when executing, including settings written through older configuration APIs.
+
 Versioned manifests require the v3 backend and have no v2.5 plugin compatibility
 requirement. See [plugin manifest versions](plugin-manifests.md). Upgrade Stash
 before installing packages that declare `apiVersion: 3`.
@@ -80,6 +103,7 @@ query {
     definitions {
       name display_name description type default_value editor
       options { value label }
+      mapping_targets { name label type description }
       preview { entity description }
     }
     values

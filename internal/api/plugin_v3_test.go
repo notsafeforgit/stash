@@ -31,7 +31,11 @@ ui: {entry: index.js, assets: {"/": dist}}
 tasks: [{name: Native task}]
 hooks: [{name: File deleted, triggeredBy: [File.Destroy.Post]}]
 settings:
-  mappings: {type: JSON, editor: JQ_MAP, default: {title: '.title'}}
+  mappings:
+    type: JSON
+    editor: JQ_MAP
+    default: {title: '.title'}
+    mappingTargets: [{name: title, label: Title, type: String, description: The title}]
   data: {type: JSON, default: [false, 0, null]}
 `,
 	} {
@@ -62,7 +66,7 @@ settings:
  pluginTasks { plugin { id } }
  pluginsV3 { id api_version paths { entry } settings { type options { value } } }
  pluginTasksV3 { plugin { id api_version } }
- pluginSettingsV3(plugin_id: "native") { values definitions { name type options { value } } }
+ pluginSettingsV3(plugin_id: "native") { values definitions { name type options { value } mapping_targets { name label type description } } }
 }`, nil)
 	require.NotContains(t, response, "errors")
 	data := response["data"].(map[string]interface{})
@@ -79,6 +83,12 @@ settings:
 	settings := data["pluginSettingsV3"].(map[string]interface{})
 	require.Equal(t, map[string]interface{}{"title": ".title"}, settings["values"].(map[string]interface{})["mappings"])
 	require.Empty(t, settings["definitions"].([]interface{})[0].(map[string]interface{})["options"])
+	for _, definition := range settings["definitions"].([]interface{}) {
+		definition := definition.(map[string]interface{})
+		if definition["name"] == "mappings" {
+			require.Equal(t, []interface{}{map[string]interface{}{"name": "title", "label": "Title", "type": "String", "description": "The title"}}, definition["mapping_targets"])
+		}
+	}
 	require.Contains(t, request(`{ pluginSettings(plugin_id: "native") { values } }`, nil), "errors")
 	require.Contains(t, request(`mutation { updatePluginSettings(plugin_id: "native", input: {data: null}) }`, nil), "errors")
 	const update = `mutation($input: Map!, $reset: [String!]) { updatePluginSettingsV3(plugin_id: "native", input: $input, reset: $reset) }`
@@ -91,6 +101,9 @@ settings:
 	response = request(update, map[string]interface{}{"input": map[string]interface{}{"data": true, "mappings": map[string]interface{}{"bad": ".["}}})
 	require.Contains(t, response, "errors")
 	require.Equal(t, saved, cfg.GetPluginConfiguration("native"), "a bad mapping must reject the whole patch")
+	response = request(update, map[string]interface{}{"input": map[string]interface{}{"data": true, "mappings": map[string]interface{}{"id": "empty"}}})
+	require.Contains(t, response, "errors")
+	require.Equal(t, saved, cfg.GetPluginConfiguration("native"), "unsupported targets must reject the whole patch")
 	response = request(update, map[string]interface{}{"input": map[string]interface{}{}, "reset": []string{"mappings"}})
 	require.NotContains(t, response, "errors")
 	require.NotContains(t, cfg.GetPluginConfiguration("native"), "mappings")

@@ -14,6 +14,7 @@ import {
   PluginSettingEditorV3,
   PluginSettingTypeV3,
   PluginPreviewEntityV3,
+  type PluginMappingTargetV3,
 } from "@/core/generated-graphql";
 import { PluginSettingsForm } from "./plugin-settings-form";
 
@@ -27,6 +28,7 @@ async function fixture(
   saved: Record<string, unknown> = {},
   mappingType = PluginSettingTypeV3.Json,
   previewEntity?: PluginPreviewEntityV3,
+  targets?: PluginMappingTargetV3[],
 ) {
   let currentSaved = saved;
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -128,6 +130,12 @@ async function fixture(
       editor: PluginSettingEditorV3.JqMap,
       default_value: mappingType === PluginSettingTypeV3.Json ? {} : "{}",
       options: [],
+      mapping_targets:
+        targets?.map((target) => ({
+          ...target,
+          __typename: "PluginMappingTargetV3" as const,
+          description: target.description ?? null,
+        })) ?? null,
       preview: previewEntity
         ? {
             __typename: "PluginSettingPreviewV3",
@@ -139,6 +147,7 @@ async function fixture(
     {
       __typename: "PluginSettingV3",
       name: "other",
+      mapping_targets: null,
       display_name: null,
       description: null,
       editor: null,
@@ -150,6 +159,7 @@ async function fixture(
     {
       __typename: "PluginSettingV3",
       name: "enabled",
+      mapping_targets: null,
       display_name: null,
       description: null,
       editor: null,
@@ -339,6 +349,106 @@ it("previews the raw mapping draft with sample JSON without saving it", async ()
     "A quoted title",
   );
   expect(control("jq expression").value).toBe(expression);
+  const trigger = container.querySelector('[data-slot="collapsible-trigger"]');
+  expect(trigger?.getAttribute("aria-expanded")).toBe("true");
+  expect(
+    document.getElementById(trigger?.getAttribute("aria-controls") ?? ""),
+  ).not.toBeNull();
+  await click("Preview mappings");
+  expect(trigger?.getAttribute("aria-expanded")).toBe("false");
+  await click("Preview mappings");
+  expect(control("Sample input (JSON)").value).toContain("A quoted title");
+  expect(requests).toHaveLength(1);
+});
+
+it("retains unsupported saved targets and prevents saving or testing them", async () => {
+  const { container, requests, edit, click, submit, control } = await fixture(
+    { mappings: { payload: ".catalog.title" } },
+    PluginSettingTypeV3.Json,
+    undefined,
+    [
+      {
+        name: "title",
+        label: "Title",
+        type: "String",
+        description: "The title",
+      },
+    ],
+  );
+  const target = container.querySelector('[data-slot="select-trigger"]');
+  expect(target?.textContent).toContain("payload");
+  expect(target?.getAttribute("aria-invalid")).toBe("true");
+  await edit("jq expression", ".stash.title");
+  await submit();
+  await click("Preview mappings");
+  await click("Test expression");
+  expect(requests).toHaveLength(0);
+  expect(container.textContent).toContain("Choose a supported target field");
+  expect(control("jq expression").value).toBe(".stash.title");
+  await click("Remove mapping payload");
+  await submit();
+  expect(requests.at(-1)?.variables.input).toEqual({ mappings: {} });
+});
+
+it("offers declared target labels and value formats and prevents duplicate selection", async () => {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
+  const { container, requests, click, edit, submit } = await fixture(
+    { mappings: { title: ".catalog.title" } },
+    PluginSettingTypeV3.Json,
+    undefined,
+    [
+      {
+        name: "title",
+        label: "Title",
+        type: "String",
+        description: "The title",
+      },
+      {
+        name: "performer_ids",
+        label: "Performers",
+        type: "[ID!]",
+        description: "Existing Stash performer IDs",
+      },
+    ],
+  );
+  expect(container.textContent).toContain("title: String");
+  await click("Add mapping");
+  const triggers = container.querySelectorAll<HTMLButtonElement>(
+    '[data-slot="select-trigger"]',
+  );
+  const trigger = triggers[1];
+  if (!trigger) throw new Error("Missing second target selector");
+  await act(async () => trigger.click());
+  const options = [
+    ...document.querySelectorAll<HTMLElement>('[role="option"]'),
+  ];
+  expect(options.map((option) => option.textContent)).toEqual([
+    "Title",
+    "Performers",
+  ]);
+  const [title, performers] = options;
+  if (!title || !performers) throw new Error("Missing target options");
+  expect(title.getAttribute("aria-disabled")).toBe("true");
+  await act(async () => performers.click());
+  expect(trigger.textContent).toContain("Performers");
+  expect(container.textContent).toContain("Existing Stash performer IDs");
+  await edit("jq expression", '["12"]', 1);
+  await submit();
+  expect(requests.at(-1)?.variables.input).toEqual({
+    mappings: { title: ".catalog.title", performer_ids: '["12"]' },
+  });
+  expect(
+    [...container.querySelectorAll("button")].find(
+      (button) => button.textContent === "Add mapping",
+    )?.disabled,
+  ).toBe(true);
 });
 
 it("preserves malformed saved data for repair, then switches to the mapping editor", async () => {

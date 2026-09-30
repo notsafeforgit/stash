@@ -7,6 +7,12 @@ query PluginSettings($plugin_id: ID!) {
       type
       default_value
       editor
+      mapping_targets {
+        name
+        label
+        type
+        description
+      }
       preview {
         entity
         description

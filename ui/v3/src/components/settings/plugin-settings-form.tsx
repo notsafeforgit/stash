@@ -3,6 +3,12 @@ import { useId, useState, type ReactNode } from "react";
 import { useApolloClient } from "@apollo/client/react";
 import { useForm } from "@tanstack/react-form";
 import { z } from "zod";
+import { ChevronDownIcon } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import * as GQL from "src/core/generated-graphql";
 import { useMsg } from "src/hooks/message";
 import { useSaveIndicator } from "src/hooks/save-indicator";
@@ -72,30 +78,45 @@ function SettingControl({
 }) {
   const id = useId();
   const msg = useMsg();
-  const [preview, setPreview] = useState(false);
+  const [previewReady, setPreviewReady] = useState(false);
   const label = setting.display_name || setting.name;
   const editor = setting.editor;
   const text = typeof value === "string" ? value : "";
   const descriptionId = setting.description ? `${id}-description` : undefined;
   const previewControl = (
-    <>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        onClick={() => setPreview(!preview)}
-        aria-expanded={preview}
+    <Collapsible
+      onOpenChange={(open) => {
+        if (open) setPreviewReady(true);
+      }}
+      className="rounded-lg border p-3"
+      disabled={disabled}
+    >
+      <CollapsibleTrigger
+        render={
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="group w-full justify-between"
+          />
+        }
       >
         {msg("config.plugins.preview_expression", "Preview mappings")}
-      </Button>
-      {preview && (
-        <PluginExpressionPreview
-          pluginId={pluginId}
-          setting={setting}
-          expression={value}
+        <ChevronDownIcon
+          data-icon="inline-end"
+          className="transition-transform group-aria-expanded:rotate-180"
         />
-      )}
-    </>
+      </CollapsibleTrigger>
+      <CollapsibleContent keepMounted className="pt-3">
+        {previewReady && (
+          <PluginExpressionPreview
+            pluginId={pluginId}
+            setting={setting}
+            expression={value}
+          />
+        )}
+      </CollapsibleContent>
+    </Collapsible>
   );
   if (editor === GQL.PluginSettingEditorV3.JqMap) {
     return (
@@ -110,6 +131,7 @@ function SettingControl({
           value={value}
           onChange={onChange}
           disabled={disabled}
+          targets={setting.mapping_targets}
         />
         {previewControl}
       </FieldSet>
@@ -248,7 +270,7 @@ export function PluginSettingsForm({
             .map((setting) => {
               const draft = value.values[setting.name];
               if (setting.editor === GQL.PluginSettingEditorV3.JqMap) {
-                const mappings = mappingValue(draft);
+                const mappings = mappingValue(draft, setting.mapping_targets);
                 return [
                   setting.name,
                   setting.type === GQL.PluginSettingTypeV3.Json

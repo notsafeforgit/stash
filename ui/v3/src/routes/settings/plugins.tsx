@@ -1,12 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@apollo/client/react";
-import {
-  ChevronDown,
-  ChevronRight,
-  ExternalLink,
-  RefreshCw,
-} from "lucide-react";
+import { ChevronRight, ExternalLink, RefreshCw } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
 import { useConfigurationContext } from "src/hooks/config";
 import { useToast } from "src/hooks/toast";
@@ -15,6 +10,11 @@ import { cn } from "src/lib/utils";
 import { Button } from "src/components/ui/button";
 import { Spinner } from "src/components/ui/spinner";
 import { Switch } from "src/components/ui/switch";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { SettingsSection } from "src/components/settings/setting-row";
 import { PluginSettingsForm } from "src/components/settings/plugin-settings-form";
 import { PackageManager } from "src/components/settings/package-manager";
@@ -30,7 +30,7 @@ function PluginCard({ plugin }: { plugin: Plugin }) {
     refetchQueries: [{ query: GQL.PluginsDocument }],
   });
 
-  const [expanded, setExpanded] = useState(false);
+  const [detailsReady, setDetailsReady] = useState(false);
   const [needsReload, setNeedsReload] = useState(false);
 
   const pluginsConfig = (configuration.plugins ?? {}) as Record<
@@ -56,33 +56,39 @@ function PluginCard({ plugin }: { plugin: Plugin }) {
     (plugin.hooks?.length ?? 0) > 0 || (plugin.settings?.length ?? 0) > 0;
 
   return (
-    <div className={cn("rounded-lg border", !plugin.enabled && "opacity-60")}>
+    <Collapsible
+      onOpenChange={(open) => {
+        if (open) setDetailsReady(true);
+      }}
+      className={cn("rounded-lg border", !plugin.enabled && "opacity-60")}
+    >
       <div className="flex flex-col gap-2 p-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className={cn(
-                "h-auto gap-1 p-0 text-sm font-medium hover:bg-transparent",
-                hasDetails && "cursor-pointer hover:text-primary",
-              )}
-              onClick={() => hasDetails && setExpanded((v) => !v)}
+            <CollapsibleTrigger
+              disabled={!hasDetails}
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="group"
+                />
+              }
             >
-              {hasDetails &&
-                (expanded ? (
-                  <ChevronDown className="size-4" />
-                ) : (
-                  <ChevronRight className="size-4" />
-                ))}
+              {hasDetails && (
+                <ChevronRight
+                  data-icon="inline-start"
+                  className="transition-transform group-aria-expanded:rotate-90"
+                />
+              )}
               {plugin.name}
               {plugin.version && (
                 <span className="font-normal text-muted-foreground">
                   ({plugin.version})
                 </span>
               )}
-            </Button>
+            </CollapsibleTrigger>
             {plugin.url && (
               <a
                 href={plugin.url}
@@ -127,50 +133,54 @@ function PluginCard({ plugin }: { plugin: Plugin }) {
         </div>
       </div>
 
-      {expanded && hasDetails && (
-        <div className="space-y-4 border-t p-3">
-          {!!plugin.hooks?.length && (
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium">
-                {msg("config.plugins.hooks", "Hooks")}
-              </h4>
-              {plugin.hooks.map((h) => (
-                <div key={h.name} className="text-sm">
-                  <div className="font-medium">{h.name}</div>
-                  {h.description && (
-                    <div className="text-muted-foreground">{h.description}</div>
-                  )}
-                  {!!h.hooks?.length && (
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {h.hooks.map((hh) => (
-                        <code
-                          key={hh}
-                          className="rounded bg-muted px-1.5 py-0.5 text-xs"
-                        >
-                          {hh}
-                        </code>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-          {!!plugin.settings?.length && (
-            <div className="space-y-3">
-              <h4 className="text-sm font-medium">
-                {msg("settings", "Settings")}
-              </h4>
-              <PluginSettingsForm
-                pluginId={plugin.id}
-                settings={plugin.settings}
-                saved={pluginSettings}
-              />
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+      <CollapsibleContent keepMounted>
+        {detailsReady && hasDetails && (
+          <div className="flex flex-col gap-4 border-t p-3">
+            {!!plugin.hooks?.length && (
+              <div className="flex flex-col gap-2">
+                <h4 className="text-sm font-medium">
+                  {msg("config.plugins.hooks", "Hooks")}
+                </h4>
+                {plugin.hooks.map((h) => (
+                  <div key={h.name} className="text-sm">
+                    <div className="font-medium">{h.name}</div>
+                    {h.description && (
+                      <div className="text-muted-foreground">
+                        {h.description}
+                      </div>
+                    )}
+                    {!!h.hooks?.length && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {h.hooks.map((hh) => (
+                          <code
+                            key={hh}
+                            className="rounded bg-muted px-1.5 py-0.5 text-xs"
+                          >
+                            {hh}
+                          </code>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            {!!plugin.settings?.length && (
+              <div className="flex flex-col gap-3">
+                <h4 className="text-sm font-medium">
+                  {msg("settings", "Settings")}
+                </h4>
+                <PluginSettingsForm
+                  pluginId={plugin.id}
+                  settings={plugin.settings}
+                  saved={pluginSettings}
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 

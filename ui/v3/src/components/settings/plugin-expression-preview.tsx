@@ -85,7 +85,10 @@ export function PluginExpressionPreview({
       const api = createPluginExpressionsAPI(apollo);
       const result =
         setting.editor === PluginSettingEditorV3.JqMap
-          ? await api.map(mappingValue(expression), data)
+          ? await api.map(
+              mappingValue(expression, setting.mapping_targets),
+              data,
+            )
           : await api.jq(
               typeof expression === "string" ? expression : "",
               data,

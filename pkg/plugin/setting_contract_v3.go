@@ -52,13 +52,14 @@ type PluginSettingOptionV3 struct {
 }
 
 type SettingConfigV3 struct {
-	Type         PluginSettingTypeV3     `yaml:"type" json:"type"`
-	DisplayName  string                  `yaml:"displayName" json:"display_name"`
-	Description  string                  `yaml:"description" json:"description"`
-	DefaultValue interface{}             `yaml:"default" json:"default_value"`
-	Editor       *PluginSettingEditorV3  `yaml:"editor" json:"editor"`
-	Options      []PluginSettingOptionV3 `yaml:"options" json:"options"`
-	Preview      *PluginSettingPreviewV3 `yaml:"preview" json:"preview"`
+	Type           PluginSettingTypeV3     `yaml:"type" json:"type"`
+	DisplayName    string                  `yaml:"displayName" json:"display_name"`
+	Description    string                  `yaml:"description" json:"description"`
+	DefaultValue   interface{}             `yaml:"default" json:"default_value"`
+	Editor         *PluginSettingEditorV3  `yaml:"editor" json:"editor"`
+	Options        []PluginSettingOptionV3 `yaml:"options" json:"options"`
+	Preview        *PluginSettingPreviewV3 `yaml:"preview" json:"preview"`
+	MappingTargets []PluginMappingTargetV3 `yaml:"mappingTargets" json:"mapping_targets"`
 }
 
 type PluginSettingV3 struct {
@@ -109,6 +110,9 @@ func (s *SettingConfigV3) normalizeAndValidate() error {
 		if !s.Preview.Entity.IsValid() {
 			return fmt.Errorf("preview entity must be SCENE or IMAGE")
 		}
+	}
+	if err := s.validateMappingTargets(); err != nil {
+		return err
 	}
 	if s.DefaultValue != nil {
 		value, err := manifestJSON(s.DefaultValue)
@@ -184,7 +188,7 @@ func (s SettingConfigV3) validateValue(value interface{}) error {
 				if err := json.Unmarshal([]byte(text), &mappings); err != nil {
 					return fmt.Errorf("expected a JSON object of field names and jq expressions: %w", err)
 				}
-				return validateJQMappings(mappings)
+				return s.validateMappings(mappings)
 			case "JQ":
 				_, err := compileJQ(text)
 				return err
@@ -203,7 +207,7 @@ func (s SettingConfigV3) validateValue(value interface{}) error {
 			if !ok {
 				return fmt.Errorf("expected an object of field names and jq expressions")
 			}
-			return validateJQMappings(mappings)
+			return s.validateMappings(mappings)
 		}
 	default:
 		return fmt.Errorf("unknown setting type %q", s.Type)

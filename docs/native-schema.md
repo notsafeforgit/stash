@@ -36,8 +36,16 @@ covering indexes retain their historical names to avoid unnecessary rebuilding.
 Repositories and filter joins use the promoted table names. The active fork
 migration ledger is removed and legacy migrators cannot modify a native schema.
 
-This first migration deliberately preserves saved-filter conflict/shadow data
-and per-name policy until the next canonical-model conversions consume them.
+Migration 1000001 validates and moves each saved-filter AST onto
+`saved_filters.filter_ast`, then removes `object_filter` and `saved_filter_state`
+in one transaction. The repository reads and writes that single representation.
+Invalid ASTs stop conversion before the old state is changed. Existing pending
+legacy conflicts retain their exact input strings in `saved_filter_import_conflicts`
+for review; the canonical AST stays selected. This evidence survives deletion of
+the saved filter. `native_migration_history` records each native conversion.
+
+Legacy filter files can still be converted at the import boundary while their
+remaining callers are retired. They do not create live projection/shadow data.
 Default-filter configuration promotion, unified performer names, archive UUIDs,
 source/provenance models, and the catalog import are separate remaining work.
 The full [transition plan](native-archive-transition-plan.md) remains the

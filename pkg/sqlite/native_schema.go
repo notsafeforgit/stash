@@ -92,6 +92,20 @@ func validateDatabaseLineage(path string) error {
 		if present[forkSchemaMigrationsTable] {
 			return errors.New("native database still contains an active fork migration ledger")
 		}
+		if version >= NativeSchemaBaseline+1 {
+			for _, name := range []string{"native_migration_history", "saved_filter_import_conflicts"} {
+				if !present[name] {
+					return fmt.Errorf("native database schema is incomplete: missing %s", name)
+				}
+			}
+			var hasAST bool
+			if err := conn.Get(&hasAST, "SELECT EXISTS(SELECT 1 FROM pragma_table_info('saved_filters') WHERE name = 'filter_ast')"); err != nil {
+				return err
+			}
+			if !hasAST {
+				return errors.New("native database schema is incomplete: missing saved_filters.filter_ast")
+			}
+		}
 		return nil
 	}
 	if version >= NativeSchemaBaseline {

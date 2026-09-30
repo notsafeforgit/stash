@@ -155,10 +155,10 @@ func TestNativePromotionImportsMissingLegacyStateOnce(t *testing.T) {
 
 	raw = openRawDB(t, dbPath)
 	defer raw.Close()
-	if !rawTableExists(t, raw, "saved_filter_state") {
-		t.Fatal("saved-filter sidecar was not recreated")
+	if rawTableExists(t, raw, "saved_filter_state") {
+		t.Fatal("saved-filter sidecar remains after canonical conversion")
 	}
-	if got, want := queryUint(t, raw, "SELECT COUNT(*) FROM saved_filter_state"), uint(1); got != want {
+	if got, want := queryUint(t, raw, "SELECT COUNT(*) FROM saved_filters WHERE filter_ast != ''"), uint(1); got != want {
 		t.Fatalf("reconciled saved-filter count = %d, want %d", got, want)
 	}
 }
@@ -224,8 +224,11 @@ func TestPrivateForkVersionFourUpgradesToConsolidatedMigration(t *testing.T) {
 	if got, want := queryUint(t, raw, "SELECT COUNT(*) FROM legacy_schema_history WHERE track = 'legacy-fork'"), uint(9); got != want {
 		t.Fatalf("consolidated migration count = %d, want %d", got, want)
 	}
-	if rawColumnExists(t, raw, "performer_aliases", "ignore_auto_tag") || rawColumnExists(t, raw, "saved_filters", "filter_ast") {
-		t.Fatal("private fork columns remain after consolidated migration")
+	if rawColumnExists(t, raw, "performer_aliases", "ignore_auto_tag") || rawTableExists(t, raw, "saved_filter_state") {
+		t.Fatal("transitional fork state remains after canonical conversion")
+	}
+	if !rawColumnExists(t, raw, "saved_filters", "filter_ast") || rawColumnExists(t, raw, "saved_filters", "object_filter") {
+		t.Fatal("saved filters must store only their canonical AST")
 	}
 }
 

@@ -66,9 +66,8 @@ type SavedFilter struct {
 	Mode       FilterMode      `db:"mode" json:"mode"`
 	Name       string          `db:"name" json:"name"`
 	FindFilter *FindFilterType `json:"find_filter"`
-	// Legacy v2.5 criteria map. Persisted filters use FilterAST as the
-	// canonical representation; this field only carries data for not-yet
-	// migrated rows and legacy import files. The GraphQL object_filter
+	// Historical criteria map accepted by one-time imports and the remaining
+	// legacy API adapter. Only FilterAST is persisted. The GraphQL object_filter
 	// field is resolved by flattening FilterAST, not from this field.
 	ObjectFilter map[string]interface{} `json:"object_filter"`
 	FilterAST    *FilterAST             `json:"filter_ast"`

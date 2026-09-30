@@ -86,8 +86,19 @@ func TestNativeImportPreservesLegacySavedFilterConflicts(t *testing.T) {
 	}
 	raw = openRawDB(t, path)
 	defer raw.Close()
-	var pending string
-	require.NoError(t, raw.QueryRow(`SELECT pending_legacy_object_filter FROM saved_filter_state JOIN saved_filters ON saved_filter_id = id WHERE name = 'Complex'`).Scan(&pending))
-	require.JSONEq(t, `{"rating100":{"value":60,"modifier":"LESS_THAN"}}`, pending)
-	require.Equal(t, uint(0), queryUint(t, raw, `SELECT COUNT(*) FROM saved_filter_state WHERE saved_filter_id NOT IN (SELECT id FROM saved_filters)`))
+	var evidence, selection string
+	var reviewRequired bool
+	require.NoError(t, raw.QueryRow(`SELECT evidence, selection, review_required
+FROM saved_filter_import_conflicts JOIN saved_filters ON saved_filter_id = saved_filters.id
+WHERE name = 'Complex'`).Scan(&evidence, &selection, &reviewRequired))
+	var originals map[string]string
+	require.NoError(t, json.Unmarshal([]byte(evidence), &originals))
+	require.JSONEq(t, `{"rating100":{"value":60,"modifier":"LESS_THAN"}}`, originals["pending_legacy_object_filter"])
+	require.Equal(t, "preserved-canonical", selection)
+	require.True(t, reviewRequired)
+	require.False(t, rawTableExists(t, raw, "saved_filter_state"))
+	// Deleting a filter must not erase the migration's audit evidence.
+	_, err = raw.Exec("DELETE FROM saved_filters WHERE name = 'Complex'")
+	require.NoError(t, err)
+	require.Equal(t, uint(1), queryUint(t, raw, "SELECT count(*) FROM saved_filter_import_conflicts WHERE saved_filter_id IS NULL"))
 }

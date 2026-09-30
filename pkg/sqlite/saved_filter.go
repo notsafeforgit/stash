@@ -12,96 +12,91 @@ import (
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jmoiron/sqlx"
 
-	"github.com/stashapp/stash/pkg/logger"
 	"github.com/stashapp/stash/pkg/models"
 )
 
 const (
 	savedFilterTable       = "saved_filters"
-	savedFilterStateTable  = "saved_filter_state"
 	savedFilterDefaultName = ""
-	savedFilterIDColumn    = "saved_filter_id"
 )
 
 type savedFilterRow struct {
-	ID           int               `db:"id" goqu:"skipinsert"`
-	Mode         models.FilterMode `db:"mode"`
-	Name         string            `db:"name"`
-	FindFilter   string            `db:"find_filter"`
-	ObjectFilter string            `db:"object_filter"`
-	UIOptions    string            `db:"ui_options"`
+	ID         int               `db:"id" goqu:"skipinsert"`
+	Mode       models.FilterMode `db:"mode"`
+	Name       string            `db:"name"`
+	FindFilter string            `db:"find_filter"`
+	FilterAST  string            `db:"filter_ast"`
+	UIOptions  string            `db:"ui_options"`
 }
 
-type savedFilterQueryRow struct {
-	savedFilterRow
-	FilterAST string `db:"filter_ast"`
-}
-
-func encodeJSONOrEmpty(v interface{}) string {
+func encodeJSONOrEmpty(v interface{}) (string, error) {
 	if v == nil {
-		return ""
+		return "", nil
 	}
-
 	encoded, err := json.Marshal(v)
 	if err != nil {
-		logger.Errorf("error encoding json %v: %v", v, err)
+		return "", err
 	}
-
-	return string(encoded)
+	return string(encoded), nil
 }
 
-func decodeJSON(s string, v interface{}) {
+func decodeJSON(s string, v interface{}) error {
 	if s == "" {
-		return
+		return nil
 	}
-
-	if err := json.Unmarshal([]byte(s), v); err != nil {
-		logger.Errorf("error decoding json %q: %v", s, err)
-	}
+	return json.Unmarshal([]byte(s), v)
 }
 
-func (r *savedFilterRow) fromSavedFilter(o models.SavedFilter) {
-	r.ID = o.ID
-	r.Mode = o.Mode
-	r.Name = o.Name
-
-	// encode the filters as json
-	r.FindFilter = encodeJSONOrEmpty(o.FindFilter)
-	if o.FilterAST != nil {
-		flat, _ := o.FilterAST.FlatObjectFilter()
-		r.ObjectFilter = encodeJSONOrEmpty(flat)
-	} else {
-		r.ObjectFilter = encodeJSONOrEmpty(o.ObjectFilter)
+func (r *savedFilterRow) fromSavedFilter(o models.SavedFilter) error {
+	r.ID, r.Mode, r.Name = o.ID, o.Mode, o.Name
+	var err error
+	r.FindFilter, err = encodeJSONOrEmpty(o.FindFilter)
+	if err != nil {
+		return fmt.Errorf("encoding find filter: %w", err)
 	}
-	r.UIOptions = encodeJSONOrEmpty(o.UIOptions)
+	ast := o.FilterAST
+	if ast == nil && len(o.ObjectFilter) != 0 {
+		// Transitional callers and historical import files are converted at the
+		// boundary; only the canonical AST is persisted.
+		ast, err = models.FilterASTFromLegacySavedFilter(o.ObjectFilter)
+		if err != nil {
+			return fmt.Errorf("converting imported filter: %w", err)
+		}
+	}
+	if ast != nil {
+		ast, err = ast.Normalize()
+		if err != nil {
+			return fmt.Errorf("invalid saved-filter AST: %w", err)
+		}
+		r.FilterAST, err = encodeJSONOrEmpty(ast)
+		if err != nil {
+			return fmt.Errorf("encoding saved-filter AST: %w", err)
+		}
+	}
+	r.UIOptions, err = encodeJSONOrEmpty(o.UIOptions)
+	if err != nil {
+		return fmt.Errorf("encoding filter UI options: %w", err)
+	}
+	return nil
 }
 
-func (r *savedFilterQueryRow) resolve() *models.SavedFilter {
-	ret := &models.SavedFilter{
-		ID:   r.ID,
-		Mode: r.Mode,
-		Name: r.Name,
+func (r *savedFilterRow) resolve() (*models.SavedFilter, error) {
+	ret := &models.SavedFilter{ID: r.ID, Mode: r.Mode, Name: r.Name}
+	if err := decodeJSON(r.FindFilter, &ret.FindFilter); err != nil {
+		return nil, fmt.Errorf("decoding find filter: %w", err)
 	}
-
-	// decode the filters from json
-	if r.FindFilter != "" {
-		ret.FindFilter = &models.FindFilterType{}
-		decodeJSON(r.FindFilter, &ret.FindFilter)
+	if err := decodeJSON(r.FilterAST, &ret.FilterAST); err != nil {
+		return nil, fmt.Errorf("decoding filter AST: %w", err)
 	}
-	if r.ObjectFilter != "" {
-		ret.ObjectFilter = make(map[string]interface{})
-		decodeJSON(r.ObjectFilter, &ret.ObjectFilter)
+	if ret.FilterAST != nil {
+		if err := ret.FilterAST.Validate(); err != nil {
+			return nil, fmt.Errorf("invalid stored filter AST: %w", err)
+		}
 	}
-	if r.FilterAST != "" {
-		ret.FilterAST = &models.FilterAST{}
-		decodeJSON(r.FilterAST, ret.FilterAST)
+	if err := decodeJSON(r.UIOptions, &ret.UIOptions); err != nil {
+		return nil, fmt.Errorf("decoding filter UI options: %w", err)
 	}
-	if r.UIOptions != "" {
-		ret.UIOptions = make(map[string]interface{})
-		decodeJSON(r.UIOptions, &ret.UIOptions)
-	}
-
-	return ret
+	return ret, nil
 }
 
 type SavedFilterStore struct {
@@ -124,40 +119,17 @@ func (qb *SavedFilterStore) table() exp.IdentifierExpression {
 }
 
 func (qb *SavedFilterStore) selectDataset() *goqu.SelectDataset {
-	stateTable := goqu.T(savedFilterStateTable)
-	return dialect.From(qb.table()).
-		Select(qb.table().All(), goqu.COALESCE(stateTable.Col("filter_ast"), "").As("filter_ast")).
-		LeftJoin(stateTable, goqu.On(stateTable.Col(savedFilterIDColumn).Eq(qb.table().Col(idColumn))))
-}
-
-func (qb *SavedFilterStore) setFilterAST(ctx context.Context, id int, filter *models.SavedFilter, legacyObjectFilter string) error {
-	stateTable := goqu.T(savedFilterStateTable)
-	if filter.FilterAST == nil {
-		q := dialect.Delete(stateTable).Where(stateTable.Col(savedFilterIDColumn).Eq(id))
-		_, err := exec(ctx, q)
-		return err
-	}
-
-	q := dialect.Insert(stateTable).
-		Cols(savedFilterIDColumn, "filter_ast", "legacy_object_filter").
-		Vals(goqu.Vals{id, encodeJSONOrEmpty(filter.FilterAST), legacyObjectFilter}).
-		OnConflict(goqu.DoUpdate(savedFilterIDColumn, goqu.Record{
-			"filter_ast":           goqu.I("excluded.filter_ast"),
-			"legacy_object_filter": goqu.I("excluded.legacy_object_filter"),
-		}))
-	_, err := exec(ctx, q)
-	return err
+	return dialect.From(qb.table()).Select(qb.table().All())
 }
 
 func (qb *SavedFilterStore) Create(ctx context.Context, newObject *models.SavedFilter) error {
 	var r savedFilterRow
-	r.fromSavedFilter(*newObject)
+	if err := r.fromSavedFilter(*newObject); err != nil {
+		return err
+	}
 
 	id, err := qb.tableMgr.insertID(ctx, r)
 	if err != nil {
-		return err
-	}
-	if err := qb.setFilterAST(ctx, id, newObject, r.ObjectFilter); err != nil {
 		return err
 	}
 
@@ -173,12 +145,11 @@ func (qb *SavedFilterStore) Create(ctx context.Context, newObject *models.SavedF
 
 func (qb *SavedFilterStore) Update(ctx context.Context, updatedObject *models.SavedFilter) error {
 	var r savedFilterRow
-	r.fromSavedFilter(*updatedObject)
-
-	if err := qb.tableMgr.updateByID(ctx, updatedObject.ID, r); err != nil {
+	if err := r.fromSavedFilter(*updatedObject); err != nil {
 		return err
 	}
-	if err := qb.setFilterAST(ctx, updatedObject.ID, updatedObject, r.ObjectFilter); err != nil {
+
+	if err := qb.tableMgr.updateByID(ctx, updatedObject.ID, r); err != nil {
 		return err
 	}
 
@@ -253,12 +224,15 @@ func (qb *SavedFilterStore) getMany(ctx context.Context, q *goqu.SelectDataset) 
 	const single = false
 	var ret []*models.SavedFilter
 	if err := queryFunc(ctx, q, single, func(r *sqlx.Rows) error {
-		var f savedFilterQueryRow
+		var f savedFilterRow
 		if err := r.StructScan(&f); err != nil {
 			return err
 		}
 
-		s := f.resolve()
+		s, err := f.resolve()
+		if err != nil {
+			return fmt.Errorf("reading saved filter %d: %w", f.ID, err)
+		}
 
 		ret = append(ret, s)
 		return nil

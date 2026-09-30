@@ -83,6 +83,8 @@ func TestNativeLineageRejectsUnsafeInputsBeforeWriting(t *testing.T) {
 		{"newer version", fmt.Sprintf("UPDATE schema_migrations SET version = %d", sqlite.GetRequiredSchemaVersion()+1), "incompatible with required"},
 		{"dirty migration", "UPDATE schema_migrations SET dirty = 1", "is incomplete"},
 		{"missing authoritative data", "DROP TABLE video_file_metadata", "missing video_file_metadata"},
+		{"missing migration evidence", "DROP TABLE saved_filter_import_conflicts", "missing saved_filter_import_conflicts"},
+		{"missing canonical filters", "ALTER TABLE saved_filters DROP COLUMN filter_ast", "missing saved_filters.filter_ast"},
 		{"foreign primary version", "DROP TABLE native_schema; UPDATE schema_migrations SET version = 87", "unsupported legacy Stash schema"},
 		{"newer legacy fork", "DROP TABLE native_schema; UPDATE schema_migrations SET version = 86; CREATE TABLE fork_schema_migrations(version INTEGER); INSERT INTO fork_schema_migrations VALUES (10)", "unsupported legacy fork schema 10"},
 	} {

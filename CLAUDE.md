@@ -6,9 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Stash is a self-hosted media organizer written in Go (backend) + React/TypeScript (frontend). It exposes a GraphQL API, manages a SQLite database, and wraps FFmpeg for video processing.
 
-This repository is a **tracking fork** of upstream stashapp/stash. Before syncing with upstream, adding database migrations, or changing the GraphQL schema, read [FORK.md](FORK.md) — it documents the rebase-based sync playbook, the separate fork migration track and its hazards, and the design rules that keep upstream rebases manageable (additive schema changes only; fork logic in fork-owned files). The [documentation index](docs/README.md) links current guides. [docs/v3-schema-promotion.md](docs/v3-schema-promotion.md) describes a conditional future transition; v2.5 compatibility remains required today.
+This repository is now an **independent fork** of upstream stashapp/stash. Work continues on `v3-rewrite` under the [native archive transition plan](docs/native-archive-transition-plan.md); merge into `develop` follows migration verification and the owner's success review. Read [FORK.md](FORK.md) for migration, release, and upstream-import policy. V2.5 compatibility is frozen at `v2.5-compatible-final`, not a constraint on new code. [Transition progress](docs/native-archive-progress.md) distinguishes completed work from the still-running compatible production deployment. The [documentation index](docs/README.md) links current guides.
 
-New plugins use the independent [`apiVersion: 3` contract](docs/plugin-manifests.md) and have no v2.5 plugin compatibility requirement. Extend the v3 manifest and `PluginV3` / `PluginSettingV3` API types; keep legacy plugin adaptation inside the host.
+New plugins use the independent [`apiVersion: 3` contract](docs/plugin-manifests.md). Preserve its settings, UI contributions, capability checks, and after-success notifications. Existing unversioned adaptation is scheduled for removal after actual callers are converted; do not extend it. Native catalog invariants belong in core services.
+
+The build commands and storage-bridge descriptions below describe the code as
+it is converted. They are not requirements to keep two UIs, legacy API shims,
+or dual migration tracks. Update each section with its implementation change;
+do not remove a required caller without converting and testing it.
 
 ## Development quickstart
 

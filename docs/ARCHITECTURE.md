@@ -1,9 +1,12 @@
 # v3 rewrite architecture
 
-This is the system overview for the `v3-rewrite` tracking fork. Stash runs one
+This is the system overview for the `v3-rewrite` independent fork. Stash runs one
 Go backend with a shared GraphQL API, a SQLite library, filesystem media, and
 embedded browser applications. Active frontend work belongs in `ui/v3/`;
-`ui/v2.5/` remains the read-only fallback and client compatibility baseline.
+`ui/v2.5/` and the storage/API bridges described below are being retired under
+the [native archive transition](native-archive-transition-plan.md). They describe
+the starting implementation, not constraints on new development. The
+[progress record](native-archive-progress.md) tracks the migration and cutover.
 
 Start here for runtime and storage boundaries. The [v3 frontend guide](../ui/v3/docs/architecture.md)
 maps UI modules and state ownership; the [development guide](../ui/v3/docs/development.md)
@@ -111,13 +114,15 @@ ordinary SQL. External writes invalidate caches, and startup rebuilds the search
 index. No FTS tables or persistent search tracking triggers are added to the
 library database. See [read performance](read-performance.md) for details.
 
-### Two migration tracks
+### Historical bridge and native migration
 
 Upstream SQL migrations in [pkg/sqlite/migrations](../pkg/sqlite/migrations/)
 own `schema_migrations` and `appSchemaVersion`. Fork Go migrations register
 through [fork_migrate.go](../pkg/sqlite/fork_migrate.go) and record their version
-in `fork_schema_migrations`. Fork changes must not advance the upstream numeric
-sequence or add columns to upstream-owned tables.
+in `fork_schema_migrations`. This was the compatible release's storage boundary.
+New native changes use a separately identified primary schema with normal
+constraints and repositories. Historical fork migrations remain only as
+one-time import steps until promotion coverage is complete.
 
 Fork-only values live in `fork_*` sidecars: canonical saved filters, performer
 name policies, extended file metadata, scene-cover provenance, and shares.
@@ -129,13 +134,14 @@ derived state. These paths run in the fork binary regardless of the UI flag.
 
 An upstream-only binary at the matching upstream schema version can use the
 base representation while ignoring fork sidecars. This does not promise that
-any older Stash release can open the database. [Retiring compatibility](v3-schema-promotion.md)
-is a conditional future transition, not current migration policy.
+any older Stash release can open the database. Promoted native databases are
+incompatible with old binaries. [FORK.md](../FORK.md) and the
+[native archive plan](native-archive-transition-plan.md) define the current policy.
 
 ### Shared API, richer v3 state
 
-Keep GraphQL additions compatible with existing operation shapes, argument
-defaults, and mutation behavior. In particular:
+The starting implementation contains these bridges. Remove them after converting
+their actual consumers; new API contracts do not need v2.5 projections:
 
 - Saved filters keep their v2.5 `object_filter` projection while a sidecar holds
   the canonical v3 AST and a legacy shadow. Complex conflicting edits preserve
@@ -269,8 +275,8 @@ replica of the server library.
 
 | Change | Start with |
 | --- | --- |
-| Add or extend a GraphQL field | Schema → gqlgen mapping/resolver → repository/service if needed → v3 operation; preserve the v2.5 contract |
-| Add persisted fork data | [FORK.md](../FORK.md), a sidecar migration/reconciler, and close/upstream-write/reopen compatibility fixtures |
+| Add or extend a GraphQL field | Schema → gqlgen mapping/resolver → shared service/repository → supported client operations; test retained native contracts |
+| Add persisted data | [FORK.md](../FORK.md), a native migration with constraints, migration fixtures, and restart/restore tests |
 | Add a list or detail view | [Frontend module map](../ui/v3/docs/architecture.md#module-map), typed list configuration, and shared detail layouts |
 | Change playback | [Player guide](../ui/v3/docs/player.md), frontend transition tests, and backend stream/timestamp tests |
 | Change navigation, gestures, or overlays | [Interaction guide](../ui/v3/docs/interactions.md) and browser regression fixtures |

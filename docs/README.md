@@ -1,8 +1,11 @@
 # Project documentation
 
-This branch is the `v3-rewrite` tracking fork of Stash. Active UI development is
-in `ui/v3/`; v2.5 remains the mainline client and storage compatibility baseline.
-v3 route paths may differ, but existing v2.5 clients must keep working.
+This branch is the `v3-rewrite` independent fork of Stash. Active UI development
+is in `ui/v3/`. The [native archive transition](native-archive-transition-plan.md)
+retires v2.5 compatibility and brings catalogs into the application.
+[Implementation progress](native-archive-progress.md) records verified work and
+the production cutover status. The [final compatible release](releases/v2.5-compatible-final.md)
+provides the frozen fallback for users who do not migrate.
 
 ## Current development guides
 
@@ -15,7 +18,7 @@ v3 route paths may differ, but existing v2.5 clients must keep working.
 | [Player architecture](../ui/v3/docs/player.md) | Media lifetime, source/seek policy, recovery, transcode sessions, and backend HLS boundaries |
 | [Interaction and layout contracts](../ui/v3/docs/interactions.md) | Motion, dialogs, editing shells, mobile navigation, keyboard layout, and focus |
 | [Feature development plan](../ui/v3/docs/plan.md) | Expectations for new feature work |
-| [Fork maintenance](../FORK.md) | Upstream syncs, additive API changes, migrations, and rollback compatibility |
+| [Fork maintenance](../FORK.md) | Independent development, upstream imports, native migrations, and release boundaries |
 | [Repository guidance](../CLAUDE.md) and [v3 contributor guidance](../ui/v3/AGENTS.md) | Coding conventions and backend/player constraints |
 | [Plugin host](../ui/v3/docs/plugin-host.md) | Current v3 UI plugin API, startup lifecycle, and failure handling |
 | [Versioned plugin manifests](plugin-manifests.md) | Independent v3 plugin contract, legacy adapter, and API generations |

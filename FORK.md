@@ -1,198 +1,112 @@
-# Fork maintenance
+# Independent fork maintenance
 
-This repository is a **tracking fork** of [stashapp/stash](https://github.com/stashapp/stash),
-not a hard fork. Upstream changes are absorbed by rebasing the fork branch, and
-fork features are designed to keep that cheap. This document is the playbook
-for syncs and the rules that keep the conflict surface small. It is written for
-both humans and LLM agents performing a sync.
+This repository develops an independent native media archive based on Stash.
+The [native archive transition plan](docs/native-archive-transition-plan.md)
+defines the full migration scope and acceptance criteria.
+[Implementation progress](docs/native-archive-progress.md) records completed
+work, verification, and deployment status. The compatible production deployment
+remains separate from development until the cutover gates pass.
 
-See the [documentation index](docs/README.md) for current v3 guides and the
-[deployment runbook](docs/v3-deployment.md) for publishing and restarting the
-local container after validation.
+## Branch and release policy
 
-## Strategy
+- Continue implementation on `v3-rewrite` in incremental, reviewable commits.
+  Merge directly into `develop` only after verification and the owner's success
+  review. Do not rebase published implementation commits or force-push releases.
+- `v2.5-compatible-final` identifies the last supported compatible source.
+  [Its release manifest](docs/releases/v2.5-compatible-final.json) pins the exact
+  existing images. Never rebuild or move these final and dated release tags.
+- Publish development Stash images to `native-preview` and revision tags. The
+  wrapper explicitly selects a full source-image digest and publishes separate
+  native preview variants. Never select the newest source image implicitly.
+- Keep live production pinned during development. Exercise migrations and
+  imports against copies before opening the native database for production
+  writes. Preserve the original database, configuration, catalogs, and operating
+  state at a common backup boundary.
 
-- Sync by rebasing `v3-rewrite` onto `stashapp/develop` (per upstream release,
-  or as needed). This keeps the fork history linear and makes the upstream base
-  explicit. Because the branch is published, fetch `origin/v3-rewrite` before
-  rebasing and update it afterward with `git push --force-with-lease`, never an
-  unconditional force push.
-- Enable `git rerere` so re-encountered conflicts auto-resolve.
-- Mainline v2.5 API clients must keep working. Fork features add compatibility
-  layers at the resolver level rather than changing existing API semantics
-  (see "Saved filters" in CLAUDE.md for the pattern).
-- **New v3 plugins have no v2.5 plugin compatibility requirement.** Their
-  `apiVersion: 3` manifest and `PluginV3` / `PluginSettingV3` API types are
-  independent contracts. Extend those types instead of the legacy plugin types.
-  The host adapts existing unversioned plugins for v3 management and keeps
-  versioned plugins out of v2.5 discovery. See [plugin manifests](docs/plugin-manifests.md).
-- The v3 UI is currently gated by `--enable-v3-ui` / `STASH_ENABLE_V3_UI=true`.
-  Keep the existing v2.5 UI and client contract available throughout the rewrite.
+## Upstream changes
 
-## Design rules that keep rebases cheap
+Import useful upstream fixes selectively with their source revision and native
+regression tests. Routine rebasing onto upstream and minimizing merge conflicts
+are no longer architecture requirements. Preserve copyright/license attribution.
+The frozen compatible release is a migration fallback, not an indefinitely
+maintained parallel product.
 
-1. **New code goes in new files/directories.** `ui/v3/` is wholly fork-owned;
-   Go-side fork logic lives in dedicated files (e.g. `pkg/models/filter_ast*.go`).
-2. **Schema changes are additive only.** Never change the type, nullability, or
-   semantics of an existing GraphQL field or argument.
-3. **Touch shared upstream files minimally** — a one-line `case` branch or call
-   into a fork-owned file, not inline logic.
-4. **Never edit generated files by hand** (`internal/api/generated_*.go` and the v3
-   `src/core/generated-graphql.ts` are gitignored). Regenerate the backend
-   with `make generate` and v3 operations with `pnpm --dir ui/v3 gqlgen`.
+StashDB/stash-box compatibility remains a network protocol requirement. It does
+not require matching upstream's database schema, GraphQL server, UI, or plugin
+format. Preserve endpoint-qualified remote IDs and fingerprint algorithms.
 
-## Sync playbook
+## Database and domain ownership
 
-1. Add the source remote once with
-   `git remote add stashapp https://github.com/stashapp/stash.git`. Before each
-   sync, run `git fetch stashapp` and `git fetch origin v3-rewrite`,
-   then `git -c rerere.enabled=true rebase stashapp/develop`.
-2. **Generated files:** never hand-merge conflicts in them. Take either side
-   to let the rebase proceed, then run `make generate` and commit the
-   regenerated output. During a rebase, remember that `--ours` is the new
-   upstream base plus commits already replayed, while `--theirs` is the fork
-   commit currently being replayed. This eliminates most apparent conflicts.
-3. **Database migrations** — keep upstream fallback viable:
-   - Upstream migrations remain in `pkg/sqlite/migrations/*.sql` and own only
-     upstream's `schema_migrations` version. Fork DB changes are registered as
-     Go migrations with `sqlite.RegisterForkMigration` and are recorded in the
-     separate `fork_schema_migrations` table. Do not add new fork changes to
-     upstream's numeric migration sequence.
-   - Never leave fork columns in upstream-owned tables. Store fork data in
-     `fork_*` sidecar tables keyed to upstream rows with cascading foreign
-     keys. v3 writes an upstream-compatible base representation and richer
-     sidecar state in the same transaction.
-   - Register idempotent compatibility passes with
-     `sqlite.RegisterForkReconciler`. They run after migrations and whenever
-     v3 opens a current database, importing upstream-only edits and
-     invalidating derived data whose source fingerprint changed.
-   - Migration 5 is the single consolidated pre-public fork migration. It
-     imports the private development columns from historical migrations 1-4,
-     drops those columns, and creates all current sidecars.
-4. **Expected conflict zones:** `pkg/ffmpeg` (fork's HLS/segmented-streaming
-   rework overlaps upstream transcode work) and occasionally
-   `internal/api/resolver_*.go`. Resolve in favour of keeping fork behaviour;
-   consult CLAUDE.md sections for the intent behind fork code before choosing
-   sides.
-5. **Validate after every sync and before pushing fork changes:** install both
-   UI dependency trees, then run `make generate`, `make ui`, `make ui-v3-only`,
-   and `make validate-fork` in that order. The Go embedded-asset tests require
-   built v3 route chunks; generation's placeholder directories are insufficient.
-   See the [development guide](ui/v3/docs/development.md#validation).
-   `make validate-fork` regenerates the backend, validates v3, runs
-   integration tests, and runs the CI-pinned linter without requiring a local
-   install. For lint alone, use `make lint`, which executes
-   `go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2 run`.
-   Keep that version synchronized with `.github/workflows/golangci-lint.yml`.
-   During iteration, use `make test`, `make validate-ui-v3`, and focused
-   integration tests such as
-   `go test -tags integration ./pkg/sqlite/... -run SavedFilter`.
-   v3 validation also runs Vitest and the [pinned v2.5 compatibility check](ui/v3/scripts/check-compatibility.mjs).
-   It validates mainline client operations and detects breaking GraphQL changes,
-   changed argument defaults, and changes to upstream's migration track. After
-   an upstream sync, update [the baseline revision](ui/v3/scripts/compatibility-baseline.json)
-   to the new upstream base and review the compatibility results. The SQLite
-   suite includes [mainline write fixtures](pkg/sqlite/testdata/v25_saved_filter_edits.sql)
-   exercised across v3 close/reopen cycles.
-   For an upstream sync that changes v2.5, additionally run
-   `make generate && make validate`; fork feature work must not edit v2.5.
-6. `ui/v2.5/` is read-only fork-side: upstream changes rebase in freely; fork
-   changes to it are not allowed (all active UI development is `ui/v3/`).
-7. Review the rewritten range, verify that `stashapp/develop` is an ancestor of
-   `v3-rewrite`, then publish with
-   `git push --force-with-lease origin v3-rewrite`. A lease failure means the
-   remote changed after it was fetched; fetch and inspect it rather than
-   overriding it.
+New data belongs in normal SQLite migrations, models, repositories, and domain
+services. Use foreign keys, unique constraints, bounded indexed lookups, and
+transactional updates. One-to-one metadata tables may remain normalized; being
+first class does not require flattening them into entity rows.
 
-## Fork-owned surfaces (update when extending)
+The native schema must have an explicit lineage and independent version range.
+Validate it before writes, reject dirty/newer/foreign databases, and verify that
+the frozen binary refuses the promoted schema. Production uses a distinct native
+database path. An upstream schema number must never be mistaken for a native
+schema merely because its integer matches.
 
-| Area | What | Upstream collision risk |
-|---|---|---|
-| `ui/v3/` | entire v3 UI | none (new directory) |
-| `ui/ui_v3.go` | v3 embedded UI selector; keep `ui/ui.go` upstream-shaped for v2.5 | low |
-| `pkg/previewimage/`, `internal/manager/*preview_images*`, and `internal/api/*preview_image*` | scene/marker stills and image thumbnails sharing HDR AVIF encoding, storage, and legacy JPEG adapters; see [preview images](docs/preview-images.md) | low (new files) |
-| `graphql/schema/` | additive v3 API fields, including filter ASTs and loss-aware performer merge opt-in | low (additive) |
-| `internal/api/resolver_mutation_bulk_*.go` + `bulk_update.go` | fork bulk-job orchestration; legacy synchronous adapters remain in shared resolvers | low (new files) |
-| `internal/manager/generate_scene_selection.go` | opt-in generation for frozen scene-filter matches, including cover resets across pages | low (new file and small generation hook) |
-| `internal/api/resolver_query_bulk_custom_fields.go` + `graphql/schema/types/bulk_custom_fields.graphql` | shared/partial custom-field names for the complete bulk-edit target | low (new files) |
-| `internal/api/resolver_mutation_default_filter.go` + `internal/manager/default_filter_update.go` | atomic per-view default-filter updates | low (new files) |
-| `internal/api/json_values.go` | recursive JSON-number conversion for configuration persistence; shared helper/resolver call sites stay small | low (new file) |
-| `internal/api/resolver_entity_image*.go`, `internal/manager/scene_frame_image.go` | normalized entity images from uploads, images, scene covers or independent scene frames | low (new files) |
-| `internal/api/job_subscription.go` | cancel-aware job subscription forwarding | low (new file) |
-| `pkg/plugin/file_hooks.go`, `internal/api/post_update_hooks.go`, `internal/manager/plugin_hooks.go` | committed file deletion/update notifications and specialized entity edit hooks; see [plugin events](docs/plugin-events.md) | low (new files, small service/resolver hooks) |
-| `pkg/plugin/settings_v3.go`, `pkg/plugin/jq.go`, `internal/api/resolver_plugin_settings.go`, `internal/manager/config/plugin_update.go` | additive settings metadata, atomic patches and embedded jq evaluation; see [plugin settings](docs/plugin-settings.md) | low (new files, small manifest additions) |
-| `pkg/plugin/manifest_v3.go`, `pkg/plugin/setting_contract_v3.go`, `internal/api/resolver_plugin_v3.go`, `graphql/schema/types/plugin-v3.graphql` | versioned v3 manifests and independent plugin/settings API, including native JSON settings; no v2.5 plugin compatibility obligation | low (new files and legacy adapter) |
-| `internal/sharing/`, `internal/api/*share*`, `pkg/sqlite/share.go`, `graphql/schema/types/media_share.graphql` | expiring media capabilities, isolated guest router and additive owner management; see [sharing](docs/sharing.md) | low (new files, small server/repository hooks) |
-| `fork_shares`, `fork_share_sessions`, `internal/manager/config/sharing.go` | grants, frozen membership, hashed guest sessions and public share URL | none (fork-owned tables/key) |
-| `internal/api/performer_merge_*.go` | canonical-name retention and opt-in loss-aware performer merge validation | low (new files) |
-| `pkg/models/filter_ast*.go` | AST model + v2.5 compat layer | none (new files) |
-| `pkg/sqlite/fork_migrate.go` + `pkg/sqlite/migrations/fork_*.go` | consolidated fork migration and roll-forward reconcilers | low |
-| `pkg/file/delete_*.go`, `pkg/fsutil/*identity*.go`, `pkg/fsutil/rename_noreplace*.go`, `pkg/sqlite/file_deletions.go` | staged deletion, bounded filenames, pending-only journal and crash recovery; see [file deletion](docs/file-deletion.md) | low (new files and transaction hooks) |
-| `pkg/sqlite/media_search.go`, `media_browse.go` + `pkg/sqlite/migrations/fork_read_indexes.go` | bounded search candidates and ordinary covering indexes for browsing | low (small query-builder calls; no upstream table changes) |
-| `pkg/sqlite/read_acceleration.go`, `search_index.go`, `search_changes.go` | disposable substring index and snapshot-scoped count cache | low (separate database; connection-local tracking only) |
-| `fork_performer_autotag_ignored_names` | case-insensitive auto-tag opt-outs keyed by performer and name text | none (fork-owned table) |
-| `fork_saved_filter_state` | canonical filter AST plus upstream compatibility shadow | none (fork-owned table) |
-| `fork_video_file_metadata` / `fork_image_file_metadata` | ffprobe metadata plus source fingerprints | none (fork-owned tables) |
-| `fork_scene_cover_sources`, `internal/manager/scene_cover_source.go` | durable cover frame selections, source validity and guarded regeneration | low (sidecar and small generation hooks) |
-| `forkDefaultFilterState` UI config key | canonical default-filter AST, legacy shadow, and pending conflict | none (ignored by v2.5) |
-| `pkg/ffmpeg` HLS changes | segmented streaming, PTS normalization | **high** |
+Historical primary/fork schemas are supported input formats for one-time
+promotion. Import all completed migration history and retained values before
+removing the sidecars. Enumerate unknown fork objects and fail with a useful
+report. Do not create new compatibility sidecars, live reconcilers, or parallel
+write projections. Existing bridge code may remain temporarily while its
+consumers are converted, but must be removed before the transition is complete.
 
-Migration 5 restores all upstream-owned tables to their upstream shape. An
-upstream-only server at the same upstream schema version ignores the sidecars.
-Migration 6 adds optional `fork_scenes_created_at` and `fork_images_created_at`
-indexes on `(created_at, title)`. They use standard SQLite columns and collation,
-so upstream writes maintain them without fork code. The fork recreates missing
-indexes after an upstream table rebuild. Migration 7 stores scene cover origins
-in a sidecar, retaining source identity after file deletion and invalidating
-provenance when upstream changes the cover. Migration 8 adds expiring media share
-grants and guest sessions in two independent sidecars. Migration 9 adds
-`fork_file_deletions`, containing only pending filesystem deletion commit markers.
-These migrations do not change upstream's
-schema version. Substring search uses a rebuildable `<database>.search.sqlite`
-cache with FTS5 trigram tables. No search virtual tables or persistent tracking
-triggers are added to the library database. Connection-local TEMP triggers
-collect changed titles, details, paths, fingerprints, markers and file links;
-their journal rolls back with the write. A pinned `PRAGMA data_version` observer
-detects other writers, invalidates counts and schedules a full index rebuild.
-Each read pins its library snapshot before accepting cached results. Search
-always rechecks the original joined-row predicates and falls back to ordinary
-SQL for stale/unavailable indexes, short terms and overly broad candidate sets.
-The index rebuilds in the background at startup, including after an upstream
-round trip, so no upstream-maintained metadata or migration is required.
+Canonical performer UUIDs, accounts, source posts, shared revisions/captures,
+field decisions, media associations, and durable jobs belong to core services.
+Source publishers and depicted performers are separate relationships, including
+for aggregator accounts. Preserve names, aliases, explicit unlinks, merge
+redirects, UUIDs, local integer IDs, and provenance during import.
 
-The auxiliary file contains searchable library text and is created with mode
-0600. It can be excluded from backups and deleted with Stash stopped; the next
-start rebuilds it automatically. Builds enable `sqlite_fts5` alongside the
-existing SQLite build tags. Builds without FTS5 or without a writable cache
-directory retain ordinary search. Exact counts use a bounded in-memory cache
-and are invalidated after library commits; time-dependent counts bypass it.
-v3 scene/image lists request cards and totals independently, rendering cards
-while totals load. v2.5 retains its existing operations and UI.
-Rolling forward to v3 recreates missing sidecars and imports compatible
-upstream changes; fork-only data remains available when its sidecar was kept.
-Saved-filter edits are imported automatically only when the stored AST is
-losslessly representable by v2.5. For complex ASTs, reconciliation preserves
-the v3 canonical value and stores the conflicting v2.5 edit separately rather
-than silently replacing either version. `defaultFilters` remains directly
-usable by v2.5, while the v2.5-ignored `forkDefaultFilterState` config key
-preserves the canonical default-filter AST and compatibility shadow. v3
-reconciles these values at startup. Its default-filter controls replace or
-clear both namespaces atomically, and surface a choice when a v2.5 edit
-conflicts with a complex v3 default.
+Filesystem effects are not made atomic by a SQLite transaction. Preserve the
+deletion journal and commit markers, root validation, completion receipts,
+postprocessor path changes, and producer outboxes. Required post-commit work
+must survive restart. Never reclassify failed or pending work as completed.
 
-V3 route names may differ from v2.5. Compatibility applies to the existing
-clients' API and storage contracts. V3 navigation and HTTP requests must honor
-the public mount point in the server's base element; raw filter links and
-history writes use `applicationHref`, while backend requests use `getPlatformURL`.
-Default-filter controls use the additive `configureDefaultFilter` mutation;
-legacy `configureUI`, `configureUISetting`, and `setDefaultFilter` remain available.
+Config and database publication need durable checkpoints. A failed or interrupted
+migration must leave enough state for deterministic retry. Resolve or preserve
+conflicting saved/default filters before dropping either representation. Do not
+use an old binary to roll back a native database after native writes begin.
 
-## Retiring v2.5 compatibility
+## API, UI, and plugin contracts
 
-The rollback bridge is intentionally removable, but retirement is a one-way
-schema transition rather than deletion of the sidecars in place. Follow
-[Retiring v2.5 Compatibility](docs/v3-schema-promotion.md) for the promotion
-gate, final schema, removal map, and required migration tests. In particular,
-the final release must promote v3 data through the primary migration track and
-advance `appSchemaVersion`; another fork migration would not prevent an old
-upstream binary from reopening and writing the database.
+V3 is the application; v2.5 UI/API compatibility is no longer a requirement.
+Version the supported contract, inventory actual callers, and regenerate them
+together. Remove old adapters only after converting their consumers, including
+host/n8n jobs, installed plugins, offline/share entry points, and backup tools.
+Preserve intentional public media/share URLs and standalone/offline behavior.
+
+New plugins use [`apiVersion: 3`](docs/plugin-manifests.md). Retain typed settings,
+schema-constrained mappings, UI contributions on desktop/mobile, capability
+negotiation, jq evaluation, and notifications after successful changes. Hooks
+cannot veto committed changes. Native archive consistency must not depend on
+catalogMetadata or any other plugin receiving a notification.
+
+Use shared domain services for both GraphQL and native ingestion. Producers send
+idempotent events with durable receipts and scoped credentials; they do not write
+the library database. Keep after-success behavior consistent across API edits,
+background jobs, and imported changes. Never expose internal plugin settings in
+mapping data without an explicit use case.
+
+## Validation and documentation
+
+Never edit generated Go/TypeScript bindings by hand. Regenerate supported
+clients. During the conversion, existing build commands still build both UIs;
+their removal is a planned implementation step, not an ongoing support promise.
+Build real embedded assets before full Go validation.
+
+Test changed invariants and migration outcomes with real SQLite fixtures. Cover
+restarts, retries, integrity, unknown inputs, lossless promotion, API callers,
+and retained external protocols. Replace v2.5 round-trip/build checks with
+native migration and contract tests as their runtime paths are removed. Keep
+security and dependency checks for the remaining application.
+
+Use the [cutover runbook](docs/native-archive-transition-plan.md#production-cutover-runbook),
+full-copy migration rehearsal, semantic reconciliation, and an isolated restore
+drill before deploying the new writer. Update architecture, contributor guidance,
+build/CI, packaging, and deployment instructions with their implementation
+changes. Do not describe planned work as already deployed or declare completion
+while the plan's acceptance criteria remain unmet.

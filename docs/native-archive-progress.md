@@ -30,6 +30,7 @@ review. Production has not been migrated.
 | --- | --- |
 | Stash `781ee4b93` | Full transition plan and documentation links |
 | Stash `b76c600a8` | Frozen release manifest, non-overwriting preservation script, child-manifest retention, isolated native preview tags; seven safety tests and actionlint passed |
+| Stash `5c4a4c057` | Independent-fork policy and baseline progress record |
 | stash-s6 `5dab164` | Explicit digest selection for native builds, isolated preview variants, preservation workflow using pinned Stash release tooling; actionlint and [resolved bake validation](https://github.com/notsafeforgit/stash-s6/actions/runs/36757903303) passed |
 
 ## Phase status
@@ -37,11 +38,11 @@ review. Production has not been migrated.
 | Phase | Status |
 | --- | --- |
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
-| 1 Native schema and services | Not yet implemented |
+| 1 Native schema and services | First schema promotion implemented and rehearsed: lineage/version refusal, sidecar promotion, historical audit, repository/filter joins, no runtime DB reconciliation. Canonical filter/name models, archive identities/sources, and domain services remain. |
 | 2 Ingestion and producer adapter | Not yet implemented |
 | 3 Catalog importer and full-copy reconciliation | Not yet implemented |
 | 4 Native UI and client conversion | Not yet implemented |
-| 5 Compatibility removal and packaging | Preview packaging isolated; runtime/build conversion remains |
+| 5 Compatibility removal and packaging | Preview packaging isolated and old compatibility gate replaced by current v3 operation/plugin-contract checks. Old UI/API/plugin adapters and config bridge still require conversion/removal. |
 | 6 Backup and cutover rehearsal | Not yet implemented |
 | 7 Production cutover | Not started; compatible production continues |
 | 8 Retirement and acceptance | Not started |
@@ -50,3 +51,30 @@ No live catalog data or Stash schema has been changed. Do not retire existing
 writers, mounts, plugin data, or backups until rehearsal and cutover requirements
 have passed. Original catalogs and operating state are migration inputs, including
 performer merges, UUIDs, explicit unlink decisions, and pending producer work.
+
+## First native schema rehearsal
+
+On 2026-09-30, an online SQLite backup of the running compatible library produced
+a 1,071,263,744-byte isolated snapshot in 3.289 seconds. A separate copy promoted
+from primary 86 / fork 9 to native 1000000 in 3.207 seconds. This measurement
+covers the initial table promotion, not the later catalog import or production
+cutover downtime.
+
+The snapshot contains 270,760 scenes, 498,646 images, 769,643 files, 1,426
+performers, and 83 saved filters. Streaming row digests matched across all 65
+retained data tables after accounting for table names and equivalent empty
+nullable filter fields. Foreign-key checking found zero violations. The private
+snapshot, migrated copy, and full comparison receipt are retained locally in
+`.local/native-archive-rehearsal-20260930/`; no private library data is committed.
+
+The actual frozen compatible binary was run against an isolated empty native
+database and refused schema 1000000 as an unknown legacy fork version. The
+native version stayed unchanged. Unit/integration tests also reject foreign
+lineage, unsupported versions, missing native tables, unknown legacy objects,
+destination collisions, dirty states, and partial SQL promotion.
+
+The full Go unit/integration suite (`GOTOOLCHAIN=auto make it`), SQLite/sharing
+integration tests, targeted Go lint, and the retained v3 plugin/current-operation
+check passed. `GOTOOLCHAIN=auto make validate-fork` also passed: generation,
+frontend lint/types/locales, 527 UI tests in 90 files, all-repository Go lint and
+unit/integration tests, and retained native contract checks.

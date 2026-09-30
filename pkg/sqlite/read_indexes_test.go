@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestReadIndexesUpstreamRoundTrip(t *testing.T) {
+func TestReadIndexesPersistAcrossRestart(t *testing.T) {
 	config.InitializeEmpty()
 	path := filepath.Join(t.TempDir(), "read-indexes.sqlite")
 	db := sqlite.NewDatabase()
@@ -19,17 +19,14 @@ func TestReadIndexesUpstreamRoundTrip(t *testing.T) {
 	version := db.Version()
 	require.NoError(t, db.Close())
 
-	// Plain upstream SQLite can maintain these indexes: no fork-specific
-	// collations, functions, triggers, or table columns are needed to write.
+	// These remain ordinary SQLite indexes after native promotion. Their large
+	// contents do not need rebuilding just to remove a historical name prefix.
 	raw, err := sql.Open("sqlite3", path)
 	require.NoError(t, err)
 	for _, table := range []string{"scenes", "images"} {
 		_, err := raw.Exec(fmt.Sprintf("INSERT INTO %s (title, created_at, updated_at) VALUES ('upstream write', '2026-01-01', '2026-01-01')", table))
 		require.NoError(t, err)
 		_, err = raw.Exec("UPDATE " + table + " SET title = 'upstream edit'")
-		require.NoError(t, err)
-		// Upstream table migrations may remove an index; roll-forward repairs it.
-		_, err = raw.Exec("DROP INDEX fork_" + table + "_created_at")
 		require.NoError(t, err)
 	}
 	require.NoError(t, raw.Close())

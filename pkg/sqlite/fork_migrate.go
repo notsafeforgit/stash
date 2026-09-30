@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"sort"
 
@@ -66,9 +67,8 @@ func registerForkMigration(version uint, name string, legacySchemaVersion uint, 
 	}
 }
 
-// RegisterForkReconciler registers an idempotent compatibility pass that runs
-// whenever a fully migrated database is opened. Reconcilers import changes
-// made while the database was used by an upstream-only server.
+// RegisterForkReconciler registers a historical compatibility pass used only
+// when importing a legacy database, before native schema promotion.
 func RegisterForkReconciler(name string, fn customMigrationFunc) {
 	if name == "" {
 		panic("fork reconciler name must be non-empty")
@@ -140,6 +140,9 @@ func (m *Migrator) GetNextForkMigrationVersion(current uint) uint {
 }
 
 func (m *Migrator) RunForkMigration(ctx context.Context, newVersion uint) error {
+	if m.CurrentSchemaVersion() >= NativeSchemaBaseline {
+		return errors.New("legacy fork migrations cannot run against a native database")
+	}
 	current, err := m.CurrentForkSchemaVersion(ctx)
 	if err != nil {
 		return err
@@ -169,7 +172,10 @@ func (m *Migrator) RunForkMigration(ctx context.Context, newVersion uint) error 
 }
 
 func (m *Migrator) RunAllForkMigrations(ctx context.Context) error {
-	requiredVersion := m.RequiredForkSchemaVersion()
+	if m.CurrentSchemaVersion() >= NativeSchemaBaseline {
+		return nil
+	}
+	requiredVersion := GetRequiredForkSchemaVersion()
 
 	for {
 		currentVersion, err := m.CurrentForkSchemaVersion(ctx)
@@ -194,6 +200,9 @@ func (m *Migrator) RunAllForkMigrations(ctx context.Context) error {
 }
 
 func (m *Migrator) RunForkReconcilers(ctx context.Context) error {
+	if m.CurrentSchemaVersion() >= NativeSchemaBaseline {
+		return nil
+	}
 	reconcilers := make([]forkReconciler, 0, len(forkReconcilers))
 	for _, reconciler := range forkReconcilers {
 		reconcilers = append(reconcilers, reconciler)
@@ -219,6 +228,9 @@ func (m *Migrator) AdoptLegacyForkSchemaVersion(ctx context.Context, schemaVersi
 	if !isLegacy {
 		return schemaVersion, nil
 	}
+	if err := m.snapshotLegacyHistory(ctx); err != nil {
+		return 0, err
+	}
 
 	logger.Infof("Adopting legacy fork schema version %d into fork migration metadata", schemaVersion)
 	for _, migration := range getForkMigrations() {
@@ -242,7 +254,7 @@ func (m *Migrator) AdoptLegacyForkSchemaVersion(ctx context.Context, schemaVersi
 }
 
 func legacyForkSchemaState(schemaVersion uint) (upstreamSchemaVersion uint, forkSchemaVersion uint, isLegacy bool, err error) {
-	if schemaVersion < legacyForkFirstSchemaVersion {
+	if schemaVersion < legacyForkFirstSchemaVersion || schemaVersion >= NativeSchemaBaseline {
 		return 0, 0, false, nil
 	}
 	if schemaVersion > legacyForkLastSchemaVersion {

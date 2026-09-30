@@ -144,7 +144,7 @@ func (r *imageRepositoryType) addImageFilesTable(f *filterBuilder, joinType join
 
 func (r *imageRepositoryType) addImageFileMetadataTable(f *filterBuilder, joinType joinType) {
 	r.addImageFilesTable(f, joinType)
-	f.addJoin(joinType, imageFileMetadataTable, "", "fork_image_file_metadata.file_id = images_files.file_id")
+	f.addJoin(joinType, imageFileMetadataTable, "", "image_file_metadata.file_id = images_files.file_id")
 }
 
 var (

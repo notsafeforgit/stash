@@ -293,9 +293,9 @@ func (qb *videoFileFilterHandler) criterionHandler() criterionHandler {
 		orientationCriterionHandler(videoFileFilter.Orientation, "video_files.height", "video_files.width", qb.addVideoFilesTable),
 		floatIntCriterionHandler(videoFileFilter.Framerate, "ROUND(video_files.frame_rate)", qb.addVideoFilesTable),
 		intCriterionHandler(videoFileFilter.Bitrate, "video_files.bit_rate", qb.addVideoFilesTable),
-		intCriterionHandler(videoFileFilter.BitDepth, "fork_video_file_metadata.bit_depth", qb.addVideoFileMetadataTable),
-		floatIntCriterionHandler(videoFileFilter.VideoStreamDuration, "fork_video_file_metadata.video_stream_duration", qb.addVideoFileMetadataTable),
-		intCriterionHandler(videoFileFilter.FrameCount, "fork_video_file_metadata.frame_count", qb.addVideoFileMetadataTable),
+		intCriterionHandler(videoFileFilter.BitDepth, "video_file_metadata.bit_depth", qb.addVideoFileMetadataTable),
+		floatIntCriterionHandler(videoFileFilter.VideoStreamDuration, "video_file_metadata.video_stream_duration", qb.addVideoFileMetadataTable),
+		intCriterionHandler(videoFileFilter.FrameCount, "video_file_metadata.frame_count", qb.addVideoFileMetadataTable),
 		durationMismatchCriterionHandler(videoFileFilter.DurationMismatch, qb.addVideoFileMetadataTable),
 		qb.codecCriterionHandler(videoFileFilter.VideoCodec, "video_files.video_codec", qb.addVideoFilesTable),
 		qb.codecCriterionHandler(videoFileFilter.AudioCodec, "video_files.audio_codec", qb.addVideoFilesTable),
@@ -313,7 +313,7 @@ func (qb *videoFileFilterHandler) addVideoFilesTable(f *filterBuilder, joinType 
 
 func (qb *videoFileFilterHandler) addVideoFileMetadataTable(f *filterBuilder, joinType joinType) {
 	qb.addVideoFilesTable(f, joinType)
-	f.addJoin(joinType, videoFileMetadataTable, "", "fork_video_file_metadata.file_id = files.id")
+	f.addJoin(joinType, videoFileMetadataTable, "", "video_file_metadata.file_id = files.id")
 }
 
 func (qb *videoFileFilterHandler) codecCriterionHandler(codec *models.StringCriterionInput, codecColumn string, addJoinFn func(f *filterBuilder, joinType joinType)) criterionHandlerFunc {
@@ -373,7 +373,7 @@ func (qb *imageFileFilterHandler) criterionHandler() criterionHandler {
 	return compoundHandler{
 		joinedStringCriterionHandler(ff.Format, "image_files.format", qb.addImageFilesTable),
 		resolutionCriterionHandler(ff.Resolution, "image_files.height", "image_files.width", qb.addImageFilesTable),
-		intCriterionHandler(ff.BitDepth, "fork_image_file_metadata.bit_depth", qb.addImageFileMetadataTable),
+		intCriterionHandler(ff.BitDepth, "image_file_metadata.bit_depth", qb.addImageFileMetadataTable),
 		orientationCriterionHandler(ff.Orientation, "image_files.height", "image_files.width", qb.addImageFilesTable),
 	}
 }
@@ -384,5 +384,5 @@ func (qb *imageFileFilterHandler) addImageFilesTable(f *filterBuilder, joinType 
 
 func (qb *imageFileFilterHandler) addImageFileMetadataTable(f *filterBuilder, joinType joinType) {
 	qb.addImageFilesTable(f, joinType)
-	f.addJoin(joinType, imageFileMetadataTable, "", "fork_image_file_metadata.file_id = files.id")
+	f.addJoin(joinType, imageFileMetadataTable, "", "image_file_metadata.file_id = files.id")
 }

@@ -30,7 +30,7 @@ flowchart TD
     jobs --> files["Source media and generated files"]
     media --> mediaService
     mediaService --> files
-    repo --> db["SQLite library and fork sidecars"]
+    repo --> db["SQLite native library"]
     db -. "derived search data" .-> search["Disposable .search.sqlite index"]
     offline["Standalone offline library"] --> browser["Browser IndexedDB and OPFS"]
 ```
@@ -97,7 +97,7 @@ not made atomic by a SQLite transaction.
 
 | Data | Owner and lifetime |
 | --- | --- |
-| Library metadata and relationships | Main SQLite file, normally `stash-go.sqlite`; authoritative upstream tables plus fork sidecars |
+| Library metadata and relationships | Main SQLite file with native lineage and primary migration sequence; production promotion uses a separate native database path |
 | Server/UI configuration | YAML configuration managed by [internal/manager/config](../internal/manager/config/); includes UI defaults and plugin settings |
 | Original media | Configured library paths and archive contents; database file/folder records describe these files |
 | Stored artwork blobs | [BlobStore](../pkg/sqlite/blob.go), configured for database blobs or a separate filesystem location |
@@ -124,13 +124,14 @@ New native changes use a separately identified primary schema with normal
 constraints and repositories. Historical fork migrations remain only as
 one-time import steps until promotion coverage is complete.
 
-Fork-only values live in `fork_*` sidecars: canonical saved filters, performer
-name policies, extended file metadata, scene-cover provenance, and shares.
-Migration 5 consolidated the earlier private schema changes into compatible
-sidecars; subsequent migrations add ordinary browsing indexes, cover origins,
-and share grants/sessions. Idempotent reconcilers run after migration and when a
-current database opens, importing compatible upstream edits and invalidating
-derived state. These paths run in the fork binary regardless of the UI flag.
+The first native schema is 1000000 with lineage
+`org.notsafeforgit.stash.native-archive`. It completes historical sidecars once,
+promotes their records into normal tables, and records their completed history
+in `legacy_schema_history`. Normal startup no longer runs fork reconcilers.
+Foreign lineage, dirty migrations, missing native identity, unsupported legacy
+versions, and unknown fork objects are rejected. See
+[native schema promotion](native-schema.md) for the implemented boundary and
+remaining canonical-model conversions.
 
 An upstream-only binary at the matching upstream schema version can use the
 base representation while ignoring fork sidecars. This does not promise that
@@ -156,10 +157,10 @@ their actual consumers; new API contracts do not need v2.5 projections:
 - Legacy bulk mutations retain their synchronous return contract; additive
   `bulk*UpdateJob` mutations support v3's background workflow.
 
-[FORK.md](../FORK.md) documents the storage bridges and fork-owned extension
-files. [check-compatibility.mjs](../ui/v3/scripts/check-compatibility.mjs) checks
-the schema, mainline operations, and upstream migration track against a pinned
-baseline. It cannot prove every runtime behavior of an external client.
+[FORK.md](../FORK.md) documents migration and contract policy.
+[check-native-contracts.mjs](../ui/v3/scripts/check-native-contracts.mjs) checks
+current v3 operations and the retained plugin API. Runtime protocol behavior,
+shares, and one-time historical database imports have their own tests.
 
 ## Request and work flows
 

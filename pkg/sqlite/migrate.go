@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -40,7 +41,6 @@ func GetRequiredSchemaVersion() uint {
 
 func (db *Database) NeedsMigration() bool {
 	return db.schemaVersion != GetRequiredSchemaVersion() ||
-		db.forkSchemaVersion != GetRequiredForkSchemaVersion() ||
 		db.legacyForkSchemaVersion != 0
 }
 
@@ -51,6 +51,9 @@ type Migrator struct {
 }
 
 func NewMigrator(db *Database) (*Migrator, error) {
+	if err := validateDatabaseLineage(db.dbPath); err != nil {
+		return nil, err
+	}
 	m := &Migrator{
 		db: db,
 	}
@@ -94,7 +97,7 @@ func (m *Migrator) RequiredSchemaVersion() uint {
 }
 
 func (m *Migrator) RequiredForkSchemaVersion() uint {
-	return GetRequiredForkSchemaVersion()
+	return 0
 }
 
 func (m *Migrator) GetNextMigrationVersion(current uint) uint {
@@ -128,11 +131,22 @@ func (m *Migrator) getMigrate() (*migrate.Migrate, error) {
 }
 
 func (m *Migrator) RunMigration(ctx context.Context, newVersion uint) error {
-	databaseSchemaVersion, _, _ := m.m.Version()
+	databaseSchemaVersion, dirty, err := m.m.Version()
+	if err != nil && !errors.Is(err, migrate.ErrNilVersion) {
+		return err
+	}
+	if dirty {
+		return fmt.Errorf("cannot continue incomplete database migration %d", databaseSchemaVersion)
+	}
 
 	expectedNext := m.GetNextMigrationVersion(databaseSchemaVersion)
 	if newVersion != expectedNext {
 		return fmt.Errorf("invalid migration version %d, expected %d", newVersion, expectedNext)
+	}
+	if newVersion == NativeSchemaBaseline {
+		if err := m.prepareNativePromotion(ctx); err != nil {
+			return fmt.Errorf("preparing native schema promotion: %w", err)
+		}
 	}
 
 	// run pre migrations as needed
@@ -152,6 +166,9 @@ func (m *Migrator) RunMigration(ctx context.Context, newVersion uint) error {
 
 	// update the schema version
 	m.db.schemaVersion, _, _ = m.m.Version()
+	if m.db.schemaVersion >= NativeSchemaBaseline {
+		m.db.forkSchemaVersion = 0
+	}
 
 	return nil
 }
@@ -257,19 +274,5 @@ func (db *Database) RunAllMigrations() error {
 		}
 	}
 
-	if err := m.RunAllForkMigrations(ctx); err != nil {
-		return err
-	}
-
-	return m.RunForkReconcilers(ctx)
-}
-
-func (db *Database) runForkReconcilers() error {
-	m, err := NewMigrator(db)
-	if err != nil {
-		return err
-	}
-	defer m.Close()
-
-	return m.RunForkReconcilers(context.Background())
+	return nil
 }

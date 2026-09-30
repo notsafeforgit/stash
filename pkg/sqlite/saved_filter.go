@@ -18,7 +18,7 @@ import (
 
 const (
 	savedFilterTable       = "saved_filters"
-	savedFilterStateTable  = "fork_saved_filter_state"
+	savedFilterStateTable  = "saved_filter_state"
 	savedFilterDefaultName = ""
 	savedFilterIDColumn    = "saved_filter_id"
 )

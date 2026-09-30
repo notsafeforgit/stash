@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSceneCoverSourcePersistenceAndUpstreamEdits(t *testing.T) {
+func TestSceneCoverSourcePersistenceAndValidity(t *testing.T) {
 	config.InitializeEmpty()
 	database := sqlite.NewDatabase()
 	database.SetBlobStoreOptions(sqlite.BlobStoreOptions{UseDatabase: true})
@@ -75,24 +75,24 @@ func TestSceneCoverSourcePersistenceAndUpstreamEdits(t *testing.T) {
 		require.NoError(t, r.Scene.UpdateCover(ctx, scene.ID, cover))
 		return r.Scene.SetCoverSource(ctx, scene.ID, &source)
 	}))
-	// Upstream does not know about the sidecar. Its cover edit must still
-	// invalidate reads immediately, and be reconciled on the next v3 open.
+	// A mismatched checksum must never expose incorrect provenance, including
+	// after restart. Ordinary native cover writers above clear it atomically.
 	raw := openRawDB(t, path)
 	_, err := raw.Exec("UPDATE scenes SET cover_blob = NULL WHERE id = ?", scene.ID)
 	require.NoError(t, err)
-	require.Equal(t, uint(1), queryUint(t, raw, "SELECT count(*) FROM fork_scene_cover_sources"))
+	require.Equal(t, uint(1), queryUint(t, raw, "SELECT count(*) FROM scene_cover_sources"))
 	require.NoError(t, raw.Close())
 	require.Nil(t, readSource())
 	require.NoError(t, database.Close())
 	require.NoError(t, database.Open(path))
 	require.Nil(t, readSource())
 	raw = openRawDB(t, path)
-	require.Equal(t, uint(0), queryUint(t, raw, "SELECT count(*) FROM fork_scene_cover_sources"))
+	require.Equal(t, uint(1), queryUint(t, raw, "SELECT count(*) FROM scene_cover_sources"))
 	require.Equal(t, database.AppSchemaVersion(), queryUint(t, raw, "SELECT version FROM schema_migrations"))
 	require.NoError(t, raw.Close())
 
-	// Deleting a scene cascades its origin; recreating fork tables after an
-	// upstream rebuild remains idempotent without changing the base schema.
+	// Deleting a scene cascades its origin. Missing authoritative tables are
+	// corruption; startup must not silently recreate them as empty tables.
 	require.NoError(t, r.WithTxn(ctx, func(ctx context.Context) error {
 		require.NoError(t, r.Scene.UpdateCover(ctx, scene.ID, cover))
 		require.NoError(t, r.Scene.SetCoverSource(ctx, scene.ID, &source))
@@ -100,11 +100,10 @@ func TestSceneCoverSourcePersistenceAndUpstreamEdits(t *testing.T) {
 	}))
 	require.Nil(t, readSource())
 	raw = openRawDB(t, path)
-	require.Equal(t, uint(0), queryUint(t, raw, "SELECT count(*) FROM fork_scene_cover_sources"))
-	_, err = raw.Exec("DROP TABLE fork_scene_cover_sources")
+	require.Equal(t, uint(0), queryUint(t, raw, "SELECT count(*) FROM scene_cover_sources"))
+	_, err = raw.Exec("DROP TABLE scene_cover_sources")
 	require.NoError(t, err)
 	require.NoError(t, raw.Close())
 	require.NoError(t, database.Close())
-	require.NoError(t, database.Open(path))
-	require.Nil(t, readSource())
+	require.ErrorContains(t, database.Open(path), "missing scene_cover_sources")
 }

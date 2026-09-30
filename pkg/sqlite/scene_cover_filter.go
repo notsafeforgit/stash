@@ -22,7 +22,7 @@ func sceneCoverFrameCriterionHandler(value interface{}) (criterionHandler, error
 	// Correlated predicates avoid multiplying rows or restricting an OR branch
 	// through shared file joins. Match the checksum even before reconciliation
 	// so an upstream/uploaded replacement cannot inherit the old selection.
-	known := `SELECT 1 FROM fork_scene_cover_sources AS cover_source
+	known := `SELECT 1 FROM scene_cover_sources AS cover_source
 WHERE cover_source.scene_id = scenes.id AND cover_source.cover_checksum = scenes.cover_blob`
 	defaultFrame := `EXISTS (SELECT 1 FROM scenes_files AS cover_file
 JOIN video_files AS cover_video ON cover_video.file_id = cover_file.file_id

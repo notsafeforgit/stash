@@ -104,7 +104,7 @@ func requireDeletionState(t *testing.T, db *sqlite.Database, path string, id mod
 	require.NoDirExists(t, db.FileDeletionJournalPath())
 	raw := openRawDB(t, db.DatabasePath())
 	defer raw.Close()
-	require.Zero(t, queryUint(t, raw, "SELECT COUNT(*) FROM fork_file_deletions"))
+	require.Zero(t, queryUint(t, raw, "SELECT COUNT(*) FROM file_deletions"))
 }
 
 func TestFileDeletionRecoversAfterProcessCrash(t *testing.T) {
@@ -201,7 +201,7 @@ func TestFileDeletionIdleTransactionsAndOrphanMarkers(t *testing.T) {
 	requireDeletionState(t, db, source, id, false)
 	// Crash after journal removal but before its marker was pruned.
 	raw := openRawDB(t, db.DatabasePath())
-	_, err := raw.Exec("INSERT INTO fork_file_deletions (id) VALUES ('finished-operation')")
+	_, err := raw.Exec("INSERT INTO file_deletions (id) VALUES ('finished-operation')")
 	require.NoError(t, err)
 	require.NoError(t, raw.Close())
 	require.NoError(t, db.RecoverFileDeletions())
@@ -231,7 +231,7 @@ func TestFileDeletionFailedTrashRetainedUntilRetry(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "original", string(data))
 	raw := openRawDB(t, db.DatabasePath())
-	require.Equal(t, uint(1), queryUint(t, raw, "SELECT COUNT(*) FROM fork_file_deletions"))
+	require.Equal(t, uint(1), queryUint(t, raw, "SELECT COUNT(*) FROM file_deletions"))
 	require.NoError(t, raw.Close())
 	require.NoError(t, os.Remove(trash))
 	require.NoError(t, db.RecoverFileDeletions())

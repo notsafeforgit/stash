@@ -11,7 +11,7 @@ type migrator struct {
 	db *sqlx.DB
 }
 
-func (m *migrator) withTxn(ctx context.Context, fn func(tx *sqlx.Tx) error) error {
+func (m *migrator) withTxn(ctx context.Context, fn func(tx *sqlx.Tx) error) (err error) {
 	tx, err := m.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("beginning transaction: %w", err)

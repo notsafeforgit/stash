@@ -2,6 +2,8 @@ package sqlite_test
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,11 +14,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestForkSavedFilterRollbackRoundTrip(t *testing.T) {
+func TestNativeImportPreservesLegacySavedFilterConflicts(t *testing.T) {
 	config.InitializeEmpty()
 	path := filepath.Join(t.TempDir(), "roundtrip.sqlite")
 	db := sqlite.NewDatabase()
-	require.NoError(t, db.Open(path))
+	buildLegacyDatabase(t, path, 86, true)
 	flat := &models.FilterAST{Root: &models.FilterASTNode{Condition: &models.FilterASTCondition{
 		Field: "rating100", Value: map[string]interface{}{"value": float64(80), "modifier": "GREATER_THAN"},
 	}}}
@@ -24,32 +26,38 @@ func TestForkSavedFilterRollbackRoundTrip(t *testing.T) {
 		Operator: models.FilterGroupOperatorOr,
 		Children: []*models.FilterASTNode{flat.Root, {Condition: &models.FilterASTCondition{Field: "organized", Value: map[string]interface{}{"value": true}}}},
 	}}}
-	repo := db.Repository()
-	require.NoError(t, repo.WithTxn(context.Background(), func(ctx context.Context) error {
-		for name, ast := range map[string]*models.FilterAST{"Flat": flat, "Complex": complexAST, "Removed": flat} {
-			if err := repo.SavedFilter.Create(ctx, &models.SavedFilter{Name: name, Mode: models.FilterModeScenes, FilterAST: ast}); err != nil {
-				return err
-			}
-		}
-		return nil
-	}))
-	upstreamVersion := db.Version()
-	require.NoError(t, db.Close())
-
-	// Simulate rollback to the mainline server, including an upstream delete.
 	raw := openRawDB(t, path)
+	for name, ast := range map[string]*models.FilterAST{"Flat": flat, "Complex": complexAST, "Removed": flat} {
+		encodedAST, err := json.Marshal(ast)
+		require.NoError(t, err)
+		projection, _ := ast.FlatObjectFilter()
+		encodedFlat, err := json.Marshal(projection)
+		require.NoError(t, err)
+		result, err := raw.Exec("INSERT INTO saved_filters(name, mode, object_filter) VALUES (?, 'SCENES', ?)", name, string(encodedFlat))
+		require.NoError(t, err)
+		id, err := result.LastInsertId()
+		require.NoError(t, err)
+		_, err = raw.Exec("INSERT INTO fork_saved_filter_state(saved_filter_id, filter_ast, legacy_object_filter) VALUES (?, ?, ?)", id, string(encodedAST), string(encodedFlat))
+		require.NoError(t, err)
+	}
+
+	// The import input includes edits made by the old mainline client.
 	fixture, err := os.ReadFile("testdata/v25_saved_filter_edits.sql")
 	require.NoError(t, err)
 	_, err = raw.Exec(string(fixture))
 	require.NoError(t, err)
 	require.NoError(t, raw.Close())
 
-	// Two opens cover roll-forward reconciliation and its idempotence.
+	var needed *sqlite.MigrationNeededError
+	require.True(t, errors.As(db.Open(path), &needed))
+	require.NoError(t, db.RunAllMigrations())
+
+	// Two opens verify the imported values persist without runtime reconciliation.
 	for range 2 {
 		db = sqlite.NewDatabase()
 		require.NoError(t, db.Open(path))
-		require.Equal(t, upstreamVersion, db.Version())
-		repo = db.Repository()
+		require.Equal(t, sqlite.GetRequiredSchemaVersion(), db.Version())
+		repo := db.Repository()
 		require.NoError(t, repo.WithReadTxn(context.Background(), func(ctx context.Context) error {
 			filters, err := repo.SavedFilter.All(ctx)
 			if err != nil {
@@ -79,7 +87,7 @@ func TestForkSavedFilterRollbackRoundTrip(t *testing.T) {
 	raw = openRawDB(t, path)
 	defer raw.Close()
 	var pending string
-	require.NoError(t, raw.QueryRow(`SELECT pending_legacy_object_filter FROM fork_saved_filter_state JOIN saved_filters ON saved_filter_id = id WHERE name = 'Complex'`).Scan(&pending))
+	require.NoError(t, raw.QueryRow(`SELECT pending_legacy_object_filter FROM saved_filter_state JOIN saved_filters ON saved_filter_id = id WHERE name = 'Complex'`).Scan(&pending))
 	require.JSONEq(t, `{"rating100":{"value":60,"modifier":"LESS_THAN"}}`, pending)
-	require.Equal(t, uint(0), queryUint(t, raw, `SELECT COUNT(*) FROM fork_saved_filter_state WHERE saved_filter_id NOT IN (SELECT id FROM saved_filters)`))
+	require.Equal(t, uint(0), queryUint(t, raw, `SELECT COUNT(*) FROM saved_filter_state WHERE saved_filter_id NOT IN (SELECT id FROM saved_filters)`))
 }

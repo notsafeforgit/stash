@@ -18,7 +18,7 @@ func (qb *SceneStore) GetCoverSource(ctx context.Context, sceneID int) (*models.
 		Fingerprint []byte        `db:"source_fingerprint"`
 	}
 	err := dbWrapper.Get(ctx, &row, `SELECT source.cover_checksum, source.source_file_id, source.at, source.source_fingerprint
-FROM fork_scene_cover_sources AS source
+FROM scene_cover_sources AS source
 JOIN scenes ON scenes.id = source.scene_id AND scenes.cover_blob = source.cover_checksum
 WHERE source.scene_id = ?`, sceneID)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -36,7 +36,7 @@ WHERE source.scene_id = ?`, sceneID)
 
 func (qb *SceneStore) SetCoverSource(ctx context.Context, sceneID int, source *models.SceneCoverSource) error {
 	if source == nil {
-		_, err := dbWrapper.Exec(ctx, "DELETE FROM fork_scene_cover_sources WHERE scene_id = ?", sceneID)
+		_, err := dbWrapper.Exec(ctx, "DELETE FROM scene_cover_sources WHERE scene_id = ?", sceneID)
 		return err
 	}
 	if err := source.Validate(); err != nil {
@@ -46,7 +46,7 @@ func (qb *SceneStore) SetCoverSource(ctx context.Context, sceneID int, source *m
 	if err != nil {
 		return err
 	}
-	result, err := dbWrapper.Exec(ctx, `INSERT INTO fork_scene_cover_sources
+	result, err := dbWrapper.Exec(ctx, `INSERT INTO scene_cover_sources
 (scene_id, cover_checksum, source_file_id, at, source_fingerprint)
 SELECT ?, ?, ?, ?, ?
 WHERE EXISTS (SELECT 1 FROM scenes WHERE id = ? AND cover_blob = ?)
@@ -69,10 +69,10 @@ ON CONFLICT(scene_id) DO UPDATE SET
 }
 
 func (qb *SceneStore) invalidateCoverSource(ctx context.Context, sceneID int) error {
-	_, err := dbWrapper.Exec(ctx, `DELETE FROM fork_scene_cover_sources
+	_, err := dbWrapper.Exec(ctx, `DELETE FROM scene_cover_sources
 WHERE scene_id = ? AND NOT EXISTS (
-  SELECT 1 FROM scenes WHERE scenes.id = fork_scene_cover_sources.scene_id
-    AND scenes.cover_blob = fork_scene_cover_sources.cover_checksum
+  SELECT 1 FROM scenes WHERE scenes.id = scene_cover_sources.scene_id
+    AND scenes.cover_blob = scene_cover_sources.cover_checksum
 )`, sceneID)
 	return err
 }

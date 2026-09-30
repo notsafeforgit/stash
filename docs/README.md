@@ -19,6 +19,7 @@ provides the frozen fallback for users who do not migrate.
 | [Interaction and layout contracts](../ui/v3/docs/interactions.md) | Motion, dialogs, editing shells, mobile navigation, keyboard layout, and focus |
 | [Feature development plan](../ui/v3/docs/plan.md) | Expectations for new feature work |
 | [Fork maintenance](../FORK.md) | Independent development, upstream imports, native migrations, and release boundaries |
+| [Native schema promotion](native-schema.md) | Implemented lineage, one-time historical imports, promoted tables, and remaining model conversions |
 | [Repository guidance](../CLAUDE.md) and [v3 contributor guidance](../ui/v3/AGENTS.md) | Coding conventions and backend/player constraints |
 | [Plugin host](../ui/v3/docs/plugin-host.md) | Current v3 UI plugin API, startup lifecycle, and failure handling |
 | [Versioned plugin manifests](plugin-manifests.md) | Independent v3 plugin contract, legacy adapter, and API generations |

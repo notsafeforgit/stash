@@ -21,8 +21,8 @@ const (
 	videoFileTable         = "video_files"
 	imageFileTable         = "image_files"
 	fileIDColumn           = "file_id"
-	videoFileMetadataTable = "fork_video_file_metadata"
-	imageFileMetadataTable = "fork_image_file_metadata"
+	videoFileMetadataTable = "video_file_metadata"
+	imageFileMetadataTable = "image_file_metadata"
 
 	videoCaptionsTable    = "video_captions"
 	captionCodeColumn     = "language_code"

@@ -23,7 +23,7 @@ const (
 	performersAliasesTable            = "performer_aliases"
 	performerAliasColumn              = "alias"
 	performersTagsTable               = "performers_tags"
-	performerAutoTagIgnoredNamesTable = "fork_performer_autotag_ignored_names"
+	performerAutoTagIgnoredNamesTable = "performer_autotag_ignored_names"
 
 	performerURLsTable = "performer_urls"
 	performerURLColumn = "url"
@@ -267,7 +267,7 @@ func (qb *PerformerStore) table() exp.IdentifierExpression {
 
 func (qb *PerformerStore) selectDataset() *goqu.SelectDataset {
 	ignoredPrimaryName := goqu.L(
-		"EXISTS (SELECT 1 FROM fork_performer_autotag_ignored_names WHERE performer_id = performers.id AND name = performers.name)",
+		"EXISTS (SELECT 1 FROM performer_autotag_ignored_names WHERE performer_id = performers.id AND name = performers.name)",
 	).As("ignore_primary_name_auto_tag")
 
 	return dialect.From(qb.table()).Select(qb.table().All(), ignoredPrimaryName)
@@ -687,11 +687,11 @@ func (qb *PerformerStore) QueryForAutoTag(ctx context.Context, words []string) (
 	for _, w := range words {
 		whereClauses = append(whereClauses, goqu.And(
 			table.Col("name").Like(w+"%"),
-			goqu.L("NOT EXISTS (SELECT 1 FROM fork_performer_autotag_ignored_names WHERE performer_id = performers.id AND name = performers.name)"),
+			goqu.L("NOT EXISTS (SELECT 1 FROM performer_autotag_ignored_names WHERE performer_id = performers.id AND name = performers.name)"),
 		))
 		whereClauses = append(whereClauses, goqu.And(
 			performersAliasesJoinTable.Col("alias").Like(w+"%"),
-			goqu.L("NOT EXISTS (SELECT 1 FROM fork_performer_autotag_ignored_names WHERE performer_id = performers.id AND name = performer_aliases.alias)"),
+			goqu.L("NOT EXISTS (SELECT 1 FROM performer_autotag_ignored_names WHERE performer_id = performers.id AND name = performer_aliases.alias)"),
 		))
 	}
 

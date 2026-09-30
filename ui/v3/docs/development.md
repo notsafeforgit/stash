@@ -126,7 +126,7 @@ generate → build UIs → validate → compile order.
 
 | Command | Checks |
 | --- | --- |
-| `make validate-ui-v3` | Biome lint (including accessibility), React purity/type-contract lint, generation, TypeScript, formatting, locales, Vitest, and pinned v2.5 compatibility |
+| `make validate-ui-v3` | Biome lint (including accessibility), React purity/type-contract lint, generation, TypeScript, formatting, locales, Vitest, and native contracts |
 | `make validate-fork` | Backend generation, v3 validation, Go lint, and Go unit/integration tests |
 | `make lint` | CI-pinned golangci-lint via `go run` |
 | `make it` | Go tests with `sqlite_stat4 sqlite_math_functions sqlite_fts5 integration` build tags |
@@ -136,10 +136,12 @@ generate → build UIs → validate → compile order.
 | `make validate` | Upstream/v2.5 UI validation plus backend checks; does not validate v3 |
 
 During iteration, choose checks for the changed contracts. The
-[compatibility checker](../scripts/check-compatibility.mjs) validates pinned
-mainline operations, additive schema behavior, argument defaults, and upstream
-migrations. Follow [FORK.md](../../../FORK.md) when updating its baseline after
-an upstream sync. Do not modify `ui/v2.5/` for fork feature work.
+[native contract checker](../scripts/check-native-contracts.mjs) validates current
+v3 application operations and the retained versioned plugin API. Historical
+database inputs are covered by one-time migration tests; upstream schema and
+client compatibility are no longer release gates. Follow
+[FORK.md](../../../FORK.md) for independent development and cutover policy.
+Do not add features to the retiring `ui/v2.5/` application.
 
 TypeScript enables `strict` and `noUncheckedIndexedAccess`: check lookup results
 or iterate actual entries. Do not add blanket non-null assertions to satisfy the

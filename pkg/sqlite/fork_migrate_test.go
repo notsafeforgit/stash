@@ -14,63 +14,6 @@ import (
 	_ "github.com/stashapp/stash/pkg/sqlite/migrations"
 )
 
-func TestForkMigrationsRunOutsideUpstreamSchemaVersion(t *testing.T) {
-	config.InitializeEmpty()
-
-	db := sqlite.NewDatabase()
-	dbPath := filepath.Join(t.TempDir(), "stash-go.sqlite")
-
-	if err := db.Open(dbPath); err != nil {
-		t.Fatalf("Open: %v", err)
-	}
-	if got, want := db.Version(), db.AppSchemaVersion(); got != want {
-		t.Fatalf("upstream schema version = %d, want %d", got, want)
-	}
-	if got, want := db.ForkSchemaVersion(), db.RequiredForkSchemaVersion(); got != want {
-		t.Fatalf("fork schema version = %d, want %d", got, want)
-	}
-	if err := db.Close(); err != nil {
-		t.Fatalf("Close: %v", err)
-	}
-
-	raw := openRawDB(t, dbPath)
-	defer raw.Close()
-
-	if got, want := queryUint(t, raw, "SELECT version FROM schema_migrations LIMIT 1"), db.AppSchemaVersion(); got != want {
-		t.Fatalf("stored upstream schema version = %d, want %d", got, want)
-	}
-	if got, want := queryUint(t, raw, "SELECT MAX(version) FROM fork_schema_migrations"), db.RequiredForkSchemaVersion(); got != want {
-		t.Fatalf("stored fork schema version = %d, want %d", got, want)
-	}
-	if rawColumnExists(t, raw, "performer_aliases", "ignore_auto_tag") {
-		t.Fatal("performer_aliases.ignore_auto_tag column was not removed")
-	}
-	if !rawTableExists(t, raw, "fork_performer_autotag_ignored_names") {
-		t.Fatal("fork_performer_autotag_ignored_names table was not created")
-	}
-	for _, tableName := range []string{"fork_saved_filter_state", "fork_video_file_metadata", "fork_image_file_metadata", "fork_scene_cover_sources", "fork_file_deletions"} {
-		if !rawTableExists(t, raw, tableName) {
-			t.Fatalf("%s table was not created", tableName)
-		}
-	}
-	if rawColumnExists(t, raw, "saved_filters", "filter_ast") {
-		t.Fatal("saved_filters.filter_ast column was not removed")
-	}
-	for _, column := range []string{"video_stream_duration", "frame_count", "duration_mismatch", "bit_depth", "color_range", "color_space", "color_transfer", "color_primaries"} {
-		if rawColumnExists(t, raw, "video_files", column) {
-			t.Fatalf("video_files.%s column was not removed", column)
-		}
-	}
-	for _, column := range []string{"bit_depth", "color_range", "color_space", "color_transfer", "color_primaries"} {
-		if rawColumnExists(t, raw, "image_files", column) {
-			t.Fatalf("image_files.%s column was not removed", column)
-		}
-	}
-	if got, want := queryUint(t, raw, "SELECT COUNT(*) FROM fork_schema_migrations"), uint(5); got != want {
-		t.Fatalf("fork migration count = %d, want %d", got, want)
-	}
-}
-
 func TestLegacyForkSchemaVersionIsAdopted(t *testing.T) {
 	config.InitializeEmpty()
 	t.Cleanup(func() { config.InitializeEmpty() })
@@ -167,7 +110,7 @@ func TestLegacyForkSchemaVersionIsAdopted(t *testing.T) {
 	if got, want := queryUint(t, raw, "SELECT version FROM schema_migrations LIMIT 1"), adopted.AppSchemaVersion(); got != want {
 		t.Fatalf("stored adopted upstream schema version after migration = %d, want %d", got, want)
 	}
-	if got, want := queryUint(t, raw, "SELECT MAX(version) FROM fork_schema_migrations"), adopted.RequiredForkSchemaVersion(); got != want {
+	if got, want := queryUint(t, raw, "SELECT MAX(version) FROM legacy_schema_history WHERE track = 'legacy-fork'"), sqlite.GetRequiredForkSchemaVersion(); got != want {
 		t.Fatalf("stored adopted fork schema version after migration = %d, want %d", got, want)
 	}
 	for _, column := range []string{"production_date", "production_date_precision"} {
@@ -177,17 +120,11 @@ func TestLegacyForkSchemaVersionIsAdopted(t *testing.T) {
 	}
 }
 
-func TestForkReconcilersRunWhenDatabaseOpens(t *testing.T) {
+func TestNativePromotionImportsMissingLegacyStateOnce(t *testing.T) {
 	config.InitializeEmpty()
 
 	dbPath := filepath.Join(t.TempDir(), "stash-go.sqlite")
-	db := sqlite.NewDatabase()
-	if err := db.Open(dbPath); err != nil {
-		t.Fatalf("Open initial database: %v", err)
-	}
-	if err := db.Close(); err != nil {
-		t.Fatalf("Close initial database: %v", err)
-	}
+	buildLegacyDatabase(t, dbPath, 86, true)
 
 	raw := openRawDB(t, dbPath)
 	if _, err := raw.Exec("DROP TABLE fork_saved_filter_state"); err != nil {
@@ -202,8 +139,15 @@ func TestForkReconcilersRunWhenDatabaseOpens(t *testing.T) {
 	}
 
 	reopened := sqlite.NewDatabase()
+	var needed *sqlite.MigrationNeededError
+	if err := reopened.Open(dbPath); !errors.As(err, &needed) {
+		t.Fatalf("Open legacy database: %v", err)
+	}
+	if err := reopened.RunAllMigrations(); err != nil {
+		t.Fatal(err)
+	}
 	if err := reopened.Open(dbPath); err != nil {
-		t.Fatalf("Open reconciled database: %v", err)
+		t.Fatal(err)
 	}
 	if err := reopened.Close(); err != nil {
 		t.Fatalf("Close reconciled database: %v", err)
@@ -211,10 +155,10 @@ func TestForkReconcilersRunWhenDatabaseOpens(t *testing.T) {
 
 	raw = openRawDB(t, dbPath)
 	defer raw.Close()
-	if !rawTableExists(t, raw, "fork_saved_filter_state") {
+	if !rawTableExists(t, raw, "saved_filter_state") {
 		t.Fatal("saved-filter sidecar was not recreated")
 	}
-	if got, want := queryUint(t, raw, "SELECT COUNT(*) FROM fork_saved_filter_state"), uint(1); got != want {
+	if got, want := queryUint(t, raw, "SELECT COUNT(*) FROM saved_filter_state"), uint(1); got != want {
 		t.Fatalf("reconciled saved-filter count = %d, want %d", got, want)
 	}
 }
@@ -223,13 +167,7 @@ func TestPrivateForkVersionFourUpgradesToConsolidatedMigration(t *testing.T) {
 	config.InitializeEmpty()
 
 	dbPath := filepath.Join(t.TempDir(), "stash-go.sqlite")
-	db := sqlite.NewDatabase()
-	if err := db.Open(dbPath); err != nil {
-		t.Fatalf("Open initial database: %v", err)
-	}
-	if err := db.Close(); err != nil {
-		t.Fatalf("Close initial database: %v", err)
-	}
+	buildLegacyDatabase(t, dbPath, 86, true)
 
 	raw := openRawDB(t, dbPath)
 	statements := []string{
@@ -280,10 +218,10 @@ func TestPrivateForkVersionFourUpgradesToConsolidatedMigration(t *testing.T) {
 
 	raw = openRawDB(t, dbPath)
 	defer raw.Close()
-	if got, want := queryUint(t, raw, "SELECT MAX(version) FROM fork_schema_migrations"), upgrade.RequiredForkSchemaVersion(); got != want {
+	if got, want := queryUint(t, raw, "SELECT MAX(version) FROM legacy_schema_history WHERE track = 'legacy-fork'"), sqlite.GetRequiredForkSchemaVersion(); got != want {
 		t.Fatalf("consolidated fork version = %d, want %d", got, want)
 	}
-	if got, want := queryUint(t, raw, "SELECT COUNT(*) FROM fork_schema_migrations"), uint(5); got != want {
+	if got, want := queryUint(t, raw, "SELECT COUNT(*) FROM legacy_schema_history WHERE track = 'legacy-fork'"), uint(9); got != want {
 		t.Fatalf("consolidated migration count = %d, want %d", got, want)
 	}
 	if rawColumnExists(t, raw, "performer_aliases", "ignore_auto_tag") || rawColumnExists(t, raw, "saved_filters", "filter_ast") {

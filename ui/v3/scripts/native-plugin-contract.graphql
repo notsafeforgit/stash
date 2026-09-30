@@ -1,0 +1,121 @@
+# Frozen v3 extension contract from v2.5-compatible-final.
+# Native development retains this API independently of upstream compatibility.
+"The v3 plugin contract. Legacy manifests are adapted here for v3 management."
+type PluginV3 {
+  id: ID!
+  api_version: Int!
+  name: String!
+  description: String
+  url: String
+  version: String
+  enabled: Boolean!
+  tasks: [PluginTaskV3!]!
+  hooks: [PluginHookV3!]!
+  settings: [PluginSettingV3!]!
+  operations: [PluginOperationV3!]!
+  requires: [ID!]!
+  paths: PluginPathsV3!
+}
+
+type PluginPathsV3 {
+  entry: String
+}
+
+enum PluginOperationKindV3 {
+  QUERY
+  MUTATION
+}
+
+"A declared backend operation callable by a plugin page. QUERY handlers must be read-only."
+type PluginOperationV3 {
+  name: String!
+  kind: PluginOperationKindV3!
+  description: String
+}
+
+type PluginTaskV3 {
+  name: String!
+  description: String
+  plugin: PluginV3!
+}
+
+type PluginHookV3 {
+  name: String!
+  description: String
+  hooks: [String!]!
+  plugin: PluginV3!
+}
+
+enum PluginSettingTypeV3 {
+  STRING
+  NUMBER
+  BOOLEAN
+  JSON
+}
+
+enum PluginSettingEditorV3 {
+  TEXT
+  TEXTAREA
+  SELECT
+  JSON
+  JQ
+  JQ_MAP
+}
+
+type PluginSettingOptionV3 {
+  value: String!
+  label: String!
+}
+
+"An allowed jq mapping destination. Type describes the destination value format."
+type PluginMappingTargetV3 {
+  name: String!
+  label: String!
+  type: String!
+  description: String
+}
+
+enum PluginPreviewEntityV3 {
+  SCENE
+  IMAGE
+}
+
+"Declares a plugin's read-only provider of expression input for a selected entity."
+type PluginSettingPreviewV3 {
+  entity: PluginPreviewEntityV3!
+  description: String
+}
+
+type PluginSettingV3 {
+  name: String!
+  display_name: String
+  description: String
+  type: PluginSettingTypeV3!
+  default_value: Any
+  editor: PluginSettingEditorV3
+  options: [PluginSettingOptionV3!]!
+  preview: PluginSettingPreviewV3
+  "When declared, only these destination fields can be saved in a JQ_MAP."
+  mapping_targets: [PluginMappingTargetV3!]
+}
+
+type PluginSettingsV3 {
+  definitions: [PluginSettingV3!]!
+  values: Map!
+}
+
+extend type Query {
+  pluginsV3: [PluginV3!]!
+  pluginTasksV3: [PluginTaskV3!]!
+  pluginSettingsV3(plugin_id: ID!): PluginSettingsV3!
+  "Loads expression input using the setting's declared read-only preview handler."
+  pluginSettingPreviewV3(plugin_id: ID!, setting: String!, entity_id: ID!): Any
+  "Runs a declared read-only operation (60 second deadline, 1 MiB input, 4 MiB output)."
+  pluginQueryV3(plugin_id: ID!, operation: String!, input: Map): Any
+}
+
+extend type Mutation {
+  updatePluginSettingsV3(plugin_id: ID!, input: Map!, reset: [String!]): Map!
+  "Runs a declared mutation (120 second deadline, 1 MiB input, 4 MiB output)."
+  pluginMutationV3(plugin_id: ID!, operation: String!, input: Map): Any
+}

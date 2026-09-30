@@ -34,7 +34,7 @@ const (
 	cacheSizeEnv = "STASH_SQLITE_CACHE_SIZE"
 )
 
-var appSchemaVersion uint = 86
+var appSchemaVersion = NativeSchemaBaseline
 
 //go:embed migrations/*.sql
 var migrationsBox embed.FS
@@ -203,12 +203,8 @@ func (db *Database) Open(dbPath string) error {
 				CurrentSchemaVersion:      databaseSchemaVersion,
 				RequiredSchemaVersion:     requiredSchemaVersion,
 				CurrentForkSchemaVersion:  db.forkSchemaVersion,
-				RequiredForkSchemaVersion: GetRequiredForkSchemaVersion(),
+				RequiredForkSchemaVersion: db.RequiredForkSchemaVersion(),
 			}
-		}
-
-		if err := db.runForkReconcilers(); err != nil {
-			return fmt.Errorf("reconciling fork data: %w", err)
 		}
 	}
 
@@ -451,7 +447,7 @@ func (db *Database) ForkSchemaVersion() uint {
 }
 
 func (db *Database) RequiredForkSchemaVersion() uint {
-	return GetRequiredForkSchemaVersion()
+	return 0 // native releases have a single primary migration sequence
 }
 
 func (db *Database) DatabasePath() string {

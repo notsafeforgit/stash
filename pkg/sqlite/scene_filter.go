@@ -129,9 +129,9 @@ func (qb *sceneFilterHandler) criterionHandler() criterionHandler {
 		orientationCriterionHandler(sceneFilter.Orientation, "video_files.height", "video_files.width", qb.addVideoFilesTable),
 		floatIntCriterionHandler(sceneFilter.Framerate, "ROUND(video_files.frame_rate)", qb.addVideoFilesTable),
 		intCriterionHandler(sceneFilter.Bitrate, "video_files.bit_rate", qb.addVideoFilesTable),
-		intCriterionHandler(sceneFilter.BitDepth, "fork_video_file_metadata.bit_depth", qb.addVideoFileMetadataTable),
-		floatIntCriterionHandler(sceneFilter.VideoStreamDuration, "fork_video_file_metadata.video_stream_duration", qb.addVideoFileMetadataTable),
-		intCriterionHandler(sceneFilter.FrameCount, "fork_video_file_metadata.frame_count", qb.addVideoFileMetadataTable),
+		intCriterionHandler(sceneFilter.BitDepth, "video_file_metadata.bit_depth", qb.addVideoFileMetadataTable),
+		floatIntCriterionHandler(sceneFilter.VideoStreamDuration, "video_file_metadata.video_stream_duration", qb.addVideoFileMetadataTable),
+		intCriterionHandler(sceneFilter.FrameCount, "video_file_metadata.frame_count", qb.addVideoFileMetadataTable),
 		durationMismatchCriterionHandler(sceneFilter.DurationMismatch, qb.addVideoFileMetadataTable),
 		qb.codecCriterionHandler(sceneFilter.VideoCodec, "video_files.video_codec", qb.addVideoFilesTable),
 		qb.codecCriterionHandler(sceneFilter.AudioCodec, "video_files.audio_codec", qb.addVideoFilesTable),
@@ -306,7 +306,7 @@ func (qb *sceneFilterHandler) addVideoFilesTable(f *filterBuilder, joinType join
 
 func (qb *sceneFilterHandler) addVideoFileMetadataTable(f *filterBuilder, joinType joinType) {
 	qb.addVideoFilesTable(f, joinType)
-	f.addJoin(joinType, videoFileMetadataTable, "", "fork_video_file_metadata.file_id = scenes_files.file_id")
+	f.addJoin(joinType, videoFileMetadataTable, "", "video_file_metadata.file_id = scenes_files.file_id")
 }
 
 func (qb *sceneFilterHandler) playCountCriterionHandler(count *models.IntCriterionInput) criterionHandlerFunc {

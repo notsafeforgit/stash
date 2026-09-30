@@ -31,6 +31,7 @@ type Repository struct {
 	ConfigurationMigration ConfigurationMigrationReaderWriter
 	ArchiveEntity          ArchiveEntityReaderWriter
 	SourceAccount          SourceAccountReaderWriter
+	SourceEvidence         SourceEvidenceReaderWriter
 	Share                  ShareReaderWriter
 }
 

@@ -37,13 +37,14 @@ review. Production has not been migrated.
 | Stash `e8fb366d2` | Unified performer names, per-name auto-tag policy, nonunique display names, full-copy semantic reconciliation; complete validation gate passed |
 | Stash `e4fa14045` | Native default filters, durable config publication, revision-checked review, full-copy reconciliation; complete validation gate passed |
 | Stash `bd7f2af84` | Portable archive UUIDs, transactional merge redirects and catalog UUID adoption; full-copy reconciliation and complete validation gate passed |
+| Stash `4d1c7571d` | Qualified source accounts, evidence replay, and audited ownership choices; full-copy reconciliation and complete validation gate passed |
 
 ## Phase status
 
 | Phase | Status |
 | --- | --- |
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
-| 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities, and native account/evidence/ownership storage are implemented. Source equivalence, post/profile/capture models, review APIs/UI and remaining domain services are in progress. |
+| 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities, native account/ownership storage, and shared post/profile/capture storage are implemented. Source equivalence, media appearances, review APIs/UI and remaining domain services are in progress. |
 | 2 Ingestion and producer adapter | Not yet implemented |
 | 3 Catalog importer and full-copy reconciliation | Not yet implemented |
 | 4 Native UI and client conversion | Not yet implemented |
@@ -211,3 +212,38 @@ than applied twice or used to restart completed work. The private inventory
 manifest includes complete schema definitions and per-file schema hashes.
 This is an individually consistent schema inventory, not a coordinated backup
 boundary or a complete integrity assessment; those remain release requirements.
+
+## Shared source evidence
+
+Migration 1000006 adds portable source posts, shared post revisions and profile
+bodies, immutable captures, and checked profile references. Post bodies remain
+shared across attachments and meaningful profile edits. Evidence reconstructs
+exactly, including large numeric IDs and nanosecond capture times. Versioned
+retention removes redundant Reddit renditions and noisy Twitter/Reddit profile
+fields for new data; trusted historical import preserves already-retained data.
+The 26 synthetic reference fixtures exercise the existing Python policy.
+
+Capture replay is idempotent across restart and rejects changed content under
+an existing UUID. Integration tests cover rollback after a late write failure,
+cross-post foreign keys, immutable evidence, missing-reference and payload
+corruption, bounded indexed queries, and forgotten-post protection. Anonymised
+exports remove the new data while preserving the original database. Direct-scan
+performer assignments survive migration without invented source posts.
+The complete `make validate-fork` gate passed, including 528 UI tests, current
+native contracts, Go lint, and all Go unit/integration tests.
+
+The full-copy schema migration took 31.4 milliseconds and added 90,112 bytes
+(88 KiB). All 75 retained tables matched by streaming row digest, with zero
+foreign-key violations and empty new source tables. The private comparison
+receipt is `.local/native-archive-rehearsal-20260930/source-evidence-reconciliation.json`.
+An additional read-only inventory covered all 1,697 catalogs: 366,963 observation
+records, 430,910 capture-detail records, and 776 separately stored profile bodies.
+The largest reconstructed payload size bound was 2,928,259 bytes, below the new
+4 MiB limit; no catalog failed inspection. The calculation covers both embedded
+and shared profile formats, and deliberately overcounts shared/patch overlap.
+It is not a full decode/depth/import validation or a common backup boundary.
+Its private receipt is `catalog-evidence-size-inventory.json` in the rehearsal
+directory; the all-catalog import rehearsal remains required.
+Source-account/capture associations, media appearances, gallery-dl API ingestion,
+actual catalog import, and UI exposure remain subsequent work. Production has
+not been migrated.

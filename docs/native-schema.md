@@ -140,6 +140,73 @@ deleted performer identities. Anonymised exports remove source account evidence
 and decisions. Source-account equivalence plans, native review APIs/UI, capture
 references, and importing actual catalogs remain subsequent work.
 
+Migration 1000006 adds source posts and retained evidence. A post has its own
+UUID and qualified service identifiers; native and mirror identifiers cannot
+collide. An existing identifier cannot silently move to another UUID. Additional
+identifiers require the reviewed post revision. None of these records is
+required for a directly scanned scene, image, file, or performer.
+
+| Record | Meaning |
+| --- | --- |
+| `source_posts` / `source_post_identifiers` | The source post and its explicit identifiers, independent of library media |
+| `source_post_revisions` | Shared post body and normalized title/text/date/language projection |
+| `source_captures` | An immutable observation of a post revision, with capture time, producer, platform, extractor version, retention policy, and per-file/provenance patch |
+| `source_profile_bodies` | Shared meaningful profile JSON, identified by namespace and content hash |
+| `source_capture_profiles` | Typed references from each capture's shared body or patch to a profile body |
+| `source_payloads` | Content-addressed JSON bytes, optionally compressed without changing their checksum |
+
+A multi-image post reuses its post revision while keeping each attachment's
+capture details. Identical profiles are reusable across both captures and posts.
+A meaningful profile edit selects another profile body; it does not copy the
+post body. The revision signature excludes profile references, while the capture
+signature includes them. Changed post counters can still produce distinct post
+evidence; profile pruning does not imply a general post-field allowlist.
+
+`gallery-dl-retained-v1` implements the existing catalog policy for new input:
+remove known credential/runtime fields, keep meaningful Twitter/Reddit profile
+fields, and keep Reddit originals or the best available preview instead of
+preview ladders. Animation and stream manifests survive; a blurred fallback is
+not relabelled as an original. Unknown extractors retain their source fields
+apart from credential/runtime filtering. Malformed or missing media IDs do not
+establish duplicate content. Normalization works on copies and never fetches
+URLs or alters extractor working metadata.
+
+`legacy-retained-v1` is reserved for trusted catalog import. It partitions old
+retained evidence without applying new pruning retroactively. Network ingestion
+must not expose this escape hatch. Unknown payload shapes stay whole rather
+than guessing which fields belong to a file. The import and network ingestion
+boundaries themselves are still subsequent work.
+
+Shared bodies and patches contain null profile placeholders. Separate RFC 6901
+references identify those placeholders; source JSON cannot impersonate an
+internal sentinel. Reconstruction checks all references before substituting
+anything, verifies body hashes, rejects overlapping/unused references, and
+enforces a 4 MiB bound on stored and expanded capture data. Metadata projections
+are bounded at 256 KiB, depth at 64, and profile references at 1,024 per capture.
+Oversized historical records require an explicit import rejection/report or a
+versioned larger-object design, never silent truncation. The all-catalog import
+rehearsal must assess these limits before production cutover.
+
+The native `json-v1` hash representation uses sorted map keys, UTF-8 without HTML
+escaping (except U+2028/U+2029), and exact numeric tokens. Duplicate keys, invalid
+UTF-8, and unpaired surrogate escapes are rejected. It is not RFC 8785 and is
+independent of producer event-byte digests. Profile hashes include their
+namespace and a versioned domain separator. Revisions and capture signatures
+use ordered JSON tuples with separate domains. The 26 synthetic reference
+fixtures in `pkg/archive/testdata/source-retention-v1.json` cover the existing
+Python policy; native tests additionally cover malformed IDs and reference
+integrity. These files contain no library data.
+
+Capture writes are transactional. Replaying an identical capture UUID returns
+the original record, including after restart; different contents under that
+UUID fail. Reads verify decompressed length, payload checksums, profile hashes,
+and revision/capture signatures. This also detects lost profile references.
+Summary queries omit bodies and use bounded indexed keyset pagination. Retained
+evidence is immutable; a forgotten-post tombstone rejects new captures and
+resurrection. Purge/forget commands, account/capture associations, media
+appearances, source merging, API/UI exposure, and actual catalog import remain
+subsequent work. Anonymised exports remove source evidence and vacuum free pages.
+
 The filesystem deletion journal currently derives its directory from the
 database filename. Promotion in place retains that association, but a production
 path change must first drain pending deletions or transfer the exact journal

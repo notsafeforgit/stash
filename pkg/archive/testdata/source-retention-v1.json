@@ -1,0 +1,3918 @@
+{
+  "policy": "gallery-dl-retained-v1",
+  "reference": "scrape-catalog 0.5.0 retention, observation split and profile extraction; synthetic data only",
+  "cases": [
+    {
+      "name": "reddit-gallery-originals",
+      "origin": "gallery-dl",
+      "platform": "reddit",
+      "input": {
+        "category": "reddit",
+        "id": "post1",
+        "author": "sample_author",
+        "author_fullname": "t2_sample",
+        "title": "Example gallery",
+        "url": "https://www.reddit.com/gallery/post1",
+        "gallery_data": {
+          "items": [
+            {
+              "media_id": "a"
+            },
+            {
+              "media_id": "b"
+            }
+          ]
+        },
+        "media_metadata": {
+          "a": {
+            "id": "a",
+            "s": {
+              "x": 2400,
+              "y": 4800,
+              "u": "https://preview.redd.it/a.jpg?width=2400"
+            },
+            "p": [
+              {
+                "x": 100,
+                "y": 200,
+                "u": "https://preview.redd.it/sample.jpg?width=100"
+              },
+              {
+                "x": 1080,
+                "y": 2160,
+                "u": "https://preview.redd.it/sample.jpg?width=1080"
+              },
+              {
+                "x": 300,
+                "y": 600,
+                "u": "https://preview.redd.it/sample.jpg?width=300"
+              }
+            ],
+            "o": [
+              {
+                "x": 3000,
+                "y": 6000,
+                "u": "https://preview.redd.it/blur.jpg?blur=40"
+              }
+            ]
+          },
+          "b": {
+            "id": "b",
+            "s": {
+              "x": 2400,
+              "y": 4800,
+              "u": "https://preview.redd.it/b.jpg?width=2400"
+            },
+            "p": [
+              {
+                "x": 100,
+                "y": 200,
+                "u": "https://preview.redd.it/sample.jpg?width=100"
+              },
+              {
+                "x": 1080,
+                "y": 2160,
+                "u": "https://preview.redd.it/sample.jpg?width=1080"
+              },
+              {
+                "x": 300,
+                "y": 600,
+                "u": "https://preview.redd.it/sample.jpg?width=300"
+              }
+            ],
+            "o": [
+              {
+                "x": 3000,
+                "y": 6000,
+                "u": "https://preview.redd.it/blur.jpg?blur=40"
+              }
+            ]
+          }
+        },
+        "user": {
+          "id": "sample",
+          "name": "sample_author",
+          "created": 1,
+          "created_utc": 1,
+          "is_friend": false,
+          "link_karma": 99,
+          "subreddit": {
+            "title": "Sample Author",
+            "public_description": "An example biography",
+            "url": "/user/sample_author/",
+            "default_set": true,
+            "subscribers": 20
+          }
+        },
+        "num": 1,
+        "filename": "a",
+        "extension": "jpg",
+        "_url": "https://i.redd.it/a.jpg",
+        "source_extractor_url": "https://www.reddit.com/user/sample_author/",
+        "thumbnail": "https://preview.redd.it/thumb.jpg",
+        "thumbnail_width": 140,
+        "thumbnail_height": 280
+      },
+      "retained": {
+        "category": "reddit",
+        "id": "post1",
+        "author": "sample_author",
+        "author_fullname": "t2_sample",
+        "title": "Example gallery",
+        "url": "https://www.reddit.com/gallery/post1",
+        "gallery_data": {
+          "items": [
+            {
+              "media_id": "a"
+            },
+            {
+              "media_id": "b"
+            }
+          ]
+        },
+        "media_metadata": {
+          "a": {
+            "id": "a",
+            "s": {
+              "x": 2400,
+              "y": 4800,
+              "u": "https://preview.redd.it/a.jpg?width=2400"
+            }
+          },
+          "b": {
+            "id": "b",
+            "s": {
+              "x": 2400,
+              "y": 4800,
+              "u": "https://preview.redd.it/b.jpg?width=2400"
+            }
+          }
+        },
+        "user": {
+          "id": "sample",
+          "name": "sample_author",
+          "created_utc": 1,
+          "subreddit": {
+            "title": "Sample Author",
+            "public_description": "An example biography",
+            "url": "/user/sample_author/"
+          }
+        },
+        "num": 1,
+        "filename": "a",
+        "extension": "jpg",
+        "_url": "https://i.redd.it/a.jpg",
+        "source_extractor_url": "https://www.reddit.com/user/sample_author/"
+      },
+      "shared": {
+        "author": "sample_author",
+        "author_fullname": "t2_sample",
+        "category": "reddit",
+        "gallery_data": {
+          "items": [
+            {
+              "media_id": "a"
+            },
+            {
+              "media_id": "b"
+            }
+          ]
+        },
+        "id": "post1",
+        "media_metadata": {
+          "a": {
+            "id": "a",
+            "s": {
+              "u": "https://preview.redd.it/a.jpg?width=2400",
+              "x": 2400,
+              "y": 4800
+            }
+          },
+          "b": {
+            "id": "b",
+            "s": {
+              "u": "https://preview.redd.it/b.jpg?width=2400",
+              "x": 2400,
+              "y": 4800
+            }
+          }
+        },
+        "title": "Example gallery",
+        "url": "https://www.reddit.com/gallery/post1",
+        "user": null
+      },
+      "patch": {
+        "_url": "https://i.redd.it/a.jpg",
+        "extension": "jpg",
+        "filename": "a",
+        "num": 1,
+        "source_extractor_url": "https://www.reddit.com/user/sample_author/"
+      },
+      "profiles": [
+        {
+          "namespace": "native:reddit",
+          "body": {
+            "created_utc": 1,
+            "id": "sample",
+            "name": "sample_author",
+            "subreddit": {
+              "public_description": "An example biography",
+              "title": "Sample Author",
+              "url": "/user/sample_author/"
+            }
+          },
+          "hash": "02ca4361a83355dbbcfddea498a65deb0680a14e5140fa1fe01304fc3e134929"
+        }
+      ],
+      "profile_refs": [
+        {
+          "part": "shared",
+          "path": "/user",
+          "namespace": "native:reddit",
+          "body": {
+            "created_utc": 1,
+            "id": "sample",
+            "name": "sample_author",
+            "subreddit": {
+              "public_description": "An example biography",
+              "title": "Sample Author",
+              "url": "/user/sample_author/"
+            }
+          },
+          "hash": "02ca4361a83355dbbcfddea498a65deb0680a14e5140fa1fe01304fc3e134929"
+        }
+      ]
+    },
+    {
+      "name": "reddit-profile-noise",
+      "origin": "gallery-dl",
+      "platform": "reddit",
+      "input": {
+        "category": "reddit",
+        "id": "post1",
+        "author": "sample_author",
+        "author_fullname": "t2_sample",
+        "title": "Example gallery",
+        "url": "https://www.reddit.com/gallery/post1",
+        "gallery_data": {
+          "items": [
+            {
+              "media_id": "a"
+            },
+            {
+              "media_id": "b"
+            }
+          ]
+        },
+        "media_metadata": {
+          "a": {
+            "id": "a",
+            "s": {
+              "x": 2400,
+              "y": 4800,
+              "u": "https://preview.redd.it/a.jpg?width=2400"
+            },
+            "p": [
+              {
+                "x": 100,
+                "y": 200,
+                "u": "https://preview.redd.it/sample.jpg?width=100"
+              },
+              {
+                "x": 1080,
+                "y": 2160,
+                "u": "https://preview.redd.it/sample.jpg?width=1080"
+              },
+              {
+                "x": 300,
+                "y": 600,
+                "u": "https://preview.redd.it/sample.jpg?width=300"
+              }
+            ],
+            "o": [
+              {
+                "x": 3000,
+                "y": 6000,
+                "u": "https://preview.redd.it/blur.jpg?blur=40"
+              }
+            ]
+          },
+          "b": {
+            "id": "b",
+            "s": {
+              "x": 2400,
+              "y": 4800,
+              "u": "https://preview.redd.it/b.jpg?width=2400"
+            },
+            "p": [
+              {
+                "x": 100,
+                "y": 200,
+                "u": "https://preview.redd.it/sample.jpg?width=100"
+              },
+              {
+                "x": 1080,
+                "y": 2160,
+                "u": "https://preview.redd.it/sample.jpg?width=1080"
+              },
+              {
+                "x": 300,
+                "y": 600,
+                "u": "https://preview.redd.it/sample.jpg?width=300"
+              }
+            ],
+            "o": [
+              {
+                "x": 3000,
+                "y": 6000,
+                "u": "https://preview.redd.it/blur.jpg?blur=40"
+              }
+            ]
+          }
+        },
+        "user": {
+          "id": "sample",
+          "name": "sample_author",
+          "created": 1,
+          "created_utc": 1,
+          "is_friend": true,
+          "link_karma": 9999,
+          "subreddit": {
+            "title": "Sample Author",
+            "public_description": "An example biography",
+            "url": "/user/sample_author/",
+            "default_set": false,
+            "subscribers": 20
+          }
+        },
+        "num": 1,
+        "filename": "a",
+        "extension": "jpg",
+        "_url": "https://i.redd.it/a.jpg",
+        "source_extractor_url": "https://www.reddit.com/user/sample_author/",
+        "thumbnail": "https://preview.redd.it/thumb.jpg",
+        "thumbnail_width": 140,
+        "thumbnail_height": 280
+      },
+      "retained": {
+        "category": "reddit",
+        "id": "post1",
+        "author": "sample_author",
+        "author_fullname": "t2_sample",
+        "title": "Example gallery",
+        "url": "https://www.reddit.com/gallery/post1",
+        "gallery_data": {
+          "items": [
+            {
+              "media_id": "a"
+            },
+            {
+              "media_id": "b"
+            }
+          ]
+        },
+        "media_metadata": {
+          "a": {
+            "id": "a",
+            "s": {
+              "x": 2400,
+              "y": 4800,
+              "u": "https://preview.redd.it/a.jpg?width=2400"
+            }
+          },
+          "b": {
+            "id": "b",
+            "s": {
+              "x": 2400,
+              "y": 4800,
+              "u": "https://preview.redd.it/b.jpg?width=2400"
+            }
+          }
+        },
+        "user": {
+          "id": "sample",
+          "name": "sample_author",
+          "created_utc": 1,
+          "subreddit": {
+            "title": "Sample Author",
+            "public_description": "An example biography",
+            "url": "/user/sample_author/"
+          }
+        },
+        "num": 1,
+        "filename": "a",
+        "extension": "jpg",
+        "_url": "https://i.redd.it/a.jpg",
+        "source_extractor_url": "https://www.reddit.com/user/sample_author/"
+      },
+      "shared": {
+        "author": "sample_author",
+        "author_fullname": "t2_sample",
+        "category": "reddit",
+        "gallery_data": {
+          "items": [
+            {
+              "media_id": "a"
+            },
+            {
+              "media_id": "b"
+            }
+          ]
+        },
+        "id": "post1",
+        "media_metadata": {
+          "a": {
+            "id": "a",
+            "s": {
+              "u": "https://preview.redd.it/a.jpg?width=2400",
+              "x": 2400,
+              "y": 4800
+            }
+          },
+          "b": {
+            "id": "b",
+            "s": {
+              "u": "https://preview.redd.it/b.jpg?width=2400",
+              "x": 2400,
+              "y": 4800
+            }
+          }
+        },
+        "title": "Example gallery",
+        "url": "https://www.reddit.com/gallery/post1",
+        "user": null
+      },
+      "patch": {
+        "_url": "https://i.redd.it/a.jpg",
+        "extension": "jpg",
+        "filename": "a",
+        "num": 1,
+        "source_extractor_url": "https://www.reddit.com/user/sample_author/"
+      },
+      "profiles": [
+        {
+          "namespace": "native:reddit",
+          "body": {
+            "created_utc": 1,
+            "id": "sample",
+            "name": "sample_author",
+            "subreddit": {
+              "public_description": "An example biography",
+              "title": "Sample Author",
+              "url": "/user/sample_author/"
+            }
+          },
+          "hash": "02ca4361a83355dbbcfddea498a65deb0680a14e5140fa1fe01304fc3e134929"
+        }
+      ],
+      "profile_refs": [
+        {
+          "part": "shared",
+          "path": "/user",
+          "namespace": "native:reddit",
+          "body": {
+            "created_utc": 1,
+            "id": "sample",
+            "name": "sample_author",
+            "subreddit": {
+              "public_description": "An example biography",
+              "title": "Sample Author",
+              "url": "/user/sample_author/"
+            }
+          },
+          "hash": "02ca4361a83355dbbcfddea498a65deb0680a14e5140fa1fe01304fc3e134929"
+        }
+      ]
+    },
+    {
+      "name": "reddit-preview-fallback-2",
+      "origin": "gallery-dl",
+      "platform": "reddit",
+      "input": {
+        "category": "reddit",
+        "id": "post1",
+        "author": "sample_author",
+        "author_fullname": "t2_sample",
+        "title": "Example gallery",
+        "url": "https://www.reddit.com/gallery/post1",
+        "gallery_data": {
+          "items": [
+            {
+              "media_id": "a"
+            },
+            {
+              "media_id": "b"
+            }
+          ]
+        },
+        "media_metadata": {
+          "a": {
+            "id": "a",
+            "s": null,
+            "p": [
+              {
+                "x": 100,
+                "y": 200,
+                "u": "https://preview.redd.it/sample.jpg?width=100"
+              },
+              {
+                "x": 1080,
+                "y": 2160,
+                "u": "https://preview.redd.it/sample.jpg?width=1080"
+              },
+              {
+                "x": 300,
+                "y": 600,
+                "u": "https://preview.redd.it/sample.jpg?width=300"
+              }
+            ],
+            "o": [
+              {
+                "x": 3000,
+                "y": 6000,
+                "u": "https://preview.redd.it/blur.jpg?blur=40"
+              }
+            ]
+          },
+          "b": {
+            "id": "b",
+            "s": {
+              "x": 2400,
+              "y": 4800,
+              "u": "https://preview.redd.it/b.jpg?width=2400"
+            },
+            "p": [
+              {
+                "x": 100,
+                "y": 200,
+                "u": "https://preview.redd.it/sample.jpg?width=100"
+              },
+              {
+                "x": 1080,
+                "y": 2160,
+                "u": "https://preview.redd.it/sample.jpg?width=1080"
+              },
+              {
+                "x": 300,
+                "y": 600,
+                "u": "https://preview.redd.it/sample.jpg?width=300"
+              }
+            ],
+            "o": [
+              {
+                "x": 3000,
+                "y": 6000,
+                "u": "https://preview.redd.it/blur.jpg?blur=40"
+              }
+            ]
+          }
+        },
+        "user": {
+          "id": "sample",
+          "name": "sample_author",
+          "created": 1,
+          "created_utc": 1,
+          "is_friend": false,
+          "link_karma": 99,
+          "subreddit": {
+            "title": "Sample Author",
+            "public_description": "An example biography",
+            "url": "/user/sample_author/",
+            "default_set": true,
+            "subscribers": 20
+          }
+        },
+        "num": 1,
+        "filename": "a",
+        "extension": "jpg",
+        "_url": "https://i.redd.it/a.jpg",
+        "source_extractor_url": "https://www.reddit.com/user/sample_author/",
+        "thumbnail": "https://preview.redd.it/thumb.jpg",
+        "thumbnail_width": 140,
+        "thumbnail_height": 280
+      },
+      "retained": {
+        "category": "reddit",
+        "id": "post1",
+        "author": "sample_author",
+        "author_fullname": "t2_sample",
+        "title": "Example gallery",
+        "url": "https://www.reddit.com/gallery/post1",
+        "gallery_data": {
+          "items": [
+            {
+              "media_id": "a"
+            },
+            {
+              "media_id": "b"
+            }
+          ]
+        },
+        "media_metadata": {
+          "a": {
+            "id": "a",
+            "s": null,
+            "p": [
+              {
+                "x": 1080,
+                "y": 2160,
+                "u": "https://preview.redd.it/sample.jpg?width=1080"
+              }
+            ]
+          },
+          "b": {
+            "id": "b",
+            "s": {
+              "x": 2400,
+              "y": 4800,
+              "u": "https://preview.redd.it/b.jpg?width=2400"
+            }
+          }
+        },
+        "user": {
+          "id": "sample",
+          "name": "sample_author",
+          "created_utc": 1,
+          "subreddit": {
+            "title": "Sample Author",
+            "public_description": "An example biography",
+            "url": "/user/sample_author/"
+          }
+        },
+        "num": 1,
+        "filename": "a",
+        "extension": "jpg",
+        "_url": "https://i.redd.it/a.jpg",
+        "source_extractor_url": "https://www.reddit.com/user/sample_author/"
+      },
+      "shared": {
+        "author": "sample_author",
+        "author_fullname": "t2_sample",
+        "category": "reddit",
+        "gallery_data": {
+          "items": [
+            {
+              "media_id": "a"
+            },
+            {
+              "media_id": "b"
+            }
+          ]
+        },
+        "id": "post1",
+        "media_metadata": {
+          "a": {
+            "id": "a",
+            "p": [
+              {
+                "u": "https://preview.redd.it/sample.jpg?width=1080",
+                "x": 1080,
+                "y": 2160
+              }
+            ],
+            "s": null
+          },
+          "b": {
+            "id": "b",
+            "s": {
+              "u": "https://preview.redd.it/b.jpg?width=2400",
+              "x": 2400,
+              "y": 4800
+            }
+          }
+        },
+        "title": "Example gallery",
+        "url": "https://www.reddit.com/gallery/post1",
+        "user": null
+      },
+      "patch": {
+        "_url": "https://i.redd.it/a.jpg",
+        "extension": "jpg",
+        "filename": "a",
+        "num": 1,
+        "source_extractor_url": "https://www.reddit.com/user/sample_author/"
+      },
+      "profiles": [
+        {
+          "namespace": "native:reddit",
+          "body": {
+            "created_utc": 1,
+            "id": "sample",
+            "name": "sample_author",
+            "subreddit": {
+              "public_description": "An example biography",
+              "title": "Sample Author",
+              "url": "/user/sample_author/"
+            }
+          },
+          "hash": "02ca4361a83355dbbcfddea498a65deb0680a14e5140fa1fe01304fc3e134929"
+        }
+      ],
+      "profile_refs": [
+        {
+          "part": "shared",
+          "path": "/user",
+          "namespace": "native:reddit",
+          "body": {
+            "created_utc": 1,
+            "id": "sample",
+            "name": "sample_author",
+            "subreddit": {
+              "public_description": "An example biography",
+              "title": "Sample Author",
+              "url": "/user/sample_author/"
+            }
+          },
+          "hash": "02ca4361a83355dbbcfddea498a65deb0680a14e5140fa1fe01304fc3e134929"
+        }
+      ]
+    },
+    {
+      "name": "reddit-preview-fallback-3",
+      "origin": "gallery-dl",
+      "platform": "reddit",
+      "input": {
+        "category": "reddit",
+        "id": "post1",
+        "author": "sample_author",
+        "author_fullname": "t2_sample",
+        "title": "Example gallery",
+        "url": "https://www.reddit.com/gallery/post1",
+        "gallery_data": {
+          "items": [
+            {
+              "media_id": "a"
+            },
+            {
+              "media_id": "b"
+            }
+          ]
+        },
+        "media_metadata": {
+          "a": {
+            "id": "a",
+            "s": {},
+            "p": [
+              {
+                "x": 100,
+                "y": 200,
+                "u": "https://preview.redd.it/sample.jpg?width=100"
+              },
+              {
+                "x": 1080,
+                "y": 2160,
+                "u": "https://preview.redd.it/sample.jpg?width=1080"
+              },
+              {
+                "x": 300,
+                "y": 600,
+                "u": "https://preview.redd.it/sample.jpg?width=300"
+              }
+            ],
+            "o": [
+              {
+                "x": 3000,
+                "y": 6000,
+                "u": "https://preview.redd.it/blur.jpg?blur=40"
+              }
+            ]
+          },
+          "b": {
+            "id": "b",
+            "s": {
+              "x": 2400,
+              "y": 4800,
+              "u": "https://preview.redd.it/b.jpg?width=2400"
+            },
+            "p": [
+              {
+                "x": 100,
+                "y": 200,
+                "u": "https://preview.redd.it/sample.jpg?width=100"
+              },
+              {
+                "x": 1080,
+                "y": 2160,
+                "u": "https://preview.redd.it/sample.jpg?width=1080"
+              },
+              {
+                "x": 300,
+                "y": 600,
+                "u": "https://preview.redd.it/sample.jpg?width=300"
+              }
+            ],
+            "o": [
+              {
+                "x": 3000,
+                "y": 6000,
+                "u": "https://preview.redd.it/blur.jpg?blur=40"
+              }
+            ]
+          }
+        },
+        "user": {
+          "id": "sample",
+          "name": "sample_author",
+          "created": 1,
+          "created_utc": 1,
+          "is_friend": false,
+          "link_karma": 99,
+          "subreddit": {
+            "title": "Sample Author",
+            "public_description": "An example biography",
+            "url": "/user/sample_author/",
+            "default_set": true,
+            "subscribers": 20
+          }
+        },
+        "num": 1,
+        "filename": "a",
+        "extension": "jpg",
+        "_url": "https://i.redd.it/a.jpg",
+        "source_extractor_url": "https://www.reddit.com/user/sample_author/",
+        "thumbnail": "https://preview.redd.it/thumb.jpg",
+        "thumbnail_width": 140,
+        "thumbnail_height": 280
+      },
+      "retained": {
+        "category": "reddit",
+        "id": "post1",
+        "author": "sample_author",
+        "author_fullname": "t2_sample",
+        "title": "Example gallery",
+        "url": "https://www.reddit.com/gallery/post1",
+        "gallery_data": {
+          "items": [
+            {
+              "media_id": "a"
+            },
+            {
+              "media_id": "b"
+            }
+          ]
+        },
+        "media_metadata": {
+          "a": {
+            "id": "a",
+            "s": {},
+            "p": [
+              {
+                "x": 1080,
+                "y": 2160,
+                "u": "https://preview.redd.it/sample.jpg?width=1080"
+              }
+            ]
+          },
+          "b": {
+            "id": "b",
+            "s": {
+              "x": 2400,
+              "y": 4800,
+              "u": "https://preview.redd.it/b.jpg?width=2400"
+            }
+          }
+        },
+        "user": {
+          "id": "sample",
+          "name": "sample_author",
+          "created_utc": 1,
+          "subreddit": {
+            "title": "Sample Author",
+            "public_description": "An example biography",
+            "url": "/user/sample_author/"
+          }
+        },
+        "num": 1,
+        "filename": "a",
+        "extension": "jpg",
+        "_url": "https://i.redd.it/a.jpg",
+        "source_extractor_url": "https://www.reddit.com/user/sample_author/"
+      },
+      "shared": {
+        "author": "sample_author",
+        "author_fullname": "t2_sample",
+        "category": "reddit",
+        "gallery_data": {
+          "items": [
+            {
+              "media_id": "a"
+            },
+            {
+              "media_id": "b"
+            }
+          ]
+        },
+        "id": "post1",
+        "media_metadata": {
+          "a": {
+            "id": "a",
+            "p": [
+              {
+                "u": "https://preview.redd.it/sample.jpg?width=1080",
+                "x": 1080,
+                "y": 2160
+              }
+            ],
+            "s": {}
+          },
+          "b": {
+            "id": "b",
+            "s": {
+              "u": "https://preview.redd.it/b.jpg?width=2400",
+              "x": 2400,
+              "y": 4800
+            }
+          }
+        },
+        "title": "Example gallery",
+        "url": "https://www.reddit.com/gallery/post1",
+        "user": null
+      },
+      "patch": {
+        "_url": "https://i.redd.it/a.jpg",
+        "extension": "jpg",
+        "filename": "a",
+        "num": 1,
+        "source_extractor_url": "https://www.reddit.com/user/sample_author/"
+      },
+      "profiles": [
+        {
+          "namespace": "native:reddit",
+          "body": {
+            "created_utc": 1,
+            "id": "sample",
+            "name": "sample_author",
+            "subreddit": {
+              "public_description": "An example biography",
+              "title": "Sample Author",
+              "url": "/user/sample_author/"
+            }
+          },
+          "hash": "02ca4361a83355dbbcfddea498a65deb0680a14e5140fa1fe01304fc3e134929"
+        }
+      ],
+      "profile_refs": [
+        {
+          "part": "shared",
+          "path": "/user",
+          "namespace": "native:reddit",
+          "body": {
+            "created_utc": 1,
+            "id": "sample",
+            "name": "sample_author",
+            "subreddit": {
+              "public_description": "An example biography",
+              "title": "Sample Author",
+              "url": "/user/sample_author/"
+            }
+          },
+          "hash": "02ca4361a83355dbbcfddea498a65deb0680a14e5140fa1fe01304fc3e134929"
+        }
+      ]
+    },
+    {
+      "name": "reddit-preview-fallback-4",
+      "origin": "gallery-dl",
+      "platform": "reddit",
+      "input": {
+        "category": "reddit",
+        "id": "post1",
+        "author": "sample_author",
+        "author_fullname": "t2_sample",
+        "title": "Example gallery",
+        "url": "https://www.reddit.com/gallery/post1",
+        "gallery_data": {
+          "items": [
+            {
+              "media_id": "a"
+            },
+            {
+              "media_id": "b"
+            }
+          ]
+        },
+        "media_metadata": {
+          "a": {
+            "id": "a",
+            "s": {
+              "u": "invalid"
+            },
+            "p": [
+              {
+                "x": 100,
+                "y": 200,
+                "u": "https://preview.redd.it/sample.jpg?width=100"
+              },
+              {
+                "x": 1080,
+                "y": 2160,
+                "u": "https://preview.redd.it/sample.jpg?width=1080"
+              },
+              {
+                "x": 300,
+                "y": 600,
+                "u": "https://preview.redd.it/sample.jpg?width=300"
+              }
+            ],
+            "o": [
+              {
+                "x": 3000,
+                "y": 6000,
+                "u": "https://preview.redd.it/blur.jpg?blur=40"
+              }
+            ]
+          },
+          "b": {
+            "id": "b",
+            "s": {
+              "x": 2400,
+              "y": 4800,
+              "u": "https://preview.redd.it/b.jpg?width=2400"
+            },
+            "p": [
+              {
+                "x": 100,
+                "y": 200,
+                "u": "https://preview.redd.it/sample.jpg?width=100"
+              },
+              {
+                "x": 1080,
+                "y": 2160,
+                "u": "https://preview.redd.it/sample.jpg?width=1080"
+              },
+              {
+                "x": 300,
+                "y": 600,
+                "u": "https://preview.redd.it/sample.jpg?width=300"
+              }
+            ],
+            "o": [
+              {
+                "x": 3000,
+                "y": 6000,
+                "u": "https://preview.redd.it/blur.jpg?blur=40"
+              }
+            ]
+          }
+        },
+        "user": {
+          "id": "sample",
+          "name": "sample_author",
+          "created": 1,
+          "created_utc": 1,
+          "is_friend": false,
+          "link_karma": 99,
+          "subreddit": {
+            "title": "Sample Author",
+            "public_description": "An example biography",
+            "url": "/user/sample_author/",
+            "default_set": true,
+            "subscribers": 20
+          }
+        },
+        "num": 1,
+        "filename": "a",
+        "extension": "jpg",
+        "_url": "https://i.redd.it/a.jpg",
+        "source_extractor_url": "https://www.reddit.com/user/sample_author/",
+        "thumbnail": "https://preview.redd.it/thumb.jpg",
+        "thumbnail_width": 140,
+        "thumbnail_height": 280
+      },
+      "retained": {
+        "category": "reddit",
+        "id": "post1",
+        "author": "sample_author",
+        "author_fullname": "t2_sample",
+        "title": "Example gallery",
+        "url": "https://www.reddit.com/gallery/post1",
+        "gallery_data": {
+          "items": [
+            {
+              "media_id": "a"
+            },
+            {
+              "media_id": "b"
+            }
+          ]
+        },
+        "media_metadata": {
+          "a": {
+            "id": "a",
+            "s": {
+              "u": "invalid"
+            },
+            "p": [
+              {
+                "x": 1080,
+                "y": 2160,
+                "u": "https://preview.redd.it/sample.jpg?width=1080"
+              }
+            ]
+          },
+          "b": {
+            "id": "b",
+            "s": {
+              "x": 2400,
+              "y": 4800,
+              "u": "https://preview.redd.it/b.jpg?width=2400"
+            }
+          }
+        },
+        "user": {
+          "id": "sample",
+          "name": "sample_author",
+          "created_utc": 1,
+          "subreddit": {
+            "title": "Sample Author",
+            "public_description": "An example biography",
+            "url": "/user/sample_author/"
+          }
+        },
+        "num": 1,
+        "filename": "a",
+        "extension": "jpg",
+        "_url": "https://i.redd.it/a.jpg",
+        "source_extractor_url": "https://www.reddit.com/user/sample_author/"
+      },
+      "shared": {
+        "author": "sample_author",
+        "author_fullname": "t2_sample",
+        "category": "reddit",
+        "gallery_data": {
+          "items": [
+            {
+              "media_id": "a"
+            },
+            {
+              "media_id": "b"
+            }
+          ]
+        },
+        "id": "post1",
+        "media_metadata": {
+          "a": {
+            "id": "a",
+            "p": [
+              {
+                "u": "https://preview.redd.it/sample.jpg?width=1080",
+                "x": 1080,
+                "y": 2160
+              }
+            ],
+            "s": {
+              "u": "invalid"
+            }
+          },
+          "b": {
+            "id": "b",
+            "s": {
+              "u": "https://preview.redd.it/b.jpg?width=2400",
+              "x": 2400,
+              "y": 4800
+            }
+          }
+        },
+        "title": "Example gallery",
+        "url": "https://www.reddit.com/gallery/post1",
+        "user": null
+      },
+      "patch": {
+        "_url": "https://i.redd.it/a.jpg",
+        "extension": "jpg",
+        "filename": "a",
+        "num": 1,
+        "source_extractor_url": "https://www.reddit.com/user/sample_author/"
+      },
+      "profiles": [
+        {
+          "namespace": "native:reddit",
+          "body": {
+            "created_utc": 1,
+            "id": "sample",
+            "name": "sample_author",
+            "subreddit": {
+              "public_description": "An example biography",
+              "title": "Sample Author",
+              "url": "/user/sample_author/"
+            }
+          },
+          "hash": "02ca4361a83355dbbcfddea498a65deb0680a14e5140fa1fe01304fc3e134929"
+        }
+      ],
+      "profile_refs": [
+        {
+          "part": "shared",
+          "path": "/user",
+          "namespace": "native:reddit",
+          "body": {
+            "created_utc": 1,
+            "id": "sample",
+            "name": "sample_author",
+            "subreddit": {
+              "public_description": "An example biography",
+              "title": "Sample Author",
+              "url": "/user/sample_author/"
+            }
+          },
+          "hash": "02ca4361a83355dbbcfddea498a65deb0680a14e5140fa1fe01304fc3e134929"
+        }
+      ]
+    },
+    {
+      "name": "reddit-preview-fallback-5",
+      "origin": "gallery-dl",
+      "platform": "reddit",
+      "input": {
+        "category": "reddit",
+        "id": "post1",
+        "author": "sample_author",
+        "author_fullname": "t2_sample",
+        "title": "Example gallery",
+        "url": "https://www.reddit.com/gallery/post1",
+        "gallery_data": {
+          "items": [
+            {
+              "media_id": "a"
+            },
+            {
+              "media_id": "b"
+            }
+          ]
+        },
+        "media_metadata": {
+          "a": {
+            "id": "a",
+            "s": {
+              "u": "https://["
+            },
+            "p": [
+              {
+                "x": 100,
+                "y": 200,
+                "u": "https://preview.redd.it/sample.jpg?width=100"
+              },
+              {
+                "x": 1080,
+                "y": 2160,
+                "u": "https://preview.redd.it/sample.jpg?width=1080"
+              },
+              {
+                "x": 300,
+                "y": 600,
+                "u": "https://preview.redd.it/sample.jpg?width=300"
+              }
+            ],
+            "o": [
+              {
+                "x": 3000,
+                "y": 6000,
+                "u": "https://preview.redd.it/blur.jpg?blur=40"
+              }
+            ]
+          },
+          "b": {
+            "id": "b",
+            "s": {
+              "x": 2400,
+              "y": 4800,
+              "u": "https://preview.redd.it/b.jpg?width=2400"
+            },
+            "p": [
+              {
+                "x": 100,
+                "y": 200,
+                "u": "https://preview.redd.it/sample.jpg?width=100"
+              },
+              {
+                "x": 1080,
+                "y": 2160,
+                "u": "https://preview.redd.it/sample.jpg?width=1080"
+              },
+              {
+                "x": 300,
+                "y": 600,
+                "u": "https://preview.redd.it/sample.jpg?width=300"
+              }
+            ],
+            "o": [
+              {
+                "x": 3000,
+                "y": 6000,
+                "u": "https://preview.redd.it/blur.jpg?blur=40"
+              }
+            ]
+          }
+        },
+        "user": {
+          "id": "sample",
+          "name": "sample_author",
+          "created": 1,
+          "created_utc": 1,
+          "is_friend": false,
+          "link_karma": 99,
+          "subreddit": {
+            "title": "Sample Author",
+            "public_description": "An example biography",
+            "url": "/user/sample_author/",
+            "default_set": true,
+            "subscribers": 20
+          }
+        },
+        "num": 1,
+        "filename": "a",
+        "extension": "jpg",
+        "_url": "https://i.redd.it/a.jpg",
+        "source_extractor_url": "https://www.reddit.com/user/sample_author/",
+        "thumbnail": "https://preview.redd.it/thumb.jpg",
+        "thumbnail_width": 140,
+        "thumbnail_height": 280
+      },
+      "retained": {
+        "category": "reddit",
+        "id": "post1",
+        "author": "sample_author",
+        "author_fullname": "t2_sample",
+        "title": "Example gallery",
+        "url": "https://www.reddit.com/gallery/post1",
+        "gallery_data": {
+          "items": [
+            {
+              "media_id": "a"
+            },
+            {
+              "media_id": "b"
+            }
+          ]
+        },
+        "media_metadata": {
+          "a": {
+            "id": "a",
+            "s": {
+              "u": "https://["
+            },
+            "p": [
+              {
+                "x": 1080,
+                "y": 2160,
+                "u": "https://preview.redd.it/sample.jpg?width=1080"
+              }
+            ]
+          },
+          "b": {
+            "id": "b",
+            "s": {
+              "x": 2400,
+              "y": 4800,
+              "u": "https://preview.redd.it/b.jpg?width=2400"
+            }
+          }
+        },
+        "user": {
+          "id": "sample",
+          "name": "sample_author",
+          "created_utc": 1,
+          "subreddit": {
+            "title": "Sample Author",
+            "public_description": "An example biography",
+            "url": "/user/sample_author/"
+          }
+        },
+        "num": 1,
+        "filename": "a",
+        "extension": "jpg",
+        "_url": "https://i.redd.it/a.jpg",
+        "source_extractor_url": "https://www.reddit.com/user/sample_author/"
+      },
+      "shared": {
+        "author": "sample_author",
+        "author_fullname": "t2_sample",
+        "category": "reddit",
+        "gallery_data": {
+          "items": [
+            {
+              "media_id": "a"
+            },
+            {
+              "media_id": "b"
+            }
+          ]
+        },
+        "id": "post1",
+        "media_metadata": {
+          "a": {
+            "id": "a",
+            "p": [
+              {
+                "u": "https://preview.redd.it/sample.jpg?width=1080",
+                "x": 1080,
+                "y": 2160
+              }
+            ],
+            "s": {
+              "u": "https://["
+            }
+          },
+          "b": {
+            "id": "b",
+            "s": {
+              "u": "https://preview.redd.it/b.jpg?width=2400",
+              "x": 2400,
+              "y": 4800
+            }
+          }
+        },
+        "title": "Example gallery",
+        "url": "https://www.reddit.com/gallery/post1",
+        "user": null
+      },
+      "patch": {
+        "_url": "https://i.redd.it/a.jpg",
+        "extension": "jpg",
+        "filename": "a",
+        "num": 1,
+        "source_extractor_url": "https://www.reddit.com/user/sample_author/"
+      },
+      "profiles": [
+        {
+          "namespace": "native:reddit",
+          "body": {
+            "created_utc": 1,
+            "id": "sample",
+            "name": "sample_author",
+            "subreddit": {
+              "public_description": "An example biography",
+              "title": "Sample Author",
+              "url": "/user/sample_author/"
+            }
+          },
+          "hash": "02ca4361a83355dbbcfddea498a65deb0680a14e5140fa1fe01304fc3e134929"
+        }
+      ],
+      "profile_refs": [
+        {
+          "part": "shared",
+          "path": "/user",
+          "namespace": "native:reddit",
+          "body": {
+            "created_utc": 1,
+            "id": "sample",
+            "name": "sample_author",
+            "subreddit": {
+              "public_description": "An example biography",
+              "title": "Sample Author",
+              "url": "/user/sample_author/"
+            }
+          },
+          "hash": "02ca4361a83355dbbcfddea498a65deb0680a14e5140fa1fe01304fc3e134929"
+        }
+      ]
+    },
+    {
+      "name": "reddit-blurred-fallback-is-still-blurred",
+      "origin": "gallery-dl",
+      "platform": "reddit",
+      "input": {
+        "category": "reddit",
+        "id": "post1",
+        "author": "sample_author",
+        "author_fullname": "t2_sample",
+        "title": "Example gallery",
+        "url": "https://www.reddit.com/gallery/post1",
+        "gallery_data": {
+          "items": [
+            {
+              "media_id": "a"
+            },
+            {
+              "media_id": "b"
+            }
+          ]
+        },
+        "media_metadata": {
+          "a": {
+            "id": "a",
+            "o": [
+              {
+                "x": 100,
+                "y": 200,
+                "u": "https://preview.redd.it/sample.jpg?width=100"
+              },
+              {
+                "x": 800,
+                "y": 1600,
+                "u": "https://preview.redd.it/sample.jpg?width=800"
+              },
+              {
+                "x": 500,
+                "y": 1000,
+                "u": "https://preview.redd.it/sample.jpg?width=500"
+              }
+            ]
+          },
+          "b": {
+            "id": "b",
+            "s": {
+              "x": 2400,
+              "y": 4800,
+              "u": "https://preview.redd.it/b.jpg?width=2400"
+            },
+            "p": [
+              {
+                "x": 100,
+                "y": 200,
+                "u": "https://preview.redd.it/sample.jpg?width=100"
+              },
+              {
+                "x": 1080,
+                "y": 2160,
+                "u": "https://preview.redd.it/sample.jpg?width=1080"
+              },
+              {
+                "x": 300,
+                "y": 600,
+                "u": "https://preview.redd.it/sample.jpg?width=300"
+              }
+            ],
+            "o": [
+              {
+                "x": 3000,
+                "y": 6000,
+                "u": "https://preview.redd.it/blur.jpg?blur=40"
+              }
+            ]
+          }
+        },
+        "user": {
+          "id": "sample",
+          "name": "sample_author",
+          "created": 1,
+          "created_utc": 1,
+          "is_friend": false,
+          "link_karma": 99,
+          "subreddit": {
+            "title": "Sample Author",
+            "public_description": "An example biography",
+            "url": "/user/sample_author/",
+            "default_set": true,
+            "subscribers": 20
+          }
+        },
+        "num": 1,
+        "filename": "a",
+        "extension": "jpg",
+        "_url": "https://i.redd.it/a.jpg",
+        "source_extractor_url": "https://www.reddit.com/user/sample_author/",
+        "thumbnail": "https://preview.redd.it/thumb.jpg",
+        "thumbnail_width": 140,
+        "thumbnail_height": 280
+      },
+      "retained": {
+        "category": "reddit",
+        "id": "post1",
+        "author": "sample_author",
+        "author_fullname": "t2_sample",
+        "title": "Example gallery",
+        "url": "https://www.reddit.com/gallery/post1",
+        "gallery_data": {
+          "items": [
+            {
+              "media_id": "a"
+            },
+            {
+              "media_id": "b"
+            }
+          ]
+        },
+        "media_metadata": {
+          "a": {
+            "id": "a",
+            "o": [
+              {
+                "x": 800,
+                "y": 1600,
+                "u": "https://preview.redd.it/sample.jpg?width=800"
+              }
+            ]
+          },
+          "b": {
+            "id": "b",
+            "s": {
+              "x": 2400,
+              "y": 4800,
+              "u": "https://preview.redd.it/b.jpg?width=2400"
+            }
+          }
+        },
+        "user": {
+          "id": "sample",
+          "name": "sample_author",
+          "created_utc": 1,
+          "subreddit": {
+            "title": "Sample Author",
+            "public_description": "An example biography",
+            "url": "/user/sample_author/"
+          }
+        },
+        "num": 1,
+        "filename": "a",
+        "extension": "jpg",
+        "_url": "https://i.redd.it/a.jpg",
+        "source_extractor_url": "https://www.reddit.com/user/sample_author/"
+      },
+      "shared": {
+        "author": "sample_author",
+        "author_fullname": "t2_sample",
+        "category": "reddit",
+        "gallery_data": {
+          "items": [
+            {
+              "media_id": "a"
+            },
+            {
+              "media_id": "b"
+            }
+          ]
+        },
+        "id": "post1",
+        "media_metadata": {
+          "a": {
+            "id": "a",
+            "o": [
+              {
+                "u": "https://preview.redd.it/sample.jpg?width=800",
+                "x": 800,
+                "y": 1600
+              }
+            ]
+          },
+          "b": {
+            "id": "b",
+            "s": {
+              "u": "https://preview.redd.it/b.jpg?width=2400",
+              "x": 2400,
+              "y": 4800
+            }
+          }
+        },
+        "title": "Example gallery",
+        "url": "https://www.reddit.com/gallery/post1",
+        "user": null
+      },
+      "patch": {
+        "_url": "https://i.redd.it/a.jpg",
+        "extension": "jpg",
+        "filename": "a",
+        "num": 1,
+        "source_extractor_url": "https://www.reddit.com/user/sample_author/"
+      },
+      "profiles": [
+        {
+          "namespace": "native:reddit",
+          "body": {
+            "created_utc": 1,
+            "id": "sample",
+            "name": "sample_author",
+            "subreddit": {
+              "public_description": "An example biography",
+              "title": "Sample Author",
+              "url": "/user/sample_author/"
+            }
+          },
+          "hash": "02ca4361a83355dbbcfddea498a65deb0680a14e5140fa1fe01304fc3e134929"
+        }
+      ],
+      "profile_refs": [
+        {
+          "part": "shared",
+          "path": "/user",
+          "namespace": "native:reddit",
+          "body": {
+            "created_utc": 1,
+            "id": "sample",
+            "name": "sample_author",
+            "subreddit": {
+              "public_description": "An example biography",
+              "title": "Sample Author",
+              "url": "/user/sample_author/"
+            }
+          },
+          "hash": "02ca4361a83355dbbcfddea498a65deb0680a14e5140fa1fe01304fc3e134929"
+        }
+      ]
+    },
+    {
+      "name": "reddit-original-post-url",
+      "origin": "gallery-dl",
+      "platform": "reddit",
+      "input": {
+        "category": "reddit",
+        "url": "https://i.redd.it/a.jpg",
+        "preview": {
+          "enabled": true,
+          "images": [
+            {
+              "id": "other",
+              "source": {
+                "url": "https://preview.redd.it/a.jpg?width=2400"
+              },
+              "resolutions": [
+                {
+                  "url": "https://preview.redd.it/a.jpg?width=100"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "retained": {
+        "category": "reddit",
+        "url": "https://i.redd.it/a.jpg"
+      },
+      "shared": {
+        "category": "reddit",
+        "url": "https://i.redd.it/a.jpg"
+      },
+      "patch": {},
+      "profiles": [],
+      "profile_refs": []
+    },
+    {
+      "name": "reddit-animation-variants",
+      "origin": "gallery-dl",
+      "platform": "reddit",
+      "input": {
+        "category": "reddit",
+        "preview": {
+          "images": [
+            {
+              "source": {
+                "url": "https://preview.redd.it/poster.jpg"
+              },
+              "resolutions": [
+                {
+                  "url": "https://preview.redd.it/small.jpg"
+                }
+              ],
+              "variants": {
+                "mp4": {
+                  "source": {
+                    "url": "https://preview.redd.it/a.mp4"
+                  },
+                  "resolutions": [
+                    {
+                      "url": "https://preview.redd.it/small.mp4"
+                    }
+                  ]
+                },
+                "nsfw_blurred": {
+                  "source": {
+                    "url": "https://preview.redd.it/blur.jpg"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "retained": {
+        "category": "reddit",
+        "preview": {
+          "images": [
+            {
+              "source": {
+                "url": "https://preview.redd.it/poster.jpg"
+              },
+              "variants": {
+                "mp4": {
+                  "source": {
+                    "url": "https://preview.redd.it/a.mp4"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "shared": {
+        "category": "reddit",
+        "preview": {
+          "images": [
+            {
+              "source": {
+                "url": "https://preview.redd.it/poster.jpg"
+              },
+              "variants": {
+                "mp4": {
+                  "source": {
+                    "url": "https://preview.redd.it/a.mp4"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "patch": {},
+      "profiles": [],
+      "profile_refs": []
+    },
+    {
+      "name": "reddit-video-manifests",
+      "origin": "gallery-dl",
+      "platform": "reddit",
+      "input": {
+        "category": "reddit",
+        "secure_media": {
+          "reddit_video": {
+            "fallback_url": "https://v.redd.it/a/DASH_1080.mp4",
+            "dash_url": "https://v.redd.it/a/DASHPlaylist.mpd",
+            "hls_url": "https://v.redd.it/a/HLSPlaylist.m3u8",
+            "has_audio": true
+          }
+        },
+        "preview": {
+          "reddit_video_preview": {
+            "fallback_url": "https://v.redd.it/a/DASH_240.mp4"
+          },
+          "images": [
+            {
+              "source": {
+                "url": "https://preview.redd.it/poster.jpg"
+              }
+            }
+          ]
+        }
+      },
+      "retained": {
+        "category": "reddit",
+        "secure_media": {
+          "reddit_video": {
+            "fallback_url": "https://v.redd.it/a/DASH_1080.mp4",
+            "dash_url": "https://v.redd.it/a/DASHPlaylist.mpd",
+            "hls_url": "https://v.redd.it/a/HLSPlaylist.m3u8",
+            "has_audio": true
+          }
+        }
+      },
+      "shared": {
+        "category": "reddit",
+        "secure_media": {
+          "reddit_video": {
+            "dash_url": "https://v.redd.it/a/DASHPlaylist.mpd",
+            "fallback_url": "https://v.redd.it/a/DASH_1080.mp4",
+            "has_audio": true,
+            "hls_url": "https://v.redd.it/a/HLSPlaylist.m3u8"
+          }
+        }
+      },
+      "patch": {},
+      "profiles": [],
+      "profile_refs": []
+    },
+    {
+      "name": "reddit-nested-crossposts",
+      "origin": "gallery-dl",
+      "platform": "reddit",
+      "input": {
+        "category": "reddit",
+        "id": "post1",
+        "author": "sample_author",
+        "author_fullname": "t2_sample",
+        "title": "Example gallery",
+        "url": "https://www.reddit.com/gallery/post1",
+        "gallery_data": {
+          "items": [
+            {
+              "media_id": "a"
+            },
+            {
+              "media_id": "b"
+            }
+          ]
+        },
+        "media_metadata": {
+          "a": {
+            "id": "a",
+            "s": {
+              "x": 2400,
+              "y": 4800,
+              "u": "https://preview.redd.it/a.jpg?width=2400"
+            },
+            "p": [
+              {
+                "x": 100,
+                "y": 200,
+                "u": "https://preview.redd.it/sample.jpg?width=100"
+              },
+              {
+                "x": 1080,
+                "y": 2160,
+                "u": "https://preview.redd.it/sample.jpg?width=1080"
+              },
+              {
+                "x": 300,
+                "y": 600,
+                "u": "https://preview.redd.it/sample.jpg?width=300"
+              }
+            ],
+            "o": [
+              {
+                "x": 3000,
+                "y": 6000,
+                "u": "https://preview.redd.it/blur.jpg?blur=40"
+              }
+            ]
+          },
+          "b": {
+            "id": "b",
+            "s": {
+              "x": 2400,
+              "y": 4800,
+              "u": "https://preview.redd.it/b.jpg?width=2400"
+            },
+            "p": [
+              {
+                "x": 100,
+                "y": 200,
+                "u": "https://preview.redd.it/sample.jpg?width=100"
+              },
+              {
+                "x": 1080,
+                "y": 2160,
+                "u": "https://preview.redd.it/sample.jpg?width=1080"
+              },
+              {
+                "x": 300,
+                "y": 600,
+                "u": "https://preview.redd.it/sample.jpg?width=300"
+              }
+            ],
+            "o": [
+              {
+                "x": 3000,
+                "y": 6000,
+                "u": "https://preview.redd.it/blur.jpg?blur=40"
+              }
+            ]
+          }
+        },
+        "user": {
+          "id": "sample",
+          "name": "sample_author",
+          "created": 1,
+          "created_utc": 1,
+          "is_friend": false,
+          "link_karma": 99,
+          "subreddit": {
+            "title": "Sample Author",
+            "public_description": "An example biography",
+            "url": "/user/sample_author/",
+            "default_set": true,
+            "subscribers": 20
+          }
+        },
+        "num": 1,
+        "filename": "a",
+        "extension": "jpg",
+        "_url": "https://i.redd.it/a.jpg",
+        "source_extractor_url": "https://www.reddit.com/user/sample_author/",
+        "thumbnail": "https://preview.redd.it/thumb.jpg",
+        "thumbnail_width": 140,
+        "thumbnail_height": 280,
+        "crosspost_parent_list": [
+          {
+            "category": "reddit",
+            "id": "post1",
+            "author": "sample_author",
+            "author_fullname": "t2_sample",
+            "title": "Example gallery",
+            "url": "https://www.reddit.com/gallery/post1",
+            "gallery_data": {
+              "items": [
+                {
+                  "media_id": "a"
+                },
+                {
+                  "media_id": "b"
+                }
+              ]
+            },
+            "media_metadata": {
+              "a": {
+                "id": "a",
+                "s": {
+                  "x": 2400,
+                  "y": 4800,
+                  "u": "https://preview.redd.it/a.jpg?width=2400"
+                },
+                "p": [
+                  {
+                    "x": 100,
+                    "y": 200,
+                    "u": "https://preview.redd.it/sample.jpg?width=100"
+                  },
+                  {
+                    "x": 1080,
+                    "y": 2160,
+                    "u": "https://preview.redd.it/sample.jpg?width=1080"
+                  },
+                  {
+                    "x": 300,
+                    "y": 600,
+                    "u": "https://preview.redd.it/sample.jpg?width=300"
+                  }
+                ],
+                "o": [
+                  {
+                    "x": 3000,
+                    "y": 6000,
+                    "u": "https://preview.redd.it/blur.jpg?blur=40"
+                  }
+                ]
+              },
+              "b": {
+                "id": "b",
+                "s": {
+                  "x": 2400,
+                  "y": 4800,
+                  "u": "https://preview.redd.it/b.jpg?width=2400"
+                },
+                "p": [
+                  {
+                    "x": 100,
+                    "y": 200,
+                    "u": "https://preview.redd.it/sample.jpg?width=100"
+                  },
+                  {
+                    "x": 1080,
+                    "y": 2160,
+                    "u": "https://preview.redd.it/sample.jpg?width=1080"
+                  },
+                  {
+                    "x": 300,
+                    "y": 600,
+                    "u": "https://preview.redd.it/sample.jpg?width=300"
+                  }
+                ],
+                "o": [
+                  {
+                    "x": 3000,
+                    "y": 6000,
+                    "u": "https://preview.redd.it/blur.jpg?blur=40"
+                  }
+                ]
+              }
+            },
+            "user": {
+              "id": "sample",
+              "name": "sample_author",
+              "created": 1,
+              "created_utc": 1,
+              "is_friend": false,
+              "link_karma": 99,
+              "subreddit": {
+                "title": "Sample Author",
+                "public_description": "An example biography",
+                "url": "/user/sample_author/",
+                "default_set": true,
+                "subscribers": 20
+              }
+            },
+            "num": 1,
+            "filename": "a",
+            "extension": "jpg",
+            "_url": "https://i.redd.it/a.jpg",
+            "source_extractor_url": "https://www.reddit.com/user/sample_author/",
+            "thumbnail": "https://preview.redd.it/thumb.jpg",
+            "thumbnail_width": 140,
+            "thumbnail_height": 280
+          }
+        ],
+        "enrichment_attachments": [
+          {
+            "media_metadata": {
+              "a": {
+                "id": "a",
+                "s": {
+                  "x": 2400,
+                  "y": 4800,
+                  "u": "https://preview.redd.it/a.jpg?width=2400"
+                },
+                "p": [
+                  {
+                    "x": 100,
+                    "y": 200,
+                    "u": "https://preview.redd.it/sample.jpg?width=100"
+                  },
+                  {
+                    "x": 1080,
+                    "y": 2160,
+                    "u": "https://preview.redd.it/sample.jpg?width=1080"
+                  },
+                  {
+                    "x": 300,
+                    "y": 600,
+                    "u": "https://preview.redd.it/sample.jpg?width=300"
+                  }
+                ],
+                "o": [
+                  {
+                    "x": 3000,
+                    "y": 6000,
+                    "u": "https://preview.redd.it/blur.jpg?blur=40"
+                  }
+                ]
+              },
+              "b": {
+                "id": "b",
+                "s": {
+                  "x": 2400,
+                  "y": 4800,
+                  "u": "https://preview.redd.it/b.jpg?width=2400"
+                },
+                "p": [
+                  {
+                    "x": 100,
+                    "y": 200,
+                    "u": "https://preview.redd.it/sample.jpg?width=100"
+                  },
+                  {
+                    "x": 1080,
+                    "y": 2160,
+                    "u": "https://preview.redd.it/sample.jpg?width=1080"
+                  },
+                  {
+                    "x": 300,
+                    "y": 600,
+                    "u": "https://preview.redd.it/sample.jpg?width=300"
+                  }
+                ],
+                "o": [
+                  {
+                    "x": 3000,
+                    "y": 6000,
+                    "u": "https://preview.redd.it/blur.jpg?blur=40"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "retained": {
+        "category": "reddit",
+        "id": "post1",
+        "author": "sample_author",
+        "author_fullname": "t2_sample",
+        "title": "Example gallery",
+        "url": "https://www.reddit.com/gallery/post1",
+        "gallery_data": {
+          "items": [
+            {
+              "media_id": "a"
+            },
+            {
+              "media_id": "b"
+            }
+          ]
+        },
+        "media_metadata": {
+          "a": {
+            "id": "a",
+            "s": {
+              "x": 2400,
+              "y": 4800,
+              "u": "https://preview.redd.it/a.jpg?width=2400"
+            }
+          },
+          "b": {
+            "id": "b",
+            "s": {
+              "x": 2400,
+              "y": 4800,
+              "u": "https://preview.redd.it/b.jpg?width=2400"
+            }
+          }
+        },
+        "user": {
+          "id": "sample",
+          "name": "sample_author",
+          "created_utc": 1,
+          "subreddit": {
+            "title": "Sample Author",
+            "public_description": "An example biography",
+            "url": "/user/sample_author/"
+          }
+        },
+        "num": 1,
+        "filename": "a",
+        "extension": "jpg",
+        "_url": "https://i.redd.it/a.jpg",
+        "source_extractor_url": "https://www.reddit.com/user/sample_author/",
+        "crosspost_parent_list": [
+          {
+            "category": "reddit",
+            "id": "post1",
+            "author": "sample_author",
+            "author_fullname": "t2_sample",
+            "title": "Example gallery",
+            "url": "https://www.reddit.com/gallery/post1",
+            "gallery_data": {
+              "items": [
+                {
+                  "media_id": "a"
+                },
+                {
+                  "media_id": "b"
+                }
+              ]
+            },
+            "media_metadata": {
+              "a": {
+                "id": "a",
+                "s": {
+                  "x": 2400,
+                  "y": 4800,
+                  "u": "https://preview.redd.it/a.jpg?width=2400"
+                }
+              },
+              "b": {
+                "id": "b",
+                "s": {
+                  "x": 2400,
+                  "y": 4800,
+                  "u": "https://preview.redd.it/b.jpg?width=2400"
+                }
+              }
+            },
+            "user": {
+              "id": "sample",
+              "name": "sample_author",
+              "created_utc": 1,
+              "subreddit": {
+                "title": "Sample Author",
+                "public_description": "An example biography",
+                "url": "/user/sample_author/"
+              }
+            },
+            "num": 1,
+            "filename": "a",
+            "extension": "jpg",
+            "_url": "https://i.redd.it/a.jpg",
+            "source_extractor_url": "https://www.reddit.com/user/sample_author/"
+          }
+        ],
+        "enrichment_attachments": [
+          {
+            "media_metadata": {
+              "a": {
+                "id": "a",
+                "s": {
+                  "x": 2400,
+                  "y": 4800,
+                  "u": "https://preview.redd.it/a.jpg?width=2400"
+                }
+              },
+              "b": {
+                "id": "b",
+                "s": {
+                  "x": 2400,
+                  "y": 4800,
+                  "u": "https://preview.redd.it/b.jpg?width=2400"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "shared": {
+        "author": "sample_author",
+        "author_fullname": "t2_sample",
+        "category": "reddit",
+        "crosspost_parent_list": [
+          {
+            "_url": "https://i.redd.it/a.jpg",
+            "author": "sample_author",
+            "author_fullname": "t2_sample",
+            "category": "reddit",
+            "extension": "jpg",
+            "filename": "a",
+            "gallery_data": {
+              "items": [
+                {
+                  "media_id": "a"
+                },
+                {
+                  "media_id": "b"
+                }
+              ]
+            },
+            "id": "post1",
+            "media_metadata": {
+              "a": {
+                "id": "a",
+                "s": {
+                  "u": "https://preview.redd.it/a.jpg?width=2400",
+                  "x": 2400,
+                  "y": 4800
+                }
+              },
+              "b": {
+                "id": "b",
+                "s": {
+                  "u": "https://preview.redd.it/b.jpg?width=2400",
+                  "x": 2400,
+                  "y": 4800
+                }
+              }
+            },
+            "num": 1,
+            "source_extractor_url": "https://www.reddit.com/user/sample_author/",
+            "title": "Example gallery",
+            "url": "https://www.reddit.com/gallery/post1",
+            "user": null
+          }
+        ],
+        "enrichment_attachments": [
+          {
+            "media_metadata": {
+              "a": {
+                "id": "a",
+                "s": {
+                  "u": "https://preview.redd.it/a.jpg?width=2400",
+                  "x": 2400,
+                  "y": 4800
+                }
+              },
+              "b": {
+                "id": "b",
+                "s": {
+                  "u": "https://preview.redd.it/b.jpg?width=2400",
+                  "x": 2400,
+                  "y": 4800
+                }
+              }
+            }
+          }
+        ],
+        "gallery_data": {
+          "items": [
+            {
+              "media_id": "a"
+            },
+            {
+              "media_id": "b"
+            }
+          ]
+        },
+        "id": "post1",
+        "media_metadata": {
+          "a": {
+            "id": "a",
+            "s": {
+              "u": "https://preview.redd.it/a.jpg?width=2400",
+              "x": 2400,
+              "y": 4800
+            }
+          },
+          "b": {
+            "id": "b",
+            "s": {
+              "u": "https://preview.redd.it/b.jpg?width=2400",
+              "x": 2400,
+              "y": 4800
+            }
+          }
+        },
+        "title": "Example gallery",
+        "url": "https://www.reddit.com/gallery/post1",
+        "user": null
+      },
+      "patch": {
+        "_url": "https://i.redd.it/a.jpg",
+        "extension": "jpg",
+        "filename": "a",
+        "num": 1,
+        "source_extractor_url": "https://www.reddit.com/user/sample_author/"
+      },
+      "profiles": [
+        {
+          "namespace": "native:reddit",
+          "body": {
+            "created_utc": 1,
+            "id": "sample",
+            "name": "sample_author",
+            "subreddit": {
+              "public_description": "An example biography",
+              "title": "Sample Author",
+              "url": "/user/sample_author/"
+            }
+          },
+          "hash": "02ca4361a83355dbbcfddea498a65deb0680a14e5140fa1fe01304fc3e134929"
+        }
+      ],
+      "profile_refs": [
+        {
+          "part": "shared",
+          "path": "/crosspost_parent_list/0/user",
+          "namespace": "native:reddit",
+          "body": {
+            "created_utc": 1,
+            "id": "sample",
+            "name": "sample_author",
+            "subreddit": {
+              "public_description": "An example biography",
+              "title": "Sample Author",
+              "url": "/user/sample_author/"
+            }
+          },
+          "hash": "02ca4361a83355dbbcfddea498a65deb0680a14e5140fa1fe01304fc3e134929"
+        },
+        {
+          "part": "shared",
+          "path": "/user",
+          "namespace": "native:reddit",
+          "body": {
+            "created_utc": 1,
+            "id": "sample",
+            "name": "sample_author",
+            "subreddit": {
+              "public_description": "An example biography",
+              "title": "Sample Author",
+              "url": "/user/sample_author/"
+            }
+          },
+          "hash": "02ca4361a83355dbbcfddea498a65deb0680a14e5140fa1fe01304fc3e134929"
+        }
+      ]
+    },
+    {
+      "name": "reddit-parent-extractor",
+      "origin": "gallery-dl",
+      "platform": "reddit",
+      "input": {
+        "category": "redgifs",
+        "id": "child",
+        "_url": "https://media.example.test/child.mp4",
+        "filename": "child",
+        "extension": "mp4",
+        "_reddit": {
+          "category": "reddit",
+          "id": "post1",
+          "author": "sample_author",
+          "author_fullname": "t2_sample",
+          "title": "Example gallery",
+          "url": "https://www.reddit.com/gallery/post1",
+          "gallery_data": {
+            "items": [
+              {
+                "media_id": "a"
+              },
+              {
+                "media_id": "b"
+              }
+            ]
+          },
+          "media_metadata": {
+            "a": {
+              "id": "a",
+              "s": {
+                "x": 2400,
+                "y": 4800,
+                "u": "https://preview.redd.it/a.jpg?width=2400"
+              },
+              "p": [
+                {
+                  "x": 100,
+                  "y": 200,
+                  "u": "https://preview.redd.it/sample.jpg?width=100"
+                },
+                {
+                  "x": 1080,
+                  "y": 2160,
+                  "u": "https://preview.redd.it/sample.jpg?width=1080"
+                },
+                {
+                  "x": 300,
+                  "y": 600,
+                  "u": "https://preview.redd.it/sample.jpg?width=300"
+                }
+              ],
+              "o": [
+                {
+                  "x": 3000,
+                  "y": 6000,
+                  "u": "https://preview.redd.it/blur.jpg?blur=40"
+                }
+              ]
+            },
+            "b": {
+              "id": "b",
+              "s": {
+                "x": 2400,
+                "y": 4800,
+                "u": "https://preview.redd.it/b.jpg?width=2400"
+              },
+              "p": [
+                {
+                  "x": 100,
+                  "y": 200,
+                  "u": "https://preview.redd.it/sample.jpg?width=100"
+                },
+                {
+                  "x": 1080,
+                  "y": 2160,
+                  "u": "https://preview.redd.it/sample.jpg?width=1080"
+                },
+                {
+                  "x": 300,
+                  "y": 600,
+                  "u": "https://preview.redd.it/sample.jpg?width=300"
+                }
+              ],
+              "o": [
+                {
+                  "x": 3000,
+                  "y": 6000,
+                  "u": "https://preview.redd.it/blur.jpg?blur=40"
+                }
+              ]
+            }
+          },
+          "user": {
+            "id": "sample",
+            "name": "sample_author",
+            "created": 1,
+            "created_utc": 1,
+            "is_friend": false,
+            "link_karma": 99,
+            "subreddit": {
+              "title": "Sample Author",
+              "public_description": "An example biography",
+              "url": "/user/sample_author/",
+              "default_set": true,
+              "subscribers": 20
+            }
+          },
+          "num": 1,
+          "filename": "a",
+          "extension": "jpg",
+          "_url": "https://i.redd.it/a.jpg",
+          "source_extractor_url": "https://www.reddit.com/user/sample_author/",
+          "thumbnail": "https://preview.redd.it/thumb.jpg",
+          "thumbnail_width": 140,
+          "thumbnail_height": 280
+        }
+      },
+      "retained": {
+        "category": "redgifs",
+        "id": "child",
+        "_url": "https://media.example.test/child.mp4",
+        "filename": "child",
+        "extension": "mp4",
+        "_reddit": {
+          "category": "reddit",
+          "id": "post1",
+          "author": "sample_author",
+          "author_fullname": "t2_sample",
+          "title": "Example gallery",
+          "url": "https://www.reddit.com/gallery/post1",
+          "gallery_data": {
+            "items": [
+              {
+                "media_id": "a"
+              },
+              {
+                "media_id": "b"
+              }
+            ]
+          },
+          "media_metadata": {
+            "a": {
+              "id": "a",
+              "s": {
+                "x": 2400,
+                "y": 4800,
+                "u": "https://preview.redd.it/a.jpg?width=2400"
+              }
+            },
+            "b": {
+              "id": "b",
+              "s": {
+                "x": 2400,
+                "y": 4800,
+                "u": "https://preview.redd.it/b.jpg?width=2400"
+              }
+            }
+          },
+          "user": {
+            "id": "sample",
+            "name": "sample_author",
+            "created_utc": 1,
+            "subreddit": {
+              "title": "Sample Author",
+              "public_description": "An example biography",
+              "url": "/user/sample_author/"
+            }
+          },
+          "num": 1,
+          "filename": "a",
+          "extension": "jpg",
+          "_url": "https://i.redd.it/a.jpg",
+          "source_extractor_url": "https://www.reddit.com/user/sample_author/"
+        }
+      },
+      "shared": {
+        "_reddit": {
+          "author": "sample_author",
+          "author_fullname": "t2_sample",
+          "category": "reddit",
+          "gallery_data": {
+            "items": [
+              {
+                "media_id": "a"
+              },
+              {
+                "media_id": "b"
+              }
+            ]
+          },
+          "id": "post1",
+          "media_metadata": {
+            "a": {
+              "id": "a",
+              "s": {
+                "u": "https://preview.redd.it/a.jpg?width=2400",
+                "x": 2400,
+                "y": 4800
+              }
+            },
+            "b": {
+              "id": "b",
+              "s": {
+                "u": "https://preview.redd.it/b.jpg?width=2400",
+                "x": 2400,
+                "y": 4800
+              }
+            }
+          },
+          "title": "Example gallery",
+          "url": "https://www.reddit.com/gallery/post1",
+          "user": null
+        }
+      },
+      "patch": {
+        "_reddit": {
+          "_url": "https://i.redd.it/a.jpg",
+          "extension": "jpg",
+          "filename": "a",
+          "num": 1,
+          "source_extractor_url": "https://www.reddit.com/user/sample_author/"
+        },
+        "_url": "https://media.example.test/child.mp4",
+        "category": "redgifs",
+        "extension": "mp4",
+        "filename": "child",
+        "id": "child"
+      },
+      "profiles": [
+        {
+          "namespace": "native:reddit",
+          "body": {
+            "created_utc": 1,
+            "id": "sample",
+            "name": "sample_author",
+            "subreddit": {
+              "public_description": "An example biography",
+              "title": "Sample Author",
+              "url": "/user/sample_author/"
+            }
+          },
+          "hash": "02ca4361a83355dbbcfddea498a65deb0680a14e5140fa1fe01304fc3e134929"
+        }
+      ],
+      "profile_refs": [
+        {
+          "part": "shared",
+          "path": "/_reddit/user",
+          "namespace": "native:reddit",
+          "body": {
+            "created_utc": 1,
+            "id": "sample",
+            "name": "sample_author",
+            "subreddit": {
+              "public_description": "An example biography",
+              "title": "Sample Author",
+              "url": "/user/sample_author/"
+            }
+          },
+          "hash": "02ca4361a83355dbbcfddea498a65deb0680a14e5140fa1fe01304fc3e134929"
+        }
+      ]
+    },
+    {
+      "name": "twitter-shared-profile",
+      "origin": "gallery-dl",
+      "platform": "twitter",
+      "input": {
+        "category": "twitter",
+        "tweet_id": "100",
+        "content": "An example post",
+        "author": {
+          "id": 98765432109876543210,
+          "name": "SampleAuthor",
+          "description": "Bio <&> café 🎥",
+          "profile_image": "https://example.test/avatar.png",
+          "followers_count": 50,
+          "verified": true
+        },
+        "user": {
+          "id": 98765432109876543210,
+          "name": "SampleAuthor",
+          "description": "Bio <&> café 🎥",
+          "profile_image": "https://example.test/avatar.png",
+          "followers_count": 50,
+          "verified": true
+        },
+        "source_user": {
+          "id": 98765432109876543210,
+          "name": "SampleAuthor",
+          "description": "Bio <&> café 🎥",
+          "profile_image": "https://example.test/avatar.png",
+          "followers_count": 50,
+          "verified": true
+        },
+        "width": 1920,
+        "height": 1080,
+        "num": 1,
+        "filename": "a",
+        "extension": "mp4",
+        "description": "An attachment caption",
+        "_url": "https://example.test/a.mp4",
+        "source_extractor_url": "https://x.com/SampleAuthor/media"
+      },
+      "retained": {
+        "category": "twitter",
+        "tweet_id": "100",
+        "content": "An example post",
+        "author": {
+          "id": 98765432109876543210,
+          "name": "SampleAuthor",
+          "description": "Bio <&> café 🎥",
+          "profile_image": "https://example.test/avatar.png"
+        },
+        "user": {
+          "id": 98765432109876543210,
+          "name": "SampleAuthor",
+          "description": "Bio <&> café 🎥",
+          "profile_image": "https://example.test/avatar.png"
+        },
+        "source_user": {
+          "id": 98765432109876543210,
+          "name": "SampleAuthor",
+          "description": "Bio <&> café 🎥",
+          "profile_image": "https://example.test/avatar.png"
+        },
+        "width": 1920,
+        "height": 1080,
+        "num": 1,
+        "filename": "a",
+        "extension": "mp4",
+        "description": "An attachment caption",
+        "_url": "https://example.test/a.mp4",
+        "source_extractor_url": "https://x.com/SampleAuthor/media"
+      },
+      "shared": {
+        "author": null,
+        "category": "twitter",
+        "content": "An example post",
+        "tweet_id": "100",
+        "user": null
+      },
+      "patch": {
+        "_url": "https://example.test/a.mp4",
+        "description": "An attachment caption",
+        "extension": "mp4",
+        "filename": "a",
+        "height": 1080,
+        "num": 1,
+        "source_extractor_url": "https://x.com/SampleAuthor/media",
+        "source_user": null,
+        "width": 1920
+      },
+      "profiles": [
+        {
+          "namespace": "native:twitter",
+          "body": {
+            "description": "Bio <&> café 🎥",
+            "id": 98765432109876543210,
+            "name": "SampleAuthor",
+            "profile_image": "https://example.test/avatar.png"
+          },
+          "hash": "bac691b26f777b62301c503c1092af648ead73447543cc9fc36d60e393da43f7"
+        }
+      ],
+      "profile_refs": [
+        {
+          "part": "shared",
+          "path": "/author",
+          "namespace": "native:twitter",
+          "body": {
+            "description": "Bio <&> café 🎥",
+            "id": 98765432109876543210,
+            "name": "SampleAuthor",
+            "profile_image": "https://example.test/avatar.png"
+          },
+          "hash": "bac691b26f777b62301c503c1092af648ead73447543cc9fc36d60e393da43f7"
+        },
+        {
+          "part": "shared",
+          "path": "/user",
+          "namespace": "native:twitter",
+          "body": {
+            "description": "Bio <&> café 🎥",
+            "id": 98765432109876543210,
+            "name": "SampleAuthor",
+            "profile_image": "https://example.test/avatar.png"
+          },
+          "hash": "bac691b26f777b62301c503c1092af648ead73447543cc9fc36d60e393da43f7"
+        },
+        {
+          "part": "patch",
+          "path": "/source_user",
+          "namespace": "native:twitter",
+          "body": {
+            "description": "Bio <&> café 🎥",
+            "id": 98765432109876543210,
+            "name": "SampleAuthor",
+            "profile_image": "https://example.test/avatar.png"
+          },
+          "hash": "bac691b26f777b62301c503c1092af648ead73447543cc9fc36d60e393da43f7"
+        }
+      ]
+    },
+    {
+      "name": "twitter-noisy-profile",
+      "origin": "gallery-dl",
+      "platform": "twitter",
+      "input": {
+        "category": "twitter",
+        "tweet_id": "100",
+        "content": "An example post",
+        "author": {
+          "id": 98765432109876543210,
+          "name": "SampleAuthor",
+          "description": "Bio <&> café 🎥",
+          "profile_image": "https://example.test/avatar.png",
+          "followers_count": 999,
+          "verified": true
+        },
+        "user": {
+          "id": 98765432109876543210,
+          "name": "SampleAuthor",
+          "description": "Bio <&> café 🎥",
+          "profile_image": "https://example.test/avatar.png",
+          "followers_count": 50,
+          "verified": true
+        },
+        "source_user": {
+          "id": 98765432109876543210,
+          "name": "SampleAuthor",
+          "description": "Bio <&> café 🎥",
+          "profile_image": "https://example.test/avatar.png",
+          "followers_count": 50,
+          "verified": true
+        },
+        "width": 1920,
+        "height": 1080,
+        "num": 1,
+        "filename": "a",
+        "extension": "mp4",
+        "description": "An attachment caption",
+        "_url": "https://example.test/a.mp4",
+        "source_extractor_url": "https://x.com/SampleAuthor/media"
+      },
+      "retained": {
+        "category": "twitter",
+        "tweet_id": "100",
+        "content": "An example post",
+        "author": {
+          "id": 98765432109876543210,
+          "name": "SampleAuthor",
+          "description": "Bio <&> café 🎥",
+          "profile_image": "https://example.test/avatar.png"
+        },
+        "user": {
+          "id": 98765432109876543210,
+          "name": "SampleAuthor",
+          "description": "Bio <&> café 🎥",
+          "profile_image": "https://example.test/avatar.png"
+        },
+        "source_user": {
+          "id": 98765432109876543210,
+          "name": "SampleAuthor",
+          "description": "Bio <&> café 🎥",
+          "profile_image": "https://example.test/avatar.png"
+        },
+        "width": 1920,
+        "height": 1080,
+        "num": 1,
+        "filename": "a",
+        "extension": "mp4",
+        "description": "An attachment caption",
+        "_url": "https://example.test/a.mp4",
+        "source_extractor_url": "https://x.com/SampleAuthor/media"
+      },
+      "shared": {
+        "author": null,
+        "category": "twitter",
+        "content": "An example post",
+        "tweet_id": "100",
+        "user": null
+      },
+      "patch": {
+        "_url": "https://example.test/a.mp4",
+        "description": "An attachment caption",
+        "extension": "mp4",
+        "filename": "a",
+        "height": 1080,
+        "num": 1,
+        "source_extractor_url": "https://x.com/SampleAuthor/media",
+        "source_user": null,
+        "width": 1920
+      },
+      "profiles": [
+        {
+          "namespace": "native:twitter",
+          "body": {
+            "description": "Bio <&> café 🎥",
+            "id": 98765432109876543210,
+            "name": "SampleAuthor",
+            "profile_image": "https://example.test/avatar.png"
+          },
+          "hash": "bac691b26f777b62301c503c1092af648ead73447543cc9fc36d60e393da43f7"
+        }
+      ],
+      "profile_refs": [
+        {
+          "part": "shared",
+          "path": "/author",
+          "namespace": "native:twitter",
+          "body": {
+            "description": "Bio <&> café 🎥",
+            "id": 98765432109876543210,
+            "name": "SampleAuthor",
+            "profile_image": "https://example.test/avatar.png"
+          },
+          "hash": "bac691b26f777b62301c503c1092af648ead73447543cc9fc36d60e393da43f7"
+        },
+        {
+          "part": "shared",
+          "path": "/user",
+          "namespace": "native:twitter",
+          "body": {
+            "description": "Bio <&> café 🎥",
+            "id": 98765432109876543210,
+            "name": "SampleAuthor",
+            "profile_image": "https://example.test/avatar.png"
+          },
+          "hash": "bac691b26f777b62301c503c1092af648ead73447543cc9fc36d60e393da43f7"
+        },
+        {
+          "part": "patch",
+          "path": "/source_user",
+          "namespace": "native:twitter",
+          "body": {
+            "description": "Bio <&> café 🎥",
+            "id": 98765432109876543210,
+            "name": "SampleAuthor",
+            "profile_image": "https://example.test/avatar.png"
+          },
+          "hash": "bac691b26f777b62301c503c1092af648ead73447543cc9fc36d60e393da43f7"
+        }
+      ]
+    },
+    {
+      "name": "twitter-meaningful-profile-change",
+      "origin": "gallery-dl",
+      "platform": "twitter",
+      "input": {
+        "category": "twitter",
+        "tweet_id": "100",
+        "content": "An example post",
+        "author": {
+          "id": 98765432109876543210,
+          "name": "SampleAuthor",
+          "description": "A revised biography",
+          "profile_image": "https://example.test/avatar.png",
+          "followers_count": 999,
+          "verified": true
+        },
+        "user": {
+          "id": 98765432109876543210,
+          "name": "SampleAuthor",
+          "description": "Bio <&> café 🎥",
+          "profile_image": "https://example.test/avatar.png",
+          "followers_count": 50,
+          "verified": true
+        },
+        "source_user": {
+          "id": 98765432109876543210,
+          "name": "SampleAuthor",
+          "description": "Bio <&> café 🎥",
+          "profile_image": "https://example.test/avatar.png",
+          "followers_count": 50,
+          "verified": true
+        },
+        "width": 1920,
+        "height": 1080,
+        "num": 1,
+        "filename": "a",
+        "extension": "mp4",
+        "description": "An attachment caption",
+        "_url": "https://example.test/a.mp4",
+        "source_extractor_url": "https://x.com/SampleAuthor/media"
+      },
+      "retained": {
+        "category": "twitter",
+        "tweet_id": "100",
+        "content": "An example post",
+        "author": {
+          "id": 98765432109876543210,
+          "name": "SampleAuthor",
+          "description": "A revised biography",
+          "profile_image": "https://example.test/avatar.png"
+        },
+        "user": {
+          "id": 98765432109876543210,
+          "name": "SampleAuthor",
+          "description": "Bio <&> café 🎥",
+          "profile_image": "https://example.test/avatar.png"
+        },
+        "source_user": {
+          "id": 98765432109876543210,
+          "name": "SampleAuthor",
+          "description": "Bio <&> café 🎥",
+          "profile_image": "https://example.test/avatar.png"
+        },
+        "width": 1920,
+        "height": 1080,
+        "num": 1,
+        "filename": "a",
+        "extension": "mp4",
+        "description": "An attachment caption",
+        "_url": "https://example.test/a.mp4",
+        "source_extractor_url": "https://x.com/SampleAuthor/media"
+      },
+      "shared": {
+        "author": null,
+        "category": "twitter",
+        "content": "An example post",
+        "tweet_id": "100",
+        "user": null
+      },
+      "patch": {
+        "_url": "https://example.test/a.mp4",
+        "description": "An attachment caption",
+        "extension": "mp4",
+        "filename": "a",
+        "height": 1080,
+        "num": 1,
+        "source_extractor_url": "https://x.com/SampleAuthor/media",
+        "source_user": null,
+        "width": 1920
+      },
+      "profiles": [
+        {
+          "namespace": "native:twitter",
+          "body": {
+            "description": "A revised biography",
+            "id": 98765432109876543210,
+            "name": "SampleAuthor",
+            "profile_image": "https://example.test/avatar.png"
+          },
+          "hash": "f0cd9cb6a51f51336c495297d89b51debc6302f44fb45dac067c3061c322bbb2"
+        },
+        {
+          "namespace": "native:twitter",
+          "body": {
+            "description": "Bio <&> café 🎥",
+            "id": 98765432109876543210,
+            "name": "SampleAuthor",
+            "profile_image": "https://example.test/avatar.png"
+          },
+          "hash": "bac691b26f777b62301c503c1092af648ead73447543cc9fc36d60e393da43f7"
+        }
+      ],
+      "profile_refs": [
+        {
+          "part": "shared",
+          "path": "/author",
+          "namespace": "native:twitter",
+          "body": {
+            "description": "A revised biography",
+            "id": 98765432109876543210,
+            "name": "SampleAuthor",
+            "profile_image": "https://example.test/avatar.png"
+          },
+          "hash": "f0cd9cb6a51f51336c495297d89b51debc6302f44fb45dac067c3061c322bbb2"
+        },
+        {
+          "part": "shared",
+          "path": "/user",
+          "namespace": "native:twitter",
+          "body": {
+            "description": "Bio <&> café 🎥",
+            "id": 98765432109876543210,
+            "name": "SampleAuthor",
+            "profile_image": "https://example.test/avatar.png"
+          },
+          "hash": "bac691b26f777b62301c503c1092af648ead73447543cc9fc36d60e393da43f7"
+        },
+        {
+          "part": "patch",
+          "path": "/source_user",
+          "namespace": "native:twitter",
+          "body": {
+            "description": "Bio <&> café 🎥",
+            "id": 98765432109876543210,
+            "name": "SampleAuthor",
+            "profile_image": "https://example.test/avatar.png"
+          },
+          "hash": "bac691b26f777b62301c503c1092af648ead73447543cc9fc36d60e393da43f7"
+        }
+      ]
+    },
+    {
+      "name": "twitter-raw-profile",
+      "origin": "gallery-dl",
+      "platform": "twitter",
+      "input": {
+        "category": "twitter",
+        "author": {
+          "rest_id": "1",
+          "core": {
+            "name": "Sample",
+            "screen_name": "sample",
+            "created_at": "2026-01-01",
+            "private": "drop"
+          },
+          "avatar": {
+            "image_url": "https://example.test/a.png"
+          },
+          "legacy": {
+            "description": "Bio",
+            "followers_count": 10,
+            "entities": {
+              "url": {
+                "urls": [
+                  {
+                    "expanded_url": "https://example.test/profile"
+                  }
+                ]
+              },
+              "hashtags": []
+            }
+          },
+          "privacy": {
+            "protected": true
+          }
+        }
+      },
+      "retained": {
+        "category": "twitter",
+        "author": {
+          "rest_id": "1",
+          "legacy": {
+            "description": "Bio",
+            "entities": {
+              "url": {
+                "urls": [
+                  {
+                    "expanded_url": "https://example.test/profile"
+                  }
+                ]
+              }
+            }
+          },
+          "core": {
+            "name": "Sample",
+            "screen_name": "sample",
+            "created_at": "2026-01-01"
+          },
+          "avatar": {
+            "image_url": "https://example.test/a.png"
+          }
+        }
+      },
+      "shared": {
+        "author": null,
+        "category": "twitter"
+      },
+      "patch": {},
+      "profiles": [
+        {
+          "namespace": "native:twitter",
+          "body": {
+            "avatar": {
+              "image_url": "https://example.test/a.png"
+            },
+            "core": {
+              "created_at": "2026-01-01",
+              "name": "Sample",
+              "screen_name": "sample"
+            },
+            "legacy": {
+              "description": "Bio",
+              "entities": {
+                "url": {
+                  "urls": [
+                    {
+                      "expanded_url": "https://example.test/profile"
+                    }
+                  ]
+                }
+              }
+            },
+            "rest_id": "1"
+          },
+          "hash": "690a1b5998381d3e6c4aa78636001eb507d37240670d5e93d24c6ffc5dad05c3"
+        }
+      ],
+      "profile_refs": [
+        {
+          "part": "shared",
+          "path": "/author",
+          "namespace": "native:twitter",
+          "body": {
+            "avatar": {
+              "image_url": "https://example.test/a.png"
+            },
+            "core": {
+              "created_at": "2026-01-01",
+              "name": "Sample",
+              "screen_name": "sample"
+            },
+            "legacy": {
+              "description": "Bio",
+              "entities": {
+                "url": {
+                  "urls": [
+                    {
+                      "expanded_url": "https://example.test/profile"
+                    }
+                  ]
+                }
+              }
+            },
+            "rest_id": "1"
+          },
+          "hash": "690a1b5998381d3e6c4aa78636001eb507d37240670d5e93d24c6ffc5dad05c3"
+        }
+      ]
+    },
+    {
+      "name": "twitter-enrichment-profiles-in-arrays",
+      "origin": "gallery-dl-enrichment",
+      "platform": "twitter",
+      "input": {
+        "category": "twitter",
+        "a/b~c": [
+          {
+            "author": {
+              "id": 98765432109876543210,
+              "name": "SampleAuthor",
+              "description": "Bio <&> café 🎥",
+              "profile_image": "https://example.test/avatar.png",
+              "followers_count": 50,
+              "verified": true
+            }
+          },
+          {
+            "quoted_by": {
+              "id": 98765432109876543210,
+              "name": "SampleAuthor",
+              "description": "Bio <&> café 🎥",
+              "profile_image": "https://example.test/avatar.png",
+              "followers_count": 50,
+              "verified": true
+            }
+          }
+        ],
+        "attachments": [
+          {
+            "filename": "a",
+            "_url": "https://example.test/a.jpg"
+          },
+          {
+            "filename": "b",
+            "_url": "https://example.test/b.jpg"
+          }
+        ]
+      },
+      "retained": {
+        "category": "twitter",
+        "a/b~c": [
+          {
+            "author": {
+              "id": 98765432109876543210,
+              "name": "SampleAuthor",
+              "description": "Bio <&> café 🎥",
+              "profile_image": "https://example.test/avatar.png"
+            }
+          },
+          {
+            "quoted_by": {
+              "id": 98765432109876543210,
+              "name": "SampleAuthor",
+              "description": "Bio <&> café 🎥",
+              "profile_image": "https://example.test/avatar.png"
+            }
+          }
+        ],
+        "attachments": [
+          {
+            "filename": "a",
+            "_url": "https://example.test/a.jpg"
+          },
+          {
+            "filename": "b",
+            "_url": "https://example.test/b.jpg"
+          }
+        ]
+      },
+      "shared": {
+        "a/b~c": [
+          {
+            "author": null
+          },
+          {
+            "quoted_by": null
+          }
+        ],
+        "attachments": [
+          {
+            "_url": "https://example.test/a.jpg",
+            "filename": "a"
+          },
+          {
+            "_url": "https://example.test/b.jpg",
+            "filename": "b"
+          }
+        ],
+        "category": "twitter"
+      },
+      "patch": {},
+      "profiles": [
+        {
+          "namespace": "native:twitter",
+          "body": {
+            "description": "Bio <&> café 🎥",
+            "id": 98765432109876543210,
+            "name": "SampleAuthor",
+            "profile_image": "https://example.test/avatar.png"
+          },
+          "hash": "bac691b26f777b62301c503c1092af648ead73447543cc9fc36d60e393da43f7"
+        }
+      ],
+      "profile_refs": [
+        {
+          "part": "shared",
+          "path": "/a~1b~0c/0/author",
+          "namespace": "native:twitter",
+          "body": {
+            "description": "Bio <&> café 🎥",
+            "id": 98765432109876543210,
+            "name": "SampleAuthor",
+            "profile_image": "https://example.test/avatar.png"
+          },
+          "hash": "bac691b26f777b62301c503c1092af648ead73447543cc9fc36d60e393da43f7"
+        },
+        {
+          "part": "shared",
+          "path": "/a~1b~0c/1/quoted_by",
+          "namespace": "native:twitter",
+          "body": {
+            "description": "Bio <&> café 🎥",
+            "id": 98765432109876543210,
+            "name": "SampleAuthor",
+            "profile_image": "https://example.test/avatar.png"
+          },
+          "hash": "bac691b26f777b62301c503c1092af648ead73447543cc9fc36d60e393da43f7"
+        }
+      ]
+    },
+    {
+      "name": "credential-and-runtime-redaction",
+      "origin": "gallery-dl",
+      "platform": "other",
+      "input": {
+        "category": "other",
+        "Authorization": "fixture-secret",
+        "Password": "fixture-secret",
+        "_runtime": {
+          "debug": "drop"
+        },
+        "_url": "https://example.test/file.mp4",
+        "metadata": {
+          "client-secret": "fixture-secret",
+          "ordinary": "retained"
+        },
+        "_parent": {
+          "category": "other",
+          "headers": {
+            "Cookie": "fixture-secret"
+          },
+          "content": "retained parent"
+        }
+      },
+      "retained": {
+        "category": "other",
+        "_url": "https://example.test/file.mp4",
+        "metadata": {
+          "ordinary": "retained"
+        },
+        "_parent": {
+          "category": "other",
+          "content": "retained parent"
+        }
+      },
+      "shared": {
+        "_parent": {
+          "category": "other",
+          "content": "retained parent"
+        },
+        "_url": "https://example.test/file.mp4",
+        "category": "other",
+        "metadata": {
+          "ordinary": "retained"
+        }
+      },
+      "patch": {},
+      "profiles": [],
+      "profile_refs": []
+    },
+    {
+      "name": "unknown-extractor-is-preserved",
+      "origin": "gallery-dl",
+      "platform": "other",
+      "input": {
+        "category": "other",
+        "author": {
+          "name": "Unknown",
+          "followers_count": 4
+        },
+        "media_metadata": {
+          "a": {
+            "s": {
+              "x": 100,
+              "y": 200,
+              "u": "https://preview.redd.it/sample.jpg?width=100"
+            },
+            "p": [
+              {
+                "x": 50,
+                "y": 100,
+                "u": "https://preview.redd.it/sample.jpg?width=50"
+              }
+            ]
+          }
+        },
+        "$profile": "ordinary source data",
+        "_url": "https://example.test/file.jpg",
+        "num": 2
+      },
+      "retained": {
+        "category": "other",
+        "author": {
+          "name": "Unknown",
+          "followers_count": 4
+        },
+        "media_metadata": {
+          "a": {
+            "s": {
+              "x": 100,
+              "y": 200,
+              "u": "https://preview.redd.it/sample.jpg?width=100"
+            },
+            "p": [
+              {
+                "x": 50,
+                "y": 100,
+                "u": "https://preview.redd.it/sample.jpg?width=50"
+              }
+            ]
+          }
+        },
+        "$profile": "ordinary source data",
+        "_url": "https://example.test/file.jpg",
+        "num": 2
+      },
+      "shared": {
+        "$profile": "ordinary source data",
+        "_url": "https://example.test/file.jpg",
+        "author": {
+          "followers_count": 4,
+          "name": "Unknown"
+        },
+        "category": "other",
+        "media_metadata": {
+          "a": {
+            "p": [
+              {
+                "u": "https://preview.redd.it/sample.jpg?width=50",
+                "x": 50,
+                "y": 100
+              }
+            ],
+            "s": {
+              "u": "https://preview.redd.it/sample.jpg?width=100",
+              "x": 100,
+              "y": 200
+            }
+          }
+        },
+        "num": 2
+      },
+      "patch": {},
+      "profiles": [],
+      "profile_refs": []
+    },
+    {
+      "name": "legacy-nfo",
+      "origin": "legacy-nfo",
+      "platform": "reddit",
+      "input": {
+        "nfo_fields": {
+          "title": [
+            "Example title"
+          ],
+          "plot": [
+            "Example description"
+          ],
+          "url": [
+            "https://example.test/post/1"
+          ]
+        },
+        "nfo_path": "Sample/1.nfo"
+      },
+      "retained": {
+        "nfo_fields": {
+          "title": [
+            "Example title"
+          ],
+          "plot": [
+            "Example description"
+          ],
+          "url": [
+            "https://example.test/post/1"
+          ]
+        },
+        "nfo_path": "Sample/1.nfo"
+      },
+      "shared": {
+        "nfo_fields": {
+          "plot": [
+            "Example description"
+          ],
+          "title": [
+            "Example title"
+          ],
+          "url": [
+            "https://example.test/post/1"
+          ]
+        }
+      },
+      "patch": {
+        "nfo_path": "Sample/1.nfo"
+      },
+      "profiles": [],
+      "profile_refs": []
+    },
+    {
+      "name": "instagram-attachment-partition",
+      "origin": "gallery-dl",
+      "platform": "instagram",
+      "input": {
+        "category": "instagram",
+        "id": "post",
+        "author": {
+          "id": "author",
+          "name": "Example",
+          "custom": "retained"
+        },
+        "title": "Caption",
+        "filename": "a",
+        "num": 1,
+        "extension": "jpg",
+        "_url": "https://example.test/a.jpg",
+        "source_extractor_url": "https://example.test/feed"
+      },
+      "retained": {
+        "category": "instagram",
+        "id": "post",
+        "author": {
+          "id": "author",
+          "name": "Example",
+          "custom": "retained"
+        },
+        "title": "Caption",
+        "filename": "a",
+        "num": 1,
+        "extension": "jpg",
+        "_url": "https://example.test/a.jpg",
+        "source_extractor_url": "https://example.test/feed"
+      },
+      "shared": {
+        "author": {
+          "custom": "retained",
+          "id": "author",
+          "name": "Example"
+        },
+        "category": "instagram",
+        "id": "post",
+        "title": "Caption"
+      },
+      "patch": {
+        "_url": "https://example.test/a.jpg",
+        "extension": "jpg",
+        "filename": "a",
+        "num": 1,
+        "source_extractor_url": "https://example.test/feed"
+      },
+      "profiles": [],
+      "profile_refs": []
+    },
+    {
+      "name": "bluesky-attachment-partition",
+      "origin": "gallery-dl",
+      "platform": "bluesky",
+      "input": {
+        "category": "bluesky",
+        "id": "post",
+        "author": {
+          "id": "author",
+          "name": "Example",
+          "custom": "retained"
+        },
+        "title": "Caption",
+        "filename": "a",
+        "num": 1,
+        "extension": "jpg",
+        "_url": "https://example.test/a.jpg",
+        "source_extractor_url": "https://example.test/feed"
+      },
+      "retained": {
+        "category": "bluesky",
+        "id": "post",
+        "author": {
+          "id": "author",
+          "name": "Example",
+          "custom": "retained"
+        },
+        "title": "Caption",
+        "filename": "a",
+        "num": 1,
+        "extension": "jpg",
+        "_url": "https://example.test/a.jpg",
+        "source_extractor_url": "https://example.test/feed"
+      },
+      "shared": {
+        "author": {
+          "custom": "retained",
+          "id": "author",
+          "name": "Example"
+        },
+        "category": "bluesky",
+        "id": "post",
+        "title": "Caption"
+      },
+      "patch": {
+        "_url": "https://example.test/a.jpg",
+        "extension": "jpg",
+        "filename": "a",
+        "num": 1,
+        "source_extractor_url": "https://example.test/feed"
+      },
+      "profiles": [],
+      "profile_refs": []
+    },
+    {
+      "name": "tiktok-attachment-partition",
+      "origin": "gallery-dl",
+      "platform": "tiktok",
+      "input": {
+        "category": "tiktok",
+        "id": "post",
+        "author": {
+          "id": "author",
+          "name": "Example",
+          "custom": "retained"
+        },
+        "title": "Caption",
+        "filename": "a",
+        "num": 1,
+        "extension": "jpg",
+        "_url": "https://example.test/a.jpg",
+        "source_extractor_url": "https://example.test/feed"
+      },
+      "retained": {
+        "category": "tiktok",
+        "id": "post",
+        "author": {
+          "id": "author",
+          "name": "Example",
+          "custom": "retained"
+        },
+        "title": "Caption",
+        "filename": "a",
+        "num": 1,
+        "extension": "jpg",
+        "_url": "https://example.test/a.jpg",
+        "source_extractor_url": "https://example.test/feed"
+      },
+      "shared": {
+        "author": {
+          "custom": "retained",
+          "id": "author",
+          "name": "Example"
+        },
+        "category": "tiktok",
+        "id": "post",
+        "title": "Caption"
+      },
+      "patch": {
+        "_url": "https://example.test/a.jpg",
+        "extension": "jpg",
+        "filename": "a",
+        "num": 1,
+        "source_extractor_url": "https://example.test/feed"
+      },
+      "profiles": [],
+      "profile_refs": []
+    },
+    {
+      "name": "coomer-attachment-partition",
+      "origin": "gallery-dl",
+      "platform": "coomer",
+      "input": {
+        "category": "coomer",
+        "id": "post",
+        "author": {
+          "id": "author",
+          "name": "Example",
+          "custom": "retained"
+        },
+        "title": "Caption",
+        "filename": "a",
+        "num": 1,
+        "extension": "jpg",
+        "_url": "https://example.test/a.jpg",
+        "source_extractor_url": "https://example.test/feed"
+      },
+      "retained": {
+        "category": "coomer",
+        "id": "post",
+        "author": {
+          "id": "author",
+          "name": "Example",
+          "custom": "retained"
+        },
+        "title": "Caption",
+        "filename": "a",
+        "num": 1,
+        "extension": "jpg",
+        "_url": "https://example.test/a.jpg",
+        "source_extractor_url": "https://example.test/feed"
+      },
+      "shared": {
+        "author": {
+          "custom": "retained",
+          "id": "author",
+          "name": "Example"
+        },
+        "category": "coomer",
+        "id": "post",
+        "title": "Caption"
+      },
+      "patch": {
+        "_url": "https://example.test/a.jpg",
+        "extension": "jpg",
+        "filename": "a",
+        "num": 1,
+        "source_extractor_url": "https://example.test/feed"
+      },
+      "profiles": [],
+      "profile_refs": []
+    },
+    {
+      "name": "kemono-attachment-partition",
+      "origin": "gallery-dl",
+      "platform": "kemono",
+      "input": {
+        "category": "kemono",
+        "id": "post",
+        "author": {
+          "id": "author",
+          "name": "Example",
+          "custom": "retained"
+        },
+        "title": "Caption",
+        "filename": "a",
+        "num": 1,
+        "extension": "jpg",
+        "_url": "https://example.test/a.jpg",
+        "source_extractor_url": "https://example.test/feed"
+      },
+      "retained": {
+        "category": "kemono",
+        "id": "post",
+        "author": {
+          "id": "author",
+          "name": "Example",
+          "custom": "retained"
+        },
+        "title": "Caption",
+        "filename": "a",
+        "num": 1,
+        "extension": "jpg",
+        "_url": "https://example.test/a.jpg",
+        "source_extractor_url": "https://example.test/feed"
+      },
+      "shared": {
+        "author": {
+          "custom": "retained",
+          "id": "author",
+          "name": "Example"
+        },
+        "category": "kemono",
+        "id": "post",
+        "title": "Caption"
+      },
+      "patch": {
+        "_url": "https://example.test/a.jpg",
+        "extension": "jpg",
+        "filename": "a",
+        "num": 1,
+        "source_extractor_url": "https://example.test/feed"
+      },
+      "profiles": [],
+      "profile_refs": []
+    },
+    {
+      "name": "tumblr-attachment-partition",
+      "origin": "gallery-dl",
+      "platform": "tumblr",
+      "input": {
+        "category": "tumblr",
+        "id": "post",
+        "author": {
+          "id": "author",
+          "name": "Example",
+          "custom": "retained"
+        },
+        "title": "Caption",
+        "filename": "a",
+        "num": 1,
+        "extension": "jpg",
+        "_url": "https://example.test/a.jpg",
+        "source_extractor_url": "https://example.test/feed"
+      },
+      "retained": {
+        "category": "tumblr",
+        "id": "post",
+        "author": {
+          "id": "author",
+          "name": "Example",
+          "custom": "retained"
+        },
+        "title": "Caption",
+        "filename": "a",
+        "num": 1,
+        "extension": "jpg",
+        "_url": "https://example.test/a.jpg",
+        "source_extractor_url": "https://example.test/feed"
+      },
+      "shared": {
+        "author": {
+          "custom": "retained",
+          "id": "author",
+          "name": "Example"
+        },
+        "category": "tumblr",
+        "id": "post",
+        "title": "Caption"
+      },
+      "patch": {
+        "_url": "https://example.test/a.jpg",
+        "extension": "jpg",
+        "filename": "a",
+        "num": 1,
+        "source_extractor_url": "https://example.test/feed"
+      },
+      "profiles": [],
+      "profile_refs": []
+    }
+  ]
+}

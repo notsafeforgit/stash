@@ -171,6 +171,7 @@ func (db *Database) Repository() models.Repository {
 		ConfigurationMigration: &ConfigurationMigrationStore{},
 		ArchiveEntity:          &ArchiveEntityStore{},
 		SourceAccount:          &SourceAccountStore{},
+		SourceEvidence:         &SourceEvidenceStore{},
 		Share:                  &ShareStore{},
 	}
 }

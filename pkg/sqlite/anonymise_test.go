@@ -106,6 +106,8 @@ WHERE source.original_id=71 AND source.kind='performer' AND source.state='redire
 
 func TestAnonymiserRemovesSourceAccountEvidence(t *testing.T) {
 	source, repo := archiveTestDatabase(t)
+	post := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "native:twitter", Value: "private-account-post"}, "")
+	capture := recordSourceTestCapture(t, repo, sourceTestCapture(t, post.UUID, 1, "private-account-biography"))
 	account := createSourceAccount(t, repo, "native:reddit")
 	evidence := accountEvidence()
 	evidence.Details = []byte(`{"private":"private-account-evidence"}`)
@@ -123,13 +125,19 @@ func TestAnonymiserRemovesSourceAccountEvidence(t *testing.T) {
 	require.NoError(t, anonymiser.Anonymise(context.Background()))
 	contents, err := os.ReadFile(output)
 	require.NoError(t, err)
-	for _, value := range []string{account.UUID, performer.UUID, "private-account-"} {
+	for _, value := range []string{account.UUID, performer.UUID, post.UUID, capture.UUID, capture.RevisionUUID, "private-account-"} {
 		require.NotContains(t, string(contents), value)
 	}
 	require.Equal(t, account.UUID, findSourceAccount(t, repo, account.UUID).UUID)
+	require.NoError(t, repo.WithReadTxn(context.Background(), func(ctx context.Context) error {
+		stored, err := repo.SourceEvidence.FindCapture(ctx, capture.UUID)
+		require.NoError(t, err)
+		require.Equal(t, capture, stored, "the original source evidence remains untouched")
+		return nil
+	}))
 	raw := openRawDB(t, output)
 	defer raw.Close()
-	for _, table := range []string{"source_accounts", "source_account_identifiers", "source_account_identifier_evidence", "account_performer_decisions", "account_performer_links"} {
+	for _, table := range []string{"source_accounts", "source_account_identifiers", "source_account_identifier_evidence", "account_performer_decisions", "account_performer_links", "source_posts", "source_post_identifiers", "source_post_revisions", "source_captures", "source_capture_profiles", "source_profile_bodies", "source_payloads"} {
 		require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM "+table))
 	}
 }

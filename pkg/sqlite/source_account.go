@@ -1,7 +1,6 @@
 package sqlite
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -116,66 +115,13 @@ func accountEvidenceJSON(value json.RawMessage) (string, error) {
 	if len(value) == 0 {
 		return "{}", nil
 	}
-	if len(value) > 65536 || !utf8.Valid(value) || !json.Valid(value) {
-		return "", errors.New("account identifier evidence must be a JSON object of at most 64 KiB")
-	}
-	decoder := json.NewDecoder(bytes.NewReader(value))
-	decoder.UseNumber() // service IDs must never pass through float64
-	object, err := accountEvidenceValue(decoder, 0)
+	object, err := archive.DecodeJSONObject(value, 65536)
 	if err != nil {
 		return "", err
 	}
-	if _, ok := object.(map[string]interface{}); !ok {
-		return "", errors.New("account identifier evidence must be a JSON object")
-	}
+	// Retain the account-evidence JSON encoding established in migration 1000005.
 	canonical, err := json.Marshal(object)
 	return string(canonical), err
-}
-
-func accountEvidenceValue(decoder *json.Decoder, depth int) (interface{}, error) {
-	if depth > 64 {
-		return nil, errors.New("account identifier evidence exceeds nesting limit")
-	}
-	token, err := decoder.Token()
-	if err != nil {
-		return nil, err
-	}
-	switch token {
-	case json.Delim('{'):
-		object := make(map[string]interface{})
-		for decoder.More() {
-			key, err := decoder.Token()
-			if err != nil {
-				return nil, err
-			}
-			name, ok := key.(string)
-			if !ok {
-				return nil, errors.New("invalid account evidence object key")
-			}
-			if _, duplicate := object[name]; duplicate {
-				return nil, errors.New("account evidence object contains duplicate keys")
-			}
-			object[name], err = accountEvidenceValue(decoder, depth+1)
-			if err != nil {
-				return nil, err
-			}
-		}
-		_, err := decoder.Token()
-		return object, err
-	case json.Delim('['):
-		array := make([]interface{}, 0)
-		for decoder.More() {
-			value, err := accountEvidenceValue(decoder, depth+1)
-			if err != nil {
-				return nil, err
-			}
-			array = append(array, value)
-		}
-		_, err := decoder.Token()
-		return array, err
-	default:
-		return token, nil
-	}
 }
 
 func validateAccountEvidence(e models.AccountIdentifierEvidence) (string, error) {

@@ -103,3 +103,33 @@ WHERE source.original_id=71 AND source.kind='performer' AND source.state='redire
 	require.NoError(t, rows.Err())
 	require.Equal(t, survivor.UUID, archiveFind(t, repo, models.ArchivePerformer, 72).UUID)
 }
+
+func TestAnonymiserRemovesSourceAccountEvidence(t *testing.T) {
+	source, repo := archiveTestDatabase(t)
+	account := createSourceAccount(t, repo, "native:reddit")
+	evidence := accountEvidence()
+	evidence.Details = []byte(`{"private":"private-account-evidence"}`)
+	observeAccount(t, repo, account.UUID, models.AccountReference{Namespace: "native:reddit", Kind: "handle", Value: "private-account-handle"}, evidence)
+	performer := archiveFind(t, repo, models.ArchivePerformer, 71)
+	require.NoError(t, repo.WithTxn(context.Background(), func(ctx context.Context) error {
+		_, err := repo.SourceAccount.DecideOwnership(ctx, models.AccountOwnershipInput{AccountUUID: account.UUID,
+			ExpectedAccountRevision: account.Revision + 1, State: models.AccountOwnershipLinked, PerformerUUID: performer.UUID,
+			ExpectedPerformerRevision: performer.Revision, Origin: "review", Reason: "private-account-choice"})
+		return err
+	}))
+	output := filepath.Join(t.TempDir(), "anonymous.sqlite")
+	anonymiser, err := sqlite.NewAnonymiser(source, output)
+	require.NoError(t, err)
+	require.NoError(t, anonymiser.Anonymise(context.Background()))
+	contents, err := os.ReadFile(output)
+	require.NoError(t, err)
+	for _, value := range []string{account.UUID, performer.UUID, "private-account-"} {
+		require.NotContains(t, string(contents), value)
+	}
+	require.Equal(t, account.UUID, findSourceAccount(t, repo, account.UUID).UUID)
+	raw := openRawDB(t, output)
+	defer raw.Close()
+	for _, table := range []string{"source_accounts", "source_account_identifiers", "source_account_identifier_evidence", "account_performer_decisions", "account_performer_links"} {
+		require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM "+table))
+	}
+}

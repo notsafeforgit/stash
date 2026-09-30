@@ -63,6 +63,7 @@ func (db *Anonymiser) Anonymise(ctx context.Context) error {
 			func() error { return db.anonymiseGroups(ctx) },
 			func() error { return db.anonymiseSavedFilters(ctx) },
 			func() error { return db.anonymiseNativeFilterEvidence(ctx) },
+			func() error { return db.deleteSourceAccountEvidence(ctx) },
 			func() error { return db.anonymiseArchiveUUIDs(ctx) },
 			func() error { return db.Optimise(ctx) },
 		})
@@ -1079,6 +1080,17 @@ func (db *Anonymiser) anonymiseArchiveUUIDs(ctx context.Context) error {
 		// library. Foreign keys cascade through aliases and merge redirects.
 		_, err := dbWrapper.Exec(ctx, "UPDATE archive_entities SET uuid = "+archiveUUIDExpression)
 		return err
+	})
+}
+
+func (db *Anonymiser) deleteSourceAccountEvidence(ctx context.Context) error {
+	return txn.WithTxn(ctx, db, func(ctx context.Context) error {
+		for _, table := range []string{"account_performer_links", "account_performer_decisions", "source_account_identifier_evidence", "source_account_identifiers", "source_accounts"} {
+			if _, err := dbWrapper.Exec(ctx, "DELETE FROM "+table); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
 

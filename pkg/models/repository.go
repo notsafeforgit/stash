@@ -30,6 +30,7 @@ type Repository struct {
 	DefaultFilter          DefaultFilterReaderWriter
 	ConfigurationMigration ConfigurationMigrationReaderWriter
 	ArchiveEntity          ArchiveEntityReaderWriter
+	SourceAccount          SourceAccountReaderWriter
 	Share                  ShareReaderWriter
 }
 

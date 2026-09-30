@@ -170,6 +170,7 @@ func (db *Database) Repository() models.Repository {
 		DefaultFilter:          &DefaultFilterStore{},
 		ConfigurationMigration: &ConfigurationMigrationStore{},
 		ArchiveEntity:          &ArchiveEntityStore{},
+		SourceAccount:          &SourceAccountStore{},
 		Share:                  &ShareStore{},
 	}
 }

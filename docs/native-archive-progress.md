@@ -36,13 +36,14 @@ review. Production has not been migrated.
 | Stash `43d8bba99` | Canonical saved-filter ASTs, legacy conflict evidence, strict persistence validation, full-copy semantic reconciliation; complete validation gate passed |
 | Stash `e8fb366d2` | Unified performer names, per-name auto-tag policy, nonunique display names, full-copy semantic reconciliation; complete validation gate passed |
 | Stash `e4fa14045` | Native default filters, durable config publication, revision-checked review, full-copy reconciliation; complete validation gate passed |
+| Stash `bd7f2af84` | Portable archive UUIDs, transactional merge redirects and catalog UUID adoption; full-copy reconciliation and complete validation gate passed |
 
 ## Phase status
 
 | Phase | Status |
 | --- | --- |
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
-| 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, and portable archive identities are implemented. Source/provenance models and remaining domain services are in progress. |
+| 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities, and native account/evidence/ownership storage are implemented. Source equivalence, post/profile/capture models, review APIs/UI and remaining domain services are in progress. |
 | 2 Ingestion and producer adapter | Not yet implemented |
 | 3 Catalog importer and full-copy reconciliation | Not yet implemented |
 | 4 Native UI and client conversion | Not yet implemented |
@@ -163,3 +164,50 @@ was 249,470,976 bytes (about 238 MiB). The private reconciliation receipt is
 `.local/native-archive-rehearsal-20260930/archive-identity-reconciliation.json`.
 The full validation gate passed, including migration/lifecycle and merge tests,
 anonymised-export checks, 528 UI tests, native contracts, and Go lint/tests.
+
+## Source account foundation
+
+Migration 1000005 adds independent source accounts, qualified identifier claims,
+observation evidence, and ownership decisions. Indexed candidate queries retain
+reused handles and conflicting IDs for review. Native IDs, handles, and mirror
+identifiers remain distinct; matching never assigns media performers. Accounts
+and ownership are optional for directly scanned or purchased media.
+
+Evidence replay preserves large numeric identifiers and subsecond timestamps,
+extends observation intervals, and rejects changed contents under the same key.
+New evidence invalidates stale review revisions. Linked, explicitly unlinked,
+and undecided decisions retain immutable history with a checked current head.
+Applying a link validates both account and performer revisions. Profile discovery
+cannot undo an existing explicit choice. Merge redirects, adopted UUIDs, and
+deleted-performer tombstones preserve previous decisions. Anonymised exports
+remove source account evidence.
+
+The full-copy migration took 32.6 milliseconds and added 69,632 bytes (68 KiB).
+All 70 existing tables, including 1,540,475 archive identities, matched by streaming
+row digest, and foreign-key checking found zero violations. New account tables
+were empty: schema promotion does not invent provenance for library records.
+The private receipt is
+`.local/native-archive-rehearsal-20260930/source-account-reconciliation.json`.
+The complete `make validate-fork` gate passed: 528 UI tests, current native
+contracts, Go lint, and all Go unit/integration tests. Go compilation used
+workspace scratch space through `GOTMPDIR` after the shared temporary filesystem
+hit its quota; no checks were skipped.
+Source equivalence/review services, actual catalog import, and API/UI exposure
+are still outstanding. Production remains compatible.
+
+## Physical catalog inventory
+
+The read-only schema inventory on 2026-09-30 found 1,700 databases under the
+catalog root: 1,697 schema-3 source catalogs plus the registry, automation, and
+run-journal databases. It covers 54 table families and six exact schema variants,
+with no unreadable databases after allowing SQLite's transient shared-memory
+files. Base database files totalled 2,979,741,696 bytes; this excludes WAL files
+and producer state outside the root.
+
+The migration coverage now explicitly includes older plugin profile/binding
+tables, collection backfill completions, and one-time backfill policy receipts.
+These records must be reconciled with the newer registry and job state rather
+than applied twice or used to restart completed work. The private inventory
+manifest includes complete schema definitions and per-file schema hashes.
+This is an individually consistent schema inventory, not a coordinated backup
+boundary or a complete integrity assessment; those remain release requirements.

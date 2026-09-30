@@ -1,9 +1,10 @@
 # Native archive and independent fork transition plan
 
-Status: proposed implementation plan, requested on 2026-09-30. This document
-defines the transition; writing it does not migrate a database, change running
-scrapers, or deploy a new server. The existing runtime remains the compatibility
-bridge until the release and data migration described here are complete.
+Status: implementation in progress on `v3-rewrite`, following the plan requested
+on 2026-09-30. The [progress record](native-archive-progress.md) distinguishes
+validated checkpoints from outstanding work. Production remains on the frozen
+compatible release until the release and data migration described here are
+complete.
 
 The target is one independently maintained Stash application that owns media,
 performers, source accounts, posts, provenance, import rules, and metadata edits.
@@ -160,6 +161,28 @@ Version normalization policies. Preserve old capture/observation IDs as legacy
 identifiers when canonical IDs change. Migration comparison must reconstruct the
 retained payload semantics, including capture patches and profile references.
 Do not promise recovery of fields the existing reduction policy already removed.
+
+### Direct scans and purchased media
+
+Performers and media do not require scrape provenance. Purchased MP4s and other
+files added directly to a Stash scan receive ordinary scene/file identities and
+retain the same performer, playback, marker, and metadata features. No source
+account, upstream post, or fictional scrape record is required. A performer may
+have only directly imported media, only scraped media, or both.
+
+Let the owner assign a performer once to a folder or import batch. Subsequent
+new files can inherit that explicit rule; filename title fallback applies only
+when a permitted stronger selection is absent. Never replace an intentional
+empty title or existing curated attribution. Name/alias matching must return
+all candidates and leave ambiguity for review. Do not guess performer identity
+from an arbitrary vendor filename or treat a directory name as verified account
+ownership.
+
+Manual intake can optionally retain vendor URLs, purchase notes, or collection
+membership, without making any of those mandatory. Rescans remain idempotent;
+adding a scraped appearance later attaches provenance to the existing media
+when the association is verified. The direct-scan path is included in migration,
+policy-preview, backup/restore, and standalone export tests.
 
 ### Metadata decisions
 
@@ -498,6 +521,8 @@ still reconcile.
 | discovery_accounts, discovery_targets, discovery_candidates | Confirmed relationships, unresolved candidates, fetch progress, and review decisions |
 | run journal scan_jobs, extractor_jobs, scan_deferrals | Requested scopes/date windows, durable cursor state, retries, and deferrals; reset stale process ownership |
 | backfill_completion, backfill_scan_completion, legacy_backfill_skip | Completed components, receipts, and deliberate no-repeat decisions |
+| collection_backfill_completion, backfill_policy_migrations | Collection-level completion evidence and recorded policy transitions; preserve their skip/resume semantics |
+| catalog_metadata_accounts, catalog_metadata_performers | Older plugin bindings and profile evidence, reconciled with identity-registry migration receipts rather than applied twice |
 | legacy_handoffs and n8n result receipts | Outstanding handoff/result semantics, with resolved historical runtime state classified explicitly |
 | gallery-dl archive databases | Keep as producer download state; snapshot and associate with the migration, without converting archive rows into fake posts |
 | Plugin settings and local filename/folder rules | Native import policy, mapped expressions, completeness settings, and preserved legacy rule provenance |

@@ -46,8 +46,8 @@ the saved filter. `native_migration_history` records each native conversion.
 
 Legacy filter files can still be converted at the import boundary while their
 remaining callers are retired. They do not create live projection/shadow data.
-Archive UUIDs, source/provenance models, and the catalog import are separate
-remaining work.
+The source/provenance services and catalog import remain separate work; the
+implemented native migrations are described below.
 The full [transition plan](native-archive-transition-plan.md) remains the
 acceptance requirement.
 
@@ -107,6 +107,38 @@ references. A UUID already assigned elsewhere requires reconciliation. Actual
 catalog import and native API/UI exposure remain separate work; creating this
 registry has not imported or modified the live catalogs. Anonymised exports
 replace UUIDs while preserving the graph of redirects.
+
+Migration 1000005 adds native `source_accounts`, qualified
+`source_account_identifiers`, and their retained evidence. Accounts have UUIDs
+independent of library performers. Identifier lookup uses a covering index and
+bounded keyset pagination; identifiers are deliberately not globally unique.
+Reused handles and disputed IDs remain candidates rather than silently merging
+accounts. Known native handles are normalized for matching; opaque IDs, mirror
+user IDs, and unknown service identifiers retain their spelling. Offline profile
+URL parsing preserves native/mirror scopes and does not infer an author from a
+post, feed, or directory.
+
+Evidence has a stable key, basis, origin, retained JSON object, and observation
+interval. Replays reuse a claim and may widen its interval with nanosecond
+precision. Reusing an evidence key with different contents is rejected. New
+evidence increments the account revision; identical repeats do not invalidate
+review. Numeric identifiers are not decoded through floating point, and
+duplicate JSON keys or invalid UTF-8 cannot silently lose evidence.
+
+`account_performer_decisions` stores immutable linked, explicitly unlinked, and
+undecided choices. `account_performer_links` points to the current decision
+through a checked composite foreign key. Decisions require the reviewed account
+revision and, when linking, the reviewed active performer revision. Profile
+discovery cannot reverse an existing link or explicit unlink. Source identifiers
+never assign scene/image performers. Choosing a newer decision preserves history;
+moving the head backwards or attaching it to another account is refused.
+
+Ownership references the typed archive performer identity. UUID adoption follows
+foreign keys, merges resolve through retained redirects, and deletion retains
+the decision against the tombstone for review. New choices cannot use stale or
+deleted performer identities. Anonymised exports remove source account evidence
+and decisions. Source-account equivalence plans, native review APIs/UI, capture
+references, and importing actual catalogs remain subsequent work.
 
 The filesystem deletion journal currently derives its directory from the
 database filename. Promotion in place retains that association, but a production

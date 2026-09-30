@@ -39,13 +39,14 @@ review. Production has not been migrated.
 | Stash `bd7f2af84` | Portable archive UUIDs, transactional merge redirects and catalog UUID adoption; full-copy reconciliation and complete validation gate passed |
 | Stash `4d1c7571d` | Qualified source accounts, evidence replay, and audited ownership choices; full-copy reconciliation and complete validation gate passed |
 | Stash `02d3c67c2` | Shared post/profile evidence, lossless captures, versioned retention, replay and integrity checks; full-copy reconciliation, catalog size inventory, and complete validation gate passed |
+| Stash `c1d2c9387` | Portable gallery identities, membership revisions, and explicit source-album requirements; full-copy reconciliation and complete validation gate passed |
 
 ## Phase status
 
 | Phase | Status |
 | --- | --- |
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
-| 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities, native account/ownership storage, and shared post/profile/capture storage are implemented. Source equivalence, media appearances, review APIs/UI and remaining domain services are in progress. |
+| 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries, native account/ownership storage, shared post/profile/capture storage, ordered attachment manifests, and audited media associations are implemented. Source equivalence, album construction, review APIs/UI and remaining domain services are in progress. |
 | 2 Ingestion and producer adapter | Not yet implemented |
 | 3 Catalog importer and full-copy reconciliation | Not yet implemented |
 | 4 Native UI and client conversion | Not yet implemented |
@@ -274,6 +275,36 @@ The rebuild grew the database file by 150,364,160 bytes (143.4 MiB), with
 can serve subsequent native writes. The private receipt is
 `.local/native-archive-rehearsal-20260930/gallery-identity-reconciliation.json`.
 
-Automatic source-gallery construction, ordered attachment associations, and the
-native album UI are not implemented by this foundation checkpoint. They remain
-required work. No production galleries or files have been modified.
+Automatic source-gallery construction and the native album UI remain required
+work. Ordered attachment associations are described below. No production
+galleries or files have been modified.
+
+## Ordered source attachments and media associations
+
+Migration 1000008 adds shared ordered attachment manifests and capture-to-manifest
+references. Source order, repeated attachment slots, declared albums, expected
+counts, and incomplete source lists survive independently of download state.
+Repeated captures share one list; partial captures retain prior snapshots.
+Media evidence must cite a capture containing that attachment and typed archive
+identities. Observed/verified candidates require an actual current file link.
+
+Selecting media is an audited revision-checked operation. Ingestion can select a
+unique supported match; ambiguous candidates require review. Explicit unlinks
+survive later evidence. Merge redirects, UUID adoption, deletion tombstones,
+restart, keyset pagination, late-write rollback, and anonymisation are covered
+by the focused tests. Core/API ingestion must still validate producer evidence;
+these repositories are not exposed directly to untrusted producers.
+
+The full-copy schema migration took 54.9 milliseconds. Streaming digests matched
+all 82 retained tables, foreign-key checks found zero violations, and all seven
+new tables were empty. The database file did not grow because existing free
+pages could hold the new schema. The private receipt is
+`.local/native-archive-rehearsal-20260930/attachment-reconciliation.json`.
+The complete `make validate-fork` gate passed: generation, frontend checks and
+528 UI tests, retained native contracts, Go lint, and all Go unit/integration
+tests. The previous gallery checkpoint also passed CI lint, build, and preview
+image publication.
+
+Source manifest selection, source-to-gallery construction and synchronization,
+manual album decisions, importer integration, and native UI remain outstanding.
+Production remains on the compatible release.

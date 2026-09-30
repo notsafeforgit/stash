@@ -209,6 +209,22 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 				}
 			}
 		}
+		if version >= NativeSchemaBaseline+8 {
+			for _, name := range []string{"source_attachments", "source_attachment_manifests", "source_attachment_entries", "source_capture_attachment_manifests", "source_media_evidence", "attachment_media_decisions", "attachment_media_links"} {
+				if !present[name] {
+					return fmt.Errorf("native database schema is incomplete: missing %s", name)
+				}
+			}
+			for _, name := range []string{"source_captures_scope", "source_attachment_manifests_immutable", "source_attachment_entries_immutable", "source_capture_attachment_manifests_immutable", "source_attachment_identity_immutable", "source_attachments_active_post", "source_attachment_manifests_active_post", "source_capture_attachment_manifests_active_post", "source_media_evidence_kind_insert", "source_media_evidence_kind_update", "attachment_media_decisions_kind_insert", "attachment_media_decisions_kind_update", "source_media_evidence_immutable", "attachment_media_decision_immutable", "attachment_media_head_forward"} {
+				var exists bool
+				if err := conn.Get(&exists, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type IN ('index', 'trigger') AND name = ?)", name); err != nil {
+					return err
+				}
+				if !exists {
+					return fmt.Errorf("native database schema is incomplete: missing %s", name)
+				}
+			}
+		}
 		return nil
 	}
 	if version >= NativeSchemaBaseline {

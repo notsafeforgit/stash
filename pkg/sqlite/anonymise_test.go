@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/sqlite"
@@ -111,6 +112,14 @@ func TestAnonymiserRemovesSourceAccountEvidence(t *testing.T) {
 	source, repo := archiveTestDatabase(t)
 	post := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "native:twitter", Value: "private-account-post"}, "")
 	capture := recordSourceTestCapture(t, repo, sourceTestCapture(t, post.UUID, 1, "private-account-biography"))
+	manifest := recordAttachmentManifest(t, repo, models.SourceAttachmentManifestInput{CaptureUUID: capture.UUID, Complete: true,
+		Entries: []models.SourceAttachmentEntry{sourceAttachmentEntry(0, "private-account-attachment")}})
+	attachment := manifestEntries(t, repo, manifest.UUID)[0].Attachment
+	media := archiveFind(t, repo, models.ArchiveScene, 31)
+	mediaEvidence := recordMediaEvidence(t, repo, models.SourceMediaEvidence{UUID: uuid.NewString(), CaptureUUID: capture.UUID, AttachmentUUID: attachment.UUID,
+		MediaUUID: media.UUID, Basis: "legacy", Details: []byte(`{"private":"private-account-file-path"}`)})
+	require.NoError(t, applyMediaChoice(repo, models.AttachmentMediaDecisionInput{AttachmentUUID: attachment.UUID, ExpectedAttachmentRevision: attachment.Revision + 1,
+		State: "linked", MediaUUID: media.UUID, ExpectedMediaRevision: media.Revision, Origin: "review", Reason: "private-account-media-choice"}))
 	account := createSourceAccount(t, repo, "native:reddit")
 	evidence := accountEvidence()
 	evidence.Details = []byte(`{"private":"private-account-evidence"}`)
@@ -128,7 +137,7 @@ func TestAnonymiserRemovesSourceAccountEvidence(t *testing.T) {
 	require.NoError(t, anonymiser.Anonymise(context.Background()))
 	contents, err := os.ReadFile(output)
 	require.NoError(t, err)
-	for _, value := range []string{account.UUID, performer.UUID, post.UUID, capture.UUID, capture.RevisionUUID, "private-account-"} {
+	for _, value := range []string{account.UUID, performer.UUID, post.UUID, capture.UUID, capture.RevisionUUID, manifest.UUID, attachment.UUID, mediaEvidence.UUID, "private-account-"} {
 		require.NotContains(t, string(contents), value)
 	}
 	require.Equal(t, account.UUID, findSourceAccount(t, repo, account.UUID).UUID)
@@ -143,4 +152,13 @@ func TestAnonymiserRemovesSourceAccountEvidence(t *testing.T) {
 	for _, table := range []string{"source_accounts", "source_account_identifiers", "source_account_identifier_evidence", "account_performer_decisions", "account_performer_links", "source_posts", "source_post_identifiers", "source_post_revisions", "source_captures", "source_capture_profiles", "source_profile_bodies", "source_payloads"} {
 		require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM "+table))
 	}
+	for _, table := range []string{"source_attachments", "source_attachment_manifests", "source_attachment_entries", "source_capture_attachment_manifests", "source_media_evidence", "attachment_media_decisions", "attachment_media_links"} {
+		require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM "+table))
+	}
+	require.NoError(t, repo.WithReadTxn(context.Background(), func(ctx context.Context) error {
+		original, err := repo.SourceAttachment.MediaDecision(ctx, attachment.UUID)
+		require.NoError(t, err)
+		require.Equal(t, media.UUID, *original.MediaUUID, "anonymizing a copy leaves original associations intact")
+		return nil
+	}))
 }

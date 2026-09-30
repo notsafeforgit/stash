@@ -32,6 +32,7 @@ type Repository struct {
 	ArchiveEntity          ArchiveEntityReaderWriter
 	SourceAccount          SourceAccountReaderWriter
 	SourceEvidence         SourceEvidenceReaderWriter
+	SourceAttachment       SourceAttachmentReaderWriter
 	Share                  ShareReaderWriter
 }
 

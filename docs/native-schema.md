@@ -222,9 +222,50 @@ A deleted gallery retains its identity tombstone, and a reused integer ID gets
 a different UUID. Anonymised exports rekey gallery identities too.
 
 This is a prerequisite for source-post albums, not automatic album creation.
-Ordered attachments, post-to-gallery associations, synchronization, manual
-membership decisions, and the mixed-media album UI remain subsequent work under
+Post-to-gallery associations, synchronization, manual membership decisions,
+and the mixed-media album UI remain subsequent work under
 the [album requirements](native-archive-transition-plan.md#source-post-albums-and-galleries).
+
+Migration 1000008 stores source attachments independently of local downloads.
+An attachment belongs to one source post and keeps a qualified, opaque source
+identifier. Immutable `attachments-v1` manifests share ordered entries across
+captures with the same list. Each capture names one manifest; replay with a
+different list is rejected. Complete lists have contiguous zero-based positions
+and a matching count. Partial lists may have gaps and an independently known
+total; they cannot erase an older complete snapshot. Multiple source positions
+may refer to the same attachment, but a position itself is unique.
+An explicit album flag or multiple declared/observed entries identifies an
+album, independent of how many files have downloaded. Lists are bounded to
+4,096 entries and 4 MiB, with source positions and expected counts up to one
+million. Oversized lists are rejected, never silently truncated.
+
+`source_media_evidence` records candidate scene/image and optional file UUIDs.
+Composite foreign keys prove that the cited capture actually contains the
+attachment. Typed identity checks reject performer/gallery targets as media.
+Observed-file and verified-bytes evidence additionally require a current
+scene/image-to-file relationship. This trusted repository boundary records
+proof supplied by core ingestion; it is not permission for an HTTP producer to
+assert verification. The ingestion service still needs to validate the root,
+path, and bytes. Legacy/review evidence can preserve historical associations
+without making them automatic matches.
+
+Media choices are separate immutable decisions with a current head. They require
+the reviewed attachment and target-media revisions. Ingestion may select only
+one active candidate, supported by a current observed/verified file association,
+while no explicit link or unlink is selected. Ambiguous evidence, deleted
+candidates, or more than 1,000 evidence rows require review. Later captures do
+not overwrite explicit choices. Merged UUIDs resolve to the surviving identity;
+adoption cascades references, and deletion retains historical links to tombstones.
+Evidence replay is idempotent across those identity changes, while changed
+evidence content under an existing UUID is rejected. A future transport receipt
+must separately validate exact producer event bytes.
+
+The new repositories use bounded, indexed lookups and the caller's transaction.
+Late insert/head failures roll back the evidence, choices, and revisions together.
+Reads validate manifest counts and signatures; missing entries are corruption,
+not an empty album. Anonymised copies remove manifests and association history
+before rekeying identities. This schema does not yet select a current manifest,
+construct a gallery, add ingestion endpoints, or implement album UI.
 
 The filesystem deletion journal currently derives its directory from the
 database filename. Promotion in place retains that association, but a production

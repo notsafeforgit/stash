@@ -4,155 +4,20 @@ import (
 	"testing"
 
 	"github.com/stashapp/stash/pkg/models"
-	"github.com/stashapp/stash/pkg/models/mocks"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
 
-func nameFilter(n string) *models.PerformerFilterType {
-	return &models.PerformerFilterType{
-		Name: &models.StringCriterionInput{
-			Value:    n,
-			Modifier: models.CriterionModifierEquals,
-		},
-		Disambiguation: &models.StringCriterionInput{
-			Modifier: models.CriterionModifierIsNull,
-		},
-	}
-}
-
-func disambigFilter(n string, d string) *models.PerformerFilterType {
-	return &models.PerformerFilterType{
-		Name: &models.StringCriterionInput{
-			Value:    n,
-			Modifier: models.CriterionModifierEquals,
-		},
-		Disambiguation: &models.StringCriterionInput{
-			Value:    d,
-			Modifier: models.CriterionModifierEquals,
-		},
-	}
-}
-
 func TestValidateName(t *testing.T) {
-	db := mocks.NewDatabase()
-
-	const (
-		name1       = "name 1"
-		name2       = "name 2"
-		disambig    = "disambiguation"
-		newName     = "new name"
-		newDisambig = "new disambiguation"
-	)
-
-	pp := 1
-	findFilter := &models.FindFilterType{
-		PerPage: &pp,
-	}
-
-	db.Performer.On("QueryCount", testCtx, nameFilter(name1), findFilter).Return(1, nil)
-	db.Performer.On("QueryCount", testCtx, nameFilter(name2), findFilter).Return(1, nil)
-	db.Performer.On("QueryCount", testCtx, disambigFilter(name2, disambig), findFilter).Return(1, nil)
-	db.Performer.On("QueryCount", testCtx, mock.Anything, findFilter).Return(0, nil)
-
-	tests := []struct {
-		tName    string
-		name     string
-		disambig string
-		want     error
-	}{
-		{"missing name", "", newDisambig, ErrNameMissing},
-		{"new name", newName, "", nil},
-		{"new name new disambig", newName, newDisambig, nil},
-		{"new name existing disambig", newName, disambig, nil},
-		{"existing name", name1, "", &NameExistsError{name1, ""}},
-		{"existing name new disambig", name1, newDisambig, nil},
-		{"existing name existing disambig", name1, disambig, nil},
-		{"existing name and disambig", name2, disambig, &NameExistsError{name2, disambig}},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.tName, func(t *testing.T) {
-			got := ValidateName(testCtx, tt.name, tt.disambig, db.Performer)
-			assert.Equal(t, tt.want, got)
-		})
-	}
+	assert.Equal(t, ErrNameMissing, ValidateName(""))
+	assert.Equal(t, ErrNameMissing, ValidateName("  "))
+	assert.NoError(t, ValidateName("A shared display name"))
+	assert.NoError(t, ValidateName("A shared display name"))
 }
 
 func TestValidateUpdateName(t *testing.T) {
-	db := mocks.NewDatabase()
-
-	const (
-		name1       = "name 1"
-		name2       = "name 2"
-		disambig1   = "disambiguation 1"
-		disambig2   = "disambiguation 2"
-		newName     = "new name"
-		newDisambig = "new disambiguation"
-	)
-
-	osUnset := models.OptionalString{}
-	osNull := models.OptionalString{Set: true, Null: true}
-	osName1 := models.NewOptionalString(name1)
-	osName2 := models.NewOptionalString(name2)
-	osDisambig1 := models.NewOptionalString(disambig1)
-	osDisambig2 := models.NewOptionalString(disambig2)
-	osNewName := models.NewOptionalString(newName)
-	osNewDisambig := models.NewOptionalString(newDisambig)
-
-	existing1 := models.Performer{
-		ID:   1,
-		Name: name1,
-	}
-	existing2 := models.Performer{
-		ID:             2,
-		Name:           name2,
-		Disambiguation: disambig1,
-	}
-	existing3 := models.Performer{
-		ID:             3,
-		Name:           name2,
-		Disambiguation: disambig2,
-	}
-
-	pp := 2
-	findFilter := &models.FindFilterType{
-		PerPage: &pp,
-	}
-
-	db.Performer.On("Query", testCtx, nameFilter(name1), findFilter).Return([]*models.Performer{&existing1}, 1, nil)
-	db.Performer.On("Query", testCtx, nameFilter(name2), findFilter).Return([]*models.Performer{&existing2, &existing3}, 2, nil)
-	db.Performer.On("Query", testCtx, disambigFilter(name2, disambig1), findFilter).Return([]*models.Performer{&existing2}, 1, nil)
-	db.Performer.On("Query", testCtx, disambigFilter(name2, disambig2), findFilter).Return([]*models.Performer{&existing3}, 1, nil)
-	db.Performer.On("Query", testCtx, mock.Anything, findFilter).Return(nil, 0, nil)
-
-	tests := []struct {
-		tName     string
-		performer models.Performer
-		name      models.OptionalString
-		disambig  models.OptionalString
-		want      error
-	}{
-		{"missing name", existing1, osNull, osUnset, ErrNameMissing},
-		{"same name", existing3, osName2, osUnset, nil},
-		{"same disambig", existing2, osUnset, osDisambig1, nil},
-		{"same name same disambig", existing2, osName2, osDisambig1, nil},
-		{"new name", existing1, osNewName, osUnset, nil},
-		{"new disambig", existing1, osUnset, osNewDisambig, nil},
-		{"new name new disambig", existing1, osNewName, osNewDisambig, nil},
-		{"remove disambig", existing3, osUnset, osNull, &NameExistsError{name2, ""}},
-		{"existing name keep disambig", existing3, osName1, osUnset, nil},
-		{"existing name remove disambig", existing3, osName1, osNull, &NameExistsError{name1, ""}},
-		{"existing disambig", existing2, osUnset, osDisambig2, &NameExistsError{name2, disambig2}},
-		{"existing name and disambig", existing1, osName2, osDisambig1, &NameExistsError{name2, disambig1}},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.tName, func(t *testing.T) {
-			got := ValidateUpdateName(testCtx, tt.performer, tt.name, tt.disambig, db.Performer)
-			assert.Equal(t, tt.want, got)
-		})
-	}
+	assert.NoError(t, ValidateUpdateName(models.OptionalString{}))
+	assert.Equal(t, ErrNameMissing, ValidateUpdateName(models.NewOptionalString("")))
+	assert.NoError(t, ValidateUpdateName(models.NewOptionalString("Another performer's name")))
 }
 
 func TestValidateAliases(t *testing.T) {
@@ -213,7 +78,7 @@ func TestValidateUpdateAliases(t *testing.T) {
 		want    error
 	}{
 		{"both unset", osUnset, nil, nil},
-		{"name conflicts with alias", os2, nil, &DuplicateAliasError{name2}},
+		{"promote existing alias", os2, nil, nil},
 		{"valid name set", os3, nil, nil},
 		{"valid aliases empty", os1, []models.PerformerAlias{}, nil},
 		{"alias matches name", osUnset, []models.PerformerAlias{{Alias: name1U}}, &DuplicateAliasError{name1U}},
@@ -309,9 +174,6 @@ func TestValidateUpdateDeathDate(t *testing.T) {
 }
 
 func TestValidateCreate(t *testing.T) {
-	db := mocks.NewDatabase()
-	db.Performer.On("QueryCount", mock.Anything, mock.Anything, mock.Anything).Return(0, nil)
-
 	tests := []struct {
 		name    string
 		pName   string
@@ -331,7 +193,7 @@ func TestValidateCreate(t *testing.T) {
 			p.Aliases = models.NewRelatedPerformerAliases(NormalizeAliases(p.Name, tt.aliases))
 
 			// This should NOT panic
-			err := ValidateCreate(testCtx, p, db.Performer)
+			err := ValidateCreate(p)
 			assert.Nil(t, err)
 		})
 	}

@@ -85,6 +85,8 @@ func TestNativeLineageRejectsUnsafeInputsBeforeWriting(t *testing.T) {
 		{"missing authoritative data", "DROP TABLE video_file_metadata", "missing video_file_metadata"},
 		{"missing migration evidence", "DROP TABLE saved_filter_import_conflicts", "missing saved_filter_import_conflicts"},
 		{"missing canonical filters", "ALTER TABLE saved_filters DROP COLUMN filter_ast", "missing saved_filters.filter_ast"},
+		{"missing name model", "DROP TABLE performer_names", "missing performer_names"},
+		{"missing canonical name", "INSERT INTO performers(id, created_at, updated_at) VALUES (1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)", "performer has no canonical name"},
 		{"foreign primary version", "DROP TABLE native_schema; UPDATE schema_migrations SET version = 87", "unsupported legacy Stash schema"},
 		{"newer legacy fork", "DROP TABLE native_schema; UPDATE schema_migrations SET version = 86; CREATE TABLE fork_schema_migrations(version INTEGER); INSERT INTO fork_schema_migrations VALUES (10)", "unsupported legacy fork schema 10"},
 	} {
@@ -204,7 +206,7 @@ INSERT INTO fork_file_deletions VALUES ('pending-filesystem-operation');
 	raw = openRawDB(t, path)
 	defer raw.Close()
 	for _, query := range []string{
-		"SELECT count(*) FROM performer_autotag_ignored_names WHERE performer_id = 71 AND name = 'Alias'",
+		"SELECT count(*) FROM performer_names WHERE performer_id = 71 AND name = 'Alias' AND ignore_auto_tag = 1 AND is_primary = 0",
 		"SELECT count(*) FROM video_file_metadata WHERE file_id = 21 AND frame_count = 300 AND bit_depth = 10 AND color_transfer = 'smpte2084'",
 		"SELECT count(*) FROM image_file_metadata WHERE file_id = 22 AND bit_depth = 16",
 		"SELECT count(*) FROM scene_cover_sources WHERE scene_id = 31 AND source_file_id = 9999 AND at = 12.5",

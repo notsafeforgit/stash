@@ -46,10 +46,25 @@ the saved filter. `native_migration_history` records each native conversion.
 
 Legacy filter files can still be converted at the import boundary while their
 remaining callers are retired. They do not create live projection/shadow data.
-Default-filter configuration promotion, unified performer names, archive UUIDs,
+Default-filter configuration promotion, archive UUIDs,
 source/provenance models, and the catalog import are separate remaining work.
 The full [transition plan](native-archive-transition-plan.md) remains the
 acceptance requirement.
+
+Migration 1000002 consolidates `performers.name`, `performer_aliases`, and
+`performer_autotag_ignored_names` into `performer_names`. Position zero is the
+canonical name; subsequent positions order aliases. The primary flag is derived
+from that position, and each row owns its auto-tag policy. The performer's global
+ignore flag remains on `performers`. Lookups, sorting, filtering, auto-tagging,
+and writes use the native name set. Name selection moves an existing name and
+its policy together; replacement is transactional.
+
+Names are not globally unique, and display disambiguation is optional. Name
+matches must therefore return candidates rather than establish identity. Exact
+duplicate canonical/alias entries are represented once; migration history keeps
+their original evidence and any unmatched old policy. Case variants are retained
+as distinct spellings. The old name column, alias table, and policy table are
+removed. Startup refuses a native database with a missing canonical name.
 
 The filesystem deletion journal currently derives its directory from the
 database filename. Promotion in place retains that association, but a production

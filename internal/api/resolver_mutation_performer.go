@@ -152,7 +152,7 @@ func (r *mutationResolver) PerformerCreate(ctx context.Context, input models.Per
 	if err := r.withTxn(ctx, func(ctx context.Context) error {
 		qb := r.repository.Performer
 
-		if err := performer.ValidateCreate(ctx, newPerformer, qb); err != nil {
+		if err := performer.ValidateCreate(newPerformer); err != nil {
 			return err
 		}
 

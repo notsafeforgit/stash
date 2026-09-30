@@ -46,7 +46,7 @@ func performerASTConditionHandler(condition *models.FilterASTCondition) (criteri
 		if err != nil {
 			return nil, err
 		}
-		return stringCriterionHandler(&input, "performers.name"), nil
+		return stringCriterionHandler(&input, performerPrimaryNameSQL), nil
 	case "disambiguation":
 		input, err := decodeASTValue[models.StringCriterionInput](condition.Value)
 		if err != nil {

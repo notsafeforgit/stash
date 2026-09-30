@@ -125,7 +125,7 @@ func (qb *performerFilterHandler) criterionHandler() criterionHandler {
 	convertLegacyCareerLengthFilter(&filter)
 
 	return compoundHandler{
-		stringCriterionHandler(filter.Name, tableName+".name"),
+		stringCriterionHandler(filter.Name, performerPrimaryNameSQL),
 		stringCriterionHandler(filter.Disambiguation, tableName+".disambiguation"),
 		stringCriterionHandler(filter.Details, tableName+".details"),
 
@@ -350,8 +350,7 @@ func (qb *performerFilterHandler) performerIsMissingCriterionHandler(isMissing *
 				performersStashIDsTableMgr.leftJoin(f, "performer_stash_ids", "performers.id")
 				f.addWhere("performer_stash_ids.performer_id IS NULL")
 			case "aliases":
-				performersAliasesTableMgr.leftJoin(f, "", "performers.id")
-				f.addWhere("performer_aliases.alias IS NULL")
+				f.addWhere("NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.id AND position > 0)")
 			case "tags":
 				f.addLeftJoin(performersTagsTable, "tags_join", "tags_join.performer_id = performers.id")
 				f.addWhere("tags_join.performer_id IS NULL")
@@ -401,10 +400,13 @@ func (qb *performerFilterHandler) aliasCriterionHandler(alias *models.StringCrit
 	h := stringListCriterionHandlerBuilder{
 		primaryTable: performerTable,
 		primaryFK:    performerIDColumn,
-		joinTable:    performersAliasesTable,
-		stringColumn: performerAliasColumn,
+		joinTable:    performerNamesTable,
+		stringColumn: "name",
 		addJoinTable: func(f *filterBuilder, joinType joinType) {
-			performersAliasesTableMgr.join(f, joinType, "", "performers.id")
+			f.addJoin(joinType, performerNamesTable, "", "performer_names.performer_id = performers.id AND performer_names.position > 0")
+		},
+		excludeHandler: func(f *filterBuilder, criterion *models.StringCriterionInput) {
+			f.addWhere("NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.id AND position > 0 AND name LIKE ?)", "%"+criterion.Value+"%")
 		},
 	}
 
@@ -417,11 +419,11 @@ func (qb *performerFilterHandler) allNamesCriterionHandler(names *models.StringC
 			return
 		}
 
-		const canonical = "performers.name"
-		const aliases = "COALESCE((SELECT GROUP_CONCAT(performer_aliases.alias, ' | ') FROM performer_aliases WHERE performer_aliases.performer_id = performers.id), '')"
-		const aliasMatch = "EXISTS (SELECT 1 FROM performer_aliases WHERE performer_aliases.performer_id = performers.id AND performer_aliases.alias LIKE ?)"
-		const aliasRegex = "EXISTS (SELECT 1 FROM performer_aliases WHERE performer_aliases.performer_id = performers.id AND performer_aliases.alias regexp ?)"
-		const aliasPresent = "EXISTS (SELECT 1 FROM performer_aliases WHERE performer_aliases.performer_id = performers.id AND TRIM(performer_aliases.alias) != '')"
+		const canonical = performerPrimaryNameSQL
+		const aliases = "COALESCE((SELECT GROUP_CONCAT(name, ' | ') FROM performer_names WHERE performer_id = performers.id AND position > 0), '')"
+		const aliasMatch = "EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.id AND position > 0 AND name LIKE ?)"
+		const aliasRegex = "EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.id AND position > 0 AND name regexp ?)"
+		const aliasPresent = "EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.id AND position > 0 AND TRIM(name) != '')"
 
 		switch names.Modifier {
 		case models.CriterionModifierIncludes:

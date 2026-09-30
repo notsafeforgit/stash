@@ -106,6 +106,19 @@ func validateDatabaseLineage(path string) error {
 				return errors.New("native database schema is incomplete: missing saved_filters.filter_ast")
 			}
 		}
+		if version >= NativeSchemaBaseline+2 {
+			if !present["performer_names"] {
+				return errors.New("native database schema is incomplete: missing performer_names")
+			}
+			var missingPrimary bool
+			if err := conn.Get(&missingPrimary, `SELECT EXISTS(SELECT 1 FROM performers
+WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.id AND position = 0))`); err != nil {
+				return err
+			}
+			if missingPrimary {
+				return errors.New("native database schema is incomplete: performer has no canonical name")
+			}
+		}
 		return nil
 	}
 	if version >= NativeSchemaBaseline {

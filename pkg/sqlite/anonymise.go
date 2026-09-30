@@ -540,7 +540,6 @@ func (db *Anonymiser) anonymisePerformers(ctx context.Context) error {
 		if err := txn.WithTxn(ctx, db, func(ctx context.Context) error {
 			query := dialect.From(table).Select(
 				table.Col(idColumn),
-				table.Col("name"),
 				table.Col("disambiguation"),
 				table.Col("details"),
 				table.Col("tattoos"),
@@ -553,7 +552,6 @@ func (db *Anonymiser) anonymisePerformers(ctx context.Context) error {
 			return queryFunc(ctx, query, single, func(rows *sqlx.Rows) error {
 				var (
 					id             int
-					name           sql.NullString
 					disambiguation sql.NullString
 					details        sql.NullString
 					tattoos        sql.NullString
@@ -562,7 +560,6 @@ func (db *Anonymiser) anonymisePerformers(ctx context.Context) error {
 
 				if err := rows.Scan(
 					&id,
-					&name,
 					&disambiguation,
 					&details,
 					&tattoos,
@@ -572,7 +569,6 @@ func (db *Anonymiser) anonymisePerformers(ctx context.Context) error {
 				}
 
 				set := goqu.Record{}
-				db.obfuscateNullString(set, "name", name)
 				db.obfuscateNullString(set, "disambiguation", disambiguation)
 				db.obfuscateNullString(set, "details", details)
 				db.obfuscateNullString(set, "tattoos", tattoos)
@@ -601,7 +597,7 @@ func (db *Anonymiser) anonymisePerformers(ctx context.Context) error {
 		}
 	}
 
-	if err := db.anonymiseAliases(ctx, goqu.T(performersAliasesTable), "performer_id"); err != nil {
+	if err := db.anonymisePerformerNames(ctx); err != nil {
 		return err
 	}
 
@@ -691,6 +687,21 @@ func (db *Anonymiser) anonymiseStudios(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (db *Anonymiser) anonymisePerformerNames(ctx context.Context) error {
+	return txn.WithTxn(ctx, db, func(ctx context.Context) error {
+		table := goqu.T(performerNamesTable)
+		_, err := exec(ctx, dialect.Update(table).Set(goqu.Record{
+			"name": goqu.L("'Performer ' || performer_id || ' name ' || position"),
+		}))
+		if err != nil {
+			return fmt.Errorf("anonymising performer names: %w", err)
+		}
+		// The migration audit can retain old spellings that were deduplicated.
+		_, err = exec(ctx, dialect.Update("native_migration_history").Set(goqu.Record{"details": "{}"}))
+		return err
+	})
 }
 
 func (db *Anonymiser) anonymiseAliases(ctx context.Context, table exp.IdentifierExpression, idColumn string) error {

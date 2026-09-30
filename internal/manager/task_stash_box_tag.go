@@ -235,7 +235,7 @@ func (t *stashBoxBatchPerformerTagTask) processMatchedPerformer(ctx context.Cont
 		err = r.WithTxn(ctx, func(ctx context.Context) error {
 			qb := r.Performer
 
-			if err := performer.ValidateCreate(ctx, *newPerformer, qb); err != nil {
+			if err := performer.ValidateCreate(*newPerformer); err != nil {
 				return err
 			}
 

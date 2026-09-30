@@ -33,13 +33,14 @@ review. Production has not been migrated.
 | Stash `5c4a4c057` | Independent-fork policy and baseline progress record |
 | stash-s6 `5dab164` | Explicit digest selection for native builds, isolated preview variants, preservation workflow using pinned Stash release tooling; actionlint and [resolved bake validation](https://github.com/notsafeforgit/stash-s6/actions/runs/36757903303) passed |
 | Stash `bc77846a6` | Native lineage 1000000, sidecar promotion, pre-write refusal, historical migration audit, full-copy rehearsal, native plugin/current-operation validation; complete validation gate passed |
+| Stash `43d8bba99` | Canonical saved-filter ASTs, legacy conflict evidence, strict persistence validation, full-copy semantic reconciliation; complete validation gate passed |
 
 ## Phase status
 
 | Phase | Status |
 | --- | --- |
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
-| 1 Native schema and services | First schema promotion implemented and rehearsed: lineage/version refusal, sidecar promotion, historical audit, repository/filter joins, no runtime DB reconciliation. Canonical saved-filter conversion is implemented; default-filter config, performer names, archive identities/sources, and domain services remain. |
+| 1 Native schema and services | Schema promotion, canonical saved filters, and unified performer names are implemented. Default-filter config, archive identities/sources, and domain services remain. |
 | 2 Ingestion and producer adapter | Not yet implemented |
 | 3 Catalog importer and full-copy reconciliation | Not yet implemented |
 | 4 Native UI and client conversion | Not yet implemented |
@@ -95,3 +96,19 @@ The copied library has no pending legacy filter conflicts. The reconciliation
 receipt is `.local/native-archive-rehearsal-20260930/saved-filter-reconciliation.json`.
 Focused SQLite/import tests and the complete `make validate-fork` gate passed,
 including all 527 frontend tests and retained native contract checks.
+
+## Unified performer names
+
+Migration 1000002 consolidates canonical names, ordered aliases, and per-name
+auto-tag policy into `performer_names`. Display names and disambiguation no longer
+have to be globally unique. Existing alias selection transfers its policy and
+keeps the previous canonical name; database writes replace a name set atomically.
+The old name column and both name-related tables are removed. Existing search,
+filter, sorting, auto-tag, merge, and anonymised-export callers use the new model.
+
+The full-copy migration took 77.3 milliseconds. All 1,426 performer records,
+1,927 names (including 501 aliases), and their policies reconciled. Streaming
+digests matched for the other 64 retained tables; foreign-key checking found
+zero violations. The receipt is
+`.local/native-archive-rehearsal-20260930/performer-name-reconciliation.json`.
+Focused migration/domain/API tests and the full validation gate passed.

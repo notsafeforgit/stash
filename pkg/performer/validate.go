@@ -21,18 +21,6 @@ func (e *NotFoundError) Error() string {
 	return fmt.Sprintf("performer with id %d not found", e.id)
 }
 
-type NameExistsError struct {
-	Name           string
-	Disambiguation string
-}
-
-func (e *NameExistsError) Error() string {
-	if e.Disambiguation != "" {
-		return fmt.Sprintf("performer with name '%s' and disambiguation '%s' already exists", e.Name, e.Disambiguation)
-	}
-	return fmt.Sprintf("performer with name '%s' already exists", e.Name)
-}
-
 type DuplicateAliasError struct {
 	Alias string
 }
@@ -50,13 +38,15 @@ func (e *DeathDateError) Error() string {
 	return fmt.Sprintf("death date %s should be after birthdate %s", e.DeathDate, e.Birthdate)
 }
 
-func ValidateCreate(ctx context.Context, performer models.Performer, qb models.PerformerReader) error {
-	if err := ValidateName(ctx, performer.Name, performer.Disambiguation, qb); err != nil {
+func ValidateCreate(performer models.Performer) error {
+	if err := ValidateName(performer.Name); err != nil {
 		return err
 	}
 
-	if err := ValidateAliases(performer.Name, performer.Aliases.List()); err != nil {
-		return err
+	if performer.Aliases.Loaded() {
+		if err := ValidateAliases(performer.Name, performer.Aliases.List()); err != nil {
+			return err
+		}
 	}
 
 	if err := ValidateDeathDate(performer.Birthdate, performer.DeathDate); err != nil {
@@ -76,7 +66,7 @@ func ValidateUpdate(ctx context.Context, id int, partial models.PerformerPartial
 		return &NotFoundError{id}
 	}
 
-	if err := ValidateUpdateName(ctx, *existing, partial.Name, partial.Disambiguation, qb); err != nil {
+	if err := ValidateUpdateName(partial.Name); err != nil {
 		return err
 	}
 
@@ -95,104 +85,20 @@ func ValidateUpdate(ctx context.Context, id int, partial models.PerformerPartial
 	return nil
 }
 
-func validateName(ctx context.Context, name string, disambig string, existingID *int, qb models.PerformerQueryer) error {
-	performerFilter := models.PerformerFilterType{
-		Name: &models.StringCriterionInput{
-			Value:    name,
-			Modifier: models.CriterionModifierEquals,
-		},
-	}
-
-	modifier := models.CriterionModifierIsNull
-
-	if disambig != "" {
-		modifier = models.CriterionModifierEquals
-	}
-
-	performerFilter.Disambiguation = &models.StringCriterionInput{
-		Value:    disambig,
-		Modifier: modifier,
-	}
-
-	if existingID == nil {
-		// creating: error if any existing performer matches
-
-		pp := 1
-		findFilter := models.FindFilterType{
-			PerPage: &pp,
-		}
-
-		count, err := qb.QueryCount(ctx, &performerFilter, &findFilter)
-		if err != nil {
-			return err
-		}
-
-		if count > 0 {
-			return &NameExistsError{
-				Name:           name,
-				Disambiguation: disambig,
-			}
-		}
-
-		return nil
-	} else {
-		// updating: check for matches, but ignore self
-
-		pp := 2
-		findFilter := models.FindFilterType{
-			PerPage: &pp,
-		}
-
-		conflicts, _, err := qb.Query(ctx, &performerFilter, &findFilter)
-		if err != nil {
-			return err
-		}
-
-		if len(conflicts) > 0 {
-			// valid if the only conflict is the existing performer
-			if len(conflicts) > 1 || conflicts[0].ID != *existingID {
-				return &NameExistsError{
-					Name:           name,
-					Disambiguation: disambig,
-				}
-			}
-		}
-
-		return nil
-	}
-}
-
-// ValidateName returns an error if the performer name and disambiguation provided is used by another performer.
-func ValidateName(ctx context.Context, name string, disambig string, qb models.PerformerQueryer) error {
-	if name == "" {
+// ValidateName validates a display value, not identity. Different performers
+// may have the same canonical name or alias, with or without disambiguation.
+func ValidateName(name string) error {
+	if strings.TrimSpace(name) == "" {
 		return ErrNameMissing
 	}
-
-	return validateName(ctx, name, disambig, nil, qb)
+	return nil
 }
 
-// ValidateUpdateName performs the same check as ValidateName, but is used when modifying an existing performer.
-func ValidateUpdateName(ctx context.Context, existing models.Performer, name models.OptionalString, disambig models.OptionalString, qb models.PerformerQueryer) error {
-	// if neither name nor disambig is set, don't check anything
-	if !name.Set && !disambig.Set {
+func ValidateUpdateName(name models.OptionalString) error {
+	if !name.Set {
 		return nil
 	}
-
-	newName := existing.Name
-	if name.Set {
-		newName = name.Value
-	}
-
-	if newName == "" {
-		return ErrNameMissing
-	}
-
-	newDisambig := existing.Disambiguation
-	if disambig.Set {
-		newDisambig = disambig.Value
-	}
-
-	return validateName(ctx, newName, newDisambig, &existing.ID, qb)
+	return ValidateName(name.Value)
 }
 
 func ValidateAliases(name string, aliases []models.PerformerAlias) error {
@@ -222,9 +128,16 @@ func ValidateUpdateAliases(existing models.Performer, name models.OptionalString
 		newName = name.Value
 	}
 
-	// If aliases is nil, we're only changing the name - check existing aliases against new name
+	// Selecting an existing alias promotes it and retains the old canonical
+	// name in its position. Other name changes keep the remaining aliases.
 	if aliases == nil {
-		return ValidateAliases(newName, existing.Aliases.List())
+		names := append([]models.PerformerAlias(nil), existing.Aliases.List()...)
+		for i := range names {
+			if names[i].Alias == newName {
+				names[i].Alias = existing.Name
+			}
+		}
+		return ValidateAliases(newName, names)
 	}
 
 	newAliases := GetEffectiveAliases(existing.Aliases.List(), aliases.Values, aliases.Mode, false)

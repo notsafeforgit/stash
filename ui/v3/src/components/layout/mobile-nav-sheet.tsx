@@ -22,7 +22,7 @@ export function MobileNavSheet({
   onOpenChangeComplete,
 }: MobileNavSheetProps) {
   const intl = useIntl();
-  const items = useNavItems({ placement: "main" });
+  const items = useNavItems({ placement: ["main", "mobile", "utility"] });
   return (
     <BottomSheet
       open={open}
@@ -76,7 +76,9 @@ export function MobileNavSheet({
             )}
           >
             <span className="[&>svg]:size-6">{item.icon}</span>
-            <span className="text-xs font-medium">{item.label}</span>
+            <span className="text-center text-xs font-medium wrap-anywhere whitespace-normal">
+              {item.label}
+            </span>
           </Link>
         ))}
         <Link

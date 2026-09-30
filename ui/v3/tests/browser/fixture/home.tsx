@@ -18,6 +18,43 @@ import { installRouteTransitions } from "@/core/route-transitions";
 import { MobileNavigationProvider } from "@/components/layout/mobile-navigation";
 import { RouteViewport } from "@/components/layout/route-viewport";
 import { preloadFrontPage } from "@/components/frontpage/preload-front-page";
+import { NavLinks } from "@/components/layout/nav-items";
+import { UserMenu } from "@/components/layout/user-menu";
+import { recordNavItem } from "@/plugins/registry";
+
+const pluginNavigation = new URLSearchParams(location.search).has(
+  "plugin-navigation",
+);
+const pluginPages = [
+  { path: "/examplePlugin/review", label: "Catalog review" },
+  { path: "/examplePlugin/library", label: "Plugin library" },
+  { path: "/examplePlugin/mobile", label: "Mobile plugin page" },
+] as const;
+if (pluginNavigation) {
+  recordNavItem("examplePlugin", {
+    to: pluginPages[0].path,
+    label: (intl) =>
+      intl.formatMessage({
+        id: "examplePlugin.review",
+        defaultMessage: "Catalog review",
+      }),
+    placement: "utility",
+  });
+  recordNavItem("examplePlugin", {
+    to: pluginPages[1].path,
+    label: pluginPages[1].label,
+  });
+  recordNavItem("examplePlugin", {
+    to: pluginPages[1].path,
+    label: pluginPages[1].label,
+    placement: "mobile",
+  });
+  recordNavItem("examplePlugin", {
+    to: pluginPages[2].path,
+    label: pluginPages[2].label,
+    placement: "mobile",
+  });
+}
 
 declare global {
   interface Window {
@@ -173,6 +210,14 @@ const root = createRootRoute({
             data-app-viewport
             className="flex h-dvh flex-col overflow-hidden"
           >
+            {pluginNavigation && (
+              <div className="hidden md:flex">
+                <nav aria-label="Primary navigation">
+                  <NavLinks />
+                </nav>
+                <UserMenu />
+              </div>
+            )}
             <RouteViewport>
               <Outlet />
             </RouteViewport>
@@ -201,6 +246,13 @@ const router = createRouter({
         getParentRoute: () => root,
         path,
         component: () => <h1 className="p-4">{path}</h1>,
+      }),
+    ),
+    ...pluginPages.map(({ path, label }) =>
+      createRoute({
+        getParentRoute: () => root,
+        path,
+        component: () => <h1>{label}</h1>,
       }),
     ),
   ]),

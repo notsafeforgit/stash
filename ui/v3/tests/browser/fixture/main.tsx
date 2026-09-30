@@ -417,6 +417,7 @@ createRoot(root).render(
   <StrictMode>
     <IntlProvider
       locale="en-GB"
+      defaultLocale="en-GB"
       messages={flattenMessages(messages)}
       formats={{
         date: { long: { year: "numeric", month: "long", day: "numeric" } },

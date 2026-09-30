@@ -11,6 +11,7 @@ import {
   Tag,
   Download,
   Tv,
+  Puzzle,
 } from "lucide-react";
 import { getRegisteredNavItems, type NavPlacement } from "@/plugins";
 
@@ -92,21 +93,29 @@ const BUILTIN_NAV_ITEMS: NavItem[] = [
  */
 export const NAV_ITEMS: readonly NavItem[] = BUILTIN_NAV_ITEMS;
 
-export function useNavItems(opts?: { placement?: NavPlacement }): NavItem[] {
+export function useNavItems(opts?: {
+  placement?: NavPlacement | readonly NavPlacement[];
+}): NavItem[] {
   const intl = useIntl();
-  const placement: NavPlacement = opts?.placement ?? "main";
+  const placement = opts?.placement ?? "main";
+  const placements = typeof placement === "string" ? [placement] : placement;
 
   const pluginItems = getRegisteredNavItems()
-    .filter((item) => (item.placement ?? "main") === placement)
+    .filter((item) => placements.includes(item.placement ?? "main"))
     .map((item) => ({
       label: typeof item.label === "function" ? item.label(intl) : item.label,
-      icon: item.icon,
+      icon: item.icon ?? <Puzzle className="size-4" />,
       to: item.to,
       hotkey: item.hotkey,
     }));
 
-  if (placement !== "main") return pluginItems;
-  return [...BUILTIN_NAV_ITEMS, ...pluginItems];
+  const items = placements.includes("main")
+    ? [...BUILTIN_NAV_ITEMS, ...pluginItems]
+    : pluginItems;
+  // A destination registered for several surfaces appears once in a combined menu.
+  return items.filter(
+    (item, index) => items.findIndex((other) => other.to === item.to) === index,
+  );
 }
 
 interface NavLinksProps {

@@ -161,13 +161,14 @@ interface StashPluginHost {
 
 `host.nav.add({ label, to, icon?, placement?, hotkey? })`:
 
-- `placement: "main"` (default) — primary sidebar / mobile bottom-tab overflow.
-- `placement: "mobile"` — primary mobile nav (use sparingly; the bottom bar is space-constrained).
-- `placement: "utility"` — utility menus only.
+- `placement: "main"` (default) — primary desktop navigation and mobile drawer.
+- `placement: "mobile"` — mobile drawer only. The compact bottom bar keeps its built-in quick links.
+- `placement: "utility"` — desktop **More options** menu and mobile drawer.
+- The mobile drawer includes all placements and shows each destination once.
 - `label` may be a string or a function `(intl) => string` for plugins that ship localized strings.
 - `hotkey` follows the same `"g <key>"` chord syntax as built-in nav (`"g s"` for `/scenes`). Built-in hotkeys take precedence; plugin hotkeys cannot shadow them.
 - `icon` is a rendered React node, not a component function. For JSX source, pass
-  `icon: <TvIcon size={16} />`, not `icon: TvIcon`.
+  `icon: <TvIcon size={16} />`, not `icon: TvIcon`. Entries without an icon use the host's plugin icon.
 
 ### Filter extensions
 

@@ -63,8 +63,8 @@ export interface PluginNavItem {
   icon?: ReactNode;
   /**
    * Where to surface the nav item:
-   * - `main` (default): primary sidebar / desktop nav.
-   * - `mobile`: mobile bottom-tab bar (limit to high-priority items).
+   * - `main` (default): primary desktop nav and mobile drawer.
+   * - `mobile`: mobile drawer only. The compact bottom bar keeps its built-in tabs.
    * - `utility`: secondary menus only (overflow on desktop, drawer on mobile).
    */
   placement?: NavPlacement;

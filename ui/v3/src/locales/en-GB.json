@@ -2108,9 +2108,10 @@
     "will_create_tag": "Will create tag “{name}”"
   },
   "default_filter": {
-    "keep_v3": "Keep v3",
-    "use_v25": "Use v2.5",
-    "version_conflict": "This default was changed in v2.5. Choose which version to keep."
+    "import_conflict": "Migration retained another version of this default. Choose which to keep.",
+    "invalid_import": "The imported alternative has invalid criteria. Keep the current default or save a new one.",
+    "keep_current": "Keep current default",
+    "use_imported": "Use imported alternative"
   },
   "search": "Search…",
   "search_filter": {

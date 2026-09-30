@@ -21,6 +21,9 @@ type schema58Migrator struct {
 }
 
 func post58(ctx context.Context, db *sqlx.DB) error {
+	if sqlite.IsNewDatabaseMigration(ctx) {
+		return nil
+	}
 	logger.Info("Running post-migration for schema version 58")
 
 	m := schema58Migrator{

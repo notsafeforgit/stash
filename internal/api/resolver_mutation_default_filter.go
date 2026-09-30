@@ -14,5 +14,5 @@ func (r *mutationResolver) ConfigureDefaultFilter(ctx context.Context, input Con
 			Mode: f.Mode, FindFilter: f.FindFilter, FilterAST: f.FilterAst, UIOptions: convertMapJSONNumbers(f.UIOptions),
 		}
 	}
-	return manager.GetInstance().ConfigureDefaultFilter(input.View, input.Action.String(), filter)
+	return manager.GetInstance().ConfigureDefaultFilter(ctx, input.View, input.Action.String(), filter, input.ExpectedRevision)
 }

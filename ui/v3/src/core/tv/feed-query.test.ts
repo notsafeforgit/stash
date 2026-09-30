@@ -193,8 +193,8 @@ describe("TV query construction", () => {
       ...playerConfiguration,
       ui: {
         ...playerConfiguration.ui,
-        forkDefaultFilterState: {
-          scenes: { pending_legacy_object_filter: {} },
+        defaultFilterConflicts: {
+          scenes: { revision: 1 },
         },
       },
     };

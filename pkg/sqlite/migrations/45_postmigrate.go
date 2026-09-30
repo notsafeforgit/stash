@@ -257,6 +257,9 @@ func (m *schema45Migrator) dropTable(ctx context.Context, table string) error {
 }
 
 func (m *schema45Migrator) migrateConfig(ctx context.Context) error {
+	if sqlite.IsNewDatabaseMigration(ctx) {
+		return nil
+	}
 	c := config.GetInstance()
 
 	// if we don't have blobs, and storage is already set, then don't overwrite

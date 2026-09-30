@@ -46,8 +46,8 @@ the saved filter. `native_migration_history` records each native conversion.
 
 Legacy filter files can still be converted at the import boundary while their
 remaining callers are retired. They do not create live projection/shadow data.
-Default-filter configuration promotion, archive UUIDs,
-source/provenance models, and the catalog import are separate remaining work.
+Archive UUIDs, source/provenance models, and the catalog import are separate
+remaining work.
 The full [transition plan](native-archive-transition-plan.md) remains the
 acceptance requirement.
 
@@ -65,6 +65,26 @@ duplicate canonical/alias entries are represented once; migration history keeps
 their original evidence and any unmatched old policy. Case variants are retained
 as distinct spellings. The old name column, alias table, and policy table are
 removed. Startup refuses a native database with a missing canonical name.
+
+Migration 1000003 adds `default_filters`, one native record per view with a
+revision that survives clearing the default. Default filters no longer live in
+the configuration file. The UI configuration response includes their derived
+values, but generic UI-setting writes cannot modify them. Conflict resolution
+requires the reviewed revision and rejects stale browser actions.
+
+`configuration_migrations` first commits the exact filter-only input, converted
+records, and any pending alternatives together. The manager then atomically
+publishes the cleaned configuration and its source digest, and marks publication
+complete. Retrying either interruption point reuses the checkpoint; it cannot
+reimport a cleared or edited default. A changed source configuration stops
+publication for reconciliation. Invalid canonical criteria stop import before
+any records are staged. Historical string pagination is converted explicitly.
+Other settings and credentials do not become migration evidence.
+
+New database creation skips historical configuration rewrites; those apply only
+to actual older database inputs. Configuration publication uses a flushed
+temporary file, atomic replacement, and directory sync while retaining existing
+permissions and symlinks. Automatic migration backups are retained on success.
 
 The filesystem deletion journal currently derives its directory from the
 database filename. Promotion in place retains that association, but a production

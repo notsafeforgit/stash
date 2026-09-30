@@ -692,7 +692,14 @@ func (r *mutationResolver) GenerateAPIKey(ctx context.Context, input GenerateAPI
 func (r *mutationResolver) ConfigureUI(ctx context.Context, input map[string]interface{}, partial map[string]interface{}) (map[string]interface{}, error) {
 	input = convertMapJSONNumbers(input)
 	partial = convertMapJSONNumbers(partial)
-	return config.GetInstance().UpdateUIConfiguration(func(existing map[string]interface{}) (map[string]interface{}, error) {
+	for _, values := range []map[string]interface{}{input, partial} {
+		for key := range values {
+			if nativeDefaultFilterConfigKey(key) {
+				return nil, errors.New("default filters are native records; use configureDefaultFilter")
+			}
+		}
+	}
+	_, err := config.GetInstance().UpdateUIConfiguration(func(existing map[string]interface{}) (map[string]interface{}, error) {
 		if input != nil {
 			existing = input
 		}
@@ -701,14 +708,30 @@ func (r *mutationResolver) ConfigureUI(ctx context.Context, input map[string]int
 		}
 		return existing, nil
 	})
+	if err != nil {
+		return nil, err
+	}
+	return manager.GetInstance().UIConfiguration(ctx)
 }
 
 func (r *mutationResolver) ConfigureUISetting(ctx context.Context, key string, value interface{}) (map[string]interface{}, error) {
+	if nativeDefaultFilterConfigKey(key) {
+		return nil, errors.New("default filters are native records; use configureDefaultFilter")
+	}
 	value = convertJSONNumbers(value)
-	return config.GetInstance().UpdateUIConfiguration(func(existing map[string]interface{}) (map[string]interface{}, error) {
+	_, err := config.GetInstance().UpdateUIConfiguration(func(existing map[string]interface{}) (map[string]interface{}, error) {
 		utils.NestedMap(existing).Set(key, value)
 		return existing, nil
 	})
+	if err != nil {
+		return nil, err
+	}
+	return manager.GetInstance().UIConfiguration(ctx)
+}
+
+func nativeDefaultFilterConfigKey(key string) bool {
+	key = strings.SplitN(key, ".", 2)[0]
+	return key == "defaultFilters" || key == "forkDefaultFilterState" || key == "defaultFilterConflicts"
 }
 
 func (r *mutationResolver) ConfigurePlugin(ctx context.Context, pluginID string, input map[string]interface{}) (map[string]interface{}, error) {

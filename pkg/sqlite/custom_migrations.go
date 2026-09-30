@@ -8,6 +8,16 @@ import (
 
 type customMigrationFunc func(ctx context.Context, db *sqlx.DB) error
 
+type newDatabaseMigrationKey struct{}
+
+// IsNewDatabaseMigration distinguishes schema creation from importing an old
+// library. Historical config rewrites must not run against a modern config
+// merely because the user selected a new database path.
+func IsNewDatabaseMigration(ctx context.Context) bool {
+	value, _ := ctx.Value(newDatabaseMigrationKey{}).(bool)
+	return value
+}
+
 func RegisterPostMigration(schemaVersion uint, fn customMigrationFunc) {
 	v := postMigrations[schemaVersion]
 	v = append(v, fn)

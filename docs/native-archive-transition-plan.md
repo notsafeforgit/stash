@@ -198,7 +198,7 @@ table merely to remove its fork prefix.
 | Current storage | Native target and conversion |
 | --- | --- |
 | fork_saved_filter_state | Move the authoritative AST to saved_filters.filter_ast. Resolve pending legacy conflicts and validate every AST before removing object_filter and compatibility shadows. |
-| forkDefaultFilterState in config | One authoritative default-filter AST per view. Convert config atomically with a durable migration checkpoint; remove dual writes and startup reconciliation. |
+| forkDefaultFilterState in config | One authoritative default-filter AST per view in default_filters. Commit the source evidence and converted records together, then publish the cleaned config atomically with a durable checkpoint. Remove dual writes and startup reconciliation. |
 | fork_performer_autotag_ignored_names and performer_aliases | performer_names containing name, primary status, order, and auto-tag policy. Preserve the global ignore flag and per-name policy; names remain nonunique across performers. |
 | fork_video_file_metadata | video_file_metadata, retaining source validity checks and derived probe fields. |
 | fork_image_file_metadata | image_file_metadata, with the same validity rules. |

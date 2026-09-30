@@ -119,6 +119,13 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 				return errors.New("native database schema is incomplete: performer has no canonical name")
 			}
 		}
+		if version >= NativeSchemaBaseline+3 {
+			for _, name := range []string{"default_filters", "configuration_migrations", "default_filter_import_conflicts"} {
+				if !present[name] {
+					return fmt.Errorf("native database schema is incomplete: missing %s", name)
+				}
+			}
+		}
 		return nil
 	}
 	if version >= NativeSchemaBaseline {

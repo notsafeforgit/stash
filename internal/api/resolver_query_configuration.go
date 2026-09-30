@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/stashapp/stash/internal/manager"
 	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/pkg/fsutil"
 	"github.com/stashapp/stash/pkg/models"
@@ -13,7 +14,13 @@ import (
 )
 
 func (r *queryResolver) Configuration(ctx context.Context) (*ConfigResult, error) {
-	return makeConfigResult(), nil
+	result := makeConfigResult()
+	ui, err := manager.GetInstance().UIConfiguration(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result.UI = ui
+	return result, nil
 }
 
 func (r *queryResolver) Directory(ctx context.Context, path, locale *string) (*Directory, error) {

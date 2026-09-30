@@ -34,13 +34,14 @@ review. Production has not been migrated.
 | stash-s6 `5dab164` | Explicit digest selection for native builds, isolated preview variants, preservation workflow using pinned Stash release tooling; actionlint and [resolved bake validation](https://github.com/notsafeforgit/stash-s6/actions/runs/36757903303) passed |
 | Stash `bc77846a6` | Native lineage 1000000, sidecar promotion, pre-write refusal, historical migration audit, full-copy rehearsal, native plugin/current-operation validation; complete validation gate passed |
 | Stash `43d8bba99` | Canonical saved-filter ASTs, legacy conflict evidence, strict persistence validation, full-copy semantic reconciliation; complete validation gate passed |
+| Stash `e8fb366d2` | Unified performer names, per-name auto-tag policy, nonunique display names, full-copy semantic reconciliation; complete validation gate passed |
 
 ## Phase status
 
 | Phase | Status |
 | --- | --- |
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
-| 1 Native schema and services | Schema promotion, canonical saved filters, and unified performer names are implemented. Default-filter config, archive identities/sources, and domain services remain. |
+| 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, and unified performer names are implemented. Archive identities/sources and domain services remain. |
 | 2 Ingestion and producer adapter | Not yet implemented |
 | 3 Catalog importer and full-copy reconciliation | Not yet implemented |
 | 4 Native UI and client conversion | Not yet implemented |
@@ -112,3 +113,27 @@ digests matched for the other 64 retained tables; foreign-key checking found
 zero violations. The receipt is
 `.local/native-archive-rehearsal-20260930/performer-name-reconciliation.json`.
 Focused migration/domain/API tests and the full validation gate passed.
+
+## Native default filters
+
+Migration 1000003 makes default filters database records with persistent
+revisions. A durable configuration checkpoint commits the original filter-only
+input, native records, and conflict evidence before atomically publishing the
+cleaned config. Generic UI configuration writes cannot bypass the native API;
+resolving an alternative requires the revision shown to the reviewer.
+
+Interruption tests cover both publication boundaries, restart, changed inputs,
+invalid criteria, preserving edits after import, and stale review actions.
+Configuration writes retain permissions and symlinks. Anonymised exports remove
+filter evidence and criteria, including freed pages. New database creation no
+longer runs old configuration rewrites against modern settings. Pre-migration
+backups remain available after success.
+
+The full-copy SQL migration took 31.4 milliseconds; staging and publishing the
+nine actual default filters took 20.5 milliseconds. Historical string pagination
+was converted without losing sort/display options or the original input. All
+66 other retained tables matched by streaming row digest, with zero foreign-key
+violations and no pending default conflicts. The receipt is
+`.local/native-archive-rehearsal-20260930/default-filter-reconciliation.json`.
+The complete `make validate-fork` gate passed, including 528 UI tests, native
+contract checks, Go lint, and all Go unit/integration tests.

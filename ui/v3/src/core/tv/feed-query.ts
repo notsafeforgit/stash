@@ -29,12 +29,10 @@ export function tvSortOptions(mode: TvMode) {
   return getFilterOptions(tvFilterMode(mode)).sortByOptions;
 }
 const conflictSchema = z.object({
-  forkDefaultFilterState: z
+  defaultFilterConflicts: z
     .record(
       z.string(),
-      z
-        .object({ pending_legacy_object_filter: z.unknown().optional() })
-        .passthrough(),
+      z.object({ revision: z.number().int().positive() }).passthrough(),
     )
     .optional(),
 });
@@ -123,11 +121,7 @@ export async function resolveTvQuery(
   };
   if (filterChoice.kind === "default") {
     const state = conflictSchema.safeParse(configuration.ui);
-    if (
-      state.success &&
-      state.data.forkDefaultFilterState?.[view] &&
-      "pending_legacy_object_filter" in state.data.forkDefaultFilterState[view]
-    )
+    if (state.success && state.data.defaultFilterConflicts?.[view])
       throw new Error(
         "Resolve the default filter conflict in the library, or select another TV filter",
       );

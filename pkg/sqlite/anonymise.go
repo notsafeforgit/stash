@@ -62,6 +62,7 @@ func (db *Anonymiser) Anonymise(ctx context.Context) error {
 			func() error { return db.anonymiseTags(ctx) },
 			func() error { return db.anonymiseGroups(ctx) },
 			func() error { return db.anonymiseSavedFilters(ctx) },
+			func() error { return db.anonymiseNativeFilterEvidence(ctx) },
 			func() error { return db.Optimise(ctx) },
 		})
 	}(); err != nil {
@@ -1052,6 +1053,23 @@ func (db *Anonymiser) anonymiseText(ctx context.Context, table exp.IdentifierExp
 	}
 
 	return nil
+}
+
+func (db *Anonymiser) anonymiseNativeFilterEvidence(ctx context.Context) error {
+	return txn.WithTxn(ctx, db, func(ctx context.Context) error {
+		for _, query := range []string{
+			"DELETE FROM saved_filter_import_conflicts",
+			"DELETE FROM default_filter_import_conflicts",
+			"UPDATE configuration_migrations SET source_json = '{}', target_json = '{}'",
+			"UPDATE saved_filters SET find_filter = '', filter_ast = '', ui_options = ''",
+			"UPDATE default_filters SET find_filter = '', filter_ast = '', ui_options = ''",
+		} {
+			if _, err := dbWrapper.Exec(ctx, query); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (db *Anonymiser) anonymiseFingerprint(ctx context.Context, table exp.IdentifierExpression, column string, value string) error {

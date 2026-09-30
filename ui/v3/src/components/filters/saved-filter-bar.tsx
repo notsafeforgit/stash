@@ -218,8 +218,9 @@ export const SavedFilterBar: React.FC<{
             {defaultFilter.hasConflict && (
               <DefaultFilterConflict
                 disabled={defaultFilter.saving}
-                onUseLegacy={defaultFilter.useLegacy}
-                onKeepV3={defaultFilter.keepV3}
+                canUseImported={defaultFilter.canUseImported}
+                onUseImported={defaultFilter.useImported}
+                onKeepCurrent={defaultFilter.keepCurrent}
               />
             )}
           </div>

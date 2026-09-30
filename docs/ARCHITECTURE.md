@@ -139,17 +139,18 @@ any older Stash release can open the database. Promoted native databases are
 incompatible with old binaries. [FORK.md](../FORK.md) and the
 [native archive plan](native-archive-transition-plan.md) define the current policy.
 
-### Shared API, richer v3 state
+### Native state and remaining API conversion
 
-The starting implementation contains these bridges. Remove them after converting
-their actual consumers; new API contracts do not need v2.5 projections:
+The [native schema](native-schema.md) now owns saved/default filters and performer
+names. Other API bridges remain until their callers are converted:
 
-- Saved filters keep their v2.5 `object_filter` projection while a sidecar holds
-  the canonical v3 AST and a legacy shadow. Complex conflicting edits preserve
-  both values for resolution; they are not silently flattened into a new AST.
-- Default filters use the equivalent `defaultFilters` / `forkDefaultFilterState`
-  configuration bridge. `configureDefaultFilter` updates one view atomically;
-  changing a default must not replace the entire UI configuration.
+- Saved filters persist their canonical AST on `saved_filters`; the old sidecar
+  and projection column are removed. Migration evidence retains conflicts.
+- Default filters persist on `default_filters`. A durable config-import
+  checkpoint publishes the cleaned configuration after native records commit.
+  `configureDefaultFilter` updates one view; conflict resolution checks its
+  revision. The UI configuration response includes derived defaults without
+  maintaining a second writable copy.
 - `Scene.sceneStreams` keeps the legacy stream catalogue.
   [sceneStreamsV3](../internal/api/resolver_model_scene_v3.go) supplies v3's
   separate catalogue. The [legacy adapter](../internal/manager/scene_stream_legacy_compat.go)

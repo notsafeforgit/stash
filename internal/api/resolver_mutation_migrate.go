@@ -53,9 +53,10 @@ func (r *mutationResolver) MigrateLegacySavedFilters(ctx context.Context) (strin
 func (r *mutationResolver) Migrate(ctx context.Context, input manager.MigrateInput) (string, error) {
 	mgr := manager.GetInstance()
 	t := &task.MigrateJob{
-		BackupPath: input.BackupPath,
-		Config:     mgr.Config,
-		Database:   mgr.Database,
+		BackupPath:     input.BackupPath,
+		Config:         mgr.Config,
+		Database:       mgr.Database,
+		AfterMigration: mgr.PromoteDefaultFilterConfig,
 	}
 
 	if err := t.PreExecute(); err != nil {

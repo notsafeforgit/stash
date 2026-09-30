@@ -11,6 +11,9 @@ import (
 )
 
 func post12(ctx context.Context, db *sqlx.DB) error {
+	if sqlite.IsNewDatabaseMigration(ctx) {
+		return nil
+	}
 	m := schema12Migrator{
 		migrator: migrator{
 			db: db,

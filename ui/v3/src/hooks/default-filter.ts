@@ -17,8 +17,8 @@ import { useToast } from "./toast";
 
 type DefaultFilterUIConfig = {
   defaultFilters?: Partial<Record<View, SavedFilterLike>>;
-  forkDefaultFilterState?: Partial<
-    Record<View, { pending_legacy_object_filter?: unknown }>
+  defaultFilterConflicts?: Partial<
+    Record<View, { revision: number; import_error?: string }>
   >;
 };
 
@@ -35,14 +35,21 @@ export function useDefaultFilterActions(
     | DefaultFilterUIConfig
     | undefined;
   const defaultFilter = view ? ui?.defaultFilters?.[view] : undefined;
-  const forkState = view ? ui?.forkDefaultFilterState?.[view] : undefined;
+  const conflict = view ? ui?.defaultFilterConflicts?.[view] : undefined;
 
   const write = useCallback(
     async (action: DefaultFilterAction, nextFilter?: DefaultFilterInput) => {
       if (!view) return;
       try {
         await configureDefaultFilter({
-          variables: { input: { view, action, filter: nextFilter } },
+          variables: {
+            input: {
+              view,
+              action,
+              filter: nextFilter,
+              expected_revision: conflict?.revision,
+            },
+          },
         });
         Toast.success(
           intl.formatMessage({
@@ -56,7 +63,7 @@ export function useDefaultFilterActions(
         // The tracked save reports the error and updates the save indicator.
       }
     },
-    [configureDefaultFilter, intl, Toast, view],
+    [configureDefaultFilter, intl, Toast, view, conflict?.revision],
   );
 
   const setCurrent = useCallback(() => {
@@ -69,21 +76,23 @@ export function useDefaultFilterActions(
     });
   }, [filter, write]);
   const clear = useCallback(() => write(DefaultFilterAction.Clear), [write]);
-  const useLegacy = useCallback(
-    () => write(DefaultFilterAction.UseLegacy),
+  const useImported = useCallback(
+    () => write(DefaultFilterAction.UseImported),
     [write],
   );
-  const keepV3 = useCallback(() => write(DefaultFilterAction.KeepV3), [write]);
+  const keepCurrent = useCallback(
+    () => write(DefaultFilterAction.KeepCurrent),
+    [write],
+  );
 
   return {
     hasDefault: Boolean(defaultFilter),
-    hasConflict: Boolean(
-      forkState && "pending_legacy_object_filter" in forkState,
-    ),
+    hasConflict: Boolean(conflict),
+    canUseImported: !conflict?.import_error,
     saving,
     setCurrent,
     clear,
-    useLegacy,
-    keepV3,
+    useImported,
+    keepCurrent,
   };
 }

@@ -14,7 +14,8 @@ export function useDefaultFilterActions(): ReturnType<
     saving: false,
     setCurrent: unexpectedWrite,
     clear: unexpectedWrite,
-    useLegacy: unexpectedWrite,
-    keepV3: unexpectedWrite,
+    canUseImported: true,
+    useImported: unexpectedWrite,
+    keepCurrent: unexpectedWrite,
   };
 }

@@ -45,9 +45,10 @@ func (db *Database) NeedsMigration() bool {
 }
 
 type Migrator struct {
-	db   *Database
-	conn *sqlx.DB
-	m    *migrate.Migrate
+	db          *Database
+	conn        *sqlx.DB
+	m           *migrate.Migrate
+	newDatabase bool
 }
 
 func NewMigrator(db *Database) (*Migrator, error) {
@@ -75,6 +76,8 @@ func NewMigrator(db *Database) (*Migrator, error) {
 	// if error encountered, close the connection
 	if err != nil {
 		m.Close()
+	} else {
+		m.newDatabase = m.CurrentSchemaVersion() == 0
 	}
 
 	return m, err
@@ -131,6 +134,7 @@ func (m *Migrator) getMigrate() (*migrate.Migrate, error) {
 }
 
 func (m *Migrator) RunMigration(ctx context.Context, newVersion uint) error {
+	ctx = context.WithValue(ctx, newDatabaseMigrationKey{}, m.newDatabase)
 	databaseSchemaVersion, dirty, err := m.m.Version()
 	if err != nil && !errors.Is(err, migrate.ErrNilVersion) {
 		return err

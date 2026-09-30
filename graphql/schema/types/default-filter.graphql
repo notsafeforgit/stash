@@ -1,8 +1,8 @@
 enum DefaultFilterAction {
   SET
   CLEAR
-  USE_LEGACY
-  KEEP_V3
+  USE_IMPORTED
+  KEEP_CURRENT
 }
 
 input DefaultFilterInput {
@@ -18,9 +18,11 @@ input ConfigureDefaultFilterInput {
   action: DefaultFilterAction!
   "Required for SET; conflict resolution uses the current server state"
   filter: DefaultFilterInput
+  "Required when resolving a migrated conflict; rejects stale review actions"
+  expected_revision: Int
 }
 
 extend type Mutation {
-  "Atomically updates a view's default filter and its v2.5 compatibility state"
+  "Updates one native default filter or resolves a retained migration conflict"
   configureDefaultFilter(input: ConfigureDefaultFilterInput!): Map!
 }

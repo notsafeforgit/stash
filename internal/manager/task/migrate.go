@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/stashapp/stash/internal/manager/config"
@@ -20,9 +19,10 @@ type migrateJobConfig interface {
 }
 
 type MigrateJob struct {
-	BackupPath string
-	Config     migrateJobConfig
-	Database   *sqlite.Database
+	BackupPath     string
+	Config         migrateJobConfig
+	Database       *sqlite.Database
+	AfterMigration func(context.Context) error
 }
 
 type databaseSchemaInfo struct {
@@ -57,11 +57,14 @@ func (s *MigrateJob) Execute(ctx context.Context, progress *job.Progress) error 
 
 	if schemaInfo.StepsRequired == 0 {
 		logger.Infof("database is already at the latest schema version")
+		if s.AfterMigration != nil {
+			return s.AfterMigration(ctx)
+		}
 		return nil
 	}
 
 	logger.Infof(
-		"Migrating database from upstream schema %d to %d and fork schema %d to %d",
+		"Migrating database from schema %d to native schema %d (historical fork %d to %d)",
 		schemaInfo.CurrentSchemaVersion,
 		schemaInfo.RequiredSchemaVersion,
 		schemaInfo.CurrentForkSchemaVersion,
@@ -114,16 +117,17 @@ func (s *MigrateJob) Execute(ctx context.Context, progress *job.Progress) error 
 		return errors.New(errStr)
 	}
 
-	// if no backup path was provided, then delete the created backup
-	if s.BackupPath == "" {
-		if err := os.Remove(backupPath); err != nil {
-			logger.Warnf("error removing unwanted database backup (%s): %s", backupPath, err.Error())
-		}
-	}
+	// A one-way native migration must retain its pre-migration backup even
+	// when the caller did not supply a custom path.
 
 	// reinitialise the database
 	if err := database.ReInitialise(); err != nil {
 		return fmt.Errorf("error reinitialising database: %s", err)
+	}
+	if s.AfterMigration != nil {
+		if err := s.AfterMigration(ctx); err != nil {
+			return fmt.Errorf("native database committed; configuration publication remains pending and can be retried: %w", err)
+		}
 	}
 
 	logger.Infof("Database migration complete")

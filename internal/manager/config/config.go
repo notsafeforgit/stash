@@ -568,7 +568,7 @@ func (i *Config) write() error {
 		return err
 	}
 
-	return os.WriteFile(i.filePath, data, 0640)
+	return fsutil.WriteFileAtomic(i.filePath, data, 0640)
 }
 
 func (i *Config) Marshal() ([]byte, error) {

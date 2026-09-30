@@ -13,6 +13,7 @@ import (
 	"github.com/knadh/koanf/parsers/yaml"
 	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/v2"
+	"github.com/stashapp/stash/internal/manager"
 	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stretchr/testify/require"
 )
@@ -87,7 +88,8 @@ func TestConfigurationJSONNumbersPersistAcrossReload(t *testing.T) {
 			// Resolver configuration is process-global; these cases must not run
 			// in parallel. Every write targets a private temporary configuration.
 			cfg := config.InitializeEmpty()
-			t.Cleanup(func() { config.InitializeEmpty() })
+			manager.SetInstance(&manager.Manager{Config: cfg})
+			t.Cleanup(func() { manager.SetInstance(nil); config.InitializeEmpty() })
 			path := filepath.Join(t.TempDir(), "config.yml")
 			cfg.SetConfigFile(path)
 			cfg.SetUIConfiguration(map[string]interface{}{"unrelated": "keep"})

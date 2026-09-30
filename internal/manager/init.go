@@ -235,8 +235,10 @@ func (s *Manager) postInit(ctx context.Context) error {
 			return err
 		}
 	}
-	if err := s.reconcileDefaultFilterConfig(); err != nil {
-		logger.Warnf("could not reconcile default-filter compatibility state: %v", err)
+	if s.Database.Ready() == nil {
+		if err := s.PromoteDefaultFilterConfig(ctx); err != nil {
+			return fmt.Errorf("promoting default-filter configuration: %w", err)
+		}
 	}
 
 	// Set the proxy if defined in config

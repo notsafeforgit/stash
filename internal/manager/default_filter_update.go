@@ -1,9 +1,9 @@
 package manager
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"regexp"
 
 	"github.com/stashapp/stash/pkg/models"
@@ -11,121 +11,135 @@ import (
 
 var defaultFilterViewPattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 
-// ConfigureDefaultFilter changes only the requested view under the same lock
-// used by legacy UI-setting writes. Conflict actions never trust a client's
-// possibly stale configuration snapshot.
-func (s *Manager) ConfigureDefaultFilter(view, action string, filter *models.SavedFilter) (map[string]interface{}, error) {
+// UIConfiguration overlays the native default-filter records onto ordinary UI
+// preferences. These derived fields are never written back to the config file.
+func (s *Manager) UIConfiguration(ctx context.Context) (map[string]interface{}, error) {
+	ui := s.Config.GetUIConfiguration()
+	if ui == nil {
+		ui = make(map[string]interface{})
+	}
+	if s.Database == nil || s.Database.Ready() != nil {
+		return ui, nil
+	} // setup/migration screen
+	delete(ui, "defaultFilters")
+	delete(ui, forkDefaultFilterStateKey)
+	delete(ui, "defaultFilterConflicts")
+	err := s.Repository.WithReadTxn(ctx, func(ctx context.Context) error {
+		filters, err := s.Repository.DefaultFilter.All(ctx)
+		if err != nil {
+			return err
+		}
+		defaults := make(map[string]interface{})
+		for _, filter := range filters {
+			if !filter.Enabled {
+				continue
+			}
+			value, err := defaultFilterUIEntry(filter)
+			if err != nil {
+				return err
+			}
+			defaults[filter.View] = value
+		}
+		if len(defaults) > 0 {
+			ui["defaultFilters"] = defaults
+		}
+		conflicts, err := s.Repository.DefaultFilter.Conflicts(ctx)
+		if err != nil {
+			return err
+		}
+		pending := make(map[string]interface{})
+		for _, conflict := range conflicts {
+			pending[conflict.View] = map[string]interface{}{"revision": conflict.Revision, "import_error": conflict.ImportError}
+		}
+		if len(pending) > 0 {
+			ui["defaultFilterConflicts"] = pending
+		}
+		return nil
+	})
+	return ui, err
+}
+
+func defaultFilterUIEntry(filter *models.DefaultFilter) (map[string]interface{}, error) {
+	data, err := json.Marshal(map[string]interface{}{
+		"mode": filter.Filter.Mode, "find_filter": filter.Filter.FindFilter,
+		"filter_ast": filter.Filter.FilterAST, "ui_options": filter.Filter.UIOptions,
+		"revision": filter.Revision,
+	})
+	if err != nil {
+		return nil, err
+	}
+	var ret map[string]interface{}
+	err = json.Unmarshal(data, &ret)
+	return ret, err
+}
+
+// ConfigureDefaultFilter updates one view. Resolving imported alternatives
+// requires the revision the user reviewed, so a stale action cannot replace a
+// default that changed in another session.
+func (s *Manager) ConfigureDefaultFilter(ctx context.Context, view, action string, filter *models.SavedFilter, expectedRevision *int) (map[string]interface{}, error) {
 	if !defaultFilterViewPattern.MatchString(view) {
 		return nil, errors.New("invalid default-filter view")
 	}
-	return s.Config.UpdateUIConfiguration(func(ui map[string]interface{}) (map[string]interface{}, error) {
-		if err := updateDefaultFilter(ui, view, action, filter); err != nil {
-			return nil, err
+	err := s.Repository.WithTxn(ctx, func(ctx context.Context) error {
+		store := s.Repository.DefaultFilter
+		current, err := store.Find(ctx, view)
+		if err != nil {
+			return err
 		}
-		return ui, nil
-	})
-}
-
-func updateDefaultFilter(ui map[string]interface{}, view, action string, filter *models.SavedFilter) error {
-	defaults, _ := stringMap(ui["defaultFilters"])
-	if defaults == nil {
-		defaults = make(map[string]interface{})
-	}
-	states, _ := stringMap(ui[forkDefaultFilterStateKey])
-	if states == nil {
-		states = make(map[string]interface{})
-	}
-
-	switch action {
-	case "CLEAR":
-		delete(defaults, view)
-		delete(states, view)
-	case "SET":
-		if filter == nil || !filter.Mode.IsValid() {
-			return errors.New("SET requires a filter with a valid mode")
+		revision := 0
+		if current != nil {
+			revision = current.Revision
 		}
-		var canonical *models.FilterAST
-		if filter.FilterAST != nil {
-			var err error
-			canonical, err = filter.FilterAST.Normalize()
-			if err != nil {
-				return fmt.Errorf("invalid default-filter AST: %w", err)
+		if expectedRevision != nil && *expectedRevision != revision {
+			return errors.New("default filter changed; reload before applying this action")
+		}
+		switch action {
+		case "CLEAR":
+			if err := store.Clear(ctx, view); err != nil {
+				return err
 			}
+			return store.ResolveConflict(ctx, view, "cleared")
+		case "SET":
+			if err := store.Set(ctx, view, filter); err != nil {
+				return err
+			}
+			return store.ResolveConflict(ctx, view, "replaced")
+		case "USE_IMPORTED", "KEEP_CURRENT":
+			if expectedRevision == nil {
+				return errors.New("conflict resolution requires the reviewed revision")
+			}
+			conflicts, err := store.Conflicts(ctx)
+			if err != nil {
+				return err
+			}
+			var pending *models.DefaultFilterConflict
+			for _, c := range conflicts {
+				if c.View == view {
+					pending = c
+					break
+				}
+			}
+			if current == nil || pending == nil {
+				return errors.New("default-filter conflict no longer exists")
+			}
+			selection := "kept-current"
+			if action == "USE_IMPORTED" {
+				if pending.ImportError != "" {
+					return errors.New("imported criteria are invalid; keep the current default or set a new one")
+				}
+				current.Filter.FilterAST = pending.Alternative
+				selection = "used-imported"
+			}
+			if err := store.Set(ctx, view, &current.Filter); err != nil {
+				return err
+			}
+			return store.ResolveConflict(ctx, view, selection)
+		default:
+			return errors.New("invalid default-filter action")
 		}
-		// Encode to the existing config shape rather than persisting Go structs.
-		encoded, err := json.Marshal(map[string]interface{}{
-			"mode": filter.Mode, "find_filter": filter.FindFilter, "ui_options": filter.UIOptions,
-		})
-		if err != nil {
-			return err
-		}
-		var entry map[string]interface{}
-		if err := json.Unmarshal(encoded, &entry); err != nil {
-			return err
-		}
-		if err := storeDefaultFilter(defaults, states, view, entry, canonical); err != nil {
-			return err
-		}
-	case "USE_LEGACY", "KEEP_V3":
-		// Reconcile only this view: an unrelated malformed default must not
-		// prevent the user from resolving or clearing this one.
-		current := map[string]interface{}{
-			"defaultFilters":          map[string]interface{}{view: defaults[view]},
-			forkDefaultFilterStateKey: map[string]interface{}{view: states[view]},
-		}
-		if _, err := reconcileDefaultFilterConfig(current); err != nil {
-			return err
-		}
-		entry, _ := stringMap(defaults[view])
-		currentStates, _ := stringMap(current[forkDefaultFilterStateKey])
-		state, _ := stringMap(currentStates[view])
-		if entry == nil || state == nil {
-			return errors.New("default-filter conflict no longer exists")
-		}
-		pending, exists := state["pending_legacy_object_filter"]
-		if !exists {
-			return errors.New("default-filter conflict no longer exists")
-		}
-		canonical, err := decodeDefaultFilterAST(state["filter_ast"])
-		if action == "USE_LEGACY" {
-			legacy, _ := stringMap(pending)
-			canonical, err = models.FilterASTFromLegacySavedFilter(legacy)
-		}
-		if err != nil {
-			return err
-		}
-		if err := storeDefaultFilter(defaults, states, view, entry, canonical); err != nil {
-			return err
-		}
-	default:
-		return errors.New("invalid default-filter action")
-	}
-
-	if len(defaults) == 0 {
-		delete(ui, "defaultFilters")
-	} else {
-		ui["defaultFilters"] = defaults
-	}
-	if len(states) == 0 {
-		delete(ui, forkDefaultFilterStateKey)
-	} else {
-		ui[forkDefaultFilterStateKey] = states
-	}
-	return nil
-}
-
-func storeDefaultFilter(defaults, states map[string]interface{}, view string, entry map[string]interface{}, canonical *models.FilterAST) error {
-	encoded, err := encodeDefaultFilterAST(canonical)
+	})
 	if err != nil {
-		return err
+		return nil, err
 	}
-	legacy, _ := canonical.FlatObjectFilter()
-	entry["object_filter"] = legacy
-	entry["filter_ast"] = encoded
-	defaults[view] = entry
-	states[view] = map[string]interface{}{
-		"filter_ast":           encoded,
-		"legacy_object_filter": legacy,
-	}
-	return nil
+	return s.UIConfiguration(ctx)
 }

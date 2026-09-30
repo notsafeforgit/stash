@@ -60,6 +60,8 @@ var testCtx = context.Background()
 
 type mockHookExecutor struct{}
 
+func (*mockHookExecutor) HasHooks(hook.TriggerEnum) bool { return false }
+
 func (*mockHookExecutor) ExecutePostHooks(ctx context.Context, id int, hookType hook.TriggerEnum, input interface{}, inputFields []string) {
 }
 

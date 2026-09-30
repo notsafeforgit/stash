@@ -82,6 +82,7 @@ var AllHookTriggerEnum = []TriggerEnum{
 
 	PerformerCreatePost,
 	PerformerUpdatePost,
+	PerformerMergePost,
 	PerformerDestroyPost,
 
 	StudioCreatePost,
@@ -128,6 +129,7 @@ func (e TriggerEnum) IsValid() bool {
 
 		PerformerCreatePost,
 		PerformerUpdatePost,
+		PerformerMergePost,
 		PerformerDestroyPost,
 
 		StudioCreatePost,

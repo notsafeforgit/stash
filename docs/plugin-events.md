@@ -26,6 +26,7 @@ hooks:
       - Image.Update.Post
       - Gallery.Update.Post
       - Performer.Update.Post
+      - Performer.Merge.Post
       - Studio.Update.Post
       - Group.Update.Post
       - Tag.Update.Post
@@ -88,6 +89,21 @@ This event means the database entry was removed. Depending on the originating
 operation, the physical file may be kept, moved to trash, or deleted. It is not
 a guarantee that final filesystem cleanup completed. Do not attempt to fetch
 the deleted record or assume its ID can still be used to find its path.
+
+## Performer merges
+
+`Performer.Merge.Post` fires once after `performerMerge` commits, with the
+destination performer as `hookContext.id`. Its `input` contains `destination`
+(the final identity), `previous_destination`, and `sources` (identities captured
+before deletion). Every snapshot contains string `id`, `name`, `disambiguation`,
+`alias_list` (strings), and `urls` (strings). Empty lists are arrays, not null.
+
+The original profiles survive in the notification even when the merge's chosen
+values discard some source aliases or URLs. Sources can no longer be queried
+by ID. Failed or rolled-back merges emit nothing. This is a distinct merge
+event; it does not synthesize `Performer.Update.Post` or individual destruction
+events. Plugins can use it to redirect external identity references without
+inferring a merge from deletions or treating shared media as identity evidence.
 
 ## Field edits
 

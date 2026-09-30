@@ -635,6 +635,7 @@ func (r *mutationResolver) PerformerMerge(ctx context.Context, input PerformerMe
 	}
 
 	var dest *models.Performer
+	var notification *PerformerMergeNotification
 	if err := r.withTxn(ctx, func(ctx context.Context) error {
 		qb := r.repository.Performer
 
@@ -657,6 +658,10 @@ func (r *mutationResolver) PerformerMerge(ctx context.Context, input PerformerMe
 			}
 		}
 		if err := preservePerformerMergeNames(ctx, qb, dest, sources, values, legacyAliasList); err != nil {
+			return err
+		}
+		notification, err = r.capturePerformerMerge(ctx, dest, sources)
+		if err != nil {
 			return err
 		}
 
@@ -732,12 +737,21 @@ func (r *mutationResolver) PerformerMerge(ctx context.Context, input PerformerMe
 				return err
 			}
 		}
+		if notification != nil {
+			notification.Destination, err = r.performerMergeProfile(ctx, dest)
+			if err != nil {
+				return err
+			}
+		}
 
 		return nil
 	}); err != nil {
 		return nil, err
 	}
 
+	if notification != nil {
+		r.hookExecutor.ExecutePostHooks(ctx, destID, hook.PerformerMergePost, *notification, nil)
+	}
 	return dest, nil
 }
 

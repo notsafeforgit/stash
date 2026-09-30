@@ -35,13 +35,14 @@ review. Production has not been migrated.
 | Stash `bc77846a6` | Native lineage 1000000, sidecar promotion, pre-write refusal, historical migration audit, full-copy rehearsal, native plugin/current-operation validation; complete validation gate passed |
 | Stash `43d8bba99` | Canonical saved-filter ASTs, legacy conflict evidence, strict persistence validation, full-copy semantic reconciliation; complete validation gate passed |
 | Stash `e8fb366d2` | Unified performer names, per-name auto-tag policy, nonunique display names, full-copy semantic reconciliation; complete validation gate passed |
+| Stash `e4fa14045` | Native default filters, durable config publication, revision-checked review, full-copy reconciliation; complete validation gate passed |
 
 ## Phase status
 
 | Phase | Status |
 | --- | --- |
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
-| 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, and unified performer names are implemented. Archive identities/sources and domain services remain. |
+| 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, and portable archive identities are implemented. Source/provenance models and remaining domain services are in progress. |
 | 2 Ingestion and producer adapter | Not yet implemented |
 | 3 Catalog importer and full-copy reconciliation | Not yet implemented |
 | 4 Native UI and client conversion | Not yet implemented |
@@ -137,3 +138,28 @@ violations and no pending default conflicts. The receipt is
 `.local/native-archive-rehearsal-20260930/default-filter-reconciliation.json`.
 The complete `make validate-fork` gate passed, including 528 UI tests, native
 contract checks, Go lint, and all Go unit/integration tests.
+
+## Portable archive identities
+
+Migration 1000004 assigns stable UUIDs to performers, scenes, images, and file
+records while retaining their integer IDs. Typed foreign keys and partial unique
+indexes connect identities to the existing records. Creation, edits, deletion,
+and current performer/scene merge callers maintain the identity lifecycle.
+Redirects survive merges and subsequent deletion; reused local IDs cannot
+resurrect an old identity. Partial merges that leave the source without a UUID
+are rejected at commit.
+
+The archive repository supports revision-checked adoption of catalog UUIDs,
+preserving generated UUIDs as redirects and refusing conflicting assignments.
+It rejects cycles and cross-kind redirects. Anonymised exports replace UUIDs
+without breaking the graph. Actual catalog import and API/UI exposure remain
+outstanding.
+
+The full-copy migration took 12.6 seconds and created 1,540,475 identities for
+1,426 performers, 270,760 scenes, 498,646 images, and 769,643 file records. All
+69 retained tables matched by streaming row digest, every existing record had
+its identity, and foreign-key checking found zero violations. Database growth
+was 249,470,976 bytes (about 238 MiB). The private reconciliation receipt is
+`.local/native-archive-rehearsal-20260930/archive-identity-reconciliation.json`.
+The full validation gate passed, including migration/lifecycle and merge tests,
+anonymised-export checks, 528 UI tests, native contracts, and Go lint/tests.

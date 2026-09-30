@@ -89,6 +89,8 @@ func TestNativeLineageRejectsUnsafeInputsBeforeWriting(t *testing.T) {
 		{"missing native defaults", "DROP TABLE default_filters", "missing default_filters"},
 		{"missing config checkpoint", "DROP TABLE configuration_migrations", "missing configuration_migrations"},
 		{"missing default alternatives", "DROP TABLE default_filter_import_conflicts", "missing default_filter_import_conflicts"},
+		{"missing archive identities", "DROP TABLE archive_entities", "missing archive_entities"},
+		{"missing identity lifecycle", "DROP TRIGGER archive_scene_deleted", "missing archive_scene_deleted"},
 		{"missing canonical name", "INSERT INTO performers(id, created_at, updated_at) VALUES (1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)", "performer has no canonical name"},
 		{"foreign primary version", "DROP TABLE native_schema; UPDATE schema_migrations SET version = 87", "unsupported legacy Stash schema"},
 		{"newer legacy fork", "DROP TABLE native_schema; UPDATE schema_migrations SET version = 86; CREATE TABLE fork_schema_migrations(version INTEGER); INSERT INTO fork_schema_migrations VALUES (10)", "unsupported legacy fork schema 10"},

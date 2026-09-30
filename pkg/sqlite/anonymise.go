@@ -63,6 +63,7 @@ func (db *Anonymiser) Anonymise(ctx context.Context) error {
 			func() error { return db.anonymiseGroups(ctx) },
 			func() error { return db.anonymiseSavedFilters(ctx) },
 			func() error { return db.anonymiseNativeFilterEvidence(ctx) },
+			func() error { return db.anonymiseArchiveUUIDs(ctx) },
 			func() error { return db.Optimise(ctx) },
 		})
 	}(); err != nil {
@@ -1069,6 +1070,15 @@ func (db *Anonymiser) anonymiseNativeFilterEvidence(ctx context.Context) error {
 			}
 		}
 		return nil
+	})
+}
+
+func (db *Anonymiser) anonymiseArchiveUUIDs(ctx context.Context) error {
+	return txn.WithTxn(ctx, db, func(ctx context.Context) error {
+		// Retain the graph while preventing UUIDs from identifying the source
+		// library. Foreign keys cascade through aliases and merge redirects.
+		_, err := dbWrapper.Exec(ctx, "UPDATE archive_entities SET uuid = "+archiveUUIDExpression)
+		return err
 	})
 }
 

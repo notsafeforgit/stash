@@ -169,6 +169,7 @@ func (db *Database) Repository() models.Repository {
 		SavedFilter:            db.SavedFilter,
 		DefaultFilter:          &DefaultFilterStore{},
 		ConfigurationMigration: &ConfigurationMigrationStore{},
+		ArchiveEntity:          &ArchiveEntityStore{},
 		Share:                  &ShareStore{},
 	}
 }

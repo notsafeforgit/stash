@@ -117,6 +117,9 @@ func (s *Service) Merge(ctx context.Context, sourceIDs []int, destinationID int,
 	}
 
 	// delete old scenes
+	if err := s.Repository.RedirectMergedIdentities(ctx, sourceIDs, destinationID); err != nil {
+		return fmt.Errorf("preserving merged scene identities: %w", err)
+	}
 	for _, src := range sources {
 		const deleteGenerated = true
 		const deleteFile = false

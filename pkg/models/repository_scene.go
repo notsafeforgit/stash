@@ -138,6 +138,7 @@ type SceneWriter interface {
 	SceneUpdater
 	SceneDestroyer
 	SceneCoverSourceWriter
+	RedirectMergedIdentities(ctx context.Context, sourceIDs []int, destinationID int) error
 
 	AddFileID(ctx context.Context, id int, fileID FileID) error
 	AddGalleryIDs(ctx context.Context, sceneID int, galleryIDs []int) error

@@ -126,6 +126,33 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 				}
 			}
 		}
+		if version >= NativeSchemaBaseline+4 {
+			if !present["archive_entities"] {
+				return errors.New("native database schema is incomplete: missing archive_entities")
+			}
+			var triggers []string
+			if err := conn.Select(&triggers, "SELECT name FROM sqlite_schema WHERE type = 'trigger' AND name LIKE 'archive_%'"); err != nil {
+				return err
+			}
+			existing := make(map[string]bool, len(triggers))
+			for _, name := range triggers {
+				existing[name] = true
+			}
+			required := []string{"archive_entity_redirect_insert", "archive_entity_redirect_update", "archive_entity_kind_immutable", "archive_entity_no_resurrection"}
+			for _, kind := range []string{"performer", "scene", "image", "file"} {
+				for _, action := range []string{"created", "changed", "deleted"} {
+					required = append(required, "archive_"+kind+"_"+action)
+				}
+			}
+			for _, action := range []string{"insert", "update", "delete"} {
+				required = append(required, "archive_performer_name_"+action)
+			}
+			for _, name := range required {
+				if !existing[name] {
+					return fmt.Errorf("native database schema is incomplete: missing %s", name)
+				}
+			}
+		}
 		return nil
 	}
 	if version >= NativeSchemaBaseline {

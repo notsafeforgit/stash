@@ -44,6 +44,10 @@ const (
 // production date must not mask a valid release date.
 const sceneAgeDateExpr = "COALESCE(NULLIF(scenes.production_date, ''), scenes.date)"
 
+func (qb *SceneStore) RedirectMergedIdentities(ctx context.Context, sourceIDs []int, destinationID int) error {
+	return redirectArchiveLocalIDs(ctx, models.ArchiveScene, sourceIDs, destinationID)
+}
+
 type sceneRow struct {
 	ID                      int         `db:"id" goqu:"skipinsert"`
 	Title                   zero.String `db:"title"`

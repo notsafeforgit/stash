@@ -86,6 +86,28 @@ to actual older database inputs. Configuration publication uses a flushed
 temporary file, atomic replacement, and directory sync while retaining existing
 permissions and symlinks. Automatic migration backups are retained on success.
 
+Migration 1000004 adds `archive_entities`, a UUID identity registry for performers,
+scenes, images, and file records. Every active identity has exactly one checked,
+typed foreign key to the existing row; partial unique indexes enforce one UUID
+per row. Existing integer IDs and media relationships remain unchanged. UUIDs
+identify records, independent of names, paths, and content fingerprints.
+
+Schema-owned lifecycle triggers allocate identities on creation, advance
+revisions on edits, and retain deletion tombstones. A reused local integer ID
+receives a new UUID. Performer and scene merges write redirects in the same
+transaction that transfers relationships and removes the source records.
+Redirects retain their meaning if the survivor is subsequently deleted.
+Cross-kind redirects, cycles, and resurrection of retired identities are refused.
+Lookup by local ID uses the appropriate partial index; UUID resolution is bounded
+to 128 redirects and rejects an invalid chain.
+
+The archive repository can adopt a pre-existing catalog UUID with a revision
+check, retaining the generated UUID as a redirect and cascading existing UUID
+references. A UUID already assigned elsewhere requires reconciliation. Actual
+catalog import and native API/UI exposure remain separate work; creating this
+registry has not imported or modified the live catalogs. Anonymised exports
+replace UUIDs while preserving the graph of redirects.
+
 The filesystem deletion journal currently derives its directory from the
 database filename. Promotion in place retains that association, but a production
 path change must first drain pending deletions or transfer the exact journal

@@ -1914,6 +1914,24 @@ func (_m *SceneReaderWriter) QueryCount(ctx context.Context, sceneFilter *models
 	return r0, r1
 }
 
+// RedirectMergedIdentities provides a mock function with given fields: ctx, sourceIDs, destinationID
+func (_m *SceneReaderWriter) RedirectMergedIdentities(ctx context.Context, sourceIDs []int, destinationID int) error {
+	ret := _m.Called(ctx, sourceIDs, destinationID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RedirectMergedIdentities")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, []int, int) error); ok {
+		r0 = rf(ctx, sourceIDs, destinationID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // ResetActivity provides a mock function with given fields: ctx, sceneID, resetResume, resetDuration
 func (_m *SceneReaderWriter) ResetActivity(ctx context.Context, sceneID int, resetResume bool, resetDuration bool) (bool, error) {
 	ret := _m.Called(ctx, sceneID, resetResume, resetDuration)

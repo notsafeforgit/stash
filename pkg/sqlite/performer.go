@@ -1038,6 +1038,9 @@ AND NOT EXISTS(SELECT 1 FROM `+table+` o WHERE o.`+idColumn+` = `+table+`.`+idCo
 		}
 	}
 
+	if err := redirectArchiveLocalIDs(ctx, models.ArchivePerformer, source, destination); err != nil {
+		return err
+	}
 	for _, id := range source {
 		err := qb.Destroy(ctx, id)
 		if err != nil {

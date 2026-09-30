@@ -29,6 +29,7 @@ type Repository struct {
 	SavedFilter            SavedFilterReaderWriter
 	DefaultFilter          DefaultFilterReaderWriter
 	ConfigurationMigration ConfigurationMigrationReaderWriter
+	ArchiveEntity          ArchiveEntityReaderWriter
 	Share                  ShareReaderWriter
 }
 

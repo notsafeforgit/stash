@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/stashapp/stash/internal/manager/config"
+	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/sqlite"
 	"github.com/stretchr/testify/require"
 )
@@ -73,4 +74,32 @@ UPDATE native_migration_history SET details = '{"private":"private-filter-value"
 	raw = openRawDB(t, path)
 	defer raw.Close()
 	require.Equal(t, uint(1), queryUint(t, raw, "SELECT count(*) FROM default_filter_import_conflicts"))
+}
+
+func TestAnonymiserRekeysArchiveUUIDsAndKeepsRedirects(t *testing.T) {
+	source, repo := archiveTestDatabase(t)
+	ctx := context.Background()
+	before := archiveFind(t, repo, models.ArchivePerformer, 71)
+	survivor := archiveFind(t, repo, models.ArchivePerformer, 72)
+	require.NoError(t, repo.WithTxn(ctx, func(ctx context.Context) error { return repo.Performer.Merge(ctx, []int{71}, 72) }))
+	output := filepath.Join(t.TempDir(), "anonymous.sqlite")
+	anonymiser, err := sqlite.NewAnonymiser(source, output)
+	require.NoError(t, err)
+	require.NoError(t, anonymiser.Anonymise(ctx))
+	contents, err := os.ReadFile(output)
+	require.NoError(t, err)
+	for _, value := range []string{before.UUID, survivor.UUID} {
+		require.NotContains(t, string(contents), value)
+	}
+	raw := openRawDB(t, output)
+	defer raw.Close()
+	require.Equal(t, uint(1), queryUint(t, raw, `SELECT count(*) FROM archive_entities source
+JOIN archive_entities target ON target.uuid=source.redirect_to
+WHERE source.original_id=71 AND source.kind='performer' AND source.state='redirected' AND target.performer_id=72`))
+	rows, err := raw.Query("PRAGMA foreign_key_check")
+	require.NoError(t, err)
+	defer rows.Close()
+	require.False(t, rows.Next())
+	require.NoError(t, rows.Err())
+	require.Equal(t, survivor.UUID, archiveFind(t, repo, models.ArchivePerformer, 72).UUID)
 }

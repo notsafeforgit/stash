@@ -40,13 +40,14 @@ review. Production has not been migrated.
 | Stash `4d1c7571d` | Qualified source accounts, evidence replay, and audited ownership choices; full-copy reconciliation and complete validation gate passed |
 | Stash `02d3c67c2` | Shared post/profile evidence, lossless captures, versioned retention, replay and integrity checks; full-copy reconciliation, catalog size inventory, and complete validation gate passed |
 | Stash `c1d2c9387` | Portable gallery identities, membership revisions, and explicit source-album requirements; full-copy reconciliation and complete validation gate passed |
+| Stash `e31ced0d9` | Ordered shared attachment manifests and audited media associations; full-copy reconciliation and complete validation gate passed |
 
 ## Phase status
 
 | Phase | Status |
 | --- | --- |
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
-| 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries, native account/ownership storage, shared post/profile/capture storage, ordered attachment manifests, and audited media associations are implemented. Source equivalence, album construction, review APIs/UI and remaining domain services are in progress. |
+| 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries, native account/ownership storage, shared post/profile/capture storage, ordered attachment manifests, audited media associations, and reviewed source-list selection are implemented. Source equivalence, album construction, review APIs/UI and remaining domain services are in progress. |
 | 2 Ingestion and producer adapter | Not yet implemented |
 | 3 Catalog importer and full-copy reconciliation | Not yet implemented |
 | 4 Native UI and client conversion | Not yet implemented |
@@ -305,6 +306,42 @@ The complete `make validate-fork` gate passed: generation, frontend checks and
 tests. The previous gallery checkpoint also passed CI lint, build, and preview
 image publication.
 
-Source manifest selection, source-to-gallery construction and synchronization,
-manual album decisions, importer integration, and native UI remain outstanding.
+Source-to-gallery construction and synchronization, manual album decisions,
+importer integration, and native UI remain outstanding. Source manifest selection
+is described below.
 Production remains on the compatible release.
+
+## Reviewed source-list selection
+
+Migration 1000009 records the selected attachment evidence for each source post.
+Compatible partial lists accumulate known positions and counts without erasing
+earlier knowledge. A complete capture can replace redundant partial references;
+all original captures and earlier decisions remain available. Different IDs at
+one position, conflicting known media kinds/counts, and out-of-count positions
+produce explicit conflicts rather than a guessed list.
+
+Read-only previews carry the post revision. Applying a choice requires that
+revision; pinned and disabled selections survive later captures. Review can
+choose a specific capture or explicitly resume automatic selection from it.
+Equivalent automatic replay retains the original decision. Bounded bulk queries
+load supporting manifests and entries; source payloads are not duplicated.
+
+Focused tests cover accumulation, complete/partial semantics, redundant evidence,
+conflicts, stale actions, pin/disable/re-enable, restart/replay, pagination,
+late-head failure rollback, cross-post foreign keys, corruption detection,
+forgotten posts, migration preservation, and anonymised copies.
+
+The full-copy migration took 45.1 milliseconds. All 89 retained tables matched
+by streaming row digest, foreign-key checks found zero violations, and the three
+new tables were empty. Existing free pages held the new schema without growing
+the file. The private receipt is
+`.local/native-archive-rehearsal-20260930/selection-reconciliation.json`.
+The complete `make validate-fork` gate passed: generation, frontend validation
+and 528 UI tests, retained native
+contracts, Go lint, and all Go unit/integration tests. The previous attachment
+checkpoint also passed CI lint, build, and preview image publication.
+
+The source-list repository does not yet construct galleries or expose a native
+review API/UI. Gallery association, synchronization, manual metadata/membership
+decisions, catalog importer integration, and the remaining transition phases
+are still required. Production has not been migrated.

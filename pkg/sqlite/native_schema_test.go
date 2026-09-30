@@ -106,6 +106,8 @@ func TestNativeLineageRejectsUnsafeInputsBeforeWriting(t *testing.T) {
 		{"missing attachment choices", "DROP TABLE attachment_media_decisions", "missing attachment_media_decisions"},
 		{"missing attachment media guard", "DROP TRIGGER source_media_evidence_kind_update", "missing source_media_evidence_kind_update"},
 		{"missing attachment capture scope", "DROP INDEX source_captures_scope", "missing source_captures_scope"},
+		{"missing attachment selection", "DROP TABLE post_attachment_selections", "missing post_attachment_selections"},
+		{"missing attachment selection guard", "DROP TRIGGER post_attachment_selection_forward", "missing post_attachment_selection_forward"},
 		{"missing gallery membership revision", "DROP TRIGGER archive_gallery_galleries_images_delete", "missing archive_gallery_galleries_images_delete"},
 		{"missing canonical name", "INSERT INTO performers(id, created_at, updated_at) VALUES (1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)", "performer has no canonical name"},
 		{"foreign primary version", "DROP TABLE native_schema; UPDATE schema_migrations SET version = 87", "unsupported legacy Stash schema"},

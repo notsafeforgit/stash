@@ -111,32 +111,36 @@ func (s *SourceAttachmentStore) FindManifest(ctx context.Context, value string) 
 		return nil, err
 	}
 	ret := row.resolve()
-	if ret.Version != archive.AttachmentManifestVersion {
-		return nil, fmt.Errorf("%w: unsupported attachment manifest version", models.ErrSourcePayloadCorrupt)
-	}
 	entries, err := attachmentManifestEntries(ctx, id, -1, archive.MaxManifestEntries+1)
 	if err != nil {
 		return nil, err
 	}
-	if len(entries) != ret.EntryCount {
-		return nil, models.ErrSourcePayloadCorrupt
+	if _, err := validatedAttachmentManifest(ret, entries); err != nil {
+		return nil, err
 	}
+	return ret, nil
+}
+
+func validatedAttachmentManifest(ret *models.SourceAttachmentManifest, entries []models.SourceAttachmentManifestEntry) (models.SourceAttachmentManifestInput, error) {
 	input := models.SourceAttachmentManifestInput{Complete: ret.Complete, DeclaredAlbum: ret.DeclaredAlbum, ExpectedCount: ret.ExpectedCount}
+	if ret.Version != archive.AttachmentManifestVersion || len(entries) != ret.EntryCount {
+		return input, models.ErrSourcePayloadCorrupt
+	}
 	for _, entry := range entries {
 		input.Entries = append(input.Entries, models.SourceAttachmentEntry{Position: entry.Position, MediaKind: entry.MediaKind, Reference: entry.Attachment.Reference})
 	}
-	input, err = archive.NormalizeAttachmentManifest(input)
+	input, err := archive.NormalizeAttachmentManifest(input)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", models.ErrSourcePayloadCorrupt, err)
+		return input, fmt.Errorf("%w: %v", models.ErrSourcePayloadCorrupt, err)
 	}
 	signature, err := sourceSignature("stash-source-attachments-v1", archive.AttachmentManifestSignatureInput(input))
 	if err != nil {
-		return nil, err
+		return input, err
 	}
 	if signature != ret.Signature {
-		return nil, models.ErrSourcePayloadCorrupt
+		return input, models.ErrSourcePayloadCorrupt
 	}
-	return ret, nil
+	return input, nil
 }
 
 func (s *SourceAttachmentStore) ManifestForCapture(ctx context.Context, value string) (*models.SourceAttachmentManifest, error) {

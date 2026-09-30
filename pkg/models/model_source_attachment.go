@@ -104,4 +104,8 @@ type SourceAttachmentReaderWriter interface {
 	DecideMedia(context.Context, AttachmentMediaDecisionInput) (*AttachmentMediaDecision, error)
 	MediaDecision(context.Context, string) (*AttachmentMediaDecision, error)
 	MediaDecisionHistory(context.Context, string, int, int) ([]AttachmentMediaDecision, error)
+	Selection(context.Context, string) (*AttachmentSelection, error)
+	SelectionHistory(context.Context, string, int, int) ([]AttachmentSelectionDecision, error)
+	PreviewSelection(context.Context, string, string) (*AttachmentSelectionPreview, error)
+	DecideSelection(context.Context, AttachmentSelectionInput) (*AttachmentSelection, error)
 }

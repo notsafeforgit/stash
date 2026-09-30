@@ -264,8 +264,43 @@ The new repositories use bounded, indexed lookups and the caller's transaction.
 Late insert/head failures roll back the evidence, choices, and revisions together.
 Reads validate manifest counts and signatures; missing entries are corruption,
 not an empty album. Anonymised copies remove manifests and association history
-before rekeying identities. This schema does not yet select a current manifest,
-construct a gallery, add ingestion endpoints, or implement album UI.
+before rekeying identities. Gallery construction, ingestion endpoints, and album
+UI remain separate work; current source selection is added by migration 1000009.
+
+Migration 1000009 adds audited post attachment selections. An automatic selection
+combines compatible partial manifests by source position, preserving known
+counts, album declarations, and media hints. Unknown hints can become known;
+different attachment IDs, conflicting known types/counts, or positions outside a
+known count require review. Capture timestamps never authorize silently removing
+or reordering items. For example, positions 0 and 2 from one capture can combine
+with position 1 from another. Even when all three positions are known, the list
+is marked source-complete only when a contributing capture explicitly observed
+a complete list. This remains independent of local download completeness.
+
+Selections retain only the immutable manifest references needed to establish the
+combined result. Redundant source lists are omitted from the new selection,
+while their original captures and previous decisions remain intact. Header and
+entry loading uses two bounded, indexed queries for the selected post's lists;
+it does not scan all posts or issue a query per capture. At most 4,099 supporting
+lists and 16,384 input entries are processed, and the combined list retains the
+4,096-entry/4-MiB bounds. Exceeding a bound fails explicitly and leaves the prior
+choice intact. Review can select one complete source list directly.
+
+`PreviewSelection` is read-only and returns the current source-post revision,
+conflict kinds/positions, proposed entries, and whether an existing choice is
+protected. Automatic decisions require that revision and cannot replace a
+`pinned` or `disabled` choice. Review can pin an exact capture's manifest, disable
+automatic source selection, or choose a capture as the new automatic starting
+point. None of these actions deletes captures, media, or galleries. Equivalent
+automatic replay keeps the previous decision and revision.
+
+`post_attachment_decisions`, their manifest-reference rows, and the current head
+commit together. Foreign keys scope every reference to its source post, history
+is immutable, and a head cannot move backward. Counts and a selection signature
+detect missing/changed evidence on current-selection reads. New selections are
+blocked for forgotten posts. Anonymised exports remove the new history and
+references. API/UI exposure, source-to-gallery synchronization, and manual
+gallery field/membership decisions are still required by the transition plan.
 
 The filesystem deletion journal currently derives its directory from the
 database filename. Promotion in place retains that association, but a production

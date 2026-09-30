@@ -120,6 +120,8 @@ func TestAnonymiserRemovesSourceAccountEvidence(t *testing.T) {
 		MediaUUID: media.UUID, Basis: "legacy", Details: []byte(`{"private":"private-account-file-path"}`)})
 	require.NoError(t, applyMediaChoice(repo, models.AttachmentMediaDecisionInput{AttachmentUUID: attachment.UUID, ExpectedAttachmentRevision: attachment.Revision + 1,
 		State: "linked", MediaUUID: media.UUID, ExpectedMediaRevision: media.Revision, Origin: "review", Reason: "private-account-media-choice"}))
+	selection := applySelection(t, repo, models.AttachmentSelectionInput{PostUUID: post.UUID, ExpectedPostRevision: selectionPost(t, repo, post.UUID).Revision,
+		CaptureUUID: capture.UUID, Mode: "pinned", Origin: "review", Reason: "private-account-album-choice"})
 	account := createSourceAccount(t, repo, "native:reddit")
 	evidence := accountEvidence()
 	evidence.Details = []byte(`{"private":"private-account-evidence"}`)
@@ -137,7 +139,7 @@ func TestAnonymiserRemovesSourceAccountEvidence(t *testing.T) {
 	require.NoError(t, anonymiser.Anonymise(context.Background()))
 	contents, err := os.ReadFile(output)
 	require.NoError(t, err)
-	for _, value := range []string{account.UUID, performer.UUID, post.UUID, capture.UUID, capture.RevisionUUID, manifest.UUID, attachment.UUID, mediaEvidence.UUID, "private-account-"} {
+	for _, value := range []string{account.UUID, performer.UUID, post.UUID, capture.UUID, capture.RevisionUUID, manifest.UUID, attachment.UUID, mediaEvidence.UUID, selection.Decision.UUID, "private-account-"} {
 		require.NotContains(t, string(contents), value)
 	}
 	require.Equal(t, account.UUID, findSourceAccount(t, repo, account.UUID).UUID)
@@ -152,13 +154,16 @@ func TestAnonymiserRemovesSourceAccountEvidence(t *testing.T) {
 	for _, table := range []string{"source_accounts", "source_account_identifiers", "source_account_identifier_evidence", "account_performer_decisions", "account_performer_links", "source_posts", "source_post_identifiers", "source_post_revisions", "source_captures", "source_capture_profiles", "source_profile_bodies", "source_payloads"} {
 		require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM "+table))
 	}
-	for _, table := range []string{"source_attachments", "source_attachment_manifests", "source_attachment_entries", "source_capture_attachment_manifests", "source_media_evidence", "attachment_media_decisions", "attachment_media_links"} {
+	for _, table := range []string{"source_attachments", "source_attachment_manifests", "source_attachment_entries", "source_capture_attachment_manifests", "source_media_evidence", "attachment_media_decisions", "attachment_media_links", "post_attachment_decisions", "post_attachment_decision_manifests", "post_attachment_selections"} {
 		require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM "+table))
 	}
 	require.NoError(t, repo.WithReadTxn(context.Background(), func(ctx context.Context) error {
 		original, err := repo.SourceAttachment.MediaDecision(ctx, attachment.UUID)
 		require.NoError(t, err)
 		require.Equal(t, media.UUID, *original.MediaUUID, "anonymizing a copy leaves original associations intact")
+		stored, err := repo.SourceAttachment.Selection(ctx, post.UUID)
+		require.NoError(t, err)
+		require.Equal(t, selection, stored)
 		return nil
 	}))
 }

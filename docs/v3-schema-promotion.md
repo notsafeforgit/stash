@@ -1,5 +1,12 @@
 # Retiring v2.5 Compatibility
 
+The [native archive and independent fork transition plan](native-archive-transition-plan.md)
+now covers the full requested transition, including all current sidecars,
+catalog import, gallery-dl/n8n ingestion, backups, and deployment. This document
+is the earlier schema-focused outline. Its preservation requirements still
+apply, but its table inventory and compatibility timeline are not the complete
+implementation scope. No production migration has been executed by these plans.
+
 This document describes the one-way transition from the rollback-compatible
 v3 bridge to a v3-only schema. Do not start this transition while any database
 must still open in v2.5. The promotion release must advance the primary SQLite

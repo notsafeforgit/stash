@@ -2,7 +2,8 @@
 
 This package implements durable delivery and a gallery-dl download adapter.
 It is development code on `v3-rewrite`; the installed host and n8n download
-helpers still use their existing catalogs. Launcher conversion, activation of
+helpers still use their existing catalogs. Durable caller URL snapshots now feed
+the native dispatcher. Launcher conversion, activation of
 reviewed worker profiles, additional source adapters and production cutover remain unfinished.
 
 Python 3.12 or newer is required. Runtime delivery uses only the standard
@@ -234,7 +235,8 @@ process does not certify that its file events were delivered.
 ## Automatic source dispatch
 
 `dispatch --profile FILE` performs one bounded scheduling cycle: deliver one
-ready event batch, submit one queued source request, then discover up to 50
+ready event batch, resolve up to 50 pending caller URLs, submit one queued source
+request, then discover up to 50
 eligible runs and execute at most one claimed attempt. It uses the scoped
 `POST /runs/ready` API, filtered by the reviewed root and policy. The server
 returns only run UUIDs and pagination sequences. A discovery result grants no
@@ -255,7 +257,7 @@ the server's recovery/backoff path. Deferred work requires explicit review.
 
 Delivery and request admission continue while discovery is backing off. A cycle
 can report `idle`, `waiting`, `backoff`, `contended`, `unavailable`, or a worker
-attempt outcome. Exit 2 denotes unfinished local delivery/admission or an
+attempt outcome. Exit 2 denotes unfinished local resolution/delivery/admission or an
 unsuccessful attempt; exit 0 only describes this cycle. Neither certifies the
 whole source queue or media intake. Preserve the result's native run identity
 and inspect its state and file receipts when a workflow needs completion.
@@ -395,8 +397,9 @@ limits are not a cap on total disk usage. Queue status reports pending windows,
 submission states and age; a fresh schedule resets the age of an emptied group.
 
 Producer schema 2 introduced request/ticket tables; schema 3 added dispatch
-cursors and discovery backoff. Schema 4 adds durable ticket-to-submission links
-and unassigned ranges. Opening a schema-1, schema-2 or schema-3 outbox promotes it
+cursors and discovery backoff. Schema 4 added durable ticket-to-submission links
+and unassigned ranges. Schema 5 adds caller snapshots and source bindings.
+Opening an outbox from schemas 1–4 promotes it
 in one SQLite transaction, preserving event bytes, receipts, dependencies,
 active delivery/submission leases, frozen requests and caller tickets. Old tickets
 are linked to the first covering submissions from their original request sequence;
@@ -404,6 +407,62 @@ pending portions stay unassigned. Both tickets and requests are read in bounded
 pages. A failed migration rolls back. Older producer code refuses the new schema when opening
 it; preserve the queue in backups rather than recreating it during rollback.
 This does not change the Stash database schema.
+
+## Durable caller lists
+
+`queue-sources` records one execution with a caller-provided UUID, an ordered
+URL list, reviewed policy, logical root, operation and frozen absolute window.
+It works before Stash is reachable or the sources have collection bindings.
+The UTF-8 file uses the first token of each nonempty, non-comment line;
+duplicates retain their first position. Entries must already be exact HTTP(S)
+source URLs. Host Twitter handles, Reddit mode expansion and n8n inputs still
+require the launcher conversion; this command does not reinterpret those lists.
+
+```sh
+stash-ingest --outbox /persistent/producer.sqlite --endpoint STASH_ORIGIN \
+  --producer PRODUCER_UUID queue-sources --call CALL_UUID \
+  --targets-file /persistent/source-urls.txt \
+  --profile /persistent/profiles/reddit.json --lookback-seconds 604800
+```
+
+When `--until` is omitted, the first committed snapshot fixes the current UTC
+cutoff. `--lookback-seconds` subtracts from that cutoff; `--since` supplies an
+absolute lower bound instead. Omitting both requests all earlier history.
+The time window does not change the reviewed profile's archive/skip behavior.
+Full-history launcher conversion must preserve those settings separately.
+
+Repeat the same caller UUID and options after a lost command response. The
+original URL list, policy and window are retained even if the files changed or
+disappeared; preparation is not repeated. Changed options under that UUID are
+rejected. A fresh scheduled execution uses a fresh UUID. Concurrent first
+requests retain whichever snapshot commits first. Local acknowledgement is not
+source or media completion.
+
+`resolve-sources` and `dispatch` resolve at most 50 targets per cycle. Resolution
+prioritizes downloads over enrichment and newer cutoffs within each operation,
+matching the subsequent submission queue. Each unique
+active collection match and its deterministic source ticket commit in one local
+transaction. Interruption cannot leave a queued ticket without its retained
+binding. Existing source-request coalescing still combines equivalent work from
+different callers. Bound targets are never looked up again or silently moved to
+another collection/revision. Unresolved, ambiguous, disabled and retired matches
+remain in review. After fixing the source definitions or access grants,
+`retry-call UUID` retries only the reviewed targets; already queued work remains
+bound. Transient lookup failures retain fenced leases and persistent backoff.
+
+`calls-status --call UUID --after N` pages through 50 local targets at a time.
+`call-status UUID` checks every target's original source ticket and requested
+window, sharing a bounded cache only within that inspection. It reports success
+only when all targets have confirmed source coverage. Later rescans cannot
+complete a cancelled earlier call. Outages and mismatched bindings remain
+visible; diagnostics include at most 20 affected URLs with an explicit truncation
+flag. Media intake still requires the native event receipts.
+
+A snapshot holds at most 10,000 distinct URLs and 8 MiB of URL data. The default
+queue limits are 10,000 retained calls and 100,000 retained targets. Capacity
+failure preserves old records and rolls back the new snapshot. These records,
+bindings and ticket relationships are part of the persistent producer outbox
+and its backup/restore boundary; schema migration invents no past caller runs.
 
 ## Inspection and delivery
 
@@ -413,14 +472,19 @@ is no command-line token argument.
 
 | Command | Result |
 |---|---|
-| `status` | Event counts/bytes/age plus the source-request backlog |
+| `status` | Event counts/bytes/age plus source-request and caller backlogs |
 | `lookup-collections --target URL [--target URL ...] [--root UUID]` | Current scoped collection candidates; exits 0 only when each URL resolves to one active collection, otherwise 2 |
+| `queue-sources --call UUID --targets-file FILE --profile FILE` | Freezes one caller execution and its source list locally; optional absolute or relative time window |
+| `resolve-sources` | Resolves up to 50 caller URLs and queues bound tickets; exits 2 while unresolved or reviewed targets remain |
+| `calls-status [--call UUID] [--after N]` | Local caller counts and an optional page of retained source bindings |
+| `call-status UUID` | Checks all original source tickets; exits 0 only for `source_succeeded`, otherwise 2 |
+| `retry-call UUID` | Retries reviewed targets without changing bound sources or the frozen window |
 | `drain` | Attempts one ready batch of at most eight events; exits 2 while local event work remains |
 | `retry EVENT_UUID` | Requeues one explicitly reviewed event with its original contents |
 | `receipt-status EVENT_UUID` | Reads actual server ingestion/worker status |
 | `queue-run --collection UUID --revision N --profile FILE --until TIME` | Records/coalesces a download request using the profile digest; low-level callers may use `--policy SHA256` instead |
 | `submit-runs` | Submits one ready request; exits 2 while requests remain pending, in flight or in review |
-| `dispatch --profile FILE` | Delivers/submits queued work and discovers at most one source attempt; retains pagination and discovery backoff |
+| `dispatch --profile FILE` | Resolves/delivers/submits queued work and discovers at most one source attempt; retains pagination and backoff |
 | `runs-status [--intent UUID \| --ticket UUID] [--after N]` | Local request counts and up to 50 relevant historical submissions |
 | `ticket-status UUID` | Checks the ticket's original source windows; exits 0 only for `source_succeeded`, otherwise 2 |
 | `retry-run-request UUID` | Retries a reviewed submission with the original UUID and bytes |
@@ -451,8 +515,9 @@ those cases rather than select a candidate automatically. Historical targets,
 changed media roots and different query/sort parameters never silently match.
 The Python client rejects inconsistent roots, URLs, duplicate IDs and malformed
 revisions before producing a usable binding. Lookup neither creates collections
-nor enqueues work. Durable caller/list conversion still needs to freeze these
-bindings together with the original URLs and time windows before submission.
+nor enqueues work. The durable caller queue freezes the original URLs and time
+window, then commits selected bindings with their source tickets before native
+submission. Installed launcher conversion remains unfinished.
 
 ## Validation
 
@@ -466,15 +531,18 @@ Twitter transformations, filename budgets, lease loss, bounded resume, offline
 window coalescing, caller tickets, split completion ranges, cancellation followed
 by later rescans, schema promotion, shared window semantics,
 portable configuration, changed assets, worker failure outcomes and log isolation.
+Caller tests cover a 500-source list, lost command responses, frozen relative
+windows, concurrent admission, expired resolution leases, atomic binding/ticket
+rollback, reviewed matches, later rescans and schema-4 preservation.
 The backend test
 `TestPythonProducerDurableDeliveryAgainstNativeHTTP` runs this actual client
 against the native HTTP router and SQLite, loses committed event and run-submission
 responses, and checks replay after reopening, independent rejection, caller-ticket
 deduplication, exact ticket completion and the submit/claim/renew/checkpoint/finish lease
 cycle. `TestPythonDownloadWorkerRecoversFinishAndDeliversFiles` runs the worker
-against the real API/SQLite, drains a capture during downloading, recovers a lost
+against the real API/SQLite from a persisted URL-list caller, drains a capture during downloading, recovers a lost
 attempt-completion response and admits a dependent file after reopening the
-outbox. It checks the ticket-status CLI after restart and verifies that source
+outbox. It checks the ticket-status and call-status CLIs after restart and verifies that source
 success still leaves actual media intake queued.
 These checks are included in `make validate-fork`
 and the build workflow. No production endpoint or source website is contacted.

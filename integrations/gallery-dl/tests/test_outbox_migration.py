@@ -15,8 +15,15 @@ from helpers import PRODUCER, capture, file_event, receipt
 from test_run_queue import request, admission
 
 
+def schema_four(db):
+    db.execute("DROP TABLE source_call_targets")
+    db.execute("DROP TABLE source_calls")
+    db.execute("PRAGMA user_version=4")
+
+
 def schema_three(db):
     """Remove exactly schema 4's additions to construct a populated v3 input."""
+    schema_four(db)
     db.execute("DROP TABLE run_ticket_requests")
     db.execute("DROP INDEX unassigned_run_tickets")
     db.execute("ALTER TABLE run_intent_tickets DROP COLUMN unassigned")
@@ -152,6 +159,37 @@ class OutboxMigrationTests(unittest.TestCase):
         with self.assertRaises(sqlite3.OperationalError):
             self.open()
         self.assertEqual(self.db.execute("PRAGMA user_version").fetchone()[0], 2)
+        self.assertEqual(self.db.execute("SELECT * FROM events ORDER BY seq").fetchall(), self.before)
+
+    def test_v4_promotion_preserves_ticket_assignments_dispatch_and_operational_rows(self):
+        with closing(self.open()) as box:
+            queue = RunQueue(box)
+            queue.enqueue(request(), ticket_uuid=str(uuid.uuid4()))
+            sent = queue.claim(str(uuid.uuid4()))
+            queue.admit(sent, admission(sent.body))
+            queue.enqueue(request(30, 40), ticket_uuid=str(uuid.uuid4()))
+            queue.claim(str(uuid.uuid4()))
+            box.db.execute("INSERT INTO dispatch_cursors(root_uuid,policy_sha256,after_sequence,failures,available_at) VALUES(?,?,50,3,2000)",
+                           (str(uuid.uuid4()), "a" * 64))
+            schema_four(box.db)
+        tables = [row[0] for row in self.db.execute("SELECT name FROM sqlite_schema WHERE type='table' ORDER BY name")]
+        before = {name: self.db.execute('SELECT * FROM "' + name + '" ORDER BY rowid').fetchall() for name in tables}
+        with closing(self.open()) as box:
+            self.assertEqual(box.db.execute("PRAGMA user_version").fetchone()[0], SCHEMA)
+            self.assertEqual(box.db.execute("SELECT count(*) FROM source_calls").fetchone()[0], 0)
+            self.assertEqual(box.db.execute("SELECT count(*) FROM source_call_targets").fetchone()[0], 0)
+        after = {name: self.db.execute('SELECT * FROM "' + name + '" ORDER BY rowid').fetchall() for name in tables}
+        self.assertEqual(after, before)
+        self.assertEqual(self.db.execute("PRAGMA foreign_key_check").fetchall(), [])
+
+    def test_v4_unknown_caller_table_rolls_back_without_recreating_the_outbox(self):
+        with closing(self.open()) as box:
+            schema_four(box.db)
+            box.db.execute("CREATE TABLE source_calls(unrecognized TEXT)")
+        with self.assertRaises(sqlite3.OperationalError):
+            self.open()
+        self.assertEqual(self.db.execute("PRAGMA user_version").fetchone()[0], 4)
+        self.assertIsNone(self.db.execute("SELECT name FROM sqlite_schema WHERE name='source_call_targets'").fetchone())
         self.assertEqual(self.db.execute("SELECT * FROM events ORDER BY seq").fetchall(), self.before)
 
 

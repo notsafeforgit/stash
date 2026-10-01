@@ -1639,3 +1639,57 @@ Durable caller/list requests, source registration/import, actual host/n8n
 launcher conversion, full-history policy preservation and later transition
 phases remain unfinished. No production service, configuration, workflow,
 website login or live catalog was changed.
+
+## Durable caller snapshots before collection lookup
+
+Producer schema 5 adds `source_calls` and `source_call_targets`. A caller records
+its execution UUID, ordered URL list, reviewed policy, root, operation and
+absolute time window before network access. The command options have a stable
+digest; retries retain the original snapshot without reopening changed or
+missing list/profile files or recalculating relative time bounds. Concurrent
+first requests keep the snapshot that commits first. Different options require
+a different caller UUID.
+
+`queue-sources` accepts a UTF-8 URL list and an absolute lower bound or a lookback
+interval. `resolve-sources` binds up to 50 pending URLs through scoped native
+lookup. Resolution uses fenced leases and retained backoff, prioritizing downloads
+and newer cutoffs before backfill/enrichment. Each chosen collection/revision
+and deterministic source ticket commit in the same outbox transaction; a failed
+commit leaves neither half behind. Existing queue coalescing shares equivalent
+work between different callers. Bound targets never silently change collection.
+Missing, ambiguous, disabled or retired matches remain in review; `retry-call`
+retries only those unresolved targets after their definitions/access are fixed.
+The dispatcher now resolves one bounded page before source admission/discovery.
+
+`calls-status` provides local counts and 50-target pages. `call-status` checks all
+original source tickets, verifies their frozen definitions/root and requires
+confirmed coverage of every requested window. It shares a bounded run-status
+cache only within that inspection and limits detailed issue output to 20 URLs.
+It cannot report successful media intake or let a later rescrape complete an
+earlier cancelled caller request. Temporary API failure remains unavailable.
+
+The schema-4 promotion fixture preserves every existing table row, including
+pending events, active leases, receipt/ticket assignments and dispatch cursors.
+Unknown conflicting tables roll back migration without recreating the outbox.
+Existing schema-1/2/3 promotion tests still pass. No Stash database migration or
+production queue conversion is part of this increment.
+
+The required `make validate-fork` gate passed: 528 v3 tests, native contracts,
+Go lint and all Go tests. The final producer suite passes all 154 tests on
+Python 3.12 and 3.14. Coverage includes 500-source lists, offline admission,
+frozen cutoffs, concurrent retries, expired resolution leases, atomic
+binding/ticket rollback, priority, review, capacity, original-root validation
+and whole-call completion. Both real HTTP producer fixtures pass without cached
+Go results. The download fixture now records a URL-list caller through the CLI,
+replays it after deleting the input file, restarts, resolves/submits/executes it,
+recovers a lost finish response and checks both ticket/call status while actual
+media intake remains queued. Evidence is in `source-calls-final-validation.log`,
+`source-calls-python-final.log`, `source-calls-host-python-final.log` and
+`source-calls-http-final.log` under `/tmp/stash-native-transition`.
+
+The existing host helpers and n8n workflows still need their handle/list parsing,
+Reddit mode/date expansion, full-history archive/skip policies and receipt/result
+contracts converted to these caller records. Source registration/import,
+additional extractors, actual launcher activation and subsequent transition
+phases remain unfinished. Production services and data remain on the frozen
+compatible deployment. Parent commit `f4edf75b7` passed all three CI workflows.

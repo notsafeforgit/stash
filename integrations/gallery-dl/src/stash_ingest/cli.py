@@ -48,6 +48,27 @@ def main(argv=None):
     lookup = commands.add_parser("lookup-collections", help="Resolve exact source URLs within this producer's grants")
     lookup.add_argument("--target", action="append", required=True)
     lookup.add_argument("--root", help="Logical root UUID; omitted means unbound metadata collections")
+    sources = commands.add_parser("queue-sources", help="Freeze a URL list and time window for one caller execution")
+    sources.add_argument("--call", required=True, help="Stable caller execution UUID; retry with the same options")
+    sources.add_argument("--targets-file", required=True, help="UTF-8 URL list; first token per non-comment line")
+    sources.add_argument("--root", help="Logical root UUID; a worker profile can supply it")
+    source_policy = sources.add_mutually_exclusive_group(required=True)
+    source_policy.add_argument("--policy", help="Reviewed policy SHA-256")
+    source_policy.add_argument("--profile", help="Native worker profile to snapshot on first admission")
+    sources.add_argument("--operation", choices=("download", "enrich"), default="download")
+    sources.add_argument("--cooldown", type=int, default=0)
+    start = sources.add_mutually_exclusive_group()
+    start.add_argument("--since", help="Absolute RFC3339 lower bound")
+    start.add_argument("--lookback-seconds", type=int, help="Look back from the frozen upper bound")
+    sources.add_argument("--until", help="RFC3339 upper bound; omitted means the first admission time")
+    commands.add_parser("resolve-sources", help="Bind up to 50 pending caller targets and queue their source tickets")
+    calls_status = commands.add_parser("calls-status", help="Local caller state and paginated source bindings")
+    calls_status.add_argument("--call")
+    calls_status.add_argument("--after", type=int, default=0)
+    call_status = commands.add_parser("call-status", help="Check source completion for every target in one caller execution")
+    call_status.add_argument("call_uuid")
+    retry_call = commands.add_parser("retry-call", help="Retry unresolved reviewed targets without rebinding queued work")
+    retry_call.add_argument("call_uuid")
     commands.add_parser("drain", help="Deliver one bounded batch of ready events")
     retry = commands.add_parser("retry", help="Retry a reviewed event with its original bytes")
     retry.add_argument("event_uuid")
@@ -86,9 +107,26 @@ def main(argv=None):
         box = Outbox(args.outbox, args.endpoint, args.producer)
         client = Client(args.endpoint, args.producer, token_env=args.token_env)
         requests = RunQueue(box)
+        from .source_calls import SourceCalls, resolve_once
+        calls = SourceCalls(box)
         if args.command == "lookup-collections":
             from .collections import lookup_collections
             output = lookup_collections(client, args.target, args.root)
+        elif args.command == "queue-sources":
+            from .caller_input import record_file_call
+            output = record_file_call(calls, args)
+        elif args.command == "resolve-sources":
+            output = {"resolution": resolve_once(calls, client), "calls": calls.summary()}
+        elif args.command == "calls-status":
+            output = calls.summary(args.call)
+            if args.call:
+                output["targets"] = calls.page(args.call, after=args.after)
+                output["has_more"] = bool(output["targets"] and output["targets"][-1]["position"] < output["target_count"])
+        elif args.command == "call-status":
+            from .completion import inspect_call
+            output = inspect_call(calls, client, args.call_uuid)
+        elif args.command == "retry-call":
+            output = {"retried": calls.retry(args.call_uuid), "call": calls.summary(args.call_uuid)}
         elif args.command == "drain":
             output = {"delivery": drain_once(box, client), "outbox": box.status()}
         elif args.command == "retry":
@@ -143,10 +181,14 @@ def main(argv=None):
             with worker_output():
                 output = dispatch_once(box, client, Configuration(args.profile))
         else:
-            output = {**box.status(), "source_requests": requests.status()}
+            output = {**box.status(), "source_requests": requests.status(), "source_calls": calls.summary()}
         print(json.dumps(output, sort_keys=True))
         if args.command == "lookup-collections":
             return 0 if all(item["state"] == "resolved" for item in output["targets"]) else 2
+        if args.command == "resolve-sources":
+            return 2 if any(output["calls"]["counts"][state] for state in ("pending", "resolving", "review")) else 0
+        if args.command == "call-status":
+            return 0 if output["state"] == "source_succeeded" else 2
         if args.command == "drain":
             counts = output["outbox"]["counts"]
             return 2 if any(counts[k] for k in ("pending", "sending", "review")) else 0
@@ -161,7 +203,8 @@ def main(argv=None):
             counts = output["outbox"]["counts"]
             requests = output["source_requests"]
             incomplete = (any(counts[k] for k in ("pending", "sending", "review")) or requests["pending_windows"]
-                          or any(requests["counts"][k] for k in ("pending", "sending", "review")))
+                          or any(requests["counts"][k] for k in ("pending", "sending", "review"))
+                          or any(output["source_calls"]["counts"][k] for k in ("pending", "resolving", "review")))
             return 0 if output["state"] in ("idle", "source_succeeded") and not incomplete else 2
         return 0
     except (InvalidData, Unavailable, Capacity, SourcePaused) as exc:

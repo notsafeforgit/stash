@@ -15,7 +15,6 @@ from stash_ingest.configuration import Configuration
 from stash_ingest.cli import main as producer_cli
 from stash_ingest.gallery import NativeDownloadJob
 from stash_ingest.outbox import Outbox
-from stash_ingest.run_queue import RunQueue
 from test_configuration import profile_fixture
 from test_gallery import Fixture
 from test_producer import reddit_data
@@ -31,21 +30,25 @@ def main():
     client = Client(setup["endpoint"], setup["producer"])
     now = datetime.now(timezone.utc)
     database = directory / "producer.sqlite"
-    ticket = str(uuid.uuid4())
+    call_uuid = str(uuid.uuid4())
+    ticket = str(uuid.uuid5(uuid.UUID(call_uuid), "source/1"))
+    targets = directory / "caller-targets.txt"
+    targets.write_text("https://fixture.invalid/account\n")
+    command = ["--outbox", str(database), "--endpoint", setup["endpoint"], "--producer", setup["producer"],
+               "queue-sources", "--call", call_uuid, "--targets-file", str(targets), "--profile", str(path),
+               "--until", now.isoformat(timespec="milliseconds")]
     output = io.StringIO()
     with redirect_stdout(output):
-        status = producer_cli(["--outbox", str(database), "--endpoint", setup["endpoint"],
-                               "--producer", setup["producer"], "lookup-collections", "--root", setup["root"],
-                               "--target", "https://fixture.invalid/account"])
-    lookup = json.loads(output.getvalue())
-    assert status == 0 and lookup["targets"][0]["state"] == "resolved", lookup
-    binding = lookup["targets"][0]["candidates"][0]
-    assert binding["collection_uuid"] == setup["collection"]
-    with closing(Outbox(database, setup["endpoint"], setup["producer"])) as box:
-        queue = RunQueue(box)
-        queue.enqueue({"collection_uuid": binding["collection_uuid"], "collection_revision": binding["collection_revision"],
-                       "policy_sha256": profile.policy_sha256, "operation": "download", "cooldown_seconds": 0,
-                       "window": {"since": None, "until": now.isoformat(timespec="milliseconds")}}, ticket_uuid=ticket)
+        status = producer_cli(command)
+    recorded = json.loads(output.getvalue())
+    assert status == 0 and recorded["counts"]["pending"] == 1, recorded
+    targets.unlink()
+    # A lost command response reopens the original snapshot, even if the list
+    # was removed or edited while the server remained unreachable.
+    output = io.StringIO()
+    with redirect_stdout(output):
+        assert producer_cli(command) == 0
+    assert json.loads(output.getvalue()) == recorded
     # Restart after local admission, before any network request. The dispatcher
     # must submit and discover the work without a run UUID supplied by a caller.
     with closing(Outbox(database, setup["endpoint"], setup["producer"])) as box:
@@ -78,6 +81,7 @@ def main():
                                        "--producer", setup["producer"], "dispatch", "--profile", str(path)])
         result = json.loads(output.getvalue())
         assert status in (0, 2), (status, result)
+        assert result["resolution"] == {"state": "queued", "call_uuid": call_uuid, "counts": {"queued": 1, "review": 0}}, result
         admitted = result["submission"]
         assert admitted["state"] == "admitted", admitted
         assert result["run_uuid"] == admitted["run_uuid"]
@@ -100,6 +104,13 @@ def main():
         assert status == 0 and completion["state"] == "source_succeeded", completion
         assert not completion["remaining"] and not completion["unassigned"], completion
         assert completion["intake_completion"] == "inspect_native_receipts"
+        output = io.StringIO()
+        with redirect_stdout(output):
+            status = producer_cli(["--outbox", str(database), "--endpoint", setup["endpoint"],
+                                   "--producer", setup["producer"], "call-status", call_uuid])
+        call_result = json.loads(output.getvalue())
+        assert status == 0 and call_result["state"] == "source_succeeded", call_result
+        assert call_result["counts"] == {"source_succeeded": 1} and not call_result["issues"], call_result
         queued = box.receipt(file_id)
         assert queued["capture_uuid"] == box.receipt(capture_id)["capture_uuid"]
         assert result["intake_completion"] == "inspect_native_receipts"

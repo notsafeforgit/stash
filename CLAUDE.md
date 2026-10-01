@@ -75,7 +75,7 @@ local, and source completion remains distinct from verified media intake.
 Preserve conditional map order and layered private references; conversion does
 not activate a worker or replace the existing configuration files.
 `stash-ingest dispatch` discovers scoped work through the native API. Producer
-schema 4 retains pagination/backoff and each caller ticket's original submission
+schema 5 retains pagination/backoff, caller URL snapshots and each ticket's original submission
 assignments. `ticket-status` checks completed source windows against those
 assignments; later rescans cannot complete an earlier cancelled ticket. Discovery
 and admission do not certify completion. Preserve existing request/event state
@@ -87,6 +87,11 @@ An explicit root grant covers registered collections at that logical root,
 including later additions; existing collection grants do not widen on migration.
 It grants no source administration or unbound metadata access. Bounded lookup
 responses expose truncation so a partial candidate set never appears unique.
+`queue-sources` freezes a caller's URL list, policy and absolute window before
+network access. Resolution commits each collection binding and ticket together;
+never reinterpret a bound target after a retry. `call-status` checks every
+original ticket and cannot certify media intake. Host/n8n wrappers still need
+their input parsing and result contracts converted before activation.
 
 ## Architecture
 

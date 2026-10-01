@@ -24,7 +24,11 @@ The Python adapter provides durable outboxes, worker lease enforcement,
 source-window filtering, download hooks and offline run-request coalescing.
 Worker profiles now fingerprint reviewed configuration and execute one claimed
 download attempt with concurrent event delivery. Bounded dispatch now discovers
-eligible work after restart with persistent producer pagination/backoff. Launcher integration, additional
+eligible work after restart with persistent producer pagination/backoff. Caller
+snapshots now preserve URL lists and time windows before lookup; resolution
+commits each selected collection/revision and source ticket atomically in the
+producer outbox. Whole-call inspection requires source coverage for every
+original ticket. Launcher integration, additional
 post adapters, host/n8n activation, catalog import, and native administration/review
 UI remain required.
 Existing scrapes have not switched to this interface. Root, collection and policy

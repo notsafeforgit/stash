@@ -53,6 +53,12 @@ class RunQueue:
                          self.box.clock(), intent))
 
     def enqueue(self, value, *, ticket_uuid=None):
+        with self.box.transaction():
+            return self.enqueue_in_transaction(value, ticket_uuid=ticket_uuid)
+
+    def enqueue_in_transaction(self, value, *, ticket_uuid=None):
+        if not self.db.in_transaction:
+            raise RuntimeError("Source admission requires the caller transaction")
         spec = specification(value)
         if ticket_uuid is not None:
             identifier(ticket_uuid)
@@ -60,39 +66,38 @@ class RunQueue:
         template = {k: v for k, v in spec.items() if k != "window"}
         body = encode(template, 8192)
         key = digest(body)
-        with self.box.transaction():
-            if ticket_uuid is not None:
-                previous = self.db.execute("SELECT * FROM run_intent_tickets WHERE uuid=?", (ticket_uuid,)).fetchone()
-                if previous is not None:
-                    if previous["sha256"] != ticket_digest:
-                        raise Conflict("Caller ticket already identifies different source work")
-                    return previous["intent_uuid"]
-                if self.db.execute("SELECT count(*) FROM run_intent_tickets").fetchone()[0] >= self.max_tickets:
-                    raise Capacity("Caller ticket capacity exhausted; existing receipts are retained")
-            group = self.db.execute("SELECT * FROM run_intents WHERE config_sha256=?", (key,)).fetchone()
-            if group:
-                if group["template"] != body:
-                    raise Conflict("Source request configuration digest conflicts")
-                intent, pending = group["uuid"], decode(group["windows"], 16384)
-            else:
-                if self.db.execute("SELECT count(*) FROM run_intents").fetchone()[0] >= self.max_groups:
-                    raise Capacity("Offline source request configuration capacity exhausted")
-                intent, pending, now = str(uuid.uuid4()), [], self.box.clock()
-                self.db.execute("""INSERT INTO run_intents(uuid,config_sha256,template,operation,windows,
-                    window_count,latest_until,created_at,updated_at) VALUES(?,?,?,?,?,0,'',?,?)""",
-                    (intent, key, body, spec["operation"], b"[]", now, now))
-            frozen = self.db.execute("SELECT * FROM run_requests WHERE intent_uuid=? AND state!='admitted'", (intent,)).fetchone()
-            pending = windows.union(pending, [spec["window"]])
+        if ticket_uuid is not None:
+            previous = self.db.execute("SELECT * FROM run_intent_tickets WHERE uuid=?", (ticket_uuid,)).fetchone()
+            if previous is not None:
+                if previous["sha256"] != ticket_digest:
+                    raise Conflict("Caller ticket already identifies different source work")
+                return previous["intent_uuid"]
+            if self.db.execute("SELECT count(*) FROM run_intent_tickets").fetchone()[0] >= self.max_tickets:
+                raise Capacity("Caller ticket capacity exhausted; existing receipts are retained")
+        group = self.db.execute("SELECT * FROM run_intents WHERE config_sha256=?", (key,)).fetchone()
+        if group:
+            if group["template"] != body:
+                raise Conflict("Source request configuration digest conflicts")
+            intent, pending = group["uuid"], decode(group["windows"], 16384)
+        else:
+            if self.db.execute("SELECT count(*) FROM run_intents").fetchone()[0] >= self.max_groups:
+                raise Capacity("Offline source request configuration capacity exhausted")
+            intent, pending, now = str(uuid.uuid4()), [], self.box.clock()
+            self.db.execute("""INSERT INTO run_intents(uuid,config_sha256,template,operation,windows,
+                window_count,latest_until,created_at,updated_at) VALUES(?,?,?,?,?,0,'',?,?)""",
+                (intent, key, body, spec["operation"], b"[]", now, now))
+        frozen = self.db.execute("SELECT * FROM run_requests WHERE intent_uuid=? AND state!='admitted'", (intent,)).fetchone()
+        pending = windows.union(pending, [spec["window"]])
+        if frozen:
+            pending = windows.subtract(pending, [decode(frozen["window"], 8192)])
+        self._save_windows(intent, pending)
+        if ticket_uuid is not None:
+            first = frozen["seq"] if frozen else self.db.execute("SELECT coalesce(max(seq),0)+1 FROM run_requests").fetchone()[0]
+            self.db.execute("""INSERT INTO run_intent_tickets(uuid,intent_uuid,sha256,window,first_sequence,created_at,unassigned,unassigned_count)
+                VALUES(?,?,?,?,?,?,?,1)""", (ticket_uuid, intent, ticket_digest, encode(spec["window"]), first, self.box.clock(),
+                                          encode([spec["window"]], 16384)))
             if frozen:
-                pending = windows.subtract(pending, [decode(frozen["window"], 8192)])
-            self._save_windows(intent, pending)
-            if ticket_uuid is not None:
-                first = frozen["seq"] if frozen else self.db.execute("SELECT coalesce(max(seq),0)+1 FROM run_requests").fetchone()[0]
-                self.db.execute("""INSERT INTO run_intent_tickets(uuid,intent_uuid,sha256,window,first_sequence,created_at,unassigned,unassigned_count)
-                    VALUES(?,?,?,?,?,?,?,1)""", (ticket_uuid, intent, ticket_digest, encode(spec["window"]), first, self.box.clock(),
-                                              encode([spec["window"]], 16384)))
-                if frozen:
-                    tickets.attach(self.db, self.db.execute("SELECT * FROM run_intent_tickets WHERE uuid=?", (ticket_uuid,)).fetchone(), frozen)
+                tickets.attach(self.db, self.db.execute("SELECT * FROM run_intent_tickets WHERE uuid=?", (ticket_uuid,)).fetchone(), frozen)
         return intent
 
     def claim(self, owner, *, seconds=120):

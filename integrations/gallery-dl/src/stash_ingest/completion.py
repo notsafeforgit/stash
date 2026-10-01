@@ -1,5 +1,8 @@
 """Check a caller's exact source windows, independently of media intake."""
 
+from collections import Counter, OrderedDict
+import uuid
+
 from .client import Unavailable
 from .encoding import InvalidData, decode, digest, encode, identifier
 from .outbox import Conflict
@@ -40,7 +43,7 @@ def ticket_snapshot(box, ticket_uuid):
     return requested, pending, assignments
 
 
-def validate_run(value, assignment, requested):
+def validate_run(value, assignment, requested, expected=None):
     receipt = decode(assignment["receipt"], 65536)
     fields = ("collection_uuid", "collection_revision", "operation", "policy_sha256", "cooldown_seconds")
     if (not isinstance(receipt, dict) or receipt.get("request_uuid") != assignment["request_uuid"]
@@ -53,6 +56,8 @@ def validate_run(value, assignment, requested):
                for record in (receipt, value)):
             raise InvalidData("Source status does not match this caller's definition")
     root = receipt.get("root_uuid")
+    if expected is not None and root != expected["root_uuid"]:
+        raise InvalidData("Caller admission changed its original root")
     if root is not None or requested["operation"] == "download":
         identifier(root)
     if value.get("root_uuid") != root:
@@ -65,12 +70,47 @@ def validate_run(value, assignment, requested):
     return windows.union(completed)
 
 
-def inspect_ticket(box, client, ticket_uuid):
+class _RunStatuses:
+    """One inspection shares bounded current reads, never a persisted success cache."""
+
+    def __init__(self, client):
+        self.client, self.capabilities, self.cache = client, None, OrderedDict()
+
+    def get(self, run_uuid):
+        if self.capabilities is None:
+            try:
+                found = self.client.capabilities()
+                if found.get("source_runs") is not True or found.get("source_run_protocol") != 1:
+                    raise Unavailable("incompatible_source_runs")
+                self.capabilities = True
+            except Unavailable as error:
+                self.capabilities = error
+        if isinstance(self.capabilities, Unavailable):
+            raise self.capabilities
+        if run_uuid not in self.cache:
+            try:
+                self.cache[run_uuid] = self.client._request("GET", "/runs/" + identifier(run_uuid))
+            except Unavailable as error:
+                self.cache[run_uuid] = error
+            if len(self.cache) > 256:
+                self.cache.popitem(last=False)
+        current = self.cache[run_uuid]
+        self.cache.move_to_end(run_uuid)
+        if isinstance(current, Unavailable):
+            raise current
+        return current
+
+
+def inspect_ticket(box, client, ticket_uuid, *, _statuses=None, _expected=None):
     if (box.endpoint, box.producer) != (client.endpoint, client.producer):
         raise Conflict("Caller ticket and client identify different Stash producers")
     requested, unassigned, assignments = ticket_snapshot(box, ticket_uuid)
-    remaining, parts, cache = list(unassigned), [], {}
-    capabilities = None
+    if _expected is not None and requested != {key: value for key, value in _expected.items() if key != "root_uuid"}:
+        raise InvalidData("Caller ticket differs from its frozen source binding")
+    statuses = _statuses or _RunStatuses(client)
+    if statuses.client is not client:
+        raise Conflict("Source status reader identifies a different Stash client")
+    remaining, parts = list(unassigned), []
     for assignment in assignments:
         part = {"request_uuid": assignment["request_uuid"], "run_uuid": assignment["run_uuid"],
                 "state": assignment["state"], "remaining": assignment["assigned"]}
@@ -79,26 +119,8 @@ def inspect_ticket(box, client, ticket_uuid):
                 part["error_code"] = assignment["error_code"]
         else:
             try:
-                if capabilities is None:
-                    try:
-                        found = client.capabilities()
-                        if found.get("source_runs") is not True or found.get("source_run_protocol") != 1:
-                            raise Unavailable("incompatible_source_runs")
-                        capabilities = True
-                    except Unavailable as error:
-                        capabilities = error
-                if isinstance(capabilities, Unavailable):
-                    raise capabilities
-                run_uuid = assignment["run_uuid"]
-                if run_uuid not in cache:
-                    try:
-                        cache[run_uuid] = client._request("GET", "/runs/" + identifier(run_uuid))
-                    except Unavailable as error:
-                        cache[run_uuid] = error
-                current = cache[run_uuid]
-                if isinstance(current, Unavailable):
-                    raise current
-                completed = validate_run(current, assignment, requested)
+                current = statuses.get(assignment["run_uuid"])
+                completed = validate_run(current, assignment, requested, _expected)
                 part["remaining"] = windows.subtract(assignment["assigned"], completed)
                 if not part["remaining"]:
                     part["state"] = "source_succeeded"
@@ -121,3 +143,39 @@ def inspect_ticket(box, client, ticket_uuid):
     return {"ticket_uuid": ticket_uuid, "state": state, "operation": requested["operation"],
             "requested": requested["window"], "unassigned": unassigned, "remaining": remaining,
             "submissions": parts, "intake_completion": "inspect_native_receipts"}
+
+
+def inspect_call(calls, client, call_uuid):
+    if (calls.box.endpoint, calls.box.producer) != (client.endpoint, client.producer):
+        raise Conflict("Caller queue and client identify different Stash producers")
+    summary = calls.summary(call_uuid)
+    statuses, counts, issues = _RunStatuses(client), Counter(), []
+    after = 0
+    while page := calls.page(call_uuid, after=after):
+        for item in page:
+            if item["position"] != after + 1:
+                raise InvalidData("Caller snapshot has missing source positions")
+            after = item["position"]
+            state, code = item["state"], item["error_code"]
+            if state == "queued":
+                try:
+                    if item["ticket_uuid"] != str(uuid.uuid5(uuid.UUID(call_uuid), "source/" + str(after))):
+                        raise InvalidData("Caller target has a different ticket identity")
+                    expected = {**summary["definition"], "collection_uuid": item["collection_uuid"],
+                                "collection_revision": item["collection_revision"]}
+                    result = inspect_ticket(calls.box, client, item["ticket_uuid"], _statuses=statuses, _expected=expected)
+                    state = result["state"]
+                    code = next((part["error_code"] for part in result["submissions"] if part.get("error_code")), None)
+                except InvalidData:
+                    state, code = "review", "caller_binding_mismatch"
+            counts[state] += 1
+            if state != "source_succeeded" and len(issues) < 20:
+                issues.append({"position": after, "target_url": item["target_url"], "state": state, "error_code": code})
+    if after != summary["target_count"]:
+        raise InvalidData("Caller snapshot has missing source targets")
+    state = next((s for s in ("review", "cancelled", "deferred", "unavailable", "running", "resolving",
+                             "queued", "sending", "pending", "recorded") if counts[s]), "source_succeeded")
+    return {"call_uuid": call_uuid, "state": state, "requested": summary["definition"]["window"],
+            "target_count": after, "counts": dict(counts), "issues": issues,
+            "issues_truncated": after - counts["source_succeeded"] > len(issues),
+            "intake_completion": "inspect_native_receipts"}

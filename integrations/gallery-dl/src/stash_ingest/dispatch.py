@@ -5,6 +5,7 @@ from .encoding import InvalidData, encode, identifier
 from .events import sha256
 from .outbox import Capacity, Conflict
 from .run_queue import RunQueue, submit_once
+from .source_calls import SourceCalls, resolve_once
 from .worker import execute
 
 
@@ -102,8 +103,10 @@ def dispatch_once(box, client, configuration):
     """Deliver, admit and attempt work once; no outcome certifies media intake."""
     dispatcher = Dispatcher(box, client, configuration)
     requests = RunQueue(box)
+    calls = SourceCalls(box)
     delivery = drain_once(box, client)
+    resolution = resolve_once(calls, client)
     submission = submit_once(requests, client)
     result = dispatcher.once()
-    return {**result, "delivery": delivery, "submission": submission, "outbox": box.status(),
-            "source_requests": requests.status(), "intake_completion": "inspect_native_receipts"}
+    return {**result, "delivery": delivery, "resolution": resolution, "submission": submission, "outbox": box.status(),
+            "source_requests": requests.status(), "source_calls": calls.summary(), "intake_completion": "inspect_native_receipts"}

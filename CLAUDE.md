@@ -240,6 +240,14 @@ Agent note for `make validate-ui-v3`: `ui/v3/src/core/generated-graphql.ts` is i
 
 Background tasks (scan, generate, identify, etc.) run through `pkg/job`. Jobs are queued and can be monitored via the GraphQL subscription `jobsSubscribe`.
 
+New archive work uses `pkg/job.Durable` with native jobs, stable submission
+acknowledgements, attempt history, and fenced worker leases. Domain writes and
+attempt completion use its `Publish` transaction; hashing/probing happens before
+publication and retains descriptor checks. This service currently supports the
+`media.verify` kind, but the file-completion worker and HTTP admission are not yet
+wired. Do not route native ingestion through the legacy in-memory queue or claim
+that existing scheduled scrapes have switched. See [native ingestion](docs/native-ingestion.md).
+
 ### v3 extension points
 
 See `ui/v3/docs/architecture.md` for the current module map and compatibility rules. List configurations require a discriminated GraphQL/local `source`; generated query variables remain typed through the data hook. Layout, preferences, query state, and cache refill live in separate list modules. Player transition policy consumes plain buffered/seekable state in `scene-player-transitions.ts`; media effects, recovery, and transcode leases are separate hooks. Keep the stable player root and existing iOS seek/timeline behavior when extending these modules.

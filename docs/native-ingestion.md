@@ -87,6 +87,48 @@ publication boundary does not yet implement the durable file worker or completio
 HTTP event. The [schema guide](native-schema.md) describes identity lifetimes,
 unchanged fingerprint handling, and migration behavior.
 
+### Durable archive work
+
+Native schema 1000019 provides `archive_jobs`, immutable submission acknowledgements,
+and attempt history. `job.Durable` supplies submission, claim/renew, progress,
+cancellation, bounded recovery, and atomic publication. The only accepted kind
+is currently `media.verify`; its file-completion admission and worker loop are
+still being connected. No new worker runs automatically, and the public API
+continues to advertise `file_ingestion: false`.
+
+Each server-created submission has a stable request UUID. Replaying it returns
+the original job even after completion. Distinct submissions with the same kind
+and work key share queued/running work, provided their arguments, resource key,
+and attempt limit agree. A new submission after completion can create a new job.
+These internal submission digests use canonical arguments; the public capture
+protocol retains its separate exact-request-byte digest contract.
+
+Work/resource keys are hashes calculated by the admitting domain service. A
+unique running-resource index prevents two jobs owning the same destination at
+once. Keys must represent the effective target and policy; widening a scrape
+window requires an explicit policy decision, not silently reusing another job's
+key. Shared filesystem locks remain necessary for external downloaders.
+
+Claims increment a persistent fence and record an owner and deadline. Renewal,
+progress, and publication require that exact unexpired lease. Recovery examines
+at most 100 expired attempts per transaction and either requeues them or marks
+them failed at their attempt limit. Retry times survive repeat submissions;
+duplicates cannot bypass backoff. The default service capacity is 10,000 active
+jobs, checked before new work is created; coalescing and receipt lookup still
+work at capacity. Queue/history reads use bounded indexed pagination.
+
+`Durable.Publish` checks the lease, runs domain writes, records the attempt result,
+and checks ownership/deadline again before commit. Failure rolls everything back.
+Expensive inspection runs outside that transaction; prepared files retain their
+descriptors and add their own final checks. Cancellation requires the reviewed
+job revision and immediately invalidates its lease. Result/progress objects are
+bounded; failures use machine-readable codes rather than persisting raw stderr.
+
+This is the durable storage/publication boundary, not a replacement for the
+current scheduled scrapes. Producer authentication and scope checks, path/file
+reservations, file-completion receipts, actual workers, source-run coordination,
+and host/n8n outbox delivery remain required before switching those callers.
+
 ## Wire contract
 
 All producer routes require the bearer token and reject query parameters:

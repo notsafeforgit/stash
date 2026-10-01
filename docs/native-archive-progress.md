@@ -54,6 +54,7 @@ review. Production has not been migrated.
 | Stash `dd9ee3768` | Isolated native test fixtures retain real migration coverage while avoiding repeated empty-schema construction; complete validation gate passed |
 | Stash `367ea96ed` | Scoped capture ingestion and durable receipts; full-copy reconciliation, complete validation gate, CI lint/build, and preview image publication passed |
 | Stash `2215503f7` | Verified media preparation through the shared scanner; complete validation gate, Windows package cross-compilation, CI lint/build, and preview image publication passed |
+| Stash `5777a6b60` | Verified content identities, immutable root/file verification history, and file-generation guards; full-copy reconciliation, complete validation gate, CI lint/build, and preview image publication passed |
 
 ## Phase status
 
@@ -61,7 +62,7 @@ review. Production has not been migrated.
 | --- | --- |
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
 | 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries and metadata relationship targets, native account/ownership storage and reviewed consolidation, shared post/profile/capture storage, ordered attachment manifests, audited media associations, reviewed source-list selection, and source-gallery synchronization with manual membership intent are implemented. Scalar and relationship field choices protect explicit and preserved metadata. Revisioned logical roots and source collections retain capture/manual-intake provenance; captured publisher choices connect source evidence to accounts independently of depicted performers. Verified byte identities and immutable per-file verification history now use persistent file-generation guards. Producer identity matching, policy resolution, review APIs/UI and remaining domain services are in progress. |
-| 2 Ingestion and producer adapter | In progress: scoped producer tokens, Reddit/Twitter capture batches and durable receipts are implemented. Verified file preparation uses the shared scanner and can publish content proofs with descriptor and generation checks before commit. File-completion events and atomic file/source/gallery/receipt publication, durable workers/run leases, additional source adapters, producer outboxes and host/n8n conversion remain. |
+| 2 Ingestion and producer adapter | In progress: scoped producer tokens, Reddit/Twitter capture batches and durable receipts are implemented. Verified file preparation uses the shared scanner and can publish content proofs with descriptor and generation checks before commit. Persistent jobs now have coalesced submissions, fenced leases, retry/cancellation/recovery, and atomic domain/result publication. File-completion admission and file/source/gallery/receipt integration, actual workers and source-run coordination, additional source adapters, producer outboxes and host/n8n conversion remain. |
 | 3 Catalog importer and full-copy reconciliation | Not yet implemented |
 | 4 Native UI and client conversion | Not yet implemented |
 | 5 Compatibility removal and packaging | Preview packaging isolated and old compatibility gate replaced by current v3 operation/plugin-contract checks. Old UI/API/plugin adapters and config bridge still require conversion/removal. |
@@ -839,3 +840,46 @@ all 528 UI tests, retained v3 extension contracts and 71 application operation
 files, Go lint with zero issues, and every Go unit/integration package. Durable
 file jobs and atomic file/source/gallery/completion-receipt publication remain
 the next ingestion work.
+
+## Durable archive jobs and publication
+
+Migration 1000019 stores archive jobs, immutable submission acknowledgements,
+and per-attempt history. Replayed submissions return their original job even
+after completion. Equivalent active submissions share one job; different work
+sharing a resource cannot run concurrently. Pending capacity, attempt limits,
+bounded recovery, and indexed pagination keep queue work bounded. Repeat
+submissions may promote priority but cannot bypass retry delays.
+
+Claims record an owner, deadline, and increasing fence. Renewal, progress, and
+publication require that exact unexpired lease. Cancellation uses the reviewed
+job revision and invalidates ownership. Expired attempts remain in history and
+are requeued or failed at their attempt limit. `job.Durable.Publish` commits
+domain writes and the result together, checking expiry and final job state before
+commit. Failures roll back both, including expiry inside an earlier commit hook.
+Result/progress JSON is bounded and error codes exclude raw worker output.
+
+Focused tests passed for coalesced and conflicting replay, queue capacity,
+concurrent submissions/claims, restart recovery, stale owners, renewal, deferred
+retry, retry exhaustion, shared destinations, cancellation, SQL immutability,
+atomic domain/result rollback, query plans, schema-18 promotion, startup guards,
+and anonymisation. The concurrent claim and bounded recovery tests also passed
+under Go's race detector. The pinned linter reported zero issues after correcting
+the error-code predicate and test cursor cleanup.
+
+The isolated full copy migrated from 1000018 to 1000019 in 0.060 seconds. All
+121 retained tables matched by streaming semantic digest, with zero foreign-key
+violations and no size growth. Existing file generations and content history
+remained intact; all three job tables begin empty. The private reconciliation
+receipt is `.local/native-archive-rehearsal-20260930/archive-job-reconciliation.json`.
+
+The only accepted job kind is currently `media.verify`. File-completion admission,
+path/file reservations, the actual worker, file/source/gallery/receipt integration,
+source-run coordination, and producer/host/n8n delivery remain subsequent work.
+No worker starts automatically, no legacy journals were imported or retired,
+and production remains on the pinned compatible release.
+
+The final complete `make validate-fork` gate passed with all corrections included:
+generation, frontend checks and 528 UI tests, retained v3 extension contracts and
+71 application operation files, zero Go lint issues, and all Go unit/integration
+packages. The SQLite suite completed in 204.5 seconds and the API suite in
+118.9 seconds.

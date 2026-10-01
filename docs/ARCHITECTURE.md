@@ -106,6 +106,7 @@ not made atomic by a SQLite transaction.
 | Server/UI configuration | YAML configuration managed by [internal/manager/config](../internal/manager/config/); includes UI defaults and plugin settings |
 | Original media | Configured library paths and archive contents; database file/folder records describe these files |
 | Verified byte identity | Shared SHA-256 content UUIDs and immutable verification history in the main database; file generations fence observed changes without merging media entities |
+| Durable archive work | Native jobs, submission acknowledgements and attempts in the library database; fenced leases and atomic domain/result publication, with file-worker and producer integration still in progress |
 | Stored artwork blobs | [BlobStore](../pkg/sqlite/blob.go), configured for database blobs or a separate filesystem location |
 | Generated media | Configured generated paths: covers, previews, sprites, transcodes, temporary downloads; generation and cleanup belong to manager/media services |
 | Search acceleration | Separate `<database>.search.sqlite` plus an in-memory exact-count cache; derived and rebuildable |

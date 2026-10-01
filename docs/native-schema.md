@@ -650,6 +650,25 @@ exports remove these hashes and private path/descriptor histories before source
 roots are removed. Startup requires the generation column, guards, and lookup
 indexes.
 
+Migration 1000019 adds durable archive jobs, stable submission acknowledgements,
+and per-attempt history. Active equivalent work has one job; each submitting
+request keeps its association after completion so retries cannot schedule a new
+run accidentally. A unique running-resource index serializes shared destinations.
+Claiming advances a persistent ownership fence; heartbeat/progress/result writes
+require the unexpired owner and fence. Recovery is bounded and respects attempt
+limits. Job revisions protect cancellation, and terminal jobs and finished
+attempts are immutable.
+
+`job.Durable.Publish` combines domain writes and the attempt outcome in one
+managed transaction and rechecks expiry before commit. Repeat submissions can
+promote priority but preserve an existing retry delay. Bounded indexed queue and
+attempt reads avoid scanning media/catalog tables. The migration leaves all job
+tables empty and preserves existing ingestion receipts and verified file history;
+legacy journals require the separate importer. Anonymised exports remove jobs,
+arguments, acknowledgements, and attempts. The [ingestion guide](native-ingestion.md)
+distinguishes this internal boundary from the still-unfinished file worker and
+source-run coordinator.
+
 The filesystem deletion journal currently derives its directory from the
 database filename. Promotion in place retains that association, but a production
 path change must first drain pending deletions or transfer the exact journal

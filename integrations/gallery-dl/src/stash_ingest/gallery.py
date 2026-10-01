@@ -142,6 +142,8 @@ class NativeDownloadJob(job.DownloadJob):
         self._native_queued_date = None
         super().__init__(extractor, parent)
         extractor = self.extractor
+        if parent is None and self.producer.source_category is not None and extractor.category != self.producer.source_category:
+            raise InvalidData("Extractor does not match this worker profile's source category")
         if parent is None and extractor.url != self.producer.lease.run["target_url"]:
             raise InvalidData("Extractor target differs from the claimed collection")
         if parent is not None and self._native_source_date is None:

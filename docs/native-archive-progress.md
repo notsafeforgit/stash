@@ -69,7 +69,7 @@ review. Production has not been migrated.
 | --- | --- |
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
 | 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries and metadata relationship targets, native account/ownership storage and reviewed consolidation, shared post/profile/capture storage, ordered attachment manifests, audited media associations, reviewed source-list selection, and source-gallery synchronization with manual membership intent are implemented. Scalar and relationship field choices protect explicit and preserved metadata. Revisioned logical roots and source collections retain capture/manual-intake provenance; captured publisher choices connect source evidence to accounts independently of depicted performers. Verified byte identities and immutable per-file verification history now use persistent file-generation guards. Producer identity matching, policy resolution, review APIs/UI and remaining domain services are in progress. |
-| 2 Ingestion and producer adapter | In progress: scoped producer tokens, Reddit/Twitter capture batches and durable receipts are implemented. Verified preparation uses the shared scanner; file/media publication checks descriptors, generations and persistent path removals, reuses concurrent scans, and rejects ambiguous verified-byte owners. Intake publication connects collection provenance, selected source media, attachment evidence and album galleries while preserving explicit choices. Persistent jobs have coalesced submissions, fenced leases, retry/cancellation/recovery, and atomic domain/result publication. File-completion admission now queues a durable worker that checkpoints registration, generates previews and delivers retryable media/gallery hooks; scoped status reports actual completion. Native collection policies now apply typed metadata and explicit performer defaults in intake and ordinary scans, with dry preview and guarded apply. Source-run coordination now coalesces missing date ranges, fences worker ownership, retains checkpoints and deferrals, and excludes overlapping destinations. A supported Python producer package now provides retained-payload outboxes, fenced delivery, durable receipts, backoff and review. The gallery-dl SDK now queues source evidence before download, verifies root/prefix and lease ownership, holds shared destination locks, and queues flushed final files before archive acknowledgement. Reddit single-media evidence and original Twitter attachment membership are covered. The producer now coalesces offline source requests, freezes submissions for replay, retains caller tickets and validates native admission receipts. Claimed Reddit/Twitter windows use precise source timestamps and parent context, with directory checks before postprocessor callbacks. Reviewed portable profiles now fingerprint settings/assets and execute one claimed attempt with concurrent outbox delivery and lost-finish recovery. Deployment configuration conversion, policy migration, general durable edit notifications, additional source adapters and actual host/n8n worker conversion remain. |
+| 2 Ingestion and producer adapter | In progress: scoped producer tokens, Reddit/Twitter capture batches and durable receipts are implemented. Verified preparation uses the shared scanner; file/media publication checks descriptors, generations and persistent path removals, reuses concurrent scans, and rejects ambiguous verified-byte owners. Intake publication connects collection provenance, selected source media, attachment evidence and album galleries while preserving explicit choices. Persistent jobs have coalesced submissions, fenced leases, retry/cancellation/recovery, and atomic domain/result publication. File-completion admission now queues a durable worker that checkpoints registration, generates previews and delivers retryable media/gallery hooks; scoped status reports actual completion. Native collection policies now apply typed metadata and explicit performer defaults in intake and ordinary scans, with dry preview and guarded apply. Source-run coordination now coalesces missing date ranges, fences worker ownership, retains checkpoints and deferrals, and excludes overlapping destinations. A supported Python producer package now provides retained-payload outboxes, fenced delivery, durable receipts, backoff and review. The gallery-dl SDK now queues source evidence before download, verifies root/prefix and lease ownership, holds shared destination locks, and queues flushed final files before archive acknowledgement. Reddit single-media evidence and original Twitter attachment membership are covered. The producer now coalesces offline source requests, freezes submissions for replay, retains caller tickets and validates native admission receipts. Claimed Reddit/Twitter windows use precise source timestamps and parent context, with directory checks before postprocessor callbacks. Reviewed portable profiles now fingerprint settings/assets and execute one claimed attempt with concurrent outbox delivery and lost-finish recovery. A local converter now stages ordered, source-scoped profiles from the host and n8n JSON layers without copying website credentials. Runtime alignment/profile activation, policy migration, general durable edit notifications, additional source adapters and actual host/n8n launcher conversion remain. |
 | 3 Catalog importer and full-copy reconciliation | Not yet implemented |
 | 4 Native UI and client conversion | Not yet implemented |
 | 5 Compatibility removal and packaging | Preview packaging isolated and old compatibility gate replaced by current v3 operation/plugin-contract checks. Old UI/API/plugin adapters and config bridge still require conversion/removal. |
@@ -1401,3 +1401,60 @@ Actual host/n8n configuration conversion and launchers, additional source
 adapters, enrichment, catalog import and later transition phases remain. The
 production deployment, website login configuration and existing catalog writers
 have not switched. This checkpoint adds no native or producer schema migration.
+
+## Local configuration conversion and source-scoped policies
+
+`stash-ingest-config` now converts ordered gallery-dl JSON layers into a new,
+inactive worker profile. Its merge retains object insertion order and replaces
+arrays/scalars as the pinned gallery-dl runtime does. Recognized catalog
+prepare/complete hooks are removed from named, typed and inline definitions;
+unknown legacy callbacks stop conversion. The converter preserves archive
+segment-list formatting and existing download IDs, skip/early-stop policy,
+original-quality flags, pacing and remaining processors. Local helper scripts
+receive checked asset digests. Publication flushes a temporary file and links it
+exclusively into place with private permissions; it never overwrites an input
+configuration or an existing output.
+
+Website-access fields retain references to the original private files. Layered
+headers/cookies merge from their respective JSON Pointers, including ancestor
+replacement semantics, without copying secret values into the profile. Known
+yt-dlp credential argument values use references while other arguments, including
+format selection, remain part of policy identity. Conditional filename/directory
+map order is now retained both when saving a profile and computing its digest;
+sorting those maps would change first-match behavior without changing the old
+digest.
+
+Optional source categories constrain the root extractor before source work.
+Twitter profiles omit unrelated service settings. Reddit profiles can do the
+same with its finite supported child-host whitelist, retaining child base and
+parent-specific settings. Unknown dependency graphs retain their configuration.
+Unused named processors are omitted from scoped profiles. This matters for the
+actual deployment: host ThisVid recovery refreshes cookies, while n8n asks for a
+host refresh and exits. That intentional difference remains in full profiles
+but no longer splits otherwise equivalent Reddit/Twitter policies.
+
+Read-only conversion of the actual host configuration and merged n8n configuration
+produced matching ordered portable settings and helper digests for Reddit and
+Twitter. The n8n check ran in an isolated copy of its image, with networking
+disabled and read-only mounts. Both mounts report the same media/lock identities.
+The installed n8n gallery-dl reports version 1.32.15.dev0 but source commit
+`0d2966061c5c5138a6961da26eab5583861962a1`, while the supported worker requires
+`c40eb2a42fbaa1d26a2bb7c96804b7f47d1f73f8`. Its native profile validation rejects
+that mismatch as intended. The runtime must be aligned before activation.
+
+Private staging artifacts are in `.local/native-worker-conversion-20261001`.
+Their shared root UUID is explicitly unregistered and for rehearsal only;
+regenerate deployment profiles against the actual registered root after the
+cutover gates. The packaged converter was installed and exercised in the isolated
+producer environment. No live config, wrapper, workflow, credential, catalog or
+production deployment was changed. Host/n8n/recovery launcher conversion,
+additional source adapters, enrichment, catalog import and the later transition
+phases remain unfinished.
+
+Validation passed the full `make validate-fork` gate: 528 v3 tests, native
+contracts for 71 operation files, Go lint and the complete Go test suite. All 113 producer tests passed
+on Python 3.12 and 3.14. After the final argument-type guard, both Python suites
+and the real HTTP producer/download-worker fixtures passed again. Logs are
+`config-conversion-final-validation.log`, `config-conversion-final-python.log`,
+`config-conversion-final-python312.log` and `config-conversion-http-final.log`
+under `/tmp/stash-native-transition`. This checkpoint adds no schema migration.

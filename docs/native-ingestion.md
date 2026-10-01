@@ -24,7 +24,7 @@ The Python adapter provides durable outboxes, worker lease enforcement,
 source-window filtering, download hooks and offline run-request coalescing.
 Worker profiles now fingerprint reviewed configuration and execute one claimed
 download attempt with concurrent event delivery. Launcher integration, additional
-post adapters, host/n8n conversion, catalog import, and native administration/review
+post adapters, host/n8n activation, catalog import, and native administration/review
 UI remain required.
 Existing scrapes have not switched to this interface. Root, collection and policy
 administration endpoints are described below.
@@ -653,6 +653,12 @@ tests. The backend's HTTP tests execute delivery, source leases and the download
 worker against isolated native databases, including a lost completion response
 and file admission after outbox restart. Python 3.12 or newer is required.
 
-This package is not yet installed into the host/n8n launch paths. Deployment
-configuration conversion, additional source adapters and conversion of recovery
-and scheduled callers remain required before cutover.
+The local configuration converter now stages profiles from ordered gallery-dl
+JSON layers, preserving first-match rule order, archive formats and website
+access references while removing recognized catalog writers. Optional source
+categories retain relevant child settings and reject a different root extractor.
+See the package guide for conversion and publication semantics.
+
+This package is not yet installed into the host/n8n launch paths. Runtime alignment,
+activation of converted profiles, additional source adapters and conversion of
+recovery and scheduled callers remain required before cutover.

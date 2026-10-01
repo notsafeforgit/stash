@@ -100,7 +100,7 @@ def execute(box, client, configuration, run_uuid):
                 delivery.check()
 
             producer = Producer(box, lease, configuration.root, extractor_version=SUPPORTED_VERSION,
-                                configuration_check=check_configuration)
+                                configuration_check=check_configuration, source_category=configuration.source_category)
             task = NativeDownloadJob(lease.run["target_url"], producer=producer, lock_directory=configuration.locks.path)
             status = task.run()
             lease.check()

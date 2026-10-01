@@ -71,6 +71,9 @@ Host/n8n launch paths have not switched to the native adapter.
 The producer CLI can validate a portable worker profile and execute one claimed
 source attempt with concurrent outbox delivery. Website-access references stay
 local, and source completion remains distinct from verified media intake.
+`stash-ingest-config` stages new profiles from ordered gallery-dl JSON layers.
+Preserve conditional map order and layered private references; conversion does
+not activate a worker or replace the existing configuration files.
 
 ## Architecture
 

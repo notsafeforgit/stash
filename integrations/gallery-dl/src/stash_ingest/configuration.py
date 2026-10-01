@@ -4,6 +4,7 @@ from contextlib import contextmanager
 import copy
 import hashlib
 from importlib.metadata import distribution, PackageNotFoundError
+import json
 import os
 from pathlib import Path
 import re
@@ -23,6 +24,9 @@ YTDLP_VERSION = "2026.9.27.232945.dev0"
 REFERENCE = re.compile(r"\$\{stash:([a-z][a-z0-9_]{0,63})\}")
 ACCESS_OPTIONS = frozenset(("username", "password", "cookies", "cookies-from-browser", "proxy",
                             "headers", "http-headers", "authorization", "oauth", "netrc", "client-id"))
+CREDENTIAL_ARGUMENTS = frozenset(("--cookies", "--cookies-from-browser", "--username", "-u", "--password", "-p",
+                                 "--video-password", "--ap-username", "--ap-password", "--proxy", "--add-headers",
+                                 "--netrc-location", "--netrc-cmd"))
 _active_configuration = threading.Lock()
 
 
@@ -34,6 +38,46 @@ def _access_option(key):
 def _json_file(path):
     with open(path, "rb") as file:
         return decode(file.read(CONFIG_LIMIT + 1), CONFIG_LIMIT)
+
+
+def merge_values(previous, incoming):
+    """Gallery-dl merges objects recursively and replaces all other values."""
+    if isinstance(previous, dict) and isinstance(incoming, dict):
+        result = copy.deepcopy(previous)
+        for key, value in incoming.items():
+            result[key] = merge_values(result.get(key), value)
+        return result
+    return copy.deepcopy(incoming)
+
+
+def profile_bytes(value):
+    # Conditional filename/directory maps use first-match insertion order.
+    # Canonical sort_keys JSON would change their behavior and policy identity.
+    encode(value, CONFIG_LIMIT)
+    body = json.dumps(value, ensure_ascii=False, allow_nan=False, indent=2).encode() + b"\n"
+    if len(body) > CONFIG_LIMIT:
+        raise InvalidData("Worker configuration exceeds its serialized byte limit")
+    return body
+
+
+def private_arguments(value):
+    """Identify credential argument values without hiding other yt-dlp behavior."""
+    if not isinstance(value, list) or any(not isinstance(arg, str) for arg in value):
+        raise InvalidData("Worker cmdline-args must use an explicit argument list")
+    private = False
+    result = []
+    for arg in value:
+        result.append(private)
+        if private:
+            private = False
+        else:
+            option, separator, _ = arg.partition("=")
+            if separator and option in CREDENTIAL_ARGUMENTS:
+                raise InvalidData("Website access arguments require a separate referenced value")
+            private = arg in CREDENTIAL_ARGUMENTS
+    if private:
+        raise InvalidData("Website access argument has no value")
+    return result
 
 
 def _path(value, base):
@@ -108,13 +152,27 @@ def runtime_identity():
 class Configuration:
     def __init__(self, filename):
         filename = Path(filename).resolve(strict=True)
-        value = _json_file(filename)
-        if (not isinstance(value, dict) or set(value) != {"schema", "root", "locks", "gallery", "bindings"}
+        self._initialize(_json_file(filename), filename.parent)
+
+    @classmethod
+    def from_document(cls, value, base_directory):
+        encode(value, CONFIG_LIMIT)
+        result = cls.__new__(cls)
+        result._initialize(copy.deepcopy(value), Path(base_directory).resolve(strict=True))
+        return result
+
+    def _initialize(self, value, base):
+        required = {"schema", "root", "locks", "gallery", "bindings"}
+        if (not isinstance(value, dict) or not required <= set(value) or set(value) - required - {"source_category"}
                 or value["schema"] != SCHEMA or not isinstance(value["gallery"], dict)
                 or not isinstance(value["bindings"], dict) or len(value["bindings"]) > 64):
             raise InvalidData("Invalid native gallery-dl worker configuration")
-        self.root_uuid, self.root = self._root(value["root"], filename.parent, media=True)
-        _, self.locks = self._root(value["locks"], filename.parent, media=False)
+        self.source_category = value.get("source_category")
+        if self.source_category is not None and (not isinstance(self.source_category, str)
+                or not re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", self.source_category)):
+            raise InvalidData("Invalid worker source category")
+        self.root_uuid, self.root = self._root(value["root"], base, media=True)
+        _, self.locks = self._root(value["locks"], base, media=False)
         self.assets = {}
         self._values = {"media_root": str(self.root.path)}
         self._kinds = {"media_root": "path"}
@@ -126,14 +184,24 @@ class Configuration:
             kind = binding.get("kind")
             self._kinds[name] = kind
             if kind == "path" and set(binding) == {"kind", "path"}:
-                resolved = str(_path(binding["path"], filename.parent))
+                resolved = str(_path(binding["path"], base))
             elif kind == "asset" and set(binding) == {"kind", "path", "sha256"}:
-                path = _path(binding["path"], filename.parent)
+                path = _path(binding["path"], base)
                 self.assets[path] = _asset(path, binding["sha256"])
                 assets[name] = binding["sha256"]
                 resolved = str(path)
             elif kind == "private" and set(binding) == {"kind", "file", "pointer"}:
-                resolved = _pointer(_json_file(_path(binding["file"], filename.parent)), binding["pointer"])
+                resolved = _pointer(_json_file(_path(binding["file"], base)), binding["pointer"])
+            elif kind == "private" and set(binding) == {"kind", "sources"}:
+                sources = binding["sources"]
+                if not isinstance(sources, list) or not 1 <= len(sources) <= 16:
+                    raise InvalidData("Private configuration layers must be a bounded list")
+                resolved = None
+                for source in sources:
+                    if not isinstance(source, dict) or set(source) != {"file", "pointer"}:
+                        raise InvalidData("Invalid private configuration layer")
+                    incoming = _pointer(_json_file(_path(source["file"], base)), source["pointer"])
+                    resolved = merge_values(resolved, incoming)
             elif kind == "private" and set(binding) == {"kind", "env"}:
                 reference = binding["env"]
                 if not isinstance(reference, str) or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", reference):
@@ -147,7 +215,8 @@ class Configuration:
         self._gallery = self._expand(value["gallery"])
         self._validate(self._gallery)
         self.policy_sha256 = digest(encode({"version": SCHEMA, "operation": "download",
-                                           "runtime": runtime_identity(), "gallery": value["gallery"],
+                                           "source_category": self.source_category,
+                                           "runtime": runtime_identity(), "gallery_sha256": digest(profile_bytes(value["gallery"])),
                                            "assets": assets}, CONFIG_LIMIT))
 
     @staticmethod
@@ -162,6 +231,17 @@ class Configuration:
         if isinstance(value, dict):
             result = {}
             for key, child in value.items():
+                if key == "cmdline-args" and child:
+                    result[key] = []
+                    for arg, private in zip(child, private_arguments(child)):
+                        reference = REFERENCE.fullmatch(arg) if private else None
+                        if private and (reference is None or self._kinds.get(reference[1]) != "private"):
+                            raise InvalidData("Website access arguments must use local private references")
+                        expanded = self._expand(arg, access=private)
+                        if not isinstance(expanded, str):
+                            raise InvalidData("Resolved worker arguments must be strings")
+                        result[key].append(expanded)
+                    continue
                 if key == "function" and child:
                     module, separator, function = child.rpartition(":") if isinstance(child, str) else ("", "", "")
                     reference = REFERENCE.fullmatch(module)

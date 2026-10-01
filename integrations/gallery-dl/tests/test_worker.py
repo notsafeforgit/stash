@@ -105,6 +105,18 @@ class WorkerTests(unittest.TestCase):
         self.delivery.close.assert_called_once()
         self.lease.close.assert_called_once()
 
+    def test_scoped_profile_refuses_a_different_root_extractor_before_download(self):
+        path = self.directory / "worker.json"
+        value = json.loads(path.read_text())
+        value["source_category"] = "twitter"
+        self.profile = Configuration.from_document(value, self.directory)
+        self.lease.run["policy_sha256"] = self.profile.policy_sha256
+        self.client._request.return_value = self.lease.run
+        result = self.run_worker()
+        self.assertEqual(result["state"], "deferred")
+        self.assertEqual(self.downloaded, [])
+        self.assertEqual(result["outbox"]["counts"]["pending"], 0)
+
     def test_current_file_survives_lost_lease_without_finishing_attempt(self):
         self.after_download = lambda: setattr(self.lease, "active", False)
         result = self.run_worker()

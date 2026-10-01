@@ -2,8 +2,8 @@
 
 This package implements durable delivery and a gallery-dl download adapter.
 It is development code on `v3-rewrite`; the installed host and n8n download
-helpers still use their existing catalogs. Launcher/configuration conversion,
-additional source adapters and production cutover remain unfinished.
+helpers still use their existing catalogs. Launcher conversion, activation of
+reviewed worker profiles, additional source adapters and production cutover remain unfinished.
 
 Python 3.12 or newer is required. Runtime delivery uses only the standard
 library. Install the local package with `pip install ./integrations/gallery-dl`
@@ -134,11 +134,13 @@ SDK classes are not a production launcher and do not change installed hooks.
 
 A `stash-gallery-worker-v1` JSON profile separates portable gallery-dl settings
 from deployment paths and local website-access references. Its five required
-keys are `schema`, `root`, `locks`, `gallery` and `bindings`:
+keys are `schema`, `root`, `locks`, `gallery` and `bindings`. Optional
+`source_category` restricts the root extractor; a mismatch stops before extraction:
 
 ```json
 {
   "schema": "stash-gallery-worker-v1",
+  "source_category": "reddit",
   "root": {"uuid": "REVIEWED_ROOT_UUID", "path": "/media/porn", "identity": [0, 0]},
   "locks": {"path": "/persistent/download-locks", "identity": [0, 0]},
   "gallery": {
@@ -181,8 +183,12 @@ Legacy `gallery_catalog_hook` writers are rejected, including named definitions.
 
 `private` bindings read a JSON Pointer from an existing local JSON file, or use
 `{"kind":"private","env":"WEBSITE_ACCESS"}`. A complete reference can supply
-structured cookies or headers. Private references are accepted only in website
-access settings, never interpolated into filenames or commands. These values
+structured cookies or headers. Layered access settings use
+`{"kind":"private","sources":[{"file":"…","pointer":"…"},…]}` and merge
+objects in order, replacing scalar/list values as gallery-dl does. Private
+references are accepted only in website access settings and the values of known
+yt-dlp access arguments such as `--cookies` or `--password`. They cannot be
+interpolated into filenames or shell commands. These values
 stay in worker memory and gallery-dl; they are not sent to Stash or copied into
 the outbox. The Stash API token still uses the separate `--token-env` option.
 
@@ -191,7 +197,9 @@ digests, pinned gallery-dl/yt-dlp runtime identity and adapter source digest. It
 excludes private values, local binding paths, directory identities and the
 requested run window. Equivalent host/container profiles therefore share a
 policy; rotating cookies does not create a new policy. Changing extraction or
-conversion settings/code does. Relative binding paths resolve against the
+conversion settings/code does. Conditional map order is retained in the digest
+and saved profile: rearranging first-match filename rules changes the policy.
+Relative binding paths resolve against the
 profile file. Keep one worker in each process: gallery-dl configuration is
 process-global, and simultaneous activation is rejected.
 
@@ -213,6 +221,55 @@ checking native receipts. Waiting, retry, deferred, paused and unconfirmed
 completion exit 2. Invalid configuration or unavailable admission exits 1.
 Continue draining the durable outbox after execution; stopping the download
 process does not certify that its file events were delivered.
+
+## Converting existing gallery-dl settings
+
+`stash-ingest-config` reads ordered JSON config layers and writes a **new,
+inactive** worker profile. It requires the reviewed root UUID, media/lock paths
+and device/inode identities. It does not register a root, contact a website,
+start downloading, rewrite the input files or activate a launcher.
+
+```sh
+stash-ingest-config \
+  --config /private/gallery-dl/config.json \
+  --config /private/gallery-dl/worker-overrides.json \
+  --category reddit \
+  --root ROOT_UUID --root-path /media/porn --root-identity DEVICE INODE \
+  --locks /persistent/download-locks --lock-identity DEVICE INODE \
+  --working-directory /media/porn \
+  --output /persistent/profiles/reddit.json
+```
+
+The command recursively merges objects and replaces arrays/scalars exactly as
+gallery-dl does. It retains insertion order, filenames, archive formats/IDs,
+original-quality flags, skip rules, pacing and remaining processors. Recognized
+legacy `prepare`/`complete` catalog hooks are removed from named, typed and inline
+definitions; unknown catalog callbacks require review. Archive segment lists
+remain lists so formatted archive names still use gallery-dl's path handling.
+Local Python/shell helpers in argument-array processors become asset bindings;
+`--asset PATH` can identify additional helpers. Shell-string processors and
+ambiguous path forms require explicit review rather than silent rewriting.
+
+Access values reference their original input file and JSON Pointer, including
+partial merges of structured headers/cookies and credential argument values.
+Other yt-dlp arguments remain visible in the policy; changing format selection
+must not be hidden as a credential change. Input files remain the private access
+source, so the eventual cutover must keep those references valid when retiring
+legacy settings. No credentials are printed in the conversion report.
+
+`--category twitter` removes unrelated extractor settings and unused named
+processors. Reddit can do the same when its existing whitelist limits children
+to Reddit, Imgur, Redgifs and direct links; their base and parent-specific
+settings remain. Unrecognized dependency graphs retain all configured sites.
+This prevents unrelated ThisVid recovery settings from splitting otherwise
+equivalent Reddit/Twitter worker policies. The root-category constraint also
+prevents using the resulting profile for another service.
+
+The report lists removed/excluded setting paths and binding counts, plus the
+validated policy/root identity. Publication uses a flushed temporary file and
+an exclusive atomic link with private permissions. An existing output is never
+replaced. Missing mounts, helpers or pinned runtime prevent publication. Deploying
+the new profiles and converting host/n8n/recovery launchers remain separate steps.
 
 ## Offline source requests
 

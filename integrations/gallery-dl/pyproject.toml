@@ -16,6 +16,7 @@ gallery = [
 
 [project.scripts]
 stash-ingest = "stash_ingest.cli:main"
+stash-ingest-config = "stash_ingest.config_migration:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

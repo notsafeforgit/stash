@@ -32,3 +32,16 @@ func validateFileIngestSchema(conn *sqlx.DB) error {
 	}
 	return nil
 }
+
+func validateIngestRootSchema(conn *sqlx.DB) error {
+	for _, name := range []string{"ingest_credential_roots", "ingest_root_immutable", "ingest_root_receipts", "ingest_scope_receipts", "source_collection_target_root"} {
+		var exists bool
+		if err := conn.Get(&exists, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
+			return err
+		}
+		if !exists {
+			return fmt.Errorf("native database schema is incomplete: missing %s", name)
+		}
+	}
+	return nil
+}

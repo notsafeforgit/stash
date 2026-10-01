@@ -173,10 +173,10 @@ func (s *SourceCollectionStore) LookupTarget(ctx context.Context, target, after 
 }
 
 // LookupCurrentTargets resolves only the current exact URL and root within an
-// explicit collection scope. Historical URLs are review evidence, not authority
+// explicit collection or root grant. Historical URLs are review evidence, not authority
 // to redirect a scheduled scrape to a different target or scan order.
-func (s *SourceCollectionStore) LookupCurrentTargets(ctx context.Context, targets, collections []string, root *string) ([]*models.SourceCollection, error) {
-	if len(targets) < 1 || len(targets) > 50 || len(collections) < 1 || len(collections) > 128 {
+func (s *SourceCollectionStore) LookupCurrentTargets(ctx context.Context, targets, collections []string, root *string, allCollections bool) ([]*models.SourceCollection, error) {
+	if len(targets) < 1 || len(targets) > 50 || (len(collections) < 1 && !allCollections) || len(collections) > 128 || (allCollections && root == nil) {
 		return nil, errors.New("invalid bounded collection lookup")
 	}
 	for _, target := range targets {
@@ -194,21 +194,28 @@ func (s *SourceCollectionStore) LookupCurrentTargets(ctx context.Context, target
 			return nil, err
 		}
 	}
-	targetJSON, err := json.Marshal(targets)
-	if err != nil {
-		return nil, err
-	}
 	collectionJSON, err := json.Marshal(collections)
 	if err != nil {
 		return nil, err
 	}
-	var rows []sourceCollectionRow
-	if err := dbWrapper.Select(ctx, &rows, sourceCollectionSelect+` WHERE b.uuid IN (SELECT value FROM json_each(?))
- AND r.revision=b.revision AND r.root_uuid IS ? AND r.target_url IN (SELECT value FROM json_each(?)) ORDER BY b.uuid`,
-		collectionJSON, root, targetJSON); err != nil {
-		return nil, err
+	ret := make([]*models.SourceCollection, 0)
+	for _, target := range targets {
+		query := sourceCollectionSelect + " WHERE r.revision=b.revision AND r.target_url!='' AND r.target_url=? AND r.root_uuid IS ?"
+		args := []any{target, root}
+		if !allCollections {
+			query += " AND b.uuid IN (SELECT value FROM json_each(?))"
+			args = append(args, collectionJSON)
+		}
+		// One extra candidate proves truncation. Never let a partial match set
+		// look unique, and never page unrelated targets before applying scope.
+		query += " ORDER BY b.uuid LIMIT 129"
+		var rows []sourceCollectionRow
+		if err := dbWrapper.Select(ctx, &rows, query, args...); err != nil {
+			return nil, err
+		}
+		ret = append(ret, resolveCollections(rows)...)
 	}
-	return resolveCollections(rows), nil
+	return ret, nil
 }
 
 func (s *SourceCollectionStore) History(ctx context.Context, value string, after, limit int) ([]models.SourceCollectionRevision, error) {

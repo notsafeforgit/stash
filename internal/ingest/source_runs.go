@@ -72,7 +72,10 @@ func (c *RunCoordinator) Submit(ctx context.Context, token string, input models.
 				break
 			}
 		}
-		if !hasCollection {
+		// Admission replay may identify a historical root after a collection
+		// moves. Check the returned immutable admission inside this transaction
+		// rather than rejecting it against only today's collection definition.
+		if !hasCollection && len(credential.RootUUIDs) == 0 {
 			return ErrForbidden
 		}
 		result, err = c.Service.Repo.SourceRun.Submit(ctx, credential.ProducerUUID, input, c.Now(), c.MaxActive)
@@ -104,19 +107,20 @@ func (c *RunCoordinator) List(ctx context.Context, token, collection string, aft
 		if err != nil {
 			return err
 		}
-		found := false
-		var root *string
+		roots := make([]*string, 0, len(credential.RootUUIDs)+1)
+		for i := range credential.RootUUIDs {
+			roots = append(roots, &credential.RootUUIDs[i])
+		}
 		for _, scope := range credential.Scopes {
 			if scope.CollectionUUID == collection {
-				found = true
-				root = scope.RootUUID
+				roots = append(roots, scope.RootUUID)
 				break
 			}
 		}
-		if !found {
+		if len(roots) == 0 {
 			return ErrForbidden
 		}
-		rows, err := c.Service.Repo.SourceRun.List(ctx, collection, root, after, 50)
+		rows, err := c.Service.Repo.SourceRun.List(ctx, collection, roots, after, 50)
 		if err != nil {
 			return err
 		}
@@ -135,7 +139,7 @@ func (c *RunCoordinator) List(ctx context.Context, token, collection string, aft
 }
 
 // Ready discovers only download work permitted at this worker's root. It does
-// not grant a lease or expose work from other collections under that root.
+// not grant a lease. A root grant includes every registered collection there.
 func (c *RunCoordinator) Ready(ctx context.Context, token, root, policy string, after int64) ([]models.SourceRunCandidate, error) {
 	var result []models.SourceRunCandidate
 	err := c.Service.Repo.WithReadTxn(ctx, func(ctx context.Context) error {
@@ -149,10 +153,11 @@ func (c *RunCoordinator) Ready(ctx context.Context, token, root, policy string, 
 				collections = append(collections, scope.CollectionUUID)
 			}
 		}
-		if len(collections) == 0 {
+		allCollections := permittedRoot(credential, root)
+		if len(collections) == 0 && !allCollections {
 			return ErrForbidden
 		}
-		result, err = c.Service.Repo.SourceRun.Ready(ctx, collections, root, policy, after, 50, c.Now())
+		result, err = c.Service.Repo.SourceRun.Ready(ctx, collections, allCollections, root, policy, after, 50, c.Now())
 		return err
 	})
 	return result, err

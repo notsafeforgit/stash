@@ -30,7 +30,8 @@ def lookup_collections(client, targets, root_uuid):
     targets = [target_url(target) for target in targets]
     if client.capabilities().get("collection_lookup") is not True:
         raise Unavailable("incompatible_collection_lookup")
-    result = client._request("POST", "/collections/lookup", encode({"root_uuid": root_uuid, "targets": targets}, 512 << 10))
+    result = client._request("POST", "/collections/lookup", encode({"root_uuid": root_uuid, "targets": targets}, 512 << 10),
+                             max_response_bytes=4 << 20)
     try:
         if (not isinstance(result, dict) or "root_uuid" not in result or result["root_uuid"] != root_uuid
                 or not isinstance(result.get("targets"), list) or len(result["targets"]) != len(targets)):
@@ -38,7 +39,8 @@ def lookup_collections(client, targets, root_uuid):
         found, seen = [], set()
         for target, item in zip(targets, result["targets"], strict=True):
             if (not isinstance(item, dict) or item.get("target_url") != target
-                    or not isinstance(item.get("candidates"), list) or len(item["candidates"]) > 128):
+                    or not isinstance(item.get("candidates"), list) or len(item["candidates"]) > 128
+                    or type(item.get("has_more")) is not bool or (item["has_more"] and len(item["candidates"]) != 128)):
                 raise InvalidData("Mismatched collection candidates")
             candidates = []
             for candidate in item["candidates"]:
@@ -52,11 +54,9 @@ def lookup_collections(client, targets, root_uuid):
                 seen.add(collection)
                 candidates.append({"collection_uuid": collection, "collection_revision": revision, "state": state})
             state = "unresolved" if not candidates else "ambiguous"
-            if len(candidates) == 1:
+            if len(candidates) == 1 and not item["has_more"]:
                 state = "resolved" if candidates[0]["state"] == "active" else candidates[0]["state"]
-            found.append({"target_url": target, "state": state, "candidates": candidates})
-        if len(seen) > 128:
-            raise InvalidData("Collection lookup exceeds the producer grant limit")
+            found.append({"target_url": target, "state": state, "candidates": candidates, "has_more": item["has_more"]})
         return {"root_uuid": root_uuid, "targets": found}
     except InvalidData:
         raise Unavailable("invalid_collection_lookup") from None

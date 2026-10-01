@@ -123,6 +123,36 @@ func TestProducerCollectionLookupPreservesTargetAndScope(t *testing.T) {
 	require.Empty(t, lookup(&root.UUID, topTarget)[0].Candidates, "do not substitute historical URLs")
 	require.Equal(t, []ingestCollectionBinding{{top.UUID, 2, "active"}}, lookup(&root.UUID, topTarget+"&changed=1")[0].Candidates)
 	require.Empty(t, lookup(&root.UUID, moved.TargetURL)[0].Candidates, "a prior root grant cannot see a moved definition")
+	rootCredential, rootToken, err := service.IssueCredential(t.Context(), producer.UUID, nil, nil, root.UUID)
+	require.NoError(t, err)
+	require.Empty(t, rootCredential.Scopes)
+	require.Equal(t, []string{root.UUID}, rootCredential.RootUUIDs)
+	// Collections registered after issuance are included without minting another
+	// token. Candidate limits must still reveal ambiguity instead of truncating
+	// to an apparently unique source definition.
+	require.NoError(t, service.Repo.WithTxn(t.Context(), func(ctx context.Context) error {
+		for range 30 {
+			_, err := service.Repo.SourceCollection.Put(ctx, models.SourceCollectionInput{Origin: "review", SourceCollectionDefinition: models.SourceCollectionDefinition{
+				Label: "Later source", Kind: "feed", State: "active", TargetURL: target, RootUUID: &root.UUID, PathPrefix: "Later"}})
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}))
+	w := request(rootToken, &root.UUID, []string{target})
+	require.Equal(t, http.StatusOK, w.Code)
+	var bounded struct {
+		Targets []ingestCollectionMatches `json:"targets"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &bounded))
+	require.Len(t, bounded.Targets[0].Candidates, 128)
+	require.True(t, bounded.Targets[0].HasMore)
+	require.False(t, lookup(&root.UUID, target)[0].HasMore, "individual grants were not expanded")
+	require.Equal(t, http.StatusForbidden, request(rootToken, nil, []string{target}).Code)
+	require.Equal(t, http.StatusForbidden, request(rootToken, &otherRoot.UUID, []string{target}).Code)
+	require.NoError(t, service.Repo.WithTxn(t.Context(), func(ctx context.Context) error { return service.Repo.Ingest.RevokeCredential(ctx, rootCredential.UUID) }))
+	require.Equal(t, http.StatusUnauthorized, request(rootToken, &root.UUID, []string{target}).Code)
 	require.NoError(t, service.Repo.WithTxn(t.Context(), func(ctx context.Context) error { return service.Repo.Ingest.RevokeCredential(ctx, credential.UUID) }))
 	require.Equal(t, http.StatusUnauthorized, request(token, &root.UUID, []string{target}).Code)
 }

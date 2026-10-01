@@ -115,7 +115,7 @@ func TestPythonProducerDurableDeliveryAgainstNativeHTTP(t *testing.T) {
 		rejected, err := service.Repo.Ingest.FindReceipt(ctx, producer.UUID, result.Rejected)
 		require.NoError(t, err)
 		require.Nil(t, rejected)
-		runs, err := service.Repo.SourceRun.List(ctx, collection.UUID, nil, 0, 50)
+		runs, err := service.Repo.SourceRun.List(ctx, collection.UUID, []*string{nil}, 0, 50)
 		require.NoError(t, err)
 		require.Len(t, runs, 1, "lost submission acknowledgement must not create another run")
 		require.Equal(t, result.RunUUID, runs[0].UUID)

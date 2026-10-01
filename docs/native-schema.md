@@ -740,6 +740,20 @@ validates the schema and current attempt/lease agreement. Anonymisation removes
 run state before its producer and source definitions. Migration invents no runs
 or legacy journal completion. See the [run protocol](native-ingestion.md#source-run-coordination).
 
+Migration 1000024 adds immutable `ingest_credential_roots` for explicitly issued
+Stash API-token grants. Each selected logical root permits ingestion for its
+registered collections, including later additions. Existing named collection
+grants retain their original scope; migration creates no root grants.
+
+The receipt table retains every value, including accepted file-job identities.
+Its insert guard accepts either a matching collection/root grant or a matching
+explicit root grant, while preserving collection revision, capture provenance
+and job-kind constraints. A null receipt root cannot match a root grant.
+Grant deletion guards retain permission evidence while receipts reference it;
+token revocation leaves those records intact. Anonymisation removes receipts
+before both kinds of grants. A source-target/root index supports bounded current
+collection lookup. Normal database backups include the grants and receipts.
+
 Migrations run against copies during development. SQL failure leaves a dirty
 migration state that startup refuses; restore the migration backup or use a
 validated recovery procedure. Do not force a schema version to hide a failure.

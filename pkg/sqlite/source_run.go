@@ -264,16 +264,26 @@ VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, id, c.UUID, c.Revision, c.RootUUID, rootRe
 	return s.Find(ctx, id)
 }
 
-func (s *SourceRunStore) List(ctx context.Context, collection string, root *string, after int64, limit int) ([]models.SourceRun, error) {
-	if !validSourceRunUUID(collection) || (root != nil && !validSourceRunUUID(*root)) || after < 0 {
+func (s *SourceRunStore) List(ctx context.Context, collection string, roots []*string, after int64, limit int) ([]models.SourceRun, error) {
+	if !validSourceRunUUID(collection) || len(roots) < 1 || len(roots) > 128 || after < 0 {
 		return nil, models.ErrSourceRunInvalid
 	}
 	limit, err := sourcePageLimit(limit)
 	if err != nil {
 		return nil, models.ErrSourceRunInvalid
 	}
+	args := []any{collection, after}
+	for _, root := range roots {
+		if root != nil && !validSourceRunUUID(*root) {
+			return nil, models.ErrSourceRunInvalid
+		}
+		args = append(args, root)
+	}
+	args = append(args, limit)
+	query := "SELECT * FROM source_runs WHERE collection_uuid=? AND id>? AND (" +
+		strings.TrimSuffix(strings.Repeat("root_uuid IS ? OR ", len(roots)), " OR ") + ") ORDER BY id LIMIT ?"
 	var rows []sourceRunRow
-	if err := dbWrapper.Select(ctx, &rows, "SELECT * FROM source_runs WHERE collection_uuid=? AND root_uuid IS ? AND id>? ORDER BY id LIMIT ?", collection, root, after, limit); err != nil {
+	if err := dbWrapper.Select(ctx, &rows, query, args...); err != nil {
 		return nil, err
 	}
 	ret := make([]models.SourceRun, 0, len(rows))
@@ -287,8 +297,8 @@ func (s *SourceRunStore) List(ctx context.Context, collection string, root *stri
 	return ret, nil
 }
 
-func (s *SourceRunStore) Ready(ctx context.Context, collections []string, root, policy string, after int64, limit int, now time.Time) ([]models.SourceRunCandidate, error) {
-	if len(collections) < 1 || len(collections) > 128 || !validSourceRunUUID(root) || !archive.ValidSHA256(policy) || after < 0 || !validJobTime(now) {
+func (s *SourceRunStore) Ready(ctx context.Context, collections []string, allCollections bool, root, policy string, after int64, limit int, now time.Time) ([]models.SourceRunCandidate, error) {
+	if (len(collections) < 1 && !allCollections) || len(collections) > 128 || !validSourceRunUUID(root) || !archive.ValidSHA256(policy) || after < 0 || !validJobTime(now) {
 		return nil, models.ErrSourceRunInvalid
 	}
 	limit, err := sourcePageLimit(limit)
@@ -300,7 +310,9 @@ func (s *SourceRunStore) Ready(ctx context.Context, collections []string, root, 
 		if !validSourceRunUUID(collection) {
 			return nil, models.ErrSourceRunInvalid
 		}
-		args = append(args, collection)
+		if !allCollections {
+			args = append(args, collection)
+		}
 	}
 	args = append(args, limit)
 	// Use the bounded active set, never traverse completed run history. An
@@ -309,8 +321,11 @@ func (s *SourceRunStore) Ready(ctx context.Context, collections []string, root, 
 	// behind the explicit review boundary.
 	query := `SELECT id,uuid FROM source_runs INDEXED BY source_runs_active
 WHERE state IN ('queued','running','deferred') AND root_uuid=? AND policy_sha256=? AND id>? AND operation='download'
-AND ((state='queued' AND available_at_ms<=?) OR (state='running' AND lease_until_ms<=?))
-AND collection_uuid IN (` + strings.TrimSuffix(strings.Repeat("?,", len(collections)), ",") + `) ORDER BY id LIMIT ?`
+AND ((state='queued' AND available_at_ms<=?) OR (state='running' AND lease_until_ms<=?))`
+	if !allCollections {
+		query += " AND collection_uuid IN (" + strings.TrimSuffix(strings.Repeat("?,", len(collections)), ",") + ")"
+	}
+	query += " ORDER BY id LIMIT ?"
 	ret := make([]models.SourceRunCandidate, 0)
 	if err := dbWrapper.Select(ctx, &ret, query, args...); err != nil {
 		return nil, err

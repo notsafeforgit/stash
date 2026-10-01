@@ -19,8 +19,8 @@ class CollectionLookupTests(unittest.TestCase):
     def setUp(self):
         self.client = Client("http://fixture.invalid", PRODUCER)
         self.client.capabilities = Mock(return_value={"collection_lookup": True})
-        self.response = {"root_uuid": ROOT, "targets": [{"target_url": TARGET, "candidates": [candidate()]}]}
-        self.client._request = Mock(side_effect=lambda *args: copy.deepcopy(self.response))
+        self.response = {"root_uuid": ROOT, "targets": [{"target_url": TARGET, "candidates": [candidate()], "has_more": False}]}
+        self.client._request = Mock(side_effect=lambda *args, **kwargs: copy.deepcopy(self.response))
 
     def test_resolution_preserves_exact_urls_and_does_not_select_ambiguous_or_inactive_collections(self):
         states = ("resolved", "unresolved", "ambiguous", "disabled", "retired")
@@ -79,6 +79,18 @@ class CollectionLookupTests(unittest.TestCase):
         self.response["targets"].append(duplicate)
         with self.assertRaisesRegex(Unavailable, "invalid_collection_lookup"):
             lookup_collections(self.client, [TARGET, duplicate["target_url"]], ROOT)
+
+    def test_root_grants_allow_large_batches_but_truncated_matches_stay_ambiguous(self):
+        self.response["targets"][0].update(candidates=[candidate() for _ in range(128)], has_more=True)
+        other = {"target_url": TARGET + "&other=1", "candidates": [candidate()], "has_more": False}
+        self.response["targets"].append(other)
+        result = lookup_collections(self.client, [TARGET, other["target_url"]], ROOT)
+        self.assertEqual([item["state"] for item in result["targets"]], ["ambiguous", "resolved"])
+        self.assertTrue(result["targets"][0]["has_more"])
+        self.assertEqual(self.client._request.call_args.kwargs["max_response_bytes"], 4 << 20)
+        self.response["targets"][0]["candidates"] = [candidate()]
+        with self.assertRaisesRegex(Unavailable, "invalid_collection_lookup"):
+            lookup_collections(self.client, [TARGET, other["target_url"]], ROOT)
 
 
 if __name__ == "__main__":

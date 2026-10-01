@@ -55,7 +55,7 @@ func TestPythonDownloadWorkerRecoversFinishAndDeliversFiles(t *testing.T) {
 		}})
 		return err
 	}))
-	_, token, err := service.IssueCredential(t.Context(), producer.UUID, []models.IngestScope{{CollectionUUID: collection.UUID, RootUUID: &root.UUID}}, nil)
+	_, token, err := service.IssueCredential(t.Context(), producer.UUID, nil, nil, root.UUID)
 	require.NoError(t, err)
 	router := (&ingestRoutes{service: service, fileIngestion: true}).router()
 	var finishes, finishStatus atomic.Int32

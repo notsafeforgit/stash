@@ -23,6 +23,12 @@ environment reference for each request and sends the token only in the
 Authorization header; it does not store the token, follow redirects, inherit
 website proxies or load cookies. Website credentials remain with gallery-dl.
 
+Stash can authorize named collection/root pairs or all registered collections at
+an explicitly selected logical root. The latter also covers later additions,
+without granting source registration or editing. Existing tokens do not acquire
+root grants when the database upgrades; unbound metadata still requires a named
+collection grant. Capabilities report `scopes` and `root_uuids` separately.
+
 The endpoint must be an HTTP(S) origin without user information, path, query or
 fragment. HTTPS uses normal certificate verification. A request timeout is at
 most 30 seconds. Response bodies are bounded and do not become persisted error
@@ -53,7 +59,10 @@ Delivery waits for that capture's receipt. The queue never creates a filename or
 infers an attachment from a directory name; those are producer integration tasks.
 
 SQLite transactions use WAL and `synchronous=FULL`. Independent drainers claim
-bounded batches with expiring, fenced delivery leases. Interrupted work replays
+bounded batches with expiring, fenced delivery leases. Concurrent first opens
+use a bounded retry for SQLite BUSY/LOCKED responses during WAL activation,
+without replacing the database. Other setup failures propagate.
+Interrupted work replays
 the exact original bytes and event UUID. A mismatched receipt cannot discard the
 payload. Valid receipt storage and payload removal commit together, retaining a
 small acknowledgement row for replay and dependent file events. Outbox delivery
@@ -428,9 +437,12 @@ command claims a completed scrape or starts a downloader.
 Collection lookup uses the native API's `collection_lookup` capability and
 `POST /collections/lookup`. A request contains up to 50 distinct exact source
 URLs and one logical root; omit the root only for unbound metadata collections.
-The server queries the token's permitted collection IDs and current revisions,
-then returns candidate UUIDs, revisions and states grouped by URL. It does not
-send collection labels, account associations, directory names or local mounts.
+The server applies the token's collection/root grants to current revisions,
+then returns candidate UUIDs, revisions and states grouped by URL. Each URL has
+at most 128 candidates and a `has_more` flag. Truncation always requires review;
+the client validates the flag and allows up to 4 MiB for the entire response.
+It does not send collection labels, account associations, directory names or
+local mounts.
 
 An absent visible match is `unresolved`; it does not prove the URL is absent
 from the whole library. Multiple matches are `ambiguous`, including when one is

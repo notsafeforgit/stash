@@ -40,6 +40,7 @@ func TestIngestReceiptConstraintsAndAnonymisation(t *testing.T) {
 		"UPDATE ingest_credentials SET secret_hash='0000000000000000000000000000000000000000000000000000000000000000'",
 		"UPDATE ingest_producers SET label='changed identity'",
 		"UPDATE ingest_credential_scopes SET collection_uuid=collection_uuid",
+		"DELETE FROM ingest_credential_scopes",
 	} {
 		_, err := raw.Exec(query)
 		require.Error(t, err, query)

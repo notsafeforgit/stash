@@ -150,7 +150,8 @@ func (rs *ingestRoutes) capabilities(w http.ResponseWriter, r *http.Request) {
 	}
 	ingestJSON(w, http.StatusOK, map[string]interface{}{
 		"protocol": ingest.ProtocolVersion, "producer_uuid": credential.ProducerUUID, "scopes": credential.Scopes,
-		"kinds": kinds, "post_namespaces": []string{"native:reddit", "native:twitter"},
+		"root_uuids": credential.RootUUIDs,
+		"kinds":      kinds, "post_namespaces": []string{"native:reddit", "native:twitter"},
 		"retention_policy": archive.SourceRetentionVersion, "max_event_bytes": ingest.MaxEventBytes, "max_batch_bytes": ingest.MaxBatchBytes, "max_batch_events": ingest.MaxBatchEvents,
 		"max_file_event_bytes": ingest.MaxFileEventBytes, "file_ingestion": rs.fileIngestion,
 		"source_runs": true, "source_run_protocol": 1, "source_run_submission_receipts": true, "source_run_dispatch": true,
@@ -168,6 +169,7 @@ type ingestCollectionBinding struct {
 type ingestCollectionMatches struct {
 	TargetURL  string                    `json:"target_url"`
 	Candidates []ingestCollectionBinding `json:"candidates"`
+	HasMore    bool                      `json:"has_more"`
 }
 
 func (rs *ingestRoutes) lookupCollections(w http.ResponseWriter, r *http.Request) {
@@ -189,6 +191,10 @@ func (rs *ingestRoutes) lookupCollections(w http.ResponseWriter, r *http.Request
 		entry := ingestCollectionMatches{TargetURL: target, Candidates: make([]ingestCollectionBinding, 0)}
 		for _, collection := range result {
 			if collection.TargetURL == target {
+				if len(entry.Candidates) == 128 {
+					entry.HasMore = true
+					continue
+				}
 				entry.Candidates = append(entry.Candidates, ingestCollectionBinding{collection.UUID, collection.Revision, collection.State})
 			}
 		}

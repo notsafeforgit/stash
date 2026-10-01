@@ -26,6 +26,7 @@ type IngestCredential struct {
 	ProducerUUID string        `json:"producer_uuid"`
 	SecretHash   string        `json:"-"`
 	Scopes       []IngestScope `json:"scopes"`
+	RootUUIDs    []string      `json:"root_uuids"` // every registered collection at these explicit roots
 	ExpiresAt    *time.Time    `json:"expires_at"`
 	Revoked      bool          `json:"revoked"`
 	CreatedAt    time.Time     `json:"created_at"`

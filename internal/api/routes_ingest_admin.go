@@ -93,17 +93,18 @@ func (rs *ingestRoutes) credentials(w http.ResponseWriter, r *http.Request) {
 func (rs *ingestRoutes) issueCredential(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		Scopes    []models.IngestScope `json:"scopes"`
+		RootUUIDs []string             `json:"root_uuids"`
 		ExpiresAt *time.Time           `json:"expires_at"`
 	}
 	if err := readIngestJSON(w, r, 65536, &input); err != nil {
 		ingestError(w, err)
 		return
 	}
-	if len(input.Scopes) < 1 || len(input.Scopes) > 128 || (input.ExpiresAt != nil && !input.ExpiresAt.After(time.Now())) {
+	if len(input.Scopes)+len(input.RootUUIDs) < 1 || len(input.Scopes)+len(input.RootUUIDs) > 128 || (input.ExpiresAt != nil && !input.ExpiresAt.After(time.Now())) {
 		ingestError(w, ingest.ErrInvalid)
 		return
 	}
-	credential, token, err := rs.service.IssueCredential(r.Context(), chi.URLParam(r, "producer"), input.Scopes, input.ExpiresAt)
+	credential, token, err := rs.service.IssueCredential(r.Context(), chi.URLParam(r, "producer"), input.Scopes, input.ExpiresAt, input.RootUUIDs...)
 	if err != nil {
 		ingestError(w, err)
 		return

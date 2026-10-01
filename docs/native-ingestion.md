@@ -44,12 +44,19 @@ the general Stash API key do not authenticate this interface. Tokens are not
 accepted in URLs. Its router has no GraphQL, plugin, filesystem, or application
 fallback. Responses use `Cache-Control: no-store`.
 
-Each token belongs to one durable producer UUID and grants specific collection
-UUIDs at specific logical root UUIDs. A null root grants metadata access for an
-unbound collection; it is not a wildcard. One credential can grant up to 128
-collections, with one root per collection. A binding change can use separate
-credentials while an older outbox drains. Root UUIDs convey no arbitrary host
-path authority. Tokens have 32 random secret bytes; only their SHA-256 verifiers
+Each token belongs to one durable producer UUID. It can grant specific collection
+UUIDs at specific logical root UUIDs, or all registered collections at explicitly
+selected logical roots. A root grant also covers collections registered there
+later, so a saved list with hundreds of sources does not need one grant per
+source. It grants no collection creation, editing or other administration.
+Existing collection grants remain limited to their named collections.
+
+A null root in a collection grant permits metadata access for that unbound
+collection; it is not a wildcard. Root grants never include unbound collections.
+One token can hold up to 128 combined collection and root grants, with one root
+per named collection. A binding change can use separate tokens while an older
+outbox drains. Root UUIDs convey no arbitrary host path authority. Tokens have
+32 random secret bytes; only their SHA-256 verifiers
 are stored. Optional expiry and permanent Stash API-token revocation are checked
 in each write transaction. API-token rotation retains the producer UUID and event
 receipts.
@@ -60,15 +67,18 @@ The application's existing authenticated router exposes administration:
 | --- | --- |
 | `POST /producers` | `{"label":"Host gallery-dl"}`; returns a producer UUID |
 | `GET /producers?after=<uuid>` | Up to 50 producers ordered by UUID |
-| `POST /producers/<uuid>/credentials` | `{"scopes":[{"collection_uuid":"…","root_uuid":null}],"expires_at":null}`; returns credential metadata and its token once |
+| `POST /producers/<uuid>/credentials` | `{"scopes":[{"collection_uuid":"…","root_uuid":null}],"root_uuids":[],"expires_at":null}`; returns token metadata and its secret once; either grant list may be empty |
 | `GET /producers/<uuid>/credentials?after=<uuid>` | Up to 50 credential records; excludes tokens and verifiers |
 | `DELETE /credentials/<uuid>` | Permanently revokes the credential; repeated revocation is safe |
 
 Administration requires application access, independently of the producer token.
-JSON writes and origin checks reject cross-site browser administration. Scope
-issuance requires an active collection and a root used by one of its recorded
-definitions. A historical root grant supports rotating credentials while old
-events remain undelivered. Retired/disabled roots cannot receive new grants.
+JSON writes and origin checks reject cross-site browser administration. Issuing
+a named collection grant requires an active collection and a root used by one
+of its recorded definitions. An explicitly selected historical binding supports
+token rotation while old events remain undelivered. A root grant requires an
+active registered root. Retired/disabled roots cannot receive new grants.
+Capabilities and token administration responses include both `scopes` and
+`root_uuids`. Native migration 1000024 adds no grants to existing tokens.
 
 ## File preparation in core
 
@@ -237,14 +247,18 @@ Collection lookup accepts `{"root_uuid":"…","targets":["https://…"]}` with
 1–50 distinct URLs; a null root selects unbound metadata collections. Its
 `collection_lookup` capability is advertised separately. The response echoes
 the root and requested URLs in order, each with candidate `collection_uuid`,
-`collection_revision` and `state` values. Empty candidate lists are explicit;
-all permitted duplicates are retained. The lookup applies the token's collection
+`collection_revision` and `state` values. Each URL returns at most 128 candidates
+and a `has_more` boolean; `true` means additional matches exist and requires
+review, never automatic selection. Empty candidate lists are explicit.
+The lookup applies the token's collection
 and root grants before returning candidates and reads only current definitions.
 Historical target URLs and moved roots cannot redirect a caller's source work.
 Labels, account IDs and path information are excluded from this projection.
 Callers must preserve ambiguity and inactive states for review; this read grants
 no collection creation or modification authority. Native submission still
 validates the chosen definition when admitting the request.
+The Python lookup client accepts at most 4 MiB for this bounded response; other
+producer responses retain their 1 MiB limit.
 
 An event has this shape; UUID placeholders must be replaced with canonical,
 lowercase, nonzero UUIDs:
@@ -376,6 +390,12 @@ deferral limits. Pagination never grants ownership or certifies completion.
 The producer's `dispatch` command retains its cursor/backoff across restarts,
 continues delivery/admission during discovery outages, and still uses the
 existing claim before downloading. See the producer guide for cycle outcomes.
+
+An explicit root grant includes eligible runs from all registered collections at
+that root. Collection grants still filter discovery by their named IDs. Run
+history and admission replay check the run's recorded root, including after a
+collection moves: a token for only the new root cannot read or replay old-root
+work. New submissions against another root are rolled back before admission.
 
 Capabilities advertise `source_run_submission_receipts: true` when submission
 responses identify the committed request. Multiple requests may coalesce into

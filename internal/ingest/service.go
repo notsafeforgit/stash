@@ -40,8 +40,8 @@ func Digest(body []byte) string { sum := sha256.Sum256(body); return hex.EncodeT
 
 // The 32 random secret bytes are returned once; database reads and JSON exports
 // contain only a SHA-256 verifier. Tokens are accepted only in Authorization.
-func (s *Service) IssueCredential(ctx context.Context, producer string, scopes []models.IngestScope, expires *time.Time) (*models.IngestCredential, string, error) {
-	if !ValidUUID(producer) || len(scopes) < 1 || len(scopes) > 128 || (expires != nil && (!expires.After(time.Now()) || expires.Year() > 9999)) {
+func (s *Service) IssueCredential(ctx context.Context, producer string, scopes []models.IngestScope, expires *time.Time, roots ...string) (*models.IngestCredential, string, error) {
+	if !ValidUUID(producer) || len(scopes)+len(roots) < 1 || len(scopes)+len(roots) > 128 || (expires != nil && (!expires.After(time.Now()) || expires.Year() > 9999)) {
 		return nil, "", ErrInvalid
 	}
 	seen := make(map[string]bool)
@@ -50,6 +50,13 @@ func (s *Service) IssueCredential(ctx context.Context, producer string, scopes [
 			return nil, "", ErrInvalid
 		}
 		seen[scope.CollectionUUID] = true
+	}
+	seenRoots := make(map[string]bool)
+	for _, root := range roots {
+		if !ValidUUID(root) || seenRoots[root] {
+			return nil, "", ErrInvalid
+		}
+		seenRoots[root] = true
 	}
 	id := uuid.NewString()
 	secret := make([]byte, 32)
@@ -66,7 +73,7 @@ func (s *Service) IssueCredential(ctx context.Context, producer string, scopes [
 		if owner == nil {
 			return ErrNotFound
 		}
-		result, err = s.Repo.Ingest.IssueCredential(ctx, models.IngestCredential{UUID: id, ProducerUUID: producer, SecretHash: Digest([]byte(token)), Scopes: scopes, ExpiresAt: expires})
+		result, err = s.Repo.Ingest.IssueCredential(ctx, models.IngestCredential{UUID: id, ProducerUUID: producer, SecretHash: Digest([]byte(token)), Scopes: scopes, RootUUIDs: roots, ExpiresAt: expires})
 		return err
 	})
 	if err != nil {
@@ -103,8 +110,20 @@ func (s *Service) Authenticate(ctx context.Context, token string) (*models.Inges
 }
 
 func permitted(credential *models.IngestCredential, collection string, root *string) bool {
+	if root != nil && permittedRoot(credential, *root) {
+		return true
+	}
 	for _, scope := range credential.Scopes {
 		if scope.CollectionUUID == collection && reflect.DeepEqual(scope.RootUUID, root) {
+			return true
+		}
+	}
+	return false
+}
+
+func permittedRoot(credential *models.IngestCredential, root string) bool {
+	for _, allowed := range credential.RootUUIDs {
+		if allowed == root {
 			return true
 		}
 	}

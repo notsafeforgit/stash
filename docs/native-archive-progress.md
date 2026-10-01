@@ -1582,3 +1582,60 @@ bulk worker access and durable unresolved caller/list requests must be addressed
 before the launchers switch. Collection registration/import, preservation of
 full-history policy, n8n receipt conversion and the remaining transition phases
 are still required. Production services and workflow graphs remain unchanged.
+
+## Explicit media-root grants for bulk producers
+
+Native schema 1000024 adds root grants for a producer's Stash API token. A grant
+covers all registered collections at that logical root, including subsequent
+additions, so the existing 497-entry Twitter and 421-entry Reddit lists no longer
+require a grant per source. Named collection/root grants remain available and
+retain their existing authority. Tokens hold at most 128 combined grant records;
+neither form grants source administration. Root grants exclude unbound metadata.
+Website logins and cookies remain with gallery-dl/n8n.
+
+Capture/file admission, receipt reads, collection lookup, source-run admission,
+dispatch and run history use the same permissions. Historical admission replay
+checks the recorded root after a collection moves; a token for only the new root
+cannot acquire access to the old run. Rejected admissions roll back. Issuance
+requires active registered roots, and capabilities expose the explicit grants.
+Root grants are created only through administration, never schema migration.
+
+Collection lookup applies permission filters before its per-URL limit. It returns
+up to 128 candidates with `has_more` when additional matches exist. The Python
+client preserves that ambiguity and allows a bounded 4 MiB lookup response;
+other responses retain their 1 MiB limit. The new target/root index supports
+these lookups without returning unrelated collection information.
+
+The migration preserves receipt values, including accepted file-job references.
+SQL guards validate either form of permission and retain grant evidence while
+receipts reference it. Populated fixtures verify named-token preservation,
+receipt replay, queued file work, rejection of forged unbound receipts, root
+movement, later collection registration, revocation and anonymisation. The real
+Python HTTP download fixture now uses a root-only token through capture and
+dependent file admission.
+
+A concurrent outbox startup test exposed SQLite journal-mode lock contention.
+Commit `88e87e162` adds a bounded retry without replacing the queue. A real reader
+lock regression verifies preservation of pending events, leases and receipts.
+All 141 producer tests pass on Python 3.12 and 3.14.
+
+A separate 1,473,081,344-byte copy of the schema-1000023 rehearsal migrated in
+0.132 seconds. Streaming semantic comparison checked all 133 existing tables:
+no differences, no foreign-key violations, all 1,542,050 archive identities and
+770,734 metadata baselines retained, and no invented root grants. Reconciliation
+took 140.440 seconds; evidence is
+`.local/native-archive-rehearsal-20260930/root-grant-reconciliation.json`.
+The populated receipt fixtures cover values absent from this production-derived
+copy, whose native producer/job tables remain empty.
+
+The full `make validate-fork` gate passed: 528 v3 tests, native contract checks,
+all 141 producer tests, Go lint with zero issues and the complete Go suite.
+Logs are `root-grants-final-validation.log`, `root-grants-host-python.log`,
+`root-grants-preservation-final.log`, `root-grants-outbox-contention.log`,
+`root-grants-full-copy-migration.log` and
+`root-grants-full-copy-reconciliation.log` under `/tmp/stash-native-transition`.
+
+Durable caller/list requests, source registration/import, actual host/n8n
+launcher conversion, full-history policy preservation and later transition
+phases remain unfinished. No production service, configuration, workflow,
+website login or live catalog was changed.

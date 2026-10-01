@@ -37,10 +37,11 @@ func (s *Service) LookupCollections(ctx context.Context, token string, root *str
 				collections = append(collections, scope.CollectionUUID)
 			}
 		}
-		if len(collections) == 0 {
+		allCollections := root != nil && permittedRoot(credential, *root)
+		if len(collections) == 0 && !allCollections {
 			return ErrForbidden
 		}
-		result, err = s.Repo.SourceCollection.LookupCurrentTargets(ctx, targets, collections, root)
+		result, err = s.Repo.SourceCollection.LookupCurrentTargets(ctx, targets, collections, root, allCollections)
 		return err
 	})
 	return result, err

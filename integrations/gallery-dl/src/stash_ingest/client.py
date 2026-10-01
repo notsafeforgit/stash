@@ -38,7 +38,9 @@ class Client:
         # inherit a site's proxy, cookie jar, netrc or authentication handler.
         self.opener = build_opener(ProxyHandler({}), NoRedirect())
 
-    def _request(self, method, route, body=None, *, timed=False, allow_empty=False):
+    def _request(self, method, route, body=None, *, timed=False, allow_empty=False, max_response_bytes=1 << 20):
+        if type(max_response_bytes) is not int or not 1 <= max_response_bytes <= 4 << 20:
+            raise InvalidData("Invalid Stash response size limit")
         token = os.environ.get(self.token_env, "")
         if not token or any(ord(c) <= 32 or ord(c) >= 127 for c in token):
             raise Unavailable("stash_token_missing")
@@ -54,9 +56,9 @@ class Client:
                 if (response.status != 200 or response.headers.get_content_type() != "application/json"
                         or response.headers.get("Content-Encoding") is not None):
                     raise Unavailable("invalid_response")
-                raw = response.read((1 << 20) + 1)
+                raw = response.read(max_response_bytes + 1)
             try:
-                data = decode(raw, 1 << 20)
+                data = decode(raw, max_response_bytes)
                 return (data, server_date, started) if timed else data
             except InvalidData:
                 raise Unavailable("invalid_response") from None

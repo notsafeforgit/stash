@@ -106,8 +106,8 @@ var (
 type SourceRunReaderWriter interface {
 	Submit(context.Context, string, SourceRunRequest, time.Time, int) (*SourceRun, error)
 	Find(context.Context, string) (*SourceRun, error)
-	List(context.Context, string, *string, int64, int) ([]SourceRun, error)
-	Ready(context.Context, []string, string, string, int64, int, time.Time) ([]SourceRunCandidate, error)
+	List(context.Context, string, []*string, int64, int) ([]SourceRun, error)
+	Ready(context.Context, []string, bool, string, string, int64, int, time.Time) ([]SourceRunCandidate, error)
 	Attempts(context.Context, string, int64, int) ([]SourceRunAttempt, error)
 	Claim(context.Context, string, string, string, string, time.Time, time.Duration) (*SourceRun, error)
 	CheckLease(context.Context, SourceRunLease, time.Time) (*SourceRun, error)

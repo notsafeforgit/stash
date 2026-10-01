@@ -111,6 +111,10 @@ func (s *IngestStore) FindCredential(ctx context.Context, id string) (*models.In
 	for _, scope := range scopes {
 		ret.Scopes = append(ret.Scopes, models.IngestScope{CollectionUUID: scope.CollectionUUID, RootUUID: scope.RootUUID})
 	}
+	ret.RootUUIDs = make([]string, 0)
+	if err := dbWrapper.Select(ctx, &ret.RootUUIDs, "SELECT root_uuid FROM ingest_credential_roots WHERE credential_uuid=? ORDER BY root_uuid", id); err != nil {
+		return nil, err
+	}
 	return ret, nil
 }
 
@@ -125,7 +129,7 @@ func (s *IngestStore) IssueCredential(ctx context.Context, input models.IngestCr
 			return nil, err
 		}
 	}
-	if !validIngestDigest(input.SecretHash) || input.Revoked || len(input.Scopes) < 1 || len(input.Scopes) > 128 ||
+	if !validIngestDigest(input.SecretHash) || input.Revoked || len(input.Scopes)+len(input.RootUUIDs) < 1 || len(input.Scopes)+len(input.RootUUIDs) > 128 ||
 		(input.ExpiresAt != nil && (!input.ExpiresAt.After(time.Now()) || input.ExpiresAt.Year() > 9999)) {
 		return nil, errors.New("invalid ingestion credential")
 	}
@@ -156,6 +160,17 @@ func (s *IngestStore) IssueCredential(ctx context.Context, input models.IngestCr
 			}
 		}
 	}
+	seenRoots := make(map[string]bool)
+	for _, id := range input.RootUUIDs {
+		root, err := (&MediaRootStore{}).Find(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if root == nil || root.State != "active" || seenRoots[id] {
+			return nil, models.ErrSourceDefinitionConflict
+		}
+		seenRoots[id] = true
+	}
 	var expires interface{}
 	if input.ExpiresAt != nil {
 		expires = input.ExpiresAt.UTC().Format(time.RFC3339Nano)
@@ -165,6 +180,11 @@ func (s *IngestStore) IssueCredential(ctx context.Context, input models.IngestCr
 	}
 	for _, scope := range input.Scopes {
 		if _, err := dbWrapper.Exec(ctx, "INSERT INTO ingest_credential_scopes(credential_uuid,collection_uuid,root_uuid) VALUES(?,?,?)", input.UUID, scope.CollectionUUID, scope.RootUUID); err != nil {
+			return nil, err
+		}
+	}
+	for _, root := range input.RootUUIDs {
+		if _, err := dbWrapper.Exec(ctx, "INSERT INTO ingest_credential_roots(credential_uuid,root_uuid) VALUES(?,?)", input.UUID, root); err != nil {
 			return nil, err
 		}
 	}

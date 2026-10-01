@@ -83,6 +83,10 @@ when upgrading older outboxes.
 `lookup-collections` resolves exact current source URLs through the producer's
 collection/root grants. Preserve missing and ambiguous candidates for review;
 historical URLs must not silently redirect scheduled work to a new target.
+An explicit root grant covers registered collections at that logical root,
+including later additions; existing collection grants do not widen on migration.
+It grants no source administration or unbound metadata access. Bounded lookup
+responses expose truncation so a partial candidate set never appears unique.
 
 ## Architecture
 

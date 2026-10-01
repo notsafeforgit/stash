@@ -111,7 +111,10 @@ IDs, credential references and result branches while adding a durable wait.
 `stash-import-n8n-receipts` explicitly imports a reviewed frozen receipt snapshot
 into the producer outbox. Exact bytes and manifests survive replay; old tokens
 can be inspected locally but cannot become native completion proof or new work.
-Activation, remaining operational journal migration and recovery callers remain open.
+`stash-import-scan-journal` retains a reviewed frozen journal in the native
+database with atomic receipts, bounded inspection and explicit dispositions.
+It does not activate jobs or reinterpret old cursor hashes. Source/profile
+bindings, cutoff/retry policy, cursor conversion and recovery callers remain open.
 
 ## Architecture
 

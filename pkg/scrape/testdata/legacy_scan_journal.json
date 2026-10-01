@@ -1,0 +1,16 @@
+{
+  "captured_at": "2026-10-01T19:00:00Z",
+  "external_tables": {"backfill_completion": 2, "legacy_backfill_skip": 0},
+  "tables": {
+    "scan_jobs": [{"id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","run_key":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","context":"host","command_json":"[\"/worker/bin/gallery-dl\", \"-i\", \"-\", \"-o\", \"extractor.reddit.date-min=2026-09-20T12:34:56\"]","url":"https://www.reddit.com/user/Example/submitted/?sort=new","created":1790784000.125,"attempts":3,"retry_after":1790899200.25,"last_status":4}],
+    "extractor_jobs": [
+      {"id":"extractor-one","url":"https://www.reddit.com/user/Example/submitted/?sort=new","context":"host","pid":1234,"process_start":"boot-identity:123","last_key":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","last_index":257,"scope":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      {"id":"extractor-manual","url":"https://fixture.invalid/source","context":"host","pid":1235,"process_start":"failed","last_key":null,"last_index":0,"scope":"manual:False"}
+    ],
+    "scan_deferrals": [{"context":"host","url":"https://www.reddit.com/user/Example/submitted/?sort=new","reason":"account_unavailable","last_status":4,"deferred_at":1790794000.5}],
+    "backfill_scan_completion": [{"backfill_key":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","scan_key":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","completed":1790784100.75}],
+    "collection_backfill_completion": [{"platform":"reddit","collection_kind":"subreddit","collection_name":"ExampleFeed","recorded_at":"2026-09-29T12:34:56.123456-07:00","result_json":"{ \"confirmed\": true, \"historical_time_unknown\": true, \"large\": 90071992547409931234 }"}],
+    "backfill_policy_migrations": [{"name":"legacy-twitter-daily-list-v1","applied_at":"2026-09-29T00:00:00Z","details_json":"{ \"legacy_skip_accounts\": 485, \"unchanged\": \"Café\" }"}],
+    "legacy_handoffs": [{"run_key":"old-run","unit":"old-worker.service","boot_id":"original-boot","pid":4567,"jobs_json":"[\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"]"}]
+  }
+}

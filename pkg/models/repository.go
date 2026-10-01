@@ -40,6 +40,7 @@ type Repository struct {
 	ArchiveJob             ArchiveJobReaderWriter
 	SourceRun              SourceRunReaderWriter
 	SourceBackfill         SourceBackfillReaderWriter
+	ScanJournal            ScanJournalReaderWriter
 	SourceEvidence         SourceEvidenceReaderWriter
 	SourceAttachment       SourceAttachmentReaderWriter
 	SourceGallery          SourceGalleryReaderWriter

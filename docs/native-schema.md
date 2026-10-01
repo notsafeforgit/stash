@@ -777,6 +777,37 @@ Startup requires the tables/indexes/guards and rejects missing or inconsistent
 proof links. Anonymised exports remove these private decisions before their
 source-run and producer references. Ordinary database backups include them.
 
+## Retained scan journal snapshots
+
+Migration 1000026 adds `scan_journals` and `scan_journal_records`. A snapshot
+has a stable UUID, the original database UUID, a logical media root, its captured
+time, an exact document digest and a table inventory. The entire snapshot and
+every row commit together. Reusing its UUID with a changed root, source or
+document conflicts; another explicitly identified snapshot can preserve a later
+state of the same mutable journal.
+
+Records retain their original table/key, values, embedded JSON strings and a
+deterministic UUID derived from the snapshot and key. Indexed summaries keep
+target/context, retry state, legacy lower bounds, extractor positions, deferrals
+and exact scope references available without reading all raw command evidence.
+Original commands are retained only for recognized non-secret argument forms;
+they are never executable server input. Unknown options require review of the
+private source snapshot before import. Older extractor column variants remain
+identifiable in their original evidence.
+
+Dispositions are `pending_binding`, `historical` and `review`. These describe
+migration evidence, not source-run state. A saved PID, boot identity or systemd
+unit never becomes a native lease. Unbound/manual extractor scopes and handoffs
+remain reviewable. Per-scan hashes remain opaque historical identifiers; they do
+not prove a native window completed. Collection confirmations remain distinct
+from account backfill decisions. Native activation still requires source/profile
+bindings, explicit cutoff/deferral policy and conversion of the legacy archive-key
+cursor format. These tables deliberately create no source runs or completion proof.
+
+Table/index/guard checks and record-count reconciliation run at startup.
+Snapshots and rows are immutable; anonymised exports remove this private history
+before deleting source roots. Normal database backups include it.
+
 Migrations run against copies during development. SQL failure leaves a dirty
 migration state that startup refuses; restore the migration backup or use a
 validated recovery procedure. Do not force a schema version to hide a failure.

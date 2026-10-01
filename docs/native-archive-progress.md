@@ -1971,3 +1971,82 @@ be migrated. A read-only audit found 907 queued scans, 28 extractor checkpoints,
 migration and no handoffs at inspection time. These are live changing counts,
 not a cutover boundary. Source registration, recovery callers, profile/service
 activation and subsequent transition phases remain outstanding.
+
+## Native retention and inspection of frozen scan journals
+
+Migration 1000026 adds `scan_journals` and `scan_journal_records` to the native
+database. The application API retains one complete snapshot atomically, with
+its UUID, original database/root identity, capture time, document digest, table
+inventory and every original row. Replay returns the same receipt; reusing an
+identity with different evidence conflicts. Indexed pagination exposes compact
+summaries, while a separate record lookup returns the original evidence.
+Startup reconciles retained counts and requires the schema guards/indexes.
+Anonymised exports remove this private operational history.
+
+The seven supported families are `scan_jobs`, `extractor_jobs`, `scan_deferrals`,
+`backfill_scan_completion`, `collection_backfill_completion`,
+`backfill_policy_migrations` and `legacy_handoffs`. Empty tables and older
+extractor column variants remain identifiable. Embedded command/result/detail
+JSON strings retain their values, including timestamp spelling and large IDs.
+Exact old scope IDs connect extractor evidence to pending scans; manual or
+unbound scopes remain reviewable. Deferrals retain their reasons and retry
+requirements. Unknown tables/columns and unsupported command forms block import;
+no command, PID or historical service handoff is executed or resumed.
+
+`stash-import-scan-journal` reads one SQLite snapshot, inventories every table/view,
+and prepares a bounded document without modifying the source. Apply requires an
+explicit application endpoint, a fixed snapshot identity/time and the reviewed
+input digest. Its acknowledgement must match the expected inventory, root,
+source, snapshot and document hash. The two permanent account-backfill tables
+are explicitly inventoried as external to this importer and retain their
+separate account-history migration. Producer tokens cannot use these routes.
+
+This completes an evidence-retention layer, not operational activation. Imported
+records have `pending_binding`, `historical` or `review` dispositions. They create
+no native runs, attempts, requests or completion decisions. The old archive-key
+cursor hash differs from the native post/attachment hash; copying it into a
+native progress record would not implement correct resume. Activation still
+needs source/profile bindings, a reviewed cutoff, retry/ignored-work handling,
+cursor conversion and a common quiesced cutover boundary. Historical collection
+and hashed per-scan receipts do not become native source-window proof.
+
+The full-copy rehearsal is
+`.local/native-scan-journal-rehearsal-20261001/native-scan-journal-rehearsal.sqlite`.
+Schema 1000025 → 1000026 took 0.066752 seconds on the 1,473,081,344-byte copy.
+All 136 preexisting tables matched their source semantically, the two new tables
+were empty before import, and foreign-key violations and size growth were zero.
+Reconciliation took 48.715 seconds. The source schema-25 copy was preserved.
+
+A fresh read-only backup of the actual journal supplied 1,063 retained records:
+863 scans, 28 extractor checkpoints, 166 deferrals, one per-scan completion,
+four collection completions and one policy migration, with no handoff rows.
+Its separate account-history inventory reports 1,329 completions and zero skips.
+Import/replay took 0.100069 seconds through the core repository service. Every
+original evidence row and derived summary matched after replay and reopening.
+Dispositions are 1,050 pending bindings, seven reviews and six historical rows.
+Native source work remained empty. These are local rehearsal timings, not API
+or UI latency guarantees, and this changing live journal is not a final cutover
+boundary. `review.json`, `input.json`, the frozen SQLite input and both
+reconciliation reports are retained privately in that rehearsal directory.
+
+The real Go/Python HTTP fixture commits an import, drops its response, and then
+verifies exact replay, paginated summaries, every evidence record, application
+authority and unchanged source bytes. Repository tests cover older extractor
+shapes, unknown inputs, conflicting identities, atomic rollback, immutable rows,
+restart and detection of missing evidence. The shared fixture preserves all
+seven families and never fabricates native work.
+
+The full `make validate-fork` gate passed: 528 v3 tests in 91 files, native
+application contract checks, all 195 producer tests, zero Go lint issues and
+all Go tests (API 229.979 seconds, ingest 361.327 seconds, SQLite 339.588 seconds).
+The producer suite also passed on the host's Python 3.12 runtime. Focused store
+and real HTTP checks passed separately. Logs are `scan-journal-validation-final.log`,
+`scan-journal-python314.log`, `scan-journal-python312.log`,
+`scan-journal-focused.log`, `scan-journal-http.log`, `scan-journal-migration.log`,
+`scan-journal-reconciliation.log` and `scan-journal-real-import.log` under
+`/tmp/stash-native-transition`. Parent commit `220c20dc1` passed all three CI jobs.
+
+Production, installed workers and workflows remain unchanged. Remaining work
+includes activation of retained operational state, source registration, the
+other catalog families and all later transition phases. This increment neither
+finishes the migration nor changes the frozen compatible release.

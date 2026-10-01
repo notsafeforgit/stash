@@ -39,6 +39,10 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Post("/backfills/import", rs.importBackfills)
 	r.Post("/backfills/status", rs.backfillStatus)
 	r.Get("/backfills/{decision}", rs.backfill)
+	r.Post("/scan-journals/import", rs.importScanJournal)
+	r.Get("/scan-journals/{journal}", rs.scanJournal)
+	r.Get("/scan-journals/{journal}/records", rs.scanJournalRecords)
+	r.Get("/scan-journal-records/{record}", rs.scanJournalRecord)
 	return r
 }
 

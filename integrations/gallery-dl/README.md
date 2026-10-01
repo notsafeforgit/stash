@@ -591,6 +591,57 @@ nor enqueues work. The durable caller queue freezes the original URLs and time
 window, then commits selected bindings with their source tickets before native
 submission. Installed launcher conversion remains unfinished.
 
+## Retaining the scan journal
+
+`stash-import-scan-journal` prepares a frozen journal database through one
+read-only SQLite snapshot. It inventories every table/view, rejects unknown
+families or changed columns, retains all recognized scan-history rows and reports
+the account-backfill tables handled by `stash-import-backfills` separately.
+Preparation is local and prints counts/digests without raw commands or payloads.
+The server performs semantic validation when applying the snapshot.
+
+```sh
+stash-import-scan-journal --journal /migration/run-journal.sqlite \
+  --root ROOT_UUID --source ORIGINAL_DATABASE_UUID --snapshot SNAPSHOT_UUID \
+  --captured-at 2026-10-01T12:00:00Z
+stash-import-scan-journal --journal /migration/run-journal.sqlite \
+  --root ROOT_UUID --source ORIGINAL_DATABASE_UUID --snapshot SNAPSHOT_UUID \
+  --captured-at 2026-10-01T12:00:00Z --expected-sha256 PREPARED_INPUT_SHA256 \
+  --endpoint https://native-stash.example --apply
+```
+
+Use the same database UUID as the account-backfill importer, and a distinct
+snapshot UUID and fixed capture time for this backup boundary. Apply requires
+an explicit endpoint, the reviewed preparation digest and `STASH_API_KEY`
+(or `--api-key-env`). It makes one atomic application API request. Repeat the
+same frozen inputs after a lost response; an existing snapshot identity cannot
+be repurposed for changed bytes, another root or another source database.
+No proxy, redirect, website login or producer token participates in this import.
+
+The native receipt inventories `scan_jobs`, `extractor_jobs`, `scan_deferrals`,
+`backfill_scan_completion`, `collection_backfill_completion`,
+`backfill_policy_migrations` and `legacy_handoffs`, including empty tables.
+Older extractor tables can omit their later checkpoint columns. Valid unknown
+historical provenance inside JSON strings is preserved; unsupported command
+options must be reviewed in the private source snapshot before importing them.
+Limits are 10,000 retained records and 8 MiB per atomic document. Oversized
+snapshots fail rather than silently dropping rows or splitting the boundary.
+
+The result is `retained`, with `jobs_activated: 0`. This is an evidence-import
+step, not completion of the operational migration. Original retry delays,
+deferrals, date minima and cursor positions remain available for the next
+binding/activation step. Native jobs still need reviewed collection/profile
+bindings, cutoff policy, conversion of the old archive-key cursor and explicit
+handling of deferred/ignored work. Manual/orphan extractor scopes and historical
+process handoffs remain review records. Historical collection and hashed per-scan
+completions never become native source-window proof. No old command or systemd
+unit is executed, and no PID is resumed.
+
+Retained rows and their manifest now belong to Stash's database and its normal
+backup boundary. Keep the frozen original and preparation manifest for semantic
+reconciliation and rollback. The original journal and active old workers are
+untouched by this development importer.
+
 ## Native n8n backfills
 
 `stash-ingest-n8n` replaces the account backfill runner's record/inspect contract.
@@ -799,5 +850,10 @@ after reopening the outbox. Source completion still leaves file intake queued.
 `TestPythonBackfillImporterReplaysAfterLostNativeResponse` executes the maintenance
 importer against the real application router/SQLite, loses a committed batch's
 response and verifies replay without duplicate decisions or source-file changes.
+`TestPythonScanJournalImporterRetainsAtomicSnapshotAfterLostResponse` does the
+same for a whole journal, then checks paginated summaries and every original
+record through the real HTTP inspection routes. Migration fixtures preserve
+the seven families, old extractor columns, timestamps and embedded JSON strings;
+unknown inputs and conflicting snapshot identities cannot partially publish.
 These checks are included in `make validate-fork`
 and the build workflow. No production endpoint or source website is contacted.

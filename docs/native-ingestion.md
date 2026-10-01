@@ -791,3 +791,29 @@ use the old runner until the remaining operational-history and deployment gates 
 The [receipt importer](../integrations/gallery-dl/README.md#retaining-old-n8n-result-tokens)
 preserves historical inspection results separately from this proof API. Importing
 one never assigns an account, launches work or marks native source windows complete.
+
+## Legacy scan journal inspection
+
+The application-authorized `/api/v3/archive` router now accepts frozen journal
+snapshots through `POST /scan-journals/import`. Its input is `uuid`, `root_uuid`,
+`source_uuid` and `document`; the document contains `captured_at`, `tables` and
+`external_tables`. It is limited to 10,000 rows and 8 MiB, and commits atomically.
+Only the seven documented scan-history families are accepted. Unknown input
+tables/fields and unsafe or unsupported command forms block import. The original
+account-backfill table counts are inventoried under `external_tables`; their rows
+use the separate backfill importer.
+
+`GET /scan-journals/<uuid>` returns the retained receipt and counts.
+`GET /scan-journals/<uuid>/records?after=<sequence>&table=<family>` returns up to
+100 summaries in sequence order; omit `table` to inspect every family. Advance
+with the last sequence and stop on an empty page. Original evidence is available
+separately through `GET /scan-journal-records/<uuid>`. These routes require
+application access, reject cross-origin mutations, and return `no-store` results.
+Producer ingestion tokens cannot import or inspect this maintenance evidence.
+
+The [journal command](../integrations/gallery-dl/README.md#retaining-the-scan-journal)
+provides read-only preparation, an explicit reviewed-digest apply and replay after
+a lost response. Retention does not activate jobs: source/profile bindings,
+legacy cursor conversion and retry/cutoff decisions remain separate migration
+work. Old runtime ownership and historical completion hashes are never substituted
+for native source leases or coverage.

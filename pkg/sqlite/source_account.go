@@ -17,15 +17,21 @@ import (
 type SourceAccountStore struct{}
 
 type sourceAccountRow struct {
-	UUID      string    `db:"uuid"`
-	Namespace string    `db:"namespace"`
-	Label     string    `db:"label"`
-	Revision  int       `db:"revision"`
-	CreatedAt Timestamp `db:"created_at"`
+	UUID          string         `db:"uuid"`
+	Namespace     string         `db:"namespace"`
+	Label         string         `db:"label"`
+	Revision      int            `db:"revision"`
+	CreatedAt     Timestamp      `db:"created_at"`
+	RedirectTo    sql.NullString `db:"redirect_to"`
+	CanonicalUUID string         `db:"canonical_uuid"`
 }
 
 func (r sourceAccountRow) resolve() *models.SourceAccount {
-	return &models.SourceAccount{UUID: r.UUID, Namespace: r.Namespace, Label: r.Label, Revision: r.Revision, CreatedAt: r.CreatedAt.Timestamp}
+	ret := &models.SourceAccount{UUID: r.UUID, Namespace: r.Namespace, Label: r.Label, Revision: r.Revision, CreatedAt: r.CreatedAt.Timestamp, CanonicalUUID: r.CanonicalUUID}
+	if r.RedirectTo.Valid {
+		ret.RedirectTo = &r.RedirectTo.String
+	}
+	return ret
 }
 
 func (s *SourceAccountStore) Create(ctx context.Context, namespace, label string) (*models.SourceAccount, error) {
@@ -45,13 +51,32 @@ func (s *SourceAccountStore) Find(ctx context.Context, value string) (*models.So
 		return nil, err
 	}
 	var row sourceAccountRow
-	if err := dbWrapper.Get(ctx, &row, "SELECT * FROM source_accounts WHERE uuid = ?", id); err != nil {
+	if err := dbWrapper.Get(ctx, &row, `SELECT a.*, c.destination_uuid AS redirect_to FROM source_accounts a
+LEFT JOIN source_account_consolidations c ON c.source_uuid=a.uuid WHERE a.uuid=?`, id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
 	}
 	return row.resolve(), nil
+}
+
+func (s *SourceAccountStore) Resolve(ctx context.Context, value string) (*models.SourceAccount, error) {
+	account, err := s.Find(ctx, value)
+	if err != nil || account == nil {
+		return account, err
+	}
+	if account.CanonicalUUID == account.UUID {
+		return account, nil
+	}
+	root, err := s.Find(ctx, account.CanonicalUUID)
+	if err != nil {
+		return nil, err
+	}
+	if root == nil || root.CanonicalUUID != root.UUID || root.Namespace != account.Namespace {
+		return nil, errors.New("invalid canonical source account")
+	}
+	return root, nil
 }
 
 func accountPage(after string, limit int) (string, int, error) {
@@ -81,10 +106,10 @@ func (s *SourceAccountStore) Lookup(ctx context.Context, reference models.Accoun
 		return nil, err
 	}
 	var rows []sourceAccountRow
-	if err := dbWrapper.Select(ctx, &rows, `SELECT a.* FROM source_account_identifiers i
-JOIN source_accounts a ON a.uuid = i.account_uuid
-WHERE i.namespace = ? AND i.kind = ? AND i.value = ? AND i.account_uuid > ?
-ORDER BY i.account_uuid LIMIT ?`, ref.Namespace, ref.Kind, ref.Value, after, limit); err != nil {
+	if err := dbWrapper.Select(ctx, &rows, `SELECT DISTINCT a.* FROM source_account_identifiers i
+JOIN source_accounts a ON a.uuid=i.canonical_uuid
+WHERE i.namespace=? AND i.kind=? AND i.value=? AND i.canonical_uuid>?
+ORDER BY i.canonical_uuid LIMIT ?`, ref.Namespace, ref.Kind, ref.Value, after, limit); err != nil {
 		return nil, err
 	}
 	ret := make([]*models.SourceAccount, 0, len(rows))
@@ -95,15 +120,16 @@ ORDER BY i.account_uuid LIMIT ?`, ref.Namespace, ref.Kind, ref.Value, after, lim
 }
 
 type accountIdentifierRow struct {
-	UUID        string `db:"uuid"`
-	AccountUUID string `db:"account_uuid"`
-	Namespace   string `db:"namespace"`
-	Kind        string `db:"kind"`
-	Value       string `db:"value"`
+	UUID          string `db:"uuid"`
+	AccountUUID   string `db:"account_uuid"`
+	CanonicalUUID string `db:"canonical_uuid"`
+	Namespace     string `db:"namespace"`
+	Kind          string `db:"kind"`
+	Value         string `db:"value"`
 }
 
 func (r accountIdentifierRow) resolve() *models.AccountIdentifier {
-	return &models.AccountIdentifier{UUID: r.UUID, AccountUUID: r.AccountUUID,
+	return &models.AccountIdentifier{UUID: r.UUID, AccountUUID: r.AccountUUID, CanonicalAccountUUID: r.CanonicalUUID,
 		Reference: models.AccountReference{Namespace: r.Namespace, Kind: r.Kind, Value: r.Value}}
 }
 
@@ -156,8 +182,8 @@ func (s *SourceAccountStore) ObserveIdentifier(ctx context.Context, value string
 	if err != nil {
 		return nil, err
 	}
-	result, err := dbWrapper.Exec(ctx, `INSERT INTO source_account_identifiers(uuid, account_uuid, namespace, kind, value)
-VALUES (?, ?, ?, ?, ?) ON CONFLICT(account_uuid, namespace, kind, value) DO NOTHING`, uuid.NewString(), account.UUID, ref.Namespace, ref.Kind, ref.Value)
+	result, err := dbWrapper.Exec(ctx, `INSERT INTO source_account_identifiers(uuid, account_uuid, canonical_uuid, namespace, kind, value)
+VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(account_uuid, namespace, kind, value) DO NOTHING`, uuid.NewString(), account.UUID, account.CanonicalUUID, ref.Namespace, ref.Kind, ref.Value)
 	if err != nil {
 		return nil, err
 	}
@@ -197,28 +223,36 @@ first_observed = min(first_observed, excluded.first_observed), last_observed = m
 		if _, err := dbWrapper.Exec(ctx, "UPDATE source_accounts SET revision = revision + 1 WHERE uuid = ?", account.UUID); err != nil {
 			return nil, err
 		}
+		canonical, err := s.Resolve(ctx, account.UUID)
+		if err != nil {
+			return nil, err
+		}
+		if canonical.UUID != account.UUID {
+			if _, err := dbWrapper.Exec(ctx, "UPDATE source_accounts SET revision=revision+1 WHERE uuid=?", canonical.UUID); err != nil {
+				return nil, err
+			}
+		}
 	}
 	return identifier.resolve(), nil
 }
 
 func (s *SourceAccountStore) Identifiers(ctx context.Context, value, after string, limit int) ([]*models.AccountIdentifier, error) {
-	id, err := archiveUUID(value)
+	account, err := s.Resolve(ctx, value)
 	if err != nil {
 		return nil, err
+	}
+	if account == nil {
+		return nil, models.ErrSourceAccountConflict
 	}
 	after, limit, err = accountPage(after, limit)
 	if err != nil {
 		return nil, err
 	}
-	var rows []accountIdentifierRow
-	if err := dbWrapper.Select(ctx, &rows, "SELECT * FROM source_account_identifiers WHERE account_uuid = ? AND uuid > ? ORDER BY uuid LIMIT ?", id, after, limit); err != nil {
+	members, err := sourceAccountMembers(ctx, account.UUID)
+	if err != nil {
 		return nil, err
 	}
-	ret := make([]*models.AccountIdentifier, 0, len(rows))
-	for _, row := range rows {
-		ret = append(ret, row.resolve())
-	}
-	return ret, nil
+	return sourceAccountMemberIdentifiers(ctx, members, after, limit)
 }
 
 func (s *SourceAccountStore) Evidence(ctx context.Context, value, after string, limit int) ([]models.AccountIdentifierEvidence, error) {
@@ -273,14 +307,17 @@ func (r accountOwnershipRow) resolve() *models.AccountOwnershipDecision {
 }
 
 func (s *SourceAccountStore) Ownership(ctx context.Context, value string) (*models.AccountOwnershipDecision, error) {
-	id, err := archiveUUID(value)
+	account, err := s.Resolve(ctx, value)
 	if err != nil {
 		return nil, err
+	}
+	if account == nil {
+		return nil, nil
 	}
 	var row accountOwnershipRow
 	if err := dbWrapper.Get(ctx, &row, `SELECT d.* FROM account_performer_links l
 JOIN account_performer_decisions d ON d.account_uuid = l.account_uuid AND d.uuid = l.decision_uuid
-WHERE l.account_uuid = ?`, id); err != nil {
+WHERE l.account_uuid = ?`, account.UUID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -318,7 +355,7 @@ func (s *SourceAccountStore) DecideOwnership(ctx context.Context, input models.A
 	if err != nil {
 		return nil, err
 	}
-	if account == nil || account.Revision != input.ExpectedAccountRevision {
+	if account == nil || account.RedirectTo != nil || account.CanonicalUUID != account.UUID || account.Revision != input.ExpectedAccountRevision {
 		return nil, models.ErrSourceAccountConflict
 	}
 	var performerUUID *string

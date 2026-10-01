@@ -462,6 +462,47 @@ selection, full creation-intent conversion, review API/UI,
 and durable after-success delivery still belong to the subsequent domain/API
 work. No new producer-facing endpoint exposes the repositories directly.
 
+Migration 1000014 adds reviewed consolidation of duplicate source-account
+records within one qualified service namespace. Accounts on different services,
+including native and mirror namespaces, remain independent records that can
+share a performer owner. A matching name does not consolidate accounts.
+
+`source_account_consolidations` retains the source/destination UUIDs, committed
+revisions, chosen ownership decision, review signature, request digest, origin,
+reason, and time. Original account rows, identifiers, evidence, and ownership
+history remain in place. Current ownership and identifier lookup follow the
+canonical account; ownership history remains scoped to its original account.
+Consolidation history exposes the events touching the requested record, including
+the retained intermediate UUIDs in a sequence of consolidations.
+
+Canonical account UUIDs are indexed on both accounts and identifiers. A composite
+foreign key ties each identifier's original account and canonical account to the
+account row, and consolidation updates cascade atomically. This supports indexed
+candidate pagination and direct resolution without walking redirect chains.
+Original evidence ownership does not change. Additional identifier evidence on
+an old account also advances the canonical account's review revision.
+
+Preview is limited to the two account components, at most 4096 account records
+and 8192 identifiers. Its signature covers membership, identifiers, ownership,
+and the current revisions of referenced performers. Compatible existing choices
+can be preserved, including explicit unlinks. Contradictory ownership requires
+an explicit resulting choice. Conflicting stable IDs, including TikTok `secUid`
+values and mirror user IDs, require acknowledgement and remain retained evidence.
+These operations do not assign depicted performers
+to media. A performer merge or new identity evidence invalidates a stale preview.
+
+An optional consolidation UUID supplies replay identity: exact repeated input
+returns the existing event, and changed input is rejected. Failed writes leave
+transaction context that prevents an accidental partial commit. Startup checks
+the context and agreement between canonical indexes and consolidation history.
+Identifiers and evidence claims cannot be rewritten; repeated observations may
+extend their time intervals. Anonymised exports remove the new history and
+context with the other account evidence. Migration begins with every existing
+account as its own canonical identity and invents no consolidations.
+
+Producer evidence matching, account-review API/UI, and catalog import remain
+separate required integration work; no new public endpoint exposes these stores.
+
 The filesystem deletion journal currently derives its directory from the
 database filename. Promotion in place retains that association, but a production
 path change must first drain pending deletions or transfer the exact journal

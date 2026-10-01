@@ -16,17 +16,20 @@ type AccountReference struct {
 }
 
 type SourceAccount struct {
-	UUID      string
-	Namespace string
-	Label     string
-	Revision  int
-	CreatedAt time.Time
+	UUID          string
+	Namespace     string
+	Label         string
+	Revision      int
+	CreatedAt     time.Time
+	RedirectTo    *string
+	CanonicalUUID string
 }
 
 type AccountIdentifier struct {
-	UUID        string
-	AccountUUID string
-	Reference   AccountReference
+	UUID                 string
+	AccountUUID          string
+	CanonicalAccountUUID string
+	Reference            AccountReference
 }
 
 // AccountIdentifierEvidence records why an identifier is associated with an
@@ -81,6 +84,7 @@ var (
 type SourceAccountReaderWriter interface {
 	Create(context.Context, string, string) (*SourceAccount, error)
 	Find(context.Context, string) (*SourceAccount, error)
+	Resolve(context.Context, string) (*SourceAccount, error)
 	// Lookup is an indexed, bounded candidate query. Identifiers are not
 	// globally unique: a reused handle or disputed ID remains reviewable.
 	Lookup(context.Context, AccountReference, string, int) ([]*SourceAccount, error)
@@ -90,4 +94,7 @@ type SourceAccountReaderWriter interface {
 	Ownership(context.Context, string) (*AccountOwnershipDecision, error)
 	OwnershipHistory(context.Context, string, int, int) ([]*AccountOwnershipDecision, error)
 	DecideOwnership(context.Context, AccountOwnershipInput) (*AccountOwnershipDecision, error)
+	PreviewConsolidation(context.Context, string, string) (*AccountConsolidationPreview, error)
+	Consolidate(context.Context, AccountConsolidationInput) (*AccountConsolidation, error)
+	ConsolidationHistory(context.Context, string, int, int) ([]AccountConsolidation, error)
 }

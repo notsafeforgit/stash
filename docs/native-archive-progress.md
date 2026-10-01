@@ -45,13 +45,14 @@ review. Production has not been migrated.
 | Stash `377f7a6ad` | Source albums with persistent manual membership intent; full-copy reconciliation, complete validation gate, CI lint/build, and preview image publication passed |
 | Stash `5bc0149ea` | Portable tag/studio/group identities and tag-merge redirects; full-copy reconciliation, complete validation gate, CI lint/build, and preview image publication passed |
 | Stash `5fd4d0f93` | Scalar field decisions with explicit clear/inherit, preserved legacy values and new-album capture provenance; full-copy reconciliation, complete validation gate, CI lint/build, and preview image publication passed |
+| Stash `b2ecfe605` | Typed metadata relationships and coalesced collection choices; full-copy reconciliation, complete validation gate, CI lint/build, and preview image publication passed |
 
 ## Phase status
 
 | Phase | Status |
 | --- | --- |
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
-| 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries and metadata relationship targets, native account/ownership storage, shared post/profile/capture storage, ordered attachment manifests, audited media associations, reviewed source-list selection, and source-gallery synchronization with manual membership intent are implemented. Scalar and relationship field choices protect explicit and preserved metadata. Source equivalence, policy resolution, review APIs/UI and remaining domain services are in progress. |
+| 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries and metadata relationship targets, native account/ownership storage and reviewed consolidation, shared post/profile/capture storage, ordered attachment manifests, audited media associations, reviewed source-list selection, and source-gallery synchronization with manual membership intent are implemented. Scalar and relationship field choices protect explicit and preserved metadata. Producer identity matching, policy resolution, review APIs/UI and remaining domain services are in progress. |
 | 2 Ingestion and producer adapter | Not yet implemented |
 | 3 Catalog importer and full-copy reconciliation | Not yet implemented |
 | 4 Native UI and client conversion | Not yet implemented |
@@ -490,3 +491,49 @@ integration tests. The SQLite suite completed in 402.1 seconds.
 Source/policy resolution, native review API/UI, creation-intent conversion,
 producer/catalog import integration, and durable after-success delivery remain
 required. Production has not been migrated.
+
+## Reviewed source-account consolidation
+
+Migration 1000014 adds explicit consolidation of duplicate account records in
+one service namespace. Original account UUIDs, identifier evidence, and ownership
+history remain available. Canonical account and identifier indexes follow the
+surviving record through checked foreign keys, including after nested merges.
+Lookup remains indexed and paginated instead of traversing redirect chains.
+
+A preview covers the selected account components and their current performer
+revisions. Compatible ownership choices can be retained; contradictory ownership
+requires an explicit resulting choice. Conflicting stable IDs require a separate
+acknowledgement and stay in the evidence. Cross-service and native/mirror accounts
+remain distinct, and consolidation does not assign depicted performers to media.
+An optional operation UUID provides exact replay without duplicate history.
+Transaction/startup guards reject unfinished work, and anonymised exports remove
+the added private history.
+
+Focused tests cover retained identifiers and local ownership history, canonical
+lookups and query plans, nested consolidation, stale identity and performer
+reviews, explicit unlink preservation, conflict resolution, replay, rollback,
+startup refusal, anonymisation, and migration with existing decisions. Fixtures
+exercise Reddit, Twitter, Instagram, Bluesky, TikTok, Patreon, OnlyFans, Fansly,
+Coomer/Kemono namespaces, and an unfamiliar extractor. A regression fixture also
+requires acknowledgement before consolidating conflicting TikTok `secUid`
+claims. Review bounds are 4096 account records and 8192 identifiers.
+
+The full-copy migration took 1.054 seconds. Streaming comparisons matched all
+103 retained tables and columns, with zero foreign-key violations. The new
+consolidation/context tables were empty, and every existing account began as its
+own canonical identity. No links were inferred and the database file did not
+grow, with 110,796,800 bytes remaining on its reusable free-page list. The private
+receipt is
+`.local/native-archive-rehearsal-20260930/account-consolidation-reconciliation.json`.
+The Stash copy has no imported source accounts yet; populated migration fixtures
+separately verify existing identifiers and ownership choices.
+
+The final complete `make validate-fork` gate passed: generation, frontend
+validation and all 528 UI tests, retained v3 extension contracts and 71 application
+operation files, Go lint with zero issues, and all Go unit/integration tests.
+The SQLite suite completed in 450.9 seconds. An earlier run exhausted the shared
+temporary-files quota during linking; both Go build and linker temporary files
+were redirected to the workspace disk for successful validation.
+
+Producer evidence matching, native account-review API/UI, and catalog import
+remain required integration work. Production has not been migrated.

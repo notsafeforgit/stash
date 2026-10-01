@@ -94,6 +94,8 @@ func TestNativeLineageRejectsUnsafeInputsBeforeWriting(t *testing.T) {
 		{"missing publisher decisions", "DROP TABLE capture_publisher_decisions", "missing capture_publisher_decisions"},
 		{"missing ingest producers", "DROP TABLE ingest_producers", "missing ingest_producers"},
 		{"missing ingest scopes", "DROP TABLE ingest_credential_scopes", "missing ingest_credential_scopes"},
+		{"missing backfill history", "DROP TABLE source_backfill_decisions", "missing source_backfill_decisions"},
+		{"missing backfill lookup index", "DROP INDEX source_backfill_subject", "missing source_backfill_subject"},
 		{"missing ingest receipt integrity", "DROP TRIGGER ingest_receipt_scope", "missing ingest_receipt_scope"},
 		{"missing publisher claims", "DROP TABLE capture_publisher_claims", "missing capture_publisher_claims"},
 		{"missing publisher publication", "DROP TRIGGER capture_publisher_decision_publish", "missing capture_publisher_decision_publish"},

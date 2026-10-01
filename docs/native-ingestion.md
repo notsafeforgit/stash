@@ -720,7 +720,7 @@ and date options into durable caller snapshots. Full-history and Reddit top mode
 select separately reviewed global `skip=true` profiles. Local recording returns
 the execution UUID; strict inspection cannot report success until every original
 source ticket completes. n8n receipt/result handling and permanent historical
-completion/skip decisions still require conversion before activation.
+completion/skip handling still requires integration before activation.
 
 This package is not yet installed into the host/n8n launch paths. Runtime alignment,
 activation of converted profiles, additional source adapters and conversion of
@@ -730,3 +730,52 @@ The producer's n8n Containerfile now builds an isolated pinned worker runtime
 on an explicitly selected existing custom n8n image. A separate rehearsal image
 has passed the producer suite and actual host/n8n profile comparison; selecting
 that image and updating the live workflow commands still belong to cutover.
+
+## Permanent account backfill decisions
+
+Native backfill history records an account's accepted one-time scrape separately
+from ongoing incremental runs. A subject contains `root_uuid`, `platform` and
+`account`; current definitions cover the existing Reddit/Twitter n8n modes.
+Reddit lookup folds name case and Twitter lookup normalizes numeric IDs. Exact
+source URLs retain the requested spelling/query shape for coverage validation.
+These are source-account keys, with no implied performer ownership or attribution.
+
+| Route | Authority and behavior |
+|---|---|
+| `POST /api/v3/ingest/backfills/status` | Explicit producer root grant; body adds `component` to the subject |
+| `POST /api/v3/ingest/backfills/complete` | Same root grant; proves native completion using original request definitions |
+| `POST /api/v3/archive/backfills/status` | Application authentication; same compact status |
+| `POST /api/v3/archive/backfills/import` | Application authentication; atomic batch of 1–50 historical records, at most 4 MiB |
+| `GET /api/v3/archive/backfills/{decision}` | Application authentication; retained evidence for one decision |
+
+Status is `needed`, `completed` or `skipped`, with `account_complete` and compact
+decision summaries. A completed requested component suppresses that component;
+the completed required set (Twitter, or both Reddit new and top) suppresses all
+account backfill modes. An explicit legacy skip suppresses outstanding work
+without claiming account completion. Summaries report the basis and decision
+time; private logs/provenance remain in the application-only evidence endpoint.
+`account_complete` describes an accepted workflow outcome, not proof that every
+historical post or original media file was obtainable.
+
+Completion accepts `uuid`, the subject, `component`, an explicit full-history
+`window` (`since: null`), `policy_sha256` and 1–512 original `SourceRunRequest`
+objects. Their producer-scoped stored hashes must match. Actual completed ranges
+must cover the whole window for every expected component URL, using the same
+root and policy. Queue admission, another account's run, fabricated ranges and
+missing targets cannot produce a completion decision. The caller must select
+its reviewed full-history profile; the server verifies committed run coverage,
+not the source website's exhaustiveness. File intake retains its own receipts.
+
+Use the same completion UUID and proof after a lost response. A changed proof
+under that UUID conflicts. Root authority is checked again before commit;
+collection-only grants cannot expose account-wide history. Capability responses
+advertise `source_backfill_protocol: 1`.
+
+Historical import accepts `root_uuid`, a stable input-database `source_uuid`,
+`table` and the full source `record`. Only `backfill_completion` and
+`legacy_backfill_skip` are handled by this importer. Other catalog/journal
+families retain their separate migration requirements. Imported decisions never
+manufacture source windows, and producer tokens cannot submit legacy assertions.
+See the [maintenance importer](../integrations/gallery-dl/README.md#backfill-journal-import)
+for read-only preflight and resumable batches. Installed n8n workflows still use
+the old runner until their caller/result contracts and deployment are converted.

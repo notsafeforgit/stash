@@ -19,6 +19,7 @@ stash-ingest = "stash_ingest.cli:main"
 stash-ingest-config = "stash_ingest.config_migration:main"
 stash-ingest-twitter = "stash_ingest.launchers:twitter_main"
 stash-ingest-reddit = "stash_ingest.launchers:reddit_main"
+stash-import-backfills = "stash_ingest.backfill_import:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

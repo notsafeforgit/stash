@@ -588,6 +588,50 @@ nor enqueues work. The durable caller queue freezes the original URLs and time
 window, then commits selected bindings with their source tickets before native
 submission. Installed launcher conversion remains unfinished.
 
+## Backfill journal import
+
+`stash-import-backfills` migrates permanent account completion/skip decisions
+through the native application API. It handles `backfill_completion` and
+`legacy_backfill_skip`; per-scan completions and the remaining journal/catalog
+families still require the broader migration. This is a maintenance command,
+separate from normal worker ingestion and the still-unconverted n8n runner.
+
+```sh
+stash-import-backfills --journal /migration/run-journal-snapshot.sqlite \
+  --root ROOT_UUID --source INPUT_DATABASE_UUID
+# After reviewing the preflight, target the intended native database instance:
+stash-import-backfills --journal /migration/run-journal-snapshot.sqlite \
+  --root ROOT_UUID --source INPUT_DATABASE_UUID \
+  --endpoint STASH_ORIGIN --apply
+```
+
+The first form only validates/counts records and needs no API key or connection.
+Use a consistent journal snapshot from the migration backup boundary. The source
+database UUID belongs in that migration's manifest and must stay fixed across
+retries and relocated copies; the root must already exist in the native database.
+The importer opens SQLite read-only, rejects unknown columns/unsupported row
+shapes, and validates all records before its first network write. Both passes
+use the same SQLite read transaction, so concurrent changes cannot alter a batch
+halfway through import.
+
+`--apply` reads the existing Stash **application** API key from `STASH_API_KEY`
+(or `--api-key-env NAME`) and sends it only in the `ApiKey` header to the selected
+origin. Producer tokens cannot import historical acceptances. Redirects, website
+cookies and proxy inheritance are disabled. Batches contain at most 50 records
+and 4 MiB; acknowledgements must match the stable decision UUID, component,
+outcome and historical basis for every record.
+
+Rerun the same command after interruption or a lost response. Already committed
+records replay unchanged; a different payload under an imported primary key is
+a conflict, not an overwrite. Errors report confirmed acknowledgement counts
+without printing record bodies, historical logs or keys. A lost response can
+leave more rows committed than that count indicates, which replay resolves.
+
+The native database retains the original `result_json` string and all provenance.
+An old user acceptance remains an acceptance even when it states that exhaustive
+history was unverified. Imported skips remain distinguishable from completion;
+neither kind creates native source-run coverage or successful media receipts.
+
 ## Validation
 
 After `make pre-producer`, `make validate-producer` runs delivery and actual
@@ -613,5 +657,8 @@ against the real API/SQLite from a persisted URL-list caller, drains a capture d
 attempt-completion response and admits a dependent file after reopening the
 outbox. It checks the ticket-status and call-status CLIs after restart and verifies that source
 success still leaves actual media intake queued.
+`TestPythonBackfillImporterReplaysAfterLostNativeResponse` executes the maintenance
+importer against the real application router/SQLite, loses a committed batch's
+response and verifies replay without duplicate decisions or source-file changes.
 These checks are included in `make validate-fork`
 and the build workflow. No production endpoint or source website is contacted.

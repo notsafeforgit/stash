@@ -94,8 +94,15 @@ original ticket and cannot certify media intake. Staged Twitter/Reddit host
 launchers now expand the existing lists/modes/dates into source calls. Full-history
 and Reddit top mode require a separate reviewed global `skip=true` profile.
 Local recording is not source completion; strict inspection returns pending until
-all original tickets finish. n8n/recovery result contracts and permanent backfill
-decisions still need conversion before activating these callers.
+all original tickets finish. n8n/recovery result contracts still need conversion
+to native caller receipts and permanent backfill history before activation.
+`source_backfill_decisions` now retains permanent account-backfill history in
+the native database. Historical acceptance/skip imports retain their entire
+source row without creating source-run coverage. Native completion proves every
+component URL through the producer's original request hashes and completed
+windows. The maintenance importer validates a read-only journal snapshot and
+uses application-authorized batches; producer tokens cannot import historical
+assertions. n8n must still adopt the status/proof API and durable caller receipts.
 
 ## Architecture
 

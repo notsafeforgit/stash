@@ -754,6 +754,29 @@ token revocation leaves those records intact. Anonymisation removes receipts
 before both kinds of grants. A source-target/root index supports bounded current
 collection lookup. Normal database backups include the grants and receipts.
 
+Migration 1000025 adds `source_backfill_decisions` and its retained
+`source_backfill_requests` proof links. Decisions belong to a logical media root
+and a qualified source account, independently of performer ownership. Current
+component definitions preserve the eight modes used by the existing Reddit and
+Twitter n8n runner. A composite subject/component index bounds status lookups;
+neither performer names nor a full-library scan participates.
+
+Historical completion and skip imports use stable UUIDs derived from the input
+database UUID, source table and original primary key. They retain the complete
+original row, including the exact `result_json` string, user confirmations,
+unknown provenance fields and timestamp spelling. A changed row under the same
+identity requires review; it cannot overwrite earlier evidence. Imported
+acceptance is distinct from verified native source-window coverage and does not
+create runs, requests or file receipts.
+
+Native decisions reference the authenticated producer's immutable request rows
+with foreign keys. The request digest, root, exact target URL, policy and actual
+completed ranges must cover every URL and the whole requested window. Proof
+links and decisions commit together, and replay preserves the original receipt.
+Startup requires the tables/indexes/guards and rejects missing or inconsistent
+proof links. Anonymised exports remove these private decisions before their
+source-run and producer references. Ordinary database backups include them.
+
 Migrations run against copies during development. SQL failure leaves a dirty
 migration state that startup refuses; restore the migration backup or use a
 validated recovery procedure. Do not force a schema version to hide a failure.

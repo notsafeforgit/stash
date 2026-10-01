@@ -72,7 +72,7 @@ review. Production has not been migrated.
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
 | 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries and metadata relationship targets, native account/ownership storage and reviewed consolidation, shared post/profile/capture storage, ordered attachment manifests, audited media associations, reviewed source-list selection, and source-gallery synchronization with manual membership intent are implemented. Scalar and relationship field choices protect explicit and preserved metadata. Revisioned logical roots and source collections retain capture/manual-intake provenance; captured publisher choices connect source evidence to accounts independently of depicted performers. Verified byte identities and immutable per-file verification history now use persistent file-generation guards. Producer identity matching, policy resolution, review APIs/UI and remaining domain services are in progress. |
 | 2 Ingestion and producer adapter | In progress: scoped producer tokens, Reddit/Twitter capture batches and durable receipts are implemented. Verified preparation uses the shared scanner; file/media publication checks descriptors, generations and persistent path removals, reuses concurrent scans, and rejects ambiguous verified-byte owners. Intake publication connects collection provenance, selected source media, attachment evidence and album galleries while preserving explicit choices. Persistent jobs have coalesced submissions, fenced leases, retry/cancellation/recovery, and atomic domain/result publication. File-completion admission now queues a durable worker that checkpoints registration, generates previews and delivers retryable media/gallery hooks; scoped status reports actual completion. Native collection policies now apply typed metadata and explicit performer defaults in intake and ordinary scans, with dry preview and guarded apply. Source-run coordination now coalesces missing date ranges, fences worker ownership, retains checkpoints and deferrals, and excludes overlapping destinations. A supported Python producer package now provides retained-payload outboxes, fenced delivery, durable receipts, backoff and review. The gallery-dl SDK now queues source evidence before download, verifies root/prefix and lease ownership, holds shared destination locks, and queues flushed final files before archive acknowledgement. Reddit single-media evidence and original Twitter attachment membership are covered. The producer now coalesces offline source requests, freezes submissions for replay, retains caller tickets and validates native admission receipts. Claimed Reddit/Twitter windows use precise source timestamps and parent context, with directory checks before postprocessor callbacks. Reviewed portable profiles now fingerprint settings/assets and execute one claimed attempt with concurrent outbox delivery and lost-finish recovery. A local converter now stages ordered, source-scoped profiles from the host and n8n JSON layers without copying website credentials. Scoped dispatch now discovers eligible runs with durable pagination/backoff, and a separate n8n image packages the pinned worker runtime. Staged host Twitter/Reddit launchers preserve saved lists, modes, date filters and full-history profiles through durable caller snapshots. Live image/profile activation, policy migration, general durable edit notifications, additional source adapters and n8n/recovery caller conversion remain. |
-| 3 Catalog importer and full-copy reconciliation | Not yet implemented |
+| 3 Catalog importer and full-copy reconciliation | Permanent account-backfill completion/skip imports are implemented and rehearsed against a full copy, preserving original decisions and provenance. The remaining catalog/journal families, identity/metadata import, global reconciliation and cutover import remain unfinished. |
 | 4 Native UI and client conversion | Not yet implemented |
 | 5 Compatibility removal and packaging | Preview packaging isolated and old compatibility gate replaced by current v3 operation/plugin-contract checks. Old UI/API/plugin adapters and config bridge still require conversion/removal. |
 | 6 Backup and cutover rehearsal | Not yet implemented |
@@ -1748,3 +1748,72 @@ provenance without inventing verified source-window coverage or rescraping them.
 The old skip-table format must remain supported as historical input even when
 this snapshot has no rows. Production launchers, workflows and services remain
 on the compatible deployment; parent commit `66d7e91e2` passed all three CI jobs.
+
+## Native permanent backfill decisions and journal import
+
+Native schema 1000025 adds `source_backfill_decisions` and foreign-keyed original
+request proof. Historical completion and deliberate skips retain the entire
+source record, including the exact result JSON and user-confirmation provenance.
+Stable UUIDs derive from an input-database UUID and the original table/key;
+replaying unchanged rows preserves the original decision, while changed evidence
+conflicts. Migration creates no decisions, runs or proof for existing rows.
+
+The API now exposes root-scoped compact status and native completion proof.
+Account-wide reads/writes require an explicit producer root grant; a collection
+grant alone does not widen. Application-authenticated endpoints import historical
+assertions in atomic bounded batches and expose retained evidence. The component
+definitions preserve the eight existing Reddit/Twitter n8n modes. Qualified
+source-account lookup is independent of performer identity or ownership.
+
+Native completion checks the authenticated producer's original request hashes,
+root, exact target URLs, policy and actual completed ranges for the entire
+component. Queue admission, partial coverage, another account's URLs, missing
+requests and fabricated windows cannot become completion. Imported acceptance
+remains distinct from native source-run proof; neither certifies media intake
+or exhaustive availability from a source website. Startup checks preserve proof
+integrity, and anonymised exports remove this private operational history.
+
+`stash-import-backfills` opens a journal snapshot read-only, validates the two
+recognized account-backfill table shapes and all rows before network writes,
+then submits at most 50 records/4 MiB per batch through the application API.
+Both passes use one SQLite read snapshot. Stable returned IDs and outcomes are
+checked before acknowledging a batch. The real Go/Python HTTP fixture commits a
+batch and drops its response, then verifies successful replay with 52 decisions,
+no duplicates, no fabricated source runs and unchanged source bytes.
+
+The isolated full-copy rehearsal is
+`.local/native-backfill-rehearsal-20261001/native-backfill-rehearsal.sqlite`.
+Schema 1000024 → 1000025 took 0.071 seconds on the 1,473,081,344-byte copy.
+Before importing, all 134 existing tables matched their source semantically;
+the two new tables were empty and foreign-key violations were zero. The
+reconciliation took 53.521 seconds and found no size growth.
+
+The actual journal snapshot then supplied 1,329 completion records: 497 Twitter
+and 416 each for Reddit new/top. Import and replay took 0.299 seconds through the
+core repository services. Every original field and result-JSON byte matched;
+replay and reopening preserved every decision. Source runs, source requests and
+native proof rows stayed empty. Indexed status checks on this full-library copy
+had median 0.01869 ms, p95 0.02498 ms and maximum 0.14606 ms in one read transaction;
+these are local repository timings, not network or UI latency guarantees.
+The snapshot has no legacy-skip rows, so synthetic fixtures cover those semantics.
+
+Private evidence includes `review.json`, `input-records.json`,
+`backfill-migration-reconciliation.json` and `backfill-import-reconciliation.json`
+in that rehearsal directory. The preserved schema-24 copy and live journal were
+not changed. Parent commit `7852533f1` passed all three CI workflows.
+
+The full `make validate-fork` gate passed: 528 v3 tests in 91 files, native
+contracts covering 71 application operation files, all 167 producer tests,
+Go lint with zero issues and all Go tests (API 205.548 seconds, ingest 350.598
+seconds, SQLite 329.962 seconds). The same 167 producer tests also passed on the
+host's Python 3.12 runtime. Focused store/API checks and the real HTTP importer
+fixture passed separately. Logs are `backfill-final-validation.log`,
+`backfill-python312.log`, `backfill-focused-v2.log`,
+`backfill-http-import-v2.log` and `backfill-real-import-rehearsal.log` under
+`/tmp/stash-native-transition`.
+
+The installed n8n runner still needs to consume this history, freeze/persist its
+caller receipts, inspect original source tickets and submit completion proof.
+Per-scan completions, deferred/ignored work, the other catalog families, source
+registration and subsequent transition phases remain outstanding. This is not a
+live migration or deployment; production remains on the frozen compatible image.

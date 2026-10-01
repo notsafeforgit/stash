@@ -54,6 +54,13 @@ type SourceRun struct {
 	UpdatedAt          time.Time         `json:"updated_at"`
 }
 
+// SourceRunCandidate is a discovery hint, not a lease. The worker must still
+// claim the run before reading a source or changing download state.
+type SourceRunCandidate struct {
+	Sequence int64  `json:"sequence" db:"id"`
+	UUID     string `json:"uuid" db:"uuid"`
+}
+
 type SourceRunProgress struct {
 	ItemsSeen      int64  `json:"items_seen"`
 	FilesCompleted int64  `json:"files_completed"`
@@ -100,6 +107,7 @@ type SourceRunReaderWriter interface {
 	Submit(context.Context, string, SourceRunRequest, time.Time, int) (*SourceRun, error)
 	Find(context.Context, string) (*SourceRun, error)
 	List(context.Context, string, *string, int64, int) ([]SourceRun, error)
+	Ready(context.Context, []string, string, string, int64, int, time.Time) ([]SourceRunCandidate, error)
 	Attempts(context.Context, string, int64, int) ([]SourceRunAttempt, error)
 	Claim(context.Context, string, string, string, string, time.Time, time.Duration) (*SourceRun, error)
 	CheckLease(context.Context, SourceRunLease, time.Time) (*SourceRun, error)

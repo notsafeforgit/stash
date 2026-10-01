@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
 from pathlib import Path
 import sqlite3
 import tempfile
@@ -7,7 +8,9 @@ import uuid
 
 from stash_ingest.encoding import digest, encode
 from stash_ingest.outbox import Conflict, Outbox, SCHEMA
+from stash_ingest.run_queue import RunQueue
 from helpers import PRODUCER, capture, file_event, receipt
+from test_run_queue import request, admission
 
 
 class OutboxMigrationTests(unittest.TestCase):
@@ -68,6 +71,37 @@ class OutboxMigrationTests(unittest.TestCase):
         self.assertEqual(self.db.execute("PRAGMA user_version").fetchone()[0], 1)
         self.assertEqual(self.db.execute("SELECT * FROM events ORDER BY seq").fetchall(), self.before)
         self.assertIsNone(self.db.execute("SELECT name FROM sqlite_schema WHERE name='run_intents'").fetchone())
+
+    def test_v2_promotion_preserves_frozen_requests_tickets_and_admissions(self):
+        tables = ("binding", "events", "run_intents", "run_requests", "run_intent_tickets")
+        with closing(self.open()) as box:
+            queue = RunQueue(box)
+            queue.enqueue(request(), ticket_uuid=str(uuid.uuid4()))
+            sent = queue.claim(str(uuid.uuid4()))
+            queue.admit(sent, admission(sent.body))
+            queue.enqueue(request(30, 40), ticket_uuid=str(uuid.uuid4()))
+            queue.claim(str(uuid.uuid4()))
+            queue.enqueue(request(50, 60, policy_sha256="b" * 64), ticket_uuid=str(uuid.uuid4()))
+            # These are the exact schema-2 tables; only the new cursor table is
+            # removed to retain real populated admission and lease state.
+            box.db.execute("DROP TABLE dispatch_cursors")
+            box.db.execute("PRAGMA user_version=2")
+        before = {table: self.db.execute(f"SELECT * FROM {table}").fetchall() for table in tables}
+        with closing(self.open()) as box:
+            self.assertEqual(box.db.execute("PRAGMA user_version").fetchone()[0], SCHEMA)
+            self.assertEqual(box.db.execute("SELECT count(*) FROM dispatch_cursors").fetchone()[0], 0)
+        self.assertEqual({table: self.db.execute(f"SELECT * FROM {table}").fetchall() for table in tables}, before)
+        self.assertEqual(self.db.execute("PRAGMA foreign_key_check").fetchall(), [])
+
+    def test_v2_cursor_collision_keeps_old_version_and_operational_state(self):
+        with closing(self.open()) as box:
+            box.db.execute("DROP TABLE dispatch_cursors")
+            box.db.execute("PRAGMA user_version=2")
+            box.db.execute("CREATE TABLE dispatch_cursors(unrecognized TEXT)")
+        with self.assertRaises(sqlite3.OperationalError):
+            self.open()
+        self.assertEqual(self.db.execute("PRAGMA user_version").fetchone()[0], 2)
+        self.assertEqual(self.db.execute("SELECT * FROM events ORDER BY seq").fetchall(), self.before)
 
 
 if __name__ == "__main__":

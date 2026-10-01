@@ -1,0 +1,19 @@
+# Build with integrations/gallery-dl as the context and an explicitly pinned
+# existing n8n image. Native commands use /opt/stash-ingest/bin; n8n's own
+# Python runtime, entry point and PATH are preserved.
+ARG N8N_BASE_IMAGE
+FROM ${N8N_BASE_IMAGE}
+
+USER root
+COPY pyproject.toml README.md /tmp/stash-ingest-package/
+COPY src/stash_ingest /tmp/stash-ingest-package/src/stash_ingest
+RUN uv --no-cache venv --python /usr/bin/python3 /opt/stash-ingest \
+    && uv --no-cache pip install --python /opt/stash-ingest/bin/python \
+       "/tmp/stash-ingest-package[gallery]" \
+    && /opt/stash-ingest/bin/python -c \
+       'import json; from stash_ingest.configuration import runtime_identity; print(json.dumps(runtime_identity(), sort_keys=True))' \
+    && rm -rf /tmp/stash-ingest-package
+
+ARG STASH_REVISION=uncommitted
+LABEL io.stash.native-worker.revision=${STASH_REVISION}
+USER node

@@ -17,7 +17,7 @@ from .encoding import InvalidData, MAX_BATCH_BYTES, decode, digest, encode, iden
 from .endpoint import origin
 
 APPLICATION_ID = 0x5354494F  # STIO, not a Stash or gallery-dl archive database.
-SCHEMA = 2
+SCHEMA = 3
 
 
 class Conflict(InvalidData):
@@ -62,7 +62,7 @@ class Outbox:
             version = self.db.execute("PRAGMA user_version").fetchone()[0]
             application = self.db.execute("PRAGMA application_id").fetchone()[0]
             tables = self.db.execute("SELECT name FROM sqlite_schema WHERE type='table'").fetchall()
-            if not ((version in (1, SCHEMA) and application == APPLICATION_ID)
+            if not ((version in (1, 2, SCHEMA) and application == APPLICATION_ID)
                     or (version == 0 and application == 0 and not tables)):
                 raise InvalidData("Unsupported or foreign outbox database")
             self.db.execute("PRAGMA foreign_keys=ON")
@@ -114,8 +114,21 @@ class Outbox:
         version = self.db.execute("PRAGMA user_version").fetchone()[0]
         if version == SCHEMA:
             return
-        if version != 1:
+        if version not in (1, 2):
             raise InvalidData("Unsupported outbox migration")
+        if version == 1:
+            self._migrate_runs()
+        self.db.execute("""CREATE TABLE dispatch_cursors(
+            root_uuid TEXT NOT NULL, policy_sha256 TEXT NOT NULL,
+            after_sequence INTEGER NOT NULL DEFAULT 0 CHECK(after_sequence>=0),
+            revision INTEGER NOT NULL DEFAULT 1 CHECK(revision>0),
+            failures INTEGER NOT NULL DEFAULT 0 CHECK(failures>=0),
+            available_at REAL NOT NULL DEFAULT 0, error_code TEXT,
+            PRIMARY KEY(root_uuid,policy_sha256)
+        )""")
+        self.db.execute(f"PRAGMA user_version={SCHEMA}")
+
+    def _migrate_runs(self):
         self.db.execute("""CREATE TABLE run_intents(
             uuid TEXT PRIMARY KEY, config_sha256 TEXT NOT NULL UNIQUE, template BLOB NOT NULL,
             operation TEXT NOT NULL CHECK(operation IN ('download','enrich')),
@@ -147,7 +160,7 @@ class Outbox:
             sha256 TEXT NOT NULL, window BLOB NOT NULL, first_sequence INTEGER NOT NULL CHECK(first_sequence>0),
             created_at REAL NOT NULL
         )""")
-        self.db.execute(f"PRAGMA user_version={SCHEMA}")
+        self.db.execute("PRAGMA user_version=2")
 
     @contextmanager
     def transaction(self):

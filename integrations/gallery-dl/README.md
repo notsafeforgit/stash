@@ -222,6 +222,63 @@ completion exit 2. Invalid configuration or unavailable admission exits 1.
 Continue draining the durable outbox after execution; stopping the download
 process does not certify that its file events were delivered.
 
+## Automatic source dispatch
+
+`dispatch --profile FILE` performs one bounded scheduling cycle: deliver one
+ready event batch, submit one queued source request, then discover up to 50
+eligible runs and execute at most one claimed attempt. It uses the scoped
+`POST /runs/ready` API, filtered by the reviewed root and policy. The server
+returns only run UUIDs and pagination sequences. A discovery result grants no
+ownership; the existing claim still checks collection definitions, destination
+overlap, cooldowns and fencing before any source work starts.
+
+```sh
+stash-ingest --outbox /persistent/producer.sqlite --endpoint STASH_ORIGIN \
+  --producer PRODUCER_UUID dispatch --profile /persistent/profiles/reddit.json
+```
+
+The producer retains its pagination cursor and discovery backoff in the outbox.
+A page of busy candidates cannot permanently hide later work, including after
+process restart. Cursor changes use revisions so competing dispatchers cannot
+both advance the same page state. End-of-list wraps the cursor for a later pass;
+this does not acknowledge any scrape as completed. Expired attempts go through
+the server's recovery/backoff path. Deferred work requires explicit review.
+
+Delivery and request admission continue while discovery is backing off. A cycle
+can report `idle`, `waiting`, `backoff`, `contended`, `unavailable`, or a worker
+attempt outcome. Exit 2 denotes unfinished local delivery/admission or an
+unsuccessful attempt; exit 0 only describes this cycle. Neither certifies the
+whole source queue or media intake. Preserve the result's native run identity
+and inspect its state and file receipts when a workflow needs completion.
+
+A host timer can invoke this as one oneshot service per reviewed profile, with
+exit 2 accepted as pending work; an already-active service must not be launched
+again by its timer. Host/n8n wrapper activation and their workflow receipt
+conversion remain required. This command does not update installed launchers.
+
+## n8n worker image
+
+`Containerfile.n8n` adds the pinned producer and gallery-dl/yt-dlp dependencies
+to `/opt/stash-ingest`, an isolated Python environment. Build on the existing
+customized n8n image, pinned by digest or immutable local image ID; it must
+already supply Python 3.12+, uv, git, ffmpeg and the retained conversion tools.
+
+```sh
+podman build --pull=never \
+  --build-arg N8N_BASE_IMAGE=PINNED_CUSTOM_N8N_IMAGE \
+  --build-arg STASH_REVISION=SOURCE_COMMIT \
+  --tag localhost/n8n-native:SOURCE_COMMIT \
+  --file integrations/gallery-dl/Containerfile.n8n integrations/gallery-dl
+```
+
+The build validates the exact supported gallery-dl commit and yt-dlp version.
+Native launchers use `/opt/stash-ingest/bin/stash-ingest` and its sibling Python
+interpreter. n8n's existing PATH, entry point and system Python environment stay
+as supplied by the base image. Private website config, Stash token references,
+profiles, outboxes, download archives and media are deployment mounts, never
+image build inputs. Select the new image only at the verified cutover after
+converting workflow/host entry points and their receipts.
+
 ## Converting existing gallery-dl settings
 
 `stash-ingest-config` reads ordered JSON config layers and writes a **new,
@@ -312,11 +369,13 @@ evicting work. Request acknowledgements and tickets remain as history, so these
 limits are not a cap on total disk usage. Queue status reports pending windows,
 submission states and age; a fresh schedule resets the age of an emptied group.
 
-Producer schema 2 adds request/ticket tables through one SQLite transaction.
-Opening a schema-1 outbox preserves event bytes, receipts, dependencies and active
-delivery leases. A failed migration rolls back. Older producer code refuses the
-new schema when opening it; preserve the queue in backups rather than recreating
-it during rollback. This does not change the Stash database schema.
+Producer schema 2 introduced request/ticket tables; schema 3 adds dispatch
+cursors and discovery backoff. Opening a schema-1 or schema-2 outbox promotes it
+in one SQLite transaction, preserving event bytes, receipts, dependencies,
+active delivery/submission leases, frozen requests and caller tickets. A failed
+migration rolls back. Older producer code refuses the new schema when opening
+it; preserve the queue in backups rather than recreating it during rollback.
+This does not change the Stash database schema.
 
 ## Inspection and delivery
 
@@ -332,6 +391,7 @@ is no command-line token argument.
 | `receipt-status EVENT_UUID` | Reads actual server ingestion/worker status |
 | `queue-run --collection UUID --revision N --profile FILE --until TIME` | Records/coalesces a download request using the profile digest; low-level callers may use `--policy SHA256` instead |
 | `submit-runs` | Submits one ready request; exits 2 while requests remain pending, in flight or in review |
+| `dispatch --profile FILE` | Delivers/submits queued work and discovers at most one source attempt; retains pagination and discovery backoff |
 | `runs-status [--intent UUID \| --ticket UUID] [--after N]` | Local request counts and up to 50 relevant historical submissions |
 | `retry-run-request UUID` | Retries a reviewed submission with the original UUID and bytes |
 | `worker-policy --profile FILE` | Validates the local worker profile and prints its portable policy/root identity |

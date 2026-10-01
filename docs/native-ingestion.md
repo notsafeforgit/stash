@@ -23,7 +23,8 @@ Native source-run coordination now provides coalesced windows and fenced leases.
 The Python adapter provides durable outboxes, worker lease enforcement,
 source-window filtering, download hooks and offline run-request coalescing.
 Worker profiles now fingerprint reviewed configuration and execute one claimed
-download attempt with concurrent event delivery. Launcher integration, additional
+download attempt with concurrent event delivery. Bounded dispatch now discovers
+eligible work after restart with persistent producer pagination/backoff. Launcher integration, additional
 post adapters, host/n8n activation, catalog import, and native administration/review
 UI remain required.
 Existing scrapes have not switched to this interface. Root, collection and policy
@@ -340,6 +341,7 @@ Producer authentication and collection/root grants are the same as event intake.
 | `POST /runs` | Submit the typed request below; returns its native run plus the committed `request_uuid` |
 | `GET /runs/<uuid>` | Current state, windows, ownership, progress and retry time |
 | `POST /runs/list` | `collection_uuid`, optional integer `after`; at most 50 authorized runs in sequence order |
+| `POST /runs/ready` | `root_uuid`, `policy_sha256`, optional integer `after`; up to 50 permitted download candidates as `sequence`/`uuid` pairs |
 | `POST /runs/<uuid>/attempts` | Optional integer `after` fence; at most 50 attempts |
 | `POST /runs/<uuid>/claim` | `owner_uuid`, `policy_sha256`, `lease_seconds` (5–900) |
 | `POST /runs/<uuid>/lease` | `owner_uuid`, `fence`, and exactly one of `lease_seconds`, `progress`, or `outcome` |
@@ -350,6 +352,15 @@ query-string tokens and parameters remain rejected. A claim returns 204 and
 with the same producer and worker UUID returns its still-valid lease. A different
 producer or worker cannot borrow it. Rotate the ingestion token while retaining
 the producer UUID when the same worker should keep ownership.
+
+Capabilities advertise `source_run_dispatch: true` for scoped work discovery.
+It uses the bounded active-run index and the server clock, excluding future
+retry times, live leases and explicitly deferred work. Expired leases can be
+discovered, but only a claim can recover them, applying normal retry delay and
+deferral limits. Pagination never grants ownership or certifies completion.
+The producer's `dispatch` command retains its cursor/backoff across restarts,
+continues delivery/admission during discovery outages, and still uses the
+existing claim before downloading. See the producer guide for cycle outcomes.
 
 Capabilities advertise `source_run_submission_receipts: true` when submission
 responses identify the committed request. Multiple requests may coalesce into
@@ -662,3 +673,8 @@ See the package guide for conversion and publication semantics.
 This package is not yet installed into the host/n8n launch paths. Runtime alignment,
 activation of converted profiles, additional source adapters and conversion of
 recovery and scheduled callers remain required before cutover.
+
+The producer's n8n Containerfile now builds an isolated pinned worker runtime
+on an explicitly selected existing custom n8n image. A separate rehearsal image
+has passed the producer suite and actual host/n8n profile comparison; selecting
+that image and updating the live workflow commands still belong to cutover.

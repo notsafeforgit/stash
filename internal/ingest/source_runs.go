@@ -134,6 +134,30 @@ func (c *RunCoordinator) List(ctx context.Context, token, collection string, aft
 	return result, nil
 }
 
+// Ready discovers only download work permitted at this worker's root. It does
+// not grant a lease or expose work from other collections under that root.
+func (c *RunCoordinator) Ready(ctx context.Context, token, root, policy string, after int64) ([]models.SourceRunCandidate, error) {
+	var result []models.SourceRunCandidate
+	err := c.Service.Repo.WithReadTxn(ctx, func(ctx context.Context) error {
+		credential, err := c.Service.authenticate(ctx, token)
+		if err != nil {
+			return err
+		}
+		collections := make([]string, 0, len(credential.Scopes))
+		for _, scope := range credential.Scopes {
+			if scope.RootUUID != nil && *scope.RootUUID == root {
+				collections = append(collections, scope.CollectionUUID)
+			}
+		}
+		if len(collections) == 0 {
+			return ErrForbidden
+		}
+		result, err = c.Service.Repo.SourceRun.Ready(ctx, collections, root, policy, after, 50, c.Now())
+		return err
+	})
+	return result, err
+}
+
 func (c *RunCoordinator) Attempts(ctx context.Context, token, id string, after int64) ([]models.SourceRunAttempt, error) {
 	var result []models.SourceRunAttempt
 	err := c.Service.Repo.WithReadTxn(ctx, func(ctx context.Context) error {

@@ -1,7 +1,8 @@
 """Real worker/API interoperability; only the website supplies fixture data."""
 
-from contextlib import closing
+from contextlib import closing, redirect_stdout
 from datetime import datetime, timedelta, timezone
+import io
 import json
 from pathlib import Path
 import sys
@@ -10,10 +11,10 @@ from unittest.mock import patch
 
 from stash_ingest.client import Client, drain_once
 from stash_ingest.configuration import Configuration
+from stash_ingest.cli import main as producer_cli
 from stash_ingest.gallery import NativeDownloadJob
 from stash_ingest.outbox import Outbox
-from stash_ingest.run_queue import RunQueue, submit_once
-from stash_ingest.worker import execute
+from stash_ingest.run_queue import RunQueue
 from test_configuration import profile_fixture
 from test_gallery import Fixture
 from test_producer import reddit_data
@@ -34,9 +35,9 @@ def main():
         queue.enqueue({"collection_uuid": setup["collection"], "collection_revision": setup["revision"],
                        "policy_sha256": profile.policy_sha256, "operation": "download", "cooldown_seconds": 0,
                        "window": {"since": None, "until": now.isoformat(timespec="milliseconds")}})
-        admitted = submit_once(queue, client)
-        assert admitted["state"] == "admitted", admitted
-
+    # Restart after local admission, before any network request. The dispatcher
+    # must submit and discover the work without a run UUID supplied by a caller.
+    with closing(Outbox(database, setup["endpoint"], setup["producer"])) as box:
         def job(target, *, producer, lock_directory):
             extractor = Fixture.from_url(target)
             extractor.records, extractor.visited = [reddit_data(date=(now - timedelta(days=1)).isoformat())], []
@@ -60,7 +61,15 @@ def main():
             return task
 
         with patch("stash_ingest.gallery.NativeDownloadJob", side_effect=job):
-            result = execute(box, client, profile, admitted["run_uuid"])
+            output = io.StringIO()
+            with redirect_stdout(output):
+                status = producer_cli(["--outbox", str(database), "--endpoint", setup["endpoint"],
+                                       "--producer", setup["producer"], "dispatch", "--profile", str(path)])
+        result = json.loads(output.getvalue())
+        assert status in (0, 2), (status, result)
+        admitted = result["submission"]
+        assert admitted["state"] == "admitted", admitted
+        assert result["run_uuid"] == admitted["run_uuid"]
         assert result["state"] == "source_succeeded", result
         assert result["finish_recovered"] is True, result
         rows = list(box.db.execute("SELECT event_uuid,kind FROM events ORDER BY seq"))

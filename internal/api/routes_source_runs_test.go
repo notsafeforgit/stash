@@ -66,6 +66,10 @@ func TestSourceRunHTTPScopedOwnershipAndLateEvidence(t *testing.T) {
 		return w
 	}
 	input := models.SourceRunRequest{RequestUUID: uuid.NewString(), CollectionUUID: collection.UUID, CollectionRevision: collection.Revision, Operation: "enrich", PolicySHA256: strings.Repeat("a", 64), Window: models.SourceWindow{Until: time.Now().UTC().Truncate(time.Millisecond)}}
+	ready := map[string]any{"root_uuid": uuid.NewString(), "policy_sha256": input.PolicySHA256}
+	require.Equal(t, http.StatusUnauthorized, request(handler, http.MethodPost, ingestPath+"/runs/ready", "", ready).Code)
+	require.Equal(t, http.StatusForbidden, request(handler, http.MethodPost, ingestPath+"/runs/ready", token, ready).Code, "an unbound scope does not grant a media root")
+	require.Equal(t, http.StatusBadRequest, request(handler, http.MethodPost, ingestPath+"/runs/ready", token, map[string]any{"command": "arbitrary"}).Code)
 	require.Equal(t, http.StatusUnauthorized, request(handler, http.MethodPost, ingestPath+"/runs", "", input).Code)
 	require.Equal(t, http.StatusBadRequest, request(handler, http.MethodPost, ingestPath+"/runs", token, map[string]any{"command": "gallery-dl arbitrary-command"}).Code)
 	w := request(handler, http.MethodPost, ingestPath+"/runs", token, input)

@@ -93,6 +93,11 @@ func TestSourceRunNewRootScopeListsOnlyAuthorizedHistory(t *testing.T) {
 	rows, err := f.coordinator.List(t.Context(), f.token, f.collection.UUID, 0)
 	require.NoError(t, err)
 	require.Equal(t, []models.SourceRun{*newRun}, rows)
+	ready, err := f.coordinator.Ready(t.Context(), f.token, root.UUID, newRun.PolicySHA256, 0)
+	require.NoError(t, err)
+	require.Equal(t, []models.SourceRunCandidate{{Sequence: newRun.Sequence, UUID: newRun.UUID}}, ready)
+	_, err = f.coordinator.Ready(t.Context(), f.token, f.root.UUID, old.PolicySHA256, 0)
+	require.ErrorIs(t, err, ingest.ErrForbidden)
 }
 
 func TestSourceRunAnonymisationRemovesWorkerAndTargetState(t *testing.T) {

@@ -73,6 +73,8 @@ def main(argv=None):
     execute = commands.add_parser("execute-run", help="Execute one claimed source attempt; media intake finishes separately")
     execute.add_argument("run_uuid")
     execute.add_argument("--profile", required=True)
+    dispatch = commands.add_parser("dispatch", help="Deliver queued events, submit a request and discover one source attempt")
+    dispatch.add_argument("--profile", required=True)
     args = parser.parse_args(argv)
     box = None
     try:
@@ -124,6 +126,11 @@ def main(argv=None):
             from .worker import execute as execute_source
             with worker_output():
                 output = execute_source(box, client, Configuration(args.profile), args.run_uuid)
+        elif args.command == "dispatch":
+            from .configuration import Configuration
+            from .dispatch import dispatch_once
+            with worker_output():
+                output = dispatch_once(box, client, Configuration(args.profile))
         else:
             output = {**box.status(), "source_requests": requests.status()}
         print(json.dumps(output, sort_keys=True))
@@ -135,6 +142,12 @@ def main(argv=None):
             return 2 if state["pending_windows"] or any(state["counts"][k] for k in ("pending", "sending", "review")) else 0
         if args.command == "execute-run":
             return 0 if output["state"] == "source_succeeded" else 2
+        if args.command == "dispatch":
+            counts = output["outbox"]["counts"]
+            requests = output["source_requests"]
+            incomplete = (any(counts[k] for k in ("pending", "sending", "review")) or requests["pending_windows"]
+                          or any(requests["counts"][k] for k in ("pending", "sending", "review")))
+            return 0 if output["state"] in ("idle", "source_succeeded") and not incomplete else 2
         return 0
     except (InvalidData, Unavailable, Capacity, SourcePaused) as exc:
         print(str(exc), file=sys.stderr)

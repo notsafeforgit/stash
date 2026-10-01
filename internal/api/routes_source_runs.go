@@ -65,6 +65,23 @@ func (rs *ingestRoutes) sourceRuns(w http.ResponseWriter, r *http.Request) {
 	}
 	ingestJSON(w, http.StatusOK, result)
 }
+func (rs *ingestRoutes) readySourceRuns(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		RootUUID     string `json:"root_uuid"`
+		PolicySHA256 string `json:"policy_sha256"`
+		After        int64  `json:"after"`
+	}
+	if err := readIngestJSON(w, r, 4096, &input); err != nil {
+		ingestError(w, err)
+		return
+	}
+	result, err := rs.runCoordinator().Ready(r.Context(), ingestToken(r), input.RootUUID, input.PolicySHA256, input.After)
+	if err != nil {
+		ingestError(w, err)
+		return
+	}
+	ingestJSON(w, http.StatusOK, result)
+}
 func (rs *ingestRoutes) sourceRunAttempts(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		After int64 `json:"after"`

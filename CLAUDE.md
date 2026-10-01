@@ -74,6 +74,9 @@ local, and source completion remains distinct from verified media intake.
 `stash-ingest-config` stages new profiles from ordered gallery-dl JSON layers.
 Preserve conditional map order and layered private references; conversion does
 not activate a worker or replace the existing configuration files.
+`stash-ingest dispatch` discovers scoped work through the native API. Producer
+schema 3 retains its pagination/backoff; discovery is not a lease or completion
+receipt. Preserve existing request/event state when upgrading older outboxes.
 
 ## Architecture
 

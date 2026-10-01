@@ -169,6 +169,8 @@ func TestSourceRunCoalescesWiderWindowsWithoutRepeatingCompletedWork(t *testing.
 	f.coordinator.MaxActive = 1
 	input := f.request()
 	r := f.submit(t, input)
+	require.Equal(t, f.collection.TargetURL, r.TargetURL)
+	require.Equal(t, f.collection.PathPrefix, r.PathPrefix)
 	require.Equal(t, r, f.submit(t, input))
 	changed := input
 	changed.PolicySHA256 = strings.Repeat("b", 64)
@@ -210,6 +212,19 @@ func TestSourceRunCoalescesWiderWindowsWithoutRepeatingCompletedWork(t *testing.
 	input.RequestUUID = uuid.NewString()
 	fresh := f.submit(t, input)
 	require.NotEqual(t, done.UUID, fresh.UUID, "a new scheduled request may observe the source again")
+}
+
+func TestSourceRunResponseKeepsPinnedCollectionDestination(t *testing.T) {
+	f := newSourceRunFixture(t)
+	r := f.submit(t, f.request())
+	definition := f.collection.SourceCollectionDefinition
+	definition.TargetURL, definition.PathPrefix = "https://www.reddit.com/user/other/submitted/", "Other"
+	putSourceCollection(t, f.repo, models.SourceCollectionInput{UUID: f.collection.UUID,
+		ExpectedRevision: f.collection.Revision, SourceCollectionDefinition: definition, Origin: "review"})
+	restored := f.find(t, r.UUID)
+	require.Equal(t, r.TargetURL, restored.TargetURL)
+	require.Equal(t, r.PathPrefix, restored.PathPrefix)
+	require.Equal(t, r.CollectionRevision, restored.CollectionRevision)
 }
 
 func TestSourceRunConcurrentRequestsAndClaimsHaveOneOwner(t *testing.T) {

@@ -30,7 +30,7 @@ func (s *SourceRunStore) Claim(ctx context.Context, id, producer, owner, policy 
 		return nil, models.ErrSourceRunConflict
 	}
 	if row.State == "running" && row.Producer.String == producer && row.Owner.String == owner && row.LeaseUntil.Int64 > now.UnixMilli() {
-		r, err := row.resolve()
+		r, err := row.resolve(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -42,7 +42,7 @@ func (s *SourceRunStore) Claim(ctx context.Context, id, producer, owner, policy 
 	if row.State != "queued" || row.Available > now.UnixMilli() {
 		return nil, nil
 	}
-	r, err := row.resolve()
+	r, err := row.resolve(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -280,7 +280,7 @@ func (s *SourceRunStore) Recover(ctx context.Context, now time.Time, limit int) 
 		return 0, err
 	}
 	for _, row := range rows {
-		r, err := row.resolve()
+		r, err := row.resolve(ctx)
 		if err != nil {
 			return 0, err
 		}

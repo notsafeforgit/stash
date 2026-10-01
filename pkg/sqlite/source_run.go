@@ -51,8 +51,16 @@ type sourceRunRow struct {
 	Updated            int64          `db:"updated_at_ms"`
 }
 
-func (row sourceRunRow) resolve() (*models.SourceRun, error) {
+func (row sourceRunRow) resolve(ctx context.Context) (*models.SourceRun, error) {
+	var definition struct {
+		TargetURL  string `db:"target_url"`
+		PathPrefix string `db:"path_prefix"`
+	}
+	if err := dbWrapper.Get(ctx, &definition, "SELECT target_url,path_prefix FROM source_collection_revisions WHERE collection_uuid=? AND revision=?", row.Collection, row.CollectionRevision); err != nil {
+		return nil, err
+	}
 	r := &models.SourceRun{Sequence: row.Sequence, UUID: row.UUID, CollectionUUID: row.Collection, CollectionRevision: row.CollectionRevision,
+		TargetURL: definition.TargetURL, PathPrefix: definition.PathPrefix,
 		RootUUID: row.Root, RootRevision: int(row.RootRevision.Int64), Operation: row.Operation, PolicySHA256: row.Policy, CooldownSeconds: row.Cooldown,
 		State: row.State, Revision: row.Revision, Fence: row.Fence, Failures: row.Failures, ProducerUUID: row.Producer.String, OwnerUUID: row.Owner.String,
 		AvailableAt: time.UnixMilli(row.Available).UTC(), ErrorCode: row.ErrorCode, CreatedAt: time.UnixMilli(row.Created).UTC(), UpdatedAt: time.UnixMilli(row.Updated).UTC()}
@@ -100,7 +108,7 @@ func (s *SourceRunStore) Find(ctx context.Context, id string) (*models.SourceRun
 	if err != nil || row == nil {
 		return nil, err
 	}
-	return row.resolve()
+	return row.resolve(ctx)
 }
 
 func sourceRunHash(value any) (string, error) {
@@ -207,7 +215,7 @@ func (s *SourceRunStore) Submit(ctx context.Context, producer string, input mode
 	}
 	id := uuid.NewString()
 	if row != nil {
-		r, err := row.resolve()
+		r, err := row.resolve(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -270,7 +278,7 @@ func (s *SourceRunStore) List(ctx context.Context, collection string, root *stri
 	}
 	ret := make([]models.SourceRun, 0, len(rows))
 	for _, row := range rows {
-		r, err := row.resolve()
+		r, err := row.resolve(ctx)
 		if err != nil {
 			return nil, err
 		}

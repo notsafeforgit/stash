@@ -67,7 +67,7 @@ review. Production has not been migrated.
 | --- | --- |
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
 | 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries and metadata relationship targets, native account/ownership storage and reviewed consolidation, shared post/profile/capture storage, ordered attachment manifests, audited media associations, reviewed source-list selection, and source-gallery synchronization with manual membership intent are implemented. Scalar and relationship field choices protect explicit and preserved metadata. Revisioned logical roots and source collections retain capture/manual-intake provenance; captured publisher choices connect source evidence to accounts independently of depicted performers. Verified byte identities and immutable per-file verification history now use persistent file-generation guards. Producer identity matching, policy resolution, review APIs/UI and remaining domain services are in progress. |
-| 2 Ingestion and producer adapter | In progress: scoped producer tokens, Reddit/Twitter capture batches and durable receipts are implemented. Verified preparation uses the shared scanner; file/media publication checks descriptors, generations and persistent path removals, reuses concurrent scans, and rejects ambiguous verified-byte owners. Intake publication connects collection provenance, selected source media, attachment evidence and album galleries while preserving explicit choices. Persistent jobs have coalesced submissions, fenced leases, retry/cancellation/recovery, and atomic domain/result publication. File-completion admission now queues a durable worker that checkpoints registration, generates previews and delivers retryable media/gallery hooks; scoped status reports actual completion. Native collection policies now apply typed metadata and explicit performer defaults in intake and ordinary scans, with dry preview and guarded apply. Source-run coordination now coalesces missing date ranges, fences worker ownership, retains checkpoints and deferrals, and excludes overlapping destinations. A supported Python producer package now provides retained-payload outboxes, fenced delivery, durable receipts, backoff and review. Policy migration, general durable edit notifications, additional source adapters, gallery-dl hooks/leases and actual host/n8n worker conversion remain. |
+| 2 Ingestion and producer adapter | In progress: scoped producer tokens, Reddit/Twitter capture batches and durable receipts are implemented. Verified preparation uses the shared scanner; file/media publication checks descriptors, generations and persistent path removals, reuses concurrent scans, and rejects ambiguous verified-byte owners. Intake publication connects collection provenance, selected source media, attachment evidence and album galleries while preserving explicit choices. Persistent jobs have coalesced submissions, fenced leases, retry/cancellation/recovery, and atomic domain/result publication. File-completion admission now queues a durable worker that checkpoints registration, generates previews and delivers retryable media/gallery hooks; scoped status reports actual completion. Native collection policies now apply typed metadata and explicit performer defaults in intake and ordinary scans, with dry preview and guarded apply. Source-run coordination now coalesces missing date ranges, fences worker ownership, retains checkpoints and deferrals, and excludes overlapping destinations. A supported Python producer package now provides retained-payload outboxes, fenced delivery, durable receipts, backoff and review. The gallery-dl SDK now queues source evidence before download, verifies root/prefix and lease ownership, holds shared destination locks, and queues flushed final files before archive acknowledgement. Reddit single-media evidence and original Twitter attachment membership are covered. Effective window/configuration handling, offline run requests, policy migration, general durable edit notifications, additional source adapters and actual host/n8n worker conversion remain. |
 | 3 Catalog importer and full-copy reconciliation | Not yet implemented |
 | 4 Native UI and client conversion | Not yet implemented |
 | 5 Compatibility removal and packaging | Preview packaging isolated and old compatibility gate replaced by current v3 operation/plugin-contract checks. Old UI/API/plugin adapters and config bridge still require conversion/removal. |
@@ -1204,3 +1204,61 @@ test-cache dependency update passed targeted race tests and Go lint. Logs are
 `producer-outbox-final-race.log`, `producer-outbox-final-lint.log`, and
 `producer-outbox-python312.log` in that directory. The isolated wheel/CLI check
 is under `/tmp/stash-native-transition/producer-wheel.Tll9Rf`.
+
+## Gallery-dl lifecycle and source ownership
+
+The development producer SDK now connects actual gallery-dl download/skip hooks
+to native source leases and its durable outbox. Captures are queued before
+download. Final files are flushed, hashed and queued with their capture dependency
+before gallery-dl's archive is acknowledged. Existing unarchived files can retry
+failed metadata/exec processing; unresolved archive skips retain source evidence
+without inventing a completed file. Atomic metadata writes and the existing
+GIF-to-MKV output convention are supported. UTF-8 filename budgeting preserves
+source IDs and reserves space for configured temporary files and yt-dlp formats.
+
+Run responses include the target URL and destination prefix from their immutable
+collection revision. Historical responses keep that definition after collection
+edits. The worker verifies its reviewed local root identity and prefix, shares
+destination locks across writers, disables asynchronous source prefetch and
+checks ownership before traversal and each source HTTP attempt, including retries.
+Lease deadlines use server time and a conservative monotonic budget. A current
+file can finish queuing after ownership loss; subsequent source work pauses.
+Bounded cursor replay preserves the prior checkpoint until it is encountered.
+
+The server attachment parser now accepts direct single-media Reddit evidence,
+including explicit video stream URLs and validated crosspost context. Single
+items can link to library media without creating a gallery. The Twitter adapter
+preserves original attachment membership before gallery-dl expands video previews
+or transforms tweet metadata, retaining each output's attachment ID. Source order
+and identity do not come from local output numbers or filenames. The parser policy
+is `captured-attachments-v2`; the retained payload policy is unchanged.
+
+Actual runtime fixtures cover download/skip paths, archive recovery, failed or
+missing postprocessors, capacity exhaustion, transformed paths, source retry
+fencing, missing resume cursors, destination checks and both raw/transformed
+Twitter payloads. A real Python-to-Go HTTP test covers source-run submission,
+claim exclusion, renewal, checkpoints and completion in addition to durable
+delivery/replay. Backend publication tests confirm that a verified single Reddit
+attachment links without an album. The isolated pinned runtime installs with
+`make pre-producer`; CI and the full fork gate require the runtime tests.
+
+All 59 Python tests passed on Python 3.12 and 3.14. Targeted Go race tests passed for the
+parser, pinned definitions, single-attachment publication and real HTTP client
+(1.0, 15.2, 7.5 and 7.2 seconds respectively). No native migration is added.
+The production host/n8n wrappers, website credentials, catalog writers and frozen
+compatible deployment have not changed.
+
+The SDK is not yet a production launcher. Effective window/configuration
+handling and policy fingerprints, durable offline run requests, metadata-only
+enrichment, other platform/external-host adapters, multi-entry yt-dlp output
+association, legacy checkpoint migration and host/n8n/recovery conversion remain
+required. Catalog import and later transition phases are also unfinished.
+
+The complete fork gate passed: backend generation, 528 UI tests, 71 native
+operation contracts, zero Go lint issues and every Go unit/integration package.
+API tests took 173.4 seconds, ingestion 345.1 seconds, manager 44.8 seconds and
+SQLite 318.8 seconds. The producer suite had 58 tests during that gate; the added
+source HTTP-retry regression and final adapter passed all 59 afterward on both
+Python versions. Logs are `producer-lifecycle-final-validation.log`,
+`producer-lifecycle-final-python.log`, `producer-lifecycle-python312.log` and
+`producer-lifecycle-race.log` under `/tmp/stash-native-transition`.

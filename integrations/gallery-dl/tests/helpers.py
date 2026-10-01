@@ -31,7 +31,7 @@ def file_event(parent=None, **changes):
                  sha256="a" * 64, media_kind="scene")
     if parent:
         event["source"] = {"capture_event_uuid": parent["event_uuid"],
-                           "attachment": {"namespace": "native:twitter:media", "value": "101"}}
+                           "attachment": {"namespace": "native:twitter", "value": "101"}}
     event.update(changes)
     return event
 

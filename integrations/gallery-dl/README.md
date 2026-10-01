@@ -1,14 +1,17 @@
 # Native Stash producer
 
-This package implements the durable delivery portion of the gallery-dl adapter.
+This package implements durable delivery and a gallery-dl download adapter.
 It is development code on `v3-rewrite`; the installed host and n8n download
-helpers still use their existing catalogs. Download hooks, native run lease
-integration, launcher conversion and production cutover remain separate work.
+helpers still use their existing catalogs. Launcher conversion, durable offline
+run requests, additional source adapters and production cutover remain unfinished.
 
 Python 3.12 or newer is required. Runtime delivery uses only the standard
 library. Install the local package with `pip install ./integrations/gallery-dl`
 in the runner's environment when integrating it; do not replace a live wrapper
 with this CLI. The CLI drains events that a producer has already durably queued.
+The optional `[gallery]` extra pins the gallery-dl source revision and yt-dlp
+version used to verify downloader integration. Run `make pre-producer` to install
+that test runtime into `.local/native-producer`, independently of live workers.
 
 ## Authentication boundary
 
@@ -52,8 +55,8 @@ SQLite transactions use WAL and `synchronous=FULL`. Independent drainers claim
 bounded batches with expiring, fenced delivery leases. Interrupted work replays
 the exact original bytes and event UUID. A mismatched receipt cannot discard the
 payload. Valid receipt storage and payload removal commit together, retaining a
-small acknowledgement row for replay and dependent file events. The download
-archive is independent and is never modified by this package.
+small acknowledgement row for replay and dependent file events. Outbox delivery
+never modifies the download archive; the download adapter handles it as below.
 
 Default capacity is 10,000 unacknowledged events or 512 MiB of queued payloads.
 Pending, in-flight and review events all consume capacity. Exhaustion raises an
@@ -65,6 +68,49 @@ Transient failures use persistent exponential backoff, from five seconds to one
 day. A rejected/expired Stash token leaves the evidence pending for rotation.
 Scope, schema and conflict errors require explicit review. Retrying a reviewed
 event preserves its bytes; correcting its contents requires a new event UUID.
+
+## Download lifecycle
+
+`runs.submit` submits an already durable, typed source-run request. `RunLease`
+claims the work, renews ownership and sends checkpoints or a terminal outcome.
+Lease deadlines use the response's server time and a conservative monotonic
+budget, so a worker's wall-clock skew cannot extend ownership. Start the lease's
+heartbeat before extraction and close it when finished. Failed renewal or
+progress pauses new source work; it does not discard a current file's evidence.
+
+Construct `Producer` with the matching outbox, lease and a `filesystem.Root`
+whose device/inode identity was provisioned explicitly. `NativeDownloadJob`
+requires that producer and an existing persistent lock directory shared by all
+host/container writers. It checks the pinned collection URL and path prefix,
+mount identity and live lease before extraction/download boundaries. Child jobs
+inherit those objects, and asynchronous extraction is disabled. Destination
+locks cover a filename stem and its transformed encodings.
+
+Before downloading, the adapter queues a retained source capture and derives the
+attachment from source evidence. Reddit galleries use their media IDs; ordinary
+Reddit images and videos use direct service URLs. Twitter captures preserve the
+original media list before gallery-dl's transformation and keep each output's
+attachment ID. Output numbers and filenames do not establish attachment identity.
+Unsupported or ambiguous attachments stop before download. A single attachment
+can be associated without creating a gallery.
+
+After synchronous postprocessing, the adapter flushes and hashes the actual
+final file, then queues its dependent file event before updating gallery-dl's
+archive. Metadata writes use atomic replacement. Failed processors, queue
+capacity or persistence failures leave the archive unacknowledged. Existing
+unarchived files retry metadata/exec processing; archived files can repair queued
+delivery without downloading again. Unresolved archive skips queue source
+evidence only. The existing GIF-to-MKV converter is recognized explicitly.
+Filename budgeting preserves source IDs and handles UTF-8 and downloader
+temporary suffixes without truncating the source metadata.
+
+Checkpoints retain the last completed source cursor during bounded replay. A
+missing saved cursor cannot report successful traversal. The caller still owns
+the validated date-window/extractor configuration, configuration fingerprint,
+durable offline request coalescing, run outcome and deployment integration.
+Only Reddit/Twitter attachment adapters are implemented so far; external linked
+sources and multi-entry yt-dlp output association still need integration. These
+SDK classes are not a production launcher and do not change installed hooks.
 
 ## Inspection and delivery
 
@@ -86,11 +132,16 @@ receipts remain recoverable. The CLI does not schedule new source runs.
 
 ## Validation
 
-`make validate-producer` runs the standard-library tests, including the same
-retention corpus used by Go. Tests cover concurrent delivery, subprocess death,
+After `make pre-producer`, `make validate-producer` runs delivery and actual
+gallery-dl runtime tests, including the same retention corpus used by Go.
+`PRODUCER_PYTHON` can select another environment with the pinned dependencies.
+Tests cover concurrent delivery, subprocess death,
 receipt replay, token rotation, dependency ordering, capacity, partial batches,
-redirect rejection and disabled file processing. The backend test
+redirect rejection, disabled file processing, download/skip/postprocessor paths,
+Twitter transformations, filename budgets, lease loss and bounded resume.
+The backend test
 `TestPythonProducerDurableDeliveryAgainstNativeHTTP` runs this actual client
 against the native HTTP router and SQLite, loses a committed response, and checks
-replay and independent rejection. Both checks are included in `make validate-fork`
+replay, independent rejection and the submit/claim/renew/checkpoint/finish lease
+cycle. Both checks are included in `make validate-fork`
 and the build workflow. No production endpoint or source website is contacted.

@@ -20,7 +20,8 @@ A source capture alone never acknowledges downloaded or playable media.
 Native metadata policies now share one evaluator between verified intake and
 ordinary scans, with explicit performer defaults and authenticated preview/apply.
 Native source-run coordination now provides coalesced windows and fenced leases.
-Durable producer outboxes, worker lease enforcement, additional post adapters,
+The Python adapter provides durable outboxes, worker lease enforcement and
+download hooks. Offline run-request coalescing, additional post adapters,
 host/n8n conversion, catalog import, and native administration/review UI remain required.
 Existing scrapes have not switched to this interface. Root, collection and policy
 administration endpoints are described below.
@@ -364,6 +365,10 @@ the producer UUID when the same worker should keep ownership.
 
 Operations are `download` and `enrich`; download requires a logical media root.
 The collection supplies the reviewed target URL, namespace and destination.
+Run responses include `target_url` and `path_prefix` from the immutable collection
+revision pinned by the run, including historical status responses. They do not
+expose the server's absolute filesystem binding. The producer must verify its
+local destination against that prefix before writing.
 Policy identity covers effective extraction, archive/skip, original-quality,
 conversion, metadata-only and pacing behavior plus adapter version; omit secrets
 and the requested date window. Worker conversion will supply this fingerprint
@@ -608,12 +613,21 @@ The package uses `STASH_INGEST_TOKEN` (or another named environment reference)
 only for Stash's API. Website logins, cookies and downloader proxy settings
 remain in the gallery-dl environment and are not managed by this client.
 
-The shared Python/Go policy corpus verifies retention before queued persistence.
-`make validate-producer` runs the Python tests, and the backend's real HTTP test
-executes the Python client against an isolated native database. Python 3.12 or
-newer is therefore required for the full fork validation gate.
+The adapter queues retained captures before download, checks source leases and
+the pinned destination, holds shared filesystem locks, and queues flushed final
+files before archive acknowledgement. It preserves original Twitter attachment
+membership through gallery-dl's transformation and supports single-media Reddit
+evidence without inventing albums. The
+[package guide](../integrations/gallery-dl/README.md) describes supported runtime
+paths and remaining caller responsibilities.
 
-This package is not yet installed into the host/n8n launch paths. Gallery-dl
-download hooks, physical destination locks, source-run lease enforcement,
-outage request coalescing and conversion of existing recovery/scheduled callers
-are still required before cutover.
+The shared Python/Go policy corpus verifies retention before queued persistence.
+`make pre-producer` installs the pinned gallery-dl/yt-dlp test runtime into an
+isolated environment; `make validate-producer` runs delivery and real downloader
+tests. The backend's HTTP test executes the client and source-lease lifecycle
+against an isolated native database. Python 3.12 or newer is required.
+
+This package is not yet installed into the host/n8n launch paths. Effective
+window/configuration handling, outage request coalescing, additional source
+adapters and conversion of recovery/scheduled callers remain required before
+cutover.

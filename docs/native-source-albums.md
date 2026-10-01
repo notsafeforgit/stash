@@ -3,7 +3,7 @@
 The native gallery repository can maintain one logical gallery for a source
 post, with ordered image/video attachments and explicit membership choices.
 `pkg/archive.ExtractCapturedAlbum` derives the source list under
-`captured-album-v1`. These are core services; production ingestion, catalog
+`captured-attachments-v2`. These are core services; production ingestion, catalog
 backfill, and the ordered gallery UI still need their integrations under the
 [transition plan](native-archive-transition-plan.md#source-post-albums-and-galleries).
 
@@ -12,8 +12,9 @@ backfill, and the ordered gallery UI still need their integrations under the
 | Source | Post identity | Ordered attachment evidence |
 | --- | --- | --- |
 | Reddit | `id`, qualified as `native:reddit` | `gallery_data.items[].media_id`, with optional type hints from `media_metadata` |
-| Reddit reached through another media host | The `_reddit` parent's `id` | The parent's own gallery data |
-| Reddit crosspost | The crosspost's own `id` | The referenced parent's gallery data, retaining the evidence pointer |
+| Reddit single media | `id`, qualified as `native:reddit` | A direct `i.redd.it`, `preview.redd.it` or `v.redd.it` post URL, or explicit Reddit video stream fields; one attachment without an album declaration |
+| Reddit reached through another media host | The `_reddit` parent's `id` | The parent's own gallery or direct media evidence |
+| Reddit crosspost | The crosspost's own `id` | The referenced parent's gallery or direct media evidence, retaining the evidence pointer |
 | Twitter | Matching `tweet_id`, `rest_id`, or `id_str`, qualified as `native:twitter` | The full `extended_entities.media` list, including the raw API `legacy` wrapper when present |
 
 The parser returns the qualified post reference, policy version, evidence JSON
@@ -32,7 +33,8 @@ relevant distinctions:
   omit media or add video previews and card/article images. `count` and `num`
   alone cannot prove the original post's attachment list or its order. The
   ordinary transformed Twitter capture does not include that full list, so the
-  native adapter must capture it before file filtering/rendition expansion.
+  native adapter now captures it before file filtering/rendition expansion and
+  preserves each output's media ID through the transformation.
 
 Consequently, older Twitter captures containing only `num`, `count`, filenames,
 or a per-file media ID remain unresolved for automatic gallery creation. They
@@ -67,5 +69,7 @@ items, crosspost/parent identity, exact IDs, conservative media hints, reduced
 payloads, bounds, replay, and rejected file-counter inference. SQLite integration
 tests feed parsed lists through captured evidence, selection, and gallery sync,
 then add an image and a later video to the same gallery and replay without
-duplicating membership. The fixtures use explicit media associations; native
-ingestion must still verify how each completed file maps to its source slot.
+duplicating membership. Native producer tests also verify association using
+captured CDN URLs/attachment IDs, including output numbers that differ from the
+source position. Single-media file ingestion links its source without creating
+a gallery. Other extractor and external-host associations remain unfinished.

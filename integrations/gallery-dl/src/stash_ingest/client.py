@@ -3,6 +3,7 @@
 import math
 import os
 import re
+import time
 from http.client import HTTPException
 from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
@@ -37,7 +38,7 @@ class Client:
         # inherit a site's proxy, cookie jar, netrc or authentication handler.
         self.opener = build_opener(ProxyHandler({}), NoRedirect())
 
-    def _request(self, method, route, body=None):
+    def _request(self, method, route, body=None, *, timed=False, allow_empty=False):
         token = os.environ.get(self.token_env, "")
         if not token or any(ord(c) <= 32 or ord(c) >= 127 for c in token):
             raise Unavailable("stash_token_missing")
@@ -45,13 +46,18 @@ class Client:
                           method=method, headers={"Authorization": "Bearer " + token,
                           "Accept": "application/json", "Content-Type": "application/json"})
         try:
+            started = time.monotonic()
             with self.opener.open(request, timeout=self.timeout) as response:
+                server_date = response.headers.get("Date")
+                if allow_empty and response.status == 204:
+                    return (None, server_date, started) if timed else None
                 if (response.status != 200 or response.headers.get_content_type() != "application/json"
                         or response.headers.get("Content-Encoding") is not None):
                     raise Unavailable("invalid_response")
                 raw = response.read((1 << 20) + 1)
             try:
-                return decode(raw, 1 << 20)
+                data = decode(raw, 1 << 20)
+                return (data, server_date, started) if timed else data
             except InvalidData:
                 raise Unavailable("invalid_response") from None
         except HTTPError as exc:

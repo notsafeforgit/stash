@@ -23,7 +23,11 @@ import (
 )
 
 func TestPythonProducerDurableDeliveryAgainstNativeHTTP(t *testing.T) {
-	python, err := exec.LookPath("python3")
+	pythonName := os.Getenv("PRODUCER_PYTHON")
+	if pythonName == "" {
+		pythonName = "python3"
+	}
+	python, err := exec.LookPath(pythonName)
 	require.NoError(t, err, "native producer integration tests require Python 3.12 or newer")
 	config.InitializeEmpty()
 	db := sqlite.NewDatabase()
@@ -38,7 +42,7 @@ func TestPythonProducerDurableDeliveryAgainstNativeHTTP(t *testing.T) {
 			return err
 		}
 		collection, err = service.Repo.SourceCollection.Put(ctx, models.SourceCollectionInput{SourceCollectionDefinition: models.SourceCollectionDefinition{
-			Label: "Fixture feed", Kind: "feed", Namespace: "native:twitter", State: "active",
+			Label: "Fixture feed", Kind: "feed", Namespace: "native:twitter", State: "active", TargetURL: "https://x.com/fixture/media",
 		}, Origin: "review"})
 		return err
 	}))

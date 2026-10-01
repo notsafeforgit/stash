@@ -9,7 +9,7 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-const CapturedAlbumPolicy = "captured-album-v1"
+const CapturedAlbumPolicy = "captured-attachments-v2"
 
 // CapturedAlbum is source-list evidence, independent of local file availability.
 // The caller records it against the matching post/capture before selecting it.
@@ -102,8 +102,9 @@ func capturedAlbumEntries(result *CapturedAlbum, raw interface{}, metadata sourc
 	return nil
 }
 
-// ExtractCapturedAlbum uses explicit source attachment lists. gallery-dl's num
-// and count describe output files, which may include preview renditions or omit
+// ExtractCapturedAlbum uses explicit source lists or a direct Reddit media link.
+// A single item produces attachment evidence but does not declare an album.
+// gallery-dl's num and count describe output files, which may include previews or omit
 // unavailable media; they cannot prove the full source list or its order.
 // Unsupported or insufficient metadata returns nil, never a guessed gallery.
 func ExtractCapturedAlbum(raw []byte) (*CapturedAlbum, error) {
@@ -147,7 +148,11 @@ func ExtractCapturedAlbum(raw []byte) (*CapturedAlbum, error) {
 		if gallery == nil {
 			declared, _ := data["is_gallery"].(bool)
 			if !declared {
-				return nil, nil
+				found, err := capturedRedditSingle(result, data, path)
+				if err != nil || !found {
+					return nil, err
+				}
+				break
 			}
 			result.Manifest.DeclaredAlbum = true
 			break

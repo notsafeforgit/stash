@@ -30,6 +30,8 @@ type SourceRun struct {
 	UUID               string            `json:"uuid"`
 	CollectionUUID     string            `json:"collection_uuid"`
 	CollectionRevision int               `json:"collection_revision"`
+	TargetURL          string            `json:"target_url"`
+	PathPrefix         string            `json:"path_prefix"`
 	RootUUID           *string           `json:"root_uuid"`
 	RootRevision       int               `json:"root_revision"`
 	Operation          string            `json:"operation"`

@@ -97,6 +97,43 @@ func TestFileEventAcknowledgesQueueAndExposesCommittedResultSeparately(t *testin
 	require.Equal(t, accepted, replay)
 }
 
+func TestFileEventSingleRedditAttachmentLinksMediaWithoutCreatingGallery(t *testing.T) {
+	f := newIntakePublicationFixture(t, true)
+	capture := f.event(t)
+	capture.RootUUID = &f.root.UUID
+	capture.Post.Value = "singlepost"
+	capture.Source = json.RawMessage(`{"category":"reddit","id":"singlepost","url":"https://i.redd.it/actualmedia.png"}`)
+	var err error
+	f.receipt, err = f.submit(t, capture)
+	require.NoError(t, err)
+	require.Equal(t, "actualmedia", f.attachment(t, 0).Reference.Value)
+	event := f.fileEvent(t)
+	accepted, err := f.submitFile(t, event)
+	require.NoError(t, err)
+	repo := f.service.Repo
+	durable := job.NewDurable(repo)
+	claimed, err := durable.Claim(t.Context(), models.ArchiveJobVerifyMedia, uuid.NewString(), time.Minute)
+	require.NoError(t, err)
+	require.Equal(t, accepted.JobUUID, claimed.UUID)
+	var work ingest.FileWork
+	require.NoError(t, json.Unmarshal(claimed.Arguments, &work))
+	_, err = durable.Publish(t.Context(), claimed.Lease(), func(ctx context.Context, _ *models.ArchiveJob) (models.ArchiveJobOutcome, error) {
+		published, err := f.prepared.PublishIntake(ctx, repo, work.Publication)
+		if err != nil {
+			return models.ArchiveJobOutcome{}, err
+		}
+		require.Equal(t, "linked", published.Result.SourceMedia)
+		require.NotEmpty(t, published.Result.MediaUUID)
+		require.Empty(t, published.Result.GalleryUUID, "a singleton is attributable without being an album")
+		body, err := json.Marshal(published.Result)
+		return models.ArchiveJobOutcome{State: "succeeded", Result: body}, err
+	})
+	require.NoError(t, err)
+	status, err := f.service.ReceiptStatus(t.Context(), f.token, event.EventUUID)
+	require.NoError(t, err)
+	require.Equal(t, "succeeded", status.State)
+}
+
 func TestFileEventReplaySurvivesRestartMissingFileAndTokenRotation(t *testing.T) {
 	f := newIntakePublicationFixture(t, true)
 	event := f.fileEvent(t)

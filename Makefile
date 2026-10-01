@@ -469,8 +469,15 @@ validate: validate-ui validate-backend
 validate-fork: generate-backend validate-ui-v3 validate-producer validate-backend
 
 .PHONY: validate-producer
+export PRODUCER_PYTHON ?= $(abspath .local/native-producer/bin/python)
+
+.PHONY: pre-producer
+pre-producer:
+	python3 -m venv .local/native-producer
+	.local/native-producer/bin/python -m pip install './integrations/gallery-dl[gallery]'
+
 validate-producer:
-	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=integrations/gallery-dl/src python3 -m unittest discover -s integrations/gallery-dl/tests -v
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=integrations/gallery-dl/src "$(PRODUCER_PYTHON)" -m unittest discover -s integrations/gallery-dl/tests -v
 
 # locally builds and tags a 'stash/build' docker image
 .PHONY: docker-build

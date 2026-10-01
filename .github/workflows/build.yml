@@ -131,8 +131,10 @@ jobs:
       with:
         name: generated
 
+    - name: Install native producer test runtime
+      run: make pre-producer
+
     - name: Test Backend
-      # Ubuntu 24.04 supplies Python 3.12 for the native producer contract tests.
       run: make validate-producer it
 
   # Job 3: Build the active Linux target in parallel with backend tests.

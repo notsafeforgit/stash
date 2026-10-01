@@ -62,7 +62,7 @@ jobs:
       run: make ui ui-v3-only
 
     - name: Validate fork before publishing
-      run: make validate-fork
+      run: make pre-producer validate-fork
 
     - name: Compile linux amd64
       env:

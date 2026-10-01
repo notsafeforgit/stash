@@ -2,11 +2,14 @@
 
 import json
 import sys
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 from stash_ingest.client import Client, drain_once
 from stash_ingest.encoding import encode
 from stash_ingest.outbox import Outbox
+from stash_ingest.runs import RunLease, submit
 from helpers import capture
 
 
@@ -16,6 +19,25 @@ def main():
     box = Outbox(Path(setup["directory"]) / "producer.sqlite", setup["endpoint"],
                  setup["producer"], clock=lambda: now[0])
     client = Client(setup["endpoint"], setup["producer"])
+    policy = "b" * 64
+    request = {"request_uuid": str(uuid.uuid4()), "collection_uuid": setup["collection"],
+               "collection_revision": setup["revision"], "operation": "enrich", "policy_sha256": policy,
+               "window": {"since": None, "until": datetime.now(timezone.utc).isoformat(timespec="milliseconds")},
+               "cooldown_seconds": 0}
+    run = submit(client, request)
+    assert submit(client, request)["uuid"] == run["uuid"]
+    lease = RunLease.claim(client, run["uuid"], policy)
+    assert lease is not None
+    try:
+        assert lease.run["target_url"] == "https://x.com/fixture/media"
+        assert lease.run["path_prefix"] == ""
+        assert RunLease.claim(client, run["uuid"], policy) is None
+        lease.renew()
+        lease.progress(1, 0, "source-key")
+        assert lease.run["progress"]["items_seen"] == 1
+        assert lease.finish("succeeded")["state"] == "succeeded"
+    finally:
+        lease.close()
     source = capture(producer_uuid=setup["producer"], collection_uuid=setup["collection"],
                      collection_revision=setup["revision"], root_uuid=None)
     # Well-formed local envelope, but the claimed post contradicts raw evidence.

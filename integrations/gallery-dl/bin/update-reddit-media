@@ -1,0 +1,5 @@
+#!/usr/bin/env python3
+"""Staged host/n8n replacement; run with the installed native producer Python."""
+from stash_ingest.launchers import reddit_main
+
+raise SystemExit(reddit_main())

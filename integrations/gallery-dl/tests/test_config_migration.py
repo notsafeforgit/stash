@@ -264,6 +264,33 @@ class ConfigMigrationTests(unittest.TestCase):
         with self.assertRaises(InvalidData):
             Converter([self.path], bad_root, self.locks)
 
+    def test_full_history_cli_changes_global_skip_without_rewriting_inputs_or_private_values(self):
+        self.value["extractor"]["reddit"]["skip"] = "abort:4"
+        self.value["extractor"]["reddit>redgifs"] = {"skip": "abort:4"}
+        self.path.write_text(json.dumps(self.value))
+        original = self.path.read_bytes()
+        _, normal = self.profile()
+        destination = self.directory / "full-history.json"
+        args = ["--config", str(self.path), "--root", ROOT, "--root-path", self.root["path"], "--root-identity",
+                *map(str, self.root["identity"]), "--locks", self.locks["path"], "--lock-identity",
+                *map(str, self.locks["identity"]), "--full-history", "--output", str(destination)]
+        output, errors = io.StringIO(), io.StringIO()
+        with redirect_stdout(output), redirect_stderr(errors):
+            self.assertEqual(main(args), 0, errors.getvalue())
+        full = Configuration(destination)
+        self.assertNotEqual(full.policy_sha256, normal.policy_sha256)
+        self.assertEqual(json.loads(output.getvalue())["policy_sha256"], full.policy_sha256)
+        self.assertEqual(self.path.read_bytes(), original)
+        self.assertNotIn(b"base-private", destination.read_bytes())
+        self.assertNotIn("base-private", output.getvalue() + errors.getvalue())
+        with full.activate():
+            for category in ("reddit", "reddit>redgifs"):
+                self.assertIs(config.interpolate(("extractor", category), "skip"), True)
+                self.assertEqual(config.get(("extractor", category), "skip"), "abort:4")
+            for category in ("coomer", "kemono"):
+                self.assertIs(config.get(("extractor", category), "original"), True)
+            self.assertEqual(config.get(("extractor",), "headers")["X-Base"], "base-private")
+
 
 if __name__ == "__main__":
     unittest.main()

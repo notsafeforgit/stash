@@ -90,8 +90,12 @@ responses expose truncation so a partial candidate set never appears unique.
 `queue-sources` freezes a caller's URL list, policy and absolute window before
 network access. Resolution commits each collection binding and ticket together;
 never reinterpret a bound target after a retry. `call-status` checks every
-original ticket and cannot certify media intake. Host/n8n wrappers still need
-their input parsing and result contracts converted before activation.
+original ticket and cannot certify media intake. Staged Twitter/Reddit host
+launchers now expand the existing lists/modes/dates into source calls. Full-history
+and Reddit top mode require a separate reviewed global `skip=true` profile.
+Local recording is not source completion; strict inspection returns pending until
+all original tickets finish. n8n/recovery result contracts and permanent backfill
+decisions still need conversion before activating these callers.
 
 ## Architecture
 

@@ -17,6 +17,8 @@ gallery = [
 [project.scripts]
 stash-ingest = "stash_ingest.cli:main"
 stash-ingest-config = "stash_ingest.config_migration:main"
+stash-ingest-twitter = "stash_ingest.launchers:twitter_main"
+stash-ingest-reddit = "stash_ingest.launchers:reddit_main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

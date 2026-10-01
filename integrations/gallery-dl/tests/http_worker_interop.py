@@ -5,6 +5,8 @@ from datetime import datetime, timedelta, timezone
 import io
 import json
 from pathlib import Path
+import re
+import subprocess
 import sys
 import time
 from unittest.mock import patch
@@ -25,6 +27,8 @@ def main():
     directory = Path(setup["directory"])
     path, profile = profile_fixture(directory)
     profile["root"]["uuid"] = setup["root"]
+    if setup["launcher"]:
+        profile["source_category"] = "reddit"
     path.write_text(json.dumps(profile))
     profile = Configuration(path)
     client = Client(setup["endpoint"], setup["producer"])
@@ -33,27 +37,41 @@ def main():
     call_uuid = str(uuid.uuid4())
     ticket = str(uuid.uuid5(uuid.UUID(call_uuid), "source/1"))
     targets = directory / "caller-targets.txt"
-    targets.write_text("https://fixture.invalid/account\n")
+    targets.write_text(setup["target"] + "\n")
     command = ["--outbox", str(database), "--endpoint", setup["endpoint"], "--producer", setup["producer"],
                "queue-sources", "--call", call_uuid, "--targets-file", str(targets), "--profile", str(path),
                "--until", now.isoformat(timespec="milliseconds")]
-    output = io.StringIO()
-    with redirect_stdout(output):
-        status = producer_cli(command)
-    recorded = json.loads(output.getvalue())
-    assert status == 0 and recorded["counts"]["pending"] == 1, recorded
+    if setup["launcher"]:
+        command = [sys.executable, str(Path(__file__).resolve().parents[1] / "bin/update-reddit-media"),
+                   "--outbox", str(database), "--endpoint", setup["endpoint"], "--producer", setup["producer"],
+                   "--call", call_uuid, "--config-file", str(targets), "--profile", str(path),
+                   "--until", now.isoformat(timespec="milliseconds")]
+
+    def record():
+        if setup["launcher"]:
+            result = subprocess.run(command, capture_output=True, text=True, timeout=30)
+            assert result.returncode == 0, result.stderr
+            value = json.loads(result.stdout)
+            assert value["state"] == "recorded"
+            return value["call"]
+        output = io.StringIO()
+        with redirect_stdout(output):
+            assert producer_cli(command) == 0
+        return json.loads(output.getvalue())
+
+    recorded = record()
+    assert recorded["counts"]["pending"] == 1, recorded
     targets.unlink()
     # A lost command response reopens the original snapshot, even if the list
     # was removed or edited while the server remained unreachable.
-    output = io.StringIO()
-    with redirect_stdout(output):
-        assert producer_cli(command) == 0
-    assert json.loads(output.getvalue()) == recorded
+    assert record() == recorded
     # Restart after local admission, before any network request. The dispatcher
     # must submit and discover the work without a run UUID supplied by a caller.
     with closing(Outbox(database, setup["endpoint"], setup["producer"])) as box:
         def job(target, *, producer, lock_directory):
-            extractor = Fixture.from_url(target)
+            class CallerFixture(Fixture):
+                pattern = re.escape(setup["target"])
+            extractor = CallerFixture.from_url(target)
             extractor.records, extractor.visited = [reddit_data(date=(now - timedelta(days=1)).isoformat())], []
             task = NativeDownloadJob(extractor, producer=producer, lock_directory=lock_directory)
 

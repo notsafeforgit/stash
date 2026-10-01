@@ -24,6 +24,17 @@ import (
 )
 
 func TestPythonDownloadWorkerRecoversFinishAndDeliversFiles(t *testing.T) {
+	for _, launcher := range []bool{false, true} {
+		name := "caller-cli"
+		if launcher {
+			name = "host-launcher"
+		}
+		t.Run(name, func(t *testing.T) { runPythonDownloadWorker(t, launcher) })
+	}
+}
+
+func runPythonDownloadWorker(t *testing.T, launcher bool) {
+	t.Helper()
 	python, packagePath := nativeProducerRuntime(t)
 	config.InitializeEmpty()
 	directory := t.TempDir()
@@ -38,6 +49,10 @@ func TestPythonDownloadWorkerRecoversFinishAndDeliversFiles(t *testing.T) {
 	var producer *models.IngestProducer
 	var root *models.MediaRoot
 	var collection *models.SourceCollection
+	target := "https://fixture.invalid/account"
+	if launcher {
+		target = "https://www.reddit.com/r/native_fixture/?sort=new"
+	}
 	require.NoError(t, service.Repo.WithTxn(t.Context(), func(ctx context.Context) error {
 		producer, err = service.Repo.Ingest.CreateProducer(ctx, "Python download fixture")
 		if err != nil {
@@ -50,7 +65,7 @@ func TestPythonDownloadWorkerRecoversFinishAndDeliversFiles(t *testing.T) {
 			return err
 		}
 		collection, err = service.Repo.SourceCollection.Put(ctx, models.SourceCollectionInput{Origin: "review", SourceCollectionDefinition: models.SourceCollectionDefinition{
-			Label: "Worker feed", Kind: "feed", Namespace: "native:reddit", State: "active", TargetURL: "https://fixture.invalid/account",
+			Label: "Worker feed", Kind: "feed", Namespace: "native:reddit", State: "active", TargetURL: target,
 			RootUUID: &root.UUID, PathPrefix: "Account",
 		}})
 		return err
@@ -83,6 +98,7 @@ func TestPythonDownloadWorkerRecoversFinishAndDeliversFiles(t *testing.T) {
 	setup, err := json.Marshal(map[string]interface{}{
 		"directory": directory, "endpoint": server.URL, "producer": producer.UUID, "root": root.UUID,
 		"collection": collection.UUID, "revision": collection.Revision,
+		"target": target, "launcher": launcher,
 	})
 	require.NoError(t, err)
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)

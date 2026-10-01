@@ -715,6 +715,13 @@ access references while removing recognized catalog writers. Optional source
 categories retain relevant child settings and reject a different root extractor.
 See the package guide for conversion and publication semantics.
 
+Staged Twitter/Reddit host launchers now expand the existing account/list, mode
+and date options into durable caller snapshots. Full-history and Reddit top mode
+select separately reviewed global `skip=true` profiles. Local recording returns
+the execution UUID; strict inspection cannot report success until every original
+source ticket completes. n8n receipt/result handling and permanent historical
+completion/skip decisions still require conversion before activation.
+
 This package is not yet installed into the host/n8n launch paths. Runtime alignment,
 activation of converted profiles, additional source adapters and conversion of
 recovery and scheduled callers remain required before cutover.

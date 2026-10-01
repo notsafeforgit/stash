@@ -3,8 +3,9 @@
 This package implements durable delivery and a gallery-dl download adapter.
 It is development code on `v3-rewrite`; the installed host and n8n download
 helpers still use their existing catalogs. Durable caller URL snapshots now feed
-the native dispatcher. Launcher conversion, activation of
-reviewed worker profiles, additional source adapters and production cutover remain unfinished.
+the native dispatcher. Staged Twitter/Reddit host launchers preserve saved-list,
+mode and date inputs. n8n/recovery caller conversion, activation of reviewed
+worker profiles, additional source adapters and production cutover remain unfinished.
 
 Python 3.12 or newer is required. Runtime delivery uses only the standard
 library. Install the local package with `pip install ./integrations/gallery-dl`
@@ -333,6 +334,13 @@ This prevents unrelated ThisVid recovery settings from splitting otherwise
 equivalent Reddit/Twitter worker policies. The root-category constraint also
 prevents using the resulting profile for another service.
 
+Create a separate profile with `--full-history` for the host wrappers' historical
+`-o skip=true` override. This sets the global gallery-dl `skip` option, which
+overrides extractor and child-specific `abort:4` settings without removing them.
+The normal and full-history profiles have different policy digests. This option
+does not clear date limits or bypass the download archive; already downloaded
+files can still be skipped while traversal continues past them.
+
 The report lists removed/excluded setting paths and binding counts, plus the
 validated policy/root identity. Publication uses a flushed temporary file and
 an exclusive atomic link with private permissions. An existing output is never
@@ -415,8 +423,9 @@ URL list, reviewed policy, logical root, operation and frozen absolute window.
 It works before Stash is reachable or the sources have collection bindings.
 The UTF-8 file uses the first token of each nonempty, non-comment line;
 duplicates retain their first position. Entries must already be exact HTTP(S)
-source URLs. Host Twitter handles, Reddit mode expansion and n8n inputs still
-require the launcher conversion; this command does not reinterpret those lists.
+source URLs. The host launchers below expand Twitter handles and Reddit modes
+before recording the snapshot; this low-level command does not reinterpret those
+lists. n8n's execution/result contract still requires conversion.
 
 ```sh
 stash-ingest --outbox /persistent/producer.sqlite --endpoint STASH_ORIGIN \
@@ -429,7 +438,8 @@ When `--until` is omitted, the first committed snapshot fixes the current UTC
 cutoff. `--lookback-seconds` subtracts from that cutoff; `--since` supplies an
 absolute lower bound instead. Omitting both requests all earlier history.
 The time window does not change the reviewed profile's archive/skip behavior.
-Full-history launcher conversion must preserve those settings separately.
+Full-history host launchers require the separate reviewed global `skip=true`
+profile described above.
 
 Repeat the same caller UUID and options after a lost command response. The
 original URL list, policy and window are retained even if the files changed or
@@ -463,6 +473,65 @@ queue limits are 10,000 retained calls and 100,000 retained targets. Capacity
 failure preserves old records and rolls back the new snapshot. These records,
 bindings and ticket relationships are part of the persistent producer outbox
 and its backup/restore boundary; schema migration invents no past caller runs.
+
+## Staged host launchers
+
+The package entry points `stash-ingest-twitter` and `stash-ingest-reddit`, also
+available as `bin/update-twitter-media` and `bin/update-reddit-media`, record
+source calls through this queue. Run the scripts with the installed producer's
+Python. They are staged replacements; the existing host scripts and n8n workflow
+commands have not switched.
+
+| Input | Retained behavior |
+|---|---|
+| Twitter `--username`, `--user-id`/`--gid` | Handles, profile URLs and numeric account IDs use the existing normalized X URLs |
+| `--config-file` | Twitter retains first-token/comment handling and input order; Reddit sorts profile/community names before expansion |
+| Reddit `--mode new\|top`, `--subreddit`, `--saved` | Retains profile/search URLs, all/year top variants, communities and explicit saved-post targets |
+| Reddit `--date-min`, `--date-min-relative`, `--date-min-days` | Freezes the first request's lower bound; the absolute option takes precedence |
+| `--full-history`, Reddit top mode | Requires the reviewed profile with global `skip=true`; retains any date minimum |
+| `--dry-run` | Prints URL/window expansion without a profile, API request or outbox creation |
+
+Saved-list defaults remain `~/.config/gallery-dl/twitter-list.conf` and
+`reddit-list.conf`, overridden by `TWITTER_LIST_CONFIG` / `REDDIT_LIST_CONFIG`.
+Ignored input lines are reported by line number. Empty lists and invalid date
+filters fail instead of claiming completed work. Reddit `me` is accepted only
+through the saved-post option; use Twitter's ID option for `/i/user/ID` URLs.
+Raw gallery-dl flags and `--gallery-dl-bin` are replaced by the reviewed profile.
+
+Set `STASH_INGEST_OUTBOX`, `STASH_INGEST_ENDPOINT`, `STASH_INGEST_PRODUCER`, and
+the Stash API token environment reference. `--profile` chooses an explicit
+profile; otherwise the launcher selects `STASH_INGEST_TWITTER_PROFILE` or
+`STASH_INGEST_REDDIT_PROFILE`. Full-history/top requests select the corresponding
+`STASH_INGEST_TWITTER_FULL_HISTORY_PROFILE` or
+`STASH_INGEST_REDDIT_FULL_HISTORY_PROFILE`. These profiles must have the matching
+source category. Website access remains in their local gallery-dl references.
+
+```sh
+stash-ingest-reddit --username Example --mode top --call CALL_UUID \
+  --profile /persistent/profiles/reddit-full-history.json
+stash-ingest --outbox /persistent/producer.sqlite --endpoint STASH_ORIGIN \
+  --producer PRODUCER_UUID call-status CALL_UUID
+```
+
+`--call` must stay fixed across retries of one execution. Under systemd, omitting
+it derives a UUID from the producer, `INVOCATION_ID`, service and mode. Each new
+invocation gets new work; interactive calls without an explicit UUID create a new
+execution. The response includes the call UUID. Repeating it with the same
+options retains the original lists, policy and dates even if input files vanish.
+
+By default exit 0 means **recorded locally**, with JSON `state: recorded`.
+Dispatchers/workers execute the call separately. `--strict-errors` also inspects
+completion and exits 0 only for `source_succeeded`, 2 for unfinished/review work,
+and 1 when inputs, storage or API access fail. It does not wait for completion.
+Source success still requires separate file-intake receipts. An existing n8n
+completion branch must never treat local recording as completed backfill.
+
+The old relative date options formatted local wall time without an offset,
+which gallery-dl interpreted as UTC. This conversion preserves that exact
+boundary and freezes it once. Use an explicit timezone in `--date-min` when a
+new caller needs an unambiguous cutoff. ISO string bounds retain gallery-dl's
+second precision; numeric Unix bounds retain milliseconds. Native windows reject
+empty/future lower bounds and sub-millisecond numeric values.
 
 ## Inspection and delivery
 

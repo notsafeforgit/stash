@@ -99,17 +99,31 @@ func (rs *ingestRoutes) sourceRunAttempts(w http.ResponseWriter, r *http.Request
 }
 func (rs *ingestRoutes) claimRun(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		OwnerUUID    string `json:"owner_uuid"`
-		PolicySHA256 string `json:"policy_sha256"`
-		LeaseSeconds int    `json:"lease_seconds"`
+		OwnerUUID        string `json:"owner_uuid"`
+		PolicySHA256     string `json:"policy_sha256"`
+		LeaseSeconds     int    `json:"lease_seconds"`
+		RecoveryProtocol int    `json:"recovery_protocol"`
 	}
 	if err := readIngestJSON(w, r, 4096, &input); err != nil {
 		ingestError(w, err)
 		return
 	}
-	if input.LeaseSeconds < 5 || input.LeaseSeconds > 900 {
+	if input.LeaseSeconds < 5 || input.LeaseSeconds > 900 || input.RecoveryProtocol < 0 || input.RecoveryProtocol > 1 {
 		ingestError(w, models.ErrSourceRunInvalid)
 		return
+	}
+	if input.RecoveryProtocol == 0 {
+		// Older workers ignore the archive replay policy. They must not claim
+		// recovered work and report success after an ordinary archive stop.
+		run, err := rs.runCoordinator().Find(r.Context(), ingestToken(r), chi.URLParam(r, "run"))
+		if err != nil {
+			ingestError(w, err)
+			return
+		}
+		if run != nil && run.Recovery != nil {
+			ingestError(w, models.ErrSourceRunConflict)
+			return
+		}
 	}
 	result, err := rs.runCoordinator().Claim(r.Context(), ingestToken(r), chi.URLParam(r, "run"), input.OwnerUUID, input.PolicySHA256, time.Duration(input.LeaseSeconds)*time.Second)
 	sourceRunResponse(w, result, err)

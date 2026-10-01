@@ -26,32 +26,40 @@ type SourceRunRequest struct {
 }
 
 type SourceRun struct {
-	Sequence           int64             `json:"sequence"`
-	UUID               string            `json:"uuid"`
-	CollectionUUID     string            `json:"collection_uuid"`
-	CollectionRevision int               `json:"collection_revision"`
-	TargetURL          string            `json:"target_url"`
-	PathPrefix         string            `json:"path_prefix"`
-	RootUUID           *string           `json:"root_uuid"`
-	RootRevision       int               `json:"root_revision"`
-	Operation          string            `json:"operation"`
-	PolicySHA256       string            `json:"policy_sha256"`
-	CooldownSeconds    int               `json:"cooldown_seconds"`
-	State              string            `json:"state"`
-	Revision           int64             `json:"revision"`
-	Fence              int64             `json:"fence"`
-	Failures           int               `json:"failures"`
-	Pending            []SourceWindow    `json:"pending"`
-	Completed          []SourceWindow    `json:"completed"`
-	Window             *SourceWindow     `json:"window"`
-	ProducerUUID       string            `json:"producer_uuid,omitempty"`
-	OwnerUUID          string            `json:"owner_uuid,omitempty"`
-	LeaseUntil         *time.Time        `json:"lease_until,omitempty"`
-	AvailableAt        time.Time         `json:"available_at"`
-	Progress           SourceRunProgress `json:"progress"`
-	ErrorCode          string            `json:"error_code"`
-	CreatedAt          time.Time         `json:"created_at"`
-	UpdatedAt          time.Time         `json:"updated_at"`
+	Sequence           int64              `json:"sequence"`
+	UUID               string             `json:"uuid"`
+	CollectionUUID     string             `json:"collection_uuid"`
+	CollectionRevision int                `json:"collection_revision"`
+	TargetURL          string             `json:"target_url"`
+	PathPrefix         string             `json:"path_prefix"`
+	RootUUID           *string            `json:"root_uuid"`
+	RootRevision       int                `json:"root_revision"`
+	Operation          string             `json:"operation"`
+	PolicySHA256       string             `json:"policy_sha256"`
+	CooldownSeconds    int                `json:"cooldown_seconds"`
+	State              string             `json:"state"`
+	Revision           int64              `json:"revision"`
+	Fence              int64              `json:"fence"`
+	Failures           int                `json:"failures"`
+	Pending            []SourceWindow     `json:"pending"`
+	Completed          []SourceWindow     `json:"completed"`
+	Window             *SourceWindow      `json:"window"`
+	ProducerUUID       string             `json:"producer_uuid,omitempty"`
+	OwnerUUID          string             `json:"owner_uuid,omitempty"`
+	LeaseUntil         *time.Time         `json:"lease_until,omitempty"`
+	AvailableAt        time.Time          `json:"available_at"`
+	Progress           SourceRunProgress  `json:"progress"`
+	Recovery           *SourceRunRecovery `json:"recovery,omitempty"`
+	ErrorCode          string             `json:"error_code"`
+	CreatedAt          time.Time          `json:"created_at"`
+	UpdatedAt          time.Time          `json:"updated_at"`
+}
+
+// Recovery comes from a reviewed journal activation, never from a worker's
+// progress report. Replaying an expanded window must not stop at archived files.
+type SourceRunRecovery struct {
+	ActivationUUID string `json:"activation_uuid"`
+	ReplayArchive  bool   `json:"replay_archive"`
 }
 
 // SourceRunCandidate is a discovery hint, not a lease. The worker must still

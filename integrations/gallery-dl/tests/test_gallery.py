@@ -23,6 +23,7 @@ from stash_ingest.outbox import Outbox
 from stash_ingest.producer import Producer
 from stash_ingest.runs import SourcePaused
 from stash_ingest.source_window import SourceWindow
+from stash_ingest.scan_resume import legacy_cursor, PREFIX as LEGACY_CURSOR_PREFIX
 from test_producer import LeaseFixture, reddit_data
 from test_source_window import snowflake
 from helpers import PRODUCER
@@ -385,6 +386,59 @@ class GalleryTests(unittest.TestCase):
         task = self.task()
         with self.assertRaises(SourcePaused):
             task.run()
+        self.assertEqual(self.lease.checkpoints, [])
+
+    def test_legacy_checkpoint_replays_archived_prefix_then_restores_stop_rule(self):
+        records = [reddit_data(str(i)) for i in range(1, 13)]
+        # Prime earlier files and older history; the sixth file was interrupted.
+        prime = self.task(*records[:5], *records[6:10])
+        self.assertEqual(prime.run(), 0)
+        config.set(("extractor",), "skip", "abort:2")
+        # Capture the old archive-key hash for the missing sixth file, before
+        # attempting its download. This is the legacy prepare-hook boundary.
+        task = self.task(records[5])
+        saved = []
+
+        def interrupt(url):
+            saved.append(legacy_cursor(task, task.pathfmt))
+            raise RuntimeError("fixture interruption")
+
+        task.download = interrupt
+        self.assertNotEqual(task.run(), 0)
+        self.lease.checkpoints.clear()
+        self.lease.run["progress"] = {"items_seen": 6, "files_completed": 0, "cursor": saved[0]}
+        self.producer = Producer(self.box, self.lease, self.root, extractor_version="fixture")
+        resumed = self.task(*records)
+        self.assertEqual(resumed.run(), 0)
+        self.assertEqual(resumed.extractor.visited, [r["id"] for r in records[:8]])
+        self.assertTrue((self.media / "Account" / "post6_6.jpg").is_file())
+        self.assertFalse((self.media / "Account" / "post11_11.jpg").exists())
+        self.assertTrue(self.lease.checkpoints)
+        self.assertTrue(all(not c[2].startswith(LEGACY_CURSOR_PREFIX) for c in self.lease.checkpoints))
+
+    def test_expanded_recovery_window_never_restores_archive_stop_after_checkpoints(self):
+        records = [reddit_data(str(i)) for i in range(1, 5)]
+        self.assertEqual(self.task(*records[:3]).run(), 0)
+        config.set(("extractor",), "skip", "abort:1")
+        self.lease.run["recovery"] = {"activation_uuid": "fixture", "replay_archive": True}
+        self.producer = Producer(self.box, self.lease, self.root, extractor_version="fixture")
+        resumed = self.task(*records)
+        self.assertEqual(resumed.run(), 0)
+        self.assertEqual(resumed.extractor.visited, [r["id"] for r in records])
+        self.assertTrue((self.media / "Account" / "post4_4.jpg").is_file())
+
+    def test_full_history_policy_ignores_legacy_stop_checkpoint(self):
+        self.lease.run["progress"] = {"items_seen": 3, "files_completed": 0, "cursor": LEGACY_CURSOR_PREFIX + "f" * 64}
+        self.producer = Producer(self.box, self.lease, self.root, extractor_version="fixture")
+        self.assertEqual(self.task().run(), 0)
+        self.assertTrue(self.lease.checkpoints)
+
+    def test_missing_legacy_checkpoint_keeps_existing_native_progress(self):
+        config.set(("extractor",), "skip", "abort:1")
+        self.lease.run["progress"] = {"items_seen": 3, "files_completed": 0, "cursor": LEGACY_CURSOR_PREFIX + "f" * 64}
+        self.producer = Producer(self.box, self.lease, self.root, extractor_version="fixture")
+        with self.assertRaises(SourcePaused):
+            self.task().run()
         self.assertEqual(self.lease.checkpoints, [])
 
     def test_actual_twitter_transformation_retains_original_membership_and_each_media_id(self):

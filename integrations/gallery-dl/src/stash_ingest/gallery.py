@@ -18,6 +18,7 @@ from .filesystem import destination_lock
 from .runs import SourcePaused
 from .outbox import Capacity
 from .source_window import published, validate_keywords
+from .scan_resume import legacy_cursor
 
 SUPPORTED_VERSION = "1.32.15-dev"
 
@@ -231,7 +232,10 @@ class NativeDownloadJob(job.DownloadJob):
         self.hooks = collections.defaultdict(list, self.hooks)
         self._archive_write_file = self._archive_write_skip = self._archive_write_after = False
         self._native_skip_rule = self._skipexc
-        if self.producer.resume_cursor:
+        if self.producer.legacy_resume and self._native_skip_rule is None:
+            # Old full-history/no-skip runs did not use checkpoint stop rules.
+            self.producer.resume_cursor = ""
+        if self.producer.resume_cursor or self.producer.replay_archive:
             self._skipexc = None
         seen = set()
         for callbacks in list(self.hooks.values()):
@@ -313,8 +317,9 @@ class NativeDownloadJob(job.DownloadJob):
         filename.install(self).begin(pathfmt.kwdict)
         kept = dict(pathfmt.kwdict, _url=self._native_url, source_extractor_url=self.extractor.url)
         self._native_prepared = self.producer.prepare(kept)
-        self._native_cursor, self._native_replay = self.producer.cursor(self._native_prepared)
-        if not self.producer.resume_cursor and self._skipexc is None:
+        old_cursor = legacy_cursor(self, pathfmt) if self.producer.legacy_resume else None
+        self._native_cursor, self._native_replay = self.producer.cursor(self._native_prepared, legacy_cursor=old_cursor)
+        if not self.producer.resume_cursor and not self.producer.replay_archive and self._skipexc is None:
             self._skipexc = self._native_skip_rule
             if self._native_replay:
                 self._skipcnt = -1

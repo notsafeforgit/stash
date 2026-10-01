@@ -813,7 +813,64 @@ Producer ingestion tokens cannot import or inspect this maintenance evidence.
 
 The [journal command](../integrations/gallery-dl/README.md#retaining-the-scan-journal)
 provides read-only preparation, an explicit reviewed-digest apply and replay after
-a lost response. Retention does not activate jobs: source/profile bindings,
-legacy cursor conversion and retry/cutoff decisions remain separate migration
-work. Old runtime ownership and historical completion hashes are never substituted
+a lost response. Retention does not activate jobs; reviewed activation uses the
+separate operation below. Old runtime ownership and historical completion hashes are never substituted
 for native source leases or coverage.
+
+## Activating retained scan requests
+
+`POST /scan-journal-activations/preview` takes `uuid`, `scan_record_uuid`,
+`collection_uuid`, `collection_revision`, `root_revision`, `policy_sha256`,
+`cooldown_seconds`, an explicit millisecond-precision `cutoff`, and optionally
+`checkpoint_record_uuid`. It requires application access. The selected scan's
+exact target URL must match the active native collection, and its snapshot root
+must match the active root revision. The cutoff must be at or after the frozen
+snapshot time and cannot be in the future beyond the normal one-minute allowance.
+This binding records the reviewed worker profile digest; it never executes the
+old command or imports its private configuration.
+
+Preview consolidates every scan in the same snapshot/context/exact URL group.
+Old commands must agree after removing their date-min option. The oldest lower
+bound wins; an unbounded request includes all history. Unzoned legacy Reddit dates
+keep gallery-dl's UTC interpretation. The largest retry count (capped at the native eight-failure limit) and latest
+delay are retained. Fractional delays round up to the next millisecond. Any
+existing deferral, or eight prior failures, leaves the run
+deferred until an explicit normal source-run review. Preview returns every
+included scan and deferral UUID, the effective window, recovery policy and a
+`plan_sha256`; it creates no work.
+
+`POST /scan-journal-activations` takes `{binding, expected_plan_sha256}` and commits
+one new native download run with its immutable activation receipt and all original
+job bindings. An existing active native run with the same work identity conflicts;
+activation cannot replace a native lease, progress or pending ranges. A later
+snapshot of an already activated original job also conflicts. Exact retries after
+a lost response return the original activation, even after its run has started
+or finished. `GET /scan-journal-activations/<uuid>` inspects the receipt.
+The receipt's state describes the initial activation; inspect its `run_uuid`
+through the source-run API for current execution state. Scan record responses add
+`activation_uuid` when bound; original summaries and evidence
+remain unchanged. Producer tokens have no access to these maintenance routes.
+
+Without an explicit checkpoint, the worker replays the retained date window
+without stopping on archived files. With a checkpoint, its scope must belong to
+one of the selected scans and have the same consolidated lower bound. The first
+claim seeds its old item position and `gallery-dl-archive-v1:<hash>` cursor, with
+zero claimed completed files. The worker reproduces the old archive-key hash
+from actual gallery-dl metadata, replays through that position and then writes
+native cursors. A missing position cannot report completion. As in the old worker,
+a full-history/no-skip profile without an archive stop rule ignores that legacy
+checkpoint. Expanding the traversal window discards the incompatible cursor and
+disables archive stopping for that window, including subsequent retries.
+
+Only a real claim creates an attempt. Activation creates no producer identity,
+access token, historical lease, source-window completion or media-intake proof.
+Manual/unbound checkpoints and historical service handoffs remain separate review
+evidence. The [activation CLI](../integrations/gallery-dl/README.md#activating-retained-scans)
+uses the same preview/apply contract. Rehearsal bindings are not production
+configuration; final activation follows the common quiesced cutover boundary.
+
+The ingestion capability response advertises `source_run_recovery_protocol: 1`.
+Current workers require it and send `recovery_protocol: 1` when claiming a run.
+An older worker cannot claim recovered work: otherwise it could ignore the replay
+policy and incorrectly stop at archived items. Recovery policy remains fixed
+throughout the lease. Ordinary non-recovery requests keep the source-run protocol.

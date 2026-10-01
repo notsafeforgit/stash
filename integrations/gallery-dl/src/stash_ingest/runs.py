@@ -37,7 +37,7 @@ class RunLease:
         lease = cls(client, run, owner or str(uuid.uuid4()), policy, seconds=seconds)
         response = client._request("POST", "/runs/" + lease.run_uuid + "/claim",
                                    encode({"owner_uuid": lease.owner, "policy_sha256": policy,
-                                           "lease_seconds": seconds}), timed=True, allow_empty=True)
+                                           "lease_seconds": seconds, "recovery_protocol": 1}), timed=True, allow_empty=True)
         if response[0] is None:
             return None
         lease._accept(response)
@@ -68,7 +68,7 @@ class RunLease:
             raise SourcePaused("Source lease expired before its response arrived")
         if self.run is not None:
             for field in ("collection_uuid", "collection_revision", "target_url", "path_prefix",
-                          "root_uuid", "root_revision", "window", "operation"):
+                          "root_uuid", "root_revision", "window", "operation", "recovery"):
                 if run.get(field) != self.run.get(field):
                     raise SourcePaused("Source lease definition changed")
         self.run, self.deadline = run, deadline

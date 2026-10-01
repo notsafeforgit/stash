@@ -800,9 +800,9 @@ migration evidence, not source-run state. A saved PID, boot identity or systemd
 unit never becomes a native lease. Unbound/manual extractor scopes and handoffs
 remain reviewable. Per-scan hashes remain opaque historical identifiers; they do
 not prove a native window completed. Collection confirmations remain distinct
-from account backfill decisions. Native activation still requires source/profile
-bindings, explicit cutoff/deferral policy and conversion of the legacy archive-key
-cursor format. These tables deliberately create no source runs or completion proof.
+from account backfill decisions. Retention alone creates no source runs or
+completion proof; the separate schema-27 activation receipt records a reviewed
+operational binding.
 
 Table/index/guard checks and record-count reconciliation run at startup.
 Snapshots and rows are immutable; anonymised exports remove this private history
@@ -813,3 +813,22 @@ migration state that startup refuses; restore the migration backup or use a
 validated recovery procedure. Do not force a schema version to hide a failure.
 The compatible database and deployment stay pinned until the production cutover
 and restore gates pass.
+
+## Reviewed scan activation
+
+Migration 1000027 adds `scan_journal_activations` and
+`scan_journal_activation_jobs`. An immutable plan binds an exact snapshot target
+to a native collection/root revision, worker policy, cutoff, consolidated window,
+retry state and optional legacy checkpoint. Its receipt references the created
+source run. Each original scan key is unique within its original database UUID,
+so later snapshots cannot activate the same pending job again. SQL guards and
+startup reconciliation protect the record-to-plan bindings; anonymised exports
+remove them before deleting the retained journal and source runs.
+
+Activation creates a queued or deferred source run without producer requests,
+attempts or completion evidence. The first real lease can seed the reviewed old
+cursor. Run responses expose a recovery policy derived from the immutable plan:
+when coalescing expands its window, the worker must traverse archived items without
+its normal archive stop rule. Exact-window retries preserve native checkpoints.
+The original snapshot remains immutable and normal database backups include both
+evidence and activation state. See the [application contract](native-ingestion.md#activating-retained-scan-requests).

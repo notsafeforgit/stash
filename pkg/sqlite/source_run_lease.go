@@ -108,6 +108,18 @@ OR EXISTS(SELECT 1 FROM source_run_cooldowns WHERE target_key=? AND available_at
 	if err != nil {
 		return nil, err
 	}
+	if r.Fence == 0 && r.Recovery != nil {
+		activation, err := sourceRunRecoverySeed(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if activation != nil && scrape.SameWindow(window, activation.Window) {
+			progressJSON, err = json.Marshal(activation.Progress)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
 	if r.Fence > 0 {
 		// A checkpoint is meaningful only for the same exact traversal window.
 		// Widening an interrupted window restarts that traversal deliberately.

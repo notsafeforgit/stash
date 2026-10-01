@@ -99,7 +99,8 @@ func (s *ScanJournalStore) Record(ctx context.Context, id string) (*models.ScanJ
 		return nil, models.ErrScanJournalInvalid
 	}
 	var row scanJournalRecordRow
-	if err := dbWrapper.Get(ctx, &row, "SELECT * FROM scan_journal_records WHERE uuid=?", id); err != nil {
+	if err := dbWrapper.Get(ctx, &row, `SELECT r.*,coalesce(a.activation_uuid,'') AS activation_uuid FROM scan_journal_records r
+LEFT JOIN scan_journal_activation_jobs a ON a.record_uuid=r.uuid WHERE r.uuid=?`, id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -115,13 +116,14 @@ func (s *ScanJournalStore) Records(ctx context.Context, journal, table string, a
 	}
 	where, args := "", []any{journal, after}
 	if table != "" {
-		where = " AND source_table=?"
+		where = " AND r.source_table=?"
 		args = append(args, table)
 	}
 	args = append(args, limit)
 	var rows []scanJournalRecordRow
-	if err := dbWrapper.Select(ctx, &rows, `SELECT id,uuid,journal_uuid,source_table,source_key,context,target_url,disposition,summary
-FROM scan_journal_records WHERE journal_uuid=? AND id>?`+where+" ORDER BY id LIMIT ?", args...); err != nil {
+	if err := dbWrapper.Select(ctx, &rows, `SELECT r.id,r.uuid,r.journal_uuid,r.source_table,r.source_key,r.context,r.target_url,r.disposition,r.summary,
+coalesce(a.activation_uuid,'') AS activation_uuid FROM scan_journal_records r
+LEFT JOIN scan_journal_activation_jobs a ON a.record_uuid=r.uuid WHERE r.journal_uuid=? AND r.id>?`+where+" ORDER BY r.id LIMIT ?", args...); err != nil {
 		return nil, err
 	}
 	result := make([]models.ScanJournalRecord, 0, len(rows))

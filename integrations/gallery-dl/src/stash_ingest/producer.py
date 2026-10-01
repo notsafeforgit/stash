@@ -9,6 +9,7 @@ from .retention import POLICY, retain
 from .runs import SourcePaused
 from .source_window import SourceWindow
 from . import source
+from .scan_resume import PREFIX as LEGACY_CURSOR_PREFIX
 
 
 @dataclass(frozen=True)
@@ -46,6 +47,10 @@ class Producer:
         self.items_seen = run["progress"]["items_seen"]
         self.files_completed = run["progress"]["files_completed"]
         self.resume_cursor = run["progress"]["cursor"]
+        recovery = run.get("recovery") or {}
+        self.replay_archive = recovery.get("replay_archive", False)
+        if type(self.replay_archive) is not bool:
+            raise InvalidData("Invalid archive recovery policy")
         self.replay_seen = 0
         self.replay_limit = max(64, self.items_seen + 64)
 
@@ -100,13 +105,18 @@ class Producer:
                  "source": {"capture_event_uuid": prepared.event_uuid, "attachment": prepared.attachment}}
         return self.outbox.enqueue(encode(event))
 
-    def cursor(self, prepared):
+    @property
+    def legacy_resume(self):
+        return self.resume_cursor.startswith(LEGACY_CURSOR_PREFIX)
+
+    def cursor(self, prepared, *, legacy_cursor=None):
         key = digest(encode([source.post(prepared.source), prepared.attachment,
                              prepared.source.get("type")]))
         replay = bool(self.resume_cursor)
         if replay:
             self.replay_seen += 1
-            if key == self.resume_cursor:
+            candidate = legacy_cursor if self.legacy_resume else key
+            if candidate == self.resume_cursor:
                 self.resume_cursor = ""
             elif self.replay_seen > self.replay_limit:
                 raise SourcePaused("Saved source cursor was not found within bounded replay")

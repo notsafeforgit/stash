@@ -32,7 +32,7 @@ class WorkerTests(unittest.TestCase):
         profile, _ = profile_fixture(self.directory)
         self.profile = Configuration(profile)
         self.client = Client("http://example.invalid", PRODUCER, timeout=1)
-        self.client.capabilities = Mock(return_value={"source_runs": True, "source_run_protocol": 1, "file_ingestion": True})
+        self.client.capabilities = Mock(return_value={"source_runs": True, "source_run_protocol": 1, "source_run_recovery_protocol": 1, "file_ingestion": True})
         self.lease = LeaseFixture()
         self.lease.client = self.client
         self.lease.run.update(policy_sha256=self.profile.policy_sha256, path_prefix="Account", fence=3)
@@ -87,6 +87,11 @@ class WorkerTests(unittest.TestCase):
             self.run_worker()
         self.claim.assert_not_called()
         self.client.capabilities.return_value["file_ingestion"] = True
+        self.client.capabilities.return_value["source_run_recovery_protocol"] = 0
+        with self.assertRaises(Unavailable):
+            self.run_worker()
+        self.claim.assert_not_called()
+        self.client.capabilities.return_value["source_run_recovery_protocol"] = 1
         self.claim.return_value = None
         self.assertEqual(self.run_worker()["state"], "waiting")
         self.delivery.start.assert_not_called()

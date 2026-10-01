@@ -2050,3 +2050,76 @@ Production, installed workers and workflows remain unchanged. Remaining work
 includes activation of retained operational state, source registration, the
 other catalog families and all later transition phases. This increment neither
 finishes the migration nor changes the frozen compatible release.
+
+## Native activation of retained scan requests
+
+Schema 1000027 adds immutable activation plans and original-job bindings. The
+application preview binds a retained scan to the exact native collection URL,
+logical root revision, reviewed worker policy and an explicit cutoff. All scans
+in that snapshot/context/URL group consolidate into one window when their old
+command policies agree. Original date minima, UTC interpretation, retry delays
+and failure limits survive. An existing deferral remains deferred; ordinary timer
+requests cannot release it. Manual/unbound extractor scopes and historical
+service handoffs remain review evidence.
+
+`stash-activate-scan-journal` saves the normalized preview and applies its reviewed
+plan digest. Activation creates one native queued/deferred run, without inventing
+producer requests, access tokens, process ownership, attempts or completion proof.
+Replay returns the same receipt after response loss or restart. Original scan
+keys are unique within their source database across snapshots, preventing a later
+snapshot from scheduling the same pending job again. A collision with an existing
+active native run rolls back instead of replacing its progress or lease.
+
+An explicitly selected checkpoint must match a selected scan's consolidated
+scope. The first real claim seeds its old item count and qualified archive-key
+cursor, with zero claimed completed files. The worker reproduces the original
+gallery-dl key hash and JSON encoding, replays through the position, restores
+the archive stop rule and then writes native cursors. Missing checkpoints remain
+unfinished. Full-history/no-skip profiles without a stop rule preserve the old
+behavior of ignoring that checkpoint. A wider window replays without archive
+stopping, including on subsequent retries; omitting a checkpoint deliberately
+selects that replay behavior as well.
+
+The server advertises recovery protocol 1 and requires workers to acknowledge it
+when claiming recovered work. Older workers cannot silently ignore that policy
+and mark a partial traversal successful. Current workers require the capability,
+and verify that recovery policy remains fixed during their lease. Lease/status
+queries read only the bounded recovery fields through the run's unique index,
+not the complete retained maintenance plan. Producer outbox schema stays at 7.
+
+The isolated rehearsal database is
+`.local/native-scan-activation-rehearsal-20261001/native-scan-activation-rehearsal.sqlite`.
+Schema 1000026 → 1000027 took 0.079122 seconds on the 1,473,081,344-byte copy.
+All 138 preexisting tables matched before activation, with zero foreign-key
+violations or size growth; reconciliation took 55.085 seconds. Three selected
+actual journal requests exercised a bound checkpoint, a deferral and full replay
+against an empty isolated media root and an explicitly unusable placeholder
+worker policy. Activation/replay took 0.056358 seconds, producing two queued runs
+and one deferred run. Reopening preserved all three receipts; no worker, producer
+request or attempt was created. The snapshot, its 1,063 rows and all 1,329 permanent
+account-backfill decisions still matched their originals exactly afterward.
+These are local rehearsal timings, not production latency guarantees.
+
+The rehearsal inputs, migration and retained-evidence reconciliation reports,
+activation results and helper source are retained in that private directory.
+Final production source/profile bindings have not been created. Earlier staged
+worker profiles/images need their adapter fingerprints refreshed before they can
+be activated with the new recovery contract. The live database, host launchers,
+n8n workflows and frozen compatible deployment remain unchanged. Broader catalog
+migration, recovery callers and subsequent transition phases remain open.
+
+Final `make validate-fork` passed: 528 v3 tests in 91 files, native application
+contracts, 200 producer tests, zero Go lint issues and the complete Go suite.
+The same producer suite passed separately on the host's Python 3.12 runtime.
+Focused database and real Go/Python HTTP checks cover response loss, exact replay,
+deferral/backoff preservation, old-worker rejection, incompatible scope/policy,
+expanded-window replay, cross-snapshot duplicate protection and rollback of a
+native-run collision. Gallery-dl lifecycle fixtures cover restoration of the
+archive stop rule, missing cursors and full-history replay; hash fixtures preserve
+legacy spacing, Unicode escaping and large IDs.
+
+Validation logs are `scan-activation-validation-verified.log`,
+`scan-activation-python312-verified.log`, `scan-activation-final-http.log` and
+the focused database logs under `/tmp/stash-native-transition`; rehearsal logs
+are `scan-activation-migration.log`, `scan-activation-reconciliation.log` and
+`scan-activation-real-activation.log`. Parent `298ac862a` passed all three CI jobs.

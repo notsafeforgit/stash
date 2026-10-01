@@ -113,8 +113,13 @@ into the producer outbox. Exact bytes and manifests survive replay; old tokens
 can be inspected locally but cannot become native completion proof or new work.
 `stash-import-scan-journal` retains a reviewed frozen journal in the native
 database with atomic receipts, bounded inspection and explicit dispositions.
-It does not activate jobs or reinterpret old cursor hashes. Source/profile
-bindings, cutoff/retry policy, cursor conversion and recovery callers remain open.
+It does not activate jobs. `stash-activate-scan-journal` separately previews and
+applies an explicit source/profile/cutoff binding, consolidating exact target
+requests while retaining deferrals and retry delays. Recovery never transfers
+old process ownership or creates completion proof. The native worker understands
+the original archive-key cursor; widened windows replay without archive stopping.
+Production source registration, final cutover bindings and recovery callers
+remain open.
 
 ## Architecture
 

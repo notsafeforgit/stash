@@ -73,6 +73,7 @@ def execute(box, client, configuration, run_uuid):
     configuration.check()
     capabilities = client.capabilities()
     if (capabilities.get("source_runs") is not True or capabilities.get("source_run_protocol") != 1
+            or capabilities.get("source_run_recovery_protocol") != 1
             or capabilities.get("file_ingestion") is not True):
         raise Unavailable("native_download_worker_unavailable")
     current = client._request("GET", "/runs/" + run_uuid)

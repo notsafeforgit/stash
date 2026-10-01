@@ -630,9 +630,7 @@ snapshots fail rather than silently dropping rows or splitting the boundary.
 The result is `retained`, with `jobs_activated: 0`. This is an evidence-import
 step, not completion of the operational migration. Original retry delays,
 deferrals, date minima and cursor positions remain available for the next
-binding/activation step. Native jobs still need reviewed collection/profile
-bindings, cutoff policy, conversion of the old archive-key cursor and explicit
-handling of deferred/ignored work. Manual/orphan extractor scopes and historical
+binding/activation step described below. Manual/orphan extractor scopes and historical
 process handoffs remain review records. Historical collection and hashed per-scan
 completions never become native source-window proof. No old command or systemd
 unit is executed, and no PID is resumed.
@@ -641,6 +639,47 @@ Retained rows and their manifest now belong to Stash's database and its normal
 backup boundary. Keep the frozen original and preparation manifest for semantic
 reconciliation and rollback. The original journal and active old workers are
 untouched by this development importer.
+
+## Activating retained scans
+
+`stash-activate-scan-journal` previews a binding through the application API;
+`--apply` requires its reviewed plan digest. Prepare a JSON object with a new
+activation `uuid`, the selected `scan_record_uuid`, native `collection_uuid`,
+`collection_revision`, `root_revision`, reviewed `policy_sha256`,
+`cooldown_seconds` and fixed RFC3339 `cutoff` at millisecond precision. The source
+URL and logical root must match exactly. The cutoff must cover the frozen
+snapshot. The native profile replaces the old command; verify its destination,
+archive and skip policy as part of the source binding.
+
+```sh
+stash-activate-scan-journal --binding recovery-binding.json \
+  --endpoint https://native-stash.example > recovery-preview.json
+stash-activate-scan-journal --binding recovery-preview.json \
+  --endpoint https://native-stash.example --expected-sha256 REVIEWED_PLAN_SHA256 --apply
+```
+
+Both commands use `STASH_API_KEY` (or `--api-key-env`), with no proxy or redirect.
+Keep the returned normalized binding and plan digest for retries. A lost response
+is retried with exactly those inputs; activation never resets an existing native
+run. The result is one run for all equivalent pending requests at this exact
+snapshot/context/URL. Differing old command policies require review. Existing
+deferrals and retry delays survive; normal source-run review controls retry or
+cancellation. No worker starts merely because the snapshot was retained.
+
+Optionally set `checkpoint_record_uuid` to a retained extractor checkpoint whose
+scope covers the consolidated lower bound. The native worker reproduces that
+legacy archive-key hash during replay and then records native cursors. A missing
+checkpoint leaves the run unfinished. Full-history/no-skip profiles without an
+archive stop rule keep their old behavior of ignoring legacy stop checkpoints.
+Omit the checkpoint to replay the window without archive stopping. An expanded
+window also replays without archive stopping so unfinished older work is covered.
+No existing files are downloaded again solely because archive stopping is disabled;
+the reviewed profile still controls archive skips and forced downloads.
+
+The final production binding requires the common quiesced migration boundary.
+Development rehearsals use isolated roots and do not authorize production worker
+activation. Manual/orphan checkpoints, historical handoffs and completion hashes
+remain evidence; this command creates no historical lease or completion proof.
 
 ## Native n8n backfills
 

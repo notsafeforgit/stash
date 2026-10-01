@@ -81,6 +81,16 @@ func (row sourceRunRow) resolve(ctx context.Context) (*models.SourceRun, error) 
 		value := time.UnixMilli(row.LeaseUntil.Int64).UTC()
 		r.LeaseUntil = &value
 	}
+	activation, err := sourceRunRecoverySeed(ctx, r.UUID)
+	if err != nil {
+		return nil, err
+	}
+	if activation != nil {
+		r.Recovery = &models.SourceRunRecovery{ActivationUUID: activation.UUID, ReplayArchive: activation.ReplayArchive}
+		if r.Window != nil && !scrape.SameWindow(*r.Window, activation.Window) {
+			r.Recovery.ReplayArchive = true
+		}
+	}
 	return r, nil
 }
 
@@ -177,47 +187,62 @@ func (s *SourceRunStore) Submit(ctx context.Context, producer string, input mode
 	if window.Until.After(now.Add(time.Minute)) {
 		return nil, models.ErrSourceRunInvalid
 	}
-	c, err := (&SourceCollectionStore{}).Find(ctx, input.CollectionUUID)
+	run, _, err := s.enqueue(ctx, input, now, maxActive)
 	if err != nil {
 		return nil, err
 	}
+	id := run.UUID
+	if _, err = dbWrapper.Exec(ctx, "INSERT INTO source_run_requests(producer_uuid,request_uuid,digest,run_uuid,created_at_ms) VALUES(?,?,?,?,?)", producer, input.RequestUUID, digest, id, now.UnixMilli()); err != nil {
+		return nil, err
+	}
+	return s.Find(ctx, id)
+}
+
+// enqueue is shared by producer admission and application-reviewed recovery.
+// The caller validates identity, window, policy, capacity and its transaction.
+func (s *SourceRunStore) enqueue(ctx context.Context, input models.SourceRunRequest, now time.Time, maxActive int) (*models.SourceRun, bool, error) {
+	c, err := (&SourceCollectionStore{}).Find(ctx, input.CollectionUUID)
+	if err != nil {
+		return nil, false, err
+	}
 	if c == nil || c.Revision != input.CollectionRevision || c.State != "active" || c.TargetURL == "" || c.Namespace == "" ||
 		(input.Operation == "download" && c.RootUUID == nil) {
-		return nil, models.ErrSourceDefinitionConflict
+		return nil, false, models.ErrSourceDefinitionConflict
 	}
 	var rootRevision any
 	if c.RootUUID != nil {
 		root, err := (&MediaRootStore{}).Find(ctx, *c.RootUUID)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		if root == nil || root.State != "active" {
-			return nil, models.ErrSourceDefinitionConflict
+			return nil, false, models.ErrSourceDefinitionConflict
 		}
 		rootRevision = root.Revision
 	}
 	work, err := sourceRunHash([]any{c.UUID, c.Revision, rootRevision, input.Operation, input.PolicySHA256, input.CooldownSeconds})
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	u, err := url.Parse(c.TargetURL)
 	if err != nil {
-		return nil, models.ErrSourceDefinitionConflict
+		return nil, false, models.ErrSourceDefinitionConflict
 	}
 	u.Host, u.Scheme, u.Fragment = strings.ToLower(u.Host), strings.ToLower(u.Scheme), ""
 	target, err := sourceRunHash([]string{c.Namespace, u.String()})
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	row, err := findSourceRun(ctx, "SELECT * FROM source_runs WHERE work_key=? AND state IN ('queued','running','deferred')", work)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
+	created := row == nil
 	id := uuid.NewString()
 	if row != nil {
 		r, err := row.resolve(ctx)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		covered := r.Completed
 		active := 0
@@ -225,43 +250,41 @@ func (s *SourceRunStore) Submit(ctx context.Context, producer string, input mode
 			covered = scrape.Union(covered, []models.SourceWindow{*r.Window})
 			active = 1
 		}
-		r.Pending = scrape.Subtract(scrape.Union(r.Pending, []models.SourceWindow{window}), covered)
+		r.Pending = scrape.Subtract(scrape.Union(r.Pending, []models.SourceWindow{input.Window}), covered)
 		if len(r.Pending)+len(r.Completed)+active > scrape.MaxWindows {
-			return nil, models.ErrSourceRunCapacity
+			return nil, false, models.ErrSourceRunCapacity
 		}
 		pending, err := json.Marshal(r.Pending)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		// A timer cannot reset backoff, a durable deferral, or running ownership.
 		if string(pending) != row.Pending {
 			if _, err = dbWrapper.Exec(ctx, "UPDATE source_runs SET pending=?,revision=revision+1,updated_at_ms=? WHERE uuid=?", string(pending), now.UnixMilli(), row.UUID); err != nil {
-				return nil, err
+				return nil, false, err
 			}
 		}
 		id = row.UUID
 	} else {
 		var active int
 		if err := dbWrapper.Get(ctx, &active, "SELECT count(*) FROM (SELECT 1 FROM source_runs WHERE state IN ('queued','running','deferred') LIMIT ?)", maxActive); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		if active >= maxActive {
-			return nil, models.ErrSourceRunCapacity
+			return nil, false, models.ErrSourceRunCapacity
 		}
-		pending, err := json.Marshal([]models.SourceWindow{window})
+		pending, err := json.Marshal([]models.SourceWindow{input.Window})
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		_, err = dbWrapper.Exec(ctx, `INSERT INTO source_runs(uuid,collection_uuid,collection_revision,root_uuid,root_revision,operation,policy_sha256,cooldown_seconds,work_key,target_key,pending,available_at_ms,created_at_ms,updated_at_ms)
 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, id, c.UUID, c.Revision, c.RootUUID, rootRevision, input.Operation, input.PolicySHA256, input.CooldownSeconds, work, target, string(pending), now.UnixMilli(), now.UnixMilli(), now.UnixMilli())
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 	}
-	if _, err = dbWrapper.Exec(ctx, "INSERT INTO source_run_requests(producer_uuid,request_uuid,digest,run_uuid,created_at_ms) VALUES(?,?,?,?,?)", producer, input.RequestUUID, digest, id, now.UnixMilli()); err != nil {
-		return nil, err
-	}
-	return s.Find(ctx, id)
+	run, err := s.Find(ctx, id)
+	return run, created, err
 }
 
 func (s *SourceRunStore) List(ctx context.Context, collection string, roots []*string, after int64, limit int) ([]models.SourceRun, error) {

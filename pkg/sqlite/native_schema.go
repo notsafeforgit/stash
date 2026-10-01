@@ -405,6 +405,11 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 				return err
 			}
 		}
+		if version >= NativeSchemaBaseline+30 {
+			if err := validateCatalogSnapshotSchema(conn); err != nil {
+				return err
+			}
+		}
 
 		return nil
 	}

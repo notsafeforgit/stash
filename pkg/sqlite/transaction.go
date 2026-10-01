@@ -179,6 +179,7 @@ func (db *Database) Repository() models.Repository {
 		ScanJournal:            &ScanJournalStore{},
 		CatalogIdentityImport:  &CatalogIdentityImportStore{},
 		CatalogRegistryImport:  &CatalogRegistryImportStore{},
+		CatalogSnapshot:        &CatalogSnapshotStore{},
 		Folder:                 db.Folder,
 		Gallery:                db.Gallery,
 		GalleryChapter:         db.GalleryChapter,

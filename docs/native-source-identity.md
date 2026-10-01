@@ -278,6 +278,46 @@ merge semantics. Reconstruction runs in memory and adds no stored payload copies
 The CLI publishes a new private directory after flushing its contents and supports
 verification of the exact saved manifest after interruption or response loss.
 It performs no native database writes or identity/media decisions. The resulting
-chunks are the input to the still-required native catalog importer, whose domain
+chunks are the input to the native catalog importer, whose domain
 mappings, review outcomes and completion receipts remain separate work. See the
 [snapshot command and format](../integrations/gallery-dl/README.md#individual-catalog-snapshots).
+
+## Receiving catalog snapshots
+
+Native schema 1000030 adds bounded, resumable receipt of the prepared catalog
+bodies. The application API requires the manifest's original registry source and
+catalog ID to have an imported `catalog_collection_mappings` association. It binds
+one immutable snapshot to that source/catalog pair, registry receipt and native
+collection. A new UUID cannot silently replace an existing frozen input.
+
+| Method and path under `/api/v3/archive` | Result |
+| --- | --- |
+| `POST /catalog-snapshots` | Receive the original manifest bytes, or return current progress for an exact retry |
+| `PUT /catalog-snapshots/{uuid}/chunks/{index}` | Atomically receive the next ordered JSONL chunk and its receipt |
+| `GET /catalog-snapshots/{uuid}` | Bounded progress summary, original binding and explicitly pending families |
+
+Both writes require `X-Stash-Manifest-SHA256` with the reviewed manifest digest.
+The manifest uses `application/json` and is limited to 8 MiB; chunks use
+`application/x-ndjson` and at most 1,000 rows/16 MiB. The server independently
+checks recognized table/column/key shapes, unique SQLite key ordering, exact
+chunk and table hashes/counts, embedded JSON, binary sidecar checksums and catalog
+identity rows. Retained SQLite schema text is evidence and is never executed.
+Known sidecar views and their triggers are retained without copying view rows.
+
+`catalog_snapshots` holds the frozen manifest/binding and progress;
+`catalog_snapshot_chunks` holds immutable acknowledgements;
+`catalog_snapshot_tables` holds resumable table-hash checkpoints; and
+`catalog_snapshot_records` temporarily holds original JSONL rows, indexed by
+snapshot, table/key and ordinal. Original strings and binary encodings survive
+unchanged. Hash checkpoints allow bounded transactions even for a large catalog.
+A failed chunk rolls back its records, hashes and receipt together. Replaying an
+already received chunk returns current progress without duplicating rows.
+
+The `received` state proves byte receipt only. It always reports `imported:false`
+and lists every table in `pending_families`. Referential/capture reconstruction
+proofs in the manifest are still claims to reconcile through native domain
+importers before completion. Upload does not create posts, change selected fields,
+assign performers, scan files, or activate jobs. Native mappings and eventual
+retirement of temporary staged bodies remain required subsequent work; these
+tables do not become a parallel catalog authority. Anonymisation removes their
+private source evidence before deleting registry mappings.

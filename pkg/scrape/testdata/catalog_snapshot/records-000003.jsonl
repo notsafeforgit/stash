@@ -1,0 +1,2 @@
+{"key":["schema_version"],"table":"catalog_info","values":{"key":"schema_version","value":"3"}}
+{"key":["capture-0"],"table":"observation_details","values":{"account_refs_json":"[]","capture_id":"capture-0","captured_at":"2026-09-29T12:00:00.123456+00:00","extractor_version":"1.32","observation_id":"shared","payload_patch":"{\"filename\": \"0\", \"num\": 1}"}}

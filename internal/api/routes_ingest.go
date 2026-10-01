@@ -111,11 +111,11 @@ func ingestErrorCode(err error) (int, string) {
 		return http.StatusConflict, "lease_lost"
 	case errors.Is(err, models.ErrBackfillIncomplete):
 		return http.StatusConflict, "backfill_incomplete"
-	case errors.Is(err, models.ErrSourceRunConflict), errors.Is(err, models.ErrBackfillConflict), errors.Is(err, models.ErrScanJournalConflict), errors.Is(err, models.ErrCatalogIdentityImportConflict), errors.Is(err, models.ErrCatalogRegistryImportConflict):
+	case errors.Is(err, models.ErrSourceRunConflict), errors.Is(err, models.ErrBackfillConflict), errors.Is(err, models.ErrScanJournalConflict), errors.Is(err, models.ErrCatalogIdentityImportConflict), errors.Is(err, models.ErrCatalogRegistryImportConflict), errors.Is(err, models.ErrCatalogSnapshotConflict):
 		return http.StatusConflict, "conflict"
 	case ingest.IsConflict(err), errors.Is(err, models.ErrSourceDefinitionConflict), errors.Is(err, models.ErrFilePathChanged), errors.Is(err, models.ErrFileGenerationConflict):
 		return http.StatusConflict, "conflict"
-	case errors.Is(err, ingest.ErrInvalid), errors.Is(err, models.ErrSourceRunInvalid), errors.Is(err, models.ErrBackfillInvalid), errors.Is(err, models.ErrScanJournalInvalid), errors.Is(err, models.ErrCatalogIdentityImportInvalid), errors.Is(err, models.ErrCatalogRegistryImportInvalid):
+	case errors.Is(err, ingest.ErrInvalid), errors.Is(err, models.ErrSourceRunInvalid), errors.Is(err, models.ErrBackfillInvalid), errors.Is(err, models.ErrScanJournalInvalid), errors.Is(err, models.ErrCatalogIdentityImportInvalid), errors.Is(err, models.ErrCatalogRegistryImportInvalid), errors.Is(err, models.ErrCatalogSnapshotInvalid):
 		return http.StatusBadRequest, "invalid_event"
 	default:
 		return http.StatusServiceUnavailable, "temporarily_unavailable"

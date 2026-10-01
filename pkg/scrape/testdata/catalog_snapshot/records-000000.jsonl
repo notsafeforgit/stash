@@ -1,0 +1,2 @@
+{"key":["0e89af1f8dc87249abb88a3d3751ece3688fb36ab2985177d08b94cc0a1af0ad"],"table":"account_snapshots","values":{"payload_json":"{\"id\": \"9007199254740993\", \"name\": \"Juniper \\ud83c\\udf3f\"}","platform":"reddit","snapshot_id":"0e89af1f8dc87249abb88a3d3751ece3688fb36ab2985177d08b94cc0a1af0ad"}}
+{"key":["reddit:handle:juniper"],"table":"accounts","values":{"account_key":"reddit:handle:juniper","created_at":"2026-09-29T12:00:00.123456+00:00","identity_basis":"handle","platform":"reddit","source_id":null}}

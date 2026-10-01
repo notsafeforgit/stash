@@ -740,9 +740,29 @@ existing destinations are never overwritten. Verification checks the saved
 manifest digest, chunk names/counts/hashes, ordered unique keys and binary
 checksums. After a lost preparation response, inspect the same directory with
 `--verify`. Preparation creates no native records, jobs or media and explicitly
-reports `imported:false`. Native batch import and per-record migration outcomes
-remain the next implementation step. Individually consistent live backups do not
-replace the coordinated production cutover snapshot.
+reports `imported:false`. Individually consistent live backups do not replace the
+coordinated production cutover snapshot.
+
+After importing the corresponding registry/collection mapping, receive a reviewed
+snapshot in a native database with:
+
+```sh
+stash-upload-catalog --snapshot /migration/prepared/CATALOG_ID \
+  --expected-sha256 MANIFEST_SHA256 --endpoint STASH_ORIGIN
+```
+
+The command validates the complete local snapshot before its first request. It
+uses the existing Stash application key from `STASH_API_KEY` (or `--api-key-env
+NAME`), never a producer token or website credential. It sends original bytes and
+the frozen manifest digest, checks each receipt's identity/counts, and resumes at
+the server's next chunk. Repeat the same command after interruption or response
+loss; an earlier committed chunk is not applied twice. Files changed after local
+verification cannot be uploaded under the original digest.
+
+The result has `state: "received"`, `imported: false`, and explicitly pending
+record families. This is temporary migration staging in native schema 1000030,
+not native metadata import or job activation. Source graph/capture reconciliation,
+domain mappings and final per-record outcomes are the next implementation step.
 
 ## Native n8n backfills
 

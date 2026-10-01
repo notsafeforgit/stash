@@ -193,7 +193,7 @@ def validate_manifest(value):
 def verify(path, expected_sha256=None):
     directory = Path(path).resolve(strict=True)
     manifest_path = directory / "manifest.json"
-    if manifest_path.is_symlink():
+    if manifest_path.is_symlink() or not manifest_path.is_file():
         raise InvalidData("Snapshot manifest must be a regular file")
     with manifest_path.open("rb") as file:
         body = file.read(MAX_MANIFEST_BYTES + 1)

@@ -2365,3 +2365,73 @@ Logs under `/tmp/stash-native-transition` are `catalog-snapshot-backup.log`,
 `catalog-snapshot-focused-final.log` and `catalog-snapshot-package-install.log`.
 The native database remains at schema 1000029. Production, workers and n8n have
 not switched, and the full transition remains in progress.
+
+
+## 2026-10-01: Resumable receipt of individual catalog snapshots
+
+Native schema 1000030 now receives the prepared individual catalog bodies through
+application-authorized `CatalogSnapshot` services. Each manifest is bound to its
+original registry import, source UUID, catalog ID and native collection mapping.
+Unknown schema shapes, missing mappings, changed identities and out-of-order or
+altered chunks fail. A source/catalog pair cannot silently acquire another frozen
+snapshot under a new UUID.
+
+Chunks contain at most 1,000 rows and 16 MiB. Original JSONL bytes, embedded JSON
+strings, binary sidecar encodings and row keys survive in indexed temporary
+migration records. Chunk receipts and resumable table hashes commit in the same
+transaction as their records. Lost responses, restart and exact replay do not
+create extra rows; a swallowed write failure still aborts the transaction. The
+server checks table/chunk counts and hashes, supported physical columns/keys,
+SQLite key ordering, embedded JSON and binary checksums. Retained schema SQL is
+never executed. Historical sidecar-view triggers remain supported evidence.
+
+`stash-upload-catalog` verifies the full local snapshot, submits its original
+bytes to the explicit native endpoint, checks receipt identity/counts and resumes
+from the next chunk. The installed command uses the existing application key;
+producer tokens and website credentials are unrelated to this migration access.
+The receiver reports `received` with `imported:false` and all record families
+explicitly pending. Native graph/capture reconciliation, domain mapping, review
+outcomes and retirement of temporary bodies remain subsequent work. Reception
+creates no posts, media, ownership or metadata choices, and activates no jobs.
+
+A fresh copy of the completed schema-1000029 registry rehearsal promoted in
+0.121 seconds. All 1,697 frozen catalogs were then received as 4,764,236 records in
+5,954 chunks, preserving 2,816,108,769 original JSONL bytes. The rehearsal includes
+reopening/replaying an acknowledged chunk and checking all receipts after the
+final reopen. Receipt staging and these checks took 251.832 seconds; the final
+open/consistency check took 29.508 seconds while the full input staging remained.
+Inputs are the individually consistent frozen preparation copies, not a live
+production cutover boundary. Private input manifests and the complete receipt
+set remain under `.local/native-catalog-upload-rehearsal-20261001`.
+
+
+Independent reconciliation compared the exact staged manifest, every record's
+bytes/key/hash, every chunk/table digest and all 146 pre-existing native tables.
+All 1,697 catalogs and all 4,764,236 rows matched; existing entity identities,
+selected metadata, ownership and prior receipts were unchanged. SQLite integrity
+returned `ok` and foreign-key checks found zero violations. This pass took
+277.876 seconds. The rehearsal database grew from 1,473,081,344 to 6,986,661,888
+bytes while retaining the temporary input rows and their lookup indexes. No
+expanded capture/profile copies or live catalog projections were added.
+
+All required fork-gate components passed: 528 v3 tests in 91 files, native client
+contracts, 220 producer tests on Python 3.14, backend lint with zero issues, and
+all Go tests. The final backend run passed the API
+package in 380.579 seconds and SQLite package in 471.006 seconds. The complete
+220-test producer suite also passed on Python 3.12 in 6.145 seconds. Focused tests
+cover actual Python-to-Go HTTP response loss, restart, exact replay, atomic
+rollback, checksum/ordering/lineage rejection, original binary/JSON preservation,
+receipt validation and anonymisation. The rebuilt isolated package exposes the
+installed `stash-upload-catalog` command. Parent `1b04b94fd` passed lint, build
+and preview image publication in CI.
+
+Logs under `/tmp/stash-native-transition` are `catalog-upload-focused.log`,
+`catalog-upload-python-focused.log`, `catalog-upload-validation.log`,
+`catalog-upload-backend-final.log`, `catalog-upload-python312.log`,
+`catalog-upload-promotion.log`, `catalog-upload-full-rehearsal.log`,
+`catalog-upload-independent-reconciliation.log`,
+`catalog-upload-package-install.log` and `catalog-upload-installed-command.log`.
+Production, workers and n8n remain on their existing deployment. The full native
+archive transition is still in progress; the next domain import must reconcile
+posts/captures and then every remaining physical record family before any
+snapshot can be reported as imported.

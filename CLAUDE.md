@@ -340,9 +340,15 @@ hashed snapshots with complete row/schema inventories and capture reconstruction
 proofs. Original JSON strings, binary sidecar bytes and profile references survive;
 the normalized sidecar view is not a second physical copy. Keep shared revisions
 distinct from captures and validate references before reconstructing payloads.
-Preparation reports `imported:false`; native batch mapping and activation are
-still separate required work. Unknown schemas cannot silently disappear from an
-import manifest. Use frozen copies and the coordinated cutover boundary.
+Preparation reports `imported:false`. `stash-upload-catalog` sends those exact
+bytes to application-authorized `CatalogSnapshot` services in native schema
+1000030. Bounded chunk transactions commit staging records and receipts together;
+the same frozen manifest resumes after lost responses or restart. `received`
+means the snapshot's bytes/counts match, never that its source graph or native
+domain mappings are complete. All families remain pending for the subsequent
+importers. Staging is temporary migration input, not another live catalog writer.
+Unknown schemas cannot silently disappear from a manifest. Use frozen copies and
+the coordinated cutover boundary; upload does not activate jobs or metadata.
 
 ### v3 extension points
 

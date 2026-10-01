@@ -43,6 +43,7 @@ type Repository struct {
 	ScanJournal            ScanJournalReaderWriter
 	CatalogIdentityImport  CatalogIdentityImportReaderWriter
 	CatalogRegistryImport  CatalogRegistryImportReaderWriter
+	CatalogSnapshot        CatalogSnapshotReaderWriter
 	SourceEvidence         SourceEvidenceReaderWriter
 	SourceAttachment       SourceAttachmentReaderWriter
 	SourceGallery          SourceGalleryReaderWriter

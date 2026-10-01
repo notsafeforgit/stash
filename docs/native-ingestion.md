@@ -87,6 +87,31 @@ publication boundary does not yet implement the durable file worker or completio
 HTTP event. The [schema guide](native-schema.md) describes identity lifetimes,
 unchanged fingerprint handling, and migration behavior.
 
+`CaptureFileTarget` records server-owned intake state for the authorized root
+and relative path. It captures an existing file's UUID/generation and the path's
+removal counter. Native schema 1000020 retains that counter across deletion and
+recreation, including file and folder renames. A concurrent ordinary scan may
+create the previously absent file, but delayed intake cannot undo an intervening
+removal. A fresh completion for an absent, previously removed path also requires
+an explicit restore or ordinary scan to establish a new file lifetime.
+
+`PreparedMedia.PublishFile` reuses that concurrent scan's file record, checks its
+type and verified content, and commits prepared metadata and byte proof together.
+Case-insensitive database matches must still identify the same held filesystem
+object; equal bytes under a different path spelling do not establish that.
+Reinspection of unchanged verified bytes preserves generated fingerprints.
+
+`PreparedMedia.PublishMedia` uses the exact file's existing scene/image owner,
+or one unambiguous owner of matching current verified bytes. Otherwise it creates
+a new scene/image. Legacy MD5/oshash matches and obsolete verification generations
+do not authorize associations. Multiple candidates or conflicting media kinds
+require review, and existing items retain their metadata. Final checks reject
+deletion, detachment, or conflicting ownership before commit. These methods run
+inside `Durable.Publish`, so file, proof, media association, and job result either
+commit together or roll back. Collection policy, source/gallery associations,
+durable notifications/generated assets, and completion HTTP events still need
+to be integrated by the caller; this is not yet a running ingestion worker.
+
 ### Durable archive work
 
 Native schema 1000019 provides `archive_jobs`, immutable submission acknowledgements,
@@ -125,8 +150,8 @@ job revision and immediately invalidates its lease. Result/progress objects are
 bounded; failures use machine-readable codes rather than persisting raw stderr.
 
 This is the durable storage/publication boundary, not a replacement for the
-current scheduled scrapes. Producer authentication and scope checks, path/file
-reservations, file-completion receipts, actual workers, source-run coordination,
+current scheduled scrapes. File-completion admission with producer scope checks,
+completion receipts, actual workers, source-run coordination,
 and host/n8n outbox delivery remain required before switching those callers.
 
 ## Wire contract

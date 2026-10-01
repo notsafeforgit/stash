@@ -58,6 +58,10 @@ type FileContentReaderWriter interface {
 	Current(context.Context, string) (*FileContentVerification, error)
 	History(context.Context, string, int64, int) ([]FileContentVerification, error)
 	Locations(context.Context, string, string, int) ([]FileContentLocation, error)
+	// Owners and MediaCandidates return at most two active library identities:
+	// enough to distinguish no match, a unique match, and an ambiguous match.
+	Owners(context.Context, string) ([]*ArchiveEntity, error)
+	MediaCandidates(context.Context, string) ([]*ArchiveEntity, error)
 	// RecordVerification records server-verified bytes in the caller's managed
 	// write transaction. Callers retain and recheck the descriptor through commit;
 	// a producer's checksum alone is not sufficient evidence for this operation.

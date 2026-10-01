@@ -382,8 +382,10 @@ shell command strings from API callers.
 
 The server is the only writer of authoritative source, identity, and library
 tables. Gallery-dl and n8n submit events; they never write Stash SQLite directly.
-Provide separate producer credentials scoped to ingestion and permitted roots.
-Credentials stay in mounted secrets/environment references, outside catalog
+Provide separate Stash API tokens scoped to ingestion and permitted roots.
+Revoking one stops that producer's access to Stash. Website logins and cookies
+remain with gallery-dl; Stash does not store or revoke those credentials.
+Producer tokens stay in mounted secrets/environment references, outside catalog
 payloads, jq samples, exported source configs, and logs.
 
 An event envelope includes a stable producer ID and event ID, protocol version,

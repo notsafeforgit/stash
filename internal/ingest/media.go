@@ -40,6 +40,10 @@ func (p *PreparedMedia) Revalidate(ctx context.Context, currentRoot models.Media
 // Keep PreparedMedia open until WithTxn returns: the final hook checks the live
 // binding and descriptor after all other domain writes, before SQLite commits.
 func (p *PreparedMedia) RecordContent(ctx context.Context, repo models.Repository, fileUUID string, generation int64) (*models.FileContentVerification, error) {
+	return p.recordContentAt(ctx, repo, fileUUID, generation, p.relative)
+}
+
+func (p *PreparedMedia) recordContentAt(ctx context.Context, repo models.Repository, fileUUID string, generation int64, relative string) (*models.FileContentVerification, error) {
 	root, err := repo.MediaRoot.Find(ctx, p.rootUUID)
 	if err != nil {
 		return nil, err
@@ -47,11 +51,11 @@ func (p *PreparedMedia) RecordContent(ctx context.Context, repo models.Repositor
 	if root == nil {
 		return nil, models.ErrFileGenerationConflict
 	}
-	if err := p.Revalidate(ctx, *root); err != nil {
+	if err := p.verified.RevalidateAlias(ctx, *root, relative); err != nil {
 		return nil, err
 	}
 	proof, err := repo.FileContent.RecordVerification(ctx, models.FileContentInput{
-		FileUUID: fileUUID, ExpectedGeneration: generation, SHA256: p.SHA256(), RootUUID: p.rootUUID, RelativePath: p.relative, Snapshot: p.Snapshot(),
+		FileUUID: fileUUID, ExpectedGeneration: generation, SHA256: p.SHA256(), RootUUID: p.rootUUID, RelativePath: relative, Snapshot: p.Snapshot(),
 		ExpectedRootRevision: root.Revision,
 	})
 	if err != nil {
@@ -65,7 +69,7 @@ func (p *PreparedMedia) RecordContent(ctx context.Context, repo models.Repositor
 		if current == nil {
 			return models.ErrFileGenerationConflict
 		}
-		return p.Revalidate(ctx, *current)
+		return p.verified.RevalidateAlias(ctx, *current, relative)
 	})
 	return proof, nil
 }

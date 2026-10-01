@@ -669,6 +669,24 @@ arguments, acknowledgements, and attempts. The [ingestion guide](native-ingestio
 distinguishes this internal boundary from the still-unfinished file worker and
 source-run coordinator.
 
+Migration 1000020 retains `file_path_fences`, a local removal history independent
+of file UUID lifetimes. Deleting or moving a regular file increments the original
+folder/basename key; moving a folder records its regular files' old paths. Normal
+metadata updates and ZIP member paths do not add removals. Recreating a file
+never resets the counter. No historical removals are invented during migration.
+The folded lookup index uses the same collation as existing file lookups and
+sums spelling variants so any new removal invalidates a captured path fence.
+
+Ingestion captures this state before inspection and checks it during publication
+and before commit. An ordinary scan may create a previously absent file while
+inspection runs; publication can reuse it only when the path fence remains valid.
+Stored and submitted path spellings must open the same verified filesystem
+object. Active current-generation content lookups find at most two distinct
+scene/image owners, enough to distinguish a unique association from an ambiguity
+without scanning the library. Existing independent media identities are never
+merged merely because their bytes match. Anonymised exports clear removal
+history after path rewrites, including private paths captured by those rewrites.
+
 The filesystem deletion journal currently derives its directory from the
 database filename. Promotion in place retains that association, but a production
 path change must first drain pending deletions or transfer the exact journal

@@ -124,6 +124,29 @@ WHERE v.content_uuid=? AND v.file_uuid>? AND e.state='active' ORDER BY v.file_uu
 	require.NoError(t, rows.Err())
 	require.Contains(t, plan, "SEARCH v USING COVERING INDEX file_content_versions_content")
 	require.NotContains(t, plan, "SCAN f")
+	require.NoError(t, rows.Close())
+	for _, relation := range [][2]string{{"scenes_files", "scene_id"}, {"images_files", "image_id"}} {
+		rows, err := raw.Query(`EXPLAIN QUERY PLAN SELECT DISTINCT m.* FROM file_content_versions v INDEXED BY file_content_versions_content
+CROSS JOIN archive_entities e ON e.uuid=v.file_uuid CROSS JOIN files f ON f.id=e.file_id AND f.generation=v.generation
+CROSS JOIN `+relation[0]+` l ON l.file_id=e.file_id CROSS JOIN archive_entities m ON m.`+relation[1]+`=l.`+relation[1]+`
+WHERE v.content_uuid=? AND e.kind='file' AND e.state='active' AND m.state='active' LIMIT 2`, first.Content.UUID)
+		require.NoError(t, err)
+		defer rows.Close()
+		plan = ""
+		for rows.Next() {
+			var a, b, c int
+			var detail string
+			require.NoError(t, rows.Scan(&a, &b, &c, &detail))
+			plan += detail + "\n"
+		}
+		require.NoError(t, rows.Err())
+		require.NoError(t, rows.Close())
+		require.Contains(t, plan, "SEARCH v USING COVERING INDEX file_content_versions_content")
+		for _, table := range []string{"e", "f", "l", "m"} {
+			require.Contains(t, plan, "SEARCH "+table+" USING", plan)
+			require.NotContains(t, plan, "SCAN "+table, plan)
+		}
+	}
 }
 
 func TestFileContentPinsReviewedRootRevision(t *testing.T) {

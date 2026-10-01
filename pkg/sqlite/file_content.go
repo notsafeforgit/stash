@@ -169,6 +169,46 @@ type contentFileState struct {
 	Folder     string        `db:"path"`
 }
 
+func (s *FileContentStore) Owners(ctx context.Context, id string) ([]*models.ArchiveEntity, error) {
+	id, err := archiveUUID(id)
+	if err != nil {
+		return nil, err
+	}
+	return verifiedMediaCandidates(ctx, `FROM archive_entities e`, `e.uuid=? AND e.kind='file' AND e.state='active'`, id)
+}
+
+func (s *FileContentStore) MediaCandidates(ctx context.Context, id string) ([]*models.ArchiveEntity, error) {
+	id, err := archiveUUID(id)
+	if err != nil {
+		return nil, err
+	}
+	return verifiedMediaCandidates(ctx, `FROM file_content_versions v INDEXED BY file_content_versions_content
+CROSS JOIN archive_entities e ON e.uuid=v.file_uuid
+CROSS JOIN files f ON f.id=e.file_id AND f.generation=v.generation`, `v.content_uuid=? AND e.kind='file' AND e.state='active'`, id)
+}
+
+func verifiedMediaCandidates(ctx context.Context, from, where, id string) ([]*models.ArchiveEntity, error) {
+	ret := make([]*models.ArchiveEntity, 0, 2)
+	for _, relationship := range [][2]string{{scenesFilesTable, "scene_id"}, {imagesFilesTable, "image_id"}} {
+		// These table/column names are fixed domain relationships, never inputs.
+		// Start at the selected file/content and stop after two distinct owners.
+		query := "SELECT DISTINCT m.* " + from + " CROSS JOIN " + relationship[0] + " l ON l.file_id=e.file_id" +
+			" CROSS JOIN archive_entities m ON m." + relationship[1] + "=l." + relationship[1] +
+			" WHERE " + where + " AND m.state='active' LIMIT ?"
+		var rows []archiveEntityRow
+		if err := dbWrapper.Select(ctx, &rows, query, id, 2-len(ret)); err != nil {
+			return nil, err
+		}
+		for _, row := range rows {
+			ret = append(ret, row.resolve())
+		}
+		if len(ret) == 2 {
+			break
+		}
+	}
+	return ret, nil
+}
+
 func contentFile(ctx context.Context, id string, generation int64) (*contentFileState, error) {
 	var row contentFileState
 	err := dbWrapper.Get(ctx, &row, `SELECT f.id,f.generation,f.size,f.mod_time,f.basename,p.path

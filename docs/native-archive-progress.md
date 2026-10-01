@@ -55,6 +55,7 @@ review. Production has not been migrated.
 | Stash `367ea96ed` | Scoped capture ingestion and durable receipts; full-copy reconciliation, complete validation gate, CI lint/build, and preview image publication passed |
 | Stash `2215503f7` | Verified media preparation through the shared scanner; complete validation gate, Windows package cross-compilation, CI lint/build, and preview image publication passed |
 | Stash `5777a6b60` | Verified content identities, immutable root/file verification history, and file-generation guards; full-copy reconciliation, complete validation gate, CI lint/build, and preview image publication passed |
+| Stash `b5e996347` | Durable archive jobs, fenced leases, coalesced submissions and atomic publication; full-copy reconciliation, complete validation gate, targeted race tests, CI lint/build, and preview image publication passed |
 
 ## Phase status
 
@@ -62,7 +63,7 @@ review. Production has not been migrated.
 | --- | --- |
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
 | 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries and metadata relationship targets, native account/ownership storage and reviewed consolidation, shared post/profile/capture storage, ordered attachment manifests, audited media associations, reviewed source-list selection, and source-gallery synchronization with manual membership intent are implemented. Scalar and relationship field choices protect explicit and preserved metadata. Revisioned logical roots and source collections retain capture/manual-intake provenance; captured publisher choices connect source evidence to accounts independently of depicted performers. Verified byte identities and immutable per-file verification history now use persistent file-generation guards. Producer identity matching, policy resolution, review APIs/UI and remaining domain services are in progress. |
-| 2 Ingestion and producer adapter | In progress: scoped producer tokens, Reddit/Twitter capture batches and durable receipts are implemented. Verified file preparation uses the shared scanner and can publish content proofs with descriptor and generation checks before commit. Persistent jobs now have coalesced submissions, fenced leases, retry/cancellation/recovery, and atomic domain/result publication. File-completion admission and file/source/gallery/receipt integration, actual workers and source-run coordination, additional source adapters, producer outboxes and host/n8n conversion remain. |
+| 2 Ingestion and producer adapter | In progress: scoped producer tokens, Reddit/Twitter capture batches and durable receipts are implemented. Verified preparation uses the shared scanner; file/media publication checks descriptors, generations and persistent path removals, reuses concurrent scans, and rejects ambiguous verified-byte owners. Persistent jobs have coalesced submissions, fenced leases, retry/cancellation/recovery, and atomic domain/result publication. File-completion admission and source/gallery/receipt integration, actual workers and source-run coordination, additional source adapters, producer outboxes and host/n8n conversion remain. |
 | 3 Catalog importer and full-copy reconciliation | Not yet implemented |
 | 4 Native UI and client conversion | Not yet implemented |
 | 5 Compatibility removal and packaging | Preview packaging isolated and old compatibility gate replaced by current v3 operation/plugin-contract checks. Old UI/API/plugin adapters and config bridge still require conversion/removal. |
@@ -883,3 +884,47 @@ generation, frontend checks and 528 UI tests, retained v3 extension contracts an
 71 application operation files, zero Go lint issues, and all Go unit/integration
 packages. The SQLite suite completed in 204.5 seconds and the API suite in
 118.9 seconds.
+
+## Verified file and media publication
+
+Migration 1000020 retains regular-file path removal counters independently of
+file lifetimes. Deletion, rename, and folder moves invalidate queued intake,
+including when a concurrent scan created and removed a file after admission.
+Recreation retains the removal counter; delayed completions cannot automatically
+restore an absent removed path. Ordinary scans can establish a new file lifetime.
+Anonymised exports remove path history after rewriting paths, and startup checks
+require the new table, lookup index, and triggers.
+
+File publication validates the original descriptor and any case-insensitive
+database path spelling, reuses a concurrent scan's file record, and preserves
+generated fingerprints for unchanged verified bytes. Media publication reuses
+the exact file owner or one unique owner of current verified bytes. Multiple
+owners and incompatible kinds require review; legacy matching fingerprints and
+stale proofs cannot establish these associations. Existing media metadata stays
+intact. File, proof, scene/image association, and durable job result commit
+together; final checks also reject deleted or detached media.
+
+Focused SQLite and ingestion tests passed for removals/recreation/restart,
+case-folded path history and descriptor aliases, migration/startup/anonymisation,
+concurrent scans, replay, UUID adoption, unchanged generated fingerprints,
+verified/unverified/stale/ambiguous matches, exact-owner precedence, image/video
+classification, metadata preservation, indexed candidate lookups, and atomic
+rollback after file/media removal, detachment, conflicting ownership, physical
+replacement, or lease expiry.
+
+The isolated full copy migrated from 1000019 to 1000020 in 0.062 seconds. All
+124 retained tables matched by streaming semantic digest, with zero foreign-key
+violations and no size growth. The new removal history starts empty and all
+769,643 existing file generations are preserved. The private receipt is
+`.local/native-archive-rehearsal-20260930/file-publication-reconciliation.json`.
+
+File-completion HTTP admission, the actual worker, source/gallery/receipt
+integration, durable generated assets/notifications, and producer conversion
+remain unfinished. No new worker starts automatically, `file_ingestion` remains
+false, and production remains pinned to the compatible release.
+
+The complete `make validate-fork` gate passed: generation, frontend checks and
+all 528 UI tests, retained v3 extension contracts and 71 application operation
+files, zero Go lint issues, and every Go unit/integration package. The SQLite
+suite completed in 236.0 seconds, API tests in 136.3 seconds, and ingestion tests
+in 125.3 seconds. The final checks include the query cursor cleanup correction.

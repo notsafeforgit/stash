@@ -116,6 +116,21 @@ func VerifyMediaFile(ctx context.Context, root models.MediaRoot, relative string
 
 func (v *VerifiedFile) Close() error { return v.File.Close() }
 
+// RevalidateAlias verifies both the submitted path and a stored spelling. Equal
+// text under a case-insensitive lookup is insufficient: both paths must still
+// open the descriptor's exact filesystem identity under the reviewed root.
+func (v *VerifiedFile) RevalidateAlias(ctx context.Context, root models.MediaRoot, relative string) error {
+	if err := v.Revalidate(ctx, root); err != nil {
+		return err
+	}
+	if relative == v.relative {
+		return nil
+	}
+	alias := *v
+	alias.relative = relative
+	return alias.Revalidate(ctx, root)
+}
+
 func hashOpenMediaFile(ctx context.Context, file *os.File, size int64) (string, int64, error) {
 	hash := sha256.New()
 	reader := contextFileReader{ctx: ctx, reader: io.NewSectionReader(file, 0, size)}

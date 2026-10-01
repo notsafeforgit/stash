@@ -361,8 +361,9 @@ than silently dropping any. Identity resolution follows at most 128 entries.
 New source galleries initialize title, description, and a valid date from the
 capture cited by the attachment selection. This initial implementation never
 overwrites existing gallery metadata or assigns depicted performers from the
-publisher. General per-field source/review policies, URLs, mixed-media ordering
-controls, native API/UI, durable after-success delivery, and ingestion/catalog
+publisher. The scalar choice checkpoint below records the initial field
+provenance. Automatic reevaluation, relationship policies, URLs, mixed-media
+ordering controls, native API/UI, durable after-success delivery, and ingestion/catalog
 import integration remain required. Anonymised copies remove source association
 and membership history before rekeying identities.
 
@@ -380,8 +381,47 @@ revision. Moving a relationship advances both affected definitions. Unrelated
 media usage is not part of that revision: services reviewing usage transfers
 must also validate the relevant associations. Startup verifies the new lifecycle
 and relationship guards. Anonymisation rekeys these identities and preserves
-their redirect graphs. This migration supplies stable relationship targets;
-the general metadata field-decision engine is still subsequent work.
+their redirect graphs. These identities supply stable relationship targets for
+the later relationship-field decisions.
+
+Migration 1000012 adds scalar metadata choices for scenes, images, and galleries.
+The native field schema allows title, code, details, date, rating100, organized,
+scene director/production_date, and image/gallery photographer. IDs, fingerprints,
+playback counters, arbitrary source JSON, and unrelated settings are not targets.
+Strings, dates with retained precision, nullable integer ratings from 0 to 100,
+and booleans are checked by the repository. A value must fit within 4 MiB of
+canonical JSON. Relationship/list/custom-field schemas are subsequent work.
+
+`metadata_field_baselines` marks existing entities without copying their fields.
+Both populated and empty legacy values remain protected; migration does not
+invent user intent or allow a first scrape to fill a previously empty title.
+The first edit materializes the prior field value as preserved history. Newly
+created empty fields can inherit; nonempty initial values of unknown origin are
+conservatively protected. New source albums record their known initial title,
+description, and date as inherited choices with capture references. An untitled
+album's generic title is a policy value, not an invented source caption.
+
+`metadata_field_decisions` retains immutable individual field values and their
+origin, mode, capture reference, reason, and time. `metadata_field_heads` selects
+the current choice through a scoped foreign key. Set and clear protect the field;
+inherit explicitly permits automatic selection again. Filename fallback cannot
+replace a nonempty selection from another origin. Normal column updates record
+library choices even when a user reaffirms the same empty value. Timestamp-only
+or playback-counter updates do not create metadata decisions.
+
+The repository updates the browsing field and its history in one transaction,
+checks the entity revision, verifies the resulting value, and detects equivalent
+replay. `metadata_field_write_context` distinguishes these writes from ordinary
+library edits. An ignored late error leaves the marker and prevents commit;
+startup refuses leftover markers. Decisions advance the archive revision,
+history uses bounded indexed pagination, and UUID adoption cascades references.
+Deleted entities retain history; reused integer IDs receive independent state.
+Anonymised copies remove decision values and source references before rekeying.
+
+These are core repository operations. Source authorization, candidate/policy
+selection, relationship choices, full creation-intent conversion, review API/UI,
+and durable after-success delivery still belong to the subsequent domain/API
+work. No new producer-facing endpoint exposes the repositories directly.
 
 The filesystem deletion journal currently derives its directory from the
 database filename. Promotion in place retains that association, but a production

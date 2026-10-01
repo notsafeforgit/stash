@@ -174,6 +174,7 @@ func (db *Database) Repository() models.Repository {
 		SourceEvidence:         &SourceEvidenceStore{},
 		SourceAttachment:       &SourceAttachmentStore{},
 		SourceGallery:          &SourceGalleryStore{gallery: db.Gallery},
+		MetadataField:          &MetadataFieldStore{},
 		Share:                  &ShareStore{},
 	}
 }

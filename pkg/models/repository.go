@@ -34,6 +34,7 @@ type Repository struct {
 	SourceEvidence         SourceEvidenceReaderWriter
 	SourceAttachment       SourceAttachmentReaderWriter
 	SourceGallery          SourceGalleryReaderWriter
+	MetadataField          MetadataFieldReaderWriter
 	Share                  ShareReaderWriter
 }
 

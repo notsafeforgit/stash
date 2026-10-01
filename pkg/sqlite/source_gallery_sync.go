@@ -34,6 +34,13 @@ func (s *SourceGalleryStore) Sync(ctx context.Context, post, signature string) (
 		if identity == nil {
 			return nil, models.ErrSourcePayloadCorrupt
 		}
+		if err := recordNewSourceGalleryMetadata(ctx, identity.UUID, preview); err != nil {
+			return nil, err
+		}
+		identity, err = (&ArchiveEntityStore{}).Find(ctx, identity.UUID)
+		if err != nil {
+			return nil, err
+		}
 		if _, err := s.decideAssociation(ctx, models.SourceGalleryChoiceInput{PostUUID: preview.PostUUID, ExpectedPostRevision: preview.PostRevision,
 			State: "linked", GalleryUUID: identity.UUID, ExpectedGalleryRevision: identity.Revision, Origin: "source", Reason: "Created from selected post attachments"}, &preview.SelectionUUID); err != nil {
 			return nil, err

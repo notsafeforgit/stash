@@ -100,6 +100,13 @@ func TestSourceGalleryCreatesMixedAlbumSharesMediaAndSurvivesReplay(t *testing.T
 	result := syncSourceGallery(t, repo, post.UUID)
 	require.True(t, result.Created)
 	require.NotEqual(t, manual.ID, *result.GalleryID, "matching titles never authorize adoption")
+	for _, field := range []string{"title", "details", "date"} {
+		state := metadataState(t, repo, result.GalleryUUID, field)
+		require.Equal(t, "inherit", state.Mode)
+		require.Equal(t, "source", state.Origin)
+		require.Equal(t, capture.UUID, *state.Decision.CaptureUUID)
+		require.False(t, state.Protected)
+	}
 	sourceGalleryMemberships(t, repo, *result.GalleryID, []int{41}, []int{31})
 	history := sourceGalleryHistory(t, repo, result.GalleryUUID)
 	require.Len(t, history, 2)

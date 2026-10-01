@@ -45,6 +45,9 @@ def main(argv=None):
     parser.add_argument("--token-env", default="STASH_INGEST_TOKEN")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("status", help="Local delivery state; does not claim media completion")
+    lookup = commands.add_parser("lookup-collections", help="Resolve exact source URLs within this producer's grants")
+    lookup.add_argument("--target", action="append", required=True)
+    lookup.add_argument("--root", help="Logical root UUID; omitted means unbound metadata collections")
     commands.add_parser("drain", help="Deliver one bounded batch of ready events")
     retry = commands.add_parser("retry", help="Retry a reviewed event with its original bytes")
     retry.add_argument("event_uuid")
@@ -83,7 +86,10 @@ def main(argv=None):
         box = Outbox(args.outbox, args.endpoint, args.producer)
         client = Client(args.endpoint, args.producer, token_env=args.token_env)
         requests = RunQueue(box)
-        if args.command == "drain":
+        if args.command == "lookup-collections":
+            from .collections import lookup_collections
+            output = lookup_collections(client, args.target, args.root)
+        elif args.command == "drain":
             output = {"delivery": drain_once(box, client), "outbox": box.status()}
         elif args.command == "retry":
             box.retry(args.event_uuid)
@@ -139,6 +145,8 @@ def main(argv=None):
         else:
             output = {**box.status(), "source_requests": requests.status()}
         print(json.dumps(output, sort_keys=True))
+        if args.command == "lookup-collections":
+            return 0 if all(item["state"] == "resolved" for item in output["targets"]) else 2
         if args.command == "drain":
             counts = output["outbox"]["counts"]
             return 2 if any(counts[k] for k in ("pending", "sending", "review")) else 0

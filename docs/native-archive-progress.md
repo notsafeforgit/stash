@@ -63,6 +63,7 @@ review. Production has not been migrated.
 | Stash `c84540426` | Gallery-dl lifecycle, source lease checks and final-file outbox publication; complete validation gate, targeted race tests, CI lint/build, and preview image publication passed |
 | Stash `bad3f2ca5` | Offline source request coalescing, caller tickets and immutable admission replay; producer migration fixtures, shared window corpus, complete validation gate, targeted race tests, CI lint/build, and preview image publication passed |
 | Stash `5af18a486` | Scoped source dispatch and pinned n8n worker image; complete validation gate, producer tests on both host runtimes and the installed container package, CI lint/build, and preview image publication passed |
+| Stash `a2b8a0de1` | Caller completion tied to original submissions and exact source windows; producer migration/restart fixtures, complete validation gate, CI lint/build, and preview image publication passed |
 
 ## Phase status
 
@@ -1547,3 +1548,37 @@ activation. Additional adapters, catalog import and later phases remain open.
 Documentation now calls credential revocation **Stash API-token revocation**.
 It controls a producer's access to Stash; website passwords, cookies and login
 configuration remain with gallery-dl in the host/n8n worker environments.
+
+## Scoped lookup for actual source URLs
+
+`POST /api/v3/ingest/collections/lookup` now resolves up to 50 exact source URLs
+against the producer's permitted collection IDs and current media-root binding.
+Results group candidate UUIDs, revisions and states by the requested URL. They
+exclude labels, account associations, directory names and local mount paths.
+Every authorized duplicate remains visible; unrelated matches cannot consume
+a page and hide a permitted candidate. Historical URLs do not redirect work to
+a changed target; a moved collection does not match requests under its old root grant.
+
+The Python adapter and `stash-ingest lookup-collections` validate the complete
+response before returning bindings. Missing visible matches, duplicates and
+inactive definitions remain explicit. This operation neither creates collections
+nor queues source work. The real HTTP metadata and download fixtures now resolve
+their source URLs through the API before submitting native requests, including
+the CLI entry point for download callers.
+
+The full `make validate-fork` gate passed, including 528 v3 tests, native contract
+validation, Go lint and all Go tests. All 139 producer tests passed on Python
+3.12 and 3.14. HTTP coverage includes 55 permitted duplicates among unrelated
+matches, unbound collections, inactive states, changed targets/roots, rejected
+credentials and API-token revocation. Logs are `collection-lookup-http-final.log`,
+`collection-lookup-python312.log` and `collection-lookup-final-validation.log`
+under `/tmp/stash-native-transition`. No database schema version changed.
+
+A read-only check of the installed timers confirms that regular Reddit scans
+include saved posts, and the weekly scan adds `--date-min-relative '1 week ago'`.
+The saved lists currently contain 497 distinct first-token entries for Twitter
+and 421 for Reddit. Those lists exceed the current 128-collection token limit;
+bulk worker access and durable unresolved caller/list requests must be addressed
+before the launchers switch. Collection registration/import, preservation of
+full-history policy, n8n receipt conversion and the remaining transition phases
+are still required. Production services and workflow graphs remain unchanged.

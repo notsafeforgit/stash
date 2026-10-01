@@ -118,6 +118,7 @@ type SourceCollectionReaderWriter interface {
 	Find(context.Context, string) (*SourceCollection, error)
 	List(context.Context, string, int) ([]*SourceCollection, error)
 	LookupTarget(context.Context, string, string, int) ([]*SourceCollection, error)
+	LookupCurrentTargets(context.Context, []string, []string, *string) ([]*SourceCollection, error)
 	History(context.Context, string, int, int) ([]SourceCollectionRevision, error)
 	RecordCapture(context.Context, CollectionCapture) error
 	HasCapture(context.Context, CollectionCapture) (bool, error)

@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from stash_ingest.client import Client, drain_once
+from stash_ingest.collections import lookup_collections
 from stash_ingest.completion import inspect_ticket
 from stash_ingest.encoding import encode
 from stash_ingest.outbox import Outbox
@@ -21,9 +22,13 @@ def main():
     box = Outbox(Path(setup["directory"]) / "producer.sqlite", setup["endpoint"],
                  setup["producer"], clock=lambda: now[0])
     client = Client(setup["endpoint"], setup["producer"])
+    match = lookup_collections(client, ["https://x.com/fixture/media"], None)["targets"][0]
+    assert match["state"] == "resolved", match
+    binding = match["candidates"][0]
+    assert binding["collection_uuid"] == setup["collection"]
     policy = "b" * 64
-    request = {"collection_uuid": setup["collection"],
-               "collection_revision": setup["revision"], "operation": "enrich", "policy_sha256": policy,
+    request = {"collection_uuid": binding["collection_uuid"],
+               "collection_revision": binding["collection_revision"], "operation": "enrich", "policy_sha256": policy,
                "window": {"since": None, "until": datetime.now(timezone.utc).isoformat(timespec="milliseconds")},
                "cooldown_seconds": 0}
     queue = RunQueue(box)

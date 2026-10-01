@@ -42,6 +42,7 @@ func (rs *ingestRoutes) router() http.Handler {
 	r.Use(ingestHeaders)
 	r.Route(ingestPath, func(r chi.Router) {
 		r.Get("/capabilities", rs.capabilities)
+		r.Post("/collections/lookup", rs.lookupCollections)
 		r.Post("/batches", rs.batch)
 		r.Get("/receipts/{event}", rs.receipt)
 		r.Get("/receipts/{event}/status", rs.receiptStatus)
@@ -153,8 +154,47 @@ func (rs *ingestRoutes) capabilities(w http.ResponseWriter, r *http.Request) {
 		"retention_policy": archive.SourceRetentionVersion, "max_event_bytes": ingest.MaxEventBytes, "max_batch_bytes": ingest.MaxBatchBytes, "max_batch_events": ingest.MaxBatchEvents,
 		"max_file_event_bytes": ingest.MaxFileEventBytes, "file_ingestion": rs.fileIngestion,
 		"source_runs": true, "source_run_protocol": 1, "source_run_submission_receipts": true, "source_run_dispatch": true,
+		"collection_lookup": true,
 		"receipt_semantics": "source.capture commits source evidence; file.completed queues verification; poll receipt status for media completion",
 	})
+}
+
+type ingestCollectionBinding struct {
+	CollectionUUID     string `json:"collection_uuid"`
+	CollectionRevision int    `json:"collection_revision"`
+	State              string `json:"state"`
+}
+
+type ingestCollectionMatches struct {
+	TargetURL  string                    `json:"target_url"`
+	Candidates []ingestCollectionBinding `json:"candidates"`
+}
+
+func (rs *ingestRoutes) lookupCollections(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		RootUUID *string  `json:"root_uuid"`
+		Targets  []string `json:"targets"`
+	}
+	if err := readIngestJSON(w, r, 512<<10, &input); err != nil {
+		ingestError(w, err)
+		return
+	}
+	result, err := rs.service.LookupCollections(r.Context(), ingestToken(r), input.RootUUID, input.Targets)
+	if err != nil {
+		ingestError(w, err)
+		return
+	}
+	matches := make([]ingestCollectionMatches, 0, len(input.Targets))
+	for _, target := range input.Targets {
+		entry := ingestCollectionMatches{TargetURL: target, Candidates: make([]ingestCollectionBinding, 0)}
+		for _, collection := range result {
+			if collection.TargetURL == target {
+				entry.Candidates = append(entry.Candidates, ingestCollectionBinding{collection.UUID, collection.Revision, collection.State})
+			}
+		}
+		matches = append(matches, entry)
+	}
+	ingestJSON(w, http.StatusOK, map[string]any{"root_uuid": input.RootUUID, "targets": matches})
 }
 
 type ingestBatch struct {

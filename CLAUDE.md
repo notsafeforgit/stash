@@ -80,6 +80,9 @@ assignments. `ticket-status` checks completed source windows against those
 assignments; later rescans cannot complete an earlier cancelled ticket. Discovery
 and admission do not certify completion. Preserve existing request/event state
 when upgrading older outboxes.
+`lookup-collections` resolves exact current source URLs through the producer's
+collection/root grants. Preserve missing and ambiguous candidates for review;
+historical URLs must not silently redirect scheduled work to a new target.
 
 ## Architecture
 

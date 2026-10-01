@@ -32,9 +32,18 @@ def main():
     now = datetime.now(timezone.utc)
     database = directory / "producer.sqlite"
     ticket = str(uuid.uuid4())
+    output = io.StringIO()
+    with redirect_stdout(output):
+        status = producer_cli(["--outbox", str(database), "--endpoint", setup["endpoint"],
+                               "--producer", setup["producer"], "lookup-collections", "--root", setup["root"],
+                               "--target", "https://fixture.invalid/account"])
+    lookup = json.loads(output.getvalue())
+    assert status == 0 and lookup["targets"][0]["state"] == "resolved", lookup
+    binding = lookup["targets"][0]["candidates"][0]
+    assert binding["collection_uuid"] == setup["collection"]
     with closing(Outbox(database, setup["endpoint"], setup["producer"])) as box:
         queue = RunQueue(box)
-        queue.enqueue({"collection_uuid": setup["collection"], "collection_revision": setup["revision"],
+        queue.enqueue({"collection_uuid": binding["collection_uuid"], "collection_revision": binding["collection_revision"],
                        "policy_sha256": profile.policy_sha256, "operation": "download", "cooldown_seconds": 0,
                        "window": {"since": None, "until": now.isoformat(timespec="milliseconds")}}, ticket_uuid=ticket)
     # Restart after local admission, before any network request. The dispatcher

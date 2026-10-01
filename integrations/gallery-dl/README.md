@@ -405,6 +405,7 @@ is no command-line token argument.
 | Command | Result |
 |---|---|
 | `status` | Event counts/bytes/age plus the source-request backlog |
+| `lookup-collections --target URL [--target URL ...] [--root UUID]` | Current scoped collection candidates; exits 0 only when each URL resolves to one active collection, otherwise 2 |
 | `drain` | Attempts one ready batch of at most eight events; exits 2 while local event work remains |
 | `retry EVENT_UUID` | Requeues one explicitly reviewed event with its original contents |
 | `receipt-status EVENT_UUID` | Reads actual server ingestion/worker status |
@@ -423,6 +424,23 @@ file processor leaves new file events pending while previously committed
 receipts remain recoverable. `queue-run` succeeding means the request was recorded
 locally; `submit-runs` succeeding means requests were admitted by Stash. Neither
 command claims a completed scrape or starts a downloader.
+
+Collection lookup uses the native API's `collection_lookup` capability and
+`POST /collections/lookup`. A request contains up to 50 distinct exact source
+URLs and one logical root; omit the root only for unbound metadata collections.
+The server queries the token's permitted collection IDs and current revisions,
+then returns candidate UUIDs, revisions and states grouped by URL. It does not
+send collection labels, account associations, directory names or local mounts.
+
+An absent visible match is `unresolved`; it does not prove the URL is absent
+from the whole library. Multiple matches are `ambiguous`, including when one is
+inactive. One disabled or retired match retains that state. Callers must review
+those cases rather than select a candidate automatically. Historical targets,
+changed media roots and different query/sort parameters never silently match.
+The Python client rejects inconsistent roots, URLs, duplicate IDs and malformed
+revisions before producing a usable binding. Lookup neither creates collections
+nor enqueues work. Durable caller/list conversion still needs to freeze these
+bindings together with the original URLs and time windows before submission.
 
 ## Validation
 

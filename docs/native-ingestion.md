@@ -222,6 +222,7 @@ All producer routes require the bearer token and reject query parameters:
 | Method and route under `/api/v3/ingest` | Result |
 | --- | --- |
 | `GET /capabilities` | Protocol, producer UUID, scopes, supported kinds/namespaces, retention policy, and request limits |
+| `POST /collections/lookup` | Current permitted collection candidates for exact source URLs at one logical root |
 | `POST /batches` | An ordered result for every submitted event |
 | `GET /receipts/<event-uuid>` | That producer's original receipt, subject to the token's collection/root scope |
 | `GET /receipts/<event-uuid>/status` | Current job state, attempt, bounded error code and safe result; excludes worker arguments and local mount paths |
@@ -231,6 +232,19 @@ its source payload remains limited to 4 MiB and projected metadata to 256 KiB.
 Send `Content-Type: application/json`; compressed request bodies are not accepted.
 Unknown envelope fields, duplicate JSON keys, invalid Unicode, excessive nesting,
 and unsupported protocol/kind/retention versions are rejected.
+
+Collection lookup accepts `{"root_uuid":"…","targets":["https://…"]}` with
+1–50 distinct URLs; a null root selects unbound metadata collections. Its
+`collection_lookup` capability is advertised separately. The response echoes
+the root and requested URLs in order, each with candidate `collection_uuid`,
+`collection_revision` and `state` values. Empty candidate lists are explicit;
+all permitted duplicates are retained. The lookup applies the token's collection
+and root grants before returning candidates and reads only current definitions.
+Historical target URLs and moved roots cannot redirect a caller's source work.
+Labels, account IDs and path information are excluded from this projection.
+Callers must preserve ambiguity and inactive states for review; this read grants
+no collection creation or modification authority. Native submission still
+validates the chosen definition when admitting the request.
 
 An event has this shape; UUID placeholders must be replaced with canonical,
 lowercase, nonzero UUIDs:

@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"net/url"
 	"reflect"
@@ -166,6 +167,45 @@ func (s *SourceCollectionStore) LookupTarget(ctx context.Context, target, after 
 	if err := dbWrapper.Select(ctx, &rows, sourceCollectionSelect+` WHERE r.revision=b.revision AND b.uuid IN (
  SELECT collection_uuid FROM source_collection_revisions WHERE target_url=? AND target_url!='' AND collection_uuid>?
  GROUP BY collection_uuid ORDER BY collection_uuid LIMIT ?) ORDER BY b.uuid`, target, after, limit); err != nil {
+		return nil, err
+	}
+	return resolveCollections(rows), nil
+}
+
+// LookupCurrentTargets resolves only the current exact URL and root within an
+// explicit collection scope. Historical URLs are review evidence, not authority
+// to redirect a scheduled scrape to a different target or scan order.
+func (s *SourceCollectionStore) LookupCurrentTargets(ctx context.Context, targets, collections []string, root *string) ([]*models.SourceCollection, error) {
+	if len(targets) < 1 || len(targets) > 50 || len(collections) < 1 || len(collections) > 128 {
+		return nil, errors.New("invalid bounded collection lookup")
+	}
+	for _, target := range targets {
+		if !validCollectionURL(target) {
+			return nil, errors.New("invalid collection target URL")
+		}
+	}
+	for _, collection := range collections {
+		if _, err := archiveUUID(collection); err != nil {
+			return nil, err
+		}
+	}
+	if root != nil {
+		if _, err := archiveUUID(*root); err != nil {
+			return nil, err
+		}
+	}
+	targetJSON, err := json.Marshal(targets)
+	if err != nil {
+		return nil, err
+	}
+	collectionJSON, err := json.Marshal(collections)
+	if err != nil {
+		return nil, err
+	}
+	var rows []sourceCollectionRow
+	if err := dbWrapper.Select(ctx, &rows, sourceCollectionSelect+` WHERE b.uuid IN (SELECT value FROM json_each(?))
+ AND r.revision=b.revision AND r.root_uuid IS ? AND r.target_url IN (SELECT value FROM json_each(?)) ORDER BY b.uuid`,
+		collectionJSON, root, targetJSON); err != nil {
 		return nil, err
 	}
 	return resolveCollections(rows), nil

@@ -3,7 +3,9 @@ from contextlib import closing
 from pathlib import Path
 import sqlite3
 import tempfile
+import threading
 import unittest
+from unittest.mock import patch
 import uuid
 
 from stash_ingest.encoding import digest, encode
@@ -68,6 +70,43 @@ class OutboxMigrationTests(unittest.TestCase):
         self.assertEqual(delivery.body, encode(self.file))
         self.assertIsNotNone(queue.receipt(self.source["event_uuid"]))
         self.assertEqual(queue.db.execute("SELECT count(*) FROM run_requests").fetchone()[0], 0)
+
+    def test_initial_wal_contention_waits_without_replacing_existing_events(self):
+        # A journal-mode change can report BUSY without honoring busy_timeout.
+        # Exercise that with a real reader lock and a zero-timeout connection.
+        connect = sqlite3.connect
+        retried = threading.Event()
+        attempts = 0
+
+        def trace(statement):
+            nonlocal attempts
+            if statement == "PRAGMA journal_mode=WAL":
+                attempts += 1
+                if attempts > 1:
+                    retried.set()
+
+        def without_busy_wait(*args, **kwargs):
+            kwargs["timeout"] = 0
+            db = connect(*args, **kwargs)
+            db.set_trace_callback(trace)
+            return db
+
+        def open_queue():
+            with closing(self.open()) as box:
+                return box.db.execute("PRAGMA user_version").fetchone()[0]
+
+        self.db.execute("BEGIN")
+        self.db.execute("SELECT count(*) FROM events").fetchone()
+        with patch("stash_ingest.outbox.sqlite3.connect", side_effect=without_busy_wait), ThreadPoolExecutor(max_workers=1) as pool:
+            opened = pool.submit(open_queue)
+            try:
+                self.assertTrue(retried.wait(3), "journal mode was not retried while the database was busy")
+                self.assertFalse(opened.done())
+            finally:
+                self.db.execute("COMMIT")
+            self.assertEqual(opened.result(timeout=3), SCHEMA)
+        self.assertEqual(self.db.execute("SELECT * FROM events ORDER BY seq").fetchall(), self.before)
+        self.assertEqual(self.db.execute("PRAGMA foreign_key_check").fetchall(), [])
 
     def test_wrong_binding_and_schema_collision_roll_back_the_whole_migration(self):
         with self.assertRaises(Conflict):

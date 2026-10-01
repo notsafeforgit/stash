@@ -66,8 +66,7 @@ class Outbox:
                     or (version == 0 and application == 0 and not tables)):
                 raise InvalidData("Unsupported or foreign outbox database")
             self.db.execute("PRAGMA foreign_keys=ON")
-            if self.db.execute("PRAGMA journal_mode=WAL").fetchone()[0] != "wal":
-                raise InvalidData("Outbox requires a local filesystem with SQLite WAL support")
+            self._enable_wal()
             self.db.execute("PRAGMA synchronous=FULL")
             with self.transaction():
                 # Recheck under the write lock: another runner may have opened
@@ -86,6 +85,23 @@ class Outbox:
         except BaseException:
             self.db.close()
             raise
+
+    def _enable_wal(self):
+        # Concurrent first opens can return SQLITE_BUSY immediately while the
+        # persistent journal mode changes, despite the connection busy timeout.
+        # Wait for the same database; never replace or recreate its queue.
+        deadline = time.monotonic() + 15
+        while True:
+            try:
+                mode = self.db.execute("PRAGMA journal_mode=WAL").fetchone()[0]
+                if mode != "wal":
+                    raise InvalidData("Outbox requires a local filesystem with SQLite WAL support")
+                return
+            except sqlite3.OperationalError as error:
+                if ((getattr(error, "sqlite_errorcode", 0) & 255) not in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED)
+                        or time.monotonic() >= deadline):
+                    raise
+                time.sleep(0.025)
 
     def _initialize(self):
         self.db.execute("CREATE TABLE binding(id INTEGER PRIMARY KEY CHECK(id=1), endpoint TEXT NOT NULL, producer TEXT NOT NULL)")

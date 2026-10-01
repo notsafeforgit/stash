@@ -1,6 +1,7 @@
 """Bounded worker discovery with durable pagination and outage backoff."""
 
 from .client import Unavailable, drain_once
+from .backfill_calls import BackfillCalls, advance_once
 from .encoding import InvalidData, encode, identifier
 from .events import sha256
 from .outbox import Capacity, Conflict
@@ -104,9 +105,12 @@ def dispatch_once(box, client, configuration):
     dispatcher = Dispatcher(box, client, configuration)
     requests = RunQueue(box)
     calls = SourceCalls(box)
+    backfills = BackfillCalls(box)
     delivery = drain_once(box, client)
+    backfill = advance_once(backfills, client)
     resolution = resolve_once(calls, client)
     submission = submit_once(requests, client)
     result = dispatcher.once()
-    return {**result, "delivery": delivery, "resolution": resolution, "submission": submission, "outbox": box.status(),
+    return {**result, "delivery": delivery, "backfill": backfill, "resolution": resolution, "submission": submission, "outbox": box.status(),
+            "backfill_calls": backfills.summary(),
             "source_requests": requests.status(), "source_calls": calls.summary(), "intake_completion": "inspect_native_receipts"}

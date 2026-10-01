@@ -719,8 +719,10 @@ Staged Twitter/Reddit host launchers now expand the existing account/list, mode
 and date options into durable caller snapshots. Full-history and Reddit top mode
 select separately reviewed global `skip=true` profiles. Local recording returns
 the execution UUID; strict inspection cannot report success until every original
-source ticket completes. n8n receipt/result handling and permanent historical
-completion/skip handling still requires integration before activation.
+source ticket completes. The staged n8n adapter now gates source admission on
+native permanent history, freezes completion proof and exposes pending results
+for a durable workflow wait. Historical operational receipts still require
+migration before activation.
 
 This package is not yet installed into the host/n8n launch paths. Runtime alignment,
 activation of converted profiles, additional source adapters and conversion of
@@ -777,5 +779,9 @@ Historical import accepts `root_uuid`, a stable input-database `source_uuid`,
 families retain their separate migration requirements. Imported decisions never
 manufacture source windows, and producer tokens cannot submit legacy assertions.
 See the [maintenance importer](../integrations/gallery-dl/README.md#backfill-journal-import)
-for read-only preflight and resumable batches. Installed n8n workflows still use
-the old runner until their caller/result contracts and deployment are converted.
+for read-only preflight and resumable batches. The [native n8n adapter](../integrations/gallery-dl/README.md#native-n8n-backfills)
+uses this status/proof API with durable caller snapshots. Its producer schema 6
+commits the first history decision and local source snapshot together, then retains
+the original ticket bindings and submitted proof across retries. Converted graphs
+wait on pending results and inspect the same token. Installed n8n workflows still
+use the old runner until the remaining operational-history and deployment gates pass.

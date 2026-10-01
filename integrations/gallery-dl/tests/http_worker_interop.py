@@ -13,10 +13,13 @@ from unittest.mock import patch
 import uuid
 
 from stash_ingest.client import Client, drain_once
+from stash_ingest.backfill_calls import BackfillCalls, advance_once
 from stash_ingest.configuration import Configuration
 from stash_ingest.cli import main as producer_cli
 from stash_ingest.gallery import NativeDownloadJob
 from stash_ingest.outbox import Outbox
+from stash_ingest.n8n_runner import main as n8n_cli
+from stash_ingest.source_calls import SourceCalls
 from test_configuration import profile_fixture
 from test_gallery import Fixture
 from test_producer import reddit_data
@@ -27,40 +30,60 @@ def main():
     directory = Path(setup["directory"])
     path, profile = profile_fixture(directory)
     profile["root"]["uuid"] = setup["root"]
-    if setup["launcher"]:
+    if setup["adapter"] != "caller-cli":
         profile["source_category"] = "reddit"
+    native_backfill = setup["adapter"] == "n8n-backfill"
+    if native_backfill:
+        profile["gallery"]["skip"] = True
     path.write_text(json.dumps(profile))
     profile = Configuration(path)
     client = Client(setup["endpoint"], setup["producer"])
     now = datetime.now(timezone.utc)
     database = directory / "producer.sqlite"
     call_uuid = str(uuid.uuid4())
+    backfill_uuid = str(uuid.uuid4())
+    if native_backfill:
+        call_uuid = str(uuid.uuid5(uuid.UUID(backfill_uuid), "sources"))
     ticket = str(uuid.uuid5(uuid.UUID(call_uuid), "source/1"))
     targets = directory / "caller-targets.txt"
     targets.write_text(setup["target"] + "\n")
     command = ["--outbox", str(database), "--endpoint", setup["endpoint"], "--producer", setup["producer"],
                "queue-sources", "--call", call_uuid, "--targets-file", str(targets), "--profile", str(path),
                "--until", now.isoformat(timespec="milliseconds")]
-    if setup["launcher"]:
+    if setup["adapter"] == "host-launcher":
         command = [sys.executable, str(Path(__file__).resolve().parents[1] / "bin/update-reddit-media"),
                    "--outbox", str(database), "--endpoint", setup["endpoint"], "--producer", setup["producer"],
                    "--call", call_uuid, "--config-file", str(targets), "--profile", str(path),
                    "--until", now.isoformat(timespec="milliseconds")]
+    if native_backfill:
+        command = [sys.executable, "-m", "stash_ingest.n8n_runner", "--outbox", str(database), "--endpoint", setup["endpoint"],
+                   "--producer", setup["producer"], "--call", backfill_uuid, "--mode", "reddit-profile-new",
+                   "--identity", "Native_Fixture", "--profile", str(path), "--until", now.isoformat(timespec="milliseconds")]
 
     def record():
-        if setup["launcher"]:
+        if setup["adapter"] != "caller-cli":
             result = subprocess.run(command, capture_output=True, text=True, timeout=30)
             assert result.returncode == 0, result.stderr
             value = json.loads(result.stdout)
             assert value["state"] == "recorded"
-            return value["call"]
+            return value if native_backfill else value["call"]
         output = io.StringIO()
         with redirect_stdout(output):
             assert producer_cli(command) == 0
         return json.loads(output.getvalue())
 
     recorded = record()
-    assert recorded["counts"]["pending"] == 1, recorded
+    if native_backfill:
+        assert recorded["token"] == uuid.UUID(backfill_uuid).hex, recorded
+        with closing(Outbox(database, setup["endpoint"], setup["producer"])) as box:
+            assert SourceCalls(box).summary()["calls"] == 0
+        output = io.StringIO()
+        with redirect_stdout(output):
+            pending_code = n8n_cli(["--outbox", str(database), "--endpoint", setup["endpoint"], "--producer", setup["producer"],
+                                   "--inspect", recorded["token"], "--strict"])
+        assert pending_code == 2 and json.loads(output.getvalue())["backfill_pending"] is True, output.getvalue()
+    else:
+        assert recorded["counts"]["pending"] == 1, recorded
     targets.unlink()
     # A lost command response reopens the original snapshot, even if the list
     # was removed or edited while the server remained unreachable.
@@ -132,8 +155,25 @@ def main():
         queued = box.receipt(file_id)
         assert queued["capture_uuid"] == box.receipt(capture_id)["capture_uuid"]
         assert result["intake_completion"] == "inspect_native_receipts"
-        print(json.dumps({"run_uuid": admitted["run_uuid"], "capture": capture_id, "file": file_id,
-                          "path": "Account/postabc123_abc123.jpg"}))
+        if native_backfill:
+            # Advance only the local scheduling clock; the native run/proof
+            # retains its original real cutoff. No fixture sleeps are needed.
+            box.clock = lambda: time.time() + 120
+            pending = advance_once(BackfillCalls(box), client, backfill_uuid)
+            assert pending["backfill_pending"] is True and pending["state"] == "active", pending
+            assert box.db.execute("SELECT completion FROM backfill_calls WHERE uuid=?", (backfill_uuid,)).fetchone()[0]
+    if native_backfill:
+        with closing(Outbox(database, setup["endpoint"], setup["producer"], clock=lambda: time.time() + 400)) as box:
+            done = advance_once(BackfillCalls(box), client, backfill_uuid)
+            assert done["state"] == "completed" and not done["backfill_cached"], done
+            assert not done["account_backfill_complete"], done
+        output = io.StringIO()
+        with redirect_stdout(output):
+            done_code = n8n_cli(["--outbox", str(database), "--endpoint", setup["endpoint"], "--producer", setup["producer"],
+                                "--inspect", recorded["token"], "--strict"])
+        assert done_code == 0 and json.loads(output.getvalue()) == done, output.getvalue()
+    print(json.dumps({"run_uuid": admitted["run_uuid"], "capture": capture_id, "file": file_id,
+                      "path": "Account/postabc123_abc123.jpg"}))
 
 
 if __name__ == "__main__":

@@ -71,7 +71,7 @@ review. Production has not been migrated.
 | --- | --- |
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
 | 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries and metadata relationship targets, native account/ownership storage and reviewed consolidation, shared post/profile/capture storage, ordered attachment manifests, audited media associations, reviewed source-list selection, and source-gallery synchronization with manual membership intent are implemented. Scalar and relationship field choices protect explicit and preserved metadata. Revisioned logical roots and source collections retain capture/manual-intake provenance; captured publisher choices connect source evidence to accounts independently of depicted performers. Verified byte identities and immutable per-file verification history now use persistent file-generation guards. Producer identity matching, policy resolution, review APIs/UI and remaining domain services are in progress. |
-| 2 Ingestion and producer adapter | In progress: scoped producer tokens, Reddit/Twitter capture batches and durable receipts are implemented. Verified preparation uses the shared scanner; file/media publication checks descriptors, generations and persistent path removals, reuses concurrent scans, and rejects ambiguous verified-byte owners. Intake publication connects collection provenance, selected source media, attachment evidence and album galleries while preserving explicit choices. Persistent jobs have coalesced submissions, fenced leases, retry/cancellation/recovery, and atomic domain/result publication. File-completion admission now queues a durable worker that checkpoints registration, generates previews and delivers retryable media/gallery hooks; scoped status reports actual completion. Native collection policies now apply typed metadata and explicit performer defaults in intake and ordinary scans, with dry preview and guarded apply. Source-run coordination now coalesces missing date ranges, fences worker ownership, retains checkpoints and deferrals, and excludes overlapping destinations. A supported Python producer package now provides retained-payload outboxes, fenced delivery, durable receipts, backoff and review. The gallery-dl SDK now queues source evidence before download, verifies root/prefix and lease ownership, holds shared destination locks, and queues flushed final files before archive acknowledgement. Reddit single-media evidence and original Twitter attachment membership are covered. The producer now coalesces offline source requests, freezes submissions for replay, retains caller tickets and validates native admission receipts. Claimed Reddit/Twitter windows use precise source timestamps and parent context, with directory checks before postprocessor callbacks. Reviewed portable profiles now fingerprint settings/assets and execute one claimed attempt with concurrent outbox delivery and lost-finish recovery. A local converter now stages ordered, source-scoped profiles from the host and n8n JSON layers without copying website credentials. Scoped dispatch now discovers eligible runs with durable pagination/backoff, and a separate n8n image packages the pinned worker runtime. Staged host Twitter/Reddit launchers preserve saved lists, modes, date filters and full-history profiles through durable caller snapshots. Live image/profile activation, policy migration, general durable edit notifications, additional source adapters and n8n/recovery caller conversion remain. |
+| 2 Ingestion and producer adapter | In progress: scoped producer tokens, Reddit/Twitter capture batches and durable receipts are implemented. Verified preparation uses the shared scanner; file/media publication checks descriptors, generations and persistent path removals, reuses concurrent scans, and rejects ambiguous verified-byte owners. Intake publication connects collection provenance, selected source media, attachment evidence and album galleries while preserving explicit choices. Persistent jobs have coalesced submissions, fenced leases, retry/cancellation/recovery, and atomic domain/result publication. File-completion admission now queues a durable worker that checkpoints registration, generates previews and delivers retryable media/gallery hooks; scoped status reports actual completion. Native collection policies now apply typed metadata and explicit performer defaults in intake and ordinary scans, with dry preview and guarded apply. Source-run coordination now coalesces missing date ranges, fences worker ownership, retains checkpoints and deferrals, and excludes overlapping destinations. A supported Python producer package now provides retained-payload outboxes, fenced delivery, durable receipts, backoff and review. The gallery-dl SDK now queues source evidence before download, verifies root/prefix and lease ownership, holds shared destination locks, and queues flushed final files before archive acknowledgement. Reddit single-media evidence and original Twitter attachment membership are covered. The producer now coalesces offline source requests, freezes submissions for replay, retains caller tickets and validates native admission receipts. Claimed Reddit/Twitter windows use precise source timestamps and parent context, with directory checks before postprocessor callbacks. Reviewed portable profiles now fingerprint settings/assets and execute one claimed attempt with concurrent outbox delivery and lost-finish recovery. A local converter now stages ordered, source-scoped profiles from the host and n8n JSON layers without copying website credentials. Scoped dispatch now discovers eligible runs with durable pagination/backoff, and a separate n8n image packages the pinned worker runtime. Staged host Twitter/Reddit launchers preserve saved lists, modes, date filters and full-history profiles through durable caller snapshots. Staged n8n backfill calls now check permanent history before source admission, preserve original completion proof, and expose pending results to converted workflow waits. Live image/profile activation, operational-history and policy migration, general durable edit notifications, additional source adapters and recovery caller conversion remain. |
 | 3 Catalog importer and full-copy reconciliation | Permanent account-backfill completion/skip imports are implemented and rehearsed against a full copy, preserving original decisions and provenance. The remaining catalog/journal families, identity/metadata import, global reconciliation and cutover import remain unfinished. |
 | 4 Native UI and client conversion | Not yet implemented |
 | 5 Compatibility removal and packaging | Preview packaging isolated and old compatibility gate replaced by current v3 operation/plugin-contract checks. Old UI/API/plugin adapters and config bridge still require conversion/removal. |
@@ -1817,3 +1817,82 @@ caller receipts, inspect original source tickets and submit completion proof.
 Per-scan completions, deferred/ignored work, the other catalog families, source
 registration and subsequent transition phases remain outstanding. This is not a
 live migration or deployment; production remains on the frozen compatible image.
+
+## Durable native n8n backfill callers and staged workflow conversion
+
+`stash-ingest-n8n` records the existing eight account-backfill modes using stable
+producer/workflow/execution/node/item identities. The first invocation freezes
+the account spelling, exact targets, profile policy and full-history cutoff.
+Replay returns the same token without reopening changed or missing profile
+inputs. Normal record success means local acceptance; strict inspection remains
+pending until native completion or an imported acceptance/deliberate skip.
+
+Producer schema 6 adds `backfill_calls` to the existing outbox. Before any source
+call exists, a root-authorized native history lookup must succeed. A needed
+decision and its child source snapshot commit together. Historical completion
+and skip create no source tickets. Fenced leases, bounded capacity and backoff
+retain interrupted checks across restart. Migration preserves all populated
+schema-5 tables, including pending/bound source calls and their original
+submissions; unknown table collisions roll back instead of replacing history.
+
+An active call remains tied to its original source tickets. Another call's later
+account history cannot complete or replace unfinished/cancelled work. Completion
+requires every target's assigned windows, and the adapter saves its exact proof
+before sending it. A lost server response replays the same proof/decision UUID.
+The dispatcher advances these calls alongside existing source requests, and its
+exit status stays pending when a backfill check or completion is outstanding.
+Finished workflow receipts remain local and separate from media-intake receipts.
+
+`stash-ingest-n8n-config` stages the known command/inspection graph contract in
+a new private file. It preserves workflow/node IDs, credential references,
+unrelated parameters, inputs and existing error/success outputs. Converted
+commands include stable execution context. Pending results retain their token,
+enter a 90-second persisted Wait and inspect that same call again. Unknown
+command/connection/result changes require review rather than speculative edits.
+
+Read-only inspection found three active backfill child workflows. Each current
+graph exactly matched its published version. Their three parent references all
+explicitly wait for subworkflow completion. Private input exports, staged graphs
+and review manifests are in `.local/native-n8n-adapter-20261001/`; the live n8n
+database was not changed. The actual installed n8n evaluator resolved 62 command
+and result expressions across the three conversions, including rejected account
+and token text. Its real Wait implementation checkpointed all three waits and
+retained the input token. That isolated check executed no scraper command.
+A read-only comparison also matched all eight old runner modes: five direct
+URLs and three delegated host expansions. Its source hash and result are in
+`legacy-mode-parity.json` beside the staged workflow exports.
+
+The real Go/Python download fixture now includes the packaged n8n command
+contract, local record replay, pending inspection, native download completion,
+a lost permanent-completion response, outbox reopening and exact-proof replay.
+It separately verifies that file admission remains queued after source success.
+Imported acceptance/skip, concurrent recording, fenced ownership, atomic guard
+publication, unrelated later history and cancelled original jobs have focused
+coverage. Parent commit `f5385af46` passed all three CI workflows.
+
+The full `make validate-fork` gate passed: 528 v3 tests, the 71-operation native
+contract check, Go lint with zero issues and all Go tests (API 210.155 seconds,
+ingest 344.951 seconds, SQLite 323.350 seconds). After the final Python dispatch
+pending-state fix, all 183 producer tests passed on Python 3.12 and 3.14 and in
+the installed n8n package. The final real HTTP/download fixture passed in 11.722
+seconds. Logs are `n8n-final-validation-v2.log`, `n8n-python312-final.log`,
+`n8n-python314-final.log`, `n8n-http-final.log`, `n8n-image-python-final.log` and
+`n8n-workflow-runtime-final.log` under `/tmp/stash-native-transition`.
+
+The final isolated image is
+`localhost/stash-n8n-native-rehearsal:adapter-final-20261001`, ID
+`e1248da527bcde3276967768825b9cb339b71cf9a047945549a9910731b4edbc`, built from
+the explicit existing n8n base `2fcb84852f4a…`. Its installed adapter fingerprint
+matches the final workspace files. Read-only mounts of the actual ordered n8n
+configuration, helpers, archives and media validated separate Reddit/Twitter
+full-history profiles; their source files were unchanged. The profiles and
+runtime review live under `.local/native-n8n-adapter-20261001/current/`, with
+image/graph provenance in `rehearsal-review.json`. They retain the unregistered
+rehearsal root UUID and have not been activated. This increment adds no Stash
+database migration.
+
+The remaining operational-history migration includes old result-file tokens,
+per-scan completions, deferred/ignored work and the other catalog families.
+Source registration, worker service configuration, profile/image activation,
+recovery callers and all later transition phases remain outstanding. Converted
+workflow files and profiles are staging artifacts, not a live deployment.

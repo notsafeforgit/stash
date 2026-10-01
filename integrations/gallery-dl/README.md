@@ -4,8 +4,10 @@ This package implements durable delivery and a gallery-dl download adapter.
 It is development code on `v3-rewrite`; the installed host and n8n download
 helpers still use their existing catalogs. Durable caller URL snapshots now feed
 the native dispatcher. Staged Twitter/Reddit host launchers preserve saved-list,
-mode and date inputs. n8n/recovery caller conversion, activation of reviewed
-worker profiles, additional source adapters and production cutover remain unfinished.
+mode and date inputs. The staged n8n adapter preserves stable execution tokens,
+historical backfill decisions and actual source completion. Recovery caller
+conversion, operational-history migration, activation of reviewed worker profiles,
+additional source adapters and production cutover remain unfinished.
 
 Python 3.12 or newer is required. Runtime delivery uses only the standard
 library. Install the local package with `pip install ./integrations/gallery-dl`
@@ -265,8 +267,8 @@ and inspect its state and file receipts when a workflow needs completion.
 
 A host timer can invoke this as one oneshot service per reviewed profile, with
 exit 2 accepted as pending work; an already-active service must not be launched
-again by its timer. Host/n8n wrapper activation and their workflow receipt
-conversion remain required. This command does not update installed launchers.
+again by its timer. Host/n8n wrapper activation and migration of old operational
+receipts remain required. This command does not update installed launchers.
 
 ## n8n worker image
 
@@ -406,8 +408,9 @@ submission states and age; a fresh schedule resets the age of an emptied group.
 
 Producer schema 2 introduced request/ticket tables; schema 3 added dispatch
 cursors and discovery backoff. Schema 4 added durable ticket-to-submission links
-and unassigned ranges. Schema 5 adds caller snapshots and source bindings.
-Opening an outbox from schemas 1–4 promotes it
+and unassigned ranges. Schema 5 adds caller snapshots and source bindings;
+schema 6 adds durable backfill calls, history checks and completion proof.
+Opening an outbox from schemas 1–5 promotes it
 in one SQLite transaction, preserving event bytes, receipts, dependencies,
 active delivery/submission leases, frozen requests and caller tickets. Old tickets
 are linked to the first covering submissions from their original request sequence;
@@ -425,7 +428,7 @@ The UTF-8 file uses the first token of each nonempty, non-comment line;
 duplicates retain their first position. Entries must already be exact HTTP(S)
 source URLs. The host launchers below expand Twitter handles and Reddit modes
 before recording the snapshot; this low-level command does not reinterpret those
-lists. n8n's execution/result contract still requires conversion.
+lists. The n8n adapter below adds its permanent-history and workflow-result contract.
 
 ```sh
 stash-ingest --outbox /persistent/producer.sqlite --endpoint STASH_ORIGIN \
@@ -588,13 +591,97 @@ nor enqueues work. The durable caller queue freezes the original URLs and time
 window, then commits selected bindings with their source tickets before native
 submission. Installed launcher conversion remains unfinished.
 
+## Native n8n backfills
+
+`stash-ingest-n8n` replaces the account backfill runner's record/inspect contract.
+It supports the existing eight Reddit/Twitter modes and their exact URL order.
+New calls require a reviewed matching service profile with global `skip=true`.
+Configure `STASH_INGEST_OUTBOX`, `STASH_INGEST_ENDPOINT`, `STASH_INGEST_PRODUCER`
+and `STASH_INGEST_TOKEN` in the execution environment. Set
+`STASH_INGEST_REDDIT_FULL_HISTORY_PROFILE` and
+`STASH_INGEST_TWITTER_FULL_HISTORY_PROFILE`, or pass `--profile` explicitly.
+
+```sh
+stash-ingest-n8n --mode reddit-new --identity Example \
+  --workflow WORKFLOW_ID --execution EXECUTION_NUMBER --node NODE_UUID --item 0 \
+  --profile /persistent/profiles/reddit-full-history.json
+stash-ingest-n8n --inspect RESULT_TOKEN
+```
+
+The first command records a bounded local snapshot and returns a 32-character
+result token. Its UUID derives from the producer, workflow, execution, node,
+item, mode and account; retrying the same node cannot create a new caller after
+a lost response. `--call UUID` can supply an explicit identity instead. The
+first call freezes its profile policy, exact URLs and absolute full-history
+cutoff. Replays do not reopen a removed/changed profile or recalculate the window.
+
+Inspection advances that same call; the normal dispatcher also advances queued
+backfills. A root-authorized native history lookup must succeed before any
+source call is created. Prior completion or deliberate skip produces a retained
+result with no source tickets. A `needed` decision and its child source snapshot
+commit together. API outages retain the pending check with backoff. Concurrent
+inspectors use fenced leases, and no network request holds a SQLite transaction.
+
+Once source work exists, only its original tickets can establish completion.
+Later account history cannot turn an unfinished/cancelled call into a success.
+After every target's original windows complete, the adapter saves the exact
+native proof before sending it. Lost responses replay the same proof and decision
+UUID. Native completion and file-intake completion remain separate.
+
+Known-token inspection retains the old `command_failed`, `exit_code`,
+`network_blocked`, `stdout_tail` and `stderr_tail` result fields, adding `token`,
+`backfill_pending`, the native state, retained decisions and source-call identity.
+These fields contain bounded status messages, not downloader logs or settings.
+While pending, `exit_code` is 2 and `backfill_pending` is true. Normal command
+exit 0 means the JSON result was produced; it does not certify scraping success.
+`--strict` exits 2 while pending, 1 for review/failure, and 0 for native completion
+or a retained historical acceptance/skip. `backfill_cached` identifies the latter;
+`account_backfill_complete` does not claim exhaustive website availability.
+Finished results remain available locally after restart, independently of token
+rotation or later API outages. `--inspect TOKEN --retry-reviewed` rechecks the
+same original work; it does not replace a cancelled ticket with a fresh scrape.
+If a source lookup or native job needs review, resolve and retry that underlying
+work first using its existing caller/job controls, then recheck this token.
+
+Producer schema 6 stores these calls and receipts in the existing outbox. Its
+default limit is 10,000 retained calls; reaching capacity stops admission without
+evicting history. Include this outbox in the migration/backup boundary. Stash's
+database schema does not change in this adapter increment.
+
+### Staging the existing n8n graphs
+
+`stash-ingest-n8n-config --input workflow-export.json --output staged.json`
+accepts a reviewed workflow export array and atomically creates a private file.
+It refuses unknown command/connection/result shapes and never overwrites an
+existing output. It does not access, publish or activate the n8n database.
+Existing workflow IDs, node IDs, credential references, unrelated parameters,
+inputs and success/error branches remain. The converted command records its
+execution context, and the inspection parser retains the pending flag and token.
+Pending results enter a 90-second Wait and inspect the same token again. Other
+results continue through the existing error/success handling.
+
+The interval uses n8n's persisted Wait path; waits shorter than 65 seconds keep
+the execution in the running process. See the [n8n Wait documentation](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.wait/).
+The `tests/n8n_workflow_runtime.cjs` rehearsal evaluates real staged commands and
+result expressions with the installed n8n evaluator, verifies retained IDs and
+credential references, and calls the actual Wait implementation with an isolated
+checkpoint context. It runs no scraper commands and needs no network.
+
+Before activation, preserve/import the old account decisions, per-scan state and
+result receipts, finish or reconcile old executions, register the exact source
+collections/root grants, and provision the profiles, outbox and dispatcher.
+Compare both current and published graphs at cutover; the staged converter must
+not overwrite later workflow edits. Old result-file tokens are a separate input
+format, not native outbox tokens. The installed workflows remain on the old
+runner until that conversion and deployment boundary is complete.
+
 ## Backfill journal import
 
 `stash-import-backfills` migrates permanent account completion/skip decisions
 through the native application API. It handles `backfill_completion` and
 `legacy_backfill_skip`; per-scan completions and the remaining journal/catalog
 families still require the broader migration. This is a maintenance command,
-separate from normal worker ingestion and the still-unconverted n8n runner.
+separate from normal worker ingestion and the staged native n8n adapter.
 
 ```sh
 stash-import-backfills --journal /migration/run-journal-snapshot.sqlite \
@@ -657,6 +744,9 @@ against the real API/SQLite from a persisted URL-list caller, drains a capture d
 attempt-completion response and admits a dependent file after reopening the
 outbox. It checks the ticket-status and call-status CLIs after restart and verifies that source
 success still leaves actual media intake queued.
+The same real download fixture exercises the n8n adapter's stable record/inspect
+token, pending result, lost permanent-completion response and exact-proof replay
+after reopening the outbox. Source completion still leaves file intake queued.
 `TestPythonBackfillImporterReplaysAfterLostNativeResponse` executes the maintenance
 importer against the real application router/SQLite, loses a committed batch's
 response and verifies replay without duplicate decisions or source-file changes.

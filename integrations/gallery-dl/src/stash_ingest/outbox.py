@@ -17,7 +17,7 @@ from .encoding import InvalidData, MAX_BATCH_BYTES, decode, digest, encode, iden
 from .endpoint import origin
 
 APPLICATION_ID = 0x5354494F  # STIO, not a Stash or gallery-dl archive database.
-SCHEMA = 5
+SCHEMA = 6
 
 
 class Conflict(InvalidData):
@@ -62,7 +62,7 @@ class Outbox:
             version = self.db.execute("PRAGMA user_version").fetchone()[0]
             application = self.db.execute("PRAGMA application_id").fetchone()[0]
             tables = self.db.execute("SELECT name FROM sqlite_schema WHERE type='table'").fetchall()
-            if not ((version in (1, 2, 3, 4, SCHEMA) and application == APPLICATION_ID)
+            if not ((version in (1, 2, 3, 4, 5, SCHEMA) and application == APPLICATION_ID)
                     or (version == 0 and application == 0 and not tables)):
                 raise InvalidData("Unsupported or foreign outbox database")
             self.db.execute("PRAGMA foreign_keys=ON")
@@ -130,7 +130,7 @@ class Outbox:
         version = self.db.execute("PRAGMA user_version").fetchone()[0]
         if version == SCHEMA:
             return
-        if version not in (1, 2, 3, 4):
+        if version not in (1, 2, 3, 4, 5):
             raise InvalidData("Unsupported outbox migration")
         if version == 1:
             self._migrate_runs()
@@ -139,7 +139,10 @@ class Outbox:
         if version < 4:
             from .tickets import migrate
             migrate(self.db)
-        from .source_calls import migrate
+        if version < 5:
+            from .source_calls import migrate
+            migrate(self.db)
+        from .backfill_calls import migrate
         migrate(self.db)
         self.db.execute(f"PRAGMA user_version={SCHEMA}")
 

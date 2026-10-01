@@ -15,7 +15,13 @@ from helpers import PRODUCER, capture, file_event, receipt
 from test_run_queue import request, admission
 
 
+def schema_five(db):
+    db.execute("DROP TABLE backfill_calls")
+    db.execute("PRAGMA user_version=5")
+
+
 def schema_four(db):
+    schema_five(db)
     db.execute("DROP TABLE source_call_targets")
     db.execute("DROP TABLE source_calls")
     db.execute("PRAGMA user_version=4")
@@ -190,6 +196,43 @@ class OutboxMigrationTests(unittest.TestCase):
             self.open()
         self.assertEqual(self.db.execute("PRAGMA user_version").fetchone()[0], 4)
         self.assertIsNone(self.db.execute("SELECT name FROM sqlite_schema WHERE name='source_call_targets'").fetchone())
+        self.assertEqual(self.db.execute("SELECT * FROM events ORDER BY seq").fetchall(), self.before)
+
+    def test_v5_promotion_preserves_bound_and_pending_calls_with_original_submissions(self):
+        from stash_ingest.source_calls import SourceCalls, resolve_once
+        from test_source_calls import snapshot, candidate
+        from unittest.mock import Mock
+        with closing(self.open()) as box:
+            calls = SourceCalls(box)
+            calls.record(str(uuid.uuid4()), "a" * 64, snapshot)
+            client = Mock(endpoint=box.endpoint, producer=box.producer)
+            client.capabilities.return_value = {"collection_lookup": True}
+            from stash_ingest.encoding import decode
+            client._request.side_effect = lambda method, route, body, **kwargs: {
+                "root_uuid": snapshot()["root_uuid"], "targets": [{"target_url": url,
+                    "candidates": [candidate(url)], "has_more": False} for url in decode(body)["targets"]]}
+            self.assertEqual(resolve_once(calls, client)["state"], "queued")
+            queue = RunQueue(box)
+            sent = queue.claim(str(uuid.uuid4()))
+            queue.admit(sent, admission(sent.body))
+            calls.record(str(uuid.uuid4()), "b" * 64, snapshot)
+            schema_five(box.db)
+        tables = [row[0] for row in self.db.execute("SELECT name FROM sqlite_schema WHERE type='table' ORDER BY name")]
+        before = {name: self.db.execute('SELECT * FROM "' + name + '" ORDER BY rowid').fetchall() for name in tables}
+        with closing(self.open()) as box:
+            self.assertEqual(box.db.execute("PRAGMA user_version").fetchone()[0], SCHEMA)
+            self.assertEqual(box.db.execute("SELECT count(*) FROM backfill_calls").fetchone()[0], 0)
+        after = {name: self.db.execute('SELECT * FROM "' + name + '" ORDER BY rowid').fetchall() for name in tables}
+        self.assertEqual(after, before)
+        self.assertEqual(self.db.execute("PRAGMA foreign_key_check").fetchall(), [])
+
+    def test_v5_unknown_backfill_table_rolls_back_instead_of_replacing_history(self):
+        with closing(self.open()) as box:
+            schema_five(box.db)
+            box.db.execute("CREATE TABLE backfill_calls(unrecognized TEXT)")
+        with self.assertRaises(sqlite3.OperationalError):
+            self.open()
+        self.assertEqual(self.db.execute("PRAGMA user_version").fetchone()[0], 5)
         self.assertEqual(self.db.execute("SELECT * FROM events ORDER BY seq").fetchall(), self.before)
 
 

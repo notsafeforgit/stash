@@ -181,7 +181,9 @@ def main(argv=None):
             with worker_output():
                 output = dispatch_once(box, client, Configuration(args.profile))
         else:
-            output = {**box.status(), "source_requests": requests.status(), "source_calls": calls.summary()}
+            from .backfill_calls import BackfillCalls
+            output = {**box.status(), "source_requests": requests.status(), "source_calls": calls.summary(),
+                      "backfill_calls": BackfillCalls(box).summary()}
         print(json.dumps(output, sort_keys=True))
         if args.command == "lookup-collections":
             return 0 if all(item["state"] == "resolved" for item in output["targets"]) else 2
@@ -204,7 +206,8 @@ def main(argv=None):
             requests = output["source_requests"]
             incomplete = (any(counts[k] for k in ("pending", "sending", "review")) or requests["pending_windows"]
                           or any(requests["counts"][k] for k in ("pending", "sending", "review"))
-                          or any(output["source_calls"]["counts"][k] for k in ("pending", "resolving", "review")))
+                          or any(output["source_calls"]["counts"][k] for k in ("pending", "resolving", "review"))
+                          or any(output["backfill_calls"]["counts"][k] for k in ("pending", "active", "review")))
             return 0 if output["state"] in ("idle", "source_succeeded") and not incomplete else 2
         return 0
     except (InvalidData, Unavailable, Capacity, SourcePaused) as exc:

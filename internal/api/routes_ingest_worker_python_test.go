@@ -20,20 +20,17 @@ import (
 	"github.com/stashapp/stash/pkg/archive"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/sqlite"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestPythonDownloadWorkerRecoversFinishAndDeliversFiles(t *testing.T) {
-	for _, launcher := range []bool{false, true} {
-		name := "caller-cli"
-		if launcher {
-			name = "host-launcher"
-		}
-		t.Run(name, func(t *testing.T) { runPythonDownloadWorker(t, launcher) })
+	for _, adapter := range []string{"caller-cli", "host-launcher", "n8n-backfill"} {
+		t.Run(adapter, func(t *testing.T) { runPythonDownloadWorker(t, adapter) })
 	}
 }
 
-func runPythonDownloadWorker(t *testing.T, launcher bool) {
+func runPythonDownloadWorker(t *testing.T, adapter string) {
 	t.Helper()
 	python, packagePath := nativeProducerRuntime(t)
 	config.InitializeEmpty()
@@ -50,8 +47,11 @@ func runPythonDownloadWorker(t *testing.T, launcher bool) {
 	var root *models.MediaRoot
 	var collection *models.SourceCollection
 	target := "https://fixture.invalid/account"
-	if launcher {
+	switch adapter {
+	case "host-launcher":
 		target = "https://www.reddit.com/r/native_fixture/?sort=new"
+	case "n8n-backfill":
+		target = "https://www.reddit.com/user/Native_Fixture/submitted/?sort=new&t=all"
 	}
 	require.NoError(t, service.Repo.WithTxn(t.Context(), func(ctx context.Context) error {
 		producer, err = service.Repo.Ingest.CreateProducer(ctx, "Python download fixture")
@@ -74,7 +74,26 @@ func runPythonDownloadWorker(t *testing.T, launcher bool) {
 	require.NoError(t, err)
 	router := (&ingestRoutes{service: service, fileIngestion: true}).router()
 	var finishes, finishStatus atomic.Int32
+	var backfillFinishes atomic.Int32
+	var firstProof atomic.Value
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/backfills/complete") {
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			r.Body = io.NopCloser(bytes.NewReader(body))
+			if backfillFinishes.Add(1) == 1 {
+				firstProof.Store(body)
+				committed := httptest.NewRecorder()
+				router.ServeHTTP(committed, r)
+				assert.Equal(t, http.StatusOK, committed.Code, committed.Body.String())
+				w.WriteHeader(http.StatusServiceUnavailable)
+				return
+			}
+			assert.Equal(t, firstProof.Load(), body, "lost completion response must replay the exact original proof")
+		}
 		if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/lease") {
 			body, err := io.ReadAll(r.Body)
 			if err != nil {
@@ -98,7 +117,7 @@ func runPythonDownloadWorker(t *testing.T, launcher bool) {
 	setup, err := json.Marshal(map[string]interface{}{
 		"directory": directory, "endpoint": server.URL, "producer": producer.UUID, "root": root.UUID,
 		"collection": collection.UUID, "revision": collection.Revision,
-		"target": target, "launcher": launcher,
+		"target": target, "adapter": adapter,
 	})
 	require.NoError(t, err)
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
@@ -118,6 +137,9 @@ func runPythonDownloadWorker(t *testing.T, launcher bool) {
 	require.NoError(t, json.Unmarshal(stdout.Bytes(), &result))
 	require.EqualValues(t, http.StatusOK, finishStatus.Load())
 	require.EqualValues(t, 1, finishes.Load())
+	if adapter == "n8n-backfill" {
+		require.EqualValues(t, 2, backfillFinishes.Load())
+	}
 	require.NoError(t, service.Repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
 		run, err := service.Repo.SourceRun.Find(ctx, result.RunUUID)
 		require.NoError(t, err)
@@ -134,6 +156,14 @@ func runPythonDownloadWorker(t *testing.T, launcher bool) {
 		registered, err := service.Repo.File.FindByPath(ctx, filepath.Join(mediaPath, result.Path), true)
 		require.NoError(t, err)
 		require.Nil(t, registered, "source completion and file admission do not certify verified media intake")
+		if adapter == "n8n-backfill" {
+			backfill, err := service.Repo.SourceBackfill.Status(ctx, models.BackfillSubject{RootUUID: root.UUID, Platform: "reddit", Account: "native_fixture"}, "reddit-profile-new")
+			require.NoError(t, err)
+			require.Equal(t, "completed", backfill.State)
+			require.False(t, backfill.AccountComplete)
+			require.Len(t, backfill.Decisions, 1)
+			require.Equal(t, "source_runs", backfill.Decisions[0].Basis)
+		}
 		return nil
 	}))
 	status, err := service.ReceiptStatus(t.Context(), token, result.File)

@@ -75,7 +75,7 @@ local, and source completion remains distinct from verified media intake.
 Preserve conditional map order and layered private references; conversion does
 not activate a worker or replace the existing configuration files.
 `stash-ingest dispatch` discovers scoped work through the native API. Producer
-schema 5 retains pagination/backoff, caller URL snapshots and each ticket's original submission
+schema 6 retains pagination/backoff, caller URL snapshots and each ticket's original submission
 assignments. `ticket-status` checks completed source windows against those
 assignments; later rescans cannot complete an earlier cancelled ticket. Discovery
 and admission do not certify completion. Preserve existing request/event state
@@ -94,15 +94,21 @@ original ticket and cannot certify media intake. Staged Twitter/Reddit host
 launchers now expand the existing lists/modes/dates into source calls. Full-history
 and Reddit top mode require a separate reviewed global `skip=true` profile.
 Local recording is not source completion; strict inspection returns pending until
-all original tickets finish. n8n/recovery result contracts still need conversion
-to native caller receipts and permanent backfill history before activation.
+all original tickets finish. The staged n8n adapter records stable execution
+identities, checks permanent history before source admission and retains its
+completion proof before submission. Pending workflow results must wait and
+inspect the same token; local recording cannot reach a success branch.
 `source_backfill_decisions` now retains permanent account-backfill history in
 the native database. Historical acceptance/skip imports retain their entire
 source row without creating source-run coverage. Native completion proves every
 component URL through the producer's original request hashes and completed
 windows. The maintenance importer validates a read-only journal snapshot and
 uses application-authorized batches; producer tokens cannot import historical
-assertions. n8n must still adopt the status/proof API and durable caller receipts.
+assertions. Producer schema 6 commits each n8n history check and its source
+snapshot together; later account history cannot replace that caller's original
+tickets. `stash-ingest-n8n-config` stages the known workflow graphs, preserving
+IDs, credential references and result branches while adding a durable wait.
+Activation, old operational receipt migration and recovery callers remain open.
 
 ## Architecture
 

@@ -57,6 +57,19 @@ def definition(value):
     return {**value, "window": windows.normalize(value["window"])}
 
 
+def snapshot(value):
+    if not isinstance(value, dict) or "targets" not in value:
+        raise InvalidData("A caller snapshot requires source targets")
+    targets = value["targets"]
+    if not isinstance(targets, list) or not 1 <= len(targets) <= 10000:
+        raise InvalidData("A caller snapshot requires 1–10000 targets")
+    targets = [target_url(target) for target in targets]
+    if len(set(targets)) != len(targets) or sum(len(target.encode()) for target in targets) > 8 << 20:
+        raise InvalidData("Caller targets must be unique and bounded")
+    spec = definition({key: item for key, item in value.items() if key != "targets"})
+    return spec, targets
+
+
 @dataclass(frozen=True)
 class Resolution:
     call_uuid: str
@@ -100,33 +113,33 @@ class SourceCalls:
             if previous["request_sha256"] != request_sha256:
                 raise Conflict("Caller UUID already identifies different options")
             return self.summary(call_uuid)
-        value = prepare()
-        if not isinstance(value, dict) or "targets" not in value:
-            raise InvalidData("A caller snapshot requires source targets")
-        targets = value["targets"]
-        if not isinstance(targets, list) or not 1 <= len(targets) <= 10000:
-            raise InvalidData("A caller snapshot requires 1–10000 targets")
-        targets = [target_url(target) for target in targets]
-        if len(set(targets)) != len(targets) or sum(len(target.encode()) for target in targets) > 8 << 20:
-            raise InvalidData("Caller targets must be unique and bounded")
-        spec = definition({key: item for key, item in value.items() if key != "targets"})
-        body = encode(spec, 8192)
+        spec, targets = snapshot(prepare())
         with self.box.transaction():
-            previous = self._find(call_uuid)
-            if previous is not None:
-                if previous["request_sha256"] != request_sha256:
-                    raise Conflict("Caller UUID already identifies different options")
-            else:
-                if (self.db.execute("SELECT count(*) FROM source_calls").fetchone()[0] >= self.max_calls
-                        or self.db.execute("SELECT count(*) FROM source_call_targets").fetchone()[0] + len(targets) > self.max_targets):
-                    raise Capacity("Caller capacity exhausted; existing snapshots are retained")
-                now = self.box.clock()
-                self.db.execute("""INSERT INTO source_calls(uuid,request_sha256,definition,definition_sha256,
-                    operation,until_stamp,target_count,created_at) VALUES(?,?,?,?,?,?,?,?)""",
-                    (call_uuid, request_sha256, body, digest(body), spec["operation"], spec["window"]["until"], len(targets), now))
-                self.db.executemany("""INSERT INTO source_call_targets(call_uuid,position,target_url,state,available_at)
-                    VALUES(?,?,?,'pending',?)""", [(call_uuid, index, target, now) for index, target in enumerate(targets, 1)])
+            self.record_in_transaction(call_uuid, request_sha256, {**spec, "targets": targets})
         return self.summary(call_uuid)
+
+    def record_in_transaction(self, call_uuid, request_sha256, value):
+        """Commit a prepared snapshot with its caller's prerequisite decision."""
+        if not self.db.in_transaction:
+            raise RuntimeError("Source snapshot requires the caller transaction")
+        identifier(call_uuid)
+        if not sha256(request_sha256):
+            raise InvalidData("A caller requires a stable request digest")
+        spec, targets = snapshot(value)
+        previous = self._find(call_uuid)
+        if previous is not None:
+            if previous["request_sha256"] != request_sha256:
+                raise Conflict("Caller UUID already identifies different options")
+            return
+        if (self.db.execute("SELECT count(*) FROM source_calls").fetchone()[0] >= self.max_calls
+                or self.db.execute("SELECT count(*) FROM source_call_targets").fetchone()[0] + len(targets) > self.max_targets):
+            raise Capacity("Caller capacity exhausted; existing snapshots are retained")
+        now, body = self.box.clock(), encode(spec, 8192)
+        self.db.execute("""INSERT INTO source_calls(uuid,request_sha256,definition,definition_sha256,
+            operation,until_stamp,target_count,created_at) VALUES(?,?,?,?,?,?,?,?)""",
+            (call_uuid, request_sha256, body, digest(body), spec["operation"], spec["window"]["until"], len(targets), now))
+        self.db.executemany("""INSERT INTO source_call_targets(call_uuid,position,target_url,state,available_at)
+            VALUES(?,?,?,'pending',?)""", [(call_uuid, index, target, now) for index, target in enumerate(targets, 1)])
 
     def summary(self, call_uuid=None):
         row = self._find(call_uuid) if call_uuid is not None else None

@@ -42,13 +42,14 @@ review. Production has not been migrated.
 | Stash `c1d2c9387` | Portable gallery identities, membership revisions, and explicit source-album requirements; full-copy reconciliation and complete validation gate passed |
 | Stash `e31ced0d9` | Ordered shared attachment manifests and audited media associations; full-copy reconciliation and complete validation gate passed |
 | Stash `a7ab4a1cc` | Reviewed attachment selections and compatible partial source lists; full-copy reconciliation, complete validation gate, CI lint/build, and preview image publication passed |
+| Stash `377f7a6ad` | Source albums with persistent manual membership intent; full-copy reconciliation, complete validation gate, CI lint/build, and preview image publication passed |
 
 ## Phase status
 
 | Phase | Status |
 | --- | --- |
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
-| 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries, native account/ownership storage, shared post/profile/capture storage, ordered attachment manifests, audited media associations, reviewed source-list selection, and source-gallery synchronization with manual membership intent are implemented. Source equivalence, general field decisions, review APIs/UI and remaining domain services are in progress. |
+| 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries and metadata relationship targets, native account/ownership storage, shared post/profile/capture storage, ordered attachment manifests, audited media associations, reviewed source-list selection, and source-gallery synchronization with manual membership intent are implemented. Source equivalence, general field decisions, review APIs/UI and remaining domain services are in progress. |
 | 2 Ingestion and producer adapter | Not yet implemented |
 | 3 Catalog importer and full-copy reconciliation | Not yet implemented |
 | 4 Native UI and client conversion | Not yet implemented |
@@ -387,3 +388,26 @@ The native API/UI, per-field source/review policies, manual mixed-media ordering
 durable after-success delivery, and producer/catalog import integration remain
 required. This checkpoint initializes new album title/description/date and
 preserves all existing gallery metadata. Production has not been migrated.
+
+## Portable metadata relationship targets
+
+Migration 1000011 adds tag, studio, and group UUIDs to the archive registry. They
+retain identity across renames and preserve tombstones after deletion or reuse
+of an integer ID. Tag merges retain redirects to the surviving tag while moving
+the existing aliases, remote IDs, and media relationships. Definition and
+hierarchy edits advance revisions; moving a relation invalidates both owners.
+These identities are a prerequisite for typed references in metadata history,
+not an implementation of field decisions themselves.
+
+Focused tests cover all three kinds, stale revisions, UUID adoption, redirects,
+transaction rollback, indexed lookup, relationship edits, existing source-gallery
+references, and anonymised exports. The full-copy migration took 10.28 seconds.
+All 1,541,803 prior identities matched exactly, all 96 other retained tables
+matched by streaming row digest, and all 118 tags, 124 studios, and five groups
+received identities. Foreign-key checking found zero violations. File growth
+was 1,642,496 bytes, with 146,558,976 bytes available on the reusable free-page
+list. The private receipt is
+`.local/native-archive-rehearsal-20260930/metadata-identity-reconciliation.json`.
+The complete `make validate-fork` gate passed, including generation, frontend
+validation and 528 UI tests, native contracts, Go lint, and all Go unit/integration
+tests. Production has not been migrated.

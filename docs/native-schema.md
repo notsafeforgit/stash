@@ -366,6 +366,23 @@ controls, native API/UI, durable after-success delivery, and ingestion/catalog
 import integration remain required. Anonymised copies remove source association
 and membership history before rekeying identities.
 
+Migration 1000011 extends `archive_entities` to tags, studios, and groups. These
+relationship targets need portable references before field-decision history can
+refer to them. Existing UUIDs, revisions, redirects, and incoming foreign keys
+survive the registry rebuild. New identities use checked typed foreign keys and
+partial unique indexes, with the same deletion, ID-reuse, adoption, and redirect
+rules as media identities. Tag merges now redirect former UUIDs to the survivor
+within the relationship-transfer transaction.
+
+Changes to a tag, studio, or group definition, including its own URLs, aliases,
+remote IDs, custom fields, tags, and hierarchy as applicable, advance its
+revision. Moving a relationship advances both affected definitions. Unrelated
+media usage is not part of that revision: services reviewing usage transfers
+must also validate the relevant associations. Startup verifies the new lifecycle
+and relationship guards. Anonymisation rekeys these identities and preserves
+their redirect graphs. This migration supplies stable relationship targets;
+the general metadata field-decision engine is still subsequent work.
+
 The filesystem deletion journal currently derives its directory from the
 database filename. Promotion in place retains that association, but a production
 path change must first drain pending deletions or transfer the exact journal

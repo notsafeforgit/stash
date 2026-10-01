@@ -25,6 +25,9 @@ type archiveEntityRow struct {
 	ImageID     sql.NullInt64             `db:"image_id"`
 	FileID      sql.NullInt64             `db:"file_id"`
 	GalleryID   sql.NullInt64             `db:"gallery_id"`
+	TagID       sql.NullInt64             `db:"tag_id"`
+	StudioID    sql.NullInt64             `db:"studio_id"`
+	GroupID     sql.NullInt64             `db:"group_id"`
 	OriginalID  sql.NullInt64             `db:"original_id"`
 	RedirectTo  sql.NullString            `db:"redirect_to"`
 	CreatedAt   Timestamp                 `db:"created_at"`
@@ -33,7 +36,7 @@ type archiveEntityRow struct {
 
 func (r archiveEntityRow) resolve() *models.ArchiveEntity {
 	ret := &models.ArchiveEntity{UUID: r.UUID, Kind: r.Kind, State: r.State, Revision: r.Revision, CreatedAt: r.CreatedAt.Timestamp}
-	for _, local := range []sql.NullInt64{r.PerformerID, r.SceneID, r.ImageID, r.FileID, r.GalleryID} {
+	for _, local := range []sql.NullInt64{r.PerformerID, r.SceneID, r.ImageID, r.FileID, r.GalleryID, r.TagID, r.StudioID, r.GroupID} {
 		if local.Valid {
 			id := int(local.Int64)
 			ret.LocalID = &id
@@ -72,6 +75,12 @@ func archiveLocalColumn(kind models.ArchiveEntityKind) (string, error) {
 		return "file_id", nil
 	case models.ArchiveGallery:
 		return "gallery_id", nil
+	case models.ArchiveTag:
+		return "tag_id", nil
+	case models.ArchiveStudio:
+		return "studio_id", nil
+	case models.ArchiveGroup:
+		return "group_id", nil
 	default:
 		return "", errors.New("invalid archive entity kind")
 	}
@@ -178,7 +187,8 @@ func (s *ArchiveEntityStore) Redirect(ctx context.Context, sourceUUID, destinati
 		return errors.New("merge requires distinct archive entities of the same kind")
 	}
 	result, err := dbWrapper.Exec(ctx, `UPDATE archive_entities SET state = 'redirected', revision = revision + 1,
-performer_id = NULL, scene_id = NULL, image_id = NULL, file_id = NULL, gallery_id = NULL, redirect_to = ?, retired_at = CURRENT_TIMESTAMP
+performer_id = NULL, scene_id = NULL, image_id = NULL, file_id = NULL, gallery_id = NULL,
+tag_id = NULL, studio_id = NULL, group_id = NULL, redirect_to = ?, retired_at = CURRENT_TIMESTAMP
 WHERE uuid = ? AND revision = ? AND state = 'active'`, destination.UUID, source.UUID, expectedRevision)
 	if err := checkArchiveIdentityUpdate(result, err); err != nil {
 		return err
@@ -191,6 +201,7 @@ WHERE uuid = ? AND revision = ? AND state = 'active'`, destination.UUID, source.
 		models.ArchivePerformer: "performers", models.ArchiveScene: "scenes",
 		models.ArchiveImage: "images", models.ArchiveFile: "files",
 		models.ArchiveGallery: "galleries",
+		models.ArchiveTag:     "tags", models.ArchiveStudio: "studios", models.ArchiveGroup: "groups",
 	}[source.Kind]
 	// The merge caller must remove the source record before commit. Refuse a
 	// partial merge that would leave a library row without a current UUID.

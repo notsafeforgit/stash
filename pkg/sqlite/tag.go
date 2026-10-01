@@ -1078,6 +1078,9 @@ WHERE tag_id IN `+inBinding, args...)
 		return err
 	}
 
+	if err := redirectArchiveLocalIDs(ctx, models.ArchiveTag, source, destination); err != nil {
+		return err
+	}
 	for _, id := range source {
 		err = qb.Destroy(ctx, id)
 		if err != nil {

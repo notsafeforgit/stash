@@ -14,6 +14,9 @@ const (
 	ArchiveImage     ArchiveEntityKind = "image"
 	ArchiveFile      ArchiveEntityKind = "file"
 	ArchiveGallery   ArchiveEntityKind = "gallery"
+	ArchiveTag       ArchiveEntityKind = "tag"
+	ArchiveStudio    ArchiveEntityKind = "studio"
+	ArchiveGroup     ArchiveEntityKind = "group"
 )
 
 type ArchiveEntityState string

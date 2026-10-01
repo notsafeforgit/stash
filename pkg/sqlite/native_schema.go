@@ -276,6 +276,45 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 				}
 			}
 		}
+		if version >= NativeSchemaBaseline+11 {
+			var columns, objects []string
+			if err := conn.Select(&columns, "SELECT name FROM pragma_table_info('archive_entities')"); err != nil {
+				return err
+			}
+			if err := conn.Select(&objects, "SELECT name FROM sqlite_schema WHERE type IN ('index', 'trigger') AND name LIKE 'archive_%'"); err != nil {
+				return err
+			}
+			existingColumns, existingObjects := make(map[string]bool), make(map[string]bool)
+			for _, name := range columns {
+				existingColumns[name] = true
+			}
+			for _, name := range objects {
+				existingObjects[name] = true
+			}
+			for kind, tables := range map[string][]string{
+				"tag":    {"tag_aliases", "tag_stash_ids", "tag_custom_fields", "tags_relations"},
+				"studio": {"studio_aliases", "studio_urls", "studio_stash_ids", "studio_custom_fields", "studios_tags"},
+				"group":  {"group_urls", "group_custom_fields", "groups_tags", "groups_relations"},
+			} {
+				if !existingColumns[kind+"_id"] {
+					return fmt.Errorf("native database schema is incomplete: missing archive_entities.%s_id", kind)
+				}
+				required := []string{"archive_entities_" + kind}
+				for _, action := range []string{"created", "changed", "deleted"} {
+					required = append(required, "archive_"+kind+"_"+action)
+				}
+				for _, table := range tables {
+					for _, action := range []string{"insert", "delete", "update"} {
+						required = append(required, "archive_"+kind+"_"+table+"_"+action)
+					}
+				}
+				for _, name := range required {
+					if !existingObjects[name] {
+						return fmt.Errorf("native database schema is incomplete: missing %s", name)
+					}
+				}
+			}
+		}
 		return nil
 	}
 	if version >= NativeSchemaBaseline {

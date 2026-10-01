@@ -39,6 +39,23 @@ VALUES(?,?,?) ON CONFLICT(collection_uuid,capture_uuid,collection_revision) DO N
 	return err
 }
 
+func (s *SourceCollectionStore) HasCapture(ctx context.Context, input models.CollectionCapture) (bool, error) {
+	for _, value := range []*string{&input.CollectionUUID, &input.CaptureUUID} {
+		id, err := archiveUUID(*value)
+		if err != nil {
+			return false, err
+		}
+		*value = id
+	}
+	if input.CollectionRevision <= 0 {
+		return false, errors.New("collection capture requires a revision")
+	}
+	var found bool
+	err := dbWrapper.Get(ctx, &found, `SELECT EXISTS(SELECT 1 FROM source_collection_captures
+WHERE collection_uuid=? AND capture_uuid=? AND collection_revision=?)`, input.CollectionUUID, input.CaptureUUID, input.CollectionRevision)
+	return found, err
+}
+
 func (s *SourceCollectionStore) Captures(ctx context.Context, value string, after *models.CollectionCaptureCursor, limit int) ([]models.CollectionCapture, error) {
 	id, err := archiveUUID(value)
 	if err != nil {

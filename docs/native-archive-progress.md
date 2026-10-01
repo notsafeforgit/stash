@@ -56,6 +56,7 @@ review. Production has not been migrated.
 | Stash `2215503f7` | Verified media preparation through the shared scanner; complete validation gate, Windows package cross-compilation, CI lint/build, and preview image publication passed |
 | Stash `5777a6b60` | Verified content identities, immutable root/file verification history, and file-generation guards; full-copy reconciliation, complete validation gate, CI lint/build, and preview image publication passed |
 | Stash `b5e996347` | Durable archive jobs, fenced leases, coalesced submissions and atomic publication; full-copy reconciliation, complete validation gate, targeted race tests, CI lint/build, and preview image publication passed |
+| Stash `a2fdd056e` | Verified file/media publication and persistent path removal fences; full-copy reconciliation, complete validation gate, CI lint/build, and preview image publication passed |
 
 ## Phase status
 
@@ -63,7 +64,7 @@ review. Production has not been migrated.
 | --- | --- |
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
 | 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries and metadata relationship targets, native account/ownership storage and reviewed consolidation, shared post/profile/capture storage, ordered attachment manifests, audited media associations, reviewed source-list selection, and source-gallery synchronization with manual membership intent are implemented. Scalar and relationship field choices protect explicit and preserved metadata. Revisioned logical roots and source collections retain capture/manual-intake provenance; captured publisher choices connect source evidence to accounts independently of depicted performers. Verified byte identities and immutable per-file verification history now use persistent file-generation guards. Producer identity matching, policy resolution, review APIs/UI and remaining domain services are in progress. |
-| 2 Ingestion and producer adapter | In progress: scoped producer tokens, Reddit/Twitter capture batches and durable receipts are implemented. Verified preparation uses the shared scanner; file/media publication checks descriptors, generations and persistent path removals, reuses concurrent scans, and rejects ambiguous verified-byte owners. Persistent jobs have coalesced submissions, fenced leases, retry/cancellation/recovery, and atomic domain/result publication. File-completion admission and source/gallery/receipt integration, actual workers and source-run coordination, additional source adapters, producer outboxes and host/n8n conversion remain. |
+| 2 Ingestion and producer adapter | In progress: scoped producer tokens, Reddit/Twitter capture batches and durable receipts are implemented. Verified preparation uses the shared scanner; file/media publication checks descriptors, generations and persistent path removals, reuses concurrent scans, and rejects ambiguous verified-byte owners. Intake publication connects collection provenance, selected source media, attachment evidence and album galleries while preserving explicit choices. Persistent jobs have coalesced submissions, fenced leases, retry/cancellation/recovery, and atomic domain/result publication. File-completion admission/receipts, field policy, durable generated assets/notifications, actual workers and source-run coordination, additional source adapters, producer outboxes and host/n8n conversion remain. |
 | 3 Catalog importer and full-copy reconciliation | Not yet implemented |
 | 4 Native UI and client conversion | Not yet implemented |
 | 5 Compatibility removal and packaging | Preview packaging isolated and old compatibility gate replaced by current v3 operation/plugin-contract checks. Old UI/API/plugin adapters and config bridge still require conversion/removal. |
@@ -928,3 +929,51 @@ all 528 UI tests, retained v3 extension contracts and 71 application operation
 files, zero Go lint issues, and every Go unit/integration package. The SQLite
 suite completed in 236.0 seconds, API tests in 136.3 seconds, and ingestion tests
 in 125.3 seconds. The final checks include the query cursor cleanup correction.
+
+## Collection, source attachment and album publication
+
+`PreparedMedia.PublishIntake` now combines verified file/media publication with
+collection provenance, attachment evidence and source album synchronization.
+The captured collection revision must permit the root/path, and the current
+definition must still be active and permit that location. Historical label edits
+do not invalidate accepted provenance. A referenced capture must belong to that
+collection revision and contain the attachment. Manual intake records provenance
+without inventing a scraped account, capture or gallery.
+
+An existing attachment media choice directs an unowned file to the selected
+item, resolving canonical UUID adoption. The same choice can select one owner
+of an intentionally shared file without moving or merging other owners. Existing
+file ownership is preserved when it conflicts with the selected source item;
+evidence is retained for review. Deleted selections require review instead of
+recreation. Explicit unlinks, disabled albums, and manually excluded gallery
+members remain intact. No publisher is implicitly assigned as a depicted performer.
+
+Unambiguous observed attachments can establish their media association and add
+arriving items to a shared source album. Replays retain one intake/evidence fact
+and reuse the gallery. File, content proof, library media, collection provenance,
+source choices, album changes, and durable job result share the transaction;
+failure rolls them back together. Before-commit checks reject disabled collection
+scope, removed media/file associations and changed source selections.
+
+Focused tests passed for partial album arrivals, replay, manual membership
+exclusion, direct unsourced intake, preserved explicit choices, conflicting
+evidence, deleted/adopted selections, shared files with more than two owners,
+selected-target priority over a separate byte match, historical/current scope,
+and gallery-failure rollback including the job outcome. Indexed ownership
+lookup was checked read-only against the full schema-20 library copy: both UUID
+lookups and media/file joins used indexes; 1,000 repeated cached lookups took
+0.0033 seconds locally. This is not an end-to-end ingestion throughput claim.
+The private query-plan receipt is
+`.local/native-archive-rehearsal-20260930/intake-owner-lookups.json`.
+
+No schema migration is added in this checkpoint. Field policy and performer
+defaults, durable generated assets/notifications, file-completion admission and
+receipts, the actual worker and producer conversion remain unfinished.
+The ingestion API still advertises `file_ingestion: false`; production remains
+on the frozen compatible release.
+
+The complete `make validate-fork` gate passed after the selected-media and lint
+corrections: generation, frontend checks and 528 UI tests, retained v3 extension
+contracts and 71 application operation files, zero Go lint issues, and every Go
+unit/integration package. The SQLite suite completed in 268.4 seconds, ingestion
+in 241.5 seconds, and API tests in 135.3 seconds.

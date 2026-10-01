@@ -24,11 +24,21 @@ type PublishedMedia struct {
 // The caller applies collection/source metadata, galleries, notifications, and
 // its completion result in this same managed transaction.
 func (p *PreparedMedia) PublishMedia(ctx context.Context, repo models.Repository, target FileTarget, kind models.ArchiveEntityKind) (*PublishedMedia, error) {
+	return p.publishMedia(ctx, repo, target, kind, nil)
+}
+
+// A selected source attachment may identify the intended media before any file
+// arrives. Its canonical target is read in this transaction, never supplied by
+// a producer as an override. Existing file owners are not moved or replaced.
+func (p *PreparedMedia) publishMedia(ctx context.Context, repo models.Repository, target FileTarget, kind models.ArchiveEntityKind, selected *models.ArchiveEntity) (*PublishedMedia, error) {
 	if kind != models.ArchiveScene && kind != models.ArchiveImage {
 		return nil, ErrUnsupported
 	}
 	if _, video := p.media.(*models.VideoFile); kind == models.ArchiveScene && !video {
 		return nil, ErrUnsupported
+	}
+	if selected != nil && (selected.State != models.ArchiveEntityActive || selected.Kind != kind || selected.LocalID == nil) {
+		return nil, ErrMediaKindConflict
 	}
 	published, err := p.PublishFile(ctx, repo, target)
 	if err != nil {
@@ -39,6 +49,16 @@ func (p *PreparedMedia) PublishMedia(ctx context.Context, repo models.Repository
 		return nil, err
 	}
 	linked := len(owners) > 0
+	selectedOwner := false
+	if selected != nil {
+		owns, err := repo.FileContent.HasOwner(ctx, published.Identity.UUID, selected.UUID)
+		if err != nil {
+			return nil, err
+		}
+		if owns || !linked {
+			owners, selectedOwner = []*models.ArchiveEntity{selected}, true
+		}
+	}
 	if len(owners) == 0 {
 		owners, err = repo.FileContent.MediaCandidates(ctx, published.Proof.Content.UUID)
 		if err != nil {
@@ -99,6 +119,16 @@ func (p *PreparedMedia) PublishMedia(ctx context.Context, repo models.Repository
 		}
 		if identity == nil || identity.State != models.ArchiveEntityActive || identity.Kind != kind {
 			return models.ErrArchiveIdentityConflict
+		}
+		if selectedOwner {
+			owns, err := repo.FileContent.HasOwner(ctx, fileUUID, identity.UUID)
+			if err != nil {
+				return err
+			}
+			if !owns {
+				return models.ErrArchiveIdentityConflict
+			}
+			return nil
 		}
 		owners, err := repo.FileContent.Owners(ctx, fileUUID)
 		if err != nil {

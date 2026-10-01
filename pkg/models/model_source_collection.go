@@ -120,6 +120,7 @@ type SourceCollectionReaderWriter interface {
 	LookupTarget(context.Context, string, string, int) ([]*SourceCollection, error)
 	History(context.Context, string, int, int) ([]SourceCollectionRevision, error)
 	RecordCapture(context.Context, CollectionCapture) error
+	HasCapture(context.Context, CollectionCapture) (bool, error)
 	Captures(context.Context, string, *CollectionCaptureCursor, int) ([]CollectionCapture, error)
 	RecordMediaIntake(context.Context, CollectionMediaIntake) (*CollectionMediaIntake, error)
 	MediaIntake(context.Context, string, string, int) ([]CollectionMediaIntake, error)

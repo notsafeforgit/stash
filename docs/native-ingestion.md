@@ -108,9 +108,32 @@ do not authorize associations. Multiple candidates or conflicting media kinds
 require review, and existing items retain their metadata. Final checks reject
 deletion, detachment, or conflicting ownership before commit. These methods run
 inside `Durable.Publish`, so file, proof, media association, and job result either
-commit together or roll back. Collection policy, source/gallery associations,
-durable notifications/generated assets, and completion HTTP events still need
-to be integrated by the caller; this is not yet a running ingestion worker.
+commit together or roll back.
+
+`PreparedMedia.PublishIntake` adds the recorded collection revision, source
+attachment evidence and source album membership in that same transaction. It
+checks both historical and current collection root/path scope; a label edit may
+retain accepted work, while disabling or narrowing scope prevents publication.
+The referenced capture must belong to the recorded collection revision and
+contain the attachment. These are indexed lookups of the selected records.
+
+An attachment's existing media choice directs an unowned incoming file to that
+item, including when its UUID has been adopted. This can also select one existing
+owner of an intentionally shared file without merging its other owners. Files
+already owned elsewhere stay with their owners and conflicting source links
+remain for review. A deleted selected item requires review; it is not recreated.
+Explicit unlinks and disabled albums are preserved. Otherwise unambiguous verified
+attachment evidence can establish the link automatically. Publishers never
+implicitly become depicted performers.
+
+As attachments arrive, the native source-gallery service adds their media to the
+post's album while preserving manual membership exclusions. Replayed intake
+does not duplicate its provenance or evidence. Manual media can record collection
+provenance without inventing a source capture, account or gallery. Failures roll
+back file, content proof, library media, source links, album changes and job result
+together. Field policy, durable notifications/generated assets, file-completion
+HTTP admission/receipts and the worker still need to be connected before enabling
+file ingestion.
 
 ### Durable archive work
 

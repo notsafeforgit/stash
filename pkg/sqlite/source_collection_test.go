@@ -197,6 +197,14 @@ func TestCollectionCaptureAndManualIntakeReplay(t *testing.T) {
 		}))
 	}
 	require.NoError(t, repo.WithReadTxn(context.Background(), func(ctx context.Context) error {
+		for _, revision := range []int{1, 2, 3} {
+			present, err := repo.SourceCollection.HasCapture(ctx, models.CollectionCapture{CollectionUUID: first.UUID, CollectionRevision: revision, CaptureUUID: capture.UUID})
+			require.NoError(t, err)
+			require.Equal(t, revision <= 2, present)
+		}
+		present, err := repo.SourceCollection.HasCapture(ctx, models.CollectionCapture{CollectionUUID: uuid.NewString(), CollectionRevision: 1, CaptureUUID: capture.UUID})
+		require.NoError(t, err)
+		require.False(t, present)
 		page, err := repo.SourceCollection.Captures(ctx, first.UUID, nil, 1)
 		require.NoError(t, err)
 		require.Len(t, page, 1)

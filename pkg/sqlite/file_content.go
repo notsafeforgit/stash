@@ -177,6 +177,22 @@ func (s *FileContentStore) Owners(ctx context.Context, id string) ([]*models.Arc
 	return verifiedMediaCandidates(ctx, `FROM archive_entities e`, `e.uuid=? AND e.kind='file' AND e.state='active'`, id)
 }
 
+func (s *FileContentStore) HasOwner(ctx context.Context, file, media string) (bool, error) {
+	for _, value := range []*string{&file, &media} {
+		id, err := archiveUUID(*value)
+		if err != nil {
+			return false, err
+		}
+		*value = id
+	}
+	var ret bool
+	err := dbWrapper.Get(ctx, &ret, `SELECT EXISTS(SELECT 1 FROM archive_entities f JOIN archive_entities m ON m.uuid=?
+WHERE f.uuid=? AND f.kind='file' AND f.state='active' AND m.state='active' AND
+((m.kind='scene' AND EXISTS(SELECT 1 FROM scenes_files l WHERE l.scene_id=m.scene_id AND l.file_id=f.file_id)) OR
+ (m.kind='image' AND EXISTS(SELECT 1 FROM images_files l WHERE l.image_id=m.image_id AND l.file_id=f.file_id))))`, media, file)
+	return ret, err
+}
+
 func (s *FileContentStore) MediaCandidates(ctx context.Context, id string) ([]*models.ArchiveEntity, error) {
 	id, err := archiveUUID(id)
 	if err != nil {

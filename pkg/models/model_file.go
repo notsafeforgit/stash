@@ -137,6 +137,9 @@ type BaseFile struct {
 	Fingerprints Fingerprints `json:"fingerprints"`
 
 	Size int64 `json:"size"`
+	// Generation is maintained by storage for changes to the location or bytes.
+	// It is independent of metadata such as captions, codecs, and perceptual hash.
+	Generation int64 `json:"generation"`
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

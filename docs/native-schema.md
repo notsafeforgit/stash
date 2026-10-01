@@ -608,6 +608,48 @@ The [protocol documentation](native-ingestion.md) lists current supported events
 and limits. File ingestion, producer outboxes, job leases, catalog import, and
 native administration/review UI remain subsequent work.
 
+Migration 1000018 adds `files.generation`, `media_contents`, and immutable
+`file_content_versions`. These identities have separate purposes:
+
+| Identity | Meaning |
+| --- | --- |
+| File UUID | One file record's lifetime; deletion retains a tombstone |
+| File generation | Monotonic fence for observed location/byte changes |
+| Content UUID | Shared server-verified SHA-256 bytes and their length |
+| Scene/image UUID | The library item, its metadata, relationships, and history |
+
+File generations advance on basename/folder/ZIP association, size, modification
+time, and MD5/oshash changes. Folder path changes also invalidate their files.
+Unchanged fingerprint rows are preserved during updates; captions, codec metadata,
+and perceptual hashes do not advance the counter. Updates require the generation
+read by the caller, so a delayed scanner or generation task cannot replace newer
+file state. An explicit compare-and-swap advance handles new byte evidence that
+size/mtime alone did not reveal. Counter values are fences, not a count of
+downloads or content revisions.
+
+Content verification records retain their file UUID/generation, reviewed root revision,
+relative path, descriptor identity, precise modification time, and change token.
+Current-content reads require an active file at that exact generation. Old
+verifications survive changes/deletion and canonical UUID adoption. Identical
+verified bytes share one content UUID without merging file rows, scenes, images,
+edits, or playback history. Content-location lookups start with the indexed
+content UUID; history pagination uses file UUID and generation.
+
+The server prepares one descriptor, then `PreparedMedia.RecordContent` records
+the proof in the caller's managed transaction and rechecks the current root and
+file before commit. A later generation change or closed/replaced descriptor
+rolls back publication. Generations reflect changes observed by Stash; they do
+not make filesystem writes atomic or eliminate descriptor revalidation. Durable
+file jobs, completion receipts, and association/gallery publication still need
+to be connected.
+
+Migration assigns generation 1 to existing files and leaves both new content
+tables empty. Existing fingerprints, UUIDs, and media rows remain intact; no
+historical checksum is relabelled as newly verified SHA-256 evidence. Anonymised
+exports remove these hashes and private path/descriptor histories before source
+roots are removed. Startup requires the generation column, guards, and lookup
+indexes.
+
 The filesystem deletion journal currently derives its directory from the
 database filename. Promotion in place retains that association, but a production
 path change must first drain pending deletions or transfer the exact journal

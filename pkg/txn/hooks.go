@@ -29,6 +29,10 @@ func hookManagerCtx(ctx context.Context) *hookManager {
 	return m
 }
 
+// HasHooks reports whether WithTxn/WithReadTxn owns this context. A raw
+// Manager.Begin context cannot run the pre-commit guards used by domain writes.
+func HasHooks(ctx context.Context) bool { return hookManagerCtx(ctx) != nil }
+
 func executeHooks(ctx context.Context, hooks []TxnFunc) error {
 	// we need to return the first error
 	for _, h := range hooks {

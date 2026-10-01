@@ -171,3 +171,87 @@ func TestPrepareMediaRejectsAudioOnlyAndUnfinishedDownloads(t *testing.T) {
 	_, err = ingest.PrepareMedia(ctx, root, "audio.mp4", nil, "", &file.Scanner{})
 	require.ErrorContains(t, err, "configured scanner")
 }
+
+func TestPreparedContentPublicationRechecksFileAndRootAtCommit(t *testing.T) {
+	probe := intakeProbe(t)
+	for _, change := range []string{"unchanged", "replace file", "disable root", "close descriptor", "advance generation", "different file"} {
+		t.Run(change, func(t *testing.T) {
+			fixture := newCaptureFixture(t)
+			repo := fixture.service.Repo
+			definition, path := intakeRoot(t, "image.png", intakePNG(t))
+			definition.Label = "Media fixture"
+			var root *models.MediaRoot
+			require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
+				var err error
+				root, err = repo.MediaRoot.Put(ctx, models.MediaRootInput{Origin: "review", MediaRootDefinition: definition.MediaRootDefinition})
+				return err
+			}))
+			scanner := &file.Scanner{FingerprintCalculator: intakeFingerprinter{}, FileDecorators: []file.Decorator{&imagefile.Decorator{FFProbe: probe}}}
+			prepared, err := ingest.PrepareMedia(t.Context(), *root, "image.png", nil, "", scanner)
+			require.NoError(t, err)
+			defer prepared.Close()
+			media := prepared.File()
+			var proof *models.FileContentVerification
+			err = repo.WithTxn(t.Context(), func(ctx context.Context) error {
+				folder, err := file.GetOrCreateFolderHierarchy(ctx, repo.Folder, root.Binding.Path, []string{root.Binding.Path})
+				if err != nil {
+					return err
+				}
+				base := media.Base()
+				base.ParentFolderID = folder.ID
+				base.CreatedAt = time.Now()
+				base.UpdatedAt = base.CreatedAt
+				if change == "different file" {
+					base.Basename = "other.png"
+				}
+				if err := repo.File.Create(ctx, media); err != nil {
+					return err
+				}
+				identity, err := repo.ArchiveEntity.FindByLocalID(ctx, models.ArchiveFile, int(base.ID))
+				if err != nil {
+					return err
+				}
+				proof, err = prepared.RecordContent(ctx, repo, identity.UUID, base.Generation)
+				if err != nil {
+					return err
+				}
+				switch change {
+				case "replace file":
+					return os.WriteFile(path, []byte("changed before publication"), 0600)
+				case "disable root":
+					definition := root.MediaRootDefinition
+					definition.State = "disabled"
+					_, err = repo.MediaRoot.Put(ctx, models.MediaRootInput{UUID: root.UUID, ExpectedRevision: root.Revision, Origin: "review", MediaRootDefinition: definition})
+					return err
+				case "close descriptor":
+					return prepared.Close()
+				case "advance generation":
+					_, err = repo.FileContent.Advance(ctx, identity.UUID, base.Generation)
+					return err
+				}
+				return nil
+			})
+			if change == "unchanged" {
+				require.NoError(t, err)
+				require.NotNil(t, proof)
+			} else {
+				require.Error(t, err)
+			}
+			require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+				found, err := repo.File.FindByPath(ctx, path, true)
+				require.NoError(t, err)
+				content, err := repo.FileContent.FindBySHA256(ctx, prepared.SHA256())
+				require.NoError(t, err)
+				if change == "unchanged" {
+					require.NotNil(t, found)
+					require.NotNil(t, content)
+					require.Equal(t, proof.Content.UUID, content.UUID)
+				} else {
+					require.Nil(t, found)
+					require.Nil(t, content)
+				}
+				return nil
+			}))
+		})
+	}
+}

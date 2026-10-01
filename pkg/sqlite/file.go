@@ -210,6 +210,7 @@ func (f *imageFileQueryRow) resolve() *models.ImageFile {
 
 type fileQueryRow struct {
 	FileID         null.Int      `db:"file_id"`
+	Generation     null.Int      `db:"generation"`
 	Basename       null.String   `db:"basename"`
 	ZipFileID      null.Int      `db:"zip_file_id"`
 	ParentFolderID null.Int      `db:"parent_folder_id"`
@@ -230,7 +231,8 @@ type fileQueryRow struct {
 
 func (r *fileQueryRow) resolve() models.File {
 	basic := &models.BaseFile{
-		ID: models.FileID(r.FileID.Int64),
+		ID:         models.FileID(r.FileID.Int64),
+		Generation: r.Generation.Int64,
 		DirEntry: models.DirEntry{
 			ZipFileID: nullIntFileIDPtr(r.ZipFileID),
 			ModTime:   r.ModTime.Timestamp,
@@ -414,13 +416,27 @@ func (qb *FileStore) Create(ctx context.Context, f models.File) error {
 }
 
 func (qb *FileStore) Update(ctx context.Context, f models.File) error {
+	if f.Base().Generation < 1 {
+		return models.ErrFileGenerationConflict
+	}
 	var r basicFileRow
 	r.fromBasicFile(*f.Base())
 
 	id := f.Base().ID
 
-	if err := qb.tableMgr.updateByID(ctx, id, r); err != nil {
+	// Hashing/probing may happen outside the write transaction. An older scan or
+	// generation task must not overwrite a file that changed in the meantime.
+	q := dialect.Update(qb.table()).Prepared(true).Set(r).Where(qb.table().Col("id").Eq(id), qb.table().Col("generation").Eq(f.Base().Generation))
+	result, err := exec(ctx, q)
+	if err != nil {
 		return err
+	}
+	changed, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if changed != 1 {
+		return models.ErrFileGenerationConflict
 	}
 
 	// create extended stuff here
@@ -438,8 +454,7 @@ func (qb *FileStore) Update(ctx context.Context, f models.File) error {
 	if err := FingerprintReaderWriter.replaceJoins(ctx, id, f.Base().Fingerprints); err != nil {
 		return err
 	}
-
-	return nil
+	return dbWrapper.Get(ctx, &f.Base().Generation, "SELECT generation FROM files WHERE id=?", id)
 }
 
 // ModifyFingerprints updates existing fingerprints and adds new ones.
@@ -577,6 +592,7 @@ func (qb *FileStore) selectDataset() *goqu.SelectDataset {
 
 	cols := []interface{}{
 		table.Col("id").As("file_id"),
+		table.Col("generation"),
 		table.Col("basename"),
 		table.Col("zip_file_id"),
 		table.Col("parent_folder_id"),

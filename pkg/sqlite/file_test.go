@@ -455,6 +455,9 @@ func Test_fileStore_Update(t *testing.T) {
 			assert := assert.New(t)
 
 			copy := tt.updatedObject
+			if existing, err := qb.Find(ctx, copy.Base().ID); err == nil && len(existing) == 1 {
+				copy.Base().Generation = existing[0].Base().Generation
+			}
 
 			if err := qb.Update(ctx, tt.updatedObject); (err != nil) != tt.wantErr {
 				t.Errorf("FileStore.Update() error = %v, wantErr %v", err, tt.wantErr)
@@ -484,6 +487,7 @@ func makeFileWithID(index int) models.File {
 	ret := makeFile(index)
 	ret.Base().Path = getFilePath(fileFolders[index], getFileBaseName(index))
 	ret.Base().ID = fileIDs[index]
+	ret.Base().Generation = fileGenerations[index]
 
 	return ret
 }

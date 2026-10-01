@@ -73,9 +73,19 @@ the named path after probing. Linux also checks ctime to detect same-size writes
 followed by restoring mtime; platforms without that adapter rehash. The caller
 keeps the descriptor open and must revalidate the current root immediately before
 commit, alongside authorization, collection policy, and file-generation fences.
-These checks do not make filesystem writes atomic with SQLite. Durable workers,
-generation fencing, transactional file/provenance publication, and receipt
-integration remain required before advertising `file_ingestion: true`.
+These checks do not make filesystem writes atomic with SQLite. Durable workers
+that enforce generation fences, transactional file/provenance publication, and
+receipt integration remain required before advertising `file_ingestion: true`.
+
+Native schema 1000018 now provides persistent file-generation fences and shared
+content identities. `PreparedMedia.RecordContent` records verified bytes against
+an existing file UUID and its current generation in the caller's managed write
+transaction. It rechecks the root/descriptor before commit, and a generation
+guard rejects subsequent replacement/deletion in that transaction. Ordinary file
+updates also require the generation the scanner/task read. This storage and
+publication boundary does not yet implement the durable file worker or completion
+HTTP event. The [schema guide](native-schema.md) describes identity lifetimes,
+unchanged fingerprint handling, and migration behavior.
 
 ## Wire contract
 

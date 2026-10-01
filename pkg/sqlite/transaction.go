@@ -171,6 +171,7 @@ func (db *Database) Repository() models.Repository {
 		TxnManager:             db,
 		Blob:                   db.Blobs,
 		File:                   db.File,
+		FileContent:            &FileContentStore{},
 		Folder:                 db.Folder,
 		Gallery:                db.Gallery,
 		GalleryChapter:         db.GalleryChapter,

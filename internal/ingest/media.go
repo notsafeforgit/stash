@@ -8,6 +8,7 @@ import (
 	"github.com/stashapp/stash/pkg/archive"
 	"github.com/stashapp/stash/pkg/file"
 	"github.com/stashapp/stash/pkg/models"
+	"github.com/stashapp/stash/pkg/txn"
 )
 
 // PreparedMedia is an uncommitted file inspection, not a completion receipt.
@@ -16,6 +17,8 @@ import (
 type PreparedMedia struct {
 	verified *archive.VerifiedFile
 	media    models.File
+	rootUUID string
+	relative string
 }
 
 func (p *PreparedMedia) Close() error                   { return p.verified.Close() }
@@ -30,6 +33,41 @@ func (p *PreparedMedia) File() models.File {
 
 func (p *PreparedMedia) Revalidate(ctx context.Context, currentRoot models.MediaRoot) error {
 	return p.verified.Revalidate(ctx, currentRoot)
+}
+
+// RecordContent publishes the inspected byte identity in the caller's write
+// transaction. File creation/update must already have used the prepared metadata.
+// Keep PreparedMedia open until WithTxn returns: the final hook checks the live
+// binding and descriptor after all other domain writes, before SQLite commits.
+func (p *PreparedMedia) RecordContent(ctx context.Context, repo models.Repository, fileUUID string, generation int64) (*models.FileContentVerification, error) {
+	root, err := repo.MediaRoot.Find(ctx, p.rootUUID)
+	if err != nil {
+		return nil, err
+	}
+	if root == nil {
+		return nil, models.ErrFileGenerationConflict
+	}
+	if err := p.Revalidate(ctx, *root); err != nil {
+		return nil, err
+	}
+	proof, err := repo.FileContent.RecordVerification(ctx, models.FileContentInput{
+		FileUUID: fileUUID, ExpectedGeneration: generation, SHA256: p.SHA256(), RootUUID: p.rootUUID, RelativePath: p.relative, Snapshot: p.Snapshot(),
+		ExpectedRootRevision: root.Revision,
+	})
+	if err != nil {
+		return nil, err
+	}
+	txn.AddPreCommitHook(ctx, func(ctx context.Context) error {
+		current, err := repo.MediaRoot.Find(ctx, p.rootUUID)
+		if err != nil {
+			return err
+		}
+		if current == nil {
+			return models.ErrFileGenerationConflict
+		}
+		return p.Revalidate(ctx, *current)
+	})
+	return proof, nil
 }
 
 // PrepareMedia verifies an authorized root-relative file and runs the ordinary
@@ -80,5 +118,5 @@ func PrepareMedia(ctx context.Context, root models.MediaRoot, relative string, e
 		return nil, err
 	}
 	keep = true
-	return &PreparedMedia{verified: verified, media: media}, nil
+	return &PreparedMedia{verified: verified, media: media, rootUUID: root.UUID, relative: relative}, nil
 }

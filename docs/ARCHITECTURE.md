@@ -75,7 +75,7 @@ links, worker scopes, or media requests.
 | [graphql/schema](../graphql/schema/) and [gqlgen.yml](../gqlgen.yml) | Public schema and Go type/resolver generation |
 | [internal/api](../internal/api/) | HTTP routes, GraphQL resolvers, input translation, authentication, and response shaping |
 | [internal/api/loaders](../internal/api/loaders/) | Request-scoped batching of related entity reads to avoid N+1 queries |
-| [internal/ingest](../internal/ingest/) | Producer token verification, bounded source capture intake, album/publisher resolution, and atomic receipts |
+| [internal/ingest](../internal/ingest/) | Producer token verification, bounded source capture intake, album/publisher resolution, atomic capture receipts, and verified file preparation/content publication |
 | [internal/manager](../internal/manager/) | Application lifecycle and service wiring; scan/generate/import jobs in `task_*.go`; stream and download coordination |
 | [pkg/models](../pkg/models/) | Domain values, filter/query models, and repository interfaces; `Repository` supplies entity stores and a transaction manager |
 | [pkg/scene](../pkg/scene/), [pkg/image](../pkg/image/), [pkg/gallery](../pkg/gallery/), [pkg/group](../pkg/group/) | Entity operations that coordinate related records, files, and validation; other entity packages supply their own validation/update helpers |
@@ -105,6 +105,7 @@ not made atomic by a SQLite transaction.
 | Source evidence and intake | Native accounts, posts, shared revisions/profiles, captures, album manifests, collection/root definitions, producer token verifiers, and immutable receipts in the library database |
 | Server/UI configuration | YAML configuration managed by [internal/manager/config](../internal/manager/config/); includes UI defaults and plugin settings |
 | Original media | Configured library paths and archive contents; database file/folder records describe these files |
+| Verified byte identity | Shared SHA-256 content UUIDs and immutable verification history in the main database; file generations fence observed changes without merging media entities |
 | Stored artwork blobs | [BlobStore](../pkg/sqlite/blob.go), configured for database blobs or a separate filesystem location |
 | Generated media | Configured generated paths: covers, previews, sprites, transcodes, temporary downloads; generation and cleanup belong to manager/media services |
 | Search acceleration | Separate `<database>.search.sqlite` plus an in-memory exact-count cache; derived and rebuildable |

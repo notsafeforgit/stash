@@ -306,12 +306,16 @@ const (
 )
 
 var (
-	folderIDs      []models.FolderID
-	fileIDs        []models.FileID
-	sceneFileIDs   []models.FileID
-	imageFileIDs   []models.FileID
-	galleryFileIDs []models.FileID
-	chapterIDs     []int
+	folderIDs              []models.FolderID
+	fileIDs                []models.FileID
+	fileGenerations        []int64
+	sceneFileGenerations   []int64
+	imageFileGenerations   []int64
+	galleryFileGenerations []int64
+	sceneFileIDs           []models.FileID
+	imageFileIDs           []models.FileID
+	galleryFileIDs         []models.FileID
+	chapterIDs             []int
 
 	sceneIDs       []int
 	imageIDs       []int
@@ -918,6 +922,7 @@ func makeFile(i int) models.File {
 
 	var ret models.File
 	baseFile := &models.BaseFile{
+		Generation:     fixtureFileGeneration(fileGenerations, i),
 		Basename:       getFileBaseName(i),
 		ParentFolderID: folderID,
 		DirEntry: models.DirEntry{
@@ -955,6 +960,15 @@ func makeFile(i int) models.File {
 	return ret
 }
 
+// Fixture builders are used both before insertion and to describe persisted
+// rows. Retain storage's assigned fence once that fixture has been created.
+func fixtureFileGeneration(generations []int64, i int) int64 {
+	if i >= 0 && i < len(generations) {
+		return generations[i]
+	}
+	return 0
+}
+
 func createFiles(ctx context.Context) error {
 	qb := db.File
 
@@ -966,6 +980,7 @@ func createFiles(ctx context.Context) error {
 		}
 
 		fileIDs = append(fileIDs, file.Base().ID)
+		fileGenerations = append(fileGenerations, file.Base().Generation)
 	}
 
 	return nil
@@ -1139,6 +1154,7 @@ func makeSceneFile(i int) *models.VideoFile {
 
 	return &models.VideoFile{
 		BaseFile: &models.BaseFile{
+			Generation:     fixtureFileGeneration(sceneFileGenerations, i),
 			Path:           getFilePath(folderIdxWithSceneFiles, getSceneBasename(i)),
 			Basename:       getSceneBasename(i),
 			ParentFolderID: folderIDs[folderIdxWithSceneFiles],
@@ -1233,6 +1249,7 @@ func createScenes(ctx context.Context, n int) error {
 			return fmt.Errorf("creating scene file: %w", err)
 		}
 		sceneFileIDs = append(sceneFileIDs, f.ID)
+		sceneFileGenerations = append(sceneFileGenerations, f.Generation)
 
 		scene := makeScene(i)
 
@@ -1286,6 +1303,7 @@ func getImageCustomFields(index int) map[string]interface{} {
 func makeImageFile(i int) *models.ImageFile {
 	return &models.ImageFile{
 		BaseFile: &models.BaseFile{
+			Generation:     fixtureFileGeneration(imageFileGenerations, i),
 			Path:           getFilePath(folderIdxWithImageFiles, getImageBasename(i)),
 			Basename:       getImageBasename(i),
 			ParentFolderID: folderIDs[folderIdxWithImageFiles],
@@ -1343,6 +1361,7 @@ func createImages(ctx context.Context, n int) error {
 			return fmt.Errorf("creating image file: %w", err)
 		}
 		imageFileIDs = append(imageFileIDs, f.ID)
+		imageFileGenerations = append(imageFileGenerations, f.Generation)
 
 		image := makeImage(i)
 
@@ -1389,6 +1408,7 @@ func getGalleryBasename(index int) string {
 
 func makeGalleryFile(i int) *models.BaseFile {
 	return &models.BaseFile{
+		Generation:     fixtureFileGeneration(galleryFileGenerations, i),
 		Path:           getFilePath(folderIdxWithGalleryFiles, getGalleryBasename(i)),
 		Basename:       getGalleryBasename(i),
 		ParentFolderID: folderIDs[folderIdxWithGalleryFiles],
@@ -1458,9 +1478,11 @@ func createGalleries(ctx context.Context, n int) error {
 				return fmt.Errorf("creating gallery file: %w", err)
 			}
 			galleryFileIDs = append(galleryFileIDs, f.ID)
+			galleryFileGenerations = append(galleryFileGenerations, f.Generation)
 			fileIDs = []models.FileID{f.ID}
 		} else {
 			galleryFileIDs = append(galleryFileIDs, 0)
+			galleryFileGenerations = append(galleryFileGenerations, 0)
 		}
 
 		// gallery relationship will be created with galleries

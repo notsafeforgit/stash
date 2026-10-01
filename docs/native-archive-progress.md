@@ -53,14 +53,15 @@ review. Production has not been migrated.
 | Stash `bd7848d58` | Captured publisher decisions connect source evidence to accounts; full-copy reconciliation and complete validation gate passed |
 | Stash `dd9ee3768` | Isolated native test fixtures retain real migration coverage while avoiding repeated empty-schema construction; complete validation gate passed |
 | Stash `367ea96ed` | Scoped capture ingestion and durable receipts; full-copy reconciliation, complete validation gate, CI lint/build, and preview image publication passed |
+| Stash `2215503f7` | Verified media preparation through the shared scanner; complete validation gate, Windows package cross-compilation, CI lint/build, and preview image publication passed |
 
 ## Phase status
 
 | Phase | Status |
 | --- | --- |
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
-| 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries and metadata relationship targets, native account/ownership storage and reviewed consolidation, shared post/profile/capture storage, ordered attachment manifests, audited media associations, reviewed source-list selection, and source-gallery synchronization with manual membership intent are implemented. Scalar and relationship field choices protect explicit and preserved metadata. Revisioned logical roots and source collections retain capture/manual-intake provenance; captured publisher choices now connect source evidence to accounts independently of depicted performers. Producer identity matching, policy resolution, review APIs/UI and remaining domain services are in progress. |
-| 2 Ingestion and producer adapter | In progress: scoped producer tokens, Reddit/Twitter capture batches and durable receipts are implemented. Verified file preparation uses the shared scanner. File-completion publication, durable workers/run leases, additional source adapters, producer outboxes and host/n8n conversion remain. |
+| 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries and metadata relationship targets, native account/ownership storage and reviewed consolidation, shared post/profile/capture storage, ordered attachment manifests, audited media associations, reviewed source-list selection, and source-gallery synchronization with manual membership intent are implemented. Scalar and relationship field choices protect explicit and preserved metadata. Revisioned logical roots and source collections retain capture/manual-intake provenance; captured publisher choices connect source evidence to accounts independently of depicted performers. Verified byte identities and immutable per-file verification history now use persistent file-generation guards. Producer identity matching, policy resolution, review APIs/UI and remaining domain services are in progress. |
+| 2 Ingestion and producer adapter | In progress: scoped producer tokens, Reddit/Twitter capture batches and durable receipts are implemented. Verified file preparation uses the shared scanner and can publish content proofs with descriptor and generation checks before commit. File-completion events and atomic file/source/gallery/receipt publication, durable workers/run leases, additional source adapters, producer outboxes and host/n8n conversion remain. |
 | 3 Catalog importer and full-copy reconciliation | Not yet implemented |
 | 4 Native UI and client conversion | Not yet implemented |
 | 5 Compatibility removal and packaging | Preview packaging isolated and old compatibility gate replaced by current v3 operation/plugin-contract checks. Old UI/API/plugin adapters and config bridge still require conversion/removal. |
@@ -799,3 +800,42 @@ zero Go lint issues, and every Go unit/integration package. The SQLite suite too
 186.1 seconds. The [ingestion documentation](native-ingestion.md) also clarifies
 that token revocation controls access to Stash's API; scraper website credentials
 remain with gallery-dl.
+
+## Verified content identities and file generations
+
+Migration 1000018 adds shared SHA-256 content identities and immutable verification
+history for each file generation. File UUIDs remain separate from content and
+scene/image identities: equal bytes do not merge library items or their metadata.
+Location, size, modification time, and matching-fingerprint changes advance the
+file's generation. Ordinary file updates require the generation read by the
+scanner or task. Fingerprint updates preserve identical rows, avoiding spurious
+generation changes on an unchanged rescan.
+
+`PreparedMedia.RecordContent` retains the descriptor through publication, records
+the reviewed root revision and exact relative path, and checks the root, file,
+and generation before commit. Changes or closure before commit roll back the
+proof and associated writes. Historical proofs retain their original root
+definition through later edits and survive file deletion and UUID adoption.
+Indexed content lookup returns only active, current file generations. Anonymised
+exports remove content hashes and private verification evidence.
+
+Focused SQLite and media-publication tests passed for shared bytes, stale scans,
+replaced/deleted paths, root revisions, immutable history, generation changes
+before commit, disabled roots, closed descriptors, UUID adoption, managed
+transactions, migration, and anonymisation. The existing file/media fixtures now
+retain storage-assigned generations while continuing to compare complete records.
+
+The final isolated copy migrated from 1000017 to 1000018 in 0.304 seconds. All
+119 retained tables matched by streaming semantic digest, with zero foreign-key
+violations and no size growth. All 769,643 existing files start at generation 1;
+both new content tables remain empty, so old checksums are not claimed as newly
+verified bytes. The private receipt is
+`.local/native-archive-rehearsal-20260930/file-content-final-reconciliation.json`.
+This copy remains a library-schema rehearsal without catalog imports. Production
+has not changed, and the ingestion API still advertises `file_ingestion: false`.
+
+The final complete `make validate-fork` gate passed: generation, frontend checks,
+all 528 UI tests, retained v3 extension contracts and 71 application operation
+files, Go lint with zero issues, and every Go unit/integration package. Durable
+file jobs and atomic file/source/gallery/completion-receipt publication remain
+the next ingestion work.

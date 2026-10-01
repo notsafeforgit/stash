@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/stashapp/stash/pkg/fsutil"
 	"github.com/stashapp/stash/pkg/models"
@@ -17,12 +16,7 @@ import (
 var ErrMediaFileChanged = errors.New("media file changed while being verified")
 var ErrMediaFileDigest = errors.New("media file differs from its completion digest")
 
-type FileSnapshot struct {
-	Identity    string    `json:"identity"`
-	Size        int64     `json:"size"`
-	ModifiedAt  time.Time `json:"modified_at"`
-	ChangeToken string    `json:"change_token"`
-}
+type FileSnapshot = models.FileSnapshot
 
 // VerifiedFile holds the descriptor used for hashing. Probing must use this
 // descriptor as well. Revalidate immediately before committing any association.

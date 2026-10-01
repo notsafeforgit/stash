@@ -3,6 +3,8 @@ package sqlite
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"slices"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
@@ -74,25 +76,53 @@ func (qb *fingerprintQueryBuilder) upsertJoins(ctx context.Context, fileID model
 		types[i] = ff.Type
 	}
 
-	if err := qb.destroyJoins(ctx, fileID, types); err != nil {
-		return err
+	if len(types) == 0 {
+		return nil
 	}
-
-	for _, ff := range f {
-		if err := qb.insert(ctx, fileID, ff); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return qb.reconcileJoins(ctx, fileID, f, types)
 }
 
 func (qb *fingerprintQueryBuilder) replaceJoins(ctx context.Context, fileID models.FileID, f []models.Fingerprint) error {
-	if err := qb.destroy(ctx, []int{int(fileID)}); err != nil {
+	return qb.reconcileJoins(ctx, fileID, f, nil)
+}
+
+// Preserve unchanged fingerprints. Delete/reinsert would create false file
+// generations on every metadata rescan, even when the bytes did not change.
+func (qb *fingerprintQueryBuilder) reconcileJoins(ctx context.Context, fileID models.FileID, next []models.Fingerprint, types []string) error {
+	var rows []struct {
+		Type        string      `db:"type"`
+		Fingerprint interface{} `db:"fingerprint"`
+	}
+	if err := dbWrapper.Select(ctx, &rows, "SELECT type,fingerprint FROM files_fingerprints WHERE file_id=?", fileID); err != nil {
 		return err
 	}
-
-	return qb.insertJoins(ctx, fileID, f)
+	contains := func(list []models.Fingerprint, value models.Fingerprint) bool {
+		return slices.ContainsFunc(list, func(f models.Fingerprint) bool {
+			return f.Type == value.Type && reflect.DeepEqual(f.Fingerprint, value.Fingerprint)
+		})
+	}
+	var previous []models.Fingerprint
+	for _, row := range rows {
+		if types != nil && !slices.Contains(types, row.Type) {
+			continue
+		}
+		old := models.Fingerprint{Type: row.Type, Fingerprint: row.Fingerprint}
+		previous = append(previous, old)
+		if !contains(next, old) {
+			if _, err := dbWrapper.Exec(ctx, "DELETE FROM files_fingerprints WHERE file_id=? AND type=? AND fingerprint=?", fileID, old.Type, old.Fingerprint); err != nil {
+				return err
+			}
+		}
+	}
+	for _, value := range next {
+		if !contains(previous, value) {
+			if err := qb.insert(ctx, fileID, value); err != nil {
+				return err
+			}
+			previous = append(previous, value)
+		}
+	}
+	return nil
 }
 
 func (qb *fingerprintQueryBuilder) destroyJoins(ctx context.Context, fileID models.FileID, types []string) error {

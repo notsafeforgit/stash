@@ -79,6 +79,7 @@ Browser → Vite dev server (dev) / embedded HTTP server (prod) → Chi router (
 - **`internal/manager/`** — Singleton `Manager` struct that owns all services: FFmpeg, JobManager, PluginCache, Database, etc. Accessed via `manager.GetInstance()`.
 - **`pkg/models/`** — Domain models and repository interfaces. `Repository` struct holds all `ReaderWriter` interfaces. All database access goes through these interfaces within transactions (`WithTxn`/`WithReadTxn`).
 - **`internal/ingest/`** — Native producer capture validation and atomic receipt/domain transactions. Its HTTP router uses collection/root-scoped Stash access tokens, separate from application sessions and third-party service credentials. See [native ingestion](docs/native-ingestion.md) for current capabilities and remaining file/worker integration.
+- **Verified file content** — `files.generation` fences location/byte changes; updates require the generation that was read. `media_contents` shares server-verified SHA-256 identities, and `file_content_versions` retains immutable per-generation evidence. Use the shared scanner preparation and `PreparedMedia.RecordContent` with a held descriptor through transaction completion. Content equality does not authorize merging scenes or images. See [native schema](docs/native-schema.md).
 - **`pkg/sqlite/`** — SQLite implementation of the repository interfaces, including migrations.
 - **`graphql/schema/`** — GraphQL schema. After editing, run `make generate` to regenerate Go bindings.
 

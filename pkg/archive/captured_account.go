@@ -1,0 +1,222 @@
+package archive
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/url"
+	"regexp"
+	"strings"
+	"unicode"
+
+	"github.com/stashapp/stash/pkg/models"
+)
+
+const CapturedAccountPolicy = "captured-account-v1"
+
+// CapturedAccount contains claims from one captured publisher. It does not
+// choose an account UUID, establish ownership, or assign depicted performers.
+type CapturedAccount struct {
+	Policy      string                      `json:"policy"`
+	Namespace   string                      `json:"namespace"`
+	Label       string                      `json:"label"`
+	Identifiers []CapturedAccountIdentifier `json:"identifiers"`
+}
+
+type CapturedAccountIdentifier struct {
+	Reference models.AccountReference `json:"reference"`
+	Basis     string                  `json:"basis"`
+	// Path locates the value in the original, reconstructed capture JSON.
+	Path string `json:"path"`
+}
+
+type capturedAccountField struct {
+	value interface{}
+	path  string
+}
+
+func accountField(object sourceObject, path, key string) capturedAccountField {
+	return capturedAccountField{value: object[key], path: pointerMember(path, key)}
+}
+
+func firstAccountField(object sourceObject, path string, keys ...string) capturedAccountField {
+	for _, key := range keys {
+		field := accountField(object, path, key)
+		if field.value != nil && field.value != "" {
+			return field
+		}
+	}
+	return capturedAccountField{}
+}
+
+var capturedIntegerID = regexp.MustCompile(`^-?(?:0|[1-9][0-9]*)$`)
+
+func capturedIdentifierValue(field capturedAccountField) (string, error) {
+	switch value := field.value.(type) {
+	case nil:
+		return "", nil
+	case string:
+		return value, nil
+	case json.Number:
+		if capturedIntegerID.MatchString(string(value)) {
+			return string(value), nil
+		}
+	}
+	return "", fmt.Errorf("captured account identifier at %s must be a string or integer", field.path)
+}
+
+func (a *CapturedAccount) add(field capturedAccountField, kind, basis string) error {
+	value, err := capturedIdentifierValue(field)
+	if err != nil || value == "" {
+		return err
+	}
+	ref, err := NormalizeAccountReference(models.AccountReference{Namespace: a.Namespace, Kind: kind, Value: value})
+	if err != nil {
+		return fmt.Errorf("captured account identifier at %s: %w", field.path, err)
+	}
+	a.Identifiers = append(a.Identifiers, CapturedAccountIdentifier{Reference: ref, Basis: basis, Path: field.path})
+	return nil
+}
+
+func capturedAccountLabel(field capturedAccountField) string {
+	label, _ := field.value.(string)
+	label = strings.TrimSpace(label)
+	if len(label) > 1024 || strings.IndexFunc(label, unicode.IsControl) >= 0 {
+		return ""
+	}
+	return label
+}
+
+// ExtractCapturedAccount reads gallery-dl/yt-dlp metadata without mutating it.
+// Only an explicitly captured publisher ID establishes a pairing with handles.
+// Directory names, scrape URLs, captions, and feed-owner profiles are not used.
+// A nil result means there is insufficient identity evidence. Invalid claimed
+// identifiers return an error so an importer can report them for review.
+func ExtractCapturedAccount(raw []byte) (*CapturedAccount, error) {
+	data, err := DecodeJSONObject(raw, MaxSourcePayloadBytes)
+	if err != nil {
+		return nil, err
+	}
+	path := ""
+	category, _ := data["category"].(string)
+	category = strings.ToLower(category)
+	if parent, ok := data["_reddit"].(sourceObject); ok && sourceTruthy(parent["id"]) {
+		data, path, category = parent, "/_reddit", "reddit"
+	}
+	if category == "" {
+		return nil, nil
+	}
+	result := &CapturedAccount{Policy: CapturedAccountPolicy, Namespace: "native:" + category}
+	var id, handle, secondary capturedAccountField
+	idKind, basis := "id", "captured-author"
+	author, _ := data["author"].(sourceObject)
+	authorPath := pointerMember(path, "author")
+	field := func(key string) capturedAccountField { return accountField(data, path, key) }
+	first := func(keys ...string) capturedAccountField { return firstAccountField(data, path, keys...) }
+	switch category {
+	case "reddit":
+		id, handle = field("author_fullname"), field("author")
+		if author != nil {
+			handle = accountField(author, authorPath, "name")
+		}
+	case "twitter":
+		id, handle = accountField(author, authorPath, "id"), accountField(author, authorPath, "name")
+	case "bluesky":
+		id, handle = accountField(author, authorPath, "did"), accountField(author, authorPath, "handle")
+	case "tiktok":
+		id = accountField(author, authorPath, "id")
+		secondary = accountField(author, authorPath, "secUid")
+		handle = firstAccountField(author, authorPath, "uniqueId", "name")
+		if id.value == nil || id.value == "" {
+			id, secondary, idKind = secondary, capturedAccountField{}, "secUid"
+		}
+	case "instagram":
+		id, handle = field("owner_id"), field("username")
+	case "tumblr":
+		blog, _ := data["blog"].(sourceObject)
+		blogPath := pointerMember(path, "blog")
+		id = accountField(blog, blogPath, "uuid")
+		handle = first("blog_name")
+		if handle.value == nil {
+			handle = accountField(blog, blogPath, "name")
+		}
+	case "coomer", "kemono":
+		service, _ := data["service"].(string)
+		if service == "" {
+			return nil, nil
+		}
+		result.Namespace = "mirror:" + category + ":" + strings.ToLower(service)
+		id, idKind, basis = field("user"), "user", "captured-mirror-user"
+		result.Label = capturedAccountLabel(field("username"))
+	case "ytdl", "ytdl-generic":
+		site, _ := first("extractor_key", "subcategory").value.(string)
+		site = strings.ToLower(site)
+		if site == "generic" {
+			page, _ := data["webpage_url"].(string)
+			if u, err := url.Parse(page); err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.User == nil {
+				site = strings.ToLower(u.Hostname())
+			}
+		}
+		if site == "" || site == "generic" {
+			return nil, nil
+		}
+		result.Namespace = "ytdl:" + site
+		id = first("channel_id", "uploader_id")
+		// An uploader/channel display name is not necessarily a handle.
+		result.Label = capturedAccountLabel(first("uploader", "channel"))
+	default:
+		owner, ownerPath := author, authorPath
+		if owner == nil && sourceTruthy(data["author"]) {
+			// Never borrow a feed owner's ID for a separately named author.
+			return nil, nil
+		}
+		if len(owner) == 0 {
+			for _, key := range []string{"owner", "uploader", "user", "creator"} {
+				if candidate, ok := data[key].(sourceObject); ok && len(candidate) > 0 {
+					owner, ownerPath = candidate, pointerMember(path, key)
+					break
+				}
+			}
+		}
+		if len(owner) > 0 {
+			id = firstAccountField(owner, ownerPath, "id", "did", "uuid")
+			handle = firstAccountField(owner, ownerPath, "username", "account", "handle")
+			result.Label = capturedAccountLabel(firstAccountField(owner, ownerPath, "name"))
+		} else {
+			id, handle = first("user_id", "uploader_id"), field("username")
+			result.Label = capturedAccountLabel(field("uploader"))
+		}
+	}
+	if !ValidAccountNamespace(result.Namespace) {
+		return nil, errors.New("captured account has an invalid service namespace")
+	}
+	if err := result.add(id, idKind, basis); err != nil {
+		return nil, err
+	}
+	if len(result.Identifiers) == 0 {
+		return nil, nil
+	}
+	if err := result.add(secondary, "secUid", basis); err != nil {
+		return nil, err
+	}
+	if err := result.add(handle, "handle", basis); err != nil {
+		return nil, err
+	}
+	if label := capturedAccountLabel(handle); label != "" {
+		result.Label = label
+	}
+	if category == "coomer" || category == "kemono" {
+		profile, _ := data["user_profile"].(sourceObject)
+		profilePath := pointerMember(path, "user_profile")
+		profileID, _ := capturedIdentifierValue(accountField(profile, profilePath, "id"))
+		service, _ := profile["service"].(string)
+		if profileID == result.Identifiers[0].Reference.Value && service == data["service"] {
+			// Preserve the advertised public identifier in the mirror's namespace.
+			// Neither it nor the display name proves a native service account ID.
+			if err := result.add(accountField(profile, profilePath, "public_id"), "public_id", "captured-mirror-public-id"); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return result, nil
+}

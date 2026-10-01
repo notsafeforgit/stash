@@ -46,6 +46,7 @@ review. Production has not been migrated.
 | Stash `5bc0149ea` | Portable tag/studio/group identities and tag-merge redirects; full-copy reconciliation, complete validation gate, CI lint/build, and preview image publication passed |
 | Stash `5fd4d0f93` | Scalar field decisions with explicit clear/inherit, preserved legacy values and new-album capture provenance; full-copy reconciliation, complete validation gate, CI lint/build, and preview image publication passed |
 | Stash `b2ecfe605` | Typed metadata relationships and coalesced collection choices; full-copy reconciliation, complete validation gate, CI lint/build, and preview image publication passed |
+| Stash `f96577925` | Reviewed source-account consolidation with retained identity evidence and ownership history; full-copy reconciliation and complete validation gate passed |
 
 ## Phase status
 
@@ -537,3 +538,31 @@ were redirected to the workspace disk for successful validation.
 
 Producer evidence matching, native account-review API/UI, and catalog import
 remain required integration work. Production has not been migrated.
+
+## Captured account identity extraction
+
+Core now implements `captured-account-v1` for deriving qualified identifier claims
+from reconstructed gallery-dl/yt-dlp captures. Each claim retains its source JSON
+pointer and evidence basis. The parser preserves exact numeric IDs and handles
+Reddit parent context, Twitter, Instagram, Bluesky, TikTok (including `secUid`),
+Tumblr, native subscription services, Coomer/Kemono, and unfamiliar extractors.
+It leaves missing IDs unresolved and reports malformed claims for review.
+
+Mirror user IDs and matching public identifiers retain the mirror/service
+namespace; display labels do not become native handles. Directory names, scraper
+target URLs, and unrelated feed-owner profiles cannot establish the publisher's
+ID. A generic extractor's display name remains a label. Existing legacy links
+and handle-only inventory records still require lossless import independently
+of whether the parser can derive new claims.
+
+Focused fixtures cover these service shapes, exact integers above 2^53, duplicate
+keys and malformed identifiers, replay, immutable input bytes, irrelevant profile
+noise, retained-payload equivalence, and missing/mismatched mirror profiles.
+The complete `make validate-fork` gate passed on this code with the consolidation
+checkpoint: 528 UI tests, native contracts, zero Go lint issues, and every Go
+unit/integration package. No database migration is required for this parser.
+
+See [native source identity](native-source-identity.md) for the contract and
+evidence limits. Account resolution, publisher associations, ingestion/import
+integration, and review API/UI remain required. The parser does not create
+accounts, merge candidates, change ownership, or assign depicted performers.

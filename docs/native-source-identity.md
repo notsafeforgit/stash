@@ -141,7 +141,7 @@ An optional, reviewed account map connects each exact old account key to a nativ
 source-account UUID. This is a one-time migration input, not a plugin setting or
 a second live ownership registry. Unmapped keys remain review records, including
 directory-derived labels whose service identity cannot be asserted. Captured
-account-identifier import and source routing are separate migration work; this
+account-identifier import follows in the registry step below. This performer
 operation does not infer native IDs, handles or service namespaces from a key.
 
 Saved associations and explicit unlinks become native ownership decisions only
@@ -183,3 +183,74 @@ server preview. Apply that saved preview using the same binding and endpoint,
 `--apply --expected-sha256 PLAN_SHA256`; retry the exact same input after response
 loss. The Stash application key is read from `STASH_API_KEY` (or `--api-key-env`),
 never from the registry payload. Website credentials remain with the scraper.
+
+## Importing catalog accounts and groupings
+
+Schema 1000029 imports the remaining six registry families: `catalogs`, `routes`,
+`links`, `account_identifiers`, `account_identifier_checkpoints`, and
+`account_profile_urls`. It requires the completed performer import from the same
+frozen registry, with the same source UUID and capture time. Each import's retained
+table counts must match the other's external inventory. Keep that frozen database
+through both steps; matching counts alone do not establish a common snapshot.
+
+Captured, qualified account IDs establish native source accounts. Handles observed
+alongside those IDs become identifiers on the same account. Reused handles with
+different captured IDs remain ambiguous; matching labels never merge accounts.
+Different reference kinds, such as a TikTok numeric ID and `secUid`, resolve to
+one account only when existing native evidence already establishes that connection.
+Mirror account IDs stay qualified by mirror and service. Captured mirror public
+IDs can associate a saved locator in its evidenced catalog; mirror display names
+never become native handles. Existing exact ID matches and explicit account
+bindings from the performer import preserve the chosen native account and label.
+Conflicting native candidates remain visible for review.
+
+An old locator for a known native service can create a provisional account when
+no captured ID is available. Its evidence is marked `legacy-locator`; an old
+numeric-looking key is retained as `legacy_key`, not promoted to a verified ID.
+Unknown services and directory-derived labels remain review items. No website
+requests or name-based performer matches run during this import.
+
+Each surviving catalog becomes a disabled `legacy_catalog` source collection.
+Old catalog redirects map to that survivor, and all grouping/link history is
+retained. A collection's resolved account identifies its publisher; it does not
+assign depicted performers to its media. Aggregator and directory collections can
+have no account. Imported collections have no root, destination prefix or scrape
+URL: directory routes, media keys and identifier checkpoints are retained evidence
+for subsequent validated routing and catalog-content import. Importing a grouping
+does not activate a scrape or restore old process state.
+
+Resolved saved performer/account links and unlinks become native ownership
+decisions, with the same conflict and later-edit protections as the performer
+import. Source-qualified `catalog_account_mappings` and `catalog_collection_mappings`
+preserve the original migration associations for the remaining catalog import.
+They are immutable migration records, not plugin settings or another ownership
+authority. Subsequent native account consolidation resolves their original UUIDs.
+
+The application-authorized API follows the same guarded preview/apply contract:
+
+| Method and path under `/api/v3/archive` | Result |
+| --- | --- |
+| `POST /catalog-registry-imports/preview` | Account, legacy-key, collection and ownership actions; original row outcomes and plan digest |
+| `POST /catalog-registry-imports` | Atomically apply `{binding, expected_plan_sha256}` and return the immutable receipt |
+| `GET /catalog-registry-imports/{uuid}` | Original receipt and frozen plan |
+| `GET /catalog-registry-imports/{uuid}/records?after=0` | Up to 100 original rows, with native references and retained evidence |
+
+One source registry has one account/grouping cutover. Exact retries return the
+original receipt after restart or later native edits. A stale plan or changed
+snapshot conflicts; a failed write rolls back both domain records and receipts.
+Original evidence remains available even when an account, route or catalog needs
+review. Anonymised exports remove these receipts, mappings and source rows.
+
+`stash-import-catalog-registry` reads the six families in one read-only SQLite
+transaction and inventories the seven performer families. Limits are 25,000 rows
+and a 16 MiB document. Unknown table/column shapes, incomplete identifier families,
+duplicate row keys and broken catalog redirect graphs are rejected.
+
+Prepare with `--registry FROZEN_SQLITE --identity-import SAVED_IDENTITY_JSON
+--snapshot UUID`. The saved identity binding, preview or receipt supplies the
+source UUID, performer-import UUID and capture time. Save the output privately,
+then preview with `--binding SAVED_REGISTRY_JSON --endpoint URL`. Apply the
+reviewed binding using `--apply --expected-sha256 PLAN_SHA256`; retry the same
+binding and digest after response loss. As above, authorization uses the Stash
+application key, not a producer token or website credential. Review resolution,
+source activation and the individual catalog bodies remain subsequent work.

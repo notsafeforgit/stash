@@ -832,3 +832,22 @@ when coalescing expands its window, the worker must traverse archived items with
 its normal archive stop rule. Exact-window retries preserve native checkpoints.
 The original snapshot remains immutable and normal database backups include both
 evidence and activation state. See the [application contract](native-ingestion.md#activating-retained-scan-requests).
+
+## Reviewed registry imports
+
+Migration 1000028 adds `catalog_identity_imports` and
+`catalog_identity_import_records` for frozen performer identities, saved local
+bindings, redirects, explicit account choices and older plugin evidence. Migration
+1000029 adds `catalog_registry_imports`, `catalog_registry_import_records`,
+`catalog_account_mappings` and `catalog_collection_mappings` for the complementary
+account, catalog and routing families. Both phases retain immutable original rows
+and guarded apply receipts; domain changes and receipts commit atomically.
+
+The second import references the first, validates their complementary inventories,
+and creates disabled logical collections without scrape targets or root bindings.
+Original source-qualified keys remain migration references to native accounts and
+collections. Captured IDs establish accounts, while uncertain locators remain
+provisional or unresolved. Imported publishers do not assign depicted performers.
+SQL guards and startup validation reconcile receipts, evidence counts and mappings.
+Normal database backups include these records; anonymisation removes them before
+source accounts and collections. See the [registry import contracts](native-source-identity.md#importing-the-performer-registry).

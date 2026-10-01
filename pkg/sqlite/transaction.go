@@ -178,6 +178,7 @@ func (db *Database) Repository() models.Repository {
 		SourceBackfill:         &SourceBackfillStore{},
 		ScanJournal:            &ScanJournalStore{},
 		CatalogIdentityImport:  &CatalogIdentityImportStore{},
+		CatalogRegistryImport:  &CatalogRegistryImportStore{},
 		Folder:                 db.Folder,
 		Gallery:                db.Gallery,
 		GalleryChapter:         db.GalleryChapter,

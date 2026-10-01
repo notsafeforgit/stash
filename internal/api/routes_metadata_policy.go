@@ -50,6 +50,10 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Post("/catalog-identity-imports", rs.applyCatalogIdentityImport)
 	r.Get("/catalog-identity-imports/{import}", rs.catalogIdentityImport)
 	r.Get("/catalog-identity-imports/{import}/records", rs.catalogIdentityImportRecords)
+	r.Post("/catalog-registry-imports/preview", rs.previewCatalogRegistryImport)
+	r.Post("/catalog-registry-imports", rs.applyCatalogRegistryImport)
+	r.Get("/catalog-registry-imports/{import}", rs.catalogRegistryImport)
+	r.Get("/catalog-registry-imports/{import}/records", rs.catalogRegistryImportRecords)
 	return r
 }
 

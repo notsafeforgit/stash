@@ -33,7 +33,7 @@ func catalogIdentityFixture(t *testing.T) (*sqlite.Database, models.Repository, 
 			return err
 		}
 		for _, key := range []string{"twitter:id:9007199254740993", "reddit:handle:deliberately-unlinked"} {
-			account, err := repo.SourceAccount.Create(ctx, "native:twitter", "Reviewed account")
+			account, err := repo.SourceAccount.Create(ctx, "native:"+strings.SplitN(key, ":", 2)[0], "Reviewed account")
 			if err != nil {
 				return err
 			}

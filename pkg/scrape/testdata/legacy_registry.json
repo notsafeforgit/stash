@@ -1,0 +1,39 @@
+{
+  "captured_at": "2026-09-30T12:00:00Z",
+  "tables": {
+    "catalogs": [
+      {"id":"twitter","kind":"creator","label":"Survivor","owner_key":"creator:twitter:id:9007199254740993","created_at":"2025-01-01T00:00:00Z","redirect_to":null},
+      {"id":"handle","kind":"creator","label":"Old handle folder","owner_key":"creator:twitter:handle:SURVIVOR","created_at":"2025-01-01T00:00:00Z","redirect_to":null},
+      {"id":"old","kind":"creator","label":"Former catalog","owner_key":"creator:twitter:handle:former","created_at":"2025-01-01T00:00:00Z","redirect_to":"twitter"},
+      {"id":"mirror","kind":"creator","label":"Mirror display name","owner_key":"creator:mirror:coomer:onlyfans:user:42","created_at":"2025-01-01T00:00:00Z","redirect_to":null},
+      {"id":"native","kind":"creator","label":"Native account","owner_key":"creator:onlyfans:id:42","created_at":"2025-01-01T00:00:00Z","redirect_to":null},
+      {"id":"aggregator","kind":"collection","label":"Mixed feed","owner_key":"directory:Mixed feed","created_at":"2025-01-01T00:00:00Z","redirect_to":null},
+      {"id":"unknown","kind":"creator","label":"Unknown directory label","owner_key":"creator:instagram (from aggregator reddit):handle:someone","created_at":"2025-01-01T00:00:00Z","redirect_to":null},
+      {"id":"unlinked","kind":"creator","label":"Unlinked account","owner_key":"creator:reddit:handle:deliberately-unlinked","created_at":"2025-01-01T00:00:00Z","redirect_to":null}
+    ],
+    "routes": [
+      {"route":"directory:Survivor, twitter:twitter","catalog_id":"twitter"},
+      {"route":"directory:Another directory:twitter","catalog_id":"twitter"},
+      {"route":"owner:creator:twitter:handle:survivor","catalog_id":"twitter"},
+      {"route":"media:redgifs:media:old-media-key","catalog_id":"aggregator"},
+      {"route":"directory:../outside:unknown","catalog_id":"unknown"}
+    ],
+    "links": [
+      {"source_id":"old","target_id":"twitter","reason":"Historical joined catalog","linked_at":"2026-09-29T00:00:00Z"}
+    ],
+    "account_identifiers": [
+      {"catalog_id":"twitter","account_key":"twitter:id:9007199254740993","platform":"twitter","namespace":"native:twitter","kind":"id","value":"9007199254740993","handle":"Survivor","alias_key":"twitter:handle:survivor","basis":"captured-author","origin":"gallery-dl","first_observed":"2025-01-01T00:00:00Z","last_observed":"2026-09-29T00:00:00Z"},
+      {"catalog_id":"mirror","account_key":"mirror:coomer:onlyfans:user:42","platform":"onlyfans","namespace":"mirror:coomer:onlyfans","kind":"user","value":"42","handle":"Mirror display name","alias_key":"onlyfans:handle:mirror display name","basis":"captured-mirror-name","origin":"gallery-dl-enrichment","first_observed":"2025-01-01T00:00:00Z","last_observed":"2026-09-29T00:00:00Z"},
+      {"catalog_id":"mirror","account_key":"mirror:coomer:onlyfans:user:42","platform":"onlyfans","namespace":"mirror:coomer:onlyfans","kind":"user","value":"42","handle":"public-name","alias_key":"onlyfans:handle:public-name","basis":"captured-mirror-public-id","origin":"gallery-dl-enrichment","first_observed":"2025-01-01T00:00:00Z","last_observed":"2026-09-29T00:00:00Z"},
+      {"catalog_id":"native","account_key":"onlyfans:id:42","platform":"onlyfans","namespace":"native:onlyfans","kind":"id","value":"42","handle":"public-name","alias_key":"onlyfans:handle:public-name","basis":"captured-author","origin":"gallery-dl","first_observed":"2025-01-01T00:00:00Z","last_observed":"2026-09-29T00:00:00Z"}
+    ],
+    "account_identifier_checkpoints": [
+      {"catalog_id":"twitter","captured_at":"","version":1},
+      {"catalog_id":"mirror","captured_at":"2026-09-29T00:00:00Z","version":1}
+    ],
+    "account_profile_urls": [
+      {"account_key":"twitter:id:9007199254740993","url":"https://x.com/Survivor","basis":"review","first_observed":"2026-09-29T00:00:00Z"}
+    ]
+  },
+  "external_tables": {}
+}

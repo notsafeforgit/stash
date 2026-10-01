@@ -29,13 +29,14 @@ type CatalogIdentityAction struct {
 }
 
 type CatalogOwnershipAction struct {
-	AccountKey      string `json:"account_key"`
-	AccountUUID     string `json:"account_uuid,omitempty"`
-	AccountRevision int    `json:"account_revision,omitempty"`
-	IdentityUUID    string `json:"identity_uuid,omitempty"`
-	Action          string `json:"action"` // linked, unlinked, mapped, review
-	Reason          string `json:"reason,omitempty"`
-	DecisionUUID    string `json:"decision_uuid,omitempty"`
+	AccountKey        string `json:"account_key"`
+	AccountUUID       string `json:"account_uuid,omitempty"`
+	AccountRevision   int    `json:"account_revision,omitempty"`
+	IdentityUUID      string `json:"identity_uuid,omitempty"`
+	PerformerRevision int    `json:"performer_revision,omitempty"`
+	Action            string `json:"action"` // linked, unlinked, mapped, review
+	Reason            string `json:"reason,omitempty"`
+	DecisionUUID      string `json:"decision_uuid,omitempty"`
 }
 
 type CatalogIdentityImportPlan struct {

@@ -326,6 +326,15 @@ cutover has an immutable replay receipt. Never infer account services or ownersh
 from directory labels or restore old plugin links over explicit unlinks. See
 [registry import](docs/native-source-identity.md#importing-the-performer-registry).
 
+`CatalogRegistryImport` follows with the same frozen registry in schema 1000029.
+It imports qualified captured account identifiers and disabled catalog groupings,
+retains all routing/history evidence, and resolves saved ownership where possible.
+Directory labels and reused handles cannot silently establish account identity.
+Mirror and native service accounts remain separately qualified. Original registry
+account/catalog mappings support later catalog-content import; they never become
+a second live ownership authority. No collection root or scrape target is inferred,
+and import does not activate work. Preserve exact replay and atomic rollback.
+
 ### v3 extension points
 
 See `ui/v3/docs/architecture.md` for the current module map and compatibility rules. List configurations require a discriminated GraphQL/local `source`; generated query variables remain typed through the data hook. Layout, preferences, query state, and cache refill live in separate list modules. Player transition policy consumes plain buffered/seekable state in `scene-player-transitions.ts`; media effects, recovery, and transcode leases are separate hooks. Keep the stable player root and existing iOS seek/timeline behavior when extending these modules.

@@ -400,6 +400,11 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 				return err
 			}
 		}
+		if version >= NativeSchemaBaseline+29 {
+			if err := validateCatalogRegistrySchema(conn); err != nil {
+				return err
+			}
+		}
 
 		return nil
 	}

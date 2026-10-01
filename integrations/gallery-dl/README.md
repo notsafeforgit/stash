@@ -681,6 +681,34 @@ Development rehearsals use isolated roots and do not authorize production worker
 activation. Manual/orphan checkpoints, historical handoffs and completion hashes
 remain evidence; this command creates no historical lease or completion proof.
 
+## Frozen catalog registry import
+
+`stash-import-catalog-identities` imports saved performer UUIDs, local bindings,
+merge history and explicit account choices from a frozen registry. After that
+reviewed import, `stash-import-catalog-registry` imports the complementary account
+identifiers, catalog groupings and retained routing/history evidence from the same
+frozen database. Both are maintenance commands authorized by `STASH_API_KEY`;
+producer ingest tokens cannot perform these imports.
+
+```sh
+stash-import-catalog-registry --registry /migration/registry.sqlite3 \
+  --identity-import /migration/identity-receipt.json --snapshot SNAPSHOT_UUID \
+  > /migration/registry-binding.json
+stash-import-catalog-registry --binding /migration/registry-binding.json \
+  --endpoint https://native-stash.example > /migration/registry-preview.json
+stash-import-catalog-registry --binding /migration/registry-preview.json \
+  --endpoint https://native-stash.example --expected-sha256 REVIEWED_PLAN_SHA256 --apply
+```
+
+Keep the frozen snapshot, saved binding and reviewed digest privately for retry.
+The second phase obtains the original registry UUID and capture time from the
+first phase's saved binding, preview or receipt. Unknown schema shapes are
+rejected, and uncertain identities remain review records. The imported catalog
+collections are disabled and have no scrape target/root binding. These commands
+do not import individual catalog bodies or activate workers. See the
+[native registry contracts](../../docs/native-source-identity.md#importing-the-performer-registry)
+for performer-import preparation, limits, ownership rules and inspection APIs.
+
 ## Native n8n backfills
 
 `stash-ingest-n8n` replaces the account backfill runner's record/inspect contract.

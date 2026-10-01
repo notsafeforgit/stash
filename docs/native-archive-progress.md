@@ -72,7 +72,7 @@ review. Production has not been migrated.
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
 | 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries and metadata relationship targets, native account/ownership storage and reviewed consolidation, shared post/profile/capture storage, ordered attachment manifests, audited media associations, reviewed source-list selection, and source-gallery synchronization with manual membership intent are implemented. Scalar and relationship field choices protect explicit and preserved metadata. Revisioned logical roots and source collections retain capture/manual-intake provenance; captured publisher choices connect source evidence to accounts independently of depicted performers. Verified byte identities and immutable per-file verification history now use persistent file-generation guards. Producer identity matching, policy resolution, review APIs/UI and remaining domain services are in progress. |
 | 2 Ingestion and producer adapter | In progress: scoped producer tokens, Reddit/Twitter capture batches and durable receipts are implemented. Verified preparation uses the shared scanner; file/media publication checks descriptors, generations and persistent path removals, reuses concurrent scans, and rejects ambiguous verified-byte owners. Intake publication connects collection provenance, selected source media, attachment evidence and album galleries while preserving explicit choices. Persistent jobs have coalesced submissions, fenced leases, retry/cancellation/recovery, and atomic domain/result publication. File-completion admission now queues a durable worker that checkpoints registration, generates previews and delivers retryable media/gallery hooks; scoped status reports actual completion. Native collection policies now apply typed metadata and explicit performer defaults in intake and ordinary scans, with dry preview and guarded apply. Source-run coordination now coalesces missing date ranges, fences worker ownership, retains checkpoints and deferrals, and excludes overlapping destinations. A supported Python producer package now provides retained-payload outboxes, fenced delivery, durable receipts, backoff and review. The gallery-dl SDK now queues source evidence before download, verifies root/prefix and lease ownership, holds shared destination locks, and queues flushed final files before archive acknowledgement. Reddit single-media evidence and original Twitter attachment membership are covered. The producer now coalesces offline source requests, freezes submissions for replay, retains caller tickets and validates native admission receipts. Claimed Reddit/Twitter windows use precise source timestamps and parent context, with directory checks before postprocessor callbacks. Reviewed portable profiles now fingerprint settings/assets and execute one claimed attempt with concurrent outbox delivery and lost-finish recovery. A local converter now stages ordered, source-scoped profiles from the host and n8n JSON layers without copying website credentials. Scoped dispatch now discovers eligible runs with durable pagination/backoff, and a separate n8n image packages the pinned worker runtime. Staged host Twitter/Reddit launchers preserve saved lists, modes, date filters and full-history profiles through durable caller snapshots. Staged n8n backfill calls now check permanent history before source admission, preserve original completion proof, and expose pending results to converted workflow waits. Live image/profile activation, operational-history and policy migration, general durable edit notifications, additional source adapters and recovery caller conversion remain. |
-| 3 Catalog importer and full-copy reconciliation | Permanent account-backfill completion/skip imports are implemented and rehearsed against a full copy, preserving original decisions and provenance. The remaining catalog/journal families, identity/metadata import, global reconciliation and cutover import remain unfinished. |
+| 3 Catalog importer and full-copy reconciliation | Permanent backfill decisions, retained scan journals/reviewed recovery activation, performer UUIDs and saved ownership, and account/catalog registry imports are implemented and rehearsed against full copies. Original evidence, replay receipts and unresolved conflicts are retained. Individual catalog bodies, validated source routing, review resolution, global reconciliation and cutover import remain unfinished. |
 | 4 Native UI and client conversion | Not yet implemented |
 | 5 Compatibility removal and packaging | Preview packaging isolated and old compatibility gate replaced by current v3 operation/plugin-contract checks. Old UI/API/plugin adapters and config bridge still require conversion/removal. |
 | 6 Backup and cutover rehearsal | Not yet implemented |
@@ -2203,3 +2203,93 @@ The main log is `catalog-identity-validation.log`; final focused evidence is in
 logs are `catalog-identity-migration.log`, `catalog-identity-reconciliation.log`,
 `catalog-identity-real-import.log` and `catalog-identity-import-reconciliation.log`,
 all under `/tmp/stash-native-transition`.
+
+## Reviewed account and catalog registry import
+
+Schema 1000029 imports the six remaining registry families through an
+application-authorized preview/apply API and `stash-import-catalog-registry`.
+The frozen input must complement the completed performer-registry import, with
+matching source UUID, capture time and table inventory. Original rows, plan
+outcomes, source-qualified account/catalog mappings and an immutable receipt
+remain in the native database. Exact retry and reopening preserve the receipt;
+stale plans and later native ownership choices cannot silently reapply history.
+
+Captured qualified IDs create or resolve source accounts. Captured handle/ID
+pairs share that account; reused aliases remain ambiguous. Different ID kinds
+can resolve together only through an already established native account.
+Conflicting native candidates are reported with their actual UUIDs. Mirror and
+native service namespaces stay separate; mirror display names never become
+native handles. Known legacy locators carry explicitly provisional evidence,
+while unknown services and directory-derived account labels remain review items.
+No name-only performer match or website lookup is performed.
+
+Every surviving catalog becomes a disabled `legacy_catalog` collection; historical
+redirects point to its survivor. Publisher accounts remain separate from depicted
+performers. Routes, media keys, links and identifier checkpoints are retained
+without activating jobs or inventing scrape URLs/root bindings. The actual registry
+contained 1,078 empty identifier checkpoint timestamps; the old index writes
+these when no account capture exists. They survive as historical checkpoints.
+ID evidence without a handle also retains its empty alias key.
+
+The private full-copy rehearsal is in
+`.local/native-registry-rehearsal-20261001/`. It reuses the previous increment's
+frozen registry and starts from a new copy of its schema-1000028 library.
+Promotion to 1000029 took 0.074117 seconds. All 142 preexisting tables matched
+before import, with no foreign-key violations or database-file growth; comparison
+took 63.700 seconds. The prepared input, reviewed plan, receipts, retained records,
+helper source and reconciliation reports are saved privately there.
+
+The snapshot contains 1,697 catalogs, 4,032 routes, 914 identifier rows and 1,697
+checkpoints, with empty link/profile-URL tables: 8,340 retained rows. Catalogs
+include 1,237 creator catalogs, 456 other collections and four subreddits. Preview
+took 0.121751 seconds. It created 1,181 source accounts and reused the previously
+bound Twitter account: 662 captured identity groups and 520 provisional locator
+groups. It mapped 1,358 old account keys and retained 138 unqualified keys for
+review. All 1,697 catalog collections were created disabled; 1,099 have a resolved
+publisher account. None received a scrape target or filesystem root.
+
+Three previously unresolved saved ownership choices were imported: Elizabeth
+Tran's Instagram account and the Reddit accounts for petitebbygirl and
+Southern-Lobster-808. Elizabeth Tran's existing Twitter choice was preserved.
+The directory-derived miaxmall account label remains unresolved rather than
+being silently asserted as an Instagram identity. All performer UUIDs, local IDs,
+selected names and aliases remained unchanged, including the existing Elizabeth
+Tran merge survivor.
+
+Import plus exact replay took 1.156696 seconds, and reopening returned the same
+receipt and ownership. All 8,340 source rows matched their frozen evidence:
+2,611 mapped records and 5,729 copied historical records. The post-import
+comparison checked all 142 preexisting tables; all 1,542,054 archive entities,
+selected library metadata, previous import evidence and preexisting collection
+definitions remained unchanged. Only the planned account evidence/revisions,
+new ownership choices and collection records changed. There were no unexpected
+differences, foreign-key violations or database-file growth. Reconciliation took
+51.728 seconds. These are isolated rehearsal measurements, not production timing
+guarantees.
+
+`make validate-fork` passed: 528 v3 tests in 91 files, native contracts, 207
+producer tests, zero Go lint issues and the full Go suite. After the final account
+matching/checkpoint changes, the focused SQLite suite passed in 6.598 seconds,
+the real Go/Python HTTP checks passed, and Go lint reported zero issues. The final
+snapshot-reader regression brought the Python 3.12 suite to 208 passing tests
+(5.954 seconds); all eight registry/identity tests passed on Python 3.14, and the
+real HTTP checks passed again in 3.388 seconds. Coverage includes exact response-
+loss replay, stale previews, native choices after import, mirror separation,
+reused handles, multiple identifier kinds, empty historical checkpoints, missing
+aliases, strict inventory, rollback after swallowed errors and anonymisation.
+Parent `29445f5b5` passed all three CI jobs.
+
+Validation logs are `catalog-registry-validation.log`,
+`catalog-registry-verified-focused.log`, `catalog-registry-verified-lint.log`,
+`catalog-registry-python312-final.log`, `catalog-registry-python314-final.log`
+and `catalog-registry-python-final-http.log`. Rehearsal logs are
+`catalog-registry-migration.log`, `catalog-registry-reconciliation.log`,
+`catalog-registry-real-preview.log`, `catalog-registry-real-import.log` and
+`catalog-registry-import-reconciliation-final.log`, all under
+`/tmp/stash-native-transition`.
+
+This imports the registry, not the individual catalog bodies. Native review
+resolution, validated source/root registration, media/post/profile history,
+worker activation and the later transition phases remain required work. The live
+library, catalog registry, host/n8n workers and frozen compatible deployment remain
+unchanged.

@@ -1,5 +1,5 @@
 import copy
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import closing, redirect_stderr, redirect_stdout
 import io
 import json
 from pathlib import Path
@@ -17,7 +17,7 @@ from stash_ingest.encoding import InvalidData, encode
 def registry_fixture(path):
     fixture = Path(__file__).resolve().parents[3] / "pkg/scrape/testdata/legacy_performer_registry.json"
     document = json.loads(fixture.read_text())
-    with sqlite3.connect(path) as db:
+    with closing(sqlite3.connect(path)) as db, db:
         for table, columns in {**TABLES, **EXTERNAL_TABLES}.items():
             db.execute("CREATE TABLE " + table + "(" + ",".join(column + " TEXT" for column in columns) + ")")
             for row in document["tables"].get(table, []):
@@ -39,7 +39,7 @@ class CatalogIdentityImportTests(unittest.TestCase):
             for table, rows in document["tables"].items():
                 self.assertEqual(sorted(map(encode, rows)), sorted(map(encode, captured["tables"][table])))
             self.assertEqual(before, path.read_bytes())
-            with sqlite3.connect(path) as db:
+            with closing(sqlite3.connect(path)) as db, db:
                 db.execute("ALTER TABLE performer_identities ADD COLUMN extra TEXT")
             with self.assertRaises(InvalidData):
                 snapshot(path, document["captured_at"])
@@ -48,13 +48,13 @@ class CatalogIdentityImportTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "registry.sqlite"
             document = registry_fixture(path)
-            with sqlite3.connect(path) as db:
+            with closing(sqlite3.connect(path)) as db, db:
                 for table in TABLES:
                     if table.startswith("performer_"):
                         db.execute("DROP TABLE " + table)
             captured = snapshot(path, document["captured_at"])
             self.assertEqual({"catalog_metadata_performers", "catalog_metadata_accounts"}, set(captured["tables"]))
-            with sqlite3.connect(path) as db:
+            with closing(sqlite3.connect(path)) as db, db:
                 db.execute("UPDATE catalog_metadata_performers SET profile_json=?", ('{"name":"one","name":"two"}',))
             with self.assertRaises(InvalidData):
                 snapshot(path, document["captured_at"])

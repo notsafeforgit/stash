@@ -88,6 +88,7 @@ func TestNativeLineageRejectsUnsafeInputsBeforeWriting(t *testing.T) {
 		{"missing name model", "DROP TABLE performer_names", "missing performer_names"},
 		{"missing native defaults", "DROP TABLE default_filters", "missing default_filters"},
 		{"missing catalog identity history", "DROP TABLE catalog_identity_import_records", "missing catalog_identity_import_records"},
+		{"missing catalog registry mappings", "DROP TABLE catalog_account_mappings", "missing catalog_account_mappings"},
 		{"missing config checkpoint", "DROP TABLE configuration_migrations", "missing configuration_migrations"},
 		{"missing default alternatives", "DROP TABLE default_filter_import_conflicts", "missing default_filter_import_conflicts"},
 		{"missing archive identities", "DROP TABLE archive_entities", "missing archive_entities"},

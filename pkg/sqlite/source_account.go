@@ -35,10 +35,16 @@ func (r sourceAccountRow) resolve() *models.SourceAccount {
 }
 
 func (s *SourceAccountStore) Create(ctx context.Context, namespace, label string) (*models.SourceAccount, error) {
+	return s.create(ctx, uuid.NewString(), namespace, label)
+}
+
+func (s *SourceAccountStore) create(ctx context.Context, id, namespace, label string) (*models.SourceAccount, error) {
+	if normalized, err := archiveUUID(id); err != nil || normalized != id {
+		return nil, errors.New("invalid source account UUID")
+	}
 	if !archive.ValidAccountNamespace(namespace) || !validAccountText(label, 1024, true) {
 		return nil, errors.New("invalid source account namespace or label")
 	}
-	id := uuid.NewString()
 	if _, err := dbWrapper.Exec(ctx, "INSERT INTO source_accounts(uuid, namespace, label) VALUES (?, ?, ?)", id, namespace, label); err != nil {
 		return nil, err
 	}

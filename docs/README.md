@@ -20,7 +20,7 @@ provides the frozen fallback for users who do not migrate.
 | [Feature development plan](../ui/v3/docs/plan.md) | Expectations for new feature work |
 | [Fork maintenance](../FORK.md) | Independent development, upstream imports, native migrations, and release boundaries |
 | [Native schema promotion](native-schema.md) | Implemented lineage, one-time historical imports, promoted tables, and remaining model conversions |
-| [Native source identity](native-source-identity.md) | Versioned captured account claims, service namespaces, evidence limits, and pending producer integration |
+| [Native source identity](native-source-identity.md) | Captured account claims, service namespaces, and reviewed performer/account registry import |
 | [Native source albums](native-source-albums.md) | Ordered post attachments, partial downloads, gallery membership, and source-evidence requirements |
 | [Native ingestion](native-ingestion.md) | Scoped ingestion, receipts, verified files, source-run coordination, native metadata policies, and preview/apply contracts |
 | [Repository guidance](../CLAUDE.md) and [v3 contributor guidance](../ui/v3/AGENTS.md) | Coding conventions and backend/player constraints |

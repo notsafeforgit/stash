@@ -43,7 +43,8 @@ KEYS = {
 }
 
 
-def snapshot(path, captured_at):
+def snapshot(path, captured_at, *, tables_schema=TABLES, external_schema=EXTERNAL_TABLES,
+             key_schema=KEYS, empty_keys=(), max_records=10000, max_bytes=8 << 20):
     if not isinstance(captured_at, str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,9})?(?:Z|[+-][0-9]{2}:[0-9]{2})", captured_at):
         raise InvalidData("A fixed RFC3339 snapshot time is required")
     try:
@@ -59,27 +60,28 @@ def snapshot(path, captured_at):
         total, size = 0, 0
         for entry in db.execute("SELECT name,type FROM sqlite_schema WHERE type IN ('table','view') AND name NOT GLOB 'sqlite_*' ORDER BY name").fetchall():
             table = entry["name"]
-            columns = TABLES.get(table) or EXTERNAL_TABLES.get(table)
+            columns = tables_schema.get(table) or external_schema.get(table)
             if entry["type"] != "table" or columns is None:
                 raise InvalidData("Unknown registry table or view; review the original snapshot")
             actual = {row["name"] for row in db.execute("PRAGMA table_info(" + table + ")")}
             if actual != set(columns):
                 raise InvalidData("Unsupported registry columns; review the original snapshot")
-            if table in EXTERNAL_TABLES:
+            if table in external_schema:
                 external[table] = db.execute("SELECT count(*) FROM " + table).fetchone()[0]
                 continue
             records, seen = [], set()
-            for row in db.execute("SELECT * FROM " + table + " ORDER BY " + ",".join(KEYS[table])):
+            for row in db.execute("SELECT * FROM " + table + " ORDER BY " + ",".join(key_schema[table])):
                 record = dict(row)
-                keys = tuple(record[key] for key in KEYS[table])
-                if any(not isinstance(key, str) or not key for key in keys) or keys in seen:
+                keys = tuple(record[key] for key in key_schema[table])
+                if (any(not isinstance(record[key], str) or (not record[key] and (table, key) not in empty_keys)
+                        for key in key_schema[table]) or keys in seen):
                     raise InvalidData("Invalid or duplicate registry row key")
                 seen.add(keys)
                 body = encode(record, 1 << 20)
                 total += 1
                 size += len(body)
-                if total > 10000 or size > 8 << 20:
-                    raise InvalidData("Registry identities exceed the atomic import limit")
+                if total > max_records or size > max_bytes:
+                    raise InvalidData("Registry exceeds the atomic import limit")
                 for key in ("profile_json", "payload_json", "summary_json"):
                     if key in record:
                         value = record[key]
@@ -88,12 +90,12 @@ def snapshot(path, captured_at):
                 records.append(record)
             tables[table] = records
     if not tables:
-        raise InvalidData("Registry has no recognized performer identity tables")
+        raise InvalidData("Registry has no recognized retained tables")
     modern = {table for table in TABLES if table.startswith("performer_")}
-    if tables.keys() & modern and not modern <= tables.keys():
+    if "performer_identities" in tables_schema and tables.keys() & modern and not modern <= tables.keys():
         raise InvalidData("Registry performer identity tables are incomplete")
     document = {"captured_at": captured_at, "tables": tables, "external_tables": external}
-    encode(document, 8 << 20)
+    encode(document, max_bytes)
     return document
 
 

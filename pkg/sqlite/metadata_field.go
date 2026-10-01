@@ -29,12 +29,23 @@ type metadataFieldRow struct {
 	CaptureUUID sql.NullString `db:"capture_uuid"`
 	Reason      string         `db:"reason"`
 	CreatedAt   Timestamp      `db:"created_at"`
+	Sealed      bool           `db:"sealed"`
+	RefCount    int            `db:"reference_count"`
 }
 
-func (r metadataFieldRow) resolve() (*models.MetadataFieldDecision, error) {
+func (r metadataFieldRow) resolve(ctx context.Context) (*models.MetadataFieldDecision, error) {
+	if !r.Sealed {
+		return nil, errors.New("metadata decision is not sealed")
+	}
 	value, err := metadataFieldJSON([]byte(r.Value))
 	if err != nil {
 		return nil, err
+	}
+	if metadataReferenceKind(r.Field) != "" {
+		value, err = metadataDecisionReferences(ctx, r.UUID, r.Field, r.RefCount)
+		if err != nil {
+			return nil, err
+		}
 	}
 	ret := &models.MetadataFieldDecision{UUID: r.UUID, Sequence: r.Sequence, EntityUUID: r.EntityUUID,
 		Field: r.Field, Mode: r.Mode, Origin: r.Origin, Value: value, Reason: r.Reason, CreatedAt: r.CreatedAt.Timestamp}
@@ -52,6 +63,10 @@ func metadataFieldJSON(value json.RawMessage) (json.RawMessage, error) {
 	decoder := json.NewDecoder(bytes.NewReader(value))
 	decoder.UseNumber()
 	if err := decoder.Decode(&decoded); err != nil {
+		return nil, err
+	}
+	decoded, err := canonicalMetadataJSONValue(decoded)
+	if err != nil {
 		return nil, err
 	}
 	ret, err := json.Marshal(decoded)
@@ -121,25 +136,56 @@ func (s *MetadataFieldStore) State(ctx context.Context, entityUUID, field string
 	if err != nil {
 		return nil, err
 	}
-	var raw string
-	if err := dbWrapper.Get(ctx, &raw, "SELECT "+metadataFieldValueSQL(def)+" FROM "+table+" WHERE id=?", *identity.LocalID); err != nil {
-		return nil, err
+	var value json.RawMessage
+	if metadataCollectionDefinition(def) {
+		value, err = readMetadataCollection(ctx, identity.UUID, field)
+	} else {
+		var raw string
+		err = dbWrapper.Get(ctx, &raw, "SELECT "+metadataFieldValueSQL(def)+" FROM "+table+" WHERE id=?", *identity.LocalID)
+		if err == nil {
+			value, err = metadataFieldJSON([]byte(raw))
+		}
 	}
-	value, err := metadataFieldJSON([]byte(raw))
 	if err != nil {
 		return nil, err
 	}
 	ret := &models.MetadataFieldState{Entity: identity, Field: field, Value: value, Mode: "inherit", Origin: "unset"}
+	if def.ReferenceKind != "" {
+		ret.Value, ret.References, err = resolveMetadataReferences(ctx, field, value)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if metadataCollectionDefinition(def) {
+		previous, err := metadataPending(ctx, identity.UUID, field)
+		if err != nil {
+			return nil, err
+		}
+		if previous != nil {
+			ret.Pending, ret.Protected, ret.Mode, ret.Origin = true, true, "set", "library"
+			if bytes.Equal(ret.Value, def.ClearValue) {
+				ret.Mode = "clear"
+			}
+			return ret, nil
+		}
+	}
 	var row metadataFieldRow
 	err = dbWrapper.Get(ctx, &row, `SELECT d.* FROM metadata_field_heads h
 JOIN metadata_field_decisions d ON d.uuid=h.decision_uuid AND d.entity_uuid=h.entity_uuid AND d.field=h.field
 WHERE h.entity_uuid=? AND h.field=?`, identity.UUID, field)
 	if err == nil {
-		ret.Decision, err = row.resolve()
+		ret.Decision, err = row.resolve(ctx)
 		if err != nil {
 			return nil, err
 		}
-		if !bytes.Equal(value, ret.Decision.Value) {
+		chosen := ret.Decision.Value
+		if def.ReferenceKind != "" {
+			chosen, _, err = resolveMetadataReferences(ctx, field, chosen)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if !bytes.Equal(ret.Value, chosen) {
 			return nil, errors.New("metadata field differs from its recorded decision")
 		}
 		ret.Mode, ret.Origin = row.Mode, row.Origin
@@ -185,12 +231,12 @@ func (s *MetadataFieldStore) History(ctx context.Context, entityUUID, field stri
 		return nil, err
 	}
 	var rows []metadataFieldRow
-	if err := dbWrapper.Select(ctx, &rows, "SELECT * FROM metadata_field_decisions WHERE entity_uuid=? AND field=? AND sequence>? ORDER BY sequence LIMIT ?", id, field, after, limit); err != nil {
+	if err := dbWrapper.Select(ctx, &rows, "SELECT * FROM metadata_field_decisions WHERE entity_uuid=? AND field=? AND sequence>? AND sealed=1 ORDER BY sequence LIMIT ?", id, field, after, limit); err != nil {
 		return nil, err
 	}
 	ret := make([]models.MetadataFieldDecision, 0, len(rows))
 	for _, row := range rows {
-		decision, err := row.resolve()
+		decision, err := row.resolve(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -307,7 +353,16 @@ func (s *MetadataFieldStore) apply(ctx context.Context, input models.MetadataFie
 	default:
 		return nil, errors.New("invalid metadata choice mode")
 	}
-	value, native, err := normalizeMetadataValue(def, input.Value)
+	var value json.RawMessage
+	var native interface{}
+	if metadataCollectionDefinition(def) {
+		value, native, err = normalizeMetadataCollection(ctx, def, input.Value, input.ReferenceRevisions)
+	} else {
+		if len(input.ReferenceRevisions) != 0 {
+			return nil, errors.New("only relationship metadata accepts target revisions")
+		}
+		value, native, err = normalizeMetadataValue(def, input.Value)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -336,26 +391,41 @@ WHERE c.uuid=? AND p.state='active')`, id); err != nil {
 	}
 	var ret *models.MetadataFieldState
 	err = withMetadataFieldWrite(ctx, current.Entity.UUID, input.Field, func() error {
+		if current.Pending {
+			if err := flushMetadataFieldPending(ctx, current.Entity.UUID, input.Field); err != nil {
+				return err
+			}
+			current, err = s.State(ctx, current.Entity.UUID, input.Field)
+			if err != nil {
+				return err
+			}
+		}
 		if current.Decision == nil && current.Protected {
 			if err := insertMetadataDecision(ctx, current.Entity.UUID, input.Field, "preserved", current.Origin, current.Value, nil, "Preserved before the first recorded choice"); err != nil {
 				return err
 			}
 		}
-		table, _, err := metadataFieldTable(current.Entity.Kind)
-		if err != nil {
-			return err
-		}
-		column := metadataFieldColumn(def.Name)
-		query := "UPDATE " + table + " SET " + column + "=?, updated_at=CURRENT_TIMESTAMP WHERE id=?"
-		args := []interface{}{native, *current.Entity.LocalID}
-		if def.Type == "date" {
-			date, _ := native.(*models.Date)
-			query = "UPDATE " + table + " SET " + column + "=?, " + column + "_precision=?, updated_at=CURRENT_TIMESTAMP WHERE id=?"
-			args = []interface{}{NullDateFromDatePtr(date), datePrecisionFromDatePtr(date), *current.Entity.LocalID}
-		}
-		result, err := dbWrapper.Exec(ctx, query, args...)
-		if err := checkArchiveIdentityUpdate(result, err); err != nil {
-			return err
+		if collection, ok := native.(*metadataCollectionValue); ok {
+			if err := writeMetadataCollection(ctx, current.Entity, input.Field, collection); err != nil {
+				return err
+			}
+		} else {
+			table, _, err := metadataFieldTable(current.Entity.Kind)
+			if err != nil {
+				return err
+			}
+			column := metadataFieldColumn(def.Name)
+			query := "UPDATE " + table + " SET " + column + "=?, updated_at=CURRENT_TIMESTAMP WHERE id=?"
+			args := []interface{}{native, *current.Entity.LocalID}
+			if def.Type == "date" {
+				date, _ := native.(*models.Date)
+				query = "UPDATE " + table + " SET " + column + "=?, " + column + "_precision=?, updated_at=CURRENT_TIMESTAMP WHERE id=?"
+				args = []interface{}{NullDateFromDatePtr(date), datePrecisionFromDatePtr(date), *current.Entity.LocalID}
+			}
+			result, err := dbWrapper.Exec(ctx, query, args...)
+			if err := checkArchiveIdentityUpdate(result, err); err != nil {
+				return err
+			}
 		}
 		if err := insertMetadataDecision(ctx, current.Entity.UUID, input.Field, input.Mode, input.Origin, value, capture, input.Reason); err != nil {
 			return err
@@ -374,6 +444,9 @@ func equalMetadataCapture(a, b *string) bool {
 }
 
 func insertMetadataDecision(ctx context.Context, entityUUID, field, mode, origin string, value json.RawMessage, capture *string, reason string) error {
+	if metadataReferenceKind(field) != "" {
+		return insertMetadataReferenceDecision(ctx, entityUUID, field, mode, origin, value, capture, reason)
+	}
 	_, err := dbWrapper.Exec(ctx, `INSERT INTO metadata_field_decisions(uuid, entity_uuid, field, mode, origin, value_json, capture_uuid, reason)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, uuid.NewString(), entityUUID, field, mode, origin, string(value), capture, reason)
 	return err

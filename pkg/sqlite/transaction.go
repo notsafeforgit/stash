@@ -88,6 +88,11 @@ func (db *Database) Commit(ctx context.Context) error {
 		return err
 	}
 
+	if writable, _ := ctx.Value(writableKey).(bool); writable && db.Version() >= NativeSchemaBaseline+13 {
+		if err := validateMetadataCommit(ctx); err != nil {
+			return err
+		}
+	}
 	defer db.txnComplete(ctx)
 	if snapshot, _ := ctx.Value(readAccelerationKey).(*readSnapshot); snapshot != nil && snapshot.writable {
 		return snapshot.cache.commit(ctx, tx, snapshot)

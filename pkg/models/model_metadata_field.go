@@ -7,13 +7,13 @@ import (
 	"time"
 )
 
-// MetadataFieldDefinition describes a curated scalar target. Relationships and
-// source evidence have separate contracts; a mapping cannot address arbitrary
-// entity columns or mutate the retained source payload.
+// MetadataFieldDefinition describes a curated target. A mapping cannot address
+// arbitrary entity columns or mutate retained source evidence.
 type MetadataFieldDefinition struct {
-	Name       string
-	Type       string // string, date, integer, boolean
-	ClearValue json.RawMessage
+	Name          string
+	Type          string // string, date, integer, boolean, urls, custom_fields, reference, references, groups
+	ClearValue    json.RawMessage
+	ReferenceKind ArchiveEntityKind
 }
 
 func MetadataFields(kind ArchiveEntityKind) []MetadataFieldDefinition {
@@ -27,10 +27,16 @@ func MetadataFields(kind ArchiveEntityKind) []MetadataFieldDefinition {
 		{Name: "date", Type: "date", ClearValue: json.RawMessage(`null`)},
 		{Name: "rating100", Type: "integer", ClearValue: json.RawMessage(`null`)},
 		{Name: "organized", Type: "boolean", ClearValue: json.RawMessage(`false`)},
+		{Name: "urls", Type: "urls", ClearValue: json.RawMessage(`[]`)},
+		{Name: "custom_fields", Type: "custom_fields", ClearValue: json.RawMessage(`{}`)},
+		{Name: "studio", Type: "reference", ClearValue: json.RawMessage(`null`), ReferenceKind: ArchiveStudio},
+		{Name: "performers", Type: "references", ClearValue: json.RawMessage(`[]`), ReferenceKind: ArchivePerformer},
+		{Name: "tags", Type: "references", ClearValue: json.RawMessage(`[]`), ReferenceKind: ArchiveTag},
 	}
 	if kind == ArchiveScene {
 		ret = append(ret, MetadataFieldDefinition{Name: "director", Type: "string", ClearValue: json.RawMessage(`""`)},
-			MetadataFieldDefinition{Name: "production_date", Type: "date", ClearValue: json.RawMessage(`null`)})
+			MetadataFieldDefinition{Name: "production_date", Type: "date", ClearValue: json.RawMessage(`null`)},
+			MetadataFieldDefinition{Name: "groups", Type: "groups", ClearValue: json.RawMessage(`[]`), ReferenceKind: ArchiveGroup})
 	} else {
 		ret = append(ret, MetadataFieldDefinition{Name: "photographer", Type: "string", ClearValue: json.RawMessage(`""`)})
 	}
@@ -58,6 +64,10 @@ type MetadataFieldState struct {
 	Origin    string
 	Protected bool
 	Decision  *MetadataFieldDecision
+	// References supply the current target revisions for reviewed relationship
+	// choices. Pending is visible only inside the transaction doing an edit.
+	References []*ArchiveEntity
+	Pending    bool
 }
 
 type MetadataFieldDecisionInput struct {
@@ -72,6 +82,9 @@ type MetadataFieldDecisionInput struct {
 	Origin      string // review or migration for Decide; source, policy or filename for ApplyAutomatic
 	CaptureUUID string
 	Reason      string
+	// Every nonempty relationship choice must name the reviewed revision of
+	// each target. A redirected or deleted target needs a fresh review.
+	ReferenceRevisions map[string]int
 }
 
 var (

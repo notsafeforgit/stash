@@ -48,7 +48,14 @@ func (s *customFieldsStore) SetCustomFields(ctx context.Context, id int, values 
 		if err := s.validateCustomFields(valMap, values.Remove); err != nil {
 			return err
 		}
+	}
+	if values.Full != nil || len(values.Partial) != 0 || len(values.Remove) != 0 {
+		if err := markMetadataCollectionIntent(ctx, s.table.GetTable(), s.fk.GetCol().(string), id, nil); err != nil {
+			return err
+		}
+	}
 
+	if valMap != nil {
 		if err := s.setCustomFields(ctx, id, valMap, partial); err != nil {
 			return err
 		}

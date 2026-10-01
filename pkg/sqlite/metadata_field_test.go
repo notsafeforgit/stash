@@ -125,6 +125,13 @@ func TestMetadataFieldChoicesClearInheritAndReplay(t *testing.T) {
 
 func TestMetadataFieldSchemasAndOrdinaryEdits(t *testing.T) {
 	db, repo := archiveTestDatabase(t)
+	attachmentSQL(t, db, archiveMetadataFixture)
+	targets := map[models.ArchiveEntityKind]*models.ArchiveEntity{
+		models.ArchivePerformer: archiveFind(t, repo, models.ArchivePerformer, 71),
+		models.ArchiveTag:       archiveFind(t, repo, models.ArchiveTag, 81),
+		models.ArchiveStudio:    archiveFind(t, repo, models.ArchiveStudio, 91),
+		models.ArchiveGroup:     archiveFind(t, repo, models.ArchiveGroup, 101),
+	}
 	gallery := createArchiveGallery(t, repo, "Existing gallery")
 	for _, entity := range []*models.ArchiveEntity{
 		archiveFind(t, repo, models.ArchiveScene, 31), archiveFind(t, repo, models.ArchiveImage, 41), archiveFind(t, repo, models.ArchiveGallery, gallery.ID),
@@ -141,8 +148,22 @@ func TestMetadataFieldSchemasAndOrdinaryEdits(t *testing.T) {
 				value = `97`
 			case "boolean":
 				value = `true`
+			case "urls":
+				value = `["https://example.test/post/1","https://example.test/post/2"]`
+			case "custom_fields":
+				value = `{"note":"Purchased file","score":0.3333333333333333,"empty":""}`
+			case "reference":
+				value = `"` + targets[def.ReferenceKind].UUID + `"`
+			case "references":
+				value = `["` + targets[def.ReferenceKind].UUID + `"]`
+			case "groups":
+				value = `[{"uuid":"` + targets[def.ReferenceKind].UUID + `","scene_index":2}]`
 			}
-			selected, err := applyMetadata(repo, metadataInput(state, "set", "review", value), false)
+			input := metadataInput(state, "set", "review", value)
+			if target := targets[def.ReferenceKind]; target != nil {
+				input.ReferenceRevisions = map[string]int{target.UUID: target.Revision}
+			}
+			selected, err := applyMetadata(repo, input, false)
 			require.NoError(t, err, "%s.%s", entity.Kind, def.Name)
 			require.JSONEq(t, value, string(selected.Value))
 			require.True(t, selected.Protected)

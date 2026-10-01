@@ -390,7 +390,8 @@ scene director/production_date, and image/gallery photographer. IDs, fingerprint
 playback counters, arbitrary source JSON, and unrelated settings are not targets.
 Strings, dates with retained precision, nullable integer ratings from 0 to 100,
 and booleans are checked by the repository. A value must fit within 4 MiB of
-canonical JSON. Relationship/list/custom-field schemas are subsequent work.
+canonical JSON. Migration 1000013 extends these choices to collections and
+relationships as described below.
 
 `metadata_field_baselines` marks existing entities without copying their fields.
 Both populated and empty legacy values remain protected; migration does not
@@ -418,8 +419,46 @@ history uses bounded indexed pagination, and UUID adoption cascades references.
 Deleted entities retain history; reused integer IDs receive independent state.
 Anonymised copies remove decision values and source references before rekeying.
 
+Migration 1000013 adds performers, tags, studio, URLs, and custom fields for all
+three media kinds, plus groups with scene indexes for scenes. Reference values
+use typed archive UUIDs: studio is a UUID or null, performers/tags are UUID sets,
+and groups are `{uuid, scene_index}` objects. A new nonempty choice supplies the
+reviewed revision of every target. Missing, stale, redirected, deleted, or
+wrong-kind targets require a fresh preview. Set membership has canonical UUID
+ordering; source album ordering remains in the attachment manifest.
+
+`metadata_field_references` stores historical targets through foreign keys to
+the archive registry rather than unchecked IDs inside JSON. A reference decision
+is built and sealed within the transaction; only a sealed decision can become a
+field head. Counts, contiguous positions, scope, and immutability are checked.
+UUID adoption cascades these references. Merge redirects remain intelligible in
+history; a later integer-ID reuse cannot change the meaning of an old reference.
+
+Ordinary relationship edits can require many join operations. Database triggers
+retain the first previous value in `metadata_field_pending`, and the native
+transaction manager records one final library choice per affected field before
+commit. Target retirement captures the old UUIDs before the local foreign key
+is nulled. Explicit empty sets, removing an absent value, and reaffirming an
+already-present value also record intent through the shared relationship stores.
+During the editing transaction, State reports the current value as pending and
+protected; history excludes that unfinished choice. Failed flushes roll back the
+transaction. Startup refuses pending writes or unsealed decisions. Anonymised
+exports remove references and pending state with the other private history.
+
+URLs retain order, discard exact duplicates, and require absolute HTTP(S) URLs
+within 8192 bytes. Custom fields accept native primitive string/number/boolean
+values; SQLite stores booleans as 0/1. Nulls and nested values are rejected, and
+omitting a key from the replacement object removes it. Integers must fit signed
+64-bit storage; larger exact identifiers should be strings. Floating-point
+values retain the native double precision on replay. Collection choices accept
+at most 4096 items and 4 MiB of canonical JSON. These limits do not rewrite
+existing fields during migration. UUID, owner, reverse-target, and history
+indexes bound lookups to the relevant entities, including a new scene-to-group
+index. Existing scalar decisions, entity revisions, and the last issued history
+sequence survive migration intact, including when later rows were removed.
+
 These are core repository operations. Source authorization, candidate/policy
-selection, relationship choices, full creation-intent conversion, review API/UI,
+selection, full creation-intent conversion, review API/UI,
 and durable after-success delivery still belong to the subsequent domain/API
 work. No new producer-facing endpoint exposes the repositories directly.
 

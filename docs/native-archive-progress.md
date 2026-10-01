@@ -44,13 +44,14 @@ review. Production has not been migrated.
 | Stash `a7ab4a1cc` | Reviewed attachment selections and compatible partial source lists; full-copy reconciliation, complete validation gate, CI lint/build, and preview image publication passed |
 | Stash `377f7a6ad` | Source albums with persistent manual membership intent; full-copy reconciliation, complete validation gate, CI lint/build, and preview image publication passed |
 | Stash `5bc0149ea` | Portable tag/studio/group identities and tag-merge redirects; full-copy reconciliation, complete validation gate, CI lint/build, and preview image publication passed |
+| Stash `5fd4d0f93` | Scalar field decisions with explicit clear/inherit, preserved legacy values and new-album capture provenance; full-copy reconciliation, complete validation gate, CI lint/build, and preview image publication passed |
 
 ## Phase status
 
 | Phase | Status |
 | --- | --- |
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
-| 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries and metadata relationship targets, native account/ownership storage, shared post/profile/capture storage, ordered attachment manifests, audited media associations, reviewed source-list selection, and source-gallery synchronization with manual membership intent are implemented. Scalar field choices now protect explicit and preserved metadata. Source equivalence, relationship choices, policy resolution, review APIs/UI and remaining domain services are in progress. |
+| 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries and metadata relationship targets, native account/ownership storage, shared post/profile/capture storage, ordered attachment manifests, audited media associations, reviewed source-list selection, and source-gallery synchronization with manual membership intent are implemented. Scalar and relationship field choices protect explicit and preserved metadata. Source equivalence, policy resolution, review APIs/UI and remaining domain services are in progress. |
 | 2 Ingestion and producer adapter | Not yet implemented |
 | 3 Catalog importer and full-copy reconciliation | Not yet implemented |
 | 4 Native UI and client conversion | Not yet implemented |
@@ -447,3 +448,45 @@ Relationship choices, policy/source resolution, native API/UI and creation-inten
 conversion, importer/producer integration, and durable after-success delivery
 remain required. This checkpoint does not enable automatic rescanning or overwrite
 existing album headers. Production has not been migrated.
+
+## Collection and relationship metadata choices
+
+Migration 1000013 adds the same set/clear/inherit behavior to performers, tags,
+studio, URLs, custom fields, and scene groups. Relationship decisions retain
+normalized UUID references, with reviewed target revisions and immutable sealed
+history. Performer/tag merges preserve the meaning of historical associations;
+deleting a target cannot silently rebind old history when its integer ID is
+reused. Native browsing fields remain the selected state.
+
+Ordinary bulk edits retain the previous value and record one final choice per
+field at commit. Explicit empty sets and reaffirming existing relationships also
+protect user intent. SQL guards, transaction checks, and startup validation reject
+unfinished decisions. The existing scalar history survives migration intact.
+Anonymised exports remove the added references and transaction state.
+
+Focused tests cover every field type across scenes/images/galleries, target
+revision conflicts, wrong-kind references, coalescing, clear/inherit/replay,
+empty updates through existing APIs, merge/adoption/delete/ID reuse, previous
+values without recorded history, preserved history sequence counters, late
+rollback, startup refusal, and indexed lookup. Numeric tests include large
+doubles and exact signed 64-bit integers, including writes after replay. The
+query-plan test identified a missing scene-to-group index, which is
+included in this migration. Full-copy probing found no full scans for selected
+metadata lookups; a representative single studio edit took about one millisecond.
+Existing relationship sizes were within the 4096-target bound.
+
+The final full-copy schema migration took 2.30 seconds. Streaming row digests
+matched all 101 retained tables and columns, with zero foreign-key violations.
+The new reference and pending tables were empty, no provenance was invented, and
+the file did not grow; 110,845,952 bytes remained available on its free-page list.
+The private receipt is
+`.local/native-archive-rehearsal-20260930/metadata-collections-reconciliation.json`.
+
+The complete `make validate-fork` gate passed on the final code: generation,
+frontend validation and 528 UI tests, the retained v3 extension contract and
+71 application operation files, Go lint with zero issues, and all Go unit and
+integration tests. The SQLite suite completed in 402.1 seconds.
+
+Source/policy resolution, native review API/UI, creation-intent conversion,
+producer/catalog import integration, and durable after-success delivery remain
+required. Production has not been migrated.

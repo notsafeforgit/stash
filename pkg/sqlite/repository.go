@@ -268,6 +268,13 @@ func (r *joinRepository) getIDs(ctx context.Context, id int) ([]int, error) {
 }
 
 func (r *joinRepository) insert(ctx context.Context, id int, foreignIDs ...int) error {
+	if len(foreignIDs) == 0 {
+		return nil
+	}
+	if err := markMetadataCollectionIntent(ctx, r.tableName, r.idColumn, id, foreignIDs); err != nil {
+		return err
+	}
+
 	stmt, err := dbWrapper.Prepare(ctx, fmt.Sprintf("INSERT INTO %s (%s, %s) VALUES (?, ?)", r.tableName, r.idColumn, r.fkColumn))
 	if err != nil {
 		return err
@@ -285,6 +292,13 @@ func (r *joinRepository) insert(ctx context.Context, id int, foreignIDs ...int) 
 
 // insertOrIgnore inserts a join into the table, silently failing in the event that a conflict occurs (ie when the join already exists)
 func (r *joinRepository) insertOrIgnore(ctx context.Context, id int, foreignIDs ...int) error {
+	if len(foreignIDs) == 0 {
+		return nil
+	}
+	if err := markMetadataCollectionIntent(ctx, r.tableName, r.idColumn, id, foreignIDs); err != nil {
+		return err
+	}
+
 	stmt, err := dbWrapper.Prepare(ctx, fmt.Sprintf("INSERT INTO %s (%s, %s) VALUES (?, ?) ON CONFLICT (%[2]s, %s) DO NOTHING", r.tableName, r.idColumn, r.fkColumn))
 	if err != nil {
 		return err
@@ -301,6 +315,13 @@ func (r *joinRepository) insertOrIgnore(ctx context.Context, id int, foreignIDs 
 }
 
 func (r *joinRepository) destroyJoins(ctx context.Context, id int, foreignIDs ...int) error {
+	if len(foreignIDs) == 0 {
+		return nil
+	}
+	if err := markMetadataCollectionIntent(ctx, r.tableName, r.idColumn, id, foreignIDs); err != nil {
+		return err
+	}
+
 	stmt := fmt.Sprintf("DELETE FROM %s WHERE %s = ? AND %s IN %s", r.tableName, r.idColumn, r.fkColumn, getInBinding(len(foreignIDs)))
 
 	args := make([]interface{}, len(foreignIDs)+1)
@@ -317,6 +338,10 @@ func (r *joinRepository) destroyJoins(ctx context.Context, id int, foreignIDs ..
 }
 
 func (r *joinRepository) replace(ctx context.Context, id int, foreignIDs []int) error {
+	if err := markMetadataCollectionIntent(ctx, r.tableName, r.idColumn, id, foreignIDs); err != nil {
+		return err
+	}
+
 	if err := r.destroy(ctx, []int{id}); err != nil {
 		return err
 	}

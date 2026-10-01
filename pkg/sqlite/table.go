@@ -217,6 +217,10 @@ func (t *joinTable) get(ctx context.Context, id int) ([]int, error) {
 }
 
 func (t *joinTable) insertJoins(ctx context.Context, id int, foreignIDs []int) error {
+	if err := markMetadataCollectionIntent(ctx, t.table.table.GetTable(), t.idColumn.GetCol().(string), id, foreignIDs); err != nil {
+		return err
+	}
+
 	// manually create SQL so that we can prepare once
 	// ignore duplicates
 	q := fmt.Sprintf("INSERT INTO %s (%s, %s) VALUES (?, ?) ON CONFLICT (%[2]s, %s) DO NOTHING", t.table.table.GetTable(), t.idColumn.GetCol(), t.fkColumn.GetCol())
@@ -240,6 +244,10 @@ func (t *joinTable) insertJoins(ctx context.Context, id int, foreignIDs []int) e
 }
 
 func (t *joinTable) replaceJoins(ctx context.Context, id int, foreignIDs []int) error {
+	if err := markMetadataCollectionIntent(ctx, t.table.table.GetTable(), t.idColumn.GetCol().(string), id, foreignIDs); err != nil {
+		return err
+	}
+
 	if err := t.destroy(ctx, []int{id}); err != nil {
 		return err
 	}
@@ -248,6 +256,13 @@ func (t *joinTable) replaceJoins(ctx context.Context, id int, foreignIDs []int) 
 }
 
 func (t *joinTable) addJoins(ctx context.Context, id int, foreignIDs []int) error {
+	if len(foreignIDs) == 0 {
+		return nil
+	}
+	if err := markMetadataCollectionIntent(ctx, t.table.table.GetTable(), t.idColumn.GetCol().(string), id, foreignIDs); err != nil {
+		return err
+	}
+
 	switch t.table.table.GetTable() {
 	case "galleries_images", "scenes_galleries":
 		// Source-album triggers record an explicit inclusion even when the
@@ -267,6 +282,13 @@ func (t *joinTable) addJoins(ctx context.Context, id int, foreignIDs []int) erro
 }
 
 func (t *joinTable) destroyJoins(ctx context.Context, id int, foreignIDs []int) error {
+	if len(foreignIDs) == 0 {
+		return nil
+	}
+	if err := markMetadataCollectionIntent(ctx, t.table.table.GetTable(), t.idColumn.GetCol().(string), id, foreignIDs); err != nil {
+		return err
+	}
+
 	q := dialect.Delete(t.table.table).Where(
 		t.idColumn.Eq(id),
 		t.fkColumn.In(foreignIDs),
@@ -559,6 +581,10 @@ func (t *orderedValueTable[T]) insertJoin(ctx context.Context, id int, position 
 }
 
 func (t *orderedValueTable[T]) insertJoins(ctx context.Context, id int, startPos int, v []T) error {
+	if err := markMetadataCollectionIntent(ctx, t.table.table.GetTable(), t.idColumn.GetCol().(string), id, nil); err != nil {
+		return err
+	}
+
 	for i, fk := range v {
 		if _, err := t.insertJoin(ctx, id, i+startPos, fk); err != nil {
 			return err
@@ -569,6 +595,10 @@ func (t *orderedValueTable[T]) insertJoins(ctx context.Context, id int, startPos
 }
 
 func (t *orderedValueTable[T]) replaceJoins(ctx context.Context, id int, v []T) error {
+	if err := markMetadataCollectionIntent(ctx, t.table.table.GetTable(), t.idColumn.GetCol().(string), id, nil); err != nil {
+		return err
+	}
+
 	if err := t.destroy(ctx, []int{id}); err != nil {
 		return err
 	}
@@ -578,6 +608,13 @@ func (t *orderedValueTable[T]) replaceJoins(ctx context.Context, id int, v []T) 
 }
 
 func (t *orderedValueTable[T]) addJoins(ctx context.Context, id int, v []T) error {
+	if len(v) == 0 {
+		return nil
+	}
+	if err := markMetadataCollectionIntent(ctx, t.table.table.GetTable(), t.idColumn.GetCol().(string), id, nil); err != nil {
+		return err
+	}
+
 	// get existing foreign keys
 	existing, err := t.get(ctx, id)
 	if err != nil {
@@ -596,6 +633,13 @@ func (t *orderedValueTable[T]) addJoins(ctx context.Context, id int, v []T) erro
 }
 
 func (t *orderedValueTable[T]) destroyJoins(ctx context.Context, id int, v []T) error {
+	if len(v) == 0 {
+		return nil
+	}
+	if err := markMetadataCollectionIntent(ctx, t.table.table.GetTable(), t.idColumn.GetCol().(string), id, nil); err != nil {
+		return err
+	}
+
 	existing, err := t.get(ctx, id)
 	if err != nil {
 		return fmt.Errorf("getting existing %s: %w", t.table.table.GetTable(), err)
@@ -673,6 +717,10 @@ func (t *scenesGroupsTable) insertJoin(ctx context.Context, id int, v models.Gro
 }
 
 func (t *scenesGroupsTable) insertJoins(ctx context.Context, id int, v []models.GroupsScenes) error {
+	if err := markMetadataCollectionIntent(ctx, t.table.table.GetTable(), t.idColumn.GetCol().(string), id, nil); err != nil {
+		return err
+	}
+
 	for _, fk := range v {
 		if _, err := t.insertJoin(ctx, id, fk); err != nil {
 			return err
@@ -683,6 +731,10 @@ func (t *scenesGroupsTable) insertJoins(ctx context.Context, id int, v []models.
 }
 
 func (t *scenesGroupsTable) replaceJoins(ctx context.Context, id int, v []models.GroupsScenes) error {
+	if err := markMetadataCollectionIntent(ctx, t.table.table.GetTable(), t.idColumn.GetCol().(string), id, nil); err != nil {
+		return err
+	}
+
 	if err := t.destroy(ctx, []int{id}); err != nil {
 		return err
 	}
@@ -691,6 +743,13 @@ func (t *scenesGroupsTable) replaceJoins(ctx context.Context, id int, v []models
 }
 
 func (t *scenesGroupsTable) addJoins(ctx context.Context, id int, v []models.GroupsScenes) error {
+	if len(v) == 0 {
+		return nil
+	}
+	if err := markMetadataCollectionIntent(ctx, t.table.table.GetTable(), t.idColumn.GetCol().(string), id, nil); err != nil {
+		return err
+	}
+
 	// get existing foreign keys
 	fks, err := t.get(ctx, id)
 	if err != nil {
@@ -717,6 +776,13 @@ func (t *scenesGroupsTable) addJoins(ctx context.Context, id int, v []models.Gro
 }
 
 func (t *scenesGroupsTable) destroyJoins(ctx context.Context, id int, v []models.GroupsScenes) error {
+	if len(v) == 0 {
+		return nil
+	}
+	if err := markMetadataCollectionIntent(ctx, t.table.table.GetTable(), t.idColumn.GetCol().(string), id, nil); err != nil {
+		return err
+	}
+
 	for _, vv := range v {
 		q := dialect.Delete(t.table.table).Where(
 			t.idColumn.Eq(id),

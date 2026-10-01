@@ -112,7 +112,7 @@ func TestAnonymiserRemovesSourceAccountEvidence(t *testing.T) {
 	source, repo := archiveTestDatabase(t)
 	post := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "native:twitter", Value: "private-account-post"}, "")
 	capture := recordSourceTestCapture(t, repo, sourceTestCapture(t, post.UUID, 1, "private-account-biography"))
-	manifest := recordAttachmentManifest(t, repo, models.SourceAttachmentManifestInput{CaptureUUID: capture.UUID, Complete: true,
+	manifest := recordAttachmentManifest(t, repo, models.SourceAttachmentManifestInput{CaptureUUID: capture.UUID, Complete: true, DeclaredAlbum: true,
 		Entries: []models.SourceAttachmentEntry{sourceAttachmentEntry(0, "private-account-attachment")}})
 	attachment := manifestEntries(t, repo, manifest.UUID)[0].Attachment
 	media := archiveFind(t, repo, models.ArchiveScene, 31)
@@ -122,6 +122,9 @@ func TestAnonymiserRemovesSourceAccountEvidence(t *testing.T) {
 		State: "linked", MediaUUID: media.UUID, ExpectedMediaRevision: media.Revision, Origin: "review", Reason: "private-account-media-choice"}))
 	selection := applySelection(t, repo, models.AttachmentSelectionInput{PostUUID: post.UUID, ExpectedPostRevision: selectionPost(t, repo, post.UUID).Revision,
 		CaptureUUID: capture.UUID, Mode: "pinned", Origin: "review", Reason: "private-account-album-choice"})
+	album := syncSourceGallery(t, repo, post.UUID)
+	membership := sourceGalleryHistory(t, repo, album.GalleryUUID)
+	require.Len(t, membership, 1)
 	account := createSourceAccount(t, repo, "native:reddit")
 	evidence := accountEvidence()
 	evidence.Details = []byte(`{"private":"private-account-evidence"}`)
@@ -139,7 +142,7 @@ func TestAnonymiserRemovesSourceAccountEvidence(t *testing.T) {
 	require.NoError(t, anonymiser.Anonymise(context.Background()))
 	contents, err := os.ReadFile(output)
 	require.NoError(t, err)
-	for _, value := range []string{account.UUID, performer.UUID, post.UUID, capture.UUID, capture.RevisionUUID, manifest.UUID, attachment.UUID, mediaEvidence.UUID, selection.Decision.UUID, "private-account-"} {
+	for _, value := range []string{account.UUID, performer.UUID, post.UUID, capture.UUID, capture.RevisionUUID, manifest.UUID, attachment.UUID, mediaEvidence.UUID, selection.Decision.UUID, album.GalleryUUID, membership[0].UUID, "private-account-"} {
 		require.NotContains(t, string(contents), value)
 	}
 	require.Equal(t, account.UUID, findSourceAccount(t, repo, account.UUID).UUID)
@@ -157,6 +160,10 @@ func TestAnonymiserRemovesSourceAccountEvidence(t *testing.T) {
 	for _, table := range []string{"source_attachments", "source_attachment_manifests", "source_attachment_entries", "source_capture_attachment_manifests", "source_media_evidence", "attachment_media_decisions", "attachment_media_links", "post_attachment_decisions", "post_attachment_decision_manifests", "post_attachment_selections"} {
 		require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM "+table))
 	}
+	for _, table := range []string{"post_gallery_decisions", "post_gallery_links", "source_gallery_write_context", "gallery_membership_events", "gallery_membership_heads"} {
+		require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM "+table))
+	}
+	require.Equal(t, membership, sourceGalleryHistory(t, repo, album.GalleryUUID))
 	require.NoError(t, repo.WithReadTxn(context.Background(), func(ctx context.Context) error {
 		original, err := repo.SourceAttachment.MediaDecision(ctx, attachment.UUID)
 		require.NoError(t, err)

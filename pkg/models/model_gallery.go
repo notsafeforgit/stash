@@ -8,7 +8,8 @@ import (
 )
 
 type Gallery struct {
-	ID int `json:"id"`
+	ID     int           `json:"id"`
+	Origin GalleryOrigin `json:"origin"`
 
 	Title        string `json:"title"`
 	Code         string `json:"code"`
@@ -37,6 +38,14 @@ type Gallery struct {
 	TagIDs       RelatedIDs     `json:"tag_ids"`
 	PerformerIDs RelatedIDs     `json:"performer_ids"`
 }
+
+type GalleryOrigin string
+
+const (
+	GalleryOriginManual     GalleryOrigin = "manual"
+	GalleryOriginFilesystem GalleryOrigin = "filesystem"
+	GalleryOriginSource     GalleryOrigin = "source"
+)
 
 func NewGallery() Gallery {
 	currentTime := time.Now()
@@ -96,9 +105,9 @@ func NewGalleryPartial() GalleryPartial {
 }
 
 // IsUserCreated returns true if the gallery was created by the user.
-// This is determined by whether the gallery has a primary file or folder.
+// Source albums are explicitly distinguished from manually created galleries.
 func (g *Gallery) IsUserCreated() bool {
-	return g.PrimaryFileID == nil && g.FolderID == nil
+	return g.Origin != GalleryOriginSource && g.PrimaryFileID == nil && g.FolderID == nil
 }
 
 func (g *Gallery) LoadURLs(ctx context.Context, l URLLoader) error {

@@ -241,6 +241,41 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 				}
 			}
 		}
+		if version >= NativeSchemaBaseline+10 {
+			for _, name := range []string{"post_gallery_decisions", "post_gallery_links", "source_gallery_write_context", "gallery_membership_events", "gallery_membership_heads"} {
+				if !present[name] {
+					return fmt.Errorf("native database schema is incomplete: missing %s", name)
+				}
+			}
+			var origin, unfinished bool
+			if err := conn.Get(&origin, "SELECT EXISTS(SELECT 1 FROM pragma_table_info('galleries') WHERE name = 'origin')"); err != nil {
+				return err
+			}
+			if !origin {
+				return errors.New("native database schema is incomplete: missing galleries.origin")
+			}
+			if err := conn.Get(&unfinished, "SELECT EXISTS(SELECT 1 FROM source_gallery_write_context)"); err != nil {
+				return err
+			}
+			if unfinished {
+				return errors.New("native database has an unfinished source gallery write context")
+			}
+			required := []string{"gallery_origin_immutable", "source_gallery_folder_insert", "source_gallery_folder_update", "source_gallery_file_insert", "source_gallery_file_update", "post_gallery_decision_kind_insert", "post_gallery_decision_kind_update", "post_gallery_link_scope_insert", "post_gallery_link_scope_update", "gallery_membership_kind_insert", "gallery_membership_kind_update", "post_gallery_decision_immutable", "post_gallery_head_forward", "gallery_membership_event_immutable", "gallery_membership_head_forward", "gallery_membership_current", "post_gallery_active_post"}
+			for _, table := range []string{"galleries_images", "scenes_galleries"} {
+				for _, action := range []string{"insert", "delete", "update"} {
+					required = append(required, "source_gallery_"+table+"_"+action)
+				}
+			}
+			for _, name := range required {
+				var exists bool
+				if err := conn.Get(&exists, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'trigger' AND name = ?)", name); err != nil {
+					return err
+				}
+				if !exists {
+					return fmt.Errorf("native database schema is incomplete: missing %s", name)
+				}
+			}
+		}
 		return nil
 	}
 	if version >= NativeSchemaBaseline {

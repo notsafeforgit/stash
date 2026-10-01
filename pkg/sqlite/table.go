@@ -248,6 +248,13 @@ func (t *joinTable) replaceJoins(ctx context.Context, id int, foreignIDs []int) 
 }
 
 func (t *joinTable) addJoins(ctx context.Context, id int, foreignIDs []int) error {
+	switch t.table.table.GetTable() {
+	case "galleries_images", "scenes_galleries":
+		// Source-album triggers record an explicit inclusion even when the
+		// member is already present. ON CONFLICT preserves the existing join
+		// and cover while keeping gallery-, image-, and scene-side intent equal.
+		return t.insertJoins(ctx, id, foreignIDs)
+	}
 	// get existing foreign keys
 	fks, err := t.get(ctx, id)
 	if err != nil {

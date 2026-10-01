@@ -264,8 +264,9 @@ The new repositories use bounded, indexed lookups and the caller's transaction.
 Late insert/head failures roll back the evidence, choices, and revisions together.
 Reads validate manifest counts and signatures; missing entries are corruption,
 not an empty album. Anonymised copies remove manifests and association history
-before rekeying identities. Gallery construction, ingestion endpoints, and album
-UI remain separate work; current source selection is added by migration 1000009.
+before rekeying identities. Gallery construction is added by migration 1000010.
+Ingestion endpoints and album UI remain separate work; current source selection
+is added by migration 1000009.
 
 Migration 1000009 adds audited post attachment selections. An automatic selection
 combines compatible partial manifests by source position, preserving known
@@ -299,8 +300,71 @@ commit together. Foreign keys scope every reference to its source post, history
 is immutable, and a head cannot move backward. Counts and a selection signature
 detect missing/changed evidence on current-selection reads. New selections are
 blocked for forgotten posts. Anonymised exports remove the new history and
-references. API/UI exposure, source-to-gallery synchronization, and manual
-gallery field/membership decisions are still required by the transition plan.
+references. Source-to-gallery synchronization and durable membership intent are
+added below; API/UI exposure and general field decisions remain required.
+
+Migration 1000010 distinguishes manual, filesystem, and source origins on
+galleries. Existing rows are classified from their folder/file associations
+without changing their UUIDs, revisions, metadata, or memberships. Origin is
+immutable; source-created galleries cannot acquire a folder or ZIP. Title-based
+manual-gallery lookup excludes source albums.
+
+`post_gallery_decisions` and `post_gallery_links` record explicit post-to-gallery
+associations and disable decisions. One current post owns a gallery association.
+Source creation cites the selected attachment decision; reviewed adoption
+requires the current post and gallery revisions and a pathless manual/source
+target, with no file associations even when no primary file is selected. Titles,
+performer names, and folders never imply adoption. Disabling or changing an
+association leaves the former gallery, its memberships, and its files intact.
+A deleted gallery suppresses recreation; a redirected gallery requires review.
+UUID adoption cascades into the association and its history.
+
+`SourceGallery.Preview` computes changes for the selected post using bounded,
+indexed bulk lookups. It retains source order and repeated attachment slots,
+while deduplicating actual scene/image memberships. Attachment choices resolve
+media redirects; deleted entities, undecided/unlinked attachments, and explicit
+membership exclusions remain distinct states. A `linked` entry identifies a
+library entity, not proof that its file is locally available. Producer download
+state and actual file availability remain separate ingestion work. Ordinary
+single-media posts are ineligible; explicit albums and known multi-item lists
+remain eligible with partial or absent local media.
+
+`Sync` verifies the preview signature, including current post, gallery, and
+selected media revisions, in the caller's write transaction. It creates at most
+one source gallery and changes only the planned memberships. A fresh replay
+does not create another gallery, advance revisions, or append duplicate membership
+history. One scene/image can be shared by several posts without copying media.
+An old preview becomes stale after creation; future transport receipts must
+separately make delivery replay idempotent.
+
+Membership insertions/removals are recorded in `gallery_membership_events`, with
+`gallery_membership_heads` selecting current intent. Source events cite the
+post and attachment selection. Ordinary gallery/image/scene edits are library
+choices, including an explicit add of an already-present member. Tracking
+continues for previously adopted manual galleries even after disabling the
+association. Manual inclusions and exclusions take precedence across media
+redirects. Source synchronization removes only obsolete memberships it owns;
+pre-existing/manual additions and explicit image covers remain protected.
+Source order is retained in the attachment selection; manual mixed-media order
+and its UI are subsequent work.
+
+An ephemeral `source_gallery_write_context` row identifies source writes within
+one transaction. A pre-commit guard requires all such markers to be removed;
+startup refuses a database containing a leftover marker. This distinguishes
+source membership changes from library edits without requiring plugin hooks.
+Failures roll back the gallery, identities, association, membership events, and
+revisions together. History is immutable, heads only advance, and typed/scoped
+foreign keys protect the links. History pages are bounded to 100 records;
+membership previews reject more than 8,192 members or decision heads rather
+than silently dropping any. Identity resolution follows at most 128 entries.
+
+New source galleries initialize title, description, and a valid date from the
+capture cited by the attachment selection. This initial implementation never
+overwrites existing gallery metadata or assigns depicted performers from the
+publisher. General per-field source/review policies, URLs, mixed-media ordering
+controls, native API/UI, durable after-success delivery, and ingestion/catalog
+import integration remain required. Anonymised copies remove source association
+and membership history before rekeying identities.
 
 The filesystem deletion journal currently derives its directory from the
 database filename. Promotion in place retains that association, but a production

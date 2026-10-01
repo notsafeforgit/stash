@@ -30,13 +30,14 @@ const (
 )
 
 type galleryRow struct {
-	ID            int         `db:"id" goqu:"skipinsert"`
-	Title         zero.String `db:"title"`
-	Code          zero.String `db:"code"`
-	Date          NullDate    `db:"date"`
-	DatePrecision null.Int    `db:"date_precision"`
-	Details       zero.String `db:"details"`
-	Photographer  zero.String `db:"photographer"`
+	ID            int                  `db:"id" goqu:"skipinsert"`
+	Origin        models.GalleryOrigin `db:"origin" goqu:"skipupdate"`
+	Title         zero.String          `db:"title"`
+	Code          zero.String          `db:"code"`
+	Date          NullDate             `db:"date"`
+	DatePrecision null.Int             `db:"date_precision"`
+	Details       zero.String          `db:"details"`
+	Photographer  zero.String          `db:"photographer"`
 	// expressed as 1-100
 	Rating    null.Int  `db:"rating"`
 	Organized bool      `db:"organized"`
@@ -48,6 +49,13 @@ type galleryRow struct {
 
 func (r *galleryRow) fromGallery(o models.Gallery) {
 	r.ID = o.ID
+	r.Origin = o.Origin
+	if r.Origin == "" {
+		r.Origin = models.GalleryOriginManual
+		if o.FolderID != nil || o.PrimaryFileID != nil {
+			r.Origin = models.GalleryOriginFilesystem
+		}
+	}
 	r.Title = zero.StringFrom(o.Title)
 	r.Code = zero.StringFrom(o.Code)
 	r.Date = NullDateFromDatePtr(o.Date)
@@ -74,6 +82,7 @@ type galleryQueryRow struct {
 func (r *galleryQueryRow) resolve() *models.Gallery {
 	ret := &models.Gallery{
 		ID:            r.ID,
+		Origin:        r.Origin,
 		Title:         r.Title.String,
 		Code:          r.Code.String,
 		Date:          r.Date.DatePtr(r.DatePrecision),
@@ -240,6 +249,9 @@ func (qb *GalleryStore) selectDataset() *goqu.SelectDataset {
 func (qb *GalleryStore) Create(ctx context.Context, newObject *models.CreateGalleryInput) error {
 	var r galleryRow
 	r.fromGallery(*newObject.Gallery)
+	if newObject.Origin == "" && len(newObject.FileIDs) > 0 {
+		r.Origin = models.GalleryOriginFilesystem
+	}
 
 	id, err := qb.tableMgr.insertID(ctx, r)
 	if err != nil {
@@ -709,6 +721,7 @@ func (qb *GalleryStore) FindUserGalleryByTitle(ctx context.Context, title string
 		galleriesFilesJoinTable,
 		goqu.On(galleriesFilesJoinTable.Col(galleryIDColumn).Eq(table.Col(idColumn))),
 	).Select(table.Col(idColumn)).Where(
+		table.Col("origin").Neq(models.GalleryOriginSource),
 		table.Col("folder_id").IsNull(),
 		galleriesFilesJoinTable.Col("file_id").IsNull(),
 		table.Col("title").Eq(title),

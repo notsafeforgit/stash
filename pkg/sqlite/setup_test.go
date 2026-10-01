@@ -1412,7 +1412,8 @@ func makeGallery(i int, includeScenes bool) *models.Gallery {
 	tids := indexesToIDs(tagIDs, galleryTags[i])
 
 	ret := &models.Gallery{
-		Title: getGalleryStringValue(i, titleField),
+		Origin: models.GalleryOriginFilesystem,
+		Title:  getGalleryStringValue(i, titleField),
 		URLs: models.NewRelatedStrings([]string{
 			getGalleryEmptyString(i, urlField),
 		}),
@@ -1421,6 +1422,9 @@ func makeGallery(i int, includeScenes bool) *models.Gallery {
 		StudioID:     studioID,
 		PerformerIDs: models.NewRelatedIDs(pids),
 		TagIDs:       models.NewRelatedIDs(tids),
+	}
+	if i == galleryIdxWithoutFile {
+		ret.Origin = models.GalleryOriginManual
 	}
 
 	if includeScenes {

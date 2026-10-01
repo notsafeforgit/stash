@@ -173,6 +173,7 @@ func (db *Database) Repository() models.Repository {
 		SourceAccount:          &SourceAccountStore{},
 		SourceEvidence:         &SourceEvidenceStore{},
 		SourceAttachment:       &SourceAttachmentStore{},
+		SourceGallery:          &SourceGalleryStore{gallery: db.Gallery},
 		Share:                  &ShareStore{},
 	}
 }

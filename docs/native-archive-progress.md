@@ -41,13 +41,14 @@ review. Production has not been migrated.
 | Stash `02d3c67c2` | Shared post/profile evidence, lossless captures, versioned retention, replay and integrity checks; full-copy reconciliation, catalog size inventory, and complete validation gate passed |
 | Stash `c1d2c9387` | Portable gallery identities, membership revisions, and explicit source-album requirements; full-copy reconciliation and complete validation gate passed |
 | Stash `e31ced0d9` | Ordered shared attachment manifests and audited media associations; full-copy reconciliation and complete validation gate passed |
+| Stash `a7ab4a1cc` | Reviewed attachment selections and compatible partial source lists; full-copy reconciliation, complete validation gate, CI lint/build, and preview image publication passed |
 
 ## Phase status
 
 | Phase | Status |
 | --- | --- |
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
-| 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries, native account/ownership storage, shared post/profile/capture storage, ordered attachment manifests, audited media associations, and reviewed source-list selection are implemented. Source equivalence, album construction, review APIs/UI and remaining domain services are in progress. |
+| 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries, native account/ownership storage, shared post/profile/capture storage, ordered attachment manifests, audited media associations, reviewed source-list selection, and source-gallery synchronization with manual membership intent are implemented. Source equivalence, general field decisions, review APIs/UI and remaining domain services are in progress. |
 | 2 Ingestion and producer adapter | Not yet implemented |
 | 3 Catalog importer and full-copy reconciliation | Not yet implemented |
 | 4 Native UI and client conversion | Not yet implemented |
@@ -276,9 +277,9 @@ The rebuild grew the database file by 150,364,160 bytes (143.4 MiB), with
 can serve subsequent native writes. The private receipt is
 `.local/native-archive-rehearsal-20260930/gallery-identity-reconciliation.json`.
 
-Automatic source-gallery construction and the native album UI remain required
-work. Ordered attachment associations are described below. No production
-galleries or files have been modified.
+Source-gallery construction is added in the later checkpoint below; the native
+album UI remains required. Ordered attachment associations are described below.
+No production galleries or files have been modified.
 
 ## Ordered source attachments and media associations
 
@@ -306,9 +307,9 @@ The complete `make validate-fork` gate passed: generation, frontend checks and
 tests. The previous gallery checkpoint also passed CI lint, build, and preview
 image publication.
 
-Source-to-gallery construction and synchronization, manual album decisions,
-importer integration, and native UI remain outstanding. Source manifest selection
-is described below.
+Source manifest selection and gallery synchronization are described in later
+checkpoints below. General field decisions, importer integration, and native UI
+remain outstanding.
 Production remains on the compatible release.
 
 ## Reviewed source-list selection
@@ -341,7 +342,48 @@ and 528 UI tests, retained native
 contracts, Go lint, and all Go unit/integration tests. The previous attachment
 checkpoint also passed CI lint, build, and preview image publication.
 
-The source-list repository does not yet construct galleries or expose a native
-review API/UI. Gallery association, synchronization, manual metadata/membership
-decisions, catalog importer integration, and the remaining transition phases
-are still required. Production has not been migrated.
+The source-list repository remains separate from gallery synchronization, added
+below. Native review API/UI, general field decisions, catalog importer integration,
+and the remaining transition phases are still required. Production has not been
+migrated.
+
+## Source gallery synchronization and manual membership intent
+
+Migration 1000010 adds explicit gallery origin, audited post-to-gallery choices,
+and persistent membership intent. Source synchronization creates one logical
+gallery per evidenced album, including partial albums and mixed images/videos.
+Repeated slots and reposts reuse existing media. Ordinary single-media posts do
+not create galleries. Read-only previews preserve source order and distinguish
+unselected, unlinked, deleted, and manually excluded entries; they do not pretend
+a linked library entity proves a completed download.
+
+Fresh synchronization replay makes no duplicate galleries, memberships, or audit
+events. Manual additions/removals, covers, and deliberately empty metadata survive
+later synchronization. Existing manual galleries need an explicit reviewed link;
+folder/ZIP galleries cannot be adopted. Disabled associations and deleted galleries
+suppress recreation, and gallery redirects require review. No names or titles
+establish identity, and source publishers do not become depicted performers.
+
+Repository integration tests cover partial/late media, mixed/repeated/shared
+attachments, replay/restart, stale previews, both sides of membership editing,
+disable/re-enable, UUID adoption and media redirects, integer-ID reuse, preserved
+existing galleries, and atomic rollback after late failures. Anonymised exports
+remove association and membership history. Pre-commit and startup guards reject
+unfinished source-write context.
+
+The full-copy schema migration took 72.7 milliseconds. All prior columns across
+92 retained tables matched by streaming row digest, including every existing
+gallery and archive identity. The new gallery-origin values matched the prior
+folder/file associations. Foreign-key checking found zero violations, the five
+new tables were empty, and the database file did not grow. The private receipt is
+`.local/native-archive-rehearsal-20260930/source-gallery-reconciliation.json`.
+The complete `make validate-fork` gate passed on the final implementation:
+generation, frontend validation and 528 UI tests, native contracts, Go lint,
+and all Go unit/integration tests. Existing gallery fixtures now assert their
+explicit creation origin. Regression tests also cover reaffirming membership
+through scene/image add operations and file associations without a primary file.
+
+The native API/UI, per-field source/review policies, manual mixed-media ordering,
+durable after-success delivery, and producer/catalog import integration remain
+required. This checkpoint initializes new album title/description/date and
+preserves all existing gallery metadata. Production has not been migrated.

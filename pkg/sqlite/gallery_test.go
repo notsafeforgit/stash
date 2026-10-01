@@ -79,6 +79,7 @@ func Test_galleryQueryBuilder_Create(t *testing.T) {
 		{
 			"full",
 			models.Gallery{
+				Origin:       models.GalleryOriginManual,
 				Title:        title,
 				Code:         code,
 				URLs:         models.NewRelatedStrings([]string{url}),
@@ -99,6 +100,7 @@ func Test_galleryQueryBuilder_Create(t *testing.T) {
 		{
 			"with file",
 			models.Gallery{
+				Origin:       models.GalleryOriginFilesystem,
 				Title:        title,
 				Code:         code,
 				URLs:         models.NewRelatedStrings([]string{url}),
@@ -363,6 +365,9 @@ func Test_galleryQueryBuilder_Update(t *testing.T) {
 			assert := assert.New(t)
 
 			copy := *tt.updatedObject
+			// These existing fixtures were created from files. Updating or
+			// clearing metadata does not change their creation origin.
+			copy.Origin = models.GalleryOriginFilesystem
 
 			if err := qb.Update(ctx, &models.UpdateGalleryInput{
 				Gallery: tt.updatedObject,
@@ -472,6 +477,7 @@ func Test_galleryQueryBuilder_UpdatePartial(t *testing.T) {
 			},
 			models.Gallery{
 				ID:           galleryIDs[galleryIdxWithImage],
+				Origin:       models.GalleryOriginFilesystem,
 				Title:        title,
 				Code:         code,
 				Details:      details,
@@ -497,7 +503,8 @@ func Test_galleryQueryBuilder_UpdatePartial(t *testing.T) {
 			galleryIDs[galleryIdxWithImage],
 			clearGalleryPartial(),
 			models.Gallery{
-				ID: galleryIDs[galleryIdxWithImage],
+				ID:     galleryIDs[galleryIdxWithImage],
+				Origin: models.GalleryOriginFilesystem,
 				Files: models.NewRelatedFiles([]models.File{
 					makeGalleryFile(galleryIdxWithImage),
 				}),

@@ -62,6 +62,7 @@ review. Production has not been migrated.
 | Stash `f244fd4f3` | Revisioned metadata policies, typed jq mapping, guarded previews and ordinary-scan defaults; full-copy reconciliation, complete validation gate, targeted race tests, CI lint/build, and preview image publication passed |
 | Stash `c84540426` | Gallery-dl lifecycle, source lease checks and final-file outbox publication; complete validation gate, targeted race tests, CI lint/build, and preview image publication passed |
 | Stash `bad3f2ca5` | Offline source request coalescing, caller tickets and immutable admission replay; producer migration fixtures, shared window corpus, complete validation gate, targeted race tests, CI lint/build, and preview image publication passed |
+| Stash `5af18a486` | Scoped source dispatch and pinned n8n worker image; complete validation gate, producer tests on both host runtimes and the installed container package, CI lint/build, and preview image publication passed |
 
 ## Phase status
 
@@ -1506,3 +1507,43 @@ needs to retain caller receipts and account backfill decisions. Host/n8n
 launchers, activation, additional adapters, enrichment, catalog import and later
 phases remain unfinished. The production image tag, services and workflow
 database were not changed.
+
+## Completion tied to original caller requests
+
+Caller tickets now retain the source submissions assigned to each part of their
+original time window. Assignments are written in the same transaction as frozen
+requests, including when a new caller shares an existing in-flight request. A
+later successful rescan cannot make an earlier cancelled ticket appear complete.
+
+`stash-ingest ticket-status UUID` validates the original admission identities and
+reads each assigned native run's actual completed windows. It reports remaining
+coverage, deferral, cancellation, review and API outages, and exits successfully
+only when the entire requested source range is covered. A wider shared run may
+still have other work. File intake remains a separate status; source completion
+does not assert that its media has finished importing.
+
+Producer schema 4 adds ticket assignments and unassigned ranges. Its transactional
+migration reconstructs the first covering submissions from the old tickets'
+original request sequences, preserves later rescan boundaries and retains
+existing event, lease, receipt and dispatch state. Both assignment and migration
+use bounded pages. The Stash database schema remains unchanged.
+
+All 134 producer tests passed on Python 3.12 and 3.14. Migration coverage includes
+populated schema-3 queues, multiple pages of waiting tickets and rollback on
+invalid input. The real HTTP fixtures verify queued/running/completed ticket
+states after lost admission responses and check the CLI after restart while
+media intake remains queued. The full `make validate-fork` gate passed: 528 v3
+tests, native contract validation, Go lint and all Go tests. Logs are
+`ticket-completion-python312.log`, `ticket-completion-http-final.log` and
+`ticket-completion-final-validation.log` under `/tmp/stash-native-transition`.
+
+Inspection of the current n8n backfill wrapper found that it records completion
+from process exit status. Launcher conversion must instead use these original
+ticket ranges and preserve existing permanent backfill decisions during import.
+The host/n8n launchers and live services have not changed; the prior n8n rehearsal
+image remains at `5af18a486` and must be rebuilt for this producer revision before
+activation. Additional adapters, catalog import and later phases remain open.
+
+Documentation now calls credential revocation **Stash API-token revocation**.
+It controls a producer's access to Stash; website passwords, cookies and login
+configuration remain with gallery-dl in the host/n8n worker environments.

@@ -8,6 +8,7 @@ from .encoding import InvalidData, decode, digest, encode, identifier
 from .events import sha256
 from .outbox import Capacity, Conflict, LeaseLost
 from . import windows
+from . import tickets
 
 
 def specification(value):
@@ -80,15 +81,18 @@ class RunQueue:
                 self.db.execute("""INSERT INTO run_intents(uuid,config_sha256,template,operation,windows,
                     window_count,latest_until,created_at,updated_at) VALUES(?,?,?,?,?,0,'',?,?)""",
                     (intent, key, body, spec["operation"], b"[]", now, now))
-            frozen = self.db.execute("SELECT window,seq FROM run_requests WHERE intent_uuid=? AND state!='admitted'", (intent,)).fetchone()
+            frozen = self.db.execute("SELECT * FROM run_requests WHERE intent_uuid=? AND state!='admitted'", (intent,)).fetchone()
             pending = windows.union(pending, [spec["window"]])
             if frozen:
-                pending = windows.subtract(pending, [decode(frozen[0], 8192)])
+                pending = windows.subtract(pending, [decode(frozen["window"], 8192)])
             self._save_windows(intent, pending)
             if ticket_uuid is not None:
                 first = frozen["seq"] if frozen else self.db.execute("SELECT coalesce(max(seq),0)+1 FROM run_requests").fetchone()[0]
-                self.db.execute("""INSERT INTO run_intent_tickets(uuid,intent_uuid,sha256,window,first_sequence,created_at)
-                    VALUES(?,?,?,?,?,?)""", (ticket_uuid, intent, ticket_digest, encode(spec["window"]), first, self.box.clock()))
+                self.db.execute("""INSERT INTO run_intent_tickets(uuid,intent_uuid,sha256,window,first_sequence,created_at,unassigned,unassigned_count)
+                    VALUES(?,?,?,?,?,?,?,1)""", (ticket_uuid, intent, ticket_digest, encode(spec["window"]), first, self.box.clock(),
+                                              encode([spec["window"]], 16384)))
+                if frozen:
+                    tickets.attach(self.db, self.db.execute("SELECT * FROM run_intent_tickets WHERE uuid=?", (ticket_uuid,)).fetchone(), frozen)
         return intent
 
     def claim(self, owner, *, seconds=120):
@@ -120,6 +124,7 @@ class RunQueue:
                     body,state,available_at,created_at) VALUES(?,?,?,?,?,?,'pending',?,?)""",
                     (request_id, group["uuid"], digest(body), encode(window), window["until"], body, now, group["pending_since"]))
                 self._save_windows(group["uuid"], pending)
+                tickets.assign_request(self.db, request_id)
             else:
                 request_id = candidate["value"]
             row = self.db.execute("SELECT * FROM run_requests WHERE request_uuid=?", (request_id,)).fetchone()

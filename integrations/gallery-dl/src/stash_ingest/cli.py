@@ -66,6 +66,8 @@ def main(argv=None):
     runs_status.add_argument("--intent")
     runs_status.add_argument("--ticket", help="Inspect a caller ticket and its subsequent request history")
     runs_status.add_argument("--after", type=int, default=0)
+    completion = commands.add_parser("ticket-status", help="Check actual source completion for a caller's original time window")
+    completion.add_argument("ticket_uuid")
     retry_run = commands.add_parser("retry-run-request", help="Retry a reviewed source request without changing its UUID")
     retry_run.add_argument("request_uuid")
     policy = commands.add_parser("worker-policy", help="Validate local worker configuration and report its portable digest")
@@ -116,6 +118,9 @@ def main(argv=None):
         elif args.command == "retry-run-request":
             requests.retry(args.request_uuid)
             output = {"requests": requests.status()}
+        elif args.command == "ticket-status":
+            from .completion import inspect_ticket
+            output = inspect_ticket(box, client, args.ticket_uuid)
         elif args.command == "worker-policy":
             from .configuration import Configuration
             profile = Configuration(args.profile)
@@ -141,6 +146,8 @@ def main(argv=None):
             state = output["requests"]
             return 2 if state["pending_windows"] or any(state["counts"][k] for k in ("pending", "sending", "review")) else 0
         if args.command == "execute-run":
+            return 0 if output["state"] == "source_succeeded" else 2
+        if args.command == "ticket-status":
             return 0 if output["state"] == "source_succeeded" else 2
         if args.command == "dispatch":
             counts = output["outbox"]["counts"]

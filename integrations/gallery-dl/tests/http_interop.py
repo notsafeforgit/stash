@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from stash_ingest.client import Client, drain_once
+from stash_ingest.completion import inspect_ticket
 from stash_ingest.encoding import encode
 from stash_ingest.outbox import Outbox
 from stash_ingest.runs import RunLease
@@ -40,6 +41,9 @@ def main():
     assert admitted["request_uuid"] == failed["request_uuid"]
     assert queue.enqueue(request, ticket_uuid=ticket) == intent
     assert queue.claim(str(uuid.uuid4())) is None
+    completion = inspect_ticket(box, client, ticket)
+    assert completion["state"] == "queued", completion
+    assert completion["remaining"], completion
     run_id = admitted["run_uuid"]
     lease = RunLease.claim(client, run_id, policy)
     assert lease is not None
@@ -50,9 +54,12 @@ def main():
         lease.renew()
         lease.progress(1, 0, "source-key")
         assert lease.run["progress"]["items_seen"] == 1
+        assert inspect_ticket(box, client, ticket)["state"] == "running"
         assert lease.finish("succeeded")["state"] == "succeeded"
     finally:
         lease.close()
+    completion = inspect_ticket(box, client, ticket)
+    assert completion["state"] == "source_succeeded" and not completion["remaining"], completion
     source = capture(producer_uuid=setup["producer"], collection_uuid=setup["collection"],
                      collection_revision=setup["revision"], root_uuid=None)
     # Well-formed local envelope, but the claimed post contradicts raw evidence.

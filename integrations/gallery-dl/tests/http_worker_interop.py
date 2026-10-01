@@ -8,6 +8,7 @@ from pathlib import Path
 import sys
 import time
 from unittest.mock import patch
+import uuid
 
 from stash_ingest.client import Client, drain_once
 from stash_ingest.configuration import Configuration
@@ -30,11 +31,12 @@ def main():
     client = Client(setup["endpoint"], setup["producer"])
     now = datetime.now(timezone.utc)
     database = directory / "producer.sqlite"
+    ticket = str(uuid.uuid4())
     with closing(Outbox(database, setup["endpoint"], setup["producer"])) as box:
         queue = RunQueue(box)
         queue.enqueue({"collection_uuid": setup["collection"], "collection_revision": setup["revision"],
                        "policy_sha256": profile.policy_sha256, "operation": "download", "cooldown_seconds": 0,
-                       "window": {"since": None, "until": now.isoformat(timespec="milliseconds")}})
+                       "window": {"since": None, "until": now.isoformat(timespec="milliseconds")}}, ticket_uuid=ticket)
     # Restart after local admission, before any network request. The dispatcher
     # must submit and discover the work without a run UUID supplied by a caller.
     with closing(Outbox(database, setup["endpoint"], setup["producer"])) as box:
@@ -81,6 +83,14 @@ def main():
         drain_once(box, client)
         assert box.status()["counts"] == {"pending": 0, "sending": 0, "review": 0, "acknowledged": 2}, box.status()
         assert client.receipt_status(file_id)["state"] == "queued"
+        output = io.StringIO()
+        with redirect_stdout(output):
+            status = producer_cli(["--outbox", str(database), "--endpoint", setup["endpoint"],
+                                   "--producer", setup["producer"], "ticket-status", ticket])
+        completion = json.loads(output.getvalue())
+        assert status == 0 and completion["state"] == "source_succeeded", completion
+        assert not completion["remaining"] and not completion["unassigned"], completion
+        assert completion["intake_completion"] == "inspect_native_receipts"
         queued = box.receipt(file_id)
         assert queued["capture_uuid"] == box.receipt(capture_id)["capture_uuid"]
         assert result["intake_completion"] == "inspect_native_receipts"

@@ -363,17 +363,36 @@ execution uses a new ticket. Ticket inspection includes its requested window and
 the first applicable request sequence for paginated history; the history is not
 a completion receipt for the whole requested range.
 
+`ticket-status UUID` checks that range against the native runs originally
+assigned to the ticket. Assignments are saved when a request is frozen, in the
+same transaction as its pending-window removal. A caller joining an existing
+frozen request shares its overlapping portion; any additional ranges retain
+their own assignments. Neither retries nor later rescans replace those links.
+A cancelled request stays cancelled even if an unrelated later run succeeds.
+
+The inspector reads each assigned run's current completed windows, validates its
+admitted collection/root/policy, and reports any remaining ranges. It reports
+`source_succeeded` only when every assigned range is covered, even if a wider
+shared run still has other work. Missing status, deferral, review and incomplete
+coverage remain visible. An API outage returns `unavailable`, not a cached
+success. Exit code 0 certifies this ticket's source traversal only; file intake
+still requires the native event receipts. This is the completion check intended
+for callers that record permanent backfill decisions.
+
 Capacity defaults are 10,000 retained configuration groups, 64 disjoint pending
 windows per group and 100,000 caller tickets. Exhaustion stops admission without
 evicting work. Request acknowledgements and tickets remain as history, so these
 limits are not a cap on total disk usage. Queue status reports pending windows,
 submission states and age; a fresh schedule resets the age of an emptied group.
 
-Producer schema 2 introduced request/ticket tables; schema 3 adds dispatch
-cursors and discovery backoff. Opening a schema-1 or schema-2 outbox promotes it
+Producer schema 2 introduced request/ticket tables; schema 3 added dispatch
+cursors and discovery backoff. Schema 4 adds durable ticket-to-submission links
+and unassigned ranges. Opening a schema-1, schema-2 or schema-3 outbox promotes it
 in one SQLite transaction, preserving event bytes, receipts, dependencies,
-active delivery/submission leases, frozen requests and caller tickets. A failed
-migration rolls back. Older producer code refuses the new schema when opening
+active delivery/submission leases, frozen requests and caller tickets. Old tickets
+are linked to the first covering submissions from their original request sequence;
+pending portions stay unassigned. Both tickets and requests are read in bounded
+pages. A failed migration rolls back. Older producer code refuses the new schema when opening
 it; preserve the queue in backups rather than recreating it during rollback.
 This does not change the Stash database schema.
 
@@ -393,6 +412,7 @@ is no command-line token argument.
 | `submit-runs` | Submits one ready request; exits 2 while requests remain pending, in flight or in review |
 | `dispatch --profile FILE` | Delivers/submits queued work and discovers at most one source attempt; retains pagination and discovery backoff |
 | `runs-status [--intent UUID \| --ticket UUID] [--after N]` | Local request counts and up to 50 relevant historical submissions |
+| `ticket-status UUID` | Checks the ticket's original source windows; exits 0 only for `source_succeeded`, otherwise 2 |
 | `retry-run-request UUID` | Retries a reviewed submission with the original UUID and bytes |
 | `worker-policy --profile FILE` | Validates the local worker profile and prints its portable policy/root identity |
 | `execute-run RUN_UUID --profile FILE` | Executes one claimed source attempt; does not assert media intake completion |
@@ -413,16 +433,18 @@ Tests cover concurrent delivery, subprocess death,
 receipt replay, token rotation, dependency ordering, capacity, partial batches,
 redirect rejection, disabled file processing, download/skip/postprocessor paths,
 Twitter transformations, filename budgets, lease loss, bounded resume, offline
-window coalescing, caller tickets, schema promotion, shared window semantics,
+window coalescing, caller tickets, split completion ranges, cancellation followed
+by later rescans, schema promotion, shared window semantics,
 portable configuration, changed assets, worker failure outcomes and log isolation.
 The backend test
 `TestPythonProducerDurableDeliveryAgainstNativeHTTP` runs this actual client
 against the native HTTP router and SQLite, loses committed event and run-submission
 responses, and checks replay after reopening, independent rejection, caller-ticket
-deduplication and the submit/claim/renew/checkpoint/finish lease
+deduplication, exact ticket completion and the submit/claim/renew/checkpoint/finish lease
 cycle. `TestPythonDownloadWorkerRecoversFinishAndDeliversFiles` runs the worker
 against the real API/SQLite, drains a capture during downloading, recovers a lost
 attempt-completion response and admits a dependent file after reopening the
-outbox. It verifies that source success still leaves actual media intake queued.
+outbox. It checks the ticket-status CLI after restart and verifies that source
+success still leaves actual media intake queued.
 These checks are included in `make validate-fork`
 and the build workflow. No production endpoint or source website is contacted.

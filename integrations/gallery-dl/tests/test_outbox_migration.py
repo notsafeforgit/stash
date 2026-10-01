@@ -13,6 +13,15 @@ from helpers import PRODUCER, capture, file_event, receipt
 from test_run_queue import request, admission
 
 
+def schema_three(db):
+    """Remove exactly schema 4's additions to construct a populated v3 input."""
+    db.execute("DROP TABLE run_ticket_requests")
+    db.execute("DROP INDEX unassigned_run_tickets")
+    db.execute("ALTER TABLE run_intent_tickets DROP COLUMN unassigned")
+    db.execute("ALTER TABLE run_intent_tickets DROP COLUMN unassigned_count")
+    db.execute("PRAGMA user_version=3")
+
+
 class OutboxMigrationTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -84,17 +93,20 @@ class OutboxMigrationTests(unittest.TestCase):
             queue.enqueue(request(50, 60, policy_sha256="b" * 64), ticket_uuid=str(uuid.uuid4()))
             # These are the exact schema-2 tables; only the new cursor table is
             # removed to retain real populated admission and lease state.
+            schema_three(box.db)
             box.db.execute("DROP TABLE dispatch_cursors")
             box.db.execute("PRAGMA user_version=2")
-        before = {table: self.db.execute(f"SELECT * FROM {table}").fetchall() for table in tables}
+        columns = {table: ','.join(row[1] for row in self.db.execute(f"PRAGMA table_info({table})")) for table in tables}
+        before = {table: self.db.execute(f"SELECT {columns[table]} FROM {table}").fetchall() for table in tables}
         with closing(self.open()) as box:
             self.assertEqual(box.db.execute("PRAGMA user_version").fetchone()[0], SCHEMA)
             self.assertEqual(box.db.execute("SELECT count(*) FROM dispatch_cursors").fetchone()[0], 0)
-        self.assertEqual({table: self.db.execute(f"SELECT * FROM {table}").fetchall() for table in tables}, before)
+        self.assertEqual({table: self.db.execute(f"SELECT {columns[table]} FROM {table}").fetchall() for table in tables}, before)
         self.assertEqual(self.db.execute("PRAGMA foreign_key_check").fetchall(), [])
 
     def test_v2_cursor_collision_keeps_old_version_and_operational_state(self):
         with closing(self.open()) as box:
+            schema_three(box.db)
             box.db.execute("DROP TABLE dispatch_cursors")
             box.db.execute("PRAGMA user_version=2")
             box.db.execute("CREATE TABLE dispatch_cursors(unrecognized TEXT)")

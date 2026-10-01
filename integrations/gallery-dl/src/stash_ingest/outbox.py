@@ -17,7 +17,7 @@ from .encoding import InvalidData, MAX_BATCH_BYTES, decode, digest, encode, iden
 from .endpoint import origin
 
 APPLICATION_ID = 0x5354494F  # STIO, not a Stash or gallery-dl archive database.
-SCHEMA = 3
+SCHEMA = 4
 
 
 class Conflict(InvalidData):
@@ -62,7 +62,7 @@ class Outbox:
             version = self.db.execute("PRAGMA user_version").fetchone()[0]
             application = self.db.execute("PRAGMA application_id").fetchone()[0]
             tables = self.db.execute("SELECT name FROM sqlite_schema WHERE type='table'").fetchall()
-            if not ((version in (1, 2, SCHEMA) and application == APPLICATION_ID)
+            if not ((version in (1, 2, 3, SCHEMA) and application == APPLICATION_ID)
                     or (version == 0 and application == 0 and not tables)):
                 raise InvalidData("Unsupported or foreign outbox database")
             self.db.execute("PRAGMA foreign_keys=ON")
@@ -114,10 +114,17 @@ class Outbox:
         version = self.db.execute("PRAGMA user_version").fetchone()[0]
         if version == SCHEMA:
             return
-        if version not in (1, 2):
+        if version not in (1, 2, 3):
             raise InvalidData("Unsupported outbox migration")
         if version == 1:
             self._migrate_runs()
+        if version < 3:
+            self._migrate_dispatch()
+        from .tickets import migrate
+        migrate(self.db)
+        self.db.execute(f"PRAGMA user_version={SCHEMA}")
+
+    def _migrate_dispatch(self):
         self.db.execute("""CREATE TABLE dispatch_cursors(
             root_uuid TEXT NOT NULL, policy_sha256 TEXT NOT NULL,
             after_sequence INTEGER NOT NULL DEFAULT 0 CHECK(after_sequence>=0),
@@ -126,7 +133,7 @@ class Outbox:
             available_at REAL NOT NULL DEFAULT 0, error_code TEXT,
             PRIMARY KEY(root_uuid,policy_sha256)
         )""")
-        self.db.execute(f"PRAGMA user_version={SCHEMA}")
+        self.db.execute("PRAGMA user_version=3")
 
     def _migrate_runs(self):
         self.db.execute("""CREATE TABLE run_intents(

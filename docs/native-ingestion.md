@@ -50,8 +50,9 @@ unbound collection; it is not a wildcard. One credential can grant up to 128
 collections, with one root per collection. A binding change can use separate
 credentials while an older outbox drains. Root UUIDs convey no arbitrary host
 path authority. Tokens have 32 random secret bytes; only their SHA-256 verifiers
-are stored. Optional expiry and permanent revocation are checked in each write
-transaction. Credential rotation retains the producer UUID and event receipts.
+are stored. Optional expiry and permanent Stash API-token revocation are checked
+in each write transaction. API-token rotation retains the producer UUID and event
+receipts.
 
 The application's existing authenticated router exposes administration:
 
@@ -640,8 +641,14 @@ a submission is claimed, its UUID and bytes stay fixed across backoff, lost
 responses and restart. Native admission receipts echo the committed request
 UUID; admission does not assert that a scrape has finished. Optional caller
 tickets prevent command-response retries from scheduling the same execution
-again. Producer schema 2 adds this queue transactionally to schema 1 without
-rewriting pending events, dependencies, receipts or delivery leases.
+again. Producer schema 4 retains each ticket's assignment to its original frozen
+submissions, including ranges spread across several requests. `ticket-status`
+validates their native runs and completed windows; a later unrelated rescan cannot
+complete an earlier cancelled request. Completed source traversal does not certify
+file intake; inspect file receipts separately. Upgrading earlier producer schemas
+preserves events, dependencies, receipts, delivery leases and dispatch backoff in
+one transaction; old ticket assignments are reconstructed from their first
+covering submissions.
 
 The package uses `STASH_INGEST_TOKEN` (or another named environment reference)
 only for Stash's API. Website logins, cookies and downloader proxy settings

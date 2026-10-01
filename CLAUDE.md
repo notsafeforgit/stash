@@ -75,8 +75,11 @@ local, and source completion remains distinct from verified media intake.
 Preserve conditional map order and layered private references; conversion does
 not activate a worker or replace the existing configuration files.
 `stash-ingest dispatch` discovers scoped work through the native API. Producer
-schema 3 retains its pagination/backoff; discovery is not a lease or completion
-receipt. Preserve existing request/event state when upgrading older outboxes.
+schema 4 retains pagination/backoff and each caller ticket's original submission
+assignments. `ticket-status` checks completed source windows against those
+assignments; later rescans cannot complete an earlier cancelled ticket. Discovery
+and admission do not certify completion. Preserve existing request/event state
+when upgrading older outboxes.
 
 ## Architecture
 

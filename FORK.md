@@ -86,7 +86,7 @@ cannot veto committed changes. Native archive consistency must not depend on
 catalogMetadata or any other plugin receiving a notification.
 
 Use shared domain services for both GraphQL and native ingestion. Producers send
-idempotent events with durable receipts and scoped credentials; they do not write
+idempotent events with durable receipts and scoped Stash API tokens; they do not write
 the library database. Keep after-success behavior consistent across API edits,
 background jobs, and imported changes. Never expose internal plugin settings in
 mapping data without an explicit use case.

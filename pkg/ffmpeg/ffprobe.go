@@ -351,6 +351,19 @@ func (f *FFProbe) GetReadFrameCount(path string) (int64, error) {
 }
 
 func parse(filePath string, probeJSON *FFProbeJSON) (*VideoFile, error) {
+	result, err := parseWithSize(filePath, probeJSON, 0)
+	if err != nil {
+		return nil, err
+	}
+	fileStat, err := os.Stat(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("error statting file <%s>: %w", filePath, err)
+	}
+	result.Size = fileStat.Size()
+	return result, nil
+}
+
+func parseWithSize(filePath string, probeJSON *FFProbeJSON, size int64) (*VideoFile, error) {
 	if probeJSON == nil {
 		return nil, fmt.Errorf("failed to get ffprobe json for <%s>", filePath)
 	}
@@ -371,13 +384,7 @@ func parse(filePath string, probeJSON *FFProbeJSON) (*VideoFile, error) {
 	result.Container = probeJSON.Format.FormatName
 	duration, _ := strconv.ParseFloat(probeJSON.Format.Duration, 64)
 	result.FileDuration = math.Round(duration*100) / 100
-	fileStat, err := os.Stat(filePath)
-	if err != nil {
-		statErr := fmt.Errorf("error statting file <%s>: %w", filePath, err)
-		logger.Errorf("%v", statErr)
-		return nil, statErr
-	}
-	result.Size = fileStat.Size()
+	result.Size = size
 	result.StartTime, _ = strconv.ParseFloat(probeJSON.Format.StartTime, 64)
 	result.CreationTime = probeJSON.Format.Tags.CreationTime.Time
 
@@ -428,6 +435,7 @@ func parse(filePath string, probeJSON *FFProbeJSON) (*VideoFile, error) {
 			result.Height = videoStream.Width
 		}
 
+		var err error
 		result.VideoStreamDuration, err = strconv.ParseFloat(videoStream.Duration, 64)
 		if err != nil {
 			// Revert to the historical behaviour, which is still correct in the vast majority of cases.

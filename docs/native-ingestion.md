@@ -16,6 +16,11 @@ also remain pending; current collection definitions come from the core services.
 
 ## Authentication and scope
 
+These are access tokens for Stash's ingestion API. Stash does not manage the
+producer's Reddit, Twitter, or other website credentials; those remain in
+gallery-dl's existing credential configuration. Revoking an ingestion token
+only removes that producer token's access to Stash.
+
 Producer requests require `Authorization: Bearer <token>`. Session cookies and
 the general Stash API key do not authenticate this interface. Tokens are not
 accepted in URLs. Its router has no GraphQL, plugin, filesystem, or application
@@ -45,6 +50,32 @@ JSON writes and origin checks reject cross-site browser administration. Scope
 issuance requires an active collection and a root used by one of its recorded
 definitions. A historical root grant supports rotating credentials while old
 events remain undelivered. Retired/disabled roots cannot receive new grants.
+
+## File preparation in core
+
+The backend can prepare a root-relative image or video through
+`ingest.PrepareMedia`. This is an uncommitted inspection, with no database writes,
+library handlers, download acknowledgement, or HTTP file-completion support yet.
+It verifies the reviewed root, opens a confined regular file, calculates SHA-256,
+and checks optional producer size/digest claims. Partial downloads are rejected.
+The shared scanner calculates its normal matching fingerprints and image/video
+metadata using independent, cancellable readers of that same descriptor.
+
+FFprobe receives a seekable descriptor on Linux, including for MP4 files with
+trailing metadata. Other platforms use a private bounded copy of the descriptor.
+It accepts self-contained media containers, blocks indirect playlists/network
+input, limits output to 1 MiB, and has a 30-second timeout. Audio-only files and
+media without visual dimensions are rejected. Animated images keep the shared
+scanner's clip classification.
+
+Preparation rechecks file identity, size, modification time, root binding, and
+the named path after probing. Linux also checks ctime to detect same-size writes
+followed by restoring mtime; platforms without that adapter rehash. The caller
+keeps the descriptor open and must revalidate the current root immediately before
+commit, alongside authorization, collection policy, and file-generation fences.
+These checks do not make filesystem writes atomic with SQLite. Durable workers,
+generation fencing, transactional file/provenance publication, and receipt
+integration remain required before advertising `file_ingestion: true`.
 
 ## Wire contract
 

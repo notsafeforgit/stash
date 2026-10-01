@@ -50,6 +50,9 @@ review. Production has not been migrated.
 | Stash `05105cb15` | Versioned captured-account claims across native/mirror services and unfamiliar extractors; complete validation gate and CI lint/build passed |
 | Stash `e3db87bec` / `7f2a87c09` | Explicit source album extraction and current documentation; complete validation gate, CI lint/build, and preview image publication passed |
 | Stash `d2d6fcf9f` | Revisioned logical roots and source collections, confined file opening, and intake provenance; full-copy reconciliation, complete validation gate, CI lint/build, and preview image publication passed |
+| Stash `bd7848d58` | Captured publisher decisions connect source evidence to accounts; full-copy reconciliation and complete validation gate passed |
+| Stash `dd9ee3768` | Isolated native test fixtures retain real migration coverage while avoiding repeated empty-schema construction; complete validation gate passed |
+| Stash `367ea96ed` | Scoped capture ingestion and durable receipts; full-copy reconciliation, complete validation gate, CI lint/build, and preview image publication passed |
 
 ## Phase status
 
@@ -57,7 +60,7 @@ review. Production has not been migrated.
 | --- | --- |
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
 | 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries and metadata relationship targets, native account/ownership storage and reviewed consolidation, shared post/profile/capture storage, ordered attachment manifests, audited media associations, reviewed source-list selection, and source-gallery synchronization with manual membership intent are implemented. Scalar and relationship field choices protect explicit and preserved metadata. Revisioned logical roots and source collections retain capture/manual-intake provenance; captured publisher choices now connect source evidence to accounts independently of depicted performers. Producer identity matching, policy resolution, review APIs/UI and remaining domain services are in progress. |
-| 2 Ingestion and producer adapter | Not yet implemented |
+| 2 Ingestion and producer adapter | In progress: scoped producer tokens, Reddit/Twitter capture batches and durable receipts are implemented. Verified file preparation uses the shared scanner. File-completion publication, durable workers/run leases, additional source adapters, producer outboxes and host/n8n conversion remain. |
 | 3 Catalog importer and full-copy reconciliation | Not yet implemented |
 | 4 Native UI and client conversion | Not yet implemented |
 | 5 Compatibility removal and packaging | Preview packaging isolated and old compatibility gate replaced by current v3 operation/plugin-contract checks. Old UI/API/plugin adapters and config bridge still require conversion/removal. |
@@ -759,3 +762,40 @@ access tokens, and receipt semantics. File completion/verification, producer
 outboxes, run leases, gallery synchronization during media ingestion, additional
 post identity adapters, native UI, catalog import, and actual host/n8n conversion
 remain required. Production has not changed.
+
+## Verified media preparation
+
+`ingest.PrepareMedia` verifies a confined root-relative regular file, computes
+SHA-256, checks optional producer size/digest claims, and holds its descriptor
+through shared scanner preparation. New-file scans and native preparation now
+reuse `Scanner.PrepareFile` for matching fingerprints and media decorators.
+Independent descriptor readers preserve seeking, cancellation, and ownership;
+closing a reader does not close the held file.
+
+FFprobe reads that same descriptor on Linux, with a private descriptor-copy
+fallback on other platforms. Its native intake path has a self-contained format
+allowlist, no network/playlist inputs, bounded JSON output, and a timeout. A
+promoted `bytes.Buffer.ReadFrom` method would bypass the output writer's limit;
+the bounded writer deliberately does not embed that type. Audio-only output
+cannot become a video file. Animated images retain the existing clip behavior.
+
+Revalidation detects changed bytes, file/root replacement, changed bindings,
+symlink retargeting, and restored modification times using Linux ctime or a
+portable digest recheck. Preparation performs no database writes or handlers.
+The eventual worker must revalidate inside its publication transaction and
+enforce authorization, collection policy, and file-generation fences. The API
+continues to advertise `file_ingestion: false`; file completion, durable workers,
+and transactional file/source/gallery/receipt publication remain unfinished.
+
+Focused tests passed for the filesystem checks, independent readers, cancellation,
+real image/animated-image/audio-only probing, trailing-MP4 metadata, and a file
+replaced between hashing and probing. Windows cross-compilation of the archive,
+file, and FFprobe packages passed. No database migration or production changes
+are part of this checkpoint.
+
+The complete `make validate-fork` gate passed: generation, frontend checks and
+528 UI tests, retained extension contracts and 71 application operation files,
+zero Go lint issues, and every Go unit/integration package. The SQLite suite took
+186.1 seconds. The [ingestion documentation](native-ingestion.md) also clarifies
+that token revocation controls access to Stash's API; scraper website credentials
+remain with gallery-dl.

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
 
 	"github.com/stashapp/stash/pkg/ffmpeg"
 	"github.com/stashapp/stash/pkg/file"
@@ -16,21 +17,33 @@ type Decorator struct {
 	FFProbe *ffmpeg.FFProbe
 }
 
+var ErrNoVideoStream = errors.New("media has no visual video stream")
+
 func (d *Decorator) Decorate(ctx context.Context, fs models.FS, f models.File) (models.File, error) {
 	if d.FFProbe == nil {
 		return f, errors.New("ffprobe not configured")
 	}
 
 	base := f.Base()
-	// TODO - copy to temp file if not an OsFS
-	if _, isOs := fs.(*file.OsFS); !isOs {
-		return f, fmt.Errorf("video.constructFile: only OsFS is supported")
-	}
-
 	probe := d.FFProbe
-	videoFile, err := probe.NewVideoFile(base.Path)
+	var videoFile *ffmpeg.VideoFile
+	var err error
+	if opened, ok := fs.(file.OpenedFileProvider); ok {
+		var descriptor *os.File
+		descriptor, err = opened.BorrowFile(base.Path)
+		if err == nil {
+			videoFile, err = probe.NewVideoFileFromOpen(ctx, descriptor, base.Path)
+		}
+	} else if _, isOs := fs.(*file.OsFS); isOs {
+		videoFile, err = probe.NewVideoFile(base.Path)
+	} else {
+		return f, fmt.Errorf("video.constructFile: filesystem cannot provide a seekable media file")
+	}
 	if err != nil {
 		return f, fmt.Errorf("running ffprobe on %q: %w", base.Path, err)
+	}
+	if videoFile.VideoStream == nil || videoFile.Width <= 0 || videoFile.Height <= 0 {
+		return f, ErrNoVideoStream
 	}
 
 	container, err := ffmpeg.MatchContainer(videoFile.Container, base.Path)

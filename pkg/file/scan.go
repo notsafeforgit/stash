@@ -468,18 +468,11 @@ func (s *Scanner) onNewFile(ctx context.Context, f ScannedFile) (*ScanFileResult
 
 	baseFile.ParentFolderID = *parentFolderID
 
-	const useExisting = false
-	fp, err := s.calculateFingerprints(f.FS, baseFile, path, useExisting)
+	file, err := s.PrepareFile(ctx, f)
 	if err != nil {
 		return nil, err
 	}
-
-	baseFile.SetFingerprints(fp)
-
-	file, err := s.fireDecorators(ctx, f.FS, baseFile)
-	if err != nil {
-		return nil, err
-	}
+	fp := file.Base().Fingerprints
 
 	// determine if the file is renamed from an existing file in the store
 	// do this after decoration so that missing fields can be populated
@@ -521,6 +514,32 @@ func (s *Scanner) onNewFile(ctx context.Context, f ScannedFile) (*ScanFileResult
 		File: file,
 		New:  true,
 	}, nil
+}
+
+// PrepareFile calculates fingerprints and media metadata without database
+// writes or handlers. Native intake can use the same preparation as a new-file
+// scan while holding one verified descriptor, then publish the result alongside
+// its provenance and receipt in the worker's transaction.
+func (s *Scanner) PrepareFile(ctx context.Context, f ScannedFile) (models.File, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	// Preparation must not mutate the caller's candidate on a failed probe.
+	base := *f.BaseFile
+	base.Fingerprints = nil
+	fp, err := s.calculateFingerprints(f.FS, &base, base.Path, false)
+	if err != nil {
+		return nil, err
+	}
+	base.SetFingerprints(fp)
+	ret, err := s.fireDecorators(ctx, f.FS, &base)
+	if err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return ret, nil
 }
 
 func (s *Scanner) fireDecorators(ctx context.Context, fs models.FS, f models.File) (models.File, error) {

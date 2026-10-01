@@ -35,7 +35,8 @@ func (d *Decorator) Decorate(ctx context.Context, fs models.FS, f models.File) (
 
 	// ignore clips in non-OsFS filesystems as ffprobe cannot read them
 	// TODO - copy to temp file if not an OsFS
-	if _, isOs := fs.(*file.OsFS); !isOs {
+	_, isOpened := fs.(file.OpenedFileProvider)
+	if _, isOs := fs.(*file.OsFS); !isOs && !isOpened {
 		ext := strings.ToLower(filepath.Ext(base.Path))
 
 		// AVIF images inside zip files are not supported
@@ -52,8 +53,21 @@ func (d *Decorator) Decorate(ctx context.Context, fs models.FS, f models.File) (
 		return decorateFallback(fs, f)
 	}
 
-	probe, err := d.FFProbe.NewVideoFile(base.Path)
+	var probe *ffmpeg.VideoFile
+	var err error
+	if opened, ok := fs.(file.OpenedFileProvider); ok {
+		var descriptor *os.File
+		descriptor, err = opened.BorrowFile(base.Path)
+		if err == nil {
+			probe, err = d.FFProbe.NewVideoFileFromOpen(ctx, descriptor, base.Path)
+		}
+	} else {
+		probe, err = d.FFProbe.NewVideoFile(base.Path)
+	}
 	if err != nil {
+		if ctx.Err() != nil {
+			return f, ctx.Err()
+		}
 		ret, fallbackErr := decorateFallback(fs, f)
 		if fallbackErr != nil {
 			logger.Warnf("File %q could not be read with ffprobe: %s. Fallback image decoder failed: %s", base.Path, err, fallbackErr)

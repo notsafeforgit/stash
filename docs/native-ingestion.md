@@ -19,8 +19,9 @@ A source capture alone never acknowledges downloaded or playable media.
 
 Native metadata policies now share one evaluator between verified intake and
 ordinary scans, with explicit performer defaults and authenticated preview/apply.
-Durable producer outboxes, source-run leases, additional post adapters, host/n8n
-conversion, catalog import, and native administration/review UI remain required.
+Native source-run coordination now provides coalesced windows and fenced leases.
+Durable producer outboxes, worker lease enforcement, additional post adapters,
+host/n8n conversion, catalog import, and native administration/review UI remain required.
 Existing scrapes have not switched to this interface. Root, collection and policy
 administration endpoints are described below.
 
@@ -205,7 +206,7 @@ File jobs renew their lease while hashing, probing and running effects. Producer
 claims never count as verification. A changed digest, generation, path removal,
 inactive collection or lost ownership prevents completion. A later failure does
 not undo an earlier committed registration: status reports that distinction.
-Source-run coordination and host/n8n outboxes remain required before switching
+Source-worker conversion and host/n8n outboxes remain required before switching
 the current scheduled scrapes to this interface.
 
 ## Wire contract
@@ -254,11 +255,15 @@ lowercase, nonzero UUIDs:
 }
 ```
 
-`run_uuid` currently retains producer run provenance; it does not represent a
+`run_uuid` retains producer run provenance; by itself it does not represent a
 claimed server lease or a completed scheduled job. Event collection revisions
 pin immutable definitions. Delayed events can reference an earlier active
 definition while the collection itself remains active. The requested namespace
 and logical root must match that definition and the credential's grant.
+Coordinated workers use the native run UUID described below. Older producer run
+IDs remain valid provenance while adapters are converted. Neither event kind
+changes run ownership or completion state, so delayed outbox delivery cannot
+rewind a newer attempt.
 
 The producer must apply the declared retention policy before durable outbox
 storage. The server validates it again: secrets, redundant media renditions,
@@ -317,7 +322,123 @@ committed registration while leaving intake incomplete. Receipt replay remains
 
 File event identities are qualified by producer. Replaying an event creates no
 new job; distinct file events retain separate provenance jobs and serialize on
-their destination. Source-run coalescing is a different, unfinished layer.
+their destination. Source-run coalescing uses the separate traversal contract below.
+
+## Source-run coordination
+
+The server advertises `source_runs: true` and `source_run_protocol: 1`.
+This coordinates external gallery-dl workers; it does not run shell commands,
+store website credentials, or change the currently deployed launch paths.
+Producer authentication and collection/root grants are the same as event intake.
+
+| Producer route | Body or result |
+| --- | --- |
+| `POST /runs` | Submit the typed request below; returns its native run |
+| `GET /runs/<uuid>` | Current state, windows, ownership, progress and retry time |
+| `POST /runs/list` | `collection_uuid`, optional integer `after`; at most 50 authorized runs in sequence order |
+| `POST /runs/<uuid>/attempts` | Optional integer `after` fence; at most 50 attempts |
+| `POST /runs/<uuid>/claim` | `owner_uuid`, `policy_sha256`, `lease_seconds` (5–900) |
+| `POST /runs/<uuid>/lease` | `owner_uuid`, `fence`, and exactly one of `lease_seconds`, `progress`, or `outcome` |
+
+Paths above are relative to `/api/v3/ingest`. Pagination uses JSON bodies;
+query-string tokens and parameters remain rejected. A claim returns 204 and
+`Retry-After: 5` while unavailable; inspect status and back off. Repeating a claim
+with the same producer and worker UUID returns its still-valid lease. A different
+producer or worker cannot borrow it. Rotate the ingestion token while retaining
+the producer UUID when the same worker should keep ownership.
+
+```json
+{
+  "request_uuid": "<stable request UUID>",
+  "collection_uuid": "<configured source collection UUID>",
+  "collection_revision": 1,
+  "operation": "download",
+  "policy_sha256": "<SHA-256 of effective non-secret scan configuration and adapter version>",
+  "cooldown_seconds": 30,
+  "window": {
+    "since": "2026-09-24T00:00:00Z",
+    "until": "2026-10-01T00:00:00Z"
+  }
+}
+```
+
+Operations are `download` and `enrich`; download requires a logical media root.
+The collection supplies the reviewed target URL, namespace and destination.
+Policy identity covers effective extraction, archive/skip, original-quality,
+conversion, metadata-only and pacing behavior plus adapter version; omit secrets
+and the requested date window. Worker conversion will supply this fingerprint
+from the resolved configuration. Claim requires the matching fingerprint.
+No API argument supplies a command line.
+
+Windows are half-open published-time ranges `[since, until)`, with millisecond
+precision. `since: null` requests all history before the explicit `until`.
+Persist absolute cutoffs with the local request before transmission; a network
+retry must not quietly become a newer request. A producer/request UUID is an
+immutable acknowledgement: replay returns its original run, and changed request
+contents return 409. A fresh scheduled request may create a run after the prior
+one succeeds.
+
+Equivalent work shares one active run across producers. Its identity includes
+collection and root revisions, operation, policy fingerprint and cooldown.
+Every launch path must reference the same configured collection UUID for the
+same target. Distinct collections remain distinct provenance, even when a shared
+URL forces them to serialize. Queued windows merge without filling unrequested
+gaps. While running, the claimed window and already completed ranges are
+subtracted from new requests. Widening a seven-day scan to all history retains
+the missing older interval, rather than another full copy of the seven-day scan.
+There are at most 64 pending/completed/claimed intervals per active run and
+10,000 active or deferred runs. Capacity errors do not acknowledge lost work.
+
+Claims prefer the newest uncovered range. Pending download work takes precedence
+over enrichment for the same collection. A collection, the same normalized
+target URL, and overlapping destination paths cannot have concurrent owners.
+Server mount identities and resolved paths handle host/container mappings and
+existing symlinks; a missing destination may be created by the worker afterwards.
+The worker must still acquire the existing shared filesystem download lock
+before source work or filesystem writes. The coordinator does not make a
+distributed filesystem operation atomic or physically stop an expired process.
+
+Each claim increments its fence and records an immutable traversal window in an
+attempt. Progress contains `items_seen`, `files_completed` and a bounded source
+`cursor`. Items count traversal entries, including individual media in an album,
+matching gallery-dl's existing resume checkpoint. Counts cannot decrease or move a cursor backwards under equal counts.
+The same-window retry receives its checkpoint. A changed traversal window starts
+afresh; a cursor from a different range is not reused. Cursor meaning remains an
+adapter contract, so it must be a recoverable source key rather than a raw log,
+secret, or arbitrary command.
+
+An `outcome` contains `state` (`succeeded`, `retry`, or `deferred`), `error_code`,
+and optional `retry_after_seconds` (at most one week). Success has no error code
+or retry delay and certifies traversal of the claimed window under that policy.
+It does not certify that every queued file event has finished ingestion.
+Remaining windows keep the run queued; otherwise it succeeds. A failure restores
+the claimed window, retains its checkpoint, and uses exponential retry delay
+starting at five minutes. Eight consecutive failed/expired attempts cause a
+durable deferral. Timers and manual submissions cannot clear it or shorten an
+existing delay. Target cooldown also survives changes of scan policy.
+
+Lease renewal, progress and completion require producer UUID, worker UUID,
+current fence and an unexpired server deadline. Publication checks the deadline
+again before commit. Expired ownership is recovered during subsequent claims;
+late responses cannot finish a later attempt. On a lost completion response,
+inspect that fence in attempt history before retrying. A collection/root change
+prevents renewal or success under the obsolete definition and defers queued
+work. Already captured evidence can still drain through scoped ingestion.
+
+Application-authenticated `POST /api/v3/ingest-admin/runs/<uuid>/review` accepts
+`expected_revision` and `action` (`retry` or `cancel`). Retry reopens a deferred
+run only while its definition is still current, preserving target cooldown.
+A changed definition needs a newly reviewed request. Cancellation invalidates
+ownership; it does not undo source evidence or completed-file jobs. Review
+actions and attempt outcomes remain in the database. Producer tokens cannot
+access this administrative route.
+
+Worker integration remains required: durable local request coalescing during
+outages, outbox delivery, shared filesystem locking, lease renewal and pausing
+before the next source request after expiry, and host/n8n/recovery conversion.
+No legacy PID, lease or journal is promoted automatically by this migration.
+The separate importer must preserve permanent completions, checkpoints,
+deferrals and intentionally ignored unavailable originals before cutover.
 
 ## Byte identity and receipts
 

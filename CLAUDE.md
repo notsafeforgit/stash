@@ -250,6 +250,14 @@ configured; `Checkpoint` preserves committed registration across effect retries.
 Admission receipts stay immutable and status reports actual completion. Keep this
 work out of the legacy in-memory queue. Existing scheduled scrapes have not switched. See [native ingestion](docs/native-ingestion.md).
 
+`ingest.RunCoordinator` owns source traversal windows and producer-scoped fenced
+leases. Its native records coalesce equivalent requests, retain missing ranges,
+checkpoint retries, defer repeated failures and exclude overlapping targets and
+destinations. This mutable traversal state is separate from immutable file jobs.
+External workers still need the supported adapter, durable outbox and shared
+filesystem locks before host/n8n launch paths switch to it. Website credentials
+remain in those worker environments.
+
 ### v3 extension points
 
 See `ui/v3/docs/architecture.md` for the current module map and compatibility rules. List configurations require a discriminated GraphQL/local `source`; generated query variables remain typed through the data hook. Layout, preferences, query state, and cache refill live in separate list modules. Player transition policy consumes plain buffered/seekable state in `scene-player-transitions.ts`; media effects, recovery, and transcode leases are separate hooks. Keep the stable player root and existing iOS seek/timeline behavior when extending these modules.

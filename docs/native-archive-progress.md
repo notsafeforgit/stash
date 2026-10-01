@@ -59,6 +59,7 @@ review. Production has not been migrated.
 | Stash `a2fdd056e` | Verified file/media publication and persistent path removal fences; full-copy reconciliation, complete validation gate, CI lint/build, and preview image publication passed |
 | Stash `372f3267b` | Collection/source intake and selected media feed native album galleries; full validation, targeted index checks, CI lint/build, and preview image publication passed |
 | Stash `d24eb5074` | Durable file admission, worker checkpoints, previews, scoped status and retryable plugin delivery; full-copy reconciliation, complete validation gate, targeted race tests, CI lint/build, and preview image publication passed |
+| Stash `f244fd4f3` | Revisioned metadata policies, typed jq mapping, guarded previews and ordinary-scan defaults; full-copy reconciliation, complete validation gate, targeted race tests, CI lint/build, and preview image publication passed |
 
 ## Phase status
 
@@ -66,7 +67,7 @@ review. Production has not been migrated.
 | --- | --- |
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
 | 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries and metadata relationship targets, native account/ownership storage and reviewed consolidation, shared post/profile/capture storage, ordered attachment manifests, audited media associations, reviewed source-list selection, and source-gallery synchronization with manual membership intent are implemented. Scalar and relationship field choices protect explicit and preserved metadata. Revisioned logical roots and source collections retain capture/manual-intake provenance; captured publisher choices connect source evidence to accounts independently of depicted performers. Verified byte identities and immutable per-file verification history now use persistent file-generation guards. Producer identity matching, policy resolution, review APIs/UI and remaining domain services are in progress. |
-| 2 Ingestion and producer adapter | In progress: scoped producer tokens, Reddit/Twitter capture batches and durable receipts are implemented. Verified preparation uses the shared scanner; file/media publication checks descriptors, generations and persistent path removals, reuses concurrent scans, and rejects ambiguous verified-byte owners. Intake publication connects collection provenance, selected source media, attachment evidence and album galleries while preserving explicit choices. Persistent jobs have coalesced submissions, fenced leases, retry/cancellation/recovery, and atomic domain/result publication. File-completion admission now queues a durable worker that checkpoints registration, generates previews and delivers retryable media/gallery hooks; scoped status reports actual completion. Native collection policies now apply typed metadata and explicit performer defaults in intake and ordinary scans, with dry preview and guarded apply. Policy migration, general durable edit notifications, source-run coordination, additional source adapters, producer outboxes and host/n8n conversion remain. |
+| 2 Ingestion and producer adapter | In progress: scoped producer tokens, Reddit/Twitter capture batches and durable receipts are implemented. Verified preparation uses the shared scanner; file/media publication checks descriptors, generations and persistent path removals, reuses concurrent scans, and rejects ambiguous verified-byte owners. Intake publication connects collection provenance, selected source media, attachment evidence and album galleries while preserving explicit choices. Persistent jobs have coalesced submissions, fenced leases, retry/cancellation/recovery, and atomic domain/result publication. File-completion admission now queues a durable worker that checkpoints registration, generates previews and delivers retryable media/gallery hooks; scoped status reports actual completion. Native collection policies now apply typed metadata and explicit performer defaults in intake and ordinary scans, with dry preview and guarded apply. Source-run coordination now coalesces missing date ranges, fences worker ownership, retains checkpoints and deferrals, and excludes overlapping destinations. Policy migration, general durable edit notifications, additional source adapters, producer outboxes and actual host/n8n worker conversion remain. |
 | 3 Catalog importer and full-copy reconciliation | Not yet implemented |
 | 4 Native UI and client conversion | Not yet implemented |
 | 5 Compatibility removal and packaging | Preview packaging isolated and old compatibility gate replaced by current v3 operation/plugin-contract checks. Old UI/API/plugin adapters and config bridge still require conversion/removal. |
@@ -1094,3 +1095,60 @@ for SQLite policy application, queued file-policy processing and HTTP preview/
 apply (14.9, 8.2 and 7.3 seconds respectively). The final logs are
 `/tmp/stash-native-transition/metadata-policy-final-validation.log` and
 `/tmp/stash-native-transition/metadata-policy-race.log`.
+
+
+## Native source-run coordination
+
+Migration 1000023 persists source traversal requests, coalesced windows, worker
+leases, checkpoints, attempt outcomes, target cooldowns and owner review actions.
+This specialized traversal state is separate from immutable media-verification
+jobs. Host and n8n producer identities can submit equivalent work for the same
+configured collection. Expanding a running date range keeps its missing portions
+without queuing another complete scan of the already claimed range. Disjoint
+windows preserve their gaps, with explicit queue and interval capacity limits.
+
+Claims serialize a collection, shared target URL and overlapping destinations;
+root identity and resolved paths account for host/container mount mappings and
+existing symlinks. Newest pending ranges and pending download work take precedence
+over older ranges and enrichment. Every claim advances a fence. Lease expiry,
+retry, cancellation and process restart cannot let an obsolete worker finish a
+newer attempt. Same-window retries retain their cursor; changing the traversal
+window cannot blindly reuse that cursor. Repeated failures remain durably deferred
+until application-authenticated review. Repeated timers preserve retry delays.
+
+Producer routes expose typed submit, scoped listing/status, claim, renewal,
+progress, completion and attempt history. Policy fingerprints identify effective
+worker configuration without accepting commands or storing website credentials.
+API-token rotation preserves producer identity. Late source evidence delivery
+does not alter run state. The application-only review endpoint uses the reviewed
+revision for retry/cancellation. The protocol is documented in native-ingestion.md.
+
+The isolated full library copy migrated from 1000022 to 1000023 in 0.070 seconds.
+All 128 existing tables matched by streaming semantic digest; prior migration
+history also matched, with zero foreign-key violations and no file growth.
+Reconciliation took 154.4 seconds while other validation ran. All five new run
+tables remained empty. The private receipt is
+`.local/native-archive-rehearsal-20260930/source-run-reconciliation.json`; the migrated copy is
+`native-source-run-final-rehearsal.sqlite`.
+
+Focused tests cover real SQLite concurrency, duplicate admission/claim responses,
+wider and disjoint windows, capacity, mount/directory exclusion, token rotation,
+root-scoped history, retry/deferral, cancellation, restart recovery, expiry during
+publication, HTTP operations, late capture delivery, and anonymisation. Targeted
+race checks passed (SQLite 7.0 seconds, API 2.5 seconds, interval/path helpers
+1.1 seconds). Existing gallery-dl/n8n processes and journals remain unchanged.
+
+The external adapter, local outage coalescing/outbox, actual shared filesystem
+locking and lease enforcement, legacy checkpoint/deferral migration, source
+adapters, catalog import, UI/client conversion and later transition phases remain
+required. A coordinator lease does not physically stop an old process; production
+cutover must verify the converted workers pause before further source requests
+and preserve download locks. No production schema or writer was changed.
+
+The complete `make validate-fork` gate passed on the final per-item checkpoint
+contract: backend generation, all 528 UI tests, 71 native operation contracts,
+zero Go lint issues, and every Go unit/integration package. API tests took
+160.7 seconds, ingestion 343.1 seconds, manager 44.9 seconds, and SQLite 318.9
+seconds. The final validation log is
+`/tmp/stash-native-transition/source-runs-final-validation.log`.
+Final race results are in `/tmp/stash-native-transition/source-runs-final-race.log`.

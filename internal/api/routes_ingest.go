@@ -45,6 +45,12 @@ func (rs *ingestRoutes) router() http.Handler {
 		r.Post("/batches", rs.batch)
 		r.Get("/receipts/{event}", rs.receipt)
 		r.Get("/receipts/{event}/status", rs.receiptStatus)
+		r.Post("/runs", rs.submitRun)
+		r.Post("/runs/list", rs.sourceRuns)
+		r.Get("/runs/{run}", rs.sourceRun)
+		r.Post("/runs/{run}/attempts", rs.sourceRunAttempts)
+		r.Post("/runs/{run}/claim", rs.claimRun)
+		r.Post("/runs/{run}/lease", rs.changeRunLease)
 	})
 	return r
 }
@@ -95,11 +101,15 @@ func ingestErrorCode(err error) (int, string) {
 		return http.StatusNotFound, "not_found"
 	case errors.Is(err, ingest.ErrUnsupported):
 		return http.StatusUnprocessableEntity, "unsupported"
-	case errors.Is(err, models.ErrArchiveJobCapacity):
+	case errors.Is(err, models.ErrArchiveJobCapacity), errors.Is(err, models.ErrSourceRunCapacity):
 		return http.StatusTooManyRequests, "queue_full"
+	case errors.Is(err, models.ErrSourceRunLease):
+		return http.StatusConflict, "lease_lost"
+	case errors.Is(err, models.ErrSourceRunConflict):
+		return http.StatusConflict, "conflict"
 	case ingest.IsConflict(err), errors.Is(err, models.ErrSourceDefinitionConflict), errors.Is(err, models.ErrFilePathChanged), errors.Is(err, models.ErrFileGenerationConflict):
 		return http.StatusConflict, "conflict"
-	case errors.Is(err, ingest.ErrInvalid):
+	case errors.Is(err, ingest.ErrInvalid), errors.Is(err, models.ErrSourceRunInvalid):
 		return http.StatusBadRequest, "invalid_event"
 	default:
 		return http.StatusServiceUnavailable, "temporarily_unavailable"
@@ -141,6 +151,7 @@ func (rs *ingestRoutes) capabilities(w http.ResponseWriter, r *http.Request) {
 		"kinds": kinds, "post_namespaces": []string{"native:reddit", "native:twitter"},
 		"retention_policy": archive.SourceRetentionVersion, "max_event_bytes": ingest.MaxEventBytes, "max_batch_bytes": ingest.MaxBatchBytes, "max_batch_events": ingest.MaxBatchEvents,
 		"max_file_event_bytes": ingest.MaxFileEventBytes, "file_ingestion": rs.fileIngestion,
+		"source_runs": true, "source_run_protocol": 1,
 		"receipt_semantics": "source.capture commits source evidence; file.completed queues verification; poll receipt status for media completion",
 	})
 }

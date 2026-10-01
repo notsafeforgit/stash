@@ -23,6 +23,7 @@ func (rs *ingestRoutes) adminRouter() http.Handler {
 	r.Post("/producers/{producer}/credentials", rs.issueCredential)
 	r.Get("/producers/{producer}/credentials", rs.credentials)
 	r.Delete("/credentials/{credential}", rs.revokeCredential)
+	r.Post("/runs/{run}/review", rs.reviewRun)
 	return r
 }
 

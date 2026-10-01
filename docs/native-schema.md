@@ -606,7 +606,7 @@ Migration creates no credentials, receipts, or imported catalog data.
 
 The [protocol documentation](native-ingestion.md) lists current supported events
 and limits. File intake and its durable worker are described below. Producer
-outboxes, source-run leases, catalog import and native administration/review UI
+outboxes, external worker lease enforcement, catalog import and native administration/review UI
 remain subsequent work.
 
 Migration 1000018 adds `files.generation`, `media_contents`, and immutable
@@ -667,8 +667,8 @@ attempt reads avoid scanning media/catalog tables. The migration leaves all job
 tables empty and preserves existing ingestion receipts and verified file history;
 legacy journals require the separate importer. Anonymised exports remove jobs,
 arguments, acknowledgements, and attempts. The [ingestion guide](native-ingestion.md)
-describes the connected file worker and distinguishes it from the unfinished
-source-run coordinator and producer conversion.
+describes the connected file worker and separate source-run coordinator. External
+producer conversion remains unfinished.
 
 Migration 1000020 retains `file_path_fences`, a local removal history independent
 of file UUID lifetimes. Deleting or moving a regular file increments the original
@@ -727,6 +727,18 @@ heads. Anonymised exports remove policy provenance and definitions before their
 referenced field decisions and collections. Existing library and source rows are
 unchanged, and no policies or historical authorship are inferred. See the
 [native policy contract](native-ingestion.md#native-metadata-policies).
+
+Migration 1000023 adds `source_runs`, immutable `source_run_requests`, fenced
+`source_run_attempts`, persistent target cooldowns and owner review history.
+Coalescing preserves requested date windows separately from claimed and completed
+ranges; failed attempts restore their range without bypassing backoff or permanent
+deferral. Foreign keys retain producer, collection and root revision provenance.
+Unique active-work, collection, target and destination indexes serialize ownership;
+claim additionally excludes overlapping directory scopes. Scoped pagination and
+expiry indexes bound operational lookups independently of library size. Startup
+validates the schema and current attempt/lease agreement. Anonymisation removes
+run state before its producer and source definitions. Migration invents no runs
+or legacy journal completion. See the [run protocol](native-ingestion.md#source-run-coordination).
 
 Migrations run against copies during development. SQL failure leaves a dirty
 migration state that startup refuses; restore the migration backup or use a

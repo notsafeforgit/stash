@@ -31,8 +31,10 @@ INSERT INTO performers_scenes(performer_id, scene_id) VALUES (71, 31);
 func archiveTestDatabase(t *testing.T) (*sqlite.Database, models.Repository) {
 	t.Helper()
 	config.InitializeEmpty()
+	path := filepath.Join(t.TempDir(), "identities.sqlite")
+	writeEmptyNativeFixture(t, path)
 	db := sqlite.NewDatabase()
-	require.NoError(t, db.Open(filepath.Join(t.TempDir(), "identities.sqlite")))
+	require.NoError(t, db.Open(path))
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	repo := db.Repository()
 	require.NoError(t, repo.WithTxn(context.Background(), func(ctx context.Context) error {

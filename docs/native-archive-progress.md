@@ -694,3 +694,16 @@ query fixes its join order to start with the selected post's indexed captures.
 
 Native producer/API integration, review UI, account-profile presentation,
 metadata policies, and catalog import remain required. Production has not changed.
+
+## Isolated native test fixtures
+
+Domain tests now copy a closed, empty database built once through the real
+initializer, then insert their own fixture entities. Every test still opens its
+own database and receives fresh archive UUIDs. Historical migration and new-install
+tests continue constructing their actual input schemas. An isolation test verifies
+that identities and edits do not leak between copies.
+
+The complete `make validate-fork` gate passed with 528 UI tests, native contracts,
+zero Go lint issues, and all Go unit/integration packages. The SQLite suite took
+154.3 seconds, down from 567.3 seconds before avoiding repeated empty-schema
+migrations. This changes test setup only.

@@ -133,9 +133,8 @@ func TestNativeLineageRejectsUnsafeInputsBeforeWriting(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			config.InitializeEmpty()
 			path := filepath.Join(t.TempDir(), "native.sqlite")
+			writeEmptyNativeFixture(t, path)
 			db := sqlite.NewDatabase()
-			require.NoError(t, db.Open(path))
-			require.NoError(t, db.Close())
 			raw := openRawDB(t, path)
 			_, err := raw.Exec(tc.change)
 			require.NoError(t, err)

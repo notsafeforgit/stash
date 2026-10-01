@@ -47,6 +47,7 @@ review. Production has not been migrated.
 | Stash `5fd4d0f93` | Scalar field decisions with explicit clear/inherit, preserved legacy values and new-album capture provenance; full-copy reconciliation, complete validation gate, CI lint/build, and preview image publication passed |
 | Stash `b2ecfe605` | Typed metadata relationships and coalesced collection choices; full-copy reconciliation, complete validation gate, CI lint/build, and preview image publication passed |
 | Stash `f96577925` | Reviewed source-account consolidation with retained identity evidence and ownership history; full-copy reconciliation and complete validation gate passed |
+| Stash `05105cb15` | Versioned captured-account claims across native/mirror services and unfamiliar extractors; complete validation gate and CI lint/build passed |
 
 ## Phase status
 
@@ -566,3 +567,35 @@ See [native source identity](native-source-identity.md) for the contract and
 evidence limits. Account resolution, publisher associations, ingestion/import
 integration, and review API/UI remain required. The parser does not create
 accounts, merge candidates, change ownership, or assign depicted performers.
+
+## Source-list extraction for albums
+
+Core now derives `captured-album-v1` manifests from Reddit gallery lists and
+complete Twitter media lists. It retains qualified post/media IDs, source order,
+crosspost and parent evidence pointers, missing slots, unavailable source items,
+and repeated attachments. Manifest completeness stays independent of whether
+the associated media has downloaded. Unknown lists remain unresolved.
+
+Inspection of the installed gallery-dl 1.32.15-dev extractors confirmed that
+Reddit download numbers skip items with unavailable URLs and Twitter's `count`
+counts extracted output files, including optional renditions/card images. The
+parser therefore does not infer a complete source album from `num`, `count`,
+filenames, or a per-file media ID. The native Twitter adapter must supply the
+post's media list before extractor filtering; old count-only captures require
+additional evidence or review during backfill.
+
+Focused parser fixtures and SQLite integration passed. They cover source order,
+partial identity evidence, unavailable items, repeated IDs, crosspost identity,
+conservative type hints, contradictory input, exact large IDs, retained-payload
+equivalence, bounds, and replay. Parsed lists pass through capture storage and
+selection into a gallery with an image, then accept a later video association
+without making a second gallery or duplicating memberships.
+
+The complete `make validate-fork` gate passed on the final implementation:
+generation, frontend validation and 528 UI tests, retained native contracts,
+Go lint with zero issues, and all Go unit/integration packages. The SQLite suite
+completed in 394.2 seconds.
+
+See [native source albums](native-source-albums.md). No schema migration is
+required for the parser. Producer integration, catalog backfill, native API/UI,
+and source-to-file verification remain required; production has not changed.

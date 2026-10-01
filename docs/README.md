@@ -21,6 +21,7 @@ provides the frozen fallback for users who do not migrate.
 | [Fork maintenance](../FORK.md) | Independent development, upstream imports, native migrations, and release boundaries |
 | [Native schema promotion](native-schema.md) | Implemented lineage, one-time historical imports, promoted tables, and remaining model conversions |
 | [Native source identity](native-source-identity.md) | Versioned captured account claims, service namespaces, evidence limits, and pending producer integration |
+| [Native source albums](native-source-albums.md) | Ordered post attachments, partial downloads, gallery membership, and source-evidence requirements |
 | [Repository guidance](../CLAUDE.md) and [v3 contributor guidance](../ui/v3/AGENTS.md) | Coding conventions and backend/player constraints |
 | [Plugin host](../ui/v3/docs/plugin-host.md) | Current v3 UI plugin API, startup lifecycle, and failure handling |
 | [Versioned plugin manifests](plugin-manifests.md) | Independent v3 plugin contract, legacy adapter, and API generations |

@@ -30,28 +30,28 @@ type CapturedAccountIdentifier struct {
 	Path string `json:"path"`
 }
 
-type capturedAccountField struct {
+type capturedField struct {
 	value interface{}
 	path  string
 }
 
-func accountField(object sourceObject, path, key string) capturedAccountField {
-	return capturedAccountField{value: object[key], path: pointerMember(path, key)}
+func capturedFieldAt(object sourceObject, path, key string) capturedField {
+	return capturedField{value: object[key], path: pointerMember(path, key)}
 }
 
-func firstAccountField(object sourceObject, path string, keys ...string) capturedAccountField {
+func firstCapturedField(object sourceObject, path string, keys ...string) capturedField {
 	for _, key := range keys {
-		field := accountField(object, path, key)
+		field := capturedFieldAt(object, path, key)
 		if field.value != nil && field.value != "" {
 			return field
 		}
 	}
-	return capturedAccountField{}
+	return capturedField{}
 }
 
 var capturedIntegerID = regexp.MustCompile(`^-?(?:0|[1-9][0-9]*)$`)
 
-func capturedIdentifierValue(field capturedAccountField) (string, error) {
+func capturedIdentifierValue(field capturedField) (string, error) {
 	switch value := field.value.(type) {
 	case nil:
 		return "", nil
@@ -62,10 +62,10 @@ func capturedIdentifierValue(field capturedAccountField) (string, error) {
 			return string(value), nil
 		}
 	}
-	return "", fmt.Errorf("captured account identifier at %s must be a string or integer", field.path)
+	return "", fmt.Errorf("captured identifier at %s must be a string or integer", field.path)
 }
 
-func (a *CapturedAccount) add(field capturedAccountField, kind, basis string) error {
+func (a *CapturedAccount) add(field capturedField, kind, basis string) error {
 	value, err := capturedIdentifierValue(field)
 	if err != nil || value == "" {
 		return err
@@ -78,7 +78,7 @@ func (a *CapturedAccount) add(field capturedAccountField, kind, basis string) er
 	return nil
 }
 
-func capturedAccountLabel(field capturedAccountField) string {
+func capturedAccountLabel(field capturedField) string {
 	label, _ := field.value.(string)
 	label = strings.TrimSpace(label)
 	if len(label) > 1024 || strings.IndexFunc(label, unicode.IsControl) >= 0 {
@@ -107,38 +107,38 @@ func ExtractCapturedAccount(raw []byte) (*CapturedAccount, error) {
 		return nil, nil
 	}
 	result := &CapturedAccount{Policy: CapturedAccountPolicy, Namespace: "native:" + category}
-	var id, handle, secondary capturedAccountField
+	var id, handle, secondary capturedField
 	idKind, basis := "id", "captured-author"
 	author, _ := data["author"].(sourceObject)
 	authorPath := pointerMember(path, "author")
-	field := func(key string) capturedAccountField { return accountField(data, path, key) }
-	first := func(keys ...string) capturedAccountField { return firstAccountField(data, path, keys...) }
+	field := func(key string) capturedField { return capturedFieldAt(data, path, key) }
+	first := func(keys ...string) capturedField { return firstCapturedField(data, path, keys...) }
 	switch category {
 	case "reddit":
 		id, handle = field("author_fullname"), field("author")
 		if author != nil {
-			handle = accountField(author, authorPath, "name")
+			handle = capturedFieldAt(author, authorPath, "name")
 		}
 	case "twitter":
-		id, handle = accountField(author, authorPath, "id"), accountField(author, authorPath, "name")
+		id, handle = capturedFieldAt(author, authorPath, "id"), capturedFieldAt(author, authorPath, "name")
 	case "bluesky":
-		id, handle = accountField(author, authorPath, "did"), accountField(author, authorPath, "handle")
+		id, handle = capturedFieldAt(author, authorPath, "did"), capturedFieldAt(author, authorPath, "handle")
 	case "tiktok":
-		id = accountField(author, authorPath, "id")
-		secondary = accountField(author, authorPath, "secUid")
-		handle = firstAccountField(author, authorPath, "uniqueId", "name")
+		id = capturedFieldAt(author, authorPath, "id")
+		secondary = capturedFieldAt(author, authorPath, "secUid")
+		handle = firstCapturedField(author, authorPath, "uniqueId", "name")
 		if id.value == nil || id.value == "" {
-			id, secondary, idKind = secondary, capturedAccountField{}, "secUid"
+			id, secondary, idKind = secondary, capturedField{}, "secUid"
 		}
 	case "instagram":
 		id, handle = field("owner_id"), field("username")
 	case "tumblr":
 		blog, _ := data["blog"].(sourceObject)
 		blogPath := pointerMember(path, "blog")
-		id = accountField(blog, blogPath, "uuid")
+		id = capturedFieldAt(blog, blogPath, "uuid")
 		handle = first("blog_name")
 		if handle.value == nil {
-			handle = accountField(blog, blogPath, "name")
+			handle = capturedFieldAt(blog, blogPath, "name")
 		}
 	case "coomer", "kemono":
 		service, _ := data["service"].(string)
@@ -179,9 +179,9 @@ func ExtractCapturedAccount(raw []byte) (*CapturedAccount, error) {
 			}
 		}
 		if len(owner) > 0 {
-			id = firstAccountField(owner, ownerPath, "id", "did", "uuid")
-			handle = firstAccountField(owner, ownerPath, "username", "account", "handle")
-			result.Label = capturedAccountLabel(firstAccountField(owner, ownerPath, "name"))
+			id = firstCapturedField(owner, ownerPath, "id", "did", "uuid")
+			handle = firstCapturedField(owner, ownerPath, "username", "account", "handle")
+			result.Label = capturedAccountLabel(firstCapturedField(owner, ownerPath, "name"))
 		} else {
 			id, handle = first("user_id", "uploader_id"), field("username")
 			result.Label = capturedAccountLabel(field("uploader"))
@@ -208,12 +208,12 @@ func ExtractCapturedAccount(raw []byte) (*CapturedAccount, error) {
 	if category == "coomer" || category == "kemono" {
 		profile, _ := data["user_profile"].(sourceObject)
 		profilePath := pointerMember(path, "user_profile")
-		profileID, _ := capturedIdentifierValue(accountField(profile, profilePath, "id"))
+		profileID, _ := capturedIdentifierValue(capturedFieldAt(profile, profilePath, "id"))
 		service, _ := profile["service"].(string)
 		if profileID == result.Identifiers[0].Reference.Value && service == data["service"] {
 			// Preserve the advertised public identifier in the mirror's namespace.
 			// Neither it nor the display name proves a native service account ID.
-			if err := result.add(accountField(profile, profilePath, "public_id"), "public_id", "captured-mirror-public-id"); err != nil {
+			if err := result.add(capturedFieldAt(profile, profilePath, "public_id"), "public_id", "captured-mirror-public-id"); err != nil {
 				return nil, err
 			}
 		}

@@ -199,6 +199,8 @@ class NativeDownloadJob(job.DownloadJob):
         try:
             return super().dispatch(guarded())
         except (InvalidData, Capacity, SourcePaused) as exc:
+            self.producer.failure_code = ("outbox_capacity" if isinstance(exc, Capacity) else
+                                          "source_lease_lost" if isinstance(exc, SourcePaused) else "source_rejected")
             raise exception.AbortExtraction(str(exc)) from None
 
     def initialize(self, kwdict=None):
@@ -245,6 +247,7 @@ class NativeDownloadJob(job.DownloadJob):
                     original = pp._exec
 
                     def strict(args, shell, original=original):
+                        self.producer.configuration_check()
                         result = original(args, shell)
                         if result:
                             raise InvalidData("Postprocessor failed; download remains unfinished")

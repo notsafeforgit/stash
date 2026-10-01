@@ -119,10 +119,17 @@ class RunLease:
     def finish(self, state, *, error_code="", retry_after_seconds=0):
         with self.lock:
             try:
+                expected = {"succeeded": {"queued", "succeeded"}, "retry": {"queued", "deferred"},
+                            "deferred": {"deferred"}}.get(state)
+                if expected is None:
+                    raise InvalidData("Invalid source attempt outcome")
                 result, _, _ = self._change(outcome={"state": state, "error_code": error_code,
                                                     "retry_after_seconds": retry_after_seconds})
                 if (not isinstance(result, dict) or result.get("uuid") != self.run_uuid
-                        or result.get("fence") != self.run["fence"] or result.get("state") == "running"):
+                        or result.get("fence") != self.run["fence"] or result.get("state") not in expected
+                        or any(result.get(field) != self.run.get(field) for field in (
+                            "policy_sha256", "collection_uuid", "collection_revision", "root_uuid", "root_revision",
+                            "target_url", "path_prefix", "operation"))):
                     raise SourcePaused("Run completion was not acknowledged")
                 return result
             finally:

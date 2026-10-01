@@ -76,6 +76,18 @@ class RunLeaseTests(unittest.TestCase):
             with self.assertRaises(SourcePaused):
                 self.lease._accept(response)
 
+    def test_finish_cannot_acknowledge_a_different_definition_or_invalid_outcome(self):
+        for changes in ({"state": "cancelled"}, {"state": None}, {"policy_sha256": "b" * 64},
+                        {"root_uuid": PRODUCER}, {"fence": 2}):
+            with self.subTest(changes=changes):
+                lease = RunLease(self.client, RUN, OWNER, "a" * 64, seconds=180, clock=lambda: self.now[0])
+                lease._accept(self.response())
+                self.client._request.return_value = (dict(self.run, **({"state": "succeeded"} | changes)), None, 0)
+                with self.assertRaises(SourcePaused):
+                    lease.finish("succeeded")
+                with self.assertRaises(SourcePaused):
+                    lease.check()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -22,8 +22,10 @@ ordinary scans, with explicit performer defaults and authenticated preview/apply
 Native source-run coordination now provides coalesced windows and fenced leases.
 The Python adapter provides durable outboxes, worker lease enforcement,
 source-window filtering, download hooks and offline run-request coalescing.
-Effective worker configuration, launcher integration, additional post adapters,
-host/n8n conversion, catalog import, and native administration/review UI remain required.
+Worker profiles now fingerprint reviewed configuration and execute one claimed
+download attempt with concurrent event delivery. Launcher integration, additional
+post adapters, host/n8n conversion, catalog import, and native administration/review
+UI remain required.
 Existing scrapes have not switched to this interface. Root, collection and policy
 administration endpoints are described below.
 
@@ -379,8 +381,9 @@ expose the server's absolute filesystem binding. The producer must verify its
 local destination against that prefix before writing.
 Policy identity covers effective extraction, archive/skip, original-quality,
 conversion, metadata-only and pacing behavior plus adapter version; omit secrets
-and the requested date window. Worker conversion will supply this fingerprint
-from the resolved configuration. Claim requires the matching fingerprint.
+and the requested date window. The Python worker profile supplies this fingerprint
+from portable settings, reviewed helper assets and the pinned runtime; local path
+bindings and website-access values stay in its environment. Claim requires the matching fingerprint.
 No API argument supplies a command line.
 
 Windows are half-open published-time ranges `[since, until)`, with millisecond
@@ -449,8 +452,9 @@ access this administrative route.
 The producer SDK implements durable local request coalescing during outages,
 outbox delivery, shared filesystem locking, lease renewal and pausing before the
 next source request after expiry. It applies the claimed Reddit/Twitter post
-window before file processing. Effective configuration validation and
-conversion of the actual host/n8n/recovery launch paths remain required.
+window before file processing. Reviewed worker profiles, one-attempt execution
+and finish-response recovery are implemented. Conversion of the actual
+host/n8n/recovery configuration and launch paths remains required.
 No legacy PID, lease or journal is promoted automatically by this migration.
 The separate importer must preserve permanent completions, checkpoints,
 deferrals and intentionally ignored unavailable originals before cutover.
@@ -645,9 +649,10 @@ paths and remaining caller responsibilities.
 The shared Python/Go policy corpus verifies retention before queued persistence.
 `make pre-producer` installs the pinned gallery-dl/yt-dlp test runtime into an
 isolated environment; `make validate-producer` runs delivery and real downloader
-tests. The backend's HTTP test executes the client and source-lease lifecycle
-against an isolated native database. Python 3.12 or newer is required.
+tests. The backend's HTTP tests execute delivery, source leases and the download
+worker against isolated native databases, including a lost completion response
+and file admission after outbox restart. Python 3.12 or newer is required.
 
-This package is not yet installed into the host/n8n launch paths. Effective
-configuration handling, additional source adapters and conversion of
-recovery/scheduled callers remain required before cutover.
+This package is not yet installed into the host/n8n launch paths. Deployment
+configuration conversion, additional source adapters and conversion of recovery
+and scheduled callers remain required before cutover.

@@ -8,8 +8,8 @@ additional source adapters and production cutover remain unfinished.
 Python 3.12 or newer is required. Runtime delivery uses only the standard
 library. Install the local package with `pip install ./integrations/gallery-dl`
 in the runner's environment when integrating it; do not replace a live wrapper
-with this CLI. The CLI can queue source requests and drain captured events; it
-does not launch a downloader.
+with this CLI. The CLI can queue source requests, drain captured events and
+execute one claimed download attempt using an explicitly reviewed local profile.
 The optional `[gallery]` extra pins the gallery-dl source revision and yt-dlp
 version used to verify downloader integration. Run `make pre-producer` to install
 that test runtime into `.local/native-producer`, independently of live workers.
@@ -123,12 +123,96 @@ Filename budgeting preserves source IDs and handles UTF-8 and downloader
 temporary suffixes without truncating the source metadata.
 
 Checkpoints retain the last completed source cursor during bounded replay. A
-missing saved cursor cannot report successful traversal. The caller still owns
-the reviewed extractor configuration and its fingerprint, run outcome and
-deployment integration.
+missing saved cursor cannot report successful traversal. The worker entry point
+below supplies configuration, heartbeat, event delivery and attempt outcomes;
+production launcher conversion remains separate work.
 Only Reddit/Twitter attachment adapters are implemented so far; external linked
 sources and multi-entry yt-dlp output association still need integration. These
 SDK classes are not a production launcher and do not change installed hooks.
+
+## Worker profiles and execution
+
+A `stash-gallery-worker-v1` JSON profile separates portable gallery-dl settings
+from deployment paths and local website-access references. Its five required
+keys are `schema`, `root`, `locks`, `gallery` and `bindings`:
+
+```json
+{
+  "schema": "stash-gallery-worker-v1",
+  "root": {"uuid": "REVIEWED_ROOT_UUID", "path": "/media/porn", "identity": [0, 0]},
+  "locks": {"path": "/persistent/download-locks", "identity": [0, 0]},
+  "gallery": {
+    "extractor": {
+      "base-directory": "${stash:media_root}",
+      "directory": ["{author}, reddit"],
+      "filename": "{id}_{filename}.{extension}",
+      "archive": "${stash:archive}",
+      "skip": true,
+      "reddit": {"cookies": "${stash:reddit_login}"}
+    }
+  },
+  "bindings": {
+    "archive": {"kind": "path", "path": "/persistent/archives/reddit.sqlite"},
+    "reddit_login": {
+      "kind": "private",
+      "file": "/private/gallery-dl/config.json",
+      "pointer": "/extractor/reddit/cookies"
+    }
+  }
+}
+```
+
+This is a template, not an installable configuration. Provision the native root
+UUID and review each existing directory's device/inode pair using
+`filesystem.Root.probe` before filling `identity`; `[0, 0]` is a placeholder.
+Use the actual shared lock directory and existing archive/path rules when
+converting a deployment. The directory produced by gallery-dl must fit the
+claimed collection's path prefix. Root and lock identities are checked again
+at source boundaries; a replacement mount stops further work.
+
+`path` bindings relocate archives and other local files without changing policy
+identity. `asset` bindings add `path` and a reviewed `sha256` for local helper
+code. Python postprocessor `function` settings must refer to such an asset,
+for example `${stash:converter}:prepare`. Asset digests are checked when loading
+the profile and their file identities are checked during execution. Put local
+conversion helpers used by exec processors in asset bindings too. This does not
+sandbox trusted postprocessors or fingerprint arbitrary system executables.
+Legacy `gallery_catalog_hook` writers are rejected, including named definitions.
+
+`private` bindings read a JSON Pointer from an existing local JSON file, or use
+`{"kind":"private","env":"WEBSITE_ACCESS"}`. A complete reference can supply
+structured cookies or headers. Private references are accepted only in website
+access settings, never interpolated into filenames or commands. These values
+stay in worker memory and gallery-dl; they are not sent to Stash or copied into
+the outbox. The Stash API token still uses the separate `--token-env` option.
+
+The policy SHA-256 includes the portable gallery configuration, reviewed asset
+digests, pinned gallery-dl/yt-dlp runtime identity and adapter source digest. It
+excludes private values, local binding paths, directory identities and the
+requested run window. Equivalent host/container profiles therefore share a
+policy; rotating cookies does not create a new policy. Changing extraction or
+conversion settings/code does. Relative binding paths resolve against the
+profile file. Keep one worker in each process: gallery-dl configuration is
+process-global, and simultaneous activation is rejected.
+
+`worker-policy --profile FILE` validates the local profile and prints its policy
+digest and root UUID. `queue-run --profile FILE` uses that digest in place of
+`--policy`. `execute-run RUN_UUID --profile FILE` first checks server download
+capability, root/operation/policy agreement and live ownership. It starts the
+heartbeat and a drainer with its own SQLite connection, then runs gallery-dl.
+Temporary failures request retry, source/access/configuration failures defer,
+and loss of ownership pauses further source work. Current-file events remain
+durable. A lost finish response is accepted only after finding the exact
+producer, owner, fence and outcome in the server's attempt history.
+
+The execution command prints JSON on stdout; downloader and child-process logs
+go to stderr. Exit 0 and `source_succeeded` mean this source **attempt** finished.
+Other source windows and media jobs can remain pending. `run_state` reports the
+acknowledged run state when available; `intake_completion` explicitly requires
+checking native receipts. Waiting, retry, deferred, paused and unconfirmed
+completion exit 2. Invalid configuration or unavailable admission exits 1.
+Continue draining the durable outbox after execution; stopping the download
+process does not certify that its file events were delivered.
 
 ## Offline source requests
 
@@ -189,10 +273,12 @@ is no command-line token argument.
 | `drain` | Attempts one ready batch of at most eight events; exits 2 while local event work remains |
 | `retry EVENT_UUID` | Requeues one explicitly reviewed event with its original contents |
 | `receipt-status EVENT_UUID` | Reads actual server ingestion/worker status |
-| `queue-run --collection UUID --revision N --policy SHA256 --until TIME` | Records/coalesces a request; optional `--since`, `--operation`, `--cooldown` and `--ticket` |
+| `queue-run --collection UUID --revision N --profile FILE --until TIME` | Records/coalesces a download request using the profile digest; low-level callers may use `--policy SHA256` instead |
 | `submit-runs` | Submits one ready request; exits 2 while requests remain pending, in flight or in review |
 | `runs-status [--intent UUID \| --ticket UUID] [--after N]` | Local request counts and up to 50 relevant historical submissions |
 | `retry-run-request UUID` | Retries a reviewed submission with the original UUID and bytes |
+| `worker-policy --profile FILE` | Validates the local worker profile and prints its portable policy/root identity |
+| `execute-run RUN_UUID --profile FILE` | Executes one claimed source attempt; does not assert media intake completion |
 
 `acknowledged` means Stash accepted the event transaction. For a file, that means
 verification was queued; it does not assert a successful media import. A disabled
@@ -210,11 +296,16 @@ Tests cover concurrent delivery, subprocess death,
 receipt replay, token rotation, dependency ordering, capacity, partial batches,
 redirect rejection, disabled file processing, download/skip/postprocessor paths,
 Twitter transformations, filename budgets, lease loss, bounded resume, offline
-window coalescing, caller tickets, schema promotion and shared window semantics.
+window coalescing, caller tickets, schema promotion, shared window semantics,
+portable configuration, changed assets, worker failure outcomes and log isolation.
 The backend test
 `TestPythonProducerDurableDeliveryAgainstNativeHTTP` runs this actual client
 against the native HTTP router and SQLite, loses committed event and run-submission
 responses, and checks replay after reopening, independent rejection, caller-ticket
 deduplication and the submit/claim/renew/checkpoint/finish lease
-cycle. Both checks are included in `make validate-fork`
+cycle. `TestPythonDownloadWorkerRecoversFinishAndDeliversFiles` runs the worker
+against the real API/SQLite, drains a capture during downloading, recovers a lost
+attempt-completion response and admits a dependent file after reopening the
+outbox. It verifies that source success still leaves actual media intake queued.
+These checks are included in `make validate-fork`
 and the build workflow. No production endpoint or source website is contacted.

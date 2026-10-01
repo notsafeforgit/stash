@@ -22,18 +22,39 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestPythonProducerDurableDeliveryAgainstNativeHTTP(t *testing.T) {
+func nativeProducerRuntime(t *testing.T) (string, string) {
+	t.Helper()
 	pythonName := os.Getenv("PRODUCER_PYTHON")
 	if pythonName == "" {
 		pythonName = "python3"
 	}
 	python, err := exec.LookPath(pythonName)
 	require.NoError(t, err, "native producer integration tests require Python 3.12 or newer")
+	packagePath, err := filepath.Abs("../../integrations/gallery-dl")
+	require.NoError(t, err)
+	// Register Python inputs with Go's test cache. Files read only by the child
+	// interpreter would otherwise let a changed producer reuse an old result.
+	for _, directory := range []string{"src/stash_ingest", "tests"} {
+		entries, err := os.ReadDir(filepath.Join(packagePath, directory))
+		require.NoError(t, err)
+		for _, entry := range entries {
+			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".py") {
+				_, err := os.ReadFile(filepath.Join(packagePath, directory, entry.Name()))
+				require.NoError(t, err)
+			}
+		}
+	}
+	return python, packagePath
+}
+
+func TestPythonProducerDurableDeliveryAgainstNativeHTTP(t *testing.T) {
+	python, packagePath := nativeProducerRuntime(t)
 	config.InitializeEmpty()
 	db := sqlite.NewDatabase()
 	require.NoError(t, db.Open(filepath.Join(t.TempDir(), "library.sqlite")))
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	service := ingest.New(db.Repository())
+	var err error
 	var producer *models.IngestProducer
 	var collection *models.SourceCollection
 	require.NoError(t, service.Repo.WithTxn(context.Background(), func(ctx context.Context) error {
@@ -66,20 +87,6 @@ func TestPythonProducerDurableDeliveryAgainstNativeHTTP(t *testing.T) {
 		router.ServeHTTP(w, r)
 	}))
 	t.Cleanup(server.Close)
-	packagePath, err := filepath.Abs("../../integrations/gallery-dl")
-	require.NoError(t, err)
-	// Register Python inputs with Go's test cache. Files read only by the child
-	// interpreter would otherwise let a changed producer reuse an old result.
-	for _, directory := range []string{"src/stash_ingest", "tests"} {
-		entries, err := os.ReadDir(filepath.Join(packagePath, directory))
-		require.NoError(t, err)
-		for _, entry := range entries {
-			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".py") {
-				_, err := os.ReadFile(filepath.Join(packagePath, directory, entry.Name()))
-				require.NoError(t, err)
-			}
-		}
-	}
 	setup, err := json.Marshal(map[string]interface{}{
 		"directory": t.TempDir(), "endpoint": server.URL, "producer": producer.UUID,
 		"collection": collection.UUID, "revision": collection.Revision,

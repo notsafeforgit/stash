@@ -19,13 +19,17 @@ class Prepared:
 
 
 class Producer:
-    def __init__(self, outbox, lease, root, *, extractor_version):
+    def __init__(self, outbox, lease, root, *, extractor_version, configuration_check=None):
         lease.check()
         run = lease.run
         if (outbox.producer != lease.client.producer or outbox.endpoint != lease.client.endpoint
                 or run["operation"] != "download" or run.get("root_uuid") is None):
             raise InvalidData("Producer must own a download run at its permitted media root")
         self.outbox, self.lease, self.root = outbox, lease, root
+        if configuration_check is not None and not callable(configuration_check):
+            raise InvalidData("Invalid worker configuration check")
+        self.configuration_check = configuration_check or (lambda: None)
+        self.failure_code = None
         self.window = SourceWindow(run.get("window"))
 
         self.path_prefix = run["path_prefix"]
@@ -47,6 +51,7 @@ class Producer:
     def check(self):
         self.lease.check()
         self.root.verify()
+        self.configuration_check()
 
     def relative(self, path):
         relative = self.root.relative(path)

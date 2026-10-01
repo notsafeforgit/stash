@@ -51,6 +51,7 @@ class Outbox:
             raise InvalidData("Outbox capacity must be positive")
         self.max_events, self.max_bytes, self.clock = max_events, max_bytes, clock
         path = Path(path).absolute()
+        self.path = path
         # The directory is provisioned by the runner. Do not silently create a
         # replacement on an absent mount or follow a substituted database link.
         fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)

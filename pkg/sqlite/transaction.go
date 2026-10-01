@@ -88,6 +88,11 @@ func (db *Database) Commit(ctx context.Context) error {
 		return err
 	}
 
+	if writable, _ := ctx.Value(writableKey).(bool); writable && db.Version() >= NativeSchemaBaseline+16 {
+		if err := validateCapturePublisherCommit(ctx); err != nil {
+			return err
+		}
+	}
 	if writable, _ := ctx.Value(writableKey).(bool); writable && db.Version() >= NativeSchemaBaseline+14 {
 		if err := validateAccountConsolidationCommit(ctx); err != nil {
 			return err
@@ -183,6 +188,7 @@ func (db *Database) Repository() models.Repository {
 		SourceAccount:          &SourceAccountStore{},
 		MediaRoot:              &MediaRootStore{},
 		SourceCollection:       &SourceCollectionStore{},
+		CapturePublisher:       &CapturePublisherStore{},
 		SourceEvidence:         &SourceEvidenceStore{},
 		SourceAttachment:       &SourceAttachmentStore{},
 		SourceGallery:          &SourceGalleryStore{gallery: db.Gallery},

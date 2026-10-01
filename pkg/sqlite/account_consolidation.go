@@ -158,9 +158,7 @@ func (s *SourceAccountStore) PreviewConsolidation(ctx context.Context, source, d
 	for _, id := range ret.Identifiers {
 		// Only opaque stable-ID claims conflict. Several historical handles and
 		// profile locators are normal; they never justify consolidation by name.
-		stable := id.Reference.Kind == "id" ||
-			(id.Reference.Kind == "secUid" && id.Reference.Namespace == "native:tiktok") ||
-			(id.Reference.Kind == "user" && strings.HasPrefix(id.Reference.Namespace, "mirror:"))
+		stable := stableAccountReference(id.Reference)
 		if !stable {
 			continue
 		}

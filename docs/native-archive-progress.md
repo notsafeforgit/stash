@@ -49,13 +49,14 @@ review. Production has not been migrated.
 | Stash `f96577925` | Reviewed source-account consolidation with retained identity evidence and ownership history; full-copy reconciliation and complete validation gate passed |
 | Stash `05105cb15` | Versioned captured-account claims across native/mirror services and unfamiliar extractors; complete validation gate and CI lint/build passed |
 | Stash `e3db87bec` / `7f2a87c09` | Explicit source album extraction and current documentation; complete validation gate, CI lint/build, and preview image publication passed |
+| Stash `d2d6fcf9f` | Revisioned logical roots and source collections, confined file opening, and intake provenance; full-copy reconciliation, complete validation gate, CI lint/build, and preview image publication passed |
 
 ## Phase status
 
 | Phase | Status |
 | --- | --- |
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
-| 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries and metadata relationship targets, native account/ownership storage and reviewed consolidation, shared post/profile/capture storage, ordered attachment manifests, audited media associations, reviewed source-list selection, and source-gallery synchronization with manual membership intent are implemented. Scalar and relationship field choices protect explicit and preserved metadata. Revisioned logical roots and source collections now retain capture/manual-intake provenance. Producer identity matching, policy resolution, review APIs/UI and remaining domain services are in progress. |
+| 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries and metadata relationship targets, native account/ownership storage and reviewed consolidation, shared post/profile/capture storage, ordered attachment manifests, audited media associations, reviewed source-list selection, and source-gallery synchronization with manual membership intent are implemented. Scalar and relationship field choices protect explicit and preserved metadata. Revisioned logical roots and source collections retain capture/manual-intake provenance; captured publisher choices now connect source evidence to accounts independently of depicted performers. Producer identity matching, policy resolution, review APIs/UI and remaining domain services are in progress. |
 | 2 Ingestion and producer adapter | Not yet implemented |
 | 3 Catalog importer and full-copy reconciliation | Not yet implemented |
 | 4 Native UI and client conversion | Not yet implemented |
@@ -648,3 +649,48 @@ includes that correction.
 
 Native API/UI, folder/batch defaults, ingestion, and catalog import remain
 required; production has not changed.
+
+## Captured publishers and account resolution
+
+Migration 1000016 adds publisher choices, replay identity, current selections,
+and references to the captured identifier evidence used by each choice. The
+service verifies one stored capture and uses qualified IDs to reuse or create
+accounts. Handle-only candidates and conflicting IDs remain for review; explicit
+unlinks survive automatic processing. Review can select a publisher without
+merging account records. Current reads follow later account consolidation while
+preserving the original association.
+
+Publisher identity does not assign performers or change account ownership.
+Post/profile bodies remain shared. Preview signatures cover relevant identity
+changes and current choices while ignoring unrelated observation counters, so
+ongoing scrapes of the same account do not constantly invalidate review. An
+account-leading identifier index and a post-first capture query keep checks
+scoped to the affected records. Candidate previews are bounded and disclose
+truncation; direct target lookup remains available for explicit review.
+
+Focused fixtures passed for allocation and ID reuse, handle changes/reuse,
+ambiguous IDs, TikTok secondary-ID contradictions, native/mirror namespace
+separation, missing/malformed claims, explicit unlink/inherit, stale review,
+unrelated captures, exact/conflicting replay, account consolidation, source
+retirement, late-error rollback, startup refusal, anonymisation, pagination,
+and query plans. A populated actual schema-15 fixture retains signed captures,
+shared profiles, identifiers, logical roots, and collection associations through
+migration, then successfully resolves its publisher.
+
+The isolated 1,473,081,344-byte library copy migrated from 1000015 to 1000016 in
+0.606 seconds. Streaming semantic digests matched all 111 retained tables, with
+zero foreign-key violations and no file-size growth. Migration left all four
+publisher tables empty rather than inventing associations. The private receipt
+is `.local/native-archive-rehearsal-20260930/capture-publishers-reconciliation.json`.
+The copy still has no imported catalogs; populated fixtures separately verify
+actual source captures and existing associations.
+
+The complete `make validate-fork` gate passed on the final implementation:
+generation, frontend validation and all 528 UI tests, retained v3 extension
+contracts and 71 current application operation files, Go lint with zero issues,
+and all Go unit/integration packages. The SQLite suite completed in 567.3 seconds.
+The initial focused query-plan fixture caught a broad decision scan; the final
+query fixes its join order to start with the selected post's indexed captures.
+
+Native producer/API integration, review UI, account-profile presentation,
+metadata policies, and catalog import remain required. Production has not changed.

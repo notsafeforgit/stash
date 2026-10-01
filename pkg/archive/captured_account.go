@@ -16,19 +16,8 @@ const CapturedAccountPolicy = "captured-account-v1"
 
 // CapturedAccount contains claims from one captured publisher. It does not
 // choose an account UUID, establish ownership, or assign depicted performers.
-type CapturedAccount struct {
-	Policy      string                      `json:"policy"`
-	Namespace   string                      `json:"namespace"`
-	Label       string                      `json:"label"`
-	Identifiers []CapturedAccountIdentifier `json:"identifiers"`
-}
-
-type CapturedAccountIdentifier struct {
-	Reference models.AccountReference `json:"reference"`
-	Basis     string                  `json:"basis"`
-	// Path locates the value in the original, reconstructed capture JSON.
-	Path string `json:"path"`
-}
+type CapturedAccount = models.CapturedAccount
+type CapturedAccountIdentifier = models.CapturedAccountIdentifier
 
 type capturedField struct {
 	value interface{}
@@ -65,7 +54,7 @@ func capturedIdentifierValue(field capturedField) (string, error) {
 	return "", fmt.Errorf("captured identifier at %s must be a string or integer", field.path)
 }
 
-func (a *CapturedAccount) add(field capturedField, kind, basis string) error {
+func addCapturedAccountIdentifier(a *CapturedAccount, field capturedField, kind, basis string) error {
 	value, err := capturedIdentifierValue(field)
 	if err != nil || value == "" {
 		return err
@@ -190,16 +179,16 @@ func ExtractCapturedAccount(raw []byte) (*CapturedAccount, error) {
 	if !ValidAccountNamespace(result.Namespace) {
 		return nil, errors.New("captured account has an invalid service namespace")
 	}
-	if err := result.add(id, idKind, basis); err != nil {
+	if err := addCapturedAccountIdentifier(result, id, idKind, basis); err != nil {
 		return nil, err
 	}
 	if len(result.Identifiers) == 0 {
 		return nil, nil
 	}
-	if err := result.add(secondary, "secUid", basis); err != nil {
+	if err := addCapturedAccountIdentifier(result, secondary, "secUid", basis); err != nil {
 		return nil, err
 	}
-	if err := result.add(handle, "handle", basis); err != nil {
+	if err := addCapturedAccountIdentifier(result, handle, "handle", basis); err != nil {
 		return nil, err
 	}
 	if label := capturedAccountLabel(handle); label != "" {
@@ -213,7 +202,7 @@ func ExtractCapturedAccount(raw []byte) (*CapturedAccount, error) {
 		if profileID == result.Identifiers[0].Reference.Value && service == data["service"] {
 			// Preserve the advertised public identifier in the mirror's namespace.
 			// Neither it nor the display name proves a native service account ID.
-			if err := result.add(capturedFieldAt(profile, profilePath, "public_id"), "public_id", "captured-mirror-public-id"); err != nil {
+			if err := addCapturedAccountIdentifier(result, capturedFieldAt(profile, profilePath, "public_id"), "public_id", "captured-mirror-public-id"); err != nil {
 				return nil, err
 			}
 		}

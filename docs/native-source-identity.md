@@ -57,3 +57,62 @@ Tests cover the named services, unfamiliar extractors, native/mirror separation,
 TikTok secondary IDs, Reddit parent context, misleading feed profiles, exact large
 IDs, malformed input, replay, unchanged extractor input bytes, and unchanged
 identity after source-retention reduction or irrelevant counters change.
+
+## Publisher decisions
+
+Native schema 1000016 adds `CapturePublisher.Preview` and `Apply` repository
+operations. They load and verify one retained capture, derive its account claims,
+and query only the corresponding identifiers and selected account. They never
+assign scene/image performers or change account ownership. A post can expose
+several selected publisher accounts for review; the service does not guess a
+single owner from contradictory captures.
+
+| Preview action | Meaning |
+| --- | --- |
+| `create` | A captured ID has no matching account or locator candidate. Automatic processing may create a source account. |
+| `link` | Captured ID claims resolve to one canonical account, without a contradictory claimed ID kind on that account. Other handle matches remain visible candidates. |
+| `review` | IDs are ambiguous/contradictory, only locator candidates match, or the capture's service contradicts known post identifiers. |
+| `unavailable` | The capture has no usable ID, has a malformed claim, or its post is forgotten. Existing evidence remains retained. |
+| `preserve` | A linked or explicitly unlinked decision already exists. Automatic processing leaves it intact. |
+
+Handles and mirror public identifiers alone cannot establish equivalence. A
+reviewer can select a candidate, choose a new account for a reused handle when
+no captured ID already matches, unlink a capture's publisher, or return the
+capture to automatic selection. Manual choices can resolve an ambiguous match
+for that capture without merging accounts or removing other candidate evidence.
+A selected account with contradictory IDs of the same claimed kind requires
+account reconciliation; this operation cannot overwrite its identifiers.
+Qualified native/mirror namespaces remain separate. A manual choice may also
+supply a publisher when machine-readable identity is missing, with explicit
+review provenance rather than fabricated source claims.
+
+Preview signatures cover the capture, current choice, relevant candidates,
+canonical identities, display labels, and contradictions. New competing IDs or
+account consolidation invalidate stale review. Unrelated observations of the
+same account do not: its general observation revision and creation time are
+excluded from the signature. Candidate display is bounded at 100 and reports
+truncation. Full candidate paging uses the existing qualified identifier lookup;
+explicit review can select a target directly by UUID. Post-account queries begin
+with the selected post's indexed capture range rather than scanning all decisions.
+
+Apply requires a stable request UUID and the preview signature. Replaying the
+same successful request returns its original decision even after a later unlink
+or account consolidation; it does not reapply the old choice. Changed input
+with that UUID is rejected. Automatic apply is valid only for a `create` or
+`link` preview. For `preserve`, callers use the existing decision without making
+another write or history entry. A later explicit `inherit` decision permits a
+fresh automatic selection.
+
+Decisions and evidence references are immutable. Identifier evidence records the
+capture UUID, parser policy, source JSON pointer, and observed timestamp. Joined
+claim records identify exactly which evidence a decision used; the source post
+and profile bodies stay shared. Original account associations remain history
+while current queries follow canonical accounts after consolidation. Durable
+write context prevents a late failure from committing a new account or only
+some claims when a caller ignores an error. Startup also checks publication
+integrity. Anonymised exports remove publisher decisions and evidence references.
+
+This service does not expose a public endpoint yet. Producer authorization,
+ingestion receipts, native review UI, account-profile presentation, and catalog
+import remain required integration work. The migration does not invent publisher
+choices from old paths, names, or existing account ownership.

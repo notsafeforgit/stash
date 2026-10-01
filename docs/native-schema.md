@@ -557,6 +557,37 @@ these repositories directly. The migration fabricates no collections or intake
 history from existing paths. Anonymised exports remove root bindings, collection
 definitions, and intake provenance with the other private source evidence.
 
+Migration 1000016 adds `capture_publisher_decisions`, current
+`capture_publisher_heads`, and references to the identifier evidence used by each
+choice. Capture publishers are source accounts, independently of their performer
+owners and media attribution. Decisions retain linked, unlinked, and undecided
+states, origin, policy, reason, and replay identity. Original account UUIDs remain
+historical associations; current reads follow account consolidation.
+
+The publisher service verifies and reconstructs one capture, derives qualified
+claims, and uses targeted identifier queries. Unique captured IDs can reuse an
+account; unmatched IDs with no locator candidates can create one. Handle-only,
+ambiguous, contradictory, and cross-namespace evidence remains reviewable.
+Explicit review may select an account, create a distinct account for a reused
+handle, unlink, or return to automatic selection. Existing explicit unlinks are
+protected. No operation assigns depicted performers or changes ownership.
+See [publisher decision semantics](native-source-identity.md#publisher-decisions).
+
+The new `source_account_identifiers_canonical_kind` index begins with canonical
+account UUID so checking one account's claimed ID kinds cannot scan an entire
+service. Post-account queries constrain the capture range before joining current
+choices. Preview signatures omit unrelated observation counters while retaining
+relevant identity changes, current selections, and candidate ambiguity.
+
+SQL guards publish consecutive immutable decisions and checked heads atomically.
+Deferred foreign keys require a head for every decision. A durable write context
+blocks partial commits after account allocation or evidence recording fails;
+startup rejects unfinished writes and inconsistent publication. Request digests
+make exact replay return the original result, without restoring an old choice
+over a newer one. Anonymised exports remove these private histories before
+removing captures and accounts. Migration creates no publisher choices for
+existing captures; ingestion and catalog import must establish their evidence.
+
 The filesystem deletion journal currently derives its directory from the
 database filename. Promotion in place retains that association, but a production
 path change must first drain pending deletions or transfer the exact journal

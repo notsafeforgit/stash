@@ -48,13 +48,14 @@ review. Production has not been migrated.
 | Stash `b2ecfe605` | Typed metadata relationships and coalesced collection choices; full-copy reconciliation, complete validation gate, CI lint/build, and preview image publication passed |
 | Stash `f96577925` | Reviewed source-account consolidation with retained identity evidence and ownership history; full-copy reconciliation and complete validation gate passed |
 | Stash `05105cb15` | Versioned captured-account claims across native/mirror services and unfamiliar extractors; complete validation gate and CI lint/build passed |
+| Stash `e3db87bec` / `7f2a87c09` | Explicit source album extraction and current documentation; complete validation gate, CI lint/build, and preview image publication passed |
 
 ## Phase status
 
 | Phase | Status |
 | --- | --- |
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
-| 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries and metadata relationship targets, native account/ownership storage and reviewed consolidation, shared post/profile/capture storage, ordered attachment manifests, audited media associations, reviewed source-list selection, and source-gallery synchronization with manual membership intent are implemented. Scalar and relationship field choices protect explicit and preserved metadata. Producer identity matching, policy resolution, review APIs/UI and remaining domain services are in progress. |
+| 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries and metadata relationship targets, native account/ownership storage and reviewed consolidation, shared post/profile/capture storage, ordered attachment manifests, audited media associations, reviewed source-list selection, and source-gallery synchronization with manual membership intent are implemented. Scalar and relationship field choices protect explicit and preserved metadata. Revisioned logical roots and source collections now retain capture/manual-intake provenance. Producer identity matching, policy resolution, review APIs/UI and remaining domain services are in progress. |
 | 2 Ingestion and producer adapter | Not yet implemented |
 | 3 Catalog importer and full-copy reconciliation | Not yet implemented |
 | 4 Native UI and client conversion | Not yet implemented |
@@ -599,3 +600,51 @@ completed in 394.2 seconds.
 See [native source albums](native-source-albums.md). No schema migration is
 required for the parser. Producer integration, catalog backfill, native API/UI,
 and source-to-file verification remain required; production has not changed.
+
+## Logical media roots and source collections
+
+Migration 1000015 gives roots and scrape/manual collections stable UUIDs,
+revision-checked definitions, immutable history, and bounded indexed queries.
+Collection targets remain separate from performer attribution. Purchased MP4
+batches can retain intake provenance without creating an account or source post;
+aggregator/feed collections can share captures without assigning their publisher
+as a depicted performer. Historical target URLs return current collection
+candidates rather than establishing unique identity.
+
+Media roots retain identity when a deployment binding changes. File opening
+checks the actual open directory identity and confines paths to it; inactive or
+unbound roots, replaced mounts, escaping symlinks, nonregular files, and `.part`
+paths are rejected. A file descriptor opened before a rename still references
+the original file. Authorization, complete-file verification, and producer
+receipts remain separate required checks for the ingestion service.
+
+Capture provenance pins collection revisions. Manual intake uses replayable
+event UUIDs, typed scene/image references, and original submitted UUIDs retained
+through archive UUID adoption. Deleted media retain their evidence via
+tombstones. These operations do not edit metadata or gallery membership. SQL
+revision guards and deferred foreign keys prevent stale publication and orphan
+identities; anonymised exports remove private definitions and provenance.
+
+Focused tests passed for mount replacement, symlink confinement, regular-file
+checks, descriptor identity, stale edits, retirement, URL ambiguity, indexed
+lookup, composite pagination, ignored-error rollback, exact/conflicting replay,
+UUID adoption, deletion, populated migration, and anonymisation. The filesystem
+package also compiled for Windows.
+
+The isolated full-library copy migrated from 1000014 to 1000015 in 0.885 seconds.
+Streaming semantic digests matched all 105 retained tables, with zero foreign-key
+violations and no invented rows in the six new tables. The 1,473,081,344-byte file
+did not grow; 110,706,688 bytes remain reusable. The private receipt is
+`.local/native-archive-rehearsal-20260930/source-collections-reconciliation.json`.
+The copy still has no imported catalogs; populated fixtures separately cover
+actual collection histories and intake records.
+
+The complete `make validate-fork` gate passed on the final implementation:
+generation, frontend validation and all 528 UI tests, retained v3 extension
+contracts and 71 current application operation files, Go lint with zero issues,
+and all Go unit/integration packages. The SQLite suite completed in 499.6 seconds.
+An initial validation run found a test cursor-cleanup lint issue; the final gate
+includes that correction.
+
+Native API/UI, folder/batch defaults, ingestion, and catalog import remain
+required; production has not changed.

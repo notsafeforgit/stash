@@ -181,6 +181,8 @@ func (db *Database) Repository() models.Repository {
 		ConfigurationMigration: &ConfigurationMigrationStore{},
 		ArchiveEntity:          &ArchiveEntityStore{},
 		SourceAccount:          &SourceAccountStore{},
+		MediaRoot:              &MediaRootStore{},
+		SourceCollection:       &SourceCollectionStore{},
 		SourceEvidence:         &SourceEvidenceStore{},
 		SourceAttachment:       &SourceAttachmentStore{},
 		SourceGallery:          &SourceGalleryStore{gallery: db.Gallery},

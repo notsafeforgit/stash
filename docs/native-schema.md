@@ -503,6 +503,60 @@ account as its own canonical identity and invents no consolidations.
 Producer evidence matching, account-review API/UI, and catalog import remain
 separate required integration work; no new public endpoint exposes these stores.
 
+Migration 1000015 adds logical `media_roots` and `source_collections`, each with
+an immutable definition history and a current revision. Root UUIDs survive mount
+changes; a nullable server binding records the local absolute path and directory
+identity. Collections describe account targets, feeds, subreddits, searches,
+manual batches, directories, legacy catalogs, or other collections. They may
+reference a qualified account and a root-relative directory prefix. These
+relationships do not establish depicted performers, gallery membership, or
+permission to ingest files.
+
+Updates compare the reviewed revision and retain origin/reason. Repeating an
+unchanged definition at its current revision is a no-op. Disabled definitions
+can be reactivated; retirement is permanent. The root and collection creation
+transactions must publish revision one before commit: deferred foreign keys
+prevent an ignored late error from committing an incomplete identity. SQL guards
+require consecutive immutable revisions and startup rejects missing definitions.
+A collection account foreign key includes its service namespace. Consolidated
+account references retain their original identity and resolve through the
+account service when current ownership is needed.
+
+Target URLs are optional, exact HTTP(S) evidence without embedded credentials,
+not unique identities. Indexed lookup searches historical targets and returns
+current definitions, including disabled/retired definitions and multiple
+collections using the same URL. Matching a URL does not merge collections or
+permit automatically restarting one. Current lists and history have bounded
+keyset pagination.
+
+`source_collection_captures` pins each capture to the collection revision used
+for it. The same capture can belong to several collections or historical
+revisions; pagination includes both capture UUID and revision. Direct media
+intake instead uses `source_collection_media_intake`: a stable event UUID, pinned
+collection revision, typed scene/image UUID, origin, and reason. It needs no
+invented source post or account and makes no metadata changes. Exact replay
+returns the retained event; a changed payload using that UUID is rejected.
+Media references follow archive UUID adoption while the submitted UUID is
+retained for original-event replay. Deletion tombstones preserve provenance.
+These are evidence records, not editable collection membership or proof of a
+finished download. Retired definitions may receive late historical evidence.
+
+The filesystem helper probes an open root directory and compares that identity
+when opening a file. It rejects an inactive/unbound root, a replaced mount,
+noncanonical relative paths, `.part` names, escaping symlinks, and nonregular
+files. Returned descriptors stay bound to the opened file through path renames.
+Unix opens are nonblocking to prevent a replacement FIFO from hanging a worker.
+New bindings and reactivation require a successful probe; disabling an offline
+binding or changing its label does not require its mount to be available.
+Portable imports can retain unbound logical roots for later deployment binding.
+
+Producer authorization, pinned work scopes, final-file stability/hash/probe
+checks, durable receipts, folder/batch metadata defaults, API/UI, and catalog
+import remain subsequent integration work. No producer-facing endpoint exposes
+these repositories directly. The migration fabricates no collections or intake
+history from existing paths. Anonymised exports remove root bindings, collection
+definitions, and intake provenance with the other private source evidence.
+
 The filesystem deletion journal currently derives its directory from the
 database filename. Promotion in place retains that association, but a production
 path change must first drain pending deletions or transfer the exact journal

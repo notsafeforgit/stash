@@ -383,7 +383,8 @@ shell command strings from API callers.
 The server is the only writer of authoritative source, identity, and library
 tables. Gallery-dl and n8n submit events; they never write Stash SQLite directly.
 Provide separate Stash API tokens scoped to ingestion and permitted roots.
-Revoking one stops that producer's access to Stash. Website logins and cookies
+API-token revocation means disabling a producer's access to Stash's own API;
+it does not mean Stash manages credentials for scraped services. Website logins and cookies
 remain with gallery-dl; Stash does not store or revoke those credentials.
 Producer tokens stay in mounted secrets/environment references, outside catalog
 payloads, jq samples, exported source configs, and logs.

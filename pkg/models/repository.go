@@ -41,6 +41,7 @@ type Repository struct {
 	SourceRun              SourceRunReaderWriter
 	SourceBackfill         SourceBackfillReaderWriter
 	ScanJournal            ScanJournalReaderWriter
+	CatalogIdentityImport  CatalogIdentityImportReaderWriter
 	SourceEvidence         SourceEvidenceReaderWriter
 	SourceAttachment       SourceAttachmentReaderWriter
 	SourceGallery          SourceGalleryReaderWriter

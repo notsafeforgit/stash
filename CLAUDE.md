@@ -317,6 +317,15 @@ External workers still need the supported adapter, durable outbox and shared
 filesystem locks before host/n8n launch paths switch to it. Website credentials
 remain in those worker environments.
 
+`CatalogIdentityImport` imports a frozen performer registry through a reviewed
+plan in native schema 1000028. It adopts saved catalog UUIDs, preserves historical
+redirects, and imports explicitly bound account choices without overwriting
+native metadata or later ownership decisions. Every original row has an outcome;
+unbound/conflicting identities remain review evidence. One registry/namespace
+cutover has an immutable replay receipt. Never infer account services or ownership
+from directory labels or restore old plugin links over explicit unlinks. See
+[registry import](docs/native-source-identity.md#importing-the-performer-registry).
+
 ### v3 extension points
 
 See `ui/v3/docs/architecture.md` for the current module map and compatibility rules. List configurations require a discriminated GraphQL/local `source`; generated query variables remain typed through the data hook. Layout, preferences, query state, and cache refill live in separate list modules. Player transition policy consumes plain buffered/seekable state in `scene-player-transitions.ts`; media effects, recovery, and transcode leases are separate hooks. Keep the stable player root and existing iOS seek/timeline behavior when extending these modules.

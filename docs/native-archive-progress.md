@@ -2123,3 +2123,83 @@ Validation logs are `scan-activation-validation-verified.log`,
 the focused database logs under `/tmp/stash-native-transition`; rehearsal logs
 are `scan-activation-migration.log`, `scan-activation-reconciliation.log` and
 `scan-activation-real-activation.log`. Parent `298ac862a` passed all three CI jobs.
+
+## Reviewed performer-registry import
+
+Schema 1000028 imports the five performer-registry families and both older
+plugin-binding families through an application-only preview/apply API. The
+`stash-import-catalog-identities` command reads one frozen SQLite snapshot,
+inventories every supported table/column, and requires a reviewed server plan
+before applying changes. Original JSON text and all row outcomes remain retained;
+the account map is temporary migration input, not a restored plugin setting.
+
+Saved catalog UUIDs are adopted by explicitly bound local performers while
+selected metadata and local IDs remain unchanged. Historical catalog redirects
+record already-completed merges without deleting or recreating local performers.
+Missing/reused IDs, competing bindings, UUID collisions, and unbound identities
+remain review records. Foreign-library IDs are never interpreted locally.
+Explicitly mapped accounts import saved links/unlinks or reuse an equal native
+decision; later native choices and contradictory saved alternatives require
+review. Older plugin bindings covered by their migration receipt cannot resurrect
+a later unlink. A late write error rolls back all domain and receipt changes,
+even if a caller accidentally swallows the error.
+
+Receipts preserve the reviewed plan after response loss, restart and subsequent
+native edits. A second snapshot cannot replay the same source-registry/namespace
+cutover. Each source row has a previewed outcome; retained evidence is available
+through bounded record pages. Anonymised exports remove the import evidence.
+Unresolved records need native review operations in a later increment. Bulk
+account-identifier/source routing import and the other catalog families remain
+separate required work; this is not the complete catalog migration.
+
+The private rehearsal is in
+`.local/native-performer-registry-rehearsal-20261001/`. It contains a read-only
+backup of the actual registry, its complete table inventory, exact prepared/bound
+inputs, preview, immutable receipt, original records, reconciliation reports and
+helper source. The library copy migrated from 1000027 to 1000028 in 0.069857
+seconds. All 140 existing tables matched before import, with zero foreign-key
+violations and zero size growth; that comparison took 53.614 seconds.
+
+The actual registry contains four performer identities, four local bindings,
+five saved account choices, fourteen identity events, one migration receipt,
+and two older plugin rows: thirty retained records. All four performer UUIDs
+were adopted. Elizabeth Tran retained catalog UUID
+`1d8d50be-1de6-4320-8725-b617f8ceb062`, local performer 721, and the existing
+canonical name/aliases. This registry has no recorded UUID redirects or merge
+events for the older imelizabethtran merge; the importer preserved its survivor
+and historical names without inventing a deleted performer identity.
+
+One native Twitter account was explicitly prepared from the registry's captured
+ID/handle evidence for account 742448640, then linked to that surviving performer.
+The other four saved account choices were retained for review pending native
+account mapping. This includes the directory-derived Instagram label, which was
+not silently converted into a service identity. Import and exact replay took
+0.011440 seconds; reopening retained the same receipt. The outcomes were nine
+mapped rows, fifteen copied historical rows, four review rows and two superseded
+plugin rows.
+
+The post-import comparison checked all 140 preexisting tables. Selected library
+metadata and all 1,542,046 other archive entities matched exactly; only the four
+reviewed UUID adoptions/redirects and the prepared account/ownership records
+changed. All thirty source rows matched their frozen evidence, with no unexpected
+differences or foreign-key violations. Reconciliation took 97.796 seconds. These
+are local rehearsal measurements, not production latency guarantees.
+
+The compatible deployment, live registry/library, workers and n8n workflows
+remain unchanged. Parent `f5f70f5dc` passed all three CI jobs. `make validate-fork`
+passed: 528 v3 tests in 91 files, native application contracts, 204 producer tests,
+zero Go lint issues and the complete Go suite. The producer suite also passed on
+the host's Python 3.12 runtime (6.165 seconds). After the final transaction guard,
+the focused SQLite tests, real Go/Python HTTP replay test and Go lint passed again.
+
+Coverage includes response loss, restart, native edits after successful import,
+stale previews, changed historical local bindings, explicit unlinks, preserved
+native choices, competing catalog identities, missing/cyclic redirects, conflicting
+and coalesced account mappings, unchanged selected metadata, late failure rollback,
+swallowed-error rollback, strict snapshot shapes, and anonymised evidence removal.
+The main log is `catalog-identity-validation.log`; final focused evidence is in
+`catalog-identity-atomic-final.log`, `catalog-identity-http-final.log`,
+`catalog-identity-lint-final.log`, and `catalog-identity-python312.log`. Rehearsal
+logs are `catalog-identity-migration.log`, `catalog-identity-reconciliation.log`,
+`catalog-identity-real-import.log` and `catalog-identity-import-reconciliation.log`,
+all under `/tmp/stash-native-transition`.

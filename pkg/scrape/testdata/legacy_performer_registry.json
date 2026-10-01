@@ -1,0 +1,33 @@
+{
+  "captured_at": "2026-09-30T12:00:00Z",
+  "tables": {
+    "performer_identities": [
+      {"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","profile_json":"{\"name\":\"Survivor\",\"alias_list\":[\"Former name\",\"Alias\"],\"urls\":[\"https://example.test/profile\"],\"large_id\":9007199254740993}","redirect_to":null,"created_at":"2025-01-01T00:00:00Z","updated_at":"2026-09-29T00:00:00Z"},
+      {"id":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","profile_json":"{\"name\":\"Former name\"}","redirect_to":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","created_at":"2025-01-01T00:00:00Z","updated_at":"2026-09-29T00:00:00Z"},
+      {"id":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","profile_json":"{\"name\":\"No local binding\"}","redirect_to":null,"created_at":"2025-01-01T00:00:00Z","updated_at":"2026-09-29T00:00:00Z"}
+    ],
+    "performer_identity_bindings": [
+      {"namespace":"stash","performer_id":"71","identity_id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","profile_json":"{\"name\":\"Survivor\"}","redirect_to":null,"updated_at":"2026-09-29T00:00:00Z"},
+      {"namespace":"stash","performer_id":"999","identity_id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","profile_json":"{\"name\":\"Former name\"}","redirect_to":"71","updated_at":"2026-09-29T00:00:00Z"},
+      {"namespace":"another-library","performer_id":"71","identity_id":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","profile_json":"{\"name\":\"Not a local performer\"}","redirect_to":null,"updated_at":"2026-09-29T00:00:00Z"}
+    ],
+    "performer_account_associations": [
+      {"account_key":"twitter:id:9007199254740993","identity_id":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","source":"review","reason":"Previously reviewed link","updated_at":"2026-09-29T00:00:00Z"},
+      {"account_key":"reddit:handle:deliberately-unlinked","identity_id":null,"source":"review","reason":"Explicit unlink","updated_at":"2026-09-29T00:00:00Z"},
+      {"account_key":"instagram (from aggregator reddit):handle:someone","identity_id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","source":"review","reason":"Legacy directory locator","updated_at":"2026-09-29T00:00:00Z"}
+    ],
+    "performer_identity_events": [
+      {"id":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","kind":"merge","payload_json":"{\"source\":\"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb\",\"target\":\"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\"}","created_at":"2026-09-29T00:00:00Z"}
+    ],
+    "performer_identity_migrations": [
+      {"name":"catalog-metadata-links-v1","summary_json":"{\"profiles\":1,\"account_links\":1,\"conflicts\":[]}","completed_at":"2026-09-28T00:00:00Z"}
+    ],
+    "catalog_metadata_performers": [
+      {"namespace":"stash","performer_id":"71","profile_json":"{\"name\":\"Old profile\"}","redirect_to":null}
+    ],
+    "catalog_metadata_accounts": [
+      {"namespace":"stash","account_key":"reddit:handle:deliberately-unlinked","performer_id":"71"}
+    ]
+  },
+  "external_tables": {"catalogs":2,"routes":3,"links":0,"account_identifiers":1,"account_identifier_checkpoints":2,"account_profile_urls":0}
+}

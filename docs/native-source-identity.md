@@ -116,3 +116,70 @@ This service does not expose a public endpoint yet. Producer authorization,
 ingestion receipts, native review UI, account-profile presentation, and catalog
 import remain required integration work. The migration does not invent publisher
 choices from old paths, names, or existing account ownership.
+
+## Importing the performer registry
+
+Schema 1000028 adds a reviewed import of a frozen registry's five performer
+identity tables and its two older `catalog_metadata_*` tables. Existing catalog
+performer UUIDs become the UUIDs of their explicitly bound native performers;
+the previous native UUIDs remain resolvable redirects. Local performer IDs,
+selected names, aliases, URLs and other library metadata are preserved. Saved
+catalog profiles, events, bindings and migration receipts remain inspectable
+as original evidence rather than overwriting newer selected metadata.
+
+The import requires the original registry database UUID, a stable snapshot UUID,
+capture time, and the explicit namespace identifying this Stash library. Only
+saved local bindings or an existing exact catalog UUID identify a performer.
+Unbound identities, missing/reused local IDs, multiple active bindings and UUID
+collisions become review records. Bindings for other libraries remain external
+evidence; their integer IDs are never interpreted as local Stash IDs. Historical
+catalog UUID redirects preserve an already-completed merge without deleting or
+recreating local performers. An old local merge ID that exists again is reported
+for review and is left intact.
+
+An optional, reviewed account map connects each exact old account key to a native
+source-account UUID. This is a one-time migration input, not a plugin setting or
+a second live ownership registry. Unmapped keys remain review records, including
+directory-derived labels whose service identity cannot be asserted. Captured
+account-identifier import and source routing are separate migration work; this
+operation does not infer native IDs, handles or service namespaces from a key.
+
+Saved associations and explicit unlinks become native ownership decisions only
+when both sides are resolved. A `migration_conflict` placeholder remains review,
+not a deliberate unlink. Existing native ownership choices are preserved: an
+equal choice maps to the existing decision, while a differing choice needs review.
+Several old keys mapped to one account coalesce equal choices and report
+contradictory ones. The `catalog-metadata-links-v1` receipt makes older plugin
+bindings superseded evidence, so they cannot resurrect later unlinks. A registry
+containing only the older plugin tables is retained for reconciliation.
+
+The application API exposes these maintenance operations:
+
+| Method and path under `/api/v3/archive` | Result |
+| --- | --- |
+| `POST /catalog-identity-imports/preview` | Current identity/ownership actions and every original row's proposed outcome, plus the reviewed plan digest |
+| `POST /catalog-identity-imports` | Apply `{binding, expected_plan_sha256}` atomically and return the immutable receipt |
+| `GET /catalog-identity-imports/{uuid}` | Original receipt, including its frozen plan |
+| `GET /catalog-identity-imports/{uuid}/records?after=0` | Up to 100 original rows with retained evidence, outcomes and native references |
+
+These routes require application authorization; producer ingest tokens grant
+no access. Changed identities, ownership, bindings or snapshot bytes invalidate
+an uncommitted preview. A successful retry returns the original receipt even
+after a subsequent native edit. A different snapshot cannot replay the same
+registry/namespace cutover. Resolving retained review items is subsequent native
+review work, not permission to reapply old choices. The transaction cannot commit
+part of an import even if a caller accidentally swallows a write error.
+
+`stash-import-catalog-identities` inventories every table/column in one read-only
+SQLite transaction. It rejects unknown shapes and inventories the remaining
+catalog/routing/identifier tables for their later import. Original embedded JSON
+text and large IDs survive unchanged. Limits are 10,000 retained rows and an
+8 MiB document; inputs exceeding these limits need an explicit migration plan.
+
+Prepare from a frozen copy with `--registry`, `--source`, `--snapshot`,
+`--captured-at`, `--namespace`, and optionally `--account-bindings`. Save the
+output privately. Then use `--binding saved.json --endpoint URL` to obtain the
+server preview. Apply that saved preview using the same binding and endpoint,
+`--apply --expected-sha256 PLAN_SHA256`; retry the exact same input after response
+loss. The Stash application key is read from `STASH_API_KEY` (or `--api-key-env`),
+never from the registry payload. Website credentials remain with the scraper.

@@ -25,6 +25,7 @@ stash-ingest-n8n-config = "stash_ingest.n8n_migration:main"
 stash-import-n8n-receipts = "stash_ingest.n8n_receipt_import:main"
 stash-import-scan-journal = "stash_ingest.scan_journal_import:main"
 stash-activate-scan-journal = "stash_ingest.scan_activation:main"
+stash-import-catalog-identities = "stash_ingest.catalog_identity_import:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -46,6 +46,10 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Get("/scan-journals/{journal}", rs.scanJournal)
 	r.Get("/scan-journals/{journal}/records", rs.scanJournalRecords)
 	r.Get("/scan-journal-records/{record}", rs.scanJournalRecord)
+	r.Post("/catalog-identity-imports/preview", rs.previewCatalogIdentityImport)
+	r.Post("/catalog-identity-imports", rs.applyCatalogIdentityImport)
+	r.Get("/catalog-identity-imports/{import}", rs.catalogIdentityImport)
+	r.Get("/catalog-identity-imports/{import}/records", rs.catalogIdentityImportRecords)
 	return r
 }
 

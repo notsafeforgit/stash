@@ -75,7 +75,7 @@ local, and source completion remains distinct from verified media intake.
 Preserve conditional map order and layered private references; conversion does
 not activate a worker or replace the existing configuration files.
 `stash-ingest dispatch` discovers scoped work through the native API. Producer
-schema 6 retains pagination/backoff, caller URL snapshots and each ticket's original submission
+schema 7 retains pagination/backoff, caller URL snapshots and each ticket's original submission
 assignments. `ticket-status` checks completed source windows against those
 assignments; later rescans cannot complete an earlier cancelled ticket. Discovery
 and admission do not certify completion. Preserve existing request/event state
@@ -104,11 +104,14 @@ source row without creating source-run coverage. Native completion proves every
 component URL through the producer's original request hashes and completed
 windows. The maintenance importer validates a read-only journal snapshot and
 uses application-authorized batches; producer tokens cannot import historical
-assertions. Producer schema 6 commits each n8n history check and its source
+assertions. Producer schema 7 commits each n8n history check and its source
 snapshot together; later account history cannot replace that caller's original
 tickets. `stash-ingest-n8n-config` stages the known workflow graphs, preserving
 IDs, credential references and result branches while adding a durable wait.
-Activation, old operational receipt migration and recovery callers remain open.
+`stash-import-n8n-receipts` explicitly imports a reviewed frozen receipt snapshot
+into the producer outbox. Exact bytes and manifests survive replay; old tokens
+can be inspected locally but cannot become native completion proof or new work.
+Activation, remaining operational journal migration and recovery callers remain open.
 
 ## Architecture
 

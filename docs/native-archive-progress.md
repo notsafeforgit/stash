@@ -1896,3 +1896,78 @@ per-scan completions, deferred/ignored work and the other catalog families.
 Source registration, worker service configuration, profile/image activation,
 recovery callers and all later transition phases remain outstanding. Converted
 workflow files and profiles are staging artifacts, not a live deployment.
+
+## Retained legacy n8n receipts and concurrent outbox startup
+
+`stash-import-n8n-receipts` now validates a frozen receipt-directory snapshot
+before opening the destination outbox. Apply requires the reviewed input digest
+and a stable source UUID. One transaction retains every original token and JSON
+byte, its classification, and an immutable import manifest. Replay after a lost
+response preserves those records. Conflicting input bytes, source identities or
+native caller tokens roll back the whole import. Unknown directory entries,
+nonregular/changing files and malformed JSON block import; valid but unsupported
+result shapes remain review records. Bounded capacity never evicts history.
+
+Producer schema 7 adds `legacy_n8n_receipts` and `n8n_receipt_imports`. Promotion
+preserves populated earlier delivery, ticket, source-call and backfill tables,
+including pending leases and finished results. A native call cannot reuse an
+imported token. Inspection recognizes the original token locally without opening
+a network client or requiring the old directory. It distinguishes historical
+success, deliberate skip, failure and review. A recorded network block remains
+a failure even if the old child exited zero; this matters because the actual
+Reddit workflows inspect only `command_failed`. Raw original fields remain in
+the immutable receipt body. Historical results cannot be retried as native jobs.
+
+Receipts contain no account/execution identity, so the importer does not infer
+one from their log tails. It creates no source requests, permanent account
+decisions or native completion proof, and never certifies file intake. Original
+successful result flags remain historical claims. General producer status lists
+these receipts separately from current work. Saved n8n execution graphs still
+need drain/resume handling before their old command paths can be removed.
+
+The installed-image concurrency test exposed an existing startup race: another
+first opener could publish a schema between the version/application/table reads,
+causing a valid outbox to appear foreign. Those checks now use one SQLite read
+snapshot before the existing transactional migration and binding validation.
+A deterministic regression publishes the schema between those reads and verifies
+the original queued event survives. Concurrent receipt imports publish one
+manifest, and an injected mid-import failure leaves no partial rows.
+
+The actual source directory contained one 3,640-byte successful command receipt.
+Its private snapshot and rehearsal are in `.local/native-n8n-receipts-20261001/`.
+Import, replay, restart and packaged command inspection preserved its exact
+bytes and original token. Native events, requests, source calls and backfill
+calls stayed empty; integrity and foreign-key checks passed. No API requests or
+production writes occurred. Three synthetic failure/review cases joined that
+actual result in the real n8n evaluator: 166 expressions, 12 result branches and
+three durable Wait checkpoints passed across the three staged workflows.
+
+The full `make validate-fork` gate passed with 528 v3 tests in 91 files, native
+contract checks, all then-current 191 producer tests, zero Go lint issues and
+all Go tests (API 211.930 seconds, ingest 350.228 seconds, SQLite 329.835 seconds).
+After the startup fix, all 192 producer tests passed on Python 3.12 and 3.14 and
+inside the final installed n8n image. The real HTTP/download fixture was rerun
+for that fix. Logs are `n8n-receipts-validation.log`,
+`n8n-receipts-python312-final.log`, `n8n-receipts-python314-final.log`,
+`n8n-receipts-image-tests-final.log`, `n8n-receipts-http-final.log`,
+`n8n-receipts-actual-rehearsal.log`, `n8n-receipts-packaged-rehearsal.log` and
+`n8n-receipts-workflow-runtime.log` under `/tmp/stash-native-transition`.
+Parent commit `8454a0b7f` passed all three CI workflows.
+
+The final isolated image is
+`localhost/stash-n8n-native-rehearsal:receipts-final-20261001`, ID
+`acbc5b7077d6bd11e5da74e9abf4ffcddc0af7d16f7ca965d49ef0bfc2377761`.
+Its installed adapter fingerprint matches the workspace. Refreshed full-history
+Reddit/Twitter profiles under the rehearsal's `current/` directory match that
+runtime and retain the unregistered rehearsal root. Existing configuration and
+media mounts were read-only; no worker was activated. The live n8n container and
+`localhost/n8n:latest` remained on the original `2fcb84852f4a…` image.
+This increment adds no Stash database migration.
+
+The scan journal, extractor checkpoints, deferrals, per-scan/collection/policy
+completion records, historical handoffs and other catalog families remain to
+be migrated. A read-only audit found 907 queued scans, 28 extractor checkpoints,
+166 deferrals, one per-scan completion, four collection completions, one policy
+migration and no handoffs at inspection time. These are live changing counts,
+not a cutover boundary. Source registration, recovery callers, profile/service
+activation and subsequent transition phases remain outstanding.

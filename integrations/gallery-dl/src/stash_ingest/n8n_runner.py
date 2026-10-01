@@ -17,6 +17,7 @@ from .client import Client, Unavailable
 from .configuration import Configuration
 from .encoding import InvalidData, digest, encode, identifier
 from .outbox import Capacity, Outbox
+from .n8n_receipts import LegacyReceipts
 
 
 def execution_uuid(producer, mode, account, workflow, execution, node, item):
@@ -35,7 +36,7 @@ def main(argv=None):
     parser.add_argument("--endpoint", default=os.environ.get("STASH_INGEST_ENDPOINT"))
     parser.add_argument("--producer", default=os.environ.get("STASH_INGEST_PRODUCER"))
     parser.add_argument("--token-env", default="STASH_INGEST_TOKEN")
-    parser.add_argument("--inspect", help="Retained native result token; does not read old result files")
+    parser.add_argument("--inspect", help="Retained native or explicitly imported legacy result token")
     parser.add_argument("--mode", choices=backfills.MODES)
     parser.add_argument("--identity")
     parser.add_argument("--call", help="Explicit stable caller UUID instead of n8n execution context")
@@ -57,7 +58,13 @@ def main(argv=None):
             if args.inspect:
                 if (not re.fullmatch(r"[0-9a-f]{32}", args.inspect) or any(item is not None for item in context)
                         or any((args.mode, args.identity, args.call, args.profile, args.until))):
-                    raise InvalidData("Inspection requires only a retained native result token")
+                    raise InvalidData("Inspection requires only a retained result token")
+                legacy = LegacyReceipts(box).result(args.inspect)
+                if legacy is not None:
+                    if args.retry_reviewed:
+                        raise InvalidData("A historical command receipt cannot be retried as native work")
+                    print(json.dumps(legacy, sort_keys=True))
+                    return int(legacy["legacy_receipt"]["outcome"] in ("failed", "review")) if args.strict else 0
                 call = identifier(str(uuid.UUID(args.inspect)))
                 calls.result(call)  # Reject an unknown token before API access.
                 if args.retry_reviewed:

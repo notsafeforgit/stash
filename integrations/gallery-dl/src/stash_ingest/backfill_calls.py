@@ -68,6 +68,7 @@ class BackfillCalls:
         identifier(call_uuid)
         if not sha256(request_sha256):
             raise InvalidData("Backfill caller requires a stable request digest")
+        self._check_legacy_token(call_uuid)
         prior = self._find(call_uuid)
         if prior is not None:
             if prior["request_sha256"] != request_sha256:
@@ -75,6 +76,7 @@ class BackfillCalls:
             return self.result(call_uuid)
         body = encode(backfills.definition(prepare()), 8192)
         with self.box.transaction():
+            self._check_legacy_token(call_uuid)
             prior = self._find(call_uuid)
             if prior is not None:
                 if prior["request_sha256"] != request_sha256:
@@ -86,6 +88,10 @@ class BackfillCalls:
                 self.db.execute("""INSERT INTO backfill_calls(uuid,request_sha256,definition,definition_sha256,state,available_at,created_at)
                     VALUES(?,?,?,?,'pending',?,?)""", (call_uuid, request_sha256, body, digest(body), now, now))
         return self.result(call_uuid)
+
+    def _check_legacy_token(self, call_uuid):
+        if self.db.execute("SELECT 1 FROM legacy_n8n_receipts WHERE token=?", (uuid.UUID(call_uuid).hex,)).fetchone():
+            raise Conflict("Backfill caller token already identifies legacy evidence")
 
     def result(self, call_uuid):
         row = self._find(call_uuid)

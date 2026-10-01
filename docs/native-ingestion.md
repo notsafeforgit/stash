@@ -721,8 +721,11 @@ select separately reviewed global `skip=true` profiles. Local recording returns
 the execution UUID; strict inspection cannot report success until every original
 source ticket completes. The staged n8n adapter now gates source admission on
 native permanent history, freezes completion proof and exposes pending results
-for a durable workflow wait. Historical operational receipts still require
-migration before activation.
+for a durable workflow wait. An explicit maintenance importer now retains old
+n8n result tokens in the producer outbox for local inspection, preserving exact
+bytes and import manifests without creating source-completion proof. The other
+operational journal families and saved executions still require migration before
+activation.
 
 This package is not yet installed into the host/n8n launch paths. Runtime alignment,
 activation of converted profiles, additional source adapters and conversion of
@@ -780,8 +783,11 @@ families retain their separate migration requirements. Imported decisions never
 manufacture source windows, and producer tokens cannot submit legacy assertions.
 See the [maintenance importer](../integrations/gallery-dl/README.md#backfill-journal-import)
 for read-only preflight and resumable batches. The [native n8n adapter](../integrations/gallery-dl/README.md#native-n8n-backfills)
-uses this status/proof API with durable caller snapshots. Its producer schema 6
+uses this status/proof API with durable caller snapshots. Its producer schema 7
 commits the first history decision and local source snapshot together, then retains
 the original ticket bindings and submitted proof across retries. Converted graphs
 wait on pending results and inspect the same token. Installed n8n workflows still
 use the old runner until the remaining operational-history and deployment gates pass.
+The [receipt importer](../integrations/gallery-dl/README.md#retaining-old-n8n-result-tokens)
+preserves historical inspection results separately from this proof API. Importing
+one never assigns an account, launches work or marks native source windows complete.

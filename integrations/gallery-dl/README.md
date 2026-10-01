@@ -643,10 +643,59 @@ same original work; it does not replace a cancelled ticket with a fresh scrape.
 If a source lookup or native job needs review, resolve and retry that underlying
 work first using its existing caller/job controls, then recheck this token.
 
-Producer schema 6 stores these calls and receipts in the existing outbox. Its
+Producer schema 7 stores these calls and receipts in the existing outbox. Its
 default limit is 10,000 retained calls; reaching capacity stops admission without
 evicting history. Include this outbox in the migration/backup boundary. Stash's
 database schema does not change in this adapter increment.
+
+### Retaining old n8n result tokens
+
+`stash-import-n8n-receipts` imports a frozen copy of the old `n8n-receipts`
+directory into the native producer outbox. Preflight reads every file, reports
+each token/digest/outcome and performs no writes. Apply requires that reviewed
+snapshot digest and an explicit outbox binding. Use a stable receipt-source UUID
+from the migration manifest, distinct from the run-journal database UUID.
+
+```sh
+stash-import-n8n-receipts --receipts /migration/n8n-receipts --source RECEIPT_SOURCE_UUID
+stash-import-n8n-receipts --receipts /migration/n8n-receipts --source RECEIPT_SOURCE_UUID \
+  --expected-sha256 REVIEWED_INPUT_SHA256 --apply \
+  --outbox /persistent/native-outbox.sqlite --endpoint https://stash.example \
+  --producer PRODUCER_UUID
+```
+
+The entire import commits atomically, including its manifest. Repeat the same
+command after an interruption or lost command response. Original JSON bytes,
+tokens, input hashes and import provenance are immutable; conflicting bytes,
+source identities or native caller tokens roll back the whole import. Unknown
+directory entries, nonregular files, changing files and malformed JSON block
+import. Valid JSON with unsupported result semantics is retained for review.
+The retained limits are 10,000 receipts/64 MiB, plus 1,000 manifests/16 MiB;
+capacity failure never evicts earlier results.
+
+`stash-ingest-n8n --inspect OLD_TOKEN` then works locally, even without the old
+directory, an API token or network access. It returns `state: legacy_*`,
+`backfill_pending: false` and a `legacy_receipt` provenance object. Successful
+and deliberately skipped command results retain their old result fields. Failed
+results remain failures; a recorded network block sets `command_failed: true`
+and a nonzero exit code even if its original child exit code was zero. The exact
+original is still retained in `legacy_n8n_receipts.body`. Unsupported results
+return a review error, and `--strict` exits 1 for failure/review, 0 otherwise.
+Historical receipts cannot be retried as native work. General producer status
+lists their counts separately from active work.
+
+Old receipts do not record an account or execution identity. The importer never
+guesses those from log text, queues a scrape, or creates native completion proof.
+Even an old `account_backfill_complete` flag is only a retained historical claim;
+permanent account history uses the separate journal importer below. File intake
+remains unverified. Include the outbox and its import manifests in backups.
+This preserves token inspection during cutover; saved n8n execution graphs still
+need explicit drain/resume handling before their old command paths are removed.
+
+Schema 6 → 7 preserves existing delivery events, source calls, tickets and
+backfill results, adding two initially empty receipt/history tables. It does not
+read any old receipt directory automatically. Older producer binaries reject
+schema 7; restore the pre-migration outbox copy when rehearsing a rollback.
 
 ### Staging the existing n8n graphs
 

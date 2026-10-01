@@ -182,8 +182,9 @@ def main(argv=None):
                 output = dispatch_once(box, client, Configuration(args.profile))
         else:
             from .backfill_calls import BackfillCalls
+            from .n8n_receipts import LegacyReceipts
             output = {**box.status(), "source_requests": requests.status(), "source_calls": calls.summary(),
-                      "backfill_calls": BackfillCalls(box).summary()}
+                      "backfill_calls": BackfillCalls(box).summary(), "legacy_n8n_receipts": LegacyReceipts(box).summary()}
         print(json.dumps(output, sort_keys=True))
         if args.command == "lookup-collections":
             return 0 if all(item["state"] == "resolved" for item in output["targets"]) else 2

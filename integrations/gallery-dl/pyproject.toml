@@ -22,6 +22,7 @@ stash-ingest-reddit = "stash_ingest.launchers:reddit_main"
 stash-import-backfills = "stash_ingest.backfill_import:main"
 stash-ingest-n8n = "stash_ingest.n8n_runner:main"
 stash-ingest-n8n-config = "stash_ingest.n8n_migration:main"
+stash-import-n8n-receipts = "stash_ingest.n8n_receipt_import:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

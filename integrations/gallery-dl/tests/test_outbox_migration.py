@@ -15,7 +15,15 @@ from helpers import PRODUCER, capture, file_event, receipt
 from test_run_queue import request, admission
 
 
+def schema_six(db):
+    db.execute("DROP TRIGGER native_n8n_token_unique")
+    db.execute("DROP TABLE legacy_n8n_receipts")
+    db.execute("DROP TABLE n8n_receipt_imports")
+    db.execute("PRAGMA user_version=6")
+
+
 def schema_five(db):
+    schema_six(db)
     db.execute("DROP TABLE backfill_calls")
     db.execute("PRAGMA user_version=5")
 
@@ -118,6 +126,38 @@ class OutboxMigrationTests(unittest.TestCase):
             finally:
                 self.db.execute("COMMIT")
             self.assertEqual(opened.result(timeout=3), SCHEMA)
+
+    def test_schema_publication_between_preflight_reads_uses_one_snapshot(self):
+        empty = Path(self.temp.name) / "concurrent-empty.sqlite"
+        connect = sqlite3.connect
+        with closing(connect(empty, isolation_level=None)) as raw:
+            raw.execute("PRAGMA journal_mode=WAL")
+        reader_thread = threading.get_ident()
+        observed = False
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            def publish():
+                with closing(Outbox(empty, "http://fixture.invalid", PRODUCER)) as writer:
+                    writer.enqueue(encode(capture()))
+
+            class Reader(sqlite3.Connection):
+                def execute(connection, sql, *args, **kwargs):
+                    nonlocal observed
+                    cursor = super().execute(sql, *args, **kwargs)
+                    if sql == "PRAGMA user_version" and not observed:
+                        observed = True
+                        pool.submit(publish).result(timeout=5)
+                    return cursor
+
+            def intercepted(*args, **kwargs):
+                if threading.get_ident() == reader_thread:
+                    kwargs["factory"] = Reader
+                return connect(*args, **kwargs)
+
+            with patch("stash_ingest.outbox.sqlite3.connect", side_effect=intercepted), \
+                    closing(Outbox(empty, "http://fixture.invalid", PRODUCER)) as reader:
+                self.assertTrue(observed)
+                self.assertEqual(reader.db.execute("PRAGMA user_version").fetchone()[0], SCHEMA)
+                self.assertEqual(reader.db.execute("SELECT count(*) FROM events").fetchone()[0], 1)
         self.assertEqual(self.db.execute("SELECT * FROM events ORDER BY seq").fetchall(), self.before)
         self.assertEqual(self.db.execute("PRAGMA foreign_key_check").fetchall(), [])
 
@@ -233,6 +273,43 @@ class OutboxMigrationTests(unittest.TestCase):
         with self.assertRaises(sqlite3.OperationalError):
             self.open()
         self.assertEqual(self.db.execute("PRAGMA user_version").fetchone()[0], 5)
+        self.assertEqual(self.db.execute("SELECT * FROM events ORDER BY seq").fetchall(), self.before)
+
+    def test_v6_promotion_preserves_backfill_snapshots_fences_and_finished_receipts(self):
+        from stash_ingest.backfill_calls import BackfillCalls, advance_once
+        from stash_ingest.client import Client
+        from test_backfill_calls import specification, status, decision
+        with closing(self.open()) as box:
+            calls = BackfillCalls(box)
+            spec = specification()
+            done, pending = str(uuid.uuid4()), str(uuid.uuid4())
+            calls.record(done, "a" * 64, lambda: spec)
+            client = Client(box.endpoint, PRODUCER)
+            with patch.object(client, "capabilities", return_value={"source_backfill_protocol": 1}), \
+                    patch.object(client, "_request", return_value=status(spec, [decision(spec["component"])])):
+                advance_once(calls, client, done)
+            self.assertEqual(calls.result(done)["state"], "completed")
+            calls.record(pending, "b" * 64, lambda: spec)
+            calls.claim(str(uuid.uuid4()), pending)
+            schema_six(box.db)
+        tables = [row[0] for row in self.db.execute("SELECT name FROM sqlite_schema WHERE type='table' ORDER BY name")]
+        before = {name: self.db.execute('SELECT * FROM "' + name + '" ORDER BY rowid').fetchall() for name in tables}
+        with closing(self.open()) as box:
+            self.assertEqual(box.db.execute("PRAGMA user_version").fetchone()[0], SCHEMA)
+            self.assertEqual(box.db.execute("SELECT count(*) FROM legacy_n8n_receipts").fetchone()[0], 0)
+            self.assertEqual(box.db.execute("SELECT count(*) FROM n8n_receipt_imports").fetchone()[0], 0)
+        after = {name: self.db.execute('SELECT * FROM "' + name + '" ORDER BY rowid').fetchall() for name in tables}
+        self.assertEqual(after, before)
+        self.assertEqual(self.db.execute("PRAGMA foreign_key_check").fetchall(), [])
+
+    def test_v6_unknown_receipt_table_rolls_back_all_new_objects(self):
+        with closing(self.open()) as box:
+            schema_six(box.db)
+            box.db.execute("CREATE TABLE legacy_n8n_receipts(unrecognized TEXT)")
+        with self.assertRaises(sqlite3.OperationalError):
+            self.open()
+        self.assertEqual(self.db.execute("PRAGMA user_version").fetchone()[0], 6)
+        self.assertIsNone(self.db.execute("SELECT name FROM sqlite_schema WHERE name='n8n_receipt_imports'").fetchone())
         self.assertEqual(self.db.execute("SELECT * FROM events ORDER BY seq").fetchall(), self.before)
 
 

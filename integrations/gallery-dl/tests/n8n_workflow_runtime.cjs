@@ -12,6 +12,7 @@ const { Wait } = require(path.join(base, 'dist/nodes/Wait/Wait.node.js'));
 async function main() {
   const original = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
   const staged = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
+  const legacy = process.argv[4] ? JSON.parse(fs.readFileSync(process.argv[4], 'utf8')) : [];
   assert.equal(staged.length, original.length);
   const expression = new Expression('UTC');
   let evaluations = 0;
@@ -64,6 +65,23 @@ async function main() {
       const branch = workflow.connections[pending.name].main[isPending ? 0 : 1][0].node;
       assert.equal(branch === 'Wait for native backfill', isPending);
     }
+    const error = nodes.get(workflow.connections[pending.name].main[1][0].node);
+    for (const { result, failed } of legacy) {
+      const parsed = {};
+      for (const assignment of parse.parameters.assignments.assignments) {
+        parsed[assignment.name] = evaluate(assignment.value, { stdout: JSON.stringify(result) }, workflow);
+      }
+      assert.equal(parsed.token, result.token);
+      assert.equal(evaluate(pending.parameters.conditions.conditions[0].leftValue, parsed, workflow), false);
+      const conditions = error.parameters.conditions;
+      const values = conditions.conditions.map(condition => {
+        assert.equal(condition.operator.type, 'boolean');
+        assert.equal(condition.operator.operation, 'true');
+        return evaluate(condition.leftValue, parsed, workflow) === true;
+      });
+      assert.ok(['or', 'and'].includes(conditions.combinator));
+      assert.equal(conditions.combinator === 'or' ? values.some(Boolean) : values.every(Boolean), failed);
+    }
     const wait = nodes.get('Wait for native backfill');
     let checkpoint;
     const input = [{ json: { token, backfill_pending: true } }];
@@ -79,6 +97,7 @@ async function main() {
     assert.equal(workflow.connections[wait.name].main[0][0].node, inspect.name);
   }
   console.log(JSON.stringify({ workflows: staged.length, evaluations, wait_checkpoints: staged.length,
+    legacy_result_branches: legacy.length * staged.length,
     node_ids_and_credentials_preserved: true, commands_executed: 0 }));
 }
 

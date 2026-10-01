@@ -67,7 +67,7 @@ review. Production has not been migrated.
 | --- | --- |
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
 | 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries and metadata relationship targets, native account/ownership storage and reviewed consolidation, shared post/profile/capture storage, ordered attachment manifests, audited media associations, reviewed source-list selection, and source-gallery synchronization with manual membership intent are implemented. Scalar and relationship field choices protect explicit and preserved metadata. Revisioned logical roots and source collections retain capture/manual-intake provenance; captured publisher choices connect source evidence to accounts independently of depicted performers. Verified byte identities and immutable per-file verification history now use persistent file-generation guards. Producer identity matching, policy resolution, review APIs/UI and remaining domain services are in progress. |
-| 2 Ingestion and producer adapter | In progress: scoped producer tokens, Reddit/Twitter capture batches and durable receipts are implemented. Verified preparation uses the shared scanner; file/media publication checks descriptors, generations and persistent path removals, reuses concurrent scans, and rejects ambiguous verified-byte owners. Intake publication connects collection provenance, selected source media, attachment evidence and album galleries while preserving explicit choices. Persistent jobs have coalesced submissions, fenced leases, retry/cancellation/recovery, and atomic domain/result publication. File-completion admission now queues a durable worker that checkpoints registration, generates previews and delivers retryable media/gallery hooks; scoped status reports actual completion. Native collection policies now apply typed metadata and explicit performer defaults in intake and ordinary scans, with dry preview and guarded apply. Source-run coordination now coalesces missing date ranges, fences worker ownership, retains checkpoints and deferrals, and excludes overlapping destinations. Policy migration, general durable edit notifications, additional source adapters, producer outboxes and actual host/n8n worker conversion remain. |
+| 2 Ingestion and producer adapter | In progress: scoped producer tokens, Reddit/Twitter capture batches and durable receipts are implemented. Verified preparation uses the shared scanner; file/media publication checks descriptors, generations and persistent path removals, reuses concurrent scans, and rejects ambiguous verified-byte owners. Intake publication connects collection provenance, selected source media, attachment evidence and album galleries while preserving explicit choices. Persistent jobs have coalesced submissions, fenced leases, retry/cancellation/recovery, and atomic domain/result publication. File-completion admission now queues a durable worker that checkpoints registration, generates previews and delivers retryable media/gallery hooks; scoped status reports actual completion. Native collection policies now apply typed metadata and explicit performer defaults in intake and ordinary scans, with dry preview and guarded apply. Source-run coordination now coalesces missing date ranges, fences worker ownership, retains checkpoints and deferrals, and excludes overlapping destinations. A supported Python producer package now provides retained-payload outboxes, fenced delivery, durable receipts, backoff and review. Policy migration, general durable edit notifications, additional source adapters, gallery-dl hooks/leases and actual host/n8n worker conversion remain. |
 | 3 Catalog importer and full-copy reconciliation | Not yet implemented |
 | 4 Native UI and client conversion | Not yet implemented |
 | 5 Compatibility removal and packaging | Preview packaging isolated and old compatibility gate replaced by current v3 operation/plugin-contract checks. Old UI/API/plugin adapters and config bridge still require conversion/removal. |
@@ -1152,3 +1152,55 @@ zero Go lint issues, and every Go unit/integration package. API tests took
 seconds. The final validation log is
 `/tmp/stash-native-transition/source-runs-final-validation.log`.
 Final race results are in `/tmp/stash-native-transition/source-runs-final-race.log`.
+
+## Producer retention and durable delivery
+
+The supported Python package now lives under `integrations/gallery-dl`, with a
+standard-library outbox, bounded HTTP delivery and an inspection/retry CLI.
+Source payloads must satisfy the shared retention policy before persistence;
+runtime extractor objects and known secret fields are removed from the copied
+metadata. Added common fixtures cover unusable rendition URLs and nondecimal
+dimensions so Go and Python select the same retained preview.
+
+The outbox has its own explicit SQLite lineage, stable origin/producer binding,
+FULL WAL transactions, source-before-file dependencies and bounded queued bytes
+and events. Concurrent drainers use expiring fenced leases. A server receipt must
+match the event identity, digest, collection revision, root, run and kind before
+acknowledgement and payload release commit together. Receipt rows remain for
+replay and dependent events. Restart, lost HTTP responses and Stash API token
+rotation preserve event identity. Transient errors back off durably; rejected
+events retain their payloads for explicit review. File admission remains distinct
+from completed verification. No website credential is stored or managed here.
+
+The Python tests cover shared retention, strict input, capacity, process death,
+concurrent claims, receipt dependency/replay, endpoint binding, header-only token
+rotation, redirects, capability outages, partial responses, mismatched receipts
+and disabled file processing. The real Go HTTP/SQLite test runs the Python client,
+loses a response after the commit and confirms receipt replay plus independent
+rejection. Targeted interoperability passed in 1.5 seconds. The build workflow
+and `make validate-fork` now include producer validation; Python 3.12 or newer is
+required. All 18 Python tests passed on Python 3.14 and in the installed gallery-dl
+Python 3.12 environment. Building a wheel and installing its CLI into an isolated
+environment also passed. The final real HTTP test and shared retention corpus
+passed under Go's race detector (7.0 and 1.1 seconds); final Go lint reported zero
+issues. Python source reads are registered with Go's test cache so producer edits
+invalidate the interoperability result.
+
+Actual gallery-dl hooks, native source-run leases, filesystem locks, launcher
+conversion, local outage run coalescing and catalog import remain unfinished.
+Integration inspection also found that ordinary single-media Reddit posts need
+explicit attachment evidence in the server adapter before their file events can
+be linked; the existing capture parser handles declared Reddit galleries and
+Twitter media manifests. Do not omit attribution or invent albums to bypass that
+remaining work. Host/n8n configuration, production data and the frozen compatible
+release remain unchanged. This increment changes no native database schema.
+
+The complete `make validate-fork` gate passed: backend generation, all 528 UI
+tests, 71 native operation contracts, all 18 producer tests, zero Go lint issues
+and every Go unit/integration package. API tests took 177.8 seconds, ingestion
+345.0 seconds, manager 44.1 seconds and SQLite 323.1 seconds. A subsequent final
+test-cache dependency update passed targeted race tests and Go lint. Logs are
+`/tmp/stash-native-transition/producer-outbox-final-validation.log`,
+`producer-outbox-final-race.log`, `producer-outbox-final-lint.log`, and
+`producer-outbox-python312.log` in that directory. The isolated wheel/CLI check
+is under `/tmp/stash-native-transition/producer-wheel.Tll9Rf`.

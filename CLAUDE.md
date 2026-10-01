@@ -50,6 +50,7 @@ for image publication and Quadlet restarts.
 ```bash
 make validate-fork     # Fork gate: backend generation, v3 validation, Go lint/tests
 make it                # Go unit + integration tests only
+make validate-producer # Python producer retention/outbox/HTTP contract tests
 make lint              # CI-pinned golangci-lint via go run
 make fmt               # Format Go source
 make validate-ui-v3    # Biome, generation/types, formatting, locales, tests, native contracts
@@ -61,6 +62,9 @@ make validate-ui       # v2.5 Biome, Stylelint, TypeScript, and formatting check
 Build both UIs before full Go tests or `make validate-fork`; embedded-asset tests
 require real v3 route chunks. Use the [validation sequence](ui/v3/docs/development.md#validation).
 To run a single Go test: `go test ./pkg/models/... -run TestFilterAST`.
+The native producer HTTP integration test also requires Python 3.12 or newer.
+The supported package in `integrations/gallery-dl` uses only the standard library
+for delivery; host/n8n launch paths have not switched to it.
 
 ## Architecture
 

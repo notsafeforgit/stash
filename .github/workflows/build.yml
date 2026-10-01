@@ -132,7 +132,8 @@ jobs:
         name: generated
 
     - name: Test Backend
-      run: make it
+      # Ubuntu 24.04 supplies Python 3.12 for the native producer contract tests.
+      run: make validate-producer it
 
   # Job 3: Build the active Linux target in parallel with backend tests.
   # Other cross-compilation targets require the updated compiler Dockerfile.

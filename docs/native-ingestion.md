@@ -593,3 +593,27 @@ Scan conflicts currently appear in scan logs and repeatable previews; file jobs
 also retain their review summary in durable status. General API/scan edit hooks
 still use the existing after-commit delivery path; the ingestion worker retains
 its retryable notification checkpoint.
+
+## Producer delivery queue
+
+The Python package in [integrations/gallery-dl](../integrations/gallery-dl/README.md)
+implements a durable producer outbox and the HTTP delivery client. It binds a
+queue to a stable producer UUID and Stash origin, stores exact event bytes before
+delivery, and retains receipts atomically with removing acknowledged payloads.
+Source capture dependencies, capacity bounds, concurrent drainer fences,
+persistent backoff and explicit review states survive worker restart. A file
+receipt acknowledges admission to verification, not media completion.
+
+The package uses `STASH_INGEST_TOKEN` (or another named environment reference)
+only for Stash's API. Website logins, cookies and downloader proxy settings
+remain in the gallery-dl environment and are not managed by this client.
+
+The shared Python/Go policy corpus verifies retention before queued persistence.
+`make validate-producer` runs the Python tests, and the backend's real HTTP test
+executes the Python client against an isolated native database. Python 3.12 or
+newer is therefore required for the full fork validation gate.
+
+This package is not yet installed into the host/n8n launch paths. Gallery-dl
+download hooks, physical destination locks, source-run lease enforcement,
+outage request coalescing and conversion of existing recovery/scheduled callers
+are still required before cutover.

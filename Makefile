@@ -466,7 +466,11 @@ validate: validate-ui validate-backend
 
 # Full pre-push gate for the fork backend plus the active v3 UI.
 .PHONY: validate-fork
-validate-fork: generate-backend validate-ui-v3 validate-backend
+validate-fork: generate-backend validate-ui-v3 validate-producer validate-backend
+
+.PHONY: validate-producer
+validate-producer:
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=integrations/gallery-dl/src python3 -m unittest discover -s integrations/gallery-dl/tests -v
 
 # locally builds and tags a 'stash/build' docker image
 .PHONY: docker-build

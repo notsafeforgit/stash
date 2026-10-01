@@ -189,6 +189,7 @@ func (db *Database) Repository() models.Repository {
 		MediaRoot:              &MediaRootStore{},
 		SourceCollection:       &SourceCollectionStore{},
 		CapturePublisher:       &CapturePublisherStore{},
+		Ingest:                 &IngestStore{},
 		SourceEvidence:         &SourceEvidenceStore{},
 		SourceAttachment:       &SourceAttachmentStore{},
 		SourceGallery:          &SourceGalleryStore{gallery: db.Gallery},

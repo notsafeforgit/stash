@@ -21,6 +21,9 @@ flowchart TD
     owner["v3 app / v2.5 client"] --> private["Private Chi router: sessions and API authentication"]
     private --> graphql["/graphql: gqlgen resolvers and dataloaders"]
     private --> media["Media HTTP routes"]
+    producer["Native capture producer"] --> ingest["/api/v3/ingest: scoped access tokens"]
+    ingest --> intake["Capture validation and receipt transaction"]
+    intake --> repo
     guest["Standalone share viewer"] --> shares["/share: isolated capability router"]
     shares --> mediaService["Media services / FFmpeg stream manager"]
     shares --> repo["Repository interfaces and transactions"]
@@ -72,6 +75,7 @@ links, worker scopes, or media requests.
 | [graphql/schema](../graphql/schema/) and [gqlgen.yml](../gqlgen.yml) | Public schema and Go type/resolver generation |
 | [internal/api](../internal/api/) | HTTP routes, GraphQL resolvers, input translation, authentication, and response shaping |
 | [internal/api/loaders](../internal/api/loaders/) | Request-scoped batching of related entity reads to avoid N+1 queries |
+| [internal/ingest](../internal/ingest/) | Producer token verification, bounded source capture intake, album/publisher resolution, and atomic receipts |
 | [internal/manager](../internal/manager/) | Application lifecycle and service wiring; scan/generate/import jobs in `task_*.go`; stream and download coordination |
 | [pkg/models](../pkg/models/) | Domain values, filter/query models, and repository interfaces; `Repository` supplies entity stores and a transaction manager |
 | [pkg/scene](../pkg/scene/), [pkg/image](../pkg/image/), [pkg/gallery](../pkg/gallery/), [pkg/group](../pkg/group/) | Entity operations that coordinate related records, files, and validation; other entity packages supply their own validation/update helpers |
@@ -98,6 +102,7 @@ not made atomic by a SQLite transaction.
 | Data | Owner and lifetime |
 | --- | --- |
 | Library metadata and relationships | Main SQLite file with native lineage and primary migration sequence; production promotion uses a separate native database path |
+| Source evidence and intake | Native accounts, posts, shared revisions/profiles, captures, album manifests, collection/root definitions, producer token verifiers, and immutable receipts in the library database |
 | Server/UI configuration | YAML configuration managed by [internal/manager/config](../internal/manager/config/); includes UI defaults and plugin settings |
 | Original media | Configured library paths and archive contents; database file/folder records describe these files |
 | Stored artwork blobs | [BlobStore](../pkg/sqlite/blob.go), configured for database blobs or a separate filesystem location |
@@ -162,6 +167,22 @@ names. Other API bridges remain until their callers are converted:
 [check-native-contracts.mjs](../ui/v3/scripts/check-native-contracts.mjs) checks
 current v3 operations and the retained plugin API. Runtime protocol behavior,
 shares, and one-time historical database imports have their own tests.
+
+### Native producer boundary
+
+The [native ingestion interface](native-ingestion.md) uses a separate router and
+scoped bearer tokens. Token administration stays on the authenticated application
+router. These tokens authorize calls to Stash; third-party service login secrets
+remain with gallery-dl. Producer credentials cannot authorize general GraphQL or
+plugin routes.
+
+Current `source.capture` intake verifies the post identity, retained source
+policy, collection definition, and root grant, then commits capture evidence,
+publisher resolution, album manifest/selection, and receipt together. Each batch
+item has an independent transaction. Retries return the original receipt and
+conflicting event bytes are rejected. This implemented endpoint covers metadata
+capture; final-file intake, durable producer delivery, native review UI, catalog
+migration, and actual host/n8n conversion remain required before cutover.
 
 ## Request and work flows
 

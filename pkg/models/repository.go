@@ -34,6 +34,7 @@ type Repository struct {
 	MediaRoot              MediaRootReaderWriter
 	SourceCollection       SourceCollectionReaderWriter
 	CapturePublisher       CapturePublisherReaderWriter
+	Ingest                 IngestReaderWriter
 	SourceEvidence         SourceEvidenceReaderWriter
 	SourceAttachment       SourceAttachmentReaderWriter
 	SourceGallery          SourceGalleryReaderWriter

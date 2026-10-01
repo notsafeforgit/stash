@@ -552,8 +552,8 @@ Portable imports can retain unbound logical roots for later deployment binding.
 
 Producer authorization, pinned work scopes, final-file stability/hash/probe
 checks, durable receipts, folder/batch metadata defaults, API/UI, and catalog
-import remain subsequent integration work. No producer-facing endpoint exposes
-these repositories directly. The migration fabricates no collections or intake
+import remain subsequent integration work. Producer capture intake is described
+below and in [native ingestion](native-ingestion.md). The migration fabricates no collections or intake
 history from existing paths. Anonymised exports remove root bindings, collection
 definitions, and intake provenance with the other private source evidence.
 
@@ -587,6 +587,26 @@ make exact replay return the original result, without restoring an old choice
 over a newer one. Anonymised exports remove these private histories before
 removing captures and accounts. Migration creates no publisher choices for
 existing captures; ingestion and catalog import must establish their evidence.
+
+Migration 1000017 adds `ingest_producers`, `ingest_credentials`,
+`ingest_credential_scopes`, and immutable `ingest_receipts`. Credentials store
+verifiers rather than token secrets and grant collection/root pairs. Revocation
+is permanent; rotation preserves producer identity. Receipt foreign keys require
+the committing credential's scope, the recorded collection revision, and the
+actual capture/post association. SQL guards also require collection capture
+provenance and matching logical roots.
+
+The native HTTP service commits source capture, automatic publisher resolution,
+album manifest/selection, collection provenance, and receipt in one transaction.
+Receipt lookup uses the producer/event primary key; exact replay returns the
+original result and changed event bytes conflict. Historical collection
+definitions allow delayed metadata delivery within explicitly granted scope.
+Anonymised exports remove credentials and receipts before private source records.
+Migration creates no credentials, receipts, or imported catalog data.
+
+The [protocol documentation](native-ingestion.md) lists current supported events
+and limits. File ingestion, producer outboxes, job leases, catalog import, and
+native administration/review UI remain subsequent work.
 
 The filesystem deletion journal currently derives its directory from the
 database filename. Promotion in place retains that association, but a production

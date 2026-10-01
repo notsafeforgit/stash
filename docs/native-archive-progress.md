@@ -707,3 +707,55 @@ The complete `make validate-fork` gate passed with 528 UI tests, native contract
 zero Go lint issues, and all Go unit/integration packages. The SQLite suite took
 154.3 seconds, down from 567.3 seconds before avoiding repeated empty-schema
 migrations. This changes test setup only.
+
+## Native capture ingestion and durable receipts
+
+Migration 1000017 adds producer identities, scoped access tokens, collection/root
+grants, and immutable event receipts. These are tokens for calling Stash's API;
+third-party service credentials stay with gallery-dl. Token administration uses
+the existing authenticated application router. The isolated producer router
+accepts bearer tokens and has no application, GraphQL, or plugin fallback.
+
+`/api/v3/ingest` now exposes capability discovery, bounded capture batches, and
+producer-scoped receipt lookup. A capture transaction verifies the source post
+identity and retention policy, records shared evidence and collection provenance,
+resolves its publisher, selects compatible album manifests, and publishes the
+receipt. Metadata receipts explicitly report that media has not been ingested.
+The initial identity adapters accept Reddit and Twitter; other extractors are
+reported as unsupported until their post identity adapters are implemented.
+
+Exact retries preserve the original acknowledgement; changed event bytes
+conflict. Batch items commit independently. Receipt-storage failure rolls back
+all domain changes. Delayed events can retain historical collection definitions
+within their granted root scope. Pinned/disabled albums and ambiguous publisher
+or album evidence remain reviewable. Publisher identity never assigns depicted
+performers. Token rotation preserves producer/event identity; expiry and permanent
+revocation are checked in the transaction that writes each event.
+
+Focused service, HTTP, and SQLite fixtures passed for concurrent duplicates,
+restart/lost acknowledgement, conflicting replay, strict JSON and retention,
+large source IDs, scope isolation, delayed definitions, partial batches,
+revocation/expiry, album conflicts and protected choices, rollback, immutable
+receipt constraints, indexed lookup, anonymisation, and actual schema-16 promotion
+with populated source evidence and publisher decisions.
+
+The isolated 1,473,081,344-byte library copy migrated from 1000016 to 1000017 in
+0.068 seconds. Streaming semantic digests matched all 115 retained tables, with
+zero foreign-key violations and no size growth; 110,592,000 bytes remain reusable.
+All four new tables remain empty after schema migration. The private receipt is
+`.local/native-archive-rehearsal-20260930/ingest-reconciliation.json`. This copy
+still has no imported catalogs; populated fixtures separately verify source-data
+retention through the actual historical schema.
+
+The complete `make validate-fork` gate passed on the final implementation:
+generation, frontend validation and all 528 UI tests, retained v3 extension
+contracts and 71 current application operation files, Go lint with zero issues,
+and all Go unit/integration packages. The SQLite suite completed in 180.9 seconds.
+An initial gate found response-encoding and test cursor-cleanup lint issues;
+the final gate includes both corrections.
+
+The [ingestion contract](native-ingestion.md) documents request bytes, bounds,
+access tokens, and receipt semantics. File completion/verification, producer
+outboxes, run leases, gallery synchronization during media ingestion, additional
+post identity adapters, native UI, catalog import, and actual host/n8n conversion
+remain required. Production has not changed.

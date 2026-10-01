@@ -32,6 +32,7 @@ import (
 
 	"github.com/stashapp/stash/internal/api/loaders"
 	"github.com/stashapp/stash/internal/build"
+	"github.com/stashapp/stash/internal/ingest"
 	"github.com/stashapp/stash/internal/manager"
 	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/internal/sharing"
@@ -259,6 +260,8 @@ func Initialize() (*Server, error) {
 		gqlPlayground.Handler("GraphQL playground", endpoint, gqlPlayground.WithGraphiqlEnablePluginExplorer(true))(w, r)
 	})
 
+	ingestion := ingest.New(repo)
+	r.Mount("/api/v3/ingest-admin", (&ingestRoutes{service: ingestion}).adminRouter())
 	r.Mount("/performer", server.getPerformerRoutes())
 	r.Mount("/scene", server.getSceneRoutes())
 	r.Mount("/gallery", server.getGalleryRoutes())
@@ -346,6 +349,7 @@ func Initialize() (*Server, error) {
 	if cfg.GetEnableV3UI() {
 		server.Handler = server.withShareRoutes(r)
 	}
+	server.Handler = withIngestRoutes(server.Handler, ingestion)
 	go printLatestVersion(context.TODO())
 
 	return server, nil

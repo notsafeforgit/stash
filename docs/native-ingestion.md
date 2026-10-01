@@ -17,10 +17,12 @@ Existing acknowledgements remain readable and replayable in that state; new file
 events are rejected.
 A source capture alone never acknowledges downloaded or playable media.
 
-Native field import policy and performer defaults, durable producer outboxes,
-source-run leases, additional post adapters, host/n8n conversion, catalog import,
-and native administration/review UI remain required. Existing scrapes have not
-switched to this interface. Current collection definitions come from core services.
+Native metadata policies now share one evaluator between verified intake and
+ordinary scans, with explicit performer defaults and authenticated preview/apply.
+Durable producer outboxes, source-run leases, additional post adapters, host/n8n
+conversion, catalog import, and native administration/review UI remain required.
+Existing scrapes have not switched to this interface. Root, collection and policy
+administration endpoints are described below.
 
 ## Authentication and scope
 
@@ -142,8 +144,10 @@ provenance without inventing a source capture, account or gallery. Failures roll
 back file, content proof, library media, source links, album changes and job result
 together. The HTTP worker commits this registration as a resumable checkpoint
 before generating previews and delivering media/gallery notifications. Native
-field policy and performer defaults remain separate work; this event does not
-promise arbitrary catalog-to-library metadata mapping.
+field policies run in that same checkpoint. Admission pins the current policy
+revision; changing it before publication leaves metadata for review while still
+registering the verified media. The result reports `metadata_state`, applied
+`metadata_fields`, and any `metadata:<field>` review requirements.
 
 ### Durable archive work
 
@@ -362,3 +366,109 @@ must not be marked imported or removed from an operational outbox.
 Native schemas 1000017 and 1000021 own producer identities, Stash API token
 grants, and receipts. Foreign keys bind receipts to their actual capture or job,
 recorded collection revision, and token scope. Anonymised exports remove them with private source evidence.
+
+
+## Native metadata policies
+
+Policies belong to a source collection, including an unsourced directory or
+manual batch. Definitions and their history live in the native database; there
+is no plugin settings JSON or parallel catalog writer. Migration creates no
+policies and changes no selected metadata. Each field decision made by a policy
+references the exact policy revision, with capture provenance for source-backed
+mappings. Collection scope changes require reviewing a new policy revision.
+
+The application-authenticated API lives under `/api/v3/archive`. Producer tokens
+do not authorize these routes. Browser writes use the same origin checks as
+other native administration. JSON uses snake_case keys.
+
+| Method and path | Contract |
+| --- | --- |
+| `GET /media-roots?after=<uuid>` | Up to 50 logical roots and their reviewed local bindings |
+| `POST /media-roots`, `PUT /media-roots/<uuid>` | Complete definition: `expected_revision` (zero on create), `label`, `state`, `server_path` (null unbinds), `reason`; the server probes and records directory identity |
+| `GET /collections?after=<uuid>` | Up to 50 current source collections |
+| `POST /collections`, `PUT /collections/<uuid>` | Complete definition: `expected_revision`, `label`, `kind`, `namespace`, `state`, `target_url`, nullable `account_uuid` and `root_uuid`, `path_prefix`, `reason`; path prefix is `.` for the whole root |
+| `GET /metadata-fields/scene`, `/image`, `/gallery` | Native field names, value types, clear values and relationship kinds; intake policies currently target scenes/images |
+| `GET /collections/<uuid>/metadata-policy` | Current policy, or null |
+| `PUT /collections/<uuid>/metadata-policy` | `expected_revision`, `expected_collection_revision`, `definition`, `reason`; only owner-reviewed edits are accepted here |
+| `GET /collections/<uuid>/metadata-policy/history?after=<revision>` | Up to 50 immutable revisions in ascending order |
+| `POST /metadata-policy/preview` | Existing `collection_uuid`, `entity_uuid`, and one of its `file_uuid` values; optional `source: {capture_uuid, attachment_uuid}` and `include_data` |
+| `POST /metadata-policy/apply` | The same selection plus the preview `digest`; recomputes it in the write transaction and rejects changed selections/candidates with 409 |
+
+A definition can contain both `scene` and `image` rules. This directory example
+initializes filenames and assigns an explicitly selected performer UUID:
+
+```json
+{
+  "enabled": true,
+  "apply_to_scans": true,
+  "rules": {
+    "scene": {
+      "on_create": true,
+      "on_existing": false,
+      "skip_organized_on_create": false,
+      "mark_organized": false,
+      "filename_title_fallback": true,
+      "mappings": {
+        "performers": {"value": ["56c9895d-03c1-4a93-8c0d-fbd99d27de22"]},
+        "title": {"jq": ".source.metadata.title // empty | select(type == \"string\" and length > 0)"}
+      }
+    }
+  }
+}
+```
+
+Each mapping has exactly one `value` or `jq`. The outer configuration is normal
+JSON; constant values are JSON values, not JSON serialized inside strings. Jq
+returns one value per field; `empty` omits it, while null is an actual value and
+must satisfy that field's type. Expressions share a 250 ms deadline and retain
+1 MiB output, 16 KiB expression and one-result limits. Native input allows 12 MiB
+for retained source payload plus entity data; plugin limits remain unchanged.
+
+Mapping data contains `source` (the selected post/capture, normalized `metadata`,
+and reconstructed retained `payload`, or null), `entity` (UUID, kind and permitted
+native field values), and `context` (creation flag, filename and relative path).
+It includes no plugin configuration, mapping definitions, settings, duplicate edit
+`input`, or field-name list. Expanded data is returned only with `include_data`;
+normal previews contain proposed changes and their status. Protected values and
+disabled rules can be inspected without applying them. HTTP previews select an
+existing entity; requests cannot impersonate a creation event.
+
+Only typed curated fields from `MetadataFields` are accepted. Identity, file
+fingerprints, jobs and raw source evidence are not mapping targets. Relationships
+use native UUIDs; redirects resolve to the surviving identity and deleted targets
+require review. To opt into canonical/alias matching, a `performers` mapping may
+set `performer_names: true` and return an array of names. The indexed lookup
+reports all candidates (up to 100, with an explicit overflow flag). It never
+chooses between a canonical name and a colliding alias, creates a performer, or
+uses approximate matches. Unambiguous names can be added while collisions remain
+for review; an unresolved name cannot erase existing inherited attribution.
+Use an explicit UUID to resolve ambiguity. Publisher/account ownership alone
+never supplies depicted performers.
+
+`on_create` and `on_existing` control automatic application independently.
+`skip_organized_on_create` reproduces the old creation-only condition, including
+creation requests that already supplied organized=true. `mark_organized` sets an
+unprotected organized field only when a non-filename mapping selected a value
+and no mapping/name conflict remains. It never clears an existing organized
+choice and never treats organization as identity or download completeness.
+
+Preserved legacy values and explicit set/clear decisions always win. Filename
+fallback initializes an empty inherited title; another file attached to the same
+item cannot oscillate it between filenames. A permitted source mapping can later
+replace that fallback. Newer captures of the same post can update inherited
+source fields. Older captures cannot roll them back; another post or collection
+with a different selection requires review instead of winning by arrival order.
+
+For ordinary scans, `apply_to_scans` opts a collection into directory matching.
+Lookups use bound root paths and the file's ancestor prefixes, with dedicated
+indexes. The most specific scope wins; equal-depth matches require review, and
+a disabled child policy can mask an enabled parent. The scanner records manual
+intake provenance without a fictional account/post and re-evaluates eligible
+unchanged files on rescan. ZIP members do not yet support folder policies.
+
+Remaining work includes the native forms/review queue, migration and comparison
+of installed plugin mappings, per-name reviewed resolution, and catalog import.
+Scan conflicts currently appear in scan logs and repeatable previews; file jobs
+also retain their review summary in durable status. General API/scan edit hooks
+still use the existing after-commit delivery path; the ingestion worker retains
+its retryable notification checkpoint.

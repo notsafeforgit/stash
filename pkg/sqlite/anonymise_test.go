@@ -122,6 +122,19 @@ WHERE source.original_id=81 AND source.kind='tag' AND source.state='redirected' 
 
 func TestAnonymiserRemovesSourceAccountEvidence(t *testing.T) {
 	source, repo := archiveTestDatabase(t)
+	collection := putSourceCollection(t, repo, models.SourceCollectionInput{Origin: "review", SourceCollectionDefinition: models.SourceCollectionDefinition{Label: "private-account-policy", Kind: "manual_batch", State: "active"}})
+	require.NoError(t, repo.WithTxn(context.Background(), func(ctx context.Context) error {
+		policy, err := repo.MetadataPolicy.Put(ctx, models.MetadataPolicyInput{CollectionUUID: collection.UUID, ExpectedCollectionRevision: collection.Revision, Origin: "review", Reason: "private-account-policy", Definition: models.MetadataPolicyDefinition{Enabled: true}})
+		if err != nil {
+			return err
+		}
+		entity, err := repo.ArchiveEntity.FindByLocalID(ctx, models.ArchiveScene, 31)
+		if err != nil {
+			return err
+		}
+		_, err = repo.MetadataField.ApplyAutomatic(ctx, models.MetadataFieldDecisionInput{EntityUUID: entity.UUID, ExpectedEntityRevision: entity.Revision, Field: "code", Mode: "inherit", Origin: "policy", Value: []byte(`"private-account-policy-code"`), Policy: &policy.MetadataPolicyRef})
+		return err
+	}))
 	post := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "native:twitter", Value: "private-account-post"}, "")
 	capture := recordSourceTestCapture(t, repo, sourceTestCapture(t, post.UUID, 1, "private-account-biography"))
 	manifest := recordAttachmentManifest(t, repo, models.SourceAttachmentManifestInput{CaptureUUID: capture.UUID, Complete: true, DeclaredAlbum: true,
@@ -166,7 +179,7 @@ func TestAnonymiserRemovesSourceAccountEvidence(t *testing.T) {
 	}))
 	raw := openRawDB(t, output)
 	defer raw.Close()
-	for _, table := range []string{"source_accounts", "source_account_identifiers", "source_account_identifier_evidence", "account_performer_decisions", "account_performer_links", "source_posts", "source_post_identifiers", "source_post_revisions", "source_captures", "source_capture_profiles", "source_profile_bodies", "source_payloads"} {
+	for _, table := range []string{"metadata_policies", "metadata_policy_revisions", "metadata_decision_policies", "source_accounts", "source_account_identifiers", "source_account_identifier_evidence", "account_performer_decisions", "account_performer_links", "source_posts", "source_post_identifiers", "source_post_revisions", "source_captures", "source_capture_profiles", "source_profile_bodies", "source_payloads"} {
 		require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM "+table))
 	}
 	for _, table := range []string{"source_attachments", "source_attachment_manifests", "source_attachment_entries", "source_capture_attachment_manifests", "source_media_evidence", "attachment_media_decisions", "attachment_media_links", "post_attachment_decisions", "post_attachment_decision_manifests", "post_attachment_selections"} {

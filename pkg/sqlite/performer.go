@@ -548,6 +548,19 @@ func (qb *PerformerStore) FindByGalleryID(ctx context.Context, galleryID int) ([
 	return ret, nil
 }
 
+// FindByNameOrAlias uses the native name index and includes every spelling.
+// The limit is explicit so collisions cannot trigger an unbounded library scan.
+func (qb *PerformerStore) FindByNameOrAlias(ctx context.Context, name string, limit int) ([]*models.Performer, error) {
+	if !validAccountText(name, 1024, false) || limit < 1 || limit > 101 {
+		return nil, fmt.Errorf("invalid performer name lookup")
+	}
+	var ids []int
+	if err := dbWrapper.Select(ctx, &ids, "SELECT DISTINCT performer_id FROM performer_names WHERE name=? COLLATE NOCASE ORDER BY performer_id LIMIT ?", name, limit); err != nil {
+		return nil, err
+	}
+	return qb.FindMany(ctx, ids)
+}
+
 func (qb *PerformerStore) FindByNames(ctx context.Context, names []string, nocase bool) ([]*models.Performer, error) {
 	clause := performerPrimaryNameSQL + " "
 	if nocase {

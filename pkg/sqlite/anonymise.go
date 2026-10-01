@@ -1091,6 +1091,7 @@ func (db *Anonymiser) deleteSourceAccountEvidence(ctx context.Context) error {
 			"archive_job_submissions", "archive_job_attempts", "archive_jobs",
 			"file_content_versions", "media_contents",
 			"ingest_credential_scopes", "ingest_credentials", "ingest_producers",
+			"metadata_decision_policies", "metadata_policy_revisions", "metadata_policies",
 			"metadata_field_write_context", "metadata_field_pending", "metadata_field_heads", "metadata_field_references", "metadata_field_decisions",
 			"source_gallery_write_context", "gallery_membership_heads", "gallery_membership_events", "post_gallery_links", "post_gallery_decisions",
 			"post_attachment_selections", "post_attachment_decision_manifests", "post_attachment_decisions",

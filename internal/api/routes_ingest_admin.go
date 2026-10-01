@@ -17,23 +17,7 @@ import (
 // not authenticate application sessions or grant access to these endpoints.
 func (rs *ingestRoutes) adminRouter() http.Handler {
 	r := chi.NewRouter()
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Cache-Control", "no-store")
-			if site := r.Header.Get("Sec-Fetch-Site"); site != "" && site != "same-origin" && site != "none" {
-				ingestError(w, ingest.ErrForbidden)
-				return
-			}
-			if origin := r.Header.Get("Origin"); origin != "" {
-				u, err := url.Parse(origin)
-				if err != nil || u.Host != r.Host || u.User != nil || (u.Scheme != "https" && u.Scheme != "http") {
-					ingestError(w, ingest.ErrForbidden)
-					return
-				}
-			}
-			next.ServeHTTP(w, r)
-		})
-	})
+	r.Use(nativeAdminOrigin)
 	r.Post("/producers", rs.createProducer)
 	r.Get("/producers", rs.producers)
 	r.Post("/producers/{producer}/credentials", rs.issueCredential)
@@ -138,4 +122,24 @@ func (rs *ingestRoutes) revokeCredential(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func nativeAdminOrigin(next http.Handler) http.Handler {
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		if site := r.Header.Get("Sec-Fetch-Site"); site != "" && site != "same-origin" && site != "none" {
+			ingestError(w, ingest.ErrForbidden)
+			return
+		}
+		if origin := r.Header.Get("Origin"); origin != "" {
+			u, err := url.Parse(origin)
+			if err != nil || u.Host != r.Host || u.User != nil || (u.Scheme != "https" && u.Scheme != "http") {
+				ingestError(w, ingest.ErrForbidden)
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+
 }

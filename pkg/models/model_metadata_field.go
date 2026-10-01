@@ -10,10 +10,10 @@ import (
 // MetadataFieldDefinition describes a curated target. A mapping cannot address
 // arbitrary entity columns or mutate retained source evidence.
 type MetadataFieldDefinition struct {
-	Name          string
-	Type          string // string, date, integer, boolean, urls, custom_fields, reference, references, groups
-	ClearValue    json.RawMessage
-	ReferenceKind ArchiveEntityKind
+	Name          string            `json:"name"`
+	Type          string            `json:"type"` // string, date, integer, boolean, urls, custom_fields, reference, references, groups
+	ClearValue    json.RawMessage   `json:"clear_value"`
+	ReferenceKind ArchiveEntityKind `json:"reference_kind,omitempty"`
 }
 
 func MetadataFields(kind ArchiveEntityKind) []MetadataFieldDefinition {
@@ -54,6 +54,7 @@ type MetadataFieldDecision struct {
 	CaptureUUID *string
 	Reason      string
 	CreatedAt   time.Time
+	Policy      *MetadataPolicyRef
 }
 
 type MetadataFieldState struct {
@@ -85,6 +86,7 @@ type MetadataFieldDecisionInput struct {
 	// Every nonempty relationship choice must name the reviewed revision of
 	// each target. A redirected or deleted target needs a fresh review.
 	ReferenceRevisions map[string]int
+	Policy             *MetadataPolicyRef
 }
 
 var (
@@ -93,6 +95,8 @@ var (
 )
 
 type MetadataFieldReaderWriter interface {
+	// Normalize validates a candidate without mutating the entity or history.
+	Normalize(context.Context, ArchiveEntityKind, string, json.RawMessage, map[string]int) (json.RawMessage, error)
 	State(context.Context, string, string) (*MetadataFieldState, error)
 	History(context.Context, string, string, int, int) ([]MetadataFieldDecision, error)
 	Decide(context.Context, MetadataFieldDecisionInput) (*MetadataFieldState, error)

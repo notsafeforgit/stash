@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
@@ -51,6 +52,15 @@ func (r metadataFieldRow) resolve(ctx context.Context) (*models.MetadataFieldDec
 		Field: r.Field, Mode: r.Mode, Origin: r.Origin, Value: value, Reason: r.Reason, CreatedAt: r.CreatedAt.Timestamp}
 	if r.CaptureUUID.Valid {
 		ret.CaptureUUID = &r.CaptureUUID.String
+	}
+	var policy struct {
+		CollectionUUID string `db:"collection_uuid"`
+		Revision       int    `db:"revision"`
+	}
+	if err := dbWrapper.Get(ctx, &policy, "SELECT collection_uuid,revision FROM metadata_decision_policies WHERE decision_uuid=?", r.UUID); err == nil {
+		ret.Policy = &models.MetadataPolicyRef{CollectionUUID: policy.CollectionUUID, Revision: policy.Revision}
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
 	}
 	return ret, nil
 }
@@ -301,6 +311,23 @@ func normalizeMetadataValue(def models.MetadataFieldDefinition, raw json.RawMess
 	}
 }
 
+func (s *MetadataFieldStore) Normalize(ctx context.Context, kind models.ArchiveEntityKind, field string, raw json.RawMessage, revisions map[string]int) (json.RawMessage, error) {
+	def, err := metadataFieldDefinition(kind, field)
+	if err != nil {
+		return nil, err
+	}
+	var value json.RawMessage
+	if metadataCollectionDefinition(def) {
+		value, _, err = normalizeMetadataCollection(ctx, def, raw, revisions)
+	} else {
+		if len(revisions) != 0 {
+			return nil, errors.New("only relationship metadata accepts target revisions")
+		}
+		value, _, err = normalizeMetadataValue(def, raw)
+	}
+	return value, err
+}
+
 func (s *MetadataFieldStore) Decide(ctx context.Context, input models.MetadataFieldDecisionInput) (*models.MetadataFieldState, error) {
 	if input.Origin != "review" && input.Origin != "migration" {
 		return nil, errors.New("metadata choice requires review or migration")
@@ -322,6 +349,9 @@ func (s *MetadataFieldStore) ApplyAutomatic(ctx context.Context, input models.Me
 }
 
 func (s *MetadataFieldStore) apply(ctx context.Context, input models.MetadataFieldDecisionInput, automatic bool) (*models.MetadataFieldState, error) {
+	if !automatic && input.Policy != nil {
+		return nil, errors.New("reviewed field choices do not accept automatic policy provenance")
+	}
 	current, err := s.State(ctx, input.EntityUUID, input.Field)
 	if err != nil {
 		return nil, err
@@ -386,7 +416,7 @@ WHERE c.uuid=? AND p.state='active')`, id); err != nil {
 		return nil, errors.New("source metadata requires capture provenance")
 	}
 	if d := current.Decision; d != nil && d.Mode == input.Mode && d.Origin == input.Origin && d.Reason == input.Reason &&
-		bytes.Equal(d.Value, value) && equalMetadataCapture(d.CaptureUUID, capture) {
+		bytes.Equal(d.Value, value) && equalMetadataCapture(d.CaptureUUID, capture) && reflect.DeepEqual(d.Policy, input.Policy) {
 		return current, nil
 	}
 	var ret *models.MetadataFieldState
@@ -431,6 +461,11 @@ WHERE c.uuid=? AND p.state='active')`, id); err != nil {
 			return err
 		}
 		ret, err = s.State(ctx, current.Entity.UUID, input.Field)
+		if err == nil && input.Policy != nil {
+			_, err = dbWrapper.Exec(ctx, "INSERT INTO metadata_decision_policies(decision_uuid,collection_uuid,revision) VALUES(?,?,?)", ret.Decision.UUID, input.Policy.CollectionUUID, input.Policy.Revision)
+			ref := *input.Policy
+			ret.Decision.Policy = &ref
+		}
 		return err
 	})
 	if err != nil {

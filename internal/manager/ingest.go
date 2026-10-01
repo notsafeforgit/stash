@@ -89,9 +89,12 @@ func (s *Manager) finishFileIngestion(ctx context.Context, work ingest.FileWork,
 	if s.PluginCache == nil {
 		return nil
 	}
-	if published.MediaCreated || published.FileLinked {
+	if published.MediaCreated || published.FileLinked || len(published.MetadataFields) > 0 {
 		trigger := hook.ImageUpdatePost
-		fields := []string{"files"}
+		fields := metadataHookFields(published.MetadataFields)
+		if published.FileLinked {
+			fields = append(fields, "files")
+		}
 		if media.Kind == models.ArchiveScene {
 			trigger = hook.SceneUpdatePost
 		}

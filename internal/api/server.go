@@ -266,6 +266,7 @@ func Initialize() (*Server, error) {
 		server.ingestWorker = &ingestWorkerRuntime{worker: worker}
 	}
 	r.Mount("/api/v3/ingest-admin", (&ingestRoutes{service: ingestion}).adminRouter())
+	r.Mount("/api/v3/archive", (&nativeArchiveRoutes{repo: repo, notifyMetadata: mgr.RegisterMetadataPolicyHooks}).router())
 	r.Mount("/performer", server.getPerformerRoutes())
 	r.Mount("/scene", server.getSceneRoutes())
 	r.Mount("/gallery", server.getGalleryRoutes())

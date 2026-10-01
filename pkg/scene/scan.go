@@ -50,6 +50,7 @@ type ScanHandler struct {
 	ScanGenerator  ScanGenerator
 	CaptionUpdater video.CaptionUpdater
 	PluginCache    *plugin.Cache
+	MetadataPolicy models.ScanMetadataHandler
 
 	FileNamingAlgorithm models.HashAlgorithm
 	Paths               *paths.Paths
@@ -105,6 +106,7 @@ func (h *ScanHandler) Handle(ctx context.Context, f models.File, oldFile models.
 		}
 	}
 
+	created := len(existing) == 0
 	if len(existing) > 0 {
 		updateExisting := oldFile != nil
 		if err := h.associateExisting(ctx, existing, videoFile, updateExisting); err != nil {
@@ -123,6 +125,13 @@ func (h *ScanHandler) Handle(ctx context.Context, f models.File, oldFile models.
 		h.PluginCache.RegisterPostHooks(ctx, newScene.ID, hook.SceneCreatePost, nil, nil)
 
 		existing = []*models.Scene{&newScene}
+	}
+	if h.MetadataPolicy != nil {
+		for _, entity := range existing {
+			if err := h.MetadataPolicy(ctx, models.ArchiveScene, entity.ID, f, created); err != nil {
+				return err
+			}
+		}
 	}
 
 	if oldFile != nil {

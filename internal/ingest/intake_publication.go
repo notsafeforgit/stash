@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stashapp/stash/pkg/archive"
+	"github.com/stashapp/stash/pkg/metadata"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/txn"
 )
@@ -19,6 +20,7 @@ type IntakePublication struct {
 	UUID               string                   `json:"uuid"`
 	CollectionUUID     string                   `json:"collection_uuid"`
 	CollectionRevision int                      `json:"collection_revision"`
+	PolicyRevision     int                      `json:"policy_revision"`
 	Target             FileTarget               `json:"target"`
 	Kind               models.ArchiveEntityKind `json:"media_kind"`
 	Source             *IntakeSource            `json:"source,omitempty"`
@@ -32,17 +34,19 @@ type IntakeSource struct {
 // IntakePublicationResult excludes local mount paths, captured payloads and
 // credentials. It can be included in a durable job result after commit.
 type IntakePublicationResult struct {
-	FileUUID     string                   `json:"file_uuid"`
-	Generation   int64                    `json:"generation"`
-	ContentUUID  string                   `json:"content_uuid"`
-	MediaUUID    string                   `json:"media_uuid"`
-	MediaKind    models.ArchiveEntityKind `json:"media_kind"`
-	MediaCreated bool                     `json:"media_created"`
-	FileLinked   bool                     `json:"file_linked"`
-	SourceMedia  string                   `json:"source_media"`
-	GalleryUUID  string                   `json:"gallery_uuid,omitempty"`
-	Gallery      string                   `json:"gallery"`
-	Review       []string                 `json:"review"`
+	FileUUID       string                   `json:"file_uuid"`
+	Generation     int64                    `json:"generation"`
+	ContentUUID    string                   `json:"content_uuid"`
+	MediaUUID      string                   `json:"media_uuid"`
+	MediaKind      models.ArchiveEntityKind `json:"media_kind"`
+	MediaCreated   bool                     `json:"media_created"`
+	FileLinked     bool                     `json:"file_linked"`
+	SourceMedia    string                   `json:"source_media"`
+	GalleryUUID    string                   `json:"gallery_uuid,omitempty"`
+	Gallery        string                   `json:"gallery"`
+	Review         []string                 `json:"review"`
+	MetadataState  string                   `json:"metadata_state,omitempty"`
+	MetadataFields []string                 `json:"metadata_fields,omitempty"`
 }
 
 type PublishedIntake struct {
@@ -53,8 +57,9 @@ type PublishedIntake struct {
 // PublishIntake combines media, collection provenance, attachment evidence and
 // source album membership in the caller's managed transaction. Authentication
 // occurs at admission; publication rechecks both the recorded and current
-// collection's active root/path scope. Domain field policy, generated assets,
-// after-success notifications and the completion receipt remain caller work.
+// collection's active root/path scope. Native field policies run in this same
+// transaction; generated assets, after-success notifications and the completion
+// receipt remain caller work.
 // A publisher account never becomes a depicted performer implicitly.
 func (p *PreparedMedia) PublishIntake(ctx context.Context, repo models.Repository, input IntakePublication) (*PublishedIntake, error) {
 	if !ValidUUID(input.UUID) {
@@ -109,6 +114,22 @@ func (p *PreparedMedia) PublishIntake(ctx context.Context, repo models.Repositor
 		if err := publishIntakeSource(ctx, repo, input, ret); err != nil {
 			return nil, err
 		}
+	}
+	policyInput := metadata.Input{CollectionUUID: input.CollectionUUID, CollectionRevision: input.CollectionRevision,
+		PolicyRevision: input.PolicyRevision, EntityUUID: media.Media.UUID, RelativePath: input.Target.RelativePath, Created: media.Created}
+	if input.Source != nil && ret.Result.SourceMedia == "linked" {
+		policyInput.Source = &metadata.Source{CaptureUUID: input.Source.CaptureUUID, AttachmentUUID: input.Source.AttachmentUUID}
+	}
+	policyResult, err := (metadata.Service{Repo: repo}).Apply(ctx, policyInput, "")
+	if err != nil {
+		return nil, err
+	}
+	ret.Result.MetadataState, ret.Result.MetadataFields = policyResult.State, policyResult.AppliedFields()
+	if len(ret.Result.MetadataFields) == 0 {
+		ret.Result.MetadataFields = nil // Keep the checkpoint identical after JSON replay.
+	}
+	for _, field := range policyResult.ReviewFields() {
+		ret.Result.Review = append(ret.Result.Review, "metadata:"+field)
 	}
 	txn.AddPreCommitHook(ctx, func(ctx context.Context) error { return validatePublicationCollection(ctx, repo, input) })
 	return ret, nil

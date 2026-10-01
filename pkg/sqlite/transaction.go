@@ -197,6 +197,7 @@ func (db *Database) Repository() models.Repository {
 		SourceAttachment:       &SourceAttachmentStore{},
 		SourceGallery:          &SourceGalleryStore{gallery: db.Gallery},
 		MetadataField:          &MetadataFieldStore{},
+		MetadataPolicy:         &MetadataPolicyStore{},
 		Share:                  &ShareStore{},
 	}
 }

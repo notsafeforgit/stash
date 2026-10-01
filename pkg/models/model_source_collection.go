@@ -9,96 +9,96 @@ import (
 // MediaRootBinding is local deployment state. Root UUIDs and relative paths
 // remain portable when the server's mount changes.
 type MediaRootBinding struct {
-	Path              string
-	DirectoryIdentity string
+	Path              string `json:"path"`
+	DirectoryIdentity string `json:"directory_identity"`
 }
 
 type MediaRootDefinition struct {
-	Label   string
-	State   string // active, disabled, retired
-	Binding *MediaRootBinding
+	Label   string            `json:"label"`
+	State   string            `json:"state"` // active, disabled, retired
+	Binding *MediaRootBinding `json:"binding"`
 }
 
 type MediaRoot struct {
-	UUID string
+	UUID string `json:"uuid"`
 	MediaRootDefinition
-	Revision  int
-	CreatedAt time.Time
+	Revision  int       `json:"revision"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type MediaRootRevision struct {
 	MediaRoot
-	Origin     string
-	Reason     string
-	RecordedAt time.Time
+	Origin     string    `json:"origin"`
+	Reason     string    `json:"reason"`
+	RecordedAt time.Time `json:"recorded_at"`
 }
 
 type MediaRootInput struct {
-	UUID             string // optional for creation; imports can preserve UUIDs
-	ExpectedRevision int    // zero creates a new logical root
+	UUID             string `json:"uuid"`              // optional for creation; imports can preserve UUIDs
+	ExpectedRevision int    `json:"expected_revision"` // zero creates a new logical root
 	MediaRootDefinition
-	Origin string // review or migration
-	Reason string
+	Origin string `json:"origin"` // review or migration
+	Reason string `json:"reason"`
 }
 
 type SourceCollectionDefinition struct {
-	Label       string
-	Kind        string
-	Namespace   string
-	State       string // active, disabled, retired
-	TargetURL   string
-	AccountUUID *string // scrape target, not a depicted performer
-	RootUUID    *string
-	PathPrefix  string // canonical relative path, or "." for the entire root
+	Label       string  `json:"label"`
+	Kind        string  `json:"kind"`
+	Namespace   string  `json:"namespace"`
+	State       string  `json:"state"` // active, disabled, retired
+	TargetURL   string  `json:"target_url"`
+	AccountUUID *string `json:"account_uuid"` // scrape target, not a depicted performer
+	RootUUID    *string `json:"root_uuid"`
+	PathPrefix  string  `json:"path_prefix"` // canonical relative path, or "." for the entire root
 }
 
 type SourceCollection struct {
-	UUID string
+	UUID string `json:"uuid"`
 	SourceCollectionDefinition
-	Revision  int
-	CreatedAt time.Time
+	Revision  int       `json:"revision"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type SourceCollectionRevision struct {
 	SourceCollection
-	Origin     string
-	Reason     string
-	RecordedAt time.Time
+	Origin     string    `json:"origin"`
+	Reason     string    `json:"reason"`
+	RecordedAt time.Time `json:"recorded_at"`
 }
 
 type SourceCollectionInput struct {
-	UUID             string
-	ExpectedRevision int
+	UUID             string `json:"uuid"`
+	ExpectedRevision int    `json:"expected_revision"`
 	SourceCollectionDefinition
-	Origin string // review, migration, or ingest
-	Reason string
+	Origin string `json:"origin"` // review, migration, or ingest
+	Reason string `json:"reason"`
 }
 
 type CollectionCapture struct {
-	CaptureUUID        string
-	CollectionUUID     string
-	CollectionRevision int
-	CreatedAt          time.Time
+	CaptureUUID        string    `json:"capture_uuid"`
+	CollectionUUID     string    `json:"collection_uuid"`
+	CollectionRevision int       `json:"collection_revision"`
+	CreatedAt          time.Time `json:"created_at"`
 }
 
 // A capture can belong to more than one historical definition of a collection.
 // Both fields are required to page those facts without skipping a revision.
 type CollectionCaptureCursor struct {
-	CaptureUUID        string
-	CollectionRevision int
+	CaptureUUID        string `json:"capture_uuid"`
+	CollectionRevision int    `json:"collection_revision"`
 }
 
 // CollectionMediaIntake records provenance for a manual batch or other intake.
 // It needs no invented scrape capture/account and does not set media metadata.
 type CollectionMediaIntake struct {
-	UUID               string // stable event identity; required for replay
-	CollectionUUID     string
-	CollectionRevision int
-	MediaUUID          string
-	SubmittedMediaUUID string // output: original submitted identity, retained across UUID adoption
-	Origin             string // scan, ingest, review, or migration
-	Reason             string
-	CreatedAt          time.Time
+	UUID               string    `json:"uuid"` // stable event identity; required for replay
+	CollectionUUID     string    `json:"collection_uuid"`
+	CollectionRevision int       `json:"collection_revision"`
+	MediaUUID          string    `json:"media_uuid"`
+	SubmittedMediaUUID string    `json:"submitted_media_uuid"` // output: original submitted identity, retained across UUID adoption
+	Origin             string    `json:"origin"`               // scan, ingest, review, or migration
+	Reason             string    `json:"reason"`
+	CreatedAt          time.Time `json:"created_at"`
 }
 
 var (

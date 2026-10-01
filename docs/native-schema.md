@@ -718,6 +718,16 @@ Anonymised exports delete receipts before jobs to respect the new foreign key;
 startup checks require the receipt job column and lookup index. Migration creates
 no jobs or invented file evidence for existing library rows.
 
+Migration 1000022 adds `metadata_policies`, immutable `metadata_policy_revisions`,
+and `metadata_decision_policies`. Policies pin the reviewed collection definition;
+field decisions reference the exact policy revision with foreign keys. Root-path
+and collection-directory indexes support targeted ordinary-scan matching.
+Startup requires the policy tables, guards and indexes and rejects unfinished
+heads. Anonymised exports remove policy provenance and definitions before their
+referenced field decisions and collections. Existing library and source rows are
+unchanged, and no policies or historical authorship are inferred. See the
+[native policy contract](native-ingestion.md#native-metadata-policies).
+
 Migrations run against copies during development. SQL failure leaves a dirty
 migration state that startup refuses; restore the migration backup or use a
 validated recovery procedure. Do not force a schema version to hide a failure.

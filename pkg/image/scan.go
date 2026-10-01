@@ -62,7 +62,8 @@ type ScanHandler struct {
 
 	ScanConfig ScanConfig
 
-	PluginCache *plugin.Cache
+	PluginCache    *plugin.Cache
+	MetadataPolicy models.ScanMetadataHandler
 
 	Paths *paths.Paths
 }
@@ -108,6 +109,7 @@ func (h *ScanHandler) Handle(ctx context.Context, f models.File, oldFile models.
 		}
 	}
 
+	created := len(existing) == 0
 	if len(existing) > 0 {
 		updateExisting := oldFile != nil
 
@@ -151,6 +153,13 @@ func (h *ScanHandler) Handle(ctx context.Context, f models.File, oldFile models.
 		h.PluginCache.RegisterPostHooks(ctx, newImage.ID, hook.ImageCreatePost, nil, nil)
 
 		existing = []*models.Image{&newImage}
+	}
+	if h.MetadataPolicy != nil {
+		for _, entity := range existing {
+			if err := h.MetadataPolicy(ctx, models.ArchiveImage, entity.ID, f, created); err != nil {
+				return err
+			}
+		}
 	}
 
 	// remove the old thumbnail if the checksum changed - we'll regenerate it

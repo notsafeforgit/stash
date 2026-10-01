@@ -74,7 +74,7 @@ func (j *ScanJob) Execute(ctx context.Context, progress *job.Progress) error {
 	// HACK - these should really be set in the scanner initialization
 	j.scanner.FileHandlers = getScanHandlers(j.input, taskQueue, progress)
 	j.scanner.ScanFilters = []file.PathFilter{newScanFilter(c, repo, minModTime)}
-	j.scanner.HandlerRequiredFilters = []file.Filter{newHandlerRequiredFilter(cfg, repo)}
+	j.scanner.HandlerRequiredFilters = []file.Filter{newHandlerRequiredFilter(cfg, repo), metadataHandlerRequired(repo)}
 
 	logger.Infof("Starting scan of %d paths with %d parallel tasks", len(paths), nTasks)
 
@@ -672,6 +672,7 @@ func getScanHandlers(options ScanMetadataInput, taskQueue *job.TaskQueue, progre
 		&file.FilteredHandler{
 			Filter: file.FilterFunc(imageFileFilter),
 			Handler: &image.ScanHandler{
+				MetadataPolicy:     mgr.applyScanMetadata,
 				CreatorUpdater:     r.Image,
 				GalleryFinder:      r.Gallery,
 				SceneFinderUpdater: r.Scene,
@@ -703,6 +704,7 @@ func getScanHandlers(options ScanMetadataInput, taskQueue *job.TaskQueue, progre
 		&file.FilteredHandler{
 			Filter: file.FilterFunc(videoFileFilter),
 			Handler: &scene.ScanHandler{
+				MetadataPolicy:       mgr.applyScanMetadata,
 				CreatorUpdater:       r.Scene,
 				GalleryFinderUpdater: r.Gallery,
 				CaptionUpdater:       r.File,

@@ -18,6 +18,7 @@ type PerformerFinder interface {
 	FindByStashID(ctx context.Context, stashID StashID) ([]*Performer, error)
 	FindByStashIDStatus(ctx context.Context, hasStashID bool, stashboxEndpoint string) ([]*Performer, error)
 	FindByNames(ctx context.Context, names []string, nocase bool) ([]*Performer, error)
+	FindByNameOrAlias(ctx context.Context, name string, limit int) ([]*Performer, error)
 }
 
 // PerformerQueryer provides methods to query performers.

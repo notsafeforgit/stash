@@ -123,6 +123,13 @@ func (s *Service) FileCompleted(ctx context.Context, token string, raw []byte, d
 		if err := validatePublicationCollection(ctx, s.Repo, publication); err != nil {
 			return err
 		}
+		policy, err := s.Repo.MetadataPolicy.Find(ctx, event.CollectionUUID)
+		if err != nil {
+			return err
+		}
+		if policy != nil {
+			publication.PolicyRevision = policy.Revision
+		}
 		root, err := s.Repo.MediaRoot.Find(ctx, event.RootUUID)
 		if err != nil {
 			return err

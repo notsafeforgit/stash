@@ -16,7 +16,7 @@ class SourcePaused(RuntimeError):
 
 
 def submit(client, request):
-    """Submit an already durable request; the runner owns outage coalescing."""
+    """Submit an already durable request; use RunQueue for offline coalescing."""
     return client._request("POST", "/runs", encode(request, 8192))
 
 

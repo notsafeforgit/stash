@@ -34,7 +34,16 @@ func (rs *ingestRoutes) submitRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	result, err := rs.runCoordinator().Submit(r.Context(), ingestToken(r), input)
-	sourceRunResponse(w, result, err)
+	if err != nil {
+		ingestError(w, err)
+		return
+	}
+	// Many immutable requests can coalesce into one run. Echo the committed
+	// request identity so a producer can release exactly that queued submission.
+	ingestJSON(w, http.StatusOK, struct {
+		*models.SourceRun
+		RequestUUID string `json:"request_uuid"`
+	}{result, input.RequestUUID})
 }
 func (rs *ingestRoutes) sourceRun(w http.ResponseWriter, r *http.Request) {
 	result, err := rs.runCoordinator().Find(r.Context(), ingestToken(r), chi.URLParam(r, "run"))

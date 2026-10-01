@@ -7,7 +7,8 @@ import sys
 
 from .client import Client, Unavailable, drain_once
 from .encoding import InvalidData
-from .outbox import Outbox
+from .outbox import Capacity, Outbox
+from .run_queue import RunQueue, submit_once
 
 
 def main(argv=None):
@@ -23,11 +24,28 @@ def main(argv=None):
     retry.add_argument("event_uuid")
     status = commands.add_parser("receipt-status", help="Fetch actual server work status")
     status.add_argument("event_uuid")
+    request = commands.add_parser("queue-run", help="Durably coalesce a source request without starting a scrape")
+    request.add_argument("--collection", required=True)
+    request.add_argument("--revision", required=True, type=int)
+    request.add_argument("--policy", required=True, help="SHA-256 of the effective worker configuration")
+    request.add_argument("--operation", choices=("download", "enrich"), default="download")
+    request.add_argument("--cooldown", type=int, default=0)
+    request.add_argument("--since", help="Absolute RFC3339 lower bound; omitted means all earlier history")
+    request.add_argument("--until", required=True, help="Explicit RFC3339 exclusive upper bound")
+    request.add_argument("--ticket", help="Stable caller execution UUID for command-response retries")
+    commands.add_parser("submit-runs", help="Submit one ready source request; admission is not completion")
+    runs_status = commands.add_parser("runs-status", help="Local source request state and optional paginated history")
+    runs_status.add_argument("--intent")
+    runs_status.add_argument("--ticket", help="Inspect a caller ticket and its subsequent request history")
+    runs_status.add_argument("--after", type=int, default=0)
+    retry_run = commands.add_parser("retry-run-request", help="Retry a reviewed source request without changing its UUID")
+    retry_run.add_argument("request_uuid")
     args = parser.parse_args(argv)
     box = None
     try:
         box = Outbox(args.outbox, args.endpoint, args.producer)
         client = Client(args.endpoint, args.producer, token_env=args.token_env)
+        requests = RunQueue(box)
         if args.command == "drain":
             output = {"delivery": drain_once(box, client), "outbox": box.status()}
         elif args.command == "retry":
@@ -35,14 +53,39 @@ def main(argv=None):
             output = box.status()
         elif args.command == "receipt-status":
             output = client.receipt_status(args.event_uuid)
+        elif args.command == "queue-run":
+            intent = requests.enqueue({"collection_uuid": args.collection, "collection_revision": args.revision,
+                "policy_sha256": args.policy, "operation": args.operation, "cooldown_seconds": args.cooldown,
+                "window": {"since": args.since, "until": args.until}}, ticket_uuid=args.ticket)
+            output = {"intent_uuid": intent, "ticket_uuid": args.ticket, "state": "recorded", "requests": requests.status()}
+        elif args.command == "submit-runs":
+            output = {"submission": submit_once(requests, client), "requests": requests.status()}
+        elif args.command == "runs-status":
+            output = {"requests": requests.status()}
+            if args.intent and args.ticket:
+                raise InvalidData("Choose either an intent or a caller ticket")
+            if args.ticket:
+                ticket = requests.ticket(args.ticket)
+                if ticket is None:
+                    raise InvalidData("Caller ticket was not found")
+                output["ticket"] = ticket
+                output["history"] = requests.history(ticket["intent_uuid"], after=max(args.after, ticket["first_sequence"] - 1))
+            if args.intent:
+                output["history"] = requests.history(args.intent, after=args.after)
+        elif args.command == "retry-run-request":
+            requests.retry(args.request_uuid)
+            output = {"requests": requests.status()}
         else:
-            output = box.status()
+            output = {**box.status(), "source_requests": requests.status()}
         print(json.dumps(output, sort_keys=True))
         if args.command == "drain":
             counts = output["outbox"]["counts"]
             return 2 if any(counts[k] for k in ("pending", "sending", "review")) else 0
+        if args.command == "submit-runs":
+            state = output["requests"]
+            return 2 if state["pending_windows"] or any(state["counts"][k] for k in ("pending", "sending", "review")) else 0
         return 0
-    except (InvalidData, Unavailable) as exc:
+    except (InvalidData, Unavailable, Capacity) as exc:
         print(str(exc), file=sys.stderr)
         return 1
     except (OSError, sqlite3.Error):

@@ -9,7 +9,8 @@ from pathlib import Path
 from stash_ingest.client import Client, drain_once
 from stash_ingest.encoding import encode
 from stash_ingest.outbox import Outbox
-from stash_ingest.runs import RunLease, submit
+from stash_ingest.runs import RunLease
+from stash_ingest.run_queue import RunQueue, submit_once
 from helpers import capture
 
 
@@ -20,18 +21,32 @@ def main():
                  setup["producer"], clock=lambda: now[0])
     client = Client(setup["endpoint"], setup["producer"])
     policy = "b" * 64
-    request = {"request_uuid": str(uuid.uuid4()), "collection_uuid": setup["collection"],
+    request = {"collection_uuid": setup["collection"],
                "collection_revision": setup["revision"], "operation": "enrich", "policy_sha256": policy,
                "window": {"since": None, "until": datetime.now(timezone.utc).isoformat(timespec="milliseconds")},
                "cooldown_seconds": 0}
-    run = submit(client, request)
-    assert submit(client, request)["uuid"] == run["uuid"]
-    lease = RunLease.claim(client, run["uuid"], policy)
+    queue = RunQueue(box)
+    ticket = str(uuid.uuid4())
+    intent = queue.enqueue(request, ticket_uuid=ticket)
+    failed = submit_once(queue, client)
+    assert failed["state"] == "pending", failed
+    box.close()
+    box = Outbox(Path(setup["directory"]) / "producer.sqlite", setup["endpoint"],
+                 setup["producer"], clock=lambda: now[0])
+    queue = RunQueue(box)
+    now[0] += 10
+    admitted = submit_once(queue, client)
+    assert admitted["state"] == "admitted", admitted
+    assert admitted["request_uuid"] == failed["request_uuid"]
+    assert queue.enqueue(request, ticket_uuid=ticket) == intent
+    assert queue.claim(str(uuid.uuid4())) is None
+    run_id = admitted["run_uuid"]
+    lease = RunLease.claim(client, run_id, policy)
     assert lease is not None
     try:
         assert lease.run["target_url"] == "https://x.com/fixture/media"
         assert lease.run["path_prefix"] == ""
-        assert RunLease.claim(client, run["uuid"], policy) is None
+        assert RunLease.claim(client, run_id, policy) is None
         lease.renew()
         lease.progress(1, 0, "source-key")
         assert lease.run["progress"]["items_seen"] == 1
@@ -58,7 +73,7 @@ def main():
         box.enqueue(encode(source))
         assert box.status()["counts"] == {"pending": 0, "sending": 0, "review": 1, "acknowledged": 1}
         print(json.dumps({"accepted": source["event_uuid"], "rejected": rejected["event_uuid"],
-                          "sha256": ack["sha256"]}))
+                          "sha256": ack["sha256"], "run_uuid": run_id}))
     finally:
         box.close()
 

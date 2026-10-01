@@ -1,6 +1,7 @@
 package scrape_test
 
 import (
+	"encoding/json"
 	"math/rand/v2"
 	"os"
 	"path/filepath"
@@ -12,6 +13,44 @@ import (
 	"github.com/stashapp/stash/pkg/scrape"
 	"github.com/stretchr/testify/require"
 )
+
+func TestSourceWindowsMatchProducerCorpus(t *testing.T) {
+	raw, err := os.ReadFile("testdata/windows-v1.json")
+	require.NoError(t, err)
+	var corpus struct {
+		Version string `json:"version"`
+		Cases   []struct {
+			Name      string                `json:"name"`
+			Wanted    []models.SourceWindow `json:"wanted"`
+			Covered   []models.SourceWindow `json:"covered"`
+			Union     []models.SourceWindow `json:"union"`
+			Remaining []models.SourceWindow `json:"remaining"`
+		} `json:"cases"`
+		Invalid []json.RawMessage `json:"invalid"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &corpus))
+	require.Equal(t, "source-windows-v1", corpus.Version)
+	for _, tc := range corpus.Cases {
+		t.Run(tc.Name, func(t *testing.T) {
+			for _, group := range [][]models.SourceWindow{tc.Wanted, tc.Covered} {
+				for i := range group {
+					group[i], err = scrape.NormalizeWindow(group[i])
+					require.NoError(t, err)
+				}
+			}
+			require.Equal(t, tc.Union, scrape.Union(tc.Wanted))
+			require.Equal(t, tc.Remaining, scrape.Subtract(tc.Wanted, tc.Covered))
+		})
+	}
+	for _, raw := range corpus.Invalid {
+		var window models.SourceWindow
+		err := json.Unmarshal(raw, &window)
+		if err == nil {
+			_, err = scrape.NormalizeWindow(window)
+		}
+		require.Error(t, err, string(raw))
+	}
+}
 
 func TestSourceRunWindowAlgebraPreservesRequestedCoverage(t *testing.T) {
 	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)

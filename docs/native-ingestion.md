@@ -21,7 +21,8 @@ Native metadata policies now share one evaluator between verified intake and
 ordinary scans, with explicit performer defaults and authenticated preview/apply.
 Native source-run coordination now provides coalesced windows and fenced leases.
 The Python adapter provides durable outboxes, worker lease enforcement and
-download hooks. Offline run-request coalescing, additional post adapters,
+download hooks and offline run-request coalescing. Effective worker configuration,
+launcher integration, additional post adapters,
 host/n8n conversion, catalog import, and native administration/review UI remain required.
 Existing scrapes have not switched to this interface. Root, collection and policy
 administration endpoints are described below.
@@ -334,7 +335,7 @@ Producer authentication and collection/root grants are the same as event intake.
 
 | Producer route | Body or result |
 | --- | --- |
-| `POST /runs` | Submit the typed request below; returns its native run |
+| `POST /runs` | Submit the typed request below; returns its native run plus the committed `request_uuid` |
 | `GET /runs/<uuid>` | Current state, windows, ownership, progress and retry time |
 | `POST /runs/list` | `collection_uuid`, optional integer `after`; at most 50 authorized runs in sequence order |
 | `POST /runs/<uuid>/attempts` | Optional integer `after` fence; at most 50 attempts |
@@ -347,6 +348,13 @@ query-string tokens and parameters remain rejected. A claim returns 204 and
 with the same producer and worker UUID returns its still-valid lease. A different
 producer or worker cannot borrow it. Rotate the ingestion token while retaining
 the producer UUID when the same worker should keep ownership.
+
+Capabilities advertise `source_run_submission_receipts: true` when submission
+responses identify the committed request. Multiple requests may coalesce into
+one run, so a producer must match `request_uuid` and the collection/policy
+definition before releasing a queued submission. The returned run is a current
+snapshot, which may already be running, deferred, cancelled or completed when a
+lost response is replayed. Admission does not assert scrape completion.
 
 ```json
 {
@@ -438,9 +446,10 @@ ownership; it does not undo source evidence or completed-file jobs. Review
 actions and attempt outcomes remain in the database. Producer tokens cannot
 access this administrative route.
 
-Worker integration remains required: durable local request coalescing during
-outages, outbox delivery, shared filesystem locking, lease renewal and pausing
-before the next source request after expiry, and host/n8n/recovery conversion.
+The producer SDK implements durable local request coalescing during outages,
+outbox delivery, shared filesystem locking, lease renewal and pausing before the
+next source request after expiry. Effective window/configuration handling and
+conversion of the actual host/n8n/recovery launch paths remain required.
 No legacy PID, lease or journal is promoted automatically by this migration.
 The separate importer must preserve permanent completions, checkpoints,
 deferrals and intentionally ignored unavailable originals before cutover.
@@ -609,6 +618,15 @@ Source capture dependencies, capacity bounds, concurrent drainer fences,
 persistent backoff and explicit review states survive worker restart. A file
 receipt acknowledges admission to verification, not media completion.
 
+The same producer database now coalesces source-run requests while Stash is
+unavailable. Overlapping windows merge and disjoint ranges stay separate. Once
+a submission is claimed, its UUID and bytes stay fixed across backoff, lost
+responses and restart. Native admission receipts echo the committed request
+UUID; admission does not assert that a scrape has finished. Optional caller
+tickets prevent command-response retries from scheduling the same execution
+again. Producer schema 2 adds this queue transactionally to schema 1 without
+rewriting pending events, dependencies, receipts or delivery leases.
+
 The package uses `STASH_INGEST_TOKEN` (or another named environment reference)
 only for Stash's API. Website logins, cookies and downloader proxy settings
 remain in the gallery-dl environment and are not managed by this client.
@@ -628,6 +646,5 @@ tests. The backend's HTTP test executes the client and source-lease lifecycle
 against an isolated native database. Python 3.12 or newer is required.
 
 This package is not yet installed into the host/n8n launch paths. Effective
-window/configuration handling, outage request coalescing, additional source
-adapters and conversion of recovery/scheduled callers remain required before
-cutover.
+window/configuration handling, additional source adapters and conversion of
+recovery/scheduled callers remain required before cutover.

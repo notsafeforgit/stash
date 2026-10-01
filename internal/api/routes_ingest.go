@@ -151,7 +151,7 @@ func (rs *ingestRoutes) capabilities(w http.ResponseWriter, r *http.Request) {
 		"kinds": kinds, "post_namespaces": []string{"native:reddit", "native:twitter"},
 		"retention_policy": archive.SourceRetentionVersion, "max_event_bytes": ingest.MaxEventBytes, "max_batch_bytes": ingest.MaxBatchBytes, "max_batch_events": ingest.MaxBatchEvents,
 		"max_file_event_bytes": ingest.MaxFileEventBytes, "file_ingestion": rs.fileIngestion,
-		"source_runs": true, "source_run_protocol": 1,
+		"source_runs": true, "source_run_protocol": 1, "source_run_submission_receipts": true,
 		"receipt_semantics": "source.capture commits source evidence; file.completed queues verification; poll receipt status for media completion",
 	})
 }

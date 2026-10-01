@@ -49,9 +49,11 @@ func TestPythonProducerDurableDeliveryAgainstNativeHTTP(t *testing.T) {
 	_, token, err := service.IssueCredential(context.Background(), producer.UUID, []models.IngestScope{{CollectionUUID: collection.UUID}}, nil)
 	require.NoError(t, err)
 	router := (&ingestRoutes{service: service}).router()
-	var batches atomic.Int32
+	var batches, submissions atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == ingestPath+"/batches" && batches.Add(1) == 1 {
+		lose := (r.URL.Path == ingestPath+"/batches" && batches.Add(1) == 1) ||
+			(r.URL.Path == ingestPath+"/runs" && r.Method == http.MethodPost && submissions.Add(1) == 1)
+		if lose {
 			// Commit the real request, then replace the response as a failed proxy
 			// could. The next delivery must recover the immutable receipt.
 			committed := httptest.NewRecorder()
@@ -95,6 +97,7 @@ func TestPythonProducerDurableDeliveryAgainstNativeHTTP(t *testing.T) {
 		Accepted string `json:"accepted"`
 		Rejected string `json:"rejected"`
 		Digest   string `json:"sha256"`
+		RunUUID  string `json:"run_uuid"`
 	}
 	require.NoError(t, json.Unmarshal(stdout.Bytes(), &result))
 	require.NoError(t, service.Repo.WithReadTxn(context.Background(), func(ctx context.Context) error {
@@ -105,7 +108,13 @@ func TestPythonProducerDurableDeliveryAgainstNativeHTTP(t *testing.T) {
 		rejected, err := service.Repo.Ingest.FindReceipt(ctx, producer.UUID, result.Rejected)
 		require.NoError(t, err)
 		require.Nil(t, rejected)
+		runs, err := service.Repo.SourceRun.List(ctx, collection.UUID, nil, 0, 50)
+		require.NoError(t, err)
+		require.Len(t, runs, 1, "lost submission acknowledgement must not create another run")
+		require.Equal(t, result.RunUUID, runs[0].UUID)
+		require.Equal(t, "succeeded", runs[0].State)
 		return nil
 	}))
 	require.EqualValues(t, 2, batches.Load())
+	require.EqualValues(t, 2, submissions.Load())
 }

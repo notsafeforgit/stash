@@ -11,15 +11,15 @@ import (
 const MaxWindows = 64
 
 func NormalizeWindow(w models.SourceWindow) (models.SourceWindow, error) {
+	w.Until = w.Until.UTC()
 	if w.Until.IsZero() || w.Until.Year() < 1 || w.Until.Year() > 9999 || w.Until.Nanosecond()%int(time.Millisecond) != 0 {
 		return w, models.ErrSourceRunInvalid
 	}
-	w.Until = w.Until.UTC()
 	if w.Since != nil {
-		if w.Since.Year() < 1 || w.Since.Year() > 9999 || !w.Since.Before(w.Until) || w.Since.Nanosecond()%int(time.Millisecond) != 0 {
+		since := w.Since.UTC()
+		if since.Year() < 1 || since.Year() > 9999 || !since.Before(w.Until) || since.Nanosecond()%int(time.Millisecond) != 0 {
 			return w, models.ErrSourceRunInvalid
 		}
-		since := w.Since.UTC()
 		w.Since = &since
 	}
 	return w, nil

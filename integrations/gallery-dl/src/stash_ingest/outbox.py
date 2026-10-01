@@ -17,7 +17,7 @@ from .encoding import InvalidData, MAX_BATCH_BYTES, decode, digest, encode, iden
 from .endpoint import origin
 
 APPLICATION_ID = 0x5354494F  # STIO, not a Stash or gallery-dl archive database.
-SCHEMA = 1
+SCHEMA = 2
 
 
 class Conflict(InvalidData):
@@ -61,7 +61,7 @@ class Outbox:
             version = self.db.execute("PRAGMA user_version").fetchone()[0]
             application = self.db.execute("PRAGMA application_id").fetchone()[0]
             tables = self.db.execute("SELECT name FROM sqlite_schema WHERE type='table'").fetchall()
-            if not ((version == SCHEMA and application == APPLICATION_ID)
+            if not ((version in (1, SCHEMA) and application == APPLICATION_ID)
                     or (version == 0 and application == 0 and not tables)):
                 raise InvalidData("Unsupported or foreign outbox database")
             self.db.execute("PRAGMA foreign_keys=ON")
@@ -73,6 +73,7 @@ class Outbox:
                 # and initialized the same empty queue concurrently.
                 if self.db.execute("PRAGMA user_version").fetchone()[0] == 0:
                     self._initialize()
+                self._migrate()
                 binding = self.db.execute("SELECT endpoint, producer FROM binding WHERE id=1").fetchone()
                 if tuple(binding) != (self.endpoint, self.producer):
                     raise Conflict("Outbox belongs to a different Stash origin or producer")
@@ -106,6 +107,45 @@ class Outbox:
         self.db.execute("CREATE INDEX expired_events ON events(lease_until) WHERE state='sending'")
         self.db.execute("CREATE INDEX queued_sizes ON events(length(body)) WHERE body IS NOT NULL")
         self.db.execute(f"PRAGMA application_id={APPLICATION_ID}")
+        self.db.execute("PRAGMA user_version=1")
+
+    def _migrate(self):
+        version = self.db.execute("PRAGMA user_version").fetchone()[0]
+        if version == SCHEMA:
+            return
+        if version != 1:
+            raise InvalidData("Unsupported outbox migration")
+        self.db.execute("""CREATE TABLE run_intents(
+            uuid TEXT PRIMARY KEY, config_sha256 TEXT NOT NULL UNIQUE, template BLOB NOT NULL,
+            operation TEXT NOT NULL CHECK(operation IN ('download','enrich')),
+            windows BLOB NOT NULL, window_count INTEGER NOT NULL CHECK(window_count BETWEEN 0 AND 64),
+            latest_until TEXT NOT NULL, pending_since REAL, created_at REAL NOT NULL, updated_at REAL NOT NULL,
+            CHECK((window_count=0 AND pending_since IS NULL) OR (window_count>0 AND pending_since IS NOT NULL))
+        )""")
+        self.db.execute("""CREATE TABLE run_requests(
+            seq INTEGER PRIMARY KEY, request_uuid TEXT NOT NULL UNIQUE,
+            intent_uuid TEXT NOT NULL REFERENCES run_intents(uuid),
+            sha256 TEXT NOT NULL, window BLOB NOT NULL, until_stamp TEXT NOT NULL,
+            body BLOB, receipt BLOB, run_uuid TEXT,
+            state TEXT NOT NULL CHECK(state IN ('pending','sending','admitted','review')),
+            owner TEXT, fence INTEGER NOT NULL DEFAULT 0, lease_until REAL,
+            attempts INTEGER NOT NULL DEFAULT 0, available_at REAL NOT NULL,
+            created_at REAL NOT NULL, admitted_at REAL, error_code TEXT,
+            CHECK((state='sending' AND owner IS NOT NULL AND lease_until IS NOT NULL)
+                OR (state!='sending' AND owner IS NULL AND lease_until IS NULL)),
+            CHECK((state='admitted' AND receipt IS NOT NULL AND body IS NULL AND run_uuid IS NOT NULL)
+                OR (state!='admitted' AND receipt IS NULL AND body IS NOT NULL AND run_uuid IS NULL))
+        )""")
+        self.db.execute("CREATE UNIQUE INDEX one_run_submission ON run_requests(intent_uuid) WHERE state!='admitted'")
+        self.db.execute("CREATE INDEX ready_run_requests ON run_requests(state,available_at,until_stamp)")
+        self.db.execute("CREATE INDEX expired_run_requests ON run_requests(lease_until) WHERE state='sending'")
+        self.db.execute("CREATE INDEX run_request_history ON run_requests(intent_uuid,seq)")
+        self.db.execute("CREATE INDEX pending_run_intents ON run_intents(operation,latest_until) WHERE window_count>0")
+        self.db.execute("""CREATE TABLE run_intent_tickets(
+            uuid TEXT PRIMARY KEY, intent_uuid TEXT NOT NULL REFERENCES run_intents(uuid),
+            sha256 TEXT NOT NULL, window BLOB NOT NULL, first_sequence INTEGER NOT NULL CHECK(first_sequence>0),
+            created_at REAL NOT NULL
+        )""")
         self.db.execute(f"PRAGMA user_version={SCHEMA}")
 
     @contextmanager

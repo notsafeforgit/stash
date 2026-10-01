@@ -2293,3 +2293,75 @@ resolution, validated source/root registration, media/post/profile history,
 worker activation and the later transition phases remain required work. The live
 library, catalog registry, host/n8n workers and frozen compatible deployment remain
 unchanged.
+
+## Bounded snapshots of individual catalog bodies
+
+The producer package now includes `stash-prepare-catalog`, a versioned read-only
+reader and durable snapshot command for recognized catalog schema versions 1–3.
+It inventories every physical family and schema object, validates table/key
+shapes, checks SQLite and logical references, and rejects unknown tables/columns
+or views. Older physical sidecars and normalized document/source layouts remain
+distinct supported inputs; the normalized view is not exported as duplicate data.
+
+The snapshot preserves original SQLite values and JSON strings, with an explicit
+binary representation for exact sidecar bytes. Ordered chunks contain at most
+1,000 records and 16 MiB; each table and chunk has a row count and digest. The
+manifest retains the original registry/catalog/snapshot identities, schema,
+reference counts and reconstructed capture inventory. Profile bodies and shared
+observations remain physical rows rather than being expanded into repeated stored
+payloads. The reader verifies profile hashes and paths, per-capture patches and
+sidecar content hashes. Shared observations with detail rows create no extra
+synthetic capture. Profile caching has both entry and byte bounds.
+
+Files and directories are flushed before publishing a private snapshot directory.
+Existing destinations are not overwritten; interrupted or lost acknowledgements
+can be resolved by verifying the saved manifest and chunks. Verification checks
+names, digests, counts, ordered unique keys, binary checksums and table/reference
+inventories. The command reports `imported:false`: native batch mapping, review
+outcomes and import completion receipts remain required subsequent work.
+
+The full rehearsal is in
+`.local/native-catalog-source-rehearsal-20261001/`. All 1,697 catalogs listed in
+the frozen registry were copied and prepared; there were no missing or additional
+catalog files. Initial sandboxed backups could not create SQLite's transient WAL
+shared-memory files for some sources. The isolated helper was stopped, its 227
+completed copies were preserved, and the remaining 1,470 read-only backups were
+completed with access for those temporary files. That backup pass took 97.718
+seconds. No catalog data or native library was modified.
+
+The final preparation/verification covered 4,764,236 physical rows, including
+256,991 posts, 379,449 observations, 444,898 detail captures, 781 profile bodies,
+272,556 sidecar documents and their references. Reconstruction yielded 526,348
+original captures with 18,245 profile references; the largest payload was
+2,928,257 bytes. All 22 present physical families were retained, including empty
+edit, file-event and prune queues. Preparation plus verification took 201.312
+seconds with peak resident memory of 84,004 KiB. Frozen databases occupy
+2,940,776,448 bytes and prepared record chunks 2,816,108,769 bytes, excluding their
+manifests. These individually consistent backups are rehearsal inputs, not a
+coordinated production cutover boundary.
+
+An independent comparison then read every original SQLite row and every exported
+record, preserving SQLite value types, JSON strings and binary bytes. It also
+compared all 526,348 reconstructed payloads, capture IDs, timestamps, metadata and
+extractor versions with the existing catalog reader's `observations.expand` path.
+All 1,697 catalogs, all 4,764,236 rows and all captures matched, with zero errors.
+Original database file hashes matched before and after inspection. This pass took
+136.975 seconds with peak resident memory of 134,852 KiB. Private manifests,
+source hashes, helper code and both reconciliation reports are retained locally.
+
+The producer validation gate passed all 216 tests on Python 3.14 (5.344 seconds)
+and the complete suite also passed on Python 3.12 (6.003 seconds). Eight new tests
+cover older layouts, shared/flat captures, nested profile references, exact binary
+preservation, unknown/corrupt inputs, deterministic bounded output, destination
+protection, tampering, publication response loss and the CLI. The rebuilt isolated
+package's installed command prepared and verified the Elizabeth Tran catalog with
+the exact same manifest digest as the source checkout. Parent `e172751f6` passed
+lint, build and preview image publication in CI.
+
+Logs under `/tmp/stash-native-transition` are `catalog-snapshot-backup.log`,
+`catalog-snapshot-full-rehearsal-final.log`,
+`catalog-snapshot-independent-reconciliation.log`,
+`catalog-snapshot-producer-final.log`, `catalog-snapshot-python312-final.log`,
+`catalog-snapshot-focused-final.log` and `catalog-snapshot-package-install.log`.
+The native database remains at schema 1000029. Production, workers and n8n have
+not switched, and the full transition remains in progress.

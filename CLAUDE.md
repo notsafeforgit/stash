@@ -335,6 +335,15 @@ account/catalog mappings support later catalog-content import; they never become
 a second live ownership authority. No collection root or scrape target is inferred,
 and import does not activate work. Preserve exact replay and atomic rollback.
 
+`stash-prepare-catalog` reads recognized individual catalog layouts into bounded,
+hashed snapshots with complete row/schema inventories and capture reconstruction
+proofs. Original JSON strings, binary sidecar bytes and profile references survive;
+the normalized sidecar view is not a second physical copy. Keep shared revisions
+distinct from captures and validate references before reconstructing payloads.
+Preparation reports `imported:false`; native batch mapping and activation are
+still separate required work. Unknown schemas cannot silently disappear from an
+import manifest. Use frozen copies and the coordinated cutover boundary.
+
 ### v3 extension points
 
 See `ui/v3/docs/architecture.md` for the current module map and compatibility rules. List configurations require a discriminated GraphQL/local `source`; generated query variables remain typed through the data hook. Layout, preferences, query state, and cache refill live in separate list modules. Player transition policy consumes plain buffered/seekable state in `scene-player-transitions.ts`; media effects, recovery, and transcode leases are separate hooks. Keep the stable player root and existing iOS seek/timeline behavior when extending these modules.

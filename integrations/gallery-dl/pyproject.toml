@@ -27,6 +27,7 @@ stash-import-scan-journal = "stash_ingest.scan_journal_import:main"
 stash-activate-scan-journal = "stash_ingest.scan_activation:main"
 stash-import-catalog-identities = "stash_ingest.catalog_identity_import:main"
 stash-import-catalog-registry = "stash_ingest.catalog_registry_import:main"
+stash-prepare-catalog = "stash_ingest.catalog_snapshot:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

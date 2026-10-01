@@ -709,6 +709,41 @@ do not import individual catalog bodies or activate workers. See the
 [native registry contracts](../../docs/native-source-identity.md#importing-the-performer-registry)
 for performer-import preparation, limits, ownership rules and inspection APIs.
 
+### Individual catalog snapshots
+
+`stash-prepare-catalog` prepares the individual catalog databases for the next
+import phase. It reads a frozen SQLite input in one read-only transaction,
+validates recognized schema versions 1–3, checks declared and logical references,
+and retains every physical record family. Unknown tables, columns and views fail
+preparation. Normalized sidecar views are inventoried without copying the same
+physical document twice.
+
+```sh
+stash-prepare-catalog --catalog /migration/catalogs/CATALOG_ID.sqlite3 \
+  --output /migration/prepared/CATALOG_ID --source REGISTRY_SOURCE_UUID \
+  --snapshot SNAPSHOT_UUID --captured-at FIXED_RFC3339_TIME
+stash-prepare-catalog --verify /migration/prepared/CATALOG_ID \
+  --expected-sha256 MANIFEST_SHA256
+```
+
+The output directory contains `manifest.json` and ordered `records-NNNNNN.jsonl`
+chunks. Each chunk holds at most 1,000 records and 16 MiB. SQLite text stays text,
+including original embedded JSON strings; binary sidecar bytes use an explicit
+base64 value. Hashes/counts cover every table, chunk and reconstructed capture.
+The manifest includes the original catalog identity, schema definitions and
+reference counts. Profile bodies and shared observations remain stored once per
+physical source row. Capture reconstruction verifies their references and patches
+without persisting expanded payload copies.
+
+Snapshots publish from a private temporary directory after file/directory flushes;
+existing destinations are never overwritten. Verification checks the saved
+manifest digest, chunk names/counts/hashes, ordered unique keys and binary
+checksums. After a lost preparation response, inspect the same directory with
+`--verify`. Preparation creates no native records, jobs or media and explicitly
+reports `imported:false`. Native batch import and per-record migration outcomes
+remain the next implementation step. Individually consistent live backups do not
+replace the coordinated production cutover snapshot.
+
 ## Native n8n backfills
 
 `stash-ingest-n8n` replaces the account backfill runner's record/inspect contract.

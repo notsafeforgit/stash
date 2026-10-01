@@ -254,3 +254,30 @@ reviewed binding using `--apply --expected-sha256 PLAN_SHA256`; retry the same
 binding and digest after response loss. As above, authorization uses the Stash
 application key, not a producer token or website credential. Review resolution,
 source activation and the individual catalog bodies remain subsequent work.
+
+## Preparing individual catalog bodies
+
+The supported producer package now includes `stash-prepare-catalog`, the read-only
+input stage for catalog-body migration. Its versioned reader covers recognized
+SQLite catalog layouts for versions 1–3, including flat observations, shared
+observation/capture rows, separately referenced account profiles, older physical
+sidecars and normalized sidecar documents/sources. It checks the database lineage,
+column/key inventory, SQLite integrity and logical references independently of
+whether older schemas declared every foreign key. Unknown shapes stop preparation.
+
+A prepared snapshot retains every physical row, original JSON text and binary
+sidecar bytes in bounded, ordered chunks. Its manifest binds the original registry
+UUID, catalog ID, snapshot UUID, capture time, complete schema, table/chunk hashes,
+record counts, relationship counts and reconstructed capture hashes. Shared
+observations with detail rows produce only their original captures; a flat
+observation produces one capture. The shared observation's summary timestamp is
+not invented as an additional capture. Profile hashes and reference paths are
+validated before hydration, and `_reddit` parent patches preserve their original
+merge semantics. Reconstruction runs in memory and adds no stored payload copies.
+
+The CLI publishes a new private directory after flushing its contents and supports
+verification of the exact saved manifest after interruption or response loss.
+It performs no native database writes or identity/media decisions. The resulting
+chunks are the input to the still-required native catalog importer, whose domain
+mappings, review outcomes and completion receipts remain separate work. See the
+[snapshot command and format](../integrations/gallery-dl/README.md#individual-catalog-snapshots).

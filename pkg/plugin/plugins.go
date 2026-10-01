@@ -17,6 +17,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/stashapp/stash/pkg/fsutil"
 	"github.com/stashapp/stash/pkg/logger"
@@ -428,6 +429,20 @@ func (c Cache) ExecutePostHooks(ctx context.Context, id int, hookType hook.Trigg
 	}
 }
 
+// ExecuteDurablePostHooks reports failures to the persisted caller. The event
+// identity stays the same across retries; delivery is at least once. Domain
+// changes have already committed and cannot be vetoed by a plugin.
+func (c Cache) ExecuteDurablePostHooks(ctx context.Context, eventID string, id int, hookType hook.TriggerEnum, input interface{}, inputFields []string) error {
+	if eventID == "" {
+		return errors.New("durable hook requires an event identity")
+	}
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+	return c.deliverPostHooks(ctx, hookType, common.HookContext{
+		EventID: eventID, ParentHooks: parentHookSources(ctx), ID: id, Type: hookType.String(), Input: input, InputFields: inputFields,
+	}, true)
+}
+
 func (c Cache) RegisterPostHooks(ctx context.Context, id int, hookType hook.TriggerEnum, input interface{}, inputFields []string) {
 	txn.AddPostCommitHook(ctx, func(ctx context.Context) {
 		c.ExecutePostHooks(ctx, id, hookType, input, inputFields)
@@ -449,6 +464,10 @@ func (c Cache) ExecuteSceneUpdatePostHooks(ctx context.Context, input models.Sce
 const maxCyclicLoopDepth = 10
 
 func (c Cache) executePostHooks(ctx context.Context, hookType hook.TriggerEnum, hookContext common.HookContext) error {
+	return c.deliverPostHooks(ctx, hookType, hookContext, false)
+}
+
+func (c Cache) deliverPostHooks(ctx context.Context, hookType hook.TriggerEnum, hookContext common.HookContext, reportFailure bool) error {
 	visitedPluginHookCounts := getVisitedPluginHookCounts(ctx)
 
 	for _, p := range c.enabledPluginsForHook(hookType) {
@@ -461,6 +480,9 @@ func (c Cache) executePostHooks(ctx context.Context, hookType hook.TriggerEnum, 
 		}
 
 		for _, h := range hooks {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
 			newCtx := session.AddVisitedPluginHook(ctx, p.id, hookType)
 			serverConnection := c.makeServerConnection(newCtx)
 
@@ -468,6 +490,7 @@ func (c Cache) executePostHooks(ctx context.Context, hookType hook.TriggerEnum, 
 			addHookContext(pluginInput.Args, hookContext)
 
 			pt := pluginTask{
+				context:      newCtx,
 				plugin:       &p,
 				operation:    &h.OperationConfig,
 				input:        pluginInput,
@@ -481,6 +504,12 @@ func (c Cache) executePostHooks(ctx context.Context, hookType hook.TriggerEnum, 
 			}
 
 			if err := waitForTask(ctx, task); err != nil {
+				if reportFailure && ctx.Err() != nil {
+					// Stop has been requested. Do not close the worker's database
+					// while an in-process plugin is still unwinding a request.
+					task.Wait()
+					return ctx.Err()
+				}
 				return err
 			}
 
@@ -489,6 +518,9 @@ func (c Cache) executePostHooks(ctx context.Context, hookType hook.TriggerEnum, 
 				logger.Debugf("%s [%s]: returned no result", hookType.String(), p.Name)
 			} else {
 				if output.Error != nil {
+					if reportFailure {
+						return fmt.Errorf("plugin %s hook %s: %s", p.id, hookType, *output.Error)
+					}
 					logger.Errorf("%s [%s]: returned error: %s", hookType.String(), p.Name, *output.Error)
 				} else if output.Output != nil {
 					logger.Debugf("%s [%s]: returned: %v", hookType.String(), p.Name, output.Output)

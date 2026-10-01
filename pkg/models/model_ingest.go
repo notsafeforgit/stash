@@ -43,8 +43,9 @@ type IngestReceipt struct {
 	RootUUID           *string         `json:"root_uuid"`
 	RunUUID            string          `json:"run_uuid"`
 	Kind               string          `json:"kind"`
-	PostUUID           string          `json:"post_uuid"`
-	CaptureUUID        string          `json:"capture_uuid"`
+	PostUUID           string          `json:"post_uuid,omitempty"`
+	CaptureUUID        string          `json:"capture_uuid,omitempty"`
+	JobUUID            string          `json:"job_uuid,omitempty"`
 	Result             json.RawMessage `json:"result"`
 	CommittedAt        time.Time       `json:"committed_at"`
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/stashapp/stash/pkg/hash/md5"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/scene/generate"
+	"github.com/stashapp/stash/pkg/txn"
 )
 
 type CoverSourceStatus string
@@ -224,6 +225,12 @@ func (t *GenerateCoverTask) generateWithCoverSource(ctx context.Context) error {
 	}
 	source.CoverChecksum = md5.FromBytes(data)
 	return r.WithTxn(ctx, func(ctx context.Context) error {
+		if t.publicationGuard != nil {
+			if err := t.publicationGuard(ctx); err != nil {
+				return err
+			}
+			txn.AddPreCommitHook(ctx, t.publicationGuard)
+		}
 		current, err := r.Scene.Find(ctx, scene.ID)
 		if err != nil {
 			return err

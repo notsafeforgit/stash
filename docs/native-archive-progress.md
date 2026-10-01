@@ -57,6 +57,7 @@ review. Production has not been migrated.
 | Stash `5777a6b60` | Verified content identities, immutable root/file verification history, and file-generation guards; full-copy reconciliation, complete validation gate, CI lint/build, and preview image publication passed |
 | Stash `b5e996347` | Durable archive jobs, fenced leases, coalesced submissions and atomic publication; full-copy reconciliation, complete validation gate, targeted race tests, CI lint/build, and preview image publication passed |
 | Stash `a2fdd056e` | Verified file/media publication and persistent path removal fences; full-copy reconciliation, complete validation gate, CI lint/build, and preview image publication passed |
+| Stash `372f3267b` | Collection/source intake and selected media feed native album galleries; full validation, targeted index checks, CI lint/build, and preview image publication passed |
 
 ## Phase status
 
@@ -64,7 +65,7 @@ review. Production has not been migrated.
 | --- | --- |
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
 | 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries and metadata relationship targets, native account/ownership storage and reviewed consolidation, shared post/profile/capture storage, ordered attachment manifests, audited media associations, reviewed source-list selection, and source-gallery synchronization with manual membership intent are implemented. Scalar and relationship field choices protect explicit and preserved metadata. Revisioned logical roots and source collections retain capture/manual-intake provenance; captured publisher choices connect source evidence to accounts independently of depicted performers. Verified byte identities and immutable per-file verification history now use persistent file-generation guards. Producer identity matching, policy resolution, review APIs/UI and remaining domain services are in progress. |
-| 2 Ingestion and producer adapter | In progress: scoped producer tokens, Reddit/Twitter capture batches and durable receipts are implemented. Verified preparation uses the shared scanner; file/media publication checks descriptors, generations and persistent path removals, reuses concurrent scans, and rejects ambiguous verified-byte owners. Intake publication connects collection provenance, selected source media, attachment evidence and album galleries while preserving explicit choices. Persistent jobs have coalesced submissions, fenced leases, retry/cancellation/recovery, and atomic domain/result publication. File-completion admission/receipts, field policy, durable generated assets/notifications, actual workers and source-run coordination, additional source adapters, producer outboxes and host/n8n conversion remain. |
+| 2 Ingestion and producer adapter | In progress: scoped producer tokens, Reddit/Twitter capture batches and durable receipts are implemented. Verified preparation uses the shared scanner; file/media publication checks descriptors, generations and persistent path removals, reuses concurrent scans, and rejects ambiguous verified-byte owners. Intake publication connects collection provenance, selected source media, attachment evidence and album galleries while preserving explicit choices. Persistent jobs have coalesced submissions, fenced leases, retry/cancellation/recovery, and atomic domain/result publication. File-completion admission now queues a durable worker that checkpoints registration, generates previews and delivers retryable media/gallery hooks; scoped status reports actual completion. Field policy, performer defaults, general durable edit notifications, source-run coordination, additional source adapters, producer outboxes and host/n8n conversion remain. |
 | 3 Catalog importer and full-copy reconciliation | Not yet implemented |
 | 4 Native UI and client conversion | Not yet implemented |
 | 5 Compatibility removal and packaging | Preview packaging isolated and old compatibility gate replaced by current v3 operation/plugin-contract checks. Old UI/API/plugin adapters and config bridge still require conversion/removal. |
@@ -977,3 +978,58 @@ corrections: generation, frontend checks and 528 UI tests, retained v3 extension
 contracts and 71 application operation files, zero Go lint issues, and every Go
 unit/integration package. The SQLite suite completed in 268.4 seconds, ingestion
 in 241.5 seconds, and API tests in 135.3 seconds.
+
+## File event admission, worker and runtime
+
+Migration 1000021 connects immutable file-event receipts to durable verification
+jobs while preserving all source-capture receipts. File intake can reference an
+acknowledged source attachment, or omit source data for manual media. Admission
+checks the producer's Stash API scope, final root-relative file, collection
+revision and attachment membership. Receipt failure rolls scheduling back.
+Replaying the same event returns its original receipt, including after restart,
+file disappearance or API token rotation; changed bytes under that event conflict.
+Website credentials remain entirely with the scraper.
+
+The v3 HTTP server exposes `file.completed` and a receipt status route when its
+media tools are configured. File admission returns 202 and never calls a claimed
+hash verified. The worker hashes/probes outside SQLite, renews its lease, and
+commits verified registration with a resumable progress checkpoint. It then
+creates missing previews and delivers scene/image and gallery hooks with stable
+event identities. Errors remain pending/failed; retries retain the original
+creation/link facts and do not create another item. Plugin delivery is at least
+once. Cancellation waits for the worker before SQLite closes; expired attempts
+are recoverable after restart. General edit-hook persistence remains unfinished.
+
+Status separates `registration_committed` from `media_ingested`. An effect failure
+or cancellation does not hide an earlier committed registration. Final validation
+rejects changed roots/scopes, replaced files, obsolete generations and removed
+ownership. Existing cover choices remain protected. File case detection now uses
+filesystem identity instead of equal timestamps and skips letters without case.
+
+Focused tests passed for duplicate and concurrent delivery, token rotation,
+source/manual scope, rollback, restart, retry delays, cancellation, heartbeat
+renewal, checkpoint expiry, descriptor changes before final commit, HTTP lifecycle,
+actual image/video preview generation, and plugin retry identities/cancellation.
+Schema-20 receipt promotion and anonymisation with file jobs also passed.
+
+The isolated full copy migrated from 1000020 to 1000021 in 0.680 seconds. All
+125 retained tables matched by streaming semantic digest, with zero foreign-key
+violations and no size growth. Reconciliation took 49.0 seconds. The private
+receipt is `.local/native-archive-rehearsal-20260930/file-ingest-reconciliation.json`.
+
+This development capability does not switch existing gallery-dl/n8n producers.
+Native field policy and performer defaults, source-run leases/coalescing,
+additional source adapters, producer outboxes, catalog import, review UI, and the
+remaining transition phases are still required. Production remains pinned to
+the compatible release; no production database or catalog was migrated.
+
+Targeted race checks passed for worker publication/resumption/renewal, the HTTP
+worker lifetime, and plugin cancellation (ingestion 25.4 seconds, API 3.8 seconds,
+plugins 1.1 seconds). Receipt replay also remains available when media tools are
+unavailable, while new admissions are rejected.
+
+The complete `make validate-fork` gate passed on the final implementation:
+generation, frontend checks and all 528 UI tests, retained v3 extension contracts
+and 71 application operation files, zero Go lint issues, and all Go packages.
+The API suite completed in 135.1 seconds, ingestion in 304.1 seconds, manager in
+43.2 seconds, and SQLite in 285.6 seconds.

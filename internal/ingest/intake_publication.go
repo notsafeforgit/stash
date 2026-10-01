@@ -38,6 +38,7 @@ type IntakePublicationResult struct {
 	MediaUUID    string                   `json:"media_uuid"`
 	MediaKind    models.ArchiveEntityKind `json:"media_kind"`
 	MediaCreated bool                     `json:"media_created"`
+	FileLinked   bool                     `json:"file_linked"`
 	SourceMedia  string                   `json:"source_media"`
 	GalleryUUID  string                   `json:"gallery_uuid,omitempty"`
 	Gallery      string                   `json:"gallery"`
@@ -101,7 +102,7 @@ func (p *PreparedMedia) PublishIntake(ctx context.Context, repo models.Repositor
 	}
 	ret := &PublishedIntake{Media: media, Result: IntakePublicationResult{
 		FileUUID: media.File.Identity.UUID, Generation: media.File.File.Base().Generation, ContentUUID: media.File.Proof.Content.UUID,
-		MediaUUID: media.Media.UUID, MediaKind: media.Media.Kind, MediaCreated: media.Created,
+		MediaUUID: media.Media.UUID, MediaKind: media.Media.Kind, MediaCreated: media.Created, FileLinked: media.FileLinked,
 		SourceMedia: "not_applicable", Gallery: "not_applicable", Review: []string{},
 	}}
 	if input.Source != nil {

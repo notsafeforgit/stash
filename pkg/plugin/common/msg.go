@@ -113,6 +113,9 @@ func (o *PluginOutput) SetError(err error) {
 // HookContext is passed as a PluginArgValue and indicates what hook triggered
 // this plugin task.
 type HookContext struct {
+	// EventID identifies an at-least-once durable notification. A plugin may
+	// see it again after interruption and should deduplicate its own effects.
+	EventID     string       `json:"eventId,omitempty"`
 	ParentHooks []HookSource `json:"parentHooks,omitempty"`
 	ID          int          `json:"id,omitempty"`
 	Type        string       `json:"type"`

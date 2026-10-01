@@ -18,12 +18,15 @@ import (
 
 const ingestPath = "/api/v3/ingest"
 
-type ingestRoutes struct{ service *ingest.Service }
+type ingestRoutes struct {
+	service       *ingest.Service
+	fileIngestion bool
+}
 
 // A producer token reaches only this router. Session cookies, general API keys,
 // query tokens, GraphQL and the application fallback are never part of its auth.
-func withIngestRoutes(private http.Handler, service *ingest.Service) http.Handler {
-	producer := (&ingestRoutes{service: service}).router()
+func withIngestRoutes(private http.Handler, service *ingest.Service, fileIngestion bool) http.Handler {
+	producer := (&ingestRoutes{service: service, fileIngestion: fileIngestion}).router()
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == ingestPath || strings.HasPrefix(r.URL.Path, ingestPath+"/") {
 			producer.ServeHTTP(w, r)
@@ -41,6 +44,7 @@ func (rs *ingestRoutes) router() http.Handler {
 		r.Get("/capabilities", rs.capabilities)
 		r.Post("/batches", rs.batch)
 		r.Get("/receipts/{event}", rs.receipt)
+		r.Get("/receipts/{event}/status", rs.receiptStatus)
 	})
 	return r
 }
@@ -91,7 +95,9 @@ func ingestErrorCode(err error) (int, string) {
 		return http.StatusNotFound, "not_found"
 	case errors.Is(err, ingest.ErrUnsupported):
 		return http.StatusUnprocessableEntity, "unsupported"
-	case ingest.IsConflict(err), errors.Is(err, models.ErrSourceDefinitionConflict):
+	case errors.Is(err, models.ErrArchiveJobCapacity):
+		return http.StatusTooManyRequests, "queue_full"
+	case ingest.IsConflict(err), errors.Is(err, models.ErrSourceDefinitionConflict), errors.Is(err, models.ErrFilePathChanged), errors.Is(err, models.ErrFileGenerationConflict):
 		return http.StatusConflict, "conflict"
 	case errors.Is(err, ingest.ErrInvalid):
 		return http.StatusBadRequest, "invalid_event"
@@ -126,11 +132,16 @@ func (rs *ingestRoutes) capabilities(w http.ResponseWriter, r *http.Request) {
 		ingestError(w, err)
 		return
 	}
+	kinds := []string{"source.capture"}
+	if rs.fileIngestion {
+		kinds = append(kinds, "file.completed")
+	}
 	ingestJSON(w, http.StatusOK, map[string]interface{}{
 		"protocol": ingest.ProtocolVersion, "producer_uuid": credential.ProducerUUID, "scopes": credential.Scopes,
-		"kinds": []string{"source.capture"}, "post_namespaces": []string{"native:reddit", "native:twitter"},
+		"kinds": kinds, "post_namespaces": []string{"native:reddit", "native:twitter"},
 		"retention_policy": archive.SourceRetentionVersion, "max_event_bytes": ingest.MaxEventBytes, "max_batch_bytes": ingest.MaxBatchBytes, "max_batch_events": ingest.MaxBatchEvents,
-		"file_ingestion": false, "receipt_semantics": "source evidence committed; no file download or media scan acknowledgement",
+		"max_file_event_bytes": ingest.MaxFileEventBytes, "file_ingestion": rs.fileIngestion,
+		"receipt_semantics": "source.capture commits source evidence; file.completed queues verification; poll receipt status for media completion",
 	})
 }
 
@@ -165,14 +176,69 @@ func (rs *ingestRoutes) batch(w http.ResponseWriter, r *http.Request) {
 	}
 	results := make([]ingestBatchResult, 0, len(batch.Events))
 	for index, item := range batch.Events {
-		receipt, err := rs.service.Capture(r.Context(), token, item.Event, item.Digest)
+		receipt, err := rs.accept(r, token, item)
 		result := ingestBatchResult{Index: index, Status: http.StatusOK, Receipt: receipt}
 		if err != nil {
 			result.Status, result.Error = ingestErrorCode(err)
+		} else if receipt.Kind == "file.completed" {
+			result.Status = http.StatusAccepted
 		}
 		results = append(results, result)
 	}
 	ingestJSON(w, http.StatusOK, map[string]interface{}{"results": results})
+}
+
+func (rs *ingestRoutes) accept(r *http.Request, token string, item ingestBatchEvent) (*models.IngestReceipt, error) {
+	if ingest.Digest(item.Event) != item.Digest {
+		return nil, ingest.ErrInvalid
+	}
+	var envelope map[string]json.RawMessage
+	if err := ingest.StrictJSON(item.Event, ingest.MaxEventBytes, &envelope); err != nil {
+		return nil, err
+	}
+	var kind string
+	if err := json.Unmarshal(envelope["kind"], &kind); err != nil {
+		return nil, ingest.ErrInvalid
+	}
+	switch kind {
+	case "source.capture":
+		return rs.service.Capture(r.Context(), token, item.Event, item.Digest)
+	case "file.completed":
+		if rs.fileIngestion {
+			return rs.service.FileCompleted(r.Context(), token, item.Event, item.Digest)
+		}
+		// An unavailable processor prevents new admissions, but cannot erase
+		// an acknowledgement whose response was lost before a restart.
+		var event ingest.FileEvent
+		if err := ingest.StrictJSON(item.Event, ingest.MaxFileEventBytes, &event); err != nil {
+			return nil, err
+		}
+		receipt, err := rs.service.Receipt(r.Context(), token, event.EventUUID)
+		if errors.Is(err, ingest.ErrNotFound) {
+			return nil, ingest.ErrUnsupported
+		}
+		if err != nil {
+			return nil, err
+		}
+		if receipt.ProducerUUID != event.ProducerUUID {
+			return nil, ingest.ErrForbidden
+		}
+		if receipt.Digest != item.Digest {
+			return nil, models.ErrIngestReplay
+		}
+		return receipt, nil
+	default:
+		return nil, ingest.ErrUnsupported
+	}
+}
+
+func (rs *ingestRoutes) receiptStatus(w http.ResponseWriter, r *http.Request) {
+	status, err := rs.service.ReceiptStatus(r.Context(), ingestToken(r), chi.URLParam(r, "event"))
+	if err != nil {
+		ingestError(w, err)
+		return
+	}
+	ingestJSON(w, http.StatusOK, status)
 }
 
 func (rs *ingestRoutes) receipt(w http.ResponseWriter, r *http.Request) {

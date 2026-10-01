@@ -23,6 +23,21 @@ type sourceMediaEvidenceRow struct {
 	CreatedAt      Timestamp      `db:"created_at"`
 }
 
+func (s *SourceAttachmentStore) InCapture(ctx context.Context, capture, attachment string) (bool, error) {
+	for _, value := range []*string{&capture, &attachment} {
+		id, err := archiveUUID(*value)
+		if err != nil {
+			return false, err
+		}
+		*value = id
+	}
+	var found bool
+	err := dbWrapper.Get(ctx, &found, `SELECT EXISTS(SELECT 1 FROM source_capture_attachment_manifests c
+JOIN source_attachment_entries e ON e.manifest_uuid=c.manifest_uuid
+WHERE c.capture_uuid=? AND e.attachment_uuid=?)`, capture, attachment)
+	return found, err
+}
+
 func (r sourceMediaEvidenceRow) resolve() *models.SourceMediaEvidence {
 	ret := &models.SourceMediaEvidence{UUID: r.UUID, AttachmentUUID: r.AttachmentUUID, CaptureUUID: r.CaptureUUID,
 		MediaUUID: r.MediaUUID, Basis: r.Basis, Details: json.RawMessage(r.Details), CreatedAt: r.CreatedAt.Timestamp}

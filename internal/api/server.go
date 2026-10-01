@@ -55,8 +55,9 @@ type Server struct {
 	http.Server
 	displayAddress string
 
-	manager *manager.Manager
-	shares  *sharing.Service
+	manager      *manager.Manager
+	shares       *sharing.Service
+	ingestWorker *ingestWorkerRuntime
 }
 
 // TODO - os.DirFS doesn't implement ReadDir, so re-implement it here
@@ -261,6 +262,9 @@ func Initialize() (*Server, error) {
 	})
 
 	ingestion := ingest.New(repo)
+	if worker := mgr.NewIngestFileWorker(ingestion); worker != nil {
+		server.ingestWorker = &ingestWorkerRuntime{worker: worker}
+	}
 	r.Mount("/api/v3/ingest-admin", (&ingestRoutes{service: ingestion}).adminRouter())
 	r.Mount("/performer", server.getPerformerRoutes())
 	r.Mount("/scene", server.getSceneRoutes())
@@ -349,7 +353,7 @@ func Initialize() (*Server, error) {
 	if cfg.GetEnableV3UI() {
 		server.Handler = server.withShareRoutes(r)
 	}
-	server.Handler = withIngestRoutes(server.Handler, ingestion)
+	server.Handler = withIngestRoutes(server.Handler, ingestion, server.ingestWorker != nil)
 	go printLatestVersion(context.TODO())
 
 	return server, nil
@@ -384,6 +388,8 @@ func handleFavicon(staticUI http.Handler) func(w http.ResponseWriter, r *http.Re
 // It calls ListenAndServeTLS if TLS is configured, otherwise it calls ListenAndServe.
 // Calls to Start are blocked until the server is shutdown.
 func (s *Server) Start() error {
+	s.ingestWorker.start()
+	defer s.ingestWorker.stop()
 	logger.Infof("stash is listening on " + s.Addr)
 	logger.Infof("stash is running at " + s.displayAddress)
 
@@ -400,6 +406,7 @@ func (s *Server) Shutdown() {
 	if err != nil {
 		logger.Errorf("Error shutting down http server: %v", err)
 	}
+	s.ingestWorker.stop()
 }
 
 func (s *Server) getPerformerRoutes() chi.Router {

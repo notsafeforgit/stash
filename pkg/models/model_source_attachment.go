@@ -96,6 +96,7 @@ type SourceAttachmentReaderWriter interface {
 	RecordManifest(context.Context, SourceAttachmentManifestInput) (*SourceAttachmentManifest, error)
 	FindManifest(context.Context, string) (*SourceAttachmentManifest, error)
 	ManifestForCapture(context.Context, string) (*SourceAttachmentManifest, error)
+	InCapture(context.Context, string, string) (bool, error)
 	ManifestEntries(context.Context, string, int, int) ([]SourceAttachmentManifestEntry, error)
 	Find(context.Context, string) (*SourceAttachment, error)
 	Lookup(context.Context, string, SourcePostIdentifier) (*SourceAttachment, error)

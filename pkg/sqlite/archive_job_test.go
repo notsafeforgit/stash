@@ -337,6 +337,46 @@ func TestArchiveJobPublicationIsAtomicAndRejectsExpiryBeforeCommit(t *testing.T)
 	}
 }
 
+func TestArchiveJobCheckpointKeepsDomainAndProgressAtomic(t *testing.T) {
+	for _, mode := range []string{"success", "domain failure", "expired before commit"} {
+		t.Run(mode, func(t *testing.T) {
+			f := newDurableJobFixture(t)
+			f.submit(t, jobSubmission("checkpoint", "destination"))
+			claimed := f.claim(t, uuid.NewString())
+			checkpoint, err := f.service.Checkpoint(t.Context(), claimed.Lease(), func(ctx context.Context, _ *models.ArchiveJob) (json.RawMessage, error) {
+				if _, err := f.repo.Ingest.CreateProducer(ctx, "Checkpoint fixture"); err != nil {
+					return nil, err
+				}
+				if mode == "domain failure" {
+					return nil, errors.New("fixture failure")
+				}
+				if mode == "expired before commit" {
+					txn.AddPreCommitHook(ctx, func(context.Context) error { f.now = *claimed.LeaseUntil; return nil })
+				}
+				return json.RawMessage(`{"phase":"published"}`), nil
+			})
+			raw := openRawDB(t, f.db.DatabasePath())
+			defer raw.Close()
+			if mode != "success" {
+				require.Error(t, err)
+				require.Nil(t, checkpoint)
+				require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM ingest_producers"))
+				require.Equal(t, claimed, f.find(t, claimed.UUID))
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, "running", checkpoint.State)
+			require.JSONEq(t, `{"phase":"published"}`, string(checkpoint.Progress))
+			require.EqualValues(t, 1, queryUint(t, raw, "SELECT count(*) FROM ingest_producers"))
+			f.now = *checkpoint.LeaseUntil
+			resumed := f.claim(t, uuid.NewString())
+			require.NotNil(t, resumed)
+			require.Equal(t, checkpoint.Progress, resumed.Progress)
+			require.EqualValues(t, 2, resumed.Fence)
+		})
+	}
+}
+
 func TestArchiveJobsValidationIndexesAndAnonymisation(t *testing.T) {
 	f := newDurableJobFixture(t)
 	input := jobSubmission("validation", "resource")

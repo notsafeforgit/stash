@@ -4,7 +4,33 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
 )
+
+func TestCaseLookupUsesIdentityRatherThanMatchingModificationTimes(t *testing.T) {
+	dir := t.TempDir()
+	one, two := filepath.Join(dir, "file.png"), filepath.Join(dir, "File.png")
+	require.NoError(t, os.WriteFile(one, []byte("one"), 0600))
+	require.NoError(t, os.WriteFile(two, []byte("two"), 0600))
+	first, err := os.Stat(one)
+	require.NoError(t, err)
+	second, err := os.Stat(two)
+	require.NoError(t, err)
+	if os.SameFile(first, second) {
+		t.Skip("fixture requires distinct case-sensitive names")
+	}
+	when := time.Now().Add(-time.Hour)
+	require.NoError(t, os.Chtimes(one, when, when))
+	require.NoError(t, os.Chtimes(two, when, when))
+	sensitive, err := IsFsPathCaseSensitive(one)
+	require.NoError(t, err)
+	require.True(t, sensitive)
+	flipped, err := flipCaseSingle("名字.png")
+	require.NoError(t, err)
+	require.Equal(t, "名字.Png", flipped, "uncased letters cannot establish a case-insensitive alias")
+}
 
 func TestIsFsPathCaseSensitive_UnicodeByteLength(t *testing.T) {
 	// Ⱥ (U+023A) is 2 bytes in UTF-8

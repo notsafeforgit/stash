@@ -128,6 +128,7 @@ func TestNativeLineageRejectsUnsafeInputsBeforeWriting(t *testing.T) {
 		{"missing group hierarchy revision", "DROP TRIGGER archive_group_groups_relations_update", "missing archive_group_groups_relations_update"},
 		{"missing metadata baselines", "DROP TABLE metadata_field_baselines", "missing metadata_field_baselines"},
 		{"missing metadata history", "DROP TABLE metadata_field_decisions", "missing metadata_field_decisions"},
+		{"missing file receipt index", "DROP INDEX ingest_receipts_job", "missing file ingestion receipt job association"},
 		{"missing metadata library intent", "DROP TRIGGER metadata_scene_title_library", "missing metadata_scene_title_library"},
 		{"missing canonical name", "INSERT INTO performers(id, created_at, updated_at) VALUES (1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)", "performer has no canonical name"},
 		{"foreign primary version", "DROP TABLE native_schema; UPDATE schema_migrations SET version = 87", "unsupported legacy Stash schema"},

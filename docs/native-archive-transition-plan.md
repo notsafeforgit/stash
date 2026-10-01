@@ -64,7 +64,7 @@ digests must be captured again for rehearsal and production cutover.
 | Producer implementation | /home/andrew/src/private/scrape-catalog | Separate transport/download helpers from catalog storage; transition to API producer |
 | Stash integration | CommunityScripts/plugins/catalogMetadata | Migrate its rules and native features; retire its catalog reader/writer hooks |
 | Shared gallery-dl config | /home/andrew/.config/gallery-dl/config.json | Replace catalog-writing postprocessors with native ingestion adapter |
-| n8n override | /home/andrew/services/n8n/data/workflowConfigs/n8n-gdl-overrides.json | Set container paths, endpoint, producer identity, and credential reference |
+| n8n override | /home/andrew/services/n8n/data/workflowConfigs/n8n-gdl-overrides.json | Set container paths, endpoint, producer identity, and Stash ingestion token reference |
 | Download archives | Host ~/.archives, mounted into n8n | Preserve archive IDs and skip behavior |
 | Media roots | Host /tank/media/porn; Stash/n8n /media/porn | Register one logical root with deployment-specific mounts |
 | Backup | s3_log_backup.py, catalog SQLite snapshots, media manifests, Stash backup | Publish a native archive snapshot associated with the media manifest |
@@ -811,7 +811,7 @@ rescan every catalog; long operations expose durable progress and resumability.
    and configured API clients. Resolve release-blocking discrepancies.
 6. Enable the native writer. Disable Catalog Metadata's old hooks and any
    overlapping filename plugin, install the API adapter and effective host/n8n
-   config, provision scoped credentials, and remove old catalog write authority.
+   config, provision scoped Stash API tokens, and remove old catalog write authority.
    Verify all new workers load the intended version.
 7. Resume delivery and workers gradually. Exercise one small scrape through each
    distinct launch/runtime path, plus a manual-file intake and a metadata-only

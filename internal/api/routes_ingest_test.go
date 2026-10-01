@@ -41,7 +41,7 @@ func TestIngestHTTPAuthenticationPartialBatchAndReceiptIsolation(t *testing.T) {
 	credential, token, err := service.IssueCredential(context.Background(), producer.UUID, []models.IngestScope{{CollectionUUID: collection.UUID}}, nil)
 	require.NoError(t, err)
 	privateCalls := 0
-	handler := withIngestRoutes(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { privateCalls++; w.WriteHeader(http.StatusTeapot) }), service)
+	handler := withIngestRoutes(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { privateCalls++; w.WriteHeader(http.StatusTeapot) }), service, false)
 	request := func(method, target, auth string, body []byte) *httptest.ResponseRecorder {
 		r := httptest.NewRequest(method, target, bytes.NewReader(body))
 		r.Header.Set("Content-Type", "application/json")

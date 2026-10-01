@@ -605,8 +605,9 @@ Anonymised exports remove credentials and receipts before private source records
 Migration creates no credentials, receipts, or imported catalog data.
 
 The [protocol documentation](native-ingestion.md) lists current supported events
-and limits. File ingestion, producer outboxes, job leases, catalog import, and
-native administration/review UI remain subsequent work.
+and limits. File intake and its durable worker are described below. Producer
+outboxes, source-run leases, catalog import and native administration/review UI
+remain subsequent work.
 
 Migration 1000018 adds `files.generation`, `media_contents`, and immutable
 `file_content_versions`. These identities have separate purposes:
@@ -666,8 +667,8 @@ attempt reads avoid scanning media/catalog tables. The migration leaves all job
 tables empty and preserves existing ingestion receipts and verified file history;
 legacy journals require the separate importer. Anonymised exports remove jobs,
 arguments, acknowledgements, and attempts. The [ingestion guide](native-ingestion.md)
-distinguishes this internal boundary from the still-unfinished file worker and
-source-run coordinator.
+describes the connected file worker and distinguishes it from the unfinished
+source-run coordinator and producer conversion.
 
 Migration 1000020 retains `file_path_fences`, a local removal history independent
 of file UUID lifetimes. Deleting or moving a regular file increments the original
@@ -692,6 +693,30 @@ database filename. Promotion in place retains that association, but a production
 path change must first drain pending deletions or transfer the exact journal
 with its database. Do not rename a live database and assume its pending file
 operations moved with it.
+
+Migration 1000021 extends immutable `ingest_receipts` to `file.completed`.
+A file receipt requires one `media.verify` job and a non-null scoped root; its
+post/capture pair is optional for manual media. A source capture receipt retains
+its required post/capture pair and has no job. Capture provenance is required
+whenever that pair is present. The job reference is unique, while producer/event
+identity remains shared across event kinds. Existing source receipts keep their
+values exactly and acquire a null job column.
+
+Admission commits the accepted receipt and job in one transaction. Server-owned
+arguments pin the collection revision, root-relative path, lifetime/generation,
+removal counter, and optional acknowledged source attachment. The producer's
+size/SHA-256 remain claims until the worker verifies them. Receipt replay precedes
+current file/definition checks and returns the original acknowledgement within
+the caller's permitted scope. Token rotation does not erase queued work.
+
+Publication uses a durable checkpoint: verified file, media, provenance, source
+choice, album changes and progress commit together. Restart resumes preview and
+notification work using that checkpoint and re-verifies the file. Final success
+requires current lease, scope, descriptor, generation and ownership checks.
+Status distinguishes an earlier committed registration from a completed intake.
+Anonymised exports delete receipts before jobs to respect the new foreign key;
+startup checks require the receipt job column and lookup index. Migration creates
+no jobs or invented file evidence for existing library rows.
 
 Migrations run against copies during development. SQL failure leaves a dirty
 migration state that startup refuses; restore the migration backup or use a

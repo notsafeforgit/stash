@@ -32,6 +32,10 @@ func (s *Manager) ImagePreviewImage(img *models.Image) *previewimage.Manifest {
 // thumbnail requests. The legacy URL remains a JPEG, made from the same SDR
 // rendition; v3 gets the additive, display-adaptive rendition catalog.
 func (s *Manager) GenerateImagePreview(ctx context.Context, img *models.Image) error {
+	return s.generateImagePreview(ctx, img, nil)
+}
+
+func (s *Manager) generateImagePreview(ctx context.Context, img *models.Image, guard func(context.Context) error) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -129,6 +133,11 @@ func (s *Manager) GenerateImagePreview(ctx context.Context, img *models.Image) e
 	data, err := result.JPEG()
 	if err != nil {
 		return err
+	}
+	if guard != nil {
+		if err := guard(ctx); err != nil {
+			return err
+		}
 	}
 	if err := store.Publish(img.ID, "image", previewimage.ImageKey(img.Checksum), 0, result); err != nil {
 		return err

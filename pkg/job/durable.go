@@ -82,6 +82,43 @@ func (d *Durable) Recover(ctx context.Context, limit int) (int, error) {
 	return ret, err
 }
 
+// Checkpoint commits a resumable phase and its progress together without
+// completing the job. Progress survives retries and lease recovery. The kind's
+// worker owns its complete progress document and preserves prior phase data.
+func (d *Durable) Checkpoint(ctx context.Context, lease models.ArchiveJobLease, apply func(context.Context, *models.ArchiveJob) (json.RawMessage, error)) (*models.ArchiveJob, error) {
+	var ret *models.ArchiveJob
+	err := d.Repo.WithTxn(ctx, func(ctx context.Context) error {
+		current, err := d.Repo.ArchiveJob.CheckLease(ctx, lease, d.Now())
+		if err != nil {
+			return err
+		}
+		progress, err := apply(ctx, current)
+		if err != nil {
+			return err
+		}
+		ret, err = d.Repo.ArchiveJob.Progress(ctx, lease, d.Now(), progress)
+		if err != nil {
+			return err
+		}
+		revision := ret.Revision
+		txn.AddPreCommitHook(ctx, func(ctx context.Context) error {
+			current, err := d.Repo.ArchiveJob.CheckLease(ctx, lease, d.Now())
+			if err != nil {
+				return err
+			}
+			if current.Revision != revision {
+				return models.ErrArchiveJobConflict
+			}
+			return nil
+		})
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return ret, nil
+}
+
 // Publish commits domain writes and the attempt outcome together. Expensive
 // hashing/probing happens before this method. A held file descriptor's checks
 // can register their own pre-commit hooks in apply. Any failure leaves the job

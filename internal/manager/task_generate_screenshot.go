@@ -10,12 +10,13 @@ import (
 )
 
 type GenerateCoverTask struct {
-	repository     models.Repository
-	Scene          models.Scene
-	ScreenshotAt   *float64
-	Overwrite      bool
-	ResetToDefault bool
-	onError        func(error)
+	repository       models.Repository
+	Scene            models.Scene
+	ScreenshotAt     *float64
+	Overwrite        bool
+	ResetToDefault   bool
+	onError          func(error)
+	publicationGuard func(context.Context) error
 }
 
 func (t *GenerateCoverTask) GetDescription() string {

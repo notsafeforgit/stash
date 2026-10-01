@@ -93,8 +93,12 @@ func (t *jsPluginTask) initVM() error {
 		return fmt.Errorf("error adding util API: %w", err)
 	}
 
+	ctx := t.context
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	gql := &javascript.GQL{
-		Context:    context.TODO(),
+		Context:    ctx,
 		Cookie:     t.input.ServerConnection.SessionCookie,
 		GQLHandler: t.gqlHandler,
 	}

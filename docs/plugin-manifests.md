@@ -87,3 +87,17 @@ and call declared `operations` through `pluginQueryV3` / `pluginMutationV3`.
 kinds. This is part of the independent v3 contract; no legacy representation is
 required. See the [browser host guide](../ui/v3/docs/plugin-host.md#backend-queries-and-mutations)
 for manifest syntax, execution arguments, limits and the read-only authoring contract.
+
+## Durable native intake notifications
+
+Native file intake sends scene/image and source-gallery notifications after its
+registration transaction commits. `hookContext.eventId` identifies the same
+notification across worker retries. Delivery is at least once: use that identity
+when a plugin needs to deduplicate external effects. A plugin failure cannot
+undo committed media or source associations; it leaves the intake effects pending
+or failed for inspection. Native archive consistency does not depend on a plugin.
+
+These calls report plugin errors to the persisted worker and have a two-minute
+timeout. Worker cancellation stops delivery before shutdown. Ordinary API edit
+hooks retain their existing execution path until the general durable notification
+conversion is complete; `eventId` is absent on those calls.

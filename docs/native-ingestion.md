@@ -7,19 +7,29 @@ publisher choices, collection provenance, and ordered album manifests with a
 durable receipt. This interface is not deployed to the compatible production
 server.
 
-File completion, verified media associations, gallery synchronization after
-file intake, durable producer outboxes, run leases, additional post identity
-adapters, and host/n8n conversion remain required. Capability discovery reports
-`file_ingestion: false`. A capture receipt never acknowledges a download, scan,
-or completed gallery. Collection/root administration UI and the catalog importer
-also remain pending; current collection definitions come from the core services.
+The v3 server also accepts `file.completed` when its scanner and preview tools
+are configured. Admission commits a receipt and durable verification job;
+its worker verifies bytes, registers media and source album membership, generates
+missing previews, and delivers media/gallery notifications. Poll the receipt's
+status to distinguish acceptance, committed registration, and completed intake.
+Capability discovery reports `file_ingestion: false` when the worker is unavailable.
+Existing acknowledgements remain readable and replayable in that state; new file
+events are rejected.
+A source capture alone never acknowledges downloaded or playable media.
+
+Native field import policy and performer defaults, durable producer outboxes,
+source-run leases, additional post adapters, host/n8n conversion, catalog import,
+and native administration/review UI remain required. Existing scrapes have not
+switched to this interface. Current collection definitions come from core services.
 
 ## Authentication and scope
 
 These are access tokens for Stash's ingestion API. Stash does not manage the
 producer's Reddit, Twitter, or other website credentials; those remain in
 gallery-dl's existing credential configuration. Revoking an ingestion token
-only removes that producer token's access to Stash.
+only removes that producer token's access to Stash. Already accepted jobs remain
+durable. Cancel the job or disable its collection/root to prevent further work;
+token rotation does not silently discard an accepted event.
 
 Producer requests require `Authorization: Bearer <token>`. Session cookies and
 the general Stash API key do not authenticate this interface. Tokens are not
@@ -55,7 +65,8 @@ events remain undelivered. Retired/disabled roots cannot receive new grants.
 
 The backend can prepare a root-relative image or video through
 `ingest.PrepareMedia`. This is an uncommitted inspection, with no database writes,
-library handlers, download acknowledgement, or HTTP file-completion support yet.
+library handlers or download acknowledgement. The HTTP worker uses this same
+preparation before publishing an accepted file event.
 It verifies the reviewed root, opens a confined regular file, calculates SHA-256,
 and checks optional producer size/digest claims. Partial downloads are rejected.
 The shared scanner calculates its normal matching fingerprints and image/video
@@ -73,9 +84,8 @@ the named path after probing. Linux also checks ctime to detect same-size writes
 followed by restoring mtime; platforms without that adapter rehash. The caller
 keeps the descriptor open and must revalidate the current root immediately before
 commit, alongside authorization, collection policy, and file-generation fences.
-These checks do not make filesystem writes atomic with SQLite. Durable workers
-that enforce generation fences, transactional file/provenance publication, and
-receipt integration remain required before advertising `file_ingestion: true`.
+These checks do not make filesystem writes atomic with SQLite. The durable worker
+rechecks them at publication, before effects, and before its completion commits.
 
 Native schema 1000018 now provides persistent file-generation fences and shared
 content identities. `PreparedMedia.RecordContent` records verified bytes against
@@ -83,8 +93,8 @@ an existing file UUID and its current generation in the caller's managed write
 transaction. It rechecks the root/descriptor before commit, and a generation
 guard rejects subsequent replacement/deletion in that transaction. Ordinary file
 updates also require the generation the scanner/task read. This storage and
-publication boundary does not yet implement the durable file worker or completion
-HTTP event. The [schema guide](native-schema.md) describes identity lifetimes,
+publication boundary is used by the durable file worker. The
+[schema guide](native-schema.md) describes identity lifetimes,
 unchanged fingerprint handling, and migration behavior.
 
 `CaptureFileTarget` records server-owned intake state for the authorized root
@@ -106,9 +116,8 @@ or one unambiguous owner of matching current verified bytes. Otherwise it create
 a new scene/image. Legacy MD5/oshash matches and obsolete verification generations
 do not authorize associations. Multiple candidates or conflicting media kinds
 require review, and existing items retain their metadata. Final checks reject
-deletion, detachment, or conflicting ownership before commit. These methods run
-inside `Durable.Publish`, so file, proof, media association, and job result either
-commit together or roll back.
+deletion, detachment, or conflicting ownership before commit. These methods run inside a durable transaction, so file, proof and media
+association commit together with the job's publication checkpoint or roll back.
 
 `PreparedMedia.PublishIntake` adds the recorded collection revision, source
 attachment evidence and source album membership in that same transaction. It
@@ -131,18 +140,20 @@ post's album while preserving manual membership exclusions. Replayed intake
 does not duplicate its provenance or evidence. Manual media can record collection
 provenance without inventing a source capture, account or gallery. Failures roll
 back file, content proof, library media, source links, album changes and job result
-together. Field policy, durable notifications/generated assets, file-completion
-HTTP admission/receipts and the worker still need to be connected before enabling
-file ingestion.
+together. The HTTP worker commits this registration as a resumable checkpoint
+before generating previews and delivering media/gallery notifications. Native
+field policy and performer defaults remain separate work; this event does not
+promise arbitrary catalog-to-library metadata mapping.
 
 ### Durable archive work
 
 Native schema 1000019 provides `archive_jobs`, immutable submission acknowledgements,
 and attempt history. `job.Durable` supplies submission, claim/renew, progress,
 cancellation, bounded recovery, and atomic publication. The only accepted kind
-is currently `media.verify`; its file-completion admission and worker loop are
-still being connected. No new worker runs automatically, and the public API
-continues to advertise `file_ingestion: false`.
+is currently `media.verify`. With v3 and FFmpeg/FFprobe configured, the HTTP server
+starts one processing loop after plugin routing is initialized. It cancels and
+joins that loop during shutdown before the manager closes SQLite. Transient loop
+failures are retried; jobs retain their own bounded attempts and retry delay.
 
 Each server-created submission has a stable request UUID. Replaying it returns
 the original job even after completion. Distinct submissions with the same kind
@@ -172,10 +183,26 @@ descriptors and add their own final checks. Cancellation requires the reviewed
 job revision and immediately invalidates its lease. Result/progress objects are
 bounded; failures use machine-readable codes rather than persisting raw stderr.
 
-This is the durable storage/publication boundary, not a replacement for the
-current scheduled scrapes. File-completion admission with producer scope checks,
-completion receipts, actual workers, source-run coordination,
-and host/n8n outbox delivery remain required before switching those callers.
+`Durable.Checkpoint` commits a domain phase and its progress without finishing
+the job. File registration uses this boundary; progress survives retries and
+lease recovery. A recovered worker reopens and re-verifies the accepted bytes,
+validates the original file generation and media association, then resumes its
+effects. It retains the original creation/link facts for notification delivery.
+No restart invents another item or changes the accepted receipt.
+
+Missing scene covers and image previews use the application's generators;
+existing cover selections remain protected. Generation failures stay pending or
+failed. Media and gallery hooks receive a stable `hookContext.eventId` and may
+repeat after interruption; plugins must deduplicate non-idempotent effects.
+These durable notifications supplement existing edit hooks; converting all other
+legacy post-commit notifications to persistent delivery remains separate work.
+
+File jobs renew their lease while hashing, probing and running effects. Producer
+claims never count as verification. A changed digest, generation, path removal,
+inactive collection or lost ownership prevents completion. A later failure does
+not undo an earlier committed registration: status reports that distinction.
+Source-run coordination and host/n8n outboxes remain required before switching
+the current scheduled scrapes to this interface.
 
 ## Wire contract
 
@@ -185,7 +212,8 @@ All producer routes require the bearer token and reject query parameters:
 | --- | --- |
 | `GET /capabilities` | Protocol, producer UUID, scopes, supported kinds/namespaces, retention policy, and request limits |
 | `POST /batches` | An ordered result for every submitted event |
-| `GET /receipts/<event-uuid>` | That producer's original receipt, subject to the credential's collection/root scope |
+| `GET /receipts/<event-uuid>` | That producer's original receipt, subject to the token's collection/root scope |
+| `GET /receipts/<event-uuid>/status` | Current job state, attempt, bounded error code and safe result; excludes worker arguments and local mount paths |
 
 A batch contains 1–8 entries and is at most 16 MiB. Each event is at most 5 MiB;
 its source payload remains limited to 4 MiB and projected metadata to 256 KiB.
@@ -241,6 +269,52 @@ crossposts keep their own identity; embedded Reddit parents from another media
 extractor retain their Reddit post scope. Unknown post identity adapters are
 rejected until supported, even though the account parser knows more services.
 
+## Completed file events
+
+A `file.completed` event is at most 16 KiB and has this shape:
+
+```json
+{
+  "protocol": 1,
+  "producer_uuid": "<producer UUID>",
+  "event_uuid": "<durable file event UUID>",
+  "run_uuid": "<producer run UUID>",
+  "collection_uuid": "<collection UUID>",
+  "collection_revision": 2,
+  "root_uuid": "<logical root UUID>",
+  "kind": "file.completed",
+  "observed_at": "2026-10-01T12:00:00Z",
+  "relative_path": "account/final-image.jpg",
+  "size": 12345,
+  "sha256": "<lowercase SHA-256 of final file bytes>",
+  "media_kind": "image",
+  "source": {
+    "capture_event_uuid": "<this producer's acknowledged capture event UUID>",
+    "attachment": {"namespace": "native:reddit", "value": "<media ID>"}
+  }
+}
+```
+
+Use `scene` for video scenes or `image` for images/clips. `source` is optional for
+manual purchases and other unsourced files. When supplied, it must identify an
+attachment in the same producer's acknowledged capture, with matching collection
+revision and root. Submit that capture first. Paths must name a final regular
+file within the permitted root and directory prefix; `.part` paths are rejected.
+The server owns file UUIDs, generations, removal fences, and capture UUIDs.
+
+A file item returns status 202 with an immutable `queued` receipt and job UUID.
+Status initially reports `registration_committed: false` and
+`media_ingested: false`. After verified file/media/source/album publication,
+`registration_committed` becomes true; `media_ingested` becomes true only after
+required effects and final validation succeed. The publication projection uses
+UUIDs and includes any review reasons. Cancellation or failure can retain a
+committed registration while leaving intake incomplete. Receipt replay remains
+202 with the original acknowledgement even after the job succeeds.
+
+File event identities are qualified by producer. Replaying an event creates no
+new job; distinct file events retain separate provenance jobs and serialize on
+their destination. Source-run coalescing is a different, unfinished layer.
+
 ## Byte identity and receipts
 
 Each batch entry is `{"sha256":"<digest>","event":<event object>}`. The digest
@@ -260,11 +334,12 @@ batch = b'{"events":[{"sha256":"' + digest + b'","event":' + event_bytes + b'}]}
 
 Events commit independently. HTTP 200 for a parsed batch means the results are
 available; inspect each item's `status`, `error`, and `receipt`. A successful
-item contains a receipt with producer/event identity, digest, source post and
-capture UUIDs, recorded collection definition, committing credential, timestamp,
-and a small result projection. The raw source payload is not duplicated there.
+capture item contains a receipt with producer/event identity, digest, source post
+and capture UUIDs, recorded collection definition, committing token identity,
+timestamp, and a small result projection. File receipts instead require a job
+UUID and have source identifiers only when a source capture was referenced. The raw source payload is not duplicated there.
 
-The result identifies publisher resolution (`linked`, `review`, `unavailable`,
+For `source.capture`, the result identifies publisher resolution (`linked`, `review`, `unavailable`,
 or a preserved choice), album selection (`selected`, `protected`, `review`, or
 `unavailable`), review reasons, and `media_ingested: false`. Ambiguous publishers
 or incompatible album lists retain their evidence and require review. Pinned or
@@ -279,11 +354,11 @@ immutable acknowledgements; they do not change when later review resolves a
 conflict. Revoked/expired credentials cannot read or replay them.
 
 Per-item errors use HTTP-style statuses: 400 `invalid_event`, 401 `unauthorized`,
-403 `outside_scope`, 404 `not_found`, 409 `conflict`, 422 `unsupported`, or 503
-`temporarily_unavailable`. Network loss or a retryable server error requires
-redelivery of the same event bytes. A rejected event has no success receipt and
+403 `outside_scope`, 404 `not_found`, 409 `conflict`, 422 `unsupported`,
+429 `queue_full`, or 503 `temporarily_unavailable`. Network loss or a retryable
+server error requires redelivery of the same event bytes. A rejected event has no success receipt and
 must not be marked imported or removed from an operational outbox.
 
-Native schema 1000017 owns producer identities, credentials, grants, and receipts.
-Foreign keys bind receipts to their actual capture, collection revision, and
-credential scope. Anonymised exports remove them with private source evidence.
+Native schemas 1000017 and 1000021 own producer identities, Stash API token
+grants, and receipts. Foreign keys bind receipts to their actual capture or job,
+recorded collection revision, and token scope. Anonymised exports remove them with private source evidence.

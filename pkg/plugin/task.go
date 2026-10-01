@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/stashapp/stash/pkg/plugin/common"
@@ -36,6 +37,7 @@ type taskBuilder interface {
 }
 
 type pluginTask struct {
+	context      context.Context
 	plugin       *Config
 	operation    *OperationConfig
 	input        common.PluginInput

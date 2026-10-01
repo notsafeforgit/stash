@@ -14,7 +14,7 @@ func IsFsPathCaseSensitive(path string) (bool, error) {
 	// The case sensitivity of the fs of "path" is determined by case flipping
 	// the first letter rune from the base string of the path
 	// If the resulting flipped path exists then the fs should not be case sensitive
-	// ( we check the file mod time to avoid matching an existing path )
+	// File identity distinguishes a spelling alias from two distinct files.
 
 	fi, err := os.Stat(path)
 	if err != nil { // path cannot be stat'd
@@ -30,14 +30,13 @@ func IsFsPathCaseSensitive(path string) (bool, error) {
 	flippedPath := filepath.Join(filepath.Dir(path), fBase)
 
 	fiCase, err := os.Stat(flippedPath)
-	if err != nil { // cannot stat the case flipped path
-		return true, nil // fs of path should be case sensitive
+	if os.IsNotExist(err) {
+		return true, nil
 	}
-
-	if fiCase.ModTime().Equal(fi.ModTime()) { // file path exists and is the same
-		return false, nil // fs of path is not case sensitive
+	if err != nil {
+		return false, err
 	}
-	return false, fmt.Errorf("can not determine case sensitivity of path %s", path)
+	return !os.SameFile(fi, fiCase), nil
 }
 
 // flipCaseSingle flips the case ( lower<->upper ) of a single char from the string s
@@ -45,15 +44,14 @@ func IsFsPathCaseSensitive(path string) (bool, error) {
 func flipCaseSingle(s string) (string, error) {
 	rr := []rune(s)
 	for i, r := range rr {
-		if unicode.IsLetter(r) { // look for a letter  to flip
-			if unicode.IsUpper(r) {
-				rr[i] = unicode.ToLower(r)
-				return string(rr), nil
-			}
-			rr[i] = unicode.ToUpper(r)
+		flipped := unicode.ToUpper(r)
+		if unicode.IsUpper(r) {
+			flipped = unicode.ToLower(r)
+		}
+		if flipped != r {
+			rr[i] = flipped
 			return string(rr), nil
 		}
-
 	}
 	return s, fmt.Errorf("could not case flip string %s", s)
 }

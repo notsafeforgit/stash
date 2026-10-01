@@ -203,19 +203,20 @@ func (s *IngestStore) RevokeCredential(ctx context.Context, id string) error {
 }
 
 type ingestReceiptRow struct {
-	ProducerUUID       string    `db:"producer_uuid"`
-	EventUUID          string    `db:"event_uuid"`
-	Digest             string    `db:"digest"`
-	CredentialUUID     string    `db:"credential_uuid"`
-	CollectionUUID     string    `db:"collection_uuid"`
-	CollectionRevision int       `db:"collection_revision"`
-	RootUUID           *string   `db:"root_uuid"`
-	RunUUID            string    `db:"run_uuid"`
-	Kind               string    `db:"kind"`
-	PostUUID           string    `db:"post_uuid"`
-	CaptureUUID        string    `db:"capture_uuid"`
-	Result             string    `db:"result"`
-	CommittedAt        Timestamp `db:"committed_at"`
+	ProducerUUID       string         `db:"producer_uuid"`
+	EventUUID          string         `db:"event_uuid"`
+	Digest             string         `db:"digest"`
+	CredentialUUID     string         `db:"credential_uuid"`
+	CollectionUUID     string         `db:"collection_uuid"`
+	CollectionRevision int            `db:"collection_revision"`
+	RootUUID           *string        `db:"root_uuid"`
+	RunUUID            string         `db:"run_uuid"`
+	Kind               string         `db:"kind"`
+	PostUUID           sql.NullString `db:"post_uuid"`
+	CaptureUUID        sql.NullString `db:"capture_uuid"`
+	JobUUID            sql.NullString `db:"job_uuid"`
+	Result             string         `db:"result"`
+	CommittedAt        Timestamp      `db:"committed_at"`
 }
 
 func (s *IngestStore) FindReceipt(ctx context.Context, producer, event string) (*models.IngestReceipt, error) {
@@ -231,16 +232,25 @@ func (s *IngestStore) FindReceipt(ctx context.Context, producer, event string) (
 		}
 		return nil, err
 	}
-	return &models.IngestReceipt{ProducerUUID: row.ProducerUUID, EventUUID: row.EventUUID, Digest: row.Digest, CredentialUUID: row.CredentialUUID, CollectionUUID: row.CollectionUUID, CollectionRevision: row.CollectionRevision, RootUUID: row.RootUUID, RunUUID: row.RunUUID, Kind: row.Kind, PostUUID: row.PostUUID, CaptureUUID: row.CaptureUUID, Result: []byte(row.Result), CommittedAt: row.CommittedAt.Timestamp}, nil
+	return &models.IngestReceipt{ProducerUUID: row.ProducerUUID, EventUUID: row.EventUUID, Digest: row.Digest, CredentialUUID: row.CredentialUUID, CollectionUUID: row.CollectionUUID, CollectionRevision: row.CollectionRevision, RootUUID: row.RootUUID, RunUUID: row.RunUUID, Kind: row.Kind, PostUUID: row.PostUUID.String, CaptureUUID: row.CaptureUUID.String, JobUUID: row.JobUUID.String, Result: []byte(row.Result), CommittedAt: row.CommittedAt.Timestamp}, nil
 }
 
 func (s *IngestStore) RecordReceipt(ctx context.Context, input models.IngestReceipt) (*models.IngestReceipt, error) {
-	for _, id := range []string{input.ProducerUUID, input.EventUUID, input.CredentialUUID, input.CollectionUUID, input.RunUUID, input.PostUUID, input.CaptureUUID} {
+	for _, id := range []string{input.ProducerUUID, input.EventUUID, input.CredentialUUID, input.CollectionUUID, input.RunUUID} {
 		if _, err := archiveUUID(id); err != nil {
 			return nil, err
 		}
 	}
-	if !validIngestDigest(input.Digest) || input.Kind != "source.capture" || input.CollectionRevision < 1 {
+	for _, id := range []string{input.PostUUID, input.CaptureUUID, input.JobUUID} {
+		if id != "" {
+			if _, err := archiveUUID(id); err != nil {
+				return nil, err
+			}
+		}
+	}
+	validKind := input.Kind == "source.capture" && input.CaptureUUID != "" && input.JobUUID == "" ||
+		input.Kind == "file.completed" && input.JobUUID != "" && input.RootUUID != nil
+	if !validIngestDigest(input.Digest) || !validKind || (input.PostUUID == "") != (input.CaptureUUID == "") || input.CollectionRevision < 1 {
 		return nil, errors.New("invalid ingestion receipt")
 	}
 	if _, err := archive.DecodeJSONObject(input.Result, 16384); err != nil {
@@ -256,8 +266,14 @@ func (s *IngestStore) RecordReceipt(ctx context.Context, input models.IngestRece
 		}
 		return previous, nil
 	}
-	if _, err := dbWrapper.Exec(ctx, `INSERT INTO ingest_receipts(producer_uuid,event_uuid,digest,credential_uuid,collection_uuid,collection_revision,root_uuid,run_uuid,kind,post_uuid,capture_uuid,result)
-VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`, input.ProducerUUID, input.EventUUID, input.Digest, input.CredentialUUID, input.CollectionUUID, input.CollectionRevision, input.RootUUID, input.RunUUID, input.Kind, input.PostUUID, input.CaptureUUID, string(input.Result)); err != nil {
+	optional := func(value string) interface{} {
+		if value == "" {
+			return nil
+		}
+		return value
+	}
+	if _, err := dbWrapper.Exec(ctx, `INSERT INTO ingest_receipts(producer_uuid,event_uuid,digest,credential_uuid,collection_uuid,collection_revision,root_uuid,run_uuid,kind,post_uuid,capture_uuid,job_uuid,result)
+VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`, input.ProducerUUID, input.EventUUID, input.Digest, input.CredentialUUID, input.CollectionUUID, input.CollectionRevision, input.RootUUID, input.RunUUID, input.Kind, optional(input.PostUUID), optional(input.CaptureUUID), optional(input.JobUUID), string(input.Result)); err != nil {
 		return nil, err
 	}
 	return s.FindReceipt(ctx, input.ProducerUUID, input.EventUUID)

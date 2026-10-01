@@ -19,6 +19,7 @@ class LeaseFixture:
         self.run = {"uuid": RUN, "collection_uuid": COLLECTION, "collection_revision": 1,
                     "target_url": "https://fixture.invalid/account", "path_prefix": ".",
                     "root_uuid": ROOT, "operation": "download",
+                    "window": {"since": None, "until": "2027-01-01T00:00:00Z"},
                     "progress": {"items_seen": 0, "files_completed": 0, "cursor": ""}}
         self.active = True
         self.checkpoints = []

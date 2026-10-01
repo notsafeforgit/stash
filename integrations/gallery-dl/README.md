@@ -87,6 +87,23 @@ mount identity and live lease before extraction/download boundaries. Child jobs
 inherit those objects, and asynchronous extraction is disabled. Destination
 locks cover a filename stem and its transformed encodings.
 
+The adapter enforces the claimed half-open source-post window (`since` inclusive,
+`until` exclusive) before directory, file or postprocessor handling. Reddit's
+original `created_utc` and Twitter's Snowflake timestamp retain milliseconds
+that gallery-dl's formatted dates discard. Raw and transformed Twitter payloads
+use the same boundaries. Missing or invalid source dates stop file processing.
+An older pinned post is skipped without ending traversal, so later in-range
+posts are still visited. Linked child work uses its accepted parent post's date.
+Postprocessor initialization waits for an accepted post, and its proposed
+destination is checked before initialization or post callbacks can run.
+
+Date limits apply to each extractor instance. They replace inherited
+`date-min`, `date-max`, `date-after` and `date-before` without changing the shared
+configuration file. Child extractors do not apply unrelated upload-date limits
+to an accepted parent's content. Other configured predicates and skip policies
+remain in effect and must be included in the worker's reviewed configuration.
+Extractor keywords cannot replace the source identity or publication date.
+
 Before downloading, the adapter queues a retained source capture and derives the
 attachment from source evidence. Reddit galleries use their media IDs; ordinary
 Reddit images and videos use direct service URLs. Twitter captures preserve the
@@ -107,8 +124,8 @@ temporary suffixes without truncating the source metadata.
 
 Checkpoints retain the last completed source cursor during bounded replay. A
 missing saved cursor cannot report successful traversal. The caller still owns
-the validated date-window/extractor configuration, configuration fingerprint,
-run outcome and deployment integration.
+the reviewed extractor configuration and its fingerprint, run outcome and
+deployment integration.
 Only Reddit/Twitter attachment adapters are implemented so far; external linked
 sources and multi-entry yt-dlp output association still need integration. These
 SDK classes are not a production launcher and do not change installed hooks.

@@ -10,12 +10,14 @@ import types
 from contextlib import contextmanager
 
 from gallery_dl import config, exception, job, version
+from gallery_dl import path as gallery_path
 
 from . import filename
 from .encoding import InvalidData
 from .filesystem import destination_lock
 from .runs import SourcePaused
 from .outbox import Capacity
+from .source_window import published, validate_keywords
 
 SUPPORTED_VERSION = "1.32.15-dev"
 
@@ -124,7 +126,7 @@ class NativeDownloadJob(job.DownloadJob):
     """Use only with a claimed Producer and a shared persistent lock directory.
 
     Child jobs inherit these objects through gallery-dl's normal queue path.
-    Callers own run/window configuration, heartbeat startup and final outcome.
+    Callers own configuration fingerprints, heartbeat startup and final outcome.
     """
 
     def __init__(self, extractor, parent=None, *, producer=None, lock_directory=None):
@@ -136,10 +138,15 @@ class NativeDownloadJob(job.DownloadJob):
         self._native_prepared, self._native_lock, self._native_url = None, None, None
         self._native_initializing = False
         self._native_parent = parent
+        self._native_source_date = None if parent is None else parent._native_queued_date
+        self._native_queued_date = None
         super().__init__(extractor, parent)
         extractor = self.extractor
         if parent is None and extractor.url != self.producer.lease.run["target_url"]:
             raise InvalidData("Extractor target differs from the claimed collection")
+        if parent is not None and self._native_source_date is None:
+            raise InvalidData("Child extraction has no approved source-post window")
+        self.producer.window.configure(extractor, inherited=parent is not None)
         if hasattr(extractor, "_async_items"):
             extractor.items = extractor._async_items
         request = extractor.request
@@ -159,6 +166,7 @@ class NativeDownloadJob(job.DownloadJob):
 
     def run(self):
         self.producer.check()
+        validate_keywords(self.extractor)
         try:
             result = super().run()
             if self._native_parent is None and not result:
@@ -180,15 +188,23 @@ class NativeDownloadJob(job.DownloadJob):
             while True:
                 self.producer.check()
                 try:
-                    yield next(iterator)
+                    kind, url, data = next(iterator)
                 except StopIteration:
                     return
+                value = self._native_source_date or published(data, self.extractor.category)
+                if self.producer.window.contains(value):
+                    # Upstream augments/mutates keywords in place. Preserve the
+                    # extractor's post for its subsequent attachment messages.
+                    yield kind, url, dict(data)
         try:
             return super().dispatch(guarded())
         except (InvalidData, Capacity, SourcePaused) as exc:
             raise exception.AbortExtraction(str(exc)) from None
 
     def initialize(self, kwdict=None):
+        if kwdict is None:
+            raise InvalidData("Native file processing requires an accepted source post")
+        self._check_directory(kwdict)
         if not self.extractor.config("download", True):
             raise InvalidData("A native download run cannot disable downloads; use enrichment work")
         named = config.getg("postprocessor") or {}
@@ -249,8 +265,18 @@ class NativeDownloadJob(job.DownloadJob):
 
     def handle_directory(self, kwdict):
         self.producer.check()
+        if self.pathfmt is not None:
+            self._check_directory(kwdict)
         super().handle_directory(kwdict)
         self.producer.relative(self.pathfmt.realdirectory)
+
+    def _check_directory(self, kwdict):
+        self.producer.check()
+        candidate = copy.copy(self.pathfmt) if self.pathfmt is not None else gallery_path.PathFormat(self.extractor)
+        # Gallery-dl's set_directory only formats paths. Validate the proposed
+        # destination before its init/post callbacks can touch the filesystem.
+        candidate.set_directory(dict(kwdict))
+        self.producer.relative(candidate.realdirectory)
 
     def handle_url(self, url, kwdict):
         self.producer.check()
@@ -259,6 +285,17 @@ class NativeDownloadJob(job.DownloadJob):
             return super().handle_url(url, kwdict)
         finally:
             self._release()
+
+    def handle_queue(self, url, kwdict):
+        self.producer.check()
+        value = self._native_source_date or published(kwdict, self.extractor.category)
+        if not self.producer.window.contains(value):
+            return
+        self._native_queued_date = value
+        try:
+            return super().handle_queue(url, kwdict)
+        finally:
+            self._native_queued_date = None
 
     def _release(self):
         if self._native_lock is not None:

@@ -20,9 +20,9 @@ A source capture alone never acknowledges downloaded or playable media.
 Native metadata policies now share one evaluator between verified intake and
 ordinary scans, with explicit performer defaults and authenticated preview/apply.
 Native source-run coordination now provides coalesced windows and fenced leases.
-The Python adapter provides durable outboxes, worker lease enforcement and
-download hooks and offline run-request coalescing. Effective worker configuration,
-launcher integration, additional post adapters,
+The Python adapter provides durable outboxes, worker lease enforcement,
+source-window filtering, download hooks and offline run-request coalescing.
+Effective worker configuration, launcher integration, additional post adapters,
 host/n8n conversion, catalog import, and native administration/review UI remain required.
 Existing scrapes have not switched to this interface. Root, collection and policy
 administration endpoints are described below.
@@ -448,7 +448,8 @@ access this administrative route.
 
 The producer SDK implements durable local request coalescing during outages,
 outbox delivery, shared filesystem locking, lease renewal and pausing before the
-next source request after expiry. Effective window/configuration handling and
+next source request after expiry. It applies the claimed Reddit/Twitter post
+window before file processing. Effective configuration validation and
 conversion of the actual host/n8n/recovery launch paths remain required.
 No legacy PID, lease or journal is promoted automatically by this migration.
 The separate importer must preserve permanent completions, checkpoints,
@@ -635,7 +636,9 @@ The adapter queues retained captures before download, checks source leases and
 the pinned destination, holds shared filesystem locks, and queues flushed final
 files before archive acknowledgement. It preserves original Twitter attachment
 membership through gallery-dl's transformation and supports single-media Reddit
-evidence without inventing albums. The
+evidence without inventing albums. The claimed date window is enforced with
+source timestamp precision, including out-of-order posts and parent dates for
+linked child work. The
 [package guide](../integrations/gallery-dl/README.md) describes supported runtime
 paths and remaining caller responsibilities.
 
@@ -646,5 +649,5 @@ tests. The backend's HTTP test executes the client and source-lease lifecycle
 against an isolated native database. Python 3.12 or newer is required.
 
 This package is not yet installed into the host/n8n launch paths. Effective
-window/configuration handling, additional source adapters and conversion of
+configuration handling, additional source adapters and conversion of
 recovery/scheduled callers remain required before cutover.

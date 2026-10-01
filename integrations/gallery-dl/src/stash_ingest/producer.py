@@ -7,6 +7,7 @@ import uuid
 from .encoding import InvalidData, digest, encode, identifier, utc_now
 from .retention import POLICY, retain
 from .runs import SourcePaused
+from .source_window import SourceWindow
 from . import source
 
 
@@ -25,6 +26,7 @@ class Producer:
                 or run["operation"] != "download" or run.get("root_uuid") is None):
             raise InvalidData("Producer must own a download run at its permitted media root")
         self.outbox, self.lease, self.root = outbox, lease, root
+        self.window = SourceWindow(run.get("window"))
 
         self.path_prefix = run["path_prefix"]
         if (not isinstance(self.path_prefix, str) or not self.path_prefix

@@ -1,6 +1,7 @@
 """Real gallery-dl scheduling and postprocessing with local fixture downloads."""
 
 import copy
+from datetime import datetime
 import hashlib
 from pathlib import Path
 import sqlite3
@@ -10,8 +11,10 @@ from unittest.mock import patch
 from requests.exceptions import ConnectionError
 
 from gallery_dl import config
+from gallery_dl import extractor as gdl_extractors
 from gallery_dl.extractor.common import Extractor, Message
 from gallery_dl.extractor.twitter import TwitterExtractor
+from gallery_dl.extractor.reddit import RedditExtractor
 
 from stash_ingest.encoding import InvalidData, decode
 from stash_ingest.filesystem import Root
@@ -19,7 +22,9 @@ from stash_ingest.gallery import NativeDownloadJob
 from stash_ingest.outbox import Outbox
 from stash_ingest.producer import Producer
 from stash_ingest.runs import SourcePaused
+from stash_ingest.source_window import SourceWindow
 from test_producer import LeaseFixture, reddit_data
+from test_source_window import snowflake
 from helpers import PRODUCER
 
 
@@ -51,6 +56,39 @@ class TwitterFixture(TwitterExtractor):
         return iter(copy.deepcopy(self.records))
 
 
+class RedditPaginationFixture(RedditExtractor):
+    subcategory = "user"
+    pattern = Fixture.pattern
+
+    def submissions(self):
+        def call(endpoint, params):
+            self.visited.extend(item["id"] for item in self.records)
+            return {"data": {"children": [{"kind": "t3", "data": copy.deepcopy(item)}
+                                          for item in self.records], "after": None}}
+        self.api._call = call
+        return self.api._pagination("/fixture", {})
+
+
+class ChildFixture(Fixture):
+    category = "redgifs"
+
+    def items(self):
+        # A linked child's upload date does not determine which Reddit source
+        # window owns its content. This fixture only exercises traversal here;
+        # native external-host attachment association remains separate work.
+        data = reddit_data(date="2020-01-01T00:00:00Z")
+        yield Message.Directory, "", data
+        yield Message.Url, data["_url"], data
+
+
+class ParentFixture(Fixture):
+    def items(self):
+        for item in self.records:
+            data = copy.deepcopy(item)
+            yield Message.Directory, "", data
+            yield Message.Queue, "https://fixture.invalid/child", {**data, "_extractor": ChildFixture}
+
+
 class GalleryTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -78,8 +116,8 @@ class GalleryTests(unittest.TestCase):
         network.start()
         self.addCleanup(network.stop)
 
-    def task(self, *records):
-        extractor = Fixture.from_url(self.lease.run["target_url"])
+    def task(self, *records, fixture=Fixture):
+        extractor = fixture.from_url(self.lease.run["target_url"])
         extractor.records = records or (reddit_data(),)
         extractor.visited = []
         task = NativeDownloadJob(extractor, producer=self.producer, lock_directory=self.locks)
@@ -102,6 +140,100 @@ class GalleryTests(unittest.TestCase):
     def archive_count(self):
         with sqlite3.connect(self.directory / "downloads.sqlite") as db:
             return db.execute("SELECT count(*) FROM archive").fetchone()[0]
+
+    def narrow_window(self):
+        self.lease.run["window"] = {"since": "2026-10-01T00:00:00.100Z", "until": "2026-10-01T00:00:00.300Z"}
+        self.producer.window = SourceWindow(self.lease.run["window"])
+
+    def test_claimed_window_overrides_inherited_dates_without_stopping_at_old_posts(self):
+        self.narrow_window()
+        # Normal CLI discovery compiles the Reddit classes used by items().
+        self.assertIsNotNone(gdl_extractors.find("https://www.reddit.com/user/fixture/submitted/"))
+        config.set(("extractor",), "archive-format", "{id}_{filename}")
+        for key, value in {"date-min": "2028-01-01T00:00:00", "date-max": "2020-01-01T00:00:00",
+                           "date-after": "2028-01-01", "date-before": "2020-01-01",
+                           "post-filter": 'id != "postblocked"'}.items():
+            config.set(("extractor", "reddit", "user"), key, value)
+        stamps = (("newer", "2026-10-01T00:00:00.400Z"), ("until", "2026-10-01T00:00:00.300Z"),
+                  ("since", "2026-10-01T00:00:00.100Z"), ("pinned", "2020-01-01T00:00:00Z"),
+                  ("inside", "2026-10-01T00:00:00.200Z"), ("blocked", "2026-10-01T00:00:00.200Z"))
+        records = [reddit_data(key, date=stamp, created_utc=datetime.fromisoformat(stamp).timestamp(),
+                               num_comments=0, is_video=False, is_self=False, selftext_html=None) for key, stamp in stamps]
+        for fixture in (Fixture, RedditPaginationFixture):
+            with self.subTest(fixture=fixture.__name__):
+                task = self.task(*records, fixture=fixture)
+                lower, upper = task.extractor._get_date_min_max(0, 253402210800)
+                self.assertEqual(lower, datetime.fromisoformat(self.lease.run["window"]["since"]).timestamp())
+                self.assertEqual(upper, datetime.fromisoformat(self.lease.run["window"]["until"]).timestamp())
+                before = len(self.events())
+                self.assertEqual(task.run(), 0)
+                captured = [e["post"]["value"] for e in self.events()[before:] if e["kind"] == "source.capture"]
+                self.assertEqual(captured, ["postsince", "postinside"])
+                self.assertEqual(task.extractor.visited, [r["id"] for r in records])
+        self.assertEqual(self.archive_count(), 2)
+        self.assertEqual(config.get(("extractor", "reddit", "user"), "date-max"), "2020-01-01T00:00:00")
+
+    def test_invalid_source_date_stops_before_files_or_capture_are_claimed(self):
+        task = self.task(reddit_data(date="unknown"))
+        task.download = lambda _: self.fail("Undated source was downloaded")
+        self.assertNotEqual(task.run(), 0)
+        self.assertEqual(self.events(), [])
+        self.assertFalse((self.media / "Account").exists())
+
+    def test_all_outside_the_window_has_no_file_or_postprocessor_effects(self):
+        self.narrow_window()
+        config.set(("extractor",), "keywords", False)
+        config.set(("extractor",), "init", True)
+        config.set(("extractor",), "postprocessors", [
+            {"name": "exec", "event": event, "command": ["fixture"]} for event in ("init", "post")])
+        with patch("gallery_dl.postprocessor.exec.ExecPP._exec", side_effect=AssertionError("Outside-window processor")):
+            task = self.task(reddit_data(date="2020-01-01T00:00:00Z"))
+            self.assertEqual(task.run(), 0)
+        self.assertEqual(self.events(), [])
+        self.assertFalse((self.media / "Account").exists())
+
+    def test_wrong_initial_or_later_directory_cannot_run_postprocessor_callbacks(self):
+        config.set(("extractor",), "directory", ["{destination}"])
+        config.set(("extractor",), "postprocessors", [
+            {"name": "exec", "event": event, "command": ["fixture", event]} for event in ("init", "post")])
+        calls = []
+        with patch("gallery_dl.postprocessor.exec.ExecPP._exec", side_effect=lambda args, shell: calls.append(args) or 0):
+            task = self.task(reddit_data(destination="AccountOther"))
+            self.assertNotEqual(task.run(), 0)
+            self.assertEqual(calls, [])
+            task = self.task(reddit_data(destination="Account"), reddit_data("second", destination="AccountOther"))
+            self.assertNotEqual(task.run(), 0)
+        self.assertEqual([call[-1] for call in calls], ["init", "post"])
+        self.assertEqual(len(self.events()), 2)
+        self.assertFalse((self.media / "AccountOther").exists())
+
+    def test_source_date_keywords_cannot_override_the_window_before_extraction(self):
+        config.set(("extractor",), "keywords-global", {"date": "2026-10-01T00:00:00.200Z"})
+        task = self.task(reddit_data(date="2020-01-01T00:00:00Z"))
+        with self.assertRaises(InvalidData):
+            task.run()
+        self.assertEqual(task.extractor.visited, [])
+        self.assertEqual(self.events(), [])
+
+    def test_child_traversal_uses_parent_post_window_and_ignores_child_date_limits(self):
+        self.narrow_window()
+        config.set(("extractor", "reddit>redgifs"), "date-min", "2028-01-01T00:00:00")
+        config.set(("extractor", "reddit>redgifs"), "date-max", "2020-01-01T00:00:00")
+        config.set(("extractor", "reddit>redgifs"), "date-before", "2010-01-01")
+        task = self.task(reddit_data(date="2026-10-01T00:00:00.200Z"), fixture=ParentFixture)
+        seen = []
+        original = NativeDownloadJob.handle_url
+
+        def inspect(child, url, data):
+            if child._native_parent is None:
+                return original(child, url, data)
+            seen.append((child.extractor.config("date-min", 0), child.extractor.config("date-max", 999)))
+
+        with patch.object(NativeDownloadJob, "handle_url", inspect):
+            self.assertEqual(task.run(), 0)
+        self.assertEqual(seen, [(0, 999)])
+        with self.assertRaises(InvalidData):
+            NativeDownloadJob(ChildFixture.from_url("https://fixture.invalid/child"), task)
 
     def test_download_and_existing_file_skip_keep_exact_capture_dependency(self):
         first = self.task()
@@ -256,6 +388,9 @@ class GalleryTests(unittest.TestCase):
         self.assertEqual(self.lease.checkpoints, [])
 
     def test_actual_twitter_transformation_retains_original_membership_and_each_media_id(self):
+        self.narrow_window()
+        lower = snowflake("2026-10-01T00:00:00.100Z")
+        upper = snowflake("2026-10-01T00:00:00.300Z")
         config.set(("extractor",), "filename", "{media_id}_{num}.{extension}")
         config.set(("extractor",), "archive-format", "{media_id}_{num}")
         config.set(("extractor",), "previews", True)
@@ -263,8 +398,8 @@ class GalleryTests(unittest.TestCase):
             with self.subTest(transform=transform):
                 config.set(("extractor",), "transform", transform)
                 extractor = TwitterFixture.from_url(self.lease.run["target_url"])
-                extractor.records = [{"rest_id": "9007199254740993", "legacy": {
-                    "id_str": "9007199254740993", "lang": "en", "full_text": "Album caption", "entities": {},
+                extractor.records = [{"rest_id": lower, "legacy": {
+                    "id_str": lower, "lang": "en", "full_text": "Album caption", "entities": {},
                     "extended_entities": {"media": [
                         {"id_str": "101", "type": "photo", "media_url_https": "https://pbs.twimg.com/media/first.jpg",
                          "original_info": {"width": 100, "height": 200}},
@@ -274,6 +409,9 @@ class GalleryTests(unittest.TestCase):
                     "user": {"id_str": "99", "screen_name": "example", "name": "Example", "description": "Bio",
                              "created_at": "Thu Oct 01 00:00:00 +0000 2026", "location": "", "verified": False,
                              "protected": False, "profile_image_url_https": ""}}]
+                outside = copy.deepcopy(extractor.records[0])
+                outside["rest_id"] = outside["legacy"]["id_str"] = upper
+                extractor.records.insert(0, outside)
                 task = NativeDownloadJob(extractor, producer=self.producer, lock_directory=self.locks)
 
                 def download(url):

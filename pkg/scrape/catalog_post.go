@@ -20,6 +20,19 @@ var catalogRedditPostID = regexp.MustCompile(`^[0-9a-z]{1,30}$`)
 var catalogNumericPostID = regexp.MustCompile(`^[0-9]{1,30}$`)
 var catalogBlueskyPostID = regexp.MustCompile(`^did:(?:plc:[A-Za-z0-9]+|web:[A-Za-z0-9.:-]+)/[A-Za-z0-9._~-]+$`)
 
+// CatalogLocalPostReference scopes original keys and aliases to one physical
+// catalog. Their spelling alone never proves a global service post identity.
+func CatalogLocalPostReference(source, catalog, key string) (models.SourcePostIdentifier, error) {
+	if !catalogIdentityUUID(source) || !catalogSnapshotID.MatchString(catalog) || key == "" {
+		return models.SourcePostIdentifier{}, models.ErrCatalogSnapshotInvalid
+	}
+	body, err := LegacyCatalogJSON([]any{catalog, key}, 65536)
+	if err != nil {
+		return models.SourcePostIdentifier{}, err
+	}
+	return models.SourcePostIdentifier{Namespace: "legacy:catalog:" + source, Value: "post:" + CatalogSnapshotSHA(body)}, nil
+}
+
 // CatalogPostReference keeps mirror identities qualified even though old post
 // rows call their platform "onlyfans"/"patreon". Unqualified, local, or
 // conflicting identities remain scoped to the physical source catalog.
@@ -30,11 +43,10 @@ func CatalogPostReference(source, catalog string, row map[string]any, urls []str
 	if !catalogIdentityUUID(source) || !catalogSnapshotID.MatchString(catalog) || !keyOK || key == "" || !platformOK || platform == "" || !basisOK {
 		return nil, models.ErrCatalogSnapshotInvalid
 	}
-	body, err := LegacyCatalogJSON([]any{catalog, key}, 65536)
+	legacy, err := CatalogLocalPostReference(source, catalog, key)
 	if err != nil {
 		return nil, err
 	}
-	legacy := models.SourcePostIdentifier{Namespace: "legacy:catalog:" + source, Value: "post:" + CatalogSnapshotSHA(body)}
 	ret := &CatalogPostIdentity{Legacy: legacy, Identifier: legacy, Basis: "catalog_local_identity"}
 	id, _ := row["source_id"].(string)
 	if row["source_id"] != nil && id == "" {

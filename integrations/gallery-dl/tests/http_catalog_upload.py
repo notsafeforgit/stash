@@ -15,6 +15,7 @@ from stash_ingest.catalog_registry_import import main as registry_main
 from stash_ingest.catalog_snapshot import prepare
 from stash_ingest.catalog_upload import main
 from stash_ingest.catalog_evidence_import import CatalogEvidenceClient, main as evidence_main
+from stash_ingest.catalog_relations_import import CatalogRelationsClient, main as relations_main
 from stash_ingest.encoding import digest, encode
 from test_catalog_registry_import import registry_fixture
 from test_catalog_snapshot import CATALOG_ID, CAPTURED, catalog_fixture
@@ -46,6 +47,11 @@ def run():
         unused = {"id": "unused", "name": "Original unreferenced profile"}
         db.execute("INSERT INTO account_snapshots VALUES(?,'reddit',?)",
                    (digest(encode(["source-account-snapshot-v1", "reddit", unused])), json.dumps(unused)))
+        db.execute("CREATE TABLE IF NOT EXISTS post_aliases(alias_key TEXT PRIMARY KEY,post_key TEXT NOT NULL REFERENCES posts(post_key))")
+        db.execute("INSERT INTO post_aliases VALUES('reddit:post:local-alias','reddit:post:album')")
+        db.execute("INSERT INTO handles VALUES('reddit:handle:juniper','Juniper',?)", (CAPTURED,))
+        for index in range(55):
+            db.execute("INSERT INTO post_urls VALUES('reddit:post:album',?)", (f"https://example.test/album?copy={index:02}",))
     original = source.read_bytes()
     snapshot = directory / "snapshot"
     with patch("stash_ingest.catalog_snapshot.MAX_CHUNK_ROWS", 2):
@@ -64,6 +70,12 @@ def run():
     assert mapped["state"] == "mapped" and mapped["imported"] is False
     assert mapped["capture_mappings"] == 56 and mapped["profile_mappings"] == 2
     assert mapped["processed_records"] == mapped["source_records"] == 60
+    execute(relations_main, args, 1)  # The first relationship batch committed; response lost.
+    relationships = execute(relations_main, args, 2)
+    assert relationships == execute(relations_main, args, 2)
+    assert relationships["state"] == "review" and relationships["imported"] is False
+    assert relationships["processed_records"] == relationships["source_records"] == 59
+    assert relationships["mapped_records"] == 56 and relationships["review_records"] == 3
     assert source.read_bytes() == original
 
     # Another physical catalog retains copied events and one differing payload
@@ -79,6 +91,7 @@ def run():
     copied_args = ["--snapshot", str(directory / "copied"), "--endpoint", setup["endpoint"], "--expected-sha256", copied["manifest_sha256"]]
     execute(main, copied_args)
     assert execute(evidence_main, copied_args)["state"] == "mapped"
+    assert execute(relations_main, copied_args, 2)["state"] == "review"
     client = CatalogEvidenceClient(setup["endpoint"])
     def capture_ids(snapshot_uuid, manifest_sha):
         rows = client.request("GET", f"/{snapshot_uuid}/evidence-import/records", None, manifest_sha, "application/json")
@@ -87,6 +100,15 @@ def run():
     assert len(old) == len(new) == 56
     assert sum(old[key] != new[key] for key in old) == 1
     assert old["observation_details", '["capture-0"]'] != new["observation_details", '["capture-0"]']
+    relations = CatalogRelationsClient(setup["endpoint"])
+    rows = relations.request("GET", f"/{setup['snapshot']}/relations-import/records", None, prepared["manifest_sha256"], "application/json")
+    other_rows = relations.request("GET", f"/{copied_snapshot}/relations-import/records", None, copied["manifest_sha256"], "application/json")
+    original_url = next(row for row in rows if row["table"] == "post_urls")
+    copied_url = next(row for row in other_rows if row["table"] == "post_urls" and row["key"] == original_url["key"])
+    assert original_url["post_uuid"] == copied_url["post_uuid"]
+    assert original_url["url_evidence_uuid"] != copied_url["url_evidence_uuid"]
+    detail = relations.request("GET", f"/{setup['snapshot']}/relations-import/records/{original_url['ordinal']}", None, prepared["manifest_sha256"], "application/json")
+    assert detail["source_values"]["url"] == json.loads(original_url["key"])[1]
     print(json.dumps({"records": prepared["records"], "chunks": prepared["chunks"], "source_unchanged": True, "imported": False}))
 
 

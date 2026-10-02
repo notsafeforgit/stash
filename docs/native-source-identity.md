@@ -374,9 +374,8 @@ whole-catalog inventory until that final coordination is implemented.
 ## Post links and their evidence
 
 Native schema 1000032 adds `SourcePostLinks` for post URLs, identifier evidence
-and unselected publisher claims. These core services are prerequisites for the
-remaining catalog relationship import; this schema change alone does not map
-those original rows.
+and unselected publisher claims. The schema-1000033 catalog relationship import
+uses these services to retain original catalog associations.
 
 `source_post_urls` stores each exact URL once per post. Repeated observations
 share that row and retain their own UUID, origin, basis, observation time and
@@ -403,3 +402,51 @@ forgotten posts; retrying an already committed request remains valid. Native
 writes require a managed transaction, including rollback when a caller ignores
 a late write error. Reads use bounded indexed UUID cursors. Startup checks the
 schema and relationship integrity; anonymised exports remove the evidence.
+
+## Mapping catalog relationships
+
+Native schema 1000033 maps `accounts`, `handles`, `posts`, `post_urls` and
+`post_aliases` after the snapshot's source-evidence pass has finished. Each
+`catalog_relation_records` receipt retains the original key, row checksum and
+complete source values alongside its native references or review reason. This
+keeps legacy basis, timestamps and unsupported values available beyond temporary
+staging. `catalog_relations_imports` checkpoints bounded progress atomically
+with the native writes and immutable receipts.
+
+| Source family | Native result |
+| --- | --- |
+| `accounts` | Observe the original legacy key on the account selected by the snapshot's frozen registry mapping. Retain old source IDs and identity basis as evidence; do not reinterpret them as captured service IDs. |
+| `handles` | Observe native handles at their original `first_observed` time. Mirror values become `legacy_label` references because these fields can contain display names. |
+| `post_urls` | Deduplicate the exact URL per mapped post, preserving separate evidence for each original catalog row. |
+| `post_aliases` | Add a physical-catalog-scoped legacy identifier with provenance; an alias already bound elsewhere requires review. |
+| `posts` | Retain the old account association as an unselected claim. An absent account yields `unassigned`; missing mappings or incompatible namespaces require review. |
+
+The association observation time is the frozen snapshot time. An old post's
+creation time cannot establish when its current account link was made; the
+original value remains in the receipt. Original account UUIDs survive account
+consolidation, while core lookups resolve their canonical account. Forgotten
+posts, invalid legacy values and unmapped dependencies retain review outcomes
+instead of creating new associations. No publisher selection, ownership choice,
+performer attribution, media intake or job activation occurs in this pass.
+
+| Method and path under `/api/v3/archive/catalog-snapshots/{uuid}` | Result |
+| --- | --- |
+| `GET /relations-import` | Current relationship checkpoint; 404 before the first committed batch |
+| `POST /relations-import` | Advance with `expected_manifest_sha256` and the exact `after` ordinal |
+| `GET /relations-import/records?after=0&limit=100` | Bounded summaries; keys exceeding 8 KiB are omitted with `key_omitted:true` |
+| `GET /relations-import/records/{ordinal}` | One full original key and source-values object, with its disposition and native references |
+
+These routes require application access. Writes process at most 50 rows, stopping
+between records after 16 MiB of decoded input. Each original row already meets
+the snapshot's 16 MiB limit. A late failure rolls back native writes, receipts and
+progress together. Resume a lost response by reading the committed checkpoint;
+completed passes replay unchanged. Startup verifies source-row correspondence,
+counts, checkpoint continuity and native evidence scope. Anonymisation removes
+these records before their source and account parents.
+
+The CLI is `stash-import-catalog-relations`; it revalidates the frozen snapshot
+and received-upload receipt before advancing. Exit 0 means mapped, exit 2 means
+completed with review outcomes, and exit 1 means failure or an unavailable
+response. An unassigned legacy post is counted separately from a conflict.
+Every receipt remains `imported:false`: captured publisher decisions, remaining
+catalog families and final semantic reconciliation are still required.

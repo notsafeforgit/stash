@@ -2607,3 +2607,94 @@ account/handle rows and legacy publisher associations still need their bounded
 import passes and per-row reconciliation. No received snapshot becomes imported
 through this schema upgrade. The full transition remains active, with production,
 workers and n8n on the frozen compatible deployment.
+
+## 2026-10-01: Native catalog relationship import
+
+Schema 1000033 and `stash-import-catalog-relations` now map the original
+`accounts`, `handles`, `posts`, `post_urls` and `post_aliases` families through
+core services. The pass requires a received snapshot and completed source
+evidence mapping. Application-authorized API batches bind the exact manifest
+and ordinal, process at most 50 rows, and commit native records, immutable
+source-row receipts and progress together. A late error rolls back the entire
+batch even if its caller ignores the error. Lost responses resume from the
+committed checkpoint, and completed passes replay unchanged.
+
+Account rows use the snapshot's frozen registry mappings and preserve original
+account UUIDs through consolidation. They retain legacy keys without promoting
+folder-derived or mirror IDs into native-service identities. Handle evidence
+keeps its original observation time; mirror handle fields become legacy labels
+because they can contain display names. Post URLs share exact native URL rows
+while retaining separate evidence. Aliases retain physical-catalog scope and
+cannot take over another post's identifier. Old post/account associations become
+unselected claims, without selecting publishers or assigning depicted performers.
+
+Every receipt retains the complete original values, including old identity
+basis and creation timestamps. Unmapped accounts, invalid values, conflicting
+aliases and forgotten posts retain explicit review outcomes. Posts without an
+old account are counted as unassigned. Bounded API summaries omit unusually
+large keys with an explicit marker; the individual record endpoint retains the
+full key and source values. Startup validates source correspondence, progress
+continuity and native evidence scope. Anonymised exports remove these records.
+
+Focused tests passed for all five families, interrupted batches, stale cursors,
+reopening/replay, mirror scope, alias conflicts, failed-write rollback, forgotten
+posts, oversized values, incomplete startup data and anonymisation. The real
+HTTP/Python test loses a committed relationship batch, resumes it, and imports a
+second physical catalog whose shared post URL retains separate evidence. It also
+exercises invalid routes, bounded summaries and individual record inspection.
+
+All required fork-gate components passed: backend generation, v3 generation,
+types and format checks, 528 v3 tests, 71 application operation contracts, 226
+producer tests on Python 3.14 and Python 3.12, final lint and the complete Go
+suite. One initial lint finding was corrected before the successful backend
+gate. API tests took 384.817 seconds and SQLite tests 502.426 seconds while the
+private full-corpus rehearsal ran. The rebuilt isolated package exposes the
+installed `stash-import-catalog-relations` command. Parent `781eb6e72` passed
+lint, build and native preview image publication in CI.
+
+A fresh copy of the verified schema-1000032 rehearsal was promoted in 16.210
+seconds. Importing all 1,697 frozen snapshots processed 510,366 relationship rows
+in 11,497 bounded transactions over 525.312 seconds, including restart and exact
+terminal replay checks. Reopening the completed copy took 53.851 seconds while
+the broader tests were running. The results are 471,557 mapped rows, 32,978 review
+rows and 5,831 unassigned posts. These are relationship dispositions;
+`imported:false` remains the whole-catalog status.
+
+The review count consists of 78 original account records without a frozen
+registry mapping, 78 dependent handle records and 32,822 dependent post/account
+claims. All 250,944 URL rows and 71 aliases mapped successfully, along with 1,095
+account references, 1,109 handle observations and 218,338 unselected claims.
+Resolving the underlying account mappings and reviewing actual captured
+publisher identities remain separate from these immutable migration receipts.
+
+Independent Python reconciliation reread all original snapshot chunks, verified
+their hashes, and compared every relationship key, checksum and complete source
+value with its native receipt. It independently checked mapped account references,
+handle normalization and timestamps, scoped alias hashes, URL identities,
+publisher claims and provenance. All 148 unaffected tables matched the baseline
+exactly. Existing post/account fields and identities were preserved, with exact
+revision increments accounted for by the new evidence. All 504,810 prior post
+identifiers, 1,831 account identifiers and 2,296 account-evidence rows survived;
+the pass added 71 scoped post identifiers, 1,152 account references and 2,204
+account-evidence rows. The 250,944 URL observations share 250,943 native URL rows.
+Integrity returned `ok`, and foreign-key validation found no violations. Final
+reconciliation took 182.286 seconds; the resulting database is 9,898,385,408 bytes.
+
+Logs under `/tmp/stash-native-transition` are
+`catalog-relations-focused-final.log`, `catalog-relations-promotion.log`,
+`catalog-relations-full-import.log`,
+`catalog-relations-independent-reconciliation-final.log`,
+`catalog-relations-validate-fork.log`, `catalog-relations-backend-final.log`,
+`catalog-relations-python312.log` and `catalog-relations-package-install.log`.
+The final independent checker corrected an initial manifest-field lookup in its
+standalone script; the native importer required no change from that check.
+
+The original schema-1000032 baseline and frozen catalog snapshots were not
+modified. The new private rehearsal is
+`.local/native-catalog-relations-rehearsal-20261001/native-relations-rehearsal.sqlite`.
+Captured publisher decisions, assets/files, appearances, memberships, sidecars,
+translations, edits and other histories still require their remaining mappings
+and final semantic reconciliation. No source jobs are activated, library media
+associated, galleries constructed or existing metadata selections changed by
+this pass. The full transition remains active; production, workers and n8n
+remain on the frozen compatible deployment.

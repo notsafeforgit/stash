@@ -365,7 +365,17 @@ observations, evidence for post identifiers, and unselected publisher claims.
 Claims preserve original account UUIDs through consolidation; they never become
 capture publisher choices or performer attribution. Keep request replay, forgotten
 post guards, revision checks for identifier changes and atomic rollback. Import
-of the remaining catalog relationship rows still needs to call these services.
+of catalog relationships uses these services through schema 1000033.
+
+`stash-import-catalog-relations` advances a received snapshot after its evidence
+pass, retaining accounts, handle history, post URLs/aliases and unselected
+post/account claims. Frozen registry mappings and original account UUIDs remain
+authoritative; legacy IDs must not become stronger native-service identities.
+Mirror handle fields are retained as legacy labels. Every source row retains its
+original values and mapped/review/unassigned disposition, including oversized or
+invalid values. API summaries are bounded; full evidence is retrieved one row at
+a time. Completed passes remain `imported:false`. Captured publisher selection,
+remaining catalog families and final reconciliation are separate work.
 
 ### v3 extension points
 

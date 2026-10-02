@@ -60,6 +60,10 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Get("/catalog-snapshots/{snapshot}/evidence-import", rs.catalogEvidenceImport)
 	r.Post("/catalog-snapshots/{snapshot}/evidence-import", rs.advanceCatalogEvidenceImport)
 	r.Get("/catalog-snapshots/{snapshot}/evidence-import/records", rs.catalogEvidenceRecords)
+	r.Get("/catalog-snapshots/{snapshot}/relations-import", rs.catalogRelationsImport)
+	r.Post("/catalog-snapshots/{snapshot}/relations-import", rs.advanceCatalogRelationsImport)
+	r.Get("/catalog-snapshots/{snapshot}/relations-import/records", rs.catalogRelationsRecords)
+	r.Get("/catalog-snapshots/{snapshot}/relations-import/records/{ordinal}", rs.catalogRelationRecord)
 	return r
 }
 

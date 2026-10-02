@@ -181,6 +181,7 @@ func (db *Database) Repository() models.Repository {
 		CatalogRegistryImport:  &CatalogRegistryImportStore{},
 		CatalogSnapshot:        &CatalogSnapshotStore{},
 		CatalogEvidenceImport:  &CatalogEvidenceImportStore{},
+		CatalogRelationsImport: &CatalogRelationsImportStore{},
 		Folder:                 db.Folder,
 		Gallery:                db.Gallery,
 		GalleryChapter:         db.GalleryChapter,

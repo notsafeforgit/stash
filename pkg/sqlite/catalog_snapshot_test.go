@@ -24,6 +24,7 @@ type catalogSnapshotFixture struct {
 	body     []byte
 	manifest *scrape.CatalogSnapshotManifest
 	sha      string
+	chunks   [][]byte
 }
 
 func snapshotFixture(t *testing.T) *catalogSnapshotFixture {
@@ -41,7 +42,7 @@ func snapshotFixture(t *testing.T) *catalogSnapshotFixture {
 	require.NoError(t, err)
 	manifest, err := scrape.PrepareCatalogSnapshot(body, scrape.CatalogSnapshotSHA(body))
 	require.NoError(t, err)
-	return &catalogSnapshotFixture{db, repo, body, manifest, scrape.CatalogSnapshotSHA(body)}
+	return &catalogSnapshotFixture{db: db, repo: repo, body: body, manifest: manifest, sha: scrape.CatalogSnapshotSHA(body)}
 }
 
 func (f *catalogSnapshotFixture) begin(t *testing.T) *models.CatalogSnapshot {
@@ -57,6 +58,9 @@ func (f *catalogSnapshotFixture) begin(t *testing.T) *models.CatalogSnapshot {
 
 func (f *catalogSnapshotFixture) chunk(t *testing.T, index int) []byte {
 	t.Helper()
+	if f.chunks != nil {
+		return f.chunks[index]
+	}
 	body, err := os.ReadFile(filepath.Join("../scrape/testdata/catalog_snapshot", f.manifest.Chunks[index].File))
 	require.NoError(t, err)
 	return body

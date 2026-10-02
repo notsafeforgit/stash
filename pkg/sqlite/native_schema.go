@@ -420,6 +420,11 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 				return err
 			}
 		}
+		if version >= NativeSchemaBaseline+33 {
+			if err := validateCatalogRelationsSchema(conn); err != nil {
+				return err
+			}
+		}
 
 		return nil
 	}

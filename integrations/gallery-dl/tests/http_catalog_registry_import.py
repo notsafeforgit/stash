@@ -18,7 +18,7 @@ def execute(fn, args, wanted=0):
     output, errors = io.StringIO(), io.StringIO()
     with redirect_stdout(output), redirect_stderr(errors):
         assert fn(args) == wanted, errors.getvalue()
-    return json.loads(output.getvalue()) if wanted == 0 else None
+    return json.loads(output.getvalue()) if wanted in (0, 2) else None
 
 
 def run():

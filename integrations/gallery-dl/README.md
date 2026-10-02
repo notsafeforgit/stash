@@ -787,6 +787,34 @@ summaries at `/api/v3/archive/catalog-snapshots/SNAPSHOT_UUID/evidence-import/re
 The original frozen rows remain available for review. No website credentials,
 source scheduling or existing selected Stash metadata are changed.
 
+Once the evidence pass has finished, import its account references, handle
+history, post URLs, aliases and historical account claims with schema 1000033:
+
+```sh
+stash-import-catalog-relations --snapshot /migration/prepared/CATALOG_ID \
+  --expected-sha256 MANIFEST_SHA256 --endpoint STASH_ORIGIN
+```
+
+This uses the same application API-key reference and frozen manifest. It first
+validates local files and the received snapshot, then resumes bounded batches
+from `/relations-import`. The server requires a completed evidence pass. Exit 0
+means mapped, exit 2 means completed with review outcomes, and exit 1 means
+failure or an unavailable response; rerun the same command after a lost response.
+
+Accounts use the snapshot's frozen registry mappings. Mirror handle fields are
+retained as legacy labels; ambiguous or invalid records remain for review with
+their complete original values. Historical post/account links are unselected
+claims, so they cannot silently choose publishers or depicted performers. Posts
+without an old account are counted as `unassigned`.
+
+Inspect bounded summaries at
+`/api/v3/archive/catalog-snapshots/SNAPSHOT_UUID/relations-import/records`;
+append `/ORDINAL` to that path for full evidence. Summary keys above 8 KiB
+are omitted with `key_omitted:true`; the individual record retains the full key
+and source values. These receipts also remain `imported:false`. Importing media,
+memberships, sidecars, edits and other histories, choosing captured publishers,
+and final reconciliation remain separate work.
+
 ## Native n8n backfills
 
 `stash-ingest-n8n` replaces the account backfill runner's record/inspect contract.

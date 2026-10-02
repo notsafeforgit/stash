@@ -30,6 +30,7 @@ stash-import-catalog-registry = "stash_ingest.catalog_registry_import:main"
 stash-prepare-catalog = "stash_ingest.catalog_snapshot:main"
 stash-upload-catalog = "stash_ingest.catalog_upload:main"
 stash-import-catalog-evidence = "stash_ingest.catalog_evidence_import:main"
+stash-import-catalog-relations = "stash_ingest.catalog_relations_import:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

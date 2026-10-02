@@ -975,6 +975,41 @@ references. Post evidence and shared results also have application read APIs;
 see [retained translations](../../docs/native-schema.md#retained-source-translations).
 Completion remains `imported:false` pending the remaining catalog migration.
 
+## Frozen automation input
+
+Prepare the separate automation database from a consistent SQLite backup:
+
+```sh
+stash-prepare-automation --automation /migration/automation.sqlite3 \
+  --output /migration/prepared/automation --snapshot SNAPSHOT_UUID \
+  --source REGISTRY_SOURCE_UUID --captured-at SNAPSHOT_TIME
+stash-prepare-automation --verify /migration/prepared/automation \
+  --expected-sha256 MANIFEST_SHA256
+```
+
+Use the same registry source UUID as the catalog imports, a stable snapshot UUID,
+and the backup's capture time. Preparation requires the complete recognized
+automation schema (application `SCPC`, versions 1–3). It rejects active journals,
+unknown tables/columns, corrupt inputs and changes to the source file during
+export. It opens the frozen database immutably and never runs its stored SQL or
+changes its source files. The manifest retains the original database checksum,
+schema inventory, per-table hashes and bounded ordered record chunks.
+
+All ten maintenance, translation, enrichment and discovery families are retained.
+Values include exact original/cached text, raw JSON strings, nulls, binary values,
+SQLite integers and retry timestamps. Malformed legacy JSON and broken foreign-key
+references remain evidence for domain review; preparation never repairs them or
+reclassifies their jobs. Output files are private and flushed before publication;
+an existing destination is never replaced. After an interrupted acknowledgement,
+verify the published directory using its original manifest digest.
+
+This command only prepares and verifies input. Its summary reports
+`prepared:true`, `imported:false` and every pending family. Native receipt,
+domain mapping and reviewed activation of the historical automation queue remain
+separate implementation steps. A prepared directory is not a running queue or a
+completed native migration. The production cutover also requires catalogs,
+automation and other writers to share a coordinated backup boundary.
+
 ## Historical source albums
 
 `stash-backfill-source-albums` uses the native application API to match imported

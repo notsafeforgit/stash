@@ -201,17 +201,21 @@ func PrepareCatalogSnapshot(body []byte, expected string) (*CatalogSnapshotManif
 
 func validCatalogTable(name string, table CatalogSnapshotTable, version int) bool {
 	columns := strings.Fields(catalogSnapshotColumns[name])
-	if len(columns) == 0 || !slices.Equal(table.Key, strings.Fields(catalogSnapshotKeys[name])) || table.Rows < 0 || table.Rows > 10000000 ||
+	if name == "observations" || name == "observation_details" {
+		if version == 3 || len(table.Columns) == len(columns)+1 {
+			columns = append(columns, "account_refs_json")
+		}
+	}
+	return validSnapshotTable(table, columns, strings.Fields(catalogSnapshotKeys[name]))
+}
+
+func validSnapshotTable(table CatalogSnapshotTable, columns, key []string) bool {
+	if len(columns) == 0 || !slices.Equal(table.Key, key) || table.Rows < 0 || table.Rows > 10000000 ||
 		table.Bytes < table.Rows || table.Bytes > table.Rows*CatalogChunkLimit || !archive.ValidSHA256(table.SHA256) {
 		return false
 	}
 	if table.Rows == 0 && (table.Bytes != 0 || table.SHA256 != CatalogSnapshotSHA(nil)) {
 		return false
-	}
-	if name == "observations" || name == "observation_details" {
-		if version == 3 || len(table.Columns) == len(columns)+1 {
-			columns = append(columns, "account_refs_json")
-		}
 	}
 	if len(columns) != len(table.Columns) {
 		return false
@@ -273,6 +277,21 @@ type CatalogSnapshotRecord struct {
 // Each original line survives staging verbatim. Native source payload encoding
 // is a separate operation; re-encoding here would lose original digest evidence.
 func (m *CatalogSnapshotManifest) Record(line []byte) (*CatalogSnapshotRecord, error) {
+	r, err := prepareSQLiteSnapshotRecord(line, m.Tables, validCatalogValue)
+	if err != nil {
+		return nil, err
+	}
+	if r.Table == "catalog_info" {
+		name, ok := r.Values["key"].(string)
+		expected, exists := m.CatalogInfo[name]
+		if !ok || !exists || r.Values["value"] != expected {
+			return nil, models.ErrCatalogSnapshotInvalid
+		}
+	}
+	return r, nil
+}
+
+func prepareSQLiteSnapshotRecord(line []byte, tables map[string]CatalogSnapshotTable, validValue func(string, string, any, map[string]any) bool) (*CatalogSnapshotRecord, error) {
 	bad := models.ErrCatalogSnapshotInvalid
 	if len(line) == 0 || line[len(line)-1] != '\n' || bytes.Count(line, []byte{'\n'}) != 1 {
 		return nil, bad
@@ -282,7 +301,7 @@ func (m *CatalogSnapshotManifest) Record(line []byte) (*CatalogSnapshotRecord, e
 		return nil, bad
 	}
 	table, _ := object["table"].(string)
-	descriptor, exists := m.Tables[table]
+	descriptor, exists := tables[table]
 	key, keyOK := object["key"].([]any)
 	values, valuesOK := object["values"].(map[string]any)
 	if !exists || !keyOK || !valuesOK || len(key) != len(descriptor.Key) || len(values) != len(descriptor.Columns) {
@@ -304,14 +323,7 @@ func (m *CatalogSnapshotManifest) Record(line []byte) (*CatalogSnapshotRecord, e
 	}
 	for _, column := range descriptor.Columns {
 		value, ok := values[column.Name]
-		if !ok || !validCatalogValue(table, column.Name, value, values) {
-			return nil, bad
-		}
-	}
-	if table == "catalog_info" {
-		name, ok := values["key"].(string)
-		expected, exists := m.CatalogInfo[name]
-		if !ok || !exists || values["value"] != expected {
+		if !ok || !validValue(table, column.Name, value, values) {
 			return nil, bad
 		}
 	}

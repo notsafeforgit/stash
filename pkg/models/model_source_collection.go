@@ -120,6 +120,9 @@ type SourceCollectionReaderWriter interface {
 	LookupTarget(context.Context, string, string, int) ([]*SourceCollection, error)
 	LookupCurrentTargets(context.Context, []string, []string, *string, bool) ([]*SourceCollection, error)
 	History(context.Context, string, int, int) ([]SourceCollectionRevision, error)
+	RecordPostMembership(context.Context, CollectionPostMembership) (*CollectionPostMembership, error)
+	Memberships(context.Context, string, string, int) ([]CollectionPostMembership, error)
+	PostMemberships(context.Context, string, string, int) ([]CollectionPostMembership, error)
 	RecordCapture(context.Context, CollectionCapture) error
 	HasCapture(context.Context, CollectionCapture) (bool, error)
 	Captures(context.Context, string, *CollectionCaptureCursor, int) ([]CollectionCapture, error)

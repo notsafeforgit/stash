@@ -52,6 +52,7 @@ type Repository struct {
 	SourcePostLinks         SourcePostLinksReaderWriter
 	SourceFile              SourceFileReaderWriter
 	CatalogMediaImport      CatalogMediaImportReaderWriter
+	CatalogMembershipImport CatalogMembershipImportReaderWriter
 	SourceAttachment        SourceAttachmentReaderWriter
 	SourceGallery           SourceGalleryReaderWriter
 	MetadataField           MetadataFieldReaderWriter

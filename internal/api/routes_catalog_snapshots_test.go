@@ -42,7 +42,7 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 	router := (&nativeArchiveRoutes{repo: repo}).router()
 	handler := http.StripPrefix("/api/v3/archive", router)
 	var lostBegin, lostChunk, lostEvidence, lostRelations, lostPublisher, lostAttachment atomic.Bool
-	var lostMediaBegin, lostMediaAdvance atomic.Bool
+	var lostMediaBegin, lostMediaAdvance, lostMembership atomic.Bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("ApiKey") != "fixture-application-key" || r.Header.Get("Authorization") != "" {
 			w.WriteHeader(http.StatusUnauthorized)
@@ -57,9 +57,10 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/publisher-import") && !lostPublisher.Swap(true)) ||
 			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/attachment-import") && !lostAttachment.Swap(true)) ||
 			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/media-import") && !lostMediaBegin.Swap(true)) ||
-			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/media-import/advance") && !lostMediaAdvance.Swap(true)))
+			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/media-import/advance") && !lostMediaAdvance.Swap(true)) ||
+			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/membership-import") && !lostMembership.Swap(true)))
 		if drop {
-			if strings.HasSuffix(r.URL.Path, "/evidence-import") || strings.HasSuffix(r.URL.Path, "/relations-import") || strings.HasSuffix(r.URL.Path, "/publisher-import") || strings.HasSuffix(r.URL.Path, "/attachment-import") || strings.HasSuffix(r.URL.Path, "/media-import/advance") {
+			if strings.HasSuffix(r.URL.Path, "/evidence-import") || strings.HasSuffix(r.URL.Path, "/relations-import") || strings.HasSuffix(r.URL.Path, "/publisher-import") || strings.HasSuffix(r.URL.Path, "/attachment-import") || strings.HasSuffix(r.URL.Path, "/media-import/advance") || strings.HasSuffix(r.URL.Path, "/membership-import") {
 				var progress struct {
 					State     string `json:"state"`
 					Processed int    `json:"processed_records"`
@@ -102,7 +103,9 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 	require.True(t, lostAttachment.Load())
 	require.True(t, lostMediaBegin.Load())
 	require.True(t, lostMediaAdvance.Load())
-	var relationOrdinal, publisherOrdinal, attachmentOrdinal, mediaOrdinal int64
+	require.True(t, lostMembership.Load())
+	var relationOrdinal, publisherOrdinal, attachmentOrdinal, mediaOrdinal, membershipOrdinal int64
+	var membershipCollection, membershipPost string
 	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
 		receipt, err := repo.CatalogSnapshot.Find(ctx, snapshot)
 		require.NoError(t, err)
@@ -127,6 +130,11 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, media, 1)
 		mediaOrdinal = media[0].Ordinal
+		memberships, err := repo.CatalogMembershipImport.Records(ctx, snapshot, 0, 1)
+		require.NoError(t, err)
+		require.Len(t, memberships, 1)
+		membershipOrdinal = memberships[0].Ordinal
+		membershipCollection, membershipPost = *memberships[0].CollectionUUID, *memberships[0].PostUUID
 		return nil
 	}))
 	for _, test := range []struct {
@@ -146,6 +154,20 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 		{"GET", "/catalog-snapshots/" + snapshot + "/evidence-import/records?after=-1", "", 400},
 		{"POST", "/catalog-snapshots/" + snapshot + "/evidence-import", "application/json", 400},
 		{"POST", "/catalog-snapshots/" + snapshot + "/evidence-import", "text/plain", 400},
+		{"GET", "/collections/" + membershipCollection + "/post-memberships?limit=1", "", 200},
+		{"GET", "/posts/" + membershipPost + "/collection-memberships?limit=1", "", 200},
+		{"GET", "/posts/" + membershipPost + "/collection-memberships?limit=101", "", 400},
+		{"GET", "/collections/" + membershipCollection + "/post-memberships?after=invalid", "", 400},
+		{"GET", "/collections/" + uuid.NewString() + "/post-memberships", "", 404},
+		{"GET", "/posts/" + uuid.NewString() + "/collection-memberships", "", 404},
+		{"GET", "/catalog-snapshots/" + snapshot + "/membership-import", "", 200},
+		{"GET", "/catalog-snapshots/" + snapshot + "/membership-import/records?limit=1", "", 200},
+		{"GET", "/catalog-snapshots/" + snapshot + "/membership-import/records?limit=101", "", 400},
+		{"GET", "/catalog-snapshots/" + snapshot + "/membership-import/records?after=-1", "", 400},
+		{"GET", "/catalog-snapshots/" + snapshot + "/membership-import/records/" + strconv.FormatInt(membershipOrdinal, 10), "", 200},
+		{"GET", "/catalog-snapshots/" + snapshot + "/membership-import/records/0", "", 400},
+		{"GET", "/catalog-snapshots/" + snapshot + "/membership-import/records/999999", "", 404},
+		{"POST", "/catalog-snapshots/" + snapshot + "/membership-import", "application/json", 400},
 		{"GET", "/catalog-snapshots/" + snapshot + "/relations-import", "", 200},
 		{"GET", "/catalog-snapshots/" + snapshot + "/relations-import/records?limit=1", "", 200},
 		{"GET", "/catalog-snapshots/" + snapshot + "/relations-import/records?limit=101", "", 400},

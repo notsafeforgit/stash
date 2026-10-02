@@ -125,6 +125,9 @@ func receiveCatalogFixtureRows(t *testing.T, f *catalogSnapshotFixture, rows []m
 		f.receive(t, i)
 	}
 	parent := advanceEvidence(t, f, 0)
+	for parent.State == "running" {
+		parent = advanceEvidence(t, f, parent.LastOrdinal)
+	}
 	require.Contains(t, []string{"mapped", "review"}, parent.State)
 	return f
 }

@@ -34,6 +34,7 @@ stash-import-catalog-relations = "stash_ingest.catalog_relations_import:main"
 stash-import-catalog-publishers = "stash_ingest.catalog_publisher_import:main"
 stash-import-catalog-attachments = "stash_ingest.catalog_attachment_import:main"
 stash-import-catalog-media = "stash_ingest.catalog_media_import:main"
+stash-import-catalog-memberships = "stash_ingest.catalog_membership_import:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -3079,3 +3079,73 @@ Timestamp assessments are under
 Memberships, source gallery construction and remaining catalog families still
 need conversion, so the snapshot's `imported` result remains false. Production,
 source activation and develop remain unchanged.
+
+## Native post collection memberships
+
+Schema 1000039 adds immutable direct post-membership evidence, separate from
+capture membership, media intake and performer attribution. The native model
+and paged application API retain the post, historical collection revision,
+observation time and provenance. Exact replay survives collection renaming or
+retirement and post forgetting; forgotten posts reject new evidence. New
+memberships advance the post's review revision without changing its metadata.
+
+`stash-import-catalog-memberships` maps the original membership rows after the
+snapshot's evidence pass, independently of file availability. Registry-qualified
+collection keys identify shared groups across downloaded catalogs. Legacy
+`creator` values came from punctuation in folder names and map to directory
+groups without owner attribution. Subreddit groups retain their kind. New
+groups are disabled with no inferred account, target URL or root. Conflicting
+labels and unsupported identities retain the complete original row for review.
+Later native edits do not overwrite historical group definitions or receipts.
+
+Each transaction processes at most 50 records, with a between-row byte bound,
+and commits native groups, memberships and receipts together. The client resumes
+from the last committed original ordinal after lost responses. HTTP inspection
+includes bounded receipt lists, full original values, collection-to-post evidence
+and post-to-collection evidence. This supplements capture membership; these
+groups do not by themselves create source albums or start scrapes.
+
+Focused SQLite and real HTTP tests passed in 11.565 and 5.459 seconds. Coverage
+includes bounded restart, shared groups across two independent catalog snapshots,
+lost responses, immutable replay, conflicting definitions, original-value
+inspection, later collection retirement, forgotten posts, atomic rollback after
+an injected receipt failure, corrupt-scope startup rejection and anonymisation.
+The full validation set passed generation, v3 formatting/types/locales, 528 UI
+tests, 71 native contracts, 238 producer tests and Go lint with zero issues.
+All 238 producer tests also passed under Python 3.12 in 6.741 seconds; package
+installation and the new CLI entry point were checked.
+
+The full Go run passed ingestion in 446.721 seconds and SQLite in 477.369 seconds.
+Its API package initially failed three downloader-worker cases because the direct
+Go command selected system Python, which lacked gallery-dl. Those cases passed
+in 26.068 seconds with `PRODUCER_PYTHON` pointing at the prepared environment;
+the remaining Go tests passed in the original run. Tests used a 25-minute package
+deadline while the independent full-copy migration was using disk I/O.
+
+The isolated 14,250,086,400-byte schema-1000038 copy promoted in 547.148 seconds.
+All 1,697 catalog snapshots completed membership import in 413.086 seconds,
+including 154.108 seconds to reopen through normal startup and exact terminal
+receipt replay. The 6,456 transactions mapped all 257,001 original memberships
+into 912 shared native groups, with zero review conflicts. The original
+schema-1000038 copy and production remain unchanged.
+
+Independent reconciliation passed in 349.851 seconds against all original
+frozen SQLite catalog membership rows. It verifies the original values and
+source digests, deterministic group and evidence identities, post mappings,
+historical collection definitions, timestamps, provenance and terminal receipts.
+All 166 unaffected tables and the prior migration ledger match exactly. Every
+existing collection definition is unchanged; the only additions are the 912
+disabled groups. All 257,001 post revision increments are accounted for.
+Integrity is `ok` and foreign-key violations are zero. The resulting copy is
+14,483,116,032 bytes.
+
+Private helpers, copies, per-catalog receipts and the independent reconciliation
+report are under `.local/native-catalog-membership-rehearsal-20261001/`.
+Logs under `/tmp/stash-native-transition` use the `catalog-membership-` prefix,
+including `promotion.log`, `full-import.log`, `independent-reconciliation.log`,
+`focused-http-final.log`, `validation.log`, `backend.log`, `worker-retry.log`,
+`python312-full.log` and `package-install.log`.
+
+Source gallery construction, remaining catalog families, native UI and the
+other transition phases remain open. No live migration, source activation,
+production deployment or develop merge was performed.

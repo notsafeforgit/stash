@@ -19,6 +19,7 @@ from stash_ingest.catalog_relations_import import CatalogRelationsClient, main a
 from stash_ingest.catalog_publisher_import import CatalogPublisherClient, main as publisher_main
 from stash_ingest.catalog_attachment_import import CatalogAttachmentClient, main as attachment_main
 from stash_ingest.catalog_media_import import main as media_main
+from stash_ingest.catalog_membership_import import CatalogMembershipClient, main as membership_main
 from stash_ingest.encoding import digest, encode
 from test_catalog_registry_import import registry_fixture
 from test_catalog_snapshot import CATALOG_ID, CAPTURED, catalog_fixture
@@ -60,6 +61,7 @@ def run():
         db.execute("INSERT INTO handles VALUES('reddit:handle:juniper','Juniper',?)", (CAPTURED,))
         for index in range(55):
             db.execute("INSERT INTO post_urls VALUES('reddit:post:album',?)", (f"https://example.test/album?copy={index:02}",))
+            db.execute("INSERT INTO memberships VALUES('reddit:post:album',?,'collection',?)", (f"directory:Group {index:02}", f"Group {index:02}"))
             asset, path = f"path:{index}", f"absent/{index}.mp4"
             db.execute("INSERT INTO assets(asset_id,created_at) VALUES(?,?)", (asset, CAPTURED))
             db.execute("INSERT INTO files(relpath,asset_id,state,first_observed,role) VALUES(?,?,'missing',?,'local')", (path, asset, CAPTURED))
@@ -112,6 +114,10 @@ def run():
     assert media["processed_records"] == media["source_records"] == 165
     assert media["mapped_records"] == 55 and media["unavailable_records"] == 110
     assert media["matched_files"] == media["media_associations"] == 0
+    execute(membership_main, args, 1)  # Its first bounded transaction commits before connection loss.
+    membership = execute(membership_main, args)
+    assert membership == execute(membership_main, args)
+    assert membership["state"] == "mapped" and membership["mapped_records"] == 55 and membership["imported"] is False
     assert source.read_bytes() == original
 
     # Another physical catalog retains copied events and one differing payload
@@ -134,6 +140,14 @@ def run():
     copied_attachments = execute(attachment_main, copied_args)
     assert copied_attachments["mapped_records"] == 55 and copied_attachments["unavailable_records"] == 1
     assert copied_attachments["changed_selections"] == 0
+    assert execute(membership_main, copied_args)["mapped_records"] == 55
+    memberships = CatalogMembershipClient(setup["endpoint"])
+    original_members = memberships.request("GET", f"/{setup['snapshot']}/membership-import/records", None, prepared["manifest_sha256"], "application/json")
+    copied_members = memberships.request("GET", f"/{copied_snapshot}/membership-import/records", None, copied["manifest_sha256"], "application/json")
+    assert len(original_members) == len(copied_members) == 55
+    assert {row["collection_uuid"] for row in original_members} == {row["collection_uuid"] for row in copied_members}
+    assert {row["post_uuid"] for row in original_members} == {row["post_uuid"] for row in copied_members}
+    assert not ({row["membership_uuid"] for row in original_members} & {row["membership_uuid"] for row in copied_members})
     client = CatalogEvidenceClient(setup["endpoint"])
     def capture_ids(snapshot_uuid, manifest_sha):
         rows = client.request("GET", f"/{snapshot_uuid}/evidence-import/records", None, manifest_sha, "application/json")

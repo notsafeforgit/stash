@@ -429,6 +429,15 @@ current file/archive generations and unique media ownership. This pass records
 post associations without inventing attachment order or changing selected
 metadata. Whole-catalog completion and gallery construction remain separate.
 
+Schema 1000039 retains post collection membership independently of captures,
+files, publishers and depicted performers. `stash-import-catalog-memberships`
+maps historical collection keys to disabled native groups shared across catalogs
+from the same registry. Legacy `creator` memberships were inferred from folder
+punctuation; import them as directory groups without owner attribution. Retain
+historical definition revisions, labels and original receipts; later native
+renames or retirement do not rewrite membership evidence. Do not activate
+scrapes, infer URLs or create galleries from these group labels.
+
 ### v3 extension points
 
 See `ui/v3/docs/architecture.md` for the current module map and compatibility rules. List configurations require a discriminated GraphQL/local `source`; generated query variables remain typed through the data hook. Layout, preferences, query state, and cache refill live in separate list modules. Player transition policy consumes plain buffered/seekable state in `scene-player-transitions.ts`; media effects, recovery, and transcode leases are separate hooks. Keep the stable player root and existing iOS seek/timeline behavior when extending these modules.

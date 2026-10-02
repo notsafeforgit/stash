@@ -900,6 +900,32 @@ Inspect `/api/v3/archive/catalog-snapshots/SNAPSHOT_UUID/media-import/records`
 for bounded summaries and append `/ORDINAL` for one full receipt. Results remain
 `imported:false` pending the other catalog families and final reconciliation.
 
+Map historical collection memberships with schema 1000039:
+
+```sh
+stash-import-catalog-memberships --snapshot /migration/prepared/CATALOG_ID \
+  --expected-sha256 MANIFEST_SHA256 --endpoint STASH_ORIGIN
+```
+
+The evidence import must have completed first. File matching is independent:
+a post can belong to a collection even when its media is missing. Original
+collection keys within the same catalog registry reuse one native group across
+all imported catalogs. Directory groups, including legacy `creator` groups,
+remain separate from performer ownership; subreddit groups retain their kind.
+New groups are disabled, with no inferred account, source URL or root binding.
+Unknown definitions and conflicting labels are retained for review. Existing
+native edits and historical definition revisions remain intact.
+
+Each transaction handles at most 50 memberships. Retry the same snapshot and
+manifest after interruption; the client reads committed progress before
+continuing. Exit 0 means mapped, exit 2 means review is required, and exit 1
+means a failure or unavailable response. Inspect
+`/api/v3/archive/catalog-snapshots/SNAPSHOT_UUID/membership-import/records`
+and append `/ORDINAL` for the original values and native references. Native
+membership evidence is also readable by collection or post. This pass creates
+no albums and continues to report `imported:false` until the remaining families
+and final reconciliation are complete.
+
 ## Native n8n backfills
 
 `stash-ingest-n8n` replaces the account backfill runner's record/inspect contract.

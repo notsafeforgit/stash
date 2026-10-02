@@ -43,33 +43,15 @@ type catalogMediaWork struct {
 }
 
 func loadCatalogMediaWork(ctx context.Context, id, expected string) (*catalogMediaWork, error) {
-	snapshot, err := (&CatalogSnapshotStore{}).Find(ctx, id)
+	work, err := loadCompletedCatalogRelations(ctx, id, expected)
 	if err != nil {
 		return nil, err
 	}
-	if snapshot == nil || snapshot.State != "received" || snapshot.ManifestSHA256 != expected {
-		return nil, models.ErrCatalogSnapshotConflict
-	}
-	evidence, err := (&CatalogEvidenceImportStore{}).Find(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	if evidence == nil || evidence.State == "running" || evidence.ManifestSHA256 != expected {
-		return nil, models.ErrCatalogSnapshotConflict
-	}
-	var body []byte
-	if err := dbWrapper.Get(ctx, &body, "SELECT manifest FROM catalog_snapshots WHERE uuid=?", id); err != nil {
-		return nil, err
-	}
-	manifest, err := scrape.PrepareCatalogSnapshot(body, expected)
-	if err != nil {
-		return nil, err
-	}
-	stamp, err := time.Parse(time.RFC3339Nano, snapshot.CapturedAt)
+	stamp, err := time.Parse(time.RFC3339Nano, work.snapshot.CapturedAt)
 	if err != nil {
 		return nil, models.ErrCatalogSnapshotInvalid
 	}
-	return &catalogMediaWork{catalogRelationsWork: catalogRelationsWork{catalogEvidenceWork{snapshot: snapshot, manifest: manifest}}, stamp: stamp}, nil
+	return &catalogMediaWork{catalogRelationsWork: *work, stamp: stamp}, nil
 }
 
 func (s *CatalogMediaImportStore) Begin(ctx context.Context, input models.CatalogMediaBinding, now time.Time) (*models.CatalogMediaImport, error) {

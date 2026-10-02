@@ -604,3 +604,62 @@ failure or an unavailable response. `unavailable` retains missing/pending media
 as evidence. Every result remains `imported:false` until the remaining catalog
 families and final reconciliation are complete. Database backups include the
 native evidence and receipts; anonymised exports remove them.
+
+## Historical post collection membership
+
+Schema 1000039 adds `source_collection_post_evidence`. Each immutable membership
+names a post and a historical collection definition, with its own evidence UUID,
+origin, basis, observation time and provenance. It needs no scrape capture,
+media file or performer. One post can belong to several groups, and several
+catalog snapshots can independently support the same post/group relationship.
+New evidence advances the post's review revision; exact replay does not. A
+forgotten post rejects new evidence while retaining historical replay.
+This supplements existing capture-to-collection membership and manual
+media-intake provenance. The endpoints below return direct post-membership
+evidence; capture-based membership remains available through collection captures.
+
+Native membership evidence is paged by its UUID using `after` and `limit`
+(default 50, maximum 100):
+
+| Method | Endpoint | Result |
+| --- | --- | --- |
+| GET | `/api/v3/archive/collections/{collection}/post-memberships` | Post membership evidence for one collection |
+| GET | `/api/v3/archive/posts/{post}/collection-memberships` | Collection membership evidence for one post |
+
+These lists contain provenance records. Multiple records can support the same
+post/group relationship; a collection's distinct-post view should group those
+references without discarding their evidence.
+
+The catalog membership importer consumes only the original `memberships` rows
+after their snapshot's evidence pass has completed. A registry-qualified
+collection key maps to one native group across its downloaded catalogs. The
+mapping records the original kind and label and the first native definition.
+Later native renames and retirement leave that historical definition intact.
+Equal labels alone do not combine different source keys or separate registries.
+
+Legacy `creator` meant that a directory name contained commas, so it maps to a
+directory group without assigning an owner. Other directory memberships map to
+directory groups; subreddit memberships retain their kind and Reddit namespace.
+Groups start disabled with no account, target URL or media root. Unsupported
+identities and conflicting definitions remain review records with their exact
+original values. Membership does not create an album or imply depicted
+performers, publishers, or ownership.
+
+The application-authenticated migration routes are:
+
+| Method | Endpoint | Result |
+| --- | --- | --- |
+| GET/POST | `/api/v3/archive/catalog-snapshots/{snapshot}/membership-import` | Read progress or advance a bounded transaction |
+| GET | `/api/v3/archive/catalog-snapshots/{snapshot}/membership-import/records` | Receipt summaries by original ordinal |
+| GET | `/api/v3/archive/catalog-snapshots/{snapshot}/membership-import/records/{ordinal}` | Original values and native references |
+
+POST requires `expected_manifest_sha256` and the last committed source ordinal
+as `after` (zero starts). Each transaction handles at most 50 rows and checks
+the 16 MiB work limit between rows; group creation, membership and receipts
+commit together. `stash-import-catalog-memberships` reads committed progress
+before resuming the same frozen manifest after a lost response. Exit codes are
+0 for mapped, 2 for review, and 1 for a failed/unavailable request. Original
+membership rows have no timestamp: the snapshot capture time describes when
+the evidence was retained, without inventing when the post joined the group.
+The result remains `imported:false` pending other catalog families and final
+reconciliation. Backups include the new records; anonymisation removes them.

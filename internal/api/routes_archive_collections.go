@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stashapp/stash/internal/ingest"
@@ -83,6 +84,57 @@ func (rs *nativeArchiveRoutes) putCollection(w http.ResponseWriter, r *http.Requ
 	err := rs.repo.WithTxn(r.Context(), func(ctx context.Context) error {
 		var err error
 		result, err = rs.repo.SourceCollection.Put(ctx, input)
+		return err
+	})
+	if err != nil {
+		nativeArchiveError(w, err)
+		return
+	}
+	ingestJSON(w, http.StatusOK, result)
+}
+
+func (rs *nativeArchiveRoutes) collectionPostMemberships(w http.ResponseWriter, r *http.Request) {
+	rs.membershipPage(w, r, false)
+}
+
+func (rs *nativeArchiveRoutes) postCollectionMemberships(w http.ResponseWriter, r *http.Request) {
+	rs.membershipPage(w, r, true)
+}
+
+func (rs *nativeArchiveRoutes) membershipPage(w http.ResponseWriter, r *http.Request, byPost bool) {
+	id, after, limit := chi.URLParam(r, "collection"), r.URL.Query().Get("after"), 50
+	if byPost {
+		id = chi.URLParam(r, "post")
+	}
+	var err error
+	if value := r.URL.Query().Get("limit"); value != "" {
+		limit, err = strconv.Atoi(value)
+	}
+	if err != nil || limit < 1 || limit > 100 || !ingest.ValidUUID(id) || (after != "" && !ingest.ValidUUID(after)) {
+		ingestError(w, ingest.ErrInvalid)
+		return
+	}
+	var result []models.CollectionPostMembership
+	err = rs.repo.WithReadTxn(r.Context(), func(ctx context.Context) error {
+		if byPost {
+			post, err := rs.repo.SourceEvidence.FindPost(ctx, id)
+			if err != nil {
+				return err
+			}
+			if post == nil {
+				return ingest.ErrNotFound
+			}
+			result, err = rs.repo.SourceCollection.PostMemberships(ctx, id, after, limit)
+			return err
+		}
+		collection, err := rs.repo.SourceCollection.Find(ctx, id)
+		if err != nil {
+			return err
+		}
+		if collection == nil {
+			return ingest.ErrNotFound
+		}
+		result, err = rs.repo.SourceCollection.Memberships(ctx, id, after, limit)
 		return err
 	})
 	if err != nil {

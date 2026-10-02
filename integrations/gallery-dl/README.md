@@ -926,6 +926,85 @@ membership evidence is also readable by collection or post. This pass creates
 no albums and continues to report `imported:false` until the remaining families
 and final reconciliation are complete.
 
+## Historical source albums
+
+`stash-backfill-source-albums` uses the native application API to match imported
+media to source post attachments and construct the corresponding galleries.
+It runs after the relevant source evidence, attachment manifests and media
+associations have been imported. It requires the existing application API key
+in `STASH_API_KEY` (or a named `--api-key-env`), not a scoped scraper token.
+No website login or cookie is involved, and plans contain no API key.
+
+First prepare a new private plan directory. This fetches read-only previews and
+saves the exact post, matching policy, preview signature and request UUID for
+every operation. Choose `source-identifiers-v1` for retained qualified source
+media IDs. Use `legacy-reddit-filename-v1` only when explicitly accepting the
+historical Reddit `post-id_media-id` filename convention as matching evidence.
+
+```sh
+stash-backfill-source-albums prepare --endpoint STASH_ORIGIN \
+  --policy legacy-reddit-filename-v1 --all-selected \
+  --output /migration/source-albums
+
+stash-backfill-source-albums show --plan /migration/source-albums \
+  --expected-sha256 PLAN_SHA256 --post POST_UUID
+
+stash-backfill-source-albums apply --endpoint STASH_ORIGIN \
+  --plan /migration/source-albums --expected-sha256 PLAN_SHA256
+
+stash-backfill-source-albums status --endpoint STASH_ORIGIN \
+  --plan /migration/source-albums --expected-sha256 PLAN_SHA256
+```
+
+`PLAN_SHA256` is the manifest digest printed by `prepare`; retain it with the
+reviewed plan. `show` displays one complete saved preview without contacting
+Stash. `apply` validates every saved record before making changes. The endpoint
+must match the saved origin; redirects and ambient proxies are not used. Existing
+plan directories are never overwritten. Instead of `--all-selected`, use repeated
+`--post POST_UUID` arguments or `--posts-file FILE` containing a JSON array.
+
+Discovery includes only posts with selected attachment lists, including disabled
+and forgotten posts. Forgotten entries remain in the report without a submission.
+Previews requiring review are retained without application. Disabled selections
+and single-media posts can complete as no-ops. Bounded UUID pagination is not a
+global snapshot while writers run: migration uses a quiesced boundary or an
+explicit reviewed post list. Plans allow at most 100,000 posts and 64 MiB per
+preview; exceeding a limit fails explicitly rather than dropping records.
+
+After interruption, rerun `apply` or `status` with the same directory and digest.
+The client looks up each original request before submitting it, including when a
+response was lost. It never refreshes a stale preview or silently replaces a
+failed/cancelled job. `publication_committed` means the database changes exist;
+`hooks_finished` additionally means the worker finished the applicable plugin
+notifications. Gaps without usable media remain visible in publication counts.
+
+Exit 0 means the selected command succeeded; for `apply` and `status`, every
+submitted operation in that plan has finished and no review outcome remains.
+Exit 2 means review is required (including stale, failed or cancelled work),
+exit 3 means queued/running/unsubmitted work remains, and exit 1 means an error
+or unavailable response. An error does not prove that a preceding request failed
+to commit. Plan completion does not mean all source media was downloaded, all
+catalog families were imported, or the full migration is complete.
+
+To cancel, inspect the job revision, then use `cancel` with the plan arguments,
+`--post POST_UUID` and `--expected-revision REVISION`. Cancellation cannot undo
+already-committed gallery changes or notifications. Explicit retry creates a
+separate saved plan before submitting anything:
+
+```sh
+stash-backfill-source-albums prepare-retry --endpoint STASH_ORIGIN \
+  --plan /migration/source-albums --expected-sha256 PLAN_SHA256 \
+  --post POST_UUID --output /migration/source-album-retry
+
+stash-backfill-source-albums apply --endpoint STASH_ORIGIN \
+  --plan /migration/source-album-retry --expected-sha256 RETRY_PLAN_SHA256
+```
+
+The retry pins its parent job and revision. If that job already published,
+retry resumes notification delivery with the original event identity, preserving
+later library edits. If unpublished evidence has changed, prepare and review a
+fresh plan instead. Old terminal job history remains available.
+
 ## Native n8n backfills
 
 `stash-ingest-n8n` replaces the account backfill runner's record/inspect contract.

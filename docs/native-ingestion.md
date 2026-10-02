@@ -240,6 +240,7 @@ filesystem inspection and do not require FFmpeg.
 
 | Method and route | Request or result |
 |---|---|
+| `GET /album-backfill-posts` | Selected post UUID, state, selection UUID and mode; `after` post UUID and `limit` (default 50, maximum 100) |
 | `POST /posts/{post}/album-backfill/preview` | `{ "policy": "legacy-reddit-filename-v1" }`; read-only action, signature, proposed choices, ordered slots and membership changes |
 | `POST /posts/{post}/album-backfills` | `{ "request_uuid": "…", "policy": "…", "signature": "…" }`; queues the reviewed preview |
 | `GET /album-backfill-requests/{request}` | Looks up the original submission, including after a lost response |
@@ -264,6 +265,8 @@ when the worker has delivered the applicable hooks and completed the attempt.
 `publication` contains the original event/post/gallery UUIDs, action and counts,
 without repeating large previews in job results. Disabled or ineligible posts
 can complete as no-ops. Only created or changed galleries notify plugins.
+Every status includes the original preview `signature`, allowing a resumed
+client to verify its post, policy and reviewed plan together.
 
 Automatic retry uses at most ten attempts with a 30-second delay and renewed
 worker leases. Notification delivery is at least once; plugins can deduplicate
@@ -277,8 +280,18 @@ or retract a notification already delivered.
 
 HTTP responses use snake_case names. Initial title/details/date appear only for
 gallery creation, and dates retain their calendar precision. The API is available
-on the development branch; native review UI, a migration command and production
-activation remain pending.
+on the development branch. The supported
+[`stash-backfill-source-albums` command](../integrations/gallery-dl/README.md#historical-source-albums)
+prepares private immutable plans, applies them, inspects saved submissions and
+prepares explicit retries. Native review UI and production activation remain pending.
+
+Discovery uses indexed UUID pagination over selected attachment lists. It includes
+disabled and forgotten posts for exclusion accounting, and returns no materialized
+manifests. The command records forgotten posts without submitting work for them;
+disabled and ineligible previews can be reviewed and submitted as no-ops. Discovery
+across pages is not a global snapshot under concurrent writes. Migration must use
+its quiesced database boundary or a reviewed explicit list of post UUIDs; per-post
+preview signatures still protect against changed evidence before application.
 
 ## Wire contract
 

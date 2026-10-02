@@ -24,6 +24,36 @@ type attachmentSelectionRow struct {
 	CreatedAt     Timestamp      `db:"created_at"`
 }
 
+func (s *SourceAttachmentStore) SelectedPosts(ctx context.Context, after string, limit int) ([]models.SelectedSourcePost, error) {
+	if after != "" {
+		id, err := archiveUUID(after)
+		if err != nil || id != after {
+			return nil, errors.New("invalid selected-post cursor")
+		}
+	}
+	limit, err := sourcePageLimit(limit)
+	if err != nil {
+		return nil, err
+	}
+	var rows []struct {
+		PostUUID      string `db:"post_uuid"`
+		PostState     string `db:"post_state"`
+		SelectionUUID string `db:"selection_uuid"`
+		Mode          string `db:"mode"`
+	}
+	if err := dbWrapper.Select(ctx, &rows, `SELECT s.post_uuid,p.state AS post_state,s.decision_uuid AS selection_uuid,d.mode
+FROM post_attachment_selections s JOIN source_posts p ON p.uuid=s.post_uuid
+JOIN post_attachment_decisions d ON d.uuid=s.decision_uuid
+WHERE s.post_uuid>? ORDER BY s.post_uuid LIMIT ?`, after, limit); err != nil {
+		return nil, err
+	}
+	ret := make([]models.SelectedSourcePost, 0, len(rows))
+	for _, row := range rows {
+		ret = append(ret, models.SelectedSourcePost{PostUUID: row.PostUUID, PostState: row.PostState, SelectionUUID: row.SelectionUUID, Mode: row.Mode})
+	}
+	return ret, nil
+}
+
 func (r attachmentSelectionRow) resolve(ids []string) models.AttachmentSelectionDecision {
 	ret := models.AttachmentSelectionDecision{UUID: r.UUID, PostUUID: r.PostUUID, Revision: r.Revision, Mode: r.Mode,
 		Origin: r.Origin, Reason: r.Reason, ManifestUUIDs: ids, CreatedAt: r.CreatedAt.Timestamp}

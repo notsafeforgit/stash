@@ -40,6 +40,7 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Put("/collections/{collection}", rs.putCollection)
 	r.Get("/collections/{collection}/post-memberships", rs.collectionPostMemberships)
 	r.Get("/posts/{post}/collection-memberships", rs.postCollectionMemberships)
+	r.Get("/album-backfill-posts", rs.albumPosts)
 	r.Post("/posts/{post}/album-backfill/preview", rs.previewAlbum)
 	r.Post("/posts/{post}/album-backfills", rs.applyAlbum)
 	r.Get("/posts/{post}/album-backfills", rs.albumHistory)

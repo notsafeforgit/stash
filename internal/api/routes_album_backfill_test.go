@@ -20,12 +20,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAlbumBackfillHTTPPreviewAdmissionRetryAndRuntime(t *testing.T) {
-	config.InitializeEmpty()
-	db := sqlite.NewDatabase()
-	require.NoError(t, db.Open(filepath.Join(t.TempDir(), "albums.sqlite")))
-	t.Cleanup(func() { require.NoError(t, db.Close()) })
-	repo := db.Repository()
+func albumHTTPPost(t *testing.T, repo models.Repository) *models.SourcePost {
+	t.Helper()
 	var post *models.SourcePost
 	retained, err := archive.RetainSourcePayload([]byte(`{"category":"reddit","id":"fixture","title":"Album title"}`))
 	require.NoError(t, err)
@@ -56,6 +52,16 @@ func TestAlbumBackfillHTTPPreviewAdmissionRetryAndRuntime(t *testing.T) {
 		_, err = repo.SourceAttachment.DecideSelection(ctx, models.AttachmentSelectionInput{PostUUID: post.UUID, ExpectedPostRevision: post.Revision, Mode: "pinned", CaptureUUID: capture.UUID, Origin: "review"})
 		return err
 	}))
+	return post
+}
+
+func TestAlbumBackfillHTTPPreviewAdmissionRetryAndRuntime(t *testing.T) {
+	config.InitializeEmpty()
+	db := sqlite.NewDatabase()
+	require.NoError(t, db.Open(filepath.Join(t.TempDir(), "albums.sqlite")))
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	repo := db.Repository()
+	post := albumHTTPPost(t, repo)
 	s := gallery.NewAlbumBackfill(repo)
 	handler := (&nativeArchiveRoutes{repo: repo, albums: s}).router()
 	request := func(method, path string, body any) *httptest.ResponseRecorder {
@@ -68,14 +74,29 @@ func TestAlbumBackfillHTTPPreviewAdmissionRetryAndRuntime(t *testing.T) {
 		return w
 	}
 	base := "/posts/" + post.UUID
+	w := request(http.MethodGet, "/album-backfill-posts?limit=1", nil)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var selected []models.SelectedSourcePost
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &selected))
+	require.Len(t, selected, 1)
+	require.Equal(t, post.UUID, selected[0].PostUUID)
+	require.Equal(t, "active", selected[0].PostState)
+	require.Equal(t, "pinned", selected[0].Mode)
+	require.NotEmpty(t, selected[0].SelectionUUID)
+	w = request(http.MethodGet, "/album-backfill-posts?after="+post.UUID, nil)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.JSONEq(t, `[]`, w.Body.String())
+	for _, query := range []string{"limit=101", "after=no", "after=-1", "limit=0", "limit=1.2"} {
+		require.Equal(t, http.StatusBadRequest, request(http.MethodGet, "/album-backfill-posts?"+query, nil).Code)
+	}
 	previewInput := map[string]string{"policy": models.SourceAlbumIdentifiersV1}
-	w := request(http.MethodPost, base+"/album-backfill/preview", previewInput)
+	w = request(http.MethodPost, base+"/album-backfill/preview", previewInput)
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	require.Equal(t, "no-store", w.Header().Get("Cache-Control"))
 	var preview gallery.AlbumPreview
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &preview))
 	require.Equal(t, "create", preview.Action)
-	require.Equal(t, date, *preview.InitialMetadata.Date)
+	require.Equal(t, "2026-09-28", *preview.InitialMetadata.Date)
 	require.Len(t, preview.Entries, 2)
 	require.Len(t, preview.Matches, 2)
 	require.NotContains(t, w.Body.String(), `"Namespace"`)
@@ -85,6 +106,7 @@ func TestAlbumBackfillHTTPPreviewAdmissionRetryAndRuntime(t *testing.T) {
 	require.Equal(t, http.StatusAccepted, w.Code, w.Body.String())
 	var accepted gallery.AlbumBackfillStatus
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &accepted))
+	require.Equal(t, preview.Signature, accepted.Signature)
 	require.False(t, accepted.PublicationCommitted)
 	route := "/album-backfills/" + accepted.JobUUID
 	require.Equal(t, http.StatusConflict, request(http.MethodPost, route+"/cancel", map[string]int64{"expected_revision": accepted.Revision + 1}).Code)

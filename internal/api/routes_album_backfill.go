@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -10,6 +11,33 @@ import (
 	"github.com/stashapp/stash/pkg/gallery"
 	"github.com/stashapp/stash/pkg/models"
 )
+
+func (rs *nativeArchiveRoutes) albumPosts(w http.ResponseWriter, r *http.Request) {
+	after, limit := r.URL.Query().Get("after"), 50
+	if after != "" && !ingest.ValidUUID(after) {
+		albumError(w, gallery.ErrAlbumWorkInvalid)
+		return
+	}
+	if value := r.URL.Query().Get("limit"); value != "" {
+		var err error
+		limit, err = strconv.Atoi(value)
+		if err != nil || limit < 1 || limit > 100 {
+			albumError(w, gallery.ErrAlbumWorkInvalid)
+			return
+		}
+	}
+	var rows []models.SelectedSourcePost
+	err := rs.repo.WithReadTxn(r.Context(), func(ctx context.Context) error {
+		var err error
+		rows, err = rs.repo.SourceAttachment.SelectedPosts(ctx, after, limit)
+		return err
+	})
+	if err != nil {
+		albumError(w, err)
+		return
+	}
+	ingestJSON(w, http.StatusOK, rows)
+}
 
 func (rs *nativeArchiveRoutes) albumService() *gallery.AlbumBackfill {
 	if rs.albums != nil {

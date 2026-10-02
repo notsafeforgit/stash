@@ -112,7 +112,17 @@ type SourceAttachmentReaderWriter interface {
 	MediaDecision(context.Context, string) (*AttachmentMediaDecision, error)
 	MediaDecisionHistory(context.Context, string, int, int) ([]AttachmentMediaDecision, error)
 	Selection(context.Context, string) (*AttachmentSelection, error)
+	SelectedPosts(context.Context, string, int) ([]SelectedSourcePost, error)
 	SelectionHistory(context.Context, string, int, int) ([]AttachmentSelectionDecision, error)
 	PreviewSelection(context.Context, string, string) (*AttachmentSelectionPreview, error)
 	DecideSelection(context.Context, AttachmentSelectionInput) (*AttachmentSelection, error)
+}
+
+// SelectedSourcePost is a bounded discovery row, not a materialized manifest.
+// Forgotten posts remain visible so migration plans can account for exclusions.
+type SelectedSourcePost struct {
+	PostUUID      string `json:"post_uuid"`
+	PostState     string `json:"post_state"`
+	SelectionUUID string `json:"selection_uuid"`
+	Mode          string `json:"mode"`
 }

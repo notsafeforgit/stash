@@ -3301,3 +3301,69 @@ The native album review UI and migration command remain subsequent work, along
 with remaining catalog families, native UI/caller conversion, activation,
 backup/restore drills and final cutover reconciliation. No production database,
 source job, deployment or develop merge was changed by this increment.
+
+## Supported source album migration command
+
+`stash-backfill-source-albums` now prepares and applies historical album work
+through the native application API. A private saved plan binds each post to its
+matching policy, complete preview, signature and durable request UUID. The command
+checks the manifest digest, every record and the explicit Stash origin before
+applying. Status verifies the job's post, policy, original signature, publication
+counts and retry parent. Interrupted calls reuse the saved submissions; stale
+previews remain conflicts instead of being refreshed silently.
+
+Indexed selected-post discovery exposes UUID pagination without materializing
+all manifests. Disabled and forgotten posts remain accounted for; unselected
+posts do not enter the plan. Forgotten entries and previews requiring review
+are retained without submission. Separate commands inspect, cancel and prepare
+an explicit retry. Preparing a retry makes no mutation, and a committed
+publication retains its original event through later notification retries.
+Plan completion remains distinct from full catalog migration or complete media
+downloads. No new schema migration is required.
+
+Real SQLite tests verify bounded discovery, exclusions, restart, canonical
+cursors and indexed queries. The supported Python CLI runs against the actual
+Go HTTP handlers and worker with lost admission, cancellation and retry replies;
+restarting the client recovers the original jobs with one POST per mutation.
+Producer tests also cover record tampering, changed endpoints, private plan
+publication, notification retry chains, review outcomes, contradictory server
+responses and HTTP transport boundaries. All ten new tests pass on Python 3.12
+and 3.14. Backend generation, all v3 validation (528 tests in 91 files and 71
+native contracts), all 248 producer tests and Go lint passed. The complete Go
+suite passed: API 411.114 seconds, ingestion 527.513 seconds and SQLite 561.364
+seconds. The uppercase-cursor fixture was subsequently made deterministic and
+rechecked separately.
+
+The installed command was rehearsed through a private local HTTP server against
+a fresh 14,489,649,152-byte copy of the previous schema-1000040 rehearsal. All
+1,091 selected posts completed: 559 existing galleries synchronized without new
+memberships or media choices, and 532 single-media posts remained ineligible
+no-ops. The plan retained 1,253 existing attachment choices and 1,201 unavailable
+attachments. Repeated Apply before and after processing returned the same jobs
+without another submission. The server loaded no production plugins and used
+no production API key, website credentials or media mount.
+
+Copying took 72.119 seconds. Normal database opening under concurrent test load
+took 503.493 seconds; previews took 5.879 seconds, admission and pending replay
+7.642 seconds, and worker processing 21.552 seconds. The complete command
+rehearsal, including finished-status replay, took 539.788 seconds. Startup
+validation remains separate from targeted API operation timings.
+
+Independent reconciliation passed in 295.859 seconds. All 172 tables outside
+job history match the source copy exactly. Every original job, submission and
+attempt is preserved; precisely 1,091 rows were added to each of those three
+tables. The verifier checks saved plan hashes, post coverage, work/resource keys,
+submission identity, publication counts, results and attempts directly against
+SQLite. Integrity is `ok`, with zero foreign-key violations. The resulting copy
+is 14,491,217,920 bytes.
+
+Private plans, API reports, copied data, rehearsal helpers and the independent
+report are under `.local/native-album-cli-rehearsal-20261002/`. Logs under
+`/tmp/stash-native-transition` use the `album-cli-` prefix: `focused.log`,
+`python.log`, `python312.log`, `discovery-final.log`, `validation.log`,
+`backend.log`, `rehearsal.log` and `reconciliation.log`.
+
+Native album review UI, remaining catalog families, caller conversion,
+activation, backup/restore drills and final cutover reconciliation remain open.
+This increment does not migrate live data, activate source jobs, deploy
+production, or merge develop.

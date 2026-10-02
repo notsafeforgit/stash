@@ -120,6 +120,12 @@ old process ownership or creates completion proof. The native worker understands
 the original archive-key cursor; widened windows replay without archive stopping.
 Production source registration, final cutover bindings and recovery callers
 remain open.
+`stash-backfill-source-albums` saves reviewed per-post previews and request UUIDs
+before historical album admission. Reuse the same plan/digest after interruption;
+status must match its original post, policy and signature. Explicit retry prepares
+a new plan and preserves committed publication/event identity. Indexed selected-post
+discovery retains exclusions, but multiple pages do not establish a global snapshot
+under concurrent writers. Album plan completion is not catalog migration completion.
 
 ## Architecture
 

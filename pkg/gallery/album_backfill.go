@@ -69,6 +69,7 @@ type AlbumBackfillStatus struct {
 	Sequence             int64             `json:"sequence"`
 	PostUUID             string            `json:"post_uuid"`
 	Policy               string            `json:"policy"`
+	Signature            string            `json:"signature"`
 	State                string            `json:"state"`
 	Revision             int64             `json:"revision"`
 	Attempts             int64             `json:"attempts"`
@@ -168,7 +169,7 @@ func albumStatus(current *models.ArchiveJob) (*AlbumBackfillStatus, error) {
 	if outcome.HooksFinished != (current.State == "succeeded") || (outcome.HooksFinished && progress.Publication == nil) {
 		return nil, ErrAlbumWorkInvalid
 	}
-	return &AlbumBackfillStatus{JobUUID: current.UUID, Sequence: current.Sequence, PostUUID: work.PostUUID, Policy: work.Policy, State: current.State, Revision: current.Revision,
+	return &AlbumBackfillStatus{JobUUID: current.UUID, Sequence: current.Sequence, PostUUID: work.PostUUID, Policy: work.Policy, Signature: work.Signature, State: current.State, Revision: current.Revision,
 		Attempts: current.Fence, MaxAttempts: current.MaxAttempts, AvailableAt: current.AvailableAt, PublicationCommitted: progress.Publication != nil, Publication: progress.Publication,
 		HooksFinished: outcome.HooksFinished, ErrorCode: current.ErrorCode, ResumeFromJobUUID: work.ResumeFromJobUUID, CreatedAt: current.CreatedAt, UpdatedAt: current.UpdatedAt}, nil
 }

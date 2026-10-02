@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -52,6 +54,83 @@ func previewSelection(t *testing.T, repo models.Repository, post, capture string
 		return err
 	}))
 	return ret
+}
+
+func TestSelectedSourcePostsDiscoveryIsBoundedAndKeepsExclusions(t *testing.T) {
+	db, repo := archiveTestDatabase(t)
+	var expected []models.SelectedSourcePost
+	for _, mode := range []string{"automatic", "pinned", "disabled", "forgotten"} {
+		post := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "native:reddit", Value: mode}, "")
+		capture := selectionCapture(t, repo, post.UUID, models.SourceAttachmentManifestInput{Complete: true,
+			Entries: []models.SourceAttachmentEntry{sourceAttachmentEntry(0, "item")}})
+		input := models.AttachmentSelectionInput{PostUUID: post.UUID, ExpectedPostRevision: selectionPost(t, repo, post.UUID).Revision, Mode: mode, CaptureUUID: capture, Origin: "review"}
+		if mode == "forgotten" {
+			input.Mode = "pinned"
+		}
+		if mode == "disabled" {
+			input.CaptureUUID = ""
+		}
+		selection := applySelection(t, repo, input)
+		row := models.SelectedSourcePost{PostUUID: post.UUID, PostState: "active", SelectionUUID: selection.Decision.UUID, Mode: input.Mode}
+		if mode == "forgotten" {
+			raw := openRawDB(t, db.DatabasePath())
+			_, err := raw.Exec("UPDATE source_posts SET state='forgotten' WHERE uuid=?", post.UUID)
+			require.NoError(t, err)
+			require.NoError(t, raw.Close())
+			row.PostState = "forgotten"
+		}
+		expected = append(expected, row)
+	}
+	// Merely recording a post does not make it a selected attachment list.
+	sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "native:reddit", Value: "unselected"}, "")
+	slices.SortFunc(expected, func(a, b models.SelectedSourcePost) int { return strings.Compare(a.PostUUID, b.PostUUID) })
+	require.NoError(t, db.Close())
+	require.NoError(t, db.Open(db.DatabasePath()))
+	repo = db.Repository()
+	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		var found []models.SelectedSourcePost
+		after := ""
+		for range 3 {
+			page, err := repo.SourceAttachment.SelectedPosts(ctx, after, 2)
+			require.NoError(t, err)
+			require.NotNil(t, page)
+			found = append(found, page...)
+			if len(page) > 0 {
+				after = page[len(page)-1].PostUUID
+			}
+		}
+		require.Equal(t, expected, found)
+		for _, cursor := range []string{"../invalid", "11111111-1111-4111-A111-111111111111"} {
+			_, err := repo.SourceAttachment.SelectedPosts(ctx, cursor, 2)
+			require.Error(t, err)
+		}
+		for _, limit := range []int{-1, 101} {
+			_, err := repo.SourceAttachment.SelectedPosts(ctx, "", limit)
+			require.Error(t, err)
+		}
+		return nil
+	}))
+	raw := openRawDB(t, db.DatabasePath())
+	defer raw.Close()
+	rows, err := raw.Query(`EXPLAIN QUERY PLAN SELECT s.post_uuid,p.state,d.uuid,d.mode
+FROM post_attachment_selections s JOIN source_posts p ON p.uuid=s.post_uuid
+JOIN post_attachment_decisions d ON d.uuid=s.decision_uuid
+WHERE s.post_uuid>? ORDER BY s.post_uuid LIMIT ?`, expected[0].PostUUID, 2)
+	require.NoError(t, err)
+	defer rows.Close()
+	var plans []string
+	for rows.Next() {
+		var id, parent, unused int
+		var plan string
+		require.NoError(t, rows.Scan(&id, &parent, &unused, &plan))
+		plans = append(plans, plan)
+	}
+	require.NoError(t, rows.Err())
+	require.Len(t, plans, 3)
+	for _, plan := range plans {
+		require.True(t, strings.HasPrefix(plan, "SEARCH "), plan)
+	}
+	require.Contains(t, strings.Join(plans, "\n"), "post_uuid>?")
 }
 
 func TestAttachmentSelectionCombinesSourcesAndSurvivesRestart(t *testing.T) {

@@ -96,6 +96,24 @@ type TranslationTargetHistory struct {
 	RecordedAt   time.Time `json:"recorded_at" db:"recorded_at"`
 }
 
+// A job owns a bounded, immutable set of target revisions. Changing a target
+// cannot widen or redirect a previously admitted execution.
+type TranslationTargetRef struct {
+	TargetUUID string `json:"target_uuid" db:"target_uuid"`
+	Revision   int    `json:"revision" db:"target_revision"`
+}
+
+type TranslationJobArguments struct {
+	Version     int                    `json:"version"`
+	RequestUUID string                 `json:"request_uuid"`
+	Targets     []TranslationTargetRef `json:"targets"`
+}
+
+type TranslationJobTarget struct {
+	TranslationTargetRef
+	JobUUID string `json:"job_uuid" db:"job_uuid"`
+}
+
 var (
 	ErrTranslationWorkInvalid  = errors.New("invalid native translation work")
 	ErrTranslationWorkConflict = errors.New("native translation work changed")
@@ -113,4 +131,9 @@ type TranslationWorkReaderWriter interface {
 	TargetHistory(context.Context, string, int, int) ([]TranslationTargetHistory, error)
 	ScheduleTarget(context.Context, string, int, TranslationTargetSchedule, time.Time) (*TranslationTarget, error)
 	PublishTarget(context.Context, string, int, time.Time) (*TranslationTarget, error)
+	ReadyTargets(context.Context, string, time.Time, int) ([]TranslationTarget, error)
+	BindJob(context.Context, string, time.Time) error
+	JobTargets(context.Context, string) ([]TranslationJobTarget, error)
+	TargetBinding(context.Context, string, int) (*TranslationJobTarget, error)
+	RetryTarget(context.Context, string, int, time.Time) (*TranslationTarget, error)
 }

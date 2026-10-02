@@ -57,6 +57,9 @@ const (
 	FFMpegPath  = "ffmpeg_path"
 	FFProbePath = "ffprobe_path"
 
+	TranslationWorkerEnabled = "translation_worker_enabled"
+	TranslationShellPath     = "translation_shell_path"
+
 	BlobsStorage = "blobs_storage"
 
 	DefaultMaxSessionAge = 60 * 60 * 1 // 1 hours
@@ -823,6 +826,14 @@ func (i *Config) GetFFMpegPath() string {
 // If empty, stash will attempt to resolve it from the path.
 func (i *Config) GetFFProbePath() string {
 	return i.getString(FFProbePath)
+}
+
+func (i *Config) GetTranslationWorkerEnabled() bool {
+	return i.getBool(TranslationWorkerEnabled)
+}
+
+func (i *Config) GetTranslationShellPath() string {
+	return i.getString(TranslationShellPath)
 }
 
 func (i *Config) GetJWTSignKey() []byte {
@@ -2119,6 +2130,8 @@ func (i *Config) setDefaultValues() {
 
 	i.setDefault(NoBrowser, NoBrowserDefault)
 	i.setDefault(NotificationsEnabled, NotificationsEnabledDefault)
+	i.setDefault(TranslationWorkerEnabled, false)
+	i.setDefault(TranslationShellPath, "trans")
 	i.setDefault(ShowOneTimeMovedNotification, ShowOneTimeMovedNotificationDefault)
 
 	// Set default scrapers and plugins paths

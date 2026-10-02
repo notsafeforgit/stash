@@ -12,6 +12,7 @@ import (
 const (
 	ArchiveJobVerifyMedia   = "media.verify"
 	ArchiveJobBackfillAlbum = "album.backfill"
+	ArchiveJobTranslateText = "text.translate"
 )
 
 type ArchiveJob struct {

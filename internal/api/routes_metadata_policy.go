@@ -13,12 +13,14 @@ import (
 	"github.com/stashapp/stash/pkg/gallery"
 	"github.com/stashapp/stash/pkg/metadata"
 	"github.com/stashapp/stash/pkg/models"
+	"github.com/stashapp/stash/pkg/translation"
 )
 
 type nativeArchiveRoutes struct {
 	repo           models.Repository
 	notifyMetadata func(context.Context, metadata.Input, []string) error
 	albums         *gallery.AlbumBackfill
+	translations   *translation.Service
 }
 
 // This router is mounted behind application authentication. Producer bearer
@@ -108,6 +110,15 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Get("/posts/{post}/translation-targets", rs.translationTargets)
 	r.Get("/translation-targets/{target}", rs.translationTarget)
 	r.Get("/translation-targets/{target}/history", rs.translationTargetHistory)
+	r.Post("/posts/{post}/translation-targets", rs.createTranslationTarget)
+	r.Put("/translation-targets/{target}/schedule", rs.scheduleTranslationTarget)
+	r.Post("/translation-targets/{target}/retry", rs.retryTranslationTarget)
+	r.Get("/translation-targets/{target}/job", rs.translationTargetJob)
+	r.Post("/translation-jobs/admit", rs.admitTranslation)
+	r.Get("/translation-jobs/{job}", rs.translationJob)
+	r.Get("/translation-jobs/{job}/attempts", rs.translationJobAttempts)
+	r.Post("/translation-jobs/{job}/cancel", rs.cancelTranslationJob)
+	r.Get("/translation-requests/{request}/jobs", rs.translationJobHistory)
 	r.Get("/catalog-snapshots/{snapshot}/translation-import", rs.catalogTranslationImport)
 	r.Post("/catalog-snapshots/{snapshot}/translation-import", rs.advanceCatalogTranslationImport)
 	r.Get("/catalog-snapshots/{snapshot}/translation-import/records", rs.catalogTranslationRecords)

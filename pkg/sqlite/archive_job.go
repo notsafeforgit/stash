@@ -65,7 +65,7 @@ func managedArchiveJobWrite(ctx context.Context) error {
 
 func validJobTime(value time.Time) bool { return value.UnixMilli() > 0 && value.UTC().Year() <= 9999 }
 func validJobKind(kind string) bool {
-	return kind == models.ArchiveJobVerifyMedia || kind == models.ArchiveJobBackfillAlbum
+	return kind == models.ArchiveJobVerifyMedia || kind == models.ArchiveJobBackfillAlbum || kind == models.ArchiveJobTranslateText
 }
 func validJobState(state string) bool {
 	return state == "queued" || state == "running" || state == "succeeded" || state == "failed" || state == "cancelled"
@@ -139,6 +139,9 @@ func (s *ArchiveJobStore) Submit(ctx context.Context, input models.ArchiveJobSub
 	input, digest, err := prepareJobSubmission(input)
 	if err != nil {
 		return nil, err
+	}
+	if input.Kind == models.ArchiveJobTranslateText {
+		translationJobSubmissionGuard(ctx, input.RequestUUID)
 	}
 	var previous struct {
 		Digest string `db:"digest"`

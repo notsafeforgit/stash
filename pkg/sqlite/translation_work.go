@@ -201,6 +201,15 @@ func (s *TranslationWorkStore) RetainTarget(ctx context.Context, input models.Tr
 	if request == nil {
 		return nil, models.ErrTranslationWorkInvalid
 	}
+	if input.CollectionUUID != nil {
+		var exists bool
+		if err := dbWrapper.Get(ctx, &exists, "SELECT EXISTS(SELECT 1 FROM source_collection_revisions WHERE collection_uuid=? AND revision=?)", *input.CollectionUUID, *input.CollectionRevision); err != nil {
+			return nil, err
+		}
+		if !exists {
+			return nil, models.ErrTranslationWorkInvalid
+		}
+	}
 	complete := translationWorkAtomic(ctx)
 	_, err = dbWrapper.Exec(ctx, `INSERT INTO translation_targets(uuid,request_uuid,post_uuid,collection_uuid,collection_revision,field,origin,state,priority,not_before,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`,
 		id, input.RequestUUID, input.PostUUID, input.CollectionUUID, input.CollectionRevision, input.Field, input.Origin,
@@ -267,9 +276,6 @@ func (s *TranslationWorkStore) PublishTarget(ctx context.Context, id string, exp
 	if err != nil {
 		return nil, err
 	}
-	if cache == nil {
-		return nil, models.ErrTranslationWorkConflict
-	}
 	_, err = activePostLink(ctx, target.PostUUID)
 	state, reason := "completed", ""
 	if errors.Is(err, models.ErrSourcePostForgotten) {
@@ -277,7 +283,14 @@ func (s *TranslationWorkStore) PublishTarget(ctx context.Context, id string, exp
 	} else if err != nil {
 		return nil, err
 	}
+	if state == "completed" && cache == nil {
+		return nil, models.ErrTranslationWorkConflict
+	}
 	complete := translationWorkAtomic(ctx)
+	var cacheID *string
+	if cache != nil {
+		cacheID = &cache.UUID
+	}
 	var evidenceID *string
 	if state == "completed" && cache.TranslationUUID != nil {
 		details, err := json.Marshal(map[string]string{"request_uuid": target.RequestUUID, "target_uuid": target.UUID, "cache_uuid": cache.UUID, "field": target.Field})
@@ -294,7 +307,7 @@ func (s *TranslationWorkStore) PublishTarget(ctx context.Context, id string, exp
 		evidenceID = &evidence.UUID
 	}
 	_, err = dbWrapper.Exec(ctx, `UPDATE translation_targets SET state=?,cache_uuid=?,evidence_uuid=?,reason=?,revision=revision+1,updated_at=? WHERE uuid=?`,
-		state, cache.UUID, evidenceID, reason, now.UTC(), id)
+		state, cacheID, evidenceID, reason, now.UTC(), id)
 	if err != nil {
 		return nil, err
 	}

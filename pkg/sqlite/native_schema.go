@@ -456,7 +456,7 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 			}
 		}
 		if version >= NativeSchemaBaseline+40 {
-			if err := validateAlbumJobSchema(conn); err != nil {
+			if err := validateAlbumJobSchema(conn, version); err != nil {
 				return err
 			}
 		}
@@ -480,6 +480,11 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 		}
 		if version >= NativeSchemaBaseline+44 {
 			if err := validateTranslationWorkSchema(conn); err != nil {
+				return err
+			}
+		}
+		if version >= NativeSchemaBaseline+45 {
+			if err := validateTranslationJobSchema(conn); err != nil {
 				return err
 			}
 		}

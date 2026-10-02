@@ -21,7 +21,7 @@ func validateArchiveJobSchema(conn *sqlx.DB) error {
 	return nil
 }
 
-func validateAlbumJobSchema(conn *sqlx.DB) error {
+func validateAlbumJobSchema(conn *sqlx.DB, version uint) error {
 	var found bool
 	if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type='index' AND name='archive_jobs_resource_history')"); err != nil {
 		return err
@@ -37,7 +37,11 @@ func validateAlbumJobSchema(conn *sqlx.DB) error {
 		return errors.New("native database schema is incomplete: missing album archive job kind")
 	}
 	var invalid bool
-	if err := conn.Get(&invalid, "SELECT EXISTS(SELECT 1 FROM archive_jobs WHERE kind NOT IN ('media.verify','album.backfill'))"); err != nil {
+	allowed := "'media.verify','album.backfill'"
+	if version >= NativeSchemaBaseline+45 {
+		allowed += ",'text.translate'"
+	}
+	if err := conn.Get(&invalid, "SELECT EXISTS(SELECT 1 FROM archive_jobs WHERE kind NOT IN ("+allowed+"))"); err != nil {
 		return err
 	}
 	if invalid {

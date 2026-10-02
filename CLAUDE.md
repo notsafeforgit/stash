@@ -311,8 +311,8 @@ acknowledgements, attempt history, and fenced worker leases. Domain writes and
 attempt completion use its `Publish` transaction; hashing/probing happens before
 publication and retains descriptor checks. This service supports `media.verify`
 and, in native schema 1000040,
-`album.backfill`. The HTTP server runs its file worker when media tools are
-configured; `Checkpoint` preserves committed registration across effect retries.
+`album.backfill`, with `text.translate` added in schema 1000045. The HTTP server
+runs its file worker when media tools are configured; `Checkpoint` preserves committed registration across effect retries.
 Its independent metadata-only album worker checkpoints historical media choices
 and gallery membership before durable plugin notifications. Application-only
 preview/apply, status, cancellation and retry routes retain request identities
@@ -411,8 +411,15 @@ the target revision, respects its due time and retains separate post provenance;
 it does not apply scene/image metadata. No-text outcomes complete without a
 fabricated translation. Scheduled callers must use the durable job lease to
 fence publication. Bounded application inspection returns references instead of
-repeating text. Execution admission, provider workers, automation import and
-review UI remain transition work. See
+repeating text. Schema 1000045 binds each translation job to at most fifty target
+revisions, with one active batch per request, bounded admission, fenced cache
+checkpoints and atomic publication. Cancelled or exhausted work requires an
+explicit target retry; retry delays and holds cannot be bypassed by later
+targets. The HTTP-owned translate-shell/Bing worker is opt-in through
+`translation_worker_enabled` and `translation_shell_path`; migration and normal
+startup leave it disabled by default. Provider calls have bounded output and
+timeouts, and cancellation terminates the Unix process group. Automation import,
+automatic capture scheduling and review UI remain transition work. See
 [translation work](docs/native-schema.md#translation-requests-cache-and-targets).
 
 `stash-import-catalog-relations` advances a received snapshot after its evidence

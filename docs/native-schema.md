@@ -1148,6 +1148,72 @@ History uses a revision `after` cursor and the same limits. Summaries reference
 shared requests/results without repeating their text. All these records survive
 ordinary SQLite backup/restore and are removed from anonymised exports.
 
-Execution admission/provider workers, importing the frozen automation queue,
-and native review UI remain separate transition work. These inspection routes
-do not start provider requests or claim the legacy queue has been migrated.
+### Translation execution
+
+Schema 1000045 adds the durable `text.translate` job kind and immutable
+`translation_job_targets` bindings. Each job freezes one request and at most
+50 target UUID/revision pairs; its arguments reference shared text rather than
+copying it. Admission and all bindings commit together. The database also
+rejects a submitted translation job whose complete bindings were not committed.
+
+Admission selects due pending work by priority and keeps at most 64 active
+translation jobs by default, within the overall durable-job ceiling. One active
+batch per request protects cache generation and retry delays across new targets.
+Request-specific target selection, target bindings and active-request exclusion
+use indexed lookups. Later targets wait for another bounded batch; completed
+batches share their cached result.
+
+The worker renews its lease during provider work, checkpoints a valid result in
+a fenced transaction, then atomically publishes its still-current targets and
+job outcome. A later publication failure reuses that cache after restart.
+Changed or held target revisions are not published by the old worker. Forgotten
+posts retain `review/post_forgotten`, even without a cache, and a batch containing
+only forgotten/superseded targets makes no provider request. These operations
+retain translation evidence; they do not change selected scene/image fields.
+
+Failures retain machine-readable codes without raw stderr or original text.
+Transient failures retry after five minutes, doubling up to 24 hours, with ten
+attempts per admitted batch. Cancellation and terminal provider failures hold
+the exact still-pending target revisions owned by that job. Generic lease
+recovery may leave a pending target bound to an exhausted job; it remains
+excluded from automatic admission. Explicit retry releases a held target or
+advances a target bound to a cancelled/failed job. It preserves priority and
+`not_before`, and cannot retry a successful completion. Old jobs, bindings and
+attempts remain inspectable.
+
+The HTTP server owns an optional translate-shell/Bing worker. Configure
+`translation_worker_enabled: true` and `translation_shell_path` (default `trans`)
+only when provider execution should start, then restart the server. The default
+is disabled, including on migration/rehearsal copies. An unavailable executable
+leaves the worker stopped. The current provider requires a Unix host; inspection,
+storage and migration are independent of that executable. Website credentials
+remain in the existing scraping environments.
+
+Policy `translate-shell-bing-text-v1` extracts text from recognized HTML, splits
+it into 1,800-code-point chunks and disables translate-shell init files. A leading
+HTTP/file URL is passed as literal text. The provider receives no shell-expanded
+command. Each subprocess has a 30-second deadline and 1 MiB output ceiling; the
+whole request has a five-minute deadline, at most 128 chunks and the existing
+4 MiB result limit. Unsupported inputs are retained for review instead of being
+truncated. Unix cancellation kills the process group, including descendants.
+No-text work avoids the subprocess; confirmed target-language text preserves
+the exact original, including HTML and whitespace, as `unchanged`.
+
+Additional application-authenticated operations under `/api/v3/archive` are:
+
+| Route | Result |
+| --- | --- |
+| `POST /posts/{post_uuid}/translation-targets` | Retain a request and a target together. Body: `request` with `original_text`, `target_language`, `policy`; `field` (`title` or `caption`); optional paired `collection_uuid`/`collection_revision`; explicit `schedule` with `state`, `priority`, `not_before`. Origin is application review. Replay preserves the existing target schedule. |
+| `PUT /translation-targets/{target_uuid}/schedule` | Revision-checked `schedule` replacement using `expected_revision`. Zero/omitted `not_before` means server time. |
+| `POST /translation-targets/{target_uuid}/retry` | Explicit release/retry using `expected_revision`, preserving the deadline. |
+| `GET /translation-targets/{target_uuid}/job` | Binding for the current target revision, or optional historical `revision`; unbound revisions return `null`. |
+| `POST /translation-jobs/admit` | Admit one bounded batch; body `{}`. Returns 202 with its job, or 200/null when no batch is admitted. Admission alone is not completion. |
+| `GET /translation-jobs/{job_uuid}` | Durable job, frozen target references, checkpoint, state and revision. |
+| `GET /translation-jobs/{job_uuid}/attempts` | Bounded attempts using fence `after` and `limit`. |
+| `POST /translation-jobs/{job_uuid}/cancel` | Cancel using `expected_revision` and hold its unchanged pending targets atomically. |
+| `GET /translation-requests/{request_uuid}/jobs` | Bounded execution history using sequence `after` and `limit`. |
+
+Producer tokens cannot administer this work or choose executable paths. Importing
+the frozen automation queue, automatic capture scheduling and native review UI
+remain separate transition work. Adding execution does not activate production
+or claim the legacy queue has been migrated.

@@ -2945,3 +2945,47 @@ root/path review, ambiguity handling, original state preservation and no
 replay of historical filesystem actions. No catalog appearances have yet been
 associated to native library media by this change. Production and the original
 schema-1000035 rehearsal copy remain untouched.
+
+## Shared source claims and unavailable file evidence
+
+Schema 1000037 adds the `SourceFile` domain for shared source content claims,
+file observations, guarded matches to existing library files, and post-file
+evidence. Original asset references and declared digests remain source claims;
+they do not become verified hashes or playable files. Observations preserve
+present, missing, pending and deduplicated states, converted-source roles,
+original size/modification times and surviving paths. A collection's locations
+can share one claim across later collection definition revisions.
+
+Matches retain the current file identity and generation when recorded. ZIP
+matches also require the real archive identity/generation and member relation.
+Exact paths are literal and reject conflicting reported sizes or modification
+times; converted survivors use the shared asset's size. Declared SHA-256 can
+match only existing server-verified content for that generation. Historical
+replay survives file changes, deletion and UUID adoption. New matches must
+validate the current state. Post-file evidence retains unavailable appearances
+without inventing attachments, capture membership, source order or galleries.
+
+The focused SQLite suite passed in 8.971 seconds, including shared claims,
+offline roots, cross-collection rejection, replay, generation conflicts, ZIP
+identity, declared-versus-verified hashes, forgotten posts, startup corruption
+and anonymisation of populated private evidence. The final backend suite also
+covers the added modification-time conflict case. `make validate-fork` passed
+generation, 528 v3 tests, 71 native contracts and 232 producer tests. Lint found
+a test helper available only under integration tags; replacing that dependency
+allowed `make lint it` to pass with zero lint issues and the complete Go suite
+(API 310.169 seconds, ingestion 437.782 seconds, SQLite 449.904 seconds).
+
+The isolated schema-1000036 copy promoted in 232.491 seconds and reopened through
+normal application startup in 112.446 seconds. Independent reconciliation passed
+in 395.835 seconds: all 163 existing data tables match exactly, the earlier
+migration ledger is preserved, the four new tables start empty, integrity is
+`ok`, and foreign-key violations are zero. The resulting copy is 10,487,074,816
+bytes. Private helpers, the copy and reconciliation report are under
+`.local/native-source-files-rehearsal-20261001/`; logs under
+`/tmp/stash-native-transition` use the `source-files-` prefix.
+
+This commit supplies the native evidence model, not the asset/file/appearance
+import pass. That importer follows with explicit root/mount bindings and
+per-record receipts; memberships, gallery construction and the remaining
+catalog families still need conversion. No production deployment, live data
+migration, source activation or develop merge was performed.

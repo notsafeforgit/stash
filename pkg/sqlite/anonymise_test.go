@@ -178,13 +178,27 @@ func TestAnonymiserRemovesSourceAccountEvidence(t *testing.T) {
 		_, err = repo.SourcePostLinks.ClaimAccount(ctx, models.SourcePostAccountClaimInput{SourcePostEvidence: postLinkEvidence(post.UUID), AccountUUID: publisher.UUID})
 		return err
 	}))
+	root := putMediaRoot(t, repo, models.MediaRootInput{Origin: "migration", MediaRootDefinition: models.MediaRootDefinition{Label: "private-account-root", State: "disabled"}})
+	claim := recordContentClaim(t, repo, models.SourceContentClaim{UUID: uuid.NewString(), CollectionUUID: collection.UUID, CollectionRevision: collection.Revision,
+		ReferenceNamespace: "legacy:catalog:private", ReferenceValue: "private-account-asset", Origin: "migration", ObservedAt: postLinkEvidence(post.UUID).ObservedAt})
+	observation := recordFileObservation(t, repo, models.SourceFileObservation{UUID: uuid.NewString(), ContentClaimUUID: &claim.UUID,
+		CollectionUUID: collection.UUID, CollectionRevision: collection.Revision, RootUUID: root.UUID, RootRevision: root.Revision,
+		RelativePath: "private-account-file.mp4", State: "missing", Role: "local", Origin: "migration", ObservedAt: claim.ObservedAt})
+	file := archiveFind(t, repo, models.ArchiveFile, 21)
+	fileMatch := recordFileMatch(t, repo, models.SourceFileMatch{UUID: uuid.NewString(), ObservationUUID: observation.UUID, FileUUID: file.UUID,
+		Generation: 1, Basis: "review", Origin: "review", Details: []byte(`{"private":"private-account-match"}`)})
+	postFile := models.SourcePostFileEvidence{SourcePostEvidence: postLinkEvidence(post.UUID), ObservationUUID: observation.UUID}
+	require.NoError(t, repo.WithTxn(context.Background(), func(ctx context.Context) error {
+		_, err := repo.SourceFile.RecordPostEvidence(ctx, postFile)
+		return err
+	}))
 	output := filepath.Join(t.TempDir(), "anonymous.sqlite")
 	anonymiser, err := sqlite.NewAnonymiser(source, output)
 	require.NoError(t, err)
 	require.NoError(t, anonymiser.Anonymise(context.Background()))
 	contents, err := os.ReadFile(output)
 	require.NoError(t, err)
-	for _, value := range []string{account.UUID, performer.UUID, post.UUID, capture.UUID, capture.RevisionUUID, manifest.UUID, attachment.UUID, mediaEvidence.UUID, selection.Decision.UUID, album.GalleryUUID, membership[0].UUID, "private-account-"} {
+	for _, value := range []string{account.UUID, performer.UUID, post.UUID, capture.UUID, capture.RevisionUUID, manifest.UUID, attachment.UUID, mediaEvidence.UUID, selection.Decision.UUID, album.GalleryUUID, membership[0].UUID, claim.UUID, observation.UUID, fileMatch.UUID, postFile.UUID, "private-account-"} {
 		require.NotContains(t, string(contents), value)
 	}
 	require.Equal(t, account.UUID, findSourceAccount(t, repo, account.UUID).UUID)
@@ -192,6 +206,19 @@ func TestAnonymiserRemovesSourceAccountEvidence(t *testing.T) {
 		stored, err := repo.SourceEvidence.FindCapture(ctx, capture.UUID)
 		require.NoError(t, err)
 		require.Equal(t, capture, stored, "the original source evidence remains untouched")
+		originalClaim, err := repo.SourceFile.ContentClaim(ctx, claim.UUID)
+		require.NoError(t, err)
+		require.Equal(t, claim, originalClaim)
+		originalObservation, err := repo.SourceFile.Observation(ctx, observation.UUID)
+		require.NoError(t, err)
+		require.Equal(t, observation, originalObservation)
+		matches, err := repo.SourceFile.Matches(ctx, observation.UUID, "", 10)
+		require.NoError(t, err)
+		require.Equal(t, []models.SourceFileMatch{*fileMatch}, matches)
+		postFiles, err := repo.SourceFile.PostEvidence(ctx, post.UUID, "", 10)
+		require.NoError(t, err)
+		require.Len(t, postFiles, 1)
+		require.Equal(t, postFile.UUID, postFiles[0].UUID)
 		return nil
 	}))
 	raw := openRawDB(t, output)
@@ -206,6 +233,9 @@ func TestAnonymiserRemovesSourceAccountEvidence(t *testing.T) {
 		require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM "+table))
 	}
 	for _, table := range []string{"source_post_urls", "source_post_url_evidence", "source_post_identifier_evidence", "source_post_account_claims"} {
+		require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM "+table))
+	}
+	for _, table := range []string{"source_content_claims", "source_file_observations", "source_file_matches", "source_post_file_evidence"} {
 		require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM "+table))
 	}
 	require.Equal(t, membership, sourceGalleryHistory(t, repo, album.GalleryUUID))

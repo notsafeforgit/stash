@@ -407,6 +407,17 @@ file evidence retains the full attachment/capture/file requirements. Recording
 evidence advances review revisions but never selects media, changes attribution
 or constructs galleries. `PostMediaEvidence` pages all associations for one post.
 
+Schema 1000037 adds `SourceFile` records for shared source content claims,
+root-relative file observations and guarded matches to existing library files.
+Claims are unverified source evidence, including path-derived legacy asset IDs;
+never turn them into verified `media_contents`. Observations retain missing,
+pending, deduplicated and converted paths without creating playable files.
+Matches fence both the member and archive generations for ZIP members. Exact
+replay remains valid after deletion or UUID adoption, while new matches must
+validate current files. Post-file evidence can retain unavailable appearances
+without inventing attachment/capture scope. Logical roots can remain disabled
+and unbound during migration; a historical mount prefix is not a filesystem grant.
+
 ### v3 extension points
 
 See `ui/v3/docs/architecture.md` for the current module map and compatibility rules. List configurations require a discriminated GraphQL/local `source`; generated query variables remain typed through the data hook. Layout, preferences, query state, and cache refill live in separate list modules. Player transition policy consumes plain buffered/seekable state in `scene-player-transitions.ts`; media effects, recovery, and transcode leases are separate hooks. Keep the stable player root and existing iOS seek/timeline behavior when extending these modules.

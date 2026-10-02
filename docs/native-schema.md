@@ -875,3 +875,35 @@ provisional or unresolved. Imported publishers do not assign depicted performers
 SQL guards and startup validation reconcile receipts, evidence counts and mappings.
 Normal database backups include these records; anonymisation removes them before
 source accounts and collections. See the [registry import contracts](native-source-identity.md#importing-the-performer-registry).
+
+## Source file evidence
+
+Migration 1000037 adds four normal domain tables for file provenance:
+
+| Table | Meaning |
+| --- | --- |
+| `source_content_claims` | A source's declared asset reference, optional digest/size and original timestamp. Multiple locations share one claim within a collection, including across collection definition revisions. |
+| `source_file_observations` | The reported path, root revision, state, role, size, modification time and survivor path. ZIP observations identify the archive path separately from its member path. |
+| `source_file_matches` | Evidence that an observation matched a particular library file generation, using an exact path, survivor path, verified content or explicit review. |
+| `source_post_file_evidence` | A source post's association with a file observation, including files unavailable to the library. |
+
+These immutable facts separate original source claims from current library
+availability. A path-derived asset ID is not a checksum, and recording an
+observation never creates playable media or verified content. Declared SHA-256
+matches require existing server-verified content for the same file generation.
+Exact/survivor matches retain the reviewed historical library mount prefix;
+that prefix does not register or authorize a live filesystem mount.
+Exact-path matches also reject disagreement with a reported size or modification
+time. Survivor matches use the shared asset's size, since a converted input can
+have different bytes and timestamps from its output.
+
+New matches require active file identities and current generations. ZIP matches
+also require the current archive identity/generation and its actual member
+relationship. Recorded evidence remains valid history after movement, byte
+changes, UUID adoption or deletion. Post-file evidence advances the post's
+review revision once and does not select attachments or assign performers.
+
+Historical collection/root definitions scope every observation, so offline or
+disabled roots can retain evidence without activating workers. Startup checks
+scope, target kinds and canonical relative paths before writes. Normal database
+backups include these tables; anonymised exports remove their private evidence.

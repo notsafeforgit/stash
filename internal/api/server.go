@@ -37,6 +37,7 @@ import (
 	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/internal/sharing"
 	"github.com/stashapp/stash/pkg/fsutil"
+	"github.com/stashapp/stash/pkg/gallery"
 	"github.com/stashapp/stash/pkg/logger"
 	"github.com/stashapp/stash/pkg/plugin"
 	"github.com/stashapp/stash/pkg/utils"
@@ -57,7 +58,8 @@ type Server struct {
 
 	manager      *manager.Manager
 	shares       *sharing.Service
-	ingestWorker *ingestWorkerRuntime
+	ingestWorker *archiveWorkerRuntime
+	albumWorker  *archiveWorkerRuntime
 }
 
 // TODO - os.DirFS doesn't implement ReadDir, so re-implement it here
@@ -263,10 +265,12 @@ func Initialize() (*Server, error) {
 
 	ingestion := ingest.New(repo)
 	if worker := mgr.NewIngestFileWorker(ingestion); worker != nil {
-		server.ingestWorker = &ingestWorkerRuntime{worker: worker}
+		server.ingestWorker = &archiveWorkerRuntime{worker: worker}
 	}
+	albums := gallery.NewAlbumBackfill(repo)
+	server.albumWorker = &archiveWorkerRuntime{worker: mgr.NewAlbumBackfillWorker(albums)}
 	r.Mount("/api/v3/ingest-admin", (&ingestRoutes{service: ingestion}).adminRouter())
-	r.Mount("/api/v3/archive", (&nativeArchiveRoutes{repo: repo, notifyMetadata: mgr.RegisterMetadataPolicyHooks}).router())
+	r.Mount("/api/v3/archive", (&nativeArchiveRoutes{repo: repo, notifyMetadata: mgr.RegisterMetadataPolicyHooks, albums: albums}).router())
 	r.Mount("/performer", server.getPerformerRoutes())
 	r.Mount("/scene", server.getSceneRoutes())
 	r.Mount("/gallery", server.getGalleryRoutes())
@@ -390,7 +394,9 @@ func handleFavicon(staticUI http.Handler) func(w http.ResponseWriter, r *http.Re
 // Calls to Start are blocked until the server is shutdown.
 func (s *Server) Start() error {
 	s.ingestWorker.start()
+	s.albumWorker.start()
 	defer s.ingestWorker.stop()
+	defer s.albumWorker.stop()
 	logger.Infof("stash is listening on " + s.Addr)
 	logger.Infof("stash is running at " + s.displayAddress)
 
@@ -408,6 +414,7 @@ func (s *Server) Shutdown() {
 		logger.Errorf("Error shutting down http server: %v", err)
 	}
 	s.ingestWorker.stop()
+	s.albumWorker.stop()
 }
 
 func (s *Server) getPerformerRoutes() chi.Router {

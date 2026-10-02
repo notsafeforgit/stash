@@ -664,9 +664,10 @@ The server prepares one descriptor, then `PreparedMedia.RecordContent` records
 the proof in the caller's managed transaction and rechecks the current root and
 file before commit. A later generation change or closed/replaced descriptor
 rolls back publication. Generations reflect changes observed by Stash; they do
-not make filesystem writes atomic or eliminate descriptor revalidation. Durable
-file jobs, completion receipts, and association/gallery publication still need
-to be connected.
+not make filesystem writes atomic or eliminate descriptor revalidation.
+[Native file intake](native-ingestion.md#durable-archive-work) connects durable
+jobs and completion receipts to association/gallery publication; production
+producer activation remains separate.
 
 Migration assigns generation 1 to existing files and leaves both new content
 tables empty. Existing fingerprints, UUIDs, and media rows remain intact; no
@@ -693,6 +694,16 @@ legacy journals require the separate importer. Anonymised exports remove jobs,
 arguments, acknowledgements, and attempts. The [ingestion guide](native-ingestion.md)
 describes the connected file worker and separate source-run coordinator. External
 producer conversion remains unfinished.
+
+Migration 1000040 extends the job kind constraint with `album.backfill` and adds
+`archive_jobs_resource_history(kind,resource_key,id)` for bounded per-post
+history. The jobs table is rebuilt under its original name, retaining every job,
+submission, attempt, receipt reference and progress/result checkpoint. Existing
+receipt guards still require `media.verify`; producers cannot submit album work.
+Startup checks the new index and supported kinds before writes. Historical album
+publication commits its gallery/media decisions and compact checkpoint together;
+hooks then use the original publication UUID across automatic recovery or a new
+explicit retry. Terminal history is retained. See the [album Apply API](native-ingestion.md#historical-source-album-backfill).
 
 Migration 1000020 retains `file_path_fences`, a local removal history independent
 of file UUID lifetimes. Deleting or moving a regular file increments the original

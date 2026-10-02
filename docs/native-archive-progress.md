@@ -3217,3 +3217,87 @@ The public Apply workflow, durable hook checkpoint/worker, native UI and remaini
 transition phases still need implementation. This increment adds no schema
 migration and does not expose an HTTP mutation. The original imported copy,
 production deployment, source activation and develop remain unchanged.
+
+## Durable historical album Apply and restartable notifications
+
+Native schema 1000040 adds `album.backfill` to the existing durable job service
+and an indexed per-resource history lookup. The table rebuild preserves job
+identities, submissions, attempts, receipt references and progress/result
+checkpoints. File ingestion receipts still require the `media.verify` kind.
+
+The application now exposes read-only album previews and durable Apply,
+submission/job status, bounded post/attempt history, cancellation and explicit
+retry under `/api/v3/archive`. Requests pin the post UUID, matching policy and
+preview signature. Exact lost-response replay returns its original job, even
+when the successful application has since changed the preview. Responses use
+snake_case names and calendar dates, with one public signature and initial
+metadata only for gallery creation.
+
+A metadata-only worker runs independently of FFmpeg and producer configuration.
+It rechecks the preview and commits media choices, gallery changes and a compact
+publication checkpoint in one transaction. Hooks run afterwards under a renewed
+lease. Status distinguishes a committed publication from finished notifications.
+Restart and transient failures resume the checkpoint; explicit retry retains
+terminal history and the original publication event identity. Cancelling a
+queued notification retry also preserves that publication. Later library edits
+are never reapplied by a notification retry, and unpublished stale work requires
+a fresh preview. Plugin delivery remains at least once, with stable event IDs.
+Deleted gallery UUIDs do not resolve to a replacement that reused a numeric ID.
+
+Real SQLite tests cover admission/coalescing, lost acknowledgements, queue
+backpressure, targeted history, stale evidence, checkpoint rollback, retry
+exhaustion, cancellation before/after publication, lease renewal and lost
+ownership, restart recovery, and terminal retry chains. HTTP tests exercise the
+actual handlers and worker lifecycle; a JavaScript plugin verifies event IDs
+and gallery create/update fields. The populated schema-39 migration fixture
+preserves queued, running and terminal file jobs, their attempts/submissions and
+ingestion receipt, then verifies the retained guards and indexed album history.
+A missing history index is rejected before startup changes database bytes.
+
+The final focused album tests passed (SQLite 38.901 seconds, HTTP 10.489 seconds,
+manager hooks 10.345 seconds). Backend generation, all v3 checks (528 tests in
+91 files and 71 native contracts), all 238 producer tests, and Go lint passed.
+The complete Go integration suite also passed: API 330.924 seconds, ingestion
+451.294 seconds and SQLite 490.939 seconds. Final affected tests include the
+explicit 404 for submitting work against a missing post.
+
+The complete selected-post rehearsal used a fresh copy of the schema-1000039
+membership-import baseline, upgraded through the normal migration path. All
+1,091 requests completed: 559 source galleries, 1,253 selected attachments and
+memberships, no removals or ambiguous candidates, and 1,201 unavailable album
+attachments retained as gaps. The 532 single-media posts completed as ineligible
+no-ops. Each original request remains replayable without a second job.
+
+The rehearsal intentionally interrupted notification delivery after publication,
+closed/reopened the database and recovered the expired lease. The same original
+publication and event identity survived, with one expired attempt followed by
+success. There are 1,091 jobs/submissions and 1,092 attempts, with no duplicate
+gallery or media decision from recovery. Per-post history also matches every
+original submission.
+
+Normal opening/promotion under concurrent test load took 584.474 seconds and
+reopening took 149.610 seconds. Previewing took 3.397 seconds, admission 5.573
+seconds and post-restart processing 22.490 seconds; the full rehearsal including
+replay checks took 766.832 seconds. Startup validation is measured separately
+from the targeted preview and durable Apply operations.
+
+Independent reconciliation passed in 364.935 seconds. All 154 unaffected tables
+match exactly; every original record in changed domain tables is preserved.
+The verifier rederives attachment matches from source evidence and checks the
+1,504 new proofs, 1,253 media choices/memberships (1,240 images and 13 scenes),
+3,316 post revision increments and 2,757 attachment revision increments. It also
+verifies every job's resource/work key, original submission, publication, outcome
+and attempt history, including the recovered event. Integrity is `ok`, with zero
+foreign-key violations. The final copy is 14,489,649,152 bytes.
+
+Private copies, persisted requests, previews, statuses, interruption evidence,
+helpers and independent reports are under
+`.local/native-album-jobs-rehearsal-20261002/`. Logs under
+`/tmp/stash-native-transition` use the `album-jobs-` prefix: `final-focused.log`,
+`validation.log`, `lint.log`, `backend.log`, `rehearsal.log` and
+`reconciliation.log`.
+
+The native album review UI and migration command remain subsequent work, along
+with remaining catalog families, native UI/caller conversion, activation,
+backup/restore drills and final cutover reconciliation. No production database,
+source job, deployment or develop merge was changed by this increment.

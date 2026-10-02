@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/stashapp/stash/internal/ingest"
 	"github.com/stashapp/stash/pkg/archive"
+	"github.com/stashapp/stash/pkg/gallery"
 	"github.com/stashapp/stash/pkg/metadata"
 	"github.com/stashapp/stash/pkg/models"
 )
@@ -17,6 +18,7 @@ import (
 type nativeArchiveRoutes struct {
 	repo           models.Repository
 	notifyMetadata func(context.Context, metadata.Input, []string) error
+	albums         *gallery.AlbumBackfill
 }
 
 // This router is mounted behind application authentication. Producer bearer
@@ -38,6 +40,14 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Put("/collections/{collection}", rs.putCollection)
 	r.Get("/collections/{collection}/post-memberships", rs.collectionPostMemberships)
 	r.Get("/posts/{post}/collection-memberships", rs.postCollectionMemberships)
+	r.Post("/posts/{post}/album-backfill/preview", rs.previewAlbum)
+	r.Post("/posts/{post}/album-backfills", rs.applyAlbum)
+	r.Get("/posts/{post}/album-backfills", rs.albumHistory)
+	r.Get("/album-backfills/{job}", rs.albumJob)
+	r.Get("/album-backfills/{job}/attempts", rs.albumAttempts)
+	r.Post("/album-backfills/{job}/cancel", rs.cancelAlbum)
+	r.Post("/album-backfills/{job}/retry", rs.retryAlbum)
+	r.Get("/album-backfill-requests/{request}", rs.albumRequest)
 	r.Post("/backfills/import", rs.importBackfills)
 	r.Post("/backfills/status", rs.backfillStatus)
 	r.Get("/backfills/{decision}", rs.backfill)

@@ -174,10 +174,11 @@ registering the verified media. The result reports `metadata_state`, applied
 
 Native schema 1000019 provides `archive_jobs`, immutable submission acknowledgements,
 and attempt history. `job.Durable` supplies submission, claim/renew, progress,
-cancellation, bounded recovery, and atomic publication. The only accepted kind
-is currently `media.verify`. With v3 and FFmpeg/FFprobe configured, the HTTP server
-starts one processing loop after plugin routing is initialized. It cancels and
-joins that loop during shutdown before the manager closes SQLite. Transient loop
+cancellation, bounded recovery, and atomic publication. Supported kinds are
+`media.verify` and, since schema 1000040, `album.backfill`. The HTTP server starts
+the file worker when FFmpeg/FFprobe are configured, plus an independent
+metadata-only album worker. Both start after plugin routing is initialized and
+are cancelled and joined during shutdown before the manager closes SQLite. Transient loop
 failures are retried; jobs retain their own bounded attempts and retry delay.
 
 Each server-created submission has a stable request UUID. Replaying it returns
@@ -228,6 +229,56 @@ inactive collection or lost ownership prevents completion. A later failure does
 not undo an earlier committed registration: status reports that distinction.
 Source-worker conversion and host/n8n outboxes remain required before switching
 the current scheduled scrapes to this interface.
+
+### Historical source album backfill
+
+These routes live under `/api/v3/archive` with normal application authentication
+and same-origin checks. Scoped producer tokens do not authorize these operations.
+The [matching policies](native-source-identity.md#matching-imported-media-to-source-albums)
+use retained evidence and current library records; they perform no downloads or
+filesystem inspection and do not require FFmpeg.
+
+| Method and route | Request or result |
+|---|---|
+| `POST /posts/{post}/album-backfill/preview` | `{ "policy": "legacy-reddit-filename-v1" }`; read-only action, signature, proposed choices, ordered slots and membership changes |
+| `POST /posts/{post}/album-backfills` | `{ "request_uuid": "…", "policy": "…", "signature": "…" }`; queues the reviewed preview |
+| `GET /album-backfill-requests/{request}` | Looks up the original submission, including after a lost response |
+| `GET /album-backfills/{job}` | Current work and publication status |
+| `GET /posts/{post}/album-backfills` | Targeted job history, `after` sequence and `limit` (default 50, maximum 100) |
+| `GET /album-backfills/{job}/attempts` | Attempt history, `after` fence and the same bounded limit |
+| `POST /album-backfills/{job}/cancel` | `{ "expected_revision": 3 }`; cancels queued/running work |
+| `POST /album-backfills/{job}/retry` | `{ "request_uuid": "…", "expected_revision": 3 }`; new work resuming a failed/cancelled job |
+
+Clients must retain the exact request UUID, policy and signature before submitting.
+An uncertain response is resolved by looking up or resending that same request.
+Admission returns 202 for queued/running work; terminal replay returns 200.
+Status inspection returns 200 even while work remains pending. Queue saturation
+returns 429. Changed previews or job revisions return 409, invalid requests 400,
+missing identities 404, and a matching review limit 422. A complete bounded
+preview is required; the server never treats truncated candidates as unique.
+
+The worker revalidates the signature immediately before applying choices. Gallery
+membership and its publication checkpoint commit in one managed transaction.
+`publication_committed` reports that boundary; `hooks_finished` becomes true only
+when the worker has delivered the applicable hooks and completed the attempt.
+`publication` contains the original event/post/gallery UUIDs, action and counts,
+without repeating large previews in job results. Disabled or ineligible posts
+can complete as no-ops. Only created or changed galleries notify plugins.
+
+Automatic retry uses at most ten attempts with a 30-second delay and renewed
+worker leases. Notification delivery is at least once; plugins can deduplicate
+the stable `hookContext.eventId`. Explicit retry retains terminal history in the
+old job and creates a new submission. If publication already committed, it resumes
+only notification delivery, preserving the original event identity and any later
+library edits. This remains true after cancelling a queued notification retry.
+Unpublished retries must still match their original preview; changed evidence
+requires a fresh preview and request. Cancellation cannot undo committed changes
+or retract a notification already delivered.
+
+HTTP responses use snake_case names. Initial title/details/date appear only for
+gallery creation, and dates retain their calendar precision. The API is available
+on the development branch; native review UI, a migration command and production
+activation remain pending.
 
 ## Wire contract
 

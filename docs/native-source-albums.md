@@ -3,8 +3,10 @@
 The native gallery repository can maintain one logical gallery for a source
 post, with ordered image/video attachments and explicit membership choices.
 `pkg/archive.ExtractCapturedAlbum` derives the source list under
-`captured-attachments-v2`. These are core services; production ingestion, catalog
-backfill, and the ordered gallery UI still need their integrations under the
+`captured-attachments-v2`. Native intake and the application-authorized
+[historical album backfill](native-ingestion.md#historical-source-album-backfill)
+use the same gallery service. Production activation and the ordered gallery UI
+still need their integrations under the
 [transition plan](native-archive-transition-plan.md#source-post-albums-and-galleries).
 
 ## Evidence accepted by the parser

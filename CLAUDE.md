@@ -303,9 +303,14 @@ Background tasks (scan, generate, identify, etc.) run through `pkg/job`. Jobs ar
 New archive work uses `pkg/job.Durable` with native jobs, stable submission
 acknowledgements, attempt history, and fenced worker leases. Domain writes and
 attempt completion use its `Publish` transaction; hashing/probing happens before
-publication and retains descriptor checks. This service currently supports the
-`media.verify` kind. The v3 HTTP server runs its file worker when media tools are
+publication and retains descriptor checks. This service supports `media.verify`
+and, in native schema 1000040,
+`album.backfill`. The HTTP server runs its file worker when media tools are
 configured; `Checkpoint` preserves committed registration across effect retries.
+Its independent metadata-only album worker checkpoints historical media choices
+and gallery membership before durable plugin notifications. Application-only
+preview/apply, status, cancellation and retry routes retain request identities
+and never reapply a committed publication when resuming hooks.
 Admission receipts stay immutable and status reports actual completion. Keep this
 work out of the legacy in-memory queue. Existing scheduled scrapes have not switched. See [native ingestion](docs/native-ingestion.md).
 

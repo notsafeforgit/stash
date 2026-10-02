@@ -708,8 +708,9 @@ manual membership, exclusions, cover choices, metadata and deletion suppression.
 writing and revalidates the selected file proofs and resulting gallery before
 commit. A partial failure cannot commit even if its caller swallows the error.
 A fresh preview after successful application is a no-op for those choices and
-reuses the same gallery. The application must checkpoint the publication result
-with durable after-success notifications before exposing an Apply endpoint.
-That worker/API and its UI are still pending; this increment provides the core
-service and isolated-copy migration rehearsal, without changing schema 1000039
-or migrating the live library.
+reuses the same gallery. `gallery.AlbumBackfill` now admits the reviewed signature
+as durable work, with publication and hook delivery tracked separately. Its
+[application API](native-ingestion.md#historical-source-album-backfill) supports
+status, cancellation and explicit retry. Schema 1000040 retains existing file
+jobs while admitting the new album job kind. The native UI, migration command
+and production activation remain subsequent work.

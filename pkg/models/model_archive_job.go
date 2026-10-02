@@ -9,7 +9,10 @@ import (
 
 // Archive jobs are persisted work, separate from the legacy in-memory progress
 // queue. Only a service for the named kind may interpret Arguments.
-const ArchiveJobVerifyMedia = "media.verify"
+const (
+	ArchiveJobVerifyMedia   = "media.verify"
+	ArchiveJobBackfillAlbum = "album.backfill"
+)
 
 type ArchiveJob struct {
 	Sequence    int64           `json:"sequence"`
@@ -85,6 +88,7 @@ type ArchiveJobReaderWriter interface {
 	Find(context.Context, string) (*ArchiveJob, error)
 	FindSubmission(context.Context, string) (*ArchiveJob, error)
 	List(context.Context, string, string, int64, int) ([]ArchiveJob, error)
+	ResourceHistory(context.Context, string, string, int64, int) ([]ArchiveJob, error)
 	Attempts(context.Context, string, int64, int) ([]ArchiveJobAttempt, error)
 	Claim(context.Context, string, string, time.Time, time.Duration) (*ArchiveJob, error)
 	Renew(context.Context, ArchiveJobLease, time.Time, time.Duration) (*ArchiveJob, error)

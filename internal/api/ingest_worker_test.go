@@ -122,7 +122,7 @@ func TestIngestHTTPFileReceiptWorkerAndShutdown(t *testing.T) {
 		}
 		return guard(ctx)
 	})
-	runtime := &ingestWorkerRuntime{worker: worker}
+	runtime := &archiveWorkerRuntime{worker: worker}
 	t.Cleanup(runtime.stop)
 	runtime.start()
 	runtime.start() // Starting twice must not create two processing loops.

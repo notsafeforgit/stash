@@ -64,7 +64,9 @@ func managedArchiveJobWrite(ctx context.Context) error {
 }
 
 func validJobTime(value time.Time) bool { return value.UnixMilli() > 0 && value.UTC().Year() <= 9999 }
-func validJobKind(kind string) bool     { return kind == models.ArchiveJobVerifyMedia }
+func validJobKind(kind string) bool {
+	return kind == models.ArchiveJobVerifyMedia || kind == models.ArchiveJobBackfillAlbum
+}
 func validJobState(state string) bool {
 	return state == "queued" || state == "running" || state == "succeeded" || state == "failed" || state == "cancelled"
 }
@@ -206,6 +208,25 @@ func (s *ArchiveJobStore) List(ctx context.Context, kind, state string, after in
 	}
 	var rows []archiveJobRow
 	if err := dbWrapper.Select(ctx, &rows, "SELECT * FROM archive_jobs WHERE kind=? AND state=? AND id>? ORDER BY id LIMIT ?", kind, state, after, limit); err != nil {
+		return nil, err
+	}
+	ret := make([]models.ArchiveJob, 0, len(rows))
+	for _, row := range rows {
+		ret = append(ret, *row.resolve())
+	}
+	return ret, nil
+}
+
+func (s *ArchiveJobStore) ResourceHistory(ctx context.Context, kind, resource string, after int64, limit int) ([]models.ArchiveJob, error) {
+	if !validJobKind(kind) || !archive.ValidSHA256(resource) || after < 0 {
+		return nil, errors.New("invalid archive job resource history")
+	}
+	limit, err := sourcePageLimit(limit)
+	if err != nil {
+		return nil, err
+	}
+	var rows []archiveJobRow
+	if err := dbWrapper.Select(ctx, &rows, "SELECT * FROM archive_jobs WHERE kind=? AND resource_key=? AND id>? ORDER BY id LIMIT ?", kind, resource, after, limit); err != nil {
 		return nil, err
 	}
 	ret := make([]models.ArchiveJob, 0, len(rows))

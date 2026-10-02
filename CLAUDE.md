@@ -394,6 +394,17 @@ not apply scene/image metadata or complete the whole catalog migration.
 Native document UI remains separate transition work.
 See [retained documents](docs/native-schema.md#retained-source-documents).
 
+`SourceTranslation` in schema 1000043 shares exact original/output text and
+nullable language/provider facts, with separate immutable post provenance.
+`stash-import-catalog-translations` imports frozen rows in bounded transactions
+after the evidence pass, resuming by last source ordinal. Keep the historical
+JSON-based input hash separate from the native original UTF-8 hash. Unknown
+languages do not imply English; conflicting declared hashes retain review
+evidence. Results, provenance and receipts commit together, without applying
+entity metadata or scheduling provider work. Translation jobs/cache state and
+native review UI remain separate transition work. See
+[retained translations](docs/native-schema.md#retained-source-translations).
+
 `stash-import-catalog-relations` advances a received snapshot after its evidence
 pass, retaining accounts, handle history, post URLs/aliases and unselected
 post/account claims. Frozen registry mappings and original account UUIDs remain

@@ -950,6 +950,31 @@ for bounded summaries, or append `/ORDINAL` for original values and native
 references. Completion remains `imported:false` until the entire catalog
 migration and reconciliation have finished.
 
+Map retained translation results and provenance with schema 1000043:
+
+```sh
+stash-import-catalog-translations --snapshot /migration/prepared/CATALOG_ID \
+  --expected-sha256 MANIFEST_SHA256 --endpoint STASH_ORIGIN
+```
+
+Run the evidence pass first. The command uses the Stash application API key.
+It shares exact original/output text and language/provider facts across posts
+while retaining each catalog's provenance and source timestamp. Unknown languages
+remain unknown; they do not become English translations. Original declared input
+hashes are verified using the historical catalog JSON encoding. Missing hashes
+or originals remain explicit; conflicting hashes require review. Importing does
+not change scene/image fields or submit provider work. Translation jobs/cache
+state are migrated separately.
+
+Retry the same snapshot and manifest digest after interruption. The client
+resumes from the last committed source ordinal. Exit 0 means mapped, exit 2 means
+review outcomes, and exit 1 means failure or an unavailable response. Inspect
+`/api/v3/archive/catalog-snapshots/SNAPSHOT_UUID/translation-import/records`
+for bounded summaries, or append `/ORDINAL` for original values and native
+references. Post evidence and shared results also have application read APIs;
+see [retained translations](../../docs/native-schema.md#retained-source-translations).
+Completion remains `imported:false` pending the remaining catalog migration.
+
 ## Historical source albums
 
 `stash-backfill-source-albums` uses the native application API to match imported

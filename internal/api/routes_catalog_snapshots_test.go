@@ -42,7 +42,7 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 	router := (&nativeArchiveRoutes{repo: repo}).router()
 	handler := http.StripPrefix("/api/v3/archive", router)
 	var lostBegin, lostChunk, lostEvidence, lostRelations, lostPublisher, lostAttachment atomic.Bool
-	var lostMediaBegin, lostMediaAdvance, lostMembership, lostDocument atomic.Bool
+	var lostMediaBegin, lostMediaAdvance, lostMembership, lostDocument, lostTranslation atomic.Bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("ApiKey") != "fixture-application-key" || r.Header.Get("Authorization") != "" {
 			w.WriteHeader(http.StatusUnauthorized)
@@ -59,9 +59,10 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/media-import") && !lostMediaBegin.Swap(true)) ||
 			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/media-import/advance") && !lostMediaAdvance.Swap(true)) ||
 			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/membership-import") && !lostMembership.Swap(true)) ||
-			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/document-import") && !lostDocument.Swap(true)))
+			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/document-import") && !lostDocument.Swap(true)) ||
+			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/translation-import") && !lostTranslation.Swap(true)))
 		if drop {
-			if strings.HasSuffix(r.URL.Path, "/evidence-import") || strings.HasSuffix(r.URL.Path, "/relations-import") || strings.HasSuffix(r.URL.Path, "/publisher-import") || strings.HasSuffix(r.URL.Path, "/attachment-import") || strings.HasSuffix(r.URL.Path, "/media-import/advance") || strings.HasSuffix(r.URL.Path, "/membership-import") || strings.HasSuffix(r.URL.Path, "/document-import") {
+			if strings.HasSuffix(r.URL.Path, "/evidence-import") || strings.HasSuffix(r.URL.Path, "/relations-import") || strings.HasSuffix(r.URL.Path, "/publisher-import") || strings.HasSuffix(r.URL.Path, "/attachment-import") || strings.HasSuffix(r.URL.Path, "/media-import/advance") || strings.HasSuffix(r.URL.Path, "/membership-import") || strings.HasSuffix(r.URL.Path, "/document-import") || strings.HasSuffix(r.URL.Path, "/translation-import") {
 				var progress struct {
 					State     string `json:"state"`
 					Processed int    `json:"processed_records"`
@@ -106,7 +107,9 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 	require.True(t, lostMediaAdvance.Load())
 	require.True(t, lostMembership.Load())
 	require.True(t, lostDocument.Load())
+	require.True(t, lostTranslation.Load())
 	var relationOrdinal, publisherOrdinal, attachmentOrdinal, mediaOrdinal, membershipOrdinal, documentOrdinal int64
+	var translation models.CatalogTranslationRecord
 	var membershipCollection, membershipPost string
 	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
 		receipt, err := repo.CatalogSnapshot.Find(ctx, snapshot)
@@ -140,6 +143,10 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, documents, 1)
 		documentOrdinal = documents[0].Ordinal
+		translations, err := repo.CatalogTranslationImport.Records(ctx, snapshot, 0, 1)
+		require.NoError(t, err)
+		require.Len(t, translations, 1)
+		translation = translations[0]
 		membershipCollection, membershipPost = *memberships[0].CollectionUUID, *memberships[0].PostUUID
 		return nil
 	}))
@@ -147,6 +154,29 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 		method, path, contentType string
 		status                    int
 	}{
+		{"GET", "/catalog-snapshots/" + snapshot + "/translation-import", "", 200},
+		{"GET", "/catalog-snapshots/" + snapshot + "/translation-import/records?limit=1", "", 200},
+		{"GET", "/catalog-snapshots/" + snapshot + "/translation-import/records?limit=101", "", 400},
+		{"GET", "/catalog-snapshots/" + snapshot + "/translation-import/records?after=-1", "", 400},
+		{"GET", "/catalog-snapshots/" + snapshot + "/translation-import/records/" + strconv.FormatInt(translation.Ordinal, 10), "", 200},
+		{"GET", "/catalog-snapshots/" + snapshot + "/translation-import/records/0", "", 400},
+		{"GET", "/catalog-snapshots/" + snapshot + "/translation-import/records/999999", "", 404},
+		{"GET", "/catalog-snapshots/" + uuid.NewString() + "/translation-import", "", 404},
+		{"GET", "/catalog-snapshots/" + uuid.NewString() + "/translation-import/records", "", 404},
+		{"POST", "/catalog-snapshots/" + snapshot + "/translation-import", "application/json", 400},
+		{"POST", "/catalog-snapshots/" + snapshot + "/translation-import", "text/plain", 400},
+		{"GET", "/translations/" + *translation.TranslationUUID, "", 200},
+		{"GET", "/translation-evidence/" + *translation.EvidenceUUID, "", 200},
+		{"GET", "/translations/invalid", "", 400},
+		{"GET", "/translation-evidence/invalid", "", 400},
+		{"GET", "/translations/" + uuid.NewString(), "", 404},
+		{"GET", "/translation-evidence/" + uuid.NewString(), "", 404},
+		{"GET", "/posts/" + *translation.PostUUID + "/translations?limit=1", "", 200},
+		{"GET", "/posts/" + *translation.PostUUID + "/translations?limit=101", "", 400},
+		{"GET", "/posts/" + *translation.PostUUID + "/translations?after=invalid", "", 400},
+		{"GET", "/posts/" + *translation.PostUUID + "/translations?original_sha256=invalid", "", 400},
+		{"GET", "/posts/" + uuid.NewString() + "/translations", "", 404},
+		{"GET", "/posts/invalid/translations", "", 400},
 		{"GET", "/catalog-snapshots/" + snapshot, "", 200},
 		{"GET", "/catalog-snapshots/not-a-uuid", "", 400},
 		{"GET", "/catalog-snapshots/" + uuid.NewString(), "", 404},
@@ -234,6 +264,22 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 			require.Equal(t, "no-store", response.Header().Get("Cache-Control"))
 		}
 	}
+	for _, test := range []struct {
+		query string
+		count int
+	}{{"?target_language=en", 2}, {"?target_language=ja", 0}, {"?target_language=", 0}, {"?limit=1", 1}} {
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, httptest.NewRequest("GET", "/posts/"+*translation.PostUUID+"/translations"+test.query, nil))
+		require.Equal(t, 200, response.Code)
+		var evidence []models.SourceTranslationEvidence
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &evidence))
+		require.Len(t, evidence, test.count, test.query)
+		require.NotContains(t, response.Body.String(), "translated_text")
+	}
+	// Reopening exercises persisted importer/result/provenance reconciliation,
+	// including literal Unicode separators and a NUL in the source text.
+	require.NoError(t, db.Close())
+	require.NoError(t, db.Open(filepath.Join(directory, "native.sqlite")))
 	request := httptest.NewRequest("POST", "/catalog-snapshots", strings.NewReader("{}"))
 	request.Header.Set("Origin", "https://untrusted.example")
 	request.Header.Set("Content-Type", "application/json")

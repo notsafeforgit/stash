@@ -1031,3 +1031,63 @@ The server records origin `review`; callers cannot assert source observations
 through this operation. A stale revision returns 409. After a lost response,
 read the current decision/history before choosing whether another edit is needed.
 Selecting document evidence does not apply its values to a scene or image.
+
+## Retained source translations
+
+Schema 1000043 shares translation results in `source_translations`. Identity
+includes exact original text, output, source and target languages, and provider.
+Unknown values remain null, distinct from empty strings. Original/output text
+is valid UTF-8, bounded to 4 MiB each, with no whitespace or Unicode normalization.
+The native original-text SHA-256 hashes its exact UTF-8 bytes; null original text
+has no hash. Reading a result and startup validation verify its identity/hash.
+
+`source_translation_evidence` separately retains each post association,
+optional historical collection revision, provenance, source timestamp and
+declared input hash/algorithm. Identical results can serve multiple posts and
+catalogs without repeating their text. Historical hash assertions remain separate
+from the native verified original-text hash. Source timestamp spelling and
+precision survive; native receipt time is recorded separately. New evidence
+advances the post's review revision once. Exact replay remains valid after a
+post is forgotten, but new assertions cannot resurrect it.
+
+Application-authenticated routes under `/api/v3/archive` are:
+
+| Route | Result |
+| --- | --- |
+| `GET /translations/{translation_uuid}` | One shared result, including exact text and nullable language/provider facts. |
+| `GET /translation-evidence/{evidence_uuid}` | One post/provenance assertion. |
+| `GET /posts/{post_uuid}/translations` | Bounded evidence summaries referencing results without repeating text. |
+
+Post queries accept `after` UUID, `limit` (default 50, range 1–100), optional
+`original_sha256`, and exact `target_language`. Unknown language never matches
+an English filter. These routes retain evidence; they do not select translations
+or replace titles/details. Translation work scheduling and provider/cache state
+have a separate migration step. Normal SQLite backups include these records;
+anonymised exports clear private translation data.
+
+### Historical translation import
+
+`stash-import-catalog-translations` requires the same received frozen snapshot
+and completed evidence pass used by the other importers. It records immutable
+row outcomes in `catalog_translation_records` with resumable progress in
+`catalog_translation_imports`. Each transaction handles at most 50 records and
+a 16 MiB batch threshold. The checkpoint is the last source ordinal; results,
+provenance and receipts commit together. Collection scope stays at the original
+registry-created revision 1 across later renames, root binding or retirement.
+
+Legacy `input_hash` uses `catalog-json-sha256-v1`: SHA-256 of the original text's
+historical Python JSON encoding, not its raw UTF-8 bytes. The importer classifies
+it as `verified`, `missing`, `unverifiable` (no original text), or `mismatch`.
+Mismatches retain both the result and original assertion for review. Invalid
+provenance and missing/forgotten post mappings retain review receipts and any
+valid result without creating invalid post evidence. No missing language or
+provider is guessed, and importing does not start translation work or apply
+scene/image metadata.
+
+Under `/api/v3/archive/catalog-snapshots/{snapshot_uuid}/translation-import`,
+`GET` returns progress and `POST` advances with `expected_manifest_sha256` and
+`after`. `GET /records` returns bounded summaries with source-ordinal `after`
+and a 1–100 `limit`; `GET /records/{ordinal}` includes one original row.
+Completed passes remain `imported:false` until the entire migration is reconciled.
+Startup validates receipts against their staged source, result, post and
+collection references and recomputes historical input-hash classifications.

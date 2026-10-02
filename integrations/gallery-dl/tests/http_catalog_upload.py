@@ -21,6 +21,7 @@ from stash_ingest.catalog_attachment_import import CatalogAttachmentClient, main
 from stash_ingest.catalog_media_import import main as media_main
 from stash_ingest.catalog_membership_import import CatalogMembershipClient, main as membership_main
 from stash_ingest.catalog_document_import import CatalogDocumentClient, main as document_main
+from stash_ingest.catalog_translation_import import CatalogTranslationClient, main as translation_main
 from stash_ingest.encoding import digest, encode
 from test_catalog_registry_import import registry_fixture
 from test_catalog_snapshot import CATALOG_ID, CAPTURED, catalog_fixture
@@ -47,6 +48,8 @@ def run():
     execute(registry_main, ["--binding", str(binding), "--endpoint", setup["endpoint"], "--apply", "--expected-sha256", plan["plan_sha256"]])
     source = directory / "catalog.sqlite"
     catalog_fixture(source)
+    original_text = "Exact 日本語\x00\n\u2028\u2029 and literal \\u2028 <&>"
+    input_hash = digest(json.dumps(original_text, ensure_ascii=False, separators=(",", ":")).encode())
     with closing(sqlite3.connect(source)) as db, db:
         shared = json.loads(db.execute("SELECT payload_json FROM observations WHERE observation_id='shared'").fetchone()[0])
         shared.update(author_fullname="t2_http_publisher", author="ActualHTTPPublisher")
@@ -63,6 +66,8 @@ def run():
         db.execute("INSERT INTO post_aliases VALUES('reddit:post:local-alias','reddit:post:album')")
         db.execute("INSERT INTO handles VALUES('reddit:handle:juniper','Juniper',?)", (CAPTURED,))
         for index in range(55):
+            db.execute("INSERT INTO translations VALUES(?,'reddit:post:album',?,?,?,NULL,?,NULL,'legacy',?)",
+                       (f"translation-{index:02}", input_hash, original_text, "Retained translation", "en" if index == 54 else None, CAPTURED))
             db.execute("INSERT INTO post_urls VALUES('reddit:post:album',?)", (f"https://example.test/album?copy={index:02}",))
             db.execute("INSERT INTO memberships VALUES('reddit:post:album',?,'collection',?)", (f"directory:Group {index:02}", f"Group {index:02}"))
             asset, path = f"path:{index}", f"absent/{index}.mp4"
@@ -126,6 +131,10 @@ def run():
     documents = execute(document_main, args)
     assert documents == execute(document_main, args)
     assert documents["state"] == "mapped" and documents["mapped_records"] == 58 and documents["imported"] is False
+    execute(translation_main, args, 1)  # The first translation batch committed; its response was lost.
+    translations = execute(translation_main, args)
+    assert translations == execute(translation_main, args)
+    assert translations["state"] == "mapped" and translations["mapped_records"] == 55 and translations["imported"] is False
     assert source.read_bytes() == original
 
     # Another physical catalog retains copied events and one differing payload
@@ -150,6 +159,17 @@ def run():
     assert copied_attachments["changed_selections"] == 0
     assert execute(membership_main, copied_args)["mapped_records"] == 55
     assert execute(document_main, copied_args)["mapped_records"] == 58
+    assert execute(translation_main, copied_args)["mapped_records"] == 55
+    translation_client = CatalogTranslationClient(setup["endpoint"])
+    translation_rows = translation_client.request("GET", f"/{setup['snapshot']}/translation-import/records", None, prepared["manifest_sha256"], "application/json")
+    copied_translations = translation_client.request("GET", f"/{copied_snapshot}/translation-import/records", None, copied["manifest_sha256"], "application/json")
+    assert len(translation_rows) == len(copied_translations) == 55
+    assert len({row["translation_uuid"] for row in translation_rows + copied_translations}) == 2
+    assert {row["evidence_uuid"] for row in translation_rows}.isdisjoint(row["evidence_uuid"] for row in copied_translations)
+    assert all(row["input_hash_state"] == "verified" for row in translation_rows + copied_translations)
+    detail = translation_client.request("GET", f"/{setup['snapshot']}/translation-import/records/{translation_rows[0]['ordinal']}", None, prepared["manifest_sha256"], "application/json")
+    assert detail["source_values"]["original_text"] == original_text
+    assert detail["source_values"]["input_hash"] == input_hash
     document_client = CatalogDocumentClient(setup["endpoint"])
     document_rows = document_client.request("GET", f"/{setup['snapshot']}/document-import/records", None, prepared["manifest_sha256"], "application/json")
     copied_documents = document_client.request("GET", f"/{copied_snapshot}/document-import/records", None, copied["manifest_sha256"], "application/json")
@@ -169,16 +189,22 @@ def run():
             db.execute("UPDATE catalog_info SET value=? WHERE key='id'", ("c_" + str(number) * 32,))
             if number == 4:
                 db.execute("DELETE FROM sidecars")
+            else:
+                db.execute("INSERT INTO translations VALUES('old','reddit:post:album',NULL,NULL,'Old translation',NULL,NULL,NULL,'legacy',?)", (CAPTURED,))
         flat_original = flat_source.read_bytes()
         flat_snapshot = str(uuid.uuid4())
         flat = prepare(flat_source, directory / f"flat-{number}", flat_snapshot, setup["source"], CAPTURED)
         flat_args = ["--snapshot", str(directory / f"flat-{number}"), "--endpoint", setup["endpoint"], "--expected-sha256", flat["manifest_sha256"]]
         execute(main, flat_args)
         execute(document_main, flat_args, 1)  # Evidence mapping is a required predecessor.
+        execute(translation_main, flat_args, 1)
         assert execute(evidence_main, flat_args)["state"] == "mapped"
         result = execute(document_main, flat_args)
         assert result["state"] == "mapped" and result["processed_records"] == (1 if number == 3 else 0)
         assert result == execute(document_main, flat_args)
+        translated = execute(translation_main, flat_args)
+        assert translated["state"] == "mapped" and translated["processed_records"] == (1 if number == 3 else 0)
+        assert translated == execute(translation_main, flat_args)
         rows = document_client.request("GET", f"/{flat_snapshot}/document-import/records", None, flat["manifest_sha256"], "application/json")
         if number == 3:
             assert rows[0]["document_uuid"] == document_id and rows[0]["selection_basis"] == "legacy_fallback"

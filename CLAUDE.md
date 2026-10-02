@@ -358,6 +358,15 @@ the same frozen manifest resumes after lost responses or restart. `received`
 means the snapshot's bytes/counts match, never that its source graph or native
 domain mappings are complete. All families remain pending for the subsequent
 importers. Staging is temporary migration input, not another live catalog writer.
+
+`stash-prepare-automation` and `stash-upload-automation` retain a frozen operating
+database through the same bounded receipt model in native schema 1000046. Its
+source must match an imported registry. Preserve exact raw values and one frozen
+input per source; retries use the original manifest and committed chunk position.
+The receipt reports all ten families pending and `imported:false`, even when all
+bytes have arrived. Receiving historical rows must not create native jobs, claim
+work completed, or activate providers. Domain mapping and explicit activation
+follow separately. See [frozen automation input](integrations/gallery-dl/README.md#frozen-automation-input).
 Unknown schemas cannot silently disappear from a manifest. Use frozen copies and
 the coordinated cutover boundary; upload does not activate jobs or metadata.
 

@@ -29,11 +29,18 @@ def read_regular(path, limit):
 
 
 class CatalogUploadClient(ImportClient):
+    snapshot_path = "/api/v3/archive/catalog-snapshots"
+    receipt_error = "invalid_catalog_snapshot_receipt"
+    rejected_error = "catalog_snapshot_rejected"
+    binding_error = "catalog_snapshot_binding_changed"
+    binding_keys = ("registry_import_uuid", "collection_uuid", "created_at")
+    verify_snapshot = staticmethod(verify)
+
     def request(self, method, suffix, body, manifest_sha256, content_type):
         key = os.environ.get(self.key_env, "")
         if not key or any(ord(c) <= 32 or ord(c) >= 127 for c in key):
             raise Unavailable("stash_application_key_missing")
-        request = Request(self.endpoint + "/api/v3/archive/catalog-snapshots" + suffix,
+        request = Request(self.endpoint + self.snapshot_path + suffix,
                           data=body, method=method,
                           headers={"ApiKey": key, "Accept": "application/json", "Content-Type": content_type,
                                    "X-Stash-Manifest-SHA256": manifest_sha256})
@@ -41,16 +48,16 @@ class CatalogUploadClient(ImportClient):
             with self.opener.open(request, timeout=60) as response:
                 if (response.status != 200 or response.headers.get_content_type() != "application/json"
                         or response.headers.get("Content-Encoding") is not None):
-                    raise Unavailable("invalid_catalog_snapshot_receipt")
+                    raise Unavailable(self.receipt_error)
                 return decode(response.read((64 << 10) + 1), 64 << 10)
         except HTTPError as error:
             status = error.code
             error.close()
-            raise Unavailable("catalog_snapshot_rejected", status) from None
+            raise Unavailable(self.rejected_error, status) from None
         except (HTTPException, URLError, OSError, TimeoutError):
             raise Unavailable("network_unavailable") from None
         except InvalidData:
-            raise Unavailable("invalid_catalog_snapshot_receipt") from None
+            raise Unavailable(self.receipt_error) from None
 
     @staticmethod
     def validate_receipt(result, manifest, manifest_sha256, minimum=0):
@@ -78,13 +85,13 @@ class CatalogUploadClient(ImportClient):
 
     def upload(self, directory, expected_sha256):
         directory = Path(directory).resolve(strict=True)
-        checked = verify(directory, expected_sha256)
+        checked = self.verify_snapshot(directory, expected_sha256)
         body = read_regular(directory / "manifest.json", MAX_MANIFEST_BYTES)
         if digest(body) != checked["manifest_sha256"]:
             raise InvalidData("Snapshot manifest changed after verification")
         manifest = decode(body, MAX_MANIFEST_BYTES)
         result = self.validate_receipt(self.request("POST", "", body, expected_sha256, "application/json"), manifest, expected_sha256)
-        binding = {key: result[key] for key in ("registry_import_uuid", "collection_uuid", "created_at")}
+        binding = {key: result[key] for key in self.binding_keys}
         while result["next_chunk"] < len(manifest["chunks"]):
             index = result["next_chunk"]
             chunk = manifest["chunks"][index]
@@ -95,7 +102,7 @@ class CatalogUploadClient(ImportClient):
             result = self.validate_receipt(self.request("PUT", suffix, body, expected_sha256, "application/x-ndjson"),
                                            manifest, expected_sha256, index + 1)
             if any(result[key] != value for key, value in binding.items()):
-                raise Unavailable("catalog_snapshot_binding_changed")
+                raise Unavailable(self.binding_error)
         return result
 
 

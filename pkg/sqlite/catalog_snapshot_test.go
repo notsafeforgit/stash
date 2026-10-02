@@ -177,7 +177,7 @@ func TestCatalogSnapshotSwallowedChunkFailureRollsBack(t *testing.T) {
 		_, err := f.repo.CatalogSnapshot.Receive(ctx, f.manifest.UUID, f.sha, 0, f.chunk(t, 0), catalogImportNow)
 		require.ErrorContains(t, err, "fixture late chunk failure")
 		return nil
-	}), "catalog snapshot write did not finish atomically")
+	}), "snapshot write did not finish atomically")
 	require.Zero(t, f.begin(t).NextChunk)
 	raw := openRawDB(t, f.db.DatabasePath())
 	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM catalog_snapshot_records"))

@@ -1217,3 +1217,39 @@ Producer tokens cannot administer this work or choose executable paths. Importin
 the frozen automation queue, automatic capture scheduling and native review UI
 remain separate transition work. Adding execution does not activate production
 or claim the legacy queue has been migrated.
+
+## Frozen automation snapshot receipt
+
+Migration 1000046 retains a frozen automation database before native mapping or
+activation. `automation_snapshots` binds an exact manifest and original database
+checksum to an imported registry source. A source accepts one frozen snapshot
+in the target database. Exact replay resumes it; different snapshot identities
+or manifests cannot replace the retained source.
+
+`automation_snapshot_tables` records progress and hash state for all ten source
+families. `automation_snapshot_chunks` stores immutable chunk receipts, and
+`automation_snapshot_records` retains each original line, source key and ordinal.
+Chunk records, table hashes and the receiving checkpoint commit atomically.
+Indexed chunk/table ranges support bounded verification and later domain mapping.
+Startup verifies manifest identity, registry references, original bytes, ordering,
+chunk receipts and table digests before accepting writes. Source schema SQL is
+retained as evidence and never executed. Anonymisation removes these records.
+
+Application-authenticated operations under `/api/v3/archive` are:
+
+| Route | Result |
+| --- | --- |
+| `POST /automation-snapshots` | Begin or replay the exact JSON manifest. Requires `X-Stash-Manifest-SHA256`; maximum 8 MiB. |
+| `PUT /automation-snapshots/{snapshot_uuid}/chunks/{chunk_index}` | Receive the next NDJSON chunk, or replay an already committed exact chunk. Requires the same manifest digest; maximum 16 MiB and 1,000 records. |
+| `GET /automation-snapshots/{snapshot_uuid}` | Inspect the immutable input identity and committed progress. |
+
+Encoded request bodies are rejected. Producer tokens cannot administer these
+routes. The supported client is `stash-upload-automation`; see
+[preparation and upload](../integrations/gallery-dl/README.md#frozen-automation-input).
+Both interrupted and completed receipts survive ordinary database backups.
+
+`receiving` and `received` describe transport only. Every family remains pending
+and `imported` remains false, including for a valid empty snapshot. Uploading
+creates no native translation, enrichment, discovery or maintenance work, and
+does not change library metadata. Historical domain mapping and explicit
+activation remain separate transition requirements.

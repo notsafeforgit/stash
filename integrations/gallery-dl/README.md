@@ -1004,11 +1004,36 @@ an existing destination is never replaced. After an interrupted acknowledgement,
 verify the published directory using its original manifest digest.
 
 This command only prepares and verifies input. Its summary reports
-`prepared:true`, `imported:false` and every pending family. Native receipt,
-domain mapping and reviewed activation of the historical automation queue remain
-separate implementation steps. A prepared directory is not a running queue or a
-completed native migration. The production cutover also requires catalogs,
-automation and other writers to share a coordinated backup boundary.
+`prepared:true`, `imported:false` and every pending family. The production cutover
+requires catalogs, automation and other writers to share a coordinated backup
+boundary.
+
+Retain the prepared input in native schema 1000046 after importing its registry:
+
+```sh
+stash-upload-automation --snapshot /migration/prepared/automation \
+  --expected-sha256 MANIFEST_SHA256 --endpoint STASH_ORIGIN
+```
+
+This command uses the existing Stash application API key in `STASH_API_KEY`, or
+the variable named by `--api-key-env`. Scoped producer tokens cannot administer
+migration input. The registry source UUID must already have an imported registry.
+One frozen automation snapshot is bound to that source in the target database;
+another snapshot or changed manifest conflicts instead of replacing its evidence.
+
+Retry the same directory and manifest digest after interruption. The client
+verifies local files, reads the committed checkpoint and continues at the next
+chunk. Each chunk's original records and progress commit together, including
+after a lost response. Exit 0 means every chunk was received; exit 1 means an
+error or unavailable response, which does not prove that the last write failed.
+Inspect the receipt at
+`/api/v3/archive/automation-snapshots/SNAPSHOT_UUID`.
+
+`state:received` proves byte/count agreement with the frozen input. It still
+reports `imported:false` and all ten families pending, including for an empty
+snapshot. No jobs, targets or provider requests are created. Native mapping of
+historical outcomes and pending work, followed by reviewed activation, remains
+separate work; upload completion is not a completed automation migration.
 
 ## Historical source albums
 

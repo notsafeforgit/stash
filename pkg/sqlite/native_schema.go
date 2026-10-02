@@ -479,7 +479,7 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 			}
 		}
 		if version >= NativeSchemaBaseline+44 {
-			if err := validateTranslationWorkSchema(conn); err != nil {
+			if err := validateTranslationWorkSchema(conn, version >= NativeSchemaBaseline+47); err != nil {
 				return err
 			}
 		}
@@ -490,6 +490,11 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 		}
 		if version >= NativeSchemaBaseline+46 {
 			if err := validateAutomationSnapshotSchema(conn); err != nil {
+				return err
+			}
+		}
+		if version >= NativeSchemaBaseline+47 {
+			if err := validateAutomationTranslationSchema(conn); err != nil {
 				return err
 			}
 		}

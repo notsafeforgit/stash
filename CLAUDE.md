@@ -370,6 +370,19 @@ follow separately. See [frozen automation input](integrations/gallery-dl/README.
 Unknown schemas cannot silently disappear from a manifest. Use frozen copies and
 the coordinated cutover boundary; upload does not activate jobs or metadata.
 
+`stash-import-automation-translations` maps the received translation jobs and
+targets in schema 1000047. Preserve exact request text, cached outcomes, raw
+attempt/error history and original priority/retry deadlines. Unapplied targets
+remain held until separately reviewed activation. Historical completions require
+retained cache evidence and carry migration provenance with unknown provider
+capture time; never fabricate a worker attempt. Legacy English rewrites remain
+in the source receipt while the native unchanged result preserves the original.
+Resolve source-qualified post identifiers only after known catalog evidence
+imports finish. Aliases may share one target; completion can promote only an
+untouched hold from this same import. Preserve later native edits, conflicting
+caches and unmatched references. Mapping still reports `imported:false`; other
+automation families, activation and overall reconciliation remain separate.
+
 `stash-import-catalog-evidence` maps a received snapshot's posts, profiles and
 captures through core services in schema 1000031. It uses exact manifest/ordinal
 checkpoints, bounded transactions and immutable per-row outcomes. Preserve mirror

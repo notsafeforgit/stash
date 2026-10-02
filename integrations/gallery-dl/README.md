@@ -1035,6 +1035,45 @@ snapshot. No jobs, targets or provider requests are created. Native mapping of
 historical outcomes and pending work, followed by reviewed activation, remains
 separate work; upload completion is not a completed automation migration.
 
+### Frozen translation history and work
+
+After receiving automation input and importing catalog post evidence, use:
+
+```sh
+stash-import-automation-translations --snapshot /migration/prepared/automation \
+  --expected-sha256 MANIFEST_SHA256 --endpoint STASH_ORIGIN
+```
+
+This application-authorized command maps `translation_jobs` and
+`translation_targets` in schema 1000047. It verifies the frozen files before
+network access, resumes the server's exact source ordinal, and processes bounded
+transactions. Repeat the same command after a lost response or interruption.
+Completed replay only reads its receipts. Exit 0 means these two families mapped;
+exit 2 means processing finished with retained review items; exit 1 means an error
+or unavailable response. Every result still reports `imported:false`: the other
+automation families and activation have separate completion requirements.
+
+Shared requests retain exact original text and the legacy worker's English
+translation policy. Valid cached outcomes are shared; conflicting native cache
+results remain unchanged and the source rows go to review. Historical English
+rewrites are retained in the original receipt, while native `unchanged` results
+preserve the exact original text. Job update times are not provider capture times.
+
+Applied targets become historical completions only when their post and cached
+outcome are proven. Unapplied targets are held with their original priority and
+retry deadline. No worker or provider is activated and no selected scene/image
+metadata changes. Old attempts, errors and raw outcomes remain available through
+the source record. Known unfinished catalog evidence imports must finish first;
+unmatched or forgotten posts stay reviewable. Exact legacy post aliases may share
+a target, while preexisting targets and later native edits retain their choices.
+
+Inspect progress and paginated records under
+`/api/v3/archive/automation-snapshots/SNAPSHOT_UUID/translation-import`, with
+`/records?after=ORDINAL&limit=100` for bounded summaries and `/records/ORDINAL`
+for the exact retained source values. These application routes do not accept
+producer tokens. The original source snapshot, receipts, held targets and
+historical evidence survive ordinary database backup and restore.
+
 ## Historical source albums
 
 `stash-backfill-source-albums` uses the native application API to match imported

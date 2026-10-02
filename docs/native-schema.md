@@ -1213,10 +1213,10 @@ Additional application-authenticated operations under `/api/v3/archive` are:
 | `POST /translation-jobs/{job_uuid}/cancel` | Cancel using `expected_revision` and hold its unchanged pending targets atomically. |
 | `GET /translation-requests/{request_uuid}/jobs` | Bounded execution history using sequence `after` and `limit`. |
 
-Producer tokens cannot administer this work or choose executable paths. Importing
-the frozen automation queue, automatic capture scheduling and native review UI
-remain separate transition work. Adding execution does not activate production
-or claim the legacy queue has been migrated.
+Producer tokens cannot administer this work or choose executable paths. The
+frozen automation importer below maps historical requests, results and targets.
+Reviewed activation, automatic capture scheduling and native review UI remain
+separate transition work. Adding execution does not activate production.
 
 ## Frozen automation snapshot receipt
 
@@ -1253,3 +1253,50 @@ and `imported` remains false, including for a valid empty snapshot. Uploading
 creates no native translation, enrichment, discovery or maintenance work, and
 does not change library metadata. Historical domain mapping and explicit
 activation remain separate transition requirements.
+
+## Frozen automation translation mapping
+
+Migration 1000047 adds `automation_translation_imports` and immutable
+`automation_translation_records`. Each mapping references its original staged
+ordinal and, where proven, a shared request/cache, source-qualified post,
+registry collection revision and immutable target revision. A partial source
+index restricts bounded reads to the two translation families; unrelated
+automation rows do not become translation work.
+
+Requests use exact original text and the legacy English provider policy.
+Cache mapping checks the original job hash and typed schedule/result values.
+Invalid inputs and conflicting native cache choices receive explicit review
+outcomes. The raw source preserves attempt counts, errors and English rewrites;
+native unchanged results preserve original text. Provider capture time remains
+unknown rather than borrowing a job update timestamp.
+
+Unapplied targets enter `held`, retaining priority and a retry deadline rounded
+up to native millisecond precision. Proven applied targets become completed with
+migration evidence and no fabricated worker execution. Empty-text completion
+has no translation evidence. Exact post aliases coalesce to one target, and a
+later applied alias can complete an untouched hold created by the same import.
+Existing native targets and later revisions are preserved. Known catalog evidence
+imports must finish before resolving their post references; unresolved or
+forgotten posts retain review receipts.
+
+All domain writes and their receipts commit atomically in batches of at most
+200 source rows or 16 MiB. Startup checks source scope, checkpoint counts,
+deterministic request/cache identities, original schedules, historical revisions
+and migration completion provenance. Ordinary backup/restore includes the source
+and its mappings; anonymisation removes both before dependent native work.
+
+Application-authenticated operations under
+`/api/v3/archive/automation-snapshots/{snapshot_uuid}/translation-import` are:
+
+| Route | Result |
+| --- | --- |
+| `GET` | Inspect the committed checkpoint and mapped/review counts. |
+| `POST` | Advance using `expected_manifest_sha256` and exact `after` ordinal; maximum body 4 KiB. |
+| `GET /records` | Bounded summaries with `after` and `limit` (1–100). |
+| `GET /records/{ordinal}` | Mapping and exact original source values. |
+
+Producer tokens cannot administer these routes. The supported command is
+`stash-import-automation-translations`. `mapped` or `review` completes this
+mapping pass only: `imported` remains false, and no active jobs, provider calls
+or selected library-field changes are created. Activation, other automation
+families and final reconciliation remain transition work.

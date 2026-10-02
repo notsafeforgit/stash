@@ -9,7 +9,7 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-func validateTranslationWorkSchema(conn *sqlx.DB) error {
+func validateTranslationWorkSchema(conn *sqlx.DB, allowImportedCompletion bool) error {
 	for _, name := range []string{"translation_requests", "translation_request_immutable", "translation_cache", "translation_cache_immutable", "translation_cache_scope",
 		"translation_targets", "translation_targets_request", "translation_targets_post", "translation_targets_request_state", "translation_targets_post_state", "translation_targets_ready",
 		"translation_target_initial", "translation_target_active", "translation_target_identity", "translation_target_scope", "translation_target_history", "translation_target_history_immutable", "translation_target_history_insert", "translation_target_history_update"} {
@@ -43,7 +43,8 @@ func validateTranslationWorkSchema(conn *sqlx.DB) error {
  OR (t.state='completed' AND ((c.status='no_text' AND t.evidence_uuid IS NOT NULL) OR (c.status!='no_text' AND
   (e.uuid IS NULL OR e.translation_uuid IS NOT c.translation_uuid OR e.post_uuid IS NOT t.post_uuid
    OR e.collection_uuid IS NOT t.collection_uuid OR e.collection_revision IS NOT t.collection_revision
-   OR e.origin!='worker' OR e.provenance!=('native-translation:'||t.field) OR e.captured_at IS NOT c.captured_at
+   OR NOT ((e.origin='worker' AND e.provenance=('native-translation:'||t.field) AND e.captured_at IS c.captured_at)
+    OR (? AND t.origin='migration' AND e.origin='migration' AND e.provenance=('automation-translation:'||t.field) AND e.captured_at=''))
    OR json_extract(e.details,'$.target_uuid') IS NOT t.uuid OR json_extract(e.details,'$.request_uuid') IS NOT t.request_uuid
    OR json_extract(e.details,'$.cache_uuid') IS NOT c.uuid OR json_extract(e.details,'$.field') IS NOT t.field))))
  OR t.revision!=(SELECT count(*) FROM translation_target_history h WHERE h.target_uuid=t.uuid)
@@ -56,7 +57,7 @@ func validateTranslationWorkSchema(conn *sqlx.DB) error {
  WHERE t.uuid IS NULL OR (h.revision<t.revision AND h.state NOT IN ('held','pending'))
  OR (h.state IN ('held','pending') AND (h.cache_uuid IS NOT NULL OR h.evidence_uuid IS NOT NULL OR h.reason!=''))
  OR (h.revision=1 AND h.recorded_at IS NOT t.created_at)
- OR (h.revision>1 AND (previous.revision IS NULL OR h.recorded_at<previous.recorded_at)))`)
+ OR (h.revision>1 AND (previous.revision IS NULL OR h.recorded_at<previous.recorded_at)))`, allowImportedCompletion)
 	if err != nil {
 		return err
 	}

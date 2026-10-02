@@ -4,6 +4,7 @@ from contextlib import closing
 import json
 from pathlib import Path
 import sqlite3
+import shutil
 import sys
 from unittest.mock import patch
 import uuid
@@ -13,6 +14,8 @@ from stash_ingest.catalog_identity_import import main as identity_main
 from stash_ingest.catalog_registry_import import main as registry_main
 from stash_ingest.catalog_snapshot import prepare
 from stash_ingest.catalog_upload import main
+from stash_ingest.catalog_evidence_import import CatalogEvidenceClient, main as evidence_main
+from stash_ingest.encoding import digest, encode
 from test_catalog_registry_import import registry_fixture
 from test_catalog_snapshot import CATALOG_ID, CAPTURED, catalog_fixture
 
@@ -24,6 +27,7 @@ def run():
     identities, _ = registry_fixture(registry_path)
     with closing(sqlite3.connect(registry_path)) as db, db:
         db.execute("INSERT INTO catalogs VALUES(?,?,?,?,?,?)", (CATALOG_ID, "collection", "Historical album", "directory:Historical album", CAPTURED, None))
+        db.execute("INSERT INTO catalogs VALUES(?,?,?,?,?,?)", ("c_" + "2" * 32, "collection", "Copied evidence", "directory:Copied evidence", CAPTURED, None))
     parent = execute(identity_main, ["--registry", str(registry_path), "--source", setup["source"], "--snapshot", str(uuid.uuid4()),
                                     "--captured-at", identities["captured_at"], "--namespace", "stash", "--endpoint", setup["endpoint"]])
     parent_file = directory / "parent.json"
@@ -35,6 +39,13 @@ def run():
     execute(registry_main, ["--binding", str(binding), "--endpoint", setup["endpoint"], "--apply", "--expected-sha256", plan["plan_sha256"]])
     source = directory / "catalog.sqlite"
     catalog_fixture(source)
+    with closing(sqlite3.connect(source)) as db, db:
+        for i in range(2, 55):
+            db.execute("INSERT INTO observation_details VALUES(?,?,?,?,?,?)",
+                       (f"capture-{i:03}", "shared", CAPTURED, "1.32", json.dumps({"filename": str(i), "num": i + 1}), "[]"))
+        unused = {"id": "unused", "name": "Original unreferenced profile"}
+        db.execute("INSERT INTO account_snapshots VALUES(?,'reddit',?)",
+                   (digest(encode(["source-account-snapshot-v1", "reddit", unused])), json.dumps(unused)))
     original = source.read_bytes()
     snapshot = directory / "snapshot"
     with patch("stash_ingest.catalog_snapshot.MAX_CHUNK_ROWS", 2):
@@ -47,7 +58,35 @@ def run():
     assert first["state"] == "received" and first["imported"] is False
     assert first["received_records"] == prepared["records"] and first["next_chunk"] == prepared["chunks"]
     assert set(first["pending_families"]) == set(json.loads((snapshot / "manifest.json").read_bytes())["tables"])
+    execute(evidence_main, args, 1)  # Mapping transaction committed; response lost.
+    mapped = execute(evidence_main, args)
+    assert mapped == execute(evidence_main, args)
+    assert mapped["state"] == "mapped" and mapped["imported"] is False
+    assert mapped["capture_mappings"] == 56 and mapped["profile_mappings"] == 2
+    assert mapped["processed_records"] == mapped["source_records"] == 60
     assert source.read_bytes() == original
+
+    # Another physical catalog retains copied events and one differing payload
+    # under the same old capture ID. Only the complete copied events may coalesce.
+    copied_source = directory / "copied.sqlite"
+    shutil.copyfile(source, copied_source)
+    with closing(sqlite3.connect(copied_source)) as db, db:
+        db.execute("UPDATE catalog_info SET value=? WHERE key='id'", ("c_" + "2" * 32,))
+        db.execute("UPDATE observation_details SET payload_patch=? WHERE capture_id='capture-0'",
+                   (json.dumps({"filename": "different", "num": 1}),))
+    copied_snapshot = str(uuid.uuid4())
+    copied = prepare(copied_source, directory / "copied", copied_snapshot, setup["source"], CAPTURED)
+    copied_args = ["--snapshot", str(directory / "copied"), "--endpoint", setup["endpoint"], "--expected-sha256", copied["manifest_sha256"]]
+    execute(main, copied_args)
+    assert execute(evidence_main, copied_args)["state"] == "mapped"
+    client = CatalogEvidenceClient(setup["endpoint"])
+    def capture_ids(snapshot_uuid, manifest_sha):
+        rows = client.request("GET", f"/{snapshot_uuid}/evidence-import/records", None, manifest_sha, "application/json")
+        return {(row["table"], row["key"]): row["capture_uuid"] for row in rows if "capture_uuid" in row}
+    old, new = capture_ids(setup["snapshot"], prepared["manifest_sha256"]), capture_ids(copied_snapshot, copied["manifest_sha256"])
+    assert len(old) == len(new) == 56
+    assert sum(old[key] != new[key] for key in old) == 1
+    assert old["observation_details", '["capture-0"]'] != new["observation_details", '["capture-0"]']
     print(json.dumps({"records": prepared["records"], "chunks": prepared["chunks"], "source_unchanged": True, "imported": False}))
 
 

@@ -112,6 +112,20 @@ func sourceProfileHash(namespace string, body []byte) string {
 	return hex.EncodeToString(sum[:])
 }
 
+// PrepareRetainedProfile preserves an already-retained profile independently of
+// its use in a capture. Catalogs can contain valid, currently unreferenced bodies.
+func PrepareRetainedProfile(namespace string, raw []byte) (*models.SourceProfileBody, error) {
+	value, err := DecodeJSONObject(raw, MaxSourcePayloadBytes)
+	if err != nil || len(value) == 0 || !ValidAccountNamespace(namespace) {
+		return nil, errors.New("invalid retained source profile")
+	}
+	body, err := EncodeSourceJSON(value)
+	if err != nil || len(body) > MaxSourcePayloadBytes {
+		return nil, errors.New("retained source profile exceeds payload limit")
+	}
+	return &models.SourceProfileBody{Hash: sourceProfileHash(namespace, body), Namespace: namespace, Body: body}, nil
+}
+
 func pointerMember(path, key string) string {
 	return path + "/" + strings.ReplaceAll(strings.ReplaceAll(key, "~", "~0"), "/", "~1")
 }

@@ -44,6 +44,7 @@ type Repository struct {
 	CatalogIdentityImport  CatalogIdentityImportReaderWriter
 	CatalogRegistryImport  CatalogRegistryImportReaderWriter
 	CatalogSnapshot        CatalogSnapshotReaderWriter
+	CatalogEvidenceImport  CatalogEvidenceImportReaderWriter
 	SourceEvidence         SourceEvidenceReaderWriter
 	SourceAttachment       SourceAttachmentReaderWriter
 	SourceGallery          SourceGalleryReaderWriter

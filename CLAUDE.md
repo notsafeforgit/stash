@@ -350,6 +350,16 @@ importers. Staging is temporary migration input, not another live catalog writer
 Unknown schemas cannot silently disappear from a manifest. Use frozen copies and
 the coordinated cutover boundary; upload does not activate jobs or metadata.
 
+`stash-import-catalog-evidence` maps a received snapshot's posts, profiles and
+captures through core services in schema 1000031. It uses exact manifest/ordinal
+checkpoints, bounded transactions and immutable per-row outcomes. Preserve mirror
+namespaces, local-key scope, forgotten posts and conflicts; shared observations
+must not invent an extra capture. Exact copied events can share native storage
+without losing each original row or collection provenance. `mapped`/`review`
+still reports `imported:false`; remaining catalog families and final semantic
+reconciliation are required before retiring temporary staging. These historical
+evidence mappings never select entity metadata or activate jobs.
+
 ### v3 extension points
 
 See `ui/v3/docs/architecture.md` for the current module map and compatibility rules. List configurations require a discriminated GraphQL/local `source`; generated query variables remain typed through the data hook. Layout, preferences, query state, and cache refill live in separate list modules. Player transition policy consumes plain buffered/seekable state in `scene-player-transitions.ts`; media effects, recovery, and transcode leases are separate hooks. Keep the stable player root and existing iOS seek/timeline behavior when extending these modules.

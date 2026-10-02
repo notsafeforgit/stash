@@ -321,3 +321,52 @@ assign performers, scan files, or activate jobs. Native mappings and eventual
 retirement of temporary staged bodies remain required subsequent work; these
 tables do not become a parallel catalog authority. Anonymisation removes their
 private source evidence before deleting registry mappings.
+
+## Mapping catalog source evidence
+
+Native schema 1000031 maps received `posts`, `observations`,
+`observation_details` and `account_snapshots` into the native source evidence
+services. `catalog_evidence_imports` holds bounded progress;
+`catalog_evidence_posts` binds each original post key to its native identity or
+review reason; `catalog_evidence_records` retains one immutable disposition per
+original row, including its checksum and capture/profile mapping. Staged source
+bytes remain available while other catalog families still need import.
+
+| Method and path under `/api/v3/archive/catalog-snapshots/{uuid}` | Result |
+| --- | --- |
+| `GET /evidence-import` | Current evidence mapping checkpoint; 404 before the first committed batch |
+| `POST /evidence-import` | Advance with `expected_manifest_sha256` and the exact `after` ordinal |
+| `GET /evidence-import/records?after=0&limit=100` | Bounded original-row dispositions without payload bodies |
+
+These routes require application access. Each write processes at most 50 source
+records, stopping between records once decoded input reaches 16 MiB. Individual
+source rows and reconstructed payloads also have size bounds. Indexed dependency
+lookups load the relevant post, URLs, observation and profiles. Native writes and
+their checkpoint commit together. Following a lost response, read the checkpoint
+before submitting the next batch; a stale ordinal conflicts. Completed passes
+replay their original receipt.
+
+Qualified service IDs share native posts across catalogs. Mirror URLs preserve
+`mirror:coomer:onlyfans`, `mirror:kemono:patreon` and other mirror/service
+namespaces even when old catalog rows used a native service label. Unqualified
+local keys remain scoped to their physical catalog. Captured Reddit/Twitter IDs
+can qualify a local identity, but differing captured/catalog IDs, existing
+conflicting associations and forgotten posts produce review outcomes. No names,
+directory labels or content equality establish performer ownership.
+
+The reader reproduces the original Python checksum encoding before native
+conversion. Shared observations with detail rows receive a `shared` disposition;
+only their detail rows become captures. Flat observations become one capture.
+The native store deduplicates post revisions, payloads and profile bodies. An
+exact copied event can share a capture across catalogs only when its old capture
+ID and complete native event signature agree; differing payloads, provenance or
+capture times remain distinct. Historical collection provenance is pinned to the
+original imported collection revision. Unreferenced profile bodies are retained.
+
+A pass ends in `mapped` or `review`, always with `imported:false`. These states
+cover source evidence only; they do not complete the catalog migration. They do
+not select metadata, attach media, assign performers, construct galleries or
+activate source jobs. Subsequent importers and final reconciliation must cover
+the remaining families and resolve or retain review outcomes before staging can
+be retired. The snapshot receipt's `pending_families` remains the conservative
+whole-catalog inventory until that final coordination is implemented.

@@ -761,8 +761,31 @@ verification cannot be uploaded under the original digest.
 
 The result has `state: "received"`, `imported: false`, and explicitly pending
 record families. This is temporary migration staging in native schema 1000030,
-not native metadata import or job activation. Source graph/capture reconciliation,
-domain mappings and final per-record outcomes are the next implementation step.
+not native metadata import or job activation.
+
+After receipt, map the frozen source evidence through native schema 1000031:
+
+```sh
+stash-import-catalog-evidence --snapshot /migration/prepared/CATALOG_ID \
+  --expected-sha256 MANIFEST_SHA256 --endpoint STASH_ORIGIN
+```
+
+This command uses the same application key and origin rules. It verifies the
+local snapshot and completed upload, then advances bounded native transactions
+from the server's last committed ordinal. Repeat the same command after a lost
+response or interruption. It retains native posts, shared revisions, captures and
+profiles, including profiles without capture references; it does not apply media
+or metadata changes. Qualified post IDs can share evidence across catalogs while
+unqualified local keys remain scoped to their original catalog. Mirror service
+namespaces stay distinct from native services.
+
+Exit 0 means these four evidence families were mapped; exit 2 means the pass
+finished with identity review outcomes; exit 1 means it failed or the response
+was unavailable. Every result remains `imported:false`: other families, semantic
+reconciliation and final migration completion are separate. Inspect bounded row
+summaries at `/api/v3/archive/catalog-snapshots/SNAPSHOT_UUID/evidence-import/records`.
+The original frozen rows remain available for review. No website credentials,
+source scheduling or existing selected Stash metadata are changed.
 
 ## Native n8n backfills
 

@@ -341,6 +341,35 @@ func captureSignature(input models.SourceCaptureInput, revisionSignature, patchD
 	})
 }
 
+func retainSourceProfile(ctx context.Context, profile models.SourceProfileBody) error {
+	digest, err := putSourcePayload(ctx, profile.Body)
+	if err != nil {
+		return err
+	}
+	if _, err := dbWrapper.Exec(ctx, `INSERT INTO source_profile_bodies(hash,namespace,payload_digest) VALUES(?,?,?) ON CONFLICT(hash) DO NOTHING`, profile.Hash, profile.Namespace, digest); err != nil {
+		return err
+	}
+	var same bool
+	if err := dbWrapper.Get(ctx, &same, "SELECT namespace=? AND payload_digest=? FROM source_profile_bodies WHERE hash=?", profile.Namespace, digest, profile.Hash); err != nil {
+		return err
+	}
+	if !same {
+		return models.ErrSourcePayloadCorrupt
+	}
+	return nil
+}
+
+func (s *SourceEvidenceStore) RetainProfile(ctx context.Context, namespace string, body json.RawMessage) (*models.SourceProfileBody, error) {
+	profile, err := archive.PrepareRetainedProfile(namespace, body)
+	if err != nil {
+		return nil, err
+	}
+	if err := retainSourceProfile(ctx, *profile); err != nil {
+		return nil, err
+	}
+	return profile, nil
+}
+
 func (s *SourceEvidenceStore) RecordCapture(ctx context.Context, input models.SourceCaptureInput) (*models.SourceCapture, error) {
 	metadata, revisionSignature, err := canonicalCaptureInput(&input)
 	if err != nil {
@@ -379,20 +408,8 @@ func (s *SourceEvidenceStore) RecordCapture(ctx context.Context, input models.So
 		return nil, err
 	}
 	for _, profile := range input.Payload.Profiles {
-		digest, err := putSourcePayload(ctx, profile.Body)
-		if err != nil {
+		if err := retainSourceProfile(ctx, profile); err != nil {
 			return nil, err
-		}
-		if _, err := dbWrapper.Exec(ctx, `INSERT INTO source_profile_bodies(hash, namespace, payload_digest)
-VALUES (?, ?, ?) ON CONFLICT(hash) DO NOTHING`, profile.Hash, profile.Namespace, digest); err != nil {
-			return nil, err
-		}
-		var same bool
-		if err := dbWrapper.Get(ctx, &same, "SELECT namespace = ? AND payload_digest = ? FROM source_profile_bodies WHERE hash = ?", profile.Namespace, digest, profile.Hash); err != nil {
-			return nil, err
-		}
-		if !same {
-			return nil, models.ErrSourcePayloadCorrupt
 		}
 	}
 	if _, err := dbWrapper.Exec(ctx, `INSERT INTO source_post_revisions(uuid, post_uuid, signature, body_digest, metadata, structure_version)

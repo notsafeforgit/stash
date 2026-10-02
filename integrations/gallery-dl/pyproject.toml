@@ -29,6 +29,7 @@ stash-import-catalog-identities = "stash_ingest.catalog_identity_import:main"
 stash-import-catalog-registry = "stash_ingest.catalog_registry_import:main"
 stash-prepare-catalog = "stash_ingest.catalog_snapshot:main"
 stash-upload-catalog = "stash_ingest.catalog_upload:main"
+stash-import-catalog-evidence = "stash_ingest.catalog_evidence_import:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

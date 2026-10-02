@@ -72,7 +72,7 @@ review. Production has not been migrated.
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
 | 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries and metadata relationship targets, native account/ownership storage and reviewed consolidation, shared post/profile/capture storage, ordered attachment manifests, audited media associations, reviewed source-list selection, and source-gallery synchronization with manual membership intent are implemented. Scalar and relationship field choices protect explicit and preserved metadata. Revisioned logical roots and source collections retain capture/manual-intake provenance; captured publisher choices connect source evidence to accounts independently of depicted performers. Verified byte identities and immutable per-file verification history now use persistent file-generation guards. Producer identity matching, policy resolution, review APIs/UI and remaining domain services are in progress. |
 | 2 Ingestion and producer adapter | In progress: scoped producer tokens, Reddit/Twitter capture batches and durable receipts are implemented. Verified preparation uses the shared scanner; file/media publication checks descriptors, generations and persistent path removals, reuses concurrent scans, and rejects ambiguous verified-byte owners. Intake publication connects collection provenance, selected source media, attachment evidence and album galleries while preserving explicit choices. Persistent jobs have coalesced submissions, fenced leases, retry/cancellation/recovery, and atomic domain/result publication. File-completion admission now queues a durable worker that checkpoints registration, generates previews and delivers retryable media/gallery hooks; scoped status reports actual completion. Native collection policies now apply typed metadata and explicit performer defaults in intake and ordinary scans, with dry preview and guarded apply. Source-run coordination now coalesces missing date ranges, fences worker ownership, retains checkpoints and deferrals, and excludes overlapping destinations. A supported Python producer package now provides retained-payload outboxes, fenced delivery, durable receipts, backoff and review. The gallery-dl SDK now queues source evidence before download, verifies root/prefix and lease ownership, holds shared destination locks, and queues flushed final files before archive acknowledgement. Reddit single-media evidence and original Twitter attachment membership are covered. The producer now coalesces offline source requests, freezes submissions for replay, retains caller tickets and validates native admission receipts. Claimed Reddit/Twitter windows use precise source timestamps and parent context, with directory checks before postprocessor callbacks. Reviewed portable profiles now fingerprint settings/assets and execute one claimed attempt with concurrent outbox delivery and lost-finish recovery. A local converter now stages ordered, source-scoped profiles from the host and n8n JSON layers without copying website credentials. Scoped dispatch now discovers eligible runs with durable pagination/backoff, and a separate n8n image packages the pinned worker runtime. Staged host Twitter/Reddit launchers preserve saved lists, modes, date filters and full-history profiles through durable caller snapshots. Staged n8n backfill calls now check permanent history before source admission, preserve original completion proof, and expose pending results to converted workflow waits. Live image/profile activation, operational-history and policy migration, general durable edit notifications, additional source adapters and recovery caller conversion remain. |
-| 3 Catalog importer and full-copy reconciliation | Permanent backfill decisions, retained scan journals/reviewed recovery activation, performer UUIDs and saved ownership, and account/catalog registry imports are implemented and rehearsed against full copies. Original evidence, replay receipts and unresolved conflicts are retained. Individual catalog bodies, validated source routing, review resolution, global reconciliation and cutover import remain unfinished. |
+| 3 Catalog importer and full-copy reconciliation | Permanent backfill decisions, retained scan journals/reviewed recovery activation, performer UUIDs and saved ownership, and account/catalog registry imports are implemented and rehearsed against full copies. Individual catalog bodies now have bounded snapshot receipt and native post/profile/capture mappings. Original evidence, replay receipts and unresolved conflicts are retained. Remaining catalog families, validated source routing, review resolution, global reconciliation and cutover import remain unfinished. |
 | 4 Native UI and client conversion | Not yet implemented |
 | 5 Compatibility removal and packaging | Preview packaging isolated and old compatibility gate replaced by current v3 operation/plugin-contract checks. Old UI/API/plugin adapters and config bridge still require conversion/removal. |
 | 6 Backup and cutover rehearsal | Not yet implemented |
@@ -2435,3 +2435,99 @@ Production, workers and n8n remain on their existing deployment. The full native
 archive transition is still in progress; the next domain import must reconcile
 posts/captures and then every remaining physical record family before any
 snapshot can be reported as imported.
+
+
+## 2026-10-01: Native post, profile and capture import
+
+Native schema 1000031 now maps received catalog source evidence through core
+services. Application-only checkpoint and outcome routes support
+`stash-import-catalog-evidence`; producer tokens cannot run historical imports.
+Each transaction handles at most 50 source rows and stops between records after
+16 MiB of decoded input. Indexed dependency reads load only the relevant post,
+URLs, observation and profiles. Native records, immutable row dispositions and
+progress commit together, including protection against swallowed write errors.
+The same frozen manifest resumes from the last committed ordinal after restart
+or a lost response. Completed mapping receipts replay unchanged.
+
+Qualified post IDs share native identities across physical catalogs. Coomer and
+Kemono URLs retain mirror/service namespaces even when old catalog rows called
+their platform onlyfans, fansly or patreon. Unknown local keys stay scoped to the
+source catalog. Captured Reddit/Twitter identifiers can qualify a local post;
+conflicting identities, reused reserved UUIDs and forgotten posts require review.
+These mappings never infer performer ownership from names, folders or shared
+content. Collection provenance uses the original imported definition even after
+a later native edit or retirement.
+
+The Go reader reproduces the legacy Python JSON checksum encoding, verifies
+profile hashes and hydration paths, and preserves parent Reddit patch semantics.
+Detail rows become original captures; their shared observation receives a shared
+disposition without an invented extra timestamp capture. Flat observations each
+produce one capture. Core storage deduplicates post revisions, payloads and
+profiles, including retention of unreferenced profile bodies. Identical copied
+events can share a capture across catalogs; reusing an old capture ID with
+different bytes or provenance preserves a separate event.
+
+The complete frozen corpus passed reader reconciliation: 526,348 captures from
+1,697 catalogs, including 81,450 flat observations and 18,245 profile references,
+matched the Python manifest checksums. Every payload round-tripped through the
+native representation without loss. This check took 58.894 seconds. It used
+read-only frozen inputs and made no library changes.
+
+A new copy of the schema-1000030 upload rehearsal promoted in 10.372 seconds.
+All 1,697 received catalogs then completed the evidence mapping pass: 1,082,119
+original rows, 526,348 capture mappings and 781 profile mappings, with zero review
+outcomes. The helper used 22,916 bounded transactions, reopened after its first
+batch to check the committed checkpoint, and replayed every completed receipt
+after the final reopen. Import and these checks took 1,224.670 seconds; the final
+database open/consistency check took 28.580 seconds. These are individually
+consistent frozen rehearsal inputs, not the coordinated live cutover boundary.
+Private source inventories, checkpoints and receipts are retained in
+`.local/native-catalog-evidence-rehearsal-20261001/`.
+
+Independent reconciliation then read the original catalogs with the Python source
+reader and reconstructed every stored native capture from its database payloads,
+profile references and patches. All 526,348 capture payloads, projected metadata,
+timestamps, provenance and original header hashes matched. All 781 profile bodies
+and every original post-key mapping matched. The 297,999 shared observations
+created no additional captures. Native storage contains 256,990 posts, 379,449
+shared revisions, 526,348 captures, 781 profile bodies and 18,245 profile
+references. One qualified post identity is shared between original catalog rows;
+this corpus has no exact copied capture events to coalesce, which the HTTP
+fixture tests separately.
+
+All 142 pre-existing tables outside the intended source-evidence writes matched
+the baseline, including original snapshot bytes, existing entity metadata and
+associations. SQLite integrity returned `ok` with no foreign-key violations.
+This comparison took 222.289 seconds. The rehearsal database is 8,975,618,048
+bytes while the temporary snapshot input remains present. Original source
+catalogs, the upload baseline and production were not modified.
+
+Validation passed all required fork-gate components: backend generation, v3
+generation/types/formatting, 528 v3 tests and 71 operation contract files, 223
+producer tests on Python 3.14 and Python 3.12, zero final lint issues, and the
+entire Go suite. Two initial lint findings were fixed before the successful
+backend gate. API tests took 432.370 seconds and SQLite tests 543.334 seconds
+while the separate full-copy import was running. Focused tests cover rollback,
+reopening/replay, stale checkpoints, forgotten/conflicting posts and historical
+collection scope. The real HTTP/Python test loses a committed bounded batch,
+resumes it, retains an unused profile, and imports a second physical catalog
+with both copied captures and changed data under a reused old capture ID. The
+rebuilt isolated package exposes the installed import command. Parent
+`b7f61ecb3` passed lint, build and preview publication in CI.
+
+Logs under `/tmp/stash-native-transition` are
+`catalog-evidence-reader-reconciliation.log`, `catalog-evidence-promotion.log`,
+`catalog-evidence-full-import.log`,
+`catalog-evidence-independent-reconciliation.log`,
+`catalog-evidence-validation.log`, `catalog-evidence-backend-final.log`,
+`catalog-evidence-python312.log`, `catalog-evidence-http-copies.log`,
+`catalog-evidence-historical-scope.log` and `catalog-evidence-lint-final.log`.
+
+The evidence pass reports `mapped` or `review` with `imported:false`. It covers
+four source families; assets, files, appearances, memberships, sidecar documents,
+translations, edits and other retained histories still require native mappings
+and final reconciliation. It does not select metadata, associate library media,
+construct galleries or activate jobs. Temporary snapshot bodies remain private
+migration inputs until the complete importer can retire them. Production and
+workers remain on the frozen compatible deployment; the full transition remains
+in progress.

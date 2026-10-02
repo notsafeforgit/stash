@@ -33,7 +33,7 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 	}))
 	router := (&nativeArchiveRoutes{repo: repo}).router()
 	handler := http.StripPrefix("/api/v3/archive", router)
-	var lostBegin, lostChunk atomic.Bool
+	var lostBegin, lostChunk, lostEvidence atomic.Bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("ApiKey") != "fixture-application-key" || r.Header.Get("Authorization") != "" {
 			w.WriteHeader(http.StatusUnauthorized)
@@ -42,8 +42,20 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		handler.ServeHTTP(recorder, r)
 		drop := recorder.Code == 200 && ((r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/catalog-snapshots") && !lostBegin.Swap(true)) ||
-			(r.Method == "PUT" && strings.HasSuffix(r.URL.Path, "/chunks/0") && !lostChunk.Swap(true)))
+			(r.Method == "PUT" && strings.HasSuffix(r.URL.Path, "/chunks/0") && !lostChunk.Swap(true)) ||
+			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/evidence-import") && !lostEvidence.Swap(true)))
 		if drop {
+			if strings.HasSuffix(r.URL.Path, "/evidence-import") {
+				var progress struct {
+					State     string `json:"state"`
+					Processed int    `json:"processed_records"`
+				}
+				if err := json.Unmarshal(recorder.Body.Bytes(), &progress); err != nil {
+					t.Error(err)
+				} else if progress.State != "running" || progress.Processed != 50 {
+					t.Errorf("expected bounded first mapping transaction, got %+v", progress)
+				}
+			}
 			connection, _, err := w.(http.Hijacker).Hijack()
 			if err != nil {
 				t.Error(err)
@@ -70,6 +82,7 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 	require.NoError(t, err, string(output))
 	require.True(t, lostBegin.Load())
 	require.True(t, lostChunk.Load())
+	require.True(t, lostEvidence.Load())
 	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
 		receipt, err := repo.CatalogSnapshot.Find(ctx, snapshot)
 		require.NoError(t, err)
@@ -91,6 +104,12 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 		{"POST", "/catalog-snapshots", "text/plain", 400},
 		{"PUT", "/catalog-snapshots/" + snapshot + "/chunks/-1", "application/x-ndjson", 400},
 		{"PUT", "/catalog-snapshots/" + snapshot + "/chunks/0", "application/json", 400},
+		{"GET", "/catalog-snapshots/" + snapshot + "/evidence-import", "", 200},
+		{"GET", "/catalog-snapshots/" + snapshot + "/evidence-import/records?limit=1", "", 200},
+		{"GET", "/catalog-snapshots/" + snapshot + "/evidence-import/records?limit=101", "", 400},
+		{"GET", "/catalog-snapshots/" + snapshot + "/evidence-import/records?after=-1", "", 400},
+		{"POST", "/catalog-snapshots/" + snapshot + "/evidence-import", "application/json", 400},
+		{"POST", "/catalog-snapshots/" + snapshot + "/evidence-import", "text/plain", 400},
 	} {
 		request := httptest.NewRequest(test.method, test.path, strings.NewReader("{}"))
 		request.Header.Set("Content-Type", test.contentType)

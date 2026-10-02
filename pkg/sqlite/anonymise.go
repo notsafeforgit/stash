@@ -1090,6 +1090,7 @@ func (db *Anonymiser) deleteSourceAccountEvidence(ctx context.Context) error {
 			"ingest_receipts",
 			"scan_journal_activation_jobs", "scan_journal_activations",
 			"scan_journal_records", "scan_journals",
+			"catalog_publisher_records", "catalog_publisher_imports",
 			"catalog_evidence_records", "catalog_evidence_posts", "catalog_evidence_imports",
 			"catalog_relation_records", "catalog_relations_imports",
 			"catalog_snapshot_records", "catalog_snapshot_chunks", "catalog_snapshot_tables", "catalog_snapshots",

@@ -377,6 +377,17 @@ invalid values. API summaries are bounded; full evidence is retrieved one row at
 a time. Completed passes remain `imported:false`. Captured publisher selection,
 remaining catalog families and final reconciliation are separate work.
 
+`stash-import-catalog-publishers` runs after both evidence and relationship
+passes in schema 1000034. It applies the shared captured-account policy to actual
+capture rows, linking qualified IDs or creating accounts when the core policy
+allows it. Shared observation parents are not additional captures. Preserve
+existing publisher choices and explicit unlinks; missing author IDs remain
+unavailable, while ambiguous or invalid evidence retains review context. Never
+infer the publisher from a folder, feed owner or historical catalog association.
+Exact manifest/ordinal checkpoints commit decisions, account evidence and
+immutable receipts together. This pass selects source publishers, not depicted
+performers or media metadata. Whole-catalog status remains `imported:false`.
+
 ### v3 extension points
 
 See `ui/v3/docs/architecture.md` for the current module map and compatibility rules. List configurations require a discriminated GraphQL/local `source`; generated query variables remain typed through the data hook. Layout, preferences, query state, and cache refill live in separate list modules. Player transition policy consumes plain buffered/seekable state in `scene-player-transitions.ts`; media effects, recovery, and transcode leases are separate hooks. Keep the stable player root and existing iOS seek/timeline behavior when extending these modules.

@@ -450,3 +450,52 @@ completed with review outcomes, and exit 1 means failure or an unavailable
 response. An unassigned legacy post is counted separately from a conflict.
 Every receipt remains `imported:false`: captured publisher decisions, remaining
 catalog families and final semantic reconciliation are still required.
+
+## Selecting catalog capture publishers
+
+Native schema 1000034 applies the existing `captured-account-v1` policy after a
+snapshot's evidence and relationship passes have completed. It processes the
+original flat observations and detail captures; shared observation parents do
+not become extra captures. Decisions use each capture's reconstructed source
+payload and the same core service used by native ingestion.
+
+An actual captured author ID can link to a uniquely matching account. With no
+matching account or conflicting handle candidates, the core policy can create
+an account from that ID. A handle alone, the scraped feed's owner profile, the
+folder name or an old catalog association cannot establish the publisher. Mirror
+identities retain their service-qualified namespace. Source publishers remain
+separate from depicted performers and account ownership choices.
+
+| Receipt outcome | Meaning |
+| --- | --- |
+| `linked` | The core policy selected a publisher and retained its captured identifier evidence. `created_account` records whether it also created the account. |
+| `preserved` | A publisher link or explicit unlink already existed and remains unchanged. |
+| `review` | The capture could not be mapped, its identity is invalid, or identity candidates conflict. The receipt retains the decision context and candidate references. |
+| `unavailable` | The source has no qualifying captured identity, or the post was forgotten. No publisher is inferred. |
+
+Receipts reference the existing capture and historical decision, retaining a
+small context object rather than another copy of source payloads or profiles.
+They preserve the original account UUID and resolve its current canonical UUID
+when read. Later decisions do not rewrite these historical receipts.
+
+| Method and path under `/api/v3/archive/catalog-snapshots/{uuid}` | Result |
+| --- | --- |
+| `GET /publisher-import` | Current publisher checkpoint; 404 before the first committed batch |
+| `POST /publisher-import` | Advance with `expected_manifest_sha256` and the exact `after` ordinal |
+| `GET /publisher-import/records?after=0&limit=100` | Bounded summaries; source keys exceeding 8 KiB are omitted with `key_omitted:true` |
+| `GET /publisher-import/records/{ordinal}` | One full source key, disposition, native references and decision context |
+
+Application access is required. Each transaction handles at most 50 rows and
+checks a 16 MiB retained-payload threshold between rows. Decisions, account
+evidence, receipts and progress commit together; a late failure rolls back the
+whole batch. Lost responses resume from the committed checkpoint. Copied captures
+reuse their existing choices, and completed imports replay unchanged. Startup
+validates capture correspondence, counts, checkpoint continuity and decision
+scope. Anonymisation removes the receipts before their source parents.
+
+`stash-import-catalog-publishers` validates the frozen snapshot and completed
+upload before advancing. Exit 0 means the pass completed without review outcomes;
+this can include unavailable or preserved captures. Exit 2 means completed with
+review outcomes, and exit 1 means failure or an unavailable response. Every
+result remains `imported:false`: media, memberships, remaining histories and
+final semantic reconciliation still require their own migration work.

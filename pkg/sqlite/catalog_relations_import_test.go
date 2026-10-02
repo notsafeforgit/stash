@@ -67,6 +67,7 @@ func relationFixture(t *testing.T, alter func([]map[string]any)) *catalogSnapsho
 	if alter != nil {
 		alter(rows)
 	}
+	refreshFixtureCaptureInventory(t, f, rows)
 	sort.Slice(rows, func(i, j int) bool {
 		return scrape.CatalogRecordAfter(rows[j]["table"].(string), rows[j]["key"].([]any), rows[i]["table"].(string), rows[i]["key"].([]any))
 	})

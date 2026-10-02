@@ -16,6 +16,7 @@ from stash_ingest.catalog_snapshot import prepare
 from stash_ingest.catalog_upload import main
 from stash_ingest.catalog_evidence_import import CatalogEvidenceClient, main as evidence_main
 from stash_ingest.catalog_relations_import import CatalogRelationsClient, main as relations_main
+from stash_ingest.catalog_publisher_import import CatalogPublisherClient, main as publisher_main
 from stash_ingest.encoding import digest, encode
 from test_catalog_registry_import import registry_fixture
 from test_catalog_snapshot import CATALOG_ID, CAPTURED, catalog_fixture
@@ -41,6 +42,9 @@ def run():
     source = directory / "catalog.sqlite"
     catalog_fixture(source)
     with closing(sqlite3.connect(source)) as db, db:
+        shared = json.loads(db.execute("SELECT payload_json FROM observations WHERE observation_id='shared'").fetchone()[0])
+        shared.update(author_fullname="t2_http_publisher", author="ActualHTTPPublisher")
+        db.execute("UPDATE observations SET payload_json=? WHERE observation_id='shared'", (json.dumps(shared),))
         for i in range(2, 55):
             db.execute("INSERT INTO observation_details VALUES(?,?,?,?,?,?)",
                        (f"capture-{i:03}", "shared", CAPTURED, "1.32", json.dumps({"filename": str(i), "num": i + 1}), "[]"))
@@ -76,6 +80,13 @@ def run():
     assert relationships["state"] == "review" and relationships["imported"] is False
     assert relationships["processed_records"] == relationships["source_records"] == 59
     assert relationships["mapped_records"] == 56 and relationships["review_records"] == 3
+    execute(publisher_main, args, 1)  # The first publisher batch committed; response lost.
+    publishers = execute(publisher_main, args)
+    assert publishers == execute(publisher_main, args)
+    assert publishers["state"] == "mapped" and publishers["imported"] is False
+    assert publishers["processed_records"] == publishers["source_records"] == 56
+    assert publishers["linked_records"] == 55 and publishers["unavailable_records"] == 1
+    assert publishers["created_accounts"] == 1
     assert source.read_bytes() == original
 
     # Another physical catalog retains copied events and one differing payload
@@ -92,6 +103,9 @@ def run():
     execute(main, copied_args)
     assert execute(evidence_main, copied_args)["state"] == "mapped"
     assert execute(relations_main, copied_args, 2)["state"] == "review"
+    copied_publishers = execute(publisher_main, copied_args)
+    assert copied_publishers["linked_records"] == 1 and copied_publishers["preserved_records"] == 54
+    assert copied_publishers["unavailable_records"] == 1 and copied_publishers["created_accounts"] == 0
     client = CatalogEvidenceClient(setup["endpoint"])
     def capture_ids(snapshot_uuid, manifest_sha):
         rows = client.request("GET", f"/{snapshot_uuid}/evidence-import/records", None, manifest_sha, "application/json")
@@ -109,6 +123,12 @@ def run():
     assert original_url["url_evidence_uuid"] != copied_url["url_evidence_uuid"]
     detail = relations.request("GET", f"/{setup['snapshot']}/relations-import/records/{original_url['ordinal']}", None, prepared["manifest_sha256"], "application/json")
     assert detail["source_values"]["url"] == json.loads(original_url["key"])[1]
+    publisher_client = CatalogPublisherClient(setup["endpoint"])
+    publisher_rows = publisher_client.request("GET", f"/{setup['snapshot']}/publisher-import/records", None, prepared["manifest_sha256"], "application/json")
+    assert len(publisher_rows) == 56
+    linked = next(row for row in publisher_rows if row["outcome"] == "linked")
+    detail = publisher_client.request("GET", f"/{setup['snapshot']}/publisher-import/records/{linked['ordinal']}", None, prepared["manifest_sha256"], "application/json")
+    assert detail["context"]["namespace"] == "native:reddit"
     print(json.dumps({"records": prepared["records"], "chunks": prepared["chunks"], "source_unchanged": True, "imported": False}))
 
 

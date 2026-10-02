@@ -72,7 +72,7 @@ review. Production has not been migrated.
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
 | 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries and metadata relationship targets, native account/ownership storage and reviewed consolidation, shared post/profile/capture storage, ordered attachment manifests, audited media associations, reviewed source-list selection, and source-gallery synchronization with manual membership intent are implemented. Scalar and relationship field choices protect explicit and preserved metadata. Revisioned logical roots and source collections retain capture/manual-intake provenance; captured publisher choices connect source evidence to accounts independently of depicted performers. Verified byte identities and immutable per-file verification history now use persistent file-generation guards. Producer identity matching, policy resolution, review APIs/UI and remaining domain services are in progress. |
 | 2 Ingestion and producer adapter | In progress: scoped producer tokens, Reddit/Twitter capture batches and durable receipts are implemented. Verified preparation uses the shared scanner; file/media publication checks descriptors, generations and persistent path removals, reuses concurrent scans, and rejects ambiguous verified-byte owners. Intake publication connects collection provenance, selected source media, attachment evidence and album galleries while preserving explicit choices. Persistent jobs have coalesced submissions, fenced leases, retry/cancellation/recovery, and atomic domain/result publication. File-completion admission now queues a durable worker that checkpoints registration, generates previews and delivers retryable media/gallery hooks; scoped status reports actual completion. Native collection policies now apply typed metadata and explicit performer defaults in intake and ordinary scans, with dry preview and guarded apply. Source-run coordination now coalesces missing date ranges, fences worker ownership, retains checkpoints and deferrals, and excludes overlapping destinations. A supported Python producer package now provides retained-payload outboxes, fenced delivery, durable receipts, backoff and review. The gallery-dl SDK now queues source evidence before download, verifies root/prefix and lease ownership, holds shared destination locks, and queues flushed final files before archive acknowledgement. Reddit single-media evidence and original Twitter attachment membership are covered. The producer now coalesces offline source requests, freezes submissions for replay, retains caller tickets and validates native admission receipts. Claimed Reddit/Twitter windows use precise source timestamps and parent context, with directory checks before postprocessor callbacks. Reviewed portable profiles now fingerprint settings/assets and execute one claimed attempt with concurrent outbox delivery and lost-finish recovery. A local converter now stages ordered, source-scoped profiles from the host and n8n JSON layers without copying website credentials. Scoped dispatch now discovers eligible runs with durable pagination/backoff, and a separate n8n image packages the pinned worker runtime. Staged host Twitter/Reddit launchers preserve saved lists, modes, date filters and full-history profiles through durable caller snapshots. Staged n8n backfill calls now check permanent history before source admission, preserve original completion proof, and expose pending results to converted workflow waits. Live image/profile activation, operational-history and policy migration, general durable edit notifications, additional source adapters and recovery caller conversion remain. |
-| 3 Catalog importer and full-copy reconciliation | Permanent backfill decisions, retained scan journals/reviewed recovery activation, performer UUIDs and saved ownership, and account/catalog registry imports are implemented and rehearsed against full copies. Individual catalog bodies now have bounded snapshot receipt and native post/profile/capture mappings. Original evidence, replay receipts and unresolved conflicts are retained. Remaining catalog families, validated source routing, review resolution, global reconciliation and cutover import remain unfinished. |
+| 3 Catalog importer and full-copy reconciliation | Permanent backfill decisions, retained scan journals/reviewed recovery activation, performer UUIDs and saved ownership, and account/catalog registry imports are implemented and rehearsed against full copies. Individual catalog bodies now have bounded snapshot receipt, native post/profile/capture mappings, historical account/post relationships and captured publisher decisions. Original evidence, replay receipts and unresolved conflicts are retained. Remaining catalog families, validated source routing, review resolution, global reconciliation and cutover import remain unfinished. |
 | 4 Native UI and client conversion | Not yet implemented |
 | 5 Compatibility removal and packaging | Preview packaging isolated and old compatibility gate replaced by current v3 operation/plugin-contract checks. Old UI/API/plugin adapters and config bridge still require conversion/removal. |
 | 6 Backup and cutover rehearsal | Not yet implemented |
@@ -2698,3 +2698,78 @@ and final semantic reconciliation. No source jobs are activated, library media
 associated, galleries constructed or existing metadata selections changed by
 this pass. The full transition remains active; production, workers and n8n
 remain on the frozen compatible deployment.
+
+## 2026-10-01: Captured publishers from retained catalog evidence
+
+Schema 1000034 and `stash-import-catalog-publishers` now select publishers from
+actual captured account IDs after the evidence and relationship passes complete.
+They reuse the native ingestion policy, preserving existing publisher choices
+and explicit unlinks. Qualified IDs can resolve an existing account or create
+one when the core policy allows it; ambiguous candidates and invalid identities
+retain review context. Missing captured identities and forgotten posts remain
+unavailable. Feed-owner profiles, folder names and historical catalog links never
+supply a publisher, and source publisher selection does not assign depicted
+performers or account owners.
+
+The pass processes actual flat/detail captures; shared observation parents do
+not create extra events. Immutable receipts reference existing source rows,
+captures and decisions, retaining a small decision context without copying the
+payload or profile. Original account UUIDs survive consolidation, while reads
+also expose their current canonical account. Application-authorized batches bind
+the exact manifest and ordinal, process at most 50 rows, and check a 16 MiB
+retained-payload threshold between rows. Publisher decisions, identifier evidence,
+receipts and progress commit together. Late failures roll back the entire batch,
+including account creation, even if the caller ignores the error.
+
+Focused tests cover account creation/reuse, absent and invalid identities,
+unmapped source rows, ambiguous names/IDs, forgotten posts, explicit unlinks,
+late-write rollback, prerequisites, stale bindings/cursors, restart/replay,
+startup integrity and anonymisation. Existing performer and scene associations
+remain unchanged. The real HTTP/Python test loses a committed publisher batch,
+resumes it, and imports copied captures from another physical catalog: existing
+decisions are preserved and only the genuinely new capture gets a new choice.
+Bounded summary and individual context routes are covered.
+
+All required fork-gate components passed: backend generation, v3 generation,
+types and format checks, 528 v3 tests, 71 application operation contracts, 229
+producer tests on Python 3.14 and Python 3.12, final lint and the complete Go
+suite. One test-style lint finding was corrected before the successful backend
+gate. API tests took 310.908 seconds and SQLite tests 445.270 seconds alongside
+the private full-corpus rehearsal. Reinstalling the isolated package exposes
+the `stash-import-catalog-publishers` command. Parent `db22eba99` passed lint,
+build and native preview image publication in CI.
+
+A fresh copy of the verified schema-1000033 rehearsal was promoted in 71.176
+seconds. Importing all 1,697 frozen snapshots processed 526,348 capture rows in
+11,820 bounded transactions over 517.000 seconds, including restart and exact
+terminal replay checks. Reopening the completed copy took 67.937 seconds. The
+results are 33,533 linked publishers and 492,815 unavailable captures lacking
+captured account IDs, matching the read-only preflight. Every resolved publisher
+already had an account; this corpus required no new accounts and produced no
+publisher conflicts. Historical relationship review outcomes remain separate.
+All receipts still report `imported:false` for the full catalog migration.
+
+Independent Python reconciliation reconstructed every capture from the original
+frozen catalog databases, checked its header checksum and independently derived
+the qualified author identifiers. It verified all 33,533 decisions, current
+heads and 60,625 captured identifier claims, including original observation
+times, source origins and evidence paths. All 152 unaffected tables matched the
+baseline exactly. Existing post/account fields remained unchanged apart from
+the precisely accounted revision increments. All 2,983 account identifiers and
+4,500 prior identifier-evidence rows survived; the pass added 60,625 evidence
+rows without adding identifiers. Integrity returned `ok`, with no foreign-key
+violations. Reconciliation passed in 256.629 seconds; the resulting database is
+10,262,614,016 bytes.
+
+Logs under `/tmp/stash-native-transition` use the `catalog-publishers-` prefix:
+`focused-final.log`, `http.log`, `promotion.log`, `full-import.log`,
+`independent-reconciliation.log`, `validate-fork.log`, `backend-final.log`,
+`python312.log` and `package-install.log`. The private rehearsal and machine-readable
+receipts are retained in `.local/native-catalog-publishers-rehearsal-20261001/`.
+The original schema-1000033 baseline and frozen catalog snapshots were unchanged.
+
+Assets/files, appearances, memberships, sidecars, translations, edits and other
+histories still need their remaining mappings and final semantic reconciliation.
+This pass activates no source jobs and constructs no galleries. The full
+transition remains active; production, workers and n8n remain on the frozen
+compatible deployment.

@@ -815,6 +815,33 @@ and source values. These receipts also remain `imported:false`. Importing media,
 memberships, sidecars, edits and other histories, choosing captured publishers,
 and final reconciliation remain separate work.
 
+After the evidence and relationship passes, select publishers from actual
+captured account IDs with native schema 1000034:
+
+```sh
+stash-import-catalog-publishers --snapshot /migration/prepared/CATALOG_ID \
+  --expected-sha256 MANIFEST_SHA256 --endpoint STASH_ORIGIN
+```
+
+The command uses the same application API-key reference, frozen manifest and
+resume behavior. It advances bounded batches through `/publisher-import`, using
+the core captured-account policy. Qualified IDs can link or create accounts;
+ambiguous candidates and invalid identities remain for review. Existing
+publisher choices and explicit unlinks are preserved. Captures without author
+IDs remain `unavailable`; folder names, scraped feed owners and old catalog
+links do not supply a publisher. Shared observation parents are not extra
+captures. This pass does not assign depicted performers or selected metadata.
+
+Exit 0 means completed without review outcomes, including any unavailable or
+preserved captures. Exit 2 means completed with review outcomes; exit 1 means
+failure or an unavailable response. Rerun the same command to resume a lost
+response. Inspect bounded summaries at
+`/api/v3/archive/catalog-snapshots/SNAPSHOT_UUID/publisher-import/records`;
+append `/ORDINAL` for the full key and retained decision context. Receipts refer
+to existing captures and decisions rather than duplicating their source payloads.
+Every result remains `imported:false` until the remaining catalog families and
+final reconciliation are complete.
+
 ## Native n8n backfills
 
 `stash-ingest-n8n` replaces the account backfill runner's record/inspect contract.

@@ -1074,6 +1074,61 @@ for the exact retained source values. These application routes do not accept
 producer tokens. The original source snapshot, receipts, held targets and
 historical evidence survive ordinary database backup and restore.
 
+### Activate imported translation holds
+
+`stash-activate-automation-translations` prepares and resumes a reviewed bulk
+activation through the application API. The translation mapping must have
+finished first. Here `--snapshot` is its native snapshot UUID;
+`--manifest-sha256` is the original frozen automation manifest digest.
+
+```sh
+stash-activate-automation-translations prepare --endpoint STASH_ORIGIN \
+  --snapshot SNAPSHOT_UUID --manifest-sha256 AUTOMATION_MANIFEST_SHA256 \
+  --output /migration/translation-activation
+
+stash-activate-automation-translations show \
+  --plan /migration/translation-activation --expected-sha256 PLAN_SHA256 --page 0
+
+stash-activate-automation-translations apply --endpoint STASH_ORIGIN \
+  --plan /migration/translation-activation --expected-sha256 PLAN_SHA256
+
+stash-activate-automation-translations status --endpoint STASH_ORIGIN \
+  --plan /migration/translation-activation --expected-sha256 PLAN_SHA256
+```
+
+Preparation reads indexed pages of original held receipts. Each saved page
+contains at most 100 candidates, their current schedules and exclusion reasons,
+and a preview for its eligible targets. The private plan directory retains every
+operation UUID and reviewed server hash before any Apply. Its returned
+`plan_sha256` is the digest used by the remaining commands. Preparation never
+releases work or overwrites an existing plan. At most one million original holds
+can enter one plan; separate JSON pages keep individual records bounded.
+Show validates the manifest and requested page without reading every other page.
+
+Apply validates all saved pages before its first mutation and checks each page
+again when reading it. It verifies existing activation receipts before issuing
+new Apply requests, preserving the original operation after a committed response
+is lost. Resume with the same directory, endpoint and reviewed manifest digest.
+Each page commits atomically; a stale member leaves that batch in `conflict`
+while other batches can finish. Apply lists those page/operation references;
+Status checks retained activation receipts and reports missing ones as pending.
+Later native holds, completed targets and forgotten posts remain excluded from
+the original migration selection. Changed native holds require separate
+application review.
+
+Activation preserves priorities and retry deadlines and makes those targets
+pending. An enabled provider worker may then admit due targets through its
+ordinary limits. `activation_complete` reports release of this plan's eligible
+targets; `execution_status: not_checked` explicitly leaves provider completion
+unverified. This command does not complete the overall catalog migration.
+
+The command uses `STASH_API_KEY` or `--api-key-env`, with application
+authorization. Exit codes are 0 for preparation/show or complete activation,
+1 for invalid input/transport failure, 2 for conflicting batches requiring
+review, and 3 for work not yet activated. Saved plans contain source identifiers
+and schedules, never the application key. Redirected, malformed and oversized
+responses are rejected. See [activation API contracts](../../docs/native-schema.md#reviewed-translation-activation).
+
 ## Historical source albums
 
 `stash-backfill-source-albums` uses the native application API to match imported

@@ -389,8 +389,10 @@ held revisions, preserving priorities and retry deadlines. Save the operation
 UUID and reviewed plan before applying; retries return the original receipt
 without releasing later holds or changing completed targets. Optional snapshot
 bindings permit only original imported holds. Keep activation distinct from
-worker admission and provider completion. The full backlog CLI/rehearsal and
-automatic capture scheduling remain transition work.
+worker admission and provider completion. `stash-activate-automation-translations`
+saves private, hashed candidate pages and operation identities before Apply;
+resume with the same plan, digest and endpoint. Preserve excluded native choices
+and surface stale batches. Automatic capture scheduling remains transition work.
 
 `stash-import-catalog-evidence` maps a received snapshot's posts, profiles and
 captures through core services in schema 1000031. It uses exact manifest/ordinal

@@ -1341,5 +1341,8 @@ tokens cannot administer these routes. Startup verifies plan/input hashes,
 source bindings and the historical held-to-pending transitions, independently
 of current target states. Backup/restore retains activation receipts;
 anonymisation removes them before their referenced source/target histories.
-The backlog preparation CLI, full-source activation rehearsal and automatic
-scheduling for new captures remain separate transition work.
+`stash-activate-automation-translations` saves bounded previews and operation
+identities in a private plan before applying. It validates every saved page,
+inspects existing receipts on resume and reports release separately from
+execution. See the [command and recovery contract](../integrations/gallery-dl/README.md#activate-imported-translation-holds).
+Automatic scheduling for new captures remains separate transition work.

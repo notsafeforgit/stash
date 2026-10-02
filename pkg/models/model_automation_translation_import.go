@@ -52,4 +52,5 @@ type AutomationTranslationImportReaderWriter interface {
 	Find(context.Context, string) (*AutomationTranslationImport, error)
 	Records(context.Context, string, int64, int) ([]AutomationTranslationRecord, error)
 	Record(context.Context, string, int64) (*AutomationTranslationRecordDetails, error)
+	HeldTargets(context.Context, string, string, int64, int) ([]AutomationTranslationCandidate, error)
 }

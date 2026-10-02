@@ -383,6 +383,15 @@ untouched hold from this same import. Preserve later native edits, conflicting
 caches and unmatched references. Mapping still reports `imported:false`; other
 automation families, activation and overall reconciliation remain separate.
 
+Schema 1000048 exposes reviewed translation activation through application-only
+preview/apply/status routes. Each immutable receipt releases at most 100 exact
+held revisions, preserving priorities and retry deadlines. Save the operation
+UUID and reviewed plan before applying; retries return the original receipt
+without releasing later holds or changing completed targets. Optional snapshot
+bindings permit only original imported holds. Keep activation distinct from
+worker admission and provider completion. The full backlog CLI/rehearsal and
+automatic capture scheduling remain transition work.
+
 `stash-import-catalog-evidence` maps a received snapshot's posts, profiles and
 captures through core services in schema 1000031. It uses exact manifest/ordinal
 checkpoints, bounded transactions and immutable per-row outcomes. Preserve mirror

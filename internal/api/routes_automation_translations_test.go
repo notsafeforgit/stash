@@ -70,12 +70,14 @@ func TestPythonAutomationTranslationImportRecoversCommittedResponseAndInspectsRe
 	require.True(t, lost.Load())
 	require.NoError(t, db.Close())
 	require.NoError(t, db.Open(db.DatabasePath()))
+	var manifestSHA string
 	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
 		progress, err := repo.AutomationTranslationImport.Find(ctx, id)
 		require.NoError(t, err)
 		require.EqualValues(t, 205, progress.ProcessedRecords)
 		require.EqualValues(t, 1, progress.ReviewRecords)
 		require.False(t, progress.Imported)
+		manifestSHA = progress.ManifestSHA256
 		return nil
 	}))
 	for _, test := range []struct {
@@ -85,6 +87,7 @@ func TestPythonAutomationTranslationImportRecoversCommittedResponseAndInspectsRe
 		{"GET", "", "", 200}, {"GET", "/records?limit=101", "", 400}, {"GET", "/records?after=-1", "", 400},
 		{"GET", "/records/1", "", 200}, {"GET", "/records/0", "", 400}, {"GET", "/records/9999", "", 404},
 		{"POST", "", `{}`, 400}, {"POST", "", `{"after":-1,"expected_manifest_sha256":"bad"}`, 400},
+		{"GET", "/held-targets?expected_manifest_sha256=" + manifestSHA, "", 200},
 	} {
 		r := httptest.NewRequest(test.method, "/automation-snapshots/"+id+"/translation-import"+test.suffix, strings.NewReader(test.body))
 		r.Header.Set("Content-Type", "application/json")

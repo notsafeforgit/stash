@@ -1298,5 +1298,48 @@ Application-authenticated operations under
 Producer tokens cannot administer these routes. The supported command is
 `stash-import-automation-translations`. `mapped` or `review` completes this
 mapping pass only: `imported` remains false, and no active jobs, provider calls
-or selected library-field changes are created. Activation, other automation
-families and final reconciliation remain transition work.
+or selected library-field changes are created. Other automation families and
+final reconciliation remain transition work. Releasing imported holds is a
+separate reviewed operation, described below.
+
+## Reviewed translation activation
+
+Schema 1000048 adds immutable `translation_activations` and
+`translation_activation_targets`. Each activation identifies at most 100 exact
+held target revisions. Preview records their request, post, optional collection
+revision, field, priority and deadline in a hashed plan. Apply requires the same
+input and reviewed hash; every target becomes pending in one transaction while
+keeping its priority and deadline. A changed target or forgotten post rejects
+the entire batch. Activation does not admit execution jobs or invoke a provider.
+
+The caller chooses and durably saves the activation UUID before applying. Reuse
+that UUID, exact target revisions and plan hash after interruption. The original
+receipt remains valid even if a worker completes the targets or someone later
+holds them again; replay never repeats the release. A different input or hash
+cannot reuse an existing UUID. New scheduling choices require a new preview and
+operation UUID. The existing worker admits due targets through its normal limits
+and shared request cache.
+
+Application-authenticated routes under `/api/v3/archive` are:
+
+| Route | Contract |
+| --- | --- |
+| `POST /translation-activations/preview` | Input: `uuid`, `targets` containing `target_uuid` and `revision`, and an optional paired `snapshot_uuid`/`manifest_sha256`. Returns the normalized `input`, concrete `entries` and `plan_sha256`. |
+| `POST /translation-activations` | Body: saved `input` and `expected_plan_sha256`. Returns the immutable plan, activated target revisions and original `created_at`. |
+| `GET /translation-activations/{activation_uuid}` | Inspect the original receipt; 404 if no activation committed. This is release status, not execution completion. |
+| `GET /automation-snapshots/{snapshot_uuid}/translation-import/held-targets` | Requires `expected_manifest_sha256`; pages original hold receipts using source-ordinal `after` and `limit` (1–100). Reports current revisions and `eligible`, `changed`, `completed` or `post_forgotten`. |
+
+Supplying a snapshot restricts activation to its completed translation mapping
+and the exact revisions that mapping originally held. A later native hold cannot
+be released through the old migration receipt. Ordinary application review can
+preview a later held revision without the snapshot binding. Candidate paging
+uses an index over original held receipts; it neither scans other operational
+families nor guarantees that candidates remain unchanged until Apply.
+
+Requests are bounded to 128 KiB and duplicate target UUIDs are rejected. Producer
+tokens cannot administer these routes. Startup verifies plan/input hashes,
+source bindings and the historical held-to-pending transitions, independently
+of current target states. Backup/restore retains activation receipts;
+anonymisation removes them before their referenced source/target histories.
+The backlog preparation CLI, full-source activation rehearsal and automatic
+scheduling for new captures remain separate transition work.

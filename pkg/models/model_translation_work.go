@@ -136,4 +136,7 @@ type TranslationWorkReaderWriter interface {
 	JobTargets(context.Context, string) ([]TranslationJobTarget, error)
 	TargetBinding(context.Context, string, int) (*TranslationJobTarget, error)
 	RetryTarget(context.Context, string, int, time.Time) (*TranslationTarget, error)
+	PreviewActivation(context.Context, TranslationActivationInput) (*TranslationActivationPlan, error)
+	Activate(context.Context, TranslationActivationInput, string, time.Time) (*TranslationActivation, error)
+	Activation(context.Context, string) (*TranslationActivation, error)
 }

@@ -727,6 +727,56 @@ also retain their review summary in durable status. General API/scan edit hooks
 still use the existing after-commit delivery path; the ingestion worker retains
 its retryable notification checkpoint.
 
+## Automatic source translations
+
+Translation has a separate collection policy from scene/image metadata mapping.
+Configure it through `PUT /api/v3/archive/collections/{uuid}/translation-policy`:
+
+```json
+{
+  "expected_revision": 0,
+  "expected_collection_revision": 1,
+  "reason": "Translate new source titles and captions",
+  "definition": {
+    "enabled": true,
+    "provider_policy": "translate-shell-bing-text-v1",
+    "target_language": "en",
+    "title": true,
+    "caption": true,
+    "priority": 100
+  }
+}
+```
+
+Zero policy revision creates the first policy; later writes require its current
+revision. Title reads normalized source `metadata.title`; caption reads
+`metadata.original_text`. Empty or whitespace-only values produce `no_text`
+entries. Nonempty original strings are preserved exactly. Equal strings share
+one request/cache even across posts and fields. Target identity retains the post,
+collection revision and field; repeated media captures of one post reuse its
+existing work without changing a hold, retry deadline, priority or completion.
+
+First accepted capture delivery commits a `translation` decision with the capture
+and receipt. Its status is `no_policy`, `disabled`, `collection_changed`, or
+`recorded`; individual recorded entries say `created`, `retained`, or `no_text`.
+Target references identify the revision observed by that decision, not a claim
+that provider execution finished. The separate translation worker must be enabled
+and configured to process due targets. Scheduling and translation evidence do not
+select scene/image titles or other curated fields.
+
+A missing policy disables scheduling. Disabling a policy affects future captures;
+already queued targets retain their own scheduling controls. Policy changes do
+not revisit previous captures, including accepted offline deliveries. Their exact
+receipts remain replayable. Existing text can be queued explicitly through the
+[translation target APIs](native-schema.md#translation-requests-cache-and-targets).
+
+Policies bind the reviewed collection revision. If a configured policy no longer
+matches the event's collection revision or current collection, source evidence
+still commits and `translation_policy` is reported for review. A new reviewed
+policy applies to subsequent captures under that collection revision. Replaying
+an old event cannot overwrite its saved decision. Ordinary file scans have no
+source text and do not fabricate a capture for this policy.
+
 ## Producer delivery queue
 
 The Python package in [integrations/gallery-dl](../integrations/gallery-dl/README.md)

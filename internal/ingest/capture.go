@@ -43,12 +43,13 @@ type CaptureEvent struct {
 }
 
 type CaptureResult struct {
-	Status        string   `json:"status"`
-	Publisher     string   `json:"publisher"`
-	Album         string   `json:"album"`
-	ManifestUUID  string   `json:"manifest_uuid,omitempty"`
-	Review        []string `json:"review"`
-	MediaIngested bool     `json:"media_ingested"`
+	Status        string                             `json:"status"`
+	Publisher     string                             `json:"publisher"`
+	Album         string                             `json:"album"`
+	ManifestUUID  string                             `json:"manifest_uuid,omitempty"`
+	Review        []string                           `json:"review"`
+	MediaIngested bool                               `json:"media_ingested"`
+	Translation   *models.CaptureTranslationDecision `json:"translation,omitempty"`
 }
 
 // StrictJSON preserves exact large numbers and rejects duplicate keys, unknown
@@ -253,6 +254,13 @@ func (s *Service) Capture(ctx context.Context, token string, raw []byte, digest 
 			if err := s.captureAlbum(ctx, capture, prepared.album, &result); err != nil {
 				return err
 			}
+		}
+		result.Translation, err = s.Repo.TranslationPolicy.ScheduleCapture(ctx, models.CollectionCapture{CaptureUUID: capture.UUID, CollectionUUID: collection.UUID, CollectionRevision: collection.Revision}, time.Now())
+		if err != nil {
+			return err
+		}
+		if result.Translation.Status == "collection_changed" {
+			result.Review = append(result.Review, "translation_policy")
 		}
 		encoded, err := json.Marshal(result)
 		if err != nil {

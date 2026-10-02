@@ -54,6 +54,7 @@ type Repository struct {
 	SourceDocument              SourceDocumentReaderWriter
 	SourceTranslation           SourceTranslationReaderWriter
 	TranslationWork             TranslationWorkReaderWriter
+	TranslationPolicy           TranslationPolicyReaderWriter
 	CatalogTranslationImport    CatalogTranslationImportReaderWriter
 	CatalogDocumentImport       CatalogDocumentImportReaderWriter
 	SourcePostLinks             SourcePostLinksReaderWriter

@@ -1215,8 +1215,8 @@ Additional application-authenticated operations under `/api/v3/archive` are:
 
 Producer tokens cannot administer this work or choose executable paths. The
 frozen automation importer below maps historical requests, results and targets.
-Reviewed activation, automatic capture scheduling and native review UI remain
-separate transition work. Adding execution does not activate production.
+Reviewed activation and automatic capture scheduling are documented below.
+Native review UI and production activation remain separate transition work.
 
 ## Frozen automation snapshot receipt
 
@@ -1345,4 +1345,41 @@ anonymisation removes them before their referenced source/target histories.
 identities in a private plan before applying. It validates every saved page,
 inspects existing receipts on resume and reports release separately from
 execution. See the [command and recovery contract](../integrations/gallery-dl/README.md#activate-imported-translation-holds).
-Automatic scheduling for new captures remains separate transition work.
+
+### Automatic source translation policies
+
+Schema 1000049 stores collection policies in `translation_policies` and immutable
+`translation_policy_revisions`. Each revision binds a reviewed collection
+revision, enabled state, provider/preprocessing policy, target language, title
+and caption switches, and priority. Policy writes require the expected policy
+and collection revisions. A missing policy disables automatic scheduling.
+
+`capture_translation_decisions` records the first scheduling decision for an
+exact collection/capture/revision tuple. `capture_translation_entries` records
+each enabled field as `created`, `retained` or `no_text`, with foreign keys to
+the exact target-history revision when present. Captures with equal text share
+requests and cached outcomes; targets remain qualified by post, collection
+revision and field. Existing holds, due times, priorities and outcomes survive
+recapture. Original text remains exact, including whitespace.
+
+The capture, decision, requests, targets and ingestion receipt commit together.
+Provider execution occurs later through the existing bounded worker. Retry of an
+accepted capture returns its original receipt after later policy/target edits,
+restart or post forgetting. No scene/image metadata is selected. Shared source
+metadata is read directly; scheduling does not reconstruct the provider payload.
+
+Application routes under `/api/v3/archive`:
+
+| Route | Contract |
+| --- | --- |
+| `GET /collections/{collection_uuid}/translation-policy` | Current policy or null when never configured. |
+| `PUT /collections/{collection_uuid}/translation-policy` | `expected_revision`, `expected_collection_revision`, `definition`, and optional `reason`; origin is application review. |
+| `GET /collections/{collection_uuid}/translation-policy/history` | Immutable revisions after numeric `after`, at most 50 per page. |
+| `GET /captures/{capture_uuid}/translation-decision` | Requires `collection_uuid` and `collection_revision`; returns the saved decision or 404. |
+
+Producer tokens cannot configure these policies or inspect unscoped decisions.
+The producer receives its decision in the capture receipt. Startup validates
+policy definitions, capture/collection membership, exact source text and saved
+target history independently of current policy and target states. Backup/restore
+preserves these records; anonymisation removes them with the source evidence.
+See [configuration and scheduling behavior](native-ingestion.md#automatic-source-translations).

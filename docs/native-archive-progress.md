@@ -72,7 +72,7 @@ review. Production has not been migrated.
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
 | 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries and metadata relationship targets, native account/ownership storage and reviewed consolidation, shared post/profile/capture storage, ordered attachment manifests, audited media associations, reviewed source-list selection, and source-gallery synchronization with manual membership intent are implemented. Scalar and relationship field choices protect explicit and preserved metadata. Revisioned logical roots and source collections retain capture/manual-intake provenance; captured publisher choices connect source evidence to accounts independently of depicted performers. Verified byte identities and immutable per-file verification history now use persistent file-generation guards. Producer identity matching, policy resolution, review APIs/UI and remaining domain services are in progress. |
 | 2 Ingestion and producer adapter | In progress: scoped producer tokens, Reddit/Twitter capture batches and durable receipts are implemented. Verified preparation uses the shared scanner; file/media publication checks descriptors, generations and persistent path removals, reuses concurrent scans, and rejects ambiguous verified-byte owners. Intake publication connects collection provenance, selected source media, attachment evidence and album galleries while preserving explicit choices. Persistent jobs have coalesced submissions, fenced leases, retry/cancellation/recovery, and atomic domain/result publication. File-completion admission now queues a durable worker that checkpoints registration, generates previews and delivers retryable media/gallery hooks; scoped status reports actual completion. Native collection policies now apply typed metadata and explicit performer defaults in intake and ordinary scans, with dry preview and guarded apply. Source-run coordination now coalesces missing date ranges, fences worker ownership, retains checkpoints and deferrals, and excludes overlapping destinations. A supported Python producer package now provides retained-payload outboxes, fenced delivery, durable receipts, backoff and review. The gallery-dl SDK now queues source evidence before download, verifies root/prefix and lease ownership, holds shared destination locks, and queues flushed final files before archive acknowledgement. Reddit single-media evidence and original Twitter attachment membership are covered. The producer now coalesces offline source requests, freezes submissions for replay, retains caller tickets and validates native admission receipts. Claimed Reddit/Twitter windows use precise source timestamps and parent context, with directory checks before postprocessor callbacks. Reviewed portable profiles now fingerprint settings/assets and execute one claimed attempt with concurrent outbox delivery and lost-finish recovery. A local converter now stages ordered, source-scoped profiles from the host and n8n JSON layers without copying website credentials. Scoped dispatch now discovers eligible runs with durable pagination/backoff, and a separate n8n image packages the pinned worker runtime. Staged host Twitter/Reddit launchers preserve saved lists, modes, date filters and full-history profiles through durable caller snapshots. Staged n8n backfill calls now check permanent history before source admission, preserve original completion proof, and expose pending results to converted workflow waits. Live image/profile activation, operational-history and policy migration, general durable edit notifications, additional source adapters and recovery caller conversion remain. |
-| 3 Catalog importer and full-copy reconciliation | Permanent backfill decisions, retained scan journals/reviewed recovery activation, performer UUIDs and saved ownership, and account/catalog registry imports are implemented and rehearsed against full copies. All 1,697 frozen catalog bodies have bounded snapshot receipt and native mappings for posts/profiles/captures, account/post relationships, captured publishers, attachment lists, assets/files/appearances, collection memberships, retained documents and translation results. Historical album backfill is resumable and rehearsed. Original evidence, replay receipts and unresolved conflicts are retained. Shared native translation request/cache/target storage, bounded execution, provider workers and application inspection/control are implemented. Automation snapshot preparation preserves all ten operational families and has passed full-source reconciliation. Resumable native receipt, translation request/cache/target mapping and reviewed activation are implemented. The saved-plan bulk client has activated 324,169 imported holds in a full-copy rehearsal with lost-response recovery and independent reconciliation. Automatic capture scheduling, other histories and operational families, validated source routing, review resolution, global reconciliation and cutover import remain unfinished. |
+| 3 Catalog importer and full-copy reconciliation | Permanent backfill decisions, retained scan journals/reviewed recovery activation, performer UUIDs and saved ownership, and account/catalog registry imports are implemented and rehearsed against full copies. All 1,697 frozen catalog bodies have bounded snapshot receipt and native mappings for posts/profiles/captures, account/post relationships, captured publishers, attachment lists, assets/files/appearances, collection memberships, retained documents and translation results. Historical album backfill is resumable and rehearsed. Original evidence, replay receipts and unresolved conflicts are retained. Shared native translation request/cache/target storage, bounded execution, provider workers and application inspection/control are implemented. Automation snapshot preparation preserves all ten operational families and has passed full-source reconciliation. Resumable native receipt, translation request/cache/target mapping and reviewed activation are implemented. The saved-plan bulk client has activated 324,169 imported holds in a full-copy rehearsal with lost-response recovery and independent reconciliation. Automatic capture scheduling now records revisioned collection-policy decisions with its requests and targets in the capture transaction. Existing policy migration, other histories and operational families, validated source routing, review resolution, global reconciliation and cutover import remain unfinished. |
 | 4 Native UI and client conversion | Not yet implemented |
 | 5 Compatibility removal and packaging | Preview packaging isolated and old compatibility gate replaced by current v3 operation/plugin-contract checks. Old UI/API/plugin adapters and config bridge still require conversion/removal. |
 | 6 Backup and cutover rehearsal | Not yet implemented |
@@ -4035,3 +4035,63 @@ Automatic capture scheduling, the remaining operational/history imports, native
 UI and caller conversion, compatibility removal, coordinated backup/restore and
 portable export, performance budgets and production cutover remain unfinished.
 The full transition goal remains active; production and `develop` are unchanged.
+
+## Automatic translation scheduling for captured source text
+
+Schema 1000049 adds independent, revisioned collection translation policies and
+immutable per-capture decisions. The policy selects title/caption, target
+language, provider behavior and priority. Missing policies disable scheduling.
+An enabled capture queues at most two targets in the same transaction as its
+source evidence and ingestion receipt. Equal text shares requests/cache results;
+repeated captures retain existing targets, holds, deadlines and outcomes. Receipt
+replay preserves the original decision after policy changes and worker completion.
+Translation never selects scene/image metadata.
+
+Collection changes require policy review before new scheduling. Original evidence
+still commits, with an explicit review result. Empty text receives a `no_text`
+entry. The scheduler reads shared text metadata without reconstructing provider
+payloads. Application routes expose policy configuration/history and individual
+capture decisions; scoped producer tokens cannot administer these routes.
+Startup validation, backup/restore and anonymisation cover the new records.
+
+Backend generation, Go lint and all 275 producer tests passed. Focused tests cover
+real capture acceptance/replay, shared provider results, preserved holds,
+disabled policies, stale collection revisions, large text, HTTP authorization,
+late transaction failures, backup/restore, corrupt-state refusal and migration
+collisions. Race checks passed SQLite in 19.354 seconds, ingestion in 16.204
+seconds and the API in 8.572 seconds. The complete backend run passed API in
+487.656 seconds and ingestion in 555.283 seconds; SQLite exceeded Go's default
+ten-minute package timeout while the full-copy backup was running. Its complete
+rerun passed in 271.287 seconds. `make test` and `make it` now share an overridable
+twenty-minute package timeout; operation, worker and provider deadlines are
+unchanged. The preceding `fe3ab0525` checkpoint passed CI lint, build, tests and
+native preview publication.
+
+The isolated schema-48 backup took 177.101 seconds and 18,794,524,672 bytes under
+concurrent regression-test load. Promotion to schema 1000049 passed in 487.469
+seconds. Independent reconciliation passed in 421.142 seconds: all 198 existing
+data tables match row for row, including their SQLite value types; earlier schema
+definitions, migration history and sequences are preserved. The four new tables
+are empty. Integrity is `ok`, foreign-key violations are zero, and the resulting
+database is 18,794,569,728 bytes. Existing pending/completed translation work,
+selected metadata and original import receipts remain unchanged.
+
+Normal reopening passed in 162.647 seconds, including policy and capture-decision
+validation. Its CPU profile is retained with the rehearsal. Startup performance
+remains unfinished release work.
+
+Private rehearsal artifacts are under
+`.local/native-translation-policy-rehearsal-20261002/`; validation logs under
+`/tmp/stash-native-transition` use the `translation-policy-` prefix. For space,
+the unused schema-47 copy was compressed from 18,417,156,096 to 4,042,088,994
+bytes. Its decompressed SHA-256 matched before removing the redundant raw file;
+the archive and prior reconciliation remain retained. The schema-48 baseline
+and frozen source inputs remain unchanged.
+
+The next frozen enrichment inventory contains 252,050 jobs, eight cooldowns and
+eight source-progress records, with no staged result payloads. Completed, pending,
+retry, coalesced, missing-URL, identity-conflict and deliberately excluded states
+require separate native outcomes. Their import/execution, remaining histories,
+existing policy conversion, native UI, compatibility removal, coordinated
+backup/restore/export, performance work and cutover remain unfinished. Production
+has not changed, and the full transition goal remains active.

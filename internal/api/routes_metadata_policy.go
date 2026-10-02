@@ -32,6 +32,10 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Get("/collections/{collection}/metadata-policy", rs.policy)
 	r.Put("/collections/{collection}/metadata-policy", rs.putPolicy)
 	r.Get("/collections/{collection}/metadata-policy/history", rs.policyHistory)
+	r.Get("/collections/{collection}/translation-policy", rs.translationPolicy)
+	r.Put("/collections/{collection}/translation-policy", rs.putTranslationPolicy)
+	r.Get("/collections/{collection}/translation-policy/history", rs.translationPolicyHistory)
+	r.Get("/captures/{capture}/translation-decision", rs.captureTranslationDecision)
 	r.Post("/metadata-policy/preview", rs.preview)
 	r.Post("/metadata-policy/apply", rs.apply)
 	r.Get("/media-roots", rs.roots)
@@ -147,11 +151,11 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 }
 
 func nativeArchiveError(w http.ResponseWriter, err error) {
-	if errors.Is(err, models.ErrMetadataPolicyInvalid) {
+	if errors.Is(err, models.ErrMetadataPolicyInvalid) || errors.Is(err, models.ErrTranslationPolicyInvalid) {
 		ingestJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_policy", "message": err.Error()})
 		return
 	}
-	if errors.Is(err, models.ErrMetadataPolicyConflict) || errors.Is(err, models.ErrMetadataFieldConflict) || errors.Is(err, models.ErrSourceDefinitionConflict) {
+	if errors.Is(err, models.ErrMetadataPolicyConflict) || errors.Is(err, models.ErrMetadataFieldConflict) || errors.Is(err, models.ErrSourceDefinitionConflict) || errors.Is(err, models.ErrTranslationPolicyConflict) {
 		ingestJSON(w, http.StatusConflict, map[string]string{"error": "preview_changed", "message": "The collection, policy, or metadata changed; load a fresh preview."})
 		return
 	}

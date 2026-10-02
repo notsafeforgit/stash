@@ -328,15 +328,17 @@ lint:
 	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run
 
 # runs unit tests - excluding integration tests
+# Migration fixtures can exceed Go's default ten-minute package budget.
+GO_TEST_TIMEOUT ?= 20m
 .PHONY: test
 test:
-	go test ./...
+	go test -timeout $(GO_TEST_TIMEOUT) ./...
 
 # runs all tests - including integration tests
 .PHONY: it
 it:
 	$(eval GO_BUILD_TAGS += integration)
-	go test -tags "$(GO_BUILD_TAGS)" ./...
+	go test -timeout $(GO_TEST_TIMEOUT) -tags "$(GO_BUILD_TAGS)" ./...
 
 # generates test mocks
 .PHONY: generate-test-mocks

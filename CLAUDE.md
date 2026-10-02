@@ -63,6 +63,9 @@ make validate-ui       # v2.5 Biome, Stylelint, TypeScript, and formatting check
 Build both UIs before full Go tests or `make validate-fork`; embedded-asset tests
 require real v3 route chunks. Use the [validation sequence](ui/v3/docs/development.md#validation).
 To run a single Go test: `go test ./pkg/models/... -run TestFilterAST`.
+The shared `make test`/`make it` package timeout is twenty minutes for the growing
+migration suite; override `GO_TEST_TIMEOUT` when needed. Individual operation,
+lease and provider deadlines remain independently tested.
 Native producer tests require Python 3.12 or newer. `make pre-producer` installs
 the pinned gallery-dl/yt-dlp test dependencies into `.local/native-producer`;
 `PRODUCER_PYTHON` can select another prepared environment. The supported package
@@ -392,7 +395,13 @@ bindings permit only original imported holds. Keep activation distinct from
 worker admission and provider completion. `stash-activate-automation-translations`
 saves private, hashed candidate pages and operation identities before Apply;
 resume with the same plan, digest and endpoint. Preserve excluded native choices
-and surface stale batches. Automatic capture scheduling remains transition work.
+and surface stale batches. Schema 1000049 adds independent collection translation
+policies. Capture acceptance records the policy decision and at most two target
+references in its own transaction. Repeated captures retain existing holds,
+deadlines and outcomes; receipt replay never applies a later policy. A changed
+collection requires policy review. Provider execution remains separately enabled,
+and scheduling never selects scene/image fields. Existing policy migration and
+enrichment/discovery caller conversion remain transition work.
 
 `stash-import-catalog-evidence` maps a received snapshot's posts, profiles and
 captures through core services in schema 1000031. It uses exact manifest/ordinal
@@ -451,8 +460,9 @@ explicit target retry; retry delays and holds cannot be bypassed by later
 targets. The HTTP-owned translate-shell/Bing worker is opt-in through
 `translation_worker_enabled` and `translation_shell_path`; migration and normal
 startup leave it disabled by default. Provider calls have bounded output and
-timeouts, and cancellation terminates the Unix process group. Automation import,
-automatic capture scheduling and review UI remain transition work. See
+timeouts, and cancellation terminates the Unix process group. Translation history
+import, reviewed activation and capture scheduling are implemented; remaining
+operational imports, policy migration and review UI remain transition work. See
 [translation work](docs/native-schema.md#translation-requests-cache-and-targets).
 
 `stash-import-catalog-relations` advances a received snapshot after its evidence

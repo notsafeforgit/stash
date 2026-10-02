@@ -13,6 +13,11 @@ and historical private schemas 998/999. Production deployment must still use a
 separate native database path; a marker cannot teach arbitrary future upstream
 binaries about this fork.
 
+Startup reads primary and historical-fork versions through a single validated
+connection. Native databases have no active fork ledger, so their version lookup
+does not repeat the complete integrity pass. Each newly opened migrator still
+validates the database before writes; validation is not cached across opens.
+
 Promotion completes the legacy fork migrations and their final reconciliation
 once, snapshots existing migration history before any historical compaction,
 checks foreign keys, and rejects unknown `fork_*` objects or destination-table

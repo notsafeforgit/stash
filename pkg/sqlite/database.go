@@ -158,14 +158,9 @@ func (db *Database) Open(dbPath string) error {
 
 	db.dbPath = dbPath
 
-	databaseSchemaVersion, err := db.getDatabaseSchemaVersion()
+	databaseSchemaVersion, forkSchemaVersion, err := db.getSchemaVersions()
 	if err != nil {
-		return fmt.Errorf("getting database schema version: %w", err)
-	}
-
-	forkSchemaVersion, err := db.getForkSchemaVersion()
-	if err != nil {
-		return fmt.Errorf("getting fork database schema version: %w", err)
+		return fmt.Errorf("getting database schema versions: %w", err)
 	}
 
 	db.legacyForkSchemaVersion = 0

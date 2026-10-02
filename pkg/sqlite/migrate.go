@@ -216,25 +216,22 @@ func (m *Migrator) PostMigrate(ctx context.Context) error {
 	return nil
 }
 
-func (db *Database) getDatabaseSchemaVersion() (uint, error) {
+// Read both versions through one validated connection. Native databases have
+// no active fork ledger; only historical import inputs need that lookup.
+// Each new migrator still performs the complete pre-write integrity check.
+func (db *Database) getSchemaVersions() (uint, uint, error) {
 	m, err := NewMigrator(db)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	defer m.Close()
 
-	ret, _, _ := m.m.Version()
-	return ret, nil
-}
-
-func (db *Database) getForkSchemaVersion() (uint, error) {
-	m, err := NewMigrator(db)
-	if err != nil {
-		return 0, err
+	primary := m.CurrentSchemaVersion()
+	if primary >= NativeSchemaBaseline {
+		return primary, 0, nil
 	}
-	defer m.Close()
-
-	return m.CurrentForkSchemaVersion(context.Background())
+	fork, err := m.CurrentForkSchemaVersion(context.Background())
+	return primary, fork, err
 }
 
 func (db *Database) ReInitialise() error {

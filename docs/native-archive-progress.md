@@ -3621,6 +3621,14 @@ reconciliation, not proof that live posts are missing. All 240,397 job inputs
 target English; the largest original is 15,711 UTF-8 bytes. The assessment is
 `.local/native-translation-queue-assessment-20261002/native-reference-assessment.json`.
 
+A further cache assessment found 371 of the 42,732 cached outcomes labelled
+`english` with detected language `en` but output text different from the exact
+original. Those historical outputs cannot be passed unchanged to the native
+`unchanged` outcome, which requires the original text. The importer must retain
+the original rows/results and record an explicit mapping disposition. Counts
+and classification are retained in `native-cache-assessment.json` and
+`native-cache-conflict-assessment.json` in the same assessment directory.
+
 Execution admission/provider workers and the actual automation import remain
 unfinished. This storage checkpoint does not activate translation work, migrate
 the live queue, or complete the full archive transition.
@@ -3629,6 +3637,7 @@ Backend generation, v3 validation (528 tests in 91 files and 71 native operation
 contracts), all 254 producer tests and final Go lint passed. The full Go suite
 passed: API 380.380 seconds, ingestion 481.929 seconds and SQLite 554.317 seconds.
 Final focused translation/schema/API tests passed after the lint fixes.
+Checkpoint `6f74b8846` also passed CI lint, build and native preview publication.
 
 The isolated schema-43 backup took 44.210 seconds and 16,522,178,560 bytes.
 Promotion to schema 1000044 passed in 823.506 seconds under concurrent test load.
@@ -3651,3 +3660,26 @@ to 3,641,362,723 bytes, with its decompressed SHA-256 verified before removing
 the redundant raw copy. The compressed archive, checksum report and earlier
 reconciliation remain in `.local/native-catalog-documents-rehearsal-20261002/`.
 The schema-43 baseline, frozen inputs and production data remain unchanged.
+
+## One integrity pass during native startup
+
+Database startup now reads schema versions through one validated connection.
+Native databases no longer open another validated migrator to read an obsolete
+fork ledger. Historical import inputs still read their fork version through the
+same connection. Every new migrator continues to run the complete pre-write
+validation, with no cross-open validation cache or weakened corruption checks.
+
+On the same schema-44 library copy, the measured normal reopen decreased from
+211.083 to 136.714 seconds. The CPU profiles show integrity-validation work
+decreasing from 204.20 to 107.55 seconds, and the second version-lookup pass is
+absent. These are individual rehearsal measurements; the remaining SQL checks
+and explicit release performance budgets remain open work.
+
+Focused lineage, historical promotion and corruption-refusal tests pass,
+including refusal of an unexpected active fork ledger in a native database.
+Backend generation and Go lint pass. The new profile and reopen report are
+`reopen-single-pass-cpu.pprof` and `reopen-single-pass.json` beside the original
+measurements in `.local/native-translation-work-rehearsal-20261002/`.
+The full Go regression suite passed: API 352.198 seconds, ingestion 454.305
+seconds and SQLite 512.664 seconds. Logs use the `native-startup-` prefix in
+`/tmp/stash-native-transition`. No schema or stored values change in this step.

@@ -43,7 +43,7 @@ func TestSourceMediaEvidenceRequiresCaptureMembershipAndFileProof(t *testing.T) 
 	otherCapture, _ := attachmentFixture(t, repo)
 	media := archiveFind(t, repo, models.ArchiveScene, 31)
 	file := archiveFind(t, repo, models.ArchiveFile, 21)
-	input := models.SourceMediaEvidence{UUID: uuid.NewString(), AttachmentUUID: attachment.UUID, CaptureUUID: capture.UUID,
+	input := models.SourceMediaEvidence{UUID: uuid.NewString(), PostUUID: attachment.PostUUID, AttachmentUUID: attachment.UUID, CaptureUUID: capture.UUID,
 		MediaUUID: media.UUID, FileUUID: &file.UUID, Basis: "observed-file", Details: []byte(`{"source_id":98765432109876543210}`)}
 	apply := func() error {
 		return repo.WithTxn(context.Background(), func(ctx context.Context) error {
@@ -54,7 +54,7 @@ func TestSourceMediaEvidenceRequiresCaptureMembershipAndFileProof(t *testing.T) 
 	require.ErrorContains(t, apply(), "current file association")
 	attachmentSQL(t, db, `INSERT INTO scenes_files(scene_id, file_id, "primary") VALUES (31, 21, 1)`)
 	input.CaptureUUID = otherCapture.UUID
-	require.ErrorContains(t, apply(), "containing this attachment")
+	require.ErrorContains(t, apply(), "capture belongs to another post")
 	input.CaptureUUID = capture.UUID
 	stored := recordMediaEvidence(t, repo, input)
 	require.JSONEq(t, string(input.Details), string(stored.Details), "large source IDs must retain every digit")
@@ -83,12 +83,12 @@ func TestSourceMediaEvidenceRequiresCaptureMembershipAndFileProof(t *testing.T) 
 	_, err := raw.Exec("UPDATE source_media_evidence SET details='{}' WHERE uuid=?", stored.UUID)
 	require.ErrorContains(t, err, "immutable")
 	// Even a direct insertion cannot combine one capture with another's manifest.
-	_, err = raw.Exec(`INSERT INTO source_media_evidence(uuid, attachment_uuid, capture_uuid, manifest_uuid, position, media_uuid, file_uuid, basis, details)
-SELECT ?, attachment_uuid, ?, manifest_uuid, position, media_uuid, file_uuid, basis, details FROM source_media_evidence WHERE uuid=?`, uuid.NewString(), otherCapture.UUID, stored.UUID)
+	_, err = raw.Exec(`INSERT INTO source_media_evidence(uuid, post_uuid, attachment_uuid, capture_uuid, manifest_uuid, position, media_uuid, file_uuid, basis, details)
+SELECT ?, post_uuid, attachment_uuid, ?, manifest_uuid, position, media_uuid, file_uuid, basis, details FROM source_media_evidence WHERE uuid=?`, uuid.NewString(), otherCapture.UUID, stored.UUID)
 	require.ErrorContains(t, err, "FOREIGN KEY")
 	performer := archiveFind(t, repo, models.ArchivePerformer, 71)
-	_, err = raw.Exec(`INSERT INTO source_media_evidence(uuid, attachment_uuid, capture_uuid, manifest_uuid, position, media_uuid, file_uuid, basis, details)
-SELECT ?, attachment_uuid, capture_uuid, manifest_uuid, position, ?, file_uuid, basis, details FROM source_media_evidence WHERE uuid=?`, uuid.NewString(), performer.UUID, stored.UUID)
+	_, err = raw.Exec(`INSERT INTO source_media_evidence(uuid, post_uuid, attachment_uuid, capture_uuid, manifest_uuid, position, media_uuid, file_uuid, basis, details)
+SELECT ?, post_uuid, attachment_uuid, capture_uuid, manifest_uuid, position, ?, file_uuid, basis, details FROM source_media_evidence WHERE uuid=?`, uuid.NewString(), performer.UUID, stored.UUID)
 	require.ErrorContains(t, err, "scene or image")
 }
 
@@ -101,7 +101,7 @@ func TestSourceMediaSelectionRequiresUniqueVerifiedEvidenceAndPreservesExplicitU
 	input := models.AttachmentMediaDecisionInput{AttachmentUUID: attachment.UUID, ExpectedAttachmentRevision: attachment.Revision,
 		State: "linked", MediaUUID: media.UUID, ExpectedMediaRevision: media.Revision, Origin: "ingest"}
 	require.ErrorIs(t, applyMediaChoice(repo, input), models.ErrAmbiguousSourceMedia)
-	proof := models.SourceMediaEvidence{UUID: uuid.NewString(), AttachmentUUID: attachment.UUID, CaptureUUID: capture.UUID, MediaUUID: media.UUID, FileUUID: &file.UUID, Basis: "legacy"}
+	proof := models.SourceMediaEvidence{UUID: uuid.NewString(), PostUUID: attachment.PostUUID, AttachmentUUID: attachment.UUID, CaptureUUID: capture.UUID, MediaUUID: media.UUID, FileUUID: &file.UUID, Basis: "legacy"}
 	recordMediaEvidence(t, repo, proof)
 	input.ExpectedAttachmentRevision++
 	require.ErrorIs(t, applyMediaChoice(repo, input), models.ErrAmbiguousSourceMedia, "legacy correlation alone is not file proof")
@@ -142,7 +142,7 @@ func TestSourceMediaAmbiguityAndMergeAdoptionDeletionPreserveHistory(t *testing.
 	one := archiveFind(t, repo, models.ArchiveScene, 31)
 	two := archiveFind(t, repo, models.ArchiveScene, 32)
 	file := archiveFind(t, repo, models.ArchiveFile, 21)
-	proof := models.SourceMediaEvidence{UUID: uuid.NewString(), AttachmentUUID: attachment.UUID, CaptureUUID: capture.UUID, MediaUUID: one.UUID, FileUUID: &file.UUID, Basis: "verified-bytes"}
+	proof := models.SourceMediaEvidence{UUID: uuid.NewString(), PostUUID: attachment.PostUUID, AttachmentUUID: attachment.UUID, CaptureUUID: capture.UUID, MediaUUID: one.UUID, FileUUID: &file.UUID, Basis: "verified-bytes"}
 	recordMediaEvidence(t, repo, proof)
 	other := proof
 	other.UUID, other.MediaUUID = uuid.NewString(), two.UUID

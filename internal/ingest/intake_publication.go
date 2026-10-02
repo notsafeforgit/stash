@@ -167,6 +167,13 @@ func validatePublicationCollection(ctx context.Context, repo models.Repository, 
 
 func publishIntakeSource(ctx context.Context, repo models.Repository, input IntakePublication, ret *PublishedIntake) error {
 	source, media := input.Source, ret.Media
+	attachment, err := repo.SourceAttachment.Find(ctx, source.AttachmentUUID)
+	if err != nil {
+		return err
+	}
+	if attachment == nil {
+		return models.ErrSourceAttachmentConflict
+	}
 	details, err := json.Marshal(struct {
 		ContentUUID string `json:"content_uuid"`
 		Generation  int64  `json:"generation"`
@@ -176,12 +183,12 @@ func publishIntakeSource(ctx context.Context, repo models.Repository, input Inta
 	}
 	evidenceUUID := uuid.NewSHA1(uuid.MustParse(input.UUID), []byte("source-media-evidence")).String()
 	if _, err := repo.SourceAttachment.RecordMediaEvidence(ctx, models.SourceMediaEvidence{
-		UUID: evidenceUUID, CaptureUUID: source.CaptureUUID, AttachmentUUID: source.AttachmentUUID,
+		UUID: evidenceUUID, PostUUID: attachment.PostUUID, CaptureUUID: source.CaptureUUID, AttachmentUUID: source.AttachmentUUID,
 		MediaUUID: media.Media.UUID, FileUUID: &media.File.Identity.UUID, Basis: "verified-bytes", Details: details,
 	}); err != nil {
 		return err
 	}
-	attachment, err := repo.SourceAttachment.Find(ctx, source.AttachmentUUID)
+	attachment, err = repo.SourceAttachment.Find(ctx, source.AttachmentUUID)
 	if err != nil {
 		return err
 	}

@@ -141,7 +141,7 @@ func TestAnonymiserRemovesSourceAccountEvidence(t *testing.T) {
 		Entries: []models.SourceAttachmentEntry{sourceAttachmentEntry(0, "private-account-attachment")}})
 	attachment := manifestEntries(t, repo, manifest.UUID)[0].Attachment
 	media := archiveFind(t, repo, models.ArchiveScene, 31)
-	mediaEvidence := recordMediaEvidence(t, repo, models.SourceMediaEvidence{UUID: uuid.NewString(), CaptureUUID: capture.UUID, AttachmentUUID: attachment.UUID,
+	mediaEvidence := recordMediaEvidence(t, repo, models.SourceMediaEvidence{UUID: uuid.NewString(), PostUUID: attachment.PostUUID, CaptureUUID: capture.UUID, AttachmentUUID: attachment.UUID,
 		MediaUUID: media.UUID, Basis: "legacy", Details: []byte(`{"private":"private-account-file-path"}`)})
 	require.NoError(t, applyMediaChoice(repo, models.AttachmentMediaDecisionInput{AttachmentUUID: attachment.UUID, ExpectedAttachmentRevision: attachment.Revision + 1,
 		State: "linked", MediaUUID: media.UUID, ExpectedMediaRevision: media.Revision, Origin: "review", Reason: "private-account-media-choice"}))

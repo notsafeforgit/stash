@@ -399,6 +399,14 @@ album. Bounded immutable receipts retain conflict context; source payloads stay
 shared. Media associations, gallery construction and the remaining catalog
 families still need their subsequent import work.
 
+Schema 1000036 lets `SourceAttachment.RecordMediaEvidence` retain post-level
+legacy/review associations without invented attachments, capture provenance or
+source order. Supply `PostUUID` explicitly. Optional capture/attachment references
+must belong to that post; together they must prove capture membership. Verified
+file evidence retains the full attachment/capture/file requirements. Recording
+evidence advances review revisions but never selects media, changes attribution
+or constructs galleries. `PostMediaEvidence` pages all associations for one post.
+
 ### v3 extension points
 
 See `ui/v3/docs/architecture.md` for the current module map and compatibility rules. List configurations require a discriminated GraphQL/local `source`; generated query variables remain typed through the data hook. Layout, preferences, query state, and cache refill live in separate list modules. Player transition policy consumes plain buffered/seekable state in `scene-player-transitions.ts`; media effects, recovery, and transcode leases are separate hooks. Keep the stable player root and existing iOS seek/timeline behavior when extending these modules.

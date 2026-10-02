@@ -249,6 +249,25 @@ assert verification. The ingestion service still needs to validate the root,
 path, and bytes. Legacy/review evidence can preserve historical associations
 without making them automatic matches.
 
+Migration 1000036 extends this same evidence table with an explicit post UUID.
+Legacy/review evidence may omit the capture, attachment, or both when those
+relationships are unknown. Supplying both still requires actual membership in
+that capture's manifest. Post, capture and attachment scope is enforced by
+composite foreign keys; observed-file/verified-bytes evidence still requires
+all three identities and a file. A filename or download number cannot fill an
+unknown source position. `PostMediaEvidence` provides bounded, indexed retrieval
+including associations without attachment evidence. Such associations neither
+select attachment media nor create galleries. They can connect several posts
+to an existing scene/image without duplicating that library entity.
+
+The migration preserves existing evidence UUIDs, details, timestamps and capture
+membership. Nullable scope fields remain immutable; newly established provenance
+requires new evidence. Insertion advances the post and, when present, attachment
+revision in the same SQL statement. Retirement prevents new evidence while
+historical replay and archive UUID adoption remain supported. Startup validates
+the new scope, target kinds and required guards. Catalog path/asset matching and
+appearance import remain subsequent work.
+
 Media choices are separate immutable decisions with a current head. They require
 the reviewed attachment and target-media revisions. Ingestion may select only
 one active candidate, supported by a current observed/verified file association,

@@ -2872,3 +2872,76 @@ remaining histories still need native mapping and final semantic reconciliation.
 Verified media associations and gallery construction follow that work. No source
 jobs were activated and production, workers and n8n remain on the frozen
 compatible deployment. The full transition remains active.
+
+## Post media associations with incomplete legacy provenance
+
+Schema 1000036 extends the existing `source_media_evidence` domain rather than
+adding a parallel catalog association table. An association always identifies
+its source post and library scene/image. Legacy/review evidence can omit an
+attachment or capture when the original catalog does not establish that
+relationship. Supplying both still requires the attachment's actual presence
+in that capture's manifest. Observed/verified file evidence retains its full
+attachment, capture and current file-association requirements.
+
+This is needed for the 409,438 frozen appearances with neither a media ID nor
+position, and for other appearances whose download counters cannot establish
+source order. The repository retains uncertain provenance without manufacturing
+captures, attachment IDs, positions, galleries or playable library records.
+Evidence alone cannot select media or change performer attribution. A bounded
+post lookup includes both general and attachment-specific associations.
+
+Foreign keys enforce post scope even for direct SQL writes. Nullable scope
+fields remain immutable; added provenance is separate evidence. A single insert
+advances post/attachment review revisions atomically, while exact replay leaves
+them unchanged. Forgotten posts reject new evidence but retain historical
+replay. Archive UUID adoption and merge/deletion history remain supported.
+
+Focused SQLite tests passed in 35.192 seconds and ingestion tests in 57.277
+seconds. They cover unknown scope, multiple posts using one image, targeted
+pagination, invalid references, replay, retirement, nullable-field mutation,
+atomic rollback after a revision-trigger failure, preserved UUID adoption,
+source-choice protection, and real schema-1000035 migration with populated
+attachment evidence. Startup rejects corrupt scope before modifying the file.
+
+The isolated 10,486,972,416-byte attachment rehearsal copy promoted to schema
+1000036 in 252.940 seconds. Migration retains existing evidence IDs, capture
+membership, details, timestamps and review revisions. Independent reconciliation
+passed in 399.685 seconds: all 162 unaffected tables match exactly, the earlier
+migration ledger is retained, integrity is `ok`, and there are no foreign-key
+violations. The result is 10,486,980,608 bytes. This corpus still has zero native
+media-evidence rows; the populated schema-1000035 fixture separately verifies
+conversion of existing attachment evidence. Normal application startup reopened
+the migrated copy successfully in 110.318 seconds.
+
+The required validation set passed. `make validate-fork` completed generation,
+v3 types/format/locales, 528 v3 tests, 71 native operation contracts and 232 Python
+producer tests. Lint identified the unused revision helper replaced by the SQL
+trigger; after its removal, `make lint it` passed with zero lint issues and the
+complete Go suite. The API package took 350.572 seconds, ingestion 477.271
+seconds, and SQLite 484.752 seconds.
+
+Private copies, the independent row-digest verifier, startup helper and
+machine-readable reconciliation are under
+`.local/native-post-media-rehearsal-20261001/`. Logs under
+`/tmp/stash-native-transition` use the `post-media-` prefix, including
+`focused-final.log`, `promotion.log`, `independent-reconciliation.log`,
+`validate-fork.log`, `backend-final.log` and `reopen.log`.
+
+A separate read-only path assessment used the historical `/media/porn/` mount
+against the frozen Stash copy; it did not register or activate a root. Its
+769,643 file rows each have one scene/image owner and no ZIP membership. Of
+778,523 catalog file rows, 769,655 present rows have an exact recorded path and
+size match, while 6,288 present rows have no matching Stash path. Catalog rows
+can repeat a file across catalogs. There are also 1,058 deduplicated rows with
+matching survivor paths/sizes, and 179 converted/source-reference rows with a
+survivor but no retained original size. Other missing/pending/survivor cases
+remain unresolved. This comparison verifies database claims only, not current
+filesystem bytes, availability or hash identity. The assessment passed in
+6.919 seconds and is retained in
+`.local/native-catalog-media-assessment-20261001/path-preflight.json`.
+
+Asset/file binding and appearance import remain the next work, with explicit
+root/path review, ambiguity handling, original state preservation and no
+replay of historical filesystem actions. No catalog appearances have yet been
+associated to native library media by this change. Production and the original
+schema-1000035 rehearsal copy remain untouched.

@@ -199,7 +199,7 @@ func TestIntakePublicationPreservesSourceChoicesAndReportsConflicts(t *testing.T
 						return err
 					}
 					if choice == "ambiguous evidence" {
-						_, err := repo.SourceAttachment.RecordMediaEvidence(ctx, models.SourceMediaEvidence{UUID: uuid.NewString(), AttachmentUUID: attachment.UUID, CaptureUUID: f.receipt.CaptureUUID, MediaUUID: identity.UUID, Basis: "legacy", Details: json.RawMessage(`{}`)})
+						_, err := repo.SourceAttachment.RecordMediaEvidence(ctx, models.SourceMediaEvidence{UUID: uuid.NewString(), PostUUID: attachment.PostUUID, AttachmentUUID: attachment.UUID, CaptureUUID: f.receipt.CaptureUUID, MediaUUID: identity.UUID, Basis: "legacy", Details: json.RawMessage(`{}`)})
 						return err
 					}
 					input.State, input.MediaUUID, input.ExpectedMediaRevision = "linked", identity.UUID, identity.Revision

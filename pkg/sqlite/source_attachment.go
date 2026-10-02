@@ -250,14 +250,6 @@ VALUES (?, ?, ?, ?, ?)`, manifestID, post.UUID, entry.Position, attachment.UUID,
 	return manifest, nil
 }
 
-func bumpSourceAttachment(ctx context.Context, attachment *models.SourceAttachment) error {
-	if _, err := dbWrapper.Exec(ctx, "UPDATE source_attachments SET revision = revision + 1 WHERE uuid = ?", attachment.UUID); err != nil {
-		return err
-	}
-	_, err := dbWrapper.Exec(ctx, "UPDATE source_posts SET revision = revision + 1 WHERE uuid = ?", attachment.PostUUID)
-	return err
-}
-
 func activeAttachmentPost(ctx context.Context, attachment *models.SourceAttachment) error {
 	post, err := (&SourceEvidenceStore{}).FindPost(ctx, attachment.PostUUID)
 	if err != nil {

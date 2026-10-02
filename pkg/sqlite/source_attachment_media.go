@@ -12,10 +12,11 @@ import (
 
 type sourceMediaEvidenceRow struct {
 	UUID           string         `db:"uuid"`
-	AttachmentUUID string         `db:"attachment_uuid"`
-	CaptureUUID    string         `db:"capture_uuid"`
-	ManifestUUID   string         `db:"manifest_uuid"`
-	Position       int            `db:"position"`
+	PostUUID       string         `db:"post_uuid"`
+	AttachmentUUID sql.NullString `db:"attachment_uuid"`
+	CaptureUUID    sql.NullString `db:"capture_uuid"`
+	ManifestUUID   sql.NullString `db:"manifest_uuid"`
+	Position       sql.NullInt64  `db:"position"`
 	MediaUUID      string         `db:"media_uuid"`
 	FileUUID       sql.NullString `db:"file_uuid"`
 	Basis          string         `db:"basis"`
@@ -39,7 +40,7 @@ WHERE c.capture_uuid=? AND e.attachment_uuid=?)`, capture, attachment)
 }
 
 func (r sourceMediaEvidenceRow) resolve() *models.SourceMediaEvidence {
-	ret := &models.SourceMediaEvidence{UUID: r.UUID, AttachmentUUID: r.AttachmentUUID, CaptureUUID: r.CaptureUUID,
+	ret := &models.SourceMediaEvidence{UUID: r.UUID, PostUUID: r.PostUUID, AttachmentUUID: r.AttachmentUUID.String, CaptureUUID: r.CaptureUUID.String,
 		MediaUUID: r.MediaUUID, Basis: r.Basis, Details: json.RawMessage(r.Details), CreatedAt: r.CreatedAt.Timestamp}
 	if r.FileUUID.Valid {
 		ret.FileUUID = &r.FileUUID.String
@@ -95,7 +96,17 @@ func fileBelongsToArchiveMedia(ctx context.Context, media, file *models.ArchiveE
 }
 
 func (s *SourceAttachmentStore) RecordMediaEvidence(ctx context.Context, input models.SourceMediaEvidence) (*models.SourceMediaEvidence, error) {
-	for _, field := range []*string{&input.UUID, &input.AttachmentUUID, &input.CaptureUUID, &input.MediaUUID} {
+	for _, field := range []*string{&input.UUID, &input.PostUUID, &input.MediaUUID} {
+		id, err := archiveUUID(*field)
+		if err != nil {
+			return nil, err
+		}
+		*field = id
+	}
+	for _, field := range []*string{&input.AttachmentUUID, &input.CaptureUUID} {
+		if *field == "" {
+			continue
+		}
 		id, err := archiveUUID(*field)
 		if err != nil {
 			return nil, err
@@ -112,6 +123,10 @@ func (s *SourceAttachmentStore) RecordMediaEvidence(ctx context.Context, input m
 	if input.Basis != "observed-file" && input.Basis != "verified-bytes" && input.Basis != "review" && input.Basis != "legacy" {
 		return nil, errors.New("invalid source media evidence basis")
 	}
+	fileProof := input.Basis == "observed-file" || input.Basis == "verified-bytes"
+	if fileProof && (input.AttachmentUUID == "" || input.CaptureUUID == "" || input.FileUUID == nil) {
+		return nil, errors.New("observed media evidence requires an attachment, capture and file")
+	}
 	details, err := accountEvidenceJSON(input.Details)
 	if err != nil {
 		return nil, err
@@ -127,34 +142,13 @@ func (s *SourceAttachmentStore) RecordMediaEvidence(ctx context.Context, input m
 		if err != nil {
 			return nil, err
 		}
-		if existing.AttachmentUUID != input.AttachmentUUID || existing.CaptureUUID != input.CaptureUUID || existing.Basis != input.Basis || string(existing.Details) != details || !mediaEqual || !fileEqual {
+		if existing.PostUUID != input.PostUUID || existing.AttachmentUUID != input.AttachmentUUID || existing.CaptureUUID != input.CaptureUUID || existing.Basis != input.Basis || string(existing.Details) != details || !mediaEqual || !fileEqual {
 			return nil, models.ErrSourceMediaEvidenceReplay
 		}
 		return existing, nil
 	}
-	attachment, err := s.Find(ctx, input.AttachmentUUID)
+	manifest, position, err := s.mediaEvidenceScope(ctx, input)
 	if err != nil {
-		return nil, err
-	}
-	if attachment == nil {
-		return nil, models.ErrSourceAttachmentConflict
-	}
-	if err := activeAttachmentPost(ctx, attachment); err != nil {
-		return nil, err
-	}
-	manifest, err := s.ManifestForCapture(ctx, input.CaptureUUID)
-	if err != nil {
-		return nil, err
-	}
-	if manifest == nil || manifest.PostUUID != attachment.PostUUID {
-		return nil, errors.New("media evidence requires a capture containing this attachment")
-	}
-	var position int
-	if err := dbWrapper.Get(ctx, &position, `SELECT position FROM source_attachment_entries
-WHERE manifest_uuid = ? AND attachment_uuid = ? ORDER BY position LIMIT 1`, manifest.UUID, attachment.UUID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, errors.New("media evidence attachment is absent from the capture manifest")
-		}
 		return nil, err
 	}
 	identities := &ArchiveEntityStore{}
@@ -175,7 +169,7 @@ WHERE manifest_uuid = ? AND attachment_uuid = ? ORDER BY position LIMIT 1`, mani
 			return nil, errors.New("media evidence requires a file identity")
 		}
 	}
-	if input.Basis == "observed-file" || input.Basis == "verified-bytes" {
+	if fileProof {
 		linked, err := fileBelongsToArchiveMedia(ctx, media, file)
 		if err != nil {
 			return nil, err
@@ -184,17 +178,75 @@ WHERE manifest_uuid = ? AND attachment_uuid = ? ORDER BY position LIMIT 1`, mani
 			return nil, errors.New("observed media evidence requires a current file association")
 		}
 	}
-	if _, err := dbWrapper.Exec(ctx, `INSERT INTO source_media_evidence(uuid, attachment_uuid, capture_uuid, manifest_uuid, position, media_uuid, file_uuid, basis, details)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, input.UUID, attachment.UUID, input.CaptureUUID, manifest.UUID, position, input.MediaUUID, input.FileUUID, input.Basis, details); err != nil {
-		return nil, err
-	}
-	if err := bumpSourceAttachment(ctx, attachment); err != nil {
+	if _, err := dbWrapper.Exec(ctx, `INSERT INTO source_media_evidence(uuid, post_uuid, attachment_uuid, capture_uuid, manifest_uuid, position, media_uuid, file_uuid, basis, details)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, input.UUID, input.PostUUID,
+		sql.NullString{String: input.AttachmentUUID, Valid: input.AttachmentUUID != ""},
+		sql.NullString{String: input.CaptureUUID, Valid: input.CaptureUUID != ""},
+		manifest, position, input.MediaUUID, input.FileUUID, input.Basis, details); err != nil {
 		return nil, err
 	}
 	return findSourceMediaEvidence(ctx, input.UUID)
 }
 
+// Validate only the evidence actually supplied. Legacy appearances do not
+// establish a capture or source order just because their post has captures.
+func (s *SourceAttachmentStore) mediaEvidenceScope(ctx context.Context, input models.SourceMediaEvidence) (*string, *int, error) {
+	post, err := (&SourceEvidenceStore{}).FindPost(ctx, input.PostUUID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if post == nil || post.State != "active" {
+		return nil, nil, models.ErrSourcePostForgotten
+	}
+	if input.AttachmentUUID != "" {
+		attachment, err := s.Find(ctx, input.AttachmentUUID)
+		if err != nil {
+			return nil, nil, err
+		}
+		if attachment == nil || attachment.PostUUID != post.UUID {
+			return nil, nil, models.ErrSourceAttachmentConflict
+		}
+	}
+	if input.CaptureUUID != "" {
+		var capturePost string
+		if err := dbWrapper.Get(ctx, &capturePost, "SELECT post_uuid FROM source_captures WHERE uuid=?", input.CaptureUUID); err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return nil, nil, err
+		}
+		if capturePost != post.UUID {
+			return nil, nil, errors.New("media evidence capture belongs to another post or is missing")
+		}
+	}
+	if input.AttachmentUUID == "" || input.CaptureUUID == "" {
+		return nil, nil, nil
+	}
+	manifest, err := s.ManifestForCapture(ctx, input.CaptureUUID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if manifest == nil || manifest.PostUUID != post.UUID {
+		return nil, nil, errors.New("media evidence requires a capture containing this attachment")
+	}
+	var position int
+	if err := dbWrapper.Get(ctx, &position, `SELECT position FROM source_attachment_entries
+WHERE manifest_uuid=? AND attachment_uuid=? ORDER BY position LIMIT 1`, manifest.UUID, input.AttachmentUUID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil, errors.New("media evidence attachment is absent from the capture manifest")
+		}
+		return nil, nil, err
+	}
+	return &manifest.UUID, &position, nil
+}
+
 func (s *SourceAttachmentStore) MediaEvidence(ctx context.Context, value, after string, limit int) ([]models.SourceMediaEvidence, error) {
+	return sourceMediaEvidencePage(ctx, "attachment_uuid", value, after, limit)
+}
+
+// PostMediaEvidence includes both post-only and attachment-specific evidence.
+func (s *SourceAttachmentStore) PostMediaEvidence(ctx context.Context, value, after string, limit int) ([]models.SourceMediaEvidence, error) {
+	return sourceMediaEvidencePage(ctx, "post_uuid", value, after, limit)
+}
+
+func sourceMediaEvidencePage(ctx context.Context, column, value, after string, limit int) ([]models.SourceMediaEvidence, error) {
 	id, err := archiveUUID(value)
 	if err != nil {
 		return nil, err
@@ -210,7 +262,7 @@ func (s *SourceAttachmentStore) MediaEvidence(ctx context.Context, value, after 
 		return nil, err
 	}
 	var rows []sourceMediaEvidenceRow
-	if err := dbWrapper.Select(ctx, &rows, "SELECT * FROM source_media_evidence WHERE attachment_uuid = ? AND uuid > ? ORDER BY uuid LIMIT ?", id, after, limit); err != nil {
+	if err := dbWrapper.Select(ctx, &rows, "SELECT * FROM source_media_evidence WHERE "+column+" = ? AND uuid > ? ORDER BY uuid LIMIT ?", id, after, limit); err != nil {
 		return nil, err
 	}
 	ret := make([]models.SourceMediaEvidence, 0, len(rows))

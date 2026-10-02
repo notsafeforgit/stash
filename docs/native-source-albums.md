@@ -43,6 +43,14 @@ evidence, use a verified retained source list where available, or offer review.
 Other extractors can supply the existing typed attachment-manifest contract;
 this parser does not assume their file counters have post-level semantics.
 
+The native association repository can retain a post-to-media link even when no
+ordered list survives. Schema 1000036 permits legacy/review evidence without an
+attachment or capture reference, and retains only the references actually known.
+This preserves reposts and older catalog appearances without duplicating media
+or inventing a capture, attachment ID, or album position. Such evidence does not
+automatically select attachment media or create an album. Automatic galleries
+still require a supported source list and appropriate media associations.
+
 ## Ordering and incomplete downloads
 
 Manifest completeness means every source slot has an identity. It says nothing

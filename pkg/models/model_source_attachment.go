@@ -53,8 +53,13 @@ type SourceAttachmentManifestEntry struct {
 
 // Evidence identifies a candidate association. Recording it does not assign
 // performers, choose a preferred media entity, or create library records.
+// PostUUID is required. Legacy/review evidence may omit AttachmentUUID and/or
+// CaptureUUID when the retained evidence does not establish them. When both
+// are supplied, the capture must contain that attachment. File-proof evidence
+// always requires both; a post-only association cannot establish album order.
 type SourceMediaEvidence struct {
 	UUID           string
+	PostUUID       string
 	AttachmentUUID string
 	CaptureUUID    string
 	MediaUUID      string
@@ -102,6 +107,7 @@ type SourceAttachmentReaderWriter interface {
 	Lookup(context.Context, string, SourcePostIdentifier) (*SourceAttachment, error)
 	RecordMediaEvidence(context.Context, SourceMediaEvidence) (*SourceMediaEvidence, error)
 	MediaEvidence(context.Context, string, string, int) ([]SourceMediaEvidence, error)
+	PostMediaEvidence(context.Context, string, string, int) ([]SourceMediaEvidence, error)
 	DecideMedia(context.Context, AttachmentMediaDecisionInput) (*AttachmentMediaDecision, error)
 	MediaDecision(context.Context, string) (*AttachmentMediaDecision, error)
 	MediaDecisionHistory(context.Context, string, int, int) ([]AttachmentMediaDecision, error)

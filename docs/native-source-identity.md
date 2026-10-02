@@ -663,3 +663,53 @@ membership rows have no timestamp: the snapshot capture time describes when
 the evidence was retained, without inventing when the post joined the group.
 The result remains `imported:false` pending other catalog families and final
 reconciliation. Backups include the new records; anonymisation removes them.
+
+## Matching imported media to source albums
+
+The core `SourceGallery.PreviewBackfill` service operates on one post's selected
+attachment list. It proposes media choices and shows the resulting gallery
+membership without writing. The post UUID identifies the album; the selected
+source manifest supplies attachment positions, including repeated attachments
+and missing slots. Folder labels, filenames and download counters cannot create
+an album or determine its order.
+
+Callers must choose a matching policy explicitly:
+
+| Policy | Accepted historical evidence |
+|---|---|
+| `source-identifiers-v1` | A retained qualified Reddit or Twitter media ID equal to the typed attachment ID, plus an imported file match for the same post |
+| `legacy-reddit-filename-v1` | The identifier policy, plus the original Reddit `post-id_media-id_...` or `post-id_media-id.ext` filename convention when no explicit media ID was retained |
+
+The filename policy checks both IDs against existing native post/attachment
+records. It uses the original file observation, which can differ from the
+surviving file after deduplication or conversion. A conflicting or malformed
+explicit ID suppresses filename fallback. Unsupported namespaces and delegated
+media services cannot borrow another service's identifier convention.
+
+Proofs reference the original post-media evidence, file observation and file
+match. Current library file generations, ZIP archive generations and unique
+scene/image ownership are revalidated. A historical path match remains legacy
+evidence; it does not add a verified content digest or assert fresh filesystem
+verification. Multiple proofs for the same canonical media UUID form one
+candidate. Different candidates, changed files/ownership and media-kind conflicts
+remain review items. Existing attachment evidence also participates in ambiguity
+detection. Bounded queries fail explicitly if they cannot inspect the complete
+candidate set.
+
+Every existing attachment decision is preserved, including explicit unlinks
+and deliberately undecided reviews. For unresolved attachments, a unique current
+file-backed candidate can be proposed. Applying the exact preview signature
+records attachment-specific legacy evidence and a migration decision together
+with gallery sync. It does not manufacture a capture association. Ambiguous and
+unavailable attachments remain gaps, and the shared gallery service preserves
+manual membership, exclusions, cover choices, metadata and deletion suppression.
+
+`Backfill` requires a managed write transaction. It rechecks the preview before
+writing and revalidates the selected file proofs and resulting gallery before
+commit. A partial failure cannot commit even if its caller swallows the error.
+A fresh preview after successful application is a no-op for those choices and
+reuses the same gallery. The application must checkpoint the publication result
+with durable after-success notifications before exposing an Apply endpoint.
+That worker/API and its UI are still pending; this increment provides the core
+service and isolated-copy migration rehearsal, without changing schema 1000039
+or migrating the live library.

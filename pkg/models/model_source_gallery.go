@@ -82,5 +82,9 @@ type SourceGalleryReaderWriter interface {
 	DecideAssociation(context.Context, SourceGalleryChoiceInput) (*SourceGalleryDecision, error)
 	Preview(context.Context, string) (*SourceGalleryPreview, error)
 	Sync(context.Context, string, string) (*SourceGallerySyncResult, error)
+	PreviewBackfill(context.Context, string, string) (*SourceAlbumBackfillPreview, error)
+	// Backfill requires a managed write transaction. Its caller must checkpoint
+	// the result with durable after-success work before committing publication.
+	Backfill(context.Context, string, string, string) (*SourceAlbumBackfillResult, error)
 	MembershipHistory(context.Context, string, int, int) ([]GalleryMembershipEvent, error)
 }

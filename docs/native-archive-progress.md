@@ -3149,3 +3149,71 @@ including `promotion.log`, `full-import.log`, `independent-reconciliation.log`,
 Source gallery construction, remaining catalog families, native UI and the
 other transition phases remain open. No live migration, source activation,
 production deployment or develop merge was performed.
+
+## Imported media matching for source albums
+
+The native gallery service now previews and applies attachment-to-media
+associations from an individual post's imported file evidence. Callers choose
+qualified retained media IDs or explicitly enable the historical Reddit
+`post-id_media-id` filename convention. Matching uses original observations,
+including those whose files were deduplicated or converted, and validates the
+current library file generations and unique ownership. It never takes album
+identity or source order from a filename, folder or download counter.
+
+Duplicate catalog proofs share one media candidate. Existing attachment choices,
+including explicit unlinks and undecided reviews, are preserved. Ambiguous
+candidates, changed files/ownership and media-kind conflicts remain unresolved.
+The complete bounded candidate set participates in preview validation. Applying
+the signature records legacy attachment evidence without invented captures,
+selects supported media, and uses the existing gallery sync service in one
+managed transaction. Manual membership/exclusions, cover and metadata choices,
+source gaps, repeated attachments and deletion suppression remain intact.
+Pre-commit validation and an atomic-completion guard prevent partial publication.
+
+Focused gallery, file and media SQLite tests passed in 17.798 seconds. The new
+cases cover original-versus-survivor paths, explicit Reddit/Twitter IDs, service
+qualification, malformed/conflicting IDs, filename boundaries, duplicate proofs,
+missing slots, existing decisions, ambiguous ownership, stale previews, forgotten
+posts, disabled selections, manual exclusions, deletion, candidate limits,
+restart replay and injected/late-write rollback. Generation, all v3 checks
+(528 tests in 91 files plus 71 native contracts), all 238 producer tests and Go
+lint passed. The complete Go integration suite passed with the prepared producer
+runtime: API 325.452 seconds, ingestion 448.220 seconds and SQLite 477.203 seconds.
+
+An isolated copy of the fully imported schema-1000039 library was previewed and
+applied with the explicit historical Reddit policy. Of 1,091 selected posts,
+559 were evidenced albums and 532 were ineligible single-media posts. The core
+created 559 logical galleries, selected 1,253 attachments and added 1,253 gallery
+memberships, with zero ambiguous candidates and zero removals. Another 1,201
+album attachments remain unselected because the retained evidence did not
+establish a usable match.
+All posts previewed in 5.198 seconds; application took 13.236 seconds. The whole
+rehearsal took 589.541 seconds, including normal startup under concurrent test
+load (391.272 seconds), reopening (176.324 seconds), and verifying that replay
+reuses every gallery without another membership or media decision.
+
+Independent reconciliation passed in 275.015 seconds. It rederives the matches
+from the original observations and post/attachment IDs, checks every new proof
+and decision, and verifies ordered source slots, gallery metadata and actual
+memberships. The 1,504 new legacy proofs retain their original evidence links
+without invented capture membership. All 159 unaffected tables match exactly;
+existing records in the changed tables also remain intact. All 3,316 post and
+2,757 attachment revision increments are accounted for. Integrity is `ok` and
+foreign-key violations are zero. The resulting copy is 14,488,055,808 bytes.
+
+The memberships comprise 1,240 images and 13 scenes. Of the 559 galleries, 266
+have matches for every retained attachment, 42 have some matches, and 251 have
+none yet. Empty source albums retain their known manifests and metadata without
+inventing playable entries. This is distinct from proving that every source
+attachment has downloaded or that the source list itself is complete.
+
+Private copies, previews, results, helpers and independent reports are under
+`.local/native-source-album-rehearsal-20261002/`. Logs under
+`/tmp/stash-native-transition` use the `album-backfill-` prefix: `focused.log`,
+`validation.log`, `backend.log`, `rehearsal.log` and
+`reconciliation-final.log`.
+
+The public Apply workflow, durable hook checkpoint/worker, native UI and remaining
+transition phases still need implementation. This increment adds no schema
+migration and does not expose an HTTP mutation. The original imported copy,
+production deployment, source activation and develop remain unchanged.

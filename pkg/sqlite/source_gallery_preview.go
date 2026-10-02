@@ -86,6 +86,7 @@ WHERE h.gallery_uuid = ? ORDER BY h.media_uuid LIMIT ?`, id, maxSourceGalleryMem
 
 type sourceAlbumMediaChoice struct {
 	AttachmentUUID string         `db:"attachment_uuid"`
+	DecisionUUID   string         `db:"decision_uuid"`
 	State          string         `db:"state"`
 	MediaUUID      sql.NullString `db:"media_uuid"`
 }
@@ -104,7 +105,7 @@ func sourceAlbumChoices(ctx context.Context, selection *models.AttachmentSelecti
 		args = append(args, id)
 	}
 	var rows []sourceAlbumMediaChoice
-	if err := dbWrapper.Select(ctx, &rows, `SELECT d.attachment_uuid, d.state, d.media_uuid FROM attachment_media_links l
+	if err := dbWrapper.Select(ctx, &rows, `SELECT d.attachment_uuid, d.uuid AS decision_uuid, d.state, d.media_uuid FROM attachment_media_links l
 JOIN attachment_media_decisions d ON d.attachment_uuid = l.attachment_uuid AND d.uuid = l.decision_uuid
 WHERE l.attachment_uuid IN `+getInBinding(len(args)), args...); err != nil {
 		return nil, err
@@ -169,6 +170,12 @@ func finishSourceGalleryPreview(ret *models.SourceGalleryPreview) (*models.Sourc
 }
 
 func (s *SourceGalleryStore) Preview(ctx context.Context, value string) (*models.SourceGalleryPreview, error) {
+	return s.previewWithMediaChoices(ctx, value, nil)
+}
+
+// Proposed choices exist only in a read-only backfill preview. Normal sync
+// always reads the actual persisted decisions.
+func (s *SourceGalleryStore) previewWithMediaChoices(ctx context.Context, value string, proposed map[string]sourceAlbumMediaChoice) (*models.SourceGalleryPreview, error) {
 	post, err := (&SourceEvidenceStore{}).FindPost(ctx, value)
 	if err != nil {
 		return nil, err
@@ -257,6 +264,12 @@ func (s *SourceGalleryStore) Preview(ctx context.Context, value string) (*models
 	choices, err := sourceAlbumChoices(ctx, selection)
 	if err != nil {
 		return nil, err
+	}
+	for id, choice := range proposed {
+		if _, exists := choices[id]; exists {
+			return nil, models.ErrSourceGalleryConflict
+		}
+		choices[id] = choice
 	}
 	var members []sourceGalleryMember
 	var heads []galleryMembershipEventRow

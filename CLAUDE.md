@@ -438,6 +438,21 @@ historical definition revisions, labels and original receipts; later native
 renames or retirement do not rewrite membership evidence. Do not activate
 scrapes, infer URLs or create galleries from these group labels.
 
+`SourceGallery.PreviewBackfill` proposes attachment-to-media choices from the
+selected post's imported appearance/file evidence. `source-identifiers-v1`
+requires qualified retained Reddit/Twitter media IDs; the explicit
+`legacy-reddit-filename-v1` policy also accepts the original Reddit
+`post-id_media-id_...` filename convention. Filenames never establish album
+identity or order. Preserve every existing attachment decision, including a
+deliberately undecided review. Ambiguous candidates, changed file generations,
+changed ownership and media-kind disagreements remain unresolved. A bounded
+query must fail rather than present a truncated candidate set as unique.
+The managed-transaction `Backfill` method validates its preview, records legacy
+attachment evidence without fabricated captures, and calls the shared gallery
+sync service. Its caller must checkpoint publication with durable after-success
+work before exposing an Apply operation. That application worker/API is still
+pending; the core method is currently exercised on isolated rehearsal copies.
+
 ### v3 extension points
 
 See `ui/v3/docs/architecture.md` for the current module map and compatibility rules. List configurations require a discriminated GraphQL/local `source`; generated query variables remain typed through the data hook. Layout, preferences, query state, and cache refill live in separate list modules. Player transition policy consumes plain buffered/seekable state in `scene-player-transitions.ts`; media effects, recovery, and transcode leases are separate hooks. Keep the stable player root and existing iOS seek/timeline behavior when extending these modules.

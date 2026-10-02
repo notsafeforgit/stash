@@ -3435,3 +3435,85 @@ The resumable catalog-document importer, native document UI, remaining catalog
 families, caller conversion, activation, coordinated backup/restore and final
 cutover reconciliation remain open. Production data, deployments, source jobs
 and develop remain unchanged.
+
+## Resumable retained catalog document import
+
+Schema 1000042 adds a bounded document-import pass and immutable per-row
+receipts. The supported `stash-import-catalog-documents` command uses the native
+application API after the received snapshot's evidence pass. It maps normalized
+documents and path associations, or the older flat sidecar format, before
+selected-head rows. Original bytes, exact parser evidence, literal paths and
+source timestamp spelling survive. Shared documents reuse one byte body and
+interpretation while preserving each collection/path/post association.
+
+Explicit historical heads take precedence. A path without one retains the
+legacy reader's timestamp-text/hash ordering as a labeled `legacy_fallback`
+claim. Invalid explicit heads require review. The importer preserves existing
+native choices, including manual unlinks, and retains conflicting historical
+claims for inspection. Associations retain the registry-created collection
+revision even after later renaming, root binding or retirement. Importing
+evidence advances post review revisions without applying entity metadata,
+changing performer ownership, creating library media or constructing galleries.
+
+Each transaction processes at most 50 records with a 16 MiB batch threshold.
+The processed-record checkpoint commits with domain facts and receipts. A
+restarted client reads saved progress after a lost response, and completed
+replays issue no further writes. Startup validates phase coverage, counts and
+native reference scope. Bounded API summaries keep large original values in
+individual record responses. Anonymised exports clear the new private receipts.
+Every completed pass still reports `imported:false` pending the remaining
+families and final reconciliation.
+
+Focused tests cover dependency-phase resume, rollback after a receipt failure,
+shared bytes, exact source values, invalid timestamp review, forgotten posts,
+write/checkpoint guards, renamed collections, manual unlinks and later review
+changes. The HTTP test runs actual Python preparation/upload/import through
+the Go API, loses a committed batch response, replays completion, checks copied
+catalogs, and imports real v1 flat storage and an empty document family.
+Python receipt checks reject changed bindings, phase regression, stalled
+progress and false completion. Python 3.12 validation and package installation
+also pass.
+
+Backend generation, v3 validation (528 tests in 91 files and 71 native operation
+contracts), all 251 producer tests and Go lint passed. The full Go suite passed:
+API 357.549 seconds, ingestion 468.535 seconds and SQLite 521.282 seconds.
+
+An isolated 14,491,320,320-byte schema-41 copy was made in 49.179 seconds.
+Promotion to schema 1000042 passed in 587.242 seconds while the full test suite
+was also running. All 1,697 frozen catalogs then mapped successfully in 23,350
+bounded transactions: 1,104,088 source rows and zero review outcomes. The pass
+retained 272,556 shared documents, 415,919 path associations and 415,613 explicit
+head claims/selections, including 1,358 associations without a post. The shared
+original bytes total 81,558,266 before compression. Completed receipt replay
+after reopening passed; reopening took 242.983 seconds, and import plus reopen
+and replay took 1,196.500 seconds.
+
+Independent reconciliation passed in 271.930 seconds. Fresh row fingerprints
+for all 172 unrelated data tables match the preceding baseline's verified
+fingerprints. Every physical catalog document/source/head row matches its
+original frozen SQLite values, including binary content, exact parser text,
+paths, times, post mappings, historical collection revisions and native
+decisions. Native byte hashes and document identities were checked independently
+of the Go reader. The only changes to pre-existing post rows are the expected
+1,243,071 review-revision increments. Earlier migration history and sequence
+values are preserved. Integrity is `ok`, with zero foreign-key violations.
+The resulting isolated database is 16,420,761,600 bytes.
+
+Private helpers, receipts, copy metadata and independent reports are under
+`.local/native-catalog-documents-rehearsal-20261002/`. Logs under
+`/tmp/stash-native-transition` use the `catalog-documents-` prefix:
+`focused.log`, `generation.log`, `backend.log`, `validation.log`, `package.log`,
+`python312.log`, `promotion.log`, `rehearsal.log` and `reconciliation.log`.
+
+For rehearsal space, two older generated database copies were compressed and
+their decompressed SHA-256 digests verified before removing the redundant raw
+files. The membership rehearsal changed from 14,483,116,032 to 3,183,657,884
+bytes; the album-job rehearsal changed from 14,489,649,152 to 3,185,332,761
+bytes. Their `.sqlite.zst` archives, checksum reports and original verification
+artifacts remain in their respective private rehearsal directories. The
+schema-41 baseline and original frozen catalog inputs remain available.
+
+Native document/album review UI, translations, remaining catalog families,
+caller conversion, activation, coordinated backup/restore and final cutover
+reconciliation remain open. This checkpoint imports only isolated copies;
+production data, deployments, source jobs and develop remain unchanged.

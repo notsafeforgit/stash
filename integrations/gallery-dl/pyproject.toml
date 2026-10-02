@@ -35,6 +35,7 @@ stash-import-catalog-publishers = "stash_ingest.catalog_publisher_import:main"
 stash-import-catalog-attachments = "stash_ingest.catalog_attachment_import:main"
 stash-import-catalog-media = "stash_ingest.catalog_media_import:main"
 stash-import-catalog-memberships = "stash_ingest.catalog_membership_import:main"
+stash-import-catalog-documents = "stash_ingest.catalog_document_import:main"
 stash-backfill-source-albums = "stash_ingest.album_backfill:main"
 
 [tool.setuptools.packages.find]

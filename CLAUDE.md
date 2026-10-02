@@ -384,7 +384,14 @@ head claims and guarded native selections. Preserve malformed and empty source
 documents, unknown fields and explicit unlinks. Historical paths never authorize
 filesystem reads. Application document routes expose bounded associations and
 separate byte downloads; selecting a head does not apply entity metadata.
-The catalog-document importer and native UI remain separate transition work.
+`stash-import-catalog-documents` maps frozen catalog rows through these services
+in schema 1000042 after the evidence pass. It retains explicit selected heads,
+or the historical reader's text-timestamp/hash fallback where no head exists.
+Import receipts and the processed-record checkpoint commit with each bounded
+batch. Preserve existing native choices, the original collection revision and
+exact document bytes; paths do not authorize filesystem access. This pass does
+not apply scene/image metadata or complete the whole catalog migration.
+Native document UI remains separate transition work.
 See [retained documents](docs/native-schema.md#retained-source-documents).
 
 `stash-import-catalog-relations` advances a received snapshot after its evidence

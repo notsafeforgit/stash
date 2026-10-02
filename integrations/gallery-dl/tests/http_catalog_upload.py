@@ -20,6 +20,7 @@ from stash_ingest.catalog_publisher_import import CatalogPublisherClient, main a
 from stash_ingest.catalog_attachment_import import CatalogAttachmentClient, main as attachment_main
 from stash_ingest.catalog_media_import import main as media_main
 from stash_ingest.catalog_membership_import import CatalogMembershipClient, main as membership_main
+from stash_ingest.catalog_document_import import CatalogDocumentClient, main as document_main
 from stash_ingest.encoding import digest, encode
 from test_catalog_registry_import import registry_fixture
 from test_catalog_snapshot import CATALOG_ID, CAPTURED, catalog_fixture
@@ -33,6 +34,8 @@ def run():
     with closing(sqlite3.connect(registry_path)) as db, db:
         db.execute("INSERT INTO catalogs VALUES(?,?,?,?,?,?)", (CATALOG_ID, "collection", "Historical album", "directory:Historical album", CAPTURED, None))
         db.execute("INSERT INTO catalogs VALUES(?,?,?,?,?,?)", ("c_" + "2" * 32, "collection", "Copied evidence", "directory:Copied evidence", CAPTURED, None))
+        for number in (3, 4):
+            db.execute("INSERT INTO catalogs VALUES(?,?,?,?,?,?)", ("c_" + str(number) * 32, "collection", f"Old documents {number}", f"directory:Old documents {number}", CAPTURED, None))
     parent = execute(identity_main, ["--registry", str(registry_path), "--source", setup["source"], "--snapshot", str(uuid.uuid4()),
                                     "--captured-at", identities["captured_at"], "--namespace", "stash", "--endpoint", setup["endpoint"]])
     parent_file = directory / "parent.json"
@@ -66,6 +69,7 @@ def run():
             db.execute("INSERT INTO assets(asset_id,created_at) VALUES(?,?)", (asset, CAPTURED))
             db.execute("INSERT INTO files(relpath,asset_id,state,first_observed,role) VALUES(?,?,'missing',?,'local')", (path, asset, CAPTURED))
             db.execute("INSERT INTO appearances(post_key,attachment_key,asset_id,source_relpath) VALUES('reddit:post:album',?,?,?)", (path, asset, path))
+            db.execute("INSERT INTO sidecar_sources SELECT ?,content_sha256,document_id,'reddit:post:album',? FROM sidecar_documents WHERE document_id=1", (f"literal\\folder/{index}.nfo", CAPTURED))
     original = source.read_bytes()
     snapshot = directory / "snapshot"
     with patch("stash_ingest.catalog_snapshot.MAX_CHUNK_ROWS", 2):
@@ -118,6 +122,10 @@ def run():
     membership = execute(membership_main, args)
     assert membership == execute(membership_main, args)
     assert membership["state"] == "mapped" and membership["mapped_records"] == 55 and membership["imported"] is False
+    execute(document_main, args, 1)  # Bounded document transaction committed; response lost.
+    documents = execute(document_main, args)
+    assert documents == execute(document_main, args)
+    assert documents["state"] == "mapped" and documents["mapped_records"] == 58 and documents["imported"] is False
     assert source.read_bytes() == original
 
     # Another physical catalog retains copied events and one differing payload
@@ -141,6 +149,42 @@ def run():
     assert copied_attachments["mapped_records"] == 55 and copied_attachments["unavailable_records"] == 1
     assert copied_attachments["changed_selections"] == 0
     assert execute(membership_main, copied_args)["mapped_records"] == 55
+    assert execute(document_main, copied_args)["mapped_records"] == 58
+    document_client = CatalogDocumentClient(setup["endpoint"])
+    document_rows = document_client.request("GET", f"/{setup['snapshot']}/document-import/records", None, prepared["manifest_sha256"], "application/json")
+    copied_documents = document_client.request("GET", f"/{copied_snapshot}/document-import/records", None, copied["manifest_sha256"], "application/json")
+    assert len(document_rows) == len(copied_documents) == 58
+    document_id = document_rows[0]["document_uuid"]
+    assert {row["document_uuid"] for row in document_rows + copied_documents} == {document_id}
+    sources = {row["source_uuid"] for row in document_rows if "source_uuid" in row}
+    assert len(sources) == 57 and sources.isdisjoint(row.get("source_uuid") for row in copied_documents)
+    assert sum(row["selection_basis"] == "legacy_fallback" for row in document_rows) == 57
+    detail = document_client.request("GET", f"/{setup['snapshot']}/document-import/records/{document_rows[0]['ordinal']}", None, prepared["manifest_sha256"], "application/json")
+    assert detail["source_values"]["raw_content"] == {"sqlite_blob_base64": "b3JpZ2luYWwA/2RvY3VtZW50"}
+    # Read actual v1 flat storage and an empty document family through the same API.
+    for number in (3, 4):
+        flat_source = directory / f"flat-{number}.sqlite"
+        catalog_fixture(flat_source, version=1, normalized=False)
+        with closing(sqlite3.connect(flat_source)) as db, db:
+            db.execute("UPDATE catalog_info SET value=? WHERE key='id'", ("c_" + str(number) * 32,))
+            if number == 4:
+                db.execute("DELETE FROM sidecars")
+        flat_original = flat_source.read_bytes()
+        flat_snapshot = str(uuid.uuid4())
+        flat = prepare(flat_source, directory / f"flat-{number}", flat_snapshot, setup["source"], CAPTURED)
+        flat_args = ["--snapshot", str(directory / f"flat-{number}"), "--endpoint", setup["endpoint"], "--expected-sha256", flat["manifest_sha256"]]
+        execute(main, flat_args)
+        execute(document_main, flat_args, 1)  # Evidence mapping is a required predecessor.
+        assert execute(evidence_main, flat_args)["state"] == "mapped"
+        result = execute(document_main, flat_args)
+        assert result["state"] == "mapped" and result["processed_records"] == (1 if number == 3 else 0)
+        assert result == execute(document_main, flat_args)
+        rows = document_client.request("GET", f"/{flat_snapshot}/document-import/records", None, flat["manifest_sha256"], "application/json")
+        if number == 3:
+            assert rows[0]["document_uuid"] == document_id and rows[0]["selection_basis"] == "legacy_fallback"
+        else:
+            assert rows == []
+        assert flat_source.read_bytes() == flat_original
     memberships = CatalogMembershipClient(setup["endpoint"])
     original_members = memberships.request("GET", f"/{setup['snapshot']}/membership-import/records", None, prepared["manifest_sha256"], "application/json")
     copied_members = memberships.request("GET", f"/{copied_snapshot}/membership-import/records", None, copied["manifest_sha256"], "application/json")

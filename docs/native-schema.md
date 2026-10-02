@@ -961,8 +961,44 @@ from the current native selection.
 
 These records live inside the normal library database and its SQLite snapshots.
 Anonymised exports remove all six tables' contents. The coordinated producer
-backup, portable export, UI and catalog-document import are subsequent parts of
-the transition; applying this schema alone has not imported old NFO catalogs.
+backup, portable export and UI remain subsequent parts of the transition.
+Applying this schema alone has not imported old NFO catalogs.
+
+### Historical document import
+
+Schema 1000042 adds `catalog_document_imports` and immutable per-row
+`catalog_document_records`. The application-authorized
+`stash-import-catalog-documents` command requires a received frozen snapshot and
+a completed evidence pass. It processes normalized documents, their path
+associations (or older flat sidecar rows), then explicit selected heads. Each
+transaction processes at most 50 rows, with a 16 MiB batch threshold. It commits
+domain facts and receipts together. Resume uses the **processed-record count**;
+the source ordinal resets between dependency phases.
+
+Original bytes and parser interpretations are shared across catalogs while
+collection/path/post associations remain distinct. The imported association
+refers to the registry-created collection revision 1, even if that collection
+has since been renamed, bound to a root, or retired. The importer reads retained
+snapshot data; it does not open media or NFO paths. Invalid native interpretations
+and missing post mappings retain review receipts with the original staged values.
+
+An explicit historical head takes precedence over the legacy reader's fallback.
+For a path without a head, that fallback orders `captured_at` text descending,
+then the content hash descending. Its claim is labeled `legacy_fallback`; an
+invalid explicit head requires review instead of silently selecting a fallback.
+Existing native selections and explicit unlinks are preserved, with differing
+historical claims retained for review. Later manual changes do not rewrite
+completed import receipts or their original decision references.
+
+Under `/api/v3/archive/catalog-snapshots/{snapshot_uuid}/document-import`,
+`GET` returns progress and `POST` advances with `expected_manifest_sha256` and
+`after`. `GET /records` returns bounded summaries, using source-ordinal `after`
+and a 1–100 `limit`; `GET /records/{ordinal}` includes one original source row.
+Exit 0 means mapped, exit 2 means completed with review outcomes, and exit 1
+means failure or an unavailable response. Completed passes still report
+`imported:false`; other catalog families and final reconciliation remain required.
+Startup verifies phase coverage, counts and native reference scope. Normal
+SQLite backups retain these records; anonymised exports clear them.
 
 ### Document application API
 

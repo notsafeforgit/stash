@@ -205,6 +205,7 @@ func (db *Database) Repository() models.Repository {
 		Ingest:                  &IngestStore{},
 		SourceEvidence:          &SourceEvidenceStore{},
 		SourceDocument:          &SourceDocumentStore{},
+		CatalogDocumentImport:   &CatalogDocumentImportStore{},
 		SourcePostLinks:         &SourcePostLinksStore{},
 		SourceAttachment:        &SourceAttachmentStore{},
 		SourceFile:              &SourceFileStore{},

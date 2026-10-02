@@ -926,6 +926,30 @@ membership evidence is also readable by collection or post. This pass creates
 no albums and continues to report `imported:false` until the remaining families
 and final reconciliation are complete.
 
+Map retained NFO documents and historical selections with schema 1000042:
+
+```sh
+stash-import-catalog-documents --snapshot /migration/prepared/CATALOG_ID \
+  --expected-sha256 MANIFEST_SHA256 --endpoint STASH_ORIGIN
+```
+
+Run the evidence pass first. This command uses the existing Stash application
+API key; no website login or cookie is involved. It retains original document
+bytes, parser results, path/post associations and explicit selected heads.
+Older catalogs without a head at a path keep the original reader's latest
+text-timestamp/hash fallback, recorded as `legacy_fallback`. An invalid explicit
+head requires review. Existing native selections and manual unlinks are
+preserved. No scene/image metadata is applied, and paths are never opened.
+
+The same frozen snapshot and manifest digest resume after interruption. The
+checkpoint is the processed-record count across document/source/head phases.
+Exit 0 means mapped, exit 2 means review outcomes, and exit 1 means a failure or
+unavailable response. Inspect
+`/api/v3/archive/catalog-snapshots/SNAPSHOT_UUID/document-import/records`
+for bounded summaries, or append `/ORDINAL` for original values and native
+references. Completion remains `imported:false` until the entire catalog
+migration and reconciliation have finished.
+
 ## Historical source albums
 
 `stash-backfill-source-albums` uses the native application API to match imported

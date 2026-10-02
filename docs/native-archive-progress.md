@@ -3367,3 +3367,71 @@ Native album review UI, remaining catalog families, caller conversion,
 activation, backup/restore drills and final cutover reconciliation remain open.
 This increment does not migrate live data, activate source jobs, deploy
 production, or merge develop.
+
+## Native retained documents and application inspection
+
+Schema 1000041 adds shared original document bytes, distinct parser
+interpretations, collection/path/post associations, historical selected-head
+claims and revisioned native choices. A single document can serve many paths
+or posts; differing interpretations reuse its content bytes. Empty, malformed
+and repaired NFO input remains evidence with its original parser status,
+warnings and unknown fields. Source times retain their exact spelling and
+precision. Paths remain literal historical evidence, including backslashes and
+unattributed folder defaults; reading them cannot open a server filesystem path.
+
+The application API exposes one document or byte download at a time, with
+indexed bounded post/location association, claim and decision-history pages.
+Selection requires the current revision and exact collection/path/claim scope.
+Explicit unlinks survive later capture or migration attempts. New evidence
+advances post review revisions but creates no media or performer attribution
+and applies no scene/image metadata. These operations use application
+authentication; source producer routes cannot access them.
+
+Core and HTTP tests cover shared bytes, preserved interpretations, empty and
+invalid content, exact replay, conflicting scope, forgotten posts, guarded
+choices, lost edit replies, strict inputs, indexed lookups and restart. The
+normal SQLite backup retains populated document bytes, claims and explicit
+selection history; anonymised exports remove their private content. Startup
+refuses missing guards and corrupted bodies/interpretations without rewriting
+the database. A real schema-40 upgrade preserves existing entities; an injected
+table collision rolls back all new document tables and leaves a dirty migration
+that normal startup refuses.
+
+Backend generation, v3 validation (528 tests in 91 files and 71 native operation
+contracts), all 248 producer tests and Go lint passed. The complete Go suite also
+passed: API 356.100 seconds, ingestion 465.573 seconds and SQLite 520.524 seconds.
+
+A read-only assessment passed all 272,556 documents, 415,919 path associations
+and 415,613 selected-head timestamps from the 1,697 frozen catalog copies.
+This includes 520 invalid, 218 repaired and one empty original document, plus
+1,358 associations with no post. Original hashes, parser JSON, paths and times
+all satisfy the native retention contract. The source already shares 272,556
+distinct byte bodies, totaling 81,558,266 bytes before native compression;
+the new system can preserve those shared references. This assessment imports
+no catalog records.
+
+A fresh 14,491,217,920-byte copy of the preceding album CLI rehearsal was made
+in 40.426 seconds. Promotion from schema 1000040 to 1000041 completed in
+265.576 seconds, including the existing native validation before migration.
+Normal opening of the resulting schema-41 database passed in 173.131 seconds.
+Independent reconciliation passed in 593.804 seconds: all 173 pre-existing data
+tables match exactly, every earlier migration-history row is preserved, and
+only the schema version and one history entry changed. The six new document
+tables remain empty pending the importer. Integrity is `ok`, with zero
+foreign-key violations. The resulting copy is 14,491,320,320 bytes.
+Private copies, assessment and reconciliation helpers/results are under
+`.local/native-documents-rehearsal-20261002/`; logs use the `source-documents-`
+prefix under `/tmp/stash-native-transition`: `generation.log`, `validation.log`,
+`backend.log`, `http.log`, `migration.log`, `backup.log`, `assessment.log`,
+`rehearsal.log`, `reopen.log` and `reconciliation.log`.
+
+To provide rehearsal space, the older schema-39 source-album copy was compressed
+from 14,488,055,808 to 3,184,896,088 bytes. Decompression matched the original
+SHA-256 before the redundant raw copy was removed. Its archive, checksum report
+and original verification artifacts remain in
+`.local/native-source-album-rehearsal-20261002/`.
+
+The resumable catalog-document importer, native document UI, remaining catalog
+families, caller conversion, activation, coordinated backup/restore and final
+cutover reconciliation remain open. Production data, deployments, source jobs
+and develop remain unchanged.

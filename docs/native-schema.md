@@ -920,3 +920,78 @@ Historical collection/root definitions scope every observation, so offline or
 disabled roots can retain evidence without activating workers. Startup checks
 scope, target kinds and canonical relative paths before writes. Normal database
 backups include these tables; anonymised exports remove their private evidence.
+
+## Retained source documents
+
+Migration 1000041 adds native document evidence without creating files, media,
+performers, or selected scene/image metadata. The six tables have distinct roles:
+
+| Table | Meaning |
+| --- | --- |
+| `source_document_contents` | Exact original bytes, shared by SHA-256 and compressed when smaller. Empty and malformed documents are valid retained evidence. |
+| `source_documents` | An immutable parser interpretation: original encoding, parser identifier, parse status, warnings and parsed JSON. Different interpretations can reference the same bytes. |
+| `source_document_sources` | A document observed at a literal historical path in a collection revision, optionally associated with a post. Several paths/posts can share one document. |
+| `source_document_head_claims` | Evidence that a source writer selected a particular document at that location and time. |
+| `source_document_head_decisions` | Revisioned native selection history, including explicit unlinks. |
+| `source_document_heads` | The current decision for each collection/path pair. |
+
+Content is bounded to 16 MiB; parser warnings and results are each bounded to
+4 MiB. JSON must be unambiguous, with valid Unicode and no duplicate object keys.
+The document identity includes exact parser JSON text so an import does not
+silently reserialize, reinterpret, or drop unknown legacy fields. Byte digests
+and interpretation identities are checked when read and during startup.
+Source timestamp spelling and precision are retained; an empty timestamp means
+unknown. Recorded-at timestamps separately identify native receipt time.
+
+Paths are evidence strings, including literal backslashes. These services never
+open the historical path or resolve it against a current filesystem mount.
+Documents without a post remain accessible by collection and path, including
+historical folder defaults. A source path claim alone does not activate a
+metadata policy or assign a performer.
+
+Post/path/source lookups use bounded UUID pagination and indexed queries.
+Selected-head history uses revision pagination. Foreign keys and SQL guards
+check collection revisions, claim scope and contiguous decision history. New
+post evidence cannot resurrect a forgotten post; exact prior evidence can be
+read or replayed. New evidence advances the affected post's review revision.
+Review choices and migration selections cannot be overwritten by later automatic
+captures. Migration cannot replace any existing choice; a reviewer can change
+it by supplying its current revision. Historical head claims remain separate
+from the current native selection.
+
+These records live inside the normal library database and its SQLite snapshots.
+Anonymised exports remove all six tables' contents. The coordinated producer
+backup, portable export, UI and catalog-document import are subsequent parts of
+the transition; applying this schema alone has not imported old NFO catalogs.
+
+### Document application API
+
+The following routes are under `/api/v3/archive`, behind application
+authentication. Producer tokens do not authorize these operations.
+
+| Method and path | Result |
+| --- | --- |
+| `GET /documents/{document_uuid}` | One parser interpretation and content hash/size; no raw bytes. |
+| `GET /documents/{document_uuid}/content` | Exact bytes as an attachment download, including empty or invalid documents. |
+| `GET /document-sources/{source_uuid}` | One original path/post association. |
+| `GET /document-claims/{claim_uuid}` | One historical selected-head assertion. |
+| `GET /posts/{post_uuid}/documents` | That post's document associations, with `after` UUID and `limit`. |
+| `GET /collections/{collection_uuid}/documents?path=...` | Associations at this literal path, with `after` UUID and `limit`. |
+| `GET /collections/{collection_uuid}/document-head?path=...` | Current decision, or `null` if none exists. |
+| `GET /collections/{collection_uuid}/document-head/claims?path=...` | Historical assertions, with `after` UUID and `limit`. |
+| `GET /collections/{collection_uuid}/document-head/history?path=...` | Native decisions, with `after` revision and `limit`. |
+| `PUT /collections/{collection_uuid}/document-head` | Select or explicitly unlink a document, requiring the current revision. |
+
+List limits default to 50 and accept 1–100. Percent-encode the literal path in
+query parameters; it is not a route segment. Association lists reference shared
+document UUIDs without repeating parser results or bytes. Unknown resources
+return 404; a known location with no selection returns `null`.
+
+PUT accepts `relative_path`, `expected_revision` (zero for an undecided location),
+`state` (`linked` or `unlinked`), `source_uuid`, optional `claim_uuid`, and `reason`.
+A linked source must belong to that exact collection/path; a supplied claim must
+refer to that source. Unlink requires empty or omitted source and claim UUIDs.
+The server records origin `review`; callers cannot assert source observations
+through this operation. A stale revision returns 409. After a lost response,
+read the current decision/history before choosing whether another edit is needed.
+Selecting document evidence does not apply its values to a scene or image.

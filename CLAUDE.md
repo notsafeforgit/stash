@@ -378,6 +378,15 @@ capture publisher choices or performer attribution. Keep request replay, forgott
 post guards, revision checks for identifier changes and atomic rollback. Import
 of catalog relationships uses these services through schema 1000033.
 
+`SourceDocument` in schema 1000041 retains shared original document bytes,
+exact parser evidence, literal collection/path/post associations, historical
+head claims and guarded native selections. Preserve malformed and empty source
+documents, unknown fields and explicit unlinks. Historical paths never authorize
+filesystem reads. Application document routes expose bounded associations and
+separate byte downloads; selecting a head does not apply entity metadata.
+The catalog-document importer and native UI remain separate transition work.
+See [retained documents](docs/native-schema.md#retained-source-documents).
+
 `stash-import-catalog-relations` advances a received snapshot after its evidence
 pass, retaining accounts, handle history, post URLs/aliases and unselected
 post/account claims. Frozen registry mappings and original account UUIDs remain

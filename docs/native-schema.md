@@ -1061,7 +1061,7 @@ Application-authenticated routes under `/api/v3/archive` are:
 Post queries accept `after` UUID, `limit` (default 50, range 1–100), optional
 `original_sha256`, and exact `target_language`. Unknown language never matches
 an English filter. These routes retain evidence; they do not select translations
-or replace titles/details. Translation work scheduling and provider/cache state
+or replace titles/details. Translation execution and provider state
 have a separate migration step. Normal SQLite backups include these records;
 anonymised exports clear private translation data.
 
@@ -1091,3 +1091,58 @@ and a 1–100 `limit`; `GET /records/{ordinal}` includes one original row.
 Completed passes remain `imported:false` until the entire migration is reconciled.
 Startup validates receipts against their staged source, result, post and
 collection references and recomputes historical input-hash classifications.
+
+## Translation requests, cache and targets
+
+Schema 1000044 stores work independently of execution-job admission. A large
+historical backlog can retain every target without filling the bounded execution
+queue. `translation_requests` shares exact UTF-8 original text, target language
+and versioned provider/preprocessing policy. Requests preserve whitespace,
+Unicode and control characters; their original-text SHA-256 differs from the
+historical JSON hash. Changing provider behavior requires a new policy identity.
+
+`translation_cache` retains one immutable outcome per request:
+
+- `translated` references a shared `source_translations` result.
+- `unchanged` references the exact original text with a detected source language
+  matching the requested target language. Missing language is insufficient.
+- `no_text` records completion without inventing a translated string, provider
+  or language.
+
+Exact cache replay retains its first provenance and source timestamp. A changed
+outcome conflicts before any new result is stored. The timestamp can be empty
+when the source did not record it; native receipt time remains separate.
+
+`translation_targets` associates a request with a post, title/caption field and
+optional historical collection revision. Each target is `held`, `pending`,
+`completed` or `review`, with priority 0–100 and a `not_before` deadline. Repeated
+retention does not reset scheduling, release held work or reopen completion.
+Explicit schedule edits require the current target revision; every change is
+retained in `translation_target_history`.
+
+Publishing a due pending target atomically records the cache reference and
+post provenance. Multiple targets share the result but keep their own evidence;
+no-text completion creates no translation evidence. A forgotten post retains
+`review` with `post_forgotten` instead of receiving new assertions. Publication
+does not select or overwrite entity fields. Scheduled callers must additionally
+fence the transaction through their durable job lease.
+
+Application-authenticated inspection under `/api/v3/archive` is available at:
+
+| Route | Result |
+| --- | --- |
+| `GET /translation-requests/{request_uuid}` | One request, including its exact original text and policy. |
+| `GET /translation-requests/{request_uuid}/cache` | Its cached outcome/result reference, or `null` while uncached. A missing request returns 404. |
+| `GET /translation-requests/{request_uuid}/targets` | Bounded targets referencing this request. |
+| `GET /posts/{post_uuid}/translation-targets` | Bounded targets for this post. |
+| `GET /translation-targets/{target_uuid}` | One target and its current schedule/completion. |
+| `GET /translation-targets/{target_uuid}/history` | Bounded scheduling and publication history. |
+
+Target lists accept `state`, UUID `after` and `limit` (default 50, range 1–100).
+History uses a revision `after` cursor and the same limits. Summaries reference
+shared requests/results without repeating their text. All these records survive
+ordinary SQLite backup/restore and are removed from anonymised exports.
+
+Execution admission/provider workers, importing the frozen automation queue,
+and native review UI remain separate transition work. These inspection routes
+do not start provider requests or claim the legacy queue has been migrated.

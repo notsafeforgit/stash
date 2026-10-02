@@ -478,6 +478,11 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 				return err
 			}
 		}
+		if version >= NativeSchemaBaseline+44 {
+			if err := validateTranslationWorkSchema(conn); err != nil {
+				return err
+			}
+		}
 
 		return nil
 	}

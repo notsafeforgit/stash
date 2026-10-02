@@ -51,6 +51,7 @@ type Repository struct {
 	SourceEvidence           SourceEvidenceReaderWriter
 	SourceDocument           SourceDocumentReaderWriter
 	SourceTranslation        SourceTranslationReaderWriter
+	TranslationWork          TranslationWorkReaderWriter
 	CatalogTranslationImport CatalogTranslationImportReaderWriter
 	CatalogDocumentImport    CatalogDocumentImportReaderWriter
 	SourcePostLinks          SourcePostLinksReaderWriter

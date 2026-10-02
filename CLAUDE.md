@@ -401,9 +401,19 @@ after the evidence pass, resuming by last source ordinal. Keep the historical
 JSON-based input hash separate from the native original UTF-8 hash. Unknown
 languages do not imply English; conflicting declared hashes retain review
 evidence. Results, provenance and receipts commit together, without applying
-entity metadata or scheduling provider work. Translation jobs/cache state and
-native review UI remain separate transition work. See
+entity metadata or scheduling provider work. See
 [retained translations](docs/native-schema.md#retained-source-translations).
+
+`TranslationWork` in schema 1000044 retains shared versioned requests and cached
+outcomes, with per-post/field targets and immutable scheduling history. Cached
+results do not release held targets or reset retry deadlines. Publication checks
+the target revision, respects its due time and retains separate post provenance;
+it does not apply scene/image metadata. No-text outcomes complete without a
+fabricated translation. Scheduled callers must use the durable job lease to
+fence publication. Bounded application inspection returns references instead of
+repeating text. Execution admission, provider workers, automation import and
+review UI remain transition work. See
+[translation work](docs/native-schema.md#translation-requests-cache-and-targets).
 
 `stash-import-catalog-relations` advances a received snapshot after its evidence
 pass, retaining accounts, handle history, post URLs/aliases and unselected

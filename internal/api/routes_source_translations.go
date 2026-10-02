@@ -17,7 +17,7 @@ func (rs *nativeArchiveRoutes) readTranslation(w http.ResponseWriter, r *http.Re
 		result, err = read(ctx)
 		return err
 	})
-	if errors.Is(err, models.ErrSourceTranslationInvalid) {
+	if errors.Is(err, models.ErrSourceTranslationInvalid) || errors.Is(err, models.ErrTranslationWorkInvalid) {
 		err = ingest.ErrInvalid
 	}
 	if err != nil {

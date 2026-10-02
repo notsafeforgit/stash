@@ -894,8 +894,10 @@ matches require existing server-verified content for the same file generation.
 Exact/survivor matches retain the reviewed historical library mount prefix;
 that prefix does not register or authorize a live filesystem mount.
 Exact-path matches also reject disagreement with a reported size or modification
-time. Survivor matches use the shared asset's size, since a converted input can
-have different bytes and timestamps from its output.
+time, comparing timestamps at the library's persisted whole-second precision
+while retaining the source's original nanoseconds. Survivor matches use the
+shared asset's size, since a converted input can have different bytes and
+timestamps from its output.
 
 New matches require active file identities and current generations. ZIP matches
 also require the current archive identity/generation and its actual member

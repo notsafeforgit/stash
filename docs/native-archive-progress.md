@@ -2989,3 +2989,93 @@ import pass. That importer follows with explicit root/mount bindings and
 per-record receipts; memberships, gallery construction and the remaining
 catalog families still need conversion. No production deployment, live data
 migration, source activation or develop merge was performed.
+
+## Catalog assets, file locations and post appearances
+
+Schema 1000038 adds a resumable catalog media import with immutable root/mount
+bindings and one receipt per original asset, file and appearance. The API and
+`stash-import-catalog-media` client require the frozen manifest digest, logical
+root/revision, collection revision and historical library mount. The root can
+remain disabled and unbound; this mapping grants no live filesystem access.
+Each transaction processes at most 50 records, through assets, files and
+appearances in dependency order. The advance cursor is the processed-record
+count, while receipt inspection uses original source ordinals. Restart and lost
+responses resume committed progress without changing the binding.
+
+Asset rows become shared source claims, preserving their declared digest, size
+and original time. File observations retain the original state, role, path,
+nanosecond modification time, first-observed value and survivor. Exact path
+matches are literal and require agreeing recorded metadata; survivor matching
+uses the asset size. Existing verified hashes can establish content matches,
+but a catalog's declaration never becomes fresh byte verification. ZIP matches
+require actual archive/member identities and both generations. Appearances
+retain post-file evidence even when playable library media is unavailable.
+An association requires a unique current scene/image owner and rechecks the
+matched file generation. Legacy download positions remain evidence rather than
+invented source attachment identities or album order.
+
+The timestamp preflight found 73,920 differences caused entirely by subsecond
+precision: Stash's existing file timestamps were stored at whole-second
+precision. There were no whole-second conflicts. Matching now compares the
+precision actually retained by Stash while preserving every original source
+nanosecond value. Regression coverage separately rejects real time conflicts.
+
+The isolated schema-1000037 copy promoted in 187.705 seconds. All 1,697 frozen
+catalogs then completed the pass in 2,498.429 seconds, including normal startup
+reopening in 200.936 seconds and exact completed-receipt replay. The pass used
+40,522 bounded transactions and accounted for all 1,977,941 input rows:
+
+| Input | Mapped | Unavailable | Review |
+| --- | ---: | ---: | ---: |
+| Assets | 776,976 | 0 | 0 |
+| File locations | 770,843 | 7,631 | 49 |
+| Post appearances | 415,028 | 7,393 | 21 |
+
+Native results are 776,976 shared claims, 778,474 file observations, 770,843
+guarded file matches, 422,421 post-file evidence rows and 415,028 post-to-media
+associations. Unavailable file rows include 211 pending downloads. These are
+historical database matches, not confirmation of current filesystem bytes.
+The original source rows remain retained, including invalid paths and affected
+appearance references requiring review. Forty-nine file paths contain literal
+backslashes rejected by the native relative-path contract; 18 appearances refer
+to those files. Three other appearances still name older path-based assets
+where the same catalog file now names a deduplicated BLAKE3 asset. Those claims
+remain distinct pending reconciliation with the historical dedupe evidence.
+This pass changes no media metadata,
+performer attribution, selected attachments, existing galleries or media files.
+
+Independent reconciliation against the original frozen SQLite catalogs passed
+in 363.477 seconds. It compares every original asset/file/appearance value with
+its staged record and native outcome, verifies deterministic identities and
+exact path/size/time/generation matches against the pre-import library, and
+checks every post/media association against the original unique file owner.
+All 159 unaffected tables and the prior migration ledger match exactly; every
+post revision increment is accounted for. Integrity is `ok` and foreign-key
+violations are zero. The resulting copy is 14,250,086,400 bytes.
+Normal startup with the final, strengthened receipt-scope checks also passed
+in 156.786 seconds (`catalog-media-current-reopen.log`).
+
+Focused SQLite and real HTTP tests passed, including shared claims, converted
+survivors, unavailable media, bounded phase checkpoints, lost responses, replay,
+conflicts, ZIP members, stale generations between phases, rollback after an
+injected receipt failure, startup rejection and anonymisation. Generation, v3
+validation, 528 v3 tests, 71 native contracts and 235 producer tests passed.
+The full producer suite also passed under Python 3.12 (7.072 seconds), and the
+installed package exposes the new CLI. Go lint reported zero issues. The full
+API suite passed in 460.519 seconds; ingestion and SQLite initially reached the
+default ten-minute package deadline while the large import was running. Both
+passed when rerun with a 25-minute package deadline (564.794 and 589.070 seconds),
+with the rest of the full Go suite already passing.
+
+Private copies, import/startup helpers, per-catalog receipts and independent
+reconciliation are under `.local/native-catalog-media-rehearsal-20261001/`.
+Timestamp assessments are under
+`.local/native-catalog-media-assessment-20261001/`. Logs under
+`/tmp/stash-native-transition` use the `catalog-media-` prefix, including
+`promotion.log`, `full-import.log`, `independent-reconciliation.log`,
+`focused-http.log`, `validate-fork.log`, `backend-final.log`,
+`backend-retry.log` and `python312.log`.
+
+Memberships, source gallery construction and remaining catalog families still
+need conversion, so the snapshot's `imported` result remains false. Production,
+source activation and develop remain unchanged.

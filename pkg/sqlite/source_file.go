@@ -287,7 +287,9 @@ func sourceFilePathMatch(input *models.SourceFileMatch, observation *models.Sour
 	if size != nil && *size != file.Base().Size {
 		return models.ErrSourceFileEvidenceInvalid
 	}
-	if input.Basis == "exact-path" && observation.ModifiedAtNS != nil && *observation.ModifiedAtNS != file.Base().ModTime.UnixNano() {
+	// FileStore persists Timestamp values at whole-second precision. Preserve
+	// the source's nanoseconds, but compare only the precision the library kept.
+	if input.Basis == "exact-path" && observation.ModifiedAtNS != nil && time.Unix(0, *observation.ModifiedAtNS).Unix() != file.Base().ModTime.Unix() {
 		return models.ErrSourceFileEvidenceInvalid
 	}
 	prefix := input.LibraryRootPath

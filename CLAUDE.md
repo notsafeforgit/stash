@@ -418,6 +418,17 @@ validate current files. Post-file evidence can retain unavailable appearances
 without inventing attachment/capture scope. Logical roots can remain disabled
 and unbound during migration; a historical mount prefix is not a filesystem grant.
 
+`stash-import-catalog-media` uses schema 1000038 to bind an exact received snapshot
+to a reviewed logical root/revision and historical library mount. Its asset,
+file and appearance phases advance by processed-record count, not source ordinal.
+Native facts and receipts commit atomically in bounded batches. Preserve source
+states, converted survivors, unavailable media and ambiguous candidates. Stash
+file timestamps have whole-second precision; retain original catalog nanoseconds
+without turning precision loss into a conflict. Actual matches must validate
+current file/archive generations and unique media ownership. This pass records
+post associations without inventing attachment order or changing selected
+metadata. Whole-catalog completion and gallery construction remain separate.
+
 ### v3 extension points
 
 See `ui/v3/docs/architecture.md` for the current module map and compatibility rules. List configurations require a discriminated GraphQL/local `source`; generated query variables remain typed through the data hook. Layout, preferences, query state, and cache refill live in separate list modules. Player transition policy consumes plain buffered/seekable state in `scene-player-transitions.ts`; media effects, recovery, and transcode leases are separate hooks. Keep the stable player root and existing iOS seek/timeline behavior when extending these modules.

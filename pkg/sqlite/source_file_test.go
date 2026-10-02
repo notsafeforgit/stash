@@ -194,6 +194,19 @@ func TestSourceFileMatchesCheckLiteralPathsGenerationsAndSurvivors(t *testing.T)
 		LibraryRootPath: "/identity-fixture", Basis: "exact-path", Origin: "migration"}
 	match := recordFileMatch(t, f.repo, input)
 	require.Equal(t, match, recordFileMatch(t, f.repo, input))
+	var storedFiles []models.File
+	require.NoError(t, f.repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		var err error
+		storedFiles, err = f.repo.File.Find(ctx, 21)
+		return err
+	}))
+	fractional := f.observation
+	reportedTime := storedFiles[0].Base().ModTime.UnixNano() + 123456789
+	fractional.UUID, fractional.ModifiedAtNS = uuid.NewString(), &reportedTime
+	recordFileObservation(t, f.repo, fractional)
+	precisionMatch := input
+	precisionMatch.UUID, precisionMatch.ObservationUUID = uuid.NewString(), fractional.UUID
+	recordFileMatch(t, f.repo, precisionMatch)
 	apply := func(value models.SourceFileMatch) error {
 		return f.repo.WithTxn(t.Context(), func(ctx context.Context) error { _, err := f.repo.SourceFile.RecordMatch(ctx, value); return err })
 	}

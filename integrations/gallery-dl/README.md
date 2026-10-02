@@ -868,6 +868,38 @@ bounded and explicitly marked when truncated. Original source manifests remain
 intact. Every result remains `imported:false`: file matching, legacy appearances,
 gallery construction and the other catalog families are subsequent work.
 
+Map assets, files and appearances with schema 1000038 and an explicit historical
+root mapping:
+
+```sh
+stash-import-catalog-media --snapshot /migration/prepared/CATALOG_ID \
+  --expected-sha256 MANIFEST_SHA256 --endpoint STASH_ORIGIN \
+  --root-uuid ROOT_UUID --root-revision ROOT_REVISION \
+  --collection-revision COLLECTION_REVISION --library-root-path /media/porn
+```
+
+Use the path prefix stored in the copied Stash database, which may differ from
+the host's mount. The native logical root can remain disabled and offline. This
+binding neither activates a worker nor grants filesystem access. The command
+uses application authentication, validates the completed evidence pass and
+resumes the same immutable binding after interruptions.
+
+Shared asset claims retain declared digests without treating path-derived IDs
+as hashes. File observations retain missing, pending, deduplicated and converted
+paths. Matches require a unique literal library path or existing verified
+content; ZIP matches include archive/member identity. Appearances become native
+post-file evidence and, where one existing scene/image owns the matched file,
+post-media evidence. Unavailable files stay recorded; ambiguous or inconsistent
+matches require review. Download positions do not establish album order, and
+this pass preserves existing library metadata, attribution and galleries.
+
+Exit 0 means completed without review outcomes, exit 2 means completed with
+review outcomes, and exit 1 means failure or an unavailable response. Progress
+uses the processed-record count across the asset/file/appearance phases.
+Inspect `/api/v3/archive/catalog-snapshots/SNAPSHOT_UUID/media-import/records`
+for bounded summaries and append `/ORDINAL` for one full receipt. Results remain
+`imported:false` pending the other catalog families and final reconciliation.
+
 ## Native n8n backfills
 
 `stash-ingest-n8n` replaces the account backfill runner's record/inspect contract.

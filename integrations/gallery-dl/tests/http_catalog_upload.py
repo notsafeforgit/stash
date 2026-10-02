@@ -18,6 +18,7 @@ from stash_ingest.catalog_evidence_import import CatalogEvidenceClient, main as 
 from stash_ingest.catalog_relations_import import CatalogRelationsClient, main as relations_main
 from stash_ingest.catalog_publisher_import import CatalogPublisherClient, main as publisher_main
 from stash_ingest.catalog_attachment_import import CatalogAttachmentClient, main as attachment_main
+from stash_ingest.catalog_media_import import main as media_main
 from stash_ingest.encoding import digest, encode
 from test_catalog_registry_import import registry_fixture
 from test_catalog_snapshot import CATALOG_ID, CAPTURED, catalog_fixture
@@ -59,6 +60,10 @@ def run():
         db.execute("INSERT INTO handles VALUES('reddit:handle:juniper','Juniper',?)", (CAPTURED,))
         for index in range(55):
             db.execute("INSERT INTO post_urls VALUES('reddit:post:album',?)", (f"https://example.test/album?copy={index:02}",))
+            asset, path = f"path:{index}", f"absent/{index}.mp4"
+            db.execute("INSERT INTO assets(asset_id,created_at) VALUES(?,?)", (asset, CAPTURED))
+            db.execute("INSERT INTO files(relpath,asset_id,state,first_observed,role) VALUES(?,?,'missing',?,'local')", (path, asset, CAPTURED))
+            db.execute("INSERT INTO appearances(post_key,attachment_key,asset_id,source_relpath) VALUES('reddit:post:album',?,?,?)", (path, asset, path))
     original = source.read_bytes()
     snapshot = directory / "snapshot"
     with patch("stash_ingest.catalog_snapshot.MAX_CHUNK_ROWS", 2):
@@ -97,6 +102,16 @@ def run():
     assert attachments["processed_records"] == attachments["source_records"] == 56
     assert attachments["mapped_records"] == 55 and attachments["unavailable_records"] == 1
     assert attachments["changed_selections"] == 1
+    media_args = [*args, "--root-uuid", setup["root_uuid"], "--root-revision", str(setup["root_revision"]),
+                  "--collection-revision", "1", "--library-root-path", "/media"]
+    execute(media_main, media_args, 1)  # The root mapping commits, but its response is lost.
+    execute(media_main, media_args, 1)  # The first asset batch commits, but its response is lost.
+    media = execute(media_main, media_args)
+    assert media == execute(media_main, media_args)
+    assert media["state"] == "mapped" and media["imported"] is False
+    assert media["processed_records"] == media["source_records"] == 165
+    assert media["mapped_records"] == 55 and media["unavailable_records"] == 110
+    assert media["matched_files"] == media["media_associations"] == 0
     assert source.read_bytes() == original
 
     # Another physical catalog retains copied events and one differing payload

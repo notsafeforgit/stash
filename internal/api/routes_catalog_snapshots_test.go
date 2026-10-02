@@ -16,6 +16,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stashapp/stash/internal/manager/config"
+	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/sqlite"
 	"github.com/stretchr/testify/require"
 )
@@ -28,13 +29,20 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 	require.NoError(t, db.Open(filepath.Join(directory, "native.sqlite")))
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	repo := db.Repository()
+	var mediaRoot *models.MediaRoot
 	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
-		_, _, err := db.ExecSQL(ctx, `INSERT INTO performers(id,created_at,updated_at) VALUES(71,'2020-01-01 00:00:00','2020-01-01 00:00:00'); INSERT INTO performer_names(performer_id,name,position) VALUES(71,'Selected name',0)`, nil)
+		var err error
+		mediaRoot, err = repo.MediaRoot.Put(ctx, models.MediaRootInput{Origin: "migration", MediaRootDefinition: models.MediaRootDefinition{Label: "Historical catalog mount", State: "disabled"}})
+		if err != nil {
+			return err
+		}
+		_, _, err = db.ExecSQL(ctx, `INSERT INTO performers(id,created_at,updated_at) VALUES(71,'2020-01-01 00:00:00','2020-01-01 00:00:00'); INSERT INTO performer_names(performer_id,name,position) VALUES(71,'Selected name',0)`, nil)
 		return err
 	}))
 	router := (&nativeArchiveRoutes{repo: repo}).router()
 	handler := http.StripPrefix("/api/v3/archive", router)
 	var lostBegin, lostChunk, lostEvidence, lostRelations, lostPublisher, lostAttachment atomic.Bool
+	var lostMediaBegin, lostMediaAdvance atomic.Bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("ApiKey") != "fixture-application-key" || r.Header.Get("Authorization") != "" {
 			w.WriteHeader(http.StatusUnauthorized)
@@ -47,9 +55,11 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/evidence-import") && !lostEvidence.Swap(true)) ||
 			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/relations-import") && !lostRelations.Swap(true)) ||
 			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/publisher-import") && !lostPublisher.Swap(true)) ||
-			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/attachment-import") && !lostAttachment.Swap(true)))
+			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/attachment-import") && !lostAttachment.Swap(true)) ||
+			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/media-import") && !lostMediaBegin.Swap(true)) ||
+			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/media-import/advance") && !lostMediaAdvance.Swap(true)))
 		if drop {
-			if strings.HasSuffix(r.URL.Path, "/evidence-import") || strings.HasSuffix(r.URL.Path, "/relations-import") || strings.HasSuffix(r.URL.Path, "/publisher-import") || strings.HasSuffix(r.URL.Path, "/attachment-import") {
+			if strings.HasSuffix(r.URL.Path, "/evidence-import") || strings.HasSuffix(r.URL.Path, "/relations-import") || strings.HasSuffix(r.URL.Path, "/publisher-import") || strings.HasSuffix(r.URL.Path, "/attachment-import") || strings.HasSuffix(r.URL.Path, "/media-import/advance") {
 				var progress struct {
 					State     string `json:"state"`
 					Processed int    `json:"processed_records"`
@@ -76,7 +86,7 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 	}))
 	defer server.Close()
 	snapshot := uuid.NewString()
-	setup, err := json.Marshal(map[string]any{"directory": directory, "source": uuid.NewString(), "snapshot": snapshot, "endpoint": server.URL})
+	setup, err := json.Marshal(map[string]any{"directory": directory, "source": uuid.NewString(), "snapshot": snapshot, "endpoint": server.URL, "root_uuid": mediaRoot.UUID, "root_revision": mediaRoot.Revision})
 	require.NoError(t, err)
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 	defer cancel()
@@ -90,7 +100,9 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 	require.True(t, lostRelations.Load())
 	require.True(t, lostPublisher.Load())
 	require.True(t, lostAttachment.Load())
-	var relationOrdinal, publisherOrdinal, attachmentOrdinal int64
+	require.True(t, lostMediaBegin.Load())
+	require.True(t, lostMediaAdvance.Load())
+	var relationOrdinal, publisherOrdinal, attachmentOrdinal, mediaOrdinal int64
 	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
 		receipt, err := repo.CatalogSnapshot.Find(ctx, snapshot)
 		require.NoError(t, err)
@@ -111,6 +123,10 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, attachments, 1)
 		attachmentOrdinal = attachments[0].Ordinal
+		media, err := repo.CatalogMediaImport.Records(ctx, snapshot, 0, 1)
+		require.NoError(t, err)
+		require.Len(t, media, 1)
+		mediaOrdinal = media[0].Ordinal
 		return nil
 	}))
 	for _, test := range []struct {
@@ -160,6 +176,16 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 		{"GET", "/catalog-snapshots/" + snapshot + "/attachment-import/records/999999", "", 404},
 		{"POST", "/catalog-snapshots/" + snapshot + "/attachment-import", "application/json", 400},
 		{"POST", "/catalog-snapshots/" + snapshot + "/attachment-import", "text/plain", 400},
+		{"GET", "/catalog-snapshots/" + snapshot + "/media-import", "", 200},
+		{"GET", "/catalog-snapshots/" + snapshot + "/media-import/records?limit=1", "", 200},
+		{"GET", "/catalog-snapshots/" + snapshot + "/media-import/records?limit=101", "", 400},
+		{"GET", "/catalog-snapshots/" + snapshot + "/media-import/records?after=-1", "", 400},
+		{"GET", "/catalog-snapshots/" + snapshot + "/media-import/records/" + strconv.FormatInt(mediaOrdinal, 10), "", 200},
+		{"GET", "/catalog-snapshots/" + snapshot + "/media-import/records/0", "", 400},
+		{"GET", "/catalog-snapshots/" + snapshot + "/media-import/records/999999", "", 404},
+		{"POST", "/catalog-snapshots/" + snapshot + "/media-import", "application/json", 400},
+		{"POST", "/catalog-snapshots/" + snapshot + "/media-import", "text/plain", 400},
+		{"POST", "/catalog-snapshots/" + snapshot + "/media-import/advance", "application/json", 400},
 	} {
 		request := httptest.NewRequest(test.method, test.path, strings.NewReader("{}"))
 		request.Header.Set("Content-Type", test.contentType)

@@ -51,6 +51,7 @@ type Repository struct {
 	SourceEvidence          SourceEvidenceReaderWriter
 	SourcePostLinks         SourcePostLinksReaderWriter
 	SourceFile              SourceFileReaderWriter
+	CatalogMediaImport      CatalogMediaImportReaderWriter
 	SourceAttachment        SourceAttachmentReaderWriter
 	SourceGallery           SourceGalleryReaderWriter
 	MetadataField           MetadataFieldReaderWriter

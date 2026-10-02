@@ -139,6 +139,8 @@ func TestNativeLineageRejectsUnsafeInputsBeforeWriting(t *testing.T) {
 		{"missing source file generation guard", "DROP TRIGGER source_file_match_generation", "missing source_file_match_generation"},
 		{"missing source file post guard", "DROP TRIGGER source_post_file_evidence_active_post", "missing source_post_file_evidence_active_post"},
 		{"missing source file location index", "DROP INDEX source_file_observation_location", "missing source_file_observation_location"},
+		{"missing catalog media receipts", "DROP TABLE catalog_media_records", "missing catalog_media_records"},
+		{"missing catalog media import guard", "DROP TRIGGER catalog_media_import_guard", "missing catalog_media_import_guard"},
 		{"missing attachment capture scope", "DROP INDEX source_captures_scope", "missing source_captures_scope"},
 		{"missing attachment selection", "DROP TABLE post_attachment_selections", "missing post_attachment_selections"},
 		{"missing attachment selection guard", "DROP TRIGGER post_attachment_selection_forward", "missing post_attachment_selection_forward"},

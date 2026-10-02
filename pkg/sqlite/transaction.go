@@ -207,6 +207,7 @@ func (db *Database) Repository() models.Repository {
 		SourcePostLinks:         &SourcePostLinksStore{},
 		SourceAttachment:        &SourceAttachmentStore{},
 		SourceFile:              &SourceFileStore{},
+		CatalogMediaImport:      &CatalogMediaImportStore{},
 		SourceGallery:           &SourceGalleryStore{gallery: db.Gallery},
 		MetadataField:           &MetadataFieldStore{},
 		MetadataPolicy:          &MetadataPolicyStore{},

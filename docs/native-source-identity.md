@@ -554,3 +554,53 @@ response. Every result remains `imported:false`. Source-list completeness is
 separate from file availability: this pass creates neither playable media nor
 galleries. Existing library metadata, attribution and gallery memberships remain
 unchanged while subsequent media/appearance mapping is completed.
+
+## Mapping catalog assets, files and appearances
+
+Schema 1000038 imports these three families after a snapshot's evidence pass.
+Application access is required. A reviewed binding identifies the logical media
+root and its revision, the snapshot collection's revision, and the historical
+library mount prefix. This mapping translates catalog-relative paths into the
+paths stored in Stash. It does not bind a live filesystem mount or activate a
+worker; the root and collection can remain disabled during rehearsal.
+
+| Operation | Contract |
+| --- | --- |
+| `POST /api/v3/archive/catalog-snapshots/{snapshot}/media-import` | Begin with `expected_manifest_sha256`, `root_uuid`, `root_revision`, `collection_revision` and `library_root_path`. Repeating the same binding returns its checkpoint; a different binding conflicts. |
+| `GET .../media-import` | Read the binding, current phase and outcome counters. |
+| `POST .../media-import/advance` | Send `expected_manifest_sha256` and `after`, the previously returned `processed_records` count. |
+| `GET .../media-import/records?after=ORDINAL&limit=100` | Read bounded summaries of original rows and their native references. |
+| `GET .../media-import/records/{ordinal}` | Read one complete source key and retained match/review context. |
+
+The phases are `assets`, `files`, `appearances`, then `complete`. Each transaction
+handles at most 50 source rows and checks a 16 MiB input threshold between rows.
+The resume checkpoint is the processed-record count across phases, since original
+catalog row ordinals are ordered differently. Original rows, native evidence and
+receipts commit together. A lost response resumes by reading the checkpoint;
+completed passes replay unchanged.
+
+Assets become shared source claims. Files become observations retaining their
+original state, role, size, timestamp and survivor path. A path-derived asset ID
+is not a content hash. Automatic matching uses literal paths under the reviewed
+mount, including explicit survivor paths, then existing server-verified SHA-256
+content. Multiple candidates or conflicting metadata require review. Original
+nanoseconds remain stored, while modification times are compared at the
+whole-second precision retained by Stash's file records. ZIP matches include
+archive and member identities and both generations.
+
+Appearances retain post-file evidence even when no playable media is available.
+A currently valid match with exactly one scene/image owner also adds post-media
+evidence. The original attachment key, source media ID, download position and
+source path remain attached to that evidence; download numbering does not become
+album order. Missing source paths can use a unique location sharing the same
+asset claim; ambiguous locations remain for review. Existing library values,
+performer attribution, attachment selections and galleries are preserved.
+Unindexed present files remain unavailable here and require normal media intake.
+
+`stash-import-catalog-media` validates the local frozen snapshot and its upload
+receipt before binding or advancing. Exit 0 means the pass completed without
+review outcomes, exit 2 means completed with review outcomes, and exit 1 means
+failure or an unavailable response. `unavailable` retains missing/pending media
+as evidence. Every result remains `imported:false` until the remaining catalog
+families and final reconciliation are complete. Database backups include the
+native evidence and receipts; anonymised exports remove them.

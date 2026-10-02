@@ -370,3 +370,36 @@ activate source jobs. Subsequent importers and final reconciliation must cover
 the remaining families and resolve or retain review outcomes before staging can
 be retired. The snapshot receipt's `pending_families` remains the conservative
 whole-catalog inventory until that final coordination is implemented.
+
+## Post links and their evidence
+
+Native schema 1000032 adds `SourcePostLinks` for post URLs, identifier evidence
+and unselected publisher claims. These core services are prerequisites for the
+remaining catalog relationship import; this schema change alone does not map
+those original rows.
+
+`source_post_urls` stores each exact URL once per post. Repeated observations
+share that row and retain their own UUID, origin, basis, observation time and
+bounded JSON evidence in `source_post_url_evidence`. Observation time describes
+when the association was recorded, not when the post was published. URL strings
+are retained without fetching or canonicalising them; HTTP(S) URLs containing
+userinfo are rejected. A shared URL never merges posts.
+
+`source_post_identifier_evidence` records why a qualified identifier belongs to
+the post. Adding it requires the reviewed post revision and cannot move an
+identifier already owned by another post. Catalog aliases must keep their
+physical-catalog scope until stronger evidence establishes a service identity.
+
+`source_post_account_claims` retains an association with an original account
+UUID. Reads also resolve its current canonical UUID after consolidation. A
+claim does not choose a capture's publisher, change an explicit unlink, establish
+account ownership or assign depicted performers. Those operations retain their
+separate core review/selection contracts. Known post and account namespaces must
+agree when adding a claim; legacy-only post identities remain unqualified.
+
+All three evidence types use immutable request UUIDs. Exact retry returns the
+stored evidence, while changed content conflicts. New evidence is refused for
+forgotten posts; retrying an already committed request remains valid. Native
+writes require a managed transaction, including rollback when a caller ignores
+a late write error. Reads use bounded indexed UUID cursors. Startup checks the
+schema and relationship integrity; anonymised exports remove the evidence.

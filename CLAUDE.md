@@ -360,6 +360,13 @@ still reports `imported:false`; remaining catalog families and final semantic
 reconciliation are required before retiring temporary staging. These historical
 evidence mappings never select entity metadata or activate jobs.
 
+`SourcePostLinks` in schema 1000032 retains deduplicated post URLs with separate
+observations, evidence for post identifiers, and unselected publisher claims.
+Claims preserve original account UUIDs through consolidation; they never become
+capture publisher choices or performer attribution. Keep request replay, forgotten
+post guards, revision checks for identifier changes and atomic rollback. Import
+of the remaining catalog relationship rows still needs to call these services.
+
 ### v3 extension points
 
 See `ui/v3/docs/architecture.md` for the current module map and compatibility rules. List configurations require a discriminated GraphQL/local `source`; generated query variables remain typed through the data hook. Layout, preferences, query state, and cache refill live in separate list modules. Player transition policy consumes plain buffered/seekable state in `scene-player-transitions.ts`; media effects, recovery, and transcode leases are separate hooks. Keep the stable player root and existing iOS seek/timeline behavior when extending these modules.

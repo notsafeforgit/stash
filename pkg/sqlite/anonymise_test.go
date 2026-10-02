@@ -161,6 +161,23 @@ func TestAnonymiserRemovesSourceAccountEvidence(t *testing.T) {
 			ExpectedPerformerRevision: performer.Revision, Origin: "review", Reason: "private-account-choice"})
 		return err
 	}))
+	publisher := createSourceAccount(t, repo, "native:twitter")
+	require.NoError(t, repo.WithTxn(context.Background(), func(ctx context.Context) error {
+		_, err := repo.SourcePostLinks.ObserveURL(ctx, models.SourcePostURLInput{SourcePostEvidence: postLinkEvidence(post.UUID), URL: "https://example.test/private-account-url"})
+		if err != nil {
+			return err
+		}
+		current, err := repo.SourceEvidence.FindPost(ctx, post.UUID)
+		if err != nil {
+			return err
+		}
+		_, err = repo.SourcePostLinks.ObserveIdentifier(ctx, models.SourcePostIdentifierInput{SourcePostEvidence: postLinkEvidence(post.UUID), Identifier: models.SourcePostIdentifier{Namespace: "legacy:catalog:test", Value: "private-account-alias"}, ExpectedPostRevision: current.Revision})
+		if err != nil {
+			return err
+		}
+		_, err = repo.SourcePostLinks.ClaimAccount(ctx, models.SourcePostAccountClaimInput{SourcePostEvidence: postLinkEvidence(post.UUID), AccountUUID: publisher.UUID})
+		return err
+	}))
 	output := filepath.Join(t.TempDir(), "anonymous.sqlite")
 	anonymiser, err := sqlite.NewAnonymiser(source, output)
 	require.NoError(t, err)
@@ -186,6 +203,9 @@ func TestAnonymiserRemovesSourceAccountEvidence(t *testing.T) {
 		require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM "+table))
 	}
 	for _, table := range []string{"post_gallery_decisions", "post_gallery_links", "source_gallery_write_context", "gallery_membership_events", "gallery_membership_heads"} {
+		require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM "+table))
+	}
+	for _, table := range []string{"source_post_urls", "source_post_url_evidence", "source_post_identifier_evidence", "source_post_account_claims"} {
 		require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM "+table))
 	}
 	require.Equal(t, membership, sourceGalleryHistory(t, repo, album.GalleryUUID))

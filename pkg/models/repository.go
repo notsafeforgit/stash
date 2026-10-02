@@ -46,6 +46,7 @@ type Repository struct {
 	CatalogSnapshot        CatalogSnapshotReaderWriter
 	CatalogEvidenceImport  CatalogEvidenceImportReaderWriter
 	SourceEvidence         SourceEvidenceReaderWriter
+	SourcePostLinks        SourcePostLinksReaderWriter
 	SourceAttachment       SourceAttachmentReaderWriter
 	SourceGallery          SourceGalleryReaderWriter
 	MetadataField          MetadataFieldReaderWriter

@@ -201,6 +201,7 @@ func (db *Database) Repository() models.Repository {
 		CapturePublisher:       &CapturePublisherStore{},
 		Ingest:                 &IngestStore{},
 		SourceEvidence:         &SourceEvidenceStore{},
+		SourcePostLinks:        &SourcePostLinksStore{},
 		SourceAttachment:       &SourceAttachmentStore{},
 		SourceGallery:          &SourceGalleryStore{gallery: db.Gallery},
 		MetadataField:          &MetadataFieldStore{},

@@ -2531,3 +2531,79 @@ construct galleries or activate jobs. Temporary snapshot bodies remain private
 migration inputs until the complete importer can retire them. Production and
 workers remain on the frozen compatible deployment; the full transition remains
 in progress.
+
+## 2026-10-01: Native post link evidence services
+
+Native schema 1000032 adds the core relationship services needed by the next
+catalog import pass. `SourcePostLinks` stores each exact post URL once, with
+separate observations carrying their original evidence time and provenance. It
+also retains evidence for qualified post identifiers and unselected publisher
+claims. Identifier changes require the reviewed post revision and cannot take
+over another post's identifier. These services do not fetch URLs or infer that
+two posts with the same URL are one post.
+
+Publisher claims retain their original account UUID through consolidation and
+resolve its current canonical UUID on reads. They cannot choose a capture's
+publisher, override its explicit unlink, or assign depicted performers. The
+legacy writer inspection showed why this boundary is necessary: an old
+`source-id` account can come from a directory label, and native-service-labelled
+IDs can represent mirror accounts. The relationship importer must preserve those
+claims with their original basis; actual captured publisher evidence and native
+review decisions remain separate.
+
+Read-only inventory of the frozen source confirms 1,173 original account rows:
+1,095 already have a registry mapping and 78 remain unmapped. The existing
+OnlyFans/Fansly source-ID mappings correctly resolve to Coomer namespaces and
+Patreon mappings to Kemono; their old platform labels must not create native
+service IDs during the next pass. The private grouped inventory is saved with
+the post-link rehearsal inputs. A post-association preflight found 218,338 rows
+eligible for retained unselected claims, 32,822 whose account is still unmapped,
+and 5,831 without a legacy account. Existing mapped post/account namespaces had
+no conflicts; eligibility is not a publisher selection or performer attribution.
+
+Evidence writes are immutable and replayable, reject changed request contents,
+and refuse new observations for forgotten posts. SQL guards preserve scope and
+retirement rules. A managed transaction guard rolls back a late failure even
+when a caller ignores its error. Read APIs use bounded indexed cursors. Startup
+validates the new tables, indexes, triggers, timestamp column types and evidence
+references. Anonymised exports remove these private records before their parent
+posts and accounts.
+
+Focused regression tests pass for URL deduplication with separate observations,
+post identity conflicts, account consolidation, explicit unlink preservation,
+restart/replay, immutable rows, invalid inputs, failed-write rollback, incomplete
+startup data and anonymisation. An initial timestamp declaration mismatch was
+found and fixed before validation; the final startup guard also verifies its SQL
+type. Final focused tests took 22.725 seconds, and final lint reported zero issues.
+
+The corrected schema promoted a new copy of the schema-1000031 full-corpus
+rehearsal in 113.983 seconds while the broader validation suite was running.
+Independent comparison found all 153 pre-existing data tables unchanged,
+including the complete staged snapshots and native post/capture/profile graph.
+The four new relationship tables remain empty until their import pass. SQLite
+integrity returned `ok` and foreign-key validation found no violations. The
+comparison took 398.389 seconds, and the resulting database is 8,975,687,680
+bytes. Its private path is
+`.local/native-post-links-rehearsal-20261001/verified.sqlite`; the previous
+evidence rehearsal and original catalog snapshots were not modified.
+
+All required gate components passed: backend generation, v3 generation/types and
+format checks, 528 v3 tests, 71 application operation contracts, 223 producer
+tests, final lint and the entire Go package set. The earlier broad run used an
+ownership assertion corrected during focused validation; the final complete
+SQLite rerun passed in 127.021 seconds. Other Go packages passed in that broad
+run, including API tests in 376.154 seconds. Parent `22e96850b` passed lint, build
+and preview image publication in CI.
+
+Logs under `/tmp/stash-native-transition` are `post-links-focused-final.log`,
+`post-links-lint-final.log`, `post-links-validation.log`,
+`post-links-sqlite-final.log`, `post-links-promotion-final.log` and
+`post-links-independent-reconciliation-final.log`. The superseded rehearsal
+copy with the initial timestamp declaration was removed after the corrected
+copy passed reconciliation.
+
+This increment provides core services only. Original `post_urls`, `post_aliases`,
+account/handle rows and legacy publisher associations still need their bounded
+import passes and per-row reconciliation. No received snapshot becomes imported
+through this schema upgrade. The full transition remains active, with production,
+workers and n8n on the frozen compatible deployment.

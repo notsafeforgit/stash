@@ -136,14 +136,20 @@ func TestAttachmentSelectionConflictsPinnedDisabledAndStaleReview(t *testing.T) 
 	input.ExpectedPostRevision = selectionPost(t, repo, post.UUID).Revision
 	input.Mode, input.Origin, input.CaptureUUID = "automatic", "ingest", reordered
 	require.True(t, previewSelection(t, repo, post.UUID, reordered).Protected)
-	require.ErrorIs(t, apply(), models.ErrAttachmentSelectionProtected)
+	for _, origin := range []string{"ingest", "migration"} {
+		input.Origin = origin
+		require.ErrorIs(t, apply(), models.ErrAttachmentSelectionProtected)
+	}
 	input.Mode, input.Origin, input.CaptureUUID = "disabled", "review", ""
 	disabled := applySelection(t, repo, input)
 	require.Empty(t, disabled.Entries)
 	require.False(t, disabled.IsAlbum())
 	input.ExpectedPostRevision = selectionPost(t, repo, post.UUID).Revision
 	input.Mode, input.Origin, input.CaptureUUID = "automatic", "ingest", first
-	require.ErrorIs(t, apply(), models.ErrAttachmentSelectionProtected)
+	for _, origin := range []string{"ingest", "migration"} {
+		input.Origin = origin
+		require.ErrorIs(t, apply(), models.ErrAttachmentSelectionProtected)
+	}
 	input.Origin = "review"
 	reenabled := applySelection(t, repo, input)
 	require.Equal(t, "first", reenabled.Entries[0].Attachment.Reference.Value)

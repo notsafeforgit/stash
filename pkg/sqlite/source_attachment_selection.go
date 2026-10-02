@@ -296,7 +296,7 @@ func (s *SourceAttachmentStore) DecideSelection(ctx context.Context, input model
 	}
 	var selected *models.AttachmentSelection
 	switch {
-	case input.Origin == "ingest":
+	case input.Origin == "ingest" || (input.Origin == "migration" && input.Mode == "automatic"):
 		preview, err := s.PreviewSelection(ctx, post.UUID, input.CaptureUUID)
 		if err != nil {
 			return nil, err

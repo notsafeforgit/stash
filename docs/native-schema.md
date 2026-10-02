@@ -295,6 +295,11 @@ automatic source selection, or choose a capture as the new automatic starting
 point. None of these actions deletes captures, media, or galleries. Equivalent
 automatic replay keeps the previous decision and revision.
 
+Automatic migration decisions use the same combination and protection rules as
+ingestion, with `origin:migration` retained in the audit. The
+[catalog attachment importer](native-source-identity.md#mapping-catalog-attachment-lists)
+uses these services to recover source lists before file/media association.
+
 `post_attachment_decisions`, their manifest-reference rows, and the current head
 commit together. Foreign keys scope every reference to its source post, history
 is immutable, and a head cannot move backward. Counts and a selection signature

@@ -16,7 +16,6 @@ import (
 
 type CatalogPublisherImportStore struct{}
 
-const catalogPublisherCandidates = `source_table IN ('observations','observation_details') AND outcome!='shared'`
 const catalogPublisherColumns = `r.ordinal,e.source_table,e.source_key,e.data_sha256,e.post_uuid,r.capture_uuid,r.decision_uuid,d.account_uuid,a.canonical_uuid AS canonical_account_uuid,r.outcome,r.reason,r.created_account`
 const catalogPublisherJoins = ` FROM catalog_publisher_records r JOIN catalog_evidence_records e ON e.snapshot_uuid=r.snapshot_uuid AND e.ordinal=r.ordinal
  LEFT JOIN capture_publisher_decisions d ON d.uuid=r.decision_uuid LEFT JOIN source_accounts a ON a.uuid=d.account_uuid`
@@ -49,24 +48,7 @@ type catalogPublisherContext struct {
 	SuggestedAccount    *string  `json:"suggested_account_uuid,omitempty"`
 }
 
-type catalogPublisherSource struct {
-	Ordinal int64   `db:"ordinal"`
-	Capture *string `db:"capture_uuid"`
-	Reason  string  `db:"reason"`
-}
-
-func catalogPublisherPayloadBytes(ctx context.Context, id string) (int64, error) {
-	var size int64
-	// Count retained parts conservatively, including repeated profile references.
-	err := dbWrapper.Get(ctx, &size, `SELECT shared.byte_length+patch.byte_length+coalesce((
- SELECT sum(p.byte_length) FROM source_capture_profiles ref JOIN source_profile_bodies b ON b.hash=ref.profile_hash
- JOIN source_payloads p ON p.digest=b.payload_digest WHERE ref.capture_uuid=c.uuid),0)
- FROM source_captures c JOIN source_post_revisions r ON r.uuid=c.revision_uuid
- JOIN source_payloads shared ON shared.digest=r.body_digest JOIN source_payloads patch ON patch.digest=c.patch_digest WHERE c.uuid=?`, id)
-	return size, err
-}
-
-func importCatalogPublisher(ctx context.Context, snapshot string, row catalogPublisherSource) (*models.CatalogPublisherRecord, []byte, error) {
+func importCatalogPublisher(ctx context.Context, snapshot string, row catalogCaptureSource) (*models.CatalogPublisherRecord, []byte, error) {
 	result := &models.CatalogPublisherRecord{Ordinal: row.Ordinal, CaptureUUID: row.Capture}
 	view := catalogPublisherContext{Policy: archive.CapturedAccountPolicy, CandidateUUIDs: []string{}, Conflicts: []string{}}
 	if row.Capture == nil {
@@ -182,8 +164,8 @@ func (s *CatalogPublisherImportStore) Advance(ctx context.Context, id, expected 
 	}
 	var usedBytes int64
 	for count := 0; count < 50 && usedBytes < 16<<20; count++ {
-		var row catalogPublisherSource
-		err := dbWrapper.Get(ctx, &row, "SELECT ordinal,capture_uuid,reason FROM catalog_evidence_records WHERE snapshot_uuid=? AND ordinal>? AND "+catalogPublisherCandidates+" ORDER BY ordinal LIMIT 1", id, prior.LastOrdinal)
+		var row catalogCaptureSource
+		err := dbWrapper.Get(ctx, &row, "SELECT ordinal,capture_uuid,reason FROM catalog_evidence_records WHERE snapshot_uuid=? AND ordinal>? AND "+catalogCaptureCandidates+" ORDER BY ordinal LIMIT 1", id, prior.LastOrdinal)
 		if errors.Is(err, sql.ErrNoRows) {
 			if prior.ProcessedRecords != prior.TotalRecords {
 				return nil, models.ErrCatalogSnapshotInvalid
@@ -198,7 +180,7 @@ func (s *CatalogPublisherImportStore) Advance(ctx context.Context, id, expected 
 			return nil, err
 		}
 		if row.Capture != nil {
-			size, err := catalogPublisherPayloadBytes(ctx, *row.Capture)
+			size, err := catalogCapturePayloadBytes(ctx, *row.Capture)
 			if err != nil {
 				return nil, err
 			}

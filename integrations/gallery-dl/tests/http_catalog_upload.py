@@ -17,6 +17,7 @@ from stash_ingest.catalog_upload import main
 from stash_ingest.catalog_evidence_import import CatalogEvidenceClient, main as evidence_main
 from stash_ingest.catalog_relations_import import CatalogRelationsClient, main as relations_main
 from stash_ingest.catalog_publisher_import import CatalogPublisherClient, main as publisher_main
+from stash_ingest.catalog_attachment_import import CatalogAttachmentClient, main as attachment_main
 from stash_ingest.encoding import digest, encode
 from test_catalog_registry_import import registry_fixture
 from test_catalog_snapshot import CATALOG_ID, CAPTURED, catalog_fixture
@@ -44,6 +45,8 @@ def run():
     with closing(sqlite3.connect(source)) as db, db:
         shared = json.loads(db.execute("SELECT payload_json FROM observations WHERE observation_id='shared'").fetchone()[0])
         shared.update(author_fullname="t2_http_publisher", author="ActualHTTPPublisher")
+        shared["gallery_data"] = {"items": [{"media_id": "photo"}, {"media_id": "video"}]}
+        shared["media_metadata"] = {"photo": {"e": "Image"}, "video": {"e": "RedditVideo"}}
         db.execute("UPDATE observations SET payload_json=? WHERE observation_id='shared'", (json.dumps(shared),))
         for i in range(2, 55):
             db.execute("INSERT INTO observation_details VALUES(?,?,?,?,?,?)",
@@ -87,6 +90,13 @@ def run():
     assert publishers["processed_records"] == publishers["source_records"] == 56
     assert publishers["linked_records"] == 55 and publishers["unavailable_records"] == 1
     assert publishers["created_accounts"] == 1
+    execute(attachment_main, args, 1)  # A committed attachment batch response is lost.
+    attachments = execute(attachment_main, args)
+    assert attachments == execute(attachment_main, args)
+    assert attachments["state"] == "mapped" and attachments["imported"] is False
+    assert attachments["processed_records"] == attachments["source_records"] == 56
+    assert attachments["mapped_records"] == 55 and attachments["unavailable_records"] == 1
+    assert attachments["changed_selections"] == 1
     assert source.read_bytes() == original
 
     # Another physical catalog retains copied events and one differing payload
@@ -106,6 +116,9 @@ def run():
     copied_publishers = execute(publisher_main, copied_args)
     assert copied_publishers["linked_records"] == 1 and copied_publishers["preserved_records"] == 54
     assert copied_publishers["unavailable_records"] == 1 and copied_publishers["created_accounts"] == 0
+    copied_attachments = execute(attachment_main, copied_args)
+    assert copied_attachments["mapped_records"] == 55 and copied_attachments["unavailable_records"] == 1
+    assert copied_attachments["changed_selections"] == 0
     client = CatalogEvidenceClient(setup["endpoint"])
     def capture_ids(snapshot_uuid, manifest_sha):
         rows = client.request("GET", f"/{snapshot_uuid}/evidence-import/records", None, manifest_sha, "application/json")
@@ -129,6 +142,13 @@ def run():
     linked = next(row for row in publisher_rows if row["outcome"] == "linked")
     detail = publisher_client.request("GET", f"/{setup['snapshot']}/publisher-import/records/{linked['ordinal']}", None, prepared["manifest_sha256"], "application/json")
     assert detail["context"]["namespace"] == "native:reddit"
+    attachment_client = CatalogAttachmentClient(setup["endpoint"])
+    attachment_rows = attachment_client.request("GET", f"/{setup['snapshot']}/attachment-import/records", None, prepared["manifest_sha256"], "application/json")
+    assert len(attachment_rows) == 56
+    mapped = [row for row in attachment_rows if row["outcome"] == "mapped"]
+    assert len({row["manifest_uuid"] for row in mapped}) == len({row["selection_uuid"] for row in mapped}) == 1
+    detail = attachment_client.request("GET", f"/{setup['snapshot']}/attachment-import/records/{mapped[0]['ordinal']}", None, prepared["manifest_sha256"], "application/json")
+    assert detail["context"]["evidence_path"] == "/gallery_data/items"
     print(json.dumps({"records": prepared["records"], "chunks": prepared["chunks"], "source_unchanged": True, "imported": False}))
 
 

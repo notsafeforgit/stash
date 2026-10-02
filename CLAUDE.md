@@ -388,6 +388,17 @@ Exact manifest/ordinal checkpoints commit decisions, account evidence and
 immutable receipts together. This pass selects source publishers, not depicted
 performers or media metadata. Whole-catalog status remains `imported:false`.
 
+`stash-import-catalog-attachments` maps explicit source attachment lists from
+received captures in schema 1000035. It requires completed evidence mapping,
+shares identical manifests, and combines compatible partial lists through the
+core selection service. Automatic migration choices preserve pinned/disabled
+selections just as ingestion does. Keep source positions, missing slots and
+manifest completeness distinct from downloaded-file availability. Missing
+original lists, unsupported formats and download numbering cannot establish an
+album. Bounded immutable receipts retain conflict context; source payloads stay
+shared. Media associations, gallery construction and the remaining catalog
+families still need their subsequent import work.
+
 ### v3 extension points
 
 See `ui/v3/docs/architecture.md` for the current module map and compatibility rules. List configurations require a discriminated GraphQL/local `source`; generated query variables remain typed through the data hook. Layout, preferences, query state, and cache refill live in separate list modules. Player transition policy consumes plain buffered/seekable state in `scene-player-transitions.ts`; media effects, recovery, and transcode leases are separate hooks. Keep the stable player root and existing iOS seek/timeline behavior when extending these modules.

@@ -93,6 +93,8 @@ func TestNativeLineageRejectsUnsafeInputsBeforeWriting(t *testing.T) {
 		{"missing catalog relationship checkpoint guard", "DROP TRIGGER catalog_relations_import_guard", "missing catalog_relations_import_guard"},
 		{"missing catalog relationship evidence guard", "DROP TRIGGER catalog_relation_record_immutable", "missing catalog_relation_record_immutable"},
 		{"missing catalog publisher receipts", "DROP TABLE catalog_publisher_records", "missing catalog_publisher_records"},
+		{"missing catalog attachment receipts", "DROP TABLE catalog_attachment_records", "missing catalog_attachment_records"},
+		{"missing catalog attachment checkpoint guard", "DROP TRIGGER catalog_attachment_import_guard", "missing catalog_attachment_import_guard"},
 		{"missing catalog publisher checkpoint guard", "DROP TRIGGER catalog_publisher_import_guard", "missing catalog_publisher_import_guard"},
 		{"missing catalog publisher candidate index", "DROP INDEX catalog_evidence_publisher_candidates", "missing catalog_evidence_publisher_candidates"},
 		{"missing config checkpoint", "DROP TABLE configuration_migrations", "missing configuration_migrations"},

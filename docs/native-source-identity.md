@@ -499,3 +499,58 @@ this can include unavailable or preserved captures. Exit 2 means completed with
 review outcomes, and exit 1 means failure or an unavailable response. Every
 result remains `imported:false`: media, memberships, remaining histories and
 final semantic reconciliation still require their own migration work.
+
+## Mapping catalog attachment lists
+
+Native schema 1000035 maps explicit attachment evidence from actual flat/detail
+captures after a snapshot's evidence pass completes. It applies the shared
+`captured-attachments-v2` extractor to reconstructed payloads and verifies that
+the captured post identifier resolves to the already-mapped native post. Reddit
+gallery lists, direct Reddit media and retained Twitter extended-entities lists
+use their source positions and qualified media IDs. A shared observation parent
+is not an additional capture.
+
+Identical manifests share native storage, with each capture retaining its
+association. Compatible partial lists combine through the core automatic
+selection service, preserving missing slots and known counts. Migration choices
+carry `origin:migration`; pinned or disabled selections are protected. Conflicting
+lists remain available for review without replacing the current selection.
+Manifests and selections reference shared evidence rather than copying payloads.
+
+| Receipt outcome | Meaning |
+| --- | --- |
+| `mapped` | Source attachment evidence was retained and the automatic selection was updated or was already equivalent. `selection_changed` distinguishes those cases. |
+| `preserved` | The source manifest was retained while an existing pinned or disabled selection remained unchanged. |
+| `review` | Source evidence is unmapped, invalid, identifies a different post, disagrees with an existing capture manifest, or conflicts with the current attachment list. |
+| `unavailable` | No supported attachment-list evidence exists, or the post was forgotten. |
+
+Download counters, filenames, folder membership and captions cannot establish a
+source list. In the frozen migration corpus, older Twitter captures retain
+individual-file metadata without original extended-entities lists; this pass
+reports those as unavailable. The native scraper adapter retains the original
+lists for new captures. Legacy `appearances` and file associations are separate
+migration inputs and must still be handled, including unresolved evidence.
+
+| Method and path under `/api/v3/archive/catalog-snapshots/{uuid}` | Result |
+| --- | --- |
+| `GET /attachment-import` | Current checkpoint; 404 before the first committed batch |
+| `POST /attachment-import` | Advance with `expected_manifest_sha256` and the exact `after` ordinal |
+| `GET /attachment-import/records?after=0&limit=100` | Bounded summaries; keys exceeding 8 KiB use `key_omitted:true` |
+| `GET /attachment-import/records/{ordinal}` | Full source key, manifest/selection references and retained decision context |
+
+Application access is required. Transactions process at most 50 rows and check
+the 16 MiB retained-payload threshold between records. Source lists, selection
+decisions, receipts and progress commit atomically. Late errors roll back the
+whole batch. Lost responses resume from the committed ordinal; completed passes
+replay unchanged. Context retains at most 128 conflict samples and marks further
+conflicts with `conflicts_truncated:true`; complete source manifests remain
+available. Startup checks original-row correspondence, counts, checkpoint
+continuity and native reference scope. Anonymisation removes these receipts.
+
+`stash-import-catalog-attachments` validates the frozen local snapshot and upload
+receipt before advancing. Exit 0 means completed without review outcomes, exit 2
+means completed with review outcomes, and exit 1 means failure or an unavailable
+response. Every result remains `imported:false`. Source-list completeness is
+separate from file availability: this pass creates neither playable media nor
+galleries. Existing library metadata, attribution and gallery memberships remain
+unchanged while subsequent media/appearance mapping is completed.

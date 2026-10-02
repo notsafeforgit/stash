@@ -34,7 +34,7 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 	}))
 	router := (&nativeArchiveRoutes{repo: repo}).router()
 	handler := http.StripPrefix("/api/v3/archive", router)
-	var lostBegin, lostChunk, lostEvidence, lostRelations, lostPublisher atomic.Bool
+	var lostBegin, lostChunk, lostEvidence, lostRelations, lostPublisher, lostAttachment atomic.Bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("ApiKey") != "fixture-application-key" || r.Header.Get("Authorization") != "" {
 			w.WriteHeader(http.StatusUnauthorized)
@@ -46,9 +46,10 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 			(r.Method == "PUT" && strings.HasSuffix(r.URL.Path, "/chunks/0") && !lostChunk.Swap(true)) ||
 			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/evidence-import") && !lostEvidence.Swap(true)) ||
 			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/relations-import") && !lostRelations.Swap(true)) ||
-			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/publisher-import") && !lostPublisher.Swap(true)))
+			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/publisher-import") && !lostPublisher.Swap(true)) ||
+			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/attachment-import") && !lostAttachment.Swap(true)))
 		if drop {
-			if strings.HasSuffix(r.URL.Path, "/evidence-import") || strings.HasSuffix(r.URL.Path, "/relations-import") || strings.HasSuffix(r.URL.Path, "/publisher-import") {
+			if strings.HasSuffix(r.URL.Path, "/evidence-import") || strings.HasSuffix(r.URL.Path, "/relations-import") || strings.HasSuffix(r.URL.Path, "/publisher-import") || strings.HasSuffix(r.URL.Path, "/attachment-import") {
 				var progress struct {
 					State     string `json:"state"`
 					Processed int    `json:"processed_records"`
@@ -88,7 +89,8 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 	require.True(t, lostEvidence.Load())
 	require.True(t, lostRelations.Load())
 	require.True(t, lostPublisher.Load())
-	var relationOrdinal, publisherOrdinal int64
+	require.True(t, lostAttachment.Load())
+	var relationOrdinal, publisherOrdinal, attachmentOrdinal int64
 	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
 		receipt, err := repo.CatalogSnapshot.Find(ctx, snapshot)
 		require.NoError(t, err)
@@ -105,6 +107,10 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, publishers, 1)
 		publisherOrdinal = publishers[0].Ordinal
+		attachments, err := repo.CatalogAttachmentImport.Records(ctx, snapshot, 0, 1)
+		require.NoError(t, err)
+		require.Len(t, attachments, 1)
+		attachmentOrdinal = attachments[0].Ordinal
 		return nil
 	}))
 	for _, test := range []struct {
@@ -144,6 +150,16 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 		{"GET", "/catalog-snapshots/" + snapshot + "/publisher-import/records/999999", "", 404},
 		{"POST", "/catalog-snapshots/" + snapshot + "/publisher-import", "application/json", 400},
 		{"POST", "/catalog-snapshots/" + snapshot + "/publisher-import", "text/plain", 400},
+		{"GET", "/catalog-snapshots/" + snapshot + "/attachment-import", "", 200},
+		{"GET", "/catalog-snapshots/" + snapshot + "/attachment-import/records?limit=1", "", 200},
+		{"GET", "/catalog-snapshots/" + snapshot + "/attachment-import/records?limit=101", "", 400},
+		{"GET", "/catalog-snapshots/" + snapshot + "/attachment-import/records?after=-1", "", 400},
+		{"GET", "/catalog-snapshots/" + snapshot + "/attachment-import/records/" + strconv.FormatInt(attachmentOrdinal, 10), "", 200},
+		{"GET", "/catalog-snapshots/" + snapshot + "/attachment-import/records/0", "", 400},
+		{"GET", "/catalog-snapshots/" + snapshot + "/attachment-import/records/not-an-ordinal", "", 400},
+		{"GET", "/catalog-snapshots/" + snapshot + "/attachment-import/records/999999", "", 404},
+		{"POST", "/catalog-snapshots/" + snapshot + "/attachment-import", "application/json", 400},
+		{"POST", "/catalog-snapshots/" + snapshot + "/attachment-import", "text/plain", 400},
 	} {
 		request := httptest.NewRequest(test.method, test.path, strings.NewReader("{}"))
 		request.Header.Set("Content-Type", test.contentType)

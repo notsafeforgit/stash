@@ -27,10 +27,10 @@ func validateCatalogPublisherSchema(conn *sqlx.DB) error {
  OR rel.state IS NULL OR rel.state='running' OR i.manifest_sha256 IS NOT rel.manifest_sha256
  OR i.policy!='captured-account-v1'
  OR i.source_records IS NOT json_extract(s.manifest,'$.captures.count')
- OR i.source_records!=(SELECT count(*) FROM catalog_evidence_records WHERE snapshot_uuid=i.snapshot_uuid AND `+catalogPublisherCandidates+`)
+ OR i.source_records!=(SELECT count(*) FROM catalog_evidence_records WHERE snapshot_uuid=i.snapshot_uuid AND `+catalogCaptureCandidates+`)
  OR i.processed_records!=(SELECT count(*) FROM catalog_publisher_records r WHERE r.snapshot_uuid=i.snapshot_uuid)
  OR i.last_ordinal!=(SELECT coalesce(max(r.ordinal),0) FROM catalog_publisher_records r WHERE r.snapshot_uuid=i.snapshot_uuid)
- OR i.processed_records!=(SELECT count(*) FROM catalog_evidence_records WHERE snapshot_uuid=i.snapshot_uuid AND ordinal<=i.last_ordinal AND `+catalogPublisherCandidates+`)
+ OR i.processed_records!=(SELECT count(*) FROM catalog_evidence_records WHERE snapshot_uuid=i.snapshot_uuid AND ordinal<=i.last_ordinal AND `+catalogCaptureCandidates+`)
  OR i.linked_records!=(SELECT count(*) FROM catalog_publisher_records r WHERE r.snapshot_uuid=i.snapshot_uuid AND r.outcome='linked')
  OR i.preserved_records!=(SELECT count(*) FROM catalog_publisher_records r WHERE r.snapshot_uuid=i.snapshot_uuid AND r.outcome='preserved')
  OR i.review_records!=(SELECT count(*) FROM catalog_publisher_records r WHERE r.snapshot_uuid=i.snapshot_uuid AND r.outcome='review')

@@ -34,7 +34,7 @@ const (
 	cacheSizeEnv = "STASH_SQLITE_CACHE_SIZE"
 )
 
-var appSchemaVersion = NativeSchemaBaseline + 34
+var appSchemaVersion = NativeSchemaBaseline + 35
 
 //go:embed migrations/*.sql
 var migrationsBox embed.FS

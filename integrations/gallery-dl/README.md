@@ -842,6 +842,32 @@ to existing captures and decisions rather than duplicating their source payloads
 Every result remains `imported:false` until the remaining catalog families and
 final reconciliation are complete.
 
+Map supported source attachment lists from the received captures with schema
+1000035:
+
+```sh
+stash-import-catalog-attachments --snapshot /migration/prepared/CATALOG_ID \
+  --expected-sha256 MANIFEST_SHA256 --endpoint STASH_ORIGIN
+```
+
+This pass requires completed evidence mapping and uses the same application
+API-key reference, manifest checks and resume behavior through
+`/attachment-import`. It shares identical source lists, combines compatible
+partial lists, preserves source order and protects pinned/disabled choices.
+Contradictory lists retain review outcomes. Counters and filenames cannot supply
+missing album evidence: older Twitter captures without retained original lists
+remain unavailable even when individual downloaded files are known.
+
+Exit 0 means completed without review outcomes, including unavailable or
+preserved records; exit 2 means completed with review outcomes; exit 1 means
+failure or an unavailable response. Rerun the same command after interruption.
+Inspect summaries at
+`/api/v3/archive/catalog-snapshots/SNAPSHOT_UUID/attachment-import/records`;
+append `/ORDINAL` for source keys and decision context. Conflict samples are
+bounded and explicitly marked when truncated. Original source manifests remain
+intact. Every result remains `imported:false`: file matching, legacy appearances,
+gallery construction and the other catalog families are subsequent work.
+
 ## Native n8n backfills
 
 `stash-ingest-n8n` replaces the account backfill runner's record/inspect contract.

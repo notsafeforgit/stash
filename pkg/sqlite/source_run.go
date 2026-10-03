@@ -365,23 +365,26 @@ func (s *SourceRunStore) Attempts(ctx context.Context, id string, after int64, l
 		return nil, models.ErrSourceRunInvalid
 	}
 	var rows []struct {
-		Run      string        `db:"run_uuid"`
-		Fence    int64         `db:"fence"`
-		Producer string        `db:"producer_uuid"`
-		Owner    string        `db:"owner_uuid"`
-		Window   string        `db:"window"`
-		Progress string        `db:"progress"`
-		Started  int64         `db:"started_at_ms"`
-		Ended    sql.NullInt64 `db:"ended_at_ms"`
-		Outcome  string        `db:"outcome"`
-		Error    string        `db:"error_code"`
+		Run        string        `db:"run_uuid"`
+		Fence      int64         `db:"fence"`
+		Producer   string        `db:"producer_uuid"`
+		Owner      string        `db:"owner_uuid"`
+		Window     string        `db:"window"`
+		Progress   string        `db:"progress"`
+		Started    int64         `db:"started_at_ms"`
+		Ended      sql.NullInt64 `db:"ended_at_ms"`
+		Outcome    string        `db:"outcome"`
+		Error      string        `db:"error_code"`
+		ErrorScope string        `db:"error_scope"`
 	}
-	if err := dbWrapper.Select(ctx, &rows, "SELECT * FROM source_run_attempts WHERE run_uuid=? AND fence>? ORDER BY fence LIMIT ?", id, after, limit); err != nil {
+	if err := dbWrapper.Select(ctx, &rows, `SELECT a.*,coalesce(f.scope,'') AS error_scope FROM source_run_attempts a
+LEFT JOIN source_run_attempt_failures f ON f.run_uuid=a.run_uuid AND f.fence=a.fence
+WHERE a.run_uuid=? AND a.fence>? ORDER BY a.fence LIMIT ?`, id, after, limit); err != nil {
 		return nil, err
 	}
 	ret := make([]models.SourceRunAttempt, 0, len(rows))
 	for _, row := range rows {
-		a := models.SourceRunAttempt{SourceRunLease: models.SourceRunLease{RunUUID: row.Run, Fence: row.Fence, ProducerUUID: row.Producer, OwnerUUID: row.Owner}, StartedAt: time.UnixMilli(row.Started).UTC(), Outcome: row.Outcome, ErrorCode: row.Error}
+		a := models.SourceRunAttempt{SourceRunLease: models.SourceRunLease{RunUUID: row.Run, Fence: row.Fence, ProducerUUID: row.Producer, OwnerUUID: row.Owner}, StartedAt: time.UnixMilli(row.Started).UTC(), Outcome: row.Outcome, ErrorCode: row.Error, ErrorScope: row.ErrorScope}
 		if row.Ended.Valid {
 			value := time.UnixMilli(row.Ended.Int64).UTC()
 			a.EndedAt = &value

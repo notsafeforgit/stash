@@ -1107,7 +1107,7 @@ func (db *Anonymiser) deleteSourceAccountEvidence(ctx context.Context) error {
 			"catalog_registry_import_records", "catalog_registry_imports",
 			"catalog_identity_import_records", "catalog_identity_imports",
 			"source_backfill_requests", "source_backfill_decisions",
-			"enrichment_attempt_pacing", "source_run_pacing", "enrichment_job_pacing", "source_pacing",
+			"source_run_attempt_failures", "source_run_attempt_pacing", "enrichment_attempt_pacing", "source_run_pacing", "enrichment_job_pacing", "source_pacing",
 			"source_run_requests", "source_run_attempts", "source_run_reviews", "source_runs", "source_run_cooldowns",
 			"enrichment_checkpoint_releases", "enrichment_published_records", "enrichment_publications",
 			"enrichment_checkpoints", "enrichment_checkpoint_records", "enrichment_checkpoint_receipts", "enrichment_job_attempts", "enrichment_job_targets",

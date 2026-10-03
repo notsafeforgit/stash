@@ -32,6 +32,10 @@ class LeaseFixture:
         self.check()
         self.checkpoints.append(args)
 
+    def reserve_source(self, url):
+        self.check()
+        return "host:fixture.invalid"
+
 
 def reddit_data(key="abc123", **changes):
     url = "https://i.redd.it/" + key + ".jpg"

@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from email.utils import parsedate_to_datetime
+import re
 import threading
 import time
 import uuid
@@ -13,6 +14,22 @@ from .events import sha256
 
 class SourcePaused(RuntimeError):
     """The current file can finish, but no further source work may start."""
+
+
+def source_scope(value):
+    return (isinstance(value, str)
+            and re.fullmatch(r"(?:service|mirror|host):[a-z0-9][a-z0-9.:\-]{0,252}", value) is not None)
+
+
+class SourceFailure(RuntimeError):
+    """A controlled service failure without website responses or private URLs."""
+
+    def __init__(self, code, scope):
+        if code not in {"source_busy", "rate_limited", "timeout", "extraction_failed", "authentication",
+                        "access_denied", "challenge", "not_found"} or not source_scope(scope):
+            raise InvalidData("Invalid source failure attribution")
+        self.code, self.scope = code, scope
+        super().__init__(code + " (" + scope + ")")
 
 
 def submit(client, request):
@@ -100,6 +117,25 @@ class RunLease:
                 self.failure = type(exc).__name__
                 raise SourcePaused("Cannot checkpoint source progress; evidence remains queued") from None
 
+    def reserve_source(self, url):
+        with self.lock:
+            try:
+                self.check()
+                result = self.client._request("POST", "/runs/" + self.run_uuid + "/source",
+                                              encode({"owner_uuid": self.owner, "fence": self.run["fence"],
+                                                      "url": url}, 16384))
+                self.check()
+                if (not isinstance(result, dict) or result.get("run_uuid") != self.run_uuid
+                        or type(result.get("fence")) is not int or result["fence"] != self.run["fence"]
+                        or type(result.get("ready")) is not bool or not source_scope(result.get("source_scope"))):
+                    raise SourcePaused("Source reservation does not identify the current attempt")
+            except (Unavailable, InvalidData, SourcePaused):
+                self.failure = "source_reservation_unavailable"
+                raise SourcePaused("Cannot confirm source service ownership") from None
+            if not result["ready"]:
+                raise SourceFailure("source_busy", result["source_scope"])
+            return result["source_scope"]
+
     def start(self):
         self.check()
         if self.thread is not None:
@@ -116,15 +152,18 @@ class RunLease:
         self.thread.start()
         return self
 
-    def finish(self, state, *, error_code="", retry_after_seconds=0):
+    def finish(self, state, *, error_code="", error_scope="", retry_after_seconds=0):
         with self.lock:
             try:
                 expected = {"succeeded": {"queued", "succeeded"}, "retry": {"queued", "deferred"},
                             "deferred": {"deferred"}}.get(state)
                 if expected is None:
                     raise InvalidData("Invalid source attempt outcome")
-                result, _, _ = self._change(outcome={"state": state, "error_code": error_code,
-                                                    "retry_after_seconds": retry_after_seconds})
+                outcome = {"state": state, "error_code": error_code, "retry_after_seconds": retry_after_seconds}
+                if error_scope:
+                    SourceFailure(error_code, error_scope)
+                    outcome["error_scope"] = error_scope
+                result, _, _ = self._change(outcome=outcome)
                 if (not isinstance(result, dict) or result.get("uuid") != self.run_uuid
                         or result.get("fence") != self.run["fence"] or result.get("state") not in expected
                         or any(result.get(field) != self.run.get(field) for field in (

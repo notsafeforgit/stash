@@ -1635,5 +1635,28 @@ Existing running checkpoints gain child reservations; original root reservations
 are reconstructed for historical attempts. Startup checks bindings and required
 objects. Ordinary backups retain scheduling state; anonymisation removes it with
 work history. This does not import legacy catalog cooldowns or scheduling history.
-Download-side linked-extractor reservations, cross-collection fairness, typed
-download-adapter failures and live conversion remain required before activating production schedules.
+
+Schema 1000055 adds `source_run_attempt_pacing` and
+`source_run_attempt_failures` for download-side linked services. Each attempt
+holds its root service. Before initializing an extractor, the download adapter
+reserves that service through the current producer, owner and fence. The supported
+linked services are Redgifs and Imgur; unrelated service reservations are rejected.
+Requested but busy services persist with `reserved=0`, without holding them.
+An exact-window retry checks all prior dependencies before touching the parent
+and atomically reserves them with the new attempt. This includes expired attempts
+whose worker never reported the blocked dependency. A widened or new traversal
+discovers its own linked services. Terminal attempts retain their history without
+holding any service.
+
+Typed failure receipts bind the failing service to the matching terminal attempt,
+error code and completion time. A network or authentication failure requires a
+held service; `source_busy` may identify a requested service. Only that service
+receives any applicable cooldown. Local storage/configuration failures and
+individual media download failures retain their existing generic attempt errors.
+No source URL, website response or access value enters these tables. The additive
+migration binds historical attempts to their existing root scope and preserves
+all previous rows and schema objects. Startup validates dependencies and failure
+receipts; ordinary backups retain them and anonymisation removes them.
+
+Cross-collection fairness, legacy scheduling import and live conversion remain
+required before activating production schedules.

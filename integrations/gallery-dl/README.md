@@ -100,6 +100,21 @@ mount identity and live lease before extraction/download boundaries. Child jobs
 inherit those objects, and asynchronous extraction is disabled. Destination
 locks cover a filename stem and its transformed encodings.
 
+The executor requires native `source_run_pacing_protocol: 1`. It reserves the root
+service and each supported linked service before extractor initialization, which
+may log in. Currently the reviewed linked services are Redgifs and Imgur. A busy
+service stops the attempt with `source_busy`; native attempt dependencies make an
+exact-window retry wait before repeating source work. Reservations are released
+by completion, cancellation or expiry, and expired retries retain dependencies.
+
+Source rate limits and request timeouts stop gallery-dl's immediate HTTP retries.
+Controlled extraction, authentication and access errors identify the service
+that failed, including linked extractors. Applicable cooldowns affect that service.
+An individual media download failure does not become a website-wide outage, and
+intentional archive/window stops retain their normal semantics. Failed ownership
+checks take precedence over source error reporting. A lost finish acknowledgement
+is recovered only from the exact attempt with the same outcome, code and service.
+
 The adapter enforces the claimed half-open source-post window (`since` inclusive,
 `until` exclusive) before directory, file or postprocessor handling. Reddit's
 original `created_utc` and Twitter's Snowflake timestamp retain milliseconds
@@ -1527,8 +1542,8 @@ Use the executor below to persist fresh extraction results before network
 delivery. Ready-target discovery lists unadmitted targets; the separate ready-job
 route finds admitted retries. The native server now maintains expired/stale
 enrichment jobs independently of other workers. Shared service cooldowns and
-download/enrichment exclusion are implemented. Download-side linked-extractor reservations, cross-collection fairness, typed
-download failure reporting, legacy queue mapping and production host/n8n launchers
+download/enrichment exclusion and typed download service failures are implemented.
+Cross-collection fairness, legacy queue mapping and production host/n8n launchers
 remain transition work.
 
 ### Durable selected-job execution

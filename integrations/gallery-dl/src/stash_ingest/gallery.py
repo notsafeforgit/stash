@@ -8,6 +8,7 @@ from pathlib import Path
 import tempfile
 import types
 from contextlib import contextmanager
+import requests
 
 from gallery_dl import config, exception, job, version
 from gallery_dl import path as gallery_path
@@ -15,7 +16,7 @@ from gallery_dl import path as gallery_path
 from . import filename
 from .encoding import InvalidData
 from .filesystem import destination_lock
-from .runs import SourcePaused
+from .runs import SourceFailure, SourcePaused
 from .outbox import Capacity
 from .source_window import published, validate_keywords
 from .scan_resume import legacy_cursor
@@ -26,15 +27,24 @@ SUPPORTED_VERSION = "1.32.15-dev"
 class SourceSession:
     """Check each source HTTP attempt, including gallery-dl's internal retries."""
 
-    def __init__(self, producer, session):
-        self.producer, self.session = producer, session
+    def __init__(self, producer, session, scope):
+        self.producer, self.session, self.scope = producer, session, scope
 
     def __getattr__(self, name):
         return getattr(self.session, name)
 
     def request(self, *args, **kwargs):
         self.producer.check()
-        return self.session.request(*args, **kwargs)
+        try:
+            response = self.session.request(*args, **kwargs)
+        except requests.exceptions.Timeout:
+            self.producer.fail_source("timeout", self.scope)
+        except requests.exceptions.RequestException:
+            self.producer.fail_source("extraction_failed", self.scope)
+        if response.status_code == 429:
+            response.close()
+            self.producer.fail_source("rate_limited", self.scope)
+        return response
 
 
 class InitializationLog:
@@ -141,6 +151,7 @@ class NativeDownloadJob(job.DownloadJob):
         self._native_parent = parent
         self._native_source_date = None if parent is None else parent._native_queued_date
         self._native_queued_date = None
+        self._native_scope = None
         super().__init__(extractor, parent)
         extractor = self.extractor
         if parent is None and self.producer.source_category is not None and extractor.category != self.producer.source_category:
@@ -156,13 +167,15 @@ class NativeDownloadJob(job.DownloadJob):
 
         def guarded_request(*args, **kwargs):
             self.producer.check()
+            if self._native_scope is None:
+                raise InvalidData("Source request preceded its service reservation")
             # Only the source request receives this proxy. The downloader's
             # session remains usable while its current file finishes.
             if len(args) >= 3:
                 args = list(args)
-                args[2] = SourceSession(self.producer, args[2] or extractor.session)
+                args[2] = SourceSession(self.producer, args[2] or extractor.session, self._native_scope)
             else:
-                kwargs["session"] = SourceSession(self.producer, kwargs.get("session") or extractor.session)
+                kwargs["session"] = SourceSession(self.producer, kwargs.get("session") or extractor.session, self._native_scope)
             return request(*args, **kwargs)
 
         extractor.request = guarded_request
@@ -172,6 +185,8 @@ class NativeDownloadJob(job.DownloadJob):
         validate_keywords(self.extractor)
         try:
             result = super().run()
+            if self.producer.source_failure is not None:
+                raise self.producer.source_failure
             if self._native_parent is None and not result:
                 self.producer.traversed()
             return result
@@ -180,9 +195,34 @@ class NativeDownloadJob(job.DownloadJob):
 
     def _init(self):
         self.producer.check()
-        super()._init()
+        self._native_scope = self.producer.reserve_source(self.extractor.url)
+        self._source_operation(super()._init)
         if self.extractor.category == "twitter":
             twitter_evidence(self.extractor)
+
+    def _source_operation(self, call, *args):
+        try:
+            return call(*args)
+        except (InvalidData, Capacity, SourcePaused, SourceFailure, exception.ControlException):
+            raise
+        except (exception.ExtractionError, requests.exceptions.RequestException) as exc:
+            if isinstance(exc, exception.AuthenticationError):
+                code = "authentication"
+            elif isinstance(exc, exception.AuthorizationError):
+                code = "access_denied"
+            elif isinstance(exc, exception.ChallengeError):
+                code = "challenge"
+            elif isinstance(exc, exception.NotFoundError) or getattr(exc, "status", None) == 404:
+                code = "not_found"
+            elif isinstance(exc, requests.exceptions.Timeout):
+                code = "timeout"
+            elif getattr(exc, "status", None) == 429:
+                code = "rate_limited"
+            elif getattr(exc, "status", None) in (401, 403):
+                code = "access_denied"
+            else:
+                code = "extraction_failed"
+            self.producer.fail_source(code, self._native_scope)
 
     def dispatch(self, messages):
         def guarded():
@@ -191,7 +231,7 @@ class NativeDownloadJob(job.DownloadJob):
             while True:
                 self.producer.check()
                 try:
-                    kind, url, data = next(iterator)
+                    kind, url, data = self._source_operation(next, iterator)
                 except StopIteration:
                     return
                 value = self._native_source_date or published(data, self.extractor.category)

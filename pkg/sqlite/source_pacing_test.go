@@ -335,6 +335,7 @@ func TestSourcePacingFailedClaimCannotCommitPartialOwnership(t *testing.T) {
 
 func removeSourcePacingSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeSourceRunServicesSchema(t, raw)
 	_, err := raw.Exec(`DROP TRIGGER source_run_pacing_bind; DROP TRIGGER enrichment_job_pacing_bind;
  DROP TRIGGER enrichment_attempt_pacing_bind; DROP TABLE enrichment_attempt_pacing;
  DROP TABLE source_run_pacing; DROP TABLE enrichment_job_pacing; DROP TABLE source_pacing;

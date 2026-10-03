@@ -43,10 +43,10 @@ func sourcePacingScope(ctx context.Context, id string, enrichment bool) (string,
 // download/destination exclusions still apply; independent downloads may run
 // together, but metadata enrichment cannot compete with them on the same service.
 func sourcePacingReady(ctx context.Context, scope, collection string, enrichment bool, now time.Time) (bool, error) {
-	return sourcePacingReadyFor(ctx, scope, collection, enrichment, "", now)
+	return sourcePacingReadyFor(ctx, scope, collection, enrichment, "", "", now)
 }
 
-func sourcePacingReadyFor(ctx context.Context, scope, collection string, enrichment bool, ignoreJob string, now time.Time) (bool, error) {
+func sourcePacingReadyFor(ctx context.Context, scope, collection string, enrichment bool, ignoreJob, ignoreRun string, now time.Time) (bool, error) {
 	var busy bool
 	if err := dbWrapper.Get(ctx, &busy, `SELECT
  EXISTS(SELECT 1 FROM source_pacing WHERE scope=? AND (available_at_ms>? OR last_started_at_ms>?))
@@ -55,9 +55,9 @@ func sourcePacingReadyFor(ctx context.Context, scope, collection string, enrichm
   WHERE j.kind='post.enrich' AND j.state IN ('queued','running') AND j.state='running'
    AND j.uuid!=? AND (p.scope=? OR json_extract(j.arguments,'$.collection_uuid')=?))
  OR EXISTS(SELECT 1 FROM source_runs r INDEXED BY source_runs_expired
-  JOIN source_run_pacing p ON p.run_uuid=r.uuid
-  WHERE r.state='running' AND (p.scope=? OR r.collection_uuid=?) AND (? OR r.operation='enrich'))`,
-		scope, now.UnixMilli(), now.UnixMilli(), ignoreJob, scope, collection, scope, collection, enrichment); err != nil {
+  JOIN source_run_attempt_pacing p ON p.run_uuid=r.uuid AND p.fence=r.fence AND p.reserved=1
+  WHERE r.state='running' AND r.uuid!=? AND (p.scope=? OR r.collection_uuid=?) AND (? OR r.operation='enrich'))`,
+		scope, now.UnixMilli(), now.UnixMilli(), ignoreJob, scope, collection, ignoreRun, scope, collection, enrichment); err != nil {
 		return false, err
 	}
 	if busy || !enrichment {
@@ -73,11 +73,14 @@ func sourcePacingReadyFor(ctx context.Context, scope, collection string, enrichm
  JOIN media_roots m ON m.uuid=r.root_uuid AND m.revision=r.root_revision
  JOIN media_root_revisions v ON v.root_uuid=m.uuid AND v.revision=m.revision
  WHERE r.state IN ('queued','running','deferred') AND r.state='queued' AND r.operation='download'
-  AND r.available_at_ms<=? AND (p.scope=? OR r.collection_uuid=?) AND d.state='active' AND v.state='active'
+  AND r.available_at_ms<=? AND (p.scope=? OR r.collection_uuid=? OR EXISTS(
+   SELECT 1 FROM source_run_attempt_pacing s JOIN source_run_attempts a ON a.run_uuid=s.run_uuid AND a.fence=s.fence
+   WHERE s.run_uuid=r.uuid AND s.fence=r.fence AND s.scope=? AND a.outcome IN ('retry','expired','deferred')
+    AND a.window=json_extract(r.pending,'$[#-1]'))) AND d.state='active' AND v.state='active'
   AND NOT EXISTS(SELECT 1 FROM source_run_cooldowns d WHERE d.target_key=r.target_key AND d.available_at_ms>?)
  ) OR EXISTS(SELECT 1 FROM source_runs r JOIN source_run_cooldowns d ON d.target_key=r.target_key
  WHERE r.collection_uuid=? AND d.available_at_ms>?)`,
-		now.UnixMilli(), scope, collection, now.UnixMilli(), collection, now.UnixMilli()); err != nil {
+		now.UnixMilli(), scope, collection, scope, now.UnixMilli(), collection, now.UnixMilli()); err != nil {
 		return false, err
 	}
 	return !busy, nil
@@ -128,7 +131,7 @@ func (s *EnrichmentJobStore) ReserveSource(ctx context.Context, lease models.Enr
 	if _, err := s.Maintain(ctx, now); err != nil {
 		return false, err
 	}
-	ready, err := sourcePacingReadyFor(ctx, scope, work.CollectionUUID, true, job.UUID, now)
+	ready, err := sourcePacingReadyFor(ctx, scope, work.CollectionUUID, true, job.UUID, "", now)
 	if err != nil || !ready {
 		return false, err
 	}

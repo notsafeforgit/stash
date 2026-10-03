@@ -5,7 +5,8 @@ import unittest
 from unittest.mock import Mock
 
 from stash_ingest.client import Unavailable
-from stash_ingest.runs import RunLease, SourcePaused
+from stash_ingest.runs import RunLease, SourceFailure, SourcePaused
+from stash_ingest.encoding import decode
 from helpers import PRODUCER, COLLECTION, ROOT, RUN
 
 OWNER = "3569ad7a-4e4a-4f4f-9ecf-a59ed6f59df1"
@@ -87,6 +88,44 @@ class RunLeaseTests(unittest.TestCase):
                     lease.finish("succeeded")
                 with self.assertRaises(SourcePaused):
                     lease.check()
+
+
+    def test_source_reservation_is_fenced_and_busy_can_be_reported_with_live_lease(self):
+        self.lease._accept(self.response())
+        permit = {"run_uuid": RUN, "fence": 3, "ready": True, "source_scope": "service:redgifs"}
+        self.client._request.return_value = permit
+        self.assertEqual(self.lease.reserve_source("https://redgifs.com/watch/example"), "service:redgifs")
+        request = self.client._request.call_args.args
+        self.assertEqual(request[:2], ("POST", "/runs/" + RUN + "/source"))
+        self.assertEqual(decode(request[2]), {"owner_uuid": OWNER, "fence": 3, "url": "https://redgifs.com/watch/example"})
+        self.client._request.return_value = {**permit, "ready": False}
+        with self.assertRaises(SourceFailure) as failure:
+            self.lease.reserve_source("https://redgifs.com/watch/example")
+        self.assertEqual((failure.exception.code, failure.exception.scope), ("source_busy", "service:redgifs"))
+        self.lease.check()
+        self.client._request.return_value = (dict(self.run, state="queued"), None, 0)
+        self.lease.finish("retry", error_code="source_busy", error_scope="service:redgifs")
+        self.assertEqual(decode(self.client._request.call_args.args[2])["outcome"]["error_scope"], "service:redgifs")
+
+    def test_invalid_or_late_source_permit_stops_ownership(self):
+        permit = {"run_uuid": RUN, "fence": 3, "ready": True, "source_scope": "service:redgifs"}
+        for change in ({"run_uuid": ROOT}, {"fence": 2}, {"fence": True}, {"ready": "true"},
+                       {"source_scope": "https://redgifs.com/private?token=secret"}, {"source_scope": None}):
+            with self.subTest(change=change):
+                lease = RunLease(self.client, RUN, OWNER, "a" * 64, clock=lambda: self.now[0])
+                lease._accept(self.response())
+                self.client._request.return_value = {**permit, **change}
+                with self.assertRaises(SourcePaused):
+                    lease.reserve_source("https://redgifs.com/watch/example")
+                with self.assertRaises(SourcePaused):
+                    lease.check()
+        self.lease._accept(self.response())
+        def late(*args, **kwargs):
+            self.now[0] += 180
+            return permit
+        self.client._request.side_effect = late
+        with self.assertRaises(SourcePaused):
+            self.lease.reserve_source("https://redgifs.com/watch/example")
 
 
 if __name__ == "__main__":

@@ -7,10 +7,10 @@ from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
-from unittest.mock import patch
-from requests.exceptions import ConnectionError
+from unittest.mock import Mock, patch
+from requests.exceptions import ConnectionError, Timeout
 
-from gallery_dl import config
+from gallery_dl import config, exception
 from gallery_dl import extractor as gdl_extractors
 from gallery_dl.extractor.common import Extractor, Message
 from gallery_dl.extractor.twitter import TwitterExtractor
@@ -21,7 +21,7 @@ from stash_ingest.filesystem import Root
 from stash_ingest.gallery import NativeDownloadJob
 from stash_ingest.outbox import Outbox
 from stash_ingest.producer import Producer
-from stash_ingest.runs import SourcePaused
+from stash_ingest.runs import SourceFailure, SourcePaused
 from stash_ingest.source_window import SourceWindow
 from stash_ingest.scan_resume import legacy_cursor, PREFIX as LEGACY_CURSOR_PREFIX
 from test_producer import LeaseFixture, reddit_data
@@ -342,6 +342,76 @@ class GalleryTests(unittest.TestCase):
         self.assertNotEqual(task.run(), 0)
         self.assertFalse((self.media / "AccountOther").exists())
         self.assertEqual(self.events(), [])
+
+    def test_busy_child_is_reserved_before_initialization_and_stops_other_children(self):
+        reserved = []
+        def reserve(url):
+            reserved.append(url)
+            if url.endswith("/child"):
+                raise SourceFailure("source_busy", "service:redgifs")
+            return "service:reddit"
+        self.lease.reserve_source = reserve
+        task = self.task(reddit_data(), reddit_data("second"), fixture=ParentFixture)
+        with patch.object(ChildFixture, "initialize") as initialize:
+            with self.assertRaises(SourceFailure) as failure:
+                task.run()
+            initialize.assert_not_called()
+        self.assertEqual((failure.exception.code, failure.exception.scope), ("source_busy", "service:redgifs"))
+        self.assertEqual(reserved, [self.lease.run["target_url"], "https://fixture.invalid/child"])
+        self.assertEqual(self.events(), [])
+
+    def test_child_login_failure_is_attributed_to_child_not_parent(self):
+        self.lease.reserve_source = lambda url: "service:redgifs" if url.endswith("/child") else "service:reddit"
+        task = self.task(reddit_data(), fixture=ParentFixture)
+        with patch.object(ChildFixture, "initialize", side_effect=exception.AuthenticationError("private-cookie")):
+            with self.assertRaises(SourceFailure) as failure:
+                task.run()
+        self.assertEqual((failure.exception.code, failure.exception.scope), ("authentication", "service:redgifs"))
+        self.assertNotIn("private-cookie", str(failure.exception))
+        self.assertEqual(self.events(), [])
+
+    def test_source_rate_limit_and_timeout_stop_internal_http_retries(self):
+        for code in ("rate_limited", "timeout"):
+            with self.subTest(code=code):
+                self.producer.source_failure = None
+                task = self.task()
+                task._init()
+                response = Mock(status_code=429)
+                with patch.object(task.extractor.session, "request", return_value=response,
+                                  side_effect=Timeout("private-url") if code == "timeout" else None) as request:
+                    with self.assertRaises(SourceFailure) as failure:
+                        task.extractor.request("https://fixture.invalid/page", retries=3, interval=False)
+                    self.assertEqual(failure.exception.code, code)
+                    self.assertNotIn("private-url", str(failure.exception))
+                    with self.assertRaises(SourceFailure):
+                        task.extractor.request("https://fixture.invalid/next")
+                    self.assertEqual(request.call_count, 1)
+                if code == "rate_limited":
+                    response.close.assert_called_once()
+
+    def test_individual_media_failure_does_not_create_a_service_cooldown(self):
+        task = self.task()
+        task.download = Mock(side_effect=Timeout("missing media"))
+        self.assertNotEqual(task.run(), 0)
+        self.assertIsNone(self.producer.source_failure)
+
+    def test_source_missing_post_and_controlled_archive_stop_have_different_outcomes(self):
+        task = self.task()
+        def missing():
+            raise exception.NotFoundError("private-url")
+            yield
+        task.extractor.items = missing
+        with self.assertRaises(SourceFailure) as failure:
+            task.run()
+        self.assertEqual(failure.exception.code, "not_found")
+        self.producer.source_failure = None
+        task = self.task()
+        def stopped():
+            raise exception.StopExtraction()
+            yield
+        task.extractor.items = stopped
+        self.assertEqual(task.run(), 0)
+        self.assertIsNone(self.producer.source_failure)
 
     def test_async_and_legacy_postprocessors_are_rejected_before_execution(self):
         for options in ({"name": "exec", "async": True, "command": ["fixture"]},

@@ -129,6 +129,25 @@ func (rs *ingestRoutes) claimRun(w http.ResponseWriter, r *http.Request) {
 	sourceRunResponse(w, result, err)
 }
 
+func (rs *ingestRoutes) reserveRunSource(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		OwnerUUID string `json:"owner_uuid"`
+		Fence     int64  `json:"fence"`
+		URL       string `json:"url"`
+	}
+	if err := readIngestJSON(w, r, 16384, &input); err != nil {
+		ingestError(w, err)
+		return
+	}
+	lease := models.SourceRunLease{RunUUID: chi.URLParam(r, "run"), OwnerUUID: input.OwnerUUID, Fence: input.Fence}
+	result, err := rs.runCoordinator().ReserveSource(r.Context(), ingestToken(r), lease, input.URL)
+	if err != nil {
+		ingestError(w, err)
+		return
+	}
+	ingestJSON(w, http.StatusOK, result)
+}
+
 func (rs *ingestRoutes) changeRunLease(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		OwnerUUID    string                    `json:"owner_uuid"`

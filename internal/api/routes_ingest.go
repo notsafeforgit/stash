@@ -56,6 +56,7 @@ func (rs *ingestRoutes) router() http.Handler {
 		r.Post("/runs/{run}/attempts", rs.sourceRunAttempts)
 		r.Post("/runs/{run}/claim", rs.claimRun)
 		r.Post("/runs/{run}/lease", rs.changeRunLease)
+		r.Post("/runs/{run}/source", rs.reserveRunSource)
 		rs.enrichmentRoutes(r)
 	})
 	return r
@@ -163,6 +164,7 @@ func (rs *ingestRoutes) capabilities(w http.ResponseWriter, r *http.Request) {
 		"max_file_event_bytes": ingest.MaxFileEventBytes, "file_ingestion": rs.fileIngestion,
 		"source_runs": true, "source_run_protocol": 1, "source_run_submission_receipts": true, "source_run_dispatch": true,
 		"source_run_recovery_protocol":      1,
+		"source_run_pacing_protocol":        1,
 		"source_backfill_protocol":          1,
 		"collection_lookup":                 true,
 		"enrichment_protocol":               1,

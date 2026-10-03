@@ -85,12 +85,21 @@ func TestSourceRunHTTPScopedOwnershipAndLateEvidence(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &run))
 	require.Equal(t, "running", run.State)
 	require.Equal(t, http.StatusNoContent, request(handler, http.MethodPost, path+"/claim", otherToken, claim).Code)
+	reservation := map[string]any{"owner_uuid": owner, "fence": run.Fence, "url": "https://redgifs.com/watch/example"}
+	require.Equal(t, http.StatusUnauthorized, request(handler, http.MethodPost, path+"/source", "", reservation).Code)
+	require.Equal(t, http.StatusConflict, request(handler, http.MethodPost, path+"/source", otherToken, reservation).Code)
+	w = request(handler, http.MethodPost, path+"/source", token, reservation)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var permit models.SourceRunServiceReservation
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &permit))
+	require.Equal(t, models.SourceRunServiceReservation{RunUUID: run.UUID, Fence: run.Fence, Scope: "service:redgifs", Ready: true}, permit)
 	lease := map[string]any{"owner_uuid": owner, "fence": run.Fence, "progress": models.SourceRunProgress{ItemsSeen: 2, Cursor: "post_2"}}
 	require.Equal(t, http.StatusConflict, request(handler, http.MethodPost, path+"/lease", otherToken, lease).Code, "different producer cannot reuse another producer's fence")
 	w = request(handler, http.MethodPost, path+"/lease", token, lease)
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	require.NoError(t, service.Repo.WithTxn(t.Context(), func(ctx context.Context) error { return service.Repo.Ingest.RevokeCredential(ctx, credential.UUID) }))
 	require.Equal(t, http.StatusUnauthorized, request(handler, http.MethodPost, path+"/lease", token, lease).Code)
+	require.Equal(t, http.StatusUnauthorized, request(handler, http.MethodPost, path+"/source", token, reservation).Code)
 	_, token, err = service.IssueCredential(t.Context(), producer.UUID, scopes, nil)
 	require.NoError(t, err)
 	finish := map[string]any{"owner_uuid": owner, "fence": run.Fence, "outcome": models.SourceRunOutcome{State: "succeeded"}}
@@ -98,6 +107,7 @@ func TestSourceRunHTTPScopedOwnershipAndLateEvidence(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &run))
 	require.Equal(t, "succeeded", run.State)
+	require.Equal(t, http.StatusConflict, request(handler, http.MethodPost, path+"/source", token, reservation).Code)
 	w = request(handler, http.MethodPost, path+"/attempts", token, map[string]int{"after": 0})
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Contains(t, w.Body.String(), `"outcome":"succeeded"`)

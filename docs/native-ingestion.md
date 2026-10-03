@@ -568,8 +568,8 @@ The native server runs enrichment maintenance every 30 seconds independently of
 media and translation workers. It cancels stale source/target work, recovers
 expired attempts with backoff and preserves checkpoint/receipt evidence. Claims
 and source reservations also recover conflicting expired work; discovery remains
-read-only. Stash never contacts websites for these operations. Download-side linked-service reservations, multi-collection
-fairness, typed download-adapter failure reporting, legacy queue import and
+read-only. Stash never contacts websites for these operations. Multi-collection
+fairness, legacy queue import and
 host/n8n activation remain required before switching production schedules.
 
 The Python selected-job executor now journals stable claim requests, returned
@@ -647,6 +647,7 @@ Producer authentication and collection/root grants are the same as event intake.
 | `POST /runs/<uuid>/attempts` | Optional integer `after` fence; at most 50 attempts |
 | `POST /runs/<uuid>/claim` | `owner_uuid`, `policy_sha256`, `lease_seconds` (5–900) |
 | `POST /runs/<uuid>/lease` | `owner_uuid`, `fence`, and exactly one of `lease_seconds`, `progress`, or `outcome` |
+| `POST /runs/<uuid>/source` | `owner_uuid`, `fence`, `url`; returns `run_uuid`, `fence`, `source_scope` and boolean `ready` |
 
 Paths above are relative to `/api/v3/ingest`. Pagination uses JSON bodies;
 query-string tokens and parameters remain rejected. A claim returns 204 and
@@ -654,6 +655,27 @@ query-string tokens and parameters remain rejected. A claim returns 204 and
 with the same producer and worker UUID returns its still-valid lease. A different
 producer or worker cannot borrow it. Rotate the ingestion token while retaining
 the producer UUID when the same worker should keep ownership.
+
+The download executor requires `source_run_pacing_protocol: 1`. Before each root
+or linked extractor initializes, it reserves the contacted service through
+`/source`. The current attempt may reserve its root service, Redgifs or Imgur.
+Authority, definition and lease validity are checked through transaction commit.
+A busy service returns `ready: false` and remains a recorded dependency without
+holding it. Finish that attempt with `state: "retry"`, `error_code: "source_busy"`
+and `error_scope` equal to the returned `source_scope`. Exact-window retries wait
+for recorded dependencies before repeating parent extraction; a widened traversal
+starts its own dependency set. Repeated reservations under the same fence do not
+extend ownership or rewrite service start times.
+
+An unsuccessful `outcome` may include `error_scope` with a controlled source code:
+`source_busy`, `rate_limited`, `timeout`, `extraction_failed`, `authentication`,
+`access_denied`, `challenge` or `not_found`. Except for `source_busy`, the attempt
+must have held that service. Attempts expose the retained `error_scope`; lost
+completion responses must match outcome, code and scope as well as producer,
+owner and fence. Error scopes contain service identities, never source URLs.
+Only the failing service receives an applicable shared cooldown. Busy sources,
+missing posts, access-denied accounts and local/media failures do not create a
+service-wide outage. Source completion still does not certify media intake.
 
 Capabilities advertise `source_run_dispatch: true` for scoped work discovery.
 It uses the bounded active-run index and the server clock, excluding future

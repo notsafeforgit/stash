@@ -7,7 +7,7 @@ from .client import Client, Unavailable, drain_once
 from .encoding import InvalidData, encode, identifier
 from .outbox import Capacity, Conflict, Outbox
 from .producer import Producer
-from .runs import RunLease, SourcePaused
+from .runs import RunLease, SourceFailure, SourcePaused
 
 
 class Delivery:
@@ -50,7 +50,7 @@ class Delivery:
                 self.failure = "delivery_still_pending"
 
 
-def _confirmed_attempt(client, lease, outcome):
+def _confirmed_attempt(client, lease, outcome, error_code, error_scope):
     """Recover a committed finish whose HTTP response was lost."""
     attempts = client._request("POST", "/runs/" + lease.run_uuid + "/attempts",
                                encode({"after": lease.run["fence"] - 1}))
@@ -59,6 +59,7 @@ def _confirmed_attempt(client, lease, outcome):
     return any(isinstance(attempt, dict) and attempt.get("run_uuid") == lease.run_uuid
                and attempt.get("producer_uuid") == client.producer and attempt.get("owner_uuid") == lease.owner
                and attempt.get("fence") == lease.run["fence"] and attempt.get("outcome") == outcome
+               and attempt.get("error_code", "") == error_code and attempt.get("error_scope", "") == error_scope
                and attempt.get("ended_at") for attempt in attempts)
 
 
@@ -74,6 +75,7 @@ def execute(box, client, configuration, run_uuid):
     capabilities = client.capabilities()
     if (capabilities.get("source_runs") is not True or capabilities.get("source_run_protocol") != 1
             or capabilities.get("source_run_recovery_protocol") != 1
+            or capabilities.get("source_run_pacing_protocol") != 1
             or capabilities.get("file_ingestion") is not True):
         raise Unavailable("native_download_worker_unavailable")
     current = client._request("GET", "/runs/" + run_uuid)
@@ -90,6 +92,7 @@ def execute(box, client, configuration, run_uuid):
         if lease is None:
             return {"state": "waiting", "run_uuid": run_uuid}
         outcome, error, result = "deferred", "worker_execution_failed", None
+        error_scope = ""
         try:
             if lease.run.get("root_uuid") != configuration.root_uuid or lease.run.get("operation") != "download":
                 raise InvalidData("Claimed run changed its worker root or operation")
@@ -104,15 +107,16 @@ def execute(box, client, configuration, run_uuid):
                                 configuration_check=check_configuration, source_category=configuration.source_category)
             task = NativeDownloadJob(lease.run["target_url"], producer=producer, lock_directory=configuration.locks.path)
             status = task.run()
-            lease.check()
-            configuration.check()
-            delivery.check()
+            producer.check()
             if status == 0:
                 outcome, error = "succeeded", ""
             elif producer.failure_code == "source_rejected" or status & (8 | 16 | 32):
                 outcome, error = "deferred", producer.failure_code or "source_access_or_configuration"
             else:
                 outcome, error = "retry", producer.failure_code or "source_download_failed"
+        except SourceFailure as exc:
+            outcome = "deferred" if exc.code in {"authentication", "access_denied", "challenge", "not_found"} else "retry"
+            error, error_scope = exc.code, exc.scope
         except SourcePaused:
             result = {"state": "paused", "run_uuid": run_uuid, "error_code": "source_ownership_unavailable"}
         except Capacity:
@@ -129,12 +133,15 @@ def execute(box, client, configuration, run_uuid):
             try:
                 if result is None:
                     try:
-                        finished = lease.finish(outcome, error_code=error)
+                        failure = {"error_code": error}
+                        if error_scope:
+                            failure["error_scope"] = error_scope
+                        finished = lease.finish(outcome, **failure)
                         result = {"state": "source_succeeded" if outcome == "succeeded" else outcome,
                                   "run_uuid": run_uuid, "run_state": finished["state"], "error_code": error}
                     except (Unavailable, SourcePaused, InvalidData):
                         try:
-                            confirmed = _confirmed_attempt(client, lease, outcome)
+                            confirmed = _confirmed_attempt(client, lease, outcome, error, error_scope)
                         except (Unavailable, InvalidData):
                             confirmed = False
                         result = {"state": ("source_succeeded" if outcome == "succeeded" else outcome) if confirmed
@@ -148,6 +155,8 @@ def execute(box, client, configuration, run_uuid):
                     if result is not None:
                         result["heartbeat_error"] = "heartbeat_still_stopping"
         result["outbox"] = box.status()
+        if error_scope:
+            result["error_scope"] = error_scope
         result["intake_completion"] = "inspect_native_receipts"
         if delivery.failure:
             result["delivery_error"] = delivery.failure

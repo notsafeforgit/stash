@@ -104,15 +104,20 @@ OR EXISTS(SELECT 1 FROM source_run_cooldowns WHERE target_key=? AND available_at
 	if err != nil || !ready {
 		return nil, err
 	}
-	complete := sourcePacingAtomic(ctx)
-	// Latest uncovered range first; old history remains durable pending work.
+	// Keep linked-service dependencies across retries of this exact traversal.
 	window := r.Pending[len(r.Pending)-1]
-	r.Pending = r.Pending[:len(r.Pending)-1]
-	pendingJSON, err := json.Marshal(r.Pending)
+	windowJSON, err := json.Marshal(window)
 	if err != nil {
 		return nil, err
 	}
-	windowJSON, err := json.Marshal(window)
+	ready, err = sourceRunPendingPacingReady(ctx, r, string(windowJSON), now)
+	if err != nil || !ready {
+		return nil, err
+	}
+	complete := sourcePacingAtomic(ctx)
+	// Latest uncovered range first; old history remains durable pending work.
+	r.Pending = r.Pending[:len(r.Pending)-1]
+	pendingJSON, err := json.Marshal(r.Pending)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +159,8 @@ SELECT uuid,fence,producer_uuid,owner_uuid,window,progress,? FROM source_runs WH
 	if err != nil {
 		return nil, err
 	}
-	if err := sourcePacingStarted(ctx, scope, now); err != nil {
+	if _, err := dbWrapper.Exec(ctx, `UPDATE source_pacing SET last_started_at_ms=max(last_started_at_ms,?)
+WHERE scope IN (SELECT scope FROM source_run_attempt_pacing WHERE run_uuid=? AND fence=? AND reserved=1)`, now.UnixMilli(), id, r.Fence+1); err != nil {
 		return nil, err
 	}
 	result, err := s.Find(ctx, id)
@@ -241,7 +247,7 @@ func (s *SourceRunStore) Finish(ctx context.Context, lease models.SourceRunLease
 		return nil, err
 	}
 	if (outcome.State != "succeeded" && outcome.State != "retry" && outcome.State != "deferred") || !jobErrorCode(outcome.ErrorCode) || outcome.RetryAfterSeconds < 0 || outcome.RetryAfterSeconds > 604800 ||
-		(outcome.State == "succeeded" && (outcome.ErrorCode != "" || outcome.RetryAfterSeconds != 0)) || (outcome.State != "succeeded" && outcome.ErrorCode == "") {
+		(outcome.State == "succeeded" && (outcome.ErrorCode != "" || outcome.ErrorScope != "" || outcome.RetryAfterSeconds != 0)) || (outcome.State != "succeeded" && outcome.ErrorCode == "") {
 		return nil, models.ErrSourceRunInvalid
 	}
 	r, err := s.CheckLease(ctx, lease, now)
@@ -257,6 +263,10 @@ func (s *SourceRunStore) Finish(ctx context.Context, lease models.SourceRunLease
 }
 
 func (s *SourceRunStore) finish(ctx context.Context, r *models.SourceRun, outcome models.SourceRunOutcome, now time.Time) (*models.SourceRun, error) {
+	failureScope, err := sourceRunFailureScope(ctx, r, outcome)
+	if err != nil {
+		return nil, err
+	}
 	complete := sourcePacingAtomic(ctx)
 	state := "queued"
 	delay := time.Duration(r.CooldownSeconds) * time.Second
@@ -276,9 +286,12 @@ func (s *SourceRunStore) finish(ctx context.Context, r *models.SourceRun, outcom
 		delay = max(delay, backoff, time.Duration(outcome.RetryAfterSeconds)*time.Second)
 	}
 	if pause := sourcePacingDelay(outcome.ErrorCode, now.Add(delay), now); pause > 0 {
-		scope, err := sourcePacingScope(ctx, r.UUID, false)
-		if err != nil {
-			return nil, err
+		scope := failureScope
+		if scope == "" {
+			scope, err = sourcePacingScope(ctx, r.UUID, false)
+			if err != nil {
+				return nil, err
+			}
 		}
 		delay = max(delay, pause)
 		if err := sourcePacingPause(ctx, scope, outcome.ErrorCode, now.Add(delay)); err != nil {
@@ -295,6 +308,11 @@ func (s *SourceRunStore) finish(ctx context.Context, r *models.SourceRun, outcom
 	}
 	if _, err := dbWrapper.Exec(ctx, "UPDATE source_run_attempts SET outcome=?,error_code=?,ended_at_ms=? WHERE run_uuid=? AND fence=?", outcome.State, outcome.ErrorCode, now.UnixMilli(), r.UUID, r.Fence); err != nil {
 		return nil, err
+	}
+	if failureScope != "" {
+		if _, err := dbWrapper.Exec(ctx, `INSERT INTO source_run_attempt_failures(run_uuid,fence,scope,error_code,created_at_ms) VALUES(?,?,?,?,?)`, r.UUID, r.Fence, failureScope, outcome.ErrorCode, now.UnixMilli()); err != nil {
+			return nil, err
+		}
 	}
 	_, err = dbWrapper.Exec(ctx, `UPDATE source_runs SET state=?,pending=?,completed=?,failures=?,available_at_ms=?,error_code=?,window=NULL,producer_uuid=NULL,owner_uuid=NULL,lease_until_ms=NULL,revision=revision+1,updated_at_ms=? WHERE uuid=?`,
 		state, string(pending), string(completed), r.Failures, now.Add(delay).UnixMilli(), outcome.ErrorCode, now.UnixMilli(), r.UUID)

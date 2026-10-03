@@ -6,7 +6,7 @@ import uuid
 
 from .encoding import InvalidData, digest, encode, identifier, utc_now
 from .retention import POLICY, retain
-from .runs import SourcePaused
+from .runs import SourceFailure, SourcePaused
 from .source_window import SourceWindow
 from . import source
 from .scan_resume import PREFIX as LEGACY_CURSOR_PREFIX
@@ -32,6 +32,7 @@ class Producer:
             raise InvalidData("Invalid worker configuration check")
         self.configuration_check = configuration_check or (lambda: None)
         self.failure_code = None
+        self.source_failure = None
         self.window = SourceWindow(run.get("window"))
 
         self.path_prefix = run["path_prefix"]
@@ -58,6 +59,21 @@ class Producer:
         self.lease.check()
         self.root.verify()
         self.configuration_check()
+        if self.source_failure is not None:
+            raise self.source_failure
+
+    def fail_source(self, code, scope):
+        self.check()
+        if self.source_failure is None:
+            self.source_failure = SourceFailure(code, scope)
+        raise self.source_failure from None
+
+    def reserve_source(self, url):
+        self.check()
+        try:
+            return self.lease.reserve_source(url)
+        except SourceFailure as exc:
+            self.fail_source(exc.code, exc.scope)
 
     def relative(self, path):
         relative = self.root.relative(path)

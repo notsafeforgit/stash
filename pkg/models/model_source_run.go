@@ -88,18 +88,20 @@ func (r SourceRun) Lease() SourceRunLease {
 
 type SourceRunAttempt struct {
 	SourceRunLease
-	Window    SourceWindow      `json:"window"`
-	Progress  SourceRunProgress `json:"progress"`
-	StartedAt time.Time         `json:"started_at"`
-	EndedAt   *time.Time        `json:"ended_at"`
-	Outcome   string            `json:"outcome"`
-	ErrorCode string            `json:"error_code"`
+	Window     SourceWindow      `json:"window"`
+	Progress   SourceRunProgress `json:"progress"`
+	StartedAt  time.Time         `json:"started_at"`
+	EndedAt    *time.Time        `json:"ended_at"`
+	Outcome    string            `json:"outcome"`
+	ErrorCode  string            `json:"error_code"`
+	ErrorScope string            `json:"error_scope,omitempty"`
 }
 
 type SourceRunOutcome struct {
 	State             string `json:"state"` // succeeded, retry, deferred
 	ErrorCode         string `json:"error_code"`
 	RetryAfterSeconds int    `json:"retry_after_seconds"`
+	ErrorScope        string `json:"error_scope,omitempty"`
 }
 
 var (
@@ -119,6 +121,7 @@ type SourceRunReaderWriter interface {
 	Attempts(context.Context, string, int64, int) ([]SourceRunAttempt, error)
 	Claim(context.Context, string, string, string, string, time.Time, time.Duration) (*SourceRun, error)
 	CheckLease(context.Context, SourceRunLease, time.Time) (*SourceRun, error)
+	ReserveSource(context.Context, SourceRunLease, string, time.Time) (*SourceRunServiceReservation, error)
 	Renew(context.Context, SourceRunLease, time.Time, time.Duration) (*SourceRun, error)
 	Progress(context.Context, SourceRunLease, SourceRunProgress, time.Time) (*SourceRun, error)
 	Finish(context.Context, SourceRunLease, SourceRunOutcome, time.Time) (*SourceRun, error)

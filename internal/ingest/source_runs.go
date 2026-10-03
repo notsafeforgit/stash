@@ -228,6 +228,27 @@ func (c *RunCoordinator) Renew(ctx context.Context, token string, lease models.S
 		return c.Service.Repo.SourceRun.Renew(ctx, lease, c.Now(), duration)
 	})
 }
+
+func (c *RunCoordinator) ReserveSource(ctx context.Context, token string, lease models.SourceRunLease, url string) (*models.SourceRunServiceReservation, error) {
+	var result *models.SourceRunServiceReservation
+	err := c.Service.Repo.WithTxn(ctx, func(ctx context.Context) error {
+		credential, current, err := c.allowed(ctx, token, lease.RunUUID)
+		if err != nil {
+			return err
+		}
+		lease.ProducerUUID = credential.ProducerUUID
+		result, err = c.Service.Repo.SourceRun.ReserveSource(ctx, lease, url, c.Now())
+		if err != nil {
+			return err
+		}
+		c.guard(ctx, token, current, current.LeaseUntil)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
 func (c *RunCoordinator) Progress(ctx context.Context, token string, lease models.SourceRunLease, progress models.SourceRunProgress) (*models.SourceRun, error) {
 	return c.owned(ctx, token, lease, func(ctx context.Context, lease models.SourceRunLease) (*models.SourceRun, error) {
 		return c.Service.Repo.SourceRun.Progress(ctx, lease, progress, c.Now())

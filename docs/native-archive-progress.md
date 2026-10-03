@@ -15,9 +15,9 @@ migration: historical policies, remaining operational families, review resolutio
 and a complete cutover reconciliation are still required.
 
 Durable enrichment execution, queued-job dispatch, stale-job maintenance and
-shared download/enrichment service reservations are implemented. The next worker
-work is linked-service reservations in the download adapter, cross-collection
-fairness, typed download failure reporting and legacy queue mapping. Native UI, live host/n8n conversion, compatibility removal, coordinated
+shared download/enrichment service reservations are implemented, including linked
+download services and typed service failure reporting. The next worker work is
+cross-collection fairness and legacy queue mapping. Native UI, live host/n8n conversion, compatibility removal, coordinated
 backup/export/restore, production cutover and retirement remain major release
 gates. The phase table below records that distinction; commit count is not a
 completion percentage.
@@ -45,7 +45,7 @@ On 2026-10-03, the owner authorized pruning superseded goal artifacts. Removing
 their intermediate database paths are no longer retained. The original
 `native-archive-rehearsal-20260930/compatible-snapshot.sqlite`, frozen import
 inputs remain under `.local/`. The latest verified native database is now in
-`native-source-pacing-rehearsal-20261003/` at schema 1000054;
+`native-download-pacing-rehearsal-20261003/` at schema 1000055;
 `.local/native-rehearsal-current.json` records its reconciliation receipt. The
 superseded schema-53 copy was also removed after that comparison passed.
 
@@ -4732,3 +4732,51 @@ fairness, legacy enrichment queue/cooldown/history import and live conversion
 remain. The broader policy/operational migration, adapters, native UI,
 compatibility removal, coordinated backup/export/restore, performance and cutover
 requirements are still unfinished. The complete transition goal remains active.
+
+## Download linked services and failure attribution
+
+Schema 1000055 adds attempt-scoped requested/held services and immutable typed
+failure receipts. The source-run API authenticates the producer, checks the
+current owner/fence, and rechecks the definition and lease through commit.
+Download extractors reserve their root or supported Redgifs/Imgur child service
+before initialization. Busy requests remain durable dependencies without holding
+the service. Exact-window retries, including expired attempts, wait for their
+recorded dependencies before repeating parent extraction and reserve them in the
+claim transaction. Widened traversals discover their own dependency set.
+
+The pinned download adapter now reports controlled source error codes and the
+contacted service, without retaining website exception text or URLs. Source
+rate-limit and timeout errors stop immediate HTTP retry loops. Child errors
+affect the child's cooldown; individual media download failures and intentional
+archive stops retain their separate meanings. Lost ownership stops further work.
+Lost finish acknowledgements require the exact attempt, outcome, code and service.
+The executor requires `source_run_pacing_protocol: 1`.
+
+All 352 producer tests passed in 31.827 seconds. Focused backend checks passed,
+covering competing child reservations, authorization/fences, release, typed
+failure attribution, busy dependencies across retry/expiry, widened windows,
+caught-write rollback and historical migration preservation/collision handling.
+Race checks passed (SQLite 44.525 seconds, API 10.296 seconds). The full backend
+gate passed in 848.292 seconds with zero lint issues (API 696.224 seconds,
+ingestion 636.398 seconds, SQLite 819.788 seconds).
+
+The isolated 18,796,433,408-byte schema-54 copy migrated to schema 1000055 without
+increasing its file size. Initial validation took 149.260 seconds and
+migration/revalidation 144.357 seconds while other checks ran. Independent
+row/type comparisons and digests matched all 219 retained tables (34,810,759 rows)
+in 408.890 seconds; integrity checking passed with zero foreign-key violations.
+The frozen copy has three source runs but no attempts, so populated fixtures
+provide the historical/running-attempt migration coverage. Query plans use the
+active-run and attempt-key indexes. These timings and sparse query plans are
+not production downtime or loaded-performance estimates.
+
+Reports and scripts are under `.local/native-download-pacing-rehearsal-20261003/`.
+The verified schema-55 copy replaces the disposable schema-54 copy under the
+50 GiB free-space policy; the original compatible snapshot and frozen migration
+inputs remain. The preceding `484533461` checkpoint passed CI build, lint and
+preview-image publication. Production and `develop` remain unchanged.
+
+Cross-collection fairness, legacy queue/cooldown/history import, remaining policy
+and operational migration, additional download adapters, native UI, host/n8n
+conversion, compatibility removal, coordinated backup/export/restore, performance
+and production cutover remain unfinished. The full transition goal stays active.

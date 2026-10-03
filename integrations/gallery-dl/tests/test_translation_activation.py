@@ -152,13 +152,13 @@ class TranslationActivationTests(unittest.TestCase):
             client, plan, _ = self.fixture(directory)
             last = plan.directory / "page-000002.json"
             last.write_bytes(last.read_bytes() + b" ")
-            from stash_ingest.translation_activation import read_regular
+            from stash_ingest.activation_plan import read_regular
             reads = []
             def read(path, limit):
                 reads.append(Path(path).name)
                 return read_regular(path, limit)
             out = io.StringIO()
-            with patch("stash_ingest.translation_activation.read_regular", side_effect=read), redirect_stdout(out):
+            with patch("stash_ingest.activation_plan.read_regular", side_effect=read), redirect_stdout(out):
                 self.assertEqual(0, main(["show", "--plan", str(plan.directory), "--expected-sha256", plan.sha256, "--page", "0"]))
             self.assertEqual(["manifest.json", "page-000000.json"], reads)
             quick = Plan(plan.directory, plan.sha256, verify_pages=False)

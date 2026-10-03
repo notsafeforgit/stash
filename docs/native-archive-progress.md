@@ -5078,3 +5078,75 @@ remaining policy/operational migration, additional download adapters, native UI,
 host/n8n conversion, compatibility removal, backup/export/restore, performance
 and coordinated cutover remain required. Production and `develop` remain on
 their existing releases; the complete transition goal remains active.
+
+## Reviewed enrichment activation and collection handoffs
+
+Schema 1000059 introduces saved-preview activation through the native application
+API and `stash-activate-automation-enrichment`. Original frozen holds are listed
+once per target using indexed ordinal pages, including when legacy aliases share
+a target/revision. Preview binds the original target, current post revision,
+retained URL, chosen collection revision, release target, policy and schedule.
+Apply rechecks the preview atomically, preserves priority and exact delays, and
+retains receipts that replay after subsequent completion, edits or forgetting.
+It does not start collectors or assert their completion.
+
+Imported collections are disabled at revision 1. Reviewing and enabling a
+collection creates a new revision; activation now explicitly carries the held
+work to it. The old target remains excluded with `activation_rebound`, and the
+new pending target retains the reviewed source scope. Existing native destination
+work is preserved as a conflict. Disabled/retired collections, changed original
+holds and forgotten posts require review. General application activation also
+supports holds already bound to an active collection revision.
+
+Translation and enrichment clients share bounded HTTP and immutable saved-plan
+handling; translation plan format and receipt semantics are unchanged. Plans
+validate every page before Apply, preserve operation UUIDs after response loss,
+and distinguish activation from execution. Enrichment review candidates prevent
+an empty eligible selection from claiming completion. A packaged-wheel smoke
+check exercised both installed command entry points from the built artifact.
+
+The full backend gate passed in 885.167 seconds with zero lint issues (API
+727.260, ingestion 634.416, SQLite 867.252 seconds). All 379 producer tests passed
+against the current source in 124.096 seconds. Focused SQLite/API fixtures cover
+scope changes, occupied destinations, original alias deduplication, delayed work,
+late-failure rollback, historical receipt replay, backup/anonymisation, migration
+collision and corrupt-receipt rejection. The real Python/native HTTP fixture
+imports 205 holds, reviews their collection, hands work to revision 2 and recovers
+a committed batch response being lost while preserving its saved plan.
+
+The full-copy rehearsal reviewed 815 imported collection definitions from
+disabled revision 1 to active revision 2, then activated all 227,443 original
+holds through the real Python CLI and native HTTP API in 2,275 batches. Lost
+responses after the first batch and after 100,000 committed targets recovered
+from their original receipts. Saved plan bytes remained unchanged across resume,
+status and replay. This was confined to the disposable copy; no collector job,
+source fetch or new capture was started.
+
+Independent reconciliation passed in 968.249 seconds. All 225 unaffected tables,
+original import ledgers, previous collection definitions, target history,
+migration history and sequences match the baseline. Each original hold was
+consumed exactly once, and each replacement has the reviewed collection revision,
+retained URL, priority and exact deadline. All 16,193 other historical targets
+remain unchanged. The report verifies all 2,275 receipts and their hashes,
+227,443 replacement identities, and 454,886 new history rows. Integrity was
+clean with zero foreign-key violations.
+
+The database is 20,085,633,024 bytes, an increase of 575.340 MiB. The activation
+workflow, including plan preparation, two response-loss recoveries, status and
+replay, took 478.411 seconds. Opening the migrated copy took 158.286 seconds;
+fresh startup after activation passed in 192.032 seconds. These measurements do
+not satisfy the release's startup or cutover performance requirement. The
+indexed candidate query returned 100 records in 0.001661 seconds.
+
+Evidence is under `.local/native-enrichment-activation-rehearsal-20261003/`.
+The schema-59 copy replaces its disposable predecessor under the documented
+retention policy; original compatible and frozen input snapshots remain. Free
+space stayed above 110 GiB while both copies were present, with the 50 GiB reserve
+enforced for planned rehearsal writes. Production and `develop` are unchanged.
+The preceding `c9c9be9af` checkpoint passed build, lint and preview-image
+publication CI.
+
+The full transition goal remains active. Staged checkpoint conversion, import
+review resolution, remaining operational/policy families, additional download
+adapters, native UI, host/n8n conversion, compatibility removal,
+backup/export/restore, performance and coordinated cutover still require work.

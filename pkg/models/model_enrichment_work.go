@@ -93,4 +93,7 @@ type EnrichmentWorkReaderWriter interface {
 	ReadyPage(context.Context, string, time.Time, *EnrichmentTargetCursor, int) ([]EnrichmentTarget, error)
 	Complete(context.Context, EnrichmentCompletionInput, time.Time) (*EnrichmentCompletion, error)
 	Completion(context.Context, string) (*EnrichmentCompletion, error)
+	PreviewActivation(context.Context, EnrichmentActivationInput) (*EnrichmentActivationPlan, error)
+	Activate(context.Context, EnrichmentActivationInput, string, time.Time) (*EnrichmentActivation, error)
+	Activation(context.Context, string) (*EnrichmentActivation, error)
 }

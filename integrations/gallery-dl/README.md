@@ -1212,6 +1212,55 @@ Inspect application API progress and mapped/source records under
 historical completion bases and retained URL evidence. This command does not
 replace coordinated cutover inputs, review resolution or reviewed activation.
 
+### Reviewed enrichment activation
+
+After completing the frozen enrichment mapping, review and enable the relevant
+native collection definitions. Imported collections start disabled; enabling
+one creates a new revision. The activation preview explicitly connects the old
+held work to that reviewed revision, retaining its URL, priority and retry delay.
+It does not change the original catalog scope or start a collector itself.
+
+```sh
+stash-activate-automation-enrichment prepare --endpoint STASH_ORIGIN \
+  --snapshot SNAPSHOT_UUID --manifest-sha256 AUTOMATION_MANIFEST_SHA256 \
+  --output /migration/enrichment-activation
+
+stash-activate-automation-enrichment show \
+  --plan /migration/enrichment-activation --expected-sha256 PLAN_SHA256 --page 0
+
+stash-activate-automation-enrichment apply --endpoint STASH_ORIGIN \
+  --plan /migration/enrichment-activation --expected-sha256 PLAN_SHA256
+
+stash-activate-automation-enrichment status --endpoint STASH_ORIGIN \
+  --plan /migration/enrichment-activation --expected-sha256 PLAN_SHA256
+```
+
+The returned `plan_sha256` binds all saved pages. Review both original and release
+targets, the exact URL, post revision and chosen collection revision. Several
+legacy aliases for one target appear once. A destination already used by native
+work stays in review. If the collection revision changes, Apply excludes the old
+hold with `activation_rebound` and creates the corresponding pending target at
+the reviewed revision. Both histories remain available. For unchanged scope it
+advances the existing hold. It never modifies a later native hold or exclusion.
+
+Preparation and Show are read-only. Apply validates the complete saved plan,
+checks each atomic batch again at the server, and reads existing receipts before
+retrying a lost response. Resume with the same plan directory and digest. A
+changed post, schedule or collection requires a new preview; already successful
+operations keep their original receipts. No application key is saved in a plan.
+
+Exit codes follow translation activation: 0 for preparation/show or complete
+activation, 1 for invalid input/transport failure, 2 for batches or discovered
+candidates needing review, and 3 for targets awaiting Apply. Disabled/retired
+collections, forgotten posts, changed targets and occupied replacements make
+`needs_review` true and prevent an empty selection from claiming completion.
+`execution_status: not_checked` leaves collector completion unverified.
+
+The client supports up to one million candidates in pages of 100. Saved pages
+allow long URLs and escaped JSON without loading the entire library into memory.
+It uses `STASH_API_KEY` or `--api-key-env` and requires application authorization.
+See [activation API contracts](../../docs/native-schema.md#reviewed-enrichment-activation).
+
 ## Historical source albums
 
 `stash-backfill-source-albums` uses the native application API to match imported

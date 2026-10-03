@@ -1783,3 +1783,50 @@ values. Backups include these records; anonymisation removes them. Startup
 checks progress, typed projections, source bindings, scoped proofs and native
 history. Overall migration remains `imported:false`; review resolution and
 reviewed activation are separate release requirements.
+
+### Reviewed enrichment activation
+
+Schema 1000059 adds immutable `enrichment_activations` and
+`enrichment_activation_targets` receipts. The application API provides
+`POST /api/v3/archive/enrichment-activations/preview`,
+`POST /api/v3/archive/enrichment-activations`, and
+`GET /api/v3/archive/enrichment-activations/{activation}`.
+
+Preview accepts an operation `uuid`, optional paired `snapshot_uuid` and
+`manifest_sha256`, and up to 100 selections containing `target_uuid`, `revision`
+and the explicitly chosen `collection_revision`. Snapshot selection requires a
+finished enrichment import and one of its unchanged original holds. An active
+post and the collection's current active revision are required. Preview includes
+the post revision, retained URL and URL UUID, original and destination collection
+revisions, release target/revision, policy, priority and exact retry deadline.
+Apply sends `{input, expected_plan_sha256}` and rechecks that entire preview in
+one transaction. Changed evidence, schedules, source definitions or destinations
+conflict without releasing part of a batch.
+
+Imported collections begin disabled. Review their definitions before activating
+work; enabling one creates a new collection revision. When the chosen active
+revision differs from the held target's historical revision, activation consumes
+the original hold as `excluded` with reason `activation_rebound` and creates a
+`review` target for the same post, URL, collection UUID and policy at the selected
+revision. Its priority and deadline are unchanged. A pre-existing destination
+is a conflict, preserving native choices. If the source revision is unchanged,
+the original target simply advances from held to pending. Receipts retain both
+the consumed and released target histories. They replay after completion, later
+holds, changed collection definitions or a forgotten post, without rescheduling
+work. Activation does not create a collector job or claim source execution.
+
+`GET /api/v3/archive/automation-snapshots/{snapshot}/enrichment-import/held-targets`
+uses `expected_manifest_sha256`, sparse `after` ordinals and `limit` (1–100).
+Indexed lookup emits the last original hold for each target once, even when
+several legacy aliases share it or coalescing did not change its revision.
+Candidates identify changed/completed work, forgotten posts, disabled/retired
+collections and occupied replacement targets. A later native hold cannot be
+selected merely by substituting its new revision in a snapshot-bound request.
+
+Plans and responses allow 8 MiB so a complete page of retained URLs, including
+JSON escaping, fits. Startup validates receipt hashes, original import ownership,
+source/destination identity, active historical collection definitions and exact
+held-to-pending or held-to-excluded/replacement histories. Backup retains the
+receipts and anonymisation removes them with source evidence. The bulk application
+client is `stash-activate-automation-enrichment`; source fetches remain separate
+metadata-only worker operations.

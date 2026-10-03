@@ -68,4 +68,5 @@ type AutomationEnrichmentImportReaderWriter interface {
 	Find(context.Context, string) (*AutomationEnrichmentImport, error)
 	Records(context.Context, string, int64, int) ([]AutomationEnrichmentRecord, error)
 	Record(context.Context, string, int64) (*AutomationEnrichmentRecordDetails, error)
+	HeldTargets(context.Context, string, string, int64, int) ([]AutomationEnrichmentCandidate, error)
 }

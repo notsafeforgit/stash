@@ -22,6 +22,7 @@ import (
 
 func removeAutomationEnrichmentSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeEnrichmentActivationSchema(t, raw)
 	conn, err := raw.Conn(t.Context())
 	require.NoError(t, err)
 	defer conn.Close()

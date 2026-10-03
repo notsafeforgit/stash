@@ -4095,3 +4095,47 @@ require separate native outcomes. Their import/execution, remaining histories,
 existing policy conversion, native UI, compatibility removal, coordinated
 backup/restore/export, performance work and cutover remain unfinished. Production
 has not changed, and the full transition goal remains active.
+
+## Metadata-only producer extraction
+
+The supported producer package now includes the isolated extraction component
+for native enrichment, replacing its dependency on the old catalog library.
+It admits known single-post extractor classes across Reddit, Twitter, Bluesky,
+TikTok, Instagram, Kemono/Coomer, Patreon and Fansly. Mirror post/feed classes
+are distinguished even when gallery-dl uses the service name as their instance
+subcategory. Root feeds remain ineligible. Linked Redgifs/Imgur extraction is
+bounded; other children remain explicit unresolved references.
+
+Compact transcripts share post fields with per-record patches, removals and
+parent references. Original observation times survive checkpoint replay and
+child-only retry. The existing retention policy removes redundant previews and
+incidental profile fields before persistence. Temporary child failures discard
+partial child results while keeping the parent; a missing child is an explicit
+source limitation. Root failures, empty results, changed requests and damaged
+checkpoints cannot appear successful.
+
+The helper projects source access/pacing settings without creating download jobs,
+archives, postprocessors or cookie writes. Its cache is in memory. Originals
+remain selected for Kemono/Coomer metadata. The child suppresses private logs,
+disables downloader construction and stops on the first HTTP 429. The parent
+bounds input/output and elapsed time, and terminates the process group after
+cancellation, timeout or oversized output. Website access values remain local.
+
+All 293 producer tests passed in 8.050 seconds, including 18 new tests for compact
+reconstruction, removal/null semantics, parent retries, source configuration,
+actual pinned Reddit/Twitter transformations, mirror extractor admission,
+unchanged media/cookie files, subprocess isolation, rate limits, cancellation
+and limits. Existing native producer/API HTTP fixtures passed in 14.892 seconds.
+The final wheel installed into an isolated target and passed all 18 extraction
+tests in 0.981 seconds; installed module hashes matched the working tree.
+Packaging evidence is retained in `.local/native-metadata-fetch-20261002/`, and
+validation logs under `/tmp/stash-native-transition` use the `metadata-fetch-`
+prefix. The preceding `81c75c25d` checkpoint passed CI generation, tests, build,
+lint and native preview publication.
+
+These transcripts are producer checkpoints, not native captures or completed
+jobs. The next work is the native enrichment queue, fenced result publication
+against existing post identities, and import of the frozen enrichment and
+discovery state. Live service conversion, remaining history/policy migration,
+native UI, compatibility removal, coordinated backup/restore/export, performance
+budgets and cutover remain unfinished. Production and `develop` are unchanged.

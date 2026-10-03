@@ -403,6 +403,14 @@ collection requires policy review. Provider execution remains separately enabled
 and scheduling never selects scene/image fields. Existing policy migration and
 enrichment/discovery caller conversion remain transition work.
 
+`stash_ingest.metadata_fetch` is the isolated metadata-only extractor for native
+enrichment. It shares retained post fields in bounded resumable transcripts,
+keeps parent observation times across child retries, and excludes download jobs,
+postprocessors, archives and cookie writes. Validate post identity before turning
+these transcripts into native captures; extraction is not job completion. The
+native enrichment queue/publication and scheduled-service conversion remain
+pending. See [metadata-only extraction](integrations/gallery-dl/README.md#metadata-only-extraction-for-enrichment).
+
 `stash-import-catalog-evidence` maps a received snapshot's posts, profiles and
 captures through core services in schema 1000031. It uses exact manifest/ordinal
 checkpoints, bounded transactions and immutable per-row outcomes. Preserve mirror
@@ -547,9 +555,9 @@ changed ownership and media-kind disagreements remain unresolved. A bounded
 query must fail rather than present a truncated candidate set as unique.
 The managed-transaction `Backfill` method validates its preview, records legacy
 attachment evidence without fabricated captures, and calls the shared gallery
-sync service. Its caller must checkpoint publication with durable after-success
-work before exposing an Apply operation. That application worker/API is still
-pending; the core method is currently exercised on isolated rehearsal copies.
+sync service. The application preview/apply API admits its durable album worker,
+which checkpoints publication before retryable after-success notifications.
+Keep publication and notification replay separate when extending this workflow.
 
 ### v3 extension points
 

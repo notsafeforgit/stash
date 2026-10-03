@@ -1385,6 +1385,61 @@ An old user acceptance remains an acceptance even when it states that exhaustive
 history was unverified. Imported skips remain distinguishable from completion;
 neither kind creates native source-run coverage or successful media receipts.
 
+## Metadata-only extraction for enrichment
+
+`stash_ingest.metadata_fetch.fetch(url, settings, resume=None, timeout=180,
+check=...)` runs one metadata lookup in an isolated instance of the pinned
+gallery-dl runtime. This is the extraction component for the native enrichment
+worker. The native enrichment queue, verified post publication and conversion
+of the existing scheduled service are still pending. Calling this helper alone
+does not create a capture, complete a native job or import media.
+
+The initial root extractors are Reddit submissions, Twitter tweets, Bluesky and
+TikTok posts, Instagram posts/reels, Kemono/Coomer posts, Patreon posts and Fansly
+posts. Kemono/Coomer retain their mirror category and service-specific metadata;
+a mirror's `onlyfans` label does not identify a native OnlyFans account. Admission
+checks the extractor class, since gallery-dl replaces the Kemono/Coomer instance
+subcategory with the service name for both posts and whole creator feeds. Profile
+URLs and unsupported root extractors return explicit failures. Linked Redgifs
+images and Imgur images/albums/galleries can be resolved to two child levels.
+Other links remain unresolved references without expanding into another feed.
+
+Only source access and pacing settings survive configuration projection. There
+are no download jobs, file paths, archive updates, user filters, custom actions
+or postprocessors. Cookies can be read but are not updated, the extractor cache
+is in memory, and originals are selected for Kemono/Coomer metadata. The child
+process disables downloader construction and stops at the first HTTP 429. The
+caller-supplied `check` callback can cancel a running lookup; the parent kills
+the process group on cancellation, timeout or oversized output. Website access
+values enter through a private pipe and are excluded from results and logs.
+
+Successful extraction returns a `stash-metadata-fetch-v1` checkpoint containing
+the exact requested URL, runtime/retention versions, compact records, pending
+children and unresolved references. Each record retains its original observation
+time. Records share unchanged post fields through backward base references;
+patches and explicit removals reconstruct each retained metadata object. Child
+records refer to their parent context, preserving Reddit attribution without
+copying the whole parent onto every attachment. These references only compact
+the producer transcript; they do not create native post/performer associations.
+
+`metadata_bundle.Bundle(url, extractor_version, checkpoint).metadata(index,
+with_parent=True)` reconstructs a record for subsequent identity validation.
+The same source retention policy used by the download adapter reduces Reddit
+previews and incidental profile fields before checkpoint serialization. Input
+metadata stays unchanged. Checkpoints are bounded to 32 MiB, 1,024 records and
+256 entries in each child-reference list; each reconstructed record must satisfy
+the source payload limit. Invalid references, policy/request changes, oversized
+results and unretained data are rejected.
+
+Temporary child failures retain the parent and discard that child's partial
+records. Persist the entire returned checkpoint before retrying its pending
+children; the resumed fetch skips the parent request and retains its observation
+times. Missing children remain explicit source limitations. A root error or
+empty result cannot appear successful. The caller must distinguish a retained
+checkpoint with pending children from a finished lookup, and must still verify
+the result against the intended existing post before native publication. The
+helper neither applies field mappings nor mutates selected scene/image metadata.
+
 ## Validation
 
 After `make pre-producer`, `make validate-producer` runs delivery and actual

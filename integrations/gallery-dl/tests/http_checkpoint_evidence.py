@@ -1,5 +1,6 @@
 """Review retained checkpoint evidence through the real application API."""
 
+import hashlib
 import json
 from pathlib import Path
 import sqlite3
@@ -19,6 +20,8 @@ from stash_ingest.catalog_upload import main as upload_catalog
 from stash_ingest.catalog_evidence_import import main as evidence_main
 from stash_ingest.catalog_enrichment_import import main as receipts_main
 from stash_ingest.client import Unavailable
+from stash_ingest.metadata_bundle import Bundle
+from stash_ingest.encoding import encode
 from test_automation_snapshot import automation_fixture
 from test_catalog_registry_import import registry_fixture
 from test_catalog_snapshot import catalog_fixture, CAPTURED
@@ -93,8 +96,34 @@ def run():
     assert {key: receipt[key] for key in plan} == plan
     target = client.request("GET", "/enrichment-targets/" + plan["target"]["uuid"])
     assert target == plan["target"], (target, plan)
+    collection = next(c for c in client.request("GET", "/collections") if c["uuid"] == target["collection_uuid"])
+    definition = {k: v for k, v in collection.items() if k in {"label", "kind", "namespace", "target_url", "account_uuid", "root_uuid", "path_prefix"}}
+    definition.update(state="active", expected_revision=collection["revision"], reason="Reviewed child retry destination")
+    revised = client.request("PUT", "/collections/" + collection["uuid"], definition)
+    handoff_input = {"uuid": str(uuid.uuid4()), "evidence_uuid": request["uuid"], "evidence_plan_sha256": plan["plan_sha256"],
+                     "target_revision": target["revision"],
+                     "collection_revision": revised["revision"], "policy_sha256": "a" * 64, "extractor_version": "1.32.15-dev"}
+    handoff_plan = client.request("POST", "/checkpoint-handoffs/preview", handoff_input)
+    assert handoff_plan["retained_capture_count"] == handoff_plan["pending_count"] == handoff_plan["unscoped_reference_count"] == 1
+    assert handoff_plan["released_target_uuid"] != target["uuid"] and handoff_plan["released_revision"] == 1
+    handoff_apply = {"input": handoff_input, "expected_plan_sha256": handoff_plan["plan_sha256"]}
+    try:
+        client.request("POST", "/checkpoint-handoffs", handoff_apply)
+        raise AssertionError("committed handoff response should be lost")
+    except Unavailable as error:
+        assert str(error) == "network_unavailable", error
+    handoff_path = "/checkpoint-handoffs/" + handoff_input["uuid"]
+    handoff = client.request("GET", handoff_path)
+    assert handoff == client.request("POST", "/checkpoint-handoffs", handoff_apply)
+    assert {key: handoff[key] for key in handoff_plan} == handoff_plan
+    seed = client.request("GET", handoff_path + "/seed")
+    bundle = Bundle(seed["body"]["url"], handoff_input["extractor_version"], seed["body"])
+    assert hashlib.sha256(encode(bundle.checkpoint(), 32 << 20)).hexdigest() == seed["sha256"] == handoff_plan["seed_sha256"]
+    assert seed["body"]["records"][0]["patch"]["author"]["id"] == 9007199254740993
+    assert seed["body"]["records"][0]["observed_at"] is None and seed["body"]["unresolved"] == []
+    assert client.request("GET", "/enrichment-targets/" + target["uuid"]) == target
     assert source.read_bytes() == before
-    print(json.dumps({"accepted": True, "held_for_review": True, "receipt_uuid": request["uuid"]}))
+    print(json.dumps({"accepted": True, "handoff_reviewed": True, "held_for_review": True, "receipt_uuid": request["uuid"]}))
 
 
 if __name__ == "__main__":

@@ -26,8 +26,8 @@ handoffs are implemented. Retained legacy collector staging now has native
 conversion, inspection and reviewed acceptance into shared native captures.
 Native captures distinguish a missing historical observation time from the time
 the archive received retained evidence; acceptance retains the review hold.
-Reviewed handoff into execution and remaining import review resolution still
-require work.
+Exact handoff review and seed inspection are implemented; consuming that review
+into worker execution and remaining import review resolution still require work.
 Native UI, live host/n8n conversion, compatibility removal, coordinated
 backup/export/restore, production cutover and retirement remain major release
 gates. The phase table below records that distinction; commit count is not a
@@ -5420,3 +5420,62 @@ remaining operational/policy families, additional adapters, native UI, host/n8n
 conversion, compatibility removal, coordinated backup/export/restore, performance
 and final owner-reviewed cutover are still outstanding. Production and `develop`
 remain unchanged.
+
+## Exact checkpoint handoff review — 2026-10-03
+
+Schema 1000064 adds an application review receipt for child-only execution from
+accepted legacy captures. Preview binds the acceptance and plan hash, original
+target, current post revision, active destination collection revision, runtime
+and configuration hash, capture policy and exact resume document hash/size/counts.
+The destination target identity is explicit when a newer collection definition
+requires a replacement. Requests cannot invent an acceptance or silently reuse a
+preview after post, target, collection or runtime changes.
+
+Receipt and seed lookup recover a committed review after a lost response or
+later edits. The seed is reconstructed from frozen evidence, with original
+capture identities, payloads, extractor versions and recording times verified.
+The database stores only the small review plan. Original unscoped references
+remain in the acceptance and are counted separately; null historical observation
+times do not acquire an observing producer or a new timestamp. Backup/restore,
+anonymisation and read-only startup verification include the review.
+
+This increment does not consume the review, release the target or create a worker
+job/checkpoint/lease. Native job arguments, checkpoint storage and publication
+remain gated to their existing execution format. The next increment must bind
+native admission to this receipt, deliver the exact seed through producer scope,
+include saved child services in scheduling/fairness, preserve prefixes during
+retry, publish retained and new observations with distinct provenance, and
+version release proofs. New ordinary child captures also need bound context.
+
+Targeted tests cover retained bodies and unknown clocks, stale post/target/
+collection/runtime review, caught late-error rollback, missing/corrupt seed
+bindings, backup/restore, anonymisation, and schema-63 upgrade/collision rollback.
+The real HTTP fixture loses both committed evidence and handoff responses,
+recovers their receipts, parses the seed through the Python collector contract,
+and confirms that the original target remains in review. An initial broad run
+found an invalid namespace in the new stale-post test fixture; correcting that
+fixture passed all handoff tests with integration settings in 7.232 seconds.
+The corrected full backend gate passed in 870.028 seconds with zero lint issues
+(API 688.716, ingestion 579.586, SQLite 860.681 seconds).
+
+One online backup took 40.931 seconds. Normal opening, migration and
+reinitialisation passed in 1,058.161 seconds with idle disk-I/O priority during
+other host work. Fresh-process opening passed in 560.044 seconds while independent
+comparison and host work were running; this is not an isolated benchmark. The
+independent comparison passed in 1,377.083 seconds: all 237 existing data tables
+retain their exact values and types, including 526,348 capture UUIDs, rowids,
+observation/recording times and signatures. Existing schema objects, prior
+migration history and sequence counters are unchanged. The new handoff table is
+empty, as expected for the frozen inputs; populated review behavior is covered
+by the fixtures. Integrity is clean with zero foreign-key violations, and the
+database remains 20,265,979,904 bytes. Startup/cutover performance remains a
+release gate. Evidence is under
+`.local/native-checkpoint-review-rehearsal-20261003/`. The verified replacement
+supersedes schema 63 under the retention policy after the host-visible open-file
+check; original compatible and frozen source snapshots remain available. Free
+space stayed above 135 GiB with both rehearsal copies present.
+
+The full transition remains active, including execution handoff, migration
+review, remaining operational and policy families, adapters, native UI, host/n8n
+conversion, compatibility removal, coordinated recovery/export, performance,
+owner-reviewed cutover and retirement.

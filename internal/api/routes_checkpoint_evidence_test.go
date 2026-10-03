@@ -20,7 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCheckpointEvidenceHTTPRecoversCommittedResponseAndKeepsReviewHold(t *testing.T) {
+func TestCheckpointEvidenceAndHandoffHTTPRecoverCommittedResponsesAndKeepReviewHold(t *testing.T) {
 	python, packagePath := nativeProducerRuntime(t)
 	config.InitializeEmpty()
 	directory := t.TempDir()
@@ -43,6 +43,7 @@ func TestCheckpointEvidenceHTTPRecoversCommittedResponseAndKeepsReviewHold(t *te
 	router := (&nativeArchiveRoutes{repo: repo}).router()
 	handler := http.StripPrefix("/api/v3/archive", router)
 	var lost atomic.Bool
+	var lostHandoff atomic.Bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("ApiKey") != "fixture-application-key" || r.Header.Get("Authorization") != "" {
 			w.WriteHeader(http.StatusUnauthorized)
@@ -50,7 +51,10 @@ func TestCheckpointEvidenceHTTPRecoversCommittedResponseAndKeepsReviewHold(t *te
 		}
 		recorder := httptest.NewRecorder()
 		handler.ServeHTTP(recorder, r)
-		if recorder.Code == 200 && r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/checkpoint-evidence") && !lost.Swap(true) {
+		drop := recorder.Code == 200 && r.Method == "POST" &&
+			((strings.HasSuffix(r.URL.Path, "/checkpoint-evidence") && !lost.Swap(true)) ||
+				(strings.HasSuffix(r.URL.Path, "/checkpoint-handoffs") && !lostHandoff.Swap(true)))
+		if drop {
 			connection, _, err := w.(http.Hijacker).Hijack()
 			if err != nil {
 				t.Error(err)
@@ -75,6 +79,7 @@ func TestCheckpointEvidenceHTTPRecoversCommittedResponseAndKeepsReviewHold(t *te
 	output, err := command.CombinedOutput()
 	require.NoError(t, err, string(output))
 	require.True(t, lost.Load())
+	require.True(t, lostHandoff.Load())
 	require.NoError(t, db.Close())
 	require.NoError(t, db.Open(db.DatabasePath()))
 	for _, test := range []struct {
@@ -87,6 +92,13 @@ func TestCheckpointEvidenceHTTPRecoversCommittedResponseAndKeepsReviewHold(t *te
 		{"GET", "/checkpoint-evidence/invalid", "", "", 400},
 		{"GET", "/checkpoint-evidence/" + uuid.NewString(), "", "", 404},
 		{"POST", "/checkpoint-evidence", "{}", "https://unrelated.invalid", 403},
+		{"POST", "/checkpoint-handoffs/preview", "{}", "", 400},
+		{"POST", "/checkpoint-handoffs", "{}", "", 400},
+		{"POST", "/checkpoint-handoffs/preview", strings.Repeat(" ", 16385), "", 400},
+		{"GET", "/checkpoint-handoffs/invalid", "", "", 400},
+		{"GET", "/checkpoint-handoffs/" + uuid.NewString(), "", "", 404},
+		{"GET", "/checkpoint-handoffs/" + uuid.NewString() + "/seed", "", "", 404},
+		{"POST", "/checkpoint-handoffs", "{}", "https://unrelated.invalid", 403},
 	} {
 		r := httptest.NewRequest(test.method, test.path, strings.NewReader(test.body))
 		r.Header.Set("Content-Type", "application/json")

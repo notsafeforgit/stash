@@ -36,4 +36,8 @@ type AutomationCheckpointImportReaderWriter interface {
 	PreviewEvidence(context.Context, CheckpointEvidenceInput) (*CheckpointEvidencePlan, error)
 	AcceptEvidence(context.Context, CheckpointEvidenceInput, string, time.Time) (*CheckpointEvidenceAcceptance, error)
 	EvidenceAcceptance(context.Context, string) (*CheckpointEvidenceAcceptance, error)
+	PreviewHandoff(context.Context, CheckpointHandoffInput) (*CheckpointHandoffPlan, error)
+	AcceptHandoff(context.Context, CheckpointHandoffInput, string, time.Time) (*CheckpointHandoff, error)
+	Handoff(context.Context, string) (*CheckpointHandoff, error)
+	HandoffSeed(context.Context, string) (*CheckpointHandoffSeed, error)
 }

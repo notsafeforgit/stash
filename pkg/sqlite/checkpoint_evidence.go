@@ -164,11 +164,16 @@ func (row checkpointEvidenceRow) decode() (*models.CheckpointEvidenceAcceptance,
 }
 
 func (s *AutomationCheckpointImportStore) EvidenceAcceptance(ctx context.Context, id string) (*models.CheckpointEvidenceAcceptance, error) {
+	return readCheckpointEvidence(func(out any, query string, args ...any) error { return dbWrapper.Get(ctx, out, query, args...) },
+		func(out any, query string, args ...any) error { return dbWrapper.Select(ctx, out, query, args...) }, id)
+}
+
+func readCheckpointEvidence(get enrichmentGet, selectRows enrichmentSelect, id string) (*models.CheckpointEvidenceAcceptance, error) {
 	if !validSourceRunUUID(id) {
 		return nil, models.ErrEnrichmentInvalid
 	}
 	var row checkpointEvidenceRow
-	err := dbWrapper.Get(ctx, &row, "SELECT * FROM checkpoint_evidence_acceptances WHERE uuid=?", id)
+	err := get(&row, "SELECT * FROM checkpoint_evidence_acceptances WHERE uuid=?", id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -180,7 +185,7 @@ func (s *AutomationCheckpointImportStore) EvidenceAcceptance(ctx context.Context
 		return nil, err
 	}
 	var bindings []models.CheckpointEvidenceCapture
-	if err := dbWrapper.Select(ctx, &bindings, `SELECT body_index,capture_uuid,payload_sha256 FROM checkpoint_evidence_captures
+	if err := selectRows(&bindings, `SELECT body_index,capture_uuid,payload_sha256 FROM checkpoint_evidence_captures
  WHERE acceptance_uuid=? ORDER BY body_index`, id); err != nil {
 		return nil, err
 	}

@@ -17,6 +17,7 @@ import (
 
 func removeCaptureContextSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeCheckpointHandoffSchema(t, raw)
 	_, err := raw.Exec(`DROP TABLE source_capture_contexts; DROP INDEX source_captures_with_context;
  DELETE FROM native_migration_history WHERE version=1000063`)
 	require.NoError(t, err)

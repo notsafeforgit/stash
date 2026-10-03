@@ -1990,7 +1990,55 @@ service before initialization.
 This is the storage and collector prerequisite for reviewed execution. Job
 admission, checkpoint storage and publication still accept only the v1 native
 execution format. No evidence acceptance releases its review hold or schedules
-this new retry format yet. The application handoff, immutable job/seed binding,
+this new retry format yet. The execution handoff, immutable job/seed binding,
 worker/outbox recovery, publication/release proof and review UI remain to be
 connected and verified before activation. Existing v1 receipts and release
 proofs retain their byte-for-byte checksum contracts.
+
+### Reviewing an exact checkpoint handoff
+
+Schema 1000064 adds immutable `checkpoint_handoffs`. This is an application
+review receipt for the starting context of child-only execution. It binds an
+existing evidence acceptance and its plan hash, the original target revision,
+the post's current revision, an active destination collection revision, the
+worker configuration hash and extractor version, the context retention policy,
+and the exact resume document's hash, size and counts. The preview identifies
+the target UUID/revision that subsequent admission would release, including a
+replacement target when the collection revision changed.
+
+Under `/api/v3/archive`, all four operations require application authentication:
+
+| Route | Contract |
+| --- | --- |
+| `POST /checkpoint-handoffs/preview` | Input: `uuid`, `evidence_uuid`, `evidence_plan_sha256`, `target_revision`, `collection_revision`, `policy_sha256`, `extractor_version`. Reads current post revision and returns `plan_sha256`; writes nothing. |
+| `POST /checkpoint-handoffs` | Body: `input` with those same fields and `expected_plan_sha256`. Saves only the unchanged review. |
+| `GET /checkpoint-handoffs/{handoff}` | Recovers the committed review, including `created_at`, using the input UUID. |
+| `GET /checkpoint-handoffs/{handoff}/seed` | Returns `handoff_uuid`, `plan_sha256`, `sha256` and `body`, reconstructed from frozen evidence and verified native captures. |
+
+The database stores the bounded plan, not another copy of the source payloads
+or resume document. Seed reconstruction verifies accepted capture UUIDs, raw
+payload hashes, historical extractor versions, metadata and original recording
+times. Missing or altered evidence is an integrity failure. A new runtime or
+configuration requires a new preview. Post, target and collection changes
+invalidate an uncommitted preview; an exact replay of an already committed
+operation recovers its original receipt after later edits. Historical receipt
+and seed lookup do not authorize executing a stale target.
+
+Pending children remain scoped to their retained parents. The plan separately
+counts original unscoped references; those stay in the frozen acceptance and
+are not silently given invented parents in the new worker document. Retained
+records keep null observation times and have no claimed observing producer.
+Requests are bounded to 16 KiB, plans to 1 MiB and reconstructed seeds to the
+collector's 32 MiB / 1,024-record limits. Invalid ancestry or oversized legacy
+evidence stays in review without truncation. Clients must preserve JSON numbers
+losslessly when decoding and replaying the seed; converting source IDs or numeric
+lexemes through floating point can change its exact checksum.
+
+Accepting this review does **not** release the original target, create a job,
+write a worker checkpoint/lease/receipt, or complete enrichment. Job admission
+still needs to consume the review atomically and bind its exact seed, and worker
+checkpoint/publication/release code still rejects the new execution format.
+Those gates must be connected together before activation. Backup retains the
+review and its source evidence; anonymisation removes the review first. Startup
+reconstructs the seed and verifies historical collection and evidence bindings
+before opening for writes.

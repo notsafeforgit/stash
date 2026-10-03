@@ -38,6 +38,10 @@ func (c *EnrichmentCoordinator) Describe(ctx context.Context, token, id string) 
 // Ready exposes only the explicitly selected, currently granted collection.
 // Admission/claim revalidate the returned candidates in their write transaction.
 func (c *EnrichmentCoordinator) Ready(ctx context.Context, token, collectionID string, limit int) ([]models.EnrichmentTarget, error) {
+	return c.ReadyPage(ctx, token, collectionID, nil, limit)
+}
+
+func (c *EnrichmentCoordinator) ReadyPage(ctx context.Context, token, collectionID string, after *models.EnrichmentTargetCursor, limit int) ([]models.EnrichmentTarget, error) {
 	var ret []models.EnrichmentTarget
 	err := c.Service.Repo.WithReadTxn(ctx, func(ctx context.Context) error {
 		credential, err := c.Service.authenticate(ctx, token)
@@ -57,7 +61,33 @@ func (c *EnrichmentCoordinator) Ready(ctx context.Context, token, collectionID s
 		if !permitted(credential, collection.UUID, collection.RootUUID) {
 			return ErrForbidden
 		}
-		ret, err = c.Service.Repo.EnrichmentWork.Ready(ctx, collection.UUID, c.Now(), limit)
+		ret, err = c.Service.Repo.EnrichmentWork.ReadyPage(ctx, collection.UUID, c.Now(), after, limit)
+		return err
+	})
+	return ret, err
+}
+
+func (c *EnrichmentCoordinator) ReadyJobs(ctx context.Context, token, collectionID, policy, extractor string, after int64, limit int) ([]models.EnrichmentJobCandidate, error) {
+	var ret []models.EnrichmentJobCandidate
+	err := c.Service.Repo.WithReadTxn(ctx, func(ctx context.Context) error {
+		credential, err := c.Service.authenticate(ctx, token)
+		if err != nil {
+			return err
+		}
+		if !ValidUUID(collectionID) {
+			return ErrInvalid
+		}
+		collection, err := c.Service.Repo.SourceCollection.Find(ctx, collectionID)
+		if err != nil {
+			return err
+		}
+		if collection == nil {
+			return ErrNotFound
+		}
+		if !permitted(credential, collection.UUID, collection.RootUUID) {
+			return ErrForbidden
+		}
+		ret, err = c.Service.Repo.EnrichmentJob.Ready(ctx, collectionID, policy, extractor, after, limit, c.Now())
 		return err
 	})
 	return ret, err

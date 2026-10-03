@@ -2,6 +2,7 @@
 
 import hashlib
 from datetime import datetime
+import re
 
 from .client import Unavailable
 from .encoding import InvalidData, encode, identifier
@@ -38,10 +39,37 @@ class EnrichmentClient:
             raise Unavailable("native_enrichment_worker_unavailable")
         return capabilities
 
-    def ready(self, collection, limit=20):
+    @staticmethod
+    def target_cursor(target):
+        value = {key: target.get(key) for key in ("priority", "not_before", "uuid")}
+        EnrichmentClient._target_order(value)
+        return value
+
+    @staticmethod
+    def _target_order(value):
+        if (not isinstance(value, dict) or set(value) != {"priority", "not_before", "uuid"}
+                or type(value["priority"]) is not int or not 0 <= value["priority"] <= 100
+                or not isinstance(value["not_before"], str)):
+            raise InvalidData("Invalid enrichment target cursor")
+        identifier(value["uuid"])
+        match = re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.([0-9]{1,9}))?(?:Z|[+-]\d\d:\d\d)", value["not_before"])
+        if match is None:
+            raise InvalidData("Invalid enrichment target time")
+        try:
+            when = datetime.fromisoformat(value["not_before"]).replace(microsecond=0)
+        except ValueError:
+            raise InvalidData("Invalid enrichment target time") from None
+        # Keep native nanosecond ordering even though datetime stores microseconds.
+        return -value["priority"], when, int((match[1] or "").ljust(9, "0")), value["uuid"]
+
+    def ready(self, collection, limit=20, *, after=None):
         if type(limit) is not int or not 1 <= limit <= 100:
             raise InvalidData("Invalid enrichment candidate limit")
-        result = self.client._request("POST", PREFIX + "/collections/" + identifier(collection) + "/ready", encode({"limit": limit}))
+        previous = self._target_order(after) if after is not None else None
+        request = {"limit": limit}
+        if after is not None:
+            request["after"] = after
+        result = self.client._request("POST", PREFIX + "/collections/" + identifier(collection) + "/ready", encode(request))
         if (not isinstance(result, list) or len(result) > limit
                 or any(not isinstance(t, dict) or t.get("collection_uuid") != collection or t.get("state") != "pending" for t in result)):
             raise Unavailable("invalid_response")
@@ -51,8 +79,36 @@ class EnrichmentClient:
                 public_url(target.get("url"))
                 if type(target.get("revision")) is not int or target["revision"] < 1:
                     raise InvalidData("Invalid target revision")
+                order = self._target_order(self.target_cursor(target))
+                if previous is not None and order <= previous:
+                    raise InvalidData("Enrichment target page did not advance")
+                previous = order
             if len({t["uuid"] for t in result}) != len(result):
                 raise InvalidData("Duplicate candidate")
+        except InvalidData:
+            raise Unavailable("invalid_response") from None
+        return result
+
+    def ready_jobs(self, collection, policy, extractor, *, after=0, limit=20):
+        if (not sha256(policy) or not isinstance(extractor, str) or not extractor or len(extractor) > 128
+                or any(c in extractor for c in "\r\n\x00") or type(after) is not int or not 0 <= after <= 9223372036854775807
+                or type(limit) is not int or not 1 <= limit <= 100):
+            raise InvalidData("Invalid enrichment job discovery")
+        result = self.client._request("POST", PREFIX + "/collections/" + identifier(collection) + "/jobs/ready", encode({
+            "policy_sha256": policy, "extractor_version": extractor, "after": after, "limit": limit}))
+        if not isinstance(result, list) or len(result) > limit:
+            raise Unavailable("invalid_response")
+        try:
+            seen = set()
+            for item in result:
+                if (not isinstance(item, dict) or set(item) != {"sequence", "uuid"}
+                        or type(item["sequence"]) is not int or not after < item["sequence"] <= 9223372036854775807):
+                    raise InvalidData("Invalid enrichment job page")
+                identifier(item["uuid"])
+                if item["uuid"] in seen:
+                    raise InvalidData("Repeated enrichment job candidate")
+                after = item["sequence"]
+                seen.add(item["uuid"])
         except InvalidData:
             raise Unavailable("invalid_response") from None
         return result

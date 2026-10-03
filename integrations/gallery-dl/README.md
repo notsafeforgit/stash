@@ -411,7 +411,8 @@ cursors and discovery backoff. Schema 4 added durable ticket-to-submission links
 and unassigned ranges. Schema 5 adds caller snapshots and source bindings;
 schema 6 adds durable backfill calls, history checks and completion proof.
 Schema 7 adds retained n8n receipt history; schema 8 adds the enrichment execution
-journal. Opening an outbox from schemas 1–7 promotes it
+journal; schema 9 adds enrichment discovery cursors and backoff. Opening an
+outbox from schemas 1–8 promotes it
 in one SQLite transaction, preserving event bytes, receipts, dependencies,
 active delivery/submission leases, frozen requests and caller tickets. Old tickets
 are linked to the first covering submissions from their original request sequence;
@@ -1394,8 +1395,8 @@ gallery-dl runtime. This is the extraction component for the native enrichment
 worker. Native target/job binding, producer-owned checkpoint storage, verified
 capture publication, scoped HTTP routes and a transport/lease client are
 implemented. The selected-job executor below persists returned metadata before
-delivery. Producer dispatch and conversion of the existing scheduled service
-are still pending. Calling this helper alone
+delivery. Scoped producer dispatch is implemented below; shared source scheduling
+and conversion of the existing scheduled service are still pending. Calling this helper alone
 does not create a capture, complete a native job or import media.
 
 The initial root extractors are Reddit submissions, Twitter tweets, Bluesky and
@@ -1475,7 +1476,7 @@ producer attribution and unresolved references. A release receipt distinguishes
 completed cleanup from a job without a checkpoint. Older publications retain
 staging through migration until verified cleanup. The scoped producer API accepts
 these checkpoints through a separate enrichment contract. Shared source
-scheduling and producer dispatch remain required before
+scheduling and service conversion remain required before
 activation.
 
 Temporary child failures retain the parent and discard that child's partial
@@ -1514,8 +1515,9 @@ committed responses, exercise large Unicode checkpoints, and preserve original
 number tokens against the real native HTTP server and SQLite.
 
 Use the executor below to persist fresh extraction results before network
-delivery. Ready-target discovery does not list already admitted retries. Queued
-job discovery/dispatch, shared scheduling and cooldowns, stale-job recovery,
+delivery. Ready-target discovery lists unadmitted targets; the separate ready-job
+route finds admitted retries. The native server now maintains expired/stale
+enrichment jobs independently of other workers. Shared scheduling/cooldowns,
 legacy queue mapping and production host/n8n launchers remain transition work.
 
 ### Durable selected-job execution
@@ -1591,9 +1593,62 @@ total SQLite file size. Include the outbox in backups: an unacknowledged body
 can exist only there. Schema 7 → 8 preserves all prior tables and receipt bytes;
 older producer binaries refuse schema 8. The native Stash schema is unchanged.
 
-The executor requires a known job UUID. It does not yet discover queued retries,
-admit targets automatically, recover expired native leases, coordinate shared
-source cooldowns, or replace the scheduled enrichment service.
+The selected-job executor requires a known job UUID. The dispatcher below adds
+discovery and admission; shared source cooldowns and replacement of the scheduled
+enrichment service remain transition work.
+
+### Enrichment dispatch and native maintenance
+
+```sh
+stash-ingest --outbox /persistent/producer.sqlite --endpoint STASH_ORIGIN \
+  --producer PRODUCER_UUID dispatch-enrichment --collection COLLECTION_UUID \
+  --profile /private/reddit-metadata.json
+```
+
+Each invocation makes one bounded dispatch step for the explicitly selected
+collection. It first replays pending local delivery, including evidence produced
+with an older profile, then resumes compatible local attempts. It discovers
+eligible already-admitted jobs before admitting a fresh target. A lost admission
+reply therefore remains recoverable after restart even if no local job record
+was created. Admission and claim still validate the exact target/source revisions
+and producer grants. No producer is allowed to release a held target.
+
+Omit `--profile` to process only saved delivery for that collection, without
+loading website credentials or claiming a new attempt. If expired delivery needs
+new ownership, the result is `ownership_required`. With a matching profile,
+dispatch can reclaim the job and deliver its original bytes without refetching.
+A different profile produces `profile_required`, preserving the local body.
+Rejected or divergent evidence remains in review.
+
+Producer schema 9 stores separate delivery, local-job, native-job and target
+cursors, plus discovery failure/idle delays. Pages contain at most 20 candidates;
+target traversal retains priority, deadline and UUID order, including native
+nanosecond precision. Unsupported URLs do not stall every subsequent page.
+Selection is persisted before network work, and competing cursor updates cannot
+execute a stale selection. Native ownership remains authoritative. Cursors wrap
+to revisit temporarily unavailable jobs; they never certify completion.
+
+Native/API failures back off from five seconds, honoring a longer `Retry-After`
+for failed discovery/admission. An idle pass waits 30 seconds before rediscovery.
+The local queue retains unacknowledged bodies throughout backoff. Exit 0 means
+one job completed or no eligible work was found in that pass; `idle` is not a
+completed backfill or evidence that the whole collection has been enriched.
+Waiting, backoff, review, unavailable and profile/ownership requirements exit 2.
+Native publication receipts continue to prove individual job completion.
+
+The application runs trusted enrichment maintenance every 30 seconds while its
+HTTP server is active. It uses the partial active-job index, bounded to the 64
+permitted active enrichment jobs. It cancels work whose source/target changed
+and recovers expired ownership with native retry delay/attempt limits. It leaves
+checkpoints, publication receipts and source evidence intact, never performs
+website requests, and stops with the server before database shutdown. Producer
+discovery itself is read-only and does not recover jobs or confer a lease.
+
+Schema 8 → 9 preserves existing events, requests, receipts and staged enrichment
+bytes, adding only discovery state. A table-name collision rolls back promotion.
+Older producer binaries refuse schema 9. Include the outbox in backups. Shared
+download/enrichment pacing and fairness, legacy enrichment queue mapping, review
+resolution and production launcher conversion still precede service activation.
 
 ## Validation
 

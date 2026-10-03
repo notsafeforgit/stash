@@ -57,11 +57,12 @@ type Server struct {
 	http.Server
 	displayAddress string
 
-	manager           *manager.Manager
-	shares            *sharing.Service
-	ingestWorker      *archiveWorkerRuntime
-	albumWorker       *archiveWorkerRuntime
-	translationWorker *archiveWorkerRuntime
+	manager               *manager.Manager
+	shares                *sharing.Service
+	ingestWorker          *archiveWorkerRuntime
+	albumWorker           *archiveWorkerRuntime
+	translationWorker     *archiveWorkerRuntime
+	enrichmentMaintenance *archiveWorkerRuntime
 }
 
 // TODO - os.DirFS doesn't implement ReadDir, so re-implement it here
@@ -266,6 +267,7 @@ func Initialize() (*Server, error) {
 	})
 
 	ingestion := ingest.New(repo)
+	server.enrichmentMaintenance = &archiveWorkerRuntime{worker: ingest.NewEnrichmentMaintenance(ingestion)}
 	if worker := mgr.NewIngestFileWorker(ingestion); worker != nil {
 		server.ingestWorker = &archiveWorkerRuntime{worker: worker}
 	}
@@ -400,9 +402,11 @@ func (s *Server) Start() error {
 	s.ingestWorker.start()
 	s.albumWorker.start()
 	s.translationWorker.start()
+	s.enrichmentMaintenance.start()
 	defer s.ingestWorker.stop()
 	defer s.albumWorker.stop()
 	defer s.translationWorker.stop()
+	defer s.enrichmentMaintenance.stop()
 	logger.Infof("stash is listening on " + s.Addr)
 	logger.Infof("stash is running at " + s.displayAddress)
 
@@ -422,6 +426,7 @@ func (s *Server) Shutdown() {
 	s.ingestWorker.stop()
 	s.albumWorker.stop()
 	s.translationWorker.stop()
+	s.enrichmentMaintenance.stop()
 }
 
 func (s *Server) getPerformerRoutes() chi.Router {

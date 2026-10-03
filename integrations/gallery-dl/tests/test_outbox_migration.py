@@ -15,7 +15,13 @@ from helpers import PRODUCER, capture, file_event, receipt
 from test_run_queue import request, admission
 
 
+def schema_eight(db):
+    db.execute("DROP TABLE enrichment_dispatch")
+    db.execute("PRAGMA user_version=8")
+
+
 def schema_seven(db):
+    schema_eight(db)
     db.execute("DROP TABLE enrichment_executions")
     db.execute("PRAGMA user_version=7")
 

@@ -50,7 +50,8 @@ class EnrichmentClientTests(unittest.TestCase):
     def test_candidate_scope_duplicate_and_invalid_target_rejected(self):
         collection = self.job["arguments"]["collection_uuid"]
         target = {"uuid": self.job["arguments"]["target_uuid"], "revision": 1,
-                  "state": "pending", "collection_uuid": collection, "url": self.body["url"]}
+                  "state": "pending", "collection_uuid": collection, "url": self.body["url"],
+                  "priority": 20, "not_before": "2026-10-03T00:00:00Z"}
         self.transport._request.return_value = [target]
         self.assertEqual(self.client.ready(collection), [target])
         for value in ([target, target], [dict(target, state="held")], [dict(target, revision=True)],
@@ -78,6 +79,29 @@ class EnrichmentClientTests(unittest.TestCase):
         target["collection_revision"] += 1
         with self.assertRaises(Unavailable):
             self.client.describe(self.job["uuid"])
+
+    def test_job_discovery_rejects_nonadvancing_duplicate_and_unbounded_pages(self):
+        good = [{"sequence": 5, "uuid": str(uuid.uuid4())}, {"sequence": 6, "uuid": str(uuid.uuid4())}]
+        self.transport._request.return_value = good
+        self.assertEqual(self.client.ready_jobs(self.job["arguments"]["collection_uuid"], "a" * 64, "version", after=4), good)
+        for value in (good[::-1], [{**good[0], "sequence": True}], [good[0], dict(good[1], uuid=good[0]["uuid"])],
+                      [{**good[0], "extra": 1}], [{**good[0], "sequence": 4}], good * 20, {}):
+            self.transport._request.return_value = value
+            with self.assertRaises(Unavailable):
+                self.client.ready_jobs(self.job["arguments"]["collection_uuid"], "a" * 64, "version", after=4)
+
+    def test_target_cursor_preserves_native_nanoseconds_and_priority_order(self):
+        collection = self.job["arguments"]["collection_uuid"]
+        target = {"uuid": str(uuid.uuid4()), "revision": 1, "state": "pending", "collection_uuid": collection,
+                  "url": self.body["url"], "priority": 10, "not_before": "2026-10-03T00:00:00.000000001Z"}
+        later = {**target, "uuid": str(uuid.uuid4()), "not_before": "2026-10-03T00:00:00.000000002Z"}
+        self.transport._request.return_value = [later]
+        cursor = self.client.target_cursor(target)
+        self.assertEqual(self.client.ready(collection, after=cursor), [later])
+        for invalid in (target, dict(later, priority=11), dict(later, not_before="invalid")):
+            self.transport._request.return_value = [invalid]
+            with self.assertRaises(Unavailable):
+                self.client.ready(collection, after=cursor)
 
     def test_checkpoint_is_object_and_unchanged_evidence_keeps_original_receipt(self):
         self.transport._request.return_value = self.receipt

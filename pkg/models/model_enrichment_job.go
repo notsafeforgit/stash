@@ -26,6 +26,16 @@ type EnrichmentJobBinding struct {
 	TargetRevision int    `json:"target_revision" db:"target_revision"`
 }
 
+type EnrichmentJobCandidate struct {
+	Sequence int64  `json:"sequence"`
+	UUID     string `json:"uuid"`
+}
+
+type EnrichmentMaintenanceResult struct {
+	Recovered int `json:"recovered"`
+	Cancelled int `json:"cancelled"`
+}
+
 type EnrichmentJobLease struct {
 	ArchiveJobLease
 	ProducerUUID string `json:"producer_uuid"`
@@ -101,6 +111,8 @@ type EnrichmentCheckpointRelease struct {
 }
 
 type EnrichmentJobReaderWriter interface {
+	Ready(context.Context, string, string, string, int64, int, time.Time) ([]EnrichmentJobCandidate, error)
+	Maintain(context.Context, time.Time) (*EnrichmentMaintenanceResult, error)
 	Bind(context.Context, string, time.Time) error
 	Binding(context.Context, string) (*EnrichmentJobBinding, error)
 	TargetBinding(context.Context, string, int) (*EnrichmentJobBinding, error)

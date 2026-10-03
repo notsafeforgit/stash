@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stashapp/stash/internal/ingest"
+	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/pkg/archive"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/sqlite"
@@ -22,6 +23,7 @@ func TestEnrichmentJobsMigrationPreservesEveryPriorJobKind(t *testing.T) {
 			name = "collision"
 		}
 		t.Run(name, func(t *testing.T) {
+			config.InitializeEmpty()
 			path := filepath.Join(t.TempDir(), "schema50.sqlite")
 			buildLegacyDatabase(t, path, 86, true)
 			db := sqlite.NewDatabase()

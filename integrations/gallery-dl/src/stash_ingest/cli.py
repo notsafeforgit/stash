@@ -110,6 +110,9 @@ def main(argv=None):
     enrichment_deliver.add_argument("job_uuid")
     enrichment_status = commands.add_parser("enrichment-status", help="Inspect local enrichment delivery and retained evidence")
     enrichment_status.add_argument("--job")
+    enrichment_dispatch = commands.add_parser("dispatch-enrichment", help="Recover saved metadata and optionally admit/execute source work")
+    enrichment_dispatch.add_argument("--collection", required=True)
+    enrichment_dispatch.add_argument("--profile", help="Enable new lookups using this reviewed profile; otherwise only deliver saved results")
     args = parser.parse_args(argv)
     box = None
     try:
@@ -205,6 +208,14 @@ def main(argv=None):
         elif args.command == "enrichment-status":
             from .enrichment_journal import EnrichmentJournal
             output = EnrichmentJournal(box).summary(args.job)
+        elif args.command == "dispatch-enrichment":
+            from .enrichment_dispatch import dispatch_once as dispatch_enrichment
+            profile = None
+            if args.profile:
+                from .enrichment_configuration import EnrichmentConfiguration
+                profile = EnrichmentConfiguration(args.profile)
+            with worker_output():
+                output = dispatch_enrichment(box, client, args.collection, profile)
         else:
             from .backfill_calls import BackfillCalls
             from .enrichment_journal import EnrichmentJournal
@@ -229,6 +240,8 @@ def main(argv=None):
             return 0 if output["state"] == "source_succeeded" else 2
         if args.command in ("execute-enrichment", "deliver-enrichment"):
             return 0 if output["state"] == "completed" else 2
+        if args.command == "dispatch-enrichment":
+            return 0 if output["state"] in ("completed", "idle") else 2
         if args.command == "ticket-status":
             return 0 if output["state"] == "source_succeeded" else 2
         if args.command == "dispatch":

@@ -232,10 +232,13 @@ const enrichmentReadySelect = enrichmentTargetSelect + `
   WHERE m.uuid=r.root_uuid AND d.state='active'))
  AND NOT EXISTS(SELECT 1 FROM enrichment_job_targets b WHERE b.target_uuid=t.uuid AND b.target_revision=t.revision)
  AND NOT EXISTS(SELECT 1 FROM archive_jobs j INDEXED BY archive_jobs_enrichment_target
-  WHERE j.kind='post.enrich' AND j.state IN ('queued','running') AND json_extract(j.arguments,'$.target_uuid')=+t.uuid)
- ORDER BY t.priority DESC,t.not_before,t.uuid LIMIT ?`
+  WHERE j.kind='post.enrich' AND j.state IN ('queued','running') AND json_extract(j.arguments,'$.target_uuid')=+t.uuid)`
 
 func (s *EnrichmentWorkStore) Ready(ctx context.Context, collection string, now time.Time, limit int) ([]models.EnrichmentTarget, error) {
+	return s.ReadyPage(ctx, collection, now, nil, limit)
+}
+
+func (s *EnrichmentWorkStore) ReadyPage(ctx context.Context, collection string, now time.Time, after *models.EnrichmentTargetCursor, limit int) ([]models.EnrichmentTarget, error) {
 	if !validSourceRunUUID(collection) || !validJobTime(now) {
 		return nil, models.ErrEnrichmentInvalid
 	}
@@ -244,7 +247,17 @@ func (s *EnrichmentWorkStore) Ready(ctx context.Context, collection string, now 
 		return nil, models.ErrEnrichmentInvalid
 	}
 	ret := []models.EnrichmentTarget{}
-	err = dbWrapper.Select(ctx, &ret, enrichmentReadySelect, collection, now.UTC(), limit)
+	query, args := enrichmentReadySelect, []any{collection, now.UTC()}
+	if after != nil {
+		if after.Priority < 0 || after.Priority > 100 || !validJobTime(after.NotBefore) || !validSourceRunUUID(after.UUID) {
+			return nil, models.ErrEnrichmentInvalid
+		}
+		query += " AND (t.priority<? OR (t.priority=? AND (t.not_before>? OR (t.not_before=? AND t.uuid>?))))"
+		args = append(args, after.Priority, after.Priority, after.NotBefore.UTC(), after.NotBefore.UTC(), after.UUID)
+	}
+	query += " ORDER BY t.priority DESC,t.not_before,t.uuid LIMIT ?"
+	args = append(args, limit)
+	err = dbWrapper.Select(ctx, &ret, query, args...)
 	return ret, err
 }
 

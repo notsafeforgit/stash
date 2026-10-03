@@ -166,6 +166,7 @@ func (rs *ingestRoutes) capabilities(w http.ResponseWriter, r *http.Request) {
 		"source_backfill_protocol":        1,
 		"collection_lookup":               true,
 		"enrichment_protocol":             1,
+		"enrichment_dispatch_protocol":    1,
 		"max_enrichment_checkpoint_bytes": archive.MaxEnrichmentTranscriptBytes,
 		"receipt_semantics":               "source.capture commits source evidence; file.completed queues verification; poll receipt status for media completion",
 	})

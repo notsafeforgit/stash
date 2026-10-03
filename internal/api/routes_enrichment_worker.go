@@ -41,6 +41,7 @@ func (rs *ingestRoutes) enrichmentRoutes(r chi.Router) {
 			})
 		})
 		r.Post("/collections/{collection}/ready", rs.readyEnrichment)
+		r.Post("/collections/{collection}/jobs/ready", rs.readyEnrichmentJobs)
 		r.Post("/targets/{target}/jobs", rs.admitEnrichment)
 		r.Get("/jobs/{job}", rs.describeEnrichment)
 		r.Post("/jobs/{job}/claim", rs.claimEnrichment)
@@ -79,13 +80,29 @@ func writeEnrichmentWorker(w http.ResponseWriter, value any, err error) {
 
 func (rs *ingestRoutes) readyEnrichment(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		Limit int `json:"limit"`
+		Limit int                            `json:"limit"`
+		After *models.EnrichmentTargetCursor `json:"after"`
 	}
 	if err := readIngestJSON(w, r, 1024, &input); err != nil {
 		ingestError(w, err)
 		return
 	}
-	value, err := rs.enrichmentWorker().Ready(r.Context(), ingestToken(r), chi.URLParam(r, "collection"), input.Limit)
+	value, err := rs.enrichmentWorker().ReadyPage(r.Context(), ingestToken(r), chi.URLParam(r, "collection"), input.After, input.Limit)
+	writeEnrichmentWorker(w, value, err)
+}
+
+func (rs *ingestRoutes) readyEnrichmentJobs(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		PolicySHA256     string `json:"policy_sha256"`
+		ExtractorVersion string `json:"extractor_version"`
+		After            int64  `json:"after"`
+		Limit            int    `json:"limit"`
+	}
+	if err := readIngestJSON(w, r, 4096, &input); err != nil {
+		ingestError(w, err)
+		return
+	}
+	value, err := rs.enrichmentWorker().ReadyJobs(r.Context(), ingestToken(r), chi.URLParam(r, "collection"), input.PolicySHA256, input.ExtractorVersion, input.After, input.Limit)
 	writeEnrichmentWorker(w, value, err)
 }
 

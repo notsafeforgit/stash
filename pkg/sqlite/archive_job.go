@@ -516,20 +516,25 @@ func (s *ArchiveJobStore) Recover(ctx context.Context, now time.Time, limit int)
 	}
 	for _, row := range rows {
 		job := row.resolve()
-		if err := finishJobAttempt(ctx, job, now, "expired", "{}", "lease_expired"); err != nil {
-			return 0, err
-		}
-		state := "queued"
-		if job.Fence >= int64(job.MaxAttempts) {
-			state = "failed"
-		}
-		available := now.UnixMilli()
-		if job.Kind == models.ArchiveJobEnrichPost {
-			available = max(job.AvailableAt.UnixMilli(), enrichmentRetryAt(job, now).UnixMilli())
-		}
-		if _, err := dbWrapper.Exec(ctx, `UPDATE archive_jobs SET state=?,available_at_ms=?,owner_uuid=NULL,lease_until_ms=NULL,error_code='lease_expired',revision=revision+1,updated_at_ms=? WHERE uuid=?`, state, available, now.UnixMilli(), job.UUID); err != nil {
+		if err := recoverArchiveJob(ctx, job, now); err != nil {
 			return 0, err
 		}
 	}
 	return len(rows), nil
+}
+
+func recoverArchiveJob(ctx context.Context, job *models.ArchiveJob, now time.Time) error {
+	if err := finishJobAttempt(ctx, job, now, "expired", "{}", "lease_expired"); err != nil {
+		return err
+	}
+	state := "queued"
+	if job.Fence >= int64(job.MaxAttempts) {
+		state = "failed"
+	}
+	available := now.UnixMilli()
+	if job.Kind == models.ArchiveJobEnrichPost {
+		available = max(job.AvailableAt.UnixMilli(), enrichmentRetryAt(job, now).UnixMilli())
+	}
+	_, err := dbWrapper.Exec(ctx, `UPDATE archive_jobs SET state=?,available_at_ms=?,owner_uuid=NULL,lease_until_ms=NULL,error_code='lease_expired',revision=revision+1,updated_at_ms=? WHERE uuid=?`, state, available, now.UnixMilli(), job.UUID)
+	return err
 }

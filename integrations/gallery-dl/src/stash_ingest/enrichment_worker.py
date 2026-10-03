@@ -96,7 +96,7 @@ def execute(box, transport, configuration, job_uuid, *, fetcher=fetch):
                     "native_outcome": job["state"], "error_code": "native_job_" + job["state"]}, reserved=0)
                 return _result(journal, job_uuid, "failed")
             if configuration is None:
-                return _result(journal, job_uuid, "delivery_pending" if value.state["pending"] else "waiting")
+                return _result(journal, job_uuid, "ownership_required" if value.state["pending"] else "waiting")
             _configuration(configuration, job, value.definition["url"])
             claim = value.state["claim"]
             if job["state"] == "running" and (claim is None or job.get("owner_uuid") != claim["owner_uuid"]):

@@ -73,6 +73,12 @@ var (
 	ErrEnrichmentAtomic   = errors.New("native enrichment work did not finish atomically")
 )
 
+type EnrichmentTargetCursor struct {
+	Priority  int       `json:"priority"`
+	NotBefore time.Time `json:"not_before"`
+	UUID      string    `json:"uuid"`
+}
+
 type EnrichmentWorkReaderWriter interface {
 	RetainTarget(context.Context, EnrichmentTargetInput, EnrichmentSchedule, time.Time) (*EnrichmentTarget, error)
 	Target(context.Context, string) (*EnrichmentTarget, error)
@@ -81,6 +87,7 @@ type EnrichmentWorkReaderWriter interface {
 	Schedule(context.Context, string, int, EnrichmentSchedule, time.Time) (*EnrichmentTarget, error)
 	Retry(context.Context, string, int, time.Time) (*EnrichmentTarget, error)
 	Ready(context.Context, string, time.Time, int) ([]EnrichmentTarget, error)
+	ReadyPage(context.Context, string, time.Time, *EnrichmentTargetCursor, int) ([]EnrichmentTarget, error)
 	Complete(context.Context, EnrichmentCompletionInput, time.Time) (*EnrichmentCompletion, error)
 	Completion(context.Context, string) (*EnrichmentCompletion, error)
 }

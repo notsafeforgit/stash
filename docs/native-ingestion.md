@@ -487,12 +487,13 @@ current Stash producer bearer token. Authentication precedes checkpoint body
 decoding; each operation rechecks collection/root grants and attempt ownership
 in its domain transaction. Ordinary Stash API keys and session cookies do not
 grant producer access. Website credentials stay in the external worker.
-Capabilities advertise `enrichment_protocol: 1` and
+Capabilities advertise `enrichment_protocol: 1`, `enrichment_dispatch_protocol: 1` and
 `max_enrichment_checkpoint_bytes: 33554432`.
 
 | Method and path | Request / result |
 | --- | --- |
-| `POST /collections/{uuid}/ready` | `{limit}` selects up to 100 currently eligible, **unadmitted** targets in that collection |
+| `POST /collections/{uuid}/ready` | `{limit, after?}` selects up to 100 eligible **unadmitted** targets; `after` contains the previous priority, `not_before` and UUID |
+| `POST /collections/{uuid}/jobs/ready` | `{policy_sha256, extractor_version, after, limit}` discovers eligible admitted jobs, ordered after their integer sequence; returns `{sequence, uuid}` candidates |
 | `POST /targets/{uuid}/jobs` | `{expected_revision, policy_sha256, extractor_version}` admits or replays the job bound to that target revision |
 | `GET /jobs/{uuid}` | Returns `{job, target}`, including immutable source URL/input and the target's current scheduling state |
 | `POST /jobs/{uuid}/claim` | `{expected_revision, owner_uuid, policy_sha256, extractor_version, lease_seconds}` claims the selected job; unchanged but unavailable work returns 204 |
@@ -529,10 +530,19 @@ producer with the original grants can. Reposting an unchanged checkpoint can
 return a predecessor's receipt. Preserve that acknowledgement's original fence;
 only publishing the currently selected checkpoint proves completion.
 
-The ready-target route does not discover existing queued retries or recover
-expired jobs. Dispatch, shared download/enrichment cooldowns and fairness,
-stale-job maintenance and host/n8n activation
-remain required. These routes alone do not enable a production scheduler.
+Target pages preserve priority descending, deadline ascending and UUID ascending
+order. Job discovery reads the bounded active index and filters the selected
+collection, runtime/policy, native backoff and current source eligibility. It
+does not traverse historical job rows. Authentication requires the collection's
+current root scope; changed historical jobs are ineligible and are never exposed
+through the current root's discovery grant. Claim independently checks authority.
+
+The native server runs enrichment maintenance every 30 seconds independently of
+media and translation workers. It cancels stale source/target work, recovers
+expired attempts with backoff and preserves checkpoint/receipt evidence. No
+producer route performs maintenance or contacts websites inside Stash. Shared
+download/enrichment cooldowns and fairness, legacy queue import and host/n8n
+activation remain required before switching production schedules.
 
 The Python selected-job executor now journals stable claim requests, returned
 checkpoint bytes and pending publication/failure operations in producer outbox
@@ -542,8 +552,10 @@ delivery intent are committed locally together. Exact acknowledgements release
 local bodies; conflicting successor checkpoints or rejected bodies remain in
 review. Delivery-only recovery needs the Stash producer token, with no website
 profile or credentials. See the [profile and CLI contract](../integrations/gallery-dl/README.md#durable-selected-job-execution).
-This executor accepts an already admitted job UUID; queued-job discovery and
-production service activation remain separate work.
+The selected-job executor accepts an already admitted UUID. The collection
+dispatcher discovers those jobs before admitting fresh targets; producer schema
+9 persists its cursors and backoff across restarts. It can also deliver saved
+results without loading a profile. See [dispatch and maintenance](../integrations/gallery-dl/README.md#enrichment-dispatch-and-native-maintenance).
 
 ## Completed file events
 

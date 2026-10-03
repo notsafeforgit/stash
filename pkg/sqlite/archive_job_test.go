@@ -225,6 +225,192 @@ func TestArchiveJobsPriorityReadinessAndSharedDestination(t *testing.T) {
 	require.Equal(t, low.UUID, third.UUID)
 }
 
+func TestArchiveJobSelectedClaimDoesNotSelectOrRecoverOtherWork(t *testing.T) {
+	f := newDurableJobFixture(t)
+	f.submit(t, jobSubmission("expired", "expired"))
+	expired := f.claim(t, uuid.NewString())
+	f.now = *expired.LeaseUntil
+	highInput := jobSubmission("high", "high")
+	highInput.Priority = 100
+	high := f.submit(t, highInput)
+	selected := f.submit(t, jobSubmission("selected", "selected"))
+
+	claimed, err := f.service.ClaimByID(t.Context(), selected.UUID, selected.Revision, uuid.NewString(), time.Minute)
+	require.NoError(t, err)
+	require.NotNil(t, claimed)
+	require.Equal(t, selected.UUID, claimed.UUID)
+	require.Equal(t, "running", claimed.State)
+	require.EqualValues(t, 1, claimed.Fence)
+	require.Equal(t, high, f.find(t, high.UUID), "an explicit claim must not choose higher-priority unrelated work")
+	require.Equal(t, expired, f.find(t, expired.UUID), "an explicit claim must not run global queue recovery")
+
+	for _, unavailable := range []*models.ArchiveJob{claimed, expired} {
+		ret, err := f.service.ClaimByID(t.Context(), unavailable.UUID, unavailable.Revision, uuid.NewString(), time.Minute)
+		require.NoError(t, err)
+		require.Nil(t, ret)
+		require.Equal(t, unavailable, f.find(t, unavailable.UUID))
+	}
+	count, err := f.service.Recover(t.Context(), 100)
+	require.NoError(t, err)
+	require.Equal(t, 1, count, "trusted maintenance still recovers expired work")
+	recovered := f.find(t, expired.UUID)
+	claimed, err = f.service.ClaimByID(t.Context(), recovered.UUID, recovered.Revision, uuid.NewString(), time.Minute)
+	require.NoError(t, err)
+	require.NotNil(t, claimed)
+	require.EqualValues(t, 2, claimed.Fence)
+	_, err = f.service.Progress(t.Context(), expired.Lease(), json.RawMessage(`{}`))
+	require.ErrorIs(t, err, models.ErrArchiveJobLease)
+}
+
+func TestArchiveJobSelectedClaimRespectsSharedResourcesAndRetryDelay(t *testing.T) {
+	f := newDurableJobFixture(t)
+	otherKind := jobSubmission("album", "shared")
+	otherKind.Kind = models.ArchiveJobBackfillAlbum
+	f.submit(t, otherKind)
+	blocker, err := f.service.Claim(t.Context(), otherKind.Kind, uuid.NewString(), time.Minute)
+	require.NoError(t, err)
+	require.NotNil(t, blocker)
+	selected := f.submit(t, jobSubmission("selected", "shared"))
+	ret, err := f.service.ClaimByID(t.Context(), selected.UUID, selected.Revision, uuid.NewString(), time.Minute)
+	require.NoError(t, err)
+	require.Nil(t, ret, "a claim by ID cannot bypass another kind's resource lock")
+	require.Equal(t, selected, f.find(t, selected.UUID))
+	f.outcome(t, blocker, models.ArchiveJobOutcome{State: "succeeded", Result: json.RawMessage(`{}`)})
+	claimed, err := f.service.ClaimByID(t.Context(), selected.UUID, selected.Revision, uuid.NewString(), time.Minute)
+	require.NoError(t, err)
+	require.NotNil(t, claimed)
+	progress, err := f.service.Progress(t.Context(), claimed.Lease(), json.RawMessage(`{"checkpoint":"retained"}`))
+	require.NoError(t, err)
+	retryAt := f.now.Add(time.Hour)
+	retry := f.outcome(t, claimed, models.ArchiveJobOutcome{State: "retry", RetryAt: retryAt, ErrorCode: "source_cooldown", Result: json.RawMessage(`{}`)})
+	ret, err = f.service.ClaimByID(t.Context(), retry.UUID, retry.Revision, uuid.NewString(), time.Minute)
+	require.NoError(t, err)
+	require.Nil(t, ret, "an explicit claim must preserve retry backoff")
+	require.Equal(t, retry, f.find(t, retry.UUID))
+	f.now = retryAt
+	resumed, err := f.service.ClaimByID(t.Context(), retry.UUID, retry.Revision, uuid.NewString(), time.Minute)
+	require.NoError(t, err)
+	require.NotNil(t, resumed)
+	require.EqualValues(t, 2, resumed.Fence)
+	require.Equal(t, progress.Progress, resumed.Progress)
+	completed := f.outcome(t, resumed, models.ArchiveJobOutcome{State: "succeeded", Result: json.RawMessage(`{}`)})
+	ret, err = f.service.ClaimByID(t.Context(), completed.UUID, completed.Revision, uuid.NewString(), time.Minute)
+	require.NoError(t, err)
+	require.Nil(t, ret, "an explicit claim must not reopen completed work")
+}
+
+func TestArchiveJobSelectedClaimRejectsStaleSelectionAndInvalidInput(t *testing.T) {
+	f := newDurableJobFixture(t)
+	input := jobSubmission("selected", "resource")
+	selected := f.submit(t, input)
+	input.RequestUUID = uuid.NewString()
+	input.Priority++
+	promoted := f.submit(t, input)
+	for _, stale := range []struct {
+		id       string
+		revision int64
+	}{{selected.UUID, selected.Revision}, {uuid.NewString(), 1}} {
+		ret, err := f.service.ClaimByID(t.Context(), stale.id, stale.revision, uuid.NewString(), time.Minute)
+		require.ErrorIs(t, err, models.ErrArchiveJobConflict)
+		require.Nil(t, ret)
+	}
+	for _, invalid := range []struct {
+		id       string
+		revision int64
+		owner    string
+		duration time.Duration
+	}{
+		{"invalid", promoted.Revision, uuid.NewString(), time.Minute},
+		{"00000000-0000-4000-8000-00000000000A", promoted.Revision, uuid.NewString(), time.Minute},
+		{promoted.UUID, 0, uuid.NewString(), time.Minute},
+		{promoted.UUID, promoted.Revision, "invalid", time.Minute},
+		{promoted.UUID, promoted.Revision, uuid.Nil.String(), time.Minute},
+		{promoted.UUID, promoted.Revision, uuid.NewString(), time.Second},
+	} {
+		ret, err := f.service.ClaimByID(t.Context(), invalid.id, invalid.revision, invalid.owner, invalid.duration)
+		require.Error(t, err)
+		require.Nil(t, ret)
+	}
+	ctx, err := f.db.Begin(t.Context(), true)
+	require.NoError(t, err)
+	_, err = f.repo.ArchiveJob.ClaimByID(ctx, promoted.UUID, promoted.Revision, uuid.NewString(), f.now, time.Minute)
+	require.ErrorContains(t, err, "managed write transaction")
+	require.NoError(t, f.db.Rollback(ctx))
+	require.Equal(t, promoted, f.find(t, promoted.UUID))
+}
+
+func TestArchiveJobSelectedClaimHasOneConcurrentOwner(t *testing.T) {
+	f := newDurableJobFixture(t)
+	selected := f.submit(t, jobSubmission("selected", "resource"))
+	var wg sync.WaitGroup
+	type result struct {
+		job *models.ArchiveJob
+		err error
+	}
+	results := make(chan result, 8)
+	for range 8 {
+		wg.Go(func() {
+			ret, err := f.service.ClaimByID(t.Context(), selected.UUID, selected.Revision, uuid.NewString(), time.Minute)
+			results <- result{ret, err}
+		})
+	}
+	wg.Wait()
+	close(results)
+	claimed := 0
+	for result := range results {
+		if result.err != nil {
+			require.ErrorIs(t, result.err, models.ErrArchiveJobConflict)
+			require.Nil(t, result.job)
+			continue
+		}
+		require.NotNil(t, result.job)
+		require.Equal(t, selected.UUID, result.job.UUID)
+		claimed++
+	}
+	require.Equal(t, 1, claimed)
+	require.NoError(t, f.repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		attempts, err := f.repo.ArchiveJob.Attempts(ctx, selected.UUID, 0, 10)
+		require.NoError(t, err)
+		require.Len(t, attempts, 1)
+		return nil
+	}))
+}
+
+func TestArchiveJobClaimsRollbackSwallowedAttemptFailure(t *testing.T) {
+	for _, byID := range []bool{false, true} {
+		name := "queue"
+		if byID {
+			name = "selected"
+		}
+		t.Run(name, func(t *testing.T) {
+			f := newDurableJobFixture(t)
+			selected := f.submit(t, jobSubmission("selected", "resource"))
+			raw := openRawDB(t, f.db.DatabasePath())
+			defer raw.Close()
+			_, err := raw.Exec(`CREATE TRIGGER archive_claim_test_failure BEFORE INSERT ON archive_job_attempts
+BEGIN SELECT RAISE(FAIL, 'injected attempt failure'); END`)
+			require.NoError(t, err)
+			err = f.repo.WithTxn(t.Context(), func(ctx context.Context) error {
+				_, err := f.repo.Ingest.CreateProducer(ctx, "Must roll back")
+				require.NoError(t, err)
+				if byID {
+					_, err = f.repo.ArchiveJob.ClaimByID(ctx, selected.UUID, selected.Revision, uuid.NewString(), f.now, time.Minute)
+				} else {
+					_, err = f.repo.ArchiveJob.Claim(ctx, selected.Kind, uuid.NewString(), f.now, time.Minute)
+				}
+				require.ErrorContains(t, err, "injected attempt failure")
+				return nil // A caller cannot turn an incomplete claim into a commit.
+			})
+			require.ErrorIs(t, err, models.ErrArchiveJobConflict)
+			require.Equal(t, selected, f.find(t, selected.UUID))
+			require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM archive_job_attempts"))
+			require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM ingest_producers"))
+			_, err = raw.Exec("DROP TRIGGER archive_claim_test_failure")
+			require.NoError(t, err)
+		})
+	}
+}
+
 func TestArchiveJobsCancellationInvalidatesLeaseAndUsesReviewedRevision(t *testing.T) {
 	f := newDurableJobFixture(t)
 	queued := f.submit(t, jobSubmission("cancel", "destination"))
@@ -410,6 +596,8 @@ func TestArchiveJobsValidationIndexesAndAnonymisation(t *testing.T) {
 		"SELECT * FROM archive_jobs WHERE kind='media.verify' AND state='queued' AND id>0 ORDER BY id LIMIT 10":       "archive_jobs_list",
 		"SELECT * FROM archive_jobs WHERE state='running' AND lease_until_ms<=10 ORDER BY lease_until_ms,id LIMIT 10": "archive_jobs_expired",
 		"SELECT * FROM archive_jobs WHERE state='running' AND resource_key='fixture'":                                 "archive_jobs_running_resource",
+		`SELECT j.* FROM archive_jobs j WHERE j.uuid='fixture' AND j.state='queued' AND j.available_at_ms<=10 AND j.fence<j.max_attempts
+ AND NOT EXISTS(SELECT 1 FROM archive_jobs r WHERE r.state='running' AND r.resource_key=j.resource_key)`: "SEARCH j USING INDEX sqlite_autoindex_archive_jobs_",
 	} {
 		rows, err := raw.Query("EXPLAIN QUERY PLAN " + query)
 		require.NoError(t, err)

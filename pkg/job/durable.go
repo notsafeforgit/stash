@@ -39,7 +39,26 @@ func (d *Durable) Claim(ctx context.Context, kind, owner string, duration time.D
 		ret, err = d.Repo.ArchiveJob.Claim(ctx, kind, owner, d.Now(), duration)
 		return err
 	})
-	return ret, err
+	if err != nil {
+		return nil, err
+	}
+	return ret, nil
+}
+
+// ClaimByID is for trusted callers selecting an exact job revision. External
+// producer services must instead authorize domain scope and call the repository
+// method inside that same transaction; this wrapper provides no authorization.
+func (d *Durable) ClaimByID(ctx context.Context, id string, revision int64, owner string, duration time.Duration) (*models.ArchiveJob, error) {
+	var ret *models.ArchiveJob
+	err := d.Repo.WithTxn(ctx, func(ctx context.Context) error {
+		var err error
+		ret, err = d.Repo.ArchiveJob.ClaimByID(ctx, id, revision, owner, d.Now(), duration)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return ret, nil
 }
 
 func (d *Durable) Renew(ctx context.Context, lease models.ArchiveJobLease, duration time.Duration) (*models.ArchiveJob, error) {

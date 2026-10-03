@@ -92,6 +92,11 @@ type ArchiveJobReaderWriter interface {
 	ResourceHistory(context.Context, string, string, int64, int) ([]ArchiveJob, error)
 	Attempts(context.Context, string, int64, int) ([]ArchiveJobAttempt, error)
 	Claim(context.Context, string, string, time.Time, time.Duration) (*ArchiveJob, error)
+	// ClaimByID claims only the selected revision. The caller must authorize
+	// its domain scope in this transaction. It neither selects other work nor
+	// recovers expired jobs; trusted queue maintenance owns recovery. An unchanged
+	// but unavailable job returns nil; a missing or changed job returns conflict.
+	ClaimByID(context.Context, string, int64, string, time.Time, time.Duration) (*ArchiveJob, error)
 	Renew(context.Context, ArchiveJobLease, time.Time, time.Duration) (*ArchiveJob, error)
 	CheckLease(context.Context, ArchiveJobLease, time.Time) (*ArchiveJob, error)
 	Progress(context.Context, ArchiveJobLease, time.Time, json.RawMessage) (*ArchiveJob, error)

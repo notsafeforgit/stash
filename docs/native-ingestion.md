@@ -175,7 +175,8 @@ registering the verified media. The result reports `metadata_state`, applied
 Native schema 1000019 provides `archive_jobs`, immutable submission acknowledgements,
 and attempt history. `job.Durable` supplies submission, claim/renew, progress,
 cancellation, bounded recovery, and atomic publication. Supported kinds are
-`media.verify` and, since schema 1000040, `album.backfill`. The HTTP server starts
+`media.verify`, `album.backfill` (schema 1000040), and `text.translate` (schema
+1000045). The HTTP server starts
 the file worker when FFmpeg/FFprobe are configured, plus an independent
 metadata-only album worker. Both start after plugin routing is initialized and
 are cancelled and joined during shutdown before the manager closes SQLite. Transient loop
@@ -201,6 +202,18 @@ them failed at their attempt limit. Retry times survive repeat submissions;
 duplicates cannot bypass backoff. The default service capacity is 10,000 active
 jobs, checked before new work is created; coalescing and receipt lookup still
 work at capacity. Queue/history reads use bounded indexed pagination.
+
+`ArchiveJob.ClaimByID` claims one explicitly selected job revision using indexed
+lookups. It preserves readiness, attempt limits and shared-resource exclusion;
+it cannot fall through to unrelated work or recover other expired jobs. Trusted
+queue maintenance performs recovery separately. A changed or missing selection
+returns a conflict; an unchanged but unavailable selection returns no claim.
+Both claim paths commit the running job and its attempt together, even when a
+caller catches a late write error. This is an internal transaction primitive:
+external services must authorize the job's domain scope and current producer
+access in that same transaction, with their own final checks before commit.
+The `Durable.ClaimByID` convenience wrapper is for trusted internal callers and
+does not provide producer authorization or expose a generic HTTP claim route.
 
 `Durable.Publish` checks the lease, runs domain writes, records the attempt result,
 and checks ownership/deadline again before commit. Failure rolls everything back.

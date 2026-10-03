@@ -4198,3 +4198,42 @@ Fenced extraction/publication, operational cooldowns and fairness, legacy
 enrichment/discovery mapping, remaining policies/histories, native UI and caller
 conversion, compatibility removal, backup/restore/export, performance work and
 production cutover remain unfinished. Production and `develop` are unchanged.
+
+## Selected durable job claims
+
+The shared job repository can claim one explicitly selected job revision without
+selecting higher-priority unrelated work or running global expiry recovery.
+Readiness, retry deadlines, attempt limits and shared-resource exclusion still
+apply. A changed selection is rejected; concurrent callers obtain one owner.
+Recovery remains a separate trusted queue operation, and old leases stay fenced.
+Both claim paths now reject a transaction that tries to swallow a failed attempt
+write after changing the job to running.
+
+This is an internal primitive for the remaining enrichment coordinator. Its
+producer service must authorize the selected source and producer within the
+same transaction; the primitive adds no generic producer claim endpoint. Durable
+enrichment binding, transcript checkpoints, verified capture publication,
+cooldowns, fairness and legacy queue mapping remain separate unfinished work.
+There is no schema or production configuration change.
+
+Focused durable-job tests passed in 9.167 seconds; the selected and concurrent
+claim tests also passed under the race detector in 7.360 seconds. Coverage includes
+changed selections, concurrent owners, preserved retry deadlines/checkpoints,
+resource exclusion across job kinds, separate expiry recovery, indexed lookup,
+and rollback when a caller swallows an injected attempt-write failure.
+
+The first full backend run exhausted disk space while creating fixture databases.
+Closed compiler/test scratch was removed after checking for open handles. The
+unused schema-31 rehearsal was compressed from 8,975,618,048 to 1,940,025,791
+bytes, and schema 49 from 18,794,569,728 to 4,119,869,771 bytes. Each decompressed
+SHA-256 matched before its redundant raw file was removed; the archives, hashes
+and prior reconciliation receipts remain retained. The current schema-50 copy
+and original frozen inputs remain unchanged. Cleanup/validation records are in
+`.local/native-enrichment-work-rehearsal-20261002/` under `selected_claim_*` and
+`selected-claim-scratch-cleanup.json`.
+
+The complete backend gate then passed in 632.150 seconds, with zero lint issues:
+API tests took 424.623 seconds, ingestion 501.975 seconds and SQLite 627.888
+seconds. The preceding `a775480d8` checkpoint also passed CI tests, generation,
+lint, build and release. Production and `develop` remain unchanged; the complete
+transition goal is still active.

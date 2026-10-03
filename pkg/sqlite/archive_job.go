@@ -295,14 +295,57 @@ ORDER BY j.priority DESC,j.available_at_ms,j.id LIMIT 1`, kind, now.UnixMilli())
 	if err != nil || job == nil {
 		return job, err
 	}
-	_, err = dbWrapper.Exec(ctx, `UPDATE archive_jobs SET state='running',fence=fence+1,owner_uuid=?,lease_until_ms=?,result='{}',error_code='',revision=revision+1,updated_at_ms=? WHERE uuid=?`, owner, now.Add(duration).UnixMilli(), now.UnixMilli(), job.UUID)
+	return s.claim(ctx, job, owner, now, duration)
+}
+
+func (s *ArchiveJobStore) ClaimByID(ctx context.Context, id string, revision int64, owner string, now time.Time, duration time.Duration) (*models.ArchiveJob, error) {
+	if err := managedArchiveJobWrite(ctx); err != nil {
+		return nil, err
+	}
+	jobID, err := archiveUUID(id)
+	if err != nil || jobID != id || revision < 1 || !validJobLease(now, duration) {
+		return nil, errors.New("invalid selected archive job claim")
+	}
+	ownerID, err := archiveUUID(owner)
+	if err != nil || ownerID != owner {
+		return nil, errors.New("invalid selected archive job owner")
+	}
+	current, err := s.Find(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if current == nil || current.Revision != revision {
+		return nil, models.ErrArchiveJobConflict
+	}
+	job, err := findArchiveJob(ctx, `SELECT j.* FROM archive_jobs j
+WHERE j.uuid=? AND j.state='queued' AND j.available_at_ms<=? AND j.fence<j.max_attempts
+ AND NOT EXISTS(SELECT 1 FROM archive_jobs r WHERE r.state='running' AND r.resource_key=j.resource_key)`, id, now.UnixMilli())
+	if err != nil || job == nil {
+		return job, err
+	}
+	return s.claim(ctx, job, owner, now, duration)
+}
+
+func (s *ArchiveJobStore) claim(ctx context.Context, job *models.ArchiveJob, owner string, now time.Time, duration time.Duration) (*models.ArchiveJob, error) {
+	// Do not commit the running head without its attempt, even if a caller
+	// catches a later error and tries to commit unrelated domain writes.
+	complete := false
+	txn.AddPreCommitHook(ctx, func(context.Context) error {
+		if !complete {
+			return models.ErrArchiveJobConflict
+		}
+		return nil
+	})
+	_, err := dbWrapper.Exec(ctx, `UPDATE archive_jobs SET state='running',fence=fence+1,owner_uuid=?,lease_until_ms=?,result='{}',error_code='',revision=revision+1,updated_at_ms=? WHERE uuid=?`, owner, now.Add(duration).UnixMilli(), now.UnixMilli(), job.UUID)
 	if err != nil {
 		return nil, err
 	}
 	if _, err := dbWrapper.Exec(ctx, "INSERT INTO archive_job_attempts(job_uuid,fence,owner_uuid,started_at_ms) VALUES(?,?,?,?)", job.UUID, job.Fence+1, owner, now.UnixMilli()); err != nil {
 		return nil, err
 	}
-	return s.Find(ctx, job.UUID)
+	ret, err := s.Find(ctx, job.UUID)
+	complete = err == nil && ret != nil
+	return ret, err
 }
 
 func (s *ArchiveJobStore) CheckLease(ctx context.Context, lease models.ArchiveJobLease, now time.Time) (*models.ArchiveJob, error) {

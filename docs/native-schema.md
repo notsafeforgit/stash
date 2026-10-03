@@ -690,6 +690,13 @@ require the unexpired owner and fence. Recovery is bounded and respects attempt
 limits. Job revisions protect cancellation, and terminal jobs and finished
 attempts are immutable.
 
+An explicit `ClaimByID` checks the selected job revision and indexed readiness
+without selecting or recovering unrelated work. It preserves retry delays,
+attempt limits and shared-resource exclusion. Both queue and selected claims
+prevent an incomplete attempt write from committing its running job head.
+Domain authorization remains the calling service's responsibility within the
+same transaction; this storage primitive grants no producer access.
+
 `job.Durable.Publish` combines domain writes and the attempt outcome in one
 managed transaction and rechecks expiry before commit. Repeat submissions can
 promote priority but preserve an existing retry delay. Bounded indexed queue and

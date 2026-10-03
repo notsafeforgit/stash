@@ -86,11 +86,9 @@ func ExtractCapturedAccount(raw []byte) (*CapturedAccount, error) {
 	if err != nil {
 		return nil, err
 	}
-	path := ""
-	category, _ := data["category"].(string)
-	category = strings.ToLower(category)
-	if parent, ok := data["_reddit"].(sourceObject); ok && sourceTruthy(parent["id"]) {
-		data, path, category = parent, "/_reddit", "reddit"
+	data, path, category, err := capturedSourceContext(data)
+	if err != nil {
+		return nil, err
 	}
 	if category == "" {
 		return nil, nil
@@ -153,6 +151,18 @@ func ExtractCapturedAccount(raw []byte) (*CapturedAccount, error) {
 		id = first("channel_id", "uploader_id")
 		// An uploader/channel display name is not necessarily a handle.
 		result.Label = capturedAccountLabel(first("uploader", "channel"))
+	case "fansly":
+		if raw := data["account"]; raw != nil {
+			account, ok := raw.(sourceObject)
+			if !ok {
+				return nil, errors.New("invalid captured Fansly publisher")
+			}
+			accountPath := pointerMember(path, "account")
+			id, handle = capturedFieldAt(account, accountPath, "id"), capturedFieldAt(account, accountPath, "username")
+			break
+		}
+		// Older retained captures use the generic publisher envelope.
+		fallthrough
 	default:
 		owner, ownerPath := author, authorPath
 		if owner == nil && sourceTruthy(data["author"]) {

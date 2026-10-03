@@ -1405,6 +1405,20 @@ URLs and unsupported root extractors return explicit failures. Linked Redgifs
 images and Imgur images/albums/galleries can be resolved to two child levels.
 Other links remain unresolved references without expanding into another feed.
 
+The Python producer and Go server share post-identity fixtures for these root
+services. Bluesky uses a DID plus record key; Kemono/Coomer use mirror, service,
+account and post ID together. Instagram uses the enclosing post ID, never a
+selected image ID or story/highlight container. Linked media hosts inherit their
+enclosing post; a social account/feed parent does not replace its post. These
+adapters allow verified metadata capture/publication, while file selection and
+source-window adapters for services beyond Reddit/Twitter remain unfinished.
+
+Metadata projection preserves source post captions and dates rather than image
+alt text or per-file dates. Kemono/Coomer only use `published` for publication
+time because their transformed `date` may instead be the mirror's import time.
+Offline fixtures run the pinned extractors' real transformations as well as the
+shared Go/Python contract, including multi-image posts and exact large IDs.
+
 Only source access and pacing settings survive configuration projection. There
 are no download jobs, file paths, archive updates, user filters, custom actions
 or postprocessors. Cookies can be read but are not updated, the extractor cache

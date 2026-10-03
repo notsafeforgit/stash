@@ -1530,17 +1530,21 @@ The internal coordinator accepts only a saved checkpoint revision and digest.
 It refuses pending child lookups, and every reconstructed record must resolve
 through an existing native post identifier to the exact target post. A URL,
 caption or another returned post cannot authorize creating or changing that
-identity. Post adapters currently support Reddit and Twitter, including retained
-Reddit parent context; other adapters remain required before their activation.
+identity. [Post adapters](native-ingestion.md) cover Reddit, Twitter, Bluesky,
+TikTok, Instagram posts/reels, Patreon, Fansly and Kemono/Coomer, including retained
+Imgur/Redgifs child context. Download activation still requires attachment and
+source-window adapters; post identity support alone cannot enable it.
 Unsupported external references stay in the retained checkpoint and their count
 is exposed in the publication. Completion certifies extraction within the
 supported policy, not successful resolution of every external link.
 
-Metadata comes from the same source fields as the download producer: title,
-original content/selftext/title, source date, and language. Original text and
-observation times are preserved. A media host's caption does not replace its
-enclosing Reddit post's caption. Native partitioning still shares post/profile
-bodies and stores attachment differences separately.
+Metadata comes from the same source-specific fields as the download producer:
+Bluesky text, TikTok description, Instagram post description/date, Patreon
+publication date, and the existing content/selftext/title fields. Kemono/Coomer
+require `published`; their `date` can be the mirror's import time. Original text
+and observation times are preserved. A media host's caption does not replace its
+enclosing post's caption. Existing native partitioning continues unchanged;
+broader service-specific post/profile partitioning remains transition work.
 
 Publication reuses the download capture transaction for source evidence,
 collection provenance, publisher review/matching, attachment manifests and

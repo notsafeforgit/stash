@@ -349,10 +349,13 @@ replay their original receipt.
 Qualified service IDs share native posts across catalogs. Mirror URLs preserve
 `mirror:coomer:onlyfans`, `mirror:kemono:patreon` and other mirror/service
 namespaces even when old catalog rows used a native service label. Unqualified
-local keys remain scoped to their physical catalog. Captured Reddit/Twitter IDs
-can qualify a local identity, but differing captured/catalog IDs, existing
-conflicting associations and forgotten posts produce review outcomes. No names,
+local keys remain scoped to their physical catalog. Captured IDs from the
+[supported post adapters](native-ingestion.md) can qualify a local identity, but
+differing captured/catalog IDs, existing conflicting associations and forgotten
+posts produce review outcomes. No names,
 directory labels or content equality establish performer ownership.
+Completed import receipts keep their original outcomes; adding an adapter does
+not silently rerun earlier identity decisions.
 
 The reader reproduces the original Python checksum encoding before native
 conversion. Shared observations with detail rows receive a `shared` disposition;

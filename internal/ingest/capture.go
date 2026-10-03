@@ -122,7 +122,7 @@ func prepareCapture(event CaptureEvent) (*preparedCapture, error) {
 	if err != nil || len(metadata) > 262144 {
 		return nil, fmt.Errorf("%w: metadata exceeds 256 KiB", ErrInvalid)
 	}
-	payload, err := archive.PrepareRetainedCapture("gallery-dl", strings.TrimPrefix(post.Namespace, "native:"), retained)
+	payload, err := archive.PrepareRetainedCapture("gallery-dl", archive.CapturedPostPlatform(*post), retained)
 	if err != nil {
 		return nil, fmt.Errorf("%w: invalid retained capture", ErrInvalid)
 	}
@@ -239,7 +239,7 @@ func (s *Service) Capture(ctx context.Context, token string, raw []byte, digest 
 			return models.ErrSourcePostForgotten
 		}
 		captureID := uuid.NewSHA1(uuid.MustParse(event.ProducerUUID), []byte("source.capture\x00"+event.EventUUID)).String()
-		capture, result, err := s.recordPreparedCapture(ctx, models.SourceCaptureInput{UUID: captureID, PostUUID: post.UUID, Origin: "gallery-dl", Platform: strings.TrimPrefix(event.Post.Namespace, "native:"), CapturedAt: event.ObservedAt, ExtractorVersion: &event.ExtractorVersion, RetentionPolicy: event.RetentionPolicy, Metadata: event.Metadata, Payload: *prepared.payload}, prepared.album, collection, time.Now())
+		capture, result, err := s.recordPreparedCapture(ctx, models.SourceCaptureInput{UUID: captureID, PostUUID: post.UUID, Origin: "gallery-dl", Platform: archive.CapturedPostPlatform(models.SourcePostIdentifier{Namespace: event.Post.Namespace, Value: event.Post.Value}), CapturedAt: event.ObservedAt, ExtractorVersion: &event.ExtractorVersion, RetentionPolicy: event.RetentionPolicy, Metadata: event.Metadata, Payload: *prepared.payload}, prepared.album, collection, time.Now())
 		if err != nil {
 			return err
 		}

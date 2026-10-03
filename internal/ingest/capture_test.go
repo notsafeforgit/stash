@@ -31,6 +31,11 @@ type captureFixture struct {
 
 func newCaptureFixture(t *testing.T) captureFixture {
 	t.Helper()
+	return newCaptureFixtureForNamespace(t, "native:reddit")
+}
+
+func newCaptureFixtureForNamespace(t *testing.T, namespace string) captureFixture {
+	t.Helper()
 	config.InitializeEmpty()
 	db := sqlite.NewDatabase()
 	require.NoError(t, db.Open(filepath.Join(t.TempDir(), "ingest.sqlite")))
@@ -41,7 +46,7 @@ func newCaptureFixture(t *testing.T) captureFixture {
 		var err error
 		fixture.producer, err = service.Repo.Ingest.CreateProducer(ctx, "Gallery-dl worker")
 		require.NoError(t, err)
-		fixture.collection, err = service.Repo.SourceCollection.Put(ctx, models.SourceCollectionInput{SourceCollectionDefinition: models.SourceCollectionDefinition{Label: "A feed", Kind: "feed", Namespace: "native:reddit", State: "active"}, Origin: "review"})
+		fixture.collection, err = service.Repo.SourceCollection.Put(ctx, models.SourceCollectionInput{SourceCollectionDefinition: models.SourceCollectionDefinition{Label: "A feed", Kind: "feed", Namespace: namespace, State: "active"}, Origin: "review"})
 		return err
 	}))
 	var err error

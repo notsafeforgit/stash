@@ -70,16 +70,7 @@ class Producer:
         self.check()
         kept = retain(metadata)
         post = source.post(kept)
-        metadata = {}
-        data, _ = source._context(kept)
-        for field, candidates in (("title", ("title",)), ("original_text", ("content", "selftext", "title")),
-                                  ("published_at", ("date",)), ("language", ("lang", "language"))):
-            for key in candidates:
-                if isinstance(data.get(key), str) and data[key]:
-                    metadata[field] = data[key]
-                    break
-        if metadata.get("published_at"):
-            metadata["date_basis"] = "source"
+        metadata = source.metadata(kept)
         event_id = str(uuid.uuid4())
         event = {**self.context, "event_uuid": event_id, "kind": "source.capture", "observed_at": utc_now(),
                  "extractor_version": self.extractor_version, "retention_policy": POLICY,

@@ -60,6 +60,15 @@ func TestIngestHTTPAuthenticationPartialBatchAndReceiptIsolation(t *testing.T) {
 	good := request(http.MethodGet, capabilities, "Bearer "+token, nil)
 	require.Equal(t, http.StatusOK, good.Code)
 	require.Contains(t, good.Body.String(), `"file_ingestion":false`)
+	var supported struct {
+		Namespaces []string `json:"post_namespaces"`
+		Prefixes   []string `json:"post_namespace_prefixes"`
+	}
+	require.NoError(t, json.Unmarshal(good.Body.Bytes(), &supported))
+	require.Contains(t, supported.Namespaces, "native:bluesky")
+	require.NotContains(t, supported.Namespaces, "native:onlyfans", "mirror evidence does not advertise native OnlyFans support")
+	require.Contains(t, supported.Prefixes, "mirror:coomer:")
+	require.Contains(t, supported.Prefixes, "mirror:kemono:")
 	require.NotContains(t, good.Body.String(), credential.SecretHash)
 	require.Equal(t, 0, privateCalls)
 	for _, target := range []string{ingestPath + "/graphql", ingestPath + "/../graphql", ingestPath + "/batches/", ingestPath + "/%63apabilities"} {

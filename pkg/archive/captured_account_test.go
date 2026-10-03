@@ -24,6 +24,7 @@ func TestCapturedAccountsFromSupportedExtractors(t *testing.T) {
 		{"tumblr", `{"category":"tumblr","blog":{"uuid":"OpaqueBlog","name":"ExampleAuthor"}}`, "native:tumblr", "id", "OpaqueBlog", "exampleauthor", "/blog/uuid"},
 		{"onlyfans", `{"category":"onlyfans","user":{"id":"100","username":"ExampleAuthor"}}`, "native:onlyfans", "id", "100", "exampleauthor", "/user/id"},
 		{"fansly", `{"category":"fansly","user":{"id":"100","username":"ExampleAuthor"}}`, "native:fansly", "id", "100", "exampleauthor", "/user/id"},
+		{"fansly current", `{"category":"fansly","account":{"id":"100","username":"ExampleAuthor"},"user":{"id":"other"}}`, "native:fansly", "id", "100", "exampleauthor", "/account/id"},
 		{"patreon", `{"category":"patreon","creator":{"id":"100","username":"ExampleAuthor"}}`, "native:patreon", "id", "100", "exampleauthor", "/creator/id"},
 		{"pixiv", `{"category":"pixiv","user":{"id":1234,"account":"CaseSensitive","name":"Display label"}}`, "native:pixiv", "id", "1234", "CaseSensitive", "/user/id"},
 		{"unknown nested", `{"category":"new-service","owner":{"uuid":"Opaque-ID","handle":"CaseSensitive"}}`, "native:new-service", "id", "Opaque-ID", "CaseSensitive", "/owner/uuid"},
@@ -71,6 +72,7 @@ func TestCapturedAccountsDoNotBorrowOrInventIdentity(t *testing.T) {
 		`{"category":"ytdl","extractor_key":"Generic","uploader_id":"100"}`,
 		`{"category":"ytdl","extractor_key":"Generic","webpage_url":"file:///local","uploader_id":"100"}`,
 		`{"category":"leakgallery","creator":"ExampleAuthor","id":"post"}`,
+		`{"category":"fansly","account":{"username":"ExampleAuthor"},"user":{"id":"other"}}`,
 	} {
 		account, err := ExtractCapturedAccount([]byte(raw))
 		require.NoError(t, err, raw)
@@ -138,6 +140,7 @@ func TestCapturedAccountInvalidClaimsAreReported(t *testing.T) {
 		`{"category":"instagram","owner_id":1e20}`,
 		`{"category":"instagram","owner_id":{"id":"100"}}`,
 		`{"category":"instagram","owner_id":["100"]}`,
+		`{"category":"fansly","account":[],"user":{"id":"other"}}`,
 		`{"category":"instagram","owner_id":"100","username":{"name":"nested"}}`,
 		`{"category":"instagram","owner_id":" padded "}`,
 		`{"category":"instagram","owner_id":"with\u0000control"}`,

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/stashapp/stash/pkg/models"
 )
@@ -112,11 +111,9 @@ func ExtractCapturedAlbum(raw []byte) (*CapturedAlbum, error) {
 	if err != nil {
 		return nil, err
 	}
-	path := ""
-	category, _ := data["category"].(string)
-	category = strings.ToLower(category)
-	if parent, ok := data["_reddit"].(sourceObject); ok && sourceTruthy(parent["id"]) {
-		data, path, category = parent, "/_reddit", "reddit"
+	data, path, category, err := capturedSourceContext(data)
+	if err != nil {
+		return nil, err
 	}
 	result := &CapturedAlbum{Policy: CapturedAlbumPolicy}
 	switch category {
@@ -168,16 +165,16 @@ func ExtractCapturedAlbum(raw []byte) (*CapturedAlbum, error) {
 			return nil, err
 		}
 	case "twitter":
-		root := data
+		root, rootPath := data, path
 		if legacy, ok := data["legacy"].(sourceObject); ok {
-			data, path = legacy, "/legacy"
+			data, path = legacy, pointerMember(path, "legacy")
 		}
 		entities, ok := data["extended_entities"].(sourceObject)
 		if !ok {
 			return nil, nil
 		}
-		post, err := capturedPostReference("native:twitter", capturedFieldAt(root, "", "tweet_id"),
-			capturedFieldAt(root, "", "rest_id"), capturedFieldAt(data, path, "id_str"))
+		post, err := capturedPostReference("native:twitter", capturedFieldAt(root, rootPath, "tweet_id"),
+			capturedFieldAt(root, rootPath, "rest_id"), capturedFieldAt(data, path, "id_str"))
 		if err != nil || post == nil {
 			return nil, err
 		}

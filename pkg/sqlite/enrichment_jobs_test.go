@@ -46,6 +46,13 @@ func (s enrichmentCheckpointBeforeCommit) Checkpoint(ctx context.Context, lease 
 
 func newEnrichmentExecutionFixture(t *testing.T) *enrichmentExecutionFixture {
 	t.Helper()
+	return newEnrichmentExecutionFixtureForPost(t, models.SourcePostIdentifier{Namespace: "native:reddit", Value: "abc123"},
+		"https://www.reddit.com/comments/abc123", models.SourceCollectionDefinition{
+			Label: "Fixture feed", Kind: "feed", Namespace: "native:reddit", State: "active", TargetURL: "https://www.reddit.com/user/example"})
+}
+
+func newEnrichmentExecutionFixtureForPost(t *testing.T, ref models.SourcePostIdentifier, postURL string, collection models.SourceCollectionDefinition) *enrichmentExecutionFixture {
+	t.Helper()
 	db, repo := archiveTestDatabase(t)
 	f := &enrichmentExecutionFixture{db: db, repo: repo, now: time.Date(2026, 10, 3, 2, 0, 0, 0, time.UTC)}
 	f.service = ingest.New(repo)
@@ -59,11 +66,10 @@ func newEnrichmentExecutionFixture(t *testing.T) *enrichmentExecutionFixture {
 	}
 	require.NoError(t, json.Unmarshal(body, &fixture))
 	f.initial, f.complete = fixture.Initial, fixture.Complete
-	post := sourceTestPost(t, repo, models.SourcePostIdentifier{Namespace: "native:reddit", Value: "abc123"}, "")
-	url, err := observePostURL(repo, models.SourcePostURLInput{SourcePostEvidence: postLinkEvidence(post.UUID), URL: "https://www.reddit.com/comments/abc123"})
+	post := sourceTestPost(t, repo, ref, "")
+	url, err := observePostURL(repo, models.SourcePostURLInput{SourcePostEvidence: postLinkEvidence(post.UUID), URL: postURL})
 	require.NoError(t, err)
-	f.collection = putSourceCollection(t, repo, models.SourceCollectionInput{Origin: "review", SourceCollectionDefinition: models.SourceCollectionDefinition{
-		Label: "Fixture feed", Kind: "feed", Namespace: "native:reddit", State: "active", TargetURL: "https://www.reddit.com/user/example"}})
+	f.collection = putSourceCollection(t, repo, models.SourceCollectionInput{Origin: "review", SourceCollectionDefinition: collection})
 	f.target = retainEnrichment(t, repo, models.EnrichmentTargetInput{PostUUID: post.UUID, URLUUID: url.URLUUID,
 		CollectionUUID: f.collection.UUID, CollectionRevision: f.collection.Revision, Policy: models.EnrichmentGalleryMetadataV1, Origin: "review"},
 		models.EnrichmentSchedule{State: "pending", Priority: 20}, f.now)

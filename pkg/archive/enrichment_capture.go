@@ -2,7 +2,6 @@ package archive
 
 import (
 	"encoding/json"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -10,23 +9,38 @@ import (
 )
 
 // CapturedMetadata uses source text verbatim. It follows the download producer's
-// projection; a linked media host cannot replace its enclosing Reddit caption.
+// projection; a linked media host cannot replace its enclosing post's caption.
 func CapturedMetadata(raw []byte) (models.SourcePostMetadata, error) {
 	ret := models.SourcePostMetadata{}
 	data, err := DecodeJSONObject(raw, MaxSourcePayloadBytes)
 	if err != nil {
 		return ret, err
 	}
-	if parent, ok := data["_reddit"].(sourceObject); ok && sourceTruthy(parent["id"]) {
-		data = parent
+	data, _, category, err := capturedSourceContext(data)
+	if err != nil {
+		return ret, err
+	}
+	textKeys, dateKeys := []string{"content", "selftext", "title"}, []string{"date"}
+	switch category {
+	case "bluesky":
+		textKeys, dateKeys = []string{"text"}, []string{"createdAt", "date"}
+	case "tiktok":
+		textKeys = []string{"desc", "title"}
+	case "instagram":
+		textKeys, dateKeys = []string{"description"}, []string{"post_date"}
+	case "patreon":
+		dateKeys = []string{"published_at", "date"}
+	case "kemono", "coomer":
+		// The extractor's date may fall back to the mirror's import time.
+		dateKeys = []string{"published"}
 	}
 	for _, field := range []struct {
 		out  **string
 		keys []string
 	}{
 		{&ret.Title, []string{"title"}},
-		{&ret.OriginalText, []string{"content", "selftext", "title"}},
-		{&ret.PublishedAt, []string{"date"}},
+		{&ret.OriginalText, textKeys},
+		{&ret.PublishedAt, dateKeys},
 		{&ret.Language, []string{"lang", "language"}},
 	} {
 		for _, key := range field.keys {
@@ -71,7 +85,7 @@ func PrepareEnrichmentCapture(job string, work *models.EnrichmentJobArguments, t
 	if err != nil {
 		return nil, nil, err
 	}
-	payload, err := PrepareRetainedCapture("gallery-dl", strings.TrimPrefix(post.Namespace, "native:"), raw)
+	payload, err := PrepareRetainedCapture("gallery-dl", CapturedPostPlatform(*post), raw)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -81,7 +95,7 @@ func PrepareEnrichmentCapture(job string, work *models.EnrichmentJobArguments, t
 	}
 	key := "enrichment-capture-v1\x00" + record.ProducerUUID + "\x00" + observed.UTC().Format(time.RFC3339Nano) + "\x00" + translationDigest(raw)
 	id := uuid.NewSHA1(uuid.MustParse(job), []byte(key)).String()
-	return &models.SourceCaptureInput{UUID: id, PostUUID: work.PostUUID, Origin: "gallery-dl", Platform: strings.TrimPrefix(post.Namespace, "native:"),
+	return &models.SourceCaptureInput{UUID: id, PostUUID: work.PostUUID, Origin: "gallery-dl", Platform: CapturedPostPlatform(*post),
 		CapturedAt: observed, ExtractorVersion: &work.ExtractorVersion, RetentionPolicy: transcript.RetentionPolicy, Metadata: metadata, Payload: *payload}, post, nil
 }
 

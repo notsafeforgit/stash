@@ -14,7 +14,7 @@ def _id(value):
     if type(value) is int:
         value = str(value)
     if (not isinstance(value, str) or not value or value != value.strip()
-            or len(value) > 1024 or any(ord(c) < 32 for c in value)):
+            or len(value) > 1024 or any(ord(c) < 32 or 127 <= ord(c) < 160 for c in value)):
         raise InvalidData("Captured source has no usable identifier")
     return value
 
@@ -27,10 +27,51 @@ def _agree(values):
 
 
 def _context(source):
-    parent = source.get("_reddit")
-    if isinstance(parent, dict) and parent.get("id"):
-        return parent, "reddit"
-    return source, source.get("category")
+    category = source.get("category")
+    category = category.lower() if isinstance(category, str) else None
+    for _ in range(32):
+        parent = source.get("_reddit")
+        if isinstance(parent, dict) and parent.get("id"):
+            source, category = parent, "reddit"
+            continue
+        if category not in ("imgur", "redgifs"):
+            return source, category.lower() if isinstance(category, str) else None
+        if source.get("_parent") is not None:
+            parent = source["_parent"]
+            if not isinstance(parent, dict) or not isinstance(parent.get("category"), str) or not parent["category"]:
+                raise InvalidData("Captured extractor parent has no category")
+            source, category = parent, parent["category"].lower()
+            continue
+        return source, category.lower() if isinstance(category, str) else None
+    raise InvalidData("Captured extractor ancestry exceeds limit")
+
+
+def _numeric(value):
+    if not re.fullmatch(r"[0-9]{1,30}", value):
+        raise InvalidData("Captured source post ID is not numeric")
+    return value
+
+
+def _bluesky(data):
+    author = data.get("author")
+    did = author.get("did") if isinstance(author, dict) else None
+    key = data.get("post_id")
+    did = _id(did) if did is not None and did != "" else None
+    key = _id(key) if key is not None and key != "" else None
+    uri = data.get("uri")
+    if uri is not None and uri != "":
+        if not isinstance(uri, str) or not uri.startswith("at://"):
+            raise InvalidData("Invalid captured Bluesky post URI")
+        parts = uri[5:].split("/")
+        if (len(parts) != 3 or parts[1] != "app.bsky.feed.post"
+                or did not in (None, "", parts[0]) or key not in (None, "", parts[2])):
+            raise InvalidData("Captured Bluesky post identifiers disagree")
+        did, key = parts[0], parts[2]
+    did, key = _id(did), _id(key)
+    if (not re.fullmatch(r"did:(?:plc:[A-Za-z0-9]+|web:[A-Za-z0-9.:-]+)", did)
+            or not re.fullmatch(r"[A-Za-z0-9._~-]+", key)):
+        raise InvalidData("Invalid captured Bluesky post identity")
+    return did + "/" + key
 
 
 def post(source):
@@ -40,9 +81,55 @@ def post(source):
     elif category == "twitter":
         legacy = data.get("legacy") or data
         value = _agree([data.get("tweet_id"), data.get("rest_id"), legacy.get("id_str")])
+    elif category == "bluesky":
+        value = _bluesky(data)
+    elif category in {"tiktok", "patreon", "fansly"}:
+        value = _numeric(_id(data.get("id")))
+    elif category == "instagram":
+        if data.get("type") in ("story", "highlight"):
+            raise UnsupportedSource("Instagram story/highlight containers need a separate identity adapter")
+        value = _numeric(_agree([data.get("post_id"), data.get("sidecar_media_id")]))
+    elif category in {"kemono", "coomer"}:
+        service = data.get("service")
+        if not isinstance(service, str) or not re.fullmatch(r"[a-z0-9][a-z0-9_.-]*", service.lower()):
+            raise InvalidData("Captured mirror post has no valid service")
+        parts = [_id(data.get(key)) for key in ("user", "id")]
+        if any(any(c in part for c in "/\\?#%") for part in parts):
+            raise InvalidData("Captured mirror post contains an ambiguous path component")
+        namespace = "mirror:" + category + ":" + service.lower()
+        if len(namespace) > 128:
+            raise InvalidData("Captured mirror service namespace exceeds limit")
+        return {"namespace": namespace, "value": _id("/".join(parts))}
     else:
         raise UnsupportedSource("This extractor still needs a native post identity adapter")
     return {"namespace": "native:" + category, "value": value}
+
+
+def metadata(source):
+    """Source text and post dates, without substituting an attachment caption."""
+    data, category = _context(source)
+    text_keys, date_keys = ("content", "selftext", "title"), ("date",)
+    if category == "bluesky":
+        text_keys, date_keys = ("text",), ("createdAt", "date")
+    elif category == "tiktok":
+        text_keys = ("desc", "title")
+    elif category == "instagram":
+        text_keys, date_keys = ("description",), ("post_date",)
+    elif category == "patreon":
+        date_keys = ("published_at", "date")
+    elif category in {"kemono", "coomer"}:
+        # The extractor's date can mean mirror import time instead.
+        date_keys = ("published",)
+    result = {}
+    for field, keys in (("title", ("title",)), ("original_text", text_keys),
+                        ("published_at", date_keys), ("language", ("lang", "language"))):
+        for key in keys:
+            if isinstance(data.get(key), str) and data[key]:
+                result[field] = data[key]
+                break
+    if result.get("published_at"):
+        result["date_basis"] = "source"
+    return result
 
 
 def reddit_media(value):
@@ -118,7 +205,7 @@ def attachment(source):
                 raise InvalidData("Reddit post media identifiers disagree")
             if selected is not None and known == {selected}:
                 return {"namespace": ref["namespace"], "value": selected}
-    else:
+    elif category == "twitter":
         legacy = data.get("legacy") or data
         entities = (legacy.get("extended_entities") or {}).get("media")
         if not isinstance(entities, list):

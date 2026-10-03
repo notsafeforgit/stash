@@ -2,8 +2,9 @@
 
 The development server exposes a separate, versioned producer interface at
 `/api/v3/ingest`. Protocol 1 currently accepts `source.capture` events for
-Reddit and Twitter post identities. It records sanitized source evidence,
-publisher choices, collection provenance, and ordered album manifests with a
+Reddit, Twitter, Bluesky, TikTok, Instagram posts/reels, Patreon, Fansly and
+Kemono/Coomer post identities. It records sanitized source evidence,
+publisher choices, collection provenance, and supported album manifests with a
 durable receipt. This interface is not deployed to the compatible production
 server.
 
@@ -387,11 +388,32 @@ JSON, not an escaped JSON string. The server partitions and deduplicates post,
 profile, and per-file data itself. Producers cannot supply arbitrary storage
 patches, precomputed profile bodies, or the trusted legacy-import policy.
 
-Post identity is verified against captured Reddit `id` or Twitter
-`tweet_id`/`rest_id`/`id_str` evidence, with exact large-number handling. Reddit
-crossposts keep their own identity; embedded Reddit parents from another media
-extractor retain their Reddit post scope. Unknown post identity adapters are
-rejected until supported, even though the account parser knows more services.
+Post identity is verified against captured evidence, preserving exact large
+integers and rejecting disagreeing identifiers:
+
+| Extractor | Post identity |
+| --- | --- |
+| Reddit | `native:reddit`, captured `id` |
+| Twitter | `native:twitter`, agreeing `tweet_id`/`rest_id`/`id_str` |
+| Bluesky | `native:bluesky`, `author.did/post_id`, verified against the feed-post AT URI when present |
+| TikTok, Patreon, Fansly | `native:<service>`, numeric post `id` |
+| Instagram posts/reels | `native:instagram`, numeric `post_id`, agreeing with `sidecar_media_id` when present |
+| Kemono/Coomer | `mirror:<extractor>:<service>`, captured `user/id` |
+
+A Bluesky handle cannot substitute for its DID; neither an Instagram file's
+`media_id` nor a story/highlight container ID is treated as a regular post ID.
+Mirror account and service scopes remain distinct from native service accounts.
+Capture provenance records the actual `coomer`/`kemono` extractor separately.
+Capabilities enumerate native services in `post_namespaces` and advertise
+`mirror:coomer:`/`mirror:kemono:` in `post_namespace_prefixes`; the service suffix
+must still satisfy the qualified-namespace rules.
+
+Reddit crossposts and independent social posts keep their own identity. Supported
+Imgur/Redgifs child hosts retain their enclosing post scope, caption and publisher.
+A social extractor's parent feed/profile does not replace its actual post.
+Unknown post adapters are rejected even when their account parser is supported.
+Post support alone does not establish attachment membership or enable a download
+worker: file selection and source-window adapters still cover Reddit/Twitter.
 
 ## Metadata enrichment checkpoints
 
@@ -448,8 +470,8 @@ publications keep their bodies through migration until the scoped internal
 `ReleaseCheckpoint` operation verifies them. A null `CheckpointHead` with a
 publication/release receipt means completed staging was released, not that the
 observations disappeared. Exact acknowledgement and completion replays still work.
-Public worker routes, source scheduling and additional post identity adapters
-remain transition work. See [staging release](native-schema.md#completed-enrichment-staging-release),
+Public worker routes/dispatch, source scheduling and the remaining download
+adapters remain transition work. See [staging release](native-schema.md#completed-enrichment-staging-release),
 [publication](native-schema.md#verified-enrichment-publication),
 [checkpoint storage and lifecycle](native-schema.md#enrichment-jobs-and-checkpoint-ownership)
 and the [producer contract](../integrations/gallery-dl/README.md#metadata-only-extraction-for-enrichment).

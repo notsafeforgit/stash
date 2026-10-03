@@ -1,0 +1,707 @@
+{
+  "extractor_commit": "c40eb2a42fbaa1d26a2bb7c96804b7f47d1f73f8",
+  "cases": [
+    {
+      "name": "bluesky URI agrees with author and record",
+      "source": {
+        "category": "bluesky",
+        "uri": "at://did:plc:alice/app.bsky.feed.post/3abc",
+        "post_id": "3abc",
+        "author": {
+          "did": "did:plc:alice",
+          "handle": "changed.test"
+        },
+        "text": "  Original caption\n",
+        "description": "Attachment alt text",
+        "createdAt": "2026-10-01T00:00:00.123Z",
+        "date": "2026-10-01T00:00:00+00:00"
+      },
+      "post": {
+        "namespace": "native:bluesky",
+        "value": "did:plc:alice/3abc"
+      },
+      "platform": "bluesky",
+      "metadata": {
+        "original_text": "  Original caption\n",
+        "published_at": "2026-10-01T00:00:00.123Z",
+        "date_basis": "source"
+      }
+    },
+    {
+      "name": "bluesky scoped record without URI",
+      "source": {
+        "category": "bluesky",
+        "post_id": "3abc",
+        "author": {
+          "did": "did:web:example.test"
+        }
+      },
+      "post": {
+        "namespace": "native:bluesky",
+        "value": "did:web:example.test/3abc"
+      },
+      "platform": "bluesky",
+      "metadata": {}
+    },
+    {
+      "name": "same bluesky record on another account",
+      "source": {
+        "category": "bluesky",
+        "uri": "at://did:plc:other/app.bsky.feed.post/3abc"
+      },
+      "post": {
+        "namespace": "native:bluesky",
+        "value": "did:plc:other/3abc"
+      },
+      "platform": "bluesky",
+      "metadata": {}
+    },
+    {
+      "name": "bluesky handle cannot stand in for DID",
+      "source": {
+        "category": "bluesky",
+        "post_id": "3abc",
+        "author": {
+          "handle": "alice.test"
+        }
+      },
+      "post": null
+    },
+    {
+      "name": "bluesky conflicting author",
+      "source": {
+        "category": "bluesky",
+        "uri": "at://did:plc:alice/app.bsky.feed.post/3abc",
+        "author": {
+          "did": "did:plc:bob"
+        }
+      },
+      "post": null
+    },
+    {
+      "name": "bluesky conflicting record",
+      "source": {
+        "category": "bluesky",
+        "uri": "at://did:plc:alice/app.bsky.feed.post/3abc",
+        "post_id": "different"
+      },
+      "post": null
+    },
+    {
+      "name": "bluesky nonpost URI",
+      "source": {
+        "category": "bluesky",
+        "uri": "at://did:plc:alice/app.bsky.actor.profile/self"
+      },
+      "post": null
+    },
+    {
+      "name": "tiktok preserves integer IDs",
+      "source": {
+        "category": "tiktok",
+        "id": 9007199254740993,
+        "desc": "Source caption",
+        "title": "Generated fallback",
+        "author": {
+          "id": "21",
+          "uniqueId": "publisher"
+        },
+        "date": "2026-10-01T00:00:00+00:00"
+      },
+      "post": {
+        "namespace": "native:tiktok",
+        "value": "9007199254740993"
+      },
+      "platform": "tiktok",
+      "metadata": {
+        "title": "Generated fallback",
+        "original_text": "Source caption",
+        "published_at": "2026-10-01T00:00:00+00:00",
+        "date_basis": "source"
+      }
+    },
+    {
+      "name": "instagram carousel is a post, not its selected image",
+      "source": {
+        "category": "instagram",
+        "post_id": 9007199254740993,
+        "sidecar_media_id": "9007199254740993",
+        "post_shortcode": "ABC",
+        "media_id": "9007199254740994",
+        "description": "Album caption",
+        "date": "2026-10-02T00:00:00Z",
+        "post_date": "2026-10-01T00:00:00Z"
+      },
+      "post": {
+        "namespace": "native:instagram",
+        "value": "9007199254740993"
+      },
+      "platform": "instagram",
+      "metadata": {
+        "original_text": "Album caption",
+        "published_at": "2026-10-01T00:00:00Z",
+        "date_basis": "source"
+      }
+    },
+    {
+      "name": "instagram media ID alone does not establish post",
+      "source": {
+        "category": "instagram",
+        "media_id": "123"
+      },
+      "post": null
+    },
+    {
+      "name": "instagram shortcode alone does not establish post",
+      "source": {
+        "category": "instagram",
+        "post_shortcode": "ABC"
+      },
+      "post": null
+    },
+    {
+      "name": "instagram contradictory carousel ID",
+      "source": {
+        "category": "instagram",
+        "post_id": "123",
+        "sidecar_media_id": "124"
+      },
+      "post": null
+    },
+    {
+      "name": "instagram story is not a regular post",
+      "source": {
+        "category": "instagram",
+        "type": "story",
+        "post_id": "123",
+        "media_id": "456"
+      },
+      "post": null
+    },
+    {
+      "name": "instagram highlight is not a regular post",
+      "source": {
+        "category": "instagram",
+        "type": "highlight",
+        "post_id": "123",
+        "media_id": "456"
+      },
+      "post": null
+    },
+    {
+      "name": "patreon native post",
+      "source": {
+        "category": "patreon",
+        "id": 123,
+        "title": "Post title",
+        "content": "Post content",
+        "published_at": "2026-10-01T00:00:00.123+00:00",
+        "date": "2026-10-01T00:00:00+00:00"
+      },
+      "post": {
+        "namespace": "native:patreon",
+        "value": "123"
+      },
+      "platform": "patreon",
+      "metadata": {
+        "title": "Post title",
+        "original_text": "Post content",
+        "published_at": "2026-10-01T00:00:00.123+00:00",
+        "date_basis": "source"
+      }
+    },
+    {
+      "name": "fansly native post",
+      "source": {
+        "category": "fansly",
+        "id": "123",
+        "content": "Original post text",
+        "account": {
+          "id": "456",
+          "username": "publisher"
+        },
+        "file": {
+          "id": "attachment"
+        }
+      },
+      "post": {
+        "namespace": "native:fansly",
+        "value": "123"
+      },
+      "platform": "fansly",
+      "metadata": {
+        "original_text": "Original post text"
+      }
+    },
+    {
+      "name": "coomer onlyfans 456",
+      "source": {
+        "category": "coomer",
+        "service": "onlyfans",
+        "user": "456",
+        "id": "123",
+        "file_id": "selected-file",
+        "title": "Source title"
+      },
+      "post": {
+        "namespace": "mirror:coomer:onlyfans",
+        "value": "456/123"
+      },
+      "platform": "coomer",
+      "metadata": {
+        "title": "Source title",
+        "original_text": "Source title"
+      }
+    },
+    {
+      "name": "coomer onlyfans 789",
+      "source": {
+        "category": "coomer",
+        "service": "onlyfans",
+        "user": "789",
+        "id": "123",
+        "file_id": "selected-file",
+        "title": "Source title"
+      },
+      "post": {
+        "namespace": "mirror:coomer:onlyfans",
+        "value": "789/123"
+      },
+      "platform": "coomer",
+      "metadata": {
+        "title": "Source title",
+        "original_text": "Source title"
+      }
+    },
+    {
+      "name": "coomer fansly 456",
+      "source": {
+        "category": "coomer",
+        "service": "fansly",
+        "user": "456",
+        "id": "123",
+        "file_id": "selected-file",
+        "title": "Source title"
+      },
+      "post": {
+        "namespace": "mirror:coomer:fansly",
+        "value": "456/123"
+      },
+      "platform": "coomer",
+      "metadata": {
+        "title": "Source title",
+        "original_text": "Source title"
+      }
+    },
+    {
+      "name": "kemono patreon 456",
+      "source": {
+        "category": "kemono",
+        "service": "patreon",
+        "user": "456",
+        "id": "123",
+        "file_id": "selected-file",
+        "title": "Source title"
+      },
+      "post": {
+        "namespace": "mirror:kemono:patreon",
+        "value": "456/123"
+      },
+      "platform": "kemono",
+      "metadata": {
+        "title": "Source title",
+        "original_text": "Source title"
+      }
+    },
+    {
+      "name": "kemono fanbox ArtistName",
+      "source": {
+        "category": "kemono",
+        "service": "fanbox",
+        "user": "ArtistName",
+        "id": "123",
+        "file_id": "selected-file",
+        "title": "Source title"
+      },
+      "post": {
+        "namespace": "mirror:kemono:fanbox",
+        "value": "ArtistName/123"
+      },
+      "platform": "kemono",
+      "metadata": {
+        "title": "Source title",
+        "original_text": "Source title"
+      }
+    },
+    {
+      "name": "invalid mirror {'user': 'a/b'}",
+      "source": {
+        "category": "coomer",
+        "service": "onlyfans",
+        "user": "a/b",
+        "id": "123"
+      },
+      "post": null
+    },
+    {
+      "name": "invalid mirror {'id': 'a/b'}",
+      "source": {
+        "category": "coomer",
+        "service": "onlyfans",
+        "user": "456",
+        "id": "a/b"
+      },
+      "post": null
+    },
+    {
+      "name": "invalid mirror {'user': 'a%2Fb'}",
+      "source": {
+        "category": "coomer",
+        "service": "onlyfans",
+        "user": "a%2Fb",
+        "id": "123"
+      },
+      "post": null
+    },
+    {
+      "name": "invalid mirror {'service': 'bad/service'}",
+      "source": {
+        "category": "coomer",
+        "service": "bad/service",
+        "user": "456",
+        "id": "123"
+      },
+      "post": null
+    },
+    {
+      "name": "invalid mirror {'user': ''}",
+      "source": {
+        "category": "coomer",
+        "service": "onlyfans",
+        "user": "",
+        "id": "123"
+      },
+      "post": null
+    },
+    {
+      "name": "invalid numeric tiktok True",
+      "source": {
+        "category": "tiktok",
+        "id": true
+      },
+      "post": null
+    },
+    {
+      "name": "invalid numeric tiktok 1.5",
+      "source": {
+        "category": "tiktok",
+        "id": 1.5
+      },
+      "post": null
+    },
+    {
+      "name": "invalid numeric tiktok 123_456",
+      "source": {
+        "category": "tiktok",
+        "id": "123_456"
+      },
+      "post": null
+    },
+    {
+      "name": "invalid numeric tiktok -1",
+      "source": {
+        "category": "tiktok",
+        "id": "-1"
+      },
+      "post": null
+    },
+    {
+      "name": "invalid numeric patreon True",
+      "source": {
+        "category": "patreon",
+        "id": true
+      },
+      "post": null
+    },
+    {
+      "name": "invalid numeric patreon 1.5",
+      "source": {
+        "category": "patreon",
+        "id": 1.5
+      },
+      "post": null
+    },
+    {
+      "name": "invalid numeric patreon 123_456",
+      "source": {
+        "category": "patreon",
+        "id": "123_456"
+      },
+      "post": null
+    },
+    {
+      "name": "invalid numeric patreon -1",
+      "source": {
+        "category": "patreon",
+        "id": "-1"
+      },
+      "post": null
+    },
+    {
+      "name": "invalid numeric fansly True",
+      "source": {
+        "category": "fansly",
+        "id": true
+      },
+      "post": null
+    },
+    {
+      "name": "invalid numeric fansly 1.5",
+      "source": {
+        "category": "fansly",
+        "id": 1.5
+      },
+      "post": null
+    },
+    {
+      "name": "invalid numeric fansly 123_456",
+      "source": {
+        "category": "fansly",
+        "id": "123_456"
+      },
+      "post": null
+    },
+    {
+      "name": "invalid numeric fansly -1",
+      "source": {
+        "category": "fansly",
+        "id": "-1"
+      },
+      "post": null
+    },
+    {
+      "name": "nested child keeps root post",
+      "source": {
+        "category": "imgur",
+        "id": "child",
+        "title": "Child text",
+        "_parent": {
+          "category": "redgifs",
+          "id": "host",
+          "_reddit": {
+            "id": "original",
+            "title": "Original post",
+            "author": "publisher",
+            "gallery_data": {
+              "items": [
+                {
+                  "media_id": "photo"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "post": {
+        "namespace": "native:reddit",
+        "value": "original"
+      },
+      "platform": "reddit",
+      "metadata": {
+        "title": "Original post",
+        "original_text": "Original post"
+      }
+    },
+    {
+      "name": "non-Reddit child keeps root post",
+      "source": {
+        "category": "imgur",
+        "id": "child",
+        "content": "Child",
+        "_parent": {
+          "category": "patreon",
+          "id": "123",
+          "title": "Source title",
+          "content": "Source text"
+        }
+      },
+      "post": {
+        "namespace": "native:patreon",
+        "value": "123"
+      },
+      "platform": "patreon",
+      "metadata": {
+        "title": "Source title",
+        "original_text": "Source text"
+      }
+    },
+    {
+      "name": "quoted social post is not extractor ancestry",
+      "source": {
+        "category": "twitter",
+        "tweet_id": "123",
+        "quoted_status": {
+          "tweet_id": "456"
+        },
+        "title": "Wrapper caption"
+      },
+      "post": {
+        "namespace": "native:twitter",
+        "value": "123"
+      },
+      "platform": "twitter",
+      "metadata": {
+        "title": "Wrapper caption",
+        "original_text": "Wrapper caption"
+      }
+    },
+    {
+      "name": "unknown extractor requires adapter",
+      "source": {
+        "category": "other",
+        "id": "123"
+      },
+      "post": null
+    },
+    {
+      "name": "malformed parent",
+      "source": {
+        "category": "imgur",
+        "id": "child",
+        "_parent": "not an object"
+      },
+      "post": null
+    },
+    {
+      "name": "parent without category",
+      "source": {
+        "category": "imgur",
+        "id": "child",
+        "_parent": {
+          "id": "123"
+        }
+      },
+      "post": null
+    },
+    {
+      "name": "mirror invalid user ' account '",
+      "source": {
+        "category": "coomer",
+        "service": "onlyfans",
+        "user": " account ",
+        "id": "123"
+      },
+      "post": null
+    },
+    {
+      "name": "mirror invalid id '123 '",
+      "source": {
+        "category": "coomer",
+        "service": "onlyfans",
+        "user": "456",
+        "id": "123 "
+      },
+      "post": null
+    },
+    {
+      "name": "mirror invalid user 'a\\x7fb'",
+      "source": {
+        "category": "coomer",
+        "service": "onlyfans",
+        "user": "a\u007fb",
+        "id": "123"
+      },
+      "post": null
+    },
+    {
+      "name": "mirror publication not guessed from import",
+      "source": {
+        "category": "kemono",
+        "service": "patreon",
+        "user": "456",
+        "id": "123",
+        "title": "Source title",
+        "date": "2026-10-01T12:00:00",
+        "added": "2026-10-01T12:00:00",
+        "published": null
+      },
+      "post": {
+        "namespace": "mirror:kemono:patreon",
+        "value": "456/123"
+      },
+      "platform": "kemono",
+      "metadata": {
+        "title": "Source title",
+        "original_text": "Source title"
+      }
+    },
+    {
+      "name": "mirror publication known",
+      "source": {
+        "category": "kemono",
+        "service": "patreon",
+        "user": "456",
+        "id": "123",
+        "title": "Source title",
+        "date": "2026-10-01T12:00:00",
+        "added": "2026-10-01T12:00:00",
+        "published": "2026-09-01T12:00:00"
+      },
+      "post": {
+        "namespace": "mirror:kemono:patreon",
+        "value": "456/123"
+      },
+      "platform": "kemono",
+      "metadata": {
+        "title": "Source title",
+        "original_text": "Source title",
+        "published_at": "2026-09-01T12:00:00",
+        "date_basis": "source"
+      }
+    },
+    {
+      "name": "instagram profile parent does not replace post",
+      "source": {
+        "category": "instagram",
+        "post_id": "123",
+        "owner_id": "456",
+        "description": "Post caption",
+        "_parent": {
+          "category": "instagram",
+          "subcategory": "user",
+          "title": "Profile title",
+          "owner_id": "other"
+        }
+      },
+      "post": {
+        "namespace": "native:instagram",
+        "value": "123"
+      },
+      "platform": "instagram",
+      "metadata": {
+        "original_text": "Post caption"
+      }
+    },
+    {
+      "name": "social parent cannot replace an independent post",
+      "source": {
+        "category": "twitter",
+        "tweet_id": "123",
+        "content": "Own caption",
+        "_parent": {
+          "category": "twitter",
+          "tweet_id": "456",
+          "content": "Parent caption"
+        }
+      },
+      "post": {
+        "namespace": "native:twitter",
+        "value": "123"
+      },
+      "platform": "twitter",
+      "metadata": {
+        "original_text": "Own caption"
+      }
+    }
+  ]
+}

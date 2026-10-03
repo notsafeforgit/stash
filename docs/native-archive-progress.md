@@ -4427,3 +4427,51 @@ cooldowns/fairness, stale-job maintenance, legacy queue mapping and remaining
 policy/history migration are still required. Native UI, live host/n8n activation,
 compatibility removal, backup/restore/export, performance and cutover remain
 unfinished. Production and `develop` are unchanged; the full goal remains active.
+
+## Additional source post adapters
+
+Native capture intake and internal enrichment publication now identify Bluesky,
+TikTok, Instagram posts/reels, Patreon, Fansly and Kemono/Coomer posts. The Go
+server and Python producer share 51 identity/metadata cases. Bluesky identities
+include the author's DID; mirror identities include extractor, service and
+account. Instagram uses the enclosing post ID rather than an individual file ID.
+Disagreeing, incomplete and ambiguous identifiers cannot establish a post.
+
+Metadata uses each extractor's post caption and publication fields. Image alt
+text and attachment dates do not replace them. Mirror import dates are not
+misreported as publication dates. Current Fansly `account` envelopes and older
+retained publisher envelopes both work. Imgur/Redgifs children preserve the
+enclosing post's identity, publisher, caption and source evidence paths; social
+profile/feed parents do not replace the actual post. Capture provenance retains
+the actual mirror extractor independently of its qualified post identity.
+
+All 304 producer tests passed in 100.021 seconds, including offline execution of
+the pinned gallery-dl transformations for all seven additional source types.
+Backend persistence tests cover original provenance, child attribution, mirror
+account separation, collection authority, restart, staging release and exact
+publication/receipt replay. Focused archive/enrichment/capture checks passed in
+74.824 seconds. Both complete backend gates passed: the final run took 664.086
+seconds. The subsequent API capability check passed in 13.761 seconds, and final
+lint reported zero issues. Capabilities now list the additional native namespaces
+and distinguish Coomer/Kemono namespace prefixes from native service support.
+The preceding `7cc3e5b4a` checkpoint passed CI build, lint and native preview image
+publication.
+
+A read-only audit of the schema-53 rehearsal reconstructed and verified 17,694
+retained captures across Bluesky, Instagram and the mirrored services. It matched
+17,681 to their existing native post identifiers, with no conflicting identifiers
+or newly required associations. Thirteen Instagram story/highlight captures
+remain outside the regular-post adapter; their stored evidence is preserved.
+The audit took 7.828 seconds. Existing collection namespace scopes also agree
+with the newly supported identities. Reports, exceptions and test logs are under
+`.local/native-post-adapters-rehearsal-20261002/`. No schema migration or source
+payload rewrite was needed.
+
+Attachment manifests, file selection and source-window adapters beyond
+Reddit/Twitter, additional service-specific post/profile partitioning, and
+Instagram story/highlight semantics remain required. Post identity support alone
+does not enable a complete media download adapter. Public enrichment routes and
+dispatch, shared scheduling/cooldowns, operational-history/policy import, native
+UI, live host/n8n activation, compatibility removal, backup/restore/export,
+performance and cutover remain unfinished. The full transition goal remains
+active on `v3-rewrite`; production and `develop` are unchanged.

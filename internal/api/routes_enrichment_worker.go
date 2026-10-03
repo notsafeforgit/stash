@@ -40,6 +40,7 @@ func (rs *ingestRoutes) enrichmentRoutes(r chi.Router) {
 				next.ServeHTTP(w, r)
 			})
 		})
+		r.Post("/collections/ready", rs.readyEnrichmentCollections)
 		r.Post("/collections/{collection}/ready", rs.readyEnrichment)
 		r.Post("/collections/{collection}/jobs/ready", rs.readyEnrichmentJobs)
 		r.Post("/targets/{target}/jobs", rs.admitEnrichment)
@@ -104,6 +105,21 @@ func (rs *ingestRoutes) readyEnrichmentJobs(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	value, err := rs.enrichmentWorker().ReadyJobs(r.Context(), ingestToken(r), chi.URLParam(r, "collection"), input.PolicySHA256, input.ExtractorVersion, input.After, input.Limit)
+	writeEnrichmentWorker(w, value, err)
+}
+
+func (rs *ingestRoutes) readyEnrichmentCollections(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		PolicySHA256     string `json:"policy_sha256"`
+		ExtractorVersion string `json:"extractor_version"`
+		After            string `json:"after"`
+		Limit            int    `json:"limit"`
+	}
+	if err := readIngestJSON(w, r, 1024, &input); err != nil {
+		ingestError(w, err)
+		return
+	}
+	value, err := rs.enrichmentWorker().ReadyCollections(r.Context(), ingestToken(r), input.PolicySHA256, input.ExtractorVersion, input.After, input.Limit)
 	writeEnrichmentWorker(w, value, err)
 }
 

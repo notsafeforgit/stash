@@ -93,6 +93,21 @@ func (c *EnrichmentCoordinator) ReadyJobs(ctx context.Context, token, collection
 	return ret, err
 }
 
+func (c *EnrichmentCoordinator) ReadyCollections(ctx context.Context, token, policy, extractor, after string, limit int) ([]models.EnrichmentCollectionCandidate, error) {
+	var ret []models.EnrichmentCollectionCandidate
+	err := c.Service.Repo.WithReadTxn(ctx, func(ctx context.Context) error {
+		credential, err := c.Service.authenticate(ctx, token)
+		if err != nil {
+			return err
+		}
+		ret, err = c.Service.Repo.EnrichmentJob.Collections(ctx, models.EnrichmentCollectionQuery{
+			Scopes: credential.Scopes, Roots: credential.RootUUIDs, PolicySHA256: policy, ExtractorVersion: extractor, After: after, Limit: limit,
+		}, c.Now())
+		return err
+	})
+	return ret, err
+}
+
 type EnrichmentFailureReceipt struct {
 	models.ArchiveJobAttempt
 	ProducerUUID string `json:"producer_uuid"`

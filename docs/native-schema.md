@@ -1692,6 +1692,8 @@ cooldown, and does not consume the failure/backoff budget.
 Migration starts a new fairness epoch with zero counters; it does not invent
 historical scheduling interest or rewrite existing work. Startup validates
 service coverage, current queued-job bindings and the complete required-service
-set. Ordinary backups retain this state; anonymisation removes it. Multi-profile
-worker dispatch, legacy scheduling import and live conversion remain required
-before activating production schedules.
+set. Ordinary backups retain this state; anonymisation removes it. Producer
+outbox schema 10 adds rotation across local download/metadata profiles and
+permitted collections without changing the native database schema. Legacy
+scheduling import and live conversion remain required before activating
+production schedules.

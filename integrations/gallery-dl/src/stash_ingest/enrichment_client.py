@@ -115,6 +115,30 @@ class EnrichmentClient:
             raise Unavailable("invalid_response") from None
         return result
 
+    def ready_collections(self, policy, extractor, *, after="", limit=20):
+        if (not sha256(policy) or not isinstance(extractor, str) or not extractor or len(extractor) > 128
+                or any(c in extractor for c in "\r\n\x00") or type(limit) is not int or not 1 <= limit <= 100):
+            raise InvalidData("Invalid enrichment collection discovery")
+        if after:
+            identifier(after)
+        elif after != "":
+            raise InvalidData("Invalid enrichment collection cursor")
+        result = self.client._request("POST", PREFIX + "/collections/ready", encode({
+            "policy_sha256": policy, "extractor_version": extractor, "after": after, "limit": limit}))
+        if not isinstance(result, list) or len(result) > limit:
+            raise Unavailable("invalid_response")
+        try:
+            for item in result:
+                if not isinstance(item, dict) or set(item) != {"uuid"}:
+                    raise InvalidData("Invalid enrichment collection page")
+                identifier(item["uuid"])
+                if item["uuid"] <= after:
+                    raise InvalidData("Enrichment collection page did not advance")
+                after = item["uuid"]
+        except InvalidData:
+            raise Unavailable("invalid_response") from None
+        return result
+
     @staticmethod
     def _job(value, expected=None):
         work = value.get("arguments") if isinstance(value, dict) else None

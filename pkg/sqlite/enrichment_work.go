@@ -223,16 +223,19 @@ func (s *EnrichmentWorkStore) History(ctx context.Context, id string, after, lim
 	return ret, err
 }
 
-const enrichmentReadySelect = enrichmentTargetSelect + `
+const enrichmentReadySources = `
  JOIN source_posts p ON p.uuid=t.post_uuid AND p.state='active'
  JOIN source_collections c ON c.uuid=t.collection_uuid AND c.revision=t.collection_revision
- JOIN source_collection_revisions r ON r.collection_uuid=c.uuid AND r.revision=c.revision AND r.state='active'
- WHERE t.collection_uuid=? AND t.state='pending' AND t.not_before<=?
+ JOIN source_collection_revisions r ON r.collection_uuid=c.uuid AND r.revision=c.revision AND r.state='active'`
+
+const enrichmentReadyConditions = `t.state='pending' AND t.not_before<=?
  AND (r.root_uuid IS NULL OR EXISTS(SELECT 1 FROM media_roots m JOIN media_root_revisions d ON d.root_uuid=m.uuid AND d.revision=m.revision
   WHERE m.uuid=r.root_uuid AND d.state='active'))
  AND NOT EXISTS(SELECT 1 FROM enrichment_job_targets b WHERE b.target_uuid=t.uuid AND b.target_revision=t.revision)
  AND NOT EXISTS(SELECT 1 FROM archive_jobs j INDEXED BY archive_jobs_enrichment_target
   WHERE j.kind='post.enrich' AND j.state IN ('queued','running') AND json_extract(j.arguments,'$.target_uuid')=+t.uuid)`
+
+const enrichmentReadySelect = enrichmentTargetSelect + enrichmentReadySources + " WHERE t.collection_uuid=? AND " + enrichmentReadyConditions
 
 func (s *EnrichmentWorkStore) Ready(ctx context.Context, collection string, now time.Time, limit int) ([]models.EnrichmentTarget, error) {
 	return s.ReadyPage(ctx, collection, now, nil, limit)

@@ -31,6 +31,19 @@ type EnrichmentJobCandidate struct {
 	UUID     string `json:"uuid"`
 }
 
+type EnrichmentCollectionQuery struct {
+	Scopes           []IngestScope
+	Roots            []string
+	PolicySHA256     string
+	ExtractorVersion string
+	After            string
+	Limit            int
+}
+
+type EnrichmentCollectionCandidate struct {
+	UUID string `json:"uuid" db:"uuid"`
+}
+
 type EnrichmentMaintenanceResult struct {
 	Recovered int `json:"recovered"`
 	Cancelled int `json:"cancelled"`
@@ -111,6 +124,7 @@ type EnrichmentCheckpointRelease struct {
 }
 
 type EnrichmentJobReaderWriter interface {
+	Collections(context.Context, EnrichmentCollectionQuery, time.Time) ([]EnrichmentCollectionCandidate, error)
 	Ready(context.Context, string, string, string, int64, int, time.Time) ([]EnrichmentJobCandidate, error)
 	Maintain(context.Context, time.Time) (*EnrichmentMaintenanceResult, error)
 	Bind(context.Context, string, time.Time) error

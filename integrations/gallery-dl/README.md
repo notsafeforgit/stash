@@ -436,8 +436,9 @@ cursors and discovery backoff. Schema 4 added durable ticket-to-submission links
 and unassigned ranges. Schema 5 adds caller snapshots and source bindings;
 schema 6 adds durable backfill calls, history checks and completion proof.
 Schema 7 adds retained n8n receipt history; schema 8 adds the enrichment execution
-journal; schema 9 adds enrichment discovery cursors and backoff. Opening an
-outbox from schemas 1–8 promotes it
+journal; schema 9 adds enrichment discovery cursors and backoff; schema 10 adds
+rotation across worker profiles and permitted metadata collections. Opening an
+outbox from schemas 1–9 promotes it
 in one SQLite transaction, preserving event bytes, receipts, dependencies,
 active delivery/submission leases, frozen requests and caller tickets. Old tickets
 are linked to the first covering submissions from their original request sequence;
@@ -584,6 +585,7 @@ is no command-line token argument.
 | `queue-run --collection UUID --revision N --profile FILE --until TIME` | Records/coalesces a download request using the profile digest; low-level callers may use `--policy SHA256` instead |
 | `submit-runs` | Submits one ready request; exits 2 while requests remain pending, in flight or in review |
 | `dispatch --profile FILE` | Resolves/delivers/submits queued work and discovers at most one source attempt; retains pagination and backoff |
+| `dispatch-all --profiles FILE` | Delivers saved work and rotates across local download/metadata profiles and permitted collections |
 | `runs-status [--intent UUID \| --ticket UUID] [--after N]` | Local request counts and up to 50 relevant historical submissions |
 | `ticket-status UUID` | Checks the ticket's original source windows; exits 0 only for `source_succeeded`, otherwise 2 |
 | `retry-run-request UUID` | Retries a reviewed submission with the original UUID and bytes |
@@ -1420,8 +1422,8 @@ gallery-dl runtime. This is the extraction component for the native enrichment
 worker. Native target/job binding, producer-owned checkpoint storage, verified
 capture publication, scoped HTTP routes and a transport/lease client are
 implemented. The selected-job executor below persists returned metadata before
-delivery. Scoped producer dispatch is implemented below; shared source scheduling
-and conversion of the existing scheduled service are still pending. Calling this helper alone
+delivery. Scoped producer dispatch and shared source scheduling are implemented
+below; conversion of the existing scheduled service is still pending. Calling this helper alone
 does not create a capture, complete a native job or import media.
 
 The initial root extractors are Reddit submissions, Twitter tweets, Bluesky and
@@ -1502,8 +1504,8 @@ completed cleanup from a job without a checkpoint. Older publications retain
 staging through migration until verified cleanup. The scoped producer API accepts
 these checkpoints through a separate enrichment contract. Shared native source
 reservations and bounded download preference now coordinate the worker with
-downloads; multi-profile dispatch and service conversion remain required before
-activation.
+downloads. Dispatch across local profiles is described below; legacy scheduling
+import and service conversion remain required before activation.
 
 Temporary child failures retain the parent and discard that child's partial
 records. Persist the entire returned checkpoint before retrying its pending
@@ -1517,7 +1519,7 @@ helper neither applies field mappings nor mutates selected scene/image metadata.
 ### Enrichment transport and ownership
 
 `enrichment_client.EnrichmentClient(Client(...))` exposes capability checks,
-unadmitted target discovery for one granted collection, revision-pinned admission,
+permitted collection discovery, unadmitted target discovery, revision-pinned admission,
 job/target inspection, claim/renew, source reservations, checkpoint save/read, verified publication
 and controlled failure acknowledgements. See the
 [HTTP contract](../../docs/native-ingestion.md#producer-enrichment-api).
@@ -1554,8 +1556,7 @@ delivery. Ready-target discovery lists unadmitted targets; the separate ready-jo
 route finds admitted retries. The native server now maintains expired/stale
 enrichment jobs independently of other workers. Shared service cooldowns and
 download/enrichment exclusion and typed download service failures are implemented.
-Multi-profile dispatch, legacy queue mapping and production host/n8n launchers
-remain transition work.
+Legacy queue mapping and production host/n8n launchers remain transition work.
 
 ### Durable selected-job execution
 
@@ -1691,8 +1692,75 @@ enrichment requester gets the next turn after current downloads drain. Abandoned
 requests expire, and a metadata start restores download preference. Held/stale
 targets and cooling dependencies cannot reserve unrelated services. This server
 policy coordinates collections even when different workers submit claims.
-Dispatch across multiple profiles, legacy enrichment queue mapping, review
-resolution and production launcher conversion still precede service activation.
+Legacy enrichment queue mapping, review resolution and production launcher
+conversion still precede service activation.
+
+### Dispatch across local profiles
+
+`dispatch-all` rotates across reviewed download and metadata profiles without
+requiring callers to enumerate every collection. Keep a stable UUID for the local
+worker list and stable entry IDs across restarts:
+
+```json
+{
+  "schema": "stash-gallery-dispatch-v1",
+  "uuid": "3425f421-119e-41dd-86cb-b2f71337afca",
+  "profiles": [
+    {"id": "reddit-download", "operation": "download", "profile": "reddit-download.json"},
+    {"id": "reddit-metadata", "operation": "post.enrich", "profile": "reddit-metadata.json"},
+    {"id": "twitter-metadata", "operation": "post.enrich", "profile": "twitter-metadata.json"}
+  ]
+}
+```
+
+```sh
+stash-ingest --outbox /persistent/producer.sqlite --endpoint STASH_ORIGIN \
+  --producer PRODUCER_UUID dispatch-all --profiles /private/worker-profiles.json
+```
+
+The list accepts 1–32 distinct entries. Relative profile paths resolve beside
+the list. Each entry still uses the existing download or metadata profile
+contract; website access stays local, and the list does not confer native source
+permissions or enable unsupported extractors.
+
+One invocation delivers an ordinary event batch, advances a backfill call,
+resolves a caller page and submits one source request. It then tries one saved
+enrichment delivery before loading any website profile, and rotates through the
+list until one profile performs work or all profiles have been checked. Saved
+metadata can therefore finish delivery even if its original website profile was
+removed or its access binding is unavailable. Native historical scope and
+ownership checks still apply; conflicting evidence remains retained for review.
+
+Download entries use existing scoped run discovery. Metadata entries require
+`enrichment_collections_protocol: 1`: Stash lists permitted active collections
+with eligible unadmitted targets or due jobs for that runtime/policy. Current
+collection/root grants apply before pagination. A root grant includes subsequent
+collections at that root; an unbound collection grant stays specific to that
+collection. The worker follows pages of at most 20 collections and uses the
+existing collection dispatcher for admission and execution. Unsupported URLs
+are skipped during target traversal; the server still validates every claim.
+
+Producer schema 10 stores profile rotation, global saved-delivery rotation and
+per-policy collection cursors/backoff. Selection commits before execution, so a
+restart or a continually busy first profile/collection does not reset traversal.
+Revision checks reject competing stale selections. Idle or blocked entries give
+peers a turn; an unreadable profile reports `worker_profile_unavailable` without
+printing its path, exception or access values. Metadata discovery honors native
+retry delays and retains its own failure/idle backoff. Native service fairness
+and leases remain authoritative across different workers.
+
+Exit 0 means a successful or idle dispatch cycle with no reported local pending
+or review work. Exit 2 means work, backoff or review remains, or an inspected
+profile was unavailable. Neither `idle` nor exit 0 certifies that the library or
+a backfill is complete: callers must check their native receipts and source
+window completion. The dispatcher performs a bounded cycle; host/n8n scheduling
+and legacy queue/cooldown/history conversion remain activation work.
+
+Schema 9 → 10 adds only these two cursor tables and preserves existing outbox
+rows, staged metadata bodies and receipt bytes in one transaction. A table
+collision rolls back promotion. Older producer binaries refuse schema 10;
+include the outbox in backups and retain its pending evidence during rollback.
+The native Stash database remains at schema 1000056.
 
 ## Validation
 

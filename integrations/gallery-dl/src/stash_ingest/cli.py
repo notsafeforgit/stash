@@ -101,6 +101,8 @@ def main(argv=None):
     execute.add_argument("--profile", required=True)
     dispatch = commands.add_parser("dispatch", help="Deliver queued events, submit a request and discover one source attempt")
     dispatch.add_argument("--profile", required=True)
+    dispatch_all = commands.add_parser("dispatch-all", help="Deliver saved work and rotate across all configured worker profiles")
+    dispatch_all.add_argument("--profiles", required=True, help="Local stash-gallery-dispatch-v1 configuration")
     enrichment_policy = commands.add_parser("enrichment-policy", help="Validate a metadata-only profile without a media root")
     enrichment_policy.add_argument("--profile", required=True)
     enrichment_execute = commands.add_parser("execute-enrichment", help="Execute or recover one admitted native enrichment job")
@@ -192,6 +194,10 @@ def main(argv=None):
             from .dispatch import dispatch_once
             with worker_output():
                 output = dispatch_once(box, client, Configuration(args.profile))
+        elif args.command == "dispatch-all":
+            from .worker_dispatch import Profiles, dispatch_all
+            with worker_output():
+                output = dispatch_all(box, client, Profiles(args.profiles))
         elif args.command == "enrichment-policy":
             from .enrichment_configuration import EnrichmentConfiguration
             profile = EnrichmentConfiguration(args.profile)
@@ -244,14 +250,17 @@ def main(argv=None):
             return 0 if output["state"] in ("completed", "idle") else 2
         if args.command == "ticket-status":
             return 0 if output["state"] == "source_succeeded" else 2
-        if args.command == "dispatch":
+        if args.command in ("dispatch", "dispatch-all"):
             counts = output["outbox"]["counts"]
             requests = output["source_requests"]
             incomplete = (any(counts[k] for k in ("pending", "sending", "review")) or requests["pending_windows"]
                           or any(requests["counts"][k] for k in ("pending", "sending", "review"))
                           or any(output["source_calls"]["counts"][k] for k in ("pending", "resolving", "review"))
                           or any(output["backfill_calls"]["counts"][k] for k in ("pending", "active", "review")))
-            return 0 if output["state"] in ("idle", "source_succeeded") and not incomplete else 2
+            if args.command == "dispatch-all":
+                incomplete |= any(output["enrichment"]["counts"].get(k, 0) for k in ("active", "review"))
+                incomplete |= any(item["state"] != "idle" for item in output.get("profiles", []))
+            return 0 if output["state"] in ("idle", "source_succeeded", "completed") and not incomplete else 2
         return 0
     except (InvalidData, Unavailable, Capacity, SourcePaused) as exc:
         print(str(exc), file=sys.stderr)

@@ -39,13 +39,20 @@ def execute_fixture(box, transport, configuration, job):
     return execute(box, transport, configuration, job, fetcher=fetched)
 
 
-args = ["--outbox", str(directory / "outbox.sqlite"), "--endpoint", setup["endpoint"], "--producer", setup["producer"],
-        "dispatch-enrichment", "--collection", setup["collection"]]
-if not setup["delivery_only"]:
-    args.extend(["--profile", str(profile)])
+args = ["--outbox", str(directory / "outbox.sqlite"), "--endpoint", setup["endpoint"], "--producer", setup["producer"]]
+if setup.get("all_profiles"):
+    profiles = directory / "profiles.json"
+    profiles.write_bytes(encode({"schema": "stash-gallery-dispatch-v1", "uuid": setup["producer"], "profiles": [
+        {"id": "metadata", "operation": "post.enrich", "profile": profile.name}]}))
+    args.extend(["dispatch-all", "--profiles", str(profiles)])
+else:
+    args.extend(["dispatch-enrichment", "--collection", setup["collection"]])
+    if not setup["delivery_only"]:
+        args.extend(["--profile", str(profile)])
 output = io.StringIO()
 with (patch("stash_ingest.cli.Outbox", side_effect=lambda *a, **k: Outbox(*a, **k, clock=lambda: setup["clock"])),
       patch("stash_ingest.enrichment_dispatch.execute", side_effect=execute_fixture),
+      patch("stash_ingest.worker_dispatch.deliver_enrichment", side_effect=execute_fixture),
       patch("requests.sessions.Session.request", side_effect=AssertionError("No website network in fixture")),
       redirect_stdout(output)):
     status = main(args)

@@ -54,6 +54,27 @@ func TestEnrichmentDispatchHTTPValidatesPaginationAndScope(t *testing.T) {
 	f.request(t, "POST", path+"/jobs/ready", request, 401)
 }
 
+func TestEnrichmentCollectionsHTTPUsesOnlyCredentialScopes(t *testing.T) {
+	f := newEnrichmentHTTPFixture(t)
+	request := map[string]any{"policy_sha256": strings.Repeat("a", 64), "extractor_version": "1.32.15-dev", "after": "", "limit": 20}
+	path := "/enrichment/collections/ready"
+	page := enrichmentHTTPValue[[]models.EnrichmentCollectionCandidate](t, f.request(t, "POST", path, request, 200))
+	require.Equal(t, []models.EnrichmentCollectionCandidate{{UUID: f.collection.UUID}}, page)
+	request["after"] = f.collection.UUID
+	require.JSONEq(t, "[]", string(f.request(t, "POST", path, request, 200)))
+	for key, value := range map[string]any{"after": "bad", "limit": 101, "policy_sha256": "bad", "extractor_version": ""} {
+		previous := request[key]
+		request[key] = value
+		f.request(t, "POST", path, request, 400)
+		request[key] = previous
+	}
+	request["root_uuids"] = []string{uuid.NewString()}
+	f.request(t, "POST", path, request, 400)
+	delete(request, "root_uuids")
+	f.token = "missing"
+	f.request(t, "POST", path, request, 401)
+}
+
 func TestEnrichmentMaintenanceRuntimeRecoversWithoutOtherWorkers(t *testing.T) {
 	f := newEnrichmentHTTPFixture(t)
 	job, err := f.worker.Admit(t.Context(), f.token, f.target.UUID, 1, strings.Repeat("a", 64), "1.32.15-dev")
@@ -190,4 +211,70 @@ func TestPythonEnrichmentDispatchRecoversLostAdmissionsAndExpiredDelivery(t *tes
 			}))
 		})
 	}
+}
+
+func TestPythonEnrichmentProfilesDiscoverCollectionsAndDeliverWithoutWebsiteProfile(t *testing.T) {
+	python, packagePath := nativeProducerRuntime(t)
+	f := newEnrichmentHTTPFixture(t)
+	var lost atomic.Bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Date", f.now.Format(http.TimeFormat))
+		if r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/checkpoint") && !lost.Swap(true) {
+			committed := httptest.NewRecorder()
+			f.handler.ServeHTTP(committed, r)
+			if committed.Code == 200 {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(503)
+				_, _ = io.WriteString(w, `{"error":"temporarily_unavailable"}`)
+				return
+			}
+			w.WriteHeader(committed.Code)
+			_, _ = w.Write(committed.Body.Bytes())
+			return
+		}
+		f.handler.ServeHTTP(w, r)
+	}))
+	t.Cleanup(server.Close)
+	directory := t.TempDir()
+	fixture, err := filepath.Abs("../../pkg/archive/testdata/enrichment-transcript-v1.json")
+	require.NoError(t, err)
+	for i, expected := range []string{"delivery_pending", "waiting"} {
+		setup, err := json.Marshal(map[string]any{"endpoint": server.URL, "producer": f.producer.UUID,
+			"directory": directory, "fixture": fixture, "clock": 1000 * (i + 1), "all_profiles": true,
+			"delivery_only": i == 1, "forbid_fetch": i == 1, "expected": expected})
+		require.NoError(t, err)
+		ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+		command := exec.CommandContext(ctx, python, filepath.Join(packagePath, "tests/http_enrichment_dispatch.py"))
+		command.Env = append(os.Environ(), "PYTHONDONTWRITEBYTECODE=1", "PYTHONPATH="+filepath.Join(packagePath, "src"), "STASH_INGEST_TOKEN="+f.token)
+		if i == 0 {
+			command.Env = append(command.Env, "ENRICHMENT_DISPATCH_LOGIN=fixture-private-login")
+		}
+		command.Stdin = bytes.NewReader(setup)
+		var stdout, stderr bytes.Buffer
+		command.Stdout, command.Stderr = &stdout, &stderr
+		err = command.Run()
+		cancel()
+		require.NoError(t, err, stderr.String())
+		require.NotContains(t, stdout.String(), "fixture-private-login")
+		require.NotContains(t, stderr.String(), "fixture-private-login")
+		var result struct {
+			Fetches            int `json:"fetches"`
+			EnrichmentDelivery struct {
+				State string `json:"state"`
+			} `json:"enrichment_delivery"`
+		}
+		require.NoError(t, json.Unmarshal(stdout.Bytes(), &result))
+		require.Equal(t, 1, result.Fetches)
+		if i == 1 {
+			require.Equal(t, "completed", result.EnrichmentDelivery.State)
+		}
+	}
+	require.NoError(t, f.repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		binding, err := f.repo.EnrichmentJob.TargetBinding(ctx, f.target.UUID, 1)
+		require.NoError(t, err)
+		publication, err := f.repo.EnrichmentJob.Publication(ctx, binding.JobUUID)
+		require.NoError(t, err)
+		require.NotNil(t, publication)
+		return nil
+	}))
 }

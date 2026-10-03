@@ -488,11 +488,12 @@ decoding; each operation rechecks collection/root grants and attempt ownership
 in its domain transaction. Ordinary Stash API keys and session cookies do not
 grant producer access. Website credentials stay in the external worker.
 Capabilities advertise `enrichment_protocol: 1`, `enrichment_dispatch_protocol: 1`,
-`enrichment_source_pacing_protocol: 1` and
+`enrichment_collections_protocol: 1`, `enrichment_source_pacing_protocol: 1` and
 `max_enrichment_checkpoint_bytes: 33554432`.
 
 | Method and path | Request / result |
 | --- | --- |
+| `POST /collections/ready` | `{policy_sha256, extractor_version, after, limit}` discovers up to 100 permitted active collections with eligible work; returns `{uuid}` candidates ordered after the UUID cursor |
 | `POST /collections/{uuid}/ready` | `{limit, after?}` selects up to 100 eligible **unadmitted** targets; `after` contains the previous priority, `not_before` and UUID |
 | `POST /collections/{uuid}/jobs/ready` | `{policy_sha256, extractor_version, after, limit}` discovers eligible admitted jobs, ordered after their integer sequence; returns `{sequence, uuid}` candidates |
 | `POST /targets/{uuid}/jobs` | `{expected_revision, policy_sha256, extractor_version}` admits or replays the job bound to that target revision |
@@ -569,13 +570,21 @@ does not traverse historical job rows. Authentication requires the collection's
 current root scope; changed historical jobs are ineligible and are never exposed
 through the current root's discovery grant. Claim independently checks authority.
 
+Collection discovery applies those current grants before pagination. It includes
+collections with eligible unadmitted targets or due queued jobs for the requested
+runtime/policy; held, stale, running and terminal jobs alone do not make a
+collection ready. A root grant covers newly registered collections at that root;
+an exact collection grant with no root covers only that unbound collection.
+Moving a collection cannot reuse its old root grant. The response contains only
+UUIDs, and the caller cannot submit replacement grants. Discovery neither admits
+work nor changes leases or scheduling state.
+
 The native server runs enrichment maintenance every 30 seconds independently of
 media and translation workers. It cancels stale source/target work, recovers
 expired attempts with backoff and preserves checkpoint/receipt evidence. Claims
 and source reservations also recover conflicting expired work; discovery remains
-read-only. Stash never contacts websites for these operations. Multi-profile
-worker dispatch, legacy queue import and
-host/n8n activation remain required before switching production schedules.
+read-only. Stash never contacts websites for these operations. Legacy queue import
+and host/n8n activation remain required before switching production schedules.
 
 The Python selected-job executor now journals stable claim requests, returned
 checkpoint bytes and pending publication/failure operations in producer outbox
@@ -589,6 +598,10 @@ The selected-job executor accepts an already admitted UUID. The collection
 dispatcher discovers those jobs before admitting fresh targets; producer schema
 9 persists its cursors and backoff across restarts. It can also deliver saved
 results without loading a profile. See [dispatch and maintenance](../integrations/gallery-dl/README.md#enrichment-dispatch-and-native-maintenance).
+Producer schema 10 adds persistent rotation across local download/metadata
+profiles and automatically discovered collections. Global pending-delivery
+recovery runs before loading website profiles. See
+[dispatch across local profiles](../integrations/gallery-dl/README.md#dispatch-across-local-profiles).
 
 ## Completed file events
 

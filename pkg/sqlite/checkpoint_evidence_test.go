@@ -19,6 +19,7 @@ import (
 
 func removeCheckpointEvidenceSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeCaptureContextSchema(t, raw)
 	_, err := raw.Exec(`DROP TABLE checkpoint_evidence_captures; DROP TABLE checkpoint_evidence_acceptances;
  DELETE FROM native_migration_history WHERE version=1000062`)
 	require.NoError(t, err)

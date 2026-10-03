@@ -1943,3 +1943,54 @@ implement. Backup preserves acceptance and source evidence; anonymisation remove
 both. Startup recomputes the original conversion and reconstructed capture hashes,
 checks the original review history and collection associations, and rejects altered
 evidence before opening a writable database.
+
+### Original observation context and reviewed retry format
+
+Schema 1000063 adds `source_capture_contexts`. A new capture can embed an exact
+older capture at `/_parent` or `/_reddit`; the relationship records both capture
+UUIDs. The child and its bindings commit together. The signed capture includes
+every path and parent UUID, so deleting or replacing a binding fails integrity
+verification even if the replacement has identical metadata. Both captures must
+belong to the same post. A known parent observation cannot occur after the child.
+Existing capture rows, signatures, publisher decisions and identifier dates are
+unchanged by migration; it creates no inferred relationships.
+
+These captures use `source-retention-v1+capture-context-v1`: current reduction
+rules validate the newly fetched fields, while each embedded parent must exactly
+match its bound capture. This permits a saved older parent to retain its original
+reduction policy without allowing fresh child data to bypass today's rules.
+Capture reads expose the bindings as `Contexts`; normal captures omit the field.
+Native backup preserves the relationships and anonymisation removes them.
+
+Publisher review follows the bound context selected by the source extractor.
+Its optional `Observation` identifies the original capture and its observation
+time, including null when unrecorded. Identifier evidence uses that original
+time, rather than the newer child's fetch time. An undated original remains a
+review case; explicit linking does not fabricate first/last observed dates.
+Feed-owner context does not replace the actual author of a social post.
+
+The Go/Python parser and isolated collector also understand the future reviewed
+retry format `stash-metadata-fetch-v2`. Its immutable prefix contains context
+records with `retained_capture` UUIDs, null observation times, full original
+payloads and no delta/parent indices. The accepted checkpoint converter builds
+this prefix and preserves scoped pending children. Original record slots and
+unscoped references remain in the frozen acceptance, without invented parents.
+Missing historical failure reasons become the handoff state `legacy_pending`;
+the historical reason itself remains unchanged in the acceptance.
+
+New child records have real observation times, obey current reduction and refer
+to earlier context records. They cannot refetch a root, use old evidence as a
+delta base, add unreviewed historical captures during retry, or insert another
+unbound inline parent. Repeated pending work is deduplicated without removing its
+original evidence. Both original parent branches survive; incompatible category
+chains, excessive depth and oversized documents remain review cases. Child-only
+retry inherits gallery-dl parent settings and reserves the contacted child
+service before initialization.
+
+This is the storage and collector prerequisite for reviewed execution. Job
+admission, checkpoint storage and publication still accept only the v1 native
+execution format. No evidence acceptance releases its review hold or schedules
+this new retry format yet. The application handoff, immutable job/seed binding,
+worker/outbox recovery, publication/release proof and review UI remain to be
+connected and verified before activation. Existing v1 receipts and release
+proofs retain their byte-for-byte checksum contracts.

@@ -93,7 +93,17 @@ func (s *CapturePublisherStore) Preview(ctx context.Context, value, target strin
 	if err := populatePublisherCandidates(ctx, ret); err != nil {
 		return nil, err
 	}
-	if capture.CapturedAt.IsZero() {
+	observation, err := publisherObservationCapture(ctx, capture)
+	if err != nil {
+		return nil, err
+	}
+	if observation.UUID != capture.UUID {
+		ret.Observation = &models.CapturePublisherObservation{CaptureUUID: observation.UUID}
+		if !observation.CapturedAt.IsZero() {
+			ret.Observation.CapturedAt = &observation.CapturedAt
+		}
+	}
+	if observation.CapturedAt.IsZero() {
 		ret.Conflicts = append(ret.Conflicts, "observation_time_unrecorded")
 		ret.Action = "review"
 	}

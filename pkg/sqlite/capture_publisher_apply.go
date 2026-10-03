@@ -166,7 +166,11 @@ func recordPublisherClaims(ctx context.Context, account, captureUUID string, ide
 	if capture == nil {
 		return nil, models.ErrCapturePublisherConflict
 	}
-	if capture.CapturedAt.IsZero() {
+	observation, err := publisherObservationCapture(ctx, capture)
+	if err != nil {
+		return nil, err
+	}
+	if observation.CapturedAt.IsZero() {
 		// A reviewed account association is still useful. It must not claim
 		// that an old handle was observed on the day this evidence was imported.
 		return []publisherRecordedClaim{}, nil
@@ -178,12 +182,16 @@ func recordPublisherClaims(ctx context.Context, account, captureUUID string, ide
 		if err != nil {
 			return nil, err
 		}
-		details, err := json.Marshal(map[string]string{"capture_uuid": captureUUID, "policy": identity.Policy, "path": claim.Path})
+		detailsFields := map[string]string{"capture_uuid": captureUUID, "policy": identity.Policy, "path": claim.Path}
+		if observation.UUID != captureUUID {
+			detailsFields["observation_capture_uuid"] = observation.UUID
+		}
+		details, err := json.Marshal(detailsFields)
 		if err != nil {
 			return nil, err
 		}
 		identifier, err := accounts.ObserveIdentifier(ctx, account, claim.Reference, models.AccountIdentifierEvidence{
-			Key: key, Basis: claim.Basis, Origin: capture.Origin, Details: details, FirstObserved: capture.CapturedAt, LastObserved: capture.CapturedAt})
+			Key: key, Basis: claim.Basis, Origin: observation.Origin, Details: details, FirstObserved: observation.CapturedAt, LastObserved: observation.CapturedAt})
 		if err != nil {
 			return nil, err
 		}

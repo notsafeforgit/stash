@@ -41,10 +41,7 @@ def _configure_context(target, bundle, parent):
     Mirrors the pinned Job._build_config_path, without constructing a job.
     Category transfer is always disabled for retained source evidence.
     """
-    ancestors = []
-    while parent is not None:
-        ancestors.append(bundle.metadata(parent)["category"])
-        parent = bundle.value["records"][parent]["parent"]
+    ancestors = bundle.ancestors(parent)
     parents, previous = (), None
     for category in [*reversed(ancestors), target.category]:
         if previous is not None and category != previous and category not in parents:
@@ -211,7 +208,7 @@ def collect(url, settings, resume=None, *, factory=None, check=lambda: None, res
             if not is_post(target):
                 return {"error": "not_a_post_url"}
             walk(target)
-        if not any(item["kind"] == "post" for item in bundle.value["records"]):
+        if not any(item["kind"] == "post" or "retained_capture" in item for item in bundle.value["records"]):
             return {"error": "not_found"}
         return bundle.checkpoint()
     except InvalidData:

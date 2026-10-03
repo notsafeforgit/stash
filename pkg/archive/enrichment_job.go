@@ -78,8 +78,13 @@ func (t *EnrichmentTranscript) RecordDigest(index int) (string, error) {
 		return "", models.ErrEnrichmentInvalid
 	}
 	r := t.Records[index]
-	body, err := EncodeSourceJSON(sourceObject{"kind": r.Kind, "base": r.Base, "parent": r.Parent,
-		"patch": r.Patch, "removed": r.Removed, "observed_at": r.ObservedAt})
+	value := sourceObject{"kind": r.Kind, "base": r.Base, "parent": r.Parent,
+		"patch": r.Patch, "removed": r.Removed, "observed_at": r.ObservedAt}
+	if r.RetainedCapture != nil {
+		value["retained_capture"] = r.RetainedCapture
+		value["observed_at"] = nil
+	}
+	body, err := EncodeSourceJSON(value)
 	if err != nil {
 		return "", err
 	}

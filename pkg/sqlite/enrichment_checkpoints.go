@@ -80,7 +80,7 @@ func (s *EnrichmentJobStore) Checkpoint(ctx context.Context, lease models.Enrich
 		return nil, err
 	}
 	parsed, err := archive.ParseEnrichmentTranscript(raw)
-	if err != nil || len(parsed.Records) == 0 {
+	if err != nil || len(parsed.Records) == 0 || parsed.Schema != archive.EnrichmentTranscriptSchema {
 		return nil, models.ErrEnrichmentInvalid
 	}
 	body := parsed.Body()

@@ -63,6 +63,7 @@ type SourceCaptureInput struct {
 	RetentionPolicy  string
 	Metadata         SourcePostMetadata
 	Payload          SourceCapturePayload
+	Contexts         []SourceCaptureContext `json:",omitempty"`
 }
 
 type SourceCapture struct {
@@ -79,6 +80,15 @@ type SourceCapture struct {
 	Metadata         SourcePostMetadata
 	// Summary queries omit payloads; FindCapture loads and verifies them.
 	Payload *SourceCapturePayload
+	// Contexts identifies older captures embedded in this payload. Their source
+	// observation times remain independent of this capture's fetch time.
+	Contexts []SourceCaptureContext `json:",omitempty"`
+}
+
+type SourceCaptureContext struct {
+	CaptureUUID string `json:"capture_uuid" db:"capture_uuid"`
+	Path        string `json:"path" db:"path"`
+	ParentUUID  string `json:"parent_capture_uuid" db:"parent_capture_uuid"`
 }
 
 type SourceCaptureCursor struct {
@@ -117,6 +127,7 @@ type SourceEvidenceReaderWriter interface {
 	AddPostIdentifier(context.Context, string, SourcePostIdentifier, int) error
 	PostIdentifiers(context.Context, string, *SourcePostIdentifier, int) ([]SourcePostIdentifier, error)
 	RecordCapture(context.Context, SourceCaptureInput) (*SourceCapture, error)
+	CaptureContexts(context.Context, string) ([]SourceCaptureContext, error)
 	RetainProfile(context.Context, string, json.RawMessage) (*SourceProfileBody, error)
 	FindCapture(context.Context, string) (*SourceCapture, error)
 	Captures(context.Context, string, *SourceCaptureCursor, int) ([]*SourceCapture, error)

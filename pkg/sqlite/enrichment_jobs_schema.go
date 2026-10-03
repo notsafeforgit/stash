@@ -175,7 +175,7 @@ func validateEnrichmentCheckpoints(conn *sqlx.DB) error {
 			return err
 		}
 		parsed, err := archive.ParseEnrichmentTranscript([]byte(row.Body))
-		if err != nil || enrichmentDigest([]byte(row.Body)) != row.Digest || parsed.URL != row.URL || parsed.ExtractorVersion != row.ExtractorVersion ||
+		if err != nil || parsed.Schema != archive.EnrichmentTranscriptSchema || enrichmentDigest([]byte(row.Body)) != row.Digest || parsed.URL != row.URL || parsed.ExtractorVersion != row.ExtractorVersion ||
 			len(parsed.Records) != row.RecordCount || len(parsed.Pending) != row.PendingCount || len(parsed.Unresolved) != row.UnresolvedCount {
 			return models.ErrSourcePayloadCorrupt
 		}

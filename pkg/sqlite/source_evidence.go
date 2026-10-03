@@ -280,6 +280,16 @@ func canonicalCaptureInput(input *models.SourceCaptureInput) (string, string, er
 	if err := canonicalCaptureTime(input); err != nil {
 		return "", "", err
 	}
+	if input.RetentionPolicy != archive.CaptureContextPolicy && len(input.Contexts) != 0 {
+		return "", "", models.ErrSourceCaptureReplay
+	}
+	input.Contexts = slices.Clone(input.Contexts)
+	slices.SortFunc(input.Contexts, func(a, b models.SourceCaptureContext) int { return strings.Compare(a.Path, b.Path) })
+	for _, link := range input.Contexts {
+		if link.CaptureUUID != input.UUID {
+			return "", "", models.ErrSourceCaptureReplay
+		}
+	}
 	projection := make(map[string]interface{})
 	for name, field := range map[string]*string{"title": input.Metadata.Title, "original_text": input.Metadata.OriginalText, "published_at": input.Metadata.PublishedAt, "date_basis": input.Metadata.DateBasis, "language": input.Metadata.Language} {
 		if field != nil && !utf8.ValidString(*field) {
@@ -301,6 +311,13 @@ func canonicalCaptureInput(input *models.SourceCaptureInput) (string, string, er
 		return "", "", err
 	}
 	switch input.RetentionPolicy {
+	case archive.CaptureContextPolicy:
+		if input.CapturedAt.IsZero() {
+			return "", "", models.ErrSourceCaptureReplay
+		}
+		if err := archive.CaptureContextRetention(retained, input.Contexts); err != nil {
+			return "", "", err
+		}
 	case archive.SourceRetentionVersion:
 		clean, err := archive.RetainSourcePayload(retained)
 		if err != nil {
@@ -350,10 +367,21 @@ func captureSignature(input models.SourceCaptureInput, revisionSignature, patchD
 			input.ExtractorVersion, input.RetentionPolicy, patchDigest, references,
 		})
 	}
-	return sourceSignature("stash-source-capture-v1", []interface{}{
+	signature, err := sourceSignature("stash-source-capture-v1", []interface{}{
 		input.PostUUID, revisionSignature, input.Origin, input.Platform, input.CapturedAt.Format(accountObservationTimeFormat),
 		input.ExtractorVersion, input.RetentionPolicy, patchDigest, references,
 	})
+	if err != nil || input.RetentionPolicy != archive.CaptureContextPolicy {
+		return signature, err
+	}
+	if len(input.Contexts) < 1 || len(input.Contexts) > 2 {
+		return "", models.ErrSourcePayloadCorrupt
+	}
+	links := make([]any, 0, len(input.Contexts))
+	for _, link := range input.Contexts {
+		links = append(links, []string{link.Path, link.ParentUUID})
+	}
+	return sourceSignature("stash-source-capture-context-v1", []any{signature, links})
 }
 
 func retainSourceProfile(ctx context.Context, profile models.SourceProfileBody) error {
@@ -414,6 +442,16 @@ func (s *SourceEvidenceStore) RecordCapture(ctx context.Context, input models.So
 	if post.State != "active" {
 		return nil, models.ErrSourcePostForgotten
 	}
+	var contextsComplete *bool
+	if len(input.Contexts) != 0 {
+		if err := managedArchiveJobWrite(ctx); err != nil {
+			return nil, err
+		}
+		if err := s.validateCaptureContexts(ctx, input); err != nil {
+			return nil, err
+		}
+		contextsComplete = enrichmentAtomic(ctx)
+	}
 	bodyDigest, err := putSourcePayload(ctx, input.Payload.Shared)
 	if err != nil {
 		return nil, err
@@ -456,10 +494,19 @@ VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(post_uuid, signature) DO NOTHING`, uuid.Ne
 			return nil, err
 		}
 	}
+	for _, link := range input.Contexts {
+		if _, err := dbWrapper.Exec(ctx, "INSERT INTO source_capture_contexts(capture_uuid,path,parent_capture_uuid) VALUES(?,?,?)", link.CaptureUUID, link.Path, link.ParentUUID); err != nil {
+			return nil, err
+		}
+	}
 	if _, err := dbWrapper.Exec(ctx, "UPDATE source_posts SET revision = revision + 1 WHERE uuid = ?", post.UUID); err != nil {
 		return nil, err
 	}
-	return s.FindCapture(ctx, input.UUID)
+	ret, err := s.FindCapture(ctx, input.UUID)
+	if contextsComplete != nil {
+		*contextsComplete = err == nil
+	}
+	return ret, err
 }
 
 type sourceCaptureRow struct {
@@ -568,8 +615,17 @@ WHERE r.capture_uuid = ? ORDER BY r.part, r.path LIMIT 1025`, id); err != nil {
 		}
 	}
 	slices.SortFunc(payload.Profiles, func(a, b models.SourceProfileBody) int { return strings.Compare(a.Hash, b.Hash) })
-	if _, err := archive.RestoreCapture(payload); err != nil {
+	retained, err := archive.RestoreCapture(payload)
+	if err != nil {
 		return nil, fmt.Errorf("%w: %v", models.ErrSourcePayloadCorrupt, err)
+	}
+	if ret.RetentionPolicy == archive.CaptureContextPolicy {
+		if err := selectRows(&ret.Contexts, "SELECT * FROM source_capture_contexts WHERE capture_uuid=? ORDER BY path LIMIT 3", ret.UUID); err != nil {
+			return nil, err
+		}
+		if ret.CapturedAt.IsZero() || archive.CaptureContextRetention(retained, ret.Contexts) != nil {
+			return nil, models.ErrSourcePayloadCorrupt
+		}
 	}
 	metadata, err := archive.DecodeJSONObject([]byte(row.Metadata), 262144)
 	if err != nil {
@@ -580,7 +636,8 @@ WHERE r.capture_uuid = ? ORDER BY r.part, r.path LIMIT 1025`, id); err != nil {
 		return nil, err
 	}
 	signature, err := captureSignature(models.SourceCaptureInput{PostUUID: ret.PostUUID, Origin: ret.Origin,
-		Platform: ret.Platform, CapturedAt: ret.CapturedAt, RecordedAt: ret.RecordedAt, ExtractorVersion: ret.ExtractorVersion, RetentionPolicy: ret.RetentionPolicy}, revisionSignature, row.PatchDigest, payload.Refs)
+		Platform: ret.Platform, CapturedAt: ret.CapturedAt, RecordedAt: ret.RecordedAt, ExtractorVersion: ret.ExtractorVersion, RetentionPolicy: ret.RetentionPolicy,
+		Contexts: ret.Contexts}, revisionSignature, row.PatchDigest, payload.Refs)
 	if err != nil {
 		return nil, err
 	}

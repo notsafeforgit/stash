@@ -53,6 +53,14 @@ type CapturePublisherPreview struct {
 	AccountUUID         *string        // automatic suggestion, when Action is link
 	Conflicts           []string
 	Signature           string
+	Observation         *CapturePublisherObservation `json:",omitempty"`
+}
+
+// Only present when the publisher came from explicitly retained parent context.
+// A null timestamp means the original source observation was not recorded.
+type CapturePublisherObservation struct {
+	CaptureUUID string
+	CapturedAt  *time.Time
 }
 
 type CapturePublisherInput struct {

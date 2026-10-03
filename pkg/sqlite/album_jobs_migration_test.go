@@ -30,7 +30,25 @@ func albumJobRows(t *testing.T, db *sql.DB, table string) [][]any {
 	// otherwise exposes the old column count until that statement's first step.
 	var objects int
 	require.NoError(t, tx.QueryRow("SELECT count(*) FROM sqlite_schema").Scan(&objects))
-	rows, err := tx.Query("SELECT * FROM " + table + " ORDER BY rowid")
+	order := "rowid"
+	var definition string
+	require.NoError(t, tx.QueryRow("SELECT sql FROM sqlite_schema WHERE type='table' AND name=?", table).Scan(&definition))
+	if strings.Contains(strings.ToUpper(definition), "WITHOUT ROWID") {
+		keys, err := tx.Query(`SELECT name FROM pragma_table_info(?) WHERE pk>0 ORDER BY pk`, table)
+		require.NoError(t, err)
+		defer keys.Close()
+		var columns []string
+		for keys.Next() {
+			var column string
+			require.NoError(t, keys.Scan(&column))
+			columns = append(columns, `"`+strings.ReplaceAll(column, `"`, `""`)+`"`)
+		}
+		require.NoError(t, keys.Err())
+		require.NoError(t, keys.Close())
+		require.NotEmpty(t, columns)
+		order = strings.Join(columns, ",")
+	}
+	rows, err := tx.Query("SELECT * FROM " + table + " ORDER BY " + order)
 	require.NoError(t, err)
 	defer rows.Close()
 	columns, err := rows.Columns()

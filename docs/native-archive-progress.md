@@ -5344,3 +5344,79 @@ resolution, remaining operational/policy families, additional download adapters,
 native UI, host/n8n conversion, compatibility removal, coordinated backup/export/
 restore, performance and final cutover are still required. Production and
 `develop` remain unchanged.
+
+
+## Retained context and child retry prerequisites — 2026-10-03
+
+Schema 1000063 introduces signed capture context bindings. A newly observed
+capture can retain exact older parent metadata while identifying the original
+capture UUID at each parent path. Capture and bindings are atomic, and missing
+or replaced bindings fail integrity checks even if another capture contains the
+same text. The new retention policy applies current reduction to fresh child
+fields and verifies older embedded parents against their original captures.
+No existing capture, publisher decision or identifier date is rewritten.
+
+Publisher assessment follows the original bound observation. Known dates remain
+the parent's dates; unknown dates still require review and never become today's
+first/last observed dates after an explicit link. Nested media-host context is
+supported without confusing a feed owner with a post's actual author. Ordinary
+captures without bindings take a fast path with no additional reconstruction.
+Backup/restore and anonymisation include the new relationships.
+
+The Go and Python collector contracts now support a retained-context prefix for
+future reviewed child retries. It preserves accepted capture UUIDs, exact large
+numbers, both parent branches and historical payload bytes without inventing
+observation times, source URLs or producer identities. A retry can fetch only
+saved children; it cannot append more historical captures, copy old fields as a
+new delta, or attach unbound inline parents. The seed retains pending parent/depth
+associations, deduplicates identical child work and leaves original unscoped
+references in the frozen acceptance. Invalid/oversized or ambiguous graphs remain
+review cases. Offline Go-to-Python-to-Go tests exercise the real collector, its
+inherited source settings, child reservation and error recovery.
+
+This is a prerequisite checkpoint, not an enabled execution handoff. Native job
+admission, checkpoint storage/startup validation and publication still reject
+this new execution format. Evidence acceptance keeps its review hold. The next
+step must bind an application-reviewed handoff to the exact evidence, target,
+post and active collection revisions; deliver its seed without a fabricated
+lease/receipt; and connect worker/outbox recovery, publication and versioned
+release proofs. Existing v1 argument, receipt and release hashes remain intact.
+Context provenance also needs to be applied to newly created native child
+publications through that versioned contract.
+
+The full backend gate passed in 844.413 seconds with zero lint issues (API
+667.981, ingestion 560.558, SQLite 826.582 seconds). All 387 producer tests passed
+in 36.539 seconds. A subsequent small publisher fast path passed the relevant
+publisher/context/recording-time tests (18.169 seconds) and a final clean lint
+check. Tests cover unknown and known parent times, exact old payload retention,
+changed bindings, missing parents, future parent clocks, unretained fresh fields,
+caught late-write rollback, read-only startup refusal of deleted/rebound context,
+backup/restore, anonymisation and schema-62 upgrade/collision rollback. The
+migration comparison helper now orders WITHOUT ROWID tables by their primary
+keys, while retaining the earlier schema-refresh fix.
+
+An online backup took 43.852 seconds. Normal open, migration and reinitialisation
+passed in 705.276 seconds. Fresh-process reopen passed in 242.653 seconds while
+independent reconciliation was also running; this is not an isolated startup
+benchmark, and startup performance remains a release gate. Independent
+reconciliation passed in 506.582 seconds: all 236 existing data tables retain
+exact values and types, including all 526,348 capture UUIDs, rowids, observation/
+recording times and signatures. Existing schema objects, migration history and
+sequence counters are unchanged. The new context table is empty, as expected for
+these frozen inputs; populated context behavior is covered by the fixtures.
+Integrity is clean with zero foreign-key violations, and the database remains
+20,265,979,904 bytes. This verified replacement supersedes schema 62 under the
+retention policy, subject to the final host-visible open-file check.
+
+Obsolete paged review exports were retired after host-visible open-file checks,
+retaining their small manifests. This reclaimed another 580,788,224 bytes without
+removing frozen source inputs. With both large database copies present, free
+space stayed above 135 GiB; the existing guard reserves 50 GiB plus estimated
+peak work space. Evidence is under
+`.local/native-checkpoint-handoff-rehearsal-20261003/`.
+
+The full transition remains active. Reviewed execution, migration review,
+remaining operational/policy families, additional adapters, native UI, host/n8n
+conversion, compatibility removal, coordinated backup/export/restore, performance
+and final owner-reviewed cutover are still outstanding. Production and `develop`
+remain unchanged.

@@ -8,13 +8,13 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/stashapp/stash/pkg/models"
 )
 
 const (
 	EnrichmentTranscriptSchema   = "stash-metadata-fetch-v1"
+	EnrichmentRetainedSchema     = "stash-metadata-fetch-v2"
 	MaxEnrichmentTranscriptBytes = 32 << 20
 	MaxEnrichmentExpandedBytes   = 128 << 20
 	MaxEnrichmentReferences      = 256
@@ -27,6 +27,9 @@ type EnrichmentRecord struct {
 	Patch      map[string]any `json:"patch"`
 	Removed    []string       `json:"removed"`
 	ObservedAt string         `json:"observed_at"`
+	// A retained context is an existing capture delivered with this checkpoint,
+	// not an observation made by its submitting producer.
+	RetainedCapture *string `json:"retained_capture,omitempty"`
 }
 
 type EnrichmentReference = models.EnrichmentReference
@@ -96,11 +99,11 @@ func enrichmentIndex(value any, before int, nullable bool) (*int, error) {
 	return &ret, nil
 }
 
-func enrichmentReasonCode(value string) bool {
+func EnrichmentReasonCode(value string) bool {
 	switch value {
 	case "rate_limited", "authentication", "access_denied", "challenge", "not_found", "unsupported_extractor",
 		"extraction_failed", "timeout", "result_too_large", "invalid_checkpoint", "not_a_post_url", "worker_failed",
-		"runtime_changed", "external_reference_only", "source_busy":
+		"runtime_changed", "external_reference_only", "source_busy", "legacy_pending":
 		return true
 	}
 	return false
@@ -108,19 +111,31 @@ func enrichmentReasonCode(value string) bool {
 
 func (t *EnrichmentTranscript) restore(raw any, expandedBytes *int) error {
 	value, ok := raw.(sourceObject)
-	if !ok || !enrichmentObjectKeys(value, "kind", "base", "parent", "patch", "removed", "observed_at") {
+	keys := []string{"kind", "base", "parent", "patch", "removed", "observed_at"}
+	if t.Schema == EnrichmentRetainedSchema && value["retained_capture"] != nil {
+		keys = append(keys, "retained_capture")
+	}
+	if !ok || !enrichmentObjectKeys(value, keys...) {
 		return models.ErrEnrichmentInvalid
 	}
 	record := EnrichmentRecord{Removed: []string{}}
 	record.Kind, _ = value["kind"].(string)
 	record.ObservedAt, _ = value["observed_at"].(string)
-	if (record.Kind != "post" && record.Kind != "media" && record.Kind != "context") || !enrichmentObservedTime.MatchString(record.ObservedAt) {
+	if raw := value["retained_capture"]; raw != nil {
+		id, ok := raw.(string)
+		if !ok || !translationUUID(id) || record.Kind != "context" || value["observed_at"] != nil ||
+			value["base"] != nil || value["parent"] != nil ||
+			(len(t.Records) > 0 && t.Records[len(t.Records)-1].RetainedCapture == nil) {
+			return models.ErrEnrichmentInvalid
+		}
+		record.RetainedCapture = &id
+	} else if !validEnrichmentObservedTime(record.ObservedAt) {
 		return models.ErrEnrichmentInvalid
 	}
-	observed, err := time.Parse(time.RFC3339Nano, record.ObservedAt)
-	if err != nil || observed.IsZero() || observed.UTC().Year() < 1 || observed.UTC().Year() > 9999 {
+	if record.Kind != "post" && record.Kind != "media" && record.Kind != "context" {
 		return models.ErrEnrichmentInvalid
 	}
+	var err error
 	index := len(t.Records)
 	record.Base, err = enrichmentIndex(value["base"], index, true)
 	if err != nil {
@@ -130,12 +145,19 @@ func (t *EnrichmentTranscript) restore(raw any, expandedBytes *int) error {
 	if err != nil {
 		return err
 	}
+	if t.Schema == EnrichmentRetainedSchema && record.RetainedCapture == nil && record.Parent == nil {
+		return models.ErrEnrichmentInvalid
+	}
 	depth := 0
 	if record.Parent != nil {
 		depth = t.depths[*record.Parent] + 1
 		if depth > 2 {
 			return models.ErrEnrichmentInvalid
 		}
+	}
+	if record.Base != nil && t.Records[*record.Base].RetainedCapture != nil {
+		// New observations cannot inherit unobserved old fields through a delta.
+		return models.ErrEnrichmentInvalid
 	}
 	record.Patch, ok = value["patch"].(sourceObject)
 	if !ok {
@@ -167,23 +189,37 @@ func (t *EnrichmentTranscript) restore(raw any, expandedBytes *int) error {
 	for key, child := range record.Patch {
 		data[key] = child
 	}
-	sourceURL, _ := data["source_extractor_url"].(string)
-	if !enrichmentPublicURL(sourceURL) {
-		return models.ErrEnrichmentInvalid
-	}
 	body, err := EncodeSourceJSON(data)
 	if err != nil || len(body) > MaxSourcePayloadBytes {
 		return models.ErrEnrichmentInvalid
 	}
-	retained, err := RetainSourcePayload(body)
-	if err != nil || !bytes.Equal(body, retained) {
-		return models.ErrEnrichmentInvalid
+	if record.RetainedCapture == nil {
+		if t.Schema == EnrichmentRetainedSchema {
+			for _, key := range []string{"_parent", "_reddit"} {
+				if _, exists := data[key]; exists {
+					return models.ErrEnrichmentInvalid
+				}
+			}
+		}
+		sourceURL, _ := data["source_extractor_url"].(string)
+		retained, err := RetainSourcePayload(body)
+		if !enrichmentPublicURL(sourceURL) || err != nil || !bytes.Equal(body, retained) {
+			return models.ErrEnrichmentInvalid
+		}
+	} else {
+		depth, err = retainedContextDepth(data)
+		if err != nil {
+			return err
+		}
 	}
 	parentKey := "root"
 	if record.Parent != nil {
 		parentKey = strconv.Itoa(*record.Parent)
 	}
 	key := record.Kind + "\x00" + parentKey + "\x00" + translationDigest(body)
+	if record.RetainedCapture != nil {
+		key = "retained\x00" + *record.RetainedCapture
+	}
 	if t.seen[key] {
 		return models.ErrEnrichmentInvalid
 	}
@@ -216,6 +252,18 @@ func (t *EnrichmentTranscript) restore(raw any, expandedBytes *int) error {
 	return nil
 }
 
+func (r EnrichmentRecord) MarshalJSON() ([]byte, error) {
+	type plain EnrichmentRecord
+	var observed any = r.ObservedAt
+	if r.RetainedCapture != nil {
+		observed = nil
+	}
+	return json.Marshal(struct {
+		*plain
+		Observed any `json:"observed_at"`
+	}{plain: (*plain)(&r), Observed: observed})
+}
+
 func (t *EnrichmentTranscript) references(raw any, pending bool) ([]EnrichmentReference, error) {
 	values, ok := raw.([]any)
 	if !ok || len(values) > MaxEnrichmentReferences {
@@ -231,12 +279,16 @@ func (t *EnrichmentTranscript) references(raw any, pending bool) ([]EnrichmentRe
 		ref := EnrichmentReference{}
 		ref.URL, _ = value["url"].(string)
 		ref.Reason, _ = value["reason"].(string)
-		if !enrichmentPublicURL(ref.URL) || !enrichmentReasonCode(ref.Reason) {
+		if !enrichmentPublicURL(ref.URL) || !EnrichmentReasonCode(ref.Reason) ||
+			(ref.Reason == "legacy_pending" && (t.Schema != EnrichmentRetainedSchema || !pending)) {
 			return nil, models.ErrEnrichmentInvalid
 		}
 		parent, err := enrichmentIndex(value["parent"], len(t.Records), false)
 		if err != nil {
 			return nil, err
+		}
+		if ref.Reason == "legacy_pending" && t.Records[*parent].RetainedCapture == nil {
+			return nil, models.ErrEnrichmentInvalid
 		}
 		depth, err := enrichmentIndex(value["depth"], 4, false)
 		if err != nil || *depth != t.depths[*parent]+1 || (pending && *depth > 2) {
@@ -262,7 +314,7 @@ func ParseEnrichmentTranscript(raw []byte) (*EnrichmentTranscript, error) {
 	t.URL, _ = value["url"].(string)
 	t.RetentionPolicy, _ = value["retention_policy"].(string)
 	t.ExtractorVersion, _ = value["extractor_version"].(string)
-	if t.Schema != EnrichmentTranscriptSchema || !EnrichmentPostURL(t.URL) || t.RetentionPolicy != SourceRetentionVersion ||
+	if (t.Schema != EnrichmentTranscriptSchema && t.Schema != EnrichmentRetainedSchema) || !EnrichmentPostURL(t.URL) || t.RetentionPolicy != SourceRetentionVersion ||
 		t.ExtractorVersion == "" || len(t.ExtractorVersion) > 128 || strings.ContainsAny(t.ExtractorVersion, "\r\n\x00") {
 		return nil, models.ErrEnrichmentInvalid
 	}
@@ -275,6 +327,9 @@ func ParseEnrichmentTranscript(raw []byte) (*EnrichmentTranscript, error) {
 		if err := t.restore(record, &expandedBytes); err != nil {
 			return nil, err
 		}
+	}
+	if t.Schema == EnrichmentRetainedSchema && (len(t.Records) == 0 || t.Records[0].RetainedCapture == nil) {
+		return nil, models.ErrEnrichmentInvalid
 	}
 	t.Pending, err = t.references(value["pending"], true)
 	if err != nil {
@@ -308,6 +363,11 @@ func (t *EnrichmentTranscript) Extends(previous *EnrichmentTranscript) bool {
 		!reflect.DeepEqual(t.Records[:len(previous.Records)], previous.Records) || len(t.Unresolved) < len(previous.Unresolved) ||
 		!reflect.DeepEqual(t.Unresolved[:len(previous.Unresolved)], previous.Unresolved) {
 		return false
+	}
+	for _, record := range t.Records[len(previous.Records):] {
+		if record.RetainedCapture != nil {
+			return false // a worker cannot add more historical evidence to its reviewed seed
+		}
 	}
 	for _, pending := range previous.Pending {
 		found := false

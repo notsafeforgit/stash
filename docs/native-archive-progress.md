@@ -4237,3 +4237,31 @@ API tests took 424.623 seconds, ingestion 501.975 seconds and SQLite 627.888
 seconds. The preceding `a775480d8` checkpoint also passed CI tests, generation,
 lint, build and release. Production and `develop` remain unchanged; the complete
 transition goal is still active.
+
+## Validated compact enrichment transcripts
+
+The native archive package now validates and reconstructs the metadata
+collector's compact checkpoints. Shared base fields, explicit removals, nested
+parent context, large numeric IDs and original observation timestamps retain
+their semantics. Strict envelope/reference validation rejects malformed,
+duplicate and unretained evidence. Resumed checkpoints cannot rewrite earlier
+observations or silently discard pending or unresolved children.
+
+Producer and server both enforce the 32 MiB compact limit, 4 MiB per expanded
+record and 128 MiB aggregate expansion limit, with bounded record/reference
+counts and parent depth. Producer size accounting includes native Unicode
+separator escaping; rejected appends leave the prior checkpoint intact.
+
+All archive tests passed in 0.580 seconds. All 296 producer tests passed in
+30.097 seconds, and the repository Go lint gate reported zero issues. A shared
+Go/Python fixture covers reconstruction and resume, with additional malformed
+input, timestamp, retention and compact-amplification cases. Validation logs and
+reports are retained under `.local/native-enrichment-work-rehearsal-20261002/`
+with the `transcript_` prefix. The preceding `6dc7d53ca` checkpoint passed CI
+generation, tests, lint, build, release and native preview image publication.
+
+This adds no schema migration, producer endpoint or execution permission.
+Target/job binding, producer-owned attempts, checkpoint persistence, verified
+capture publication, cooldown/fairness coordination and legacy enrichment queue
+mapping remain next. The remaining plan phases and production deployment are
+unchanged.

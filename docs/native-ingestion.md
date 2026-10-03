@@ -393,6 +393,35 @@ crossposts keep their own identity; embedded Reddit parents from another media
 extractor retain their Reddit post scope. Unknown post identity adapters are
 rejected until supported, even though the account parser knows more services.
 
+## Metadata enrichment checkpoints
+
+The isolated gallery-dl metadata collector returns a compact
+`stash-metadata-fetch-v1` transcript. This is an internal producer checkpoint,
+separate from the `source.capture` event format. Native job binding, scoped
+checkpoint storage and verified publication remain unfinished; there is no
+producer endpoint accepting this transcript yet.
+
+`archive.ParseEnrichmentTranscript` validates the exact envelope, supported
+direct-post URL, extractor/retention versions and each record. Backward base
+references share unchanged metadata; patches replace top-level fields and a
+sorted removal list preserves missing-versus-null semantics. Parent references
+reconstruct child attribution to at most two levels. Source retention is
+checked on reconstructed metadata. Observation times retain their original
+precision, and large source identifiers never pass through floating point.
+
+Limits are 32 MiB for the compact body, 1,024 records, 256 references per pending
+or unresolved list, 4 MiB per reconstructed record including parents, and
+128 MiB for the sum of reconstructed record sizes. Compact sharing cannot bypass
+those expansion limits. Malformed or duplicate records/references are rejected.
+
+A resumed transcript must keep the earlier record and unresolved-reference
+prefixes exactly, including original observation times. Each earlier pending
+child must remain pending, become explicitly unresolved, or have new records
+for its URL and parent. Validation alone neither proves the intended existing
+post's identity nor authorizes publication or completion; the coordinator must
+also check its immutable target and current producer lease. See the
+[producer contract](../integrations/gallery-dl/README.md#metadata-only-extraction-for-enrichment).
+
 ## Completed file events
 
 A `file.completed` event is at most 16 KiB and has this shape:

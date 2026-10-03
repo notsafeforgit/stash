@@ -1,0 +1,217 @@
+{
+  "initial": {
+    "schema": "stash-metadata-fetch-v1",
+    "url": "https://www.reddit.com/comments/abc123",
+    "retention_policy": "gallery-dl-retained-v1",
+    "extractor_version": "1.32.15-dev",
+    "records": [
+      {
+        "kind": "post",
+        "parent": null,
+        "base": null,
+        "observed_at": "2026-10-03T01:00:00.123456+00:00",
+        "patch": {
+          "category": "reddit",
+          "id": "abc123",
+          "source_extractor_url": "https://www.reddit.com/comments/abc123",
+          "title": "Shared caption",
+          "author": "source-account",
+          "large_id": 9223372036854775815,
+          "legacy_field": "old",
+          "nullable": null
+        },
+        "removed": []
+      },
+      {
+        "kind": "media",
+        "parent": null,
+        "base": 0,
+        "observed_at": "2026-10-03T01:00:00.123456+00:00",
+        "patch": {
+          "num": 1,
+          "_url": "https://i.redd.it/image1.jpg"
+        },
+        "removed": [
+          "legacy_field"
+        ]
+      },
+      {
+        "kind": "context",
+        "parent": null,
+        "base": 0,
+        "observed_at": "2026-10-03T01:00:00.123456+00:00",
+        "patch": {
+          "context_marker": "child request"
+        },
+        "removed": []
+      }
+    ],
+    "pending": [
+      {
+        "url": "https://www.redgifs.com/ifr/example",
+        "parent": 2,
+        "depth": 1,
+        "reason": "timeout"
+      }
+    ],
+    "unresolved": [
+      {
+        "url": "https://example.invalid/external",
+        "parent": 0,
+        "depth": 1,
+        "reason": "external_reference_only"
+      }
+    ]
+  },
+  "complete": {
+    "schema": "stash-metadata-fetch-v1",
+    "url": "https://www.reddit.com/comments/abc123",
+    "retention_policy": "gallery-dl-retained-v1",
+    "extractor_version": "1.32.15-dev",
+    "records": [
+      {
+        "kind": "post",
+        "parent": null,
+        "base": null,
+        "observed_at": "2026-10-03T01:00:00.123456+00:00",
+        "patch": {
+          "category": "reddit",
+          "id": "abc123",
+          "source_extractor_url": "https://www.reddit.com/comments/abc123",
+          "title": "Shared caption",
+          "author": "source-account",
+          "large_id": 9223372036854775815,
+          "legacy_field": "old",
+          "nullable": null
+        },
+        "removed": []
+      },
+      {
+        "kind": "media",
+        "parent": null,
+        "base": 0,
+        "observed_at": "2026-10-03T01:00:00.123456+00:00",
+        "patch": {
+          "num": 1,
+          "_url": "https://i.redd.it/image1.jpg"
+        },
+        "removed": [
+          "legacy_field"
+        ]
+      },
+      {
+        "kind": "context",
+        "parent": null,
+        "base": 0,
+        "observed_at": "2026-10-03T01:00:00.123456+00:00",
+        "patch": {
+          "context_marker": "child request"
+        },
+        "removed": []
+      },
+      {
+        "kind": "post",
+        "parent": 2,
+        "base": null,
+        "observed_at": "2026-10-03T01:00:00.123456+00:00",
+        "patch": {
+          "category": "redgifs",
+          "id": "example",
+          "source_extractor_url": "https://www.redgifs.com/ifr/example",
+          "title": "Child caption"
+        },
+        "removed": []
+      },
+      {
+        "kind": "media",
+        "parent": 2,
+        "base": 3,
+        "observed_at": "2026-10-03T01:00:00.123456+00:00",
+        "patch": {
+          "_url": "https://media.invalid/example.mp4",
+          "num": 1
+        },
+        "removed": []
+      }
+    ],
+    "pending": [],
+    "unresolved": [
+      {
+        "url": "https://example.invalid/external",
+        "parent": 0,
+        "depth": 1,
+        "reason": "external_reference_only"
+      }
+    ]
+  },
+  "metadata": [
+    {
+      "category": "reddit",
+      "id": "abc123",
+      "source_extractor_url": "https://www.reddit.com/comments/abc123",
+      "title": "Shared caption",
+      "author": "source-account",
+      "large_id": 9223372036854775815,
+      "legacy_field": "old",
+      "nullable": null
+    },
+    {
+      "category": "reddit",
+      "id": "abc123",
+      "source_extractor_url": "https://www.reddit.com/comments/abc123",
+      "title": "Shared caption",
+      "author": "source-account",
+      "large_id": 9223372036854775815,
+      "nullable": null,
+      "num": 1,
+      "_url": "https://i.redd.it/image1.jpg"
+    },
+    {
+      "category": "reddit",
+      "id": "abc123",
+      "source_extractor_url": "https://www.reddit.com/comments/abc123",
+      "title": "Shared caption",
+      "author": "source-account",
+      "large_id": 9223372036854775815,
+      "legacy_field": "old",
+      "nullable": null,
+      "context_marker": "child request"
+    },
+    {
+      "category": "redgifs",
+      "id": "example",
+      "source_extractor_url": "https://www.redgifs.com/ifr/example",
+      "title": "Child caption",
+      "_reddit": {
+        "category": "reddit",
+        "id": "abc123",
+        "source_extractor_url": "https://www.reddit.com/comments/abc123",
+        "title": "Shared caption",
+        "author": "source-account",
+        "large_id": 9223372036854775815,
+        "legacy_field": "old",
+        "nullable": null,
+        "context_marker": "child request"
+      }
+    },
+    {
+      "category": "redgifs",
+      "id": "example",
+      "source_extractor_url": "https://www.redgifs.com/ifr/example",
+      "title": "Child caption",
+      "_url": "https://media.invalid/example.mp4",
+      "num": 1,
+      "_reddit": {
+        "category": "reddit",
+        "id": "abc123",
+        "source_extractor_url": "https://www.reddit.com/comments/abc123",
+        "title": "Shared caption",
+        "author": "source-account",
+        "large_id": 9223372036854775815,
+        "legacy_field": "old",
+        "nullable": null,
+        "context_marker": "child request"
+      }
+    }
+  ]
+}

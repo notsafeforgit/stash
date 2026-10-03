@@ -4,7 +4,8 @@ These are producer checkpoints, not native captures or completion receipts.
 The server must still verify post identity before accepting their evidence.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
+import re
 from urllib.parse import urlsplit
 
 from .encoding import InvalidData, MAX_PAYLOAD_BYTES, decode, digest, encode, utc_now
@@ -14,6 +15,8 @@ SCHEMA = "stash-metadata-fetch-v1"
 MAX_BYTES = 32 << 20
 MAX_RECORDS = 1024
 MAX_REFERENCES = 256
+MAX_EXPANDED_BYTES = 128 << 20
+OBSERVED_TIME = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$")
 ERRORS = frozenset({"rate_limited", "authentication", "access_denied", "challenge",
                     "not_found", "unsupported_extractor", "extraction_failed", "timeout",
                     "result_too_large", "invalid_checkpoint", "not_a_post_url",
@@ -42,11 +45,22 @@ def _index(value, before, nullable=True):
         raise InvalidData("Checkpoint references must point to preceding records")
 
 
+def _native_size(value, limit):
+    body = encode(value, limit)
+    # Native JSON keeps Unicode but escapes these two JavaScript separators.
+    # Measure that representation too before accepting a compact checkpoint.
+    size = len(body) + 3 * (body.count(b"\xe2\x80\xa8") + body.count(b"\xe2\x80\xa9"))
+    if size > limit:
+        raise InvalidData("Metadata checkpoint exceeds the native byte limit")
+    return size
+
+
 class Bundle:
     def __init__(self, url, extractor_version, resume=None):
         self.value = {"schema": SCHEMA, "url": public_url(url), "retention_policy": POLICY,
                       "extractor_version": extractor_version, "records": [], "pending": [], "unresolved": []}
         self._metadata, self._seen = [], {}
+        self._expanded_bytes = 0
         if resume is not None:
             saved = decode(encode(resume, MAX_BYTES), MAX_BYTES)
             if (not isinstance(saved, dict) or set(saved) != set(self.value)
@@ -61,8 +75,11 @@ class Bundle:
                 if not isinstance(saved[kind], list) or len(saved[kind]) > MAX_REFERENCES:
                     raise InvalidData("Invalid metadata checkpoint reference count")
                 for entry in saved[kind]:
+                    count = len(self.value[kind])
                     self.reference(kind, entry)
-        self._bytes = len(encode(self.value, MAX_BYTES))
+                    if count == len(self.value[kind]):
+                        raise InvalidData("Duplicate metadata checkpoint reference")
+        self._bytes = _native_size(self.value, MAX_BYTES)
 
     def _restore(self, record):
         index = len(self._metadata)
@@ -73,10 +90,15 @@ class Bundle:
                 or record["removed"] != sorted(set(record["removed"]))):
             raise InvalidData("Invalid metadata checkpoint record")
         try:
-            observed = datetime.fromisoformat(record["observed_at"])
-            if observed.tzinfo is None or "T" not in record["observed_at"]:
+            match = OBSERVED_TIME.fullmatch(record["observed_at"]) if isinstance(record["observed_at"], str) else None
+            if match is None:
                 raise ValueError()
-        except (ValueError, TypeError):
+            observed = datetime.fromisoformat(record["observed_at"]).astimezone(timezone.utc)
+            # Python truncates nanoseconds, while native capture timestamps retain
+            # them. Reject the zero instant without changing valid sub-microseconds.
+            if observed == datetime.min.replace(tzinfo=timezone.utc) and not int((match[1] or ".0")[1:]):
+                raise ValueError()
+        except (ValueError, TypeError, OverflowError):
             raise InvalidData("Expected a metadata observation time with timezone") from None
         _index(record["base"], index)
         _index(record["parent"], index)
@@ -91,9 +113,20 @@ class Bundle:
         if encode(retain(data)) != encode(data):
             raise InvalidData("Metadata checkpoint violates the source retention policy")
         public_url(data.get("source_extractor_url"))
+        key = self._key(record["kind"], record["parent"], data)
+        if key in self._seen:
+            raise InvalidData("Duplicate metadata checkpoint record")
+        expanded = dict(data)
+        if record["parent"] is not None:
+            parent = self.metadata(record["parent"], with_parent=True)
+            expanded["_reddit" if parent.get("category") == "reddit" else "_parent"] = parent
+        size = _native_size(expanded, MAX_PAYLOAD_BYTES)
+        if self._expanded_bytes + size > MAX_EXPANDED_BYTES:
+            raise InvalidData("Metadata checkpoint expansion exceeds its byte limit")
         self.value["records"].append(record)
         self._metadata.append(data)
-        self._seen[self._key(record["kind"], record["parent"], data)] = index
+        self._seen[key] = index
+        self._expanded_bytes += size
 
     @staticmethod
     def _key(kind, parent, data):
@@ -118,7 +151,7 @@ class Bundle:
         record = {"kind": kind, "parent": parent, "base": base, "observed_at": utc_now(),
                   "patch": {k: v for k, v in data.items() if k not in previous or previous[k] != v},
                   "removed": sorted(set(previous) - set(data))}
-        size = len(encode(record)) + 1
+        size = _native_size(record, MAX_BYTES) + 1
         if self._bytes + size > MAX_BYTES:
             raise InvalidData("Metadata result exceeds its byte limit")
         self._restore(record)
@@ -155,5 +188,5 @@ class Bundle:
 
     def checkpoint(self):
         # References are small but still count toward the final envelope limit.
-        encode(self.value, MAX_BYTES)
+        _native_size(self.value, MAX_BYTES)
         return self.value

@@ -101,6 +101,62 @@ class FetchTests(unittest.TestCase):
         self.assertEqual(bundle.metadata(0)["date"], "2026-10-02T00:00:00+00:00")
         self.assertEqual(messages, before)
 
+    def test_native_transcript_fixture_reconstructs_and_preserves_observation_times(self):
+        path = Path(__file__).resolve().parents[3] / "pkg/archive/testdata/enrichment-transcript-v1.json"
+        fixture = decode(path.read_bytes())
+        for kind in ("initial", "complete"):
+            saved = fixture[kind]
+            bundle = Bundle(saved["url"], saved["extractor_version"], saved)
+            self.assertEqual(bundle.checkpoint(), saved)
+            for i in range(len(saved["records"])):
+                self.assertEqual(bundle.metadata(i, with_parent=True), fixture["metadata"][i])
+        self.assertEqual(bundle.metadata(0)["large_id"], 9223372036854775815)
+        duplicate = copy.deepcopy(fixture["complete"])
+        duplicate["records"].append(duplicate["records"][0])
+        with self.assertRaisesRegex(InvalidData, "Duplicate"):
+            Bundle(duplicate["url"], duplicate["extractor_version"], duplicate)
+        for kind in ("pending", "unresolved"):
+            duplicate = copy.deepcopy(fixture["initial"])
+            duplicate[kind].append(duplicate[kind][0])
+            with self.assertRaisesRegex(InvalidData, "Duplicate"):
+                Bundle(duplicate["url"], duplicate["extractor_version"], duplicate)
+
+    def test_checkpoint_observation_times_match_native_bounds(self):
+        bundle = Bundle(URL, SUPPORTED_VERSION)
+        bundle.append("post", {"category": "reddit", "id": "abc123", "source_extractor_url": URL})
+        saved = copy.deepcopy(bundle.checkpoint())
+        for stamp in ("0001-01-01T00:00:00Z", "0001-01-01T01:00:00+01:00",
+                      "0001-01-01T00:00:00+01:00", "9999-12-31T23:30:00-01:00",
+                      "2026-10-03T01:00:00+01:60", "2026-10-03T01:00:00", "2026-10-03"):
+            with self.subTest(invalid=stamp):
+                saved["records"][0]["observed_at"] = stamp
+                with self.assertRaisesRegex(InvalidData, "observation time"):
+                    Bundle(URL, SUPPORTED_VERSION, saved)
+        for stamp in ("2026-10-03T01:00:00.123456789Z", "0001-01-01T00:00:00.000000001Z",
+                      "0001-01-01T01:00:00.000000001+01:00"):
+            with self.subTest(valid=stamp):
+                saved["records"][0]["observed_at"] = stamp
+                resumed = Bundle(URL, SUPPORTED_VERSION, saved)
+                self.assertEqual(resumed.checkpoint()["records"][0]["observed_at"], stamp)
+
+    def test_compact_expansion_is_bounded_before_appending_or_resuming(self):
+        bundle = Bundle(URL, SUPPORTED_VERSION)
+        root = {"category": "reddit", "id": "abc123", "source_extractor_url": URL, "caption": "x" * 200}
+        bundle.append("post", root)
+        before = copy.deepcopy(bundle.checkpoint())
+        with patch("stash_ingest.metadata_bundle.MAX_EXPANDED_BYTES", bundle._expanded_bytes + 1):
+            with self.assertRaisesRegex(InvalidData, "expansion"):
+                bundle.append("media", {**root, "num": 1}, base=0)
+        self.assertEqual(bundle.checkpoint(), before)
+        bundle.append("media", {**root, "num": 1}, base=0)
+        with patch("stash_ingest.metadata_bundle.MAX_EXPANDED_BYTES", bundle._expanded_bytes - 1):
+            with self.assertRaisesRegex(InvalidData, "expansion"):
+                Bundle(URL, SUPPORTED_VERSION, bundle.checkpoint())
+        unicode_root = {**root, "caption": "\u2028" * 10}
+        with patch("stash_ingest.metadata_bundle.MAX_PAYLOAD_BYTES", len(encode(unicode_root)) + 1):
+            with self.assertRaisesRegex(InvalidData, "native byte"):
+                Bundle(URL, SUPPORTED_VERSION).append("post", unicode_root)
+
     def test_fetch_does_not_construct_writers_or_touch_existing_files(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)

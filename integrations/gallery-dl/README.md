@@ -1427,9 +1427,21 @@ with_parent=True)` reconstructs a record for subsequent identity validation.
 The same source retention policy used by the download adapter reduces Reddit
 previews and incidental profile fields before checkpoint serialization. Input
 metadata stays unchanged. Checkpoints are bounded to 32 MiB, 1,024 records and
-256 entries in each child-reference list; each reconstructed record must satisfy
-the source payload limit. Invalid references, policy/request changes, oversized
-results and unretained data are rejected.
+256 entries in each child-reference list. Each reconstructed record, including
+parent context, must fit the 4 MiB source payload limit, and all reconstructed
+records together must fit 128 MiB. These limits also account for native JSON's
+Unicode separator escaping. Invalid references, duplicate records, invalid
+observation times, policy/request changes, oversized results and unretained data
+are rejected before a record is appended.
+
+The server's `archive.ParseEnrichmentTranscript` independently validates the
+same compact representation and reconstructs records without losing large
+identifiers or original observation times. `Extends` checks that a resumed
+checkpoint retains all earlier records and unresolved references. A pending
+child must remain explicit or have newly returned records for that URL and
+parent; retry cannot silently erase it. A shared Go/Python fixture verifies
+these semantics. This parser supplies no ingestion route or execution authority;
+native job binding and publication still require the coordinator.
 
 Temporary child failures retain the parent and discard that child's partial
 records. Persist the entire returned checkpoint before retrying its pending

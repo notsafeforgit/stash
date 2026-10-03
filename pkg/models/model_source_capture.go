@@ -51,11 +51,14 @@ type SourcePostMetadata struct {
 }
 
 type SourceCaptureInput struct {
-	UUID             string
-	PostUUID         string
-	Origin           string
-	Platform         string
-	CapturedAt       time.Time
+	UUID       string
+	PostUUID   string
+	Origin     string
+	Platform   string
+	CapturedAt time.Time
+	// A zero CapturedAt means the original observation time was not recorded.
+	// RecordedAt then records when the archive received this retained evidence.
+	RecordedAt       *time.Time
 	ExtractorVersion *string
 	RetentionPolicy  string
 	Metadata         SourcePostMetadata
@@ -69,6 +72,7 @@ type SourceCapture struct {
 	Origin           string
 	Platform         string
 	CapturedAt       time.Time
+	RecordedAt       *time.Time
 	ExtractorVersion *string
 	RetentionPolicy  string
 	StructureVersion string
@@ -79,7 +83,22 @@ type SourceCapture struct {
 
 type SourceCaptureCursor struct {
 	CapturedAt time.Time
+	RecordedAt *time.Time
 	UUID       string
+}
+
+// MarshalJSON preserves an unknown observation time as null, never year one or
+// the time the archive happened to import an older saved result.
+func (c SourceCapture) MarshalJSON() ([]byte, error) {
+	type alias SourceCapture
+	var observed *time.Time
+	if !c.CapturedAt.IsZero() {
+		observed = &c.CapturedAt
+	}
+	return json.Marshal(struct {
+		alias
+		CapturedAt *time.Time
+	}{alias(c), observed})
 }
 
 var (

@@ -155,7 +155,7 @@ required for a directly scanned scene, image, file, or performer.
 | --- | --- |
 | `source_posts` / `source_post_identifiers` | The source post and its explicit identifiers, independent of library media |
 | `source_post_revisions` | Shared post body and normalized title/text/date/language projection |
-| `source_captures` | An immutable observation of a post revision, with capture time, producer, platform, extractor version, retention policy, and per-file/provenance patch |
+| `source_captures` | Immutable retained evidence for a post revision, with observation time when known, origin, platform, extractor version, retention policy, and per-file/provenance patch |
 | `source_profile_bodies` | Shared meaningful profile JSON, identified by namespace and content hash |
 | `source_capture_profiles` | Typed references from each capture's shared body or patch to a profile body |
 | `source_payloads` | Content-addressed JSON bytes, optionally compressed without changing their checksum |
@@ -211,6 +211,26 @@ evidence is immutable; a forgotten-post tombstone rejects new captures and
 resurrection. Purge/forget commands, account/capture associations, media
 appearances, source merging, API/UI exposure, and actual catalog import remain
 subsequent work. Anonymised exports remove source evidence and vacuum free pages.
+
+Schema 1000061 allows trusted imports to retain a missing observation time.
+Known observations keep their exact `captured_at` value and existing signatures;
+their new `recorded_at` column is null. Undated evidence has null `captured_at`
+and a separate, required `recorded_at` identifying when the archive received it.
+That time does not establish when the source was observed. Exactly one timestamp
+is populated. Unknown observations use a distinct signature domain binding their
+recording time; identical UUID replay cannot change either timestamp's meaning.
+JSON represents the unknown observation as null. Capture summaries order by
+observation time when known, otherwise recording time, with UUID as the indexed
+tie-breaker; cursors retain the applicable timestamp.
+
+Publisher matching sends undated evidence to review. A reviewed account link
+can be saved without assigning invented first/last-observed times to its handles
+or IDs. Existing explicit decisions remain selected. Network producer captures
+continue requiring the worker's observation time. This schema change does not
+release imported collector checkpoints or start work; reviewed execution handoff
+remains separate. Migration retains all original capture UUIDs, rowids, signed
+values and relationships. Backup retains both forms of evidence; anonymisation
+removes them with the other source records.
 
 Migration 1000007 extends the same archive identity registry to galleries.
 Existing gallery IDs, memberships, covers, names, and filesystem associations

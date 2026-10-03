@@ -273,11 +273,13 @@ func canonicalCaptureInput(input *models.SourceCaptureInput) (string, string, er
 	if err != nil {
 		return "", "", err
 	}
-	if !validAccountText(input.Origin, 128, false) || !validAccountText(input.Platform, 128, false) || input.CapturedAt.IsZero() || input.CapturedAt.UTC().Year() < 1 || input.CapturedAt.UTC().Year() > 9999 ||
+	if !validAccountText(input.Origin, 128, false) || !validAccountText(input.Platform, 128, false) ||
 		(input.ExtractorVersion != nil && !validAccountText(*input.ExtractorVersion, 128, true)) {
 		return "", "", errors.New("invalid source capture provenance")
 	}
-	input.CapturedAt = input.CapturedAt.UTC()
+	if err := canonicalCaptureTime(input); err != nil {
+		return "", "", err
+	}
 	projection := make(map[string]interface{})
 	for name, field := range map[string]*string{"title": input.Metadata.Title, "original_text": input.Metadata.OriginalText, "published_at": input.Metadata.PublishedAt, "date_basis": input.Metadata.DateBasis, "language": input.Metadata.Language} {
 		if field != nil && !utf8.ValidString(*field) {
@@ -338,6 +340,15 @@ func captureSignature(input models.SourceCaptureInput, revisionSignature, patchD
 	references := make([][]string, 0, len(refs))
 	for _, ref := range refs {
 		references = append(references, []string{ref.Part, ref.Path, ref.Hash})
+	}
+	if input.CapturedAt.IsZero() {
+		if input.RecordedAt == nil {
+			return "", models.ErrSourcePayloadCorrupt
+		}
+		return sourceSignature("stash-source-capture-unrecorded-v1", []interface{}{
+			input.PostUUID, revisionSignature, input.Origin, input.Platform, nil, input.RecordedAt.UTC().Format(accountObservationTimeFormat),
+			input.ExtractorVersion, input.RetentionPolicy, patchDigest, references,
+		})
 	}
 	return sourceSignature("stash-source-capture-v1", []interface{}{
 		input.PostUUID, revisionSignature, input.Origin, input.Platform, input.CapturedAt.Format(accountObservationTimeFormat),
@@ -424,9 +435,20 @@ VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(post_uuid, signature) DO NOTHING`, uuid.Ne
 	if err := dbWrapper.Get(ctx, &revisionUUID, "SELECT uuid FROM source_post_revisions WHERE post_uuid = ? AND signature = ? AND body_digest = ? AND metadata = ? AND structure_version = ?", post.UUID, revisionSignature, bodyDigest, metadata, archive.CaptureStructureVersion); err != nil {
 		return nil, err
 	}
-	if _, err := dbWrapper.Exec(ctx, `INSERT INTO source_captures(uuid, post_uuid, revision_uuid, origin, platform, captured_at, extractor_version, retention_policy, patch_digest, signature)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, input.UUID, post.UUID, revisionUUID, input.Origin, input.Platform,
-		input.CapturedAt.Format(accountObservationTimeFormat), input.ExtractorVersion, input.RetentionPolicy, patchDigest, signature); err != nil {
+	columns := "uuid,post_uuid,revision_uuid,origin,platform,captured_at,extractor_version,retention_policy,patch_digest,signature"
+	placeholders := "?,?,?,?,?,?,?,?,?,?"
+	var observed any = input.CapturedAt.Format(accountObservationTimeFormat)
+	if input.CapturedAt.IsZero() {
+		observed = nil
+	}
+	args := []any{input.UUID, post.UUID, revisionUUID, input.Origin, input.Platform,
+		observed, input.ExtractorVersion, input.RetentionPolicy, patchDigest, signature}
+	if input.RecordedAt != nil {
+		columns += ",recorded_at"
+		placeholders += ",?"
+		args = append(args, input.RecordedAt.Format(accountObservationTimeFormat))
+	}
+	if _, err := dbWrapper.Exec(ctx, "INSERT INTO source_captures("+columns+") VALUES("+placeholders+")", args...); err != nil {
 		return nil, err
 	}
 	for _, ref := range input.Payload.Refs {
@@ -446,7 +468,8 @@ type sourceCaptureRow struct {
 	RevisionUUID      string         `db:"revision_uuid"`
 	Origin            string         `db:"origin"`
 	Platform          string         `db:"platform"`
-	CapturedAt        Timestamp      `db:"captured_at"`
+	CapturedAt        NullTimestamp  `db:"captured_at"`
+	RecordedAt        NullTimestamp  `db:"recorded_at"`
 	ExtractorVersion  sql.NullString `db:"extractor_version"`
 	RetentionPolicy   string         `db:"retention_policy"`
 	PatchDigest       string         `db:"patch_digest"`
@@ -462,7 +485,10 @@ c.extractor_version, c.retention_policy, c.patch_digest, c.signature, r.body_dig
 
 func (r sourceCaptureRow) resolve() (*models.SourceCapture, error) {
 	ret := &models.SourceCapture{UUID: r.UUID, PostUUID: r.PostUUID, RevisionUUID: r.RevisionUUID,
-		Origin: r.Origin, Platform: r.Platform, CapturedAt: r.CapturedAt.Timestamp, RetentionPolicy: r.RetentionPolicy, StructureVersion: r.StructureVersion}
+		Origin: r.Origin, Platform: r.Platform, CapturedAt: r.CapturedAt.Timestamp, RecordedAt: r.RecordedAt.TimePtr(), RetentionPolicy: r.RetentionPolicy, StructureVersion: r.StructureVersion}
+	if err := canonicalCaptureTime(&models.SourceCaptureInput{CapturedAt: ret.CapturedAt, RecordedAt: ret.RecordedAt}); err != nil {
+		return nil, models.ErrSourcePayloadCorrupt
+	}
 	if r.ExtractorVersion.Valid {
 		ret.ExtractorVersion = &r.ExtractorVersion.String
 	}
@@ -490,6 +516,13 @@ JOIN source_post_revisions r ON r.post_uuid = c.post_uuid AND r.uuid = c.revisio
 			return nil, nil
 		}
 		return nil, err
+	}
+	// Older native schemas have only observed timestamps. Read the new column
+	// only for a null observation, so pre-upgrade lineage checks remain read-only.
+	if !row.CapturedAt.Valid {
+		if err := get(&row.RecordedAt, "SELECT recorded_at FROM source_captures WHERE uuid=?", id); err != nil {
+			return nil, err
+		}
 	}
 	ret, err := row.resolve()
 	if err != nil {
@@ -547,7 +580,7 @@ WHERE r.capture_uuid = ? ORDER BY r.part, r.path LIMIT 1025`, id); err != nil {
 		return nil, err
 	}
 	signature, err := captureSignature(models.SourceCaptureInput{PostUUID: ret.PostUUID, Origin: ret.Origin,
-		Platform: ret.Platform, CapturedAt: ret.CapturedAt, ExtractorVersion: ret.ExtractorVersion, RetentionPolicy: ret.RetentionPolicy}, revisionSignature, row.PatchDigest, payload.Refs)
+		Platform: ret.Platform, CapturedAt: ret.CapturedAt, RecordedAt: ret.RecordedAt, ExtractorVersion: ret.ExtractorVersion, RetentionPolicy: ret.RetentionPolicy}, revisionSignature, row.PatchDigest, payload.Refs)
 	if err != nil {
 		return nil, err
 	}
@@ -570,15 +603,20 @@ func (s *SourceEvidenceStore) Captures(ctx context.Context, value string, after 
 	afterTime, afterUUID := "", ""
 	if after != nil {
 		afterUUID, err = archiveUUID(after.UUID)
-		if err != nil || after.CapturedAt.IsZero() {
+		clock := models.SourceCaptureInput{CapturedAt: after.CapturedAt, RecordedAt: after.RecordedAt}
+		if err != nil || canonicalCaptureTime(&clock) != nil {
 			return nil, errors.New("invalid source capture cursor")
 		}
-		afterTime = after.CapturedAt.UTC().Format(accountObservationTimeFormat)
+		afterTime = clock.CapturedAt.Format(accountObservationTimeFormat)
+		if clock.RecordedAt != nil {
+			afterTime = clock.RecordedAt.Format(accountObservationTimeFormat)
+		}
 	}
 	var rows []sourceCaptureRow
-	if err := dbWrapper.Select(ctx, &rows, "SELECT "+sourceCaptureColumns+` FROM source_captures c
+	if err := dbWrapper.Select(ctx, &rows, "SELECT "+sourceCaptureColumns+`,c.recorded_at FROM source_captures c
 JOIN source_post_revisions r ON r.post_uuid = c.post_uuid AND r.uuid = c.revision_uuid
-WHERE c.post_uuid = ? AND (c.captured_at, c.uuid) > (?, ?) ORDER BY c.captured_at, c.uuid LIMIT ?`, postUUID, afterTime, afterUUID, limit); err != nil {
+WHERE c.post_uuid = ? AND (coalesce(c.captured_at,c.recorded_at), c.uuid) > (?, ?)
+ORDER BY coalesce(c.captured_at,c.recorded_at), c.uuid LIMIT ?`, postUUID, afterTime, afterUUID, limit); err != nil {
 		return nil, err
 	}
 	ret := make([]*models.SourceCapture, 0, len(rows))

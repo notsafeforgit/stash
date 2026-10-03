@@ -23,8 +23,9 @@ validates queue/progress semantics against the frozen inputs, and historical
 catalog receipts now have native import and inspection. Legacy enrichment queue,
 cooldown and progress mapping, reviewed activation and collection-revision
 handoffs are implemented. Retained legacy collector staging now has native
-conversion and inspection; reviewed handoff into execution and remaining import
-review resolution still require work.
+conversion and inspection. Native captures can distinguish a missing historical
+observation time from the time the archive received retained evidence; reviewed
+handoff into execution and remaining import review resolution still require work.
 Native UI, live host/n8n conversion, compatibility removal, coordinated
 backup/export/restore, production cutover and retirement remain major release
 gates. The phase table below records that distinction; commit count is not a
@@ -5221,3 +5222,57 @@ staging, import review resolution, remaining operational/policy families,
 additional download adapters, native UI, host/n8n conversion, compatibility
 removal, coordinated backup/export/restore, performance and cutover still require
 work. Production and `develop` remain unchanged.
+
+## Unknown historical observation times
+
+Schema 1000061 lets retained source evidence distinguish an unknown original
+observation time from the time it entered the archive. Known captures keep their
+original timestamp and signature, with a null recording time. Undated captures
+have a null observation time and a required archive recording time under a
+separate signature domain. Identical capture UUID replay cannot change that
+meaning. JSON emits null for an unknown observation, and capture pagination
+uses the applicable timestamp plus UUID through a dedicated index.
+
+Undated publisher evidence requires review. An explicit account association is
+retained without fabricating first/last-observed dates for identifiers. Existing
+publisher choices remain selected. The normal producer boundary continues
+requiring actual observation times. This is a prerequisite for imported staging
+handoff; it does not itself turn a legacy checkpoint into an owned worker result,
+release a held target or start a collector.
+
+The full backend gate passed in 893.177 seconds with zero lint issues (API
+715.939, ingestion 618.804, SQLite 874.963 seconds). Fixtures cover nullable JSON,
+known/unknown capture paging through the index, exact replay, changed-time
+rejection, direct SQL ambiguity guards, publisher review, backup, anonymisation
+and startup rejection of altered evidence without writing to the database.
+An actual schema-60 fixture migrates while retaining signed observations and a
+noncontiguous rowid; a destination-name collision rolls back the table rebuild.
+Other historical migration fixtures now copy their historical column sets
+explicitly rather than assuming every later schema has identical columns.
+
+SQLite online backup created one replacement rehearsal copy, including committed
+WAL state. Normal opening, migration and reinitialisation passed in 704.150
+seconds while the backend checks ran. No extra full database archive was retained.
+
+Independent reconciliation passed in 381.105 seconds. All 234 existing data
+tables retain their original values and types, including all 526,348 captures'
+UUIDs, rowids, timestamps and signatures. The new recording-time column is null
+for these known observations. Earlier migration history, sequence counters and
+unrelated schema objects are unchanged. The new capture pagination index is
+used; integrity is clean with zero foreign-key violations. The verified database
+is 20,265,979,904 bytes. Undated behavior is covered by populated fixtures; no
+unknown historical times were inferred or added to the frozen library.
+
+Fresh startup passed in 162.056 seconds. Startup and cutover performance remain
+release requirements. Evidence is under
+`.local/native-capture-time-rehearsal-20261003/`. Both copies left about 138.6 GiB
+free during the final checks, above the 50 GiB reserve. The verified copy replaces
+its schema-60 predecessor under the existing retention policy; original compatible
+and frozen source inputs remain available. The preceding `4a69a1e4b` checkpoint
+passed build, lint and preview-image publication CI.
+
+The full transition remains active. Reviewed execution of imported staging,
+import review resolution, remaining operational/policy families, additional
+download adapters, native UI, host/n8n conversion, compatibility removal,
+coordinated backup/export/restore, performance and cutover still require work.
+Production and `develop` remain unchanged.

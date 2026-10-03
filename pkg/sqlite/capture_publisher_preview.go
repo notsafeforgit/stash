@@ -93,6 +93,10 @@ func (s *CapturePublisherStore) Preview(ctx context.Context, value, target strin
 	if err := populatePublisherCandidates(ctx, ret); err != nil {
 		return nil, err
 	}
+	if capture.CapturedAt.IsZero() {
+		ret.Conflicts = append(ret.Conflicts, "observation_time_unrecorded")
+		ret.Action = "review"
+	}
 	if ret.Target != nil {
 		allowed, err := publisherNamespaceAllowed(ctx, post.UUID, ret.Target.Namespace)
 		if err != nil {

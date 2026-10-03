@@ -19,6 +19,7 @@ import (
 
 func removeAutomationCheckpointSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeCaptureRecordingTimeSchema(t, raw)
 	_, err := raw.Exec(`DROP TABLE automation_checkpoint_records; DROP TABLE automation_checkpoint_imports;
  DROP TABLE automation_checkpoint_bodies; DROP INDEX automation_enrichment_staged_input;
  DELETE FROM native_migration_history WHERE version=1000060`)

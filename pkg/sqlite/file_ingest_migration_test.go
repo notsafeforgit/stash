@@ -52,8 +52,7 @@ func TestFileIngestMigrationPreservesExistingCaptureReceipt(t *testing.T) {
 	tx, err := raw.Begin()
 	require.NoError(t, err)
 	for _, table := range []string{"source_accounts", "source_account_identifiers", "source_account_identifier_evidence", "source_collections", "source_collection_revisions", "source_posts", "source_post_identifiers", "source_payloads", "source_profile_bodies", "source_post_revisions", "source_captures", "source_capture_profiles", "source_collection_captures", "capture_publisher_decisions", "capture_publisher_claims", "ingest_producers", "ingest_credentials", "ingest_credential_scopes"} {
-		_, err := tx.Exec("INSERT INTO " + table + " SELECT * FROM source_fixture." + table)
-		require.NoError(t, err, table)
+		copyHistoricalFixtureTable(t, tx, table)
 	}
 	_, err = tx.Exec(`INSERT INTO ingest_receipts SELECT producer_uuid,event_uuid,digest,credential_uuid,collection_uuid,collection_revision,root_uuid,run_uuid,kind,post_uuid,capture_uuid,result,committed_at FROM source_fixture.ingest_receipts`)
 	require.NoError(t, err)

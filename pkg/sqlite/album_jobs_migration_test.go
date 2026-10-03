@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -35,6 +36,10 @@ func albumJobRows(t *testing.T, db *sql.DB, table string) [][]any {
 		}
 		require.NoError(t, rows.Scan(pointers...))
 		ret = append(ret, row)
+		if table == "source_captures" && !slices.Contains(columns, "recorded_at") {
+			// Old observed captures acquire an explicit null recording time.
+			ret[len(ret)-1] = append(row, nil)
+		}
 	}
 	require.NoError(t, rows.Err())
 	return ret
@@ -73,8 +78,7 @@ func TestAlbumJobMigrationPreservesJobsAttemptsReceiptsAndGuards(t *testing.T) {
 	tx, err := raw.Begin()
 	require.NoError(t, err)
 	for _, table := range []string{"media_roots", "media_root_revisions", "source_collections", "source_collection_revisions", "ingest_producers", "ingest_credentials", "ingest_credential_scopes"} {
-		_, err := tx.Exec("INSERT INTO " + table + " SELECT * FROM source_fixture." + table)
-		require.NoError(t, err, table)
+		copyHistoricalFixtureTable(t, tx, table)
 	}
 	require.NoError(t, tx.Commit())
 	_, err = raw.Exec("DETACH DATABASE source_fixture")

@@ -226,8 +226,7 @@ func TestSourcePostMediaMigrationPreservesPopulatedAttachmentEvidence(t *testing
 	_, err = raw.Exec("ATTACH DATABASE ? AS source_fixture", fixture.DatabasePath())
 	require.NoError(t, err)
 	for _, table := range []string{"source_posts", "source_post_identifiers", "source_payloads", "source_profile_bodies", "source_post_revisions", "source_captures", "source_capture_profiles", "source_attachments", "source_attachment_manifests", "source_attachment_entries", "source_capture_attachment_manifests"} {
-		_, err := raw.Exec("INSERT INTO " + table + " SELECT * FROM source_fixture." + table)
-		require.NoError(t, err, table)
+		copyHistoricalFixtureTable(t, raw, table)
 	}
 	_, err = raw.Exec("DETACH DATABASE source_fixture")
 	require.NoError(t, err)

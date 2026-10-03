@@ -431,8 +431,7 @@ SELECT uuid,namespace,label,revision,created_at FROM source_fixture.source_accou
 	require.NoError(t, err)
 	for _, table := range []string{"source_account_identifiers", "source_account_identifier_evidence", "media_roots", "media_root_revisions", "source_collections", "source_collection_revisions",
 		"source_posts", "source_post_identifiers", "source_payloads", "source_profile_bodies", "source_post_revisions", "source_captures", "source_capture_profiles", "source_collection_captures"} {
-		_, err := tx.Exec("INSERT INTO " + table + " SELECT * FROM source_fixture." + table)
-		require.NoError(t, err, table)
+		copyHistoricalFixtureTable(t, tx, table)
 	}
 	require.NoError(t, tx.Commit())
 	_, err = raw.Exec("DETACH DATABASE source_fixture")

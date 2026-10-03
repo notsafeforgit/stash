@@ -166,6 +166,11 @@ func recordPublisherClaims(ctx context.Context, account, captureUUID string, ide
 	if capture == nil {
 		return nil, models.ErrCapturePublisherConflict
 	}
+	if capture.CapturedAt.IsZero() {
+		// A reviewed account association is still useful. It must not claim
+		// that an old handle was observed on the day this evidence was imported.
+		return []publisherRecordedClaim{}, nil
+	}
 	accounts := &SourceAccountStore{}
 	claims := make([]publisherRecordedClaim, 0, len(identity.Identifiers))
 	for _, claim := range identity.Identifiers {

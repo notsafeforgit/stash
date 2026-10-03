@@ -17,18 +17,7 @@ type AutomationTranslationImportStore struct{}
 const automationTranslationColumns = `r.ordinal,e.source_table,e.source_key,e.data_sha256,r.job_ordinal,r.request_uuid,r.cache_uuid,r.post_uuid,r.post_reference,r.collection_uuid,r.collection_revision,r.target_uuid,r.target_revision,r.evidence_uuid,r.disposition,r.outcome,r.reason`
 const automationTranslationJoins = ` FROM automation_translation_records r JOIN automation_snapshot_records e ON e.snapshot_uuid=r.snapshot_uuid AND e.ordinal=r.ordinal`
 
-type automationTranslationWork struct {
-	snapshot *models.AutomationSnapshot
-	manifest *scrape.AutomationSnapshotManifest
-	captured time.Time
-}
-
-func (w *automationTranslationWork) decode(row catalogEvidenceRow) (*scrape.CatalogSnapshotRecord, error) {
-	if scrape.CatalogSnapshotSHA([]byte(row.Data)) != row.SHA256 {
-		return nil, models.ErrAutomationSnapshotInvalid
-	}
-	return w.manifest.Record([]byte(row.Data))
-}
+type automationTranslationWork struct{ automationImportWork }
 
 func automationTranslationReview(r *models.AutomationTranslationRecord, reason string) *models.AutomationTranslationRecord {
 	r.Outcome, r.Disposition, r.Reason = "review", "review", reason
@@ -294,7 +283,7 @@ func (s *AutomationTranslationImportStore) Advance(ctx context.Context, id, expe
 	if now.Before(updated) {
 		return nil, models.ErrAutomationSnapshotConflict
 	}
-	w := &automationTranslationWork{snapshot, manifest, captured}
+	w := &automationTranslationWork{automationImportWork{snapshot, manifest, captured}}
 	complete := snapshotAtomicWrite(ctx)
 	stamp := now.UTC().Format(time.RFC3339Nano)
 	if prior == nil {

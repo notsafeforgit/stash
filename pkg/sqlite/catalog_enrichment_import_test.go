@@ -19,6 +19,7 @@ import (
 
 func removeCatalogEnrichmentSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeAutomationEnrichmentSchema(t, raw)
 	_, err := raw.Exec(`DROP TRIGGER source_enrichment_receipt_immutable; DROP TRIGGER source_enrichment_receipt_scope;
  DROP TRIGGER catalog_enrichment_import_guard; DROP TRIGGER catalog_enrichment_record_immutable;
  DROP TABLE catalog_enrichment_records; DROP TABLE catalog_enrichment_imports; DROP TABLE source_enrichment_receipts;

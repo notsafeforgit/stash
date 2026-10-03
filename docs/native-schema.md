@@ -1732,3 +1732,54 @@ list and `/records/{ordinal}` detail. Native receipts are available at
 `/api/v3/archive/posts/{post}/enrichment-receipts` (UUID cursor, limit 1–100).
 These are historical inspection/import routes. Queue/cooldown migration and
 reviewed activation are separate operations.
+
+## Frozen enrichment work
+
+Schema 1000058 adds `automation_enrichment_imports` and
+`automation_enrichment_records`. The `automation-enrichment-v1` pass maps
+`enrichment_jobs`, `enrichment_cooldowns`, `enrichment_seed_progress` and
+`enrichment_source_progress` from the received automation snapshot. Catalog
+post evidence and historical receipt imports must finish first; coalesced work
+also requires completed catalog relationship mapping. Each transaction processes
+at most 200 source records or 16 MiB. Progress binds the exact manifest digest
+and source ordinal; replay reads terminal progress without repeating writes.
+
+Pending/retry jobs become held native enrichment targets. Priority, original
+attempt counts and deadlines remain available. The deadline includes the later
+of the job delay and its exact platform/account cooldown. Account pauses do not
+become service-wide native pauses. Unknown cooldown semantics require review.
+Seed completion remains a traversal cursor; source last-attempt timestamps
+remain progress evidence. Neither certifies completed enrichment. No native
+jobs or attempts are created, and no target is activated by this pass.
+
+Old `done` jobs require a catalog receipt for the same native post and historical
+collection revision. `already_native` requires an existing gallery-dl capture
+bound to that same scope. Completed imported targets reference those assertions
+through `enrichment_completions.legacy_receipt_uuid` or `legacy_capture_uuid`;
+they have zero new capture associations. The completion API reports `basis` as
+`legacy_receipt` or `legacy_capture`. Ordinary native completions retain their
+capture requirements and report `basis: captures`. These historical completions
+are private to the importer and do not invent native execution or collection
+coverage. Missing proof becomes review, preserving the original status.
+
+`coalesced` requires an explicit imported catalog alias to the same native post.
+It retains that alias proof without claiming the parent executed. Unsupported,
+excluded and unresolved work retains its original disposition. Legacy staged
+JSON stays in the immutable source record with its digest and a review outcome;
+it is neither discarded nor represented as a native owned checkpoint.
+
+Matching uses source-qualified catalog keys and imported aliases. A valid
+queued URL missing from the native post is retained with migration evidence
+whose observation time is explicitly the frozen snapshot boundary. This can
+advance the post's URL-evidence revision; it does not create a post-body revision
+or alter media metadata. New work does not overwrite existing native choices.
+Only holds created by this import at their unchanged revisions can combine
+their priority/deadline or finish using historical proof.
+
+Application APIs expose GET/POST
+`/api/v3/archive/automation-snapshots/{snapshot}/enrichment-import`, a `/records`
+list (ordinal cursor, limit 1–100), and `/records/{ordinal}` with original source
+values. Backups include these records; anonymisation removes them. Startup
+checks progress, typed projections, source bindings, scoped proofs and native
+history. Overall migration remains `imported:false`; review resolution and
+reviewed activation are separate release requirements.

@@ -60,11 +60,14 @@ type EnrichmentCompletionInput struct {
 	CaptureUUIDs     []string `json:"capture_uuids"`
 }
 
-// Completion proves retained source evidence for the exact target revision.
-// Execution leases and ingestion validation are owned by the calling worker.
+// Completion distinguishes native capture proof from imported historical proof.
+// Imported proof never claims execution by a native worker.
 type EnrichmentCompletion struct {
 	EnrichmentCompletionInput
-	CreatedAt time.Time `json:"created_at"`
+	Basis             string    `json:"basis"`
+	LegacyReceiptUUID *string   `json:"legacy_receipt_uuid,omitempty"`
+	LegacyCaptureUUID *string   `json:"legacy_capture_uuid,omitempty"`
+	CreatedAt         time.Time `json:"created_at"`
 }
 
 var (

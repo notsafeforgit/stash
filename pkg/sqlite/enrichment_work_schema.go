@@ -2,13 +2,14 @@ package sqlite
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/stashapp/stash/pkg/archive"
 	"github.com/stashapp/stash/pkg/models"
 )
 
-func validateEnrichmentWorkSchema(conn *sqlx.DB) error {
+func validateEnrichmentWorkSchema(conn *sqlx.DB, importedProofs bool) error {
 	for _, object := range []struct{ name, kind string }{
 		{"enrichment_targets", "table"}, {"enrichment_completions", "table"}, {"enrichment_completion_captures", "table"}, {"enrichment_target_history", "table"},
 		{"enrichment_targets_post", "index"}, {"enrichment_targets_post_state", "index"},
@@ -39,7 +40,7 @@ func validateEnrichmentWorkSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
-	if err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM enrichment_targets t
+	query := `SELECT EXISTS(SELECT 1 FROM enrichment_targets t
  LEFT JOIN source_posts p ON p.uuid=t.post_uuid LEFT JOIN source_post_urls u ON u.uuid=t.url_uuid
  LEFT JOIN source_collection_revisions c ON c.collection_uuid=t.collection_uuid AND c.revision=t.collection_revision
  LEFT JOIN enrichment_completions e ON e.uuid=t.completion_uuid
@@ -66,7 +67,12 @@ func validateEnrichmentWorkSchema(conn *sqlx.DB) error {
  OR EXISTS(SELECT 1 FROM enrichment_completion_captures e LEFT JOIN enrichment_completions r ON r.uuid=e.completion_uuid
  LEFT JOIN enrichment_targets t ON t.uuid=r.target_uuid LEFT JOIN source_captures c ON c.uuid=e.capture_uuid
  LEFT JOIN source_collection_captures b ON b.capture_uuid=e.capture_uuid AND b.collection_uuid=t.collection_uuid AND b.collection_revision=t.collection_revision
- WHERE t.uuid IS NULL OR c.post_uuid IS NOT t.post_uuid OR c.origin NOT IN ('gallery-dl','gallery-dl-enrichment') OR b.capture_uuid IS NULL)`); err != nil {
+ WHERE t.uuid IS NULL OR c.post_uuid IS NOT t.post_uuid OR c.origin NOT IN ('gallery-dl','gallery-dl-enrichment') OR b.capture_uuid IS NULL)`
+	if importedProofs {
+		query = strings.Replace(query, "previous.state IS NOT 'pending'", "previous.state IS NOT (CASE WHEN EXISTS(SELECT 1 FROM enrichment_completions e WHERE e.uuid=h.completion_uuid AND (e.legacy_receipt_uuid IS NOT NULL OR e.legacy_capture_uuid IS NOT NULL)) THEN 'held' ELSE 'pending' END)", 1)
+		query = strings.Replace(query, "h.state IS NOT 'pending' OR h.recorded_at>e.created_at OR h.not_before>e.created_at", "h.state IS NOT (CASE WHEN e.legacy_receipt_uuid IS NOT NULL OR e.legacy_capture_uuid IS NOT NULL THEN 'held' ELSE 'pending' END) OR h.recorded_at>e.created_at OR (e.legacy_receipt_uuid IS NULL AND e.legacy_capture_uuid IS NULL AND h.not_before>e.created_at)", 1)
+	}
+	if err := conn.Get(&invalid, query); err != nil {
 		return err
 	}
 	if invalid {

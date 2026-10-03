@@ -265,15 +265,20 @@ func (s *EnrichmentWorkStore) ReadyPage(ctx context.Context, collection string, 
 }
 
 type enrichmentCompletionRow struct {
-	UUID             string    `db:"uuid"`
-	TargetUUID       string    `db:"target_uuid"`
-	ExpectedRevision int       `db:"expected_revision"`
-	Digest           string    `db:"request_digest"`
-	CaptureCount     int       `db:"capture_count"`
-	CreatedAt        time.Time `db:"created_at"`
+	UUID              string    `db:"uuid"`
+	TargetUUID        string    `db:"target_uuid"`
+	ExpectedRevision  int       `db:"expected_revision"`
+	Digest            string    `db:"request_digest"`
+	CaptureCount      int       `db:"capture_count"`
+	LegacyReceiptUUID *string   `db:"legacy_receipt_uuid"`
+	LegacyCaptureUUID *string   `db:"legacy_capture_uuid"`
+	CreatedAt         time.Time `db:"created_at"`
 }
 
 func (row enrichmentCompletionRow) resolve(captures []string) (*models.EnrichmentCompletion, error) {
+	if row.LegacyReceiptUUID != nil || row.LegacyCaptureUUID != nil {
+		return row.resolveImported(captures)
+	}
 	input := models.EnrichmentCompletionInput{UUID: row.UUID, TargetUUID: row.TargetUUID, ExpectedRevision: row.ExpectedRevision, CaptureUUIDs: captures}
 	prepared, err := archive.PrepareEnrichmentCompletion(input)
 	if err != nil || len(captures) != row.CaptureCount || !validJobTime(row.CreatedAt) {
@@ -283,7 +288,7 @@ func (row enrichmentCompletionRow) resolve(captures []string) (*models.Enrichmen
 	if err != nil || digest != row.Digest {
 		return nil, models.ErrSourcePayloadCorrupt
 	}
-	return &models.EnrichmentCompletion{EnrichmentCompletionInput: prepared, CreatedAt: row.CreatedAt}, nil
+	return &models.EnrichmentCompletion{EnrichmentCompletionInput: prepared, Basis: "captures", CreatedAt: row.CreatedAt}, nil
 }
 
 func (s *EnrichmentWorkStore) Completion(ctx context.Context, id string) (*models.EnrichmentCompletion, error) {

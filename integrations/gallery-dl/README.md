@@ -1179,6 +1179,39 @@ review, and 3 for work not yet activated. Saved plans contain source identifiers
 and schedules, never the application key. Redirected, malformed and oversized
 responses are rejected. See [activation API contracts](../../docs/native-schema.md#reviewed-translation-activation).
 
+### Frozen enrichment history and work
+
+After receiving the automation snapshot and completing catalog post evidence,
+relationship and enrichment-receipt imports, run:
+
+```sh
+stash-import-automation-enrichment --snapshot /migration/prepared/automation \
+  --expected-sha256 MANIFEST_SHA256 --endpoint STASH_ORIGIN
+```
+
+The command uses the application key in `STASH_API_KEY` (or `--api-key-env`).
+It verifies frozen input before contacting Stash, resumes from native progress
+and recovers a committed response being lost by reading that progress on rerun.
+Pages contain at most 200 source records or 16 MiB. A terminal replay performs
+only reads. Exit 0 means this pass mapped its inputs; exit 2 means it retained
+review outcomes; exit 1 means invalid input or unavailable/invalid responses.
+All outcomes retain `imported:false` for the overall migration.
+
+Pending/retry enrichment becomes held work. Original attempts, per-account or
+platform delays, seed cursors and source progress are preserved. No website is
+contacted and no job is activated. Historical completion requires a scoped old
+receipt; an `already_native` assertion requires a scoped gallery-dl capture.
+Missing proof stays in review. Original staged JSON requires conversion/review
+and is never thrown away to refetch. Coalesced work requires an explicit catalog
+alias. Existing native choices are preserved.
+
+Inspect application API progress and mapped/source records under
+`/api/v3/archive/automation-snapshots/SNAPSHOT_UUID/enrichment-import`, including
+`/records?after=ORDINAL&limit=100` and `/records/ORDINAL`. The
+[schema contract](../../docs/native-schema.md#frozen-enrichment-work) explains
+historical completion bases and retained URL evidence. This command does not
+replace coordinated cutover inputs, review resolution or reviewed activation.
+
 ## Historical source albums
 
 `stash-backfill-source-albums` uses the native application API to match imported

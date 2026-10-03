@@ -1086,6 +1086,7 @@ func (db *Anonymiser) anonymiseArchiveUUIDs(ctx context.Context) error {
 func (db *Anonymiser) deleteSourceAccountEvidence(ctx context.Context) error {
 	return txn.WithTxn(ctx, db, func(ctx context.Context) error {
 		for _, table := range []string{
+			"automation_enrichment_records", "automation_enrichment_imports",
 			"file_path_fences",
 			"ingest_receipts",
 			"scan_journal_activation_jobs", "scan_journal_activations",
@@ -1097,7 +1098,7 @@ func (db *Anonymiser) deleteSourceAccountEvidence(ctx context.Context) error {
 			"catalog_evidence_records", "catalog_evidence_posts", "catalog_evidence_imports",
 			"catalog_relation_records", "catalog_relations_imports",
 			"catalog_document_records", "catalog_document_imports",
-			"catalog_enrichment_records", "source_enrichment_receipts", "catalog_enrichment_imports",
+			"catalog_enrichment_records", "catalog_enrichment_imports",
 			"catalog_translation_records", "catalog_translation_imports",
 			"capture_translation_entries", "capture_translation_decisions", "translation_policy_revisions", "translation_policies",
 			"translation_activation_targets", "translation_activations",
@@ -1118,6 +1119,7 @@ func (db *Anonymiser) deleteSourceAccountEvidence(ctx context.Context) error {
 			"source_post_file_evidence", "source_file_matches", "source_file_observations", "source_content_claims",
 			"translation_target_history", "translation_targets", "translation_cache", "translation_requests",
 			"enrichment_target_history", "enrichment_completion_captures", "enrichment_completions", "enrichment_targets",
+			"source_enrichment_receipts",
 			"source_translation_evidence", "source_translations",
 			"source_document_heads", "source_document_head_decisions", "source_document_head_claims", "source_document_sources", "source_documents", "source_document_contents",
 			"ingest_credential_scopes", "ingest_credential_roots", "ingest_credentials", "ingest_producers",

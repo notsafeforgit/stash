@@ -509,7 +509,7 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 			}
 		}
 		if version >= NativeSchemaBaseline+50 {
-			if err := validateEnrichmentWorkSchema(conn); err != nil {
+			if err := validateEnrichmentWorkSchema(conn, version >= NativeSchemaBaseline+58); err != nil {
 				return err
 			}
 		}
@@ -546,6 +546,11 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 
 		if version >= NativeSchemaBaseline+57 {
 			if err := validateCatalogEnrichmentSchema(conn); err != nil {
+				return err
+			}
+		}
+		if version >= NativeSchemaBaseline+58 {
+			if err := validateAutomationEnrichmentSchema(conn); err != nil {
 				return err
 			}
 		}

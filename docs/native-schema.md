@@ -1893,3 +1893,53 @@ archive migration imported. Reviewed handoff of this retained evidence to native
 execution remains a separate operation. Backup includes the converted evidence;
 anonymisation removes it. Startup checks complete source bindings, progress,
 hashes and deterministic conversion semantics, including review outcomes.
+
+### Accepting retained checkpoint evidence
+
+Schema 1000062 adds `checkpoint_evidence_acceptances` and
+`checkpoint_evidence_captures`. Application review can materialize the shared
+bodies of one converted legacy checkpoint as ordinary source captures. Original
+record slots, pending children and unscoped unresolved references remain in the
+converted evidence. Repeated slots share the same capture; each binding retains
+its original body index and exact reconstructed payload digest.
+
+These captures use origin `legacy-enrichment` and policy `legacy-retained-v1`.
+Their observation time is null; their recording time is when the archive accepted
+the evidence. The old reported extractor version remains optional. Missing source
+URLs, reasons, timestamps and producer ownership are not invented. Both parent
+references, shallow deltas, explicit nulls and exact JSON numbers are preserved.
+Every body must have a supported post identity and all must identify the same
+post. Unsupported or contradictory evidence remains available in migration review.
+
+The preview identifies the exact original snapshot/manifest, ordinal, target
+revision, source/staging/body hashes, post revision, shared capture UUIDs and
+counts of original records, pending children and unscoped references. A post
+with only catalog-local identifiers may acquire its first service identifier;
+`assign_post_identifier`, `post_namespace` and `post_value` show that change in
+the preview. An identifier already assigned to another post, or a different
+service identifier on the selected post, is a conflict. Acceptance cannot merge
+posts or silently replace a native identifier.
+
+All routes use application authentication under `/api/v3/archive`:
+
+| Route | Contract |
+| --- | --- |
+| `POST /checkpoint-evidence/preview` | Input: `uuid`, `snapshot_uuid`, `manifest_sha256`, `ordinal`, `target_revision`. Returns the review plan with `plan_sha256`; writes nothing. |
+| `POST /checkpoint-evidence` | Body: `input` with those same fields and `expected_plan_sha256`. Atomically accepts only the unchanged preview. |
+| `GET /checkpoint-evidence/{acceptance}` | Reads the acceptance by its input UUID, including `created_at`. Returns 404 if absent. |
+
+Only one acceptance can own an original snapshot ordinal. A duplicate operation
+UUID replays the original receipt after later target decisions; a different UUID
+cannot replace it. Changed previews return 409. Requests are bounded to 16 KiB,
+plans to 1 MiB, and reconstructed evidence to the existing per-payload and total
+expansion limits. Capture creation, optional post identifier assignment, original
+collection association and receipt bindings commit together, including when a
+caller catches a late write error.
+
+Acceptance leaves the target's review state, schedule and history unchanged. It
+does not create a worker job, complete enrichment, select publisher accounts or
+apply Stash metadata. Reviewed child execution remains a separate handoff to
+implement. Backup preserves acceptance and source evidence; anonymisation removes
+both. Startup recomputes the original conversion and reconstructed capture hashes,
+checks the original review history and collection associations, and rejects altered
+evidence before opening a writable database.

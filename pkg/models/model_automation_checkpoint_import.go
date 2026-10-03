@@ -33,4 +33,7 @@ type AutomationCheckpointImportReaderWriter interface {
 	Find(context.Context, string) (*AutomationCheckpointImport, error)
 	Records(context.Context, string, int64, int) ([]AutomationCheckpointRecord, error)
 	Record(context.Context, string, int64) (*AutomationCheckpointRecordDetails, error)
+	PreviewEvidence(context.Context, CheckpointEvidenceInput) (*CheckpointEvidencePlan, error)
+	AcceptEvidence(context.Context, CheckpointEvidenceInput, string, time.Time) (*CheckpointEvidenceAcceptance, error)
+	EvidenceAcceptance(context.Context, string) (*CheckpointEvidenceAcceptance, error)
 }

@@ -38,6 +38,7 @@ func copyHistoricalFixtureTable(t *testing.T, db historicalFixtureDatabase, tabl
 
 func removeCaptureRecordingTimeSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeCheckpointEvidenceSchema(t, raw)
 	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM source_captures WHERE captured_at IS NULL"))
 	old, err := os.ReadFile("migrations/1000006_source_evidence.up.sql")
 	require.NoError(t, err)

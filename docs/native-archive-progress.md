@@ -23,9 +23,11 @@ validates queue/progress semantics against the frozen inputs, and historical
 catalog receipts now have native import and inspection. Legacy enrichment queue,
 cooldown and progress mapping, reviewed activation and collection-revision
 handoffs are implemented. Retained legacy collector staging now has native
-conversion and inspection. Native captures can distinguish a missing historical
-observation time from the time the archive received retained evidence; reviewed
-handoff into execution and remaining import review resolution still require work.
+conversion, inspection and reviewed acceptance into shared native captures.
+Native captures distinguish a missing historical observation time from the time
+the archive received retained evidence; acceptance retains the review hold.
+Reviewed handoff into execution and remaining import review resolution still
+require work.
 Native UI, live host/n8n conversion, compatibility removal, coordinated
 backup/export/restore, production cutover and retirement remain major release
 gates. The phase table below records that distinction; commit count is not a
@@ -5276,3 +5278,69 @@ import review resolution, remaining operational/policy families, additional
 download adapters, native UI, host/n8n conversion, compatibility removal,
 coordinated backup/export/restore, performance and cutover still require work.
 Production and `develop` remain unchanged.
+
+
+## Reviewed checkpoint evidence acceptance — 2026-10-03
+
+Schema 1000062 adds application preview, acceptance and receipt lookup for one
+converted legacy checkpoint. It records shared native captures with unknown
+observation times and the actual acceptance time, while preserving original
+record slots, both parent references, exact numbers, pending children and
+unscoped references. Duplicate source slots share a capture. It neither applies
+a newer retention policy to old source bytes nor invents producer ownership,
+missing extractor versions or source URLs.
+
+A preview binds the frozen snapshot and manifest, original ordinal and target
+revision, post revision, source hashes and reconstructed capture identities.
+When a post only has a catalog-local identifier, its first service identifier is
+an explicit reviewed change. Conflicting identifiers and another post's existing
+claim are rejected. Acceptance, captures, optional identifier and historical
+collection associations are atomic. Original review state, scheduling/history,
+worker state, publisher decisions and scene/image metadata remain unchanged.
+A lost response can be recovered by receipt UUID or exact replay after later
+review decisions. This is evidence acceptance; reviewed child execution remains
+to be implemented.
+
+The preceding `c42b84d9e` build and lint CI passed, but its preview publication
+failed during a migration test. A two-connection regression reproduced the cause:
+SQLite could expose an old column count to the comparison helper before stepping
+a statement after another connection rebuilt the table. Commit `983e9b4d8` pins
+a read transaction and refreshes its schema before preparing the row comparison.
+The new test failed before that fix and passed afterward; comparison assertions
+were retained.
+
+The full backend gate passed in 838.666 seconds with zero lint issues (API
+666.155, ingestion 557.603, SQLite 819.757 seconds). Coverage includes shared
+bodies and deltas, both parent references, large numeric IDs, missing historical
+fields, invalid graphs and oversized payloads, conflicting post identities,
+stale previews, caught late-write rollback, duplicate acceptance, backup/restore,
+anonymisation and startup refusal of missing evidence bindings without writes.
+The application API fixture imports frozen registry/catalog/automation inputs,
+loses a committed acceptance response, recovers the receipt, and verifies that
+the original target stays in review. A schema-61 fixture preserves staging and
+captures across upgrade; a destination-table collision rolls back the migration.
+
+One SQLite online backup produced the replacement copy. Normal opening,
+migration and reinitialisation passed in 808.922 seconds. Independent comparison
+passed in 437.223 seconds: all 234 existing data tables retain their exact values
+and types, including all 526,348 capture UUIDs, rowids, observation/recording times
+and signatures. Existing schema objects, prior migration history and sequence
+counters remain unchanged. The two new evidence tables are empty, as expected:
+the frozen operational snapshot has no saved legacy checkpoint bodies. Populated
+acceptance and recovery behavior is demonstrated by fixtures, not inferred from
+that empty historical input. Integrity is clean with zero foreign-key violations.
+The database remains 20,265,979,904 bytes.
+
+Fresh-process startup passed in 158.812 seconds. Startup/cutover performance
+remains a release gate. Evidence is under
+`.local/native-checkpoint-evidence-rehearsal-20261003/`. The large rehearsal was
+assigned idle disk-I/O priority while other tests and services ran. Free space
+stayed above 136 GiB with both database copies present. The verified replacement
+supersedes schema 61 under the retention policy; original compatible and frozen
+source inputs remain available.
+
+The full transition remains active: reviewed staging execution, import review
+resolution, remaining operational/policy families, additional download adapters,
+native UI, host/n8n conversion, compatibility removal, coordinated backup/export/
+restore, performance and final cutover are still required. Production and
+`develop` remain unchanged.

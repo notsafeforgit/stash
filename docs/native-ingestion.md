@@ -603,6 +603,35 @@ profiles and automatically discovered collections. Global pending-delivery
 recovery runs before loading website profiles. See
 [dispatch across local profiles](../integrations/gallery-dl/README.md#dispatch-across-local-profiles).
 
+### Legacy enrichment preparation
+
+The native migration preparation policy `automation-enrichment-v1` interprets
+frozen enrichment jobs, cooldowns, seed/source progress and catalog completion
+receipts. It preserves original attempt counts, priorities, times and status
+meanings. Decimal retry deadlines round upward to milliseconds without a floating
+point conversion. Matching platform and account cooldowns can extend a job's
+deadline; neither can shorten an existing native deadline. Platform labels remain
+historical labels: mirror OnlyFans/Fansly traffic belongs to Coomer and mirror
+Patreon traffic to Kemono according to the actual source URL. Account denials do
+not become service-wide outages.
+
+Preparation returns migration candidates. Pending/retry jobs are candidates for
+held work. `done` requires the original catalog receipt, `already_native` requires
+a retained gallery-dl capture, and `coalesced` requires the imported post alias.
+Source enumeration completion and the last attempted platform are historical
+progress, not evidence of downloaded or enriched media. Explicit exclusions stay
+excluded; missing URLs and identity conflicts remain reviewable. Original staged
+metadata retains its exact digest and requires conversion/review before it can
+become a native checkpoint, even if its queue row says `done`.
+
+The preparation functions alone create no native targets or execution history.
+The domain importer still needs to bind native posts/collections, preserve queued
+URL evidence, resolve historical proofs and map scheduling state before reviewed
+activation. Missing receipts in an older catalog snapshot cannot be inferred from
+a later automation row's success label. Production cutover uses coordinated fresh
+inputs; a rehearsal made from snapshots taken at different times cannot certify
+completion of that later work.
+
 ## Completed file events
 
 A `file.completed` event is at most 16 KiB and has this shape:

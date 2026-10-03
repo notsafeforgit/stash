@@ -18,7 +18,9 @@ Durable enrichment execution, queued-job dispatch, stale-job maintenance and
 shared download/enrichment service reservations are implemented, including linked
 download services, typed service failure reporting and bounded download preference
 across collections. Dispatch across multiple profiles and automatic discovery of
-permitted metadata collections are implemented. Legacy queue mapping is next.
+permitted metadata collections are implemented. Legacy enrichment preparation
+now validates queue/progress/receipt semantics against the frozen inputs; native
+queue mapping and activation remain next.
 Native UI, live host/n8n conversion, compatibility removal, coordinated
 backup/export/restore, production cutover and retirement remain major release
 gates. The phase table below records that distinction; commit count is not a
@@ -4882,3 +4884,64 @@ operational migration, additional download adapters, native UI, live host/n8n
 conversion, compatibility removal, coordinated backup/export/restore, performance
 and cutover still apply. Production and `develop` remain unchanged, and the full
 transition goal remains active.
+
+## Legacy enrichment semantics and frozen-input reconciliation
+
+Native preparation policy `automation-enrichment-v1` now interprets the legacy
+queue, cooldowns, seed/source progress and catalog enrichment receipts. Retry
+deadlines use exact decimal arithmetic and round upward to milliseconds;
+platform/account pauses never shorten another preserved deadline. Original
+attempt counts and creation/update times remain available without fabricating
+native leases or attempts. Contacted services come from the URL, independently
+of historical account-platform labels. Unknown versions, states, malformed
+staging and unsupported cooldown reasons require review.
+
+Preparation distinguishes held-work candidates, historical completion requiring
+a catalog receipt, existing source metadata requiring a gallery-dl capture, and
+coalescence requiring a post alias. It preserves explicit exclusions and leaves
+missing URLs/identity conflicts reviewable. Staged metadata keeps its exact hash
+and requires conversion/review even under a completed queue label. Completed
+enumeration can still leave pending jobs; neither seed progress nor the last
+source attempt certifies execution completion.
+
+The read-only assessment checked all 252,050 frozen queue rows, eight cooldowns,
+eight source-progress rows and all 16,186 retained catalog receipts with matching
+source hashes. No frozen seed-progress rows exist; fixtures cover them. The final
+pass took 4.894 seconds while validation ran. Queue candidates comprise 227,443
+pending/retry holds, 21,368 historical completions, five existing-source outcomes,
+44 coalescences, 2,443 exclusions and 747 review states. Every queue post and
+catalog resolves to an imported native identity. These are preparation results,
+not newly created targets or successful native jobs.
+
+Exact queued URLs are absent for 213,826 held candidates and two historical
+completions even though their posts match. The old selector rewrites Reddit and
+Twitter URLs to short post routes, so the domain importer must retain those URL
+associations with their original queue evidence instead of requiring exact text
+already present in `source_post_urls`.
+
+Of the 21,368 `done` rows, 16,186 have a valid exact-key catalog receipt. The other
+5,182 have no receipt through their imported post/collection identities either;
+all have queue updates newer than their individual catalog snapshots (5,180
+OnlyFans-labeled mirror jobs and two Reddit jobs). They remain unproven by this
+rehearsal input. This confirms the coordinated fresh-snapshot requirement at
+cutover; it does not justify manufacturing missing receipts or silently repeating
+that completed source work.
+
+Focused tests cover status/proof distinctions, source mirrors, account-specific
+cooldowns, deadline rounding below floating point precision, original staging
+bytes, unknown input, receipt timestamps and unresolved children. The full backend
+gate passed in 731.215 seconds with zero lint issues (API 583.246, ingestion
+517.440, SQLite 704.689 seconds). Final timestamp/cooldown checks passed with the
+complete scrape package (0.037 seconds), final lint reported zero issues, and the
+full frozen projection was rechecked unchanged.
+
+Evidence is under `.local/native-enrichment-import-preparation-20261003/`.
+The native schema remains 1000056 and no database copy was added. Free space was
+134.6 GiB after checks under the 50 GiB reserve. The preceding `346083b93`
+checkpoint passed CI build, lint and preview-image publication.
+
+Native queue/receipt/cooldown mapping, staged checkpoint conversion, reviewed
+activation and coordinated cutover inputs still need implementation. The broader
+policy/operational migration, download adapters, UI, host/n8n conversion,
+compatibility removal, backup/export/restore, performance and cutover gates remain
+unchanged. The complete transition goal remains active.

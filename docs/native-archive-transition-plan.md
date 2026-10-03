@@ -626,6 +626,15 @@ scrapers/notifications against real endpoints. Measure duration, peak temporary
 space, WAL growth, backup size, and query latency. Feed migration failures back
 into the importer before scheduling production cutover.
 
+Keep 50 GiB free on the shared host after allowing for each rehearsal's estimated
+peak additional storage, using `scripts/check_rehearsal_space.py` before starting
+and rechecking during long copies/imports. Retain the original frozen inputs and
+latest verified native copy, plus one candidate while it is being verified.
+Prune superseded rehearsal databases, indexes and compressed copies after their
+replacement passes reconciliation; keep the small reports instead of a full
+database archive for every increment. This retention policy applies to disposable
+development rehearsals, not production backups or migration source data.
+
 For the first production migration, prefer a measured maintenance window with
 legacy writers stopped and fenced. Prestage immutable source snapshots where
 useful. If a staged import is refreshed, compare complete changed source tables

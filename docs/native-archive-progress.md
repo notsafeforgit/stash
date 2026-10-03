@@ -21,6 +21,31 @@ backup/export/restore, production cutover and retirement remain major release
 gates. The phase table below records that distinction; commit count is not a
 completion percentage.
 
+## Local rehearsal storage budget
+
+Keep at least **50 GiB free** on the host filesystem for downloads and normal
+activity. Before write-heavy checks or a full-copy rehearsal, run
+`python3 scripts/check_rehearsal_space.py --additional-bytes <estimated-peak-bytes>`.
+Include the new copy, migration growth, indexes and WAL in that estimate; check
+again during long copies/imports. The check reserves space for future writes;
+it does not allocate or lock that space against other host processes.
+
+Retain the original compatible snapshot, frozen migration inputs, the latest
+verified native database and, while needed, one candidate under verification.
+After verifying its replacement, remove the superseded database and its search
+indexes, WAL files and compressed copies once no process has them open. Do not
+accumulate a full archive for every schema increment. Small reconciliation
+reports and scripts can remain. Production databases, media, active downloads
+and ordinary service backups are outside this cleanup policy.
+
+On 2026-10-03, the owner authorized pruning superseded goal artifacts. Removing
+197 obsolete database/archive/index files reclaimed about 140 GB and left about
+162 GB free. Historical sections below describe evidence recorded at the time;
+their intermediate database paths are no longer retained. The original
+`native-archive-rehearsal-20260930/compatible-snapshot.sqlite`, frozen import
+inputs and the verified schema-1000053 database in
+`native-enrichment-release-rehearsal-20261002/` remain under `.local/`.
+
 ## Frozen baseline
 
 - Stash source: `0a603d07e9ec3dd9863a7340858a635525bb2c11`, pushed annotated tag

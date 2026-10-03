@@ -166,3 +166,20 @@ func (rs *nativeArchiveRoutes) scheduleEnrichmentTarget(w http.ResponseWriter, r
 	})
 	writeEnrichmentWork(w, ret, err)
 }
+
+func (rs *nativeArchiveRoutes) retryEnrichmentTarget(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Revision int `json:"expected_revision"`
+	}
+	if err := readIngestJSON(w, r, 1024, &input); err != nil {
+		ingestError(w, err)
+		return
+	}
+	var ret *models.EnrichmentTarget
+	err := rs.repo.WithTxn(r.Context(), func(ctx context.Context) error {
+		var err error
+		ret, err = rs.repo.EnrichmentWork.Retry(ctx, chi.URLParam(r, "target"), input.Revision, time.Now())
+		return err
+	})
+	writeEnrichmentWork(w, ret, err)
+}

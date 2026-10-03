@@ -415,7 +415,16 @@ requires the current target revision. Completion requires retained gallery-dl
 captures for that same post and collection revision. It must be part of the
 calling worker's fenced publication transaction, and has no public mutation
 endpoint. Connecting extraction to execution, importing legacy enrichment state,
-and scheduled-service conversion remain pending. See
+and scheduled-service conversion remain pending.
+Schema 1000051 binds enrichment jobs to exact target/source revisions and each
+attempt to its authenticated producer. The internal coordinator checks the
+recorded logical-root scope, current eligibility and lease/credential validity
+through commit. Checkpoints retain one compact body per job, small immutable
+receipts and original per-record producers across failover. Preserve the bounded
+staging budget, historical acknowledgement replay, retry backoff and explicit
+owner retry operation. Schedule changes cancel active jobs atomically. These
+checkpoints are not captures or completion proof; public worker routes, verified
+publication, shared cooldown/fairness and stale-job maintenance remain pending. See
 [enrichment work](docs/native-schema.md#post-enrichment-targets-and-completion)
 and [metadata-only extraction](integrations/gallery-dl/README.md#metadata-only-extraction-for-enrichment).
 

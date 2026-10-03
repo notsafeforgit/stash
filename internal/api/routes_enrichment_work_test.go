@@ -90,8 +90,10 @@ func TestEnrichmentRoutesRequireReviewedRevisionsAndApplicationAccess(t *testing
 	delete(input, "origin")
 	change := map[string]any{"expected_revision": held.Revision, "schedule": models.EnrichmentSchedule{State: "pending", Priority: held.Priority, NotBefore: held.NotBefore}}
 	var pending models.EnrichmentTarget
-	require.NoError(t, json.Unmarshal(request("PUT", path+"/schedule", change, 200), &pending))
+	request("POST", path+"/retry", map[string]any{"expected_revision": held.Revision + 1}, 409)
+	require.NoError(t, json.Unmarshal(request("POST", path+"/retry", map[string]any{"expected_revision": held.Revision}, 200), &pending))
 	require.Equal(t, held.Revision+1, pending.Revision)
+	request("POST", path+"/retry", map[string]any{"expected_revision": pending.Revision}, 409)
 	request("PUT", path+"/schedule", change, 409)
 	change["expected_revision"] = pending.Revision
 	change["schedule"] = models.EnrichmentSchedule{State: "completed"}
@@ -133,7 +135,7 @@ func TestEnrichmentRoutesRequireReviewedRevisionsAndApplicationAccess(t *testing
 	_, token, err := intake.IssueCredential(t.Context(), producer.UUID, []models.IngestScope{{CollectionUUID: collection.UUID}}, nil)
 	require.NoError(t, err)
 	producerHandler := withIngestRoutes(http.NotFoundHandler(), intake, false)
-	for _, target := range []string{postPath, path, path + "/history", path + "/schedule", completionPath, "/collections/" + collection.UUID + "/enrichment-targets"} {
+	for _, target := range []string{postPath, path, path + "/history", path + "/schedule", path + "/retry", completionPath, "/collections/" + collection.UUID + "/enrichment-targets"} {
 		for _, method := range []string{"GET", "POST", "PUT"} {
 			r := httptest.NewRequest(method, "/api/v3/archive"+target, bytes.NewBufferString(`{}`))
 			r.Header.Set("Authorization", "Bearer "+token)

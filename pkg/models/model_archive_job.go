@@ -13,6 +13,7 @@ const (
 	ArchiveJobVerifyMedia   = "media.verify"
 	ArchiveJobBackfillAlbum = "album.backfill"
 	ArchiveJobTranslateText = "text.translate"
+	ArchiveJobEnrichPost    = "post.enrich"
 )
 
 type ArchiveJob struct {

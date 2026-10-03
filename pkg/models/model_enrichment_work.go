@@ -79,6 +79,7 @@ type EnrichmentWorkReaderWriter interface {
 	Targets(context.Context, EnrichmentTargetQuery) ([]EnrichmentTarget, error)
 	History(context.Context, string, int, int) ([]EnrichmentTargetHistory, error)
 	Schedule(context.Context, string, int, EnrichmentSchedule, time.Time) (*EnrichmentTarget, error)
+	Retry(context.Context, string, int, time.Time) (*EnrichmentTarget, error)
 	Ready(context.Context, string, time.Time, int) ([]EnrichmentTarget, error)
 	Complete(context.Context, EnrichmentCompletionInput, time.Time) (*EnrichmentCompletion, error)
 	Completion(context.Context, string) (*EnrichmentCompletion, error)

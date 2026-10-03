@@ -1416,9 +1416,11 @@ must send the previously read `not_before`.
 New pending work requires an active post and the current, active collection
 revision. Held/review/excluded work can retain an older or disabled binding.
 An indexed, collection-scoped readiness query omits future deadlines, forgotten
-posts and outdated/disabled collection revisions. A later source edit does not
-silently redirect an existing target. Reviewing a new binding retains a distinct
-target with its own history; the old record remains inspectable.
+posts, disabled roots and outdated/disabled collection revisions. It also omits
+target revisions already bound to jobs and targets with other active jobs.
+A later source edit does not silently redirect an existing target. Reviewing a
+new binding retains a distinct target with its own history; the old record remains
+inspectable.
 
 Completion is an internal domain operation with an operation UUID, exact target
 revision and 1–1,024 distinct capture UUIDs. Every capture must belong to the
@@ -1450,9 +1452,65 @@ Application-only routes under `/api/v3/archive` are:
 | `GET /enrichment-targets/{target_uuid}` | Current target, original binding, retained URL and optional completion UUID. |
 | `GET /enrichment-targets/{target_uuid}/history` | Immutable schedule revisions after numeric `after`, using `limit` (1–100). |
 | `PUT /enrichment-targets/{target_uuid}/schedule` | Replace scheduling fields using `expected_revision` and `schedule`; stale revisions or ineligible pending bindings return 409. |
+| `POST /enrichment-targets/{target_uuid}/retry` | Using `expected_revision`, release a held target or retry pending work whose bound job failed or was cancelled. Preserve priority and the later target/job retry deadline. Other states return 409. |
 | `GET /enrichment-completions/{completion_uuid}` | Original completion input and timestamp; 404 when no receipt committed. |
 
 Producer tokens cannot inspect or administer these routes. Cross-origin
 mutations are refused. There is no HTTP completion mutation. Retaining a pending
 target does not yet start execution: extraction dispatch, fenced publication,
 cooldown/source fairness, and legacy queue mapping remain transition work.
+
+## Enrichment jobs and checkpoint ownership
+
+Schema 1000051 adds the `post.enrich` job kind, preserving existing jobs, attempts
+and submissions. `enrichment_job_targets` binds one job to an exact target-history
+revision. Its canonical arguments also pin the post, collection revision, logical
+root, worker policy digest and extractor version. Mount paths and website
+credentials are excluded. Collection resource keys serialize enrichment jobs
+within a source; coordination with source downloads remains separate work.
+
+`enrichment_job_attempts` records the authenticated producer for each fenced
+attempt. Submission and claim cannot commit without their corresponding bindings.
+The internal ingestion coordinator authorizes against the job's recorded scope,
+checks current target/source eligibility, and rechecks credentials and lease
+ownership before commit. A producer can recover a lost claim response or rotate
+its Stash token without transferring ownership. Another producer needs a new
+attempt; knowing the old owner's UUID does not grant its lease.
+
+Checkpoint storage consists of one current body per job in
+`enrichment_checkpoints`, immutable small acknowledgements in
+`enrichment_checkpoint_receipts`, and per-record hashes in
+`enrichment_checkpoint_records`. Each record retains the producer and attempt
+that first stored it, including after a different worker resumes the transcript.
+Prior records and unresolved references cannot be rewritten. Expected-revision
+checks protect concurrent updates. Receipt, new record references, body and job
+progress commit atomically; job progress contains the receipt rather than another
+full transcript.
+
+Replaying the same checkpoint returns its original acknowledgement. The original
+attempt can confirm that acknowledgement after expiry, cancellation or target
+edits, provided its producer still has valid access. This read does not restore
+ownership or replace the current body. New checkpoint writes require the current
+producer-owned lease and unchanged, eligible target/source binding.
+
+Admission permits at most 64 active enrichment jobs. Each job permits eight
+attempts and 128 checkpoint revisions; transcript limits remain 32 MiB and 1,024
+records. `enrichment_checkpoint_usage` enforces a 2 GiB total staging budget,
+including bodies retained by failed or cancelled jobs. Exhaustion refuses new
+storage rather than discarding evidence. Publication and safe subsequent body
+cleanup are not implemented yet. Ordinary database backups retain these records;
+anonymisation removes them. Startup validates bindings, provenance, record hashes,
+checkpoint histories and exact storage accounting.
+
+A real target schedule change cancels its active job in the same transaction.
+Explicit retry creates a new target revision and preserves existing backoff;
+repeated admission cannot restart an exhausted attempt. Automatic retry and lease
+recovery impose exponential backoff starting at five minutes. Old checkpoint
+evidence stays with its original job. Collection/root changes prevent old workers
+from continuing, but automatic cancellation of those stale jobs remains pending.
+
+This coordinator has no public producer route or dispatch worker yet. Checkpoint
+acceptance verifies the transcript and execution ownership, not the intended
+post's extracted identity. It neither creates native captures nor completes the
+enrichment target. Verified capture publication, shared source cooldowns and
+fairness, and legacy queue conversion remain required before activation.

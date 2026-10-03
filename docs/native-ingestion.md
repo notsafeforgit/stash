@@ -397,9 +397,10 @@ rejected until supported, even though the account parser knows more services.
 
 The isolated gallery-dl metadata collector returns a compact
 `stash-metadata-fetch-v1` transcript. This is an internal producer checkpoint,
-separate from the `source.capture` event format. Native job binding, scoped
-checkpoint storage and verified publication remain unfinished; there is no
-producer endpoint accepting this transcript yet.
+separate from the `source.capture` event format. The internal enrichment
+coordinator now binds jobs to target/source revisions and persists checkpoints
+under producer-owned leases. There is no producer endpoint or dispatch worker
+accepting this transcript yet; verified capture publication remains unfinished.
 
 `archive.ParseEnrichmentTranscript` validates the exact envelope, supported
 direct-post URL, extractor/retention versions and each record. Backward base
@@ -418,9 +419,23 @@ A resumed transcript must keep the earlier record and unresolved-reference
 prefixes exactly, including original observation times. Each earlier pending
 child must remain pending, become explicitly unresolved, or have new records
 for its URL and parent. Validation alone neither proves the intended existing
-post's identity nor authorizes publication or completion; the coordinator must
-also check its immutable target and current producer lease. See the
-[producer contract](../integrations/gallery-dl/README.md#metadata-only-extraction-for-enrichment).
+post's identity nor certifies publication or completion.
+
+The coordinator authenticates current Stash producer credentials against the
+job's recorded collection/root scope. Moving a collection cannot expose old
+checkpoints to a new root's credentials. Each attempt is bound to its producer;
+resuming on a new attempt preserves the original producer for already retained
+observations. Renewals and new checkpoint writes recheck eligibility, credentials
+and lease deadlines before commit. Exact acknowledgement replay can confirm an
+old write after its attempt expires without restoring that attempt's ownership.
+
+Only the current compact body is retained per job; small immutable receipts and
+record hashes preserve prior acknowledgements and provenance. Storage is bounded
+across jobs, including failed/cancelled work. Saving a checkpoint leaves the
+target pending and selected media metadata unchanged. Publication must still
+verify existing post identity and commit captures, job result and target completion
+together. See [checkpoint storage and lifecycle](native-schema.md#enrichment-jobs-and-checkpoint-ownership)
+and the [producer contract](../integrations/gallery-dl/README.md#metadata-only-extraction-for-enrichment).
 
 ## Completed file events
 

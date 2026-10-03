@@ -65,7 +65,7 @@ func managedArchiveJobWrite(ctx context.Context) error {
 
 func validJobTime(value time.Time) bool { return value.UnixMilli() > 0 && value.UTC().Year() <= 9999 }
 func validJobKind(kind string) bool {
-	return kind == models.ArchiveJobVerifyMedia || kind == models.ArchiveJobBackfillAlbum || kind == models.ArchiveJobTranslateText
+	return kind == models.ArchiveJobVerifyMedia || kind == models.ArchiveJobBackfillAlbum || kind == models.ArchiveJobTranslateText || kind == models.ArchiveJobEnrichPost
 }
 func validJobState(state string) bool {
 	return state == "queued" || state == "running" || state == "succeeded" || state == "failed" || state == "cancelled"
@@ -143,6 +143,9 @@ func (s *ArchiveJobStore) Submit(ctx context.Context, input models.ArchiveJobSub
 	if input.Kind == models.ArchiveJobTranslateText {
 		translationJobSubmissionGuard(ctx, input.RequestUUID)
 	}
+	if input.Kind == models.ArchiveJobEnrichPost {
+		enrichmentJobSubmissionGuard(ctx, input.RequestUUID)
+	}
 	var previous struct {
 		Digest string `db:"digest"`
 		Job    string `db:"job_uuid"`
@@ -182,6 +185,14 @@ func (s *ArchiveJobStore) Submit(ctx context.Context, input models.ArchiveJobSub
 		}
 	} else {
 		var active int
+		if input.Kind == models.ArchiveJobEnrichPost {
+			if err := dbWrapper.Get(ctx, &active, "SELECT count(*) FROM (SELECT 1 FROM archive_jobs WHERE kind='post.enrich' AND state IN ('queued','running') LIMIT ?)", archive.MaxEnrichmentJobs); err != nil {
+				return nil, err
+			}
+			if active >= archive.MaxEnrichmentJobs {
+				return nil, models.ErrArchiveJobCapacity
+			}
+		}
 		if err := dbWrapper.Get(ctx, &active, "SELECT count(*) FROM (SELECT 1 FROM archive_jobs WHERE state IN ('queued','running') LIMIT ?)", maxActive); err != nil {
 			return nil, err
 		}
@@ -327,6 +338,9 @@ WHERE j.uuid=? AND j.state='queued' AND j.available_at_ms<=? AND j.fence<j.max_a
 }
 
 func (s *ArchiveJobStore) claim(ctx context.Context, job *models.ArchiveJob, owner string, now time.Time, duration time.Duration) (*models.ArchiveJob, error) {
+	if job.Kind == models.ArchiveJobEnrichPost {
+		enrichmentJobAttemptGuard(ctx, job.UUID, job.Fence+1)
+	}
 	// Do not commit the running head without its attempt, even if a caller
 	// catches a later error and tries to commit unrelated domain writes.
 	complete := false
@@ -437,6 +451,9 @@ func (s *ArchiveJobStore) Finish(ctx context.Context, lease models.ArchiveJobLea
 	available := job.AvailableAt.UnixMilli()
 	if state == "retry" {
 		state, available = "queued", outcome.RetryAt.UnixMilli()
+		if job.Kind == models.ArchiveJobEnrichPost {
+			available = max(available, enrichmentRetryAt(job, now).UnixMilli())
+		}
 		if job.Fence >= int64(job.MaxAttempts) {
 			state, attempt = "failed", "failed"
 		}
@@ -503,7 +520,11 @@ func (s *ArchiveJobStore) Recover(ctx context.Context, now time.Time, limit int)
 		if job.Fence >= int64(job.MaxAttempts) {
 			state = "failed"
 		}
-		if _, err := dbWrapper.Exec(ctx, `UPDATE archive_jobs SET state=?,available_at_ms=?,owner_uuid=NULL,lease_until_ms=NULL,error_code='lease_expired',revision=revision+1,updated_at_ms=? WHERE uuid=?`, state, now.UnixMilli(), now.UnixMilli(), job.UUID); err != nil {
+		available := now.UnixMilli()
+		if job.Kind == models.ArchiveJobEnrichPost {
+			available = max(job.AvailableAt.UnixMilli(), enrichmentRetryAt(job, now).UnixMilli())
+		}
+		if _, err := dbWrapper.Exec(ctx, `UPDATE archive_jobs SET state=?,available_at_ms=?,owner_uuid=NULL,lease_until_ms=NULL,error_code='lease_expired',revision=revision+1,updated_at_ms=? WHERE uuid=?`, state, available, now.UnixMilli(), job.UUID); err != nil {
 			return 0, err
 		}
 	}

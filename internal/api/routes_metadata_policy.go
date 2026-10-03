@@ -122,6 +122,7 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Get("/enrichment-targets/{target}", rs.enrichmentTarget)
 	r.Get("/enrichment-targets/{target}/history", rs.enrichmentTargetHistory)
 	r.Put("/enrichment-targets/{target}/schedule", rs.scheduleEnrichmentTarget)
+	r.Post("/enrichment-targets/{target}/retry", rs.retryEnrichmentTarget)
 	r.Get("/enrichment-completions/{completion}", rs.enrichmentCompletion)
 	r.Get("/translation-requests/{request}", rs.translationRequest)
 	r.Get("/translation-requests/{request}/cache", rs.translationRequestCache)

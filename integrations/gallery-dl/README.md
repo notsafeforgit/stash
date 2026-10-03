@@ -1390,7 +1390,8 @@ neither kind creates native source-run coverage or successful media receipts.
 `stash_ingest.metadata_fetch.fetch(url, settings, resume=None, timeout=180,
 check=...)` runs one metadata lookup in an isolated instance of the pinned
 gallery-dl runtime. This is the extraction component for the native enrichment
-worker. The native enrichment queue, verified post publication and conversion
+worker. Native target/job binding and producer-owned checkpoint storage are
+implemented internally. Producer dispatch, verified post publication and conversion
 of the existing scheduled service are still pending. Calling this helper alone
 does not create a capture, complete a native job or import media.
 
@@ -1441,7 +1442,11 @@ checkpoint retains all earlier records and unresolved references. A pending
 child must remain explicit or have newly returned records for that URL and
 parent; retry cannot silently erase it. A shared Go/Python fixture verifies
 these semantics. This parser supplies no ingestion route or execution authority;
-native job binding and publication still require the coordinator.
+the internal native coordinator separately checks immutable job bindings,
+producer-owned attempts and current source eligibility. Its checkpoint store
+keeps one current body plus small acknowledgements and original per-record
+producer provenance across resumed attempts. No public producer route accepts
+these checkpoints yet, and verified capture publication remains pending.
 
 Temporary child failures retain the parent and discard that child's partial
 records. Persist the entire returned checkpoint before retrying its pending

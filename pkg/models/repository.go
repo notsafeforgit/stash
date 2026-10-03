@@ -57,6 +57,8 @@ type Repository struct {
 	EnrichmentWork              EnrichmentWorkReaderWriter
 	EnrichmentJob               EnrichmentJobReaderWriter
 	TranslationPolicy           TranslationPolicyReaderWriter
+	CatalogEnrichmentImport     CatalogEnrichmentImportReaderWriter
+	SourceEnrichmentReceipt     SourceEnrichmentReceiptReader
 	CatalogTranslationImport    CatalogTranslationImportReaderWriter
 	CatalogDocumentImport       CatalogDocumentImportReaderWriter
 	SourcePostLinks             SourcePostLinksReaderWriter

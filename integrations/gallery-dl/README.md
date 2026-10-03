@@ -1004,6 +1004,27 @@ references. Post evidence and shared results also have application read APIs;
 see [retained translations](../../docs/native-schema.md#retained-source-translations).
 Completion remains `imported:false` pending the remaining catalog migration.
 
+Map historical enrichment receipts with native schema 1000057 after the evidence
+pass:
+
+```sh
+stash-import-catalog-enrichment --snapshot /migration/prepared/CATALOG_ID \
+  --expected-sha256 MANIFEST_SHA256 --endpoint STASH_ORIGIN
+```
+
+The command uses the application API key and resumes the last committed source
+ordinal after an interrupted or lost response. Exit 0 means mapped (including a
+catalog without this optional family), exit 2 means review outcomes, and exit 1
+means failure or an unavailable response. Inspect
+`/api/v3/archive/catalog-snapshots/SNAPSHOT_UUID/enrichment-import/records`, or
+append `/ORDINAL` for the original values and native receipt reference.
+
+Original completion times and unresolved-child counts stay intact. Importing a
+historical receipt does not schedule a website request, invent a native worker
+attempt, or assert that all child metadata was retrieved. Queue/cooldown import
+and activation remain separate; `imported:false` still means the entire catalog
+migration is not complete. See [historical enrichment receipts](../../docs/native-schema.md#historical-enrichment-receipts).
+
 ## Frozen automation input
 
 Prepare the separate automation database from a consistent SQLite backup:

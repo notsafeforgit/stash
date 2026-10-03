@@ -22,6 +22,7 @@ from stash_ingest.catalog_media_import import main as media_main
 from stash_ingest.catalog_membership_import import CatalogMembershipClient, main as membership_main
 from stash_ingest.catalog_document_import import CatalogDocumentClient, main as document_main
 from stash_ingest.catalog_translation_import import CatalogTranslationClient, main as translation_main
+from stash_ingest.catalog_enrichment_import import CatalogEnrichmentClient, main as enrichment_main
 from stash_ingest.encoding import digest, encode
 from test_catalog_registry_import import registry_fixture
 from test_catalog_snapshot import CATALOG_ID, CAPTURED, catalog_fixture
@@ -75,6 +76,10 @@ def run():
             db.execute("INSERT INTO files(relpath,asset_id,state,first_observed,role) VALUES(?,?,'missing',?,'local')", (path, asset, CAPTURED))
             db.execute("INSERT INTO appearances(post_key,attachment_key,asset_id,source_relpath) VALUES('reddit:post:album',?,?,?)", (path, asset, path))
             db.execute("INSERT INTO sidecar_sources SELECT ?,content_sha256,document_id,'reddit:post:album',? FROM sidecar_documents WHERE document_id=1", (f"literal\\folder/{index}.nfo", CAPTURED))
+    with closing(sqlite3.connect(source)) as db, db:
+        db.execute("CREATE TABLE enrichment_receipts(post_key TEXT NOT NULL,version INTEGER NOT NULL,completed_at TEXT NOT NULL,details_json TEXT NOT NULL,PRIMARY KEY(post_key,version))")
+        db.execute("INSERT INTO enrichment_receipts VALUES('reddit:post:album',1,?,?)", (CAPTURED,
+                   '{"attachment_links_enriched":3,"unresolved_children":2}'))
     original = source.read_bytes()
     snapshot = directory / "snapshot"
     with patch("stash_ingest.catalog_snapshot.MAX_CHUNK_ROWS", 2):
@@ -145,6 +150,10 @@ def run():
         db.execute("UPDATE catalog_info SET value=? WHERE key='id'", ("c_" + "2" * 32,))
         db.execute("UPDATE observation_details SET payload_patch=? WHERE capture_id='capture-0'",
                    (json.dumps({"filename": "different", "num": 1}),))
+    execute(enrichment_main, args, 1)  # Completion committed; reply lost.
+    enriched = execute(enrichment_main, args)
+    assert enriched["mapped_records"] == 1 and enriched["review_records"] == 0 and enriched["imported"] is False
+    assert enriched == execute(enrichment_main, args)
     copied_snapshot = str(uuid.uuid4())
     copied = prepare(copied_source, directory / "copied", copied_snapshot, setup["source"], CAPTURED)
     copied_args = ["--snapshot", str(directory / "copied"), "--endpoint", setup["endpoint"], "--expected-sha256", copied["manifest_sha256"]]
@@ -160,6 +169,12 @@ def run():
     assert execute(membership_main, copied_args)["mapped_records"] == 55
     assert execute(document_main, copied_args)["mapped_records"] == 58
     assert execute(translation_main, copied_args)["mapped_records"] == 55
+    assert execute(enrichment_main, copied_args)["mapped_records"] == 1
+    enrichment_client = CatalogEnrichmentClient(setup["endpoint"])
+    enrichment_rows = enrichment_client.request("GET", f"/{setup['snapshot']}/enrichment-import/records", None, prepared["manifest_sha256"], "application/json")
+    detail = enrichment_client.request("GET", f"/{setup['snapshot']}/enrichment-import/records/{enrichment_rows[0]['ordinal']}", None, prepared["manifest_sha256"], "application/json")
+    assert detail["source_values"]["completed_at"] == CAPTURED
+    assert json.loads(detail["source_values"]["details_json"])["unresolved_children"] == 2
     translation_client = CatalogTranslationClient(setup["endpoint"])
     translation_rows = translation_client.request("GET", f"/{setup['snapshot']}/translation-import/records", None, prepared["manifest_sha256"], "application/json")
     copied_translations = translation_client.request("GET", f"/{copied_snapshot}/translation-import/records", None, copied["manifest_sha256"], "application/json")
@@ -198,10 +213,14 @@ def run():
         execute(main, flat_args)
         execute(document_main, flat_args, 1)  # Evidence mapping is a required predecessor.
         execute(translation_main, flat_args, 1)
+        execute(enrichment_main, flat_args, 1)
         assert execute(evidence_main, flat_args)["state"] == "mapped"
         result = execute(document_main, flat_args)
         assert result["state"] == "mapped" and result["processed_records"] == (1 if number == 3 else 0)
         assert result == execute(document_main, flat_args)
+        enriched = execute(enrichment_main, flat_args)
+        assert enriched["state"] == "mapped" and enriched["source_records"] == 0
+        assert enriched == execute(enrichment_main, flat_args)
         translated = execute(translation_main, flat_args)
         assert translated["state"] == "mapped" and translated["processed_records"] == (1 if number == 3 else 0)
         assert translated == execute(translation_main, flat_args)

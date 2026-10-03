@@ -19,8 +19,9 @@ shared download/enrichment service reservations are implemented, including linke
 download services, typed service failure reporting and bounded download preference
 across collections. Dispatch across multiple profiles and automatic discovery of
 permitted metadata collections are implemented. Legacy enrichment preparation
-now validates queue/progress/receipt semantics against the frozen inputs; native
-queue mapping and activation remain next.
+validates queue/progress semantics against the frozen inputs, and historical
+catalog receipts now have native import and inspection. Legacy queue mapping
+and activation remain next.
 Native UI, live host/n8n conversion, compatibility removal, coordinated
 backup/export/restore, production cutover and retirement remain major release
 gates. The phase table below records that distinction; commit count is not a
@@ -49,7 +50,7 @@ On 2026-10-03, the owner authorized pruning superseded goal artifacts. Removing
 their intermediate database paths are no longer retained. The original
 `native-archive-rehearsal-20260930/compatible-snapshot.sqlite`, frozen import
 inputs remain under `.local/`. The latest verified native database is now in
-`native-source-fairness-rehearsal-20261003/` at schema 1000056;
+`native-enrichment-history-rehearsal-20261003/` at schema 1000057;
 `.local/native-rehearsal-current.json` records its reconciliation receipt. The
 superseded copies are removed after their replacements pass comparison. After
 the schema-56 checks finished, pruning Go cache entries unused for more than
@@ -121,7 +122,7 @@ the schema-56 checks finished, pruning Go cache entries unused for more than
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
 | 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries and metadata relationship targets, native account/ownership storage and reviewed consolidation, shared post/profile/capture storage, ordered attachment manifests, audited media associations, reviewed source-list selection, and source-gallery synchronization with manual membership intent are implemented. Scalar and relationship field choices protect explicit and preserved metadata. Revisioned logical roots and source collections retain capture/manual-intake provenance; captured publisher choices connect source evidence to accounts independently of depicted performers. Verified byte identities and immutable per-file verification history now use persistent file-generation guards. Producer identity matching, policy resolution, review APIs/UI and remaining domain services are in progress. |
 | 2 Ingestion and producer adapter | In progress: scoped producer tokens, Reddit/Twitter capture batches and durable receipts are implemented. Verified preparation uses the shared scanner; file/media publication checks descriptors, generations and persistent path removals, reuses concurrent scans, and rejects ambiguous verified-byte owners. Intake publication connects collection provenance, selected source media, attachment evidence and album galleries while preserving explicit choices. Persistent jobs have coalesced submissions, fenced leases, retry/cancellation/recovery, and atomic domain/result publication. File-completion admission now queues a durable worker that checkpoints registration, generates previews and delivers retryable media/gallery hooks; scoped status reports actual completion. Native collection policies now apply typed metadata and explicit performer defaults in intake and ordinary scans, with dry preview and guarded apply. Source-run coordination now coalesces missing date ranges, fences worker ownership, retains checkpoints and deferrals, and excludes overlapping destinations. A supported Python producer package now provides retained-payload outboxes, fenced delivery, durable receipts, backoff and review. The gallery-dl SDK now queues source evidence before download, verifies root/prefix and lease ownership, holds shared destination locks, and queues flushed final files before archive acknowledgement. Reddit single-media evidence and original Twitter attachment membership are covered. The producer now coalesces offline source requests, freezes submissions for replay, retains caller tickets and validates native admission receipts. Claimed Reddit/Twitter windows use precise source timestamps and parent context, with directory checks before postprocessor callbacks. Reviewed portable profiles now fingerprint settings/assets and execute one claimed attempt with concurrent outbox delivery and lost-finish recovery. A local converter now stages ordered, source-scoped profiles from the host and n8n JSON layers without copying website credentials. Scoped dispatch discovers eligible runs with durable pagination/backoff, and a separate n8n image packages the pinned worker runtime. A local profile list now rotates download and metadata work, automatically discovers permitted metadata collections, and recovers saved metadata delivery before loading website profiles. Staged host Twitter/Reddit launchers preserve saved lists, modes, date filters and full-history profiles through durable caller snapshots. Staged n8n backfill calls now check permanent history before source admission, preserve original completion proof, and expose pending results to converted workflow waits. Live image/profile activation, operational-history and policy migration, general durable edit notifications, additional source adapters and recovery caller conversion remain. |
-| 3 Catalog importer and full-copy reconciliation | Permanent backfill decisions, retained scan journals/reviewed recovery activation, performer UUIDs and saved ownership, and account/catalog registry imports are implemented and rehearsed against full copies. All 1,697 frozen catalog bodies have bounded snapshot receipt and native mappings for posts/profiles/captures, account/post relationships, captured publishers, attachment lists, assets/files/appearances, collection memberships, retained documents and translation results. Historical album backfill is resumable and rehearsed. Original evidence, replay receipts and unresolved conflicts are retained. Shared native translation request/cache/target storage, bounded execution, provider workers and application inspection/control are implemented. Automation snapshot preparation preserves all ten operational families and has passed full-source reconciliation. Resumable native receipt, translation request/cache/target mapping and reviewed activation are implemented. The saved-plan bulk client has activated 324,169 imported holds in a full-copy rehearsal with lost-response recovery and independent reconciliation. Automatic capture scheduling now records revisioned collection-policy decisions with its requests and targets in the capture transaction. Native enrichment targets preserve revisioned scheduling choices and exact capture-completion evidence, with application inspection/control. Internal execution binds jobs to exact source/target revisions, authenticates each attempt producer and retains compact checkpoints with original observation provenance. Verified publication now uses native capture, publisher, album and translation services and commits record associations with target/job completion. Completed staging is verified and released atomically, retaining native captures, acknowledgement/provenance rows and unresolved references. Scoped enrichment routes and the Python transport/lease client now expose those services, with controlled failure replay, bounded checkpoint transfer and exact source-number preservation. Selected-job execution now journals stable claims, returned checkpoints and pending delivery intents in producer outbox schema 8; reviewed metadata-only profiles and delivery-only recovery are implemented. Collection-scoped dispatch now discovers admitted retries before new targets, with durable producer cursors/backoff and pagination past incompatible URLs. Native server maintenance recovers expired attempts and cancels stale work without discarding checkpoints. Native shared service reservations and cooldowns now coordinate downloads with enrichment, including fenced reservations before contacting newly discovered child services. Download-side linked-service reservations, typed failures, bounded download preference and cooperative source turns are implemented. Persistent worker/profile rotation and automatic collection discovery are also implemented. Additional download adapters and legacy queue mapping remain. Existing policy migration, other histories and operational families, validated source routing, review resolution, global reconciliation and cutover import remain unfinished. |
+| 3 Catalog importer and full-copy reconciliation | Permanent backfill decisions, retained scan journals/reviewed recovery activation, performer UUIDs and saved ownership, and account/catalog registry imports are implemented and rehearsed against full copies. All 1,697 frozen catalog bodies have bounded snapshot receipt and native mappings for posts/profiles/captures, account/post relationships, captured publishers, attachment lists, assets/files/appearances, collection memberships, retained documents and translation results. Historical album backfill is resumable and rehearsed. Original evidence, replay receipts and unresolved conflicts are retained. Shared native translation request/cache/target storage, bounded execution, provider workers and application inspection/control are implemented. Automation snapshot preparation preserves all ten operational families and has passed full-source reconciliation. Resumable native receipt, translation request/cache/target mapping and reviewed activation are implemented. The saved-plan bulk client has activated 324,169 imported holds in a full-copy rehearsal with lost-response recovery and independent reconciliation. Automatic capture scheduling now records revisioned collection-policy decisions with its requests and targets in the capture transaction. Native enrichment targets preserve revisioned scheduling choices and exact capture-completion evidence, with application inspection/control. Internal execution binds jobs to exact source/target revisions, authenticates each attempt producer and retains compact checkpoints with original observation provenance. Verified publication now uses native capture, publisher, album and translation services and commits record associations with target/job completion. Completed staging is verified and released atomically, retaining native captures, acknowledgement/provenance rows and unresolved references. Scoped enrichment routes and the Python transport/lease client now expose those services, with controlled failure replay, bounded checkpoint transfer and exact source-number preservation. Selected-job execution now journals stable claims, returned checkpoints and pending delivery intents in producer outbox schema 8; reviewed metadata-only profiles and delivery-only recovery are implemented. Collection-scoped dispatch now discovers admitted retries before new targets, with durable producer cursors/backoff and pagination past incompatible URLs. Native server maintenance recovers expired attempts and cancels stale work without discarding checkpoints. Native shared service reservations and cooldowns now coordinate downloads with enrichment, including fenced reservations before contacting newly discovered child services. Download-side linked-service reservations, typed failures, bounded download preference and cooperative source turns are implemented. Persistent worker/profile rotation and automatic collection discovery are also implemented. Historical catalog enrichment receipts now have resumable native import and application inspection, preserving the old assertion without creating native attempts. Additional download adapters and legacy queue mapping remain. Existing policy migration, other histories and operational families, validated source routing, review resolution, global reconciliation and cutover import remain unfinished. |
 | 4 Native UI and client conversion | Not yet implemented |
 | 5 Compatibility removal and packaging | Preview packaging isolated and old compatibility gate replaced by current v3 operation/plugin-contract checks. Old UI/API/plugin adapters and config bridge still require conversion/removal. |
 | 6 Backup and cutover rehearsal | Not yet implemented |
@@ -4945,3 +4946,63 @@ activation and coordinated cutover inputs still need implementation. The broader
 policy/operational migration, download adapters, UI, host/n8n conversion,
 compatibility removal, backup/export/restore, performance and cutover gates remain
 unchanged. The complete transition goal remains active.
+
+
+## Historical catalog enrichment receipt import
+
+Schema 1000057 retains historical enrichment assertions in native receipt storage
+with a manifest-bound import ledger and application inspection API. Batches of
+50 records resume from the committed source ordinal, including after a lost HTTP
+response. Original completion timestamps, version, enriched-link counts and
+unresolved-child counts are retained. Each receipt binds the mapped post to the
+catalog's migrated collection revision 1; later collection edits/retirement do
+not rewrite that scope. Invalid or unsupported receipts, unmapped posts and
+forgotten posts retain review outcomes and their source values.
+
+Historical completion does not create a native job, attempt, target or capture,
+and does not claim exhaustive child coverage or particular capture IDs. Imported
+source provenance remains distinct by catalog. The new client is
+`stash-import-catalog-enrichment`; native post/receipt readers provide bounded
+inspection. Ordinary backup includes these tables and anonymisation removes
+them. Startup checks progress, scope, deterministic identity, retained counts and
+both historical completion and import timestamps.
+
+Focused SQLite/API tests cover interrupted batches, stale checkpoints, retired
+collection scope, exact times, unresolved children, forgotten posts, caught-write
+rollback, migration collisions and startup rejection of altered receipt facts.
+The real Python CLI/native HTTP fixture recovers a lost committed completion
+response, inspects retained source values, handles absent legacy receipt tables
+and rejects invalid requests. All 371 producer tests passed in 118.269 seconds.
+The full backend gate passed in 823.868 seconds with zero lint
+issues (API 677.598, ingestion 607.518, SQLite 796.750 seconds). The
+final stricter import-time validation passed focused checks in 28.368 seconds,
+final lint and a fresh full-database open in 131.571 seconds.
+
+The isolated full-copy import mapped all 16,186 receipts across 1,697 frozen
+catalogs, with zero review outcomes, in 33.482 seconds
+and 2,003 bounded transactions. Every terminal cursor replay matched. Source
+counts include 4,657 enriched attachment links and zero unresolved children;
+fixtures separately preserve nonzero unresolved counts. This maps historical
+assertions only and does not change the unresolved 5,182 later queue completions
+whose catalog snapshots predate their proof.
+
+Independent comparison took 275.379 seconds: all 224 pre-existing
+tables, retained schema objects, prior migration history and sequences matched.
+All 16,186 receipt identities, timestamps, counters and post/collection references
+were independently checked against the frozen source rows. Integrity was clean
+with zero foreign-key violations. Post, collection/post and receipt-source
+lookups use their targeted indexes. The native copy is 18,809,282,560
+bytes, about 12.3 MiB larger than its predecessor.
+
+Evidence is under `.local/native-enrichment-history-rehearsal-20261003/`. After
+validation, retiring the superseded schema-56 database and derived files reclaimed
+18,796,515,328 bytes; 133.4 GiB was free
+under the 50 GiB host reserve. The current pointer names the schema-57 copy;
+frozen inputs and the original compatible snapshot remain. The preceding
+`2f2d91453` checkpoint passed CI build, lint and preview-image publication.
+
+Legacy queue/cooldown/progress mapping, staged checkpoint conversion and reviewed
+activation are next. The broader policy/operational migration, download adapters,
+native UI, host/n8n conversion, compatibility removal, backup/export/restore,
+performance and coordinated cutover remain required. Production and `develop`
+remain unchanged, and the complete transition goal is active.

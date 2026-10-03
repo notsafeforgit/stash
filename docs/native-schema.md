@@ -1697,3 +1697,38 @@ outbox schema 10 adds rotation across local download/metadata profiles and
 permitted collections without changing the native database schema. Legacy
 scheduling import and live conversion remain required before activating
 production schedules.
+
+
+## Historical enrichment receipts
+
+Schema 1000057 adds `source_enrichment_receipts`, `catalog_enrichment_imports`
+and `catalog_enrichment_records`. The manifest-bound importer reads the optional
+legacy `enrichment_receipts` family after native post evidence has been mapped.
+Transactions use 50-record batches and a 16 MiB input budget, committing
+receipts and their cursor together. Exact replay returns the existing
+progress; stale cursors or changed manifest digests conflict.
+
+A receipt preserves its source version, exact completion timestamp, enriched
+attachment-link count and unresolved-child count. It binds the mapped native post
+to the catalog's historical collection revision 1, even if that collection is
+later edited or retired. The `catalog-enrichment-v1` policy identifies a legacy
+worker assertion. It does not imply complete child coverage, identify particular
+captures, or claim execution by a native worker. No jobs, targets, attempts,
+captures, post revisions or Stash media fields are created or changed.
+
+Malformed/unsupported receipts, unmapped posts and forgotten posts retain
+review outcomes and their original source values without a native receipt.
+Receipt identity includes its source/catalog, native scope and assertion; equal
+values in different catalogs do not silently acquire shared provenance. The
+snapshot importer currently accepts one frozen snapshot per source/catalog.
+Ordinary backups include the receipts and original source ledger; anonymisation
+removes both. Startup checks progress, source scope, receipt identity, counts and
+original timestamps. Catalog-wide completion remains `imported:false`.
+
+Application APIs expose resumable progress and source records at
+`/api/v3/archive/catalog-snapshots/{snapshot}/enrichment-import`, its `/records`
+list and `/records/{ordinal}` detail. Native receipts are available at
+`/api/v3/archive/enrichment-receipts/{receipt}` and
+`/api/v3/archive/posts/{post}/enrichment-receipts` (UUID cursor, limit 1–100).
+These are historical inspection/import routes. Queue/cooldown migration and
+reviewed activation are separate operations.

@@ -20,6 +20,7 @@ import (
 
 func removeSourceFairnessSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeCatalogEnrichmentSchema(t, raw)
 	_, err := raw.Exec(`DROP TRIGGER source_service_turns_bind; DROP TRIGGER source_enrichment_waiter_end;
  DROP TABLE source_enrichment_waiter_scopes; DROP TABLE source_enrichment_waiters; DROP TABLE source_service_turns;
  DELETE FROM native_migration_history WHERE version=1000056;`)

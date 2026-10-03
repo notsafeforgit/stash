@@ -190,12 +190,16 @@ func sourceSignature(domain string, value interface{}) (string, error) {
 }
 
 func readSourcePayload(ctx context.Context, digest string) (json.RawMessage, error) {
+	return readSourcePayloadUsing(func(out any, query string, args ...any) error { return dbWrapper.Get(ctx, out, query, args...) }, digest)
+}
+
+func readSourcePayloadUsing(get func(any, string, ...any) error, digest string) (json.RawMessage, error) {
 	var row struct {
 		Encoding string `db:"encoding"`
 		Length   int    `db:"byte_length"`
 		Data     []byte `db:"data"`
 	}
-	if err := dbWrapper.Get(ctx, &row, "SELECT encoding, byte_length, data FROM source_payloads WHERE digest = ?", digest); err != nil {
+	if err := get(&row, "SELECT encoding, byte_length, data FROM source_payloads WHERE digest = ?", digest); err != nil {
 		return nil, err
 	}
 	if row.Length < 2 || row.Length > archive.MaxSourcePayloadBytes || len(row.Data) > archive.MaxSourcePayloadBytes {
@@ -469,12 +473,18 @@ func (r sourceCaptureRow) resolve() (*models.SourceCapture, error) {
 }
 
 func (s *SourceEvidenceStore) FindCapture(ctx context.Context, value string) (*models.SourceCapture, error) {
+	return findSourceCapture(
+		func(out any, query string, args ...any) error { return dbWrapper.Get(ctx, out, query, args...) },
+		func(out any, query string, args ...any) error { return dbWrapper.Select(ctx, out, query, args...) }, value)
+}
+
+func findSourceCapture(get func(any, string, ...any) error, selectRows func(any, string, ...any) error, value string) (*models.SourceCapture, error) {
 	id, err := archiveUUID(value)
 	if err != nil {
 		return nil, err
 	}
 	var row sourceCaptureRow
-	if err := dbWrapper.Get(ctx, &row, "SELECT "+sourceCaptureColumns+` FROM source_captures c
+	if err := get(&row, "SELECT "+sourceCaptureColumns+` FROM source_captures c
 JOIN source_post_revisions r ON r.post_uuid = c.post_uuid AND r.uuid = c.revision_uuid WHERE c.uuid = ?`, id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -489,11 +499,11 @@ JOIN source_post_revisions r ON r.post_uuid = c.post_uuid AND r.uuid = c.revisio
 		return nil, errors.New("unsupported stored source capture structure")
 	}
 	payload := &models.SourceCapturePayload{Profiles: []models.SourceProfileBody{}, Refs: []models.SourceProfileReference{}}
-	payload.Shared, err = readSourcePayload(ctx, row.BodyDigest)
+	payload.Shared, err = readSourcePayloadUsing(get, row.BodyDigest)
 	if err != nil {
 		return nil, err
 	}
-	payload.Patch, err = readSourcePayload(ctx, row.PatchDigest)
+	payload.Patch, err = readSourcePayloadUsing(get, row.PatchDigest)
 	if err != nil {
 		return nil, err
 	}
@@ -504,7 +514,7 @@ JOIN source_post_revisions r ON r.post_uuid = c.post_uuid AND r.uuid = c.revisio
 		Namespace string `db:"namespace"`
 		Digest    string `db:"payload_digest"`
 	}
-	if err := dbWrapper.Select(ctx, &refs, `SELECT r.part, r.path, r.profile_hash, p.namespace, p.payload_digest
+	if err := selectRows(&refs, `SELECT r.part, r.path, r.profile_hash, p.namespace, p.payload_digest
 FROM source_capture_profiles r JOIN source_profile_bodies p ON p.hash = r.profile_hash
 WHERE r.capture_uuid = ? ORDER BY r.part, r.path LIMIT 1025`, id); err != nil {
 		return nil, err
@@ -516,7 +526,7 @@ WHERE r.capture_uuid = ? ORDER BY r.part, r.path LIMIT 1025`, id); err != nil {
 	for _, ref := range refs {
 		payload.Refs = append(payload.Refs, models.SourceProfileReference{Part: ref.Part, Path: ref.Path, Hash: ref.Hash})
 		if !loaded[ref.Hash] {
-			body, err := readSourcePayload(ctx, ref.Digest)
+			body, err := readSourcePayloadUsing(get, ref.Digest)
 			if err != nil {
 				return nil, err
 			}

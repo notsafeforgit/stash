@@ -441,9 +441,15 @@ result and target completion together. Ordinary job success cannot bypass that
 proof. Exact completion replay survives expiry and later source edits without
 applying a new policy. Unresolved external references remain explicit limitations.
 
-Publication currently retains the compact body for integrity/replay. Verified
-cleanup, public worker routes, source scheduling and additional post identity
-adapters remain transition work. See
+Successful publication verifies and releases the compact staging body atomically,
+retaining native captures, acknowledgement/provenance rows, unresolved references
+and a versioned integrity proof. Failed/cancelled work retains staging. Older
+publications keep their bodies through migration until the scoped internal
+`ReleaseCheckpoint` operation verifies them. A null `CheckpointHead` with a
+publication/release receipt means completed staging was released, not that the
+observations disappeared. Exact acknowledgement and completion replays still work.
+Public worker routes, source scheduling and additional post identity adapters
+remain transition work. See [staging release](native-schema.md#completed-enrichment-staging-release),
 [publication](native-schema.md#verified-enrichment-publication),
 [checkpoint storage and lifecycle](native-schema.md#enrichment-jobs-and-checkpoint-ownership)
 and the [producer contract](../integrations/gallery-dl/README.md#metadata-only-extraction-for-enrichment).

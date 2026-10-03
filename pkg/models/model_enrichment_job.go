@@ -81,6 +81,25 @@ type EnrichmentPublishedRecord struct {
 	CaptureUUID string `json:"capture_uuid" db:"capture_uuid"`
 }
 
+type EnrichmentReference struct {
+	URL    string `json:"url"`
+	Parent int    `json:"parent"`
+	Depth  int    `json:"depth"`
+	Reason string `json:"reason"`
+}
+
+// Releasing staging preserves native captures, original acknowledgement hashes
+// and unresolved references. The proof binds those retained records together;
+// it is not a promise that the original compact transcript can be reconstructed.
+type EnrichmentCheckpointRelease struct {
+	JobUUID         string                `json:"job_uuid" db:"job_uuid"`
+	Version         int                   `json:"version" db:"version"`
+	ProofSHA256     string                `json:"proof_sha256" db:"proof_sha256"`
+	CheckpointBytes int                   `json:"checkpoint_bytes" db:"checkpoint_bytes"`
+	CreatedAt       time.Time             `json:"created_at" db:"created_at"`
+	Unresolved      []EnrichmentReference `json:"unresolved" db:"-"`
+}
+
 type EnrichmentJobReaderWriter interface {
 	Bind(context.Context, string, time.Time) error
 	Binding(context.Context, string) (*EnrichmentJobBinding, error)
@@ -95,4 +114,6 @@ type EnrichmentJobReaderWriter interface {
 	Publish(context.Context, EnrichmentJobLease, int, string, []string, time.Time) (*EnrichmentPublication, error)
 	Publication(context.Context, string) (*EnrichmentPublication, error)
 	PublishedRecords(context.Context, string, int, int) ([]EnrichmentPublishedRecord, error)
+	ReleaseCheckpoint(context.Context, string, time.Time) (*EnrichmentCheckpointRelease, error)
+	CheckpointRelease(context.Context, string) (*EnrichmentCheckpointRelease, error)
 }

@@ -22,7 +22,10 @@ func TestEnrichmentPublicationMigrationPreservesStagedWorkAndRejectsUnverifiable
 			defer raw.Close()
 			// The schema-52 addition changes no existing definition: remove only
 			// its new objects to restore the exact previous layout with live data.
-			_, err = raw.Exec(`DROP TRIGGER enrichment_job_success;
+			_, err = raw.Exec(`DROP TRIGGER enrichment_checkpoint_published_delete;
+ DROP TABLE enrichment_checkpoint_releases;
+ DELETE FROM native_migration_history WHERE version=1000053;
+ DROP TRIGGER enrichment_job_success;
  DROP TABLE enrichment_published_records; DROP TABLE enrichment_publications;
  DELETE FROM native_migration_history WHERE version=1000052;
  UPDATE schema_migrations SET version=1000051;`)

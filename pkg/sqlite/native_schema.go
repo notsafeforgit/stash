@@ -514,12 +514,17 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 			}
 		}
 		if version >= NativeSchemaBaseline+51 {
-			if err := validateEnrichmentJobSchema(conn); err != nil {
+			if version >= NativeSchemaBaseline+53 {
+				if err := validateEnrichmentReleaseSchema(conn); err != nil {
+					return err
+				}
+			}
+			if err := validateEnrichmentJobSchema(conn, version >= NativeSchemaBaseline+53); err != nil {
 				return err
 			}
 		}
 		if version >= NativeSchemaBaseline+52 {
-			if err := validateEnrichmentPublicationSchema(conn); err != nil {
+			if err := validateEnrichmentPublicationSchema(conn, version >= NativeSchemaBaseline+53); err != nil {
 				return err
 			}
 		}

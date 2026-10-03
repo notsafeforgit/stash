@@ -1496,9 +1496,9 @@ producer-owned lease and unchanged, eligible target/source binding.
 Admission permits at most 64 active enrichment jobs. Each job permits eight
 attempts and 128 checkpoint revisions; transcript limits remain 32 MiB and 1,024
 records. `enrichment_checkpoint_usage` enforces a 2 GiB total staging budget,
-including bodies retained by failed, cancelled or published jobs. Exhaustion
-refuses new storage rather than discarding evidence. Safe body cleanup after
-publication remains pending. Ordinary database backups retain these records;
+including bodies retained by failed, cancelled or older published jobs. Exhaustion
+refuses new storage rather than discarding evidence. Verified publication now
+releases completed staging as described below. Ordinary database backups retain these records;
 anonymisation removes them. Startup validates bindings, provenance, record hashes,
 checkpoint histories and exact storage accounting.
 
@@ -1512,7 +1512,7 @@ from continuing, but automatic cancellation of those stale jobs remains pending.
 This coordinator has no public producer route or dispatch worker yet. Checkpoint
 acceptance verifies the transcript and execution ownership. Publication is the
 separate operation below that verifies post identity and commits native captures.
-Shared source cooldowns/fairness, checkpoint cleanup and legacy queue conversion
+Shared source cooldowns/fairness and legacy queue conversion
 remain required before activation.
 
 ## Verified enrichment publication
@@ -1560,7 +1560,38 @@ Migration preserves queued, running, failed and cancelled schema-51 work; a
 schema-51 success assertion is refused because that schema had no verified
 publication path. Backup retains publication/provenance; anonymisation removes it.
 
-Current compact checkpoint bodies remain retained after publication. Releasing
-that staging storage requires a separate, verified cleanup operation before
-enrichment dispatch is enabled. Public worker routes, shared source scheduling,
+Schema 1000053 adds verified staging release below. Public worker routes, shared source scheduling,
 remaining identity adapters and legacy queue conversion are still unfinished.
+
+## Completed enrichment staging release
+
+Schema 1000053 adds `enrichment_checkpoint_releases`. The internal publication
+coordinator verifies the saved transcript against every published native capture,
+then releases its body in the same transaction as successful publication. Storage
+accounting decreases only when that deletion commits. Failed, cancelled, running
+and unpublished jobs keep their evidence and continue counting toward the limit.
+
+Each release retains the original byte count, timestamp, unresolved references
+(URL, parent record ordinal, depth and reason), and a versioned SHA-256 proof.
+The proof binds immutable job arguments, publication and checkpoint receipts,
+original record digests/producer associations, and native capture signatures.
+Source payloads remain in the shared native capture/profile stores. Small original
+acknowledgements, observation attribution and record-to-capture associations remain
+unchanged. This releases intermediate encoding choices; it does not promise to
+reconstruct the exact compact transcript after cleanup.
+
+The migration creates the table without deleting any older staging. The scoped
+internal `ReleaseCheckpoint` operation verifies older successful publications
+before releasing them; it needs current access to the job's recorded source/root
+scope, without claiming a new attempt or requiring an expired lease. Publication
+and checkpoint acknowledgement replays continue returning their original receipts.
+`CheckpointHead` returns null after release; `CheckpointRelease`, publication
+status and published records describe the retained result and unresolved links.
+
+Startup requires either the original staging body or a valid release for every
+publication. It rechecks the proof, bounded native payloads/profile references,
+post identifiers, collection provenance, receipt histories and storage accounting
+before opening a writable connection. A missing or altered release, reference,
+capture association or payload is rejected. Ordinary database backups retain
+releases and their native evidence; anonymisation removes both. Releasing staging
+makes SQLite pages reusable; it does not vacuum the database or delete media.

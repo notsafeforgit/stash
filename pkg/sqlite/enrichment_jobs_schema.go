@@ -11,7 +11,7 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-func validateEnrichmentJobSchema(conn *sqlx.DB) error {
+func validateEnrichmentJobSchema(conn *sqlx.DB, releases bool) error {
 	for _, object := range []struct{ name, kind string }{
 		{"enrichment_job_targets", "table"}, {"enrichment_job_attempts", "table"},
 		{"enrichment_checkpoint_receipts", "table"}, {"enrichment_checkpoints", "table"},
@@ -70,6 +70,12 @@ func validateEnrichmentJobSchema(conn *sqlx.DB) error {
 	if err := validateEnrichmentJobArguments(conn); err != nil {
 		return err
 	}
+	receiptHead := "enrichment_checkpoints"
+	if releases {
+		receiptHead = `(SELECT job_uuid,revision FROM enrichment_checkpoints UNION ALL
+ SELECT p.job_uuid,p.checkpoint_revision revision FROM enrichment_publications p
+ JOIN enrichment_checkpoint_releases x ON x.job_uuid=p.job_uuid)`
+	}
 	if err := conn.Get(&invalid, `SELECT
  (SELECT count(*) FROM enrichment_checkpoint_usage)!=1
  OR NOT EXISTS(SELECT 1 FROM enrichment_checkpoint_usage WHERE singleton=1 AND byte_size=coalesce((SELECT sum(byte_size) FROM enrichment_checkpoints),0)
@@ -79,7 +85,7 @@ func validateEnrichmentJobSchema(conn *sqlx.DB) error {
   OR h.revision!=(SELECT max(revision) FROM enrichment_checkpoint_receipts p WHERE p.job_uuid=h.job_uuid)
   OR h.byte_size!=length(CAST(h.body AS BLOB)) OR h.byte_size NOT BETWEEN 1 AND 33554432
   OR r.record_count!=(SELECT count(*) FROM enrichment_checkpoint_records p WHERE p.job_uuid=h.job_uuid))
- OR EXISTS(SELECT 1 FROM enrichment_checkpoint_receipts r LEFT JOIN enrichment_checkpoints h ON h.job_uuid=r.job_uuid
+ OR EXISTS(SELECT 1 FROM enrichment_checkpoint_receipts r LEFT JOIN `+receiptHead+` h ON h.job_uuid=r.job_uuid
   LEFT JOIN enrichment_checkpoint_receipts previous ON previous.job_uuid=r.job_uuid AND previous.revision=r.revision-1
   LEFT JOIN enrichment_job_attempts a ON a.job_uuid=r.job_uuid AND a.fence=r.fence
   WHERE h.job_uuid IS NULL OR a.job_uuid IS NULL OR r.revision NOT BETWEEN 1 AND h.revision

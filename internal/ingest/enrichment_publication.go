@@ -27,6 +27,9 @@ func (c *EnrichmentCoordinator) Publish(ctx context.Context, token string, lease
 			if err != nil {
 				return err
 			}
+			if _, err := c.Service.Repo.EnrichmentJob.ReleaseCheckpoint(ctx, lease.JobUUID, c.Now()); err != nil {
+				return err
+			}
 			current, err := c.Service.Repo.ArchiveJob.Find(ctx, lease.JobUUID)
 			if err != nil {
 				return err
@@ -103,6 +106,9 @@ func (c *EnrichmentCoordinator) Publish(ctx context.Context, token string, lease
 		if err != nil {
 			return err
 		}
+		if _, err := c.Service.Repo.EnrichmentJob.ReleaseCheckpoint(ctx, lease.JobUUID, c.Now()); err != nil {
+			return err
+		}
 		after, err := c.Service.Repo.ArchiveJob.Find(ctx, lease.JobUUID)
 		if err != nil {
 			return err
@@ -135,4 +141,39 @@ func (c *EnrichmentCoordinator) Publication(ctx context.Context, token, id strin
 		return err
 	})
 	return result, err
+}
+
+func (c *EnrichmentCoordinator) CheckpointRelease(ctx context.Context, token, id string) (*models.EnrichmentCheckpointRelease, error) {
+	var result *models.EnrichmentCheckpointRelease
+	err := c.Service.Repo.WithReadTxn(ctx, func(ctx context.Context) error {
+		if _, _, _, err := c.allowed(ctx, token, id); err != nil {
+			return err
+		}
+		var err error
+		result, err = c.Service.Repo.EnrichmentJob.CheckpointRelease(ctx, id)
+		return err
+	})
+	return result, err
+}
+
+// Older verified publications retain staging through migration. Cleanup can
+// release them without a new extraction or ownership of an expired worker lease.
+func (c *EnrichmentCoordinator) ReleaseCheckpoint(ctx context.Context, token, id string) (*models.EnrichmentCheckpointRelease, error) {
+	var result *models.EnrichmentCheckpointRelease
+	err := c.Service.Repo.WithTxn(ctx, func(ctx context.Context) error {
+		_, job, _, err := c.allowed(ctx, token, id)
+		if err != nil {
+			return err
+		}
+		result, err = c.Service.Repo.EnrichmentJob.ReleaseCheckpoint(ctx, id, c.Now())
+		if err != nil {
+			return err
+		}
+		c.guard(ctx, token, job, nil)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }

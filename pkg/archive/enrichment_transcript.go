@@ -29,12 +29,7 @@ type EnrichmentRecord struct {
 	ObservedAt string         `json:"observed_at"`
 }
 
-type EnrichmentReference struct {
-	URL    string `json:"url"`
-	Parent int    `json:"parent"`
-	Depth  int    `json:"depth"`
-	Reason string `json:"reason"`
-}
+type EnrichmentReference = models.EnrichmentReference
 
 // EnrichmentTranscript preserves the producer's compact records and original
 // observation times. Validation grants no authority to publish a post or finish

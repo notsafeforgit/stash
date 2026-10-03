@@ -1450,9 +1450,13 @@ saved revision/digest, verifies every source identity against the existing targe
 post and commits native captures, target completion and job outcome together.
 Only supported post adapters can publish; retained unresolved references remain
 explicit limitations. Equal observations within a job can share captures without
-losing their record associations. No public producer route accepts these
-checkpoints yet. Shared source scheduling and verified checkpoint cleanup remain
-required before the worker is activated.
+losing their record associations. Successful publication now releases verified
+staging atomically while preserving native captures, original acknowledgements,
+producer attribution and unresolved references. A release receipt distinguishes
+completed cleanup from a job without a checkpoint. Older publications retain
+staging through migration until verified cleanup. No public producer route
+accepts these checkpoints yet. Shared source scheduling, additional identity
+adapters and producer dispatch remain required before activation.
 
 Temporary child failures retain the parent and discard that child's partial
 records. Persist the entire returned checkpoint before retrying its pending

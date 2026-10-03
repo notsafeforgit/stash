@@ -430,8 +430,13 @@ observing producer and reuses capture/publisher/album/translation services in th
 same transaction as target/job completion. Generic success cannot bypass it.
 Keep publication replay independent of current source edits and normalization;
 new publication must recheck its original deadline and current credentials/source
-through commit. Public worker routes, checkpoint cleanup, additional post
-adapters, shared cooldown/fairness and stale-job maintenance remain pending. See
+through commit. Schema 1000053 releases verified completed staging atomically
+with publication, retaining native captures, original receipts/provenance,
+unresolved references and a versioned integrity proof. Older publications retain
+their bodies until verified release. Failed/cancelled evidence stays staged.
+Preserve acknowledgement replay, exact storage accounting and validation before
+opening a writer. Public worker routes, additional post adapters, shared
+cooldown/fairness and stale-job maintenance remain pending. See
 [enrichment work](docs/native-schema.md#post-enrichment-targets-and-completion)
 and [metadata-only extraction](integrations/gallery-dl/README.md#metadata-only-extraction-for-enrichment).
 

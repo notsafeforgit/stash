@@ -26,6 +26,9 @@ func (c *EnrichmentCoordinator) allowed(ctx context.Context, token, id string) (
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	if !ValidUUID(id) {
+		return nil, nil, nil, ErrInvalid
+	}
 	current, err := c.Service.Repo.ArchiveJob.Find(ctx, id)
 	if err != nil {
 		return nil, nil, nil, err

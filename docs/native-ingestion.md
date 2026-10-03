@@ -419,11 +419,12 @@ worker: file selection and source-window adapters still cover Reddit/Twitter.
 
 The isolated gallery-dl metadata collector returns a compact
 `stash-metadata-fetch-v1` transcript. This is an internal producer checkpoint,
-separate from the `source.capture` event format. The internal enrichment
+separate from the `source.capture` event format. The enrichment
 coordinator now binds jobs to target/source revisions and persists checkpoints
 under producer-owned leases. It can publish verified checkpoints through the
-native capture transaction. There is no producer endpoint or dispatch worker
-accepting this transcript yet.
+native capture transaction. Scoped producer routes and a Python transport/lease
+client are available. Durable local execution, dispatch and scheduled-service
+conversion remain unfinished.
 
 `archive.ParseEnrichmentTranscript` validates the exact envelope, supported
 direct-post URL, extractor/retention versions and each record. Backward base
@@ -432,6 +433,9 @@ sorted removal list preserves missing-versus-null semantics. Parent references
 reconstruct child attribution to at most two levels. Source retention is
 checked on reconstructed metadata. Observation times retain their original
 precision, and large source identifiers never pass through floating point.
+Checkpoint reads and extraction subprocess handoff also preserve original JSON
+number tokens, including decimal precision, exponent spelling and negative zero.
+Ordinary event encoding and existing receipt digests are unchanged.
 
 Limits are 32 MiB for the compact body, 1,024 records, 256 references per pending
 or unresolved list, 4 MiB per reconstructed record including parents, and
@@ -470,11 +474,65 @@ publications keep their bodies through migration until the scoped internal
 `ReleaseCheckpoint` operation verifies them. A null `CheckpointHead` with a
 publication/release receipt means completed staging was released, not that the
 observations disappeared. Exact acknowledgement and completion replays still work.
-Public worker routes/dispatch, source scheduling and the remaining download
+Worker dispatch, source scheduling and the remaining download
 adapters remain transition work. See [staging release](native-schema.md#completed-enrichment-staging-release),
 [publication](native-schema.md#verified-enrichment-publication),
 [checkpoint storage and lifecycle](native-schema.md#enrichment-jobs-and-checkpoint-ownership)
 and the [producer contract](../integrations/gallery-dl/README.md#metadata-only-extraction-for-enrichment).
+
+### Producer enrichment API
+
+All paths below are relative to `/api/v3/ingest/enrichment`. They require a
+current Stash producer bearer token. Authentication precedes checkpoint body
+decoding; each operation rechecks collection/root grants and attempt ownership
+in its domain transaction. Ordinary Stash API keys and session cookies do not
+grant producer access. Website credentials stay in the external worker.
+Capabilities advertise `enrichment_protocol: 1` and
+`max_enrichment_checkpoint_bytes: 33554432`.
+
+| Method and path | Request / result |
+| --- | --- |
+| `POST /collections/{uuid}/ready` | `{limit}` selects up to 100 currently eligible, **unadmitted** targets in that collection |
+| `POST /targets/{uuid}/jobs` | `{expected_revision, policy_sha256, extractor_version}` admits or replays the job bound to that target revision |
+| `GET /jobs/{uuid}` | Returns `{job, target}`, including immutable source URL/input and the target's current scheduling state |
+| `POST /jobs/{uuid}/claim` | `{expected_revision, owner_uuid, policy_sha256, extractor_version, lease_seconds}` claims the selected job; unchanged but unavailable work returns 204 |
+| `POST /jobs/{uuid}/renew` | `{owner_uuid, fence, lease_seconds}` renews current ownership |
+| `GET /jobs/{uuid}/checkpoint` | Current receipt plus compact `body`, or null when absent/released |
+| `POST /jobs/{uuid}/checkpoint` | `{owner_uuid, fence, expected_revision, body}` saves or replays retained evidence; `body` is a JSON object |
+| `POST /jobs/{uuid}/publish` | `{owner_uuid, fence, checkpoint_revision, checkpoint_sha256}` verifies and publishes the saved checkpoint atomically |
+| `POST /jobs/{uuid}/failure` | `{owner_uuid, fence, error_code}` records a controlled unsuccessful attempt and returns its immutable receipt |
+| `GET /jobs/{uuid}/publication` | The publication receipt, or null |
+| `GET /jobs/{uuid}/release` | The verified staging-release receipt and unresolved references, or null |
+
+Job identity comes from the route and producer identity from the credential.
+Unknown request fields are rejected. Leases last 5–900 seconds. Checkpoint
+envelopes allow 32 MiB plus 4 KiB; all reconstructed-record limits still apply.
+Source responses use the native JSON representation without expanding HTML
+characters. Clients bound response reads and validate checkpoint hashes,
+counts, source URL and runtime before resuming. The Python lease helper uses
+the server's HTTP date and monotonic request start, stops further extraction
+when renewal fails, and does not extend ownership based on its local wall clock.
+
+Retryable failure codes are `rate_limited`, `extraction_failed`, `timeout` and
+`worker_failed`. Server backoff starts at five minutes and increases by attempt;
+the eighth attempt becomes terminal. Authentication, access, challenge,
+not-found, unsupported-extractor, malformed-checkpoint, size, runtime and
+post-identity failures require review. Clients cannot report success through
+the failure route or supply their own retry deadline. Failed attempts retain
+checkpoints and do not complete the target. A terminal job requires an explicit
+owner retry that creates a new target revision.
+
+Lost failure responses replay against the original producer/owner/fence and
+error code, even after a successor attempt starts. They cannot stop the successor.
+A revoked credential cannot replay; a replacement credential for the same
+producer with the original grants can. Reposting an unchanged checkpoint can
+return a predecessor's receipt. Preserve that acknowledgement's original fence;
+only publishing the currently selected checkpoint proves completion.
+
+The ready-target route does not discover existing queued retries or recover
+expired jobs. Dispatch, shared download/enrichment cooldowns and fairness,
+stale-job maintenance, durable local checkpoint delivery, and host/n8n activation
+remain required. These routes alone do not enable a production scheduler.
 
 ## Completed file events
 

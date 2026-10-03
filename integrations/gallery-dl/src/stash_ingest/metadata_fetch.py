@@ -261,7 +261,7 @@ def _exchange(command, body, timeout, check=lambda: None):
                                 selector.unregister(process.stdout)
                 if process.returncode:
                     return {"error": "worker_failed"}
-                return decode(bytes(output), MAX_BYTES)
+                return decode(bytes(output), MAX_BYTES, preserve_numbers=True)
             except BaseException:
                 _terminate(process)
                 raise
@@ -317,7 +317,7 @@ def main():
             return response
 
         requests.sessions.Session.send = guarded
-        request = decode(sys.stdin.buffer.read(INPUT_LIMIT + 1), INPUT_LIMIT)
+        request = decode(sys.stdin.buffer.read(INPUT_LIMIT + 1), INPUT_LIMIT, preserve_numbers=True)
         if not isinstance(request, dict) or set(request) != {"url", "settings", "resume"}:
             raise InvalidData("Invalid metadata fetch request")
         result = collect(request["url"], request["settings"], request["resume"])

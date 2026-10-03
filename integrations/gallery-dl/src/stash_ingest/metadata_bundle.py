@@ -41,7 +41,7 @@ def public_url(value):
 def _index(value, before, nullable=True):
     if value is None and nullable:
         return
-    if type(value) is not int or not 0 <= value < before:
+    if not isinstance(value, int) or isinstance(value, bool) or not 0 <= value < before:
         raise InvalidData("Checkpoint references must point to preceding records")
 
 
@@ -62,7 +62,7 @@ class Bundle:
         self._metadata, self._seen = [], {}
         self._expanded_bytes = 0
         if resume is not None:
-            saved = decode(encode(resume, MAX_BYTES), MAX_BYTES)
+            saved = decode(encode(resume, MAX_BYTES), MAX_BYTES, preserve_numbers=True)
             if (not isinstance(saved, dict) or set(saved) != set(self.value)
                     or any(saved[k] != self.value[k] for k in
                            ("schema", "url", "retention_policy", "extractor_version"))):

@@ -21,6 +21,7 @@ const ingestPath = "/api/v3/ingest"
 type ingestRoutes struct {
 	service       *ingest.Service
 	fileIngestion bool
+	enrichment    *ingest.EnrichmentCoordinator
 }
 
 // A producer token reaches only this router. Session cookies, general API keys,
@@ -55,6 +56,7 @@ func (rs *ingestRoutes) router() http.Handler {
 		r.Post("/runs/{run}/attempts", rs.sourceRunAttempts)
 		r.Post("/runs/{run}/claim", rs.claimRun)
 		r.Post("/runs/{run}/lease", rs.changeRunLease)
+		rs.enrichmentRoutes(r)
 	})
 	return r
 }
@@ -160,10 +162,12 @@ func (rs *ingestRoutes) capabilities(w http.ResponseWriter, r *http.Request) {
 		"retention_policy":        archive.SourceRetentionVersion, "max_event_bytes": ingest.MaxEventBytes, "max_batch_bytes": ingest.MaxBatchBytes, "max_batch_events": ingest.MaxBatchEvents,
 		"max_file_event_bytes": ingest.MaxFileEventBytes, "file_ingestion": rs.fileIngestion,
 		"source_runs": true, "source_run_protocol": 1, "source_run_submission_receipts": true, "source_run_dispatch": true,
-		"source_run_recovery_protocol": 1,
-		"source_backfill_protocol":     1,
-		"collection_lookup":            true,
-		"receipt_semantics":            "source.capture commits source evidence; file.completed queues verification; poll receipt status for media completion",
+		"source_run_recovery_protocol":    1,
+		"source_backfill_protocol":        1,
+		"collection_lookup":               true,
+		"enrichment_protocol":             1,
+		"max_enrichment_checkpoint_bytes": archive.MaxEnrichmentTranscriptBytes,
+		"receipt_semantics":               "source.capture commits source evidence; file.completed queues verification; poll receipt status for media completion",
 	})
 }
 

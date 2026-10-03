@@ -1390,9 +1390,10 @@ neither kind creates native source-run coverage or successful media receipts.
 `stash_ingest.metadata_fetch.fetch(url, settings, resume=None, timeout=180,
 check=...)` runs one metadata lookup in an isolated instance of the pinned
 gallery-dl runtime. This is the extraction component for the native enrichment
-worker. Native target/job binding, producer-owned checkpoint storage and verified
-capture publication are implemented internally. Producer dispatch and conversion
-of the existing scheduled service are still pending. Calling this helper alone
+worker. Native target/job binding, producer-owned checkpoint storage, verified
+capture publication, scoped HTTP routes and a transport/lease client are
+implemented. Durable local execution, producer dispatch and conversion of the
+existing scheduled service are still pending. Calling this helper alone
 does not create a capture, complete a native job or import media.
 
 The initial root extractors are Reddit submissions, Twitter tweets, Bluesky and
@@ -1451,12 +1452,14 @@ are rejected before a record is appended.
 
 The server's `archive.ParseEnrichmentTranscript` independently validates the
 same compact representation and reconstructs records without losing large
-identifiers or original observation times. `Extends` checks that a resumed
+identifiers or original observation times. Checkpoint and subprocess decoding
+retain original number tokens, including decimal precision, exponent spelling
+and negative zero, so resuming cannot silently rewrite earlier record hashes.
+`Extends` checks that a resumed
 checkpoint retains all earlier records and unresolved references. A pending
 child must remain explicit or have newly returned records for that URL and
 parent; retry cannot silently erase it. A shared Go/Python fixture verifies
-these semantics. This parser supplies no ingestion route or execution authority;
-the internal native coordinator separately checks immutable job bindings,
+these semantics. The native coordinator separately checks immutable job bindings,
 producer-owned attempts and current source eligibility. Its checkpoint store
 keeps one current body plus small acknowledgements and original per-record
 producer provenance across resumed attempts. Publication separately consumes the
@@ -1468,9 +1471,10 @@ losing their record associations. Successful publication now releases verified
 staging atomically while preserving native captures, original acknowledgements,
 producer attribution and unresolved references. A release receipt distinguishes
 completed cleanup from a job without a checkpoint. Older publications retain
-staging through migration until verified cleanup. No public producer route
-accepts these checkpoints yet. Shared source scheduling, additional identity
-adapters and producer dispatch remain required before activation.
+staging through migration until verified cleanup. The scoped producer API accepts
+these checkpoints through a separate enrichment contract. Shared source
+scheduling, durable local execution and producer dispatch remain required before
+activation.
 
 Temporary child failures retain the parent and discard that child's partial
 records. Persist the entire returned checkpoint before retrying its pending
@@ -1480,6 +1484,38 @@ empty result cannot appear successful. The caller must distinguish a retained
 checkpoint with pending children from a finished lookup, and must still verify
 the result against the intended existing post before native publication. The
 helper neither applies field mappings nor mutates selected scene/image metadata.
+
+### Enrichment transport and ownership
+
+`enrichment_client.EnrichmentClient(Client(...))` exposes capability checks,
+unadmitted target discovery for one granted collection, revision-pinned admission,
+job/target inspection, claim/renew, checkpoint save/read, verified publication
+and controlled failure acknowledgements. See the
+[HTTP contract](../../docs/native-ingestion.md#producer-enrichment-api).
+Checkpoint bodies remain JSON objects. Requests bind the owner/fence; server
+credentials supply the producer identity. Checkpoint reads are bounded to
+32 MiB plus 4 KiB and verify the body digest, counts, URL and extractor version.
+An unchanged checkpoint may replay an older receipt without changing provenance.
+
+`enrichment_lease.EnrichmentLease.claim(client, job, owner=..., seconds=180)`
+returns an owned lease or `None` when the selected job is currently unavailable.
+`start()` starts heartbeats; pass `check` to the isolated extractor and call
+`close()` when the attempt ends. Deadlines use the server date and monotonic
+request start, with a safety margin. Failed renewal stops further source work.
+Retain an owner UUID across a lost claim response to recover the same attempt.
+
+Only publication certifies success. Failure calls accept controlled codes;
+temporary errors receive server backoff and the eighth attempt becomes terminal.
+Exact failure replay cannot affect a newer attempt. Checkpoint/publication
+acknowledgements remain recoverable after staging release. Transport tests lose
+committed responses, exercise large Unicode checkpoints, and preserve original
+number tokens against the real native HTTP server and SQLite.
+
+This client is not a durable worker loop. Fresh extraction results still need
+local persistence before network delivery; ready-target discovery does not list
+already admitted retries. Durable execution/delivery, shared scheduling and
+cooldowns, stale-job recovery, legacy queue mapping, reviewed profiles and
+production host/n8n launchers remain transition work.
 
 ## Validation
 

@@ -1212,6 +1212,36 @@ Inspect application API progress and mapped/source records under
 historical completion bases and retained URL evidence. This command does not
 replace coordinated cutover inputs, review resolution or reviewed activation.
 
+### Legacy enrichment checkpoints
+
+After the frozen enrichment mapping finishes, convert saved collector results:
+
+```sh
+stash-import-enrichment-checkpoints \
+  --snapshot /migration/frozen-automation \
+  --expected-sha256 AUTOMATION_MANIFEST_SHA256 \
+  --endpoint STASH_ORIGIN
+```
+
+The command uses the same application key environment setting as the other
+importers. It verifies the frozen files and exact number of staged records,
+then resumes native conversion from the last committed source ordinal. Repeat
+the same command after a lost response. Exit 0 means conversion finished, 2 means
+some formats require review, and 1 means input or transport failure.
+
+Inspect progress and paged summaries at
+`/api/v3/archive/automation-snapshots/{snapshot}/enrichment-checkpoints` and
+`.../records?after=0&limit=100`. Select `.../records/{ordinal}` to inspect original
+values and the converted body. Repeated metadata is shared, source record order
+is retained, and pending children keep their saved parent context. The old
+collector did not record observation times, so conversion explicitly leaves them
+unknown. Unsupported formats retain their original evidence for review.
+
+This preserves staging without fetching sources, creating captures, releasing
+review holds or claiming completion of the underlying work. The resulting
+`legacy-enrichment-staging-v1` documents still require a reviewed handoff before
+native worker execution. `imported` remains false for the overall migration.
+
 ### Reviewed enrichment activation
 
 After completing the frozen enrichment mapping, review and enable the relevant

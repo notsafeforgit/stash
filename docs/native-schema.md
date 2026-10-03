@@ -1830,3 +1830,46 @@ held-to-pending or held-to-excluded/replacement histories. Backup retains the
 receipts and anonymisation removes them with source evidence. The bulk application
 client is `stash-activate-automation-enrichment`; source fetches remain separate
 metadata-only worker operations.
+
+### Imported enrichment staging
+
+Schema 1000060 converts saved `enrichment_jobs.staged_json` into native migration
+evidence using `legacy-enrichment-staging-v1`. The original automation record,
+its source hash and the exact staged-text hash remain available. Conversion is
+resumable in batches of at most 100 records and 4 MiB of source data; sparse source
+ordinals and the frozen manifest digest fence each request. Both valid and
+malformed non-null staged values receive a conversion or review outcome.
+
+`automation_checkpoint_imports` records progress. Immutable
+`automation_checkpoint_records` bind each outcome to the original enrichment
+mapping. `automation_checkpoint_bodies` shares equal converted documents by hash.
+Converted bodies contain ordered source records referring to shared metadata
+bodies, optional shallow deltas, and explicit `_parent`/`_reddit` references.
+Expansion reproduces the retained source values, including exact JSON numbers,
+nulls and removed fields. The converter does not apply a newer source-retention
+policy to old staged bytes. Unknown fields/formats stay in review with their
+original evidence; partial conversion is not published.
+
+Observation times are explicitly `unrecorded`. The saved extractor version is a
+reported legacy value and may be absent. Pending child URLs retain their original
+parent metadata, depth and reason. Unresolved references stay unscoped because
+the old collector did not retain their parent; missing reasons stay absent.
+Neither job update times nor the snapshot boundary become invented observation
+times. This format is separate from owned native worker transcripts and is
+rejected by that transcript parser.
+
+The application routes are `GET` and `POST`
+`/api/v3/archive/automation-snapshots/{snapshot}/enrichment-checkpoints`, with
+`GET .../records?after=0&limit=100` and `GET .../records/{ordinal}` for inspection.
+POST accepts `{expected_manifest_sha256, after}` after enrichment mapping has
+finished. Record lists omit payloads; a selected record returns its converted
+body and exact original values. Repeating the completed cursor is read-only.
+`stash-import-enrichment-checkpoints` verifies the local frozen snapshot and the
+exact staged-record count, and resumes a committed response being lost.
+
+Conversion leaves posts, media, target choices, deadlines, captures and worker
+state unchanged. It does not resolve the original review hold or mark the full
+archive migration imported. Reviewed handoff of this retained evidence to native
+execution remains a separate operation. Backup includes the converted evidence;
+anonymisation removes it. Startup checks complete source bindings, progress,
+hashes and deterministic conversion semantics, including review outcomes.

@@ -25,6 +25,7 @@ func enrichmentSelection(target *models.EnrichmentTarget, collectionRevision int
 
 func removeEnrichmentActivationSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeAutomationCheckpointSchema(t, raw)
 	_, err := raw.Exec(`DROP TABLE enrichment_activation_targets; DROP TABLE enrichment_activations;
  DROP INDEX automation_enrichment_held; DROP INDEX automation_enrichment_held_targets;
  DELETE FROM native_migration_history WHERE version=1000059`)

@@ -22,7 +22,15 @@ import (
 
 func albumJobRows(t *testing.T, db *sql.DB, table string) [][]any {
 	t.Helper()
-	rows, err := db.Query("SELECT * FROM " + table + " ORDER BY rowid")
+	tx, err := db.BeginTx(t.Context(), &sql.TxOptions{ReadOnly: true})
+	require.NoError(t, err)
+	defer func() { require.NoError(t, tx.Rollback()) }()
+	// A second connection may have rebuilt this table during migration. Step a
+	// catalog query on the pinned connection before preparing SELECT *: SQLite
+	// otherwise exposes the old column count until that statement's first step.
+	var objects int
+	require.NoError(t, tx.QueryRow("SELECT count(*) FROM sqlite_schema").Scan(&objects))
+	rows, err := tx.Query("SELECT * FROM " + table + " ORDER BY rowid")
 	require.NoError(t, err)
 	defer rows.Close()
 	columns, err := rows.Columns()
@@ -43,6 +51,21 @@ func albumJobRows(t *testing.T, db *sql.DB, table string) [][]any {
 	}
 	require.NoError(t, rows.Err())
 	return ret
+}
+
+func TestAlbumJobRowsReadsColumnsAfterExternalSchemaChange(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "columns.sqlite")
+	reader := openRawDB(t, path)
+	defer reader.Close()
+	reader.SetMaxOpenConns(1)
+	_, err := reader.Exec("CREATE TABLE evidence (original TEXT); INSERT INTO evidence VALUES('retained')")
+	require.NoError(t, err)
+	require.Equal(t, [][]any{{"retained"}}, albumJobRows(t, reader, "evidence"))
+	writer := openRawDB(t, path)
+	defer writer.Close()
+	_, err = writer.Exec("ALTER TABLE evidence ADD COLUMN added TEXT; UPDATE evidence SET added='new column'")
+	require.NoError(t, err)
+	require.Equal(t, [][]any{{"retained", "new column"}}, albumJobRows(t, reader, "evidence"))
 }
 
 func TestAlbumJobMigrationPreservesJobsAttemptsReceiptsAndGuards(t *testing.T) {

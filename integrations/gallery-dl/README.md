@@ -1390,8 +1390,8 @@ neither kind creates native source-run coverage or successful media receipts.
 `stash_ingest.metadata_fetch.fetch(url, settings, resume=None, timeout=180,
 check=...)` runs one metadata lookup in an isolated instance of the pinned
 gallery-dl runtime. This is the extraction component for the native enrichment
-worker. Native target/job binding and producer-owned checkpoint storage are
-implemented internally. Producer dispatch, verified post publication and conversion
+worker. Native target/job binding, producer-owned checkpoint storage and verified
+capture publication are implemented internally. Producer dispatch and conversion
 of the existing scheduled service are still pending. Calling this helper alone
 does not create a capture, complete a native job or import media.
 
@@ -1445,8 +1445,14 @@ these semantics. This parser supplies no ingestion route or execution authority;
 the internal native coordinator separately checks immutable job bindings,
 producer-owned attempts and current source eligibility. Its checkpoint store
 keeps one current body plus small acknowledgements and original per-record
-producer provenance across resumed attempts. No public producer route accepts
-these checkpoints yet, and verified capture publication remains pending.
+producer provenance across resumed attempts. Publication separately consumes the
+saved revision/digest, verifies every source identity against the existing target
+post and commits native captures, target completion and job outcome together.
+Only supported post adapters can publish; retained unresolved references remain
+explicit limitations. Equal observations within a job can share captures without
+losing their record associations. No public producer route accepts these
+checkpoints yet. Shared source scheduling and verified checkpoint cleanup remain
+required before the worker is activated.
 
 Temporary child failures retain the parent and discard that child's partial
 records. Persist the entire returned checkpoint before retrying its pending

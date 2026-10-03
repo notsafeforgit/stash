@@ -64,6 +64,23 @@ type EnrichmentCheckpointRecord struct {
 	ProducerUUID       string `json:"producer_uuid" db:"producer_uuid"`
 }
 
+type EnrichmentPublication struct {
+	JobUUID            string    `json:"job_uuid" db:"job_uuid"`
+	CheckpointRevision int       `json:"checkpoint_revision" db:"checkpoint_revision"`
+	Digest             string    `json:"checkpoint_sha256" db:"digest"`
+	Fence              int64     `json:"fence" db:"fence"`
+	CompletionUUID     string    `json:"completion_uuid" db:"completion_uuid"`
+	RecordCount        int       `json:"record_count" db:"record_count"`
+	CaptureCount       int       `json:"capture_count" db:"capture_count"`
+	UnresolvedCount    int       `json:"unresolved_count" db:"unresolved_count"`
+	CreatedAt          time.Time `json:"created_at" db:"created_at"`
+}
+
+type EnrichmentPublishedRecord struct {
+	EnrichmentCheckpointRecord
+	CaptureUUID string `json:"capture_uuid" db:"capture_uuid"`
+}
+
 type EnrichmentJobReaderWriter interface {
 	Bind(context.Context, string, time.Time) error
 	Binding(context.Context, string) (*EnrichmentJobBinding, error)
@@ -75,4 +92,7 @@ type EnrichmentJobReaderWriter interface {
 	CheckpointHead(context.Context, string) (*EnrichmentCheckpoint, error)
 	CheckpointReceipts(context.Context, string, int, int) ([]EnrichmentCheckpointReceipt, error)
 	CheckpointRecords(context.Context, string, int, int) ([]EnrichmentCheckpointRecord, error)
+	Publish(context.Context, EnrichmentJobLease, int, string, []string, time.Time) (*EnrichmentPublication, error)
+	Publication(context.Context, string) (*EnrichmentPublication, error)
+	PublishedRecords(context.Context, string, int, int) ([]EnrichmentPublishedRecord, error)
 }

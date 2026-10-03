@@ -448,6 +448,9 @@ func (s *ArchiveJobStore) Finish(ctx context.Context, lease models.ArchiveJobLea
 		return nil, err
 	}
 	state, attempt := outcome.State, outcome.State
+	if job.Kind == models.ArchiveJobEnrichPost && state == "succeeded" {
+		enrichmentJobSuccessGuard(ctx, job.UUID)
+	}
 	available := job.AvailableAt.UnixMilli()
 	if state == "retry" {
 		state, available = "queued", outcome.RetryAt.UnixMilli()

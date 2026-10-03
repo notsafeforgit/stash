@@ -1496,9 +1496,9 @@ producer-owned lease and unchanged, eligible target/source binding.
 Admission permits at most 64 active enrichment jobs. Each job permits eight
 attempts and 128 checkpoint revisions; transcript limits remain 32 MiB and 1,024
 records. `enrichment_checkpoint_usage` enforces a 2 GiB total staging budget,
-including bodies retained by failed or cancelled jobs. Exhaustion refuses new
-storage rather than discarding evidence. Publication and safe subsequent body
-cleanup are not implemented yet. Ordinary database backups retain these records;
+including bodies retained by failed, cancelled or published jobs. Exhaustion
+refuses new storage rather than discarding evidence. Safe body cleanup after
+publication remains pending. Ordinary database backups retain these records;
 anonymisation removes them. Startup validates bindings, provenance, record hashes,
 checkpoint histories and exact storage accounting.
 
@@ -1510,7 +1510,57 @@ evidence stays with its original job. Collection/root changes prevent old worker
 from continuing, but automatic cancellation of those stale jobs remains pending.
 
 This coordinator has no public producer route or dispatch worker yet. Checkpoint
-acceptance verifies the transcript and execution ownership, not the intended
-post's extracted identity. It neither creates native captures nor completes the
-enrichment target. Verified capture publication, shared source cooldowns and
-fairness, and legacy queue conversion remain required before activation.
+acceptance verifies the transcript and execution ownership. Publication is the
+separate operation below that verifies post identity and commits native captures.
+Shared source cooldowns/fairness, checkpoint cleanup and legacy queue conversion
+remain required before activation.
+
+## Verified enrichment publication
+
+Schema 1000052 adds `enrichment_publications` and
+`enrichment_published_records`. Foreign keys bind a publication to its exact
+checkpoint, publishing attempt and target completion receipt. Every transcript
+record maps to a native capture and retains its original observing producer
+through the checkpoint records. A capture index supports provenance lookup
+without scanning other jobs. Immutable source bytes and observation timestamps
+determine capture UUIDs; equal observations by one producer within a job can
+share a capture even when they occur as both post and parent-context records.
+
+The internal coordinator accepts only a saved checkpoint revision and digest.
+It refuses pending child lookups, and every reconstructed record must resolve
+through an existing native post identifier to the exact target post. A URL,
+caption or another returned post cannot authorize creating or changing that
+identity. Post adapters currently support Reddit and Twitter, including retained
+Reddit parent context; other adapters remain required before their activation.
+Unsupported external references stay in the retained checkpoint and their count
+is exposed in the publication. Completion certifies extraction within the
+supported policy, not successful resolution of every external link.
+
+Metadata comes from the same source fields as the download producer: title,
+original content/selftext/title, source date, and language. Original text and
+observation times are preserved. A media host's caption does not replace its
+enclosing Reddit post's caption. Native partitioning still shares post/profile
+bodies and stores attachment differences separately.
+
+Publication reuses the download capture transaction for source evidence,
+collection provenance, publisher review/matching, attachment manifests and
+translation scheduling. Captures, their record associations, target completion,
+job result and attempt outcome commit together. This path creates no fictional
+HTTP producer receipt and does not download files or select scene/image fields.
+Original capture producers can differ from the worker publishing the result.
+Credentials, the original lease deadline, and current source eligibility are
+checked through commit; expiry or a source edit rolls back all effects.
+
+An ordinary job success assertion cannot bypass publication. Lost completion
+responses replay the original receipt for the publishing producer/attempt, even
+after later source edits or lease expiry. They do not rerun normalization or
+metadata scheduling. Startup checks the job result, all associations and every
+capture against the saved source evidence, including shared-body/profile hashes.
+Migration preserves queued, running, failed and cancelled schema-51 work; a
+schema-51 success assertion is refused because that schema had no verified
+publication path. Backup retains publication/provenance; anonymisation removes it.
+
+Current compact checkpoint bodies remain retained after publication. Releasing
+that staging storage requires a separate, verified cleanup operation before
+enrichment dispatch is enabled. Public worker routes, shared source scheduling,
+remaining identity adapters and legacy queue conversion are still unfinished.

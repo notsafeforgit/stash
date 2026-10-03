@@ -239,28 +239,9 @@ func (s *Service) Capture(ctx context.Context, token string, raw []byte, digest 
 			return models.ErrSourcePostForgotten
 		}
 		captureID := uuid.NewSHA1(uuid.MustParse(event.ProducerUUID), []byte("source.capture\x00"+event.EventUUID)).String()
-		capture, err := s.Repo.SourceEvidence.RecordCapture(ctx, models.SourceCaptureInput{UUID: captureID, PostUUID: post.UUID, Origin: "gallery-dl", Platform: strings.TrimPrefix(event.Post.Namespace, "native:"), CapturedAt: event.ObservedAt, ExtractorVersion: &event.ExtractorVersion, RetentionPolicy: event.RetentionPolicy, Metadata: event.Metadata, Payload: *prepared.payload})
+		capture, result, err := s.recordPreparedCapture(ctx, models.SourceCaptureInput{UUID: captureID, PostUUID: post.UUID, Origin: "gallery-dl", Platform: strings.TrimPrefix(event.Post.Namespace, "native:"), CapturedAt: event.ObservedAt, ExtractorVersion: &event.ExtractorVersion, RetentionPolicy: event.RetentionPolicy, Metadata: event.Metadata, Payload: *prepared.payload}, prepared.album, collection, time.Now())
 		if err != nil {
 			return err
-		}
-		if err := s.Repo.SourceCollection.RecordCapture(ctx, models.CollectionCapture{CaptureUUID: capture.UUID, CollectionUUID: collection.UUID, CollectionRevision: collection.Revision}); err != nil {
-			return err
-		}
-		result := CaptureResult{Status: "committed", Publisher: "unavailable", Album: "unavailable", Review: []string{}}
-		if err := s.capturePublisher(ctx, capture.UUID, &result); err != nil {
-			return err
-		}
-		if prepared.album != nil {
-			if err := s.captureAlbum(ctx, capture, prepared.album, &result); err != nil {
-				return err
-			}
-		}
-		result.Translation, err = s.Repo.TranslationPolicy.ScheduleCapture(ctx, models.CollectionCapture{CaptureUUID: capture.UUID, CollectionUUID: collection.UUID, CollectionRevision: collection.Revision}, time.Now())
-		if err != nil {
-			return err
-		}
-		if result.Translation.Status == "collection_changed" {
-			result.Review = append(result.Review, "translation_policy")
 		}
 		encoded, err := json.Marshal(result)
 		if err != nil {
@@ -273,6 +254,37 @@ func (s *Service) Capture(ctx context.Context, token string, raw []byte, digest 
 		return nil, err
 	}
 	return receipt, nil
+}
+
+// The caller owns authorization, post identity verification and the encompassing
+// transaction. Enrichment reuses these domain effects without inventing an HTTP
+// producer receipt or nesting a second transaction.
+func (s *Service) recordPreparedCapture(ctx context.Context, input models.SourceCaptureInput, album *archive.CapturedAlbum, collection *models.SourceCollection, now time.Time) (*models.SourceCapture, *CaptureResult, error) {
+	capture, err := s.Repo.SourceEvidence.RecordCapture(ctx, input)
+	if err != nil {
+		return nil, nil, err
+	}
+	provenance := models.CollectionCapture{CaptureUUID: capture.UUID, CollectionUUID: collection.UUID, CollectionRevision: collection.Revision}
+	if err := s.Repo.SourceCollection.RecordCapture(ctx, provenance); err != nil {
+		return nil, nil, err
+	}
+	result := &CaptureResult{Status: "committed", Publisher: "unavailable", Album: "unavailable", Review: []string{}}
+	if err := s.capturePublisher(ctx, capture.UUID, result); err != nil {
+		return nil, nil, err
+	}
+	if album != nil {
+		if err := s.captureAlbum(ctx, capture, album, result); err != nil {
+			return nil, nil, err
+		}
+	}
+	result.Translation, err = s.Repo.TranslationPolicy.ScheduleCapture(ctx, provenance, now)
+	if err != nil {
+		return nil, nil, err
+	}
+	if result.Translation.Status == "collection_changed" {
+		result.Review = append(result.Review, "translation_policy")
+	}
+	return capture, result, nil
 }
 
 func (s *Service) capturePublisher(ctx context.Context, capture string, result *CaptureResult) error {

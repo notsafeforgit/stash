@@ -399,8 +399,9 @@ The isolated gallery-dl metadata collector returns a compact
 `stash-metadata-fetch-v1` transcript. This is an internal producer checkpoint,
 separate from the `source.capture` event format. The internal enrichment
 coordinator now binds jobs to target/source revisions and persists checkpoints
-under producer-owned leases. There is no producer endpoint or dispatch worker
-accepting this transcript yet; verified capture publication remains unfinished.
+under producer-owned leases. It can publish verified checkpoints through the
+native capture transaction. There is no producer endpoint or dispatch worker
+accepting this transcript yet.
 
 `archive.ParseEnrichmentTranscript` validates the exact envelope, supported
 direct-post URL, extractor/retention versions and each record. Backward base
@@ -432,9 +433,19 @@ old write after its attempt expires without restoring that attempt's ownership.
 Only the current compact body is retained per job; small immutable receipts and
 record hashes preserve prior acknowledgements and provenance. Storage is bounded
 across jobs, including failed/cancelled work. Saving a checkpoint leaves the
-target pending and selected media metadata unchanged. Publication must still
-verify existing post identity and commit captures, job result and target completion
-together. See [checkpoint storage and lifecycle](native-schema.md#enrichment-jobs-and-checkpoint-ownership)
+target pending and selected media metadata unchanged. The separate `Publish`
+operation requires a saved revision/digest with no pending children. It verifies
+every record against the existing target post, preserves original producers,
+reuses capture/publisher/album/translation services and commits captures, job
+result and target completion together. Ordinary job success cannot bypass that
+proof. Exact completion replay survives expiry and later source edits without
+applying a new policy. Unresolved external references remain explicit limitations.
+
+Publication currently retains the compact body for integrity/replay. Verified
+cleanup, public worker routes, source scheduling and additional post identity
+adapters remain transition work. See
+[publication](native-schema.md#verified-enrichment-publication),
+[checkpoint storage and lifecycle](native-schema.md#enrichment-jobs-and-checkpoint-ownership)
 and the [producer contract](../integrations/gallery-dl/README.md#metadata-only-extraction-for-enrichment).
 
 ## Completed file events

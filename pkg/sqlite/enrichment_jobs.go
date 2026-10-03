@@ -95,26 +95,30 @@ func enrichmentJobEligible(ctx context.Context, work *models.EnrichmentJobArgume
 		target.State != "pending" || now.Before(target.NotBefore) || now.Before(target.UpdatedAt) {
 		return nil, models.ErrEnrichmentConflict
 	}
+	return target, enrichmentSourceEligible(ctx, work, target)
+}
+
+func enrichmentSourceEligible(ctx context.Context, work *models.EnrichmentJobArguments, target *models.EnrichmentTarget) error {
 	if err := enrichmentEligible(ctx, target.EnrichmentTargetInput); err != nil {
-		return nil, err
+		return err
 	}
 	collection, err := (&SourceCollectionStore{}).Find(ctx, target.CollectionUUID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if collection == nil || !reflect.DeepEqual(collection.RootUUID, work.RootUUID) {
-		return nil, models.ErrEnrichmentConflict
+		return models.ErrEnrichmentConflict
 	}
 	if work.RootUUID != nil {
 		root, err := (&MediaRootStore{}).Find(ctx, *work.RootUUID)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if root == nil || root.State != "active" {
-			return nil, models.ErrEnrichmentConflict
+			return models.ErrEnrichmentConflict
 		}
 	}
-	return target, nil
+	return nil
 }
 
 func (s *EnrichmentJobStore) Bind(ctx context.Context, id string, now time.Time) error {

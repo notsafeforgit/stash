@@ -423,8 +423,15 @@ through commit. Checkpoints retain one compact body per job, small immutable
 receipts and original per-record producers across failover. Preserve the bounded
 staging budget, historical acknowledgement replay, retry backoff and explicit
 owner retry operation. Schedule changes cancel active jobs atomically. These
-checkpoints are not captures or completion proof; public worker routes, verified
-publication, shared cooldown/fairness and stale-job maintenance remain pending. See
+checkpoints are not captures or completion proof. Schema 1000052 adds publication
+receipts and indexed record-to-capture associations. The internal publisher
+consumes saved checkpoints, verifies each existing post identity, preserves the
+observing producer and reuses capture/publisher/album/translation services in the
+same transaction as target/job completion. Generic success cannot bypass it.
+Keep publication replay independent of current source edits and normalization;
+new publication must recheck its original deadline and current credentials/source
+through commit. Public worker routes, checkpoint cleanup, additional post
+adapters, shared cooldown/fairness and stale-job maintenance remain pending. See
 [enrichment work](docs/native-schema.md#post-enrichment-targets-and-completion)
 and [metadata-only extraction](integrations/gallery-dl/README.md#metadata-only-extraction-for-enrichment).
 

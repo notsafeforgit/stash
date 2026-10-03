@@ -62,9 +62,10 @@ func (s *EnrichmentJobStore) CheckpointRecords(ctx context.Context, id string, a
 		return nil, err
 	}
 	ret := []models.EnrichmentCheckpointRecord{}
-	err = dbWrapper.Select(ctx, &ret, `SELECT r.*,c.fence,a.producer_uuid FROM enrichment_checkpoint_records r
+	err = dbWrapper.Select(ctx, &ret, `SELECT r.*,c.fence,a.producer_uuid,x.capture_uuid AS retained_capture FROM enrichment_checkpoint_records r
  JOIN enrichment_checkpoint_receipts c ON c.job_uuid=r.job_uuid AND c.revision=r.checkpoint_revision
  JOIN enrichment_job_attempts a ON a.job_uuid=c.job_uuid AND a.fence=c.fence
+ LEFT JOIN enrichment_job_retained_records x ON x.job_uuid=r.job_uuid AND x.ordinal=r.ordinal
  WHERE r.job_uuid=? AND r.ordinal>? ORDER BY r.ordinal LIMIT ?`, id, after, limit)
 	return ret, err
 }
@@ -80,7 +81,7 @@ func (s *EnrichmentJobStore) Checkpoint(ctx context.Context, lease models.Enrich
 		return nil, err
 	}
 	parsed, err := archive.ParseEnrichmentTranscript(raw)
-	if err != nil || len(parsed.Records) == 0 || parsed.Schema != archive.EnrichmentTranscriptSchema {
+	if err != nil || len(parsed.Records) == 0 {
 		return nil, models.ErrEnrichmentInvalid
 	}
 	body := parsed.Body()
@@ -104,6 +105,10 @@ func (s *EnrichmentJobStore) Checkpoint(ctx context.Context, lease models.Enrich
 	}
 	work, err := archive.DecodeEnrichmentJob(current)
 	if err != nil {
+		return nil, err
+	}
+	if err := verifyEnrichmentTranscript(func(out any, q string, args ...any) error { return dbWrapper.Get(ctx, out, q, args...) },
+		func(out any, q string, args ...any) error { return dbWrapper.Select(ctx, out, q, args...) }, current, work, parsed); err != nil {
 		return nil, err
 	}
 	target, err := (&EnrichmentWorkStore{}).Target(ctx, work.TargetUUID)

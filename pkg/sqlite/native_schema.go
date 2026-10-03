@@ -509,7 +509,7 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 			}
 		}
 		if version >= NativeSchemaBaseline+50 {
-			if err := validateEnrichmentWorkSchema(conn, version >= NativeSchemaBaseline+58); err != nil {
+			if err := validateEnrichmentWorkSchema(conn, version >= NativeSchemaBaseline+58, version >= NativeSchemaBaseline+65); err != nil {
 				return err
 			}
 		}
@@ -519,7 +519,7 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 					return err
 				}
 			}
-			if err := validateEnrichmentJobSchema(conn, version >= NativeSchemaBaseline+53); err != nil {
+			if err := validateEnrichmentJobSchema(conn, version >= NativeSchemaBaseline+53, version >= NativeSchemaBaseline+65); err != nil {
 				return err
 			}
 		}
@@ -539,7 +539,7 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 			}
 		}
 		if version >= NativeSchemaBaseline+56 {
-			if err := validateSourceFairnessSchema(conn); err != nil {
+			if err := validateSourceFairnessSchema(conn, version >= NativeSchemaBaseline+65); err != nil {
 				return err
 			}
 		}
@@ -581,6 +581,11 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 		}
 		if version >= NativeSchemaBaseline+64 {
 			if err := validateCheckpointHandoffSchema(conn); err != nil {
+				return err
+			}
+		}
+		if version >= NativeSchemaBaseline+65 {
+			if err := validateEnrichmentHandoffSchema(conn); err != nil {
 				return err
 			}
 		}

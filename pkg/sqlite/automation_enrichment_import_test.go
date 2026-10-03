@@ -340,7 +340,7 @@ func TestAutomationEnrichmentMigrationPreservesNativePublication(t *testing.T) {
 	for _, collision := range []bool{false, true} {
 		t.Run(fmt.Sprint(collision), func(t *testing.T) {
 			f := newEnrichmentExecutionFixture(t)
-			job := f.admit(t)
+			job := f.admitV1(t)
 			running := f.claim(t, job.UUID, 0)
 			head, err := f.worker.Checkpoint(t.Context(), f.tokens[0], running.Lease(), 0, f.complete)
 			require.NoError(t, err)

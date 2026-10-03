@@ -350,8 +350,11 @@ func (s *EnrichmentWorkStore) Complete(ctx context.Context, input models.Enrichm
 		return nil, err
 	}
 	query, args, err := sqlx.In(`SELECT count(*) FROM source_captures c JOIN source_collection_captures b ON b.capture_uuid=c.uuid
- WHERE c.post_uuid=? AND b.collection_uuid=? AND b.collection_revision=? AND c.origin IN ('gallery-dl','gallery-dl-enrichment') AND c.uuid IN (?)`,
-		target.PostUUID, target.CollectionUUID, target.CollectionRevision, input.CaptureUUIDs)
+ WHERE c.post_uuid=? AND b.collection_uuid=? AND b.collection_revision=? AND (c.origin IN ('gallery-dl','gallery-dl-enrichment')
+ OR (c.origin='legacy-enrichment' AND EXISTS(SELECT 1 FROM enrichment_job_retained_records x
+ JOIN enrichment_job_targets j ON j.job_uuid=x.job_uuid JOIN archive_jobs a ON a.uuid=j.job_uuid AND a.state='running'
+ WHERE x.capture_uuid=c.uuid AND j.target_uuid=? AND j.target_revision=?))) AND c.uuid IN (?)`,
+		target.PostUUID, target.CollectionUUID, target.CollectionRevision, target.UUID, target.Revision, input.CaptureUUIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -361,6 +364,26 @@ func (s *EnrichmentWorkStore) Complete(ctx context.Context, input models.Enrichm
 	}
 	if count != len(input.CaptureUUIDs) {
 		return nil, models.ErrEnrichmentConflict
+	}
+	// A retained prefix can prove completion only through its reviewed native
+	// job's full atomic publication, never through the generic completion API.
+	query, args, err = sqlx.In(`SELECT EXISTS(SELECT 1 FROM source_captures WHERE origin='legacy-enrichment' AND uuid IN (?))`, input.CaptureUUIDs)
+	if err != nil {
+		return nil, err
+	}
+	var retained bool
+	if err := dbWrapper.Get(ctx, &retained, query, args...); err != nil {
+		return nil, err
+	}
+	if retained {
+		txn.AddPreCommitHook(ctx, func(ctx context.Context) error {
+			var jobID string
+			if err := dbWrapper.Get(ctx, &jobID, "SELECT job_uuid FROM enrichment_publications WHERE completion_uuid=?", input.UUID); err != nil {
+				return models.ErrEnrichmentAtomic
+			}
+			_, err := enrichmentPublishedJob(ctx, jobID)
+			return err
+		})
 	}
 	complete := enrichmentAtomic(ctx)
 	_, err = dbWrapper.Exec(ctx, `INSERT INTO enrichment_completions(uuid,target_uuid,expected_revision,request_digest,capture_count,created_at) VALUES(?,?,?,?,?,?)`,

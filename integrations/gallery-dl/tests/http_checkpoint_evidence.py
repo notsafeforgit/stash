@@ -2,10 +2,13 @@
 
 import hashlib
 import json
+import os
 from pathlib import Path
 import sqlite3
 import sys
+import subprocess
 import uuid
+from urllib.request import Request
 
 from http_enrichment_activation import execute
 from stash_ingest.activation_client import ActivationClient
@@ -22,6 +25,7 @@ from stash_ingest.catalog_enrichment_import import main as receipts_main
 from stash_ingest.client import Unavailable
 from stash_ingest.metadata_bundle import Bundle
 from stash_ingest.encoding import encode
+from stash_ingest.enrichment_configuration import EnrichmentConfiguration, SCHEMA as PROFILE_SCHEMA
 from test_automation_snapshot import automation_fixture
 from test_catalog_registry_import import registry_fixture
 from test_catalog_snapshot import catalog_fixture, CAPTURED
@@ -103,6 +107,11 @@ def run():
     handoff_input = {"uuid": str(uuid.uuid4()), "evidence_uuid": request["uuid"], "evidence_plan_sha256": plan["plan_sha256"],
                      "target_revision": target["revision"],
                      "collection_revision": revised["revision"], "policy_sha256": "a" * 64, "extractor_version": "1.32.15-dev"}
+    profile_doc = {"schema": PROFILE_SCHEMA, "source_category": "reddit", "bindings": {},
+                   "gallery": {"extractor": {"sleep-request": 0, "sleep-extractor": 0}}}
+    if setup.get("execute_handoff"):
+        profile = EnrichmentConfiguration.from_document(profile_doc, directory)
+        handoff_input.update(policy_sha256=profile.policy_sha256, extractor_version=profile.extractor_version)
     handoff_plan = client.request("POST", "/checkpoint-handoffs/preview", handoff_input)
     assert handoff_plan["retained_capture_count"] == handoff_plan["pending_count"] == handoff_plan["unscoped_reference_count"] == 1
     assert handoff_plan["released_target_uuid"] != target["uuid"] and handoff_plan["released_revision"] == 1
@@ -123,6 +132,26 @@ def run():
     assert seed["body"]["records"][0]["observed_at"] is None and seed["body"]["unresolved"] == []
     assert client.request("GET", "/enrichment-targets/" + target["uuid"]) == target
     assert source.read_bytes() == before
+    if setup.get("execute_handoff"):
+        def admin(path, value):
+            req = Request(setup["endpoint"] + "/api/v3/ingest-admin" + path, data=encode(value), method="POST",
+                          headers={"ApiKey": os.environ["STASH_API_KEY"], "Content-Type": "application/json"})
+            with client.opener.open(req, timeout=30) as response:
+                assert response.status == 201
+                return json.loads(response.read(65536))
+        producer = admin("/producers", {"label": "Reviewed checkpoint fixture"})
+        credential = admin("/producers/" + producer["uuid"] + "/credentials", {"scopes": [{"collection_uuid": revised["uuid"]}]})
+        worker = dict(setup, producer=producer["uuid"], handoff=handoff_input["uuid"], plan=handoff_plan["plan_sha256"],
+                      profile=profile_doc, seed=seed)
+        env = {**os.environ, "STASH_INGEST_TOKEN": credential["token"]}
+        for step, expected in enumerate(("delivery_pending", "delivery_pending", "completed")):
+            worker.update(step=step, expected=expected)
+            completed = subprocess.run([sys.executable, str(Path(__file__).with_name("http_handoff_execution.py"))],
+                                       input=json.dumps(worker), text=True, capture_output=True, env=env, timeout=60)
+            assert completed.returncode == 0, completed.stderr
+            result = json.loads(completed.stdout)
+            assert result["state"] == expected and result["fetches"] == 1, result
+        assert source.read_bytes() == before
     print(json.dumps({"accepted": True, "handoff_reviewed": True, "held_for_review": True, "receipt_uuid": request["uuid"]}))
 
 

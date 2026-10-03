@@ -125,6 +125,9 @@ func verifyEnrichmentPublicationCheckpoint(get enrichmentGet, selectRows enrichm
 	if transcript.URL != sourceURL {
 		return nil, models.ErrSourcePayloadCorrupt
 	}
+	if err := verifyEnrichmentTranscript(get, selectRows, job, work, transcript); err != nil {
+		return nil, err
+	}
 	var records []models.EnrichmentPublishedRecord
 	if err := selectRows(&records, enrichmentPublishedRecordsSelect+" WHERE p.job_uuid=? ORDER BY p.ordinal LIMIT 1025", job.UUID); err != nil {
 		return nil, err
@@ -132,8 +135,9 @@ func verifyEnrichmentPublicationCheckpoint(get enrichmentGet, selectRows enrichm
 	if len(records) != len(transcript.Records) {
 		return nil, models.ErrSourcePayloadCorrupt
 	}
+	captures := make([]string, len(records))
 	for i, record := range records {
-		input, post, err := archive.PrepareEnrichmentCapture(job.UUID, work, transcript, record.EnrichmentCheckpointRecord)
+		input, post, err := enrichmentRecordCapture(get, selectRows, job.UUID, work, transcript, record.EnrichmentCheckpointRecord, captures[:i])
 		if err != nil {
 			return nil, err
 		}
@@ -143,6 +147,7 @@ func verifyEnrichmentPublicationCheckpoint(get enrichmentGet, selectRows enrichm
 		if err := verifyEnrichmentCapture(get, selectRows, *input, *post, work.CollectionUUID, work.CollectionRevision); err != nil {
 			return nil, err
 		}
+		captures[i] = input.UUID
 	}
 	return transcript, nil
 }

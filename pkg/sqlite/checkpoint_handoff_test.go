@@ -19,6 +19,7 @@ import (
 
 func removeCheckpointHandoffSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeEnrichmentHandoffSchema(t, raw)
 	_, err := raw.Exec(`DROP TABLE checkpoint_handoffs; DELETE FROM native_migration_history WHERE version=1000064`)
 	require.NoError(t, err)
 }

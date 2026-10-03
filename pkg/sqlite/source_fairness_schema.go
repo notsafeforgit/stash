@@ -2,12 +2,13 @@ package sqlite
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/stashapp/stash/pkg/models"
 )
 
-func validateSourceFairnessSchema(conn *sqlx.DB) error {
+func validateSourceFairnessSchema(conn *sqlx.DB, handoffs bool) error {
 	for _, name := range []string{"source_service_turns", "source_service_turns_bind", "source_enrichment_waiters",
 		"source_enrichment_waiters_expiry", "source_enrichment_waiter_scopes", "source_enrichment_waiter_scopes_scope",
 		"source_enrichment_waiter_current", "source_enrichment_waiter_identity", "source_enrichment_waiter_end"} {
@@ -20,7 +21,7 @@ func validateSourceFairnessSchema(conn *sqlx.DB) error {
 		}
 	}
 	var invalid bool
-	err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM source_pacing p
+	query := `SELECT EXISTS(SELECT 1 FROM source_pacing p
  WHERE NOT EXISTS(SELECT 1 FROM source_service_turns t WHERE t.scope=p.scope))
  OR EXISTS(SELECT 1 FROM source_service_turns t WHERE NOT EXISTS(SELECT 1 FROM source_pacing p WHERE p.scope=t.scope))
  OR EXISTS(SELECT 1 FROM source_enrichment_waiters w
@@ -34,7 +35,16 @@ func validateSourceFairnessSchema(conn *sqlx.DB) error {
  AND NOT EXISTS(SELECT 1 FROM enrichment_checkpoints h,json_each(h.body,'$.pending') p
  WHERE h.job_uuid=s.job_uuid AND source_scope_v1(json_extract(p.value,'$.url'))=s.scope)))
  OR EXISTS(SELECT 1 FROM source_enrichment_waiters w JOIN enrichment_checkpoints h ON h.job_uuid=w.job_uuid,json_each(h.body,'$.pending') p
- WHERE NOT EXISTS(SELECT 1 FROM source_enrichment_waiter_scopes s WHERE s.job_uuid=w.job_uuid AND s.scope=source_scope_v1(json_extract(p.value,'$.url'))))`)
+	WHERE NOT EXISTS(SELECT 1 FROM source_enrichment_waiter_scopes s WHERE s.job_uuid=w.job_uuid AND s.scope=source_scope_v1(json_extract(p.value,'$.url'))))`
+	if handoffs {
+		query = strings.Replace(query, "WHERE h.job_uuid=s.job_uuid AND source_scope_v1(json_extract(p.value,'$.url'))=s.scope)", `WHERE h.job_uuid=s.job_uuid AND source_scope_v1(json_extract(p.value,'$.url'))=s.scope)
+ AND NOT EXISTS(SELECT 1 FROM enrichment_job_seed_services x WHERE x.job_uuid=s.job_uuid AND x.scope=s.scope
+ AND NOT EXISTS(SELECT 1 FROM enrichment_checkpoints WHERE job_uuid=x.job_uuid))`, 1)
+		query += ` OR EXISTS(SELECT 1 FROM source_enrichment_waiters w JOIN enrichment_job_seed_services x ON x.job_uuid=w.job_uuid
+ WHERE NOT EXISTS(SELECT 1 FROM enrichment_checkpoints WHERE job_uuid=w.job_uuid)
+ AND NOT EXISTS(SELECT 1 FROM source_enrichment_waiter_scopes s WHERE s.job_uuid=w.job_uuid AND s.scope=x.scope))`
+	}
+	err := conn.Get(&invalid, query)
 	if err != nil {
 		return err
 	}

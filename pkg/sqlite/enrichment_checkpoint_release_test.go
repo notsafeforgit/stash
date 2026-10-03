@@ -32,7 +32,7 @@ func TestEnrichmentCheckpointReleaseMigrationPreservesStagingUntilVerified(t *te
 		t.Run(name, func(t *testing.T) {
 			f := newEnrichmentExecutionFixture(t)
 			f.service.Repo.EnrichmentJob = enrichmentKeepCheckpoint{f.repo.EnrichmentJob}
-			job := f.admit(t)
+			job := f.admitV1(t)
 			running := f.claim(t, job.UUID, 0)
 			head, err := f.worker.Checkpoint(t.Context(), f.tokens[0], running.Lease(), 0, f.complete)
 			require.NoError(t, err)

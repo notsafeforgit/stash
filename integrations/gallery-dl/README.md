@@ -1693,6 +1693,20 @@ Legacy queue mapping and production host/n8n launchers remain transition work.
 
 ### Durable selected-job execution
 
+The current client requires native `enrichment_protocol: 2`. After application
+review of a legacy checkpoint, `EnrichmentClient.admit_handoff(handoff_uuid,
+plan_sha256, policy_sha256, extractor_version)` consumes that exact review and
+returns its native job. Exact retry returns the same job after a lost response.
+The application review/seed API is documented in
+[native schema](../../docs/native-schema.md#reviewing-an-exact-checkpoint-handoff).
+
+The executor automatically resumes the job's verified retained seed when no
+checkpoint exists. Its prefix keeps original capture UUIDs and null historical
+observation times. It fetches only pending children and gives fresh observations
+their own times and parent bindings. Saved outbox deliveries take priority over
+seed reads or extraction after restart. Admission does not write a fake initial
+checkpoint. The same execution commands below handle ordinary and handoff jobs.
+
 `enrichment_worker.execute(outbox, client, profile, job_uuid)` executes or recovers
 one admitted native enrichment job. `profile=None` only recovers persisted
 delivery; it never claims an attempt or contacts a source website. The CLI accepts

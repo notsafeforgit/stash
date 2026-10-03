@@ -136,6 +136,7 @@ def execute(box, transport, configuration, job_uuid, *, fetcher=fetch):
                 configuration.check()
 
             head = client.head(job_uuid, value.definition["url"], configuration.extractor_version)
+            resume = head["body"] if head else client.seed(lease.job, value.definition["url"])
             if head is not None and head["pending_count"] == 0:
                 value = journal.intent(value, lease.job, "publish", {"receipt": {k: v for k, v in head.items() if k != "body"}})
             else:
@@ -146,7 +147,7 @@ def execute(box, transport, configuration, job_uuid, *, fetcher=fetch):
                     _deliver(journal, client, value)
                     return _result(journal, job_uuid, "capacity")
                 result = fetcher(value.definition["url"], configuration.settings(),
-                                 resume=head["body"] if head else None, check=check,
+                                 resume=resume, check=check,
                                  reserve_source=lease.reserve_source)
                 if (isinstance(result, dict) and set(result) == {"error"}
                         and isinstance(result["error"], str) and result["error"] in ERRORS):

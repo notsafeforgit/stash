@@ -26,8 +26,10 @@ handoffs are implemented. Retained legacy collector staging now has native
 conversion, inspection and reviewed acceptance into shared native captures.
 Native captures distinguish a missing historical observation time from the time
 the archive received retained evidence; acceptance retains the review hold.
-Exact handoff review and seed inspection are implemented; consuming that review
-into worker execution and remaining import review resolution still require work.
+Exact handoff review, seed inspection and reviewed worker execution are now
+implemented, including child retry, publication and recovery without assigning
+new observation times to retained evidence. Import review resolution still
+requires work.
 Native UI, live host/n8n conversion, compatibility removal, coordinated
 backup/export/restore, production cutover and retirement remain major release
 gates. The phase table below records that distinction; commit count is not a
@@ -131,7 +133,7 @@ it does not remove source files or recovery inputs.
 | 0 Baseline and contract | In progress: source tagged, runtime pinned, all compatible images preserved, independent-fork policy updated. Full backup boundary, fixtures, scoped API contract and performance budgets remain. |
 | 1 Native schema and services | Schema promotion, canonical saved/default filters, durable config import, unified performer names, portable archive identities including galleries and metadata relationship targets, native account/ownership storage and reviewed consolidation, shared post/profile/capture storage, ordered attachment manifests, audited media associations, reviewed source-list selection, and source-gallery synchronization with manual membership intent are implemented. Scalar and relationship field choices protect explicit and preserved metadata. Revisioned logical roots and source collections retain capture/manual-intake provenance; captured publisher choices connect source evidence to accounts independently of depicted performers. Verified byte identities and immutable per-file verification history now use persistent file-generation guards. Producer identity matching, policy resolution, review APIs/UI and remaining domain services are in progress. |
 | 2 Ingestion and producer adapter | In progress: scoped producer tokens, Reddit/Twitter capture batches and durable receipts are implemented. Verified preparation uses the shared scanner; file/media publication checks descriptors, generations and persistent path removals, reuses concurrent scans, and rejects ambiguous verified-byte owners. Intake publication connects collection provenance, selected source media, attachment evidence and album galleries while preserving explicit choices. Persistent jobs have coalesced submissions, fenced leases, retry/cancellation/recovery, and atomic domain/result publication. File-completion admission now queues a durable worker that checkpoints registration, generates previews and delivers retryable media/gallery hooks; scoped status reports actual completion. Native collection policies now apply typed metadata and explicit performer defaults in intake and ordinary scans, with dry preview and guarded apply. Source-run coordination now coalesces missing date ranges, fences worker ownership, retains checkpoints and deferrals, and excludes overlapping destinations. A supported Python producer package now provides retained-payload outboxes, fenced delivery, durable receipts, backoff and review. The gallery-dl SDK now queues source evidence before download, verifies root/prefix and lease ownership, holds shared destination locks, and queues flushed final files before archive acknowledgement. Reddit single-media evidence and original Twitter attachment membership are covered. The producer now coalesces offline source requests, freezes submissions for replay, retains caller tickets and validates native admission receipts. Claimed Reddit/Twitter windows use precise source timestamps and parent context, with directory checks before postprocessor callbacks. Reviewed portable profiles now fingerprint settings/assets and execute one claimed attempt with concurrent outbox delivery and lost-finish recovery. A local converter now stages ordered, source-scoped profiles from the host and n8n JSON layers without copying website credentials. Scoped dispatch discovers eligible runs with durable pagination/backoff, and a separate n8n image packages the pinned worker runtime. A local profile list now rotates download and metadata work, automatically discovers permitted metadata collections, and recovers saved metadata delivery before loading website profiles. Staged host Twitter/Reddit launchers preserve saved lists, modes, date filters and full-history profiles through durable caller snapshots. Staged n8n backfill calls now check permanent history before source admission, preserve original completion proof, and expose pending results to converted workflow waits. Live image/profile activation, operational-history and policy migration, general durable edit notifications, additional source adapters and recovery caller conversion remain. |
-| 3 Catalog importer and full-copy reconciliation | Permanent backfill decisions, retained scan journals/reviewed recovery activation, performer UUIDs and saved ownership, and account/catalog registry imports are implemented and rehearsed against full copies. All 1,697 frozen catalog bodies have bounded snapshot receipt and native mappings for posts/profiles/captures, account/post relationships, captured publishers, attachment lists, assets/files/appearances, collection memberships, retained documents and translation results. Historical album backfill is resumable and rehearsed. Original evidence, replay receipts and unresolved conflicts are retained. Shared native translation request/cache/target storage, bounded execution, provider workers and application inspection/control are implemented. Automation snapshot preparation preserves all ten operational families and has passed full-source reconciliation. Resumable native receipt, translation request/cache/target mapping and reviewed activation are implemented. The saved-plan bulk client has activated 324,169 imported holds in a full-copy rehearsal with lost-response recovery and independent reconciliation. Automatic capture scheduling now records revisioned collection-policy decisions with its requests and targets in the capture transaction. Native enrichment targets preserve revisioned scheduling choices and exact capture-completion evidence, with application inspection/control. Internal execution binds jobs to exact source/target revisions, authenticates each attempt producer and retains compact checkpoints with original observation provenance. Verified publication now uses native capture, publisher, album and translation services and commits record associations with target/job completion. Completed staging is verified and released atomically, retaining native captures, acknowledgement/provenance rows and unresolved references. Scoped enrichment routes and the Python transport/lease client now expose those services, with controlled failure replay, bounded checkpoint transfer and exact source-number preservation. Selected-job execution now journals stable claims, returned checkpoints and pending delivery intents in producer outbox schema 8; reviewed metadata-only profiles and delivery-only recovery are implemented. Collection-scoped dispatch now discovers admitted retries before new targets, with durable producer cursors/backoff and pagination past incompatible URLs. Native server maintenance recovers expired attempts and cancels stale work without discarding checkpoints. Native shared service reservations and cooldowns now coordinate downloads with enrichment, including fenced reservations before contacting newly discovered child services. Download-side linked-service reservations, typed failures, bounded download preference and cooperative source turns are implemented. Persistent worker/profile rotation and automatic collection discovery are also implemented. Historical catalog enrichment receipts now have resumable native import and application inspection, preserving the old assertion without creating native attempts. Frozen legacy enrichment jobs, cooldowns and seed/source progress now have bounded native mapping with held work, scoped historical completion, explicit review and retained exclusions. Reviewed legacy enrichment activation is implemented, including explicit collection-revision handoffs. Retained staged results now have conversion and inspection, while their reviewed handoff into native execution remains outstanding. Additional download adapters, existing policy migration, other histories and operational families, validated source routing, review resolution, global reconciliation and cutover import remain unfinished. |
+| 3 Catalog importer and full-copy reconciliation | Permanent backfill decisions, retained scan journals/reviewed recovery activation, performer UUIDs and saved ownership, and account/catalog registry imports are implemented and rehearsed against full copies. All 1,697 frozen catalog bodies have bounded snapshot receipt and native mappings for posts/profiles/captures, account/post relationships, captured publishers, attachment lists, assets/files/appearances, collection memberships, retained documents and translation results. Historical album backfill is resumable and rehearsed. Original evidence, replay receipts and unresolved conflicts are retained. Shared native translation request/cache/target storage, bounded execution, provider workers and application inspection/control are implemented. Automation snapshot preparation preserves all ten operational families and has passed full-source reconciliation. Resumable native receipt, translation request/cache/target mapping and reviewed activation are implemented. The saved-plan bulk client has activated 324,169 imported holds in a full-copy rehearsal with lost-response recovery and independent reconciliation. Automatic capture scheduling now records revisioned collection-policy decisions with its requests and targets in the capture transaction. Native enrichment targets preserve revisioned scheduling choices and exact capture-completion evidence, with application inspection/control. Internal execution binds jobs to exact source/target revisions, authenticates each attempt producer and retains compact checkpoints with original observation provenance. Verified publication now uses native capture, publisher, album and translation services and commits record associations with target/job completion. Completed staging is verified and released atomically, retaining native captures, acknowledgement/provenance rows and unresolved references. Scoped enrichment routes and the Python transport/lease client now expose those services, with controlled failure replay, bounded checkpoint transfer and exact source-number preservation. Selected-job execution now journals stable claims, returned checkpoints and pending delivery intents in producer outbox schema 8; reviewed metadata-only profiles and delivery-only recovery are implemented. Collection-scoped dispatch now discovers admitted retries before new targets, with durable producer cursors/backoff and pagination past incompatible URLs. Native server maintenance recovers expired attempts and cancels stale work without discarding checkpoints. Native shared service reservations and cooldowns now coordinate downloads with enrichment, including fenced reservations before contacting newly discovered child services. Download-side linked-service reservations, typed failures, bounded download preference and cooperative source turns are implemented. Persistent worker/profile rotation and automatic collection discovery are also implemented. Historical catalog enrichment receipts now have resumable native import and application inspection, preserving the old assertion without creating native attempts. Frozen legacy enrichment jobs, cooldowns and seed/source progress now have bounded native mapping with held work, scoped historical completion, explicit review and retained exclusions. Reviewed legacy enrichment activation is implemented, including explicit collection-revision handoffs. Retained staged results now have conversion, evidence acceptance and exact handoff review; scoped native admission, worker resume, child service scheduling, publication and released proofs preserve original observations separately from fresh child captures. Additional download adapters, existing policy migration, other histories and operational families, validated source routing, review resolution, global reconciliation and cutover import remain unfinished. |
 | 4 Native UI and client conversion | Not yet implemented |
 | 5 Compatibility removal and packaging | Preview packaging isolated and old compatibility gate replaced by current v3 operation/plugin-contract checks. Old UI/API/plugin adapters and config bridge still require conversion/removal. |
 | 6 Backup and cutover rehearsal | Not yet implemented |
@@ -5479,3 +5481,77 @@ The full transition remains active, including execution handoff, migration
 review, remaining operational and policy families, adapters, native UI, host/n8n
 conversion, compatibility removal, coordinated recovery/export, performance,
 owner-reviewed cutover and retirement.
+
+## Execute reviewed checkpoint handoffs — 2026-10-03
+
+Schema 1000065 connects the reviewed seed to native admission, worker execution
+and publication. Admission rechecks the exact reviewed post, target, collection,
+root, runtime and policy, then atomically releases the planned target and creates
+one job. The small binding tables contain original capture identities, digests
+and pending service names. They do not duplicate payloads or invent a producer
+attempt/checkpoint receipt. A repeated admission recovers the original job even
+after completion or later collection edits.
+
+New native jobs pin version-2 capture semantics. Existing native v1 jobs and
+released proofs retain their original identities and checksums. The producer
+uses the verified seed only before its first real checkpoint, and recovers saved
+delivery before another fetch. Pending child services participate in pacing and
+fairness before any checkpoint exists. A child-only failure with no saved child
+failure evidence does not pause the parent service.
+
+Publication reuses original retained captures, including unknown observation
+times and extractor versions. It associates them with the destination collection
+without treating them as fresh publisher/translation evidence. Fresh child
+captures receive their real observation times and signed parent-capture bindings;
+ordinary new child enrichment uses the same contract. Version-2 release proofs
+bind the review and seed to original signatures, new captures and submitting
+producer records. Original unscoped references remain in accepted evidence.
+Startup, backup/restore and anonymisation include these relationships.
+
+The real HTTP fixture drops committed admission, checkpoint and publication
+responses, then recovers through three fresh Python worker processes. It fetches
+the saved child once, never refetches the retained root, and finishes with a
+single attempt. Exact large integers and missing historical clocks survive the
+round trip. Other fixtures cover stale review, late-error rollback, child
+cooldowns and fairness across restart, rewritten prefixes, completion outside
+publication, missing projections, and migration of existing v1 released proofs.
+
+Both build pipelines for the preceding commit failed twice while fetching the
+pinned gallery-dl repository from Codeberg (HTTP 504 before code tests). The
+dependency now uses the upstream GitHub repository at the exact same commit;
+its local installation passed. This changes the transport URL, not the pinned
+extractor version or runtime identity.
+
+The full backend gate passed in 850.368 seconds with zero lint issues (API
+681.549, ingestion 562.567, SQLite 841.071 seconds). All 388 producer tests passed
+in 38.226 seconds. The real HTTP review/execution fixtures passed in 6.153 seconds.
+The first complete backend run found one older migration fixture creating a new
+v2 job before reconstructing schema 57; switching that fixture to a historical
+v1 job passed its targeted check in 8.468 seconds and the subsequent full gate.
+
+One SQLite online backup took 70.908 seconds. Normal opening, migration and
+reinitialisation passed in 784.913 seconds, and fresh-process opening passed in
+157.299 seconds. The large-copy operations used idle disk-I/O priority during
+other tests and host activity; these are not isolated startup benchmarks.
+
+Independent comparison passed in 869.229 seconds. All 238 existing data tables
+retain their exact values and types, including 526,348 capture UUIDs, rowids,
+observation/recording times and signatures. Prior migration history and sequence
+counters are unchanged. Only the expected release-table definition and three
+scope triggers changed; the three new execution tables are empty. These frozen
+inputs contain no saved legacy checkpoint bodies, so populated handoff execution
+is demonstrated by fixtures. Integrity is clean with zero foreign-key violations,
+and the database remains 20,265,979,904 bytes. Startup/cutover performance remains
+a release gate.
+
+Evidence is under `.local/native-handoff-execution-rehearsal-20261003/`. This
+verified replacement supersedes schema 64 under the retention policy after the
+host-visible open-file check. Free space stayed above 133 GiB with both copies
+present. After the checks, 763 closed temporary SQLite test files were removed,
+reclaiming 973,881,344 bytes. Original compatible and frozen source inputs remain.
+
+The full transition remains active: refreshed coordinated snapshots, migration
+review, remaining operational/policy families, additional adapters, native UI,
+host/n8n conversion, compatibility removal, coordinated backup/export/restore,
+performance, owner-reviewed cutover and retirement are still required.
+Production and `develop` remain unchanged.

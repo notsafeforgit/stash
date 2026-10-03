@@ -347,7 +347,7 @@ func TestSourcePacingMigrationPreservesPriorJobsAndRunningOwnership(t *testing.T
 	for _, collision := range []bool{false, true} {
 		t.Run(map[bool]string{false: "upgrade", true: "collision"}[collision], func(t *testing.T) {
 			f := newEnrichmentExecutionFixture(t)
-			job := f.admit(t)
+			job := f.admitV1(t)
 			running := f.claim(t, job.UUID, 0)
 			_, err := f.worker.Checkpoint(t.Context(), f.tokens[0], running.Lease(), 0, f.initial)
 			require.NoError(t, err)

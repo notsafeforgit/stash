@@ -31,7 +31,7 @@ func (rs *ingestRoutes) enrichmentRoutes(r chi.Router) {
 					ingestError(w, err)
 					return
 				}
-				for _, key := range []string{"job", "target", "collection"} {
+				for _, key := range []string{"job", "target", "collection", "handoff"} {
 					if id := chi.URLParam(r, key); id != "" && !ingest.ValidUUID(id) {
 						ingestError(w, ingest.ErrInvalid)
 						return
@@ -44,7 +44,9 @@ func (rs *ingestRoutes) enrichmentRoutes(r chi.Router) {
 		r.Post("/collections/{collection}/ready", rs.readyEnrichment)
 		r.Post("/collections/{collection}/jobs/ready", rs.readyEnrichmentJobs)
 		r.Post("/targets/{target}/jobs", rs.admitEnrichment)
+		r.Post("/handoffs/{handoff}/jobs", rs.admitEnrichmentHandoff)
 		r.Get("/jobs/{job}", rs.describeEnrichment)
+		r.Get("/jobs/{job}/seed", rs.readEnrichmentSeed)
 		r.Post("/jobs/{job}/claim", rs.claimEnrichment)
 		r.Post("/jobs/{job}/renew", rs.renewEnrichment)
 		r.Post("/jobs/{job}/source", rs.reserveEnrichmentSource)
@@ -55,6 +57,25 @@ func (rs *ingestRoutes) enrichmentRoutes(r chi.Router) {
 		r.Get("/jobs/{job}/publication", rs.readEnrichmentPublication)
 		r.Get("/jobs/{job}/release", rs.readEnrichmentRelease)
 	})
+}
+
+func (rs *ingestRoutes) admitEnrichmentHandoff(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		ExpectedPlanSHA256 string `json:"expected_plan_sha256"`
+		PolicySHA256       string `json:"policy_sha256"`
+		ExtractorVersion   string `json:"extractor_version"`
+	}
+	if err := readIngestJSON(w, r, 4096, &input); err != nil {
+		ingestError(w, err)
+		return
+	}
+	value, err := rs.enrichmentWorker().AdmitHandoff(r.Context(), ingestToken(r), chi.URLParam(r, "handoff"), input.ExpectedPlanSHA256, input.PolicySHA256, input.ExtractorVersion)
+	writeEnrichmentWorker(w, value, err)
+}
+
+func (rs *ingestRoutes) readEnrichmentSeed(w http.ResponseWriter, r *http.Request) {
+	value, err := rs.enrichmentWorker().Seed(r.Context(), ingestToken(r), chi.URLParam(r, "job"))
+	writeEnrichmentWorker(w, value, err)
 }
 
 func writeEnrichmentWorker(w http.ResponseWriter, value any, err error) {

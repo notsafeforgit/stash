@@ -26,13 +26,15 @@ func sourceEnrichmentWaiting(ctx context.Context, job *models.ArchiveJob, now ti
 		return err
 	}
 	if _, err := dbWrapper.Exec(ctx, `INSERT OR IGNORE INTO source_pacing(scope)
- SELECT source_scope_v1(json_extract(p.value,'$.url')) FROM enrichment_checkpoints h,json_each(h.body,'$.pending') p WHERE h.job_uuid=?`, job.UUID); err != nil {
+ SELECT source_scope_v1(json_extract(p.value,'$.url')) FROM enrichment_checkpoints h,json_each(h.body,'$.pending') p WHERE h.job_uuid=?
+ UNION SELECT scope FROM enrichment_job_seed_services WHERE job_uuid=? AND NOT EXISTS(SELECT 1 FROM enrichment_checkpoints WHERE job_uuid=?)`, job.UUID, job.UUID, job.UUID); err != nil {
 		return err
 	}
 	_, err := dbWrapper.Exec(ctx, `INSERT INTO source_enrichment_waiter_scopes(job_uuid,scope)
  SELECT job_uuid,scope FROM enrichment_job_pacing WHERE job_uuid=?
  UNION SELECT h.job_uuid,source_scope_v1(json_extract(p.value,'$.url'))
- FROM enrichment_checkpoints h,json_each(h.body,'$.pending') p WHERE h.job_uuid=?`, job.UUID, job.UUID)
+ FROM enrichment_checkpoints h,json_each(h.body,'$.pending') p WHERE h.job_uuid=?
+ UNION SELECT job_uuid,scope FROM enrichment_job_seed_services WHERE job_uuid=? AND NOT EXISTS(SELECT 1 FROM enrichment_checkpoints WHERE job_uuid=?)`, job.UUID, job.UUID, job.UUID, job.UUID)
 	return err
 }
 

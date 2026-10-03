@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"reflect"
+	"slices"
 	"sort"
 	"time"
 
@@ -46,6 +47,22 @@ func (s *EnrichmentJobStore) PublishedRecords(ctx context.Context, id string, af
 	}
 	ret := []models.EnrichmentPublishedRecord{}
 	err = dbWrapper.Select(ctx, &ret, enrichmentPublishedRecordsSelect+" WHERE p.job_uuid=? AND p.ordinal>? ORDER BY p.ordinal LIMIT ?", id, after, limit)
+	if err != nil {
+		return nil, err
+	}
+	var retained []enrichmentRetainedRecord
+	if err := dbWrapper.Select(ctx, &retained, "SELECT ordinal,capture_uuid,digest FROM enrichment_job_retained_records WHERE job_uuid=? AND ordinal>? ORDER BY ordinal LIMIT ?", id, after, limit); err != nil {
+		return nil, err
+	}
+	byOrdinal := make(map[int]string, len(retained))
+	for _, record := range retained {
+		byOrdinal[record.Ordinal] = record.CaptureUUID
+	}
+	for i := range ret {
+		if id, ok := byOrdinal[ret[i].Ordinal]; ok {
+			ret[i].RetainedCapture = &id
+		}
+	}
 	return ret, err
 }
 
@@ -64,15 +81,32 @@ func verifyEnrichmentCapture(get enrichmentGet, selectRows enrichmentSelect, inp
 		return err
 	}
 	var row sourceCaptureRow
-	if err := get(&row, "SELECT "+sourceCaptureColumns+` FROM source_captures c
+	columns := sourceCaptureColumns
+	if input.RecordedAt != nil {
+		columns += ", c.recorded_at"
+	}
+	if err := get(&row, "SELECT "+columns+` FROM source_captures c
  JOIN source_post_revisions r ON r.post_uuid=c.post_uuid AND r.uuid=c.revision_uuid WHERE c.uuid=?`, input.UUID); err != nil {
 		return err
 	}
 	if row.PostUUID != input.PostUUID || row.Origin != input.Origin || row.Platform != input.Platform || !row.CapturedAt.Timestamp.Equal(input.CapturedAt) ||
-		!row.ExtractorVersion.Valid || input.ExtractorVersion == nil || row.ExtractorVersion.String != *input.ExtractorVersion || row.RetentionPolicy != input.RetentionPolicy ||
+		row.CapturedAt.Valid == input.CapturedAt.IsZero() || row.ExtractorVersion.Valid != (input.ExtractorVersion != nil) ||
+		(input.ExtractorVersion != nil && row.ExtractorVersion.String != *input.ExtractorVersion) || row.RetentionPolicy != input.RetentionPolicy ||
 		row.StructureVersion != archive.CaptureStructureVersion || row.Metadata != metadata || row.BodyDigest != sourceDigest(input.Payload.Shared) ||
 		row.PatchDigest != sourceDigest(input.Payload.Patch) || row.RevisionSignature != revisionSignature || row.Signature != signature {
 		return models.ErrSourcePayloadCorrupt
+	}
+	if input.RecordedAt != nil && (!row.RecordedAt.Valid || !row.RecordedAt.Timestamp.Equal(*input.RecordedAt)) {
+		return models.ErrSourcePayloadCorrupt
+	}
+	if input.RetentionPolicy == archive.CaptureContextPolicy {
+		var contexts []models.SourceCaptureContext
+		if err := selectRows(&contexts, "SELECT * FROM source_capture_contexts WHERE capture_uuid=? ORDER BY path LIMIT 3", input.UUID); err != nil {
+			return err
+		}
+		if !slices.Equal(contexts, input.Contexts) {
+			return models.ErrSourcePayloadCorrupt
+		}
 	}
 	var valid bool
 	if err := get(&valid, `SELECT EXISTS(SELECT 1 FROM source_post_identifiers WHERE namespace=? AND value=? AND post_uuid=?)
@@ -170,6 +204,9 @@ func (s *EnrichmentJobStore) Publish(ctx context.Context, lease models.Enrichmen
 	}
 	get := func(out any, query string, args ...any) error { return dbWrapper.Get(ctx, out, query, args...) }
 	selectRows := func(out any, query string, args ...any) error { return dbWrapper.Select(ctx, out, query, args...) }
+	if err := verifyEnrichmentTranscript(get, selectRows, job, work, transcript); err != nil {
+		return nil, err
+	}
 	unique := make(map[string]bool)
 	for after := -1; after+1 < len(captures); {
 		records, err := s.CheckpointRecords(ctx, job.UUID, after, 100)
@@ -183,7 +220,7 @@ func (s *EnrichmentJobStore) Publish(ctx context.Context, lease models.Enrichmen
 			if record.Ordinal != after+1 || record.Ordinal >= len(captures) {
 				return nil, models.ErrSourcePayloadCorrupt
 			}
-			input, post, err := archive.PrepareEnrichmentCapture(job.UUID, work, transcript, record)
+			input, post, err := enrichmentRecordCapture(get, selectRows, job.UUID, work, transcript, record, captures[:record.Ordinal])
 			if err != nil {
 				return nil, err
 			}

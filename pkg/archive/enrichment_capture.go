@@ -65,7 +65,7 @@ func CapturedMetadata(raw []byte) (models.SourcePostMetadata, error) {
 // producer to a portable capture. Equal records from the same observation share
 // a capture even when the transcript also needs a separate context record.
 func PrepareEnrichmentCapture(job string, work *models.EnrichmentJobArguments, transcript *EnrichmentTranscript, record models.EnrichmentCheckpointRecord) (*models.SourceCaptureInput, *models.SourcePostIdentifier, error) {
-	if work == nil || transcript == nil || transcript.Schema != EnrichmentTranscriptSchema || !translationUUID(job) || record.JobUUID != job || !translationUUID(record.ProducerUUID) ||
+	if work == nil || work.Version != 1 || transcript == nil || transcript.Schema != EnrichmentTranscriptSchema || !translationUUID(job) || record.JobUUID != job || !translationUUID(record.ProducerUUID) ||
 		!translationUUID(work.PostUUID) || transcript.ExtractorVersion != work.ExtractorVersion {
 		return nil, nil, models.ErrEnrichmentInvalid
 	}

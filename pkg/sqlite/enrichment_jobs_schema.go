@@ -11,7 +11,7 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-func validateEnrichmentJobSchema(conn *sqlx.DB, releases bool) error {
+func validateEnrichmentJobSchema(conn *sqlx.DB, releases, handoffs bool) error {
 	for _, object := range []struct{ name, kind string }{
 		{"enrichment_job_targets", "table"}, {"enrichment_job_attempts", "table"},
 		{"enrichment_checkpoint_receipts", "table"}, {"enrichment_checkpoints", "table"},
@@ -66,6 +66,14 @@ func validateEnrichmentJobSchema(conn *sqlx.DB, releases bool) error {
 	}
 	if invalid {
 		return models.ErrSourcePayloadCorrupt
+	}
+	if !handoffs {
+		if err := conn.Get(&invalid, "SELECT EXISTS(SELECT 1 FROM archive_jobs WHERE kind='post.enrich' AND json_extract(arguments,'$.version')!=1)"); err != nil {
+			return err
+		}
+		if invalid {
+			return models.ErrSourcePayloadCorrupt
+		}
 	}
 	if err := validateEnrichmentJobArguments(conn); err != nil {
 		return err
@@ -175,9 +183,21 @@ func validateEnrichmentCheckpoints(conn *sqlx.DB) error {
 			return err
 		}
 		parsed, err := archive.ParseEnrichmentTranscript([]byte(row.Body))
-		if err != nil || parsed.Schema != archive.EnrichmentTranscriptSchema || enrichmentDigest([]byte(row.Body)) != row.Digest || parsed.URL != row.URL || parsed.ExtractorVersion != row.ExtractorVersion ||
+		if err != nil || enrichmentDigest([]byte(row.Body)) != row.Digest || parsed.URL != row.URL || parsed.ExtractorVersion != row.ExtractorVersion ||
 			len(parsed.Records) != row.RecordCount || len(parsed.Pending) != row.PendingCount || len(parsed.Unresolved) != row.UnresolvedCount {
 			return models.ErrSourcePayloadCorrupt
+		}
+		var jobRow archiveJobRow
+		if err := conn.Get(&jobRow, "SELECT * FROM archive_jobs WHERE uuid=?", row.JobUUID); err != nil {
+			return err
+		}
+		job := jobRow.resolve()
+		work, err := archive.DecodeEnrichmentJob(job)
+		if err != nil {
+			return err
+		}
+		if err := verifyEnrichmentTranscript(conn.Get, conn.Select, job, work, parsed); err != nil {
+			return err
 		}
 		var records []struct {
 			Ordinal int    `db:"ordinal"`

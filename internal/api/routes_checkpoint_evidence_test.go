@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/stashapp/stash/internal/ingest"
 	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/pkg/scrape"
 	"github.com/stashapp/stash/pkg/sqlite"
@@ -21,6 +22,14 @@ import (
 )
 
 func TestCheckpointEvidenceAndHandoffHTTPRecoverCommittedResponsesAndKeepReviewHold(t *testing.T) {
+	checkpointEvidenceHTTP(t, false)
+}
+
+func TestEnrichmentHandoffHTTPRecoversAdmissionCheckpointAndPublicationAcrossWorkerRestarts(t *testing.T) {
+	checkpointEvidenceHTTP(t, true)
+}
+
+func checkpointEvidenceHTTP(t *testing.T, executeHandoff bool) {
 	python, packagePath := nativeProducerRuntime(t)
 	config.InitializeEmpty()
 	directory := t.TempDir()
@@ -42,18 +51,35 @@ func TestCheckpointEvidenceAndHandoffHTTPRecoverCommittedResponsesAndKeepReviewH
 	}))
 	router := (&nativeArchiveRoutes{repo: repo}).router()
 	handler := http.StripPrefix("/api/v3/archive", router)
+	producerRoutes := &ingestRoutes{service: ingest.New(repo)}
+	producerHandler := producerRoutes.router()
+	adminHandler := http.StripPrefix("/api/v3/ingest-admin", producerRoutes.adminRouter())
 	var lost atomic.Bool
 	var lostHandoff atomic.Bool
+	var lostAdmission, lostCheckpoint, lostPublication atomic.Bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("ApiKey") != "fixture-application-key" || r.Header.Get("Authorization") != "" {
+		producer := strings.HasPrefix(r.URL.Path, ingestPath+"/")
+		if !producer && (r.Header.Get("ApiKey") != "fixture-application-key" || r.Header.Get("Authorization") != "") {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 		recorder := httptest.NewRecorder()
-		handler.ServeHTTP(recorder, r)
+		switch {
+		case producer:
+			producerHandler.ServeHTTP(recorder, r)
+		case strings.HasPrefix(r.URL.Path, "/api/v3/ingest-admin/"):
+			adminHandler.ServeHTTP(recorder, r)
+		default:
+			handler.ServeHTTP(recorder, r)
+		}
 		drop := recorder.Code == 200 && r.Method == "POST" &&
 			((strings.HasSuffix(r.URL.Path, "/checkpoint-evidence") && !lost.Swap(true)) ||
 				(strings.HasSuffix(r.URL.Path, "/checkpoint-handoffs") && !lostHandoff.Swap(true)))
+		if executeHandoff && producer && recorder.Code == 200 && r.Method == "POST" {
+			drop = (strings.Contains(r.URL.Path, "/handoffs/") && strings.HasSuffix(r.URL.Path, "/jobs") && !lostAdmission.Swap(true)) ||
+				(strings.HasSuffix(r.URL.Path, "/checkpoint") && !lostCheckpoint.Swap(true)) ||
+				(strings.HasSuffix(r.URL.Path, "/publish") && !lostPublication.Swap(true))
+		}
 		if drop {
 			connection, _, err := w.(http.Hijacker).Hijack()
 			if err != nil {
@@ -70,7 +96,7 @@ func TestCheckpointEvidenceAndHandoffHTTPRecoverCommittedResponsesAndKeepReviewH
 		_, _ = w.Write(recorder.Body.Bytes())
 	}))
 	defer server.Close()
-	setup, err := json.Marshal(map[string]any{"directory": directory, "source": source, "snapshot": snapshot, "endpoint": server.URL})
+	setup, err := json.Marshal(map[string]any{"directory": directory, "source": source, "snapshot": snapshot, "endpoint": server.URL, "execute_handoff": executeHandoff})
 	require.NoError(t, err)
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()
@@ -80,6 +106,11 @@ func TestCheckpointEvidenceAndHandoffHTTPRecoverCommittedResponsesAndKeepReviewH
 	require.NoError(t, err, string(output))
 	require.True(t, lost.Load())
 	require.True(t, lostHandoff.Load())
+	if executeHandoff {
+		require.True(t, lostAdmission.Load())
+		require.True(t, lostCheckpoint.Load())
+		require.True(t, lostPublication.Load())
+	}
 	require.NoError(t, db.Close())
 	require.NoError(t, db.Open(db.DatabasePath()))
 	for _, test := range []struct {

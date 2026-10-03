@@ -9,7 +9,7 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-func validateEnrichmentWorkSchema(conn *sqlx.DB, importedProofs bool) error {
+func validateEnrichmentWorkSchema(conn *sqlx.DB, importedProofs, handoffs bool) error {
 	for _, object := range []struct{ name, kind string }{
 		{"enrichment_targets", "table"}, {"enrichment_completions", "table"}, {"enrichment_completion_captures", "table"}, {"enrichment_target_history", "table"},
 		{"enrichment_targets_post", "index"}, {"enrichment_targets_post_state", "index"},
@@ -71,6 +71,13 @@ func validateEnrichmentWorkSchema(conn *sqlx.DB, importedProofs bool) error {
 	if importedProofs {
 		query = strings.Replace(query, "previous.state IS NOT 'pending'", "previous.state IS NOT (CASE WHEN EXISTS(SELECT 1 FROM enrichment_completions e WHERE e.uuid=h.completion_uuid AND (e.legacy_receipt_uuid IS NOT NULL OR e.legacy_capture_uuid IS NOT NULL)) THEN 'held' ELSE 'pending' END)", 1)
 		query = strings.Replace(query, "h.state IS NOT 'pending' OR h.recorded_at>e.created_at OR h.not_before>e.created_at", "h.state IS NOT (CASE WHEN e.legacy_receipt_uuid IS NOT NULL OR e.legacy_capture_uuid IS NOT NULL THEN 'held' ELSE 'pending' END) OR h.recorded_at>e.created_at OR (e.legacy_receipt_uuid IS NULL AND e.legacy_capture_uuid IS NULL AND h.not_before>e.created_at)", 1)
+	}
+	if handoffs {
+		query = strings.Replace(query, "c.origin NOT IN ('gallery-dl','gallery-dl-enrichment')", `(c.origin NOT IN ('gallery-dl','gallery-dl-enrichment') AND NOT (
+ c.origin='legacy-enrichment' AND EXISTS(SELECT 1 FROM enrichment_publications p
+ JOIN enrichment_job_retained_records x ON x.job_uuid=p.job_uuid AND x.capture_uuid=c.uuid
+ JOIN enrichment_job_targets j ON j.job_uuid=p.job_uuid AND j.target_uuid=t.uuid AND j.target_revision=r.expected_revision
+ WHERE p.completion_uuid=r.uuid)))`, 1)
 	}
 	if err := conn.Get(&invalid, query); err != nil {
 		return err

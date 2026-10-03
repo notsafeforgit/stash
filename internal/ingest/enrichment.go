@@ -109,7 +109,7 @@ func (c *EnrichmentCoordinator) Admit(ctx context.Context, token, targetID strin
 		if target.Revision != expected || target.State != "pending" || collection.Revision != target.CollectionRevision || collection.State != "active" {
 			return models.ErrEnrichmentConflict
 		}
-		input, err := archive.PrepareEnrichmentJob(models.EnrichmentJobArguments{Version: 1, TargetUUID: target.UUID, TargetRevision: target.Revision,
+		input, err := archive.PrepareEnrichmentJob(models.EnrichmentJobArguments{Version: 2, CapturePolicy: archive.CaptureContextPolicy, TargetUUID: target.UUID, TargetRevision: target.Revision,
 			PostUUID: target.PostUUID, CollectionUUID: collection.UUID, CollectionRevision: collection.Revision, RootUUID: collection.RootUUID,
 			PolicySHA256: policy, ExtractorVersion: extractor})
 		if err != nil {

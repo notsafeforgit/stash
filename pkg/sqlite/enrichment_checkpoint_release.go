@@ -30,7 +30,7 @@ func readEnrichmentCheckpointRelease(get enrichmentGet, id string) (*models.Enri
 	}
 	canonical, err := json.Marshal(row.Unresolved)
 	if err != nil || string(canonical) != row.References || len(row.Unresolved) > archive.MaxEnrichmentReferences ||
-		row.Version != 1 || !archive.ValidSHA256(row.ProofSHA256) || !validJobTime(row.CreatedAt) ||
+		(row.Version != 1 && row.Version != 2) || !archive.ValidSHA256(row.ProofSHA256) || !validJobTime(row.CreatedAt) ||
 		row.CheckpointBytes < 1 || row.CheckpointBytes > archive.MaxEnrichmentTranscriptBytes {
 		return nil, models.ErrSourcePayloadCorrupt
 	}
@@ -62,7 +62,7 @@ func enrichmentReleaseProof(get enrichmentGet, selectRows enrichmentSelect, publ
 	completion, completionErr := archive.EnrichmentCompletionUUID(job.UUID)
 	if err != nil || completionErr != nil || completion != publication.CompletionUUID || !bytes.Equal(result, job.Result) ||
 		job.State != "succeeded" || job.Fence != publication.Fence || publication.CreatedAt.UnixMilli() != job.UpdatedAt.UnixMilli() ||
-		release.JobUUID != job.UUID || release.CreatedAt.Before(publication.CreatedAt) || len(release.Unresolved) != publication.UnresolvedCount {
+		release.Version != work.Version || release.JobUUID != job.UUID || release.CreatedAt.Before(publication.CreatedAt) || len(release.Unresolved) != publication.UnresolvedCount {
 		return "", models.ErrSourcePayloadCorrupt
 	}
 	var receipts []models.EnrichmentCheckpointReceipt
@@ -89,21 +89,50 @@ func enrichmentReleaseProof(get enrichmentGet, selectRows enrichmentSelect, publ
 	if len(records) != publication.RecordCount || len(records) < 1 || len(records) > archive.MaxEnrichmentCaptures {
 		return "", models.ErrSourcePayloadCorrupt
 	}
+	var seed *archive.EnrichmentTranscript
+	if work.Handoff != nil {
+		value, err := readEnrichmentSeed(get, selectRows, job, work)
+		if err != nil {
+			return "", err
+		}
+		if value == nil {
+			return "", models.ErrSourcePayloadCorrupt
+		}
+		seed, err = archive.ParseEnrichmentTranscript(value.Body)
+		if err != nil {
+			return "", err
+		}
+		if len(records) < len(seed.Records) {
+			return "", models.ErrSourcePayloadCorrupt
+		}
+	}
 	signatures := make(map[string]string)
+	preceding := make(map[string]bool)
 	for i, record := range records {
 		if record.Ordinal != i || !archive.ValidSHA256(record.Digest) || record.CheckpointRevision < 1 || record.CheckpointRevision > len(receipts) ||
 			record.Fence != receipts[record.CheckpointRevision-1].Fence || !validSourceRunUUID(record.ProducerUUID) {
 			return "", models.ErrSourcePayloadCorrupt
 		}
-		if _, ok := signatures[record.CaptureUUID]; ok {
+		if _, ok := signatures[record.CaptureUUID]; ok && work.Version == 1 {
 			continue
 		}
 		capture, err := findSourceCapture(get, selectRows, record.CaptureUUID)
 		if err != nil {
 			return "", err
 		}
-		if capture == nil || capture.PostUUID != work.PostUUID || capture.Origin != "gallery-dl" || capture.ExtractorVersion == nil ||
-			*capture.ExtractorVersion != work.ExtractorVersion || capture.RetentionPolicy != archive.SourceRetentionVersion {
+		retained := seed != nil && i < len(seed.Records)
+		if capture == nil || capture.PostUUID != work.PostUUID {
+			return "", models.ErrSourcePayloadCorrupt
+		}
+		if retained {
+			digest, err := seed.RecordDigest(i)
+			if err != nil || digest != record.Digest || seed.Records[i].RetainedCapture == nil || *seed.Records[i].RetainedCapture != capture.UUID ||
+				capture.Origin != "legacy-enrichment" || capture.RetentionPolicy != "legacy-retained-v1" || !capture.CapturedAt.IsZero() || capture.RecordedAt == nil {
+				return "", models.ErrSourcePayloadCorrupt
+			}
+			records[i].RetainedCapture = seed.Records[i].RetainedCapture
+		} else if capture.Origin != "gallery-dl" || capture.ExtractorVersion == nil || *capture.ExtractorVersion != work.ExtractorVersion ||
+			(capture.RetentionPolicy != archive.SourceRetentionVersion && (work.Version != 2 || capture.RetentionPolicy != archive.CaptureContextPolicy)) {
 			return "", models.ErrSourcePayloadCorrupt
 		}
 		raw, err := archive.RestoreCapture(capture.Payload)
@@ -114,8 +143,20 @@ func enrichmentReleaseProof(get enrichmentGet, selectRows enrichmentSelect, publ
 		if err != nil || post == nil {
 			return "", models.ErrSourcePayloadCorrupt
 		}
+		if work.Version == 2 && !retained {
+			parent := ""
+			if len(capture.Contexts) != 0 {
+				if len(capture.Contexts) != 1 || !preceding[capture.Contexts[0].ParentUUID] {
+					return "", models.ErrSourcePayloadCorrupt
+				}
+				parent = capture.Contexts[0].ParentUUID
+			}
+			if capture.CapturedAt.IsZero() || capture.RecordedAt != nil || archive.ContextEnrichmentCaptureUUID(job.UUID, record.ProducerUUID, capture.CapturedAt, raw, parent) != capture.UUID {
+				return "", models.ErrSourcePayloadCorrupt
+			}
+		}
 		input := models.SourceCaptureInput{UUID: capture.UUID, PostUUID: capture.PostUUID, Origin: capture.Origin, Platform: capture.Platform,
-			CapturedAt: capture.CapturedAt, ExtractorVersion: capture.ExtractorVersion, RetentionPolicy: capture.RetentionPolicy, Metadata: capture.Metadata, Payload: *capture.Payload}
+			CapturedAt: capture.CapturedAt, RecordedAt: capture.RecordedAt, Contexts: capture.Contexts, ExtractorVersion: capture.ExtractorVersion, RetentionPolicy: capture.RetentionPolicy, Metadata: capture.Metadata, Payload: *capture.Payload}
 		if err := verifyEnrichmentCapture(get, selectRows, input, *post, work.CollectionUUID, work.CollectionRevision); err != nil {
 			return "", err
 		}
@@ -124,6 +165,7 @@ func enrichmentReleaseProof(get enrichmentGet, selectRows enrichmentSelect, publ
 			return "", err
 		}
 		signatures[capture.UUID] = signature
+		preceding[capture.UUID] = true
 	}
 	if len(signatures) != publication.CaptureCount {
 		return "", models.ErrSourcePayloadCorrupt
@@ -142,14 +184,28 @@ func enrichmentReleaseProof(get enrichmentGet, selectRows enrichmentSelect, publ
 	}
 	recordProof := make([]any, 0, len(records))
 	for _, record := range records {
-		recordProof = append(recordProof, []any{record.Ordinal, record.CheckpointRevision, record.Digest, record.Fence, record.ProducerUUID, record.CaptureUUID})
+		entry := []any{record.Ordinal, record.CheckpointRevision, record.Digest, record.Fence, record.ProducerUUID, record.CaptureUUID}
+		if work.Version == 2 {
+			entry = append(entry, record.RetainedCapture)
+		}
+		recordProof = append(recordProof, entry)
 	}
 	references := make([]any, 0, len(release.Unresolved))
 	for _, ref := range release.Unresolved {
 		references = append(references, []any{ref.URL, ref.Parent, ref.Depth, ref.Reason})
 	}
-	return sourceSignature("stash-enrichment-checkpoint-release-v1", []any{
-		[]any{work.Version, work.TargetUUID, work.TargetRevision, work.PostUUID, work.CollectionUUID, work.CollectionRevision, work.RootUUID, work.PolicySHA256, work.ExtractorVersion},
+	domain := "stash-enrichment-checkpoint-release-v1"
+	arguments := []any{work.Version, work.TargetUUID, work.TargetRevision, work.PostUUID, work.CollectionUUID, work.CollectionRevision, work.RootUUID, work.PolicySHA256, work.ExtractorVersion}
+	if work.Version == 2 {
+		domain = "stash-enrichment-checkpoint-release-v2"
+		var handoff any
+		if work.Handoff != nil {
+			handoff = []any{work.Handoff.UUID, work.Handoff.PlanSHA256, work.Handoff.SeedSHA256}
+		}
+		arguments = append(arguments, work.CapturePolicy, handoff)
+	}
+	return sourceSignature(domain, []any{
+		arguments,
 		[]any{publication.JobUUID, publication.CheckpointRevision, publication.Digest, publication.Fence, publication.CompletionUUID,
 			publication.RecordCount, publication.CaptureCount, publication.UnresolvedCount, publication.CreatedAt.UTC().Format(time.RFC3339Nano)},
 		receiptProof, recordProof, signatures,
@@ -195,7 +251,15 @@ func (s *EnrichmentJobStore) ReleaseCheckpoint(ctx context.Context, id string, n
 	if err != nil {
 		return nil, err
 	}
-	release := models.EnrichmentCheckpointRelease{JobUUID: id, Version: 1, CheckpointBytes: len(head.Body), CreatedAt: now.UTC(), Unresolved: transcript.Unresolved}
+	job, err := (&ArchiveJobStore{}).Find(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	work, err := archive.DecodeEnrichmentJob(job)
+	if err != nil {
+		return nil, err
+	}
+	release := models.EnrichmentCheckpointRelease{JobUUID: id, Version: work.Version, CheckpointBytes: len(head.Body), CreatedAt: now.UTC(), Unresolved: transcript.Unresolved}
 	release.ProofSHA256, err = enrichmentReleaseProof(get, selectRows, *publication, release)
 	if err != nil {
 		return nil, err

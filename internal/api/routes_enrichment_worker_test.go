@@ -210,7 +210,7 @@ func TestEnrichmentWorkerHTTPRejectsUnauthorizedBodiesAndInvalidRequests(t *test
 	f.handler.ServeHTTP(w, r)
 	require.Equal(t, 400, w.Code)
 	capabilities := enrichmentHTTPValue[map[string]any](t, f.request(t, "GET", "/capabilities", nil, 200))
-	require.EqualValues(t, 1, capabilities["enrichment_protocol"])
+	require.EqualValues(t, 2, capabilities["enrichment_protocol"])
 	require.EqualValues(t, archive.MaxEnrichmentTranscriptBytes, capabilities["max_enrichment_checkpoint_bytes"])
 }
 

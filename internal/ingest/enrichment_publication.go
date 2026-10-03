@@ -73,7 +73,18 @@ func (c *EnrichmentCoordinator) Publish(ctx context.Context, token string, lease
 				if record.Ordinal != after+1 || record.Ordinal >= len(captures) {
 					return models.ErrSourcePayloadCorrupt
 				}
-				input, reference, err := archive.PrepareEnrichmentCapture(lease.JobUUID, work, transcript, record)
+				var parent string
+				if ordinal := transcript.Records[record.Ordinal].Parent; ordinal != nil {
+					parent = captures[*ordinal]
+				}
+				var retained *models.SourceCapture
+				if record.RetainedCapture != nil {
+					retained, err = c.Service.Repo.SourceEvidence.FindCapture(ctx, *record.RetainedCapture)
+					if err != nil {
+						return err
+					}
+				}
+				input, reference, err := archive.PrepareEnrichmentRecord(lease.JobUUID, work, transcript, record, parent, retained)
 				if err != nil {
 					return err
 				}
@@ -85,7 +96,13 @@ func (c *EnrichmentCoordinator) Publish(ctx context.Context, token string, lease
 					(collection.Namespace != "" && collection.Namespace != reference.Namespace) {
 					return models.ErrEnrichmentConflict
 				}
-				if !seen[input.UUID] {
+				if retained != nil {
+					// This association reuses an original observation. Do not run
+					// publisher or translation assessment as a new scrape.
+					if err := c.Service.Repo.SourceCollection.RecordCapture(ctx, models.CollectionCapture{CollectionUUID: work.CollectionUUID, CollectionRevision: work.CollectionRevision, CaptureUUID: input.UUID, CreatedAt: c.Now()}); err != nil {
+						return err
+					}
+				} else if !seen[input.UUID] {
 					raw, err := transcript.Metadata(record.Ordinal)
 					if err != nil {
 						return err

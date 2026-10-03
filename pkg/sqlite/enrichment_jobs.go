@@ -66,6 +66,10 @@ func enrichmentJobSubmissionGuard(ctx context.Context, request string) {
 		if binding == nil || binding.TargetUUID != work.TargetUUID || binding.TargetRevision != work.TargetRevision {
 			return models.ErrEnrichmentAtomic
 		}
+		if work.Handoff != nil {
+			_, err := (&EnrichmentJobStore{}).Seed(ctx, current.UUID)
+			return err
+		}
 		return nil
 	})
 }

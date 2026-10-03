@@ -9,15 +9,23 @@ import (
 // Arguments pin reviewed source/target revisions and the external runtime.
 // Website credentials and deployment-specific paths are never job arguments.
 type EnrichmentJobArguments struct {
-	Version            int     `json:"version"`
-	TargetUUID         string  `json:"target_uuid"`
-	TargetRevision     int     `json:"target_revision"`
-	PostUUID           string  `json:"post_uuid"`
-	CollectionUUID     string  `json:"collection_uuid"`
-	CollectionRevision int     `json:"collection_revision"`
-	RootUUID           *string `json:"root_uuid"`
-	PolicySHA256       string  `json:"policy_sha256"`
-	ExtractorVersion   string  `json:"extractor_version"`
+	Version            int                   `json:"version"`
+	TargetUUID         string                `json:"target_uuid"`
+	TargetRevision     int                   `json:"target_revision"`
+	PostUUID           string                `json:"post_uuid"`
+	CollectionUUID     string                `json:"collection_uuid"`
+	CollectionRevision int                   `json:"collection_revision"`
+	RootUUID           *string               `json:"root_uuid"`
+	PolicySHA256       string                `json:"policy_sha256"`
+	ExtractorVersion   string                `json:"extractor_version"`
+	CapturePolicy      string                `json:"capture_policy,omitempty"`
+	Handoff            *EnrichmentJobHandoff `json:"handoff,omitempty"`
+}
+
+type EnrichmentJobHandoff struct {
+	UUID       string `json:"uuid"`
+	PlanSHA256 string `json:"plan_sha256"`
+	SeedSHA256 string `json:"seed_sha256"`
 }
 
 type EnrichmentJobBinding struct {
@@ -85,6 +93,9 @@ type EnrichmentCheckpointRecord struct {
 	Digest             string `json:"sha256" db:"digest"`
 	Fence              int64  `json:"fence" db:"fence"`
 	ProducerUUID       string `json:"producer_uuid" db:"producer_uuid"`
+	// ProducerUUID identifies the checkpoint's submitting producer. A retained
+	// capture keeps its own original observation provenance, not that producer.
+	RetainedCapture *string `json:"retained_capture,omitempty" db:"retained_capture"`
 }
 
 type EnrichmentPublication struct {
@@ -124,6 +135,9 @@ type EnrichmentCheckpointRelease struct {
 }
 
 type EnrichmentJobReaderWriter interface {
+	AdmitHandoff(context.Context, string, string, time.Time) (*ArchiveJob, error)
+	HandoffJob(context.Context, string) (*ArchiveJob, error)
+	Seed(context.Context, string) (*CheckpointHandoffSeed, error)
 	Collections(context.Context, EnrichmentCollectionQuery, time.Time) ([]EnrichmentCollectionCandidate, error)
 	Ready(context.Context, string, string, string, int64, int, time.Time) ([]EnrichmentJobCandidate, error)
 	Maintain(context.Context, time.Time) (*EnrichmentMaintenanceResult, error)

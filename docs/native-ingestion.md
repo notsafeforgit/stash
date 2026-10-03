@@ -487,7 +487,7 @@ current Stash producer bearer token. Authentication precedes checkpoint body
 decoding; each operation rechecks collection/root grants and attempt ownership
 in its domain transaction. Ordinary Stash API keys and session cookies do not
 grant producer access. Website credentials stay in the external worker.
-Capabilities advertise `enrichment_protocol: 1`, `enrichment_dispatch_protocol: 1`,
+Capabilities advertise `enrichment_protocol: 2`, `enrichment_dispatch_protocol: 1`,
 `enrichment_collections_protocol: 1`, `enrichment_source_pacing_protocol: 1` and
 `max_enrichment_checkpoint_bytes: 33554432`.
 
@@ -497,7 +497,9 @@ Capabilities advertise `enrichment_protocol: 1`, `enrichment_dispatch_protocol: 
 | `POST /collections/{uuid}/ready` | `{limit, after?}` selects up to 100 eligible **unadmitted** targets; `after` contains the previous priority, `not_before` and UUID |
 | `POST /collections/{uuid}/jobs/ready` | `{policy_sha256, extractor_version, after, limit}` discovers eligible admitted jobs, ordered after their integer sequence; returns `{sequence, uuid}` candidates |
 | `POST /targets/{uuid}/jobs` | `{expected_revision, policy_sha256, extractor_version}` admits or replays the job bound to that target revision |
+| `POST /handoffs/{uuid}/jobs` | `{expected_plan_sha256, policy_sha256, extractor_version}` atomically consumes an application-reviewed checkpoint handoff or recovers its original job |
 | `GET /jobs/{uuid}` | Returns `{job, target}`, including immutable source URL/input and the target's current scheduling state |
+| `GET /jobs/{uuid}/seed` | Verified `{handoff_uuid, plan_sha256, sha256, body}` for the job's retained handoff, or null for an ordinary job; requires the job's producer scope |
 | `POST /jobs/{uuid}/claim` | `{expected_revision, owner_uuid, policy_sha256, extractor_version, lease_seconds}` claims the selected job; unchanged but unavailable work returns 204 |
 | `POST /jobs/{uuid}/renew` | `{owner_uuid, fence, lease_seconds}` renews current ownership |
 | `POST /jobs/{uuid}/source` | `{owner_uuid, fence, url}` reserves the main service or a supported linked service before extractor initialization; returns `{job_uuid, fence, ready}` |
@@ -516,6 +518,16 @@ characters. Clients bound response reads and validate checkpoint hashes,
 counts, source URL and runtime before resuming. The Python lease helper uses
 the server's HTTP date and monotonic request start, stops further extraction
 when renewal fails, and does not extend ownership based on its local wall clock.
+
+Argument version 2 pins capture-context semantics; an optional `handoff` pins
+the reviewed seed. A new ordinary job uses a `stash-metadata-fetch-v1` transcript;
+a handoff job uses `stash-metadata-fetch-v2`, preserving original captures in its
+immutable prefix. The worker reads a seed only when it has no native checkpoint,
+then creates its first real checkpoint at expected revision zero. Seed reads
+carry no lease/attempt or checkpoint revision. A saved local delivery is recovered
+before another seed read or fetch. Original native version-1 jobs remain readable
+and executable under their frozen identity/proof contract. See
+[reviewed execution](native-schema.md#executing-a-reviewed-checkpoint-handoff).
 
 Retryable failure codes are `rate_limited`, `extraction_failed`, `timeout`,
 `worker_failed` and `source_busy`. Server backoff starts at five minutes and increases by attempt;

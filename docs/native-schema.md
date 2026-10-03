@@ -1987,13 +1987,10 @@ chains, excessive depth and oversized documents remain review cases. Child-only
 retry inherits gallery-dl parent settings and reserves the contacted child
 service before initialization.
 
-This is the storage and collector prerequisite for reviewed execution. Job
-admission, checkpoint storage and publication still accept only the v1 native
-execution format. No evidence acceptance releases its review hold or schedules
-this new retry format yet. The execution handoff, immutable job/seed binding,
-worker/outbox recovery, publication/release proof and review UI remain to be
-connected and verified before activation. Existing v1 receipts and release
-proofs retain their byte-for-byte checksum contracts.
+Schema 1000065 connects this storage/collector contract to reviewed native
+execution, as described below. Evidence acceptance alone still leaves the target
+in review. Existing v1 receipts and release proofs retain their byte-for-byte
+checksum contracts.
 
 ### Reviewing an exact checkpoint handoff
 
@@ -2035,10 +2032,63 @@ losslessly when decoding and replaying the seed; converting source IDs or numeri
 lexemes through floating point can change its exact checksum.
 
 Accepting this review does **not** release the original target, create a job,
-write a worker checkpoint/lease/receipt, or complete enrichment. Job admission
-still needs to consume the review atomically and bind its exact seed, and worker
-checkpoint/publication/release code still rejects the new execution format.
-Those gates must be connected together before activation. Backup retains the
-review and its source evidence; anonymisation removes the review first. Startup
+write a worker checkpoint/lease/receipt, or complete enrichment. The separate
+admission operation below consumes the review and binds its exact seed.
+Backup retains the review and its source evidence; anonymisation removes the
+execution bindings before the review. Startup
 reconstructs the seed and verifies historical collection and evidence bindings
 before opening for writes.
+
+### Executing a reviewed checkpoint handoff
+
+Schema 1000065 adds `enrichment_handoff_jobs`, `enrichment_job_retained_records`
+and `enrichment_job_seed_services`. These contain one consumption receipt per
+handoff/job, bounded original capture UUIDs and record digests, and supported
+pending child services. They duplicate no source payloads. Migration does not
+release review holds or create jobs from saved legacy state.
+
+Producer admission revalidates the exact reviewed post/target/collection, logical
+root, runtime, configuration and plan hash. One transaction either releases the
+same target revision, or excludes the old target and creates the planned target
+for the newer collection revision, then submits and binds one job. A generic
+submission cannot omit the consumption receipt. A lost response replays the
+original job even after later completion, cancellation or collection changes;
+that recovery does not restart it.
+
+New native enrichment jobs use argument version 2 and pin
+`capture_policy: source-retention-v1+capture-context-v1`. A handoff job additionally
+pins `handoff: {uuid, plan_sha256, seed_sha256}`. Ordinary new jobs use the same
+capture contract without a handoff. Existing native v1 jobs, request UUIDs,
+acknowledgements, capture identities and release proofs remain valid; this is
+native execution history, not upstream UI/plugin compatibility.
+
+The scoped seed endpoint reconstructs and checks original evidence against that
+job. It is not a checkpoint acknowledgement or an invented producer attempt.
+Before the first checkpoint, scheduling and fairness account for pending Imgur
+and Redgifs services using the small service projection. A child-only failure
+without saved child failure evidence cannot pause the parent website. Once a
+real checkpoint exists, its pending services govern retries.
+
+The first checkpoint must extend the exact seed. Later checkpoints retain its
+immutable prefix and ordinary retry constraints. Each prefix record's
+`retained_capture` identifies its original native observation; `producer_uuid`
+on checkpoint/published records identifies the submitting producer, not an
+invented observer of historical data. Original missing observation/extractor
+information stays missing. Publication reuses those captures and associates them
+with the destination collection without rerunning their publisher/translation
+assessment as new observations. Retained evidence can complete a target only
+inside the bound job's verified atomic publication.
+
+Fresh child captures have their actual observation time, current extractor
+version, and a signed context binding to an earlier capture. Parent UUIDs affect
+capture identity even when their text is equal. Ordinary newly executed child
+captures receive the same context bindings. Version-2 staging release binds the
+job/seed/review hashes, original capture signatures, record delivery provenance,
+new observations and unresolved references. Unscoped legacy references remain
+in the original acceptance linked by the review; no parent or new failure is
+invented for them. Completed staging is released only after this proof verifies.
+
+Startup checks both the retained seed projections and current checkpoint or
+released publication. Backups preserve these records and anonymisation removes
+them in dependency order. Review UI and coordinated production activation remain
+transition work.

@@ -175,7 +175,9 @@ func sourcePacingStarted(ctx context.Context, scope string, now time.Time) error
 func enrichmentPendingPacingReady(ctx context.Context, job, collection, rootScope string, now time.Time) (bool, error) {
 	var scopes []string
 	if err := dbWrapper.Select(ctx, &scopes, `SELECT DISTINCT source_scope_v1(json_extract(p.value,'$.url'))
- FROM enrichment_checkpoints h,json_each(h.body,'$.pending') p WHERE h.job_uuid=?`, job); err != nil {
+ FROM enrichment_checkpoints h,json_each(h.body,'$.pending') p WHERE h.job_uuid=?
+ UNION SELECT scope FROM enrichment_job_seed_services WHERE job_uuid=?
+ AND NOT EXISTS(SELECT 1 FROM enrichment_checkpoints WHERE job_uuid=?)`, job, job, job); err != nil {
 		return false, err
 	}
 	for _, scope := range scopes {
@@ -240,6 +242,15 @@ func sourcePacingEnrichmentFailure(ctx context.Context, job *models.ArchiveJob, 
 		}
 	}
 	if len(scopes) == 0 {
+		work, err := archive.DecodeEnrichmentJob(job)
+		if err != nil {
+			return time.Time{}, err
+		}
+		// A seeded job does not refetch the parent. With no saved child
+		// failure, defer this job without inventing a parent service outage.
+		if work.Handoff != nil {
+			return maxTime(retry, now.Add(delay)), nil
+		}
 		scope, err := sourcePacingScope(ctx, job.UUID, true)
 		if err != nil {
 			return time.Time{}, err

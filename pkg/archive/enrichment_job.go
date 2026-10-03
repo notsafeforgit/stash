@@ -3,6 +3,7 @@ package archive
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
@@ -21,10 +22,17 @@ func EnrichmentResource(collection string) string {
 
 func PrepareEnrichmentJob(input models.EnrichmentJobArguments) (models.ArchiveJobSubmission, error) {
 	ret := models.ArchiveJobSubmission{}
-	if input.Version != 1 || !translationUUID(input.TargetUUID) || input.TargetRevision < 1 ||
+	if (input.Version != 1 && input.Version != 2) || !translationUUID(input.TargetUUID) || input.TargetRevision < 1 ||
 		!translationUUID(input.PostUUID) || !translationUUID(input.CollectionUUID) || input.CollectionRevision < 1 ||
 		(input.RootUUID != nil && !translationUUID(*input.RootUUID)) || !ValidSHA256(input.PolicySHA256) ||
 		input.ExtractorVersion == "" || len(input.ExtractorVersion) > 128 || strings.ContainsAny(input.ExtractorVersion, "\r\n\x00") {
+		return ret, models.ErrEnrichmentInvalid
+	}
+	if (input.Version == 1 && (input.CapturePolicy != "" || input.Handoff != nil)) ||
+		(input.Version == 2 && input.CapturePolicy != CaptureContextPolicy) {
+		return ret, models.ErrEnrichmentInvalid
+	}
+	if ref := input.Handoff; ref != nil && (!translationUUID(ref.UUID) || !ValidSHA256(ref.PlanSHA256) || !ValidSHA256(ref.SeedSHA256)) {
 		return ret, models.ErrEnrichmentInvalid
 	}
 	body, err := json.Marshal(input)
@@ -40,7 +48,7 @@ func PrepareEnrichmentJob(input models.EnrichmentJobArguments) (models.ArchiveJo
 		return ret, err
 	}
 	key := translationDigest(body)
-	return models.ArchiveJobSubmission{RequestUUID: uuid.NewSHA1(uuid.NameSpaceURL, []byte("urn:stash:enrichment-job:v1:"+key)).String(),
+	return models.ArchiveJobSubmission{RequestUUID: uuid.NewSHA1(uuid.NameSpaceURL, []byte(fmt.Sprintf("urn:stash:enrichment-job:v%d:%s", input.Version, key))).String(),
 		Kind: models.ArchiveJobEnrichPost, WorkKey: key, ResourceKey: EnrichmentResource(input.CollectionUUID), Arguments: body, MaxAttempts: 8}, nil
 }
 

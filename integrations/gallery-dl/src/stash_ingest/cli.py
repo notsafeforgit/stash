@@ -101,6 +101,15 @@ def main(argv=None):
     execute.add_argument("--profile", required=True)
     dispatch = commands.add_parser("dispatch", help="Deliver queued events, submit a request and discover one source attempt")
     dispatch.add_argument("--profile", required=True)
+    enrichment_policy = commands.add_parser("enrichment-policy", help="Validate a metadata-only profile without a media root")
+    enrichment_policy.add_argument("--profile", required=True)
+    enrichment_execute = commands.add_parser("execute-enrichment", help="Execute or recover one admitted native enrichment job")
+    enrichment_execute.add_argument("job_uuid")
+    enrichment_execute.add_argument("--profile", required=True)
+    enrichment_deliver = commands.add_parser("deliver-enrichment", help="Recover persisted enrichment delivery without website access")
+    enrichment_deliver.add_argument("job_uuid")
+    enrichment_status = commands.add_parser("enrichment-status", help="Inspect local enrichment delivery and retained evidence")
+    enrichment_status.add_argument("--job")
     args = parser.parse_args(argv)
     box = None
     try:
@@ -180,11 +189,29 @@ def main(argv=None):
             from .dispatch import dispatch_once
             with worker_output():
                 output = dispatch_once(box, client, Configuration(args.profile))
+        elif args.command == "enrichment-policy":
+            from .enrichment_configuration import EnrichmentConfiguration
+            profile = EnrichmentConfiguration(args.profile)
+            output = {"policy_sha256": profile.policy_sha256, "extractor_version": profile.extractor_version,
+                      "source_category": profile.source_category, "operation": "post.enrich", "state": "validated"}
+        elif args.command in ("execute-enrichment", "deliver-enrichment"):
+            from .enrichment_worker import execute as execute_enrichment
+            profile = None
+            if args.command == "execute-enrichment":
+                from .enrichment_configuration import EnrichmentConfiguration
+                profile = EnrichmentConfiguration(args.profile)
+            with worker_output():
+                output = execute_enrichment(box, client, profile, args.job_uuid)
+        elif args.command == "enrichment-status":
+            from .enrichment_journal import EnrichmentJournal
+            output = EnrichmentJournal(box).summary(args.job)
         else:
             from .backfill_calls import BackfillCalls
+            from .enrichment_journal import EnrichmentJournal
             from .n8n_receipts import LegacyReceipts
             output = {**box.status(), "source_requests": requests.status(), "source_calls": calls.summary(),
-                      "backfill_calls": BackfillCalls(box).summary(), "legacy_n8n_receipts": LegacyReceipts(box).summary()}
+                      "backfill_calls": BackfillCalls(box).summary(), "legacy_n8n_receipts": LegacyReceipts(box).summary(),
+                      "enrichment": EnrichmentJournal(box).summary()}
         print(json.dumps(output, sort_keys=True))
         if args.command == "lookup-collections":
             return 0 if all(item["state"] == "resolved" for item in output["targets"]) else 2
@@ -200,6 +227,8 @@ def main(argv=None):
             return 2 if state["pending_windows"] or any(state["counts"][k] for k in ("pending", "sending", "review")) else 0
         if args.command == "execute-run":
             return 0 if output["state"] == "source_succeeded" else 2
+        if args.command in ("execute-enrichment", "deliver-enrichment"):
+            return 0 if output["state"] == "completed" else 2
         if args.command == "ticket-status":
             return 0 if output["state"] == "source_succeeded" else 2
         if args.command == "dispatch":

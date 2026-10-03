@@ -410,7 +410,8 @@ Producer schema 2 introduced request/ticket tables; schema 3 added dispatch
 cursors and discovery backoff. Schema 4 added durable ticket-to-submission links
 and unassigned ranges. Schema 5 adds caller snapshots and source bindings;
 schema 6 adds durable backfill calls, history checks and completion proof.
-Opening an outbox from schemas 1–5 promotes it
+Schema 7 adds retained n8n receipt history; schema 8 adds the enrichment execution
+journal. Opening an outbox from schemas 1–7 promotes it
 in one SQLite transaction, preserving event bytes, receipts, dependencies,
 active delivery/submission leases, frozen requests and caller tickets. Old tickets
 are linked to the first covering submissions from their original request sequence;
@@ -1392,8 +1393,9 @@ check=...)` runs one metadata lookup in an isolated instance of the pinned
 gallery-dl runtime. This is the extraction component for the native enrichment
 worker. Native target/job binding, producer-owned checkpoint storage, verified
 capture publication, scoped HTTP routes and a transport/lease client are
-implemented. Durable local execution, producer dispatch and conversion of the
-existing scheduled service are still pending. Calling this helper alone
+implemented. The selected-job executor below persists returned metadata before
+delivery. Producer dispatch and conversion of the existing scheduled service
+are still pending. Calling this helper alone
 does not create a capture, complete a native job or import media.
 
 The initial root extractors are Reddit submissions, Twitter tweets, Bluesky and
@@ -1473,7 +1475,7 @@ producer attribution and unresolved references. A release receipt distinguishes
 completed cleanup from a job without a checkpoint. Older publications retain
 staging through migration until verified cleanup. The scoped producer API accepts
 these checkpoints through a separate enrichment contract. Shared source
-scheduling, durable local execution and producer dispatch remain required before
+scheduling and producer dispatch remain required before
 activation.
 
 Temporary child failures retain the parent and discard that child's partial
@@ -1511,11 +1513,87 @@ acknowledgements remain recoverable after staging release. Transport tests lose
 committed responses, exercise large Unicode checkpoints, and preserve original
 number tokens against the real native HTTP server and SQLite.
 
-This client is not a durable worker loop. Fresh extraction results still need
-local persistence before network delivery; ready-target discovery does not list
-already admitted retries. Durable execution/delivery, shared scheduling and
-cooldowns, stale-job recovery, legacy queue mapping, reviewed profiles and
-production host/n8n launchers remain transition work.
+Use the executor below to persist fresh extraction results before network
+delivery. Ready-target discovery does not list already admitted retries. Queued
+job discovery/dispatch, shared scheduling and cooldowns, stale-job recovery,
+legacy queue mapping and production host/n8n launchers remain transition work.
+
+### Durable selected-job execution
+
+`enrichment_worker.execute(outbox, client, profile, job_uuid)` executes or recovers
+one admitted native enrichment job. `profile=None` only recovers persisted
+delivery; it never claims an attempt or contacts a source website. The CLI accepts
+the usual `--outbox`, `--endpoint`, `--producer` and `--token-env` arguments:
+
+| Command | Effect |
+| --- | --- |
+| `enrichment-policy --profile PATH` | Validate a metadata-only profile and print its portable policy hash and pinned extractor version |
+| `execute-enrichment JOB_UUID --profile PATH` | Recover saved deliveries, then claim/fetch only if the native job and reviewed profile still match |
+| `deliver-enrichment JOB_UUID` | Recover saved checkpoint/publication/failure intents without loading website credentials or a profile |
+| `enrichment-status [--job JOB_UUID]` | Inspect local phases, pending operation, retained bytes and publication proof |
+
+Execution/delivery exit 0 only for a confirmed completed job, 2 for pending,
+retry, capacity, review or failed outcomes, and 1 for invalid input or an
+exception. A completed metadata lookup does not mean media has downloaded.
+Native source evidence and target completion remain separate from selected
+scene/image metadata.
+
+Metadata profiles use `stash-gallery-enrichment-v1` and require no media root,
+destination lock directory or download archive:
+
+```json
+{
+  "schema": "stash-gallery-enrichment-v1",
+  "source_category": "reddit",
+  "gallery": {
+    "extractor": {
+      "sleep-request": 5,
+      "reddit": {"cookies": "${stash:reddit_cookies}"}
+    }
+  },
+  "bindings": {
+    "reddit_cookies": {"kind": "private", "env": "REDDIT_COOKIES_FILE"}
+  }
+}
+```
+
+Private references and reviewed local assets follow the download profile
+contract. Access values stay local and do not enter the policy digest, native
+job or execution journal. The digest binds the projected access/pacing template,
+source category, reviewed assets and pinned runtime. Changes to ignored filename,
+archive or postprocessor settings do not change metadata policy. Website
+credential rotation also preserves that identity. Feed/profile URLs are rejected
+before a claim; the category must identify the job's supported post extractor.
+
+Producer schema 8 stores stable claim requests, lease acknowledgements, exact
+returned checkpoint bytes and pending delivery intents in the existing outbox.
+A nonblocking process lock allows one enrichment executor per outbox; ordinary
+download event delivery uses independent short database transactions. A process
+crash releases the lock without discarding the journal. Before fetching, the
+executor reserves the full 32 MiB checkpoint allowance against the shared outbox
+byte limit. Other events cannot consume that reservation. Failure to reserve
+records a retryable native attempt without contacting the website.
+
+Returned checkpoints are committed locally before checking for a late ownership
+failure. A matching native acknowledgement releases those bytes and atomically
+records the next publication or child-failure intent. Lost replies therefore
+replay the original requests after restart. Partial child lookups receive native
+backoff and resume the accepted head without refetching the original parent.
+If an expired attempt's undelivered body conflicts with a successor checkpoint,
+it remains in local review with its original bytes; it is never rewritten to fit
+the successor. Rejected evidence also stays inspectable. Review resolution is
+still transition work.
+
+The journal permits at most 10,000 active/review jobs by default. Registration
+prunes finished convenience records beyond the newest 1,000; native publication
+receipts remain authoritative. Those limits bound local execution history, not
+total SQLite file size. Include the outbox in backups: an unacknowledged body
+can exist only there. Schema 7 → 8 preserves all prior tables and receipt bytes;
+older producer binaries refuse schema 8. The native Stash schema is unchanged.
+
+The executor requires a known job UUID. It does not yet discover queued retries,
+admit targets automatically, recover expired native leases, coordinate shared
+source cooldowns, or replace the scheduled enrichment service.
 
 ## Validation
 

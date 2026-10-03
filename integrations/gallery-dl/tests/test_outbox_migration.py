@@ -15,7 +15,13 @@ from helpers import PRODUCER, capture, file_event, receipt
 from test_run_queue import request, admission
 
 
+def schema_seven(db):
+    db.execute("DROP TABLE enrichment_executions")
+    db.execute("PRAGMA user_version=7")
+
+
 def schema_six(db):
+    schema_seven(db)
     db.execute("DROP TRIGGER native_n8n_token_unique")
     db.execute("DROP TABLE legacy_n8n_receipts")
     db.execute("DROP TABLE n8n_receipt_imports")

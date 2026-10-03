@@ -531,8 +531,19 @@ only publishing the currently selected checkpoint proves completion.
 
 The ready-target route does not discover existing queued retries or recover
 expired jobs. Dispatch, shared download/enrichment cooldowns and fairness,
-stale-job maintenance, durable local checkpoint delivery, and host/n8n activation
+stale-job maintenance and host/n8n activation
 remain required. These routes alone do not enable a production scheduler.
+
+The Python selected-job executor now journals stable claim requests, returned
+checkpoint bytes and pending publication/failure operations in producer outbox
+schema 8. It reserves checkpoint capacity before extraction and preserves fresh
+results before checking for late lease loss. An accepted checkpoint and its next
+delivery intent are committed locally together. Exact acknowledgements release
+local bodies; conflicting successor checkpoints or rejected bodies remain in
+review. Delivery-only recovery needs the Stash producer token, with no website
+profile or credentials. See the [profile and CLI contract](../integrations/gallery-dl/README.md#durable-selected-job-execution).
+This executor accepts an already admitted job UUID; queued-job discovery and
+production service activation remain separate work.
 
 ## Completed file events
 

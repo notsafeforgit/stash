@@ -173,11 +173,21 @@ class Configuration:
             raise InvalidData("Invalid worker source category")
         self.root_uuid, self.root = self._root(value["root"], base, media=True)
         _, self.locks = self._root(value["locks"], base, media=False)
+        assets = self._bindings(value["bindings"], base, values={"media_root": str(self.root.path)}, kinds={"media_root": "path"})
+        self._gallery = self._expand(value["gallery"])
+        self._validate(self._gallery)
+        self.policy_sha256 = digest(encode({"version": SCHEMA, "operation": "download",
+                                           "source_category": self.source_category,
+                                           "runtime": runtime_identity(), "gallery_sha256": digest(profile_bytes(value["gallery"])),
+                                           "assets": assets}, CONFIG_LIMIT))
+
+    def _bindings(self, bindings, base, *, values=None, kinds=None):
+        if not isinstance(bindings, dict) or len(bindings) > 64:
+            raise InvalidData("Invalid worker bindings")
         self.assets = {}
-        self._values = {"media_root": str(self.root.path)}
-        self._kinds = {"media_root": "path"}
+        self._values, self._kinds = dict(values or {}), dict(kinds or {})
         assets = {}
-        for name, binding in value["bindings"].items():
+        for name, binding in bindings.items():
             if (not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", name) or name == "media_root"
                     or not isinstance(binding, dict)):
                 raise InvalidData("Invalid or reserved worker binding")
@@ -212,12 +222,7 @@ class Configuration:
             else:
                 raise InvalidData("Invalid local worker binding definition")
             self._values[name] = resolved
-        self._gallery = self._expand(value["gallery"])
-        self._validate(self._gallery)
-        self.policy_sha256 = digest(encode({"version": SCHEMA, "operation": "download",
-                                           "source_category": self.source_category,
-                                           "runtime": runtime_identity(), "gallery_sha256": digest(profile_bytes(value["gallery"])),
-                                           "assets": assets}, CONFIG_LIMIT))
+        return assets
 
     @staticmethod
     def _root(value, base, *, media):

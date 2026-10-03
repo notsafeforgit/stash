@@ -1383,3 +1383,69 @@ policy definitions, capture/collection membership, exact source text and saved
 target history independently of current policy and target states. Backup/restore
 preserves these records; anonymisation removes them with the source evidence.
 See [configuration and scheduling behavior](native-ingestion.md#automatic-source-translations).
+
+## Post enrichment targets and completion
+
+Schema 1000050 adds `enrichment_targets`, `enrichment_target_history`,
+`enrichment_completions` and `enrichment_completion_captures`. A target binds
+one existing post, one of its retained URL records, an exact collection revision
+and the versioned `gallery-dl-metadata-v1` extraction policy. Its deterministic
+UUID coalesces repeated requests without using a performer, account handle,
+folder label or caption as identity. The first review/migration origin is retained.
+Admission accepts supported direct post routes; it does not establish that a URL
+uniquely identifies the intended post. The publishing worker must independently
+verify extracted identity against that post.
+
+Targets have revisioned `held`, `pending`, `review`, `excluded` and `completed`
+states. Explicit rescheduling can move between the first four states; completed
+targets are immutable. Priority is 0–100, `not_before` is a UTC deadline, and
+`reason` is a machine code of at most 64 lowercase letters, digits or underscores,
+starting with a letter. Review/exclusion require a reason. Repeated retention
+returns the existing target, preserving its schedule, origin and completion.
+It cannot release a hold, restart excluded work or replace a retry deadline.
+An omitted scheduling deadline means server time, so clients preserving a delay
+must send the previously read `not_before`.
+
+New pending work requires an active post and the current, active collection
+revision. Held/review/excluded work can retain an older or disabled binding.
+An indexed, collection-scoped readiness query omits future deadlines, forgotten
+posts and outdated/disabled collection revisions. A later source edit does not
+silently redirect an existing target. Reviewing a new binding retains a distinct
+target with its own history; the old record remains inspectable.
+
+Completion is an internal domain operation with an operation UUID, exact target
+revision and 1–1,024 distinct capture UUIDs. Every capture must belong to the
+target post and have retained provenance for that exact collection revision,
+with `gallery-dl` or `gallery-dl-enrichment` origin. Legacy NFOs, an unrelated post,
+or a capture from another collection/revision cannot certify completion. Existing
+valid captures may be reused. Capture order is irrelevant; the immutable receipt
+binds the normalized set and original target revision. A second operation cannot
+replace a completed target, and exact replay returns the first receipt even after
+later collection changes or a post tombstone.
+
+The completion receipt, capture links, target transition and history commit in
+one managed transaction. A deferred foreign key prevents a receipt without its
+completed target; a failed late write also aborts a caller that swallows the
+error. The invoking worker must fence that same transaction with its execution
+lease and perform source identity validation. These records alone do not assert
+that a worker ran, authorize downloads, change selected scene/image fields, or
+certify that all linked media are locally available. Startup validation checks
+identities, scopes, histories, counts and receipt digests. Ordinary database
+backup retains the records; anonymised copies remove them with source evidence.
+
+Application-only routes under `/api/v3/archive` are:
+
+| Route | Contract |
+| --- | --- |
+| `POST /posts/{post_uuid}/enrichment-targets` | Retain work with `url_uuid`, `collection_uuid`, `collection_revision`, `policy`, and an explicit `schedule`. Origin is application review; the body cannot supply a new URL or claim migration provenance. |
+| `GET /posts/{post_uuid}/enrichment-targets` | UUID-keyset page with optional `state`, `after` and `limit` (1–100). |
+| `GET /collections/{collection_uuid}/enrichment-targets` | The same bounded listing scoped to one collection. |
+| `GET /enrichment-targets/{target_uuid}` | Current target, original binding, retained URL and optional completion UUID. |
+| `GET /enrichment-targets/{target_uuid}/history` | Immutable schedule revisions after numeric `after`, using `limit` (1–100). |
+| `PUT /enrichment-targets/{target_uuid}/schedule` | Replace scheduling fields using `expected_revision` and `schedule`; stale revisions or ineligible pending bindings return 409. |
+| `GET /enrichment-completions/{completion_uuid}` | Original completion input and timestamp; 404 when no receipt committed. |
+
+Producer tokens cannot inspect or administer these routes. Cross-origin
+mutations are refused. There is no HTTP completion mutation. Retaining a pending
+target does not yet start execution: extraction dispatch, fenced publication,
+cooldown/source fairness, and legacy queue mapping remain transition work.

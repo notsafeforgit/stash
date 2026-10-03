@@ -407,9 +407,17 @@ enrichment/discovery caller conversion remain transition work.
 enrichment. It shares retained post fields in bounded resumable transcripts,
 keeps parent observation times across child retries, and excludes download jobs,
 postprocessors, archives and cookie writes. Validate post identity before turning
-these transcripts into native captures; extraction is not job completion. The
-native enrichment queue/publication and scheduled-service conversion remain
-pending. See [metadata-only extraction](integrations/gallery-dl/README.md#metadata-only-extraction-for-enrichment).
+these transcripts into native captures; extraction is not job completion.
+Schema 1000050 now retains native enrichment targets and completion evidence.
+Targets bind an existing post URL and exact collection revision. Repeated
+retention preserves holds, exclusions, deadlines and completion; rescheduling
+requires the current target revision. Completion requires retained gallery-dl
+captures for that same post and collection revision. It must be part of the
+calling worker's fenced publication transaction, and has no public mutation
+endpoint. Connecting extraction to execution, importing legacy enrichment state,
+and scheduled-service conversion remain pending. See
+[enrichment work](docs/native-schema.md#post-enrichment-targets-and-completion)
+and [metadata-only extraction](integrations/gallery-dl/README.md#metadata-only-extraction-for-enrichment).
 
 `stash-import-catalog-evidence` maps a received snapshot's posts, profiles and
 captures through core services in schema 1000031. It uses exact manifest/ordinal

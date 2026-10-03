@@ -20,6 +20,7 @@ func TestEnrichmentPublicationMigrationPreservesStagedWorkAndRejectsUnverifiable
 			require.NoError(t, f.db.Close())
 			raw := openRawDB(t, path)
 			defer raw.Close()
+			removeSourcePacingSchema(t, raw)
 			// The schema-52 addition changes no existing definition: remove only
 			// its new objects to restore the exact previous layout with live data.
 			_, err = raw.Exec(`DROP TRIGGER enrichment_checkpoint_published_delete;

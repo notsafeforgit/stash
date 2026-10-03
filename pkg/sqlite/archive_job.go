@@ -338,7 +338,30 @@ WHERE j.uuid=? AND j.state='queued' AND j.available_at_ms<=? AND j.fence<j.max_a
 }
 
 func (s *ArchiveJobStore) claim(ctx context.Context, job *models.ArchiveJob, owner string, now time.Time, duration time.Duration) (*models.ArchiveJob, error) {
+	var pacingScope string
 	if job.Kind == models.ArchiveJobEnrichPost {
+		work, err := archive.DecodeEnrichmentJob(job)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := enrichmentJobEligible(ctx, work, now); err != nil {
+			return nil, err
+		}
+		if _, err := (&SourceRunStore{}).Recover(ctx, now, 100); err != nil {
+			return nil, err
+		}
+		pacingScope, err = sourcePacingScope(ctx, job.UUID, true)
+		if err != nil {
+			return nil, err
+		}
+		ready, err := sourcePacingReady(ctx, pacingScope, work.CollectionUUID, true, now)
+		if err != nil || !ready {
+			return nil, err
+		}
+		ready, err = enrichmentPendingPacingReady(ctx, job.UUID, work.CollectionUUID, pacingScope, now)
+		if err != nil || !ready {
+			return nil, err
+		}
 		enrichmentJobAttemptGuard(ctx, job.UUID, job.Fence+1)
 	}
 	// Do not commit the running head without its attempt, even if a caller
@@ -356,6 +379,12 @@ func (s *ArchiveJobStore) claim(ctx context.Context, job *models.ArchiveJob, own
 	}
 	if _, err := dbWrapper.Exec(ctx, "INSERT INTO archive_job_attempts(job_uuid,fence,owner_uuid,started_at_ms) VALUES(?,?,?,?)", job.UUID, job.Fence+1, owner, now.UnixMilli()); err != nil {
 		return nil, err
+	}
+	if pacingScope != "" {
+		if _, err := dbWrapper.Exec(ctx, `UPDATE source_pacing SET last_started_at_ms=max(last_started_at_ms,?)
+ WHERE scope IN (SELECT scope FROM enrichment_attempt_pacing WHERE job_uuid=? AND fence=?)`, now.UnixMilli(), job.UUID, job.Fence+1); err != nil {
+			return nil, err
+		}
 	}
 	ret, err := s.Find(ctx, job.UUID)
 	complete = err == nil && ret != nil
@@ -447,6 +476,10 @@ func (s *ArchiveJobStore) Finish(ctx context.Context, lease models.ArchiveJobLea
 	if err != nil {
 		return nil, err
 	}
+	var complete *bool
+	if job.Kind == models.ArchiveJobEnrichPost && outcome.State != "succeeded" {
+		complete = sourcePacingAtomic(ctx)
+	}
 	state, attempt := outcome.State, outcome.State
 	if job.Kind == models.ArchiveJobEnrichPost && state == "succeeded" {
 		enrichmentJobSuccessGuard(ctx, job.UUID)
@@ -461,6 +494,13 @@ func (s *ArchiveJobStore) Finish(ctx context.Context, lease models.ArchiveJobLea
 			state, attempt = "failed", "failed"
 		}
 	}
+	if job.Kind == models.ArchiveJobEnrichPost && outcome.State != "succeeded" {
+		retry, err := sourcePacingEnrichmentFailure(ctx, job, outcome.ErrorCode, time.UnixMilli(available), now)
+		if err != nil {
+			return nil, err
+		}
+		available = max(available, retry.UnixMilli())
+	}
 	if err := finishJobAttempt(ctx, job, now, attempt, string(result), outcome.ErrorCode); err != nil {
 		return nil, err
 	}
@@ -468,7 +508,11 @@ func (s *ArchiveJobStore) Finish(ctx context.Context, lease models.ArchiveJobLea
 	if err != nil {
 		return nil, err
 	}
-	return s.Find(ctx, job.UUID)
+	ret, err := s.Find(ctx, job.UUID)
+	if complete != nil {
+		*complete = err == nil && ret != nil
+	}
+	return ret, err
 }
 
 func (s *ArchiveJobStore) Cancel(ctx context.Context, id string, revision int64, now time.Time) (*models.ArchiveJob, error) {

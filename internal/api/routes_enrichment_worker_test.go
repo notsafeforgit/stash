@@ -127,6 +127,14 @@ func TestEnrichmentWorkerHTTPCheckpointFailureAndPublicationRecovery(t *testing.
 	renew := map[string]any{"owner_uuid": running.OwnerUUID, "fence": running.Fence, "lease_seconds": 120}
 	renewed := enrichmentHTTPValue[models.ArchiveJob](t, f.request(t, "POST", path+"/renew", renew, 200))
 	require.True(t, renewed.LeaseUntil.After(*running.LeaseUntil))
+	source := map[string]any{"owner_uuid": running.OwnerUUID, "fence": running.Fence, "url": "https://redgifs.com/watch/linked"}
+	reservation := f.request(t, "POST", path+"/source", source, 200)
+	require.JSONEq(t, string(reservation), string(f.request(t, "POST", path+"/source", source, 200)))
+	require.Equal(t, true, enrichmentHTTPValue[map[string]any](t, reservation)["ready"])
+	source["fence"] = running.Fence + 1
+	f.request(t, "POST", path+"/source", source, 409)
+	source["fence"], source["url"] = running.Fence, "https://unrelated.invalid/private"
+	f.request(t, "POST", path+"/source", source, 400)
 	checkpoint := map[string]any{"owner_uuid": running.OwnerUUID, "fence": running.Fence, "expected_revision": 0, "body": f.initial}
 	head := enrichmentHTTPValue[models.EnrichmentCheckpointReceipt](t, f.request(t, "POST", path+"/checkpoint", checkpoint, 200))
 	require.Equal(t, head, enrichmentHTTPValue[models.EnrichmentCheckpointReceipt](t, f.request(t, "POST", path+"/checkpoint", checkpoint, 200)))

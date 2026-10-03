@@ -58,6 +58,13 @@ class EnrichmentLease:
                 self.failed = True
                 raise SourcePaused("Cannot renew enrichment ownership") from None
 
+    def reserve_source(self, url):
+        with self.lock:
+            self.check()
+            ready = self.client.reserve_source(self.job, url)
+            self.check()
+            return ready
+
     def start(self):
         self.check()
         if self.thread is not None:

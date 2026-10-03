@@ -1467,7 +1467,7 @@ and submissions. `enrichment_job_targets` binds one job to an exact target-histo
 revision. Its canonical arguments also pin the post, collection revision, logical
 root, worker policy digest and extractor version. Mount paths and website
 credentials are excluded. Collection resource keys serialize enrichment jobs
-within a source; coordination with source downloads remains separate work.
+within a source. Schema 1000054 below adds shared coordination with downloads.
 
 `enrichment_job_attempts` records the authenticated producer for each fenced
 attempt. Submission and claim cannot commit without their corresponding bindings.
@@ -1507,12 +1507,14 @@ Explicit retry creates a new target revision and preserves existing backoff;
 repeated admission cannot restart an exhausted attempt. Automatic retry and lease
 recovery impose exponential backoff starting at five minutes. Old checkpoint
 evidence stays with its original job. Collection/root changes prevent old workers
-from continuing, but automatic cancellation of those stale jobs remains pending.
+from continuing. The server's bounded maintenance loop cancels stale jobs and
+recovers expired ownership while retaining checkpoint evidence.
 
-This coordinator has no public producer route or dispatch worker yet. Checkpoint
-acceptance verifies the transcript and execution ownership. Publication is the
+The scoped [producer API](native-ingestion.md#producer-enrichment-api) and durable
+worker expose this coordinator. Checkpoint acceptance verifies the transcript and
+execution ownership. Publication is the
 separate operation below that verifies post identity and commits native captures.
-Shared source cooldowns/fairness and legacy queue conversion
+Cross-collection fairness and legacy queue conversion
 remain required before activation.
 
 ## Verified enrichment publication
@@ -1564,8 +1566,9 @@ Migration preserves queued, running, failed and cancelled schema-51 work; a
 schema-51 success assertion is refused because that schema had no verified
 publication path. Backup retains publication/provenance; anonymisation removes it.
 
-Schema 1000053 adds verified staging release below. Public worker routes, shared source scheduling,
-remaining identity adapters and legacy queue conversion are still unfinished.
+Schema 1000053 adds verified staging release below. The scoped producer routes
+and worker are implemented; remaining adapters and legacy queue conversion still
+precede production activation.
 
 ## Completed enrichment staging release
 
@@ -1599,3 +1602,38 @@ before opening a writable connection. A missing or altered release, reference,
 capture association or payload is rejected. Ordinary database backups retain
 releases and their native evidence; anonymisation removes both. Releasing staging
 makes SQLite pages reusable; it does not vacuum the database or delete media.
+
+## Shared source scheduling
+
+Schema 1000054 adds `source_pacing`, `source_run_pacing`,
+`enrichment_job_pacing` and `enrichment_attempt_pacing`. Immutable work bindings
+identify the contacted service through the versioned `source_scope_v1` function.
+Known domain aliases share a service; Coomer/Kemono use their mirror scope rather
+than the creator's upstream service. Unknown extractors remain separate by host.
+These scopes are independent of performer identity, account aliases and website
+credentials. Changes to equivalence rules require an explicit migration/version.
+
+Download and enrichment claims read shared cooldowns and ownership inside their
+managed write transaction. Running enrichment excludes other claims for its services and collection. Pending child services are checked and reserved atomically with a
+retry claim. The current producer can also reserve a supported newly discovered
+child through the fenced worker API. Attempt reservations persist for history,
+but only the current running fence holds the service. Failure, cancellation and
+expiry release that ownership without deleting metadata checkpoints. Replaying
+an existing reservation does not consume an attempt or rewrite its start time.
+
+Eligible queued downloads precede enrichment. Independent downloads still obey
+the existing target, destination and collection locks. Typed failures impose
+shared service cooldowns: at least one hour for rate limits/timeouts/extraction
+failures and one day for authentication/challenges. Missing posts, denied accounts,
+busy sources and local worker failures do not pause an entire service. Child
+failures use the child's service. Longer delays win and old failure receipts
+cannot extend the deadline when replayed.
+
+Migration derives bindings from existing immutable source definitions and post
+URLs while preserving jobs, attempts, checkpoint bytes and prior cooldowns.
+Existing running checkpoints gain child reservations; original root reservations
+are reconstructed for historical attempts. Startup checks bindings and required
+objects. Ordinary backups retain scheduling state; anonymisation removes it with
+work history. This does not import legacy catalog cooldowns or scheduling history.
+Download-side linked-extractor reservations, cross-collection fairness, typed
+download-adapter failures and live conversion remain required before activating production schedules.

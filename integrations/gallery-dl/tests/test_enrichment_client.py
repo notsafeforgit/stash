@@ -35,11 +35,14 @@ class EnrichmentClientTests(unittest.TestCase):
             "record_count": 3, "pending_count": 1, "unresolved_count": 1}
 
     def test_capability_and_response_byte_limits(self):
-        self.transport.capabilities.return_value = {"enrichment_protocol": 1, "max_enrichment_checkpoint_bytes": MAX_BYTES}
+        good = {"enrichment_protocol": 1, "max_enrichment_checkpoint_bytes": MAX_BYTES,
+                "enrichment_source_pacing_protocol": 1}
+        self.transport.capabilities.return_value = good
         self.client.capabilities()
-        for invalid in ({}, {"enrichment_protocol": True, "max_enrichment_checkpoint_bytes": MAX_BYTES},
-                        {"enrichment_protocol": 1, "max_enrichment_checkpoint_bytes": MAX_BYTES - 1}):
-            self.transport.capabilities.return_value = invalid
+        for invalid in ({"enrichment_protocol": True}, {"max_enrichment_checkpoint_bytes": MAX_BYTES - 1},
+                        {"enrichment_source_pacing_protocol": None}, {"enrichment_source_pacing_protocol": True},
+                        {"enrichment_source_pacing_protocol": 2}):
+            self.transport.capabilities.return_value = dict(good, **invalid)
             with self.assertRaises(Unavailable):
                 self.client.capabilities()
         actual = Client("http://localhost:8009", self.transport.producer)
@@ -177,6 +180,18 @@ class EnrichmentClientTests(unittest.TestCase):
         for seconds in (True, 4, 901):
             with self.assertRaises(InvalidData):
                 self.client.claim(self.job, self.owner, seconds)
+
+    def test_source_reservation_requires_exact_attempt_and_boolean_reply(self):
+        running = dict(self.job, state="running", owner_uuid=self.owner, revision=2, fence=1)
+        good = {"job_uuid": running["uuid"], "fence": 1, "ready": True}
+        self.transport._request.return_value = good
+        self.assertTrue(self.client.reserve_source(running, "https://redgifs.com/watch/example"))
+        self.transport._request.return_value = dict(good, ready=False)
+        self.assertFalse(self.client.reserve_source(running, "https://redgifs.com/watch/example"))
+        for mutation in ({"job_uuid": str(uuid.uuid4())}, {"fence": 2}, {"fence": True}, {"ready": 1}):
+            self.transport._request.return_value = dict(good, **mutation)
+            with self.assertRaises(Unavailable):
+                self.client.reserve_source(running, "https://redgifs.com/watch/example")
 
     def test_failure_receipt_is_bound_to_attempt_producer_and_outcome(self):
         result = {"job_uuid": self.job["uuid"], "producer_uuid": self.transport.producer,

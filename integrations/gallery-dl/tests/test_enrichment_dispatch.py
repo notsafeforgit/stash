@@ -103,6 +103,17 @@ class EnrichmentDispatchTests(unittest.TestCase):
         self.native_ready.assert_not_called()
         self.targets.assert_not_called()
 
+    def test_blocked_admitted_work_does_not_admit_more_targets(self):
+        self.native_ready.return_value = [{"sequence": 1, "uuid": str(uuid.uuid4())}]
+        self.targets.return_value = [self.target()]
+        with closing(self.open()) as box:
+            self.assertEqual(self.worker(box).once()["state"], "waiting")
+            self.assertEqual(self.worker(box).state()["job_after"], 0)
+        with closing(self.open()) as box:
+            self.assertEqual(self.worker(box).once()["state"], "waiting")
+        self.targets.assert_not_called()
+        self.admit.assert_not_called()
+
     def test_expired_delivery_uses_matching_profile_for_reclaim_but_never_a_different_profile(self):
         with closing(self.open()) as box:
             value = self.stage(box)

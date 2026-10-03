@@ -42,6 +42,7 @@ func TestEnrichmentCheckpointReleaseMigrationPreservesStagingUntilVerified(t *te
 			require.NoError(t, f.db.Close())
 			raw := openRawDB(t, path)
 			defer raw.Close()
+			removeSourcePacingSchema(t, raw)
 			_, err = raw.Exec(`DROP TRIGGER enrichment_checkpoint_published_delete; DROP TABLE enrichment_checkpoint_releases;
  DELETE FROM native_migration_history WHERE version=1000053; UPDATE schema_migrations SET version=1000052;`)
 			require.NoError(t, err)

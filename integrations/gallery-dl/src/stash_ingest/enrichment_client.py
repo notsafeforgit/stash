@@ -12,7 +12,7 @@ from .metadata_bundle import Bundle, ERRORS, MAX_BYTES, MAX_RECORDS, MAX_REFEREN
 
 PREFIX = "/enrichment"
 MAX_RESPONSE = MAX_BYTES + 4096
-RETRYABLE = {"rate_limited", "extraction_failed", "timeout", "worker_failed"}
+RETRYABLE = {"rate_limited", "extraction_failed", "timeout", "worker_failed", "source_busy"}
 
 
 def checkpoint_bytes(body):
@@ -34,6 +34,8 @@ class EnrichmentClient:
     def capabilities(self):
         capabilities = self.client.capabilities()
         if (type(capabilities.get("enrichment_protocol")) is not int or capabilities["enrichment_protocol"] != 1
+                or type(capabilities.get("enrichment_source_pacing_protocol")) is not int
+                or capabilities["enrichment_source_pacing_protocol"] != 1
                 or type(capabilities.get("max_enrichment_checkpoint_bytes")) is not int
                 or capabilities["max_enrichment_checkpoint_bytes"] < MAX_BYTES):
             raise Unavailable("native_enrichment_worker_unavailable")
@@ -191,6 +193,16 @@ class EnrichmentClient:
         if response[0]["fence"] != job["fence"]:
             raise Unavailable("invalid_response")
         return response
+
+    def reserve_source(self, job, url):
+        self._job(job)
+        value = self.client._request("POST", self.path(job["uuid"], "/source"), encode({
+            **self.lease(job), "url": public_url(url)}))
+        if (not isinstance(value, dict) or value.get("job_uuid") != job["uuid"]
+                or type(value.get("fence")) is not int or value["fence"] != job["fence"]
+                or type(value.get("ready")) is not bool):
+            raise Unavailable("invalid_response")
+        return value["ready"]
 
     def _running(self, value, expected, owner):
         work = self._job(value, expected["uuid"])

@@ -156,7 +156,9 @@ class EnrichmentDispatcher:
                 return {"state": "contended"}
             # Reaching the end after a saved cursor requires another pass from
             # zero before admitting fresh work; earlier queued retries may exist.
-            if previous:
+            if previous or page:
+                # A runnable job whose claim is currently blocked must not
+                # cause successive polls to fill the queue with fresh work.
                 return {"state": "waiting"}
             targets = self.client.ready(self.key[0], PAGE_SIZE, after=state["target_cursor"])
             for target in targets:

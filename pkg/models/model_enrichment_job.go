@@ -119,6 +119,7 @@ type EnrichmentJobReaderWriter interface {
 	BindAttempt(context.Context, EnrichmentJobLease, time.Time) error
 	Attempt(context.Context, string, int64) (*EnrichmentJobAttempt, error)
 	CheckLease(context.Context, EnrichmentJobLease, time.Time) (*ArchiveJob, error)
+	ReserveSource(context.Context, EnrichmentJobLease, string, time.Time) (bool, error)
 	Checkpoint(context.Context, EnrichmentJobLease, int, json.RawMessage, time.Time) (*EnrichmentCheckpointReceipt, error)
 	CheckpointHead(context.Context, string) (*EnrichmentCheckpoint, error)
 	CheckpointReceipts(context.Context, string, int, int) ([]EnrichmentCheckpointReceipt, error)

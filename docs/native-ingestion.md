@@ -487,7 +487,8 @@ current Stash producer bearer token. Authentication precedes checkpoint body
 decoding; each operation rechecks collection/root grants and attempt ownership
 in its domain transaction. Ordinary Stash API keys and session cookies do not
 grant producer access. Website credentials stay in the external worker.
-Capabilities advertise `enrichment_protocol: 1`, `enrichment_dispatch_protocol: 1` and
+Capabilities advertise `enrichment_protocol: 1`, `enrichment_dispatch_protocol: 1`,
+`enrichment_source_pacing_protocol: 1` and
 `max_enrichment_checkpoint_bytes: 33554432`.
 
 | Method and path | Request / result |
@@ -498,6 +499,7 @@ Capabilities advertise `enrichment_protocol: 1`, `enrichment_dispatch_protocol: 
 | `GET /jobs/{uuid}` | Returns `{job, target}`, including immutable source URL/input and the target's current scheduling state |
 | `POST /jobs/{uuid}/claim` | `{expected_revision, owner_uuid, policy_sha256, extractor_version, lease_seconds}` claims the selected job; unchanged but unavailable work returns 204 |
 | `POST /jobs/{uuid}/renew` | `{owner_uuid, fence, lease_seconds}` renews current ownership |
+| `POST /jobs/{uuid}/source` | `{owner_uuid, fence, url}` reserves the main service or a supported linked service before extractor initialization; returns `{job_uuid, fence, ready}` |
 | `GET /jobs/{uuid}/checkpoint` | Current receipt plus compact `body`, or null when absent/released |
 | `POST /jobs/{uuid}/checkpoint` | `{owner_uuid, fence, expected_revision, body}` saves or replays retained evidence; `body` is a JSON object |
 | `POST /jobs/{uuid}/publish` | `{owner_uuid, fence, checkpoint_revision, checkpoint_sha256}` verifies and publishes the saved checkpoint atomically |
@@ -514,14 +516,39 @@ counts, source URL and runtime before resuming. The Python lease helper uses
 the server's HTTP date and monotonic request start, stops further extraction
 when renewal fails, and does not extend ownership based on its local wall clock.
 
-Retryable failure codes are `rate_limited`, `extraction_failed`, `timeout` and
-`worker_failed`. Server backoff starts at five minutes and increases by attempt;
+Retryable failure codes are `rate_limited`, `extraction_failed`, `timeout`,
+`worker_failed` and `source_busy`. Server backoff starts at five minutes and increases by attempt;
 the eighth attempt becomes terminal. Authentication, access, challenge,
 not-found, unsupported-extractor, malformed-checkpoint, size, runtime and
 post-identity failures require review. Clients cannot report success through
 the failure route or supply their own retry deadline. Failed attempts retain
 checkpoints and do not complete the target. A terminal job requires an explicit
 owner retry that creates a new target revision.
+
+Claims coordinate with source downloads in the same write transaction. Claims for a source-run target service cannot overlap an enrichment reservation
+for that service. Enrichment also excludes other work in its collection. Independent downloads retain their existing
+destination/target exclusions. A download run's current binding covers its target
+service; reserving its own linked extractors remains download-adapter work. Eligible queued downloads take precedence over
+new enrichment; stale definitions and deferred/backoff work do not reserve the
+service. A retry reserves its retained pending child services at claim time.
+
+Before initializing a newly discovered Redgifs or Imgur child extractor, the
+worker calls `/source` using its current lease. The route accepts the job's main
+service and those two supported child services, with producer/lease/source checks
+through commit. A reservation lasts only for that attempt; replay cannot prolong
+it or transfer it to a successor. A busy response leaves the child's URL in the
+checkpoint with `source_busy`, preserving parent observations for child-only retry.
+Scheduling reservations store service identities, not website credentials or URLs.
+
+Native cooldowns are shared across producers and both work families. Typed
+rate-limit, timeout and extraction failures pause the affected service for at
+least one hour; authentication/challenge failures pause it for at least one day.
+A longer native retry deadline wins. A retained child failure pauses that child's
+service, independently of the post's main service. Missing posts, account access
+denials, local worker failures and busy reservations do not declare a service
+outage. Replaying an old failure receipt does not extend its cooldown. Mirror
+sites use their contacted mirror service, independently of creator-account
+namespaces such as OnlyFans or Patreon.
 
 Lost failure responses replay against the original producer/owner/fence and
 error code, even after a successor attempt starts. They cannot stop the successor.
@@ -539,10 +566,11 @@ through the current root's discovery grant. Claim independently checks authority
 
 The native server runs enrichment maintenance every 30 seconds independently of
 media and translation workers. It cancels stale source/target work, recovers
-expired attempts with backoff and preserves checkpoint/receipt evidence. No
-producer route performs maintenance or contacts websites inside Stash. Shared
-download/enrichment cooldowns and fairness, legacy queue import and host/n8n
-activation remain required before switching production schedules.
+expired attempts with backoff and preserves checkpoint/receipt evidence. Claims
+and source reservations also recover conflicting expired work; discovery remains
+read-only. Stash never contacts websites for these operations. Download-side linked-service reservations, multi-collection
+fairness, typed download-adapter failure reporting, legacy queue import and
+host/n8n activation remain required before switching production schedules.
 
 The Python selected-job executor now journals stable claim requests, returned
 checkpoint bytes and pending publication/failure operations in producer outbox

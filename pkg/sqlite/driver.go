@@ -7,6 +7,7 @@ import (
 
 	"github.com/WithoutPants/sortorder/casefolded"
 	sqlite3 "github.com/mattn/go-sqlite3"
+	"github.com/stashapp/stash/pkg/scrape"
 )
 
 const sqlite3Driver = "sqlite3ex"
@@ -30,6 +31,7 @@ func (d *CustomSQLiteDriver) Open(dsn string) (driver.Conn, error) {
 				"durationToTinyInt": durationToTinyIntFn,
 				"basename":          basenameFn,
 				"phash_distance":    phashDistanceFn,
+				"source_scope_v1":   scrape.SourceScopeV1,
 			}
 
 			for name, fn := range funcs {

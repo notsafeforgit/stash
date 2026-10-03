@@ -24,7 +24,8 @@ body = decode(Path(setup["fixture"]).read_bytes(), preserve_numbers=True)["compl
 count_path = directory / "fetches.txt"
 
 
-def fetched(url, settings, *, resume, check):
+def fetched(url, settings, *, resume, check, reserve_source):
+    assert reserve_source(url)
     assert not setup["forbid_fetch"], "saved evidence must not be replaced by a new lookup"
     check()
     assert url == body["url"] and resume is None

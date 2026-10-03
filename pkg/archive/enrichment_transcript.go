@@ -100,7 +100,7 @@ func enrichmentReasonCode(value string) bool {
 	switch value {
 	case "rate_limited", "authentication", "access_denied", "challenge", "not_found", "unsupported_extractor",
 		"extraction_failed", "timeout", "result_too_large", "invalid_checkpoint", "not_a_post_url", "worker_failed",
-		"runtime_changed", "external_reference_only":
+		"runtime_changed", "external_reference_only", "source_busy":
 		return true
 	}
 	return false

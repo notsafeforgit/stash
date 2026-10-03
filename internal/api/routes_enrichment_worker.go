@@ -46,6 +46,7 @@ func (rs *ingestRoutes) enrichmentRoutes(r chi.Router) {
 		r.Get("/jobs/{job}", rs.describeEnrichment)
 		r.Post("/jobs/{job}/claim", rs.claimEnrichment)
 		r.Post("/jobs/{job}/renew", rs.renewEnrichment)
+		r.Post("/jobs/{job}/source", rs.reserveEnrichmentSource)
 		r.Get("/jobs/{job}/checkpoint", rs.readEnrichmentCheckpoint)
 		r.Post("/jobs/{job}/checkpoint", rs.saveEnrichmentCheckpoint)
 		r.Post("/jobs/{job}/publish", rs.publishEnrichment)
@@ -179,6 +180,19 @@ func (rs *ingestRoutes) renewEnrichment(w http.ResponseWriter, r *http.Request) 
 func (rs *ingestRoutes) readEnrichmentCheckpoint(w http.ResponseWriter, r *http.Request) {
 	value, err := rs.enrichmentWorker().CheckpointHead(r.Context(), ingestToken(r), chi.URLParam(r, "job"))
 	writeEnrichmentWorker(w, value, err)
+}
+
+func (rs *ingestRoutes) reserveEnrichmentSource(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		enrichmentLeaseInput
+		URL string `json:"url"`
+	}
+	if err := readIngestJSON(w, r, 16384, &input); err != nil {
+		ingestError(w, err)
+		return
+	}
+	ready, err := rs.enrichmentWorker().ReserveSource(r.Context(), ingestToken(r), input.lease(r), input.URL)
+	writeEnrichmentWorker(w, map[string]any{"job_uuid": chi.URLParam(r, "job"), "fence": input.Fence, "ready": ready}, err)
 }
 
 func (rs *ingestRoutes) saveEnrichmentCheckpoint(w http.ResponseWriter, r *http.Request) {

@@ -98,9 +98,29 @@ type EnrichmentFailureReceipt struct {
 	ProducerUUID string `json:"producer_uuid"`
 }
 
+// ReserveSource coordinates contact with a linked host before any source I/O.
+// Authority, immutable work and the current producer/lease are rechecked inside
+// the write transaction and immediately before committing the reservation.
+func (c *EnrichmentCoordinator) ReserveSource(ctx context.Context, token string, lease models.ArchiveJobLease, url string) (bool, error) {
+	var ready bool
+	err := c.Service.Repo.WithTxn(ctx, func(ctx context.Context) error {
+		credential, current, _, err := c.allowed(ctx, token, lease.JobUUID)
+		if err != nil {
+			return err
+		}
+		ready, err = c.Service.Repo.EnrichmentJob.ReserveSource(ctx, models.EnrichmentJobLease{ArchiveJobLease: lease, ProducerUUID: credential.ProducerUUID}, url, c.Now())
+		if err != nil {
+			return err
+		}
+		c.guard(ctx, token, current, current.LeaseUntil)
+		return nil
+	})
+	return ready && err == nil, err
+}
+
 func enrichmentFailureState(code string) string {
 	switch code {
-	case "rate_limited", "extraction_failed", "timeout", "worker_failed":
+	case "rate_limited", "extraction_failed", "timeout", "worker_failed", "source_busy":
 		return "retry"
 	case "authentication", "access_denied", "challenge", "not_found", "unsupported_extractor",
 		"result_too_large", "invalid_checkpoint", "not_a_post_url", "runtime_changed", "post_identity_conflict":

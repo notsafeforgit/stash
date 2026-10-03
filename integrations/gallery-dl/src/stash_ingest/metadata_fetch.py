@@ -15,7 +15,7 @@ import sys
 import time
 
 from .encoding import InvalidData, decode, encode
-from .metadata_bundle import Bundle, ERRORS, MAX_BYTES, public_url
+from .metadata_bundle import Bundle, ERRORS, MAX_BYTES, MAX_RECORDS, MAX_REFERENCES, public_url
 
 NETWORK_KEYS = frozenset({"username", "password", "cookies", "cookies-domain", "cookies-select",
                           "cookies-from-browser", "client-id", "client-secret", "refresh-token", "access-token",
@@ -105,8 +105,14 @@ class RateLimited(RuntimeError):
     pass
 
 
+class SourceBusy(RuntimeError):
+    pass
+
+
 def classify(exc):
     name = type(exc).__name__
+    if name == "SourceBusy":
+        return "source_busy"
     if name == "RateLimited" or getattr(exc, "status", None) == 429:
         return "rate_limited"
     if getattr(exc, "status", None) == 404:
@@ -117,7 +123,7 @@ def classify(exc):
             "ConnectTimeout": "timeout"}.get(name, "extraction_failed")
 
 
-def collect(url, settings, resume=None, *, factory=None, check=lambda: None):
+def collect(url, settings, resume=None, *, factory=None, check=lambda: None, reserve_source=None):
     from gallery_dl import config, extractor, util, version
     from gallery_dl.extractor.common import Extractor, Message
     from .gallery import SUPPORTED_VERSION, twitter_evidence
@@ -137,6 +143,10 @@ def collect(url, settings, resume=None, *, factory=None, check=lambda: None):
 
     def walk(target, parent=None, depth=0):
         check()
+        # Initialization can authenticate or contact the website. Acquire its
+        # service before initialization, including newly discovered children.
+        if reserve_source is not None and not reserve_source(target.url):
+            raise SourceBusy()
         _configure_context(target, bundle, parent)
         target.initialize()
         pause = util.build_duration_func(target.config("sleep-extractor"))
@@ -221,12 +231,15 @@ def _terminate(process):
     process.wait()
 
 
-def _exchange(command, body, timeout, check=lambda: None):
+def _exchange(command, body, timeout, check=lambda: None, reserve_source=None):
     """Bound both pipes and wall time, including a child stuck writing logs."""
     check()
     with subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                           stderr=subprocess.DEVNULL, start_new_session=os.name == "posix") as process:
         output, offset = bytearray(), 0
+        paced = reserve_source is not None
+        sending = body + b"\n" if paced else body
+        result, finished, contacts = None, False, 0
         deadline = time.monotonic() + timeout
         with selectors.DefaultSelector() as selector:
             try:
@@ -244,30 +257,58 @@ def _exchange(command, body, timeout, check=lambda: None):
                     for event, _ in selector.select(min(remaining, interval)):
                         if event.fileobj is process.stdin:
                             try:
-                                offset += os.write(process.stdin.fileno(), body[offset:offset + 65536])
+                                offset += os.write(process.stdin.fileno(), sending[offset:offset + 65536])
                             except BrokenPipeError:
-                                offset = len(body)
-                            if offset == len(body):
+                                offset = len(sending)
+                            if offset == len(sending):
                                 selector.unregister(process.stdin)
-                                process.stdin.close()
+                                if not paced:
+                                    process.stdin.close()
                         else:
                             chunk = os.read(process.stdout.fileno(), 65536)
                             if chunk:
                                 output.extend(chunk)
-                                if len(output) > MAX_BYTES:
+                                if len(output) > MAX_BYTES + (64 if paced else 0):
                                     _terminate(process)
                                     return {"error": "result_too_large"}
+                                if paced:
+                                    while b"\n" in output:
+                                        line, _, rest = output.partition(b"\n")
+                                        output = bytearray(rest)
+                                        frame = decode(bytes(line), MAX_BYTES + 64, preserve_numbers=True)
+                                        if not isinstance(frame, dict) or finished:
+                                            raise InvalidData("Invalid metadata worker frame")
+                                        if set(frame) == {"contact"}:
+                                            contacts += 1
+                                            if contacts > MAX_RECORDS + MAX_REFERENCES or offset != len(sending):
+                                                raise InvalidData("Too many metadata source requests")
+                                            url = public_url(frame["contact"])
+                                            check()
+                                            allowed = reserve_source(url)
+                                            check()
+                                            if type(allowed) is not bool:
+                                                raise InvalidData("Invalid metadata source reservation")
+                                            sending, offset = encode({"allowed": allowed}) + b"\n", 0
+                                            selector.register(process.stdin, selectors.EVENT_WRITE)
+                                        elif set(frame) == {"result"}:
+                                            result, finished = frame["result"], True
+                                        else:
+                                            raise InvalidData("Invalid metadata worker frame")
                             else:
                                 selector.unregister(process.stdout)
                 if process.returncode:
                     return {"error": "worker_failed"}
+                if paced:
+                    if output or not finished:
+                        raise InvalidData("Incomplete metadata worker response")
+                    return result
                 return decode(bytes(output), MAX_BYTES, preserve_numbers=True)
             except BaseException:
                 _terminate(process)
                 raise
 
 
-def fetch(url, settings, resume=None, *, timeout=180, check=lambda: None):
+def fetch(url, settings, resume=None, *, timeout=180, check=lambda: None, reserve_source=None):
     """Caller owns durable checkpoint publication and source lease management."""
     from .gallery import SUPPORTED_VERSION
     public_url(url)
@@ -276,9 +317,12 @@ def fetch(url, settings, resume=None, *, timeout=180, check=lambda: None):
         raise InvalidData("Metadata fetch timeout must be at most ten minutes")
     if resume is not None:
         Bundle(url, SUPPORTED_VERSION, resume)
-    body = encode({"url": url, "settings": settings, "resume": resume}, INPUT_LIMIT)
+    request = {"url": url, "settings": settings, "resume": resume}
+    if reserve_source is not None:
+        request["source_pacing"] = True
+    body = encode(request, INPUT_LIMIT)
     try:
-        result = _exchange([sys.executable, "-B", "-m", "stash_ingest.metadata_fetch"], body, timeout, check)
+        result = _exchange([sys.executable, "-B", "-m", "stash_ingest.metadata_fetch"], body, timeout, check, reserve_source)
         if (isinstance(result, dict) and set(result) == {"error"}
                 and isinstance(result["error"], str) and result["error"] in ERRORS):
             return result
@@ -296,7 +340,17 @@ def main():
         os.dup2(silent.fileno(), sys.stderr.fileno())
     logging.disable(logging.CRITICAL)
     runtime_validated = False
+    paced = False
+    stream = os.fdopen(output, "wb")
     try:
+        raw = sys.stdin.buffer.readline(INPUT_LIMIT + 2)
+        request = decode(raw.removesuffix(b"\n"), INPUT_LIMIT, preserve_numbers=True)
+        if not isinstance(request, dict) or set(request) not in (
+                {"url", "settings", "resume"}, {"url", "settings", "resume", "source_pacing"}):
+            raise InvalidData("Invalid metadata fetch request")
+        paced = "source_pacing" in request
+        if paced and request["source_pacing"] is not True:
+            raise InvalidData("Invalid metadata source protocol")
         from .configuration import runtime_identity
         runtime_identity()
         runtime_validated = True
@@ -317,16 +371,25 @@ def main():
             return response
 
         requests.sessions.Session.send = guarded
-        request = decode(sys.stdin.buffer.read(INPUT_LIMIT + 1), INPUT_LIMIT, preserve_numbers=True)
-        if not isinstance(request, dict) or set(request) != {"url", "settings", "resume"}:
-            raise InvalidData("Invalid metadata fetch request")
-        result = collect(request["url"], request["settings"], request["resume"])
+        def reserve_source(url):
+            stream.write(encode({"contact": public_url(url)}, 16384) + b"\n")
+            stream.flush()
+            reply = decode(sys.stdin.buffer.readline(256), 255)
+            if not isinstance(reply, dict) or set(reply) != {"allowed"} or type(reply["allowed"]) is not bool:
+                raise InvalidData("Invalid metadata source reservation")
+            return reply["allowed"]
+
+        result = collect(request["url"], request["settings"], request["resume"],
+                         reserve_source=reserve_source if paced else None)
     except InvalidData:
         result = {"error": "invalid_checkpoint" if runtime_validated else "runtime_changed"}
     except Exception as exc:
         result = {"error": classify(exc)}
-    with os.fdopen(output, "wb") as stream:
-        stream.write(encode(result, MAX_BYTES))
+    with stream:
+        if paced:
+            stream.write(encode({"result": result}, MAX_BYTES + 64) + b"\n")
+        else:
+            stream.write(encode(result, MAX_BYTES))
     return 0
 
 

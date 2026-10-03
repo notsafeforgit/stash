@@ -20,7 +20,7 @@ OBSERVED_TIME = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?(?:
 ERRORS = frozenset({"rate_limited", "authentication", "access_denied", "challenge",
                     "not_found", "unsupported_extractor", "extraction_failed", "timeout",
                     "result_too_large", "invalid_checkpoint", "not_a_post_url",
-                    "worker_failed", "runtime_changed"})
+                    "worker_failed", "runtime_changed", "source_busy"})
 
 
 def public_url(value):

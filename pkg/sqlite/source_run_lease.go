@@ -22,6 +22,9 @@ func (s *SourceRunStore) Claim(ctx context.Context, id, producer, owner, policy 
 	if _, err := s.Recover(ctx, now, 100); err != nil {
 		return nil, err
 	}
+	if _, err := (&EnrichmentJobStore{}).Maintain(ctx, now); err != nil {
+		return nil, err
+	}
 	row, err := findSourceRun(ctx, "SELECT * FROM source_runs WHERE uuid=?", id)
 	if err != nil || row == nil {
 		return nil, err
@@ -93,6 +96,15 @@ OR EXISTS(SELECT 1 FROM source_run_cooldowns WHERE target_key=? AND available_at
 			return nil, nil
 		}
 	}
+	scope, err := sourcePacingScope(ctx, id, false)
+	if err != nil {
+		return nil, err
+	}
+	ready, err := sourcePacingReady(ctx, scope, collection.UUID, r.Operation == "enrich", now)
+	if err != nil || !ready {
+		return nil, err
+	}
+	complete := sourcePacingAtomic(ctx)
 	// Latest uncovered range first; old history remains durable pending work.
 	window := r.Pending[len(r.Pending)-1]
 	r.Pending = r.Pending[:len(r.Pending)-1]
@@ -142,7 +154,12 @@ SELECT uuid,fence,producer_uuid,owner_uuid,window,progress,? FROM source_runs WH
 	if err != nil {
 		return nil, err
 	}
-	return s.Find(ctx, id)
+	if err := sourcePacingStarted(ctx, scope, now); err != nil {
+		return nil, err
+	}
+	result, err := s.Find(ctx, id)
+	*complete = err == nil && result != nil
+	return result, err
 }
 
 func (s *SourceRunStore) CheckLease(ctx context.Context, lease models.SourceRunLease, now time.Time) (*models.SourceRun, error) {
@@ -240,6 +257,7 @@ func (s *SourceRunStore) Finish(ctx context.Context, lease models.SourceRunLease
 }
 
 func (s *SourceRunStore) finish(ctx context.Context, r *models.SourceRun, outcome models.SourceRunOutcome, now time.Time) (*models.SourceRun, error) {
+	complete := sourcePacingAtomic(ctx)
 	state := "queued"
 	delay := time.Duration(r.CooldownSeconds) * time.Second
 	if outcome.State == "succeeded" {
@@ -256,6 +274,16 @@ func (s *SourceRunStore) finish(ctx context.Context, r *models.SourceRun, outcom
 		}
 		backoff := min(24*time.Hour, 5*time.Minute*time.Duration(1<<min(r.Failures-1, 8)))
 		delay = max(delay, backoff, time.Duration(outcome.RetryAfterSeconds)*time.Second)
+	}
+	if pause := sourcePacingDelay(outcome.ErrorCode, now.Add(delay), now); pause > 0 {
+		scope, err := sourcePacingScope(ctx, r.UUID, false)
+		if err != nil {
+			return nil, err
+		}
+		delay = max(delay, pause)
+		if err := sourcePacingPause(ctx, scope, outcome.ErrorCode, now.Add(delay)); err != nil {
+			return nil, err
+		}
 	}
 	pending, err := json.Marshal(r.Pending)
 	if err != nil {
@@ -277,7 +305,9 @@ func (s *SourceRunStore) finish(ctx context.Context, r *models.SourceRun, outcom
 ON CONFLICT(target_key) DO UPDATE SET available_at_ms=max(available_at_ms,excluded.available_at_ms)`, now.Add(delay).UnixMilli(), r.UUID); err != nil {
 		return nil, err
 	}
-	return s.Find(ctx, r.UUID)
+	result, err := s.Find(ctx, r.UUID)
+	*complete = err == nil && result != nil
+	return result, err
 }
 
 func (s *SourceRunStore) Recover(ctx context.Context, now time.Time, limit int) (int, error) {

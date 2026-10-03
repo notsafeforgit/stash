@@ -1475,9 +1475,9 @@ staging atomically while preserving native captures, original acknowledgements,
 producer attribution and unresolved references. A release receipt distinguishes
 completed cleanup from a job without a checkpoint. Older publications retain
 staging through migration until verified cleanup. The scoped producer API accepts
-these checkpoints through a separate enrichment contract. Shared source
-scheduling and service conversion remain required before
-activation.
+these checkpoints through a separate enrichment contract. Shared native source
+reservations now coordinate the worker with downloads; scheduling fairness and
+service conversion remain required before activation.
 
 Temporary child failures retain the parent and discard that child's partial
 records. Persist the entire returned checkpoint before retrying its pending
@@ -1492,7 +1492,7 @@ helper neither applies field mappings nor mutates selected scene/image metadata.
 
 `enrichment_client.EnrichmentClient(Client(...))` exposes capability checks,
 unadmitted target discovery for one granted collection, revision-pinned admission,
-job/target inspection, claim/renew, checkpoint save/read, verified publication
+job/target inspection, claim/renew, source reservations, checkpoint save/read, verified publication
 and controlled failure acknowledgements. See the
 [HTTP contract](../../docs/native-ingestion.md#producer-enrichment-api).
 Checkpoint bodies remain JSON objects. Requests bind the owner/fence; server
@@ -1507,6 +1507,15 @@ returns an owned lease or `None` when the selected job is currently unavailable.
 request start, with a safety margin. Failed renewal stops further source work.
 Retain an owner UUID across a lost claim response to recover the same attempt.
 
+Pass `reserve_source=lease.reserve_source` to `metadata_fetch.fetch`. The executor
+does this automatically and requires native `enrichment_source_pacing_protocol: 1`.
+Its bounded subprocess protocol requests a native reservation before initializing
+each root or linked extractor. A busy child becomes a pending `source_busy`
+reference with the parent transcript intact; no child request is made. Resuming
+fetches only pending children, whose services are reserved by the new native claim.
+Reservations end with their fenced attempt, including cancellation or expiry.
+Website access values stay in the worker and never enter scheduling records.
+
 Only publication certifies success. Failure calls accept controlled codes;
 temporary errors receive server backoff and the eighth attempt becomes terminal.
 Exact failure replay cannot affect a newer attempt. Checkpoint/publication
@@ -1517,8 +1526,10 @@ number tokens against the real native HTTP server and SQLite.
 Use the executor below to persist fresh extraction results before network
 delivery. Ready-target discovery lists unadmitted targets; the separate ready-job
 route finds admitted retries. The native server now maintains expired/stale
-enrichment jobs independently of other workers. Shared scheduling/cooldowns,
-legacy queue mapping and production host/n8n launchers remain transition work.
+enrichment jobs independently of other workers. Shared service cooldowns and
+download/enrichment exclusion are implemented. Download-side linked-extractor reservations, cross-collection fairness, typed
+download failure reporting, legacy queue mapping and production host/n8n launchers
+remain transition work.
 
 ### Durable selected-job execution
 
@@ -1594,8 +1605,8 @@ can exist only there. Schema 7 → 8 preserves all prior tables and receipt byte
 older producer binaries refuse schema 8. The native Stash schema is unchanged.
 
 The selected-job executor requires a known job UUID. The dispatcher below adds
-discovery and admission; shared source cooldowns and replacement of the scheduled
-enrichment service remain transition work.
+discovery and admission. Shared native pacing is described above; replacement of
+the scheduled enrichment service remains transition work.
 
 ### Enrichment dispatch and native maintenance
 
@@ -1646,9 +1657,11 @@ discovery itself is read-only and does not recover jobs or confer a lease.
 
 Schema 8 → 9 preserves existing events, requests, receipts and staged enrichment
 bytes, adding only discovery state. A table-name collision rolls back promotion.
-Older producer binaries refuse schema 9. Include the outbox in backups. Shared
-download/enrichment pacing and fairness, legacy enrichment queue mapping, review
-resolution and production launcher conversion still precede service activation.
+Older producer binaries refuse schema 9. Include the outbox in backups. Blocked
+ready-job claims cause a later retry pass, rather than repeated fresh admissions.
+Download-side linked-extractor reservations, cross-collection fairness, typed
+download failure reporting, legacy enrichment queue mapping, review resolution and production launcher conversion still
+precede service activation.
 
 ## Validation
 

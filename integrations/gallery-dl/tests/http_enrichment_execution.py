@@ -49,7 +49,8 @@ def lease_check(lease):
     original_check(lease)
 
 
-def fetched(url, settings, *, resume, check):
+def fetched(url, settings, *, resume, check, reserve_source):
+    assert reserve_source(url)
     global source_paused
     assert setup["fetch"] != "forbidden", "recovery must not refetch original observations"
     check()

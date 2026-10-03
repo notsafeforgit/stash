@@ -236,6 +236,30 @@ class FetchTests(unittest.TestCase):
         self.assertEqual(bundle.metadata(3, with_parent=True)["_reddit"]["title"], "Original caption")
         self.assertEqual(collect(URL, {}, finished, factory=lambda _: self.fail("completed checkpoint refetched")), finished)
 
+    def test_busy_child_is_saved_before_initialization_and_only_child_is_retried(self):
+        parent = factory(Post, URL, [(Message.Directory, "", post_data()), (Message.Queue, CHILD, post_data())])
+        child = factory(Child, CHILD, [(Message.Directory, "", {"id": "child"})])
+        initialized = []
+        original = child.initialize
+        child.initialize = lambda: (initialized.append(CHILD), original())[-1]
+        contacts = []
+
+        def reserve(url):
+            contacts.append(url)
+            return url == URL
+
+        first = collect(URL, {}, factory=lambda url: parent if url == URL else child, reserve_source=reserve)
+        self.assertEqual(contacts, [URL, CHILD])
+        self.assertEqual(initialized, [])
+        self.assertEqual(first["pending"][0]["reason"], "source_busy")
+        self.assertEqual([record["kind"] for record in first["records"]], ["post", "context"])
+        contacts.clear()
+        second = collect(URL, {}, first, factory=lambda url: child, reserve_source=lambda url: contacts.append(url) or True)
+        self.assertEqual(contacts, [CHILD])
+        self.assertEqual(initialized, [CHILD])
+        self.assertEqual(second["pending"], [])
+        self.assertEqual(second["records"][:2], first["records"])
+
     def test_pinned_reddit_gallery_shares_post_and_discards_redundant_previews(self):
         # Normal gallery-dl discovery compiles the Reddit classes used by items().
         self.assertIsNotNone(extractor.find("https://www.reddit.com/comments/abc123"))
@@ -431,6 +455,49 @@ main()
         bundle = Bundle(URL, SUPPORTED_VERSION, result)
         self.assertEqual(len(bundle.value["records"]), 2)
         self.assertEqual(bundle.metadata(1)["_url"], "https://media.invalid/a.jpg")
+
+    def test_actual_paced_child_protocol_denies_and_resumes_linked_service(self):
+        script = '''
+from gallery_dl import extractor
+from gallery_dl.extractor.common import Extractor, Message
+from stash_ingest.metadata_fetch import main
+class Fixture(Extractor):
+    category = "reddit"
+    subcategory = "submission"
+    pattern = r"https://fixture.invalid/.*"
+    def items(self):
+        yield Message.Directory, "", {"title":"Caption"}
+        yield Message.Queue, "https://fixture.invalid/child", {"title":"Caption"}
+class Child(Fixture):
+    category = "redgifs"
+    subcategory = "image"
+    def items(self):
+        yield Message.Directory, "", {"id":"child"}
+        yield Message.Url, "https://media.invalid/video.mp4", {"id":"child"}
+extractor.find = lambda url: (Child if url.endswith("/child") else Fixture).from_url(url)
+main()
+'''
+        contacts = []
+        request = {"url": URL, "settings": {}, "resume": None, "source_pacing": True}
+        first = _exchange([sys.executable, "-B", "-c", script], encode(request), 5,
+                          reserve_source=lambda url: contacts.append(url) or url == URL)
+        self.assertEqual(contacts, [URL, CHILD])
+        self.assertEqual(first["pending"][0]["reason"], "source_busy")
+        self.assertEqual(len(first["records"]), 2)
+        contacts.clear()
+        request["resume"] = first
+        second = _exchange([sys.executable, "-B", "-c", script], encode(request), 5,
+                           reserve_source=lambda url: contacts.append(url) or True)
+        self.assertEqual(contacts, [CHILD])
+        self.assertEqual(second["records"][:2], first["records"])
+        self.assertEqual(second["pending"], [])
+        self.assertEqual(len(second["records"]), 4)
+
+    def test_paced_exchange_rejects_unframed_or_multiple_results(self):
+        for output in ('{}', '{"contact":"file:///private"}', '{"result":{}}\n{"result":{}}'):
+            script = "import sys; sys.stdin.buffer.readline(); print(" + repr(output) + ")"
+            with self.subTest(output=output), self.assertRaises(InvalidData):
+                _exchange([sys.executable, "-B", "-c", script], b"{}", 5, reserve_source=lambda url: True)
 
     def test_rate_limit_stops_on_first_response_without_leaking_body(self):
         script = '''

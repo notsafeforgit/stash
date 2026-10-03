@@ -38,7 +38,7 @@ func TestEnrichmentWorkerFailureRetainsCheckpointsAndReplaysOriginalAttempt(t *t
 	queued, err := f.worker.Find(t.Context(), f.tokens[0], job.UUID)
 	require.NoError(t, err)
 	require.Equal(t, "queued", queued.State)
-	require.Equal(t, f.now.Add(5*time.Minute), queued.AvailableAt)
+	require.Equal(t, f.now.Add(time.Hour), queued.AvailableAt)
 	retained, err := f.worker.CheckpointHead(t.Context(), f.tokens[0], job.UUID)
 	require.NoError(t, err)
 	require.Equal(t, *head, retained.EnrichmentCheckpointReceipt)
@@ -118,7 +118,7 @@ func TestEnrichmentWorkerFailureBudgetAndCredentialReplay(t *testing.T) {
 		if attempt < job.MaxAttempts {
 			require.Equal(t, "retry", receipt.Outcome)
 			require.Equal(t, "queued", current.State)
-			require.Equal(t, f.now.Add(5*time.Minute*time.Duration(1<<(attempt-1))), current.AvailableAt)
+			require.Equal(t, f.now.Add(max(time.Hour, 5*time.Minute*time.Duration(1<<(attempt-1)))), current.AvailableAt)
 			f.now = current.AvailableAt
 			continue
 		}

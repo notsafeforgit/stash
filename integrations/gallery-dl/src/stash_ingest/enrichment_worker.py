@@ -146,7 +146,8 @@ def execute(box, transport, configuration, job_uuid, *, fetcher=fetch):
                     _deliver(journal, client, value)
                     return _result(journal, job_uuid, "capacity")
                 result = fetcher(value.definition["url"], configuration.settings(),
-                                 resume=head["body"] if head else None, check=check)
+                                 resume=head["body"] if head else None, check=check,
+                                 reserve_source=lease.reserve_source)
                 if (isinstance(result, dict) and set(result) == {"error"}
                         and isinstance(result["error"], str) and result["error"] in ERRORS):
                     value = journal.intent(value, lease.job, "failure", {"error_code": result["error"]})

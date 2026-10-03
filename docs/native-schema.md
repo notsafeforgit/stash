@@ -1621,7 +1621,8 @@ but only the current running fence holds the service. Failure, cancellation and
 expiry release that ownership without deleting metadata checkpoints. Replaying
 an existing reservation does not consume an attempt or rewrite its start time.
 
-Eligible queued downloads precede enrichment. Independent downloads still obey
+Eligible queued downloads initially precede enrichment, with the bounded
+preference described below. Independent downloads still obey
 the existing target, destination and collection locks. Typed failures impose
 shared service cooldowns: at least one hour for rate limits/timeouts/extraction
 failures and one day for authentication/challenges. Missing posts, denied accounts,
@@ -1658,5 +1659,39 @@ migration binds historical attempts to their existing root scope and preserves
 all previous rows and schema objects. Startup validates dependencies and failure
 receipts; ordinary backups retain them and anonymisation removes them.
 
-Cross-collection fairness, legacy scheduling import and live conversion remain
-required before activating production schedules.
+## Bounded source preference
+
+Schema 1000056 adds `source_service_turns`, `source_enrichment_waiters` and
+`source_enrichment_waiter_scopes`. Actual blocked enrichment claims register
+interest for 90 seconds; polling refreshes that deadline without resetting the
+original wait time. A queue with no requesting worker does not reserve services.
+Interest is removed when the job revision changes, and expired interest is
+ignored and pruned by subsequent registrations.
+
+A waiting enrichment job becomes due after four download starts on any required
+service, or two minutes of continuously live interest since the last enrichment
+start. The oldest eligible requester wins, with UUID as the tie-breaker. Required
+services include checkpointed children. Current target/source definitions,
+cooldowns and existing enrichment ownership must still allow the work. Held or
+stale targets and cooling dependencies cannot reserve an unrelated parent.
+Existing downloads drain before enrichment starts; further downloads wait for
+the due turn. Starting enrichment resets the affected service counters and age
+budget, preserving download preference between metadata turns. All admission and
+counter updates commit with the actual attempt; replaying ownership or a held
+reservation does not count another start.
+
+Download attempts expose `turn_until`, five minutes after their recorded start.
+The worker checks that server-derived deadline at source boundaries; heartbeats
+cannot extend it. It finishes the current file and saves its checkpoint before
+yielding. Replaying a saved cursor may itself exceed five minutes, so a resumed
+worker may reach one new checkpoint before yielding. This is a cooperative
+budget, not a hard execution timeout. Yield uses `retry` with the controlled
+`source_turn_complete` code, keeps pending windows/progress and the normal target
+cooldown, and does not consume the failure/backoff budget.
+
+Migration starts a new fairness epoch with zero counters; it does not invent
+historical scheduling interest or rewrite existing work. Startup validates
+service coverage, current queued-job bindings and the complete required-service
+set. Ordinary backups retain this state; anonymisation removes it. Multi-profile
+worker dispatch, legacy scheduling import and live conversion remain required
+before activating production schedules.

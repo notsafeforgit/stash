@@ -48,6 +48,8 @@ class Producer:
         self.items_seen = run["progress"]["items_seen"]
         self.files_completed = run["progress"]["files_completed"]
         self.resume_cursor = run["progress"]["cursor"]
+        self.turn_start_items = self.items_seen
+        self.turn_replay = bool(self.resume_cursor)
         recovery = run.get("recovery") or {}
         self.replay_archive = recovery.get("replay_archive", False)
         if type(self.replay_archive) is not bool:
@@ -55,15 +57,20 @@ class Producer:
         self.replay_seen = 0
         self.replay_limit = max(64, self.items_seen + 64)
 
-    def check(self):
+    def check(self, *, turn=True):
         self.lease.check()
         self.root.verify()
         self.configuration_check()
         if self.source_failure is not None:
             raise self.source_failure
+        # Replaying a saved cursor may itself take a full turn. Allow one new
+        # checkpoint afterward so repeated cooperative yields cannot trap the
+        # run forever replaying the same already captured prefix.
+        if turn and (not self.turn_replay or self.items_seen > self.turn_start_items):
+            self.lease.check_turn()
 
     def fail_source(self, code, scope):
-        self.check()
+        self.check(turn=False)
         if self.source_failure is None:
             self.source_failure = SourceFailure(code, scope)
         raise self.source_failure from None

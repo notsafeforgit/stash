@@ -107,6 +107,16 @@ service stops the attempt with `source_busy`; native attempt dependencies make a
 exact-window retry wait before repeating source work. Reservations are released
 by completion, cancellation or expiry, and expired retries retain dependencies.
 
+The executor also requires `source_run_fairness_protocol: 1`. Its server-derived
+`turn_until` is five minutes after the attempt starts and cannot be extended by
+heartbeats. The worker finishes its current file and checkpoint before yielding
+at a source boundary. A resumed traversal may finish replay and one new checkpoint
+first, so a long saved prefix cannot prevent progress indefinitely. This is a
+cooperative budget, not a hard wall-clock limit. An acknowledged yield returns
+`state: "yielded"` and the incomplete CLI exit code. Native history records
+`retry` / `source_turn_complete` while preserving progress and the normal target
+cooldown, without consuming failure attempts or imposing failure backoff.
+
 Source rate limits and request timeouts stop gallery-dl's immediate HTTP retries.
 Controlled extraction, authentication and access errors identify the service
 that failed, including linked extractors. Applicable cooldowns affect that service.
@@ -1491,8 +1501,9 @@ producer attribution and unresolved references. A release receipt distinguishes
 completed cleanup from a job without a checkpoint. Older publications retain
 staging through migration until verified cleanup. The scoped producer API accepts
 these checkpoints through a separate enrichment contract. Shared native source
-reservations now coordinate the worker with downloads; scheduling fairness and
-service conversion remain required before activation.
+reservations and bounded download preference now coordinate the worker with
+downloads; multi-profile dispatch and service conversion remain required before
+activation.
 
 Temporary child failures retain the parent and discard that child's partial
 records. Persist the entire returned checkpoint before retrying its pending
@@ -1543,7 +1554,7 @@ delivery. Ready-target discovery lists unadmitted targets; the separate ready-jo
 route finds admitted retries. The native server now maintains expired/stale
 enrichment jobs independently of other workers. Shared service cooldowns and
 download/enrichment exclusion and typed download service failures are implemented.
-Cross-collection fairness, legacy queue mapping and production host/n8n launchers
+Multi-profile dispatch, legacy queue mapping and production host/n8n launchers
 remain transition work.
 
 ### Durable selected-job execution
@@ -1674,9 +1685,14 @@ Schema 8 → 9 preserves existing events, requests, receipts and staged enrichme
 bytes, adding only discovery state. A table-name collision rolls back promotion.
 Older producer binaries refuse schema 9. Include the outbox in backups. Blocked
 ready-job claims cause a later retry pass, rather than repeated fresh admissions.
-Download-side linked-extractor reservations, cross-collection fairness, typed
-download failure reporting, legacy enrichment queue mapping, review resolution and production launcher conversion still
-precede service activation.
+Actual blocked claims register 90 seconds of interest; polling refreshes it.
+After four download starts or two minutes of live waiting, the oldest eligible
+enrichment requester gets the next turn after current downloads drain. Abandoned
+requests expire, and a metadata start restores download preference. Held/stale
+targets and cooling dependencies cannot reserve unrelated services. This server
+policy coordinates collections even when different workers submit claims.
+Dispatch across multiple profiles, legacy enrichment queue mapping, review
+resolution and production launcher conversion still precede service activation.
 
 ## Validation
 

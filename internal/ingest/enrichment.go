@@ -168,6 +168,9 @@ func (c *EnrichmentCoordinator) Claim(ctx context.Context, token, id string, exp
 		}
 		if result != nil {
 			c.guard(ctx, token, result, result.LeaseUntil)
+		} else {
+			// A blocked claim may record live interest for scheduling fairness.
+			c.guard(ctx, token, current, nil)
 		}
 		return nil
 	})

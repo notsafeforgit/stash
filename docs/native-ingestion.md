@@ -525,12 +525,17 @@ the failure route or supply their own retry deadline. Failed attempts retain
 checkpoints and do not complete the target. A terminal job requires an explicit
 owner retry that creates a new target revision.
 
-Claims coordinate with source downloads in the same write transaction. Claims for a source-run target service cannot overlap an enrichment reservation
-for that service. Enrichment also excludes other work in its collection. Independent downloads retain their existing
-destination/target exclusions. A download run's current binding covers its target
-service; reserving its own linked extractors remains download-adapter work. Eligible queued downloads take precedence over
-new enrichment; stale definitions and deferred/backoff work do not reserve the
-service. A retry reserves its retained pending child services at claim time.
+Claims coordinate with source downloads in the same write transaction. Enrichment
+excludes other claims for its services and collection. Download attempts reserve
+their root and supported linked services; independent downloads retain their
+existing destination/target exclusions. Eligible queued downloads initially take
+precedence. Actual enrichment claim requests keep a 90-second interest deadline,
+refreshed by polling. After four download starts or two minutes of live waiting,
+the oldest eligible requester receives the next turn once existing downloads
+drain. An enrichment start resets download preference. Stale/held work and
+cooling dependencies cannot reserve unrelated services. A retry reserves its
+retained pending child services at claim time. See the
+[scheduling contract](native-schema.md#bounded-source-preference).
 
 Before initializing a newly discovered Redgifs or Imgur child extractor, the
 worker calls `/source` using its current lease. The route accepts the job's main
@@ -568,8 +573,8 @@ The native server runs enrichment maintenance every 30 seconds independently of
 media and translation workers. It cancels stale source/target work, recovers
 expired attempts with backoff and preserves checkpoint/receipt evidence. Claims
 and source reservations also recover conflicting expired work; discovery remains
-read-only. Stash never contacts websites for these operations. Multi-collection
-fairness, legacy queue import and
+read-only. Stash never contacts websites for these operations. Multi-profile
+worker dispatch, legacy queue import and
 host/n8n activation remain required before switching production schedules.
 
 The Python selected-job executor now journals stable claim requests, returned
@@ -676,6 +681,17 @@ owner and fence. Error scopes contain service identities, never source URLs.
 Only the failing service receives an applicable shared cooldown. Busy sources,
 missing posts, access-denied accounts and local/media failures do not create a
 service-wide outage. Source completion still does not certify media intake.
+
+The download executor also requires `source_run_fairness_protocol: 1`. Running
+attempts expose `turn_until`, five minutes after their recorded start, independent
+of lease renewals. On reaching it, the worker finishes its current file/checkpoint
+and yields before further source work. A resumed traversal may finish replay and
+one new checkpoint first, preventing a long replay from repeatedly consuming the
+whole turn without progress. It reports `state: "retry"` and
+`error_code: "source_turn_complete"`, with no `error_scope` or retry override.
+This preserves pending windows and progress, applies the normal target cooldown,
+and leaves the failure count unchanged. The CLI reports an acknowledged yield
+as `yielded`, an incomplete result; it does not assert source completion.
 
 Capabilities advertise `source_run_dispatch: true` for scoped work discovery.
 It uses the bounded active-run index and the server clock, excluding future

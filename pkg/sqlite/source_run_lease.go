@@ -159,8 +159,7 @@ SELECT uuid,fence,producer_uuid,owner_uuid,window,progress,? FROM source_runs WH
 	if err != nil {
 		return nil, err
 	}
-	if _, err := dbWrapper.Exec(ctx, `UPDATE source_pacing SET last_started_at_ms=max(last_started_at_ms,?)
-WHERE scope IN (SELECT scope FROM source_run_attempt_pacing WHERE run_uuid=? AND fence=? AND reserved=1)`, now.UnixMilli(), id, r.Fence+1); err != nil {
+	if err := sourceAttemptTurnStarted(ctx, id, r.Fence+1, r.Operation == "enrich", true, now); err != nil {
 		return nil, err
 	}
 	result, err := s.Find(ctx, id)
@@ -247,7 +246,8 @@ func (s *SourceRunStore) Finish(ctx context.Context, lease models.SourceRunLease
 		return nil, err
 	}
 	if (outcome.State != "succeeded" && outcome.State != "retry" && outcome.State != "deferred") || !jobErrorCode(outcome.ErrorCode) || outcome.RetryAfterSeconds < 0 || outcome.RetryAfterSeconds > 604800 ||
-		(outcome.State == "succeeded" && (outcome.ErrorCode != "" || outcome.ErrorScope != "" || outcome.RetryAfterSeconds != 0)) || (outcome.State != "succeeded" && outcome.ErrorCode == "") {
+		(outcome.State == "succeeded" && (outcome.ErrorCode != "" || outcome.ErrorScope != "" || outcome.RetryAfterSeconds != 0)) || (outcome.State != "succeeded" && outcome.ErrorCode == "") ||
+		(outcome.ErrorCode == "source_turn_complete" && (outcome.State != "retry" || outcome.ErrorScope != "" || outcome.RetryAfterSeconds != 0)) {
 		return nil, models.ErrSourceRunInvalid
 	}
 	r, err := s.CheckLease(ctx, lease, now)
@@ -278,12 +278,14 @@ func (s *SourceRunStore) finish(ctx context.Context, r *models.SourceRun, outcom
 		}
 	} else {
 		r.Pending = scrape.Union(r.Pending, []models.SourceWindow{*r.Window})
-		r.Failures++
-		if outcome.State == "deferred" || r.Failures >= 8 {
-			state = "deferred"
+		if outcome.ErrorCode != "source_turn_complete" {
+			r.Failures++
+			if outcome.State == "deferred" || r.Failures >= 8 {
+				state = "deferred"
+			}
+			backoff := min(24*time.Hour, 5*time.Minute*time.Duration(1<<min(r.Failures-1, 8)))
+			delay = max(delay, backoff, time.Duration(outcome.RetryAfterSeconds)*time.Second)
 		}
-		backoff := min(24*time.Hour, 5*time.Minute*time.Duration(1<<min(r.Failures-1, 8)))
-		delay = max(delay, backoff, time.Duration(outcome.RetryAfterSeconds)*time.Second)
 	}
 	if pause := sourcePacingDelay(outcome.ErrorCode, now.Add(delay), now); pause > 0 {
 		scope := failureScope

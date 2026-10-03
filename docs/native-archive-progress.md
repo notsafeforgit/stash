@@ -16,8 +16,9 @@ and a complete cutover reconciliation are still required.
 
 Durable enrichment execution, queued-job dispatch, stale-job maintenance and
 shared download/enrichment service reservations are implemented, including linked
-download services and typed service failure reporting. The next worker work is
-cross-collection fairness and legacy queue mapping. Native UI, live host/n8n conversion, compatibility removal, coordinated
+download services, typed service failure reporting and bounded download preference
+across collections. The next worker work is dispatch across multiple profiles and
+legacy queue mapping. Native UI, live host/n8n conversion, compatibility removal, coordinated
 backup/export/restore, production cutover and retirement remain major release
 gates. The phase table below records that distinction; commit count is not a
 completion percentage.
@@ -45,9 +46,11 @@ On 2026-10-03, the owner authorized pruning superseded goal artifacts. Removing
 their intermediate database paths are no longer retained. The original
 `native-archive-rehearsal-20260930/compatible-snapshot.sqlite`, frozen import
 inputs remain under `.local/`. The latest verified native database is now in
-`native-download-pacing-rehearsal-20261003/` at schema 1000055;
+`native-source-fairness-rehearsal-20261003/` at schema 1000056;
 `.local/native-rehearsal-current.json` records its reconciliation receipt. The
-superseded schema-53 copy was also removed after that comparison passed.
+superseded copies are removed after their replacements pass comparison. After
+the schema-56 checks finished, pruning Go cache entries unused for more than
+49 hours reclaimed another 33.7 GB. Recently used build entries remain reusable.
 
 ## Frozen baseline
 
@@ -4780,3 +4783,52 @@ Cross-collection fairness, legacy queue/cooldown/history import, remaining polic
 and operational migration, additional download adapters, native UI, host/n8n
 conversion, compatibility removal, coordinated backup/export/restore, performance
 and production cutover remain unfinished. The full transition goal stays active.
+
+## Bounded download preference and cooperative turns
+
+Schema 1000056 records actual waiting enrichment claims with a 90-second expiry
+and per-service scheduling counters. Four download starts or two minutes of
+continuously live waiting make an enrichment turn due. The oldest eligible
+requester wins across collections, while existing downloads drain. An enrichment
+start resets the affected counters and waiting-age budget. Abandoned requests,
+held/stale targets and cooling dependencies cannot indefinitely reserve unrelated
+services. Claim authority is checked through commit even when the only write is
+the waiting hint. Replay does not count another start.
+
+The download API exposes a five-minute `turn_until` derived from the attempt's
+recorded start. The worker finishes the current file/checkpoint before yielding,
+and heartbeats cannot extend the budget. A resumed traversal may finish replay
+and one new checkpoint first, preventing a long saved prefix from trapping it
+in repeated replay. This is cooperative scheduling, not a hard timeout. Yield
+preserves pending windows and progress, applies the ordinary target cooldown and
+does not consume failures or failure backoff. The updated executor requires
+`source_run_fairness_protocol: 1` and reports an acknowledged turn as `yielded`.
+
+All 356 producer tests passed in 35.764 seconds. Focused checks passed in 13.880
+seconds, including competing claims from different collections, oldest-request
+selection, abandoned-interest expiry, held targets, child cooldowns, exact-window
+progress, authorization at blocked-claim commit, rollback and restart validation.
+Race checks passed in 51.580 seconds overall (SQLite 23.487, API 14.791 seconds).
+The full backend gate passed in 814.504 seconds with zero lint issues (API
+666.543, ingestion 611.419, SQLite 792.532 seconds).
+
+The isolated 18,796,433,408-byte schema-55 copy migrated to schema 1000056 without
+growing its file. Initial validation took 155.899 seconds and migration/revalidation
+152.656 seconds while the backend checks ran. Independent row/type comparisons
+and digests matched all 221 retained tables (34,810,759 rows) in 282.396 seconds,
+with unchanged prior schema objects, append-only migration history, successful
+integrity checking and zero foreign-key violations. Two existing service scopes
+gain zeroed counters; no historical waiting requests are invented. Populated
+fixtures cover real attempts and waiting jobs. Service/expiry lookups use their
+indexes; this sparse rehearsal is not a loaded performance benchmark.
+
+Evidence is under `.local/native-source-fairness-rehearsal-20261003/`. The verified
+copy replaces the disposable schema-55 rehearsal under the 50 GiB host reserve.
+The original compatible snapshot and frozen migration inputs remain. The
+preceding `8c69a3fc1` checkpoint passed CI build, lint and preview-image publication.
+Production and `develop` remain unchanged.
+
+Dispatch across multiple profiles, legacy queue/cooldown/history import, remaining
+policy and operational migration, additional download adapters, native UI,
+host/n8n conversion, compatibility removal, coordinated backup/export/restore,
+performance and cutover remain unfinished. The complete transition goal is active.

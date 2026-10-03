@@ -60,8 +60,18 @@ func sourcePacingReadyFor(ctx context.Context, scope, collection string, enrichm
 		scope, now.UnixMilli(), now.UnixMilli(), ignoreJob, scope, collection, ignoreRun, scope, collection, enrichment); err != nil {
 		return false, err
 	}
-	if busy || !enrichment {
+	if busy {
 		return !busy, nil
+	}
+	turn, err := sourceEnrichmentTurn(ctx, scope, collection, now)
+	if err != nil {
+		return false, err
+	}
+	if turn != "" {
+		return enrichment && turn == ignoreJob, nil
+	}
+	if !enrichment {
+		return true, nil
 	}
 	// Current, enabled download definitions take precedence. Stale definitions,
 	// deferred runs and retries still in backoff cannot indefinitely reserve it.
@@ -77,10 +87,15 @@ func sourcePacingReadyFor(ctx context.Context, scope, collection string, enrichm
    SELECT 1 FROM source_run_attempt_pacing s JOIN source_run_attempts a ON a.run_uuid=s.run_uuid AND a.fence=s.fence
    WHERE s.run_uuid=r.uuid AND s.fence=r.fence AND s.scope=? AND a.outcome IN ('retry','expired','deferred')
     AND a.window=json_extract(r.pending,'$[#-1]'))) AND d.state='active' AND v.state='active'
+  AND NOT EXISTS(SELECT 1 FROM source_pacing s WHERE s.scope=p.scope AND (s.available_at_ms>? OR s.last_started_at_ms>?))
+  AND NOT EXISTS(SELECT 1 FROM source_run_attempt_pacing a
+   JOIN source_run_attempts b ON b.run_uuid=a.run_uuid AND b.fence=a.fence JOIN source_pacing s ON s.scope=a.scope
+   WHERE a.run_uuid=r.uuid AND a.fence=r.fence AND b.outcome IN ('retry','expired','deferred')
+    AND b.window=json_extract(r.pending,'$[#-1]') AND (s.available_at_ms>? OR s.last_started_at_ms>?))
   AND NOT EXISTS(SELECT 1 FROM source_run_cooldowns d WHERE d.target_key=r.target_key AND d.available_at_ms>?)
  ) OR EXISTS(SELECT 1 FROM source_runs r JOIN source_run_cooldowns d ON d.target_key=r.target_key
  WHERE r.collection_uuid=? AND d.available_at_ms>?)`,
-		now.UnixMilli(), scope, collection, scope, now.UnixMilli(), collection, now.UnixMilli()); err != nil {
+		now.UnixMilli(), scope, collection, scope, now.UnixMilli(), now.UnixMilli(), now.UnixMilli(), now.UnixMilli(), now.UnixMilli(), collection, now.UnixMilli()); err != nil {
 		return false, err
 	}
 	return !busy, nil
@@ -145,6 +160,9 @@ func (s *EnrichmentJobStore) ReserveSource(ctx context.Context, lease models.Enr
 	if err := sourcePacingStarted(ctx, scope, now); err != nil {
 		return false, err
 	}
+	if err := sourceTurnStarted(ctx, scope, true, now); err != nil {
+		return false, err
+	}
 	*complete = true
 	return true, nil
 }
@@ -164,7 +182,7 @@ func enrichmentPendingPacingReady(ctx context.Context, job, collection, rootScop
 		if scope == rootScope {
 			continue
 		}
-		ready, err := sourcePacingReady(ctx, scope, collection, true, now)
+		ready, err := sourcePacingReadyFor(ctx, scope, collection, true, job, "", now)
 		if err != nil || !ready {
 			return false, err
 		}

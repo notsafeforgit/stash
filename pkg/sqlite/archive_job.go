@@ -354,14 +354,21 @@ func (s *ArchiveJobStore) claim(ctx context.Context, job *models.ArchiveJob, own
 		if err != nil {
 			return nil, err
 		}
-		ready, err := sourcePacingReady(ctx, pacingScope, work.CollectionUUID, true, now)
+		waiting := sourcePacingAtomic(ctx)
+		if err := sourceEnrichmentWaiting(ctx, job, now); err != nil {
+			return nil, err
+		}
+		ready, err := sourcePacingReadyFor(ctx, pacingScope, work.CollectionUUID, true, job.UUID, "", now)
 		if err != nil || !ready {
+			*waiting = err == nil
 			return nil, err
 		}
 		ready, err = enrichmentPendingPacingReady(ctx, job.UUID, work.CollectionUUID, pacingScope, now)
 		if err != nil || !ready {
+			*waiting = err == nil
 			return nil, err
 		}
+		*waiting = true
 		enrichmentJobAttemptGuard(ctx, job.UUID, job.Fence+1)
 	}
 	// Do not commit the running head without its attempt, even if a caller
@@ -381,8 +388,7 @@ func (s *ArchiveJobStore) claim(ctx context.Context, job *models.ArchiveJob, own
 		return nil, err
 	}
 	if pacingScope != "" {
-		if _, err := dbWrapper.Exec(ctx, `UPDATE source_pacing SET last_started_at_ms=max(last_started_at_ms,?)
- WHERE scope IN (SELECT scope FROM enrichment_attempt_pacing WHERE job_uuid=? AND fence=?)`, now.UnixMilli(), job.UUID, job.Fence+1); err != nil {
+		if err := sourceAttemptTurnStarted(ctx, job.UUID, job.Fence+1, true, false, now); err != nil {
 			return nil, err
 		}
 	}

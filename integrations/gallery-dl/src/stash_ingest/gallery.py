@@ -16,7 +16,7 @@ from gallery_dl import path as gallery_path
 from . import filename
 from .encoding import InvalidData
 from .filesystem import destination_lock
-from .runs import SourceFailure, SourcePaused
+from .runs import SourceFailure, SourcePaused, SourceTurnComplete
 from .outbox import Capacity
 from .source_window import published, validate_keywords
 from .scan_resume import legacy_cursor
@@ -203,7 +203,7 @@ class NativeDownloadJob(job.DownloadJob):
     def _source_operation(self, call, *args):
         try:
             return call(*args)
-        except (InvalidData, Capacity, SourcePaused, SourceFailure, exception.ControlException):
+        except (InvalidData, Capacity, SourcePaused, SourceFailure, SourceTurnComplete, exception.ControlException):
             raise
         except (exception.ExtractionError, requests.exceptions.RequestException) as exc:
             if isinstance(exc, exception.AuthenticationError):
@@ -241,6 +241,8 @@ class NativeDownloadJob(job.DownloadJob):
                     yield kind, url, dict(data)
         try:
             return super().dispatch(guarded())
+        except SourceTurnComplete:
+            raise exception.StopExtraction() from None
         except (InvalidData, Capacity, SourcePaused) as exc:
             self.producer.failure_code = ("outbox_capacity" if isinstance(exc, Capacity) else
                                           "source_lease_lost" if isinstance(exc, SourcePaused) else "source_rejected")

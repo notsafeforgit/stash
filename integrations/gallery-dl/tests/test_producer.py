@@ -8,7 +8,7 @@ from stash_ingest.encoding import InvalidData, decode
 from stash_ingest.filesystem import Root, destination_lock
 from stash_ingest.outbox import Outbox
 from stash_ingest.producer import Producer
-from stash_ingest.runs import SourcePaused
+from stash_ingest.runs import SourcePaused, SourceTurnComplete
 from stash_ingest import source
 from helpers import PRODUCER, COLLECTION, ROOT, RUN
 
@@ -27,6 +27,9 @@ class LeaseFixture:
     def check(self):
         if not self.active:
             raise SourcePaused("Fixture ownership lost")
+
+    def check_turn(self):
+        self.check()
 
     def progress(self, *args):
         self.check()
@@ -88,6 +91,25 @@ class ProducerTests(unittest.TestCase):
         self.media.mkdir()
         with self.assertRaises(InvalidData):
             self.root.verify()
+
+    def test_expired_turn_allows_cursor_replay_and_one_new_checkpoint(self):
+        prepared = self.producer.prepare(reddit_data("saved"))
+        cursor, _ = self.producer.cursor(prepared)
+        self.lease.run["progress"] = {"items_seen": 10, "files_completed": 10, "cursor": cursor}
+        resumed = Producer(self.box, self.lease, self.root, extractor_version="fixture")
+        def expired():
+            self.lease.check()
+            raise SourceTurnComplete("turn complete")
+        self.lease.check_turn = expired
+        saved = resumed.prepare(reddit_data("saved"))
+        key, replay = resumed.cursor(saved)
+        resumed.checkpoint(key, replay, False)
+        new = resumed.prepare(reddit_data("new"))
+        key, replay = resumed.cursor(new)
+        resumed.checkpoint(key, replay, False)
+        self.assertEqual(self.lease.checkpoints[-1][0], 11)
+        with self.assertRaises(SourceTurnComplete):
+            resumed.prepare(reddit_data("later"))
 
     def test_shared_destination_lock_fences_concurrent_workers(self):
         with destination_lock(self.locks, ROOT, "same-stem", self.producer.check):

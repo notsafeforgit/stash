@@ -16,6 +16,7 @@ import (
 
 func removeSourceRunServicesSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeSourceFairnessSchema(t, raw)
 	_, err := raw.Exec(`DROP TRIGGER source_run_attempt_pacing_bind;
  DROP TABLE source_run_attempt_failures; DROP TABLE source_run_attempt_pacing;
  DELETE FROM native_migration_history WHERE version=1000055;`)

@@ -16,7 +16,7 @@ from stash_ingest.configuration import Configuration
 from stash_ingest.encoding import InvalidData, decode, encode
 from stash_ingest.gallery import NativeDownloadJob
 from stash_ingest.outbox import Capacity, Conflict, Outbox
-from stash_ingest.runs import SourceFailure, SourcePaused
+from stash_ingest.runs import SourceFailure, SourcePaused, SourceTurnComplete
 from stash_ingest.worker import Delivery, execute
 from helpers import PRODUCER, ROOT, RUN, capture, receipt
 from test_configuration import profile_fixture
@@ -32,7 +32,7 @@ class WorkerTests(unittest.TestCase):
         profile, _ = profile_fixture(self.directory)
         self.profile = Configuration(profile)
         self.client = Client("http://example.invalid", PRODUCER, timeout=1)
-        self.client.capabilities = Mock(return_value={"source_runs": True, "source_run_protocol": 1, "source_run_recovery_protocol": 1, "source_run_pacing_protocol": 1, "file_ingestion": True})
+        self.client.capabilities = Mock(return_value={"source_runs": True, "source_run_protocol": 1, "source_run_recovery_protocol": 1, "source_run_pacing_protocol": 1, "source_run_fairness_protocol": 1, "file_ingestion": True})
         self.lease = LeaseFixture()
         self.lease.client = self.client
         self.lease.run.update(policy_sha256=self.profile.policy_sha256, path_prefix="Account", fence=3)
@@ -97,6 +97,11 @@ class WorkerTests(unittest.TestCase):
             self.run_worker()
         self.claim.assert_not_called()
         self.client.capabilities.return_value["source_run_pacing_protocol"] = 1
+        self.client.capabilities.return_value["source_run_fairness_protocol"] = 0
+        with self.assertRaises(Unavailable):
+            self.run_worker()
+        self.claim.assert_not_called()
+        self.client.capabilities.return_value["source_run_fairness_protocol"] = 1
         self.claim.return_value = None
         self.assertEqual(self.run_worker()["state"], "waiting")
         self.delivery.start.assert_not_called()
@@ -204,6 +209,19 @@ class WorkerTests(unittest.TestCase):
                 self.client._request.side_effect = lambda method, route, *args: [attempt] if route.endswith("/attempts") else self.lease.run
                 result = self.run_worker(lambda *a, **kw: task)
                 self.assertEqual(result["state"], "retry" if scope == "service:redgifs" else "completion_unconfirmed")
+
+    def test_time_budget_yields_after_the_current_file_without_failure(self):
+        def expired():
+            self.lease.check()
+            raise SourceTurnComplete("turn complete")
+        self.after_download = lambda: setattr(self.lease, "check_turn", expired)
+        self.lease.finish.return_value = {"state": "queued"}
+        result = self.run_worker()
+        self.assertEqual(result["state"], "yielded")
+        self.assertEqual(len(self.downloaded), 1)
+        self.assertEqual(result["outbox"]["counts"]["pending"], 2)
+        self.assertEqual(self.lease.checkpoints[-1][:2], (1, 1))
+        self.lease.finish.assert_called_once_with("retry", error_code="source_turn_complete")
 
 
 class DeliveryTests(unittest.TestCase):

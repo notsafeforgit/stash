@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import Mock
 
 from stash_ingest.client import Unavailable
-from stash_ingest.runs import RunLease, SourceFailure, SourcePaused
+from stash_ingest.runs import RunLease, SourceFailure, SourcePaused, SourceTurnComplete
 from stash_ingest.encoding import decode
 from helpers import PRODUCER, COLLECTION, ROOT, RUN
 
@@ -24,6 +24,7 @@ class RunLeaseTests(unittest.TestCase):
                     "target_url": "https://fixture.invalid/account", "path_prefix": ".",
                     "root_revision": 1, "operation": "download", "window": {"since": None, "until": self.wall.isoformat()},
                     "lease_until": (self.wall + timedelta(seconds=180)).isoformat()}
+        self.run["turn_until"] = (self.wall + timedelta(seconds=300)).isoformat()
 
     def response(self, **changes):
         return dict(self.run, **changes), format_datetime(self.wall, usegmt=True), self.now[0]
@@ -126,6 +127,32 @@ class RunLeaseTests(unittest.TestCase):
         self.client._request.side_effect = late
         with self.assertRaises(SourcePaused):
             self.lease.reserve_source("https://redgifs.com/watch/example")
+
+    def test_heartbeat_does_not_extend_turn_and_yield_can_still_checkpoint(self):
+        self.lease._accept(self.response())
+        first = self.lease.turn_deadline
+        self.now[0] += 160
+        self.wall += timedelta(seconds=160)
+        self.client._request.return_value = self.response(lease_until=(self.wall + timedelta(seconds=180)).isoformat())
+        self.lease.renew()
+        self.assertEqual(self.lease.turn_deadline, first)
+        self.now[0] = first
+        with self.assertRaises(SourceTurnComplete):
+            self.lease.check_turn()
+        self.lease.check()
+        self.lease.progress(2, 1, "saved")
+        self.client._request.return_value = (dict(self.run, state="queued"), None, 0)
+        self.lease.finish("retry", error_code="source_turn_complete")
+
+    def test_missing_or_changed_turn_deadline_cannot_extend_source_work(self):
+        missing = dict(self.run)
+        missing.pop("turn_until")
+        with self.assertRaises(SourcePaused):
+            self.lease._accept((missing, format_datetime(self.wall, usegmt=True), self.now[0]))
+        self.lease._accept(self.response())
+        self.client._request.return_value = self.response(turn_until=(self.wall + timedelta(seconds=600)).isoformat())
+        with self.assertRaises(SourcePaused):
+            self.lease.renew()
 
 
 if __name__ == "__main__":

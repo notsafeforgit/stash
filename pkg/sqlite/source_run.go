@@ -81,6 +81,14 @@ func (row sourceRunRow) resolve(ctx context.Context) (*models.SourceRun, error) 
 		value := time.UnixMilli(row.LeaseUntil.Int64).UTC()
 		r.LeaseUntil = &value
 	}
+	if r.State == "running" {
+		var started int64
+		if err := dbWrapper.Get(ctx, &started, "SELECT started_at_ms FROM source_run_attempts WHERE run_uuid=? AND fence=?", r.UUID, r.Fence); err != nil {
+			return nil, err
+		}
+		until := time.UnixMilli(started).UTC().Add(sourceDownloadTurn)
+		r.TurnUntil = &until
+	}
 	activation, err := sourceRunRecoverySeed(ctx, r.UUID)
 	if err != nil {
 		return nil, err

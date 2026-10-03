@@ -7,7 +7,7 @@ from .client import Client, Unavailable, drain_once
 from .encoding import InvalidData, encode, identifier
 from .outbox import Capacity, Conflict, Outbox
 from .producer import Producer
-from .runs import RunLease, SourceFailure, SourcePaused
+from .runs import RunLease, SourceFailure, SourcePaused, SourceTurnComplete
 
 
 class Delivery:
@@ -76,6 +76,7 @@ def execute(box, client, configuration, run_uuid):
     if (capabilities.get("source_runs") is not True or capabilities.get("source_run_protocol") != 1
             or capabilities.get("source_run_recovery_protocol") != 1
             or capabilities.get("source_run_pacing_protocol") != 1
+            or capabilities.get("source_run_fairness_protocol") != 1
             or capabilities.get("file_ingestion") is not True):
         raise Unavailable("native_download_worker_unavailable")
     current = client._request("GET", "/runs/" + run_uuid)
@@ -114,6 +115,8 @@ def execute(box, client, configuration, run_uuid):
                 outcome, error = "deferred", producer.failure_code or "source_access_or_configuration"
             else:
                 outcome, error = "retry", producer.failure_code or "source_download_failed"
+        except SourceTurnComplete:
+            outcome, error = "retry", "source_turn_complete"
         except SourceFailure as exc:
             outcome = "deferred" if exc.code in {"authentication", "access_denied", "challenge", "not_found"} else "retry"
             error, error_scope = exc.code, exc.scope
@@ -155,6 +158,8 @@ def execute(box, client, configuration, run_uuid):
                     if result is not None:
                         result["heartbeat_error"] = "heartbeat_still_stopping"
         result["outbox"] = box.status()
+        if result["state"] == "retry" and error == "source_turn_complete":
+            result["state"] = "yielded"
         if error_scope:
             result["error_scope"] = error_scope
         result["intake_completion"] = "inspect_native_receipts"

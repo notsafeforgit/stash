@@ -74,6 +74,9 @@ func (s *SourceRunStore) ReserveSource(ctx context.Context, lease models.SourceR
 		if err := sourcePacingStarted(ctx, scope, now); err != nil {
 			return nil, err
 		}
+		if err := sourceTurnStarted(ctx, scope, r.Operation == "enrich", now); err != nil {
+			return nil, err
+		}
 	}
 	result.Ready = ready
 	*complete = true

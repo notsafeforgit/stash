@@ -47,6 +47,7 @@ type SourceRun struct {
 	ProducerUUID       string             `json:"producer_uuid,omitempty"`
 	OwnerUUID          string             `json:"owner_uuid,omitempty"`
 	LeaseUntil         *time.Time         `json:"lease_until,omitempty"`
+	TurnUntil          *time.Time         `json:"turn_until,omitempty"`
 	AvailableAt        time.Time          `json:"available_at"`
 	Progress           SourceRunProgress  `json:"progress"`
 	Recovery           *SourceRunRecovery `json:"recovery,omitempty"`

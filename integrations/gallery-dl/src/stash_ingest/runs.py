@@ -16,6 +16,10 @@ class SourcePaused(RuntimeError):
     """The current file can finish, but no further source work may start."""
 
 
+class SourceTurnComplete(RuntimeError):
+    """Cooperative scheduling yield; ownership and captured progress remain valid."""
+
+
 def source_scope(value):
     return (isinstance(value, str)
             and re.fullmatch(r"(?:service|mirror|host):[a-z0-9][a-z0-9.:\-]{0,252}", value) is not None)
@@ -45,6 +49,7 @@ class RunLease:
             raise InvalidData("Invalid source lease configuration")
         self.seconds, self.clock = seconds, clock
         self.run, self.deadline, self.failure = None, 0.0, None
+        self.turn_deadline = 0.0
         self.lock = threading.RLock()
         self.stop = threading.Event()
         self.thread = None
@@ -71,29 +76,37 @@ class RunLease:
             raise SourcePaused("Source lease response does not identify the claimed work")
         try:
             until = datetime.fromisoformat(run["lease_until"])
+            turn_until = datetime.fromisoformat(run["turn_until"])
             server_time = parsedate_to_datetime(date)
-            if until.tzinfo is None or server_time.tzinfo is None:
+            if until.tzinfo is None or turn_until.tzinfo is None or server_time.tzinfo is None:
                 raise ValueError()
             # HTTP Date has one-second precision. Budget from the monotonic
             # request start, subtract another second, and cap by the requested
             # lease. A replayed claim may return an older, shorter lease.
             budget = min(self.seconds, (until - server_time).total_seconds() - 2)
             deadline = started + budget
+            turn_deadline = started + min(300, (turn_until - server_time).total_seconds() - 2)
         except (ValueError, TypeError, KeyError, OverflowError):
             raise SourcePaused("Source lease response has no usable server deadline") from None
         if deadline <= self.clock():
             raise SourcePaused("Source lease expired before its response arrived")
         if self.run is not None:
             for field in ("collection_uuid", "collection_revision", "target_url", "path_prefix",
-                          "root_uuid", "root_revision", "window", "operation", "recovery"):
+                          "root_uuid", "root_revision", "window", "operation", "recovery", "turn_until"):
                 if run.get(field) != self.run.get(field):
                     raise SourcePaused("Source lease definition changed")
+        self.turn_deadline = turn_deadline if self.run is None else min(self.turn_deadline, turn_deadline)
         self.run, self.deadline = run, deadline
 
     def check(self):
         with self.lock:
             if self.failure or self.run is None or self.clock() >= self.deadline or self.stop.is_set():
                 raise SourcePaused("Source execution is paused; its current file may finish queuing")
+
+    def check_turn(self):
+        self.check()
+        if self.clock() >= self.turn_deadline:
+            raise SourceTurnComplete("Source time budget reached; checkpointing for the next turn")
 
     def _change(self, **change):
         self.check()

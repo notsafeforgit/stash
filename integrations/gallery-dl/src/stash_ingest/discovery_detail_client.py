@@ -31,7 +31,46 @@ def post_url(namespace, value):
 
 class DiscoveryDetailClient(EnrichmentClient):
     prefix = "/discovery-details"
+    collections_path = "/collections/inspect"
     minimum_records = 0
+
+    @staticmethod
+    def _target_order(value):
+        if (not isinstance(value, dict) or set(value) != {"listing_uuid", "source_ordinal"}
+                or not _integer(value["source_ordinal"], 0)):
+            raise InvalidData("Invalid detail inspection cursor")
+        return identifier(value["listing_uuid"]), value["source_ordinal"]
+
+    def candidates(self, collection, limit=20, *, after=None):
+        if not _integer(limit, 1, 100):
+            raise InvalidData("Invalid detail inspection limit")
+        previous = self._target_order(after) if after is not None else ("", 0)
+        value = self.client._request("POST", self.prefix + "/collections/" + identifier(collection) + "/candidates",
+                                     encode({"after": after, "limit": limit}))
+        if (not isinstance(value, dict) or set(value) != {"candidates", "after", "has_more"}
+                or type(value["has_more"]) is not bool or not isinstance(value["candidates"], list)
+                or len(value["candidates"]) > min(limit, 32)):
+            raise Unavailable("invalid_response")
+        try:
+            last = self._target_order(value["after"]) if value["after"] is not None else ("", 0)
+            if last < previous or (value["has_more"] and last <= previous):
+                raise InvalidData("Detail inspection did not advance")
+            seen = set()
+            for row in value["candidates"]:
+                if (not isinstance(row, dict) or set(row) != {"cursor", "target_uuid", "target_revision",
+                        "candidate_sequence", "post_namespace", "post_value", "url"}
+                        or not _integer(row["target_revision"], 1) or not _integer(row["candidate_sequence"], 1)):
+                    raise InvalidData("Invalid detail candidate")
+                identifier(row["target_uuid"])
+                order = self._target_order(row["cursor"])
+                if (order <= previous or order > last or order[1] == 0 or row["target_uuid"] in seen
+                        or post_url(row["post_namespace"], row["post_value"]) != row["url"]):
+                    raise InvalidData("Detail candidates changed scope or order")
+                previous = order
+                seen.add(row["target_uuid"])
+        except InvalidData:
+            raise Unavailable("invalid_response") from None
+        return value
 
     def capabilities(self):
         value = self.client.capabilities()
@@ -83,13 +122,13 @@ class DiscoveryDetailClient(EnrichmentClient):
             raise Unavailable("invalid_response") from None
         return work
 
-    def admit(self, target, revision, candidate, policy, extractor):
+    def admit(self, target, revision, candidate, policy, extractor, *, automatic=False):
         _runtime(extractor)
-        if not _integer(revision, 1) or not _integer(candidate, 1) or not sha256(policy):
+        if not _integer(revision, 1) or not _integer(candidate, 1) or not sha256(policy) or type(automatic) is not bool:
             raise InvalidData("Invalid candidate detail admission")
         value = self.client._request("POST", self.prefix + "/targets/" + identifier(target) + "/jobs", encode({
             "expected_target_revision": revision, "candidate_sequence": candidate,
-            "policy_sha256": policy, "extractor_version": extractor}))
+            "policy_sha256": policy, "extractor_version": extractor, "automatic": automatic}))
         work = self._job(value)
         expected = {"target_uuid": target, "target_revision": revision, "candidate_sequence": candidate,
                     "policy_sha256": policy, "extractor_version": extractor, "generation": 1}

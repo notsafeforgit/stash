@@ -2463,8 +2463,8 @@ collection association, identity/URL evidence row and record mapping. Ordinary
 backups retain the graph; anonymisation deletes publication children before their
 dependencies. Publication does not release page bodies, finish catalog import or
 assign depicted performers. Automatic dispatch uses the same service. Actual
-source coverage, automatic candidate admission and verified staging release remain
-transition work.
+source coverage and verified staging release remain transition work. Automatic
+candidate-detail admission is described below.
 
 ### Reviewed discovery history recovery
 
@@ -2593,7 +2593,18 @@ Startup checks job bindings, generation continuity, checkpoint accounting,
 record hashes/times and rederives completed comparisons before opening a writer.
 Normal database backups contain these records; anonymisation removes their
 private source bodies and associations. The Python producer executes and recovers
-these jobs. Automatic candidate admission and verified staging release remain open.
+these jobs. Verified staging release remains open.
+
+Automatic detail admission uses the existing collection/listing and
+listing/snapshot/source-ordinal indexes, plus the candidate job-history index
+from schema 1000077. No additional native schema is required. Each inspection
+visits at most 32 definitions and 32 targets and advances past ineligible rows.
+Only a fully compared, unique weak candidate with no other review blockers can
+be automatically admitted through the selected producer profile. Any earlier job
+for the same target/candidate requires explicit review or retry, preserving
+negative results, terminal states and retry delays across comparison revisions.
+Admission repeats the read-only eligibility check transactionally and before
+commit; exact original admission replay remains available after later edits.
 
 ### Publication from authenticated detail evidence
 

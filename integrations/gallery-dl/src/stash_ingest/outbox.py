@@ -17,7 +17,7 @@ from .encoding import InvalidData, MAX_BATCH_BYTES, decode, digest, encode, iden
 from .endpoint import origin
 
 APPLICATION_ID = 0x5354494F  # STIO, not a Stash or gallery-dl archive database.
-SCHEMA = 14
+SCHEMA = 15
 
 
 class Conflict(InvalidData):
@@ -69,7 +69,7 @@ class Outbox:
                 tables = self.db.execute("SELECT name FROM sqlite_schema WHERE type='table'").fetchall()
             finally:
                 self.db.execute("ROLLBACK")
-            if not ((version in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, SCHEMA) and application == APPLICATION_ID)
+            if not ((version in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, SCHEMA) and application == APPLICATION_ID)
                     or (version == 0 and application == 0 and not tables)):
                 raise InvalidData("Unsupported or foreign outbox database")
             self.db.execute("PRAGMA foreign_keys=ON")
@@ -137,7 +137,7 @@ class Outbox:
         version = self.db.execute("PRAGMA user_version").fetchone()[0]
         if version == SCHEMA:
             return
-        if version not in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13):
+        if version not in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14):
             raise InvalidData("Unsupported outbox migration")
         if version == 1:
             self._migrate_runs()
@@ -173,10 +173,13 @@ class Outbox:
         if version < 13:
             from .discovery_collection_dispatch import migrate
             migrate(self.db)
-        from .discovery_detail_journal import migrate
-        migrate(self.db)
-        from .discovery_detail_dispatch import migrate
-        migrate(self.db)
+        if version < 14:
+            from .discovery_detail_journal import migrate
+            migrate(self.db)
+            from .discovery_detail_dispatch import migrate
+            migrate(self.db)
+        from .discovery_detail_dispatch import migrate_candidates
+        migrate_candidates(self.db)
         self.db.execute(f"PRAGMA user_version={SCHEMA}")
 
     def _migrate_dispatch(self):

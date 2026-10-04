@@ -1844,7 +1844,9 @@ workers. Website credentials remain in the external worker environment.
 
 | Operation | Route | Input |
 | --- | --- | --- |
-| Admit selected candidate | `POST /targets/{target}/jobs` | `expected_target_revision`, `candidate_sequence`, `policy_sha256`, `extractor_version` |
+| Admit selected candidate | `POST /targets/{target}/jobs` | `expected_target_revision`, `candidate_sequence`, `policy_sha256`, `extractor_version`, optional `automatic` |
+| Find collections to inspect | `POST /collections/inspect` | `policy_sha256`, `extractor_version`, `after`, `limit` |
+| Inspect automatic candidates | `POST /collections/{collection}/candidates` | `after`, `limit` |
 | Find queued jobs | `POST /collections/{collection}/jobs/ready` | `policy_sha256`, `extractor_version`, `after`, `limit` |
 | Inspect original job | `GET /jobs/{job}` | None |
 | Claim | `POST /jobs/{job}/claim` | `expected_revision`, `owner_uuid`, `policy_sha256`, `extractor_version`, `lease_seconds` |
@@ -1892,9 +1894,35 @@ See the [producer commands](../integrations/gallery-dl/README.md#candidate-detai
 `policy_sha256`, `extractor_version`, `after` (a collection UUID) and `limit`.
 Its sorted `{uuid}` entries come from the bounded active detail jobs and current
 collection/root grants; it reads no transcript bodies and cannot admit work.
-The capability is `discovery_detail_collections_protocol: 1`. Per-collection
-dispatch processes existing jobs; a new candidate requires explicit admission.
-Authenticated results can now feed the guarded native publication service above.
-Automatic candidate admission and verified staging release remain transition
-work. Production scrapers have not switched
-to these routes.
+The capability is `discovery_detail_collections_protocol: 1`.
+
+Automatic admission requires `discovery_detail_admission_protocol: 1` and a
+selected `post.verify_candidate` worker profile. `/collections/inspect` returns
+permitted active containers with retained listings, including containers that
+still have blocked or empty work. It does not promise a runnable job.
+`/collections/{collection}/candidates` returns `{candidates, after, has_more}`.
+Its cursor is `{listing_uuid, source_ordinal}`; each request inspects at most 32
+listing definitions and 32 targets through the existing indexes. `after`
+advances over inspected rows even when no candidates are eligible. Resume while
+`has_more` is true; a shorter candidate array does not mean traversal finished.
+
+Each candidate supplies its cursor, target UUID/revision, candidate sequence,
+post namespace/value and canonical fetch URL. Eligibility requires a completed
+retained comparison, exactly one weak candidate, and no review blocker other
+than missing detail. Existing detail-job history for that candidate, including
+an earlier target revision, prevents automatic readmission. Failed/cancelled
+work needs explicit retry; completed comparisons remain available for review.
+Missing history, competing candidates, earlier recovery evidence, changed
+source/post choices and identifier ownership remain blockers.
+
+The producer checks the selected profile's URL support and sends
+`automatic:true` with admission. The server repeats eligibility inside its
+transaction and before commit. Exact original admission still replays after
+later changes. Producer schema 15 adds a durable candidate cursor, preserving
+all schema-14 journals and retry delays. Saved delivery and existing jobs run
+first; an uncertain admission is recovered through the ready-job pass. Complete
+container traversals pause before polling again.
+
+Authenticated results feed the guarded native publication service above.
+Verified staging release remains transition work. Production scrapers have not
+switched to these routes.

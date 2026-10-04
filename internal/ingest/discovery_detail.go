@@ -208,15 +208,54 @@ func (c *DiscoveryDetailCoordinator) ReadyJobs(ctx context.Context, token, colle
 }
 
 func (c *DiscoveryDetailCoordinator) ReadyCollections(ctx context.Context, token, policy, extractor, after string, limit int) ([]models.EnrichmentCollectionCandidate, error) {
+	return c.collections(ctx, token, policy, extractor, after, limit, false)
+}
+
+func (c *DiscoveryDetailCoordinator) InspectionCollections(ctx context.Context, token, policy, extractor, after string, limit int) ([]models.EnrichmentCollectionCandidate, error) {
+	return c.collections(ctx, token, policy, extractor, after, limit, true)
+}
+
+func (c *DiscoveryDetailCoordinator) collections(ctx context.Context, token, policy, extractor, after string, limit int, inspect bool) ([]models.EnrichmentCollectionCandidate, error) {
 	var ret []models.EnrichmentCollectionCandidate
 	err := c.Service.Repo.WithReadTxn(ctx, func(ctx context.Context) error {
 		credential, err := c.Service.authenticate(ctx, token)
 		if err != nil {
 			return err
 		}
-		ret, err = c.Service.Repo.DiscoveryDetail.Collections(ctx, models.EnrichmentCollectionQuery{
+		query := models.EnrichmentCollectionQuery{
 			Scopes: credential.Scopes, Roots: credential.RootUUIDs, PolicySHA256: policy, ExtractorVersion: extractor, After: after, Limit: limit,
-		}, c.Now())
+		}
+		if inspect {
+			ret, err = c.Service.Repo.DiscoveryDetail.InspectionCollections(ctx, query, c.Now())
+		} else {
+			ret, err = c.Service.Repo.DiscoveryDetail.Collections(ctx, query, c.Now())
+		}
+		return err
+	})
+	return ret, err
+}
+
+func (c *DiscoveryDetailCoordinator) Candidates(ctx context.Context, token, collectionID string, after *models.DiscoveryDetailCursor, limit int) (*models.DiscoveryDetailCandidates, error) {
+	var ret *models.DiscoveryDetailCandidates
+	err := c.Service.Repo.WithReadTxn(ctx, func(ctx context.Context) error {
+		credential, err := c.Service.authenticate(ctx, token)
+		if err != nil {
+			return err
+		}
+		if !ValidUUID(collectionID) {
+			return ErrInvalid
+		}
+		collection, err := c.Service.Repo.SourceCollection.Find(ctx, collectionID)
+		if err != nil {
+			return err
+		}
+		if collection == nil {
+			return ErrNotFound
+		}
+		if !permitted(credential, collection.UUID, collection.RootUUID) {
+			return ErrForbidden
+		}
+		ret, err = c.Service.Repo.DiscoveryDetail.Candidates(ctx, collectionID, after, limit, c.Now())
 		return err
 	})
 	return ret, err

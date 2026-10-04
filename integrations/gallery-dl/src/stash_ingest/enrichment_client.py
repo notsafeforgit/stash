@@ -21,6 +21,7 @@ def checkpoint_bytes(body):
 
 
 class EnrichmentClient:
+    collections_path = "/collections/ready"
     prefix = PREFIX
     minimum_records = 1
 
@@ -123,7 +124,7 @@ class EnrichmentClient:
             identifier(after)
         elif after != "":
             raise InvalidData("Invalid enrichment collection cursor")
-        result = self.client._request("POST", self.prefix + "/collections/ready", encode({
+        result = self.client._request("POST", self.prefix + self.collections_path, encode({
             "policy_sha256": policy, "extractor_version": extractor, "after": after, "limit": limit}))
         if not isinstance(result, list) or len(result) > limit:
             raise Unavailable("invalid_response")

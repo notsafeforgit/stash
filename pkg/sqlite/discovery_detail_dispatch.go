@@ -13,27 +13,35 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-// Collections inspects only the bounded active detail jobs. It never scans
-// catalog history or interprets a candidate URL as an accepted association.
-func (s *DiscoveryDetailStore) Collections(ctx context.Context, q models.EnrichmentCollectionQuery, now time.Time) ([]models.EnrichmentCollectionCandidate, error) {
+func validateDiscoveryDetailCollections(q models.EnrichmentCollectionQuery, now time.Time) (int, error) {
 	if len(q.Scopes)+len(q.Roots) < 1 || len(q.Scopes)+len(q.Roots) > 128 || !archive.ValidSHA256(q.PolicySHA256) ||
 		q.ExtractorVersion == "" || len(q.ExtractorVersion) > 128 || !utf8.ValidString(q.ExtractorVersion) || strings.ContainsAny(q.ExtractorVersion, "\r\n\x00") ||
 		(q.After != "" && !validSourceRunUUID(q.After)) || !validJobTime(now) {
-		return nil, models.ErrDiscoveryInvalid
+		return 0, models.ErrDiscoveryInvalid
 	}
 	limit, err := sourcePageLimit(q.Limit)
 	if err != nil {
-		return nil, models.ErrDiscoveryInvalid
+		return 0, models.ErrDiscoveryInvalid
 	}
 	for _, scope := range q.Scopes {
 		if !validSourceRunUUID(scope.CollectionUUID) || (scope.RootUUID != nil && !validSourceRunUUID(*scope.RootUUID)) {
-			return nil, models.ErrDiscoveryInvalid
+			return 0, models.ErrDiscoveryInvalid
 		}
 	}
 	for _, root := range q.Roots {
 		if !validSourceRunUUID(root) {
-			return nil, models.ErrDiscoveryInvalid
+			return 0, models.ErrDiscoveryInvalid
 		}
+	}
+	return limit, nil
+}
+
+// Collections inspects only the bounded active detail jobs. It never scans
+// catalog history or interprets a candidate URL as an accepted association.
+func (s *DiscoveryDetailStore) Collections(ctx context.Context, q models.EnrichmentCollectionQuery, now time.Time) ([]models.EnrichmentCollectionCandidate, error) {
+	limit, err := validateDiscoveryDetailCollections(q, now)
+	if err != nil {
+		return nil, err
 	}
 	rows, err := activeDiscoveryDetails(ctx)
 	if err != nil {

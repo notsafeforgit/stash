@@ -308,7 +308,7 @@ class DetailDispatchTests(DetailFixture):
         profile = SimpleNamespace(operation="post.verify_candidate", policy_sha256="a" * 64,
                                   extractor_version="version", check=Mock())
         collections = sorted(str(uuid.uuid4()) for _ in range(2))
-        with patch.object(DiscoveryDetailClient, "capabilities", return_value={"discovery_detail_collections_protocol": 1}), \
+        with patch.object(DiscoveryDetailClient, "capabilities", return_value={"discovery_detail_admission_protocol": 1}), \
                 patch.object(DiscoveryDetailClient, "ready_collections", return_value=[{"uuid": v} for v in collections]), \
                 patch.object(DiscoveryDetailDispatcher, "once", side_effect=[{"state": "waiting"}, {"state": "completed"}]):
             worker = DiscoveryDetailCollectionDispatcher(self.box, transport, profile)
@@ -333,7 +333,8 @@ class DetailDispatchTests(DetailFixture):
         transport = SimpleNamespace(endpoint=self.box.endpoint, producer=PRODUCER)
         profile = SimpleNamespace(operation="post.verify_candidate", policy_sha256="a" * 64, extractor_version="version", check=Mock())
         collection = self.job["arguments"]["collection_uuid"]
-        with patch.object(DiscoveryDetailClient, "capabilities", return_value={"discovery_detail_protocol": 1}), \
+        with patch.object(DiscoveryDetailClient, "capabilities", return_value={"discovery_detail_protocol": 1, "discovery_detail_admission_protocol": 1}), \
+                patch.object(DiscoveryDetailClient, "candidates", return_value={"candidates": [], "after": None, "has_more": False}), \
                 patch.object(DiscoveryDetailClient, "ready_jobs", return_value=[{"sequence": 4, "uuid": self.job["uuid"]}]) as ready, \
                 patch("stash_ingest.discovery_detail_dispatch.execute", side_effect=RuntimeError("process death")):
             with self.assertRaises(RuntimeError):

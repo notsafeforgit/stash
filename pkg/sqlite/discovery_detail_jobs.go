@@ -137,6 +137,15 @@ func (s *DiscoveryDetailStore) Admit(ctx context.Context, input models.Discovery
 		}
 		return prior, nil
 	}
+	if input.Automatic {
+		candidate, err := automaticDiscoveryDetailCandidate(ctx, input.TargetUUID, "", now)
+		if err != nil {
+			return nil, err
+		}
+		if !automaticDetailMatches(candidate, input) {
+			return nil, models.ErrDiscoveryConflict
+		}
+	}
 	target, err := (&DiscoveryMatchStore{}).Target(ctx, input.TargetUUID)
 	if err != nil {
 		return nil, err
@@ -170,7 +179,25 @@ func (s *DiscoveryDetailStore) Admit(ctx context.Context, input models.Discovery
 		PostUUID: target.PostUUID, PostRevision: target.PostRevision, CandidateSequence: candidate.Sequence, Namespace: candidate.Namespace, Value: candidate.Value, URL: candidate.URL,
 		ListingUUID: listing.UUID, DefinitionSHA256: listing.Digest, PageOrdinal: candidate.BestPage, PageSHA256: receipt.PageSHA256, CollectionUUID: listing.CollectionUUID, CollectionRevision: listing.CollectionRevision,
 		RootUUID: listing.RootUUID, PolicySHA256: input.PolicySHA256, ExtractorVersion: input.ExtractorVersion, CapturePolicy: archive.CaptureContextPolicy}
-	return s.admit(ctx, work, listing.NotBefore, now)
+	job, err := s.admit(ctx, work, listing.NotBefore, now)
+	if err == nil && input.Automatic {
+		txn.AddPreCommitHook(ctx, func(ctx context.Context) error {
+			candidate, err := automaticDiscoveryDetailCandidate(ctx, input.TargetUUID, job.UUID, now)
+			if err != nil {
+				return err
+			}
+			if !automaticDetailMatches(candidate, input) {
+				return models.ErrDiscoveryConflict
+			}
+			return nil
+		})
+	}
+	return job, err
+}
+
+func automaticDetailMatches(candidate *models.DiscoveryDetailCandidate, input models.DiscoveryDetailAdmission) bool {
+	return candidate != nil && candidate.TargetUUID == input.TargetUUID &&
+		candidate.TargetRevision == input.ExpectedTargetRevision && candidate.CandidateSequence == input.CandidateSequence
 }
 
 func (s *DiscoveryDetailStore) admit(ctx context.Context, work models.DiscoveryDetailJobArguments, available, now time.Time) (*models.ArchiveJob, error) {

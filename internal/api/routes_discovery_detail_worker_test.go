@@ -89,9 +89,13 @@ func exerciseDiscoveryDetailHTTP(t *testing.T, service *ingest.Service, handler 
 
 func TestDiscoveryDetailHTTPAuthenticatesBeforeReadingBodies(t *testing.T) {
 	f := newEnrichmentHTTPFixture(t)
+	paths := []string{"/collections/inspect", "/collections/" + uuid.NewString() + "/candidates"}
 	for _, suffix := range []string{"checkpoint", "complete", "claim", "failure"} {
+		paths = append(paths, "/jobs/"+uuid.NewString()+"/"+suffix)
+	}
+	for _, path := range paths {
 		body := &enrichmentUnreadBody{}
-		r := httptest.NewRequest("POST", ingestPath+"/discovery-details/jobs/"+uuid.NewString()+"/"+suffix, body)
+		r := httptest.NewRequest("POST", ingestPath+"/discovery-details"+path, body)
 		r.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
 		f.handler.ServeHTTP(w, r)

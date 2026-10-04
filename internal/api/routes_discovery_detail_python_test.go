@@ -26,6 +26,14 @@ func exercisePythonDiscoveryDetailHTTP(t *testing.T, service *ingest.Service, to
 	python, packagePath := nativeProducerRuntime(t)
 	credential, err := service.Authenticate(t.Context(), token)
 	require.NoError(t, err)
+	var collection string
+	require.NoError(t, service.Repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		listing, err := service.Repo.DiscoveryJob.Listing(ctx, review.Target.ListingUUID)
+		if err == nil {
+			collection = listing.CollectionUUID
+		}
+		return err
+	}))
 	worker := ingest.NewDiscoveryDetailCoordinator(service)
 	now := time.Now().UTC().Truncate(time.Millisecond)
 	worker.Now = func() time.Time { return now }
@@ -41,6 +49,9 @@ func exercisePythonDiscoveryDetailHTTP(t *testing.T, service *ingest.Service, to
 			if strings.HasSuffix(r.URL.Path, candidate) {
 				suffix = candidate
 			}
+		}
+		if review.Coverage.Complete && strings.HasSuffix(r.URL.Path, "/jobs") {
+			suffix = "/jobs"
 		}
 		mu.Lock()
 		drop := suffix != "" && r.Method == "POST" && recorder.Code == http.StatusOK && !lost[suffix]
@@ -77,6 +88,7 @@ func exercisePythonDiscoveryDetailHTTP(t *testing.T, service *ingest.Service, to
 		t.Helper()
 		input, err := json.Marshal(map[string]any{"directory": directory, "endpoint": server.URL, "producer": credential.ProducerUUID,
 			"target": review.Target.UUID, "revision": review.Target.Revision, "candidate": review.Candidate.Sequence,
+			"collection": collection, "automatic": review.Coverage.Complete,
 			"body": body, "deliver_only": deliver, "expected": expected})
 		require.NoError(t, err)
 		ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
@@ -90,6 +102,11 @@ func exercisePythonDiscoveryDetailHTTP(t *testing.T, service *ingest.Service, to
 		output, err := command.CombinedOutput()
 		require.NoError(t, err, string(output))
 		return enrichmentHTTPValue[result](t, output)
+	}
+	if review.Coverage.Complete {
+		missed := run(false, "unavailable")
+		require.Zero(t, missed.Fetches, "an uncertain admission cannot begin source access")
+		require.Empty(t, missed.JobUUID, "the restarted dispatcher must discover the committed job")
 	}
 	first := run(false, "delivery_pending")
 	require.Equal(t, "checkpoint", first.Journal.Pending)

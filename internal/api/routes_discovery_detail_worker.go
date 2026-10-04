@@ -34,6 +34,8 @@ func (rs *ingestRoutes) discoveryDetailRoutes(r chi.Router) {
 		})
 		r.Post("/targets/{target}/jobs", rs.admitDiscoveryDetail)
 		r.Post("/collections/ready", rs.readyDiscoveryDetailCollections)
+		r.Post("/collections/inspect", rs.inspectDiscoveryDetailCollections)
+		r.Post("/collections/{collection}/candidates", rs.discoveryDetailCandidates)
 		r.Post("/collections/{collection}/jobs/ready", rs.readyDiscoveryDetails)
 		r.Get("/jobs/{job}", rs.readDiscoveryDetail)
 		r.Post("/jobs/{job}/retry", rs.retryDiscoveryDetail)
@@ -48,6 +50,12 @@ func (rs *ingestRoutes) discoveryDetailRoutes(r chi.Router) {
 	})
 }
 func (rs *ingestRoutes) readyDiscoveryDetailCollections(w http.ResponseWriter, r *http.Request) {
+	rs.discoveryDetailCollections(w, r, false)
+}
+func (rs *ingestRoutes) inspectDiscoveryDetailCollections(w http.ResponseWriter, r *http.Request) {
+	rs.discoveryDetailCollections(w, r, true)
+}
+func (rs *ingestRoutes) discoveryDetailCollections(w http.ResponseWriter, r *http.Request, inspect bool) {
 	var input struct {
 		PolicySHA256     string `json:"policy_sha256"`
 		ExtractorVersion string `json:"extractor_version"`
@@ -58,7 +66,25 @@ func (rs *ingestRoutes) readyDiscoveryDetailCollections(w http.ResponseWriter, r
 		ingestError(w, err)
 		return
 	}
-	value, err := rs.detailWorker().ReadyCollections(r.Context(), ingestToken(r), input.PolicySHA256, input.ExtractorVersion, input.After, input.Limit)
+	var value []models.EnrichmentCollectionCandidate
+	var err error
+	if inspect {
+		value, err = rs.detailWorker().InspectionCollections(r.Context(), ingestToken(r), input.PolicySHA256, input.ExtractorVersion, input.After, input.Limit)
+	} else {
+		value, err = rs.detailWorker().ReadyCollections(r.Context(), ingestToken(r), input.PolicySHA256, input.ExtractorVersion, input.After, input.Limit)
+	}
+	writeDiscoveryWorker(w, value, err)
+}
+func (rs *ingestRoutes) discoveryDetailCandidates(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		After *models.DiscoveryDetailCursor `json:"after"`
+		Limit int                           `json:"limit"`
+	}
+	if err := readIngestJSON(w, r, 4096, &input); err != nil {
+		ingestError(w, err)
+		return
+	}
+	value, err := rs.detailWorker().Candidates(r.Context(), ingestToken(r), chi.URLParam(r, "collection"), input.After, input.Limit)
 	writeDiscoveryWorker(w, value, err)
 }
 func (rs *ingestRoutes) admitDiscoveryDetail(w http.ResponseWriter, r *http.Request) {
@@ -67,13 +93,14 @@ func (rs *ingestRoutes) admitDiscoveryDetail(w http.ResponseWriter, r *http.Requ
 		CandidateSequence      int64  `json:"candidate_sequence"`
 		PolicySHA256           string `json:"policy_sha256"`
 		ExtractorVersion       string `json:"extractor_version"`
+		Automatic              bool   `json:"automatic"`
 	}
 	if err := readIngestJSON(w, r, 4096, &input); err != nil {
 		ingestError(w, err)
 		return
 	}
 	value, err := rs.detailWorker().Admit(r.Context(), ingestToken(r), models.DiscoveryDetailAdmission{TargetUUID: chi.URLParam(r, "target"), ExpectedTargetRevision: input.ExpectedTargetRevision,
-		CandidateSequence: input.CandidateSequence, PolicySHA256: input.PolicySHA256, ExtractorVersion: input.ExtractorVersion})
+		CandidateSequence: input.CandidateSequence, PolicySHA256: input.PolicySHA256, ExtractorVersion: input.ExtractorVersion, Automatic: input.Automatic})
 	writeDiscoveryWorker(w, value, err)
 }
 func (rs *ingestRoutes) retryDiscoveryDetail(w http.ResponseWriter, r *http.Request) {

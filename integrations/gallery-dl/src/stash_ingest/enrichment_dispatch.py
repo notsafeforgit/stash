@@ -29,7 +29,6 @@ class EnrichmentDispatcher:
     client_type = EnrichmentClient
     journal_type = EnrichmentJournal
     protocol = "enrichment_dispatch_protocol"
-    admit_targets = True
     cursor_fields = ("delivery_after", "local_after", "job_after", "target_cursor")
 
     @staticmethod
@@ -172,30 +171,29 @@ class EnrichmentDispatcher:
                 # A runnable job whose claim is currently blocked must not
                 # cause successive polls to fill the queue with fresh work.
                 return {"state": "waiting"}
-            if not self.admit_targets:
-                if not self.save(state, failures=0, available_at=self.box.clock() + 30, error_code=None):
-                    return {"state": "contended"}
-                return {"state": "idle"}
-            targets = self.client.ready(self.key[0], PAGE_SIZE, after=state["target_cursor"])
-            for target in targets:
-                if not self.save(state, target_cursor=self.client.target_cursor(target)):
-                    return {"state": "contended"}
-                if not self.configuration.accepts(target["url"]):
-                    continue
-                try:
-                    job = self.client.admit(target["uuid"], target["revision"], self.key[1], self.configuration.extractor_version)
-                except Unavailable as error:
-                    if error.status == 409:
-                        continue
-                    raise
-                return self._execute(state, job["uuid"], self.configuration)
-            if len(targets) < PAGE_SIZE:
-                if not self.save(state, target_cursor=None, failures=0, available_at=self.box.clock() + 30, error_code=None):
-                    return {"state": "contended"}
-                return {"state": "idle"}
-            return {"state": "waiting"}
+            return self.admit_next(state, capabilities)
         except (Unavailable, InvalidData) as error:
             return self.unavailable(state, error)
+
+    def admit_next(self, state, capabilities):
+        targets = self.client.ready(self.key[0], PAGE_SIZE, after=state["target_cursor"])
+        for target in targets:
+            if not self.save(state, target_cursor=self.client.target_cursor(target)):
+                return {"state": "contended"}
+            if not self.configuration.accepts(target["url"]):
+                continue
+            try:
+                job = self.client.admit(target["uuid"], target["revision"], self.key[1], self.configuration.extractor_version)
+            except Unavailable as error:
+                if error.status == 409:
+                    continue
+                raise
+            return self._execute(state, job["uuid"], self.configuration)
+        if len(targets) < PAGE_SIZE:
+            if not self.save(state, target_cursor=None, failures=0, available_at=self.box.clock() + 30, error_code=None):
+                return {"state": "contended"}
+            return {"state": "idle"}
+        return {"state": "waiting"}
 
 
 def dispatch_once(box, transport, collection, configuration=None):

@@ -578,8 +578,16 @@ changing the frozen source, original candidate evidence or native post revision.
 Explicit publication pins `detail_job_uuid`; preparation reconstructs that
 result's comparison and per-record provenance. All coverage, competing-candidate,
 recovery and native-edit guards still apply. Preserve publication and checkpoint
-replay after later edits. Automatic candidate admission and staging release remain
-to be integrated; ordinary enrichment cannot treat an inferred URL as accepted.
+replay after later edits. Automatic detail admission uses a separately selected
+producer profile, complete unique-candidate review and existing indexed
+references. Bound inspection by both definitions and targets and advance past
+empty/blocked rows. Any previous job for the same candidate prevents automatic
+readmission, including older target revisions and negative results. Recheck
+automatic admission before commit while preserving exact replay. Producer schema
+15 persists the candidate cursor without changing prior journals or retry
+deadlines; saved delivery and existing jobs run first, and completed collection
+traversals pause before polling again. Staging release remains to be integrated;
+ordinary enrichment cannot treat an inferred URL as accepted.
 
 `stash-import-catalog-evidence` maps a received snapshot's posts, profiles and
 captures through core services in schema 1000031. It uses exact manifest/ordinal

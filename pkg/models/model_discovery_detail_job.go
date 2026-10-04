@@ -43,6 +43,30 @@ type DiscoveryDetailAdmission struct {
 	CandidateSequence      int64  `json:"candidate_sequence"`
 	PolicySHA256           string `json:"policy_sha256"`
 	ExtractorVersion       string `json:"extractor_version"`
+	Automatic              bool   `json:"automatic,omitempty"`
+}
+
+// The cursor advances over inspected targets and empty listings, including
+// rows that still require review. It does not record completed source coverage.
+type DiscoveryDetailCursor struct {
+	ListingUUID   string `json:"listing_uuid"`
+	SourceOrdinal int64  `json:"source_ordinal"`
+}
+
+type DiscoveryDetailCandidate struct {
+	Cursor            DiscoveryDetailCursor `json:"cursor"`
+	TargetUUID        string                `json:"target_uuid"`
+	TargetRevision    int                   `json:"target_revision"`
+	CandidateSequence int64                 `json:"candidate_sequence"`
+	Namespace         string                `json:"post_namespace"`
+	Value             string                `json:"post_value"`
+	URL               string                `json:"url"`
+}
+
+type DiscoveryDetailCandidates struct {
+	Candidates []DiscoveryDetailCandidate `json:"candidates"`
+	After      *DiscoveryDetailCursor     `json:"after"`
+	HasMore    bool                       `json:"has_more"`
 }
 
 // Success here means the saved transcript was compared. It does not publish
@@ -58,6 +82,8 @@ type DiscoveryDetailResult struct {
 
 type DiscoveryDetailReaderWriter interface {
 	Collections(context.Context, EnrichmentCollectionQuery, time.Time) ([]EnrichmentCollectionCandidate, error)
+	InspectionCollections(context.Context, EnrichmentCollectionQuery, time.Time) ([]EnrichmentCollectionCandidate, error)
+	Candidates(context.Context, string, *DiscoveryDetailCursor, int, time.Time) (*DiscoveryDetailCandidates, error)
 	Admit(context.Context, DiscoveryDetailAdmission, time.Time) (*ArchiveJob, error)
 	Retry(context.Context, string, time.Time) (*ArchiveJob, error)
 	CheckJob(context.Context, string, time.Time) (*ArchiveJob, error)

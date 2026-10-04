@@ -6,12 +6,14 @@ import io
 import json
 from pathlib import Path
 import sys
+import time
 from unittest.mock import patch
 
 from stash_ingest.cli import main
 from stash_ingest.client import Client
 from stash_ingest.discovery_detail_client import DiscoveryDetailClient
 from stash_ingest.discovery_detail_configuration import DiscoveryDetailConfiguration, SCHEMA
+from stash_ingest.discovery_detail_dispatch import DiscoveryDetailDispatcher
 from stash_ingest.discovery_detail_journal import DiscoveryDetailJournal
 from stash_ingest.discovery_detail_worker import execute
 from stash_ingest.encoding import decode, encode
@@ -41,14 +43,15 @@ if not setup["deliver_only"]:
     profile = DiscoveryDetailConfiguration(profile_path)
     status, policy = cli("detail-policy", "--profile", str(profile_path))
     assert status == 0 and policy["policy_sha256"] == profile.policy_sha256
-    if not job_path.exists():
+    if not job_path.exists() and not setup["automatic"]:
         status, job = cli("admit-detail", setup["target"], "--revision", str(setup["revision"]),
                           "--candidate", str(setup["candidate"]), "--profile", str(profile_path))
         assert status == 0, job
         job_path.write_bytes(encode(job))
-job = decode(job_path.read_bytes())
+job = decode(job_path.read_bytes()) if job_path.exists() else None
 client = DiscoveryDetailClient(transport)
-client._job(job)
+if job is not None:
+    client._job(job)
 count_path = directory / "fetches.txt"
 
 
@@ -62,7 +65,10 @@ def fetched(url, settings, *, resume, check, reserve_source):
     return deepcopy(setup["body"])
 
 
-with closing(Outbox(directory / "outbox.sqlite", transport.endpoint, transport.producer)) as box:
+# The second process advances its local clock past the retained admission
+# backoff; the native server's source/lease clock remains authoritative.
+offset = 60 if setup["automatic"] and setup["expected"] != "unavailable" else 0
+with closing(Outbox(directory / "outbox.sqlite", transport.endpoint, transport.producer, clock=lambda: time.time() + offset)) as box:
     with patch("requests.sessions.Session.request", side_effect=AssertionError("unexpected source access")):
         if setup["deliver_only"]:
             status, result = cli("deliver-detail", job["uuid"])
@@ -70,9 +76,24 @@ with closing(Outbox(directory / "outbox.sqlite", transport.endpoint, transport.p
         else:
             client.capabilities()
             collections = client.ready_collections(profile.policy_sha256, profile.extractor_version)
-            assert {"uuid": job["arguments"]["collection_uuid"]} in collections
-            result = execute(box, transport, profile, job["uuid"], fetcher=fetched)
+            assert {"uuid": setup["collection"]} in collections
+            if setup["automatic"]:
+                with patch("stash_ingest.discovery_detail_dispatch.execute",
+                           side_effect=lambda box, transport, configuration, job: execute(box, transport, configuration, job, fetcher=fetched)):
+                    result = DiscoveryDetailDispatcher(box, transport, setup["collection"], profile).once()
+                if result["state"] != "unavailable":
+                    rows = box.db.execute("SELECT job_uuid FROM discovery_detail_executions").fetchall()
+                    assert len(rows) == 1
+                    job = client.describe(rows[0]["job_uuid"])["job"]
+                    assert job["arguments"]["target_uuid"] == setup["target"]
+                    job_path.write_bytes(encode(job))
+            else:
+                result = execute(box, transport, profile, job["uuid"], fetcher=fetched)
     assert result["state"] == setup["expected"], result
+    if job is None:
+        assert result["state"] == "unavailable" and not count_path.exists()
+        print(json.dumps({"state": result["state"], "fetches": 0}))
+        sys.exit(0)
     status, summary = cli("detail-status", "--job", job["uuid"])
     assert status == 0 and summary == DiscoveryDetailJournal(box).summary(job["uuid"])
     assert "publication" not in summary

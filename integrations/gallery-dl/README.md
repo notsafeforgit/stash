@@ -441,8 +441,9 @@ rotation across worker profiles and permitted metadata collections; schema 11
 adds durable discovery page delivery; schema 12 adds its dispatch cursors and
 backoff; schema 13 adds discovery collection rotation and separates discovery
 and enrichment delivery cursors in the shared worker. Schema 14 adds candidate
-detail execution, collection dispatch and an independent delivery cursor.
-Opening an outbox from schemas 1–13 promotes it
+detail execution, collection dispatch and an independent delivery cursor. Schema
+15 adds the cursor for automatic candidate inspection.
+Opening an outbox from schemas 1–14 promotes it
 in one SQLite transaction, preserving event bytes, receipts, dependencies,
 active delivery/submission leases, frozen requests and caller tickets. Old tickets
 are linked to the first covering submissions from their original request sequence;
@@ -2065,7 +2066,7 @@ root grant are discovered without changing this worker list. Moved collections
 no longer belong to the old root grant. This does not create listing definitions
 or activate imported accounts.
 
-Producer schema 14 stores profile rotation, independent saved-delivery cursors
+Producer schema 15 stores profile rotation, independent saved-delivery cursors
 for discovery, enrichment and candidate details, and each operation's per-policy collection
 cursors/backoff. Selection commits before execution, so a restart or a
 continually busy first profile/collection does not reset traversal.
@@ -2087,8 +2088,9 @@ cursor, retaining its original value for enrichment. Existing outbox rows,
 staged metadata/page bodies, claims and receipt bytes remain unchanged in one
 transaction. Unknown table/column collisions roll back promotion, including
 any preceding column rename. Schema 13 → 14 adds the detail journal and its
-dispatch tables/cursor while preserving every existing value. Older producer
-binaries refuse schema 14;
+dispatch tables/cursor while preserving every existing value. Schema 14 → 15
+adds the candidate-inspection cursor without replacing pending work or resetting
+backoff. Older producer binaries refuse schema 15;
 include the outbox in backups and retain its pending evidence during rollback.
 These outbox cursor tables do not require a separate native database migration.
 
@@ -2367,21 +2369,29 @@ commands:
 | `deliver-detail JOB_UUID` | Recover saved checkpoint/completion/failure intents without website access |
 | `detail-status [--job JOB_UUID]` | Inspect local pending evidence and retained `comparison` receipts |
 | `retry-detail JOB_UUID` | Explicitly create or recover the next generation of a failed/cancelled job, retaining its original selection and retry delay |
-| `dispatch-detail --collection UUID [--profile PATH]` | Resume deliveries and rotate through already admitted jobs; omitting the profile permits delivery only |
+| `dispatch-detail --collection UUID [--profile PATH]` | Resume saved work and admit eligible candidates through the selected profile; omitting the profile permits delivery only |
 
 Target UUID, revision and candidate sequence come from native candidate review.
 Repeating identical admission returns its original job. Changing the profile or
-selection does not reinterpret an existing job. Automatic admission of weak
-candidates is a separate transition step. The dispatcher processes admitted
-work and does not restart terminal jobs.
+selection does not reinterpret an existing job. The dispatcher admits a new weak
+candidate only after complete retained listing comparison and current review
+identify exactly one candidate with no other blocker. Any existing detail-job
+history for that target/candidate prevents automatic readmission, including
+older target revisions, negative results and terminal jobs. Use explicit review
+and, for failed/cancelled work, `retry-detail` to resolve those cases.
 
 Add a `post.verify_candidate` entry to the shared worker list to discover
-permitted collections with due jobs for that profile. The server advertises
-`discovery_detail_protocol: 1` and `discovery_detail_collections_protocol: 1`.
-Collection lookup inspects at most 32 active detail jobs, applies current grants
-and source eligibility, and returns sorted UUIDs. Saved delivery runs before
-profile loading, and collection/profile selections persist before execution so
-restarts do not repeatedly favor the first account.
+permitted collections with retained listings. Automatic dispatch requires
+`discovery_detail_admission_protocol: 1`, in addition to the detail execution
+capability. Collection inspection includes blocked containers; readiness still
+depends on the selected profile, current source choices and native review.
+Candidate requests inspect at most 32 listing definitions and 32 targets,
+advancing over empty or blocked rows. The producer checks profile URL support;
+the server rechecks automatic eligibility when admitting and committing the job.
+Saved delivery runs before profile loading, existing jobs run before new
+admission, and collection/profile selections persist before execution. A lost
+admission reply is recovered through queued-job discovery. Completed collection
+traversals pause before polling again, including passes spanning multiple pages.
 
 Outbox schema 14 stores detail evidence in `discovery_detail_executions`, separate
 from enrichment and listing journals. A full checkpoint's capacity is reserved
@@ -2392,8 +2402,9 @@ server retains the original observing producer and time for every record.
 A lost completion reply recovers the same comparison receipt. Unacknowledged
 local evidence stays available for review if a native job changes or ends.
 
-Include the producer outbox in backups. Its schema-13 promotion preserves
-existing rows, pending bytes, claims, receipts and rotation state; a conflicting
-unknown table rolls back the whole upgrade. Native archive schema 76 already
-contains the corresponding jobs and evidence; this producer increment requires
-no new native migration. Production launcher conversion remains a cutover step.
+Include the producer outbox in backups. Schema 15 adds a persisted candidate
+cursor to the schema-14 detail dispatcher while preserving every existing table,
+pending body, claim, receipt, retry deadline and rotation cursor. Conflicting
+schema objects roll back the upgrade. Native archive schema 77 already contains
+the required jobs, evidence and indexes; automatic admission requires no new
+native migration. Production launcher conversion remains a cutover step.

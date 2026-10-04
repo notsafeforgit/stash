@@ -1242,6 +1242,44 @@ Inspect application API progress and mapped/source records under
 historical completion bases and retained URL evidence. This command does not
 replace coordinated cutover inputs, review resolution or reviewed activation.
 
+### Frozen discovery and maintenance history
+
+After the frozen enrichment mapping finishes, retain discovery continuations and
+maintenance history from the same received snapshot:
+
+```sh
+stash-import-automation-discovery --snapshot /migration/prepared/automation \
+  --expected-sha256 MANIFEST_SHA256 --endpoint STASH_ORIGIN
+```
+
+This application-authorized command verifies the frozen inputs, resumes from
+the committed source ordinal, and uses batches of at most 200 records or 16 MiB.
+Repeat the same command after an interruption; a terminal replay only reads.
+Exit 0 means all records in this pass mapped, 2 means some require review, and
+1 means input or transport failure. Overall migration remains `imported:false`.
+
+Discovery recovers the source post associated with old media. It does not link
+accounts to performers. Account listings retain their exact saved cursor,
+historical page/attempt counts and retry delays, including imported cooldowns.
+Pending targets and candidate URLs remain unconfirmed. Existing lookup work
+references the enrichment mapping rather than creating duplicate targets.
+Completed assertions require retained receipts or source captures; a status
+label alone cannot establish completion. Staged page/detail results and
+ambiguous candidates remain available for review without fetching them again.
+
+Maintenance watermarks, seed summaries, source exclusions and pruning summaries
+are historical evidence. They do not replace native cursors or policies or
+certify that native work has run. Unknown formats keep their original values
+with a review reason. No scraping, job activation, performer assignment or
+scene/image metadata changes occur in this pass.
+
+Inspect `/api/v3/archive/automation-snapshots/SNAPSHOT_UUID/discovery-import`,
+`/records?after=ORDINAL&limit=100`, and `/records/ORDINAL`. Compact summaries link
+native accounts, posts and collections where validated; selected-record details
+read original values from the retained snapshot rather than another payload
+copy. See the [schema contract](../../docs/native-schema.md#frozen-discovery-and-maintenance-history).
+Reviewed discovery activation and execution remain separate work.
+
 ### Legacy enrichment checkpoints
 
 After the frozen enrichment mapping finishes, convert saved collector results:

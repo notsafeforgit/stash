@@ -2241,3 +2241,56 @@ Startup checks both the retained seed projections and current checkpoint or
 released publication. Backups preserve these records and anonymisation removes
 them in dependency order. Review UI and coordinated production activation remain
 transition work.
+
+## Frozen discovery and maintenance history
+
+Schema 1000069 adds `automation_discovery_imports` and
+`automation_discovery_records`. The `automation-discovery-v1` pass reads
+`discovery_accounts`, `discovery_targets`, `discovery_candidates` and
+`maintenance` from the received automation snapshot. The same snapshot's
+enrichment mapping must finish first. Each transaction processes at most 200
+source records or 16 MiB, committing typed associations and the exact manifest/
+source-ordinal checkpoint together. Failed writes roll back the whole batch,
+including when an outer transaction caller catches the error. Terminal replay
+returns the original progress without writes.
+
+Discovery is about identifying source posts for historical media, separately
+from performer ownership. Account continuations preserve their validated service,
+profile URL, listing/matching phase, historical attempts/pages and the later of
+their retry deadline and imported platform/account cooldowns. Cursor and staged
+page/detail digests reference original snapshot strings. The original account
+mapping remains available through later account consolidation; this pass cannot
+establish account equivalence, ownership or depicted-performer attribution.
+
+Pending targets bind their original account job, source-qualified post reference
+and historical collection revision. Candidates retain their URL, matching basis
+and payload digest, even when several URLs remain possible. Neither is an
+accepted post match. Existing lookup work references the corresponding enrichment
+record and exact URL instead of creating another target. Historical completion
+requires a same-post/collection receipt or capture; `already_native` requires a
+capture, and `coalesced` requires the imported alias proof. A completed listing
+does not certify that any target matched. Missing scope/proof and staged results
+requiring conversion receive explicit review outcomes.
+
+Known maintenance entries retain typed inventory watermarks, translation seed
+times, seed counts, source exclusions and pruning summaries. Nanosecond
+watermarks are decimal strings in the API to preserve integer precision.
+These are historical records, not live scheduling/retention policies, executable
+cursors or proof that native jobs completed. Unknown or malformed entries remain
+in the original ledger with a review reason.
+
+Application-authorized GET/POST
+`/api/v3/archive/automation-snapshots/{snapshot}/discovery-import` exposes the
+import; POST requires `expected_manifest_sha256` and `after`. `/records` accepts
+an ordinal cursor and limit 1–100. `/records/{ordinal}` returns original values
+on demand. Paged results contain compact projections and native associations;
+payloads are not copied from the snapshot into another document store.
+
+Foreign keys and immutable records retain source-family scope. Startup validates
+progress, recomputes typed projections and digests, and checks native account,
+post, collection and enrichment-proof bindings before writes. Normal database
+backups include the original snapshot and these associations; anonymisation
+removes the import before its dependencies. No jobs, captures, performer links,
+post identifiers or selected metadata are changed by this pass. The client is
+`stash-import-automation-discovery`; migration remains `imported:false` and
+reviewed discovery activation/execution remain separate transition work.

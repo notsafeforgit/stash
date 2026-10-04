@@ -390,7 +390,12 @@ func enrichmentAutomationFixture(t *testing.T, catalog *catalogSnapshotFixture, 
 	}
 	f := &automationSnapshotFixture{db: catalog.db, repo: catalog.repo}
 	var lines [][]byte
-	for _, name := range []string{"enrichment_cooldowns", "enrichment_jobs", "enrichment_seed_progress", "enrichment_source_progress"} {
+	names := make([]string, 0, len(m.Tables))
+	for name := range m.Tables {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
 		table := struct {
 			name string
 			rows []map[string]any

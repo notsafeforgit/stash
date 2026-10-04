@@ -221,6 +221,7 @@ func TestAccountReviewDiscoveryRetainsAmbiguityAndUsesLiteralSearch(t *testing.T
 
 func removeAccountReviewSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeAutomationDiscoverySchema(t, raw)
 	_, err := raw.Exec("DROP TABLE account_ownership_reviews; DELETE FROM native_migration_history WHERE version=1000068")
 	require.NoError(t, err)
 }

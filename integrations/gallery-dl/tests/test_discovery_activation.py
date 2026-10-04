@@ -108,6 +108,7 @@ class DiscoveryActivationTests(unittest.TestCase):
                      lambda x: x["listing"].update(legacy=None),
                      lambda x: x["listing"].update(initial_cursor={"cursor": "wrong-platform"}),
                      lambda x: x["listing"].update(not_before="2026-10-04T03:00:00.0001Z"),
+                     lambda x: x["listing"].update(not_before="9999-12-31T23:59:59-01:00"),
                      lambda x: x["listing"].update(collection_revision=True),
                      lambda x: x.update(credentials={"token": "must-stay-local"}),
                      lambda x: x["listing"].update(profile_url="https://user:pass@www.reddit.com/user/juniper/")]

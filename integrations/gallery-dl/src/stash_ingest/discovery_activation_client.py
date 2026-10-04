@@ -26,7 +26,10 @@ def canonical_input(value):
     if listing["legacy"] is None:
         raise InvalidData("Discovery activation requires its original snapshot and account record")
     # Go retains an exact UTC millisecond deadline, without trailing zeros.
-    stamp = datetime.fromisoformat(listing["not_before"]).astimezone(timezone.utc)
+    try:
+        stamp = datetime.fromisoformat(listing["not_before"]).astimezone(timezone.utc)
+    except (ValueError, OverflowError):
+        raise InvalidData("Discovery deadline is outside the supported UTC range") from None
     listing["not_before"] = stamp.isoformat(timespec="milliseconds")[:-6].rstrip("0").rstrip(".") + "Z"
     targets = value["targets"]
     if not isinstance(targets, list) or not 1 <= len(targets) <= MAX_TARGETS:

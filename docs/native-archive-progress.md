@@ -6555,3 +6555,21 @@ The schema-73 full-copy rehearsal and full backend gate remain in progress. The
 real held accounts have not been activated. Native review UI, historical
 coverage, detail/publication/staging-release work and the full plan's remaining
 conversion, restore and cutover gates remain open.
+
+### Activation code verification — 2026-10-04
+
+The complete fork gate for the schema-73 API checkpoint passed in 1,256 seconds,
+including generated bindings, v3 validation, producer checks, zero-issue Go lint
+and the full tagged backend suite (SQLite: 1,142 seconds). The subsequent
+operator increment passed the 458-test producer suite and the real HTTP test;
+the final out-of-range UTC deadline correction passed its focused tests.
+These changes are separate incremental commits on `v3-rewrite`.
+
+A read-only audit of the verified archive groups all 569 held targets into six
+account/collection batches: 198, 186, 3, 2, 22 and 158 targets. All associated
+native posts are active. Five collections were already active in the rehearsal;
+the 198-target collection remains disabled. The two retained cursors account
+for 37 and 30 historical pages, with no staged account-page bodies. This audit
+does not activate the accounts or prove source coverage. The schema-73 migration
+rehearsal is still running; retain schema 72 until independent reconciliation
+and reopen checks pass.

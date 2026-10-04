@@ -1,3 +1,4 @@
+import { decodeEntityJobAcknowledgment } from "@/core/entity-job-invalidation";
 import { useBulkCustomFields } from "@/components/forms/use-bulk-custom-fields";
 import { useCommittedRef } from "@/hooks/use-committed-ref";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -211,13 +212,9 @@ export function PerformerBulkEditSheet({
     matching: applyToAll ? sheetApplyToAllTarget : undefined,
   });
 
-  const [bulkUpdatePerformers, { loading: savingSync }] = useEntityMutation(
+  const [bulkUpdatePerformers, { loading: saving }] = useEntityMutation(
     GQL.BulkPerformerUpdateDocument,
   );
-  const [bulkUpdatePerformersJob, { loading: savingJob }] = useEntityMutation(
-    GQL.BulkPerformerUpdateJobDocument,
-  );
-  const saving = savingSync || savingJob;
 
   const [tagOptions, setTagOptions] = useState<EntityOption[]>([]);
   const [searchTags, { data: tagData, loading: tagLoading }] = useLazyQuery(
@@ -246,16 +243,27 @@ export function PerformerBulkEditSheet({
         currentApplyToAll,
         currentApplyToAllTarget,
       );
-      if (currentApplyToAll) {
-        await bulkUpdatePerformersJob({ variables: { input } });
+      const { data } = await bulkUpdatePerformers({ variables: { input } });
+      const acknowledgment = decodeEntityJobAcknowledgment(
+        data?.bulkPerformerUpdate,
+      );
+      if (acknowledgment.kind === "invalid") {
+        throw new Error(
+          intl.formatMessage({
+            id: "toast.invalid_bulk_update_result",
+            defaultMessage:
+              "The server did not confirm the bulk update. Check its status before retrying.",
+          }),
+        );
+      }
+      if (acknowledgment.kind === "scheduled") {
         toast.success(
           intl.formatMessage({
-            id: "toast.started_bulk_update",
-            defaultMessage: "Bulk update started",
+            id: "toast.queued_bulk_update",
+            defaultMessage: "Bulk update queued",
           }),
         );
       } else {
-        await bulkUpdatePerformers({ variables: { input } });
         onSavedRef.current?.();
       }
       onOpenChange(false);

@@ -1,3 +1,4 @@
+import { decodeEntityJobAcknowledgment } from "@/core/entity-job-invalidation";
 import { useBulkCustomFields } from "@/components/forms/use-bulk-custom-fields";
 import { useCommittedRef } from "@/hooks/use-committed-ref";
 import { useEffect, useRef, useState } from "react";
@@ -121,13 +122,9 @@ export function StudioBulkEditSheet({
     matching: applyToAll ? sheetApplyToAllTarget : undefined,
   });
 
-  const [bulkUpdateStudios, { loading: savingSync }] = useEntityMutation(
+  const [bulkUpdateStudios, { loading: saving }] = useEntityMutation(
     GQL.BulkStudioUpdateDocument,
   );
-  const [bulkUpdateStudiosJob, { loading: savingJob }] = useEntityMutation(
-    GQL.BulkStudioUpdateJobDocument,
-  );
-  const saving = savingSync || savingJob;
 
   const [tagOptions, setTagOptions] = useState<EntityOption[]>([]);
   const [searchTags, { data: tagData, loading: tagLoading }] = useLazyQuery(
@@ -163,16 +160,27 @@ export function StudioBulkEditSheet({
         currentApplyToAll,
         currentApplyToAllTarget,
       );
-      if (currentApplyToAll) {
-        await bulkUpdateStudiosJob({ variables: { input } });
+      const { data } = await bulkUpdateStudios({ variables: { input } });
+      const acknowledgment = decodeEntityJobAcknowledgment(
+        data?.bulkStudioUpdate,
+      );
+      if (acknowledgment.kind === "invalid") {
+        throw new Error(
+          intl.formatMessage({
+            id: "toast.invalid_bulk_update_result",
+            defaultMessage:
+              "The server did not confirm the bulk update. Check its status before retrying.",
+          }),
+        );
+      }
+      if (acknowledgment.kind === "scheduled") {
         toast.success(
           intl.formatMessage({
-            id: "toast.started_bulk_update",
-            defaultMessage: "Bulk update started",
+            id: "toast.queued_bulk_update",
+            defaultMessage: "Bulk update queued",
           }),
         );
       } else {
-        await bulkUpdateStudios({ variables: { input } });
         onSavedRef.current?.();
       }
       onOpenChange(false);

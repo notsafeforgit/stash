@@ -501,24 +501,6 @@ func (r *mutationResolver) PerformerUpdate(ctx context.Context, input models.Per
 	return r.getPerformer(ctx, performerID)
 }
 
-func (r *mutationResolver) BulkPerformerUpdate(ctx context.Context, input BulkPerformerUpdateInput) ([]*models.Performer, error) {
-	performerIDs, err := stringslice.StringSliceToIntSlice(input.Ids)
-	if err != nil {
-		return nil, fmt.Errorf("converting ids: %w", err)
-	}
-
-	compatInput := input
-	compatInput.ApplyToItemsMatchingFilters = nil
-	compatInput.FindFilter = nil
-	compatInput.PerformerFilterAst = nil
-
-	if _, err := r.BulkPerformerUpdateJob(ctx, compatInput); err != nil {
-		return nil, err
-	}
-
-	return refetchBulkUpdateResults(ctx, performerIDs, r.getPerformer)
-}
-
 func (r *mutationResolver) PerformerDestroy(ctx context.Context, input PerformerDestroyInput) (bool, error) {
 	id, err := strconv.Atoi(input.ID)
 	if err != nil {

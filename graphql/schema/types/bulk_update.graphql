@@ -1,0 +1,16 @@
+"Whether a bulk edit committed inline or was admitted to the job queue."
+enum BulkUpdateStatus {
+  COMPLETED
+  QUEUED
+}
+
+"The selection and outcome of one bulk update request."
+type BulkUpdateResult {
+  status: BulkUpdateStatus!
+  "Present only for QUEUED. Inspect this job for progress, failures or cancellation."
+  job_id: ID
+  "Number of selected items. A queued result does not claim they were updated."
+  selected_count: Int!
+  "IDs updated by an inline transaction; empty for QUEUED."
+  updated_ids: [ID!]!
+}

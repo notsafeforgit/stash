@@ -121,7 +121,7 @@ jobs:
       run: make pre-producer
 
     - name: Test Backend
-      run: make validate-producer it
+      run: make validate-producer validate-library it
 
   # Job 3: Build the active Linux target in parallel with backend tests.
   # Other cross-compilation targets require the updated compiler Dockerfile.

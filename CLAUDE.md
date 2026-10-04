@@ -50,6 +50,7 @@ for image publication and Quadlet restarts.
 make validate-fork     # Fork gate: backend generation, v3 validation, Go lint/tests
 make it                # Go unit + integration tests only
 make validate-producer # Python delivery, lease and gallery-dl lifecycle tests
+make validate-library  # Native manual tag/performer helper contracts
 make lint              # CI-pinned golangci-lint via go run
 make fmt               # Format Go source
 make validate-ui-v3    # Biome, generation/types, formatting, locales, tests, native contracts

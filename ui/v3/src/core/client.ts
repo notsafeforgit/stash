@@ -1,8 +1,4 @@
-import { affectedActiveQueries, rootFields } from "./mutation-invalidation";
-import {
-  decodeEntityJobAcknowledgment,
-  invalidateAfterEntityJob,
-} from "./entity-job-invalidation";
+import { refetchAfterEntityMutation } from "./entity-job-invalidation";
 import type {
   ApolloCache,
   DocumentNode,
@@ -151,23 +147,8 @@ export function useEntityMutation<TData, TVariables extends OperationVariables>(
 ) {
   const client = useApolloClient();
   return useMutation<TData, TVariables>(document, {
-    refetchQueries: (result) => {
-      const jobFields = rootFields(document).filter((field) =>
-        /^bulk.*Job$/.test(field),
-      );
-      if (jobFields.length) {
-        let refreshNow = false;
-        for (const [field, value] of Object.entries(result.data ?? {})) {
-          if (!jobFields.includes(field)) continue;
-          const acknowledgment = decodeEntityJobAcknowledgment(value);
-          if (acknowledgment.kind === "scheduled")
-            invalidateAfterEntityJob(client, document, acknowledgment.id);
-          else refreshNow = true;
-        }
-        return refreshNow ? affectedActiveQueries(client, document) : [];
-      }
-      return affectedActiveQueries(client, document);
-    },
+    refetchQueries: (result) =>
+      refetchAfterEntityMutation(client, document, result.data),
     ...options,
   } as useMutation.Options<TData, TVariables, ApolloCache, TVariables>);
 }

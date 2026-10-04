@@ -438,7 +438,11 @@ validate: validate-fork
 
 # Full pre-push gate for the fork backend plus the active v3 UI.
 .PHONY: validate-fork
-validate-fork: generate-backend validate-ui validate-producer validate-backend
+validate-fork: generate-backend validate-ui validate-producer validate-library validate-backend
+
+.PHONY: validate-library
+validate-library:
+	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s integrations/library -p 'test_*.py' -v
 
 .PHONY: validate-producer
 export PRODUCER_PYTHON ?= $(abspath .local/native-producer/bin/python)

@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/stashapp/stash/pkg/models"
@@ -12,8 +11,8 @@ import (
 	"github.com/stashapp/stash/pkg/sliceutil/stringslice"
 )
 
-// Fork bulk operations. Legacy resolvers delegate here with explicit IDs;
-// only the additive job mutations may select items by filter.
+// Native bulk edits complete explicit IDs atomically or queue the selected
+// filter results. Both paths return an explicit completion acknowledgment.
 
 type performerBulkUpdateOperation struct {
 	repository       models.PerformerReaderWriter
@@ -36,16 +35,16 @@ func (o performerBulkUpdateOperation) Update(ctx context.Context, id int) error 
 	return err
 }
 
-func (r *mutationResolver) BulkPerformerUpdateJob(ctx context.Context, input BulkPerformerUpdateInput) (string, error) {
+func (r *mutationResolver) BulkPerformerUpdate(ctx context.Context, input BulkPerformerUpdateInput) (*BulkUpdateResult, error) {
 	performerIDs, err := stringslice.StringSliceToIntSlice(input.Ids)
 	if err != nil {
-		return "", fmt.Errorf("converting ids: %w", err)
+		return nil, fmt.Errorf("converting ids: %w", err)
 	}
 
 	useBackgroundJob := input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters
 	if useBackgroundJob {
 		if !hasBulkUpdateFilter(input.FindFilter, input.PerformerFilterAst) {
-			return "", fmt.Errorf("performer_filter_ast or find_filter.q is required when apply_to_items_matching_filters is true")
+			return nil, fmt.Errorf("performer_filter_ast or find_filter.q is required when apply_to_items_matching_filters is true")
 		}
 
 		findFilter := sanitizeBulkUpdateFindFilter(input.FindFilter)
@@ -61,7 +60,7 @@ func (r *mutationResolver) BulkPerformerUpdateJob(ctx context.Context, input Bul
 			return nil
 		})
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 	}
 
@@ -86,16 +85,16 @@ func (r *mutationResolver) BulkPerformerUpdateJob(ctx context.Context, input Bul
 	if translator.hasField("career_start") || translator.hasField("career_end") {
 		updatedPerformer.CareerStart, err = translator.optionalDate(input.CareerStart, "career_start")
 		if err != nil {
-			return "", fmt.Errorf("converting career start: %w", err)
+			return nil, fmt.Errorf("converting career start: %w", err)
 		}
 		updatedPerformer.CareerEnd, err = translator.optionalDate(input.CareerEnd, "career_end")
 		if err != nil {
-			return "", fmt.Errorf("converting career end: %w", err)
+			return nil, fmt.Errorf("converting career end: %w", err)
 		}
 	} else if translator.hasField("career_length") && input.CareerLength != nil {
 		start, end, err := models.ParseYearRangeString(*input.CareerLength)
 		if err != nil {
-			return "", fmt.Errorf("could not parse career_length %q: %w", *input.CareerLength, err)
+			return nil, fmt.Errorf("could not parse career_length %q: %w", *input.CareerLength, err)
 		}
 		if start != nil {
 			updatedPerformer.CareerStart = models.NewOptionalDate(*start)
@@ -118,7 +117,7 @@ func (r *mutationResolver) BulkPerformerUpdateJob(ctx context.Context, input Bul
 	if translator.hasField("urls") {
 		// ensure url/twitter/instagram are not included in the input
 		if err := validateNoLegacyURLs(translator); err != nil {
-			return "", err
+			return nil, err
 		}
 
 		updatedPerformer.URLs = translator.updateStringsBulk(input.Urls, "urls")
@@ -132,11 +131,11 @@ func (r *mutationResolver) BulkPerformerUpdateJob(ctx context.Context, input Bul
 
 	updatedPerformer.Birthdate, err = translator.optionalDate(input.Birthdate, "birthdate")
 	if err != nil {
-		return "", fmt.Errorf("converting birthdate: %w", err)
+		return nil, fmt.Errorf("converting birthdate: %w", err)
 	}
 	updatedPerformer.DeathDate, err = translator.optionalDate(input.DeathDate, "death_date")
 	if err != nil {
-		return "", fmt.Errorf("converting death date: %w", err)
+		return nil, fmt.Errorf("converting death date: %w", err)
 	}
 
 	// prefer height_cm over height
@@ -170,7 +169,7 @@ func (r *mutationResolver) BulkPerformerUpdateJob(ctx context.Context, input Bul
 
 	updatedPerformer.TagIDs, err = translator.updateIdsBulk(input.TagIds, "tag_ids")
 	if err != nil {
-		return "", fmt.Errorf("converting tag ids: %w", err)
+		return nil, fmt.Errorf("converting tag ids: %w", err)
 	}
 
 	if input.CustomFields != nil {
@@ -192,17 +191,17 @@ func (r *mutationResolver) BulkPerformerUpdateJob(ctx context.Context, input Bul
 			}
 			return nil
 		}); err != nil {
-			return "", err
+			return nil, err
 		}
 
 		for _, performerID := range performerIDs {
 			r.hookExecutor.ExecutePostHooks(ctx, performerID, hook.PerformerUpdatePost, input, translator.getFields())
 		}
 
-		return "sync", nil
+		return completedBulkUpdate(performerIDs), nil
 	}
 
 	jobID := r.enqueueBulkUpdate(ctx, "Bulk Performer Update", performerIDs, operation, hook.PerformerUpdatePost, input, translator.getFields())
 
-	return strconv.Itoa(jobID), nil
+	return queuedBulkUpdate(jobID, len(performerIDs)), nil
 }

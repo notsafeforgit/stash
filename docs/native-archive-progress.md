@@ -7184,3 +7184,48 @@ No production plugin, service, scraper or configuration was changed. Schema
 1000077 and the verified archive rehearsal remain unchanged. Remaining client
 conversion, import/reconciliation, native review, general durable notifications,
 backup/restore and cutover work are still open.
+
+
+## Native bulk update acknowledgment — 2026-10-04
+
+Consolidated the eight entity bulk mutations into `bulk*Update` with one
+`BulkUpdateResult`: explicit IDs commit atomically and return `COMPLETED` plus
+the updated IDs; filter selections return `QUEUED`, a job ID and selected count.
+Removed duplicate `*UpdateJob` fields, synchronous entity-refetch adapters,
+movie bulk aliases and their unused input. The separate file-mtime operations
+retain their current scalar contract. This does not make the existing general
+bulk queue durable; that plan requirement remains open.
+
+All seven native edit sheets and their GraphQL operations use the new result.
+Completed edits refresh immediately; queued work keeps completion monitoring
+outside the sheet. Aliased mutations resolve the proper response key. Failed
+or cancelled jobs still refresh potentially changed records. Submission errors
+and contradictory results keep the draft open with visible feedback, and the
+admission message now explicitly says “Bulk update queued.”
+
+The caller audit found two manual host clients that require conversion. Native
+replacements for `tag_stash_collections.py` and `stash_autotag_with_aliases.py`,
+plus a shared stdlib client, are staged in `integrations/library`. They use
+canonical filter ASTs, bounded ID-sorted pages, existing aliases/path boundaries,
+explicit ignored-performer handling, and verified completion counts. Queued or
+invalid results stop later batches. Keys come from configuration instead of
+embedded source. Compatible live helpers remain unchanged until the coordinated
+cutover. The installed catalog plugin and audited n8n definitions do not call
+the removed bulk fields.
+
+Generation and embedded builds pass. Focused real SQLite/GraphQL tests cover
+all eight empty-result contracts, retired fields, atomic rollback, notifications
+after commit, selection versus execution, custom-field preservation and partial
+dates. The frontend gate passed 583 tests and current native contracts. Eight
+helper tests pass and now run in CI/the fork gate. Sixteen Chromium/WebKit
+checks pass for mobile/desktop completion, queue admission, error handling and
+retaining the open draft. The full fork gate passed in 1192.6 seconds, including
+484 producer tests, Go lint with zero issues and the tagged backend integration
+suite (SQLite: 1096.965 seconds). Reports and browser artifacts are under
+`.local/native-discovery-client-20261004/native_bulk_*` and
+`bulk-browser-results-*`.
+
+No production deployment or database migration occurred. Schema 1000077 and
+the verified archive rehearsal remain unchanged. Remaining client retirement,
+imports, native review, general durable notifications, backup/restore and cutover
+continue under the full transition plan.

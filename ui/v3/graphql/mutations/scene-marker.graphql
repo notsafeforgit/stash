@@ -46,12 +46,8 @@ mutation SceneMarkerUpdate(
 
 mutation BulkSceneMarkerUpdate($input: BulkSceneMarkerUpdateInput!) {
   bulkSceneMarkerUpdate(input: $input) {
-    ...SceneMarkerData
+    ...BulkUpdateResultData
   }
-}
-
-mutation BulkSceneMarkerUpdateJob($input: BulkSceneMarkerUpdateInput!) {
-  bulkSceneMarkerUpdateJob(input: $input)
 }
 
 mutation SceneMarkerDestroy($id: ID!) {

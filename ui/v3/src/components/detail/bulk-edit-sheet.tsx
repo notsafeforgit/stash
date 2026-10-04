@@ -1,4 +1,5 @@
 import type React from "react";
+import { useToast } from "@/hooks/toast";
 import { useIntl } from "react-intl";
 import {
   Sheet,
@@ -20,7 +21,7 @@ export interface BulkEditSheetProps {
   title: string;
   saving: boolean;
   canSubmit?: boolean;
-  onSubmit: () => void;
+  onSubmit: () => void | Promise<void>;
   /** When provided and totalCount > itemCount, shows the "apply to all" toggle. */
   applyToAllTarget?: BulkApplyTarget;
   /** Total items matching the current list filter. */
@@ -49,6 +50,7 @@ export function BulkEditSheet({
   children,
 }: BulkEditSheetProps) {
   const intl = useIntl();
+  const reportError = useToast().error;
 
   const showApplyToAll =
     !!applyToAllTarget && totalCount !== undefined && totalCount > itemCount;
@@ -66,9 +68,13 @@ export function BulkEditSheet({
 
         <form
           className="flex flex-col flex-1 overflow-hidden"
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
-            onSubmit();
+            try {
+              await onSubmit();
+            } catch (error) {
+              reportError(error);
+            }
           }}
         >
           {/* `overflow-x-hidden` + `overscroll-contain` keeps both axes

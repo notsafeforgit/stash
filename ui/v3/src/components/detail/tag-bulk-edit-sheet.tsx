@@ -1,3 +1,4 @@
+import { decodeEntityJobAcknowledgment } from "@/core/entity-job-invalidation";
 import { useBulkCustomFields } from "@/components/forms/use-bulk-custom-fields";
 import { useCommittedRef } from "@/hooks/use-committed-ref";
 import { useEffect, useRef, useState } from "react";
@@ -112,13 +113,9 @@ export function TagBulkEditSheet({
     matching: applyToAll ? sheetApplyToAllTarget : undefined,
   });
 
-  const [bulkUpdateTags, { loading: savingSync }] = useEntityMutation(
+  const [bulkUpdateTags, { loading: saving }] = useEntityMutation(
     GQL.BulkTagUpdateDocument,
   );
-  const [bulkUpdateTagsJob, { loading: savingJob }] = useEntityMutation(
-    GQL.BulkTagUpdateJobDocument,
-  );
-  const saving = savingSync || savingJob;
 
   const [tagOptions, setTagOptions] = useState<EntityOption[]>([]);
   const [searchTags, { data: tagData, loading: tagLoading }] = useLazyQuery(
@@ -144,16 +141,25 @@ export function TagBulkEditSheet({
         currentApplyToAll,
         currentApplyToAllTarget,
       );
-      if (currentApplyToAll) {
-        await bulkUpdateTagsJob({ variables: { input } });
+      const { data } = await bulkUpdateTags({ variables: { input } });
+      const acknowledgment = decodeEntityJobAcknowledgment(data?.bulkTagUpdate);
+      if (acknowledgment.kind === "invalid") {
+        throw new Error(
+          intl.formatMessage({
+            id: "toast.invalid_bulk_update_result",
+            defaultMessage:
+              "The server did not confirm the bulk update. Check its status before retrying.",
+          }),
+        );
+      }
+      if (acknowledgment.kind === "scheduled") {
         toast.success(
           intl.formatMessage({
-            id: "toast.started_bulk_update",
-            defaultMessage: "Bulk update started",
+            id: "toast.queued_bulk_update",
+            defaultMessage: "Bulk update queued",
           }),
         );
       } else {
-        await bulkUpdateTags({ variables: { input } });
         onSavedRef.current?.();
       }
       onOpenChange(false);

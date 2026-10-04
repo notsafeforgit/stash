@@ -23,9 +23,10 @@ provides the frozen fallback for users who do not migrate.
 | [Native source identity](native-source-identity.md) | Captured account claims, service namespaces, and reviewed performer/account registry import |
 | [Native source albums](native-source-albums.md) | Ordered post attachments, partial downloads, gallery membership, and source-evidence requirements |
 | [Native ingestion](native-ingestion.md) | Scoped ingestion, receipts, verified files, source-run coordination, native metadata policies, and preview/apply contracts |
+| [Native bulk updates](native-bulk-updates.md) | Completed versus queued edits, caller conversion, cache refresh and host helpers |
 | [Repository guidance](../CLAUDE.md) and [v3 contributor guidance](../ui/v3/AGENTS.md) | Coding conventions and backend/player constraints |
 | [Plugin host](../ui/v3/docs/plugin-host.md) | Current v3 UI plugin API, startup lifecycle, and failure handling |
-| [Versioned plugin manifests](plugin-manifests.md) | Independent v3 plugin contract, legacy adapter, and API generations |
+| [Versioned plugin manifests](plugin-manifests.md) | Independent v3 plugin contract, rejected packages, and API generations |
 | [Backend plugin notifications](plugin-events.md) | Scene/file deletion, metadata and file edits, commit semantics, and event payloads |
 | [Plugin settings and jq](plugin-settings.md) | Manifest settings definitions, validated updates, expression previews, mappings, and browser host APIs |
 | [Theming](../ui/v3/docs/theming.md) | Runtime CSS, JavaScript, custom assets, and component selectors |

@@ -20,12 +20,8 @@ mutation TagUpdate($input: TagUpdateInput!) {
 
 mutation BulkTagUpdate($input: BulkTagUpdateInput!) {
   bulkTagUpdate(input: $input) {
-    ...TagData
+    ...BulkUpdateResultData
   }
-}
-
-mutation BulkTagUpdateJob($input: BulkTagUpdateInput!) {
-  bulkTagUpdateJob(input: $input)
 }
 
 mutation TagsMerge(

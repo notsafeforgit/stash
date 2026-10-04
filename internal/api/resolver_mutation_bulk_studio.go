@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/plugin/hook"
@@ -11,8 +10,8 @@ import (
 	"github.com/stashapp/stash/pkg/studio"
 )
 
-// Fork bulk operations. Legacy resolvers delegate here with explicit IDs;
-// only the additive job mutations may select items by filter.
+// Native bulk edits complete explicit IDs atomically or queue the selected
+// filter results. Both paths return an explicit completion acknowledgment.
 
 type studioBulkUpdateOperation struct {
 	repository models.StudioReaderWriter
@@ -30,16 +29,16 @@ func (o studioBulkUpdateOperation) Update(ctx context.Context, id int) error {
 	return err
 }
 
-func (r *mutationResolver) BulkStudioUpdateJob(ctx context.Context, input BulkStudioUpdateInput) (string, error) {
+func (r *mutationResolver) BulkStudioUpdate(ctx context.Context, input BulkStudioUpdateInput) (*BulkUpdateResult, error) {
 	ids, err := stringslice.StringSliceToIntSlice(input.Ids)
 	if err != nil {
-		return "", fmt.Errorf("converting ids: %w", err)
+		return nil, fmt.Errorf("converting ids: %w", err)
 	}
 
 	useBackgroundJob := input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters
 	if useBackgroundJob {
 		if !hasBulkUpdateFilter(input.FindFilter, input.StudioFilterAst) {
-			return "", fmt.Errorf("studio_filter_ast or find_filter.q is required when apply_to_items_matching_filters is true")
+			return nil, fmt.Errorf("studio_filter_ast or find_filter.q is required when apply_to_items_matching_filters is true")
 		}
 
 		findFilter := sanitizeBulkUpdateFindFilter(input.FindFilter)
@@ -55,7 +54,7 @@ func (r *mutationResolver) BulkStudioUpdateJob(ctx context.Context, input BulkSt
 			return nil
 		})
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 	}
 
@@ -68,13 +67,13 @@ func (r *mutationResolver) BulkStudioUpdateJob(ctx context.Context, input BulkSt
 
 	partial.ParentID, err = translator.optionalIntFromString(input.ParentID, "parent_id")
 	if err != nil {
-		return "", fmt.Errorf("converting parent id: %w", err)
+		return nil, fmt.Errorf("converting parent id: %w", err)
 	}
 
 	if translator.hasField("urls") {
 		// ensure url/twitter/instagram are not included in the input
 		if err := validateNoLegacyURLs(translator); err != nil {
-			return "", err
+			return nil, err
 		}
 
 		partial.URLs = translator.updateStringsBulk(input.Urls, "urls")
@@ -102,7 +101,7 @@ func (r *mutationResolver) BulkStudioUpdateJob(ctx context.Context, input BulkSt
 
 	partial.TagIDs, err = translator.updateIdsBulk(input.TagIds, "tag_ids")
 	if err != nil {
-		return "", fmt.Errorf("converting tag ids: %w", err)
+		return nil, fmt.Errorf("converting tag ids: %w", err)
 	}
 
 	operation := studioBulkUpdateOperation{
@@ -119,17 +118,17 @@ func (r *mutationResolver) BulkStudioUpdateJob(ctx context.Context, input BulkSt
 			}
 			return nil
 		}); err != nil {
-			return "", err
+			return nil, err
 		}
 
 		for _, id := range ids {
 			r.hookExecutor.ExecutePostHooks(ctx, id, hook.StudioUpdatePost, input, translator.getFields())
 		}
 
-		return "sync", nil
+		return completedBulkUpdate(ids), nil
 	}
 
 	jobID := r.enqueueBulkUpdate(ctx, "Bulk Studio Update", ids, operation, hook.StudioUpdatePost, input, translator.getFields())
 
-	return strconv.Itoa(jobID), nil
+	return queuedBulkUpdate(jobID, len(ids)), nil
 }

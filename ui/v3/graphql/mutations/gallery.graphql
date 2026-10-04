@@ -12,12 +12,8 @@ mutation GalleryUpdate($input: GalleryUpdateInput!) {
 
 mutation BulkGalleryUpdate($input: BulkGalleryUpdateInput!) {
   bulkGalleryUpdate(input: $input) {
-    ...GalleryData
+    ...BulkUpdateResultData
   }
-}
-
-mutation BulkGalleryUpdateJob($input: BulkGalleryUpdateInput!) {
-  bulkGalleryUpdateJob(input: $input)
 }
 
 mutation GalleriesUpdate($input: [GalleryUpdateInput!]!) {

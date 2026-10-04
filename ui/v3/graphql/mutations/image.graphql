@@ -6,12 +6,8 @@ mutation ImageUpdate($input: ImageUpdateInput!) {
 
 mutation BulkImageUpdate($input: BulkImageUpdateInput!) {
   bulkImageUpdate(input: $input) {
-    ...SlimImageData
+    ...BulkUpdateResultData
   }
-}
-
-mutation BulkImageUpdateJob($input: BulkImageUpdateInput!) {
-  bulkImageUpdateJob(input: $input)
 }
 
 mutation ImagesSetDateFromFileMTime($input: ImagesSetDateFromFileMTimeInput!) {

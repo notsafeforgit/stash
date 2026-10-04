@@ -117,10 +117,8 @@ func TestBulkCustomFieldsPersistence(t *testing.T) {
 							input["custom_fields"] = json.RawMessage(tt.input)
 						}
 						mutation := "bulk" + entity + "Update"
-						selection := "{ id }"
+						selection := "{ status job_id selected_count updated_ids }"
 						if background {
-							mutation += "Job"
-							selection = ""
 							input["ids"] = []string{}
 							input["apply_to_items_matching_filters"] = true
 							input["find_filter"] = map[string]interface{}{"q": "bulk custom target", "per_page": 1}
@@ -136,7 +134,7 @@ func TestBulkCustomFieldsPersistence(t *testing.T) {
 						server.ServeHTTP(response, request)
 						require.Equal(t, http.StatusOK, response.Code)
 						if background {
-							require.JSONEq(t, `{"data":{"result":"1"}}`, response.Body.String())
+							require.JSONEq(t, `{"data":{"result":{"status":"QUEUED","job_id":"1","selected_count":2,"updated_ids":[]}}}`, response.Body.String())
 							require.ElementsMatch(t, ids[:2], updater.ids)
 							if tt.input != "" {
 								require.Contains(t, updater.fields, "custom_fields")
@@ -147,7 +145,7 @@ func TestBulkCustomFieldsPersistence(t *testing.T) {
 								}))
 							}
 						} else {
-							require.JSONEq(t, fmt.Sprintf(`{"data":{"result":[{"id":"%d"},{"id":"%d"}]}}`, ids[0], ids[1]), response.Body.String())
+							require.JSONEq(t, fmt.Sprintf(`{"data":{"result":{"status":"COMPLETED","job_id":null,"selected_count":2,"updated_ids":["%d","%d"]}}}`, ids[0], ids[1]), response.Body.String())
 							require.Nil(t, updater.operation)
 						}
 

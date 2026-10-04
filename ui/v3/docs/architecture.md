@@ -453,6 +453,16 @@ search, drawer, portal, and focus contracts.
 
 ## Bulk custom fields
 
+Each bulk sheet uses one `bulk*Update` document with `BulkUpdateResultData`.
+`COMPLETED` includes the committed IDs and refreshes affected library queries.
+`QUEUED` includes the selected count and job ID, closes the sheet with an
+admission message and leaves completion monitoring owned by the Apollo client.
+Failed/cancelled jobs still refresh, since earlier items may have committed.
+Mutation aliases are resolved to their response keys. Submission failures or
+contradictory acknowledgments show an error and keep the form open. The removed
+`*UpdateJob` documents and scalar `sync` convention are no longer part of these
+edits. See the [native bulk API](../../../docs/native-bulk-updates.md).
+
 All seven entity bulk-edit sheets share `components/forms/bulk-custom-fields-field.tsx`.
 Existing editable fields are the intersection of names across every affected
 item, regardless of whether their values differ. Each shared field independently

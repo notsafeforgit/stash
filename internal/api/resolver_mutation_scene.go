@@ -361,24 +361,6 @@ func (r *mutationResolver) sceneUpdateCoverImage(ctx context.Context, s *models.
 	return nil
 }
 
-func (r *mutationResolver) BulkSceneUpdate(ctx context.Context, input BulkSceneUpdateInput) ([]*models.Scene, error) {
-	sceneIDs, err := stringslice.StringSliceToIntSlice(input.Ids)
-	if err != nil {
-		return nil, fmt.Errorf("converting ids: %w", err)
-	}
-
-	compatInput := input
-	compatInput.ApplyToItemsMatchingFilters = nil
-	compatInput.FindFilter = nil
-	compatInput.SceneFilterAst = nil
-
-	if _, err := r.BulkSceneUpdateJob(ctx, compatInput); err != nil {
-		return nil, err
-	}
-
-	return refetchBulkUpdateResults(ctx, sceneIDs, r.getScene)
-}
-
 func (r *mutationResolver) SceneDestroy(ctx context.Context, input models.SceneDestroyInput) (bool, error) {
 	sceneID, err := strconv.Atoi(input.ID)
 	if err != nil {
@@ -794,24 +776,6 @@ func (r *mutationResolver) SceneMarkerUpdate(ctx context.Context, input SceneMar
 
 	r.hookExecutor.ExecutePostHooks(ctx, markerID, hook.SceneMarkerUpdatePost, input, translator.getFields())
 	return r.getSceneMarker(ctx, markerID)
-}
-
-func (r *mutationResolver) BulkSceneMarkerUpdate(ctx context.Context, input BulkSceneMarkerUpdateInput) ([]*models.SceneMarker, error) {
-	ids, err := stringslice.StringSliceToIntSlice(input.Ids)
-	if err != nil {
-		return nil, fmt.Errorf("converting ids: %w", err)
-	}
-
-	compatInput := input
-	compatInput.ApplyToItemsMatchingFilters = nil
-	compatInput.FindFilter = nil
-	compatInput.SceneMarkerFilterAst = nil
-
-	if _, err := r.BulkSceneMarkerUpdateJob(ctx, compatInput); err != nil {
-		return nil, err
-	}
-
-	return refetchBulkUpdateResults(ctx, ids, r.getSceneMarker)
 }
 
 // adjustMarkerPartialForTagExclusion adjusts the SceneMarkerPartial to exclude the primary tag from tag updates.

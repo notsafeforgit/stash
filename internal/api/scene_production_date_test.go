@@ -22,7 +22,7 @@ import (
 func TestBulkSceneProductionDate(t *testing.T) {
 	config.InitializeEmpty()
 	t.Cleanup(func() { config.InitializeEmpty() })
-	for _, mode := range []string{"legacy", "job IDs", "job filter"} {
+	for _, mode := range []string{"selected IDs", "job filter"} {
 		t.Run(mode, func(t *testing.T) {
 			db := sqlite.NewDatabase()
 			require.NoError(t, db.Open(filepath.Join(t.TempDir(), "stash.sqlite")))
@@ -66,10 +66,7 @@ func TestBulkSceneProductionDate(t *testing.T) {
 							input["production_date"] = nil
 						}
 					}
-					mutation, selection := "bulkSceneUpdate", "{ id }"
-					if mode != "legacy" {
-						mutation, selection = "bulkSceneUpdateJob", ""
-					}
+					mutation, selection := "bulkSceneUpdate", "{ status job_id selected_count updated_ids }"
 					if mode == "job filter" {
 						input["ids"] = []string{}
 						input["apply_to_items_matching_filters"] = true
@@ -89,7 +86,7 @@ func TestBulkSceneProductionDate(t *testing.T) {
 					require.Equal(t, http.StatusOK, response.Code)
 					require.NotContains(t, response.Body.String(), `"errors"`)
 					if mode == "job filter" {
-						require.JSONEq(t, `{"data":{"result":"1"}}`, response.Body.String())
+						require.JSONEq(t, `{"data":{"result":{"status":"QUEUED","job_id":"1","selected_count":2,"updated_ids":[]}}}`, response.Body.String())
 						require.ElementsMatch(t, ids[:2], updater.ids)
 						for _, id := range updater.ids {
 							require.NoError(t, repository.WithTxn(testCtx, func(ctx context.Context) error {

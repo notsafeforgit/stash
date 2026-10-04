@@ -164,8 +164,9 @@ names. Other API bridges remain until their callers are converted:
   Source MIME types, codec/GOP checks, signed URLs and resolution limits use the
   shared [stream service](../internal/manager/scene.go); public HTTP media and
   share paths remain supported independently of the retired GraphQL adapter.
-- Legacy bulk mutations retain their synchronous return contract; additive
-  `bulk*UpdateJob` mutations support v3's background workflow.
+- The native `bulk*Update` mutations return a structured completion or queue
+  acknowledgment. Duplicate `*UpdateJob` and movie bulk aliases are removed.
+  See the [bulk update contract](native-bulk-updates.md) and staged host helpers.
 
 [FORK.md](../FORK.md) documents migration and contract policy.
 [check-native-contracts.mjs](../ui/v3/scripts/check-native-contracts.mjs) checks
@@ -221,9 +222,11 @@ per-file processing in [task_scan.go](../internal/manager/task_scan.go).
 Probing, hashing, and generation depend on scan options; a scan does not
 unconditionally generate every derivative.
 
-For v3 bulk edits, [bulk resolvers](../internal/api/resolver_mutation_bulk_scene.go)
-resolve the affected IDs, removing pagination from a filter selection, then
-enqueue the operation. [task_bulk_update.go](../internal/manager/task_bulk_update.go)
+For native bulk edits, [bulk resolvers](../internal/api/resolver_mutation_bulk_scene.go)
+commit explicit IDs in one transaction and report the updated IDs. Filter
+selection removes pagination and snapshots the matching IDs before queueing,
+returning a job ID and selection count without claiming completed edits.
+[task_bulk_update.go](../internal/manager/task_bulk_update.go)
 commits each item independently and runs enabled post-hooks after successful
 writes. Failed items roll back and are reported; cancellation or an error does
 not undo already committed items.

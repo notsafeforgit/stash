@@ -57,10 +57,10 @@ func TestBulkSceneUpdate_ApplyToAll(t *testing.T) {
 	}
 	ctx := withGqlContext(testCtx, inputMap)
 
-	jobID, err := r.Mutation().BulkSceneUpdateJob(ctx, input)
+	result, err := r.Mutation().BulkSceneUpdate(ctx, input)
 
 	assert.Nil(t, err)
-	assert.Equal(t, "1", jobID)
+	assert.Equal(t, &BulkUpdateResult{Status: BulkUpdateStatusQueued, JobID: PtrString("1"), SelectedCount: 3, UpdatedIDs: []string{}}, result)
 	assert.Len(t, bulkUpdater.calls, 1)
 	assert.Equal(t, "Bulk Scene Update", bulkUpdater.calls[0].description)
 	assert.Equal(t, []int{10, 20, 30}, bulkUpdater.calls[0].ids)
@@ -102,10 +102,10 @@ func TestBulkSceneUpdate_ApplyToAllSearchOnly(t *testing.T) {
 	}
 	ctx := withGqlContext(testCtx, inputMap)
 
-	jobID, err := r.Mutation().BulkSceneUpdateJob(ctx, input)
+	result, err := r.Mutation().BulkSceneUpdate(ctx, input)
 
 	assert.Nil(t, err)
-	assert.Equal(t, "1", jobID)
+	assert.Equal(t, &BulkUpdateResult{Status: BulkUpdateStatusQueued, JobID: PtrString("1"), SelectedCount: 3, UpdatedIDs: []string{}}, result)
 	assert.Len(t, bulkUpdater.calls, 1)
 	assert.Equal(t, "Bulk Scene Update", bulkUpdater.calls[0].description)
 	assert.Equal(t, []int{10, 20, 30}, bulkUpdater.calls[0].ids)
@@ -133,9 +133,9 @@ func TestBulkSceneUpdate_ApplyToAllRequiresFilter(t *testing.T) {
 	}
 	ctx := withGqlContext(testCtx, inputMap)
 
-	jobID, err := r.Mutation().BulkSceneUpdateJob(ctx, input)
+	result, err := r.Mutation().BulkSceneUpdate(ctx, input)
 
-	assert.Empty(t, jobID)
+	assert.Nil(t, result)
 	assert.ErrorContains(t, err, "scene_filter_ast or find_filter.q is required")
 	assert.Empty(t, bulkUpdater.calls)
 	db.Scene.AssertNotCalled(t, "Query", mock.Anything, mock.Anything)
@@ -185,10 +185,10 @@ func TestBulkSceneUpdate_SelectedIDsIgnoresFiltersWithoutApplyToAll(t *testing.T
 	db.Scene.On("UpdatePartial", mock.Anything, 20, expectedPartial).
 		Return(&models.Scene{ID: 20}, nil).Once()
 
-	result, err := r.Mutation().BulkSceneUpdateJob(ctx, input)
+	result, err := r.Mutation().BulkSceneUpdate(ctx, input)
 
 	assert.NoError(t, err)
-	assert.Equal(t, "sync", result)
+	assert.Equal(t, &BulkUpdateResult{Status: BulkUpdateStatusCompleted, SelectedCount: 2, UpdatedIDs: []string{"10", "20"}}, result)
 	assert.Empty(t, bulkUpdater.calls)
 	db.Scene.AssertNotCalled(t, "Query", mock.Anything, mock.Anything)
 	db.Scene.AssertNotCalled(t, "QueryAST", mock.Anything, mock.Anything, mock.Anything)
@@ -223,10 +223,10 @@ func TestBulkSceneUpdate_SelectedIDsRunsSynchronously(t *testing.T) {
 	db.Scene.On("UpdatePartial", mock.Anything, 20, expectedPartial).
 		Return(&models.Scene{ID: 20}, nil).Once()
 
-	result, err := r.Mutation().BulkSceneUpdateJob(ctx, input)
+	result, err := r.Mutation().BulkSceneUpdate(ctx, input)
 
 	assert.NoError(t, err)
-	assert.Equal(t, "sync", result)
+	assert.Equal(t, &BulkUpdateResult{Status: BulkUpdateStatusCompleted, SelectedCount: 2, UpdatedIDs: []string{"10", "20"}}, result)
 	assert.Empty(t, bulkUpdater.calls)
 	db.AssertExpectations(t)
 }

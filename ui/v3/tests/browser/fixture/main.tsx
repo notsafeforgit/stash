@@ -55,6 +55,7 @@ import { SceneCoverFixture } from "./scene-cover";
 import { SceneDeletionFixture } from "./scene-deletion";
 import { MarkerEditorFixture } from "./marker-editor";
 import { MergeDialogsFixture } from "./merge-dialogs";
+import { BulkUpdateFixture } from "./bulk-update";
 import { DialogDismissalFixture } from "./dialog-dismissal";
 import { EntityCardsFixture } from "./entity-cards";
 import { EmbeddedListFixture } from "./embedded-list";
@@ -403,6 +404,11 @@ const router = createRouter({
       getParentRoute: () => rootRoute,
       path: "/merge-dialogs",
       component: MergeDialogsFixture,
+    }),
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/bulk-update",
+      component: BulkUpdateFixture,
     }),
     createRoute({
       getParentRoute: () => rootRoute,

@@ -36,20 +36,6 @@ func hasBulkUpdateFilter(findFilter *models.FindFilterType, filterAST *models.Fi
 	return findFilter != nil && findFilter.Q != nil && *findFilter.Q != ""
 }
 
-func refetchBulkUpdateResults[T any](ctx context.Context, ids []int, get func(context.Context, int) (*T, error)) ([]*T, error) {
-	ret := make([]*T, 0, len(ids))
-	for _, id := range ids {
-		item, err := get(ctx, id)
-		if err != nil {
-			return nil, err
-		}
-
-		ret = append(ret, item)
-	}
-
-	return ret, nil
-}
-
 func idsFromItems[T any](items []*T, getID func(*T) int) []int {
 	ids := make([]int, 0, len(items))
 	for _, item := range items {

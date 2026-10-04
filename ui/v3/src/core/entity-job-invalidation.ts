@@ -1,24 +1,50 @@
 import type { ApolloClient, DocumentNode } from "@apollo/client";
 import { monitorJobCompletion } from "./monitor-job";
-import { affectedActiveQueries } from "./mutation-invalidation";
+import {
+  affectedActiveQueries,
+  rootFieldSelections,
+} from "./mutation-invalidation";
 
 export type EntityJobAcknowledgment =
   | { kind: "completed" }
   | { kind: "scheduled"; id: string }
   | { kind: "invalid" };
 
-/** The legacy scalar response is retained for v2.5. Only numeric IDs may be
- * sent to findJob; selected-ID operations can finish synchronously. */
-export function decodeEntityJobAcknowledgment(
-  value: unknown,
-): EntityJobAcknowledgment {
-  if (value === "sync") return { kind: "completed" };
-  if (
+function isJobID(value: unknown): value is string {
+  return (
     typeof value === "string" &&
     /^[1-9]\d*$/.test(value) &&
     Number.isSafeInteger(Number(value))
+  );
+}
+
+/** Queue admission is distinct from a committed edit. Reject incomplete or
+ * contradictory acknowledgments instead of presenting them as success. */
+export function decodeEntityJobAcknowledgment(
+  value: unknown,
+): EntityJobAcknowledgment {
+  if (!value || typeof value !== "object") return { kind: "invalid" };
+  const result = value as Record<string, unknown>;
+  if (
+    typeof result.selected_count !== "number" ||
+    !Number.isSafeInteger(result.selected_count) ||
+    result.selected_count < 0 ||
+    !Array.isArray(result.updated_ids) ||
+    !result.updated_ids.every((id) => typeof id === "string" && id.length > 0)
   )
-    return { kind: "scheduled", id: value };
+    return { kind: "invalid" };
+  if (
+    result.status === "COMPLETED" &&
+    result.job_id === null &&
+    result.updated_ids.length === result.selected_count
+  )
+    return { kind: "completed" };
+  if (
+    result.status === "QUEUED" &&
+    isJobID(result.job_id) &&
+    result.updated_ids.length === 0
+  )
+    return { kind: "scheduled", id: result.job_id };
   return { kind: "invalid" };
 }
 
@@ -32,8 +58,7 @@ export function invalidateAfterEntityJob(
   mutation: DocumentNode,
   id: string,
 ): () => void {
-  const acknowledgment = decodeEntityJobAcknowledgment(id);
-  if (acknowledgment.kind !== "scheduled") return () => {};
+  if (!isJobID(id)) return () => {};
   let jobs = monitored.get(client);
   if (!jobs) {
     jobs = new Map();
@@ -58,4 +83,33 @@ export function invalidateAfterEntityJob(
   };
   pending.set(id, stop);
   return stop;
+}
+
+/** Select immediate refreshes and retain queued-job monitors beyond form lifetime. */
+export function refetchAfterEntityMutation(
+  client: ApolloClient,
+  document: DocumentNode,
+  data: unknown,
+): DocumentNode[] {
+  const fields = rootFieldSelections(document);
+  const bulkFields = fields.filter((field) =>
+    /^bulk(Scene|SceneMarker|Image|Gallery|Performer|Studio|Tag|Group)Update$/.test(
+      field.name.value,
+    ),
+  );
+  if (!bulkFields.length) return affectedActiveQueries(client, document);
+  // Mixed mutations also refresh their non-bulk edits immediately.
+  let refreshNow = fields.some(
+    (field) => field.name.value !== "__typename" && !bulkFields.includes(field),
+  );
+  const values =
+    data && typeof data === "object" ? (data as Record<string, unknown>) : {};
+  for (const field of bulkFields) {
+    const key = field.alias?.value ?? field.name.value;
+    const acknowledgment = decodeEntityJobAcknowledgment(values[key]);
+    if (acknowledgment.kind === "scheduled")
+      invalidateAfterEntityJob(client, document, acknowledgment.id);
+    else refreshNow = true;
+  }
+  return refreshNow ? affectedActiveQueries(client, document) : [];
 }

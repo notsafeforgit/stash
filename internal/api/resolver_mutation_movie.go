@@ -203,24 +203,6 @@ func (r *mutationResolver) MovieUpdate(ctx context.Context, input MovieUpdateInp
 	return r.getGroup(ctx, group.ID)
 }
 
-func (r *mutationResolver) BulkMovieUpdate(ctx context.Context, input BulkMovieUpdateInput) ([]*models.Group, error) {
-	groupIDs, err := stringslice.StringSliceToIntSlice(input.Ids)
-	if err != nil {
-		return nil, fmt.Errorf("converting ids: %w", err)
-	}
-
-	compatInput := input
-	compatInput.ApplyToItemsMatchingFilters = nil
-	compatInput.FindFilter = nil
-	compatInput.MovieFilter = nil
-
-	if _, err := r.BulkMovieUpdateJob(ctx, compatInput); err != nil {
-		return nil, err
-	}
-
-	return refetchBulkUpdateResults(ctx, groupIDs, r.getGroup)
-}
-
 func (r *mutationResolver) MovieDestroy(ctx context.Context, input MovieDestroyInput) (bool, error) {
 	id, err := strconv.Atoi(input.ID)
 	if err != nil {

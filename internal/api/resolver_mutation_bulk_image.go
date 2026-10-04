@@ -11,8 +11,8 @@ import (
 	"github.com/stashapp/stash/pkg/sliceutil/stringslice"
 )
 
-// Fork bulk operations. Legacy resolvers delegate here with explicit IDs;
-// only the additive job mutations may select items by filter.
+// Native bulk edits complete explicit IDs atomically or queue the selected
+// filter results. Both paths return an explicit completion acknowledgment.
 
 type imageBulkUpdateOperation struct {
 	repository     models.ImageReaderWriter
@@ -55,16 +55,16 @@ func (o imageBulkUpdateOperation) Update(ctx context.Context, id int) error {
 	return nil
 }
 
-func (r *mutationResolver) BulkImageUpdateJob(ctx context.Context, input BulkImageUpdateInput) (string, error) {
+func (r *mutationResolver) BulkImageUpdate(ctx context.Context, input BulkImageUpdateInput) (*BulkUpdateResult, error) {
 	imageIDs, err := stringslice.StringSliceToIntSlice(input.Ids)
 	if err != nil {
-		return "", fmt.Errorf("converting ids: %w", err)
+		return nil, fmt.Errorf("converting ids: %w", err)
 	}
 
 	useBackgroundJob := input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters
 	if useBackgroundJob {
 		if !hasBulkUpdateFilter(input.FindFilter, input.ImageFilterAst) {
-			return "", fmt.Errorf("image_filter_ast or find_filter.q is required when apply_to_items_matching_filters is true")
+			return nil, fmt.Errorf("image_filter_ast or find_filter.q is required when apply_to_items_matching_filters is true")
 		}
 
 		findFilter := sanitizeBulkUpdateFindFilter(input.FindFilter)
@@ -80,7 +80,7 @@ func (r *mutationResolver) BulkImageUpdateJob(ctx context.Context, input BulkIma
 			return nil
 		})
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 	}
 
@@ -100,26 +100,26 @@ func (r *mutationResolver) BulkImageUpdateJob(ctx context.Context, input BulkIma
 
 	updatedImage.Date, err = translator.optionalDate(input.Date, "date")
 	if err != nil {
-		return "", fmt.Errorf("converting date: %w", err)
+		return nil, fmt.Errorf("converting date: %w", err)
 	}
 	updatedImage.StudioID, err = translator.optionalIntFromString(input.StudioID, "studio_id")
 	if err != nil {
-		return "", fmt.Errorf("converting studio id: %w", err)
+		return nil, fmt.Errorf("converting studio id: %w", err)
 	}
 
 	updatedImage.URLs = translator.optionalURLsBulk(input.Urls, input.URL)
 
 	updatedImage.GalleryIDs, err = translator.updateIdsBulk(input.GalleryIds, "gallery_ids")
 	if err != nil {
-		return "", fmt.Errorf("converting gallery ids: %w", err)
+		return nil, fmt.Errorf("converting gallery ids: %w", err)
 	}
 	updatedImage.PerformerIDs, err = translator.updateIdsBulk(input.PerformerIds, "performer_ids")
 	if err != nil {
-		return "", fmt.Errorf("converting performer ids: %w", err)
+		return nil, fmt.Errorf("converting performer ids: %w", err)
 	}
 	updatedImage.TagIDs, err = translator.updateIdsBulk(input.TagIds, "tag_ids")
 	if err != nil {
-		return "", fmt.Errorf("converting tag ids: %w", err)
+		return nil, fmt.Errorf("converting tag ids: %w", err)
 	}
 
 	if input.CustomFields != nil {
@@ -144,19 +144,19 @@ func (r *mutationResolver) BulkImageUpdateJob(ctx context.Context, input BulkIma
 			}
 			return nil
 		}); err != nil {
-			return "", err
+			return nil, err
 		}
 
 		for _, imageID := range imageIDs {
 			r.hookExecutor.ExecutePostHooks(ctx, imageID, hook.ImageUpdatePost, input, translator.getFields())
 		}
 
-		return "sync", nil
+		return completedBulkUpdate(imageIDs), nil
 	}
 
 	jobID := r.enqueueBulkUpdate(ctx, "Bulk Image Update", imageIDs, operation, hook.ImageUpdatePost, input, translator.getFields())
 
-	return strconv.Itoa(jobID), nil
+	return queuedBulkUpdate(jobID, len(imageIDs)), nil
 }
 
 type imageSetDateFromMTimeOperation struct {

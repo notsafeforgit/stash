@@ -1,3 +1,4 @@
+import { decodeEntityJobAcknowledgment } from "@/core/entity-job-invalidation";
 import { useBulkCustomFields } from "@/components/forms/use-bulk-custom-fields";
 import { useCommittedRef } from "@/hooks/use-committed-ref";
 import { useEffect, useId, useRef, useState } from "react";
@@ -155,13 +156,9 @@ export function SceneBulkEditSheet({
     matching: applyToAll ? sheetApplyToAllTarget : undefined,
   });
 
-  const [bulkUpdateScenes, { loading: savingSync }] = useEntityMutation(
+  const [bulkUpdateScenes, { loading: saving }] = useEntityMutation(
     GQL.BulkSceneUpdateDocument,
   );
-  const [bulkUpdateScenesJob, { loading: savingJob }] = useEntityMutation(
-    GQL.BulkSceneUpdateJobDocument,
-  );
-  const saving = savingSync || savingJob;
   const [setDateFromMTime, { loading: settingDate }] = useEntityMutation(
     GQL.ScenesSetDateFromFileMTimeDocument,
   );
@@ -236,16 +233,27 @@ export function SceneBulkEditSheet({
         currentApplyToAll,
         currentApplyToAllTarget,
       );
-      if (currentApplyToAll) {
-        await bulkUpdateScenesJob({ variables: { input } });
+      const { data } = await bulkUpdateScenes({ variables: { input } });
+      const acknowledgment = decodeEntityJobAcknowledgment(
+        data?.bulkSceneUpdate,
+      );
+      if (acknowledgment.kind === "invalid") {
+        throw new Error(
+          intl.formatMessage({
+            id: "toast.invalid_bulk_update_result",
+            defaultMessage:
+              "The server did not confirm the bulk update. Check its status before retrying.",
+          }),
+        );
+      }
+      if (acknowledgment.kind === "scheduled") {
         toast.success(
           intl.formatMessage({
-            id: "toast.started_bulk_update",
-            defaultMessage: "Bulk update started",
+            id: "toast.queued_bulk_update",
+            defaultMessage: "Bulk update queued",
           }),
         );
       } else {
-        await bulkUpdateScenes({ variables: { input } });
         onSavedRef.current?.();
       }
       onOpenChange(false);
@@ -296,8 +304,8 @@ export function SceneBulkEditSheet({
     if (currentApplyToAll) {
       toast.success(
         intl.formatMessage({
-          id: "toast.started_bulk_update",
-          defaultMessage: "Bulk update started",
+          id: "toast.queued_bulk_update",
+          defaultMessage: "Bulk update queued",
         }),
       );
     } else {

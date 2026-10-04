@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/plugin/hook"
@@ -11,8 +10,8 @@ import (
 	"github.com/stashapp/stash/pkg/tag"
 )
 
-// Fork bulk operations. Legacy resolvers delegate here with explicit IDs;
-// only the additive job mutations may select items by filter.
+// Native bulk edits complete explicit IDs atomically or queue the selected
+// filter results. Both paths return an explicit completion acknowledgment.
 
 type tagBulkUpdateOperation struct {
 	repository models.TagReaderWriter
@@ -28,16 +27,16 @@ func (o tagBulkUpdateOperation) Update(ctx context.Context, id int) error {
 	return err
 }
 
-func (r *mutationResolver) BulkTagUpdateJob(ctx context.Context, input BulkTagUpdateInput) (string, error) {
+func (r *mutationResolver) BulkTagUpdate(ctx context.Context, input BulkTagUpdateInput) (*BulkUpdateResult, error) {
 	tagIDs, err := stringslice.StringSliceToIntSlice(input.Ids)
 	if err != nil {
-		return "", fmt.Errorf("converting ids: %w", err)
+		return nil, fmt.Errorf("converting ids: %w", err)
 	}
 
 	useBackgroundJob := input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters
 	if useBackgroundJob {
 		if !hasBulkUpdateFilter(input.FindFilter, input.TagFilterAst) {
-			return "", fmt.Errorf("tag_filter_ast or find_filter.q is required when apply_to_items_matching_filters is true")
+			return nil, fmt.Errorf("tag_filter_ast or find_filter.q is required when apply_to_items_matching_filters is true")
 		}
 
 		findFilter := sanitizeBulkUpdateFindFilter(input.FindFilter)
@@ -53,7 +52,7 @@ func (r *mutationResolver) BulkTagUpdateJob(ctx context.Context, input BulkTagUp
 			return nil
 		})
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 	}
 
@@ -75,12 +74,12 @@ func (r *mutationResolver) BulkTagUpdateJob(ctx context.Context, input BulkTagUp
 
 	updatedTag.ParentIDs, err = translator.updateIdsBulk(input.ParentIds, "parent_ids")
 	if err != nil {
-		return "", fmt.Errorf("converting parent tag ids: %w", err)
+		return nil, fmt.Errorf("converting parent tag ids: %w", err)
 	}
 
 	updatedTag.ChildIDs, err = translator.updateIdsBulk(input.ChildIds, "child_ids")
 	if err != nil {
-		return "", fmt.Errorf("converting child tag ids: %w", err)
+		return nil, fmt.Errorf("converting child tag ids: %w", err)
 	}
 
 	operation := tagBulkUpdateOperation{
@@ -97,17 +96,17 @@ func (r *mutationResolver) BulkTagUpdateJob(ctx context.Context, input BulkTagUp
 			}
 			return nil
 		}); err != nil {
-			return "", err
+			return nil, err
 		}
 
 		for _, tagID := range tagIDs {
 			r.hookExecutor.ExecutePostHooks(ctx, tagID, hook.TagUpdatePost, input, translator.getFields())
 		}
 
-		return "sync", nil
+		return completedBulkUpdate(tagIDs), nil
 	}
 
 	jobID := r.enqueueBulkUpdate(ctx, "Bulk Tag Update", tagIDs, operation, hook.TagUpdatePost, input, translator.getFields())
 
-	return strconv.Itoa(jobID), nil
+	return queuedBulkUpdate(jobID, len(tagIDs)), nil
 }

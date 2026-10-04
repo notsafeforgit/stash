@@ -260,24 +260,6 @@ func (r *mutationResolver) galleryUpdate(ctx context.Context, input models.Galle
 	return gallery, nil
 }
 
-func (r *mutationResolver) BulkGalleryUpdate(ctx context.Context, input BulkGalleryUpdateInput) ([]*models.Gallery, error) {
-	galleryIDs, err := stringslice.StringSliceToIntSlice(input.Ids)
-	if err != nil {
-		return nil, fmt.Errorf("converting ids: %w", err)
-	}
-
-	compatInput := input
-	compatInput.ApplyToItemsMatchingFilters = nil
-	compatInput.FindFilter = nil
-	compatInput.GalleryFilterAst = nil
-
-	if _, err := r.BulkGalleryUpdateJob(ctx, compatInput); err != nil {
-		return nil, err
-	}
-
-	return refetchBulkUpdateResults(ctx, galleryIDs, r.getGallery)
-}
-
 func (r *mutationResolver) GalleryDestroy(ctx context.Context, input models.GalleryDestroyInput) (bool, error) {
 	galleryIDs, err := stringslice.StringSliceToIntSlice(input.Ids)
 	if err != nil {

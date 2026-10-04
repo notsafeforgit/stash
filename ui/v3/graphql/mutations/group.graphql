@@ -12,12 +12,8 @@ mutation GroupUpdate($input: GroupUpdateInput!) {
 
 mutation BulkGroupUpdate($input: BulkGroupUpdateInput!) {
   bulkGroupUpdate(input: $input) {
-    ...GroupData
+    ...BulkUpdateResultData
   }
-}
-
-mutation BulkGroupUpdateJob($input: BulkGroupUpdateInput!) {
-  bulkGroupUpdateJob(input: $input)
 }
 
 mutation GroupDestroy($id: ID!) {

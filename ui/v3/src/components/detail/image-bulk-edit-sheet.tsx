@@ -1,3 +1,4 @@
+import { decodeEntityJobAcknowledgment } from "@/core/entity-job-invalidation";
 import { useBulkCustomFields } from "@/components/forms/use-bulk-custom-fields";
 import { useCommittedRef } from "@/hooks/use-committed-ref";
 import { useEffect, useRef, useState } from "react";
@@ -141,13 +142,9 @@ export function ImageBulkEditSheet({
     matching: applyToAll ? sheetApplyToAllTarget : undefined,
   });
 
-  const [bulkUpdateImages, { loading: savingSync }] = useEntityMutation(
+  const [bulkUpdateImages, { loading: saving }] = useEntityMutation(
     GQL.BulkImageUpdateDocument,
   );
-  const [bulkUpdateImagesJob, { loading: savingJob }] = useEntityMutation(
-    GQL.BulkImageUpdateJobDocument,
-  );
-  const saving = savingSync || savingJob;
   const [setDateFromMTime, { loading: settingDate }] = useEntityMutation(
     GQL.ImagesSetDateFromFileMTimeDocument,
   );
@@ -212,16 +209,27 @@ export function ImageBulkEditSheet({
         currentApplyToAll,
         currentApplyToAllTarget,
       );
-      if (currentApplyToAll) {
-        await bulkUpdateImagesJob({ variables: { input } });
+      const { data } = await bulkUpdateImages({ variables: { input } });
+      const acknowledgment = decodeEntityJobAcknowledgment(
+        data?.bulkImageUpdate,
+      );
+      if (acknowledgment.kind === "invalid") {
+        throw new Error(
+          intl.formatMessage({
+            id: "toast.invalid_bulk_update_result",
+            defaultMessage:
+              "The server did not confirm the bulk update. Check its status before retrying.",
+          }),
+        );
+      }
+      if (acknowledgment.kind === "scheduled") {
         toast.success(
           intl.formatMessage({
-            id: "toast.started_bulk_update",
-            defaultMessage: "Bulk update started",
+            id: "toast.queued_bulk_update",
+            defaultMessage: "Bulk update queued",
           }),
         );
       } else {
-        await bulkUpdateImages({ variables: { input } });
         onSavedRef.current?.();
       }
       onOpenChange(false);
@@ -270,8 +278,8 @@ export function ImageBulkEditSheet({
     if (currentApplyToAll) {
       toast.success(
         intl.formatMessage({
-          id: "toast.started_bulk_update",
-          defaultMessage: "Bulk update started",
+          id: "toast.queued_bulk_update",
+          defaultMessage: "Bulk update queued",
         }),
       );
     } else {

@@ -148,10 +148,10 @@ func TestBulkTagUpdate_ApplyToAll(t *testing.T) {
 	}
 	ctx := withGqlContext(testCtx, inputMap)
 
-	jobID, err := r.Mutation().BulkTagUpdateJob(ctx, input)
+	result, err := r.Mutation().BulkTagUpdate(ctx, input)
 
 	assert.Nil(t, err)
-	assert.Equal(t, "1", jobID)
+	assert.Equal(t, &BulkUpdateResult{Status: BulkUpdateStatusQueued, JobID: PtrString("1"), SelectedCount: 3, UpdatedIDs: []string{}}, result)
 	assert.Len(t, bulkUpdater.calls, 1)
 	assert.Equal(t, "Bulk Tag Update", bulkUpdater.calls[0].description)
 	assert.Equal(t, tagIDs, bulkUpdater.calls[0].ids)

@@ -12,12 +12,8 @@ mutation StudioUpdate($input: StudioUpdateInput!) {
 
 mutation BulkStudioUpdate($input: BulkStudioUpdateInput!) {
   bulkStudioUpdate(input: $input) {
-    ...StudioData
+    ...BulkUpdateResultData
   }
-}
-
-mutation BulkStudioUpdateJob($input: BulkStudioUpdateInput!) {
-  bulkStudioUpdateJob(input: $input)
 }
 
 mutation StudioDestroy($id: ID!) {

@@ -10,8 +10,8 @@ import (
 	"github.com/stashapp/stash/pkg/sliceutil/stringslice"
 )
 
-// Fork bulk operations. Legacy resolvers delegate here with explicit IDs;
-// only the additive job mutations may select items by filter.
+// Native bulk edits complete explicit IDs atomically or queue the selected
+// filter results. Both paths return an explicit completion acknowledgment.
 
 type sceneBulkUpdateOperation struct {
 	repository   models.SceneReaderWriter
@@ -49,19 +49,19 @@ func (o sceneMarkerBulkUpdateOperation) Update(ctx context.Context, id int) erro
 	return err
 }
 
-func (r *mutationResolver) BulkSceneUpdateJob(ctx context.Context, input BulkSceneUpdateInput) (string, error) {
+func (r *mutationResolver) BulkSceneUpdate(ctx context.Context, input BulkSceneUpdateInput) (*BulkUpdateResult, error) {
 	var sceneIDs []int
 	var err error
 	useBackgroundJob := input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters
 	if len(input.Ids) > 0 {
 		sceneIDs, err = stringslice.StringSliceToIntSlice(input.Ids)
 		if err != nil {
-			return "", fmt.Errorf("converting ids: %w", err)
+			return nil, fmt.Errorf("converting ids: %w", err)
 		}
 	}
 	if useBackgroundJob {
 		if !hasBulkUpdateFilter(input.FindFilter, input.SceneFilterAst) {
-			return "", fmt.Errorf("scene_filter_ast or find_filter.q is required when apply_to_items_matching_filters is true")
+			return nil, fmt.Errorf("scene_filter_ast or find_filter.q is required when apply_to_items_matching_filters is true")
 		}
 
 		findFilter := sanitizeBulkUpdateFindFilter(input.FindFilter)
@@ -76,7 +76,7 @@ func (r *mutationResolver) BulkSceneUpdateJob(ctx context.Context, input BulkSce
 			})
 			return nil
 		}); err != nil {
-			return "", fmt.Errorf("querying ids: %w", err)
+			return nil, fmt.Errorf("querying ids: %w", err)
 		}
 	}
 
@@ -96,41 +96,41 @@ func (r *mutationResolver) BulkSceneUpdateJob(ctx context.Context, input BulkSce
 
 	updatedScene.Date, err = translator.optionalDate(input.Date, "date")
 	if err != nil {
-		return "", fmt.Errorf("converting date: %w", err)
+		return nil, fmt.Errorf("converting date: %w", err)
 	}
 	updatedScene.ProductionDate, err = translator.optionalDate(input.ProductionDate, "production_date")
 	if err != nil {
-		return "", fmt.Errorf("converting production date: %w", err)
+		return nil, fmt.Errorf("converting production date: %w", err)
 	}
 	updatedScene.StudioID, err = translator.optionalIntFromString(input.StudioID, "studio_id")
 	if err != nil {
-		return "", fmt.Errorf("converting studio id: %w", err)
+		return nil, fmt.Errorf("converting studio id: %w", err)
 	}
 
 	updatedScene.URLs = translator.optionalURLsBulk(input.Urls, input.URL)
 
 	updatedScene.PerformerIDs, err = translator.updateIdsBulk(input.PerformerIds, "performer_ids")
 	if err != nil {
-		return "", fmt.Errorf("converting performer ids: %w", err)
+		return nil, fmt.Errorf("converting performer ids: %w", err)
 	}
 	updatedScene.TagIDs, err = translator.updateIdsBulk(input.TagIds, "tag_ids")
 	if err != nil {
-		return "", fmt.Errorf("converting tag ids: %w", err)
+		return nil, fmt.Errorf("converting tag ids: %w", err)
 	}
 	updatedScene.GalleryIDs, err = translator.updateIdsBulk(input.GalleryIds, "gallery_ids")
 	if err != nil {
-		return "", fmt.Errorf("converting gallery ids: %w", err)
+		return nil, fmt.Errorf("converting gallery ids: %w", err)
 	}
 
 	if translator.hasField("group_ids") {
 		updatedScene.GroupIDs, err = translator.updateGroupIDsBulk(input.GroupIds, "group_ids")
 		if err != nil {
-			return "", fmt.Errorf("converting group ids: %w", err)
+			return nil, fmt.Errorf("converting group ids: %w", err)
 		}
 	} else if translator.hasField("movie_ids") {
 		updatedScene.GroupIDs, err = translator.updateGroupIDsBulk(input.MovieIds, "movie_ids")
 		if err != nil {
-			return "", fmt.Errorf("converting movie ids: %w", err)
+			return nil, fmt.Errorf("converting movie ids: %w", err)
 		}
 	}
 
@@ -155,19 +155,19 @@ func (r *mutationResolver) BulkSceneUpdateJob(ctx context.Context, input BulkSce
 			}
 			return nil
 		}); err != nil {
-			return "", err
+			return nil, err
 		}
 
 		for _, sceneID := range sceneIDs {
 			r.hookExecutor.ExecutePostHooks(ctx, sceneID, hook.SceneUpdatePost, input, translator.getFields())
 		}
 
-		return "sync", nil
+		return completedBulkUpdate(sceneIDs), nil
 	}
 
 	jobID := r.enqueueBulkUpdate(ctx, "Bulk Scene Update", sceneIDs, operation, hook.SceneUpdatePost, input, translator.getFields())
 
-	return strconv.Itoa(jobID), nil
+	return queuedBulkUpdate(jobID, len(sceneIDs)), nil
 }
 
 type sceneSetDateFromMTimeOperation struct {
@@ -265,16 +265,16 @@ func (r *mutationResolver) ScenesSetDateFromFileMTime(ctx context.Context, input
 	return strconv.Itoa(jobID), nil
 }
 
-func (r *mutationResolver) BulkSceneMarkerUpdateJob(ctx context.Context, input BulkSceneMarkerUpdateInput) (string, error) {
+func (r *mutationResolver) BulkSceneMarkerUpdate(ctx context.Context, input BulkSceneMarkerUpdateInput) (*BulkUpdateResult, error) {
 	ids, err := stringslice.StringSliceToIntSlice(input.Ids)
 	if err != nil {
-		return "", fmt.Errorf("converting ids: %w", err)
+		return nil, fmt.Errorf("converting ids: %w", err)
 	}
 
 	useBackgroundJob := input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters
 	if useBackgroundJob {
 		if !hasBulkUpdateFilter(input.FindFilter, input.SceneMarkerFilterAst) {
-			return "", fmt.Errorf("scene_marker_filter_ast or find_filter.q is required when apply_to_items_matching_filters is true")
+			return nil, fmt.Errorf("scene_marker_filter_ast or find_filter.q is required when apply_to_items_matching_filters is true")
 		}
 
 		findFilter := sanitizeBulkUpdateFindFilter(input.FindFilter)
@@ -290,7 +290,7 @@ func (r *mutationResolver) BulkSceneMarkerUpdateJob(ctx context.Context, input B
 			return nil
 		})
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 	}
 
@@ -305,12 +305,12 @@ func (r *mutationResolver) BulkSceneMarkerUpdateJob(ctx context.Context, input B
 
 	partial.PrimaryTagID, err = translator.optionalIntFromString(input.PrimaryTagID, "primary_tag_id")
 	if err != nil {
-		return "", fmt.Errorf("converting primary tag id: %w", err)
+		return nil, fmt.Errorf("converting primary tag id: %w", err)
 	}
 
 	partial.TagIDs, err = translator.updateIdsBulk(input.TagIds, "tag_ids")
 	if err != nil {
-		return "", fmt.Errorf("converting tag ids: %w", err)
+		return nil, fmt.Errorf("converting tag ids: %w", err)
 	}
 
 	operation := sceneMarkerBulkUpdateOperation{
@@ -327,18 +327,18 @@ func (r *mutationResolver) BulkSceneMarkerUpdateJob(ctx context.Context, input B
 			}
 			return nil
 		}); err != nil {
-			return "", err
+			return nil, err
 		}
 
 		for _, id := range ids {
 			r.hookExecutor.ExecutePostHooks(ctx, id, hook.SceneMarkerUpdatePost, input, translator.getFields())
 		}
 
-		return "sync", nil
+		return completedBulkUpdate(ids), nil
 	}
 
 	jobDescription := fmt.Sprintf("Bulk Scene Marker Update (%d items)", len(ids))
 	jobID := r.enqueueBulkUpdate(ctx, jobDescription, ids, operation, hook.SceneMarkerUpdatePost, input, translator.getFields())
 
-	return strconv.Itoa(jobID), nil
+	return queuedBulkUpdate(jobID, len(ids)), nil
 }

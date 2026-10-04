@@ -12,12 +12,8 @@ mutation SceneUpdate($input: SceneUpdateInput!) {
 
 mutation BulkSceneUpdate($input: BulkSceneUpdateInput!) {
   bulkSceneUpdate(input: $input) {
-    ...SceneData
+    ...BulkUpdateResultData
   }
-}
-
-mutation BulkSceneUpdateJob($input: BulkSceneUpdateInput!) {
-  bulkSceneUpdateJob(input: $input)
 }
 
 mutation ScenesSetDateFromFileMTime($input: ScenesSetDateFromFileMTimeInput!) {

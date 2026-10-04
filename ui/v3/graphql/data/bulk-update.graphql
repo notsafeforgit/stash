@@ -1,0 +1,6 @@
+fragment BulkUpdateResultData on BulkUpdateResult {
+  status
+  job_id
+  selected_count
+  updated_ids
+}

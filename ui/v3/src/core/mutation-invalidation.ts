@@ -3,7 +3,7 @@ import type {
   DocumentNode,
   ObservableQuery,
 } from "@apollo/client";
-import type { SelectionSetNode } from "graphql";
+import type { FieldNode, SelectionSetNode } from "graphql";
 
 const queryFields = {
   scene: [
@@ -61,12 +61,12 @@ const affectedEntities: Record<Entity, readonly Entity[]> = {
   file: allEntities,
 };
 
-export function rootFields(document: DocumentNode): string[] {
-  const fields = new Set<string>();
+export function rootFieldSelections(document: DocumentNode): FieldNode[] {
+  const fields: FieldNode[] = [];
   const visited = new Set<string>();
   function collect(set: SelectionSetNode) {
     for (const selection of set.selections) {
-      if (selection.kind === "Field") fields.add(selection.name.value);
+      if (selection.kind === "Field") fields.push(selection);
       else if (selection.kind === "InlineFragment")
         collect(selection.selectionSet);
       else if (!visited.has(selection.name.value)) {
@@ -85,7 +85,13 @@ export function rootFields(document: DocumentNode): string[] {
     if (definition.kind === "OperationDefinition")
       collect(definition.selectionSet);
   }
-  return [...fields];
+  return fields;
+}
+
+export function rootFields(document: DocumentNode): string[] {
+  return [
+    ...new Set(rootFieldSelections(document).map((field) => field.name.value)),
+  ];
 }
 
 export function affectedQueryFields(mutation: DocumentNode): Set<string> {

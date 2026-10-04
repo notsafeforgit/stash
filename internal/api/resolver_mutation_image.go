@@ -204,24 +204,6 @@ func (r *mutationResolver) imageUpdate(ctx context.Context, input models.ImageUp
 	return image, nil
 }
 
-func (r *mutationResolver) BulkImageUpdate(ctx context.Context, input BulkImageUpdateInput) ([]*models.Image, error) {
-	imageIDs, err := stringslice.StringSliceToIntSlice(input.Ids)
-	if err != nil {
-		return nil, fmt.Errorf("converting ids: %w", err)
-	}
-
-	compatInput := input
-	compatInput.ApplyToItemsMatchingFilters = nil
-	compatInput.FindFilter = nil
-	compatInput.ImageFilterAst = nil
-
-	if _, err := r.BulkImageUpdateJob(ctx, compatInput); err != nil {
-		return nil, err
-	}
-
-	return refetchBulkUpdateResults(ctx, imageIDs, r.getImage)
-}
-
 func (r *mutationResolver) ImageDestroy(ctx context.Context, input models.ImageDestroyInput) (ret bool, err error) {
 	imageID, err := strconv.Atoi(input.ID)
 	if err != nil {

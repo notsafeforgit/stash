@@ -270,24 +270,6 @@ func groupPartialFromBulkGroupUpdateInput(translator changesetTranslator, input 
 	return updatedGroup, nil
 }
 
-func (r *mutationResolver) BulkGroupUpdate(ctx context.Context, input BulkGroupUpdateInput) ([]*models.Group, error) {
-	groupIDs, err := stringslice.StringSliceToIntSlice(input.Ids)
-	if err != nil {
-		return nil, fmt.Errorf("converting ids: %w", err)
-	}
-
-	compatInput := input
-	compatInput.ApplyToItemsMatchingFilters = nil
-	compatInput.FindFilter = nil
-	compatInput.GroupFilterAst = nil
-
-	if _, err := r.BulkGroupUpdateJob(ctx, compatInput); err != nil {
-		return nil, err
-	}
-
-	return refetchBulkUpdateResults(ctx, groupIDs, r.getGroup)
-}
-
 func (r *mutationResolver) GroupDestroy(ctx context.Context, input GroupDestroyInput) (bool, error) {
 	id, err := strconv.Atoi(input.ID)
 	if err != nil {

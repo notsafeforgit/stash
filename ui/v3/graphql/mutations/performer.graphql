@@ -19,12 +19,8 @@ mutation PerformerUpdateImage($id: ID!, $image: EntityImageInput!) {
 
 mutation BulkPerformerUpdate($input: BulkPerformerUpdateInput!) {
   bulkPerformerUpdate(input: $input) {
-    ...PerformerData
+    ...BulkUpdateResultData
   }
-}
-
-mutation BulkPerformerUpdateJob($input: BulkPerformerUpdateInput!) {
-  bulkPerformerUpdateJob(input: $input)
 }
 
 mutation PerformerDestroy($id: ID!) {

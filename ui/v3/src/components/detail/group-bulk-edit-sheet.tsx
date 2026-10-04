@@ -1,3 +1,4 @@
+import { decodeEntityJobAcknowledgment } from "@/core/entity-job-invalidation";
 import { useBulkCustomFields } from "@/components/forms/use-bulk-custom-fields";
 import { useCommittedRef } from "@/hooks/use-committed-ref";
 import { useEffect, useRef, useState } from "react";
@@ -118,13 +119,9 @@ export function GroupBulkEditSheet({
     matching: applyToAll ? sheetApplyToAllTarget : undefined,
   });
 
-  const [bulkUpdateGroups, { loading: savingSync }] = useEntityMutation(
+  const [bulkUpdateGroups, { loading: saving }] = useEntityMutation(
     GQL.BulkGroupUpdateDocument,
   );
-  const [bulkUpdateGroupsJob, { loading: savingJob }] = useEntityMutation(
-    GQL.BulkGroupUpdateJobDocument,
-  );
-  const saving = savingSync || savingJob;
 
   const [tagOptions, setTagOptions] = useState<EntityOption[]>([]);
   const [searchTags, { data: tagData, loading: tagLoading }] = useLazyQuery(
@@ -160,16 +157,27 @@ export function GroupBulkEditSheet({
         currentApplyToAll,
         currentApplyToAllTarget,
       );
-      if (currentApplyToAll) {
-        await bulkUpdateGroupsJob({ variables: { input } });
+      const { data } = await bulkUpdateGroups({ variables: { input } });
+      const acknowledgment = decodeEntityJobAcknowledgment(
+        data?.bulkGroupUpdate,
+      );
+      if (acknowledgment.kind === "invalid") {
+        throw new Error(
+          intl.formatMessage({
+            id: "toast.invalid_bulk_update_result",
+            defaultMessage:
+              "The server did not confirm the bulk update. Check its status before retrying.",
+          }),
+        );
+      }
+      if (acknowledgment.kind === "scheduled") {
         toast.success(
           intl.formatMessage({
-            id: "toast.started_bulk_update",
-            defaultMessage: "Bulk update started",
+            id: "toast.queued_bulk_update",
+            defaultMessage: "Bulk update queued",
           }),
         );
       } else {
-        await bulkUpdateGroups({ variables: { input } });
         onSavedRef.current?.();
       }
       onOpenChange(false);

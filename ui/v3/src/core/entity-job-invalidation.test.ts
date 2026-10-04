@@ -6,7 +6,10 @@ import {
   gql,
 } from "@apollo/client";
 import { afterEach, expect, it, vi } from "vitest";
-import { invalidateAfterEntityJob } from "./entity-job-invalidation";
+import {
+  invalidateAfterEntityJob,
+  refetchAfterEntityMutation,
+} from "./entity-job-invalidation";
 
 afterEach(() => vi.useRealTimers());
 
@@ -58,9 +61,30 @@ it.each(["FINISHED", "FAILED", "CANCELLED"])(
     const scenes = client
       .watchQuery({ query: gql`query Scenes { findScenes { count } }` })
       .subscribe({});
-    const mutation = gql`mutation { bulkSceneUpdateJob(input: {}) }`;
-    invalidateAfterEntityJob(client, mutation, "1");
-    invalidateAfterEntityJob(client, mutation, "1");
+    const mutation = gql`mutation { result: bulkSceneUpdate(input: {}) { status job_id selected_count updated_ids } }`;
+    const result = {
+      result: {
+        status: "QUEUED",
+        job_id: "1",
+        selected_count: 2,
+        updated_ids: [],
+      },
+    };
+    expect(refetchAfterEntityMutation(client, mutation, result)).toEqual([]);
+    expect(refetchAfterEntityMutation(client, mutation, result)).toEqual([]);
+    // Inline results refresh immediately; malformed results conservatively refresh too.
+    const completed = {
+      result: {
+        status: "COMPLETED",
+        job_id: null,
+        selected_count: 1,
+        updated_ids: ["2"],
+      },
+    };
+    expect(
+      refetchAfterEntityMutation(client, mutation, completed),
+    ).toHaveLength(1);
+    expect(refetchAfterEntityMutation(client, mutation, null)).toHaveLength(1);
     await vi.advanceTimersByTimeAsync(0);
     expect(sceneRequests).toBe(1);
     expect(jobRequests).toBe(1);
@@ -75,16 +99,45 @@ it.each(["FINISHED", "FAILED", "CANCELLED"])(
   },
 );
 
-it("distinguishes synchronous acknowledgments and numeric jobs", async () => {
+it("distinguishes committed edits from queue admission and rejects contradictions", async () => {
   const { decodeEntityJobAcknowledgment } = await import(
     "./entity-job-invalidation"
   );
-  expect(decodeEntityJobAcknowledgment("sync")).toEqual({ kind: "completed" });
-  expect(decodeEntityJobAcknowledgment("12")).toEqual({
+  const completed = {
+    status: "COMPLETED",
+    job_id: null,
+    selected_count: 2,
+    updated_ids: ["1", "2"],
+  };
+  const queued = {
+    status: "QUEUED",
+    job_id: "12",
+    selected_count: 2,
+    updated_ids: [],
+  };
+  expect(decodeEntityJobAcknowledgment(completed)).toEqual({
+    kind: "completed",
+  });
+  expect(decodeEntityJobAcknowledgment(queued)).toEqual({
     kind: "scheduled",
     id: "12",
   });
-  for (const value of [null, "", "abc", "1.5", "-1", "9007199254740993"])
+  for (const value of [
+    null,
+    "sync",
+    "12",
+    {},
+    { ...completed, job_id: "12" },
+    { ...completed, updated_ids: ["1"] },
+    { ...completed, selected_count: -1 },
+    { ...queued, status: "FAILED" },
+    { ...queued, selected_count: 1.5 },
+    { ...queued, updated_ids: ["1"] },
+    ...[null, "", "abc", "1.5", "-1", "9007199254740993"].map((job_id) => ({
+      ...queued,
+      job_id,
+    })),
+  ])
     expect(decodeEntityJobAcknowledgment(value)).toEqual({ kind: "invalid" });
 });
 
@@ -109,7 +162,7 @@ it.each([1, 10])(
       ),
     });
     const refetch = vi.spyOn(client, "refetchQueries");
-    const mutation = gql`mutation { bulkSceneUpdateJob(input: {}) }`;
+    const mutation = gql`mutation { bulkSceneUpdate(input: {}) { status job_id selected_count updated_ids } }`;
     invalidateAfterEntityJob(client, mutation, "sync");
     await vi.advanceTimersByTimeAsync(0);
     expect(requests).toBe(0);
@@ -146,7 +199,7 @@ it("explicit disposal cancels a pending job retry", async () => {
   });
   const dispose = invalidateAfterEntityJob(
     client,
-    gql`mutation { bulkSceneUpdateJob(input: {}) }`,
+    gql`mutation { bulkSceneUpdate(input: {}) { status job_id selected_count updated_ids } }`,
     "9",
   );
   await vi.advanceTimersByTimeAsync(0);

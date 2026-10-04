@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	"github.com/stashapp/stash/internal/manager"
 	"github.com/stashapp/stash/internal/manager/config"
@@ -13,8 +12,8 @@ import (
 	"github.com/stashapp/stash/pkg/sliceutil/stringslice"
 )
 
-// Fork bulk operations. Legacy resolvers delegate here with explicit IDs;
-// only the additive job mutations may select items by filter.
+// Native bulk edits complete explicit IDs atomically or queue the selected
+// filter results. Both paths return an explicit completion acknowledgment.
 
 type groupBulkUpdateOperation struct {
 	groupService   manager.GroupService
@@ -37,16 +36,16 @@ func (o groupBulkUpdateOperation) Update(ctx context.Context, id int) error {
 	return err
 }
 
-func (r *mutationResolver) BulkGroupUpdateJob(ctx context.Context, input BulkGroupUpdateInput) (string, error) {
+func (r *mutationResolver) BulkGroupUpdate(ctx context.Context, input BulkGroupUpdateInput) (*BulkUpdateResult, error) {
 	groupIDs, err := stringslice.StringSliceToIntSlice(input.Ids)
 	if err != nil {
-		return "", fmt.Errorf("converting ids: %w", err)
+		return nil, fmt.Errorf("converting ids: %w", err)
 	}
 
 	useBackgroundJob := input.ApplyToItemsMatchingFilters != nil && *input.ApplyToItemsMatchingFilters
 	if useBackgroundJob {
 		if !hasBulkUpdateFilter(input.FindFilter, input.GroupFilterAst) {
-			return "", fmt.Errorf("group_filter_ast or find_filter.q is required when apply_to_items_matching_filters is true")
+			return nil, fmt.Errorf("group_filter_ast or find_filter.q is required when apply_to_items_matching_filters is true")
 		}
 
 		findFilter := sanitizeBulkUpdateFindFilter(input.FindFilter)
@@ -62,7 +61,7 @@ func (r *mutationResolver) BulkGroupUpdateJob(ctx context.Context, input BulkGro
 			return nil
 		})
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 	}
 
@@ -73,7 +72,7 @@ func (r *mutationResolver) BulkGroupUpdateJob(ctx context.Context, input BulkGro
 	// Populate group from the input
 	updatedGroup, err := groupPartialFromBulkGroupUpdateInput(translator, input)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	operation := groupBulkUpdateOperation{
@@ -98,7 +97,7 @@ func (r *mutationResolver) BulkGroupUpdateJob(ctx context.Context, input BulkGro
 			}
 			return nil
 		}); err != nil {
-			return "", err
+			return nil, err
 		}
 
 		for _, groupID := range groupIDs {
@@ -106,10 +105,10 @@ func (r *mutationResolver) BulkGroupUpdateJob(ctx context.Context, input BulkGro
 			r.hookExecutor.ExecutePostHooks(ctx, groupID, hook.MovieUpdatePost, input, translator.getFields())
 		}
 
-		return "sync", nil
+		return completedBulkUpdate(groupIDs), nil
 	}
 
 	jobID := r.enqueueBulkUpdate(ctx, "Bulk Group Update", groupIDs, operation, hook.GroupUpdatePost, input, translator.getFields())
 
-	return strconv.Itoa(jobID), nil
+	return queuedBulkUpdate(jobID, len(groupIDs)), nil
 }

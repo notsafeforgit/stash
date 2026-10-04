@@ -301,24 +301,6 @@ func (r *mutationResolver) StudioUpdate(ctx context.Context, input models.Studio
 	return r.getStudio(ctx, studioID)
 }
 
-func (r *mutationResolver) BulkStudioUpdate(ctx context.Context, input BulkStudioUpdateInput) ([]*models.Studio, error) {
-	ids, err := stringslice.StringSliceToIntSlice(input.Ids)
-	if err != nil {
-		return nil, fmt.Errorf("converting ids: %w", err)
-	}
-
-	compatInput := input
-	compatInput.ApplyToItemsMatchingFilters = nil
-	compatInput.FindFilter = nil
-	compatInput.StudioFilterAst = nil
-
-	if _, err := r.BulkStudioUpdateJob(ctx, compatInput); err != nil {
-		return nil, err
-	}
-
-	return refetchBulkUpdateResults(ctx, ids, r.getStudio)
-}
-
 func (r *mutationResolver) StudioDestroy(ctx context.Context, input StudioDestroyInput) (bool, error) {
 	id, err := strconv.Atoi(input.ID)
 	if err != nil {

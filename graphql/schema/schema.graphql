@@ -331,9 +331,8 @@ type Mutation {
   sceneCreate(input: SceneCreateInput!): Scene
   sceneUpdate(input: SceneUpdateInput!): Scene
   sceneMerge(input: SceneMergeInput!): Scene
-  bulkSceneUpdate(input: BulkSceneUpdateInput!): [Scene!]
-  "Runs a bulk scene update as a background job. Returns \"sync\" for an inline run or a job ID."
-  bulkSceneUpdateJob(input: BulkSceneUpdateInput!): String!
+  "Updates explicit IDs atomically or queues a filter selection; reports completion separately from admission."
+  bulkSceneUpdate(input: BulkSceneUpdateInput!): BulkUpdateResult!
   """
   Sets each scene's date to the mtime of its primary file. Returns "sync"
   for an inline run or a job ID when running in the background.
@@ -390,18 +389,16 @@ type Mutation {
 
   sceneMarkerCreate(input: SceneMarkerCreateInput!): SceneMarker
   sceneMarkerUpdate(input: SceneMarkerUpdateInput!): SceneMarker
-  bulkSceneMarkerUpdate(input: BulkSceneMarkerUpdateInput!): [SceneMarker!]
-  "Runs a bulk scene marker update as a background job. Returns \"sync\" for an inline run or a job ID."
-  bulkSceneMarkerUpdateJob(input: BulkSceneMarkerUpdateInput!): String!
+  "Updates explicit IDs atomically or queues a filter selection; reports completion separately from admission."
+  bulkSceneMarkerUpdate(input: BulkSceneMarkerUpdateInput!): BulkUpdateResult!
   sceneMarkerDestroy(id: ID!): Boolean!
   sceneMarkersDestroy(ids: [ID!]!): Boolean!
 
   sceneAssignFile(input: AssignSceneFileInput!): Boolean!
 
   imageUpdate(input: ImageUpdateInput!): Image
-  bulkImageUpdate(input: BulkImageUpdateInput!): [Image!]
-  "Runs a bulk image update as a background job. Returns \"sync\" for an inline run or a job ID."
-  bulkImageUpdateJob(input: BulkImageUpdateInput!): String!
+  "Updates explicit IDs atomically or queues a filter selection; reports completion separately from admission."
+  bulkImageUpdate(input: BulkImageUpdateInput!): BulkUpdateResult!
   """
   Sets each image's date to the mtime of its primary file. Returns "sync"
   for an inline run or a job ID when running in the background.
@@ -429,9 +426,8 @@ type Mutation {
 
   galleryCreate(input: GalleryCreateInput!): Gallery
   galleryUpdate(input: GalleryUpdateInput!): Gallery
-  bulkGalleryUpdate(input: BulkGalleryUpdateInput!): [Gallery!]
-  "Runs a bulk gallery update as a background job. Returns \"sync\" for an inline run or a job ID."
-  bulkGalleryUpdateJob(input: BulkGalleryUpdateInput!): String!
+  "Updates explicit IDs atomically or queues a filter selection; reports completion separately from admission."
+  bulkGalleryUpdate(input: BulkGalleryUpdateInput!): BulkUpdateResult!
   galleryDestroy(input: GalleryDestroyInput!): Boolean!
   galleriesUpdate(input: [GalleryUpdateInput!]!): [Gallery]
 
@@ -448,18 +444,16 @@ type Mutation {
   performerUpdate(input: PerformerUpdateInput!): Performer
   performerDestroy(input: PerformerDestroyInput!): Boolean!
   performersDestroy(ids: [ID!]!): Boolean!
-  bulkPerformerUpdate(input: BulkPerformerUpdateInput!): [Performer!]
-  "Runs a bulk performer update as a background job. Returns \"sync\" for an inline run or a job ID."
-  bulkPerformerUpdateJob(input: BulkPerformerUpdateInput!): String!
+  "Updates explicit IDs atomically or queues a filter selection; reports completion separately from admission."
+  bulkPerformerUpdate(input: BulkPerformerUpdateInput!): BulkUpdateResult!
   performerMerge(input: PerformerMergeInput!): Performer!
 
   studioCreate(input: StudioCreateInput!): Studio
   studioUpdate(input: StudioUpdateInput!): Studio
   studioDestroy(input: StudioDestroyInput!): Boolean!
   studiosDestroy(ids: [ID!]!): Boolean!
-  bulkStudioUpdate(input: BulkStudioUpdateInput!): [Studio!]
-  "Runs a bulk studio update as a background job. Returns \"sync\" for an inline run or a job ID."
-  bulkStudioUpdateJob(input: BulkStudioUpdateInput!): String!
+  "Updates explicit IDs atomically or queues a filter selection; reports completion separately from admission."
+  bulkStudioUpdate(input: BulkStudioUpdateInput!): BulkUpdateResult!
 
   movieCreate(input: MovieCreateInput!): Movie
     @deprecated(reason: "Use groupCreate instead")
@@ -469,19 +463,13 @@ type Mutation {
     @deprecated(reason: "Use groupDestroy instead")
   moviesDestroy(ids: [ID!]!): Boolean!
     @deprecated(reason: "Use groupsDestroy instead")
-  bulkMovieUpdate(input: BulkMovieUpdateInput!): [Movie!]
-    @deprecated(reason: "Use bulkGroupUpdate instead")
-  "Runs a bulk movie update as a background job. Returns \"sync\" for an inline run or a job ID."
-  bulkMovieUpdateJob(input: BulkMovieUpdateInput!): String!
-    @deprecated(reason: "Use bulkGroupUpdateJob instead")
 
   groupCreate(input: GroupCreateInput!): Group
   groupUpdate(input: GroupUpdateInput!): Group
   groupDestroy(input: GroupDestroyInput!): Boolean!
   groupsDestroy(ids: [ID!]!): Boolean!
-  bulkGroupUpdate(input: BulkGroupUpdateInput!): [Group!]
-  "Runs a bulk group update as a background job. Returns \"sync\" for an inline run or a job ID."
-  bulkGroupUpdateJob(input: BulkGroupUpdateInput!): String!
+  "Updates explicit IDs atomically or queues a filter selection; reports completion separately from admission."
+  bulkGroupUpdate(input: BulkGroupUpdateInput!): BulkUpdateResult!
 
   addGroupSubGroups(input: GroupSubGroupAddInput!): Boolean!
   removeGroupSubGroups(input: GroupSubGroupRemoveInput!): Boolean!
@@ -494,9 +482,8 @@ type Mutation {
   tagDestroy(input: TagDestroyInput!): Boolean!
   tagsDestroy(ids: [ID!]!): Boolean!
   tagsMerge(input: TagsMergeInput!): Tag
-  bulkTagUpdate(input: BulkTagUpdateInput!): [Tag!]
-  "Runs a bulk tag update as a background job. Returns \"sync\" for an inline run or a job ID."
-  bulkTagUpdateJob(input: BulkTagUpdateInput!): String!
+  "Updates explicit IDs atomically or queues a filter selection; reports completion separately from admission."
+  bulkTagUpdate(input: BulkTagUpdateInput!): BulkUpdateResult!
 
   """
   Moves the given files to the given destination. Returns true if successful.

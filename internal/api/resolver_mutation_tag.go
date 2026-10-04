@@ -217,24 +217,6 @@ func (r *mutationResolver) TagUpdate(ctx context.Context, input TagUpdateInput) 
 	return r.getTag(ctx, t.ID)
 }
 
-func (r *mutationResolver) BulkTagUpdate(ctx context.Context, input BulkTagUpdateInput) ([]*models.Tag, error) {
-	tagIDs, err := stringslice.StringSliceToIntSlice(input.Ids)
-	if err != nil {
-		return nil, fmt.Errorf("converting ids: %w", err)
-	}
-
-	compatInput := input
-	compatInput.ApplyToItemsMatchingFilters = nil
-	compatInput.FindFilter = nil
-	compatInput.TagFilterAst = nil
-
-	if _, err := r.BulkTagUpdateJob(ctx, compatInput); err != nil {
-		return nil, err
-	}
-
-	return refetchBulkUpdateResults(ctx, tagIDs, r.getTag)
-}
-
 func (r *mutationResolver) TagDestroy(ctx context.Context, input TagDestroyInput) (bool, error) {
 	tagID, err := strconv.Atoi(input.ID)
 	if err != nil {

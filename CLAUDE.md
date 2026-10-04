@@ -497,6 +497,16 @@ completion only describes the retained listing cursor, never historical
 coverage, accepted identity or import completion. This worker does not fetch,
 admit source jobs, publish metadata or release staging.
 
+Schema 1000073 adds application-only discovery activation previews and immutable
+operation receipts. Select original target ordinals/hashes and the exact legacy
+listing definition; the preview derives and pins current native post revisions.
+Apply repeats the plan check and commits the listing, all bindings and receipt
+together. Lost responses must reuse the saved operation and hash, even after
+later native edits or comparison progress. Never interpret activation as job
+admission, source coverage, accepted identity or import completion. Producer
+tokens cannot use the archive review routes. Operator client/UI and the detail,
+publication and staging-release workflow remain open.
+
 `stash-import-catalog-evidence` maps a received snapshot's posts, profiles and
 captures through core services in schema 1000031. It uses exact manifest/ordinal
 checkpoints, bounded transactions and immutable per-row outcomes. Preserve mirror

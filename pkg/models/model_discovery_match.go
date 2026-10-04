@@ -79,6 +79,9 @@ type DiscoveryComparisonCandidates struct {
 }
 
 type DiscoveryMatchReaderWriter interface {
+	PreviewActivation(context.Context, DiscoveryActivationInput) (*DiscoveryActivationPlan, error)
+	Activate(context.Context, DiscoveryActivationInput, string, time.Time) (*DiscoveryActivation, error)
+	Activation(context.Context, string) (*DiscoveryActivation, error)
 	BindTarget(context.Context, DiscoveryTargetInput, time.Time) (*DiscoveryMatchTarget, error)
 	Target(context.Context, string) (*DiscoveryMatchTarget, error)
 	Pending(context.Context, string, int, time.Time) (*DiscoveryComparisonCandidates, error)

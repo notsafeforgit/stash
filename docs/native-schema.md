@@ -2399,6 +2399,34 @@ Startup verifies original target bindings, page/result digests, record
 references and candidate aggregates. Normal backups retain the entire graph;
 anonymised exports remove it before removing its source evidence.
 
+### Reviewed discovery activation
+
+Schema 1000073 retains immutable `discovery_activations` and
+`discovery_activation_targets` receipts. A preview selects an exact imported
+manifest, legacy-backed listing definition and up to 1,000 original target
+ordinals/hashes. It resolves current native post revisions and pins them in the
+reviewed plan. The original account hash, saved cursor, historical page count,
+retry deadline, collection/root revision, worker policy and extractor remain
+part of the same review. Existing compatible listing and target bindings can be
+reused by another explicitly reviewed batch.
+
+Apply requires the preview hash and repeats its source/revision checks. It
+commits the shared listing, every selected target and the immutable operation
+receipt atomically. A late failure rolls back the whole batch; a changed native
+post or collection requires another preview. The same operation UUID and request
+return their original receipt after a lost response, later comparison progress,
+post forgetting or collection retirement. Different inputs cannot reuse that
+operation UUID. Backup/reopen validation checks the original receipt graph and
+anonymised exports remove it before removing comparison bindings.
+
+Activation creates no page jobs, fetches no source data and chooses no post
+identity. Scoped producers separately admit due listings. Application-only
+routes expose preview/apply/replay, retained listing summaries and the comparison
+targets, candidates and original record references. Producer tokens cannot use
+these review routes. See [activation API](native-ingestion.md#reviewed-discovery-activation).
+The API does not supply the remaining operator client/UI, historical-coverage
+resolution, detail execution, match publication or staging-release workflow.
+
 ## Durable account listing pages
 
 Schema 1000071 stores immutable discovery definitions in `discovery_listings`.

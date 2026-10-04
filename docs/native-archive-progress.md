@@ -6493,3 +6493,36 @@ Evidence is under `.local/native-discovery-match-20261004/` and
 storage/worker checkpoint only; separately developed activation changes still
 require their own checks. Production, `develop` and the frozen compatible release
 remain unchanged, and the full transition goal remains open.
+
+## Reviewed discovery activation API — 2026-10-04
+
+Schema 1000073 adds application-authorized preview/apply and immutable receipts
+for binding an explicit set of retained discovery targets to one account listing.
+The reviewed input pins the original snapshot manifest and target record hashes,
+saved account cursor/history and deadline, current collection/root, and worker
+policy/runtime. Preview derives the current native post revisions. Apply binds
+the listing, targets and receipt in one transaction; late failures roll back all
+of them. A repeated operation returns its original receipt after later native
+edits, including after a committed HTTP response was lost.
+
+Bounded application routes inspect the listing, page receipts, target progress,
+candidate post IDs and original evidence references. Producer credentials do not
+grant these review operations. Activation admits no source job and makes no
+identity, historical coverage, metadata publication or import-completion claim.
+
+Focused archive, SQLite migration/replay/corruption and real Go/Python HTTP
+checks pass. The HTTP fixture retains two targets, the saved cursor and 67
+historical pages, recovers a deliberately dropped committed response, and then
+compares three album attachments as one candidate per target. Tests also cover
+stale reviews, caught transaction errors, pre-commit changes, unknown migration
+objects and authorization boundaries. The full fork gate and independent
+schema-73 rehearsal are running; schema 72 remains the verified baseline.
+The copy check initially rejected the empty WAL created by opening SQLite
+read-only. No committed frames or main-database changes occurred; the corrected
+check treats an empty WAL as absence and the replacement backup passed.
+
+Evidence is under `.local/native-discovery-client-20261004/` and
+`.local/native-discovery-activation-20261004/`. The operator client/UI, activation
+of the real held accounts, historical coverage, detail execution, match
+publication and staging release remain open alongside the broader transition
+gates. Production and `develop` remain unchanged.

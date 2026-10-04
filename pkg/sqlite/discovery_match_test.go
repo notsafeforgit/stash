@@ -20,6 +20,7 @@ import (
 
 func removeDiscoveryMatchSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeDiscoveryActivationSchema(t, raw)
 	_, err := raw.Exec(`DROP TABLE discovery_match_evidence; DROP TABLE discovery_match_candidates; DROP TABLE discovery_match_pages;
  DROP TABLE discovery_match_targets; DELETE FROM native_migration_history WHERE version=1000072`)
 	require.NoError(t, err)

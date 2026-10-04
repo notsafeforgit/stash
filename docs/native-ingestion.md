@@ -776,6 +776,41 @@ necessary before host/n8n callers switch to native discovery. In particular, a
 retained nonfinal page is successful page delivery, not successful enumeration
 or a completed catalog import.
 
+### Reviewed discovery activation
+
+These application-authenticated routes live under `/api/v3/archive`; scoped
+producer credentials do not grant review or source administration.
+
+| Route | Behavior |
+| --- | --- |
+| `POST /discovery-activations/preview` | Preview one legacy-backed listing and 1–1,000 exact original target references. |
+| `POST /discovery-activations` | Apply `{input, expected_plan_sha256}` atomically, or replay the same saved operation. |
+| `GET /discovery-activations/{activation}` | Return the immutable activation receipt. |
+| `GET /discovery-listings/{listing}` | Inspect the original definition, including saved cursor and historical page count. |
+| `GET /discovery-listings/{listing}/pages` | Page through compact received-page receipts without loading source bodies. |
+| `GET /discovery-match-targets/{target}` | Inspect the original target binding and durable comparison progress. |
+| `GET /discovery-match-targets/{target}/candidates` | Inspect distinct candidate post IDs and their strongest retained evidence. |
+| `GET /discovery-match-candidates/{candidate}/evidence` | Inspect each original page's basis and record ordinals. |
+
+The preview input contains an operation `uuid`, `manifest_sha256`, a complete
+`listing` definition and `targets: [{source_ordinal, source_sha256}]`. The listing
+requires its original `legacy` snapshot/account reference, saved cursor/history
+and preserved retry deadline, with the explicitly selected current collection,
+root, worker policy and extractor. Preview derives current post UUIDs/revisions
+and includes them in its plan hash. Save the complete returned plan before Apply;
+after a lost response, inspect or retry that same operation and expected hash.
+An exact replay remains valid after later native edits, while changed input or
+new activation against stale source state returns `409 discovery_work_changed`.
+
+List routes accept nonnegative `after` and `limit` from 1 to 100. Candidate
+pagination uses `sequence`; page/evidence pagination uses the original page
+ordinal. All responses disable caching. A receipt proves only that reviewed
+bindings were retained. Producer admission, fetched-page receipts, compared
+listing completion and accepted post identity remain distinct states. Historical
+page counts do not become native receipt counts, and activation never certifies
+historical coverage or completed catalog import. Operator client/UI and the
+remaining detail/publication/release workflow are still being implemented.
+
 ## Completed file events
 
 A `file.completed` event is at most 16 KiB and has this shape:

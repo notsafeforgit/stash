@@ -5,10 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"strconv"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/stashapp/stash/pkg/archive"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/scrape"
@@ -26,7 +24,8 @@ type discoveryMatchSourceRow struct {
 }
 
 func discoveryTargetUUID(listing string, ordinal int64) string {
-	return uuid.NewSHA1(uuid.MustParse(listing), []byte("retained-discovery-target-v1\x00"+strconv.FormatInt(ordinal, 10))).String()
+	id, _ := archive.DiscoveryTargetIdentity(listing, ordinal)
+	return id
 }
 
 func discoveryMatchSource(get enrichmentGet, listing *models.DiscoveryListing, ordinal int64) (*discoveryMatchSourceRow, map[string]any, error) {

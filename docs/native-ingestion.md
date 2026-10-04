@@ -1028,7 +1028,8 @@ its retryable notification checkpoint.
 
 These application-authenticated routes live under `/api/v3/archive`; producer
 tokens do not grant access. The backend supports explicit review of imported
-catalog edits. Native UI controls are still being built.
+catalog edits. Scene and image pages expose these choices in their **Metadata
+review** section, available through desktop tabs and the mobile section menu.
 
 | Route | Result |
 | --- | --- |
@@ -1067,6 +1068,11 @@ retained values return `unsupported`. No new performer, account or relationship
 target is created by preview or apply. Studio, tag and group choices also use
 native UUIDs and reviewed target revisions.
 
+Name candidates also include their local library IDs. The UI shows names,
+disambiguation and those IDs, and can search existing performers, studios, tags
+and groups when a retained name has no suitable candidate. Selecting depicted
+metadata does not associate a source account with a performer.
+
 Only `ready` previews can be applied. Save the preview request plus its `digest`
 and a new `request_uuid` before posting to `/metadata-file-edits/apply`. Retry the
 exact saved body after a lost response, or inspect its receipt; a committed
@@ -1079,6 +1085,22 @@ permitted native policy updates it. The mode change is explicit in preview.
 Historical edits remain separate choices regardless of timestamps, duplicate
 content claims or file survivors. File/ZIP generations, ownership, selected
 entity revision and relationship candidates are checked again before commit.
+
+The browser journals each Apply body in IndexedDB before transmission. One
+pending choice per scene/image is shared across tabs, and separate public
+deployment prefixes have separate journals. Reopening the panel only reads
+state. **Check and retry saved change** inspects the original receipt before
+retrying the identical body. Uncertain responses and storage errors preserve the
+pending choice; a definitive stale-preview refusal permits **Review again**.
+Successful receipts remove the pending browser entry and refresh active library
+queries. A subsequent display-refresh failure does not turn a saved change into
+a failed Apply. Browser storage is temporary request recovery; committed choices
+and their provenance live in the native database and its backups.
+
+Application requests use same-origin session authentication and the public
+mount prefix. The Vite development proxy forwards `/api/v3/` while retaining the
+browser Host/Origin pair. These clients do not receive producer tokens, website
+credentials or plugin settings.
 
 ## Automatic source translations
 

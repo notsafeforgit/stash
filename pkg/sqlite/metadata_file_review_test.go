@@ -134,6 +134,7 @@ func TestMetadataFileReviewAmbiguousAliasesRequireExplicitSelection(t *testing.T
 	require.Equal(t, "unresolved_names", preview.Status)
 	require.Len(t, preview.Names, 2)
 	require.Len(t, preview.Names[0].Candidates, 2)
+	require.ElementsMatch(t, []int{71, 72}, []int{preview.Names[0].Candidates[0].LocalID, preview.Names[0].Candidates[1].LocalID})
 	require.Nil(t, preview.Names[0].Selected)
 	require.Nil(t, preview.Value)
 	_, _, err := applyFileEdit(f.repo, models.MetadataFileEditApplyInput{MetadataFileEditInput: input, RequestUUID: uuid.NewString(), Digest: preview.Digest})
@@ -142,6 +143,7 @@ func TestMetadataFileReviewAmbiguousAliasesRequireExplicitSelection(t *testing.T
 	input.Selections = map[string]models.MetadataNameSelection{"Shared": {UUID: selected.UUID, Revision: selected.Revision}, "Unmatched": {UUID: selected.UUID, Revision: selected.Revision}}
 	preview = previewFileEdit(t, f.repo, input)
 	require.Equal(t, "ready", preview.Status)
+	require.Equal(t, 72, preview.Names[0].Selected.LocalID)
 	require.JSONEq(t, fmt.Sprintf(`[%q]`, selected.UUID), string(preview.Value), "several aliases for one performer must not duplicate attribution")
 	_, _, err = applyFileEdit(f.repo, models.MetadataFileEditApplyInput{MetadataFileEditInput: input, RequestUUID: uuid.NewString(), Digest: preview.Digest})
 	require.NoError(t, err)
@@ -325,6 +327,7 @@ func TestMetadataFileReviewImageArchiveGenerationAndUnsupportedSceneField(t *tes
 	attachmentSQL(t, f.db, "UPDATE files SET size=size+1 WHERE id=22")
 	_, _, err = applyFileEdit(f.repo, models.MetadataFileEditApplyInput{MetadataFileEditInput: input, RequestUUID: uuid.NewString(), Digest: preview.Digest})
 	require.ErrorIs(t, err, models.ErrFileGenerationConflict)
+	require.ErrorIs(t, err, models.ErrMetadataFieldConflict)
 }
 
 func TestMetadataFileReviewCandidateOverflowCannotLookUnique(t *testing.T) {

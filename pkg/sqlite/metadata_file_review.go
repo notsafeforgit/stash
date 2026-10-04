@@ -109,6 +109,13 @@ func (s *MetadataFieldStore) PreviewFileEdit(ctx context.Context, input models.M
 	// Retained matches can outlive a file or its archive. Revalidate both
 	// generations and the original match basis before offering an editable choice.
 	if err := (&SourceFileStore{}).validateMatch(ctx, match); err != nil {
+		if errors.Is(err, models.ErrFileGenerationConflict) || errors.Is(err, models.ErrFileContentConflict) ||
+			errors.Is(err, models.ErrFilePathChanged) || errors.Is(err, models.ErrSourceFileEvidenceInvalid) {
+			// A previously ready choice can lose its file basis. Report the same
+			// definitive stale-preview refusal as an entity/relation change so a
+			// client can retire its rejected request and start a fresh review.
+			return nil, errors.Join(models.ErrMetadataFieldConflict, err)
+		}
 		return nil, err
 	}
 	entity, err := (&ArchiveEntityStore{}).Find(ctx, input.EntityUUID)
@@ -192,7 +199,7 @@ func fileEditNameCandidates(ctx context.Context, kind models.ArchiveEntityKind, 
 			if id == nil || id.State != models.ArchiveEntityActive {
 				return nil, models.ErrMetadataFieldConflict
 			}
-			ret = append(ret, models.MetadataNameCandidate{UUID: id.UUID, Revision: id.Revision, Name: performer.Name, Disambiguation: performer.Disambiguation})
+			ret = append(ret, models.MetadataNameCandidate{UUID: id.UUID, LocalID: performer.ID, Revision: id.Revision, Name: performer.Name, Disambiguation: performer.Disambiguation})
 		}
 		sort.Slice(ret, func(i, j int) bool { return ret[i].UUID < ret[j].UUID })
 		return ret, nil
@@ -208,7 +215,7 @@ func fileEditNameCandidates(ctx context.Context, kind models.ArchiveEntityKind, 
 	default:
 		return nil, models.ErrMetadataFileReviewInvalid
 	}
-	err := dbWrapper.Select(ctx, &ret, `SELECT e.uuid,e.revision,t.name,'' AS disambiguation FROM `+table+` t
+	err := dbWrapper.Select(ctx, &ret, `SELECT e.uuid,t.id AS local_id,e.revision,t.name,'' AS disambiguation FROM `+table+` t
  JOIN archive_entities e ON e.`+column+`=t.id AND e.state='active' WHERE t.name=? COLLATE NOCASE ORDER BY e.uuid LIMIT 101`, name)
 	return ret, err
 }
@@ -221,7 +228,7 @@ func fileEditSelectedName(ctx context.Context, kind models.ArchiveEntityKind, ch
 	if id == nil || id.State != models.ArchiveEntityActive || id.LocalID == nil || id.Kind != kind || id.Revision != choice.Revision {
 		return nil, models.ErrMetadataFieldConflict
 	}
-	ret := &models.MetadataNameCandidate{UUID: id.UUID, Revision: id.Revision}
+	ret := &models.MetadataNameCandidate{UUID: id.UUID, LocalID: *id.LocalID, Revision: id.Revision}
 	var query string
 	switch kind {
 	case models.ArchivePerformer:

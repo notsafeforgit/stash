@@ -29,6 +29,7 @@ type MetadataFileEditApplyInput struct {
 
 type MetadataNameCandidate struct {
 	UUID           string `json:"uuid" db:"uuid"`
+	LocalID        int    `json:"local_id" db:"local_id"`
 	Revision       int    `json:"revision" db:"revision"`
 	Name           string `json:"name" db:"name"`
 	Disambiguation string `json:"disambiguation,omitempty" db:"disambiguation"`

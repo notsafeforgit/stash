@@ -1,3 +1,4 @@
+import { NativeMetadataReview } from "@/components/detail/native-metadata-review";
 import { EntityActionButton } from "@/components/detail/entity-actions-menu";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -432,6 +433,21 @@ function SceneDetailPage() {
               />
             </DetailEditorLayout>
           }
+        />
+      ),
+    },
+    {
+      id: "metadata-review",
+      icon: History,
+      label: intl.formatMessage({
+        id: "archive_review.title",
+        defaultMessage: "Metadata review",
+      }),
+      content: (
+        <NativeMetadataReview
+          key={`scene:${scene.id}`}
+          kind="scene"
+          entity={scene}
         />
       ),
     },

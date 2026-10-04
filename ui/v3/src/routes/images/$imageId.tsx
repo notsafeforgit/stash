@@ -1,3 +1,4 @@
+import { NativeMetadataReview } from "@/components/detail/native-metadata-review";
 import { ImageViewer } from "@/components/detail/image-viewer";
 import { EntityActionButton } from "@/components/detail/entity-actions-menu";
 
@@ -19,6 +20,7 @@ import {
   Pencil,
   FileText,
   Info,
+  History,
 } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
 import { imageTitle } from "src/core/files";
@@ -282,6 +284,21 @@ function ImageDetailPage() {
               />
             </DetailEditorLayout>
           }
+        />
+      ),
+    },
+    {
+      id: "metadata-review",
+      icon: History,
+      label: intl.formatMessage({
+        id: "archive_review.title",
+        defaultMessage: "Metadata review",
+      }),
+      content: (
+        <NativeMetadataReview
+          key={`image:${image.id}`}
+          kind="image"
+          entity={image}
         />
       ),
     },

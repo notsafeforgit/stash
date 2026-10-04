@@ -32,8 +32,9 @@ new observation times to retained evidence. File edits, state changes and
 deduplication assertions now have native history, bounded import and inspection,
 while preserving current Stash selections. Historical metadata alternatives now
 have typed preview/application APIs, guarded relationship resolution and durable
-retry receipts. Their native review controls and the remaining import review
-resolution still require work.
+retry receipts. Scene/image review controls now expose those choices on desktop
+and mobile with saved-request recovery. Remaining import review resolution and
+the broader native management interfaces still require work.
 Native UI, live host/n8n conversion, compatibility removal, coordinated
 backup/export/restore, production cutover and retirement remain major release
 gates. The phase table below records that distinction; commit count is not a
@@ -5688,3 +5689,59 @@ Remaining work includes native review controls, other operational/policy import
 families, refreshed snapshots, additional adapters, host/n8n conversion,
 compatibility removal, coordinated recovery/export, performance and the reviewed
 production cutover. Production and `develop` remain unchanged.
+
+## Scene and image metadata review controls — 2026-10-03
+
+Scene and image pages now expose native Metadata review through the shared
+layout's desktop tabs and mobile section menu. The panel loads only the selected
+entity's current fields and a bounded page of file-linked historical edits.
+Current protection and field decisions are expandable; individual alternatives
+and their previews load on demand. Applying a choice refreshes active affected
+library queries. Unrelated configuration and plugin settings are not included.
+
+Previews compare current and proposed values and explain replacement of a
+protected choice or release to automatic updates. Performer candidates show
+canonical names, disambiguation and local library IDs. Ambiguous or missing
+names require explicit choices, including a search for a differently named
+existing performer. Studios, tags and groups use the same typed selection path.
+Unknown retained fields remain unsupported. This is depicted metadata review,
+not source-account ownership or a performer merge.
+
+A deployment-scoped IndexedDB journal saves each exact Apply body before any
+transmission. Transactions coordinate tabs and retain one unresolved choice per
+scene/image. Opening the panel does not send mutations. Recovery checks the
+original receipt before replaying the saved body, including after a page reload.
+Mismatched receipts, uncertain responses and storage failures retain the pending
+request. Only a definitive stale-preview refusal permits starting a new review.
+Changed files and ZIP containers now report that refusal consistently, while
+preserving the underlying repository error. Display refresh failures remain
+separate from a successfully committed choice.
+
+The final v3 validation gate passed with 540 tests, generation, type checks,
+formatting, locales and retained contracts. The embedded v3 build and Go asset
+checks passed. Eighteen browser checks passed in 28.7 seconds using the cached
+version-matched Playwright image,
+covering scene/image pages on desktop/mobile, ambiguous and unmatched names,
+lost-response recovery, stale previews, multiple tabs and two deployment prefixes
+on one origin. Chromium and WebKit screenshots were inspected. The initial host
+browser invocation lacked its browser binaries; the cached container supplied
+both engines without another browser installation.
+
+The full fork gate passed in 976.756 seconds, including Go lint/integration tests
+and all 391 producer tests. A subsequent UI refinement uses secure random bytes
+for request UUIDs on LAN HTTP deployments where randomUUID is unavailable; the
+final v3 gate, browser run, build and Go embedding checks above include it.
+Schema stays 1000067 and this change requires no additional full-size rehearsal
+database. Evidence is under `.local/native-metadata-ui-20261003/`.
+
+Cleanup removed the closed schema-66 predecessor and temporary tests, reclaiming
+20,307,513,344 bytes. Five unused intermediate native n8n rehearsal image tags
+were removed while retaining the latest verified image. After the checks, 29
+closed temporary test files were also removed; about 189 GiB was free with the
+50 GiB reserve in force. Original compatible/frozen migration inputs and the
+verified schema-67 copy remain.
+
+Broader source/account/collection management, remaining import/policy families,
+source adapters, live host/n8n conversion, compatibility removal, coordinated
+recovery/export, performance and reviewed production cutover remain open.
+Production and `develop` remain unchanged.

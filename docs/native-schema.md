@@ -1066,7 +1066,10 @@ after-commit contract and are not registered again for a committed retry.
 Normal database backups retain the receipts; anonymisation removes them before
 their private source history. Migration creates no reviews and changes no
 selected fields. The [application API](native-ingestion.md#historical-metadata-review-api)
-is implemented; native review controls remain transition work.
+and scene/image review controls are implemented. The review controls use the
+shared mobile section menu and retain uncertain Apply requests across browser
+reloads. Broader account, source and migration review interfaces remain
+transition work.
 
 ## Retained source documents
 

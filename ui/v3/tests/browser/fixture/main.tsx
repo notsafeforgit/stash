@@ -1,3 +1,4 @@
+import { MetadataReviewFixture } from "./metadata-review";
 import { Pencil, Wand2, RotateCw, RotateCcw } from "lucide-react";
 import {
   EntityActionButton,
@@ -369,6 +370,11 @@ const router = createRouter({
       getParentRoute: () => rootRoute,
       path: "/motion-viewer",
       component: MotionViewerFixture,
+    }),
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/metadata-review",
+      component: MetadataReviewFixture,
     }),
     createRoute({
       getParentRoute: () => rootRoute,

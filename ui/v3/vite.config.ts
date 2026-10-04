@@ -41,6 +41,9 @@ export default defineConfig({
       const backend =
         process.env.VITE_APP_PLATFORM_URL ?? "http://127.0.0.1:8010";
       return {
+        // Native administration requires same-origin session requests. Preserve
+        // the browser Host/Origin pair through this development proxy.
+        "/api/v3/": { target: backend, changeOrigin: false },
         "/graphql": { target: backend, ws: true },
         "/share": backend,
         "/scene/": backend,

@@ -802,6 +802,10 @@ after a lost response, inspect or retry that same operation and expected hash.
 An exact replay remains valid after later native edits, while changed input or
 new activation against stale source state returns `409 discovery_work_changed`.
 
+`GET /collections/{collection}` retrieves the selected collection's current
+definition directly for review, including its revision, state and root binding.
+It uses application authentication and returns 404 for an unknown UUID.
+
 List routes accept nonnegative `after` and `limit` from 1 to 100. Candidate
 pagination uses `sequence`; page/evidence pagination uses the original page
 ordinal. All responses disable caching. A receipt proves only that reviewed

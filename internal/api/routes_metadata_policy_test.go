@@ -49,6 +49,14 @@ func TestNativeMetadataHTTPPreviewApplyAndSchema(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	var collection models.SourceCollection
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &collection))
+	w = request(http.MethodGet, "/collections/"+collection.UUID, nil)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var found models.SourceCollection
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &found))
+	require.Equal(t, collection, found)
+	require.Equal(t, "no-store", w.Header().Get("Cache-Control"))
+	require.Equal(t, http.StatusBadRequest, request(http.MethodGet, "/collections/not-a-uuid", nil).Code)
+	require.Equal(t, http.StatusNotFound, request(http.MethodGet, "/collections/00000000-0000-4000-8000-000000000001", nil).Code)
 	var entity, file *models.ArchiveEntity
 	require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
 		_, _, err := db.ExecSQL(ctx, `INSERT INTO folders(id,path,basename,mod_time,created_at,updated_at) VALUES(1,?,'manual',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`, []interface{}{dir})

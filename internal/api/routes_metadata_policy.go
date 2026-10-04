@@ -63,6 +63,7 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Put("/media-roots/{root}", rs.putRoot)
 	r.Get("/collections", rs.collections)
 	r.Post("/collections", rs.putCollection)
+	r.Get("/collections/{collection}", rs.collection)
 	r.Put("/collections/{collection}", rs.putCollection)
 	r.Get("/collections/{collection}/post-memberships", rs.collectionPostMemberships)
 	r.Get("/posts/{post}/collection-memberships", rs.postCollectionMemberships)

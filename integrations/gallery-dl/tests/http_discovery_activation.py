@@ -76,7 +76,7 @@ def run():
     assert imported["mapped_records"] == 3 and imported["review_records"] == 0, imported
 
     client = DiscoveryActivationClient(setup["endpoint"])
-    collection = next(c for c in client.request("GET", "/collections?limit=100") if c["uuid"] == uploaded["collection_uuid"])
+    collection = client.request("GET", "/collections/" + uploaded["collection_uuid"])
     definition = {k: v for k, v in collection.items() if k in {"label", "kind", "namespace", "target_url", "account_uuid", "root_uuid", "path_prefix"}}
     definition.update(state="active", expected_revision=collection["revision"], reason="Reviewed discovery fixture collection")
     collection = client.request("PUT", "/collections/" + collection["uuid"], definition)

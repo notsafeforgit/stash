@@ -1317,7 +1317,8 @@ target details come from the discovery-import routes above; targets must belong
 to that account and collection. Preserve the original profile URL, cursor,
 historical count and retry deadline. Use `initial_cursor: null` when no cursor
 was retained. Select the reviewed current collection revision and its actual
-root, which may be null; imported collections start disabled. Worker policy and
+root, which may be null; `GET /api/v3/archive/collections/{collection}` retrieves
+that current definition directly. Imported collections start disabled. Worker policy and
 runtime come from the producer's profile inspection command:
 
 ```sh

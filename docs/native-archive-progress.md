@@ -6573,3 +6573,37 @@ for 37 and 30 historical pages, with no staged account-page bodies. This audit
 does not activate the accounts or prove source coverage. The schema-73 migration
 rehearsal is still running; retain schema 72 until independent reconciliation
 and reopen checks pass.
+
+## Real discovery activation rehearsal — 2026-10-04
+
+The independent schema-73 migration comparison passed: all 262 pre-existing
+data tables and generated columns match, the 6,744 frozen discovery records are
+intact, integrity is clean and there are no foreign-key violations. Checkpoint
+`4c9a72d02` also passed Build and Lint CI; preview-image publication is still
+running.
+
+The shipped operator command then bound the six retained account batches on that
+isolated copy, preserving all 569 original target hashes, account references and
+post revisions. All six review files were durable before binding began. A
+deliberately lost committed response recovered through the original receipt,
+and repeated Apply/status preserved every saved file. Client execution took
+2.8 seconds after the database opened in 120 seconds. No source job was admitted
+or website contacted. These bindings do not accept post identities or establish
+coverage of the two saved cursors' 67 historical pages.
+
+The rehearsal derives metadata-only Reddit/Twitter profiles from the previously
+staged host configuration, keeping private credential references local and
+pinning the actual worker policy/runtime. One previously disabled collection
+received an explicit rehearsal revision; the other five retained their current
+definitions. `GET /api/v3/archive/collections/{collection}` now retrieves that
+selected definition directly. The metadata and activation HTTP checks pass in
+14 seconds, and Go lint reports zero issues.
+
+An independent receipt-graph check verifies the six operations, all 569 original
+records, deterministic target UUIDs, native post revisions, hashes and saved
+cursor/deadline values. Full reconciliation after those writes and a populated
+archive reopen remain in progress; schema 72 remains the verified baseline until
+they pass. Evidence is under `.local/native-discovery-activation-20261004/` and
+`.local/native-discovery-client-20261004/`. Production, the frozen compatible
+release and `develop` remain unchanged. Historical coverage, detail execution,
+publication, staging release and the broader plan's remaining gates remain open.

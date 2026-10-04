@@ -73,6 +73,28 @@ func (rs *nativeArchiveRoutes) collections(w http.ResponseWriter, r *http.Reques
 	ingestJSON(w, http.StatusOK, result)
 }
 
+func (rs *nativeArchiveRoutes) collection(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "collection")
+	if !ingest.ValidUUID(id) {
+		ingestError(w, ingest.ErrInvalid)
+		return
+	}
+	var result *models.SourceCollection
+	err := rs.repo.WithReadTxn(r.Context(), func(ctx context.Context) error {
+		var err error
+		result, err = rs.repo.SourceCollection.Find(ctx, id)
+		if err == nil && result == nil {
+			return ingest.ErrNotFound
+		}
+		return err
+	})
+	if err != nil {
+		nativeArchiveError(w, err)
+		return
+	}
+	ingestJSON(w, http.StatusOK, result)
+}
+
 func (rs *nativeArchiveRoutes) putCollection(w http.ResponseWriter, r *http.Request) {
 	var input models.SourceCollectionInput
 	if err := readIngestJSON(w, r, 24576, &input); err != nil {

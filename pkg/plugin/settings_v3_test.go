@@ -46,7 +46,8 @@ func TestJQLimitsAndIsolation(t *testing.T) {
 }
 
 func TestSettingManifestAndValidation(t *testing.T) {
-	c, err := loadPluginFromYAML(strings.NewReader(`name: Fixture
+	c, err := loadPluginFromYAML(strings.NewReader(`apiVersion: 3
+name: Fixture
 settings:
   enabled:
     type: BOOLEAN
@@ -68,16 +69,16 @@ settings:
 `))
 	require.NoError(t, err)
 	p := c.toPlugin()
-	values := p.SettingsValues(map[string]interface{}{"enabled": true, "unrelated": "kept"})
+	values := p.SettingsValuesV3(map[string]interface{}{"enabled": true, "unrelated": "kept"})
 	require.Equal(t, true, values["enabled"])
 	require.Equal(t, 0, values["amount"])
 	require.Equal(t, "import", values["mode"])
-	require.NoError(t, p.ValidateSettings(map[string]interface{}{"enabled": false, "amount": 2.5, "mode": "both", "mappings": `{"clear":"null","skip":"empty"}`}, nil))
+	require.NoError(t, p.ValidateSettingsV3(map[string]interface{}{"enabled": false, "amount": 2.5, "mode": "both", "mappings": `{"clear":"null","skip":"empty"}`}, nil))
 	for key, value := range map[string]interface{}{"enabled": "false", "amount": "2", "mode": "bad", "mappings": `{"bad":".["}`, "unknown": true} {
-		require.Error(t, p.ValidateSettings(map[string]interface{}{key: value}, nil))
+		require.Error(t, p.ValidateSettingsV3(map[string]interface{}{key: value}, nil))
 	}
-	require.Error(t, p.ValidateSettings(nil, []string{"unknown"}))
-	require.Error(t, p.ValidateSettings(map[string]interface{}{"mode": "import"}, []string{"mode"}))
-	_, err = loadPluginFromYAML(strings.NewReader("name: Fixture\nsettings:\n  bad:\n    type: STRING\n    editor: JQ_MAP\n    default: 'null'\n"))
+	require.Error(t, p.ValidateSettingsV3(nil, []string{"unknown"}))
+	require.Error(t, p.ValidateSettingsV3(map[string]interface{}{"mode": "import"}, []string{"mode"}))
+	_, err = loadPluginFromYAML(strings.NewReader("apiVersion: 3\nname: Fixture\nsettings:\n  bad:\n    type: STRING\n    editor: JQ_MAP\n    default: 'null'\n"))
 	require.Error(t, err)
 }

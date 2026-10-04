@@ -79,7 +79,7 @@ together. Remove old adapters only after converting their consumers, including
 host/n8n jobs, installed plugins, offline/share entry points, and backup tools.
 Preserve intentional public media/share URLs and standalone/offline behavior.
 
-New plugins use [`apiVersion: 3`](docs/plugin-manifests.md). Retain typed settings,
+Plugins must declare [`apiVersion: 3`](docs/plugin-manifests.md). Retain typed settings,
 schema-constrained mappings, UI contributions on desktop/mobile, capability
 negotiation, jq evaluation, and notifications after successful changes. Hooks
 cannot veto committed changes. Native archive consistency must not depend on

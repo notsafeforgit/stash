@@ -6,13 +6,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/stashapp/stash/pkg/plugin/hook"
 	"github.com/stashapp/stash/pkg/python"
 	"github.com/stashapp/stash/pkg/utils"
-	"gopkg.in/yaml.v2"
 )
 
 // Config describes the configuration for a single plugin.
@@ -62,11 +60,8 @@ type Config struct {
 	// The hooks configurations for hooks registered by this plugin.
 	Hooks []*HookConfig `yaml:"hooks"`
 
-	// Javascript files that will be injected into the stash UI.
+	// Native browser module, dependencies and served assets.
 	UI UIConfig `yaml:"ui"`
-
-	// Settings that will be used to configure the plugin.
-	Settings map[string]SettingConfig `yaml:"settings"`
 }
 
 type PluginCSP struct {
@@ -90,18 +85,7 @@ type UIConfig struct {
 	// route, so the file must be reachable beneath one of the assets
 	// mappings (typically `assets: { "/": "./dist" }` exposes a built
 	// `index.js` at `/plugin/{id}/assets/index.js`).
-	//
-	// Plugins targeting v2.5 (DOM-patcher pattern) leave this unset and
-	// continue to use Javascript[] / CSS[]; v3 ignores them.
 	Entry string `yaml:"entry"`
-
-	// Javascript files that will be injected into the stash UI.
-	// These may be URLs or paths to files relative to the plugin configuration file.
-	Javascript []string `yaml:"javascript"`
-
-	// CSS files that will be injected into the stash UI.
-	// These may be URLs or paths to files relative to the plugin configuration file.
-	CSS []string `yaml:"css"`
 
 	// Assets is a map of URL prefixes to hosted directories.
 	// This allows plugins to serve static assets from a URL path.
@@ -115,63 +99,6 @@ type UIConfig struct {
 	// /plugin/{pluginId}/assets/bar/file.txt -> {pluginDir}/baz/file.txt
 	// /plugin/{pluginId}/assets/file.txt -> {pluginDir}/root/file.txt
 	Assets utils.URLMap `yaml:"assets"`
-}
-
-func isURL(s string) bool {
-	return strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://")
-}
-
-func (c UIConfig) getCSSFiles(parent Config) []string {
-	var ret []string
-	for _, v := range c.CSS {
-		if !isURL(v) {
-			ret = append(ret, filepath.Join(parent.getConfigPath(), v))
-		}
-	}
-
-	return ret
-}
-
-func (c UIConfig) getExternalCSS() []string {
-	var ret []string
-	for _, v := range c.CSS {
-		if isURL(v) {
-			ret = append(ret, v)
-		}
-	}
-
-	return ret
-}
-
-func (c UIConfig) getJavascriptFiles(parent Config) []string {
-	var ret []string
-	for _, v := range c.Javascript {
-		if !isURL(v) {
-			ret = append(ret, filepath.Join(parent.getConfigPath(), v))
-		}
-	}
-
-	return ret
-}
-
-func (c UIConfig) getExternalScripts() []string {
-	var ret []string
-	for _, v := range c.Javascript {
-		if isURL(v) {
-			ret = append(ret, v)
-		}
-	}
-
-	return ret
-}
-
-type SettingConfig struct {
-	SettingOptions `yaml:",inline"`
-	// defaults to string
-	Type PluginSettingTypeEnum `yaml:"type"`
-	// defaults to key name
-	DisplayName string `yaml:"displayName"`
-	Description string `yaml:"description"`
 }
 
 func (c Config) getPluginTasks(includePlugin bool) []*PluginTask {
@@ -220,37 +147,6 @@ func convertHooks(hooks []hook.TriggerEnum) []string {
 	return ret
 }
 
-func (c Config) getPluginSettings() []PluginSetting {
-	ret := []PluginSetting{}
-
-	var keys []string
-	for k := range c.Settings {
-		keys = append(keys, k)
-	}
-
-	sort.Strings(keys)
-
-	for _, k := range keys {
-		o := c.Settings[k]
-		t := o.Type
-		if t == "" {
-			t = PluginSettingTypeEnumString
-		}
-
-		s := PluginSetting{
-			SettingOptions: o.SettingOptions,
-			Name:           k,
-			DisplayName:    o.DisplayName,
-			Description:    o.Description,
-			Type:           t,
-		}
-
-		ret = append(ret, s)
-	}
-
-	return ret
-}
-
 func (c Config) getName() string {
 	if c.Name != "" {
 		return c.Name
@@ -261,7 +157,7 @@ func (c Config) getName() string {
 
 func (c Config) toPlugin() *Plugin {
 	return &Plugin{
-		APIVersion:   c.apiVersion(),
+		APIVersion:   3,
 		SettingsV3:   c.settingsV3(),
 		OperationsV3: c.operationsV3(),
 		ID:           c.id,
@@ -272,16 +168,11 @@ func (c Config) toPlugin() *Plugin {
 		Tasks:        c.getPluginTasks(false),
 		Hooks:        c.getPluginHooks(false),
 		UI: PluginUI{
-			Requires:       c.UI.Requires,
-			Entry:          c.UI.Entry,
-			ExternalScript: c.UI.getExternalScripts(),
-			ExternalCSS:    c.UI.getExternalCSS(),
-			Javascript:     c.UI.getJavascriptFiles(c),
-			CSS:            c.UI.getCSSFiles(c),
-			CSP:            c.UI.CSP,
-			Assets:         c.UI.Assets,
+			Requires: c.UI.Requires,
+			Entry:    c.UI.Entry,
+			CSP:      c.UI.CSP,
+			Assets:   c.UI.Assets,
 		},
-		Settings:   c.getPluginSettings(),
 		ConfigPath: c.path,
 	}
 }
@@ -347,15 +238,6 @@ func (c Config) getExecCommand(task *OperationConfig) []string {
 func (c Config) valid() error {
 	if c.Interface != "" && !c.Interface.Valid() {
 		return fmt.Errorf("invalid interface type %s", c.Interface)
-	}
-
-	for k, o := range c.Settings {
-		if o.Type != "" && !o.Type.IsValid() {
-			return fmt.Errorf("invalid type %s for setting %s", k, o.Type)
-		}
-		if err := o.validateDefinition(); err != nil {
-			return fmt.Errorf("setting %s: %w", k, err)
-		}
 	}
 
 	return nil
@@ -430,27 +312,6 @@ type HookConfig struct {
 
 func loadPluginFromYAML(reader io.Reader) (*Config, error) {
 	return decodePluginManifest(reader)
-}
-
-func loadLegacyPluginFromYAML(reader io.Reader) (*Config, error) {
-	ret := &Config{}
-
-	parser := yaml.NewDecoder(reader)
-	parser.SetStrict(true)
-	err := parser.Decode(&ret)
-	if err != nil {
-		return nil, err
-	}
-
-	if ret.Interface == "" {
-		ret.Interface = InterfaceEnumRaw
-	}
-
-	if err := ret.valid(); err != nil {
-		return nil, err
-	}
-
-	return ret, nil
 }
 
 func loadPluginFromYAMLFile(path string) (*Config, error) {

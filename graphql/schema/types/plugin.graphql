@@ -1,55 +1,3 @@
-type PluginPaths {
-  # path to javascript files
-  javascript: [String!]
-  # path to css files
-  css: [String!]
-  """
-  Absolute URL to the v3 ESM entry module, when the plugin manifest
-  declares `ui.entry`. Null for v2.5-style plugins.
-  """
-  entry: String
-}
-
-type Plugin {
-  id: ID!
-  name: String!
-  description: String
-  url: String
-  version: String
-
-  enabled: Boolean!
-
-  tasks: [PluginTask!]
-  hooks: [PluginHook!]
-  settings: [PluginSetting!]
-
-  """
-  Plugin IDs of plugins that this plugin depends on.
-  Applies only for UI plugins to indicate css/javascript load order.
-  """
-  requires: [ID!]
-
-  paths: PluginPaths!
-}
-
-type PluginTask {
-  name: String!
-  description: String
-  plugin: Plugin!
-}
-
-type PluginHook {
-  name: String!
-  description: String
-  hooks: [String!]
-  plugin: Plugin!
-}
-
-type PluginResult {
-  error: String
-  result: String
-}
-
 input PluginArgInput {
   key: String!
   value: PluginValueInput
@@ -62,19 +10,6 @@ input PluginValueInput {
   f: Float
   o: [PluginArgInput!]
   a: [PluginValueInput!]
-}
-
-enum PluginSettingTypeEnum {
-  STRING
-  NUMBER
-  BOOLEAN
-}
-
-type PluginSetting {
-  name: String!
-  display_name: String
-  description: String
-  type: PluginSettingTypeEnum!
 }
 
 """

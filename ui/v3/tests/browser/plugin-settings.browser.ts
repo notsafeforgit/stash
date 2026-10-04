@@ -6,6 +6,15 @@ for (const width of [390, 1440]) {
   }, testInfo) => {
     await page.setViewportSize({ width, height: 1000 });
     await page.goto("/plugin-settings.html");
+    await expect(page.getByRole("alert")).toContainText(
+      "Some plugins could not be loaded",
+    );
+    await expect(page.getByRole("alert")).toContainText(
+      "community/legacy-plugin.yml",
+    );
+    await expect(page.getByRole("alert")).toContainText(
+      "requires apiVersion: 3",
+    );
     const target = page.getByRole("combobox", { name: "Target field" });
     await expect(target.locator('[data-slot="select-value"]')).toHaveText(
       "Title",

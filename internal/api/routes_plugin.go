@@ -22,8 +22,6 @@ func (rs pluginRoutes) Routes() chi.Router {
 		r.Use(rs.PluginCtx)
 		r.Get("/assets", rs.Assets)
 		r.Get("/assets/*", rs.Assets)
-		r.Get("/javascript", rs.Javascript)
-		r.Get("/css", rs.CSS)
 	})
 
 	return r
@@ -63,30 +61,6 @@ func (rs pluginRoutes) Assets(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.FileServer(http.Dir(dir)).ServeHTTP(w, r)
-}
-
-func (rs pluginRoutes) Javascript(w http.ResponseWriter, r *http.Request) {
-	p := r.Context().Value(pluginKey).(*plugin.Plugin)
-
-	if !p.Enabled {
-		http.Error(w, "plugin disabled", http.StatusBadRequest)
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/javascript")
-	serveFiles(w, r, p.UI.Javascript)
-}
-
-func (rs pluginRoutes) CSS(w http.ResponseWriter, r *http.Request) {
-	p := r.Context().Value(pluginKey).(*plugin.Plugin)
-
-	if !p.Enabled {
-		http.Error(w, "plugin disabled", http.StatusBadRequest)
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/css")
-	serveFiles(w, r, p.UI.CSS)
 }
 
 func (rs pluginRoutes) PluginCtx(next http.Handler) http.Handler {

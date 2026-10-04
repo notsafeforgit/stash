@@ -1,3 +1,4 @@
+apiVersion: 3
 # example plugin config
 name: Hawwwwt Tagger (Javascript edition)
 description: Javascript Hawwwwt tagging utility (using raw interface).
@@ -30,7 +31,7 @@ hooks:
     triggeredBy: 
       - SceneMarker.Create.Post
       - SceneMarker.Update.Post
-      - SceneMarker.Delete.Post
+      - SceneMarker.Destroy.Post
       - Scene.Create.Post
       - Scene.Update.Post
       - Scene.Destroy.Post
@@ -40,9 +41,9 @@ hooks:
       - Gallery.Create.Post
       - Gallery.Update.Post
       - Gallery.Destroy.Post
-      - Movie.Create.Post
-      - Movie.Update.Post
-      - Movie.Destroy.Post
+      - Group.Create.Post
+      - Group.Update.Post
+      - Group.Destroy.Post
       - Performer.Create.Post
       - Performer.Update.Post
       - Performer.Destroy.Post

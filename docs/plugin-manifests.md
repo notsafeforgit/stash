@@ -1,6 +1,6 @@
 # Versioned plugin manifests
 
-New plugins target the v3 plugin API by declaring `apiVersion: 3` in their
+All plugins target the v3 plugin API by declaring `apiVersion: 3` in their
 `<plugin-id>.yml` manifest. They do not need to implement v2.5 plugin APIs,
 settings types, browser scripts, or fallback behavior. Plugin IDs still come
 from filenames; `version` is the plugin's release version and is independent
@@ -23,12 +23,16 @@ settings:
       title: .stash.title
 ```
 
-The versioned manifest has its own strict parser. Unsupported versions and
-unknown fields fail with a load error; they never silently fall back to a
-legacy interpretation. Omit `apiVersion` for an existing legacy manifest.
-That format continues to work through a host adapter, with its existing
-settings representation. Do not add v3 features to the legacy manifest or
-GraphQL plugin types.
+The versioned manifest has a strict parser. Missing or unsupported versions,
+unknown fields and legacy UI injection fields fail with a load error. Rejected
+manifests cannot register tasks, hooks or browser modules. **Settings → Plugins**
+shows the manifest path and reason; `pluginLoadErrorsV3` exposes the same results
+from the latest reload. Correct or remove a manifest and reload plugins to clear
+its diagnostic. Saved settings are retained, including for rejected plugins.
+
+Unversioned plugins require an explicit port to this contract. The frozen
+`v2.5-compatible-final` release retains their old runtime; the native application
+does not adapt them.
 
 ## Backend and browser plugins
 
@@ -46,7 +50,7 @@ have backend tasks, hooks, and native settings controls.
 The browser host's `host.version` versions its JavaScript registration API;
 it remains `1`. It is separate from manifest `apiVersion: 3`.
 
-## API separation
+## Supported API
 
 The v3 UI and browser host use:
 
@@ -55,21 +59,12 @@ The v3 UI and browser host use:
 - `pluginSettingsV3` / `PluginSettingV3` for definitions and effective values.
 - `updatePluginSettingsV3` for validated, atomic settings patches.
 
-These types are independent of `Plugin`, `PluginSetting`, their enums, and
-their nested types. Required fields and new setting types on the v3 contract
-do not change generated v2.5 plugin models. The original `plugins` and
-`pluginTasks` queries expose only unversioned plugins. Legacy settings
-endpoints direct versioned plugins to their v3 equivalents.
-
-The unversioned `pluginSettings` endpoint returns `PluginSettingDefinition`
-metadata with a required `options` list. This metadata does not extend the
-original v2.5 `PluginSetting` type, so neither settings contract needs nullable
-options to accommodate v2.5 generated clients.
-
-The v3 API adapts unversioned plugins so they remain manageable in v3. This
-adapter is the host's responsibility; v3 plugin authors do not write one.
-Shared task execution, entity mutations, jq evaluation, and committed hooks
-remain available to both generations.
+The old `plugins`, `pluginTasks`, `pluginSettings` and `updatePluginSettings`
+fields and their settings/discovery types have been removed. Native task
+execution, entity mutations, jq evaluation and committed hooks remain available.
+Plugin asset URLs continue to serve ESM modules and associated files; the
+`/plugin/{id}/javascript` and `/plugin/{id}/css` concatenation endpoints are gone.
+Use `ui.csp` to declare any additional browser resource origins.
 
 `type: JSON` settings persist native objects, arrays, scalars or null.
 `editor: JQ_MAP` restricts them to field/expression objects. Existing mapping

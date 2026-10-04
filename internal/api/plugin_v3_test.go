@@ -12,6 +12,7 @@ import (
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
+	"github.com/go-chi/chi/v5"
 	"github.com/stashapp/stash/internal/manager"
 	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/pkg/plugin"
@@ -19,7 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestV3PluginAPIIsolation(t *testing.T) {
+func TestV3PluginContractAndRejectedManifests(t *testing.T) {
 	cfg := config.InitializeEmpty()
 	dir := t.TempDir()
 	cfg.SetConfigFile(filepath.Join(t.TempDir(), "config.yml"))
@@ -43,6 +44,9 @@ settings:
 	}
 	cache := plugin.NewCache(pluginSettingsTestConfig{cfg, dir})
 	cache.ReloadPlugins()
+	require.Nil(t, cache.GetPlugin("legacy"))
+	require.Len(t, cache.LoadErrors(), 1)
+	require.Contains(t, cache.LoadErrors()[0].Message, "requires apiVersion: 3")
 	manager.SetInstance(&manager.Manager{PluginCache: cache})
 	t.Cleanup(func() { manager.SetInstance(nil); config.InitializeEmpty() })
 	require.True(t, cache.HasHooks(hook.FileDestroyPost), "v3-only hooks remain available to every backend caller")
@@ -56,28 +60,27 @@ settings:
 		req = req.WithContext(context.WithValue(req.Context(), BaseURLCtxKey, "https://example.test/stash"))
 		response := httptest.NewRecorder()
 		server.ServeHTTP(response, req)
-		require.Equal(t, http.StatusOK, response.Code)
+		require.Contains(t, []int{http.StatusOK, http.StatusUnprocessableEntity}, response.Code)
 		var ret map[string]interface{}
 		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &ret))
 		return ret
 	}
 	response := request(`{
- plugins { id settings { type } }
- pluginTasks { plugin { id } }
+ pluginLoadErrorsV3 { path message }
  pluginsV3 { id api_version paths { entry } settings { type options { value } } }
  pluginTasksV3 { plugin { id api_version } }
  pluginSettingsV3(plugin_id: "native") { values definitions { name type options { value } mapping_targets { name label type description } } }
 }`, nil)
 	require.NotContains(t, response, "errors")
 	data := response["data"].(map[string]interface{})
-	legacy := data["plugins"].([]interface{})
-	require.Len(t, legacy, 1)
-	require.Equal(t, "legacy", legacy[0].(map[string]interface{})["id"])
-	require.Len(t, data["pluginTasks"], 1)
-	require.Len(t, data["pluginTasksV3"], 2)
+	loadErrors := data["pluginLoadErrorsV3"].([]interface{})
+	require.Len(t, loadErrors, 1)
+	require.Equal(t, "legacy.yml", loadErrors[0].(map[string]interface{})["path"])
+	require.Contains(t, loadErrors[0].(map[string]interface{})["message"], "requires apiVersion: 3")
+	require.Len(t, data["pluginTasksV3"], 1)
 	plugins := data["pluginsV3"].([]interface{})
-	require.Len(t, plugins, 2)
-	native := plugins[1].(map[string]interface{})
+	require.Len(t, plugins, 1)
+	native := plugins[0].(map[string]interface{})
 	require.Equal(t, float64(3), native["api_version"])
 	require.Equal(t, "https://example.test/stash/plugin/native/assets/index.js", native["paths"].(map[string]interface{})["entry"])
 	settings := data["pluginSettingsV3"].(map[string]interface{})
@@ -90,6 +93,8 @@ settings:
 		}
 	}
 	require.Contains(t, request(`{ pluginSettings(plugin_id: "native") { values } }`, nil), "errors")
+	require.Contains(t, request(`{ plugins { id } }`, nil), "errors")
+	require.Contains(t, request(`{ pluginTasks { name } }`, nil), "errors")
 	require.Contains(t, request(`mutation { updatePluginSettings(plugin_id: "native", input: {data: null}) }`, nil), "errors")
 	const update = `mutation($input: Map!, $reset: [String!]) { updatePluginSettingsV3(plugin_id: "native", input: $input, reset: $reset) }`
 	response = request(update, map[string]interface{}{"input": map[string]interface{}{"mappings": map[string]interface{}{"title": ".catalog.title"}, "data": nil}})
@@ -115,6 +120,33 @@ settings:
 	effective := response["data"].(map[string]interface{})["pluginSettingsV3"].(map[string]interface{})["values"].(map[string]interface{})
 	require.Equal(t, nativeJSON, effective["data"], "native JSON must preserve keys, arrays, false, zero and null")
 	response = request(`mutation { updatePluginSettingsV3(plugin_id: "legacy", input: {enabled: true}) }`, nil)
+	require.Contains(t, response, "errors")
+	require.Empty(t, cfg.GetPluginConfiguration("legacy"))
+
+	// Native browser modules remain served; the retired injection endpoints do not.
+	require.NoError(t, os.Mkdir(filepath.Join(dir, "dist"), 0700))
+	const module = "export default function register(host) {}"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "dist", "index.js"), []byte(module), 0600))
+	router := chi.NewRouter()
+	router.Mount("/plugin", pluginRoutes{pluginCache: cache}.Routes())
+	for path, status := range map[string]int{
+		"/plugin/native/assets/index.js": http.StatusOK,
+		"/plugin/native/javascript":      http.StatusNotFound,
+		"/plugin/native/css":             http.StatusNotFound,
+		"/plugin/legacy/assets/index.js": http.StatusNotFound,
+	} {
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
+		require.Equal(t, status, response.Code, path)
+		if status == http.StatusOK {
+			require.Equal(t, module, response.Body.String())
+		}
+	}
+
+	// Repairing a manifest and reloading clears its diagnostic and exposes only v3 metadata.
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "legacy.yml"), []byte("apiVersion: 3\nname: Upgraded\n"), 0600))
+	response = request(`mutation { reloadPlugins }`, nil)
 	require.NotContains(t, response, "errors")
-	require.Equal(t, true, cfg.GetPluginConfiguration("legacy")["enabled"])
+	require.Empty(t, cache.LoadErrors())
+	require.Equal(t, 3, cache.GetPlugin("legacy").APIVersion)
 }

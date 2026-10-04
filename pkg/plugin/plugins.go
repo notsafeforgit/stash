@@ -2,7 +2,7 @@
 // stash plugins.
 //
 // Stash plugins are configured using yml files in the configured plugins
-// directory. These yml files must follow the Config structure format.
+// directory. These yml files must declare the supported ManifestV3 contract.
 //
 // The main entry into the plugin sub-system is via the Cache type.
 package plugin
@@ -35,15 +35,14 @@ type Plugin struct {
 	SettingsV3   []PluginSettingV3   `json:"-"`
 	OperationsV3 []PluginOperationV3 `json:"-"`
 
-	ID          string          `json:"id"`
-	Name        string          `json:"name"`
-	Description *string         `json:"description"`
-	URL         *string         `json:"url"`
-	Version     *string         `json:"version"`
-	Tasks       []*PluginTask   `json:"tasks"`
-	Hooks       []*PluginHook   `json:"hooks"`
-	UI          PluginUI        `json:"ui"`
-	Settings    []PluginSetting `json:"settings"`
+	ID          string        `json:"id"`
+	Name        string        `json:"name"`
+	Description *string       `json:"description"`
+	URL         *string       `json:"url"`
+	Version     *string       `json:"version"`
+	Tasks       []*PluginTask `json:"tasks"`
+	Hooks       []*PluginHook `json:"hooks"`
+	UI          PluginUI      `json:"ui"`
 
 	Enabled bool `json:"enabled"`
 
@@ -60,21 +59,9 @@ type PluginUI struct {
 	CSP PluginCSP `json:"csp"`
 
 	// Entry is the relative path to the v3 ESM entry module within the
-	// plugin's assets. See UIConfig.Entry for details. Empty for
-	// v2.5-style plugins.
+	// plugin's assets. See UIConfig.Entry for details. Empty for backend-only
+	// plugins.
 	Entry string `json:"entry"`
-
-	// External Javascript files that will be injected into the stash UI.
-	ExternalScript []string `json:"external_script"`
-
-	// External CSS files that will be injected into the stash UI.
-	ExternalCSS []string `json:"external_css"`
-
-	// Javascript files that will be injected into the stash UI.
-	Javascript []string `json:"javascript"`
-
-	// CSS files that will be injected into the stash UI.
-	CSS []string `json:"css"`
 
 	// Assets is a map of URL prefixes to hosted directories.
 	// This allows plugins to serve static assets from a URL path.
@@ -88,16 +75,6 @@ type PluginUI struct {
 	// /plugin/{pluginId}/assets/bar/file.txt -> {pluginDir}/baz/file.txt
 	// /plugin/{pluginId}/assets/file.txt -> {pluginDir}/root/file.txt
 	Assets utils.URLMap `json:"assets"`
-}
-
-type PluginSetting struct {
-	SettingOptions
-	Name string `json:"name"`
-	// defaults to string
-	Type PluginSettingTypeEnum `json:"type"`
-	// defaults to key name
-	DisplayName string `json:"displayName"`
-	Description string `json:"description"`
 }
 
 type ServerConfig interface {
@@ -115,8 +92,19 @@ type ServerConfig interface {
 type Cache struct {
 	config       ServerConfig
 	plugins      []Config
+	loadErrors   []PluginLoadErrorV3
 	sessionStore *session.Store
 	gqlHandler   http.Handler
+}
+
+// PluginLoadErrorV3 identifies a rejected manifest without making it executable.
+type PluginLoadErrorV3 struct {
+	Path    string `json:"path"`
+	Message string `json:"message"`
+}
+
+func (c Cache) LoadErrors() []PluginLoadErrorV3 {
+	return slices.Clone(c.loadErrors)
 }
 
 // NewCache returns a new Cache.
@@ -141,25 +129,38 @@ func (c *Cache) RegisterSessionStore(sessionStore *session.Store) {
 }
 
 // ReloadPlugins clears the plugin cache and loads from the plugin path.
-// If a plugin cannot be loaded, an error is logged and the plugin is skipped.
+// Rejected manifests are reported to the owner and never enter the runnable cache.
 func (c *Cache) ReloadPlugins() {
 	path := c.config.GetPluginsPath()
 	// # 4484 - ensure plugin ids are unique
 	plugins := make([]Config, 0)
 	pluginIDs := make(map[string]bool)
+	var loadErrors []PluginLoadErrorV3
+	report := func(fp string, err error) {
+		logger.Errorf("Error loading plugin %s: %v", fp, err)
+		relative, relErr := filepath.Rel(path, fp)
+		if relErr != nil {
+			relative = filepath.Base(fp)
+		}
+		loadErrors = append(loadErrors, PluginLoadErrorV3{Path: filepath.ToSlash(relative), Message: err.Error()})
+	}
 
 	logger.Debugf("Reading plugin configs from %s", path)
 
 	err := fsutil.SymWalk(path, func(fp string, f os.FileInfo, err error) error {
-		if filepath.Ext(fp) == ".yml" {
+		if err != nil {
+			report(fp, err)
+			return nil
+		}
+		if !f.IsDir() && filepath.Ext(fp) == ".yml" {
 			plugin, err := loadPluginFromYAMLFile(fp)
 			// use case insensitive plugin IDs
 			if err != nil {
-				logger.Errorf("Error loading plugin %s: %v", fp, err)
+				report(fp, err)
 			} else {
 				pluginID := strings.ToLower(plugin.id)
 				if _, exists := pluginIDs[pluginID]; exists {
-					logger.Errorf("Error loading plugin %s: plugin ID %s already exists", fp, plugin.id)
+					report(fp, fmt.Errorf("plugin ID %s already exists", plugin.id))
 					return nil
 				}
 				pluginIDs[pluginID] = true
@@ -170,10 +171,11 @@ func (c *Cache) ReloadPlugins() {
 	})
 
 	if err != nil {
-		logger.Errorf("Error reading plugin configs: %v", err)
+		report(path, err)
 	}
 
 	c.plugins = plugins
+	c.loadErrors = loadErrors
 }
 
 func (c Cache) enabledPlugins() []Config {

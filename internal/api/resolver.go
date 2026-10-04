@@ -109,9 +109,7 @@ func (r *Resolver) Folder() FolderResolver {
 func (r *Resolver) SavedFilter() SavedFilterResolver {
 	return &savedFilterResolver{r}
 }
-func (r *Resolver) Plugin() PluginResolver {
-	return &pluginResolver{r}
-}
+
 func (r *Resolver) ConfigResult() ConfigResultResolver {
 	return &configResultResolver{r}
 }
@@ -139,7 +137,6 @@ type imageFileResolver struct{ *Resolver }
 type basicFileResolver struct{ *Resolver }
 type folderResolver struct{ *Resolver }
 type savedFilterResolver struct{ *Resolver }
-type pluginResolver struct{ *Resolver }
 type configResultResolver struct{ *Resolver }
 
 func (r *Resolver) withTxn(ctx context.Context, fn func(ctx context.Context) error) error {

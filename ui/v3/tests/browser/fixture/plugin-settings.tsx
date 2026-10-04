@@ -17,6 +17,7 @@ import {
   PluginPreviewEntityV3,
 } from "@/core/generated-graphql";
 import "./style.css";
+import { PluginLoadErrors } from "@/components/settings/plugin-load-errors";
 
 declare global {
   interface Window {
@@ -101,6 +102,16 @@ createRoot(root).render(
   <ApolloProvider client={client}>
     <IntlProvider locale="en-GB" defaultLocale="en-GB">
       <main className="mx-auto h-dvh max-w-4xl overflow-y-auto p-4">
+        <PluginLoadErrors
+          errors={[
+            {
+              __typename: "PluginLoadErrorV3",
+              path: "community/legacy-plugin.yml",
+              message:
+                "plugin manifest requires apiVersion: 3; unversioned plugins are no longer supported",
+            },
+          ]}
+        />
         <PluginSettingsForm
           pluginId="catalogMetadata"
           settings={[setting]}

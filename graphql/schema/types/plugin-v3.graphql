@@ -1,4 +1,4 @@
-"The v3 plugin contract. Legacy manifests are adapted here for v3 management."
+"The supported versioned plugin contract."
 type PluginV3 {
   id: ID!
   api_version: Int!
@@ -17,6 +17,13 @@ type PluginV3 {
 
 type PluginPathsV3 {
   entry: String
+}
+
+"A manifest rejected during the latest plugin reload. It cannot execute."
+type PluginLoadErrorV3 {
+  "Path relative to the configured plugins directory."
+  path: String!
+  message: String!
 }
 
 enum PluginOperationKindV3 {
@@ -104,6 +111,7 @@ type PluginSettingsV3 {
 
 extend type Query {
   pluginsV3: [PluginV3!]!
+  pluginLoadErrorsV3: [PluginLoadErrorV3!]!
   pluginTasksV3: [PluginTaskV3!]!
   pluginSettingsV3(plugin_id: ID!): PluginSettingsV3!
   "Loads expression input using the setting's declared read-only preview handler."

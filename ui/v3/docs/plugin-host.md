@@ -23,10 +23,10 @@ Checked against the implementation on 2026-09-29. The authoritative types are in
 A v3 plugin is an ESM module loaded at app boot. Stash's frontend dynamic-imports the module, calls its exported `register(host)` function, and the plugin uses the host APIs to add routes, nav entries, etc. Plugin code runs in the same origin and same React tree as Stash itself, with full access to the host's GraphQL client.
 
 The v3 UI uses this host instead of the v2.5 `window.PluginApi`/DOM-patching API.
-v3 does not load legacy UI scripts. Existing v2.5 UI plugins can still load in
-the v2.5 frontend, and backend plugin behavior remains shared. The v3
-plugin contract has no v2.5 plugin compatibility requirement. The host keeps
-legacy discovery and settings types separate from its v3 API.
+Only `apiVersion: 3` manifests load. The native application has no legacy script
+injection, settings adapter or discovery API. Rejected manifests appear in
+**Settings → Plugins** with their load errors; they cannot execute. The frozen
+compatible release retains the old plugin runtime.
 
 ## Plugin manifest
 

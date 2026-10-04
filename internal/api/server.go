@@ -642,10 +642,6 @@ func makeTLSConfig(c *config.Config) (*tls.Config, error) {
 	return tlsConfig, nil
 }
 
-func isURL(s string) bool {
-	return strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://")
-}
-
 func setPageSecurityHeaders(w http.ResponseWriter, r *http.Request, plugins []*plugin.Plugin) {
 	c := config.GetInstance()
 
@@ -689,18 +685,6 @@ func setPageSecurityHeaders(w http.ResponseWriter, r *http.Request, plugins []*p
 		}
 
 		ui := plugin.UI
-
-		for _, url := range ui.ExternalScript {
-			if isURL(url) {
-				scriptSrcSlice = append(scriptSrcSlice, url)
-			}
-		}
-
-		for _, url := range ui.ExternalCSS {
-			if isURL(url) {
-				styleSrcSlice = append(styleSrcSlice, url)
-			}
-		}
 
 		connectSrcSlice = append(connectSrcSlice, ui.CSP.ConnectSrc...)
 		scriptSrcSlice = append(scriptSrcSlice, ui.CSP.ScriptSrc...)

@@ -1,3 +1,4 @@
+apiVersion: 3
 # example plugin config
 name: Hawwwwt Tagger
 description: Ultimate Hawwwwt tagging utility.

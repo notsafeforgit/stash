@@ -1,9 +1,12 @@
 package plugin
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/stashapp/stash/pkg/plugin/hook"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,9 +29,7 @@ settings:
 	require.NoError(t, err)
 	p := c.toPlugin()
 	require.Equal(t, 3, p.APIVersion)
-	require.Empty(t, p.Settings, "v3 settings must not be projected into the v2.5 model")
 	require.Equal(t, "index.js", p.UI.Entry)
-	require.Empty(t, p.UI.Javascript)
 	values := p.SettingsValuesV3(nil)
 	require.Equal(t, map[string]interface{}{"title": ".catalog.title"}, values["mappings"])
 	require.Equal(t, []interface{}{false, 0, nil, map[string]interface{}{"field": "title"}}, values["filters"])
@@ -67,18 +68,66 @@ func TestV3ManifestRejectsUnsupportedContracts(t *testing.T) {
 	}
 }
 
-func TestLegacyManifestAdapter(t *testing.T) {
+func TestUnversionedManifestIsRejected(t *testing.T) {
 	c, err := loadPluginFromYAML(strings.NewReader(`name: Legacy
 ui: {javascript: [legacy.js]}
 settings:
   enabled: {type: BOOLEAN}
 `))
+	require.Nil(t, c)
+	require.ErrorContains(t, err, "requires apiVersion: 3")
+}
+
+func TestNativePluginExamplesDeclareSupportedManifests(t *testing.T) {
+	paths, err := filepath.Glob("examples/*/*.yml")
 	require.NoError(t, err)
-	p := c.toPlugin()
-	require.Equal(t, 2, p.APIVersion)
-	require.Len(t, p.Settings, 1)
-	require.Len(t, p.SettingsV3, 1)
-	require.Equal(t, PluginSettingTypeV3("BOOLEAN"), p.SettingsV3[0].Type)
-	require.Empty(t, p.UI.Entry)
-	require.NoError(t, p.ValidateSettingsV3(map[string]interface{}{"enabled": true}, nil))
+	require.NotEmpty(t, paths)
+	for _, path := range paths {
+		t.Run(path, func(t *testing.T) {
+			body, err := os.ReadFile(path)
+			require.NoError(t, err)
+			c, err := loadPluginFromYAML(strings.NewReader(string(body)))
+			require.NoError(t, err)
+			require.Equal(t, 3, c.toPlugin().APIVersion)
+		})
+	}
+}
+
+type manifestServerConfig struct {
+	durableHookConfig
+	directory string
+}
+
+func (c manifestServerConfig) GetPluginsPath() string { return c.directory }
+
+func TestPluginReloadReportsRejectedManifests(t *testing.T) {
+	dir := t.TempDir()
+	for name, body := range map[string]string{
+		"legacy":  "name: Legacy\nhooks: [{name: Unavailable, triggeredBy: [Scene.Create.Post]}]\n",
+		"future":  "apiVersion: 4\nname: Future\n",
+		"invalid": "apiVersion: 3\nui: {javascript: [old.js]}\n",
+		"native":  "apiVersion: 3\nname: Native\nhooks: [{name: Native hook, triggeredBy: [Scene.Update.Post]}]\n",
+	} {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, name+".yml"), []byte(body), 0600))
+	}
+	cache := NewCache(manifestServerConfig{directory: dir})
+	cache.ReloadPlugins()
+	require.Len(t, cache.ListPlugins(), 1)
+	require.True(t, cache.HasHooks(hook.SceneUpdatePost))
+	require.False(t, cache.HasHooks(hook.SceneCreatePost), "rejected manifests must not register hooks")
+	require.Len(t, cache.LoadErrors(), 3)
+	errors := cache.LoadErrors()
+	for i, path := range []string{"future.yml", "invalid.yml", "legacy.yml"} {
+		require.Equal(t, path, errors[i].Path)
+		require.NotEmpty(t, errors[i].Message)
+	}
+	errors[0].Message = "changed"
+	require.NotEqual(t, "changed", cache.LoadErrors()[0].Message)
+	for _, name := range []string{"future", "invalid", "legacy"} {
+		require.Nil(t, cache.GetPlugin(name))
+		require.NoError(t, os.Remove(filepath.Join(dir, name+".yml")))
+	}
+	cache.ReloadPlugins()
+	require.Len(t, cache.ListPlugins(), 1)
+	require.Empty(t, cache.LoadErrors())
 }

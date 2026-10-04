@@ -215,30 +215,7 @@ func (s SettingConfigV3) validateValue(value interface{}) error {
 	return nil
 }
 
-func adaptLegacySettings(settings []PluginSetting) []PluginSettingV3 {
-	ret := make([]PluginSettingV3, 0, len(settings))
-	for _, setting := range settings {
-		var editor *PluginSettingEditorV3
-		if setting.Editor != nil {
-			value := PluginSettingEditorV3(*setting.Editor)
-			editor = &value
-		}
-		options := make([]PluginSettingOptionV3, 0, len(setting.Options))
-		for _, option := range setting.Options {
-			options = append(options, PluginSettingOptionV3(option))
-		}
-		ret = append(ret, PluginSettingV3{Name: setting.Name, SettingConfigV3: SettingConfigV3{
-			Type: PluginSettingTypeV3(setting.Type), DisplayName: setting.DisplayName, Description: setting.Description,
-			DefaultValue: setting.DefaultValue, Editor: editor, Options: options,
-		}})
-	}
-	return ret
-}
-
 func (p Plugin) SettingsValuesV3(saved map[string]interface{}) map[string]interface{} {
-	if p.APIVersion != 3 {
-		return p.SettingsValues(saved)
-	}
 	ret := make(map[string]interface{})
 	for _, setting := range p.SettingsV3 {
 		if setting.DefaultValue != nil {
@@ -266,9 +243,6 @@ func (p Plugin) SettingsValuesV3(saved map[string]interface{}) map[string]interf
 }
 
 func (p Plugin) ValidateSettingsV3(input map[string]interface{}, reset []string) error {
-	if p.APIVersion != 3 {
-		return p.ValidateSettings(input, reset)
-	}
 	definitions := make(map[string]SettingConfigV3, len(p.SettingsV3))
 	for _, setting := range p.SettingsV3 {
 		definitions[setting.Name] = setting.SettingConfigV3

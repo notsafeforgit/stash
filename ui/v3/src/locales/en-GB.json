@@ -623,6 +623,7 @@
       "installed_plugins": "Installed Plugins",
       "triggers_on": "Triggers on",
       "plugin_packages": "Plugin packages",
+      "load_errors": "Some plugins could not be loaded",
       "no_plugins": "No plugins installed.",
       "open_page": "Open {page}",
       "reload_pages": "Reload the UI to load updated plugin pages."

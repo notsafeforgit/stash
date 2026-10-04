@@ -266,10 +266,6 @@ type Query {
   scrapeGroupURL(url: String!): ScrapedGroup
 
   # Plugins
-  "List loaded plugins"
-  plugins: [Plugin!]
-  "List available plugin operations"
-  pluginTasks: [PluginTask!]
   "User-configured invocation order for plugins per hook event"
   pluginHookOrder: [PluginHookOrder!]!
 

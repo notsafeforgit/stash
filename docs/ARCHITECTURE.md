@@ -262,6 +262,13 @@ and embedded JavaScript through Goja, plus configured hooks. Scrapers in
 scripts to retrieve metadata. Identification coordinates these sources and
 stash-box matching.
 
+Plugin manifests must declare `apiVersion: 3`. Unversioned manifests, legacy
+settings/discovery APIs and browser script/CSS injection are retired. Rejected
+manifests stay outside the executable cache, with reasons exposed through
+`pluginLoadErrorsV3` and Settings → Plugins. Correcting a manifest and reloading
+clears its diagnostic. Native ESM assets, explicit CSP configuration and saved
+settings remain supported. See [plugin manifests](plugin-manifests.md).
+
 [Backend plugin notifications](plugin-events.md) describe deletion and edit
 events. The file repository wrapper in
 [file_hooks.go](../pkg/plugin/file_hooks.go) captures file identities and update
@@ -270,7 +277,7 @@ services, scans, and cleanup share that wrapper. Entity metadata hooks also
 cover specialized activity, history, cover, and relationship edits.
 
 [Plugin settings and jq mappings](plugin-settings.md) share manifest definitions
-between backend and browser plugins. Additive GraphQL endpoints resolve defaults,
+between backend and browser plugins. Native GraphQL endpoints resolve defaults,
 validate atomic configuration patches, and evaluate JSON with an embedded jq
 interpreter. The v3 settings screen renders the declared editors and previews
 expressions without running plugin hooks.

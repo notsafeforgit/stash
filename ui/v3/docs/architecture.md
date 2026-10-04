@@ -77,6 +77,10 @@ described in [development](development.md#generation-and-builds).
    registrations. Route collisions are rejected; core routing remains available
    if plugin startup fails. See the [plugin host](plugin-host.md) for the contract.
 
+The backend loads only `apiVersion: 3` manifests. Settings → Plugins separately
+queries `pluginLoadErrorsV3` to show rejected manifests and refreshes these errors
+after package changes or reloads. Rejected packages never enter browser discovery.
+
 The offline and guest entries are independent of this sequence. The worker can
 boot the standalone offline library without configuration, plugins, or GraphQL;
 the guest viewer uses share-scoped JSON/media requests without an owner session.

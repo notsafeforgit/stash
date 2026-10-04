@@ -1,7 +1,6 @@
 package plugin
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"sort"
@@ -46,11 +45,11 @@ func decodePluginManifest(reader io.Reader) (*Config, error) {
 	}
 	value, versioned := header["apiVersion"]
 	if !versioned {
-		return loadLegacyPluginFromYAML(bytes.NewReader(data))
+		return nil, fmt.Errorf("plugin manifest requires apiVersion: 3; unversioned plugins are no longer supported")
 	}
 	version, ok := value.(int)
 	if !ok || version != 3 {
-		return nil, fmt.Errorf("unsupported plugin apiVersion %v; supported: 3 (or omit for legacy plugins)", value)
+		return nil, fmt.Errorf("unsupported plugin apiVersion %v; supported: 3", value)
 	}
 	var manifest ManifestV3
 	if err := yaml.UnmarshalStrict(data, &manifest); err != nil {
@@ -101,18 +100,9 @@ func decodePluginManifest(reader io.Reader) (*Config, error) {
 	return ret, nil
 }
 
-func (c Config) apiVersion() int {
-	if c.v3 != nil {
-		return 3
-	}
-	return 2
-}
-
 func (c Config) settingsV3() []PluginSettingV3 {
 	if c.v3 == nil {
-		// Legacy plugins are adapted into the new API; v3 authors never need to
-		// provide a legacy representation of their settings.
-		return adaptLegacySettings(c.getPluginSettings())
+		return nil
 	}
 	keys := make([]string, 0, len(c.v3.Settings))
 	for key := range c.v3.Settings {
@@ -122,28 +112,6 @@ func (c Config) settingsV3() []PluginSettingV3 {
 	ret := make([]PluginSettingV3, 0, len(keys))
 	for _, key := range keys {
 		ret = append(ret, PluginSettingV3{Name: key, SettingConfigV3: c.v3.Settings[key]})
-	}
-	return ret
-}
-
-// LegacyPlugins and LegacyPluginTasks keep v3-only metadata out of v2.5 clients.
-// Backend hooks still run for successful writes from every client.
-func (c Cache) LegacyPlugins() []*Plugin {
-	var ret []*Plugin
-	for _, p := range c.ListPlugins() {
-		if p.APIVersion != 3 {
-			ret = append(ret, p)
-		}
-	}
-	return ret
-}
-
-func (c Cache) LegacyPluginTasks() []*PluginTask {
-	var ret []*PluginTask
-	for _, task := range c.ListPluginTasks() {
-		if task.Plugin.APIVersion != 3 {
-			ret = append(ret, task)
-		}
 	}
 	return ret
 }

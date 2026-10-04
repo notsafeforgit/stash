@@ -73,8 +73,7 @@ Existing `type`, `displayName`, and `description` retain their meanings. Optiona
 Defaults are resolved on read, not written to config.
 
 V3 types are `STRING`, `NUMBER`, `BOOLEAN`, and `JSON`. JSON values persist as
-native objects, arrays, scalars or null, independently of the legacy settings
-contract. Editors are `TEXT`, `TEXTAREA`, `SELECT`, `JSON`, `JQ`, `JQ_MAP`.
+native objects, arrays, scalars or null. Editors are `TEXT`, `TEXTAREA`, `SELECT`, `JSON`, `JQ`, `JQ_MAP`.
 `SELECT` requires distinct options with string `value` and `label`. `JQ`
 compiles an expression; `JQ_MAP` validates an object of nonempty target names
 and jq expressions. JSON editors can also validate text for an explicitly
@@ -128,9 +127,9 @@ replacement; its behavior and `configuration.plugins` are unchanged.
 
 `pluginsV3.settings` exposes these definitions through the independent
 `PluginSettingV3` type. API availability can be discovered through GraphQL
-introspection. Unversioned plugins are adapted into this API; their existing
-string-based JSON settings remain strings. Native mapping settings also read
-previously saved JSON text overrides, preserving them during migration.
+introspection. Only manifests declaring `apiVersion: 3` can load. Native mapping
+settings still read previously saved JSON text overrides, preserving those values
+during migration without restoring an unversioned runtime adapter.
 
 ## Entity preview providers
 

@@ -27,8 +27,9 @@ func (c pluginSettingsTestConfig) GetPluginsPath() string { return c.path }
 func TestPluginSettingsGraphQL(t *testing.T) {
 	cfg := config.InitializeEmpty()
 	dir := t.TempDir()
-	cfg.SetConfigFile(filepath.Join(dir, "config.yml"))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "fixture.yml"), []byte(`name: Fixture
+	cfg.SetConfigFile(filepath.Join(t.TempDir(), "config.yml"))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "fixture.yml"), []byte(`apiVersion: 3
+name: Fixture
 settings:
   enabled: {type: BOOLEAN, default: false}
   mappings: {type: STRING, editor: JQ_MAP, default: '{}'}
@@ -51,14 +52,14 @@ settings:
 		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &ret))
 		return ret
 	}
-	response := request(`{ pluginSettings(plugin_id: "fixture") { values definitions { name default_value editor options { value label } } } }`, nil)
+	response := request(`{ pluginSettingsV3(plugin_id: "fixture") { values definitions { name default_value editor options { value label } } } }`, nil)
 	require.NotContains(t, response, "errors")
-	settings := response["data"].(map[string]interface{})["pluginSettings"].(map[string]interface{})
+	settings := response["data"].(map[string]interface{})["pluginSettingsV3"].(map[string]interface{})
 	require.Equal(t, map[string]interface{}{"enabled": false, "mappings": "{}"}, settings["values"])
 	definitions := settings["definitions"].([]interface{})
 	require.Equal(t, "JQ_MAP", definitions[1].(map[string]interface{})["editor"])
 	require.Equal(t, []interface{}{}, definitions[1].(map[string]interface{})["options"])
-	const update = `mutation($input: Map!, $reset: [String!]) { updatePluginSettings(plugin_id: "fixture", input: $input, reset: $reset) }`
+	const update = `mutation($input: Map!, $reset: [String!]) { updatePluginSettingsV3(plugin_id: "fixture", input: $input, reset: $reset) }`
 	cfg.SetPluginConfiguration("fixture", map[string]interface{}{"legacy": "preserved"})
 	response = request(update, map[string]interface{}{"input": map[string]interface{}{"enabled": true}})
 	require.NotContains(t, response, "errors")

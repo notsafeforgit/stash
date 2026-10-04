@@ -1,0 +1,8 @@
+apiVersion: 3
+name: Browser example
+description: A page using the native browser host and its shared React runtime.
+version: 1.0.0
+ui:
+  entry: index.js
+  assets:
+    /: .

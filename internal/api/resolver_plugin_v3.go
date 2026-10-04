@@ -72,6 +72,15 @@ func (r *queryResolver) PluginsV3(ctx context.Context) ([]*PluginV3, error) {
 	return ret, nil
 }
 
+func (r *queryResolver) PluginLoadErrorsV3(ctx context.Context) ([]*plugin.PluginLoadErrorV3, error) {
+	loadErrors := manager.GetInstance().PluginCache.LoadErrors()
+	ret := make([]*plugin.PluginLoadErrorV3, len(loadErrors))
+	for i := range loadErrors {
+		ret[i] = &loadErrors[i]
+	}
+	return ret, nil
+}
+
 func (r *queryResolver) PluginTasksV3(ctx context.Context) ([]*PluginTaskV3, error) {
 	plugins, err := r.PluginsV3(ctx)
 	if err != nil {

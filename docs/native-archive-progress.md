@@ -7142,3 +7142,45 @@ increment passed in 1,184 seconds: 583 UI tests, 484 producer tests, Go lint
 with zero issues and the complete tagged backend suite. Production and the
 verified schema-77 rehearsal are unchanged. Reports are under
 `.local/native-discovery-client-20261004/native_stream_contract_*`.
+
+
+## Native plugin manifest and discovery boundary — 2026-10-04
+
+Only manifests declaring `apiVersion: 3` now enter the executable plugin cache.
+Removed unversioned decoding, settings adaptation and legacy discovery/settings
+GraphQL types and fields. The old script/CSS injection fields, concatenation
+routes and automatic CSP origins are gone. Native ESM asset URLs and explicit
+CSP declarations remain. The native settings, jq, preview, operation, task and
+notification contracts are retained; historical JSON-text mapping overrides
+still read without rewriting saved configuration.
+
+Rejected manifests are reported through `pluginLoadErrorsV3` and an Alert in
+Settings → Plugins, including their relative path and load error. They cannot
+register hooks or serve assets. Reloading after a repair/removal clears the
+error; package changes refresh the diagnostics. The old DOM-patching React
+example was replaced with a native ESM example. Raw, RPC and server-side
+JavaScript examples now declare version 3 and pass strict manifest validation.
+
+The read-only caller audit covered 43 live n8n workflow definitions, 52 host
+scripts, the plugin sources and 582 installed plugin/environment files. The sole
+installed manifest is Catalog Metadata 1.14.1, already version 3. Its installed
+and repository code use their own v3 settings client. Old `stashapi` helpers
+remain in an unused PythonToolsInstaller environment, without a loading manifest;
+no active consumer of the removed plugin endpoints was identified. Two host
+scripts still call synchronous bulk edit mutations, so that separate retirement
+must convert those callers before removing their endpoints.
+
+Generation and the native application build pass. Package tests cover rejected
+versions, manifests and hooks, diagnostics reload, native settings and declared
+operations. The API checks pass, including actual GraphQL settings, retained
+assets, removed endpoints and after-success edit/deletion notifications. All 583
+frontend tests and the retained v3 contract checks pass. Eight Chromium/WebKit
+checks cover desktop/mobile plugin navigation, error display, constrained mapping
+choices and nonmutating previews. The full fork gate passed in 1192.797 seconds,
+including 484 producer tests, Go lint with zero issues and the tagged backend
+integration suite (SQLite: 1097.032 seconds). Reports are under `.local/native-discovery-client-20261004/native_plugin_retirement_*`.
+
+No production plugin, service, scraper or configuration was changed. Schema
+1000077 and the verified archive rehearsal remain unchanged. Remaining client
+conversion, import/reconciliation, native review, general durable notifications,
+backup/restore and cutover work are still open.

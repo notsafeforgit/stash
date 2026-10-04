@@ -19,6 +19,7 @@ import { SettingsSection } from "src/components/settings/setting-row";
 import { PluginSettingsForm } from "src/components/settings/plugin-settings-form";
 import { PackageManager } from "src/components/settings/package-manager";
 import { PluginHookOrder } from "src/components/settings/plugin-hook-order";
+import { PluginLoadErrors } from "@/components/settings/plugin-load-errors";
 import { PluginPageLinks, ReloadPluginPages } from "src/plugins/page-links";
 
 type Plugin = NonNullable<GQL.PluginsQuery["plugins"]>[number];
@@ -188,8 +189,14 @@ function SettingsPluginsPage() {
   const Toast = useToast();
   const [packagesChanged, setPackagesChanged] = useState(false);
   const { data, loading, refetch } = useQuery(GQL.PluginsDocument);
+  const { data: loadErrors, refetch: refetchLoadErrors } = useQuery(
+    GQL.PluginLoadErrorsDocument,
+  );
   const [reloadPlugins] = useMutation(GQL.ReloadPluginsDocument, {
-    refetchQueries: [{ query: GQL.PluginsDocument }],
+    refetchQueries: [
+      { query: GQL.PluginsDocument },
+      { query: GQL.PluginLoadErrorsDocument },
+    ],
   });
 
   const msg = useMsg();
@@ -213,6 +220,7 @@ function SettingsPluginsPage() {
           onPackagesChanged={() => {
             setPackagesChanged(true);
             void refetch();
+            void refetchLoadErrors();
           }}
         />
         {packagesChanged && <ReloadPluginPages />}
@@ -229,6 +237,7 @@ function SettingsPluginsPage() {
             {msg("actions.reload_plugins", "Reload plugins")}
           </Button>
         </div>
+        <PluginLoadErrors errors={loadErrors?.pluginLoadErrorsV3 ?? []} />
         {loading ? (
           <Spinner className="size-5" />
         ) : (
@@ -236,11 +245,12 @@ function SettingsPluginsPage() {
             {(data?.plugins ?? []).map((plugin) => (
               <PluginCard key={plugin.id} plugin={plugin} />
             ))}
-            {!data?.plugins?.length && (
-              <p className="text-sm text-muted-foreground">
-                {msg("config.plugins.no_plugins", "No plugins installed.")}
-              </p>
-            )}
+            {!data?.plugins?.length &&
+              !loadErrors?.pluginLoadErrorsV3.length && (
+                <p className="text-sm text-muted-foreground">
+                  {msg("config.plugins.no_plugins", "No plugins installed.")}
+                </p>
+              )}
           </div>
         )}
       </SettingsSection>

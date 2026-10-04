@@ -50,6 +50,13 @@ query Plugins {
   }
 }
 
+query PluginLoadErrors {
+  pluginLoadErrorsV3 {
+    path
+    message
+  }
+}
+
 query PluginTasks {
   pluginTasks: pluginTasksV3 {
     name

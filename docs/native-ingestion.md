@@ -467,6 +467,17 @@ result and target completion together. Ordinary job success cannot bypass that
 proof. Exact completion replay survives expiry and later source edits without
 applying a new policy. Unresolved external references remain explicit limitations.
 
+Legacy-only posts with a retained discovery lookup can gain their Reddit/Twitter
+identifier during this same publication transaction. The candidate URL must
+identify the fetched post and agree with independently retained account,
+filename, or original text/date evidence. The existing post UUID remains intact;
+an identifier already owned by another post requires review. Missing or
+ambiguous proof returns HTTP 422 `post_identity_requires_review`, records a
+terminal unsuccessful attempt and keeps the checkpoint available. It does not
+complete the target or refetch automatically. The scoped job description includes
+`discovery_resolution` after success; application users can inspect the same
+proof through `/api/v3/archive/enrichment-jobs/{job}/discovery-resolution`.
+
 Successful publication verifies and releases the compact staging body atomically,
 retaining native captures, acknowledgement/provenance rows, unresolved references
 and a versioned integrity proof. Failed/cancelled work retains staging. Older
@@ -498,7 +509,7 @@ Capabilities advertise `enrichment_protocol: 2`, `enrichment_dispatch_protocol: 
 | `POST /collections/{uuid}/jobs/ready` | `{policy_sha256, extractor_version, after, limit}` discovers eligible admitted jobs, ordered after their integer sequence; returns `{sequence, uuid}` candidates |
 | `POST /targets/{uuid}/jobs` | `{expected_revision, policy_sha256, extractor_version}` admits or replays the job bound to that target revision |
 | `POST /handoffs/{uuid}/jobs` | `{expected_plan_sha256, policy_sha256, extractor_version}` atomically consumes an application-reviewed checkpoint handoff or recovers its original job |
-| `GET /jobs/{uuid}` | Returns `{job, target}`, including immutable source URL/input and the target's current scheduling state |
+| `GET /jobs/{uuid}` | Returns `{job, target, discovery_resolution?}`, including immutable source URL/input, current scheduling state and any verified legacy identity proof |
 | `GET /jobs/{uuid}/seed` | Verified `{handoff_uuid, plan_sha256, sha256, body}` for the job's retained handoff, or null for an ordinary job; requires the job's producer scope |
 | `POST /jobs/{uuid}/claim` | `{expected_revision, owner_uuid, policy_sha256, extractor_version, lease_seconds}` claims the selected job; unchanged but unavailable work returns 204 |
 | `POST /jobs/{uuid}/renew` | `{owner_uuid, fence, lease_seconds}` renews current ownership |

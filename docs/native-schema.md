@@ -2294,3 +2294,40 @@ removes the import before its dependencies. No jobs, captures, performer links,
 post identifiers or selected metadata are changed by this pass. The client is
 `stash-import-automation-discovery`; migration remains `imported:false` and
 reviewed discovery activation/execution remain separate transition work.
+
+## Verified legacy discovery identities
+
+Schema 1000070 adds `enrichment_discovery_resolutions` and an indexed lookup of
+mapped discovery inputs. During enrichment publication, a legacy-only post can
+receive a native Reddit/Twitter identifier without changing its UUID. Exactly
+one completed discovery mapping must bind the original post, collection UUID
+and exact candidate URL. Reviewed collection revision changes retain that scope.
+
+The `retained-discovery-identity-v1` policy checks the fetched post's service ID
+against the candidate URL and requires corroboration: every retained strict
+Twitter filename identifies that post; its captured publisher matches a saved
+account identifier; or original text/title and its UTC publication date match
+the historical evidence. Text normalization preserves the original finder's
+HTML removal, NFKC case folding and Unicode word comparison, with minimum
+lengths of 40 characters for text or 20 for titles. A feed's profile object,
+translated text, a URL alone or approximate similarity cannot prove identity.
+
+The resolution references the frozen snapshot ordinal, published checkpoint
+record and identifier evidence, retaining the post's prior revision and the
+versioned matching basis. It does not copy source payloads. Original observation
+time comes from the capture; resolution time records the transaction. The
+identifier, captures, resolution, job result and target completion commit
+together. A deferred foreign key and pre-commit verification prevent a caller
+from committing the identity mutation without the complete publication.
+
+Unknown or multiply mapped inputs and IDs already belonging to another post
+require review. Publication rolls back and the controlled failure retains its
+checkpoint for later inspection. No post consolidation or performer assignment
+is inferred. Reopening verifies the original snapshot bytes, reconstructed
+native capture, matching basis, identifier receipt and publication binding even
+after compact staging has been released. Anonymisation removes resolutions
+before their dependencies; ordinary database backups retain them.
+
+The migration itself leaves existing jobs, identifiers and selected metadata
+unchanged. It does not activate workers. Account-listing discovery, reviewed
+post consolidation and production caller conversion remain transition work.

@@ -19,6 +19,7 @@ import (
 
 func removeAutomationDiscoverySchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeEnrichmentDiscoverySchema(t, raw)
 	_, err := raw.Exec(`DROP TABLE automation_discovery_records; DROP TABLE automation_discovery_imports;
  DROP INDEX automation_discovery_input; DELETE FROM native_migration_history WHERE version=1000069`)
 	require.NoError(t, err)

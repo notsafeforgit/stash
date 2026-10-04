@@ -115,6 +115,24 @@ type EnrichmentPublishedRecord struct {
 	CaptureUUID string `json:"capture_uuid" db:"capture_uuid"`
 }
 
+// A verified legacy lookup adds a service identifier to the existing post.
+// The original discovery input and published checkpoint record retain its proof.
+type EnrichmentDiscoveryResolution struct {
+	JobUUID            string    `json:"job_uuid" db:"job_uuid"`
+	SnapshotUUID       string    `json:"snapshot_uuid" db:"snapshot_uuid"`
+	SourceOrdinal      int64     `json:"source_ordinal" db:"source_ordinal"`
+	CheckpointRevision int       `json:"checkpoint_revision" db:"checkpoint_revision"`
+	RecordOrdinal      int       `json:"record_ordinal" db:"record_ordinal"`
+	PostUUID           string    `json:"post_uuid" db:"post_uuid"`
+	PostRevision       int       `json:"post_revision_before" db:"post_revision"`
+	Namespace          string    `json:"namespace" db:"namespace"`
+	Value              string    `json:"value" db:"value"`
+	Policy             string    `json:"policy" db:"policy"`
+	Basis              string    `json:"basis" db:"basis"`
+	EvidenceUUID       string    `json:"evidence_uuid" db:"evidence_uuid"`
+	CreatedAt          time.Time `json:"created_at" db:"created_at"`
+}
+
 type EnrichmentReference struct {
 	URL    string `json:"url"`
 	Parent int    `json:"parent"`
@@ -152,6 +170,8 @@ type EnrichmentJobReaderWriter interface {
 	CheckpointHead(context.Context, string) (*EnrichmentCheckpoint, error)
 	CheckpointReceipts(context.Context, string, int, int) ([]EnrichmentCheckpointReceipt, error)
 	CheckpointRecords(context.Context, string, int, int) ([]EnrichmentCheckpointRecord, error)
+	ResolveDiscoveryIdentity(context.Context, EnrichmentJobLease, int, string, int, time.Time) (*EnrichmentDiscoveryResolution, error)
+	DiscoveryResolution(context.Context, string) (*EnrichmentDiscoveryResolution, error)
 	Publish(context.Context, EnrichmentJobLease, int, string, []string, time.Time) (*EnrichmentPublication, error)
 	Publication(context.Context, string) (*EnrichmentPublication, error)
 	PublishedRecords(context.Context, string, int, int) ([]EnrichmentPublishedRecord, error)

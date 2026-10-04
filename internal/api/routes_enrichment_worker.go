@@ -96,6 +96,8 @@ func writeEnrichmentWorker(w http.ResponseWriter, value any, err error) {
 		ingestJSON(w, http.StatusConflict, map[string]string{"error": "lease_lost"})
 	case errors.Is(err, models.ErrArchiveJobConflict):
 		ingestJSON(w, http.StatusConflict, map[string]string{"error": "enrichment_work_changed"})
+	case errors.Is(err, models.ErrEnrichmentIdentityReview):
+		ingestJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "post_identity_requires_review"})
 	default:
 		writeEnrichmentWork(w, value, err)
 	}

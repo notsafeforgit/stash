@@ -18,14 +18,19 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stashapp/stash/pkg/archive"
+	"github.com/stashapp/stash/pkg/models"
 	"github.com/stretchr/testify/require"
 )
 
 func TestPythonEnrichmentExecutionRestartsAndPreservesSourceEvidence(t *testing.T) {
 	python, packagePath := nativeProducerRuntime(t)
-	for _, scenario := range []string{"lost_deliveries", "pending_child", "expired_pending", "lost_claim", "divergent_head", "capacity", "paused_after_fetch", "rejected_checkpoint"} {
+	for _, scenario := range []string{"lost_deliveries", "pending_child", "expired_pending", "lost_claim", "divergent_head", "capacity", "paused_after_fetch", "rejected_checkpoint", "identity_review"} {
 		t.Run(scenario, func(t *testing.T) {
-			f := newEnrichmentHTTPFixture(t)
+			reference := models.SourcePostIdentifier{Namespace: "native:reddit", Value: "abc123"}
+			if scenario == "identity_review" {
+				reference = models.SourcePostIdentifier{Namespace: "legacy:catalog:" + uuid.NewString(), Value: "filename-only"}
+			}
+			f := newEnrichmentHTTPFixtureForPost(t, reference)
 			var now atomic.Int64
 			now.Store(f.now.UnixMilli())
 			f.worker.Now = func() time.Time { return time.UnixMilli(now.Load()).UTC() }
@@ -128,7 +133,7 @@ func TestPythonEnrichmentExecutionRestartsAndPreservesSourceEvidence(t *testing.
 			if scenario == "paused_after_fetch" {
 				expected = "waiting"
 			}
-			if scenario == "rejected_checkpoint" {
+			if scenario == "rejected_checkpoint" || scenario == "identity_review" {
 				expected = "review"
 			}
 			first := run(fetch, false, false, expected, quota)
@@ -136,6 +141,18 @@ func TestPythonEnrichmentExecutionRestartsAndPreservesSourceEvidence(t *testing.
 			require.NoError(t, err)
 			expectedAttempts, expectedFetches := 1, 1
 			switch scenario {
+			case "identity_review":
+				require.Equal(t, "failed", job.State)
+				require.Equal(t, "review", first.Journal.Phase)
+				head, err := f.worker.CheckpointHead(t.Context(), f.token, job.UUID)
+				require.NoError(t, err)
+				require.NotNil(t, head)
+				publication, err := f.worker.Publication(t.Context(), f.token, job.UUID)
+				require.NoError(t, err)
+				require.Nil(t, publication)
+				retained := run("forbidden", true, false, "review", 512<<20)
+				require.Equal(t, 1, retained.Fetches)
+				return
 			case "paused_after_fetch":
 				require.Greater(t, first.Journal.StagedBytes, 0)
 				head, err := f.worker.CheckpointHead(t.Context(), f.token, job.UUID)

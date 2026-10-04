@@ -71,9 +71,10 @@ type EnrichmentCompletion struct {
 }
 
 var (
-	ErrEnrichmentInvalid  = errors.New("invalid native enrichment work")
-	ErrEnrichmentConflict = errors.New("native enrichment work or source changed")
-	ErrEnrichmentAtomic   = errors.New("native enrichment work did not finish atomically")
+	ErrEnrichmentInvalid        = errors.New("invalid native enrichment work")
+	ErrEnrichmentConflict       = errors.New("native enrichment work or source changed")
+	ErrEnrichmentAtomic         = errors.New("native enrichment work did not finish atomically")
+	ErrEnrichmentIdentityReview = errors.New("source post identity requires review")
 )
 
 type EnrichmentTargetCursor struct {

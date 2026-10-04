@@ -9,8 +9,9 @@ import (
 )
 
 type EnrichmentExecution struct {
-	Job    *models.ArchiveJob       `json:"job"`
-	Target *models.EnrichmentTarget `json:"target"`
+	Job                 *models.ArchiveJob                    `json:"job"`
+	Target              *models.EnrichmentTarget              `json:"target"`
+	DiscoveryResolution *models.EnrichmentDiscoveryResolution `json:"discovery_resolution,omitempty"`
 }
 
 // Describe uses the job's historical scope. Its target URL/input is immutable;
@@ -30,6 +31,10 @@ func (c *EnrichmentCoordinator) Describe(ctx context.Context, token, id string) 
 			return models.ErrEnrichmentConflict
 		}
 		ret = &EnrichmentExecution{Job: job, Target: target}
+		ret.DiscoveryResolution, err = c.Service.Repo.EnrichmentJob.DiscoveryResolution(ctx, id)
+		if err != nil {
+			return err
+		}
 		return nil
 	})
 	return ret, err

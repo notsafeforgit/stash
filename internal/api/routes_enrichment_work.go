@@ -55,6 +55,16 @@ func (rs *nativeArchiveRoutes) enrichmentCompletion(w http.ResponseWriter, r *ht
 	})
 }
 
+func (rs *nativeArchiveRoutes) enrichmentDiscoveryResolution(w http.ResponseWriter, r *http.Request) {
+	rs.readEnrichment(w, r, func(ctx context.Context) (any, error) {
+		value, err := rs.repo.EnrichmentJob.DiscoveryResolution(ctx, chi.URLParam(r, "job"))
+		if err == nil && value == nil {
+			err = ingest.ErrNotFound
+		}
+		return value, err
+	})
+}
+
 func (rs *nativeArchiveRoutes) enrichmentTargets(w http.ResponseWriter, r *http.Request) {
 	limit, err := documentLimit(r)
 	if err != nil {

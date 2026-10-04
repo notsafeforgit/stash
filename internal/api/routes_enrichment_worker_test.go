@@ -38,6 +38,11 @@ type enrichmentHTTPFixture struct {
 
 func newEnrichmentHTTPFixture(t *testing.T) *enrichmentHTTPFixture {
 	t.Helper()
+	return newEnrichmentHTTPFixtureForPost(t, models.SourcePostIdentifier{Namespace: "native:reddit", Value: "abc123"})
+}
+
+func newEnrichmentHTTPFixtureForPost(t *testing.T, reference models.SourcePostIdentifier) *enrichmentHTTPFixture {
+	t.Helper()
 	config.InitializeEmpty()
 	db := sqlite.NewDatabase()
 	require.NoError(t, db.Open(filepath.Join(t.TempDir(), "enrichment.sqlite")))
@@ -48,7 +53,7 @@ func newEnrichmentHTTPFixture(t *testing.T) *enrichmentHTTPFixture {
 	f.worker.Now = func() time.Time { return f.now }
 	f.handler = (&ingestRoutes{service: f.service, enrichment: f.worker}).router()
 	require.NoError(t, f.repo.WithTxn(t.Context(), func(ctx context.Context) error {
-		post, err := f.repo.SourceEvidence.EnsurePost(ctx, models.SourcePostIdentifier{Namespace: "native:reddit", Value: "abc123"}, "")
+		post, err := f.repo.SourceEvidence.EnsurePost(ctx, reference, "")
 		if err != nil {
 			return err
 		}

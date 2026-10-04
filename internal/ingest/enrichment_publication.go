@@ -2,6 +2,7 @@ package ingest
 
 import (
 	"context"
+	"errors"
 
 	"github.com/stashapp/stash/pkg/archive"
 	"github.com/stashapp/stash/pkg/models"
@@ -92,6 +93,15 @@ func (c *EnrichmentCoordinator) Publish(ctx context.Context, token string, lease
 				if err != nil {
 					return err
 				}
+				if post == nil || post.UUID != work.PostUUID {
+					if _, err := c.Service.Repo.EnrichmentJob.ResolveDiscoveryIdentity(ctx, owned, expected, digest, record.Ordinal, c.Now()); err != nil {
+						return err
+					}
+					post, err = c.Service.Repo.SourceEvidence.FindPostByIdentifier(ctx, *reference)
+					if err != nil {
+						return err
+					}
+				}
 				if post == nil || post.UUID != work.PostUUID || post.State != "active" ||
 					(collection.Namespace != "" && collection.Namespace != reference.Namespace) {
 					return models.ErrEnrichmentConflict
@@ -142,6 +152,13 @@ func (c *EnrichmentCoordinator) Publish(ctx context.Context, token string, lease
 		return nil
 	})
 	if err != nil {
+		if errors.Is(err, models.ErrEnrichmentIdentityReview) {
+			// The publication transaction has rolled back. Preserve staging and
+			// stop automatic retries until the owner resolves the identity.
+			if _, failure := c.Fail(ctx, token, lease, "post_identity_conflict"); failure != nil {
+				return nil, failure
+			}
+		}
 		return nil, err
 	}
 	return result, nil

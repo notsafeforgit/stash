@@ -438,7 +438,8 @@ schema 6 adds durable backfill calls, history checks and completion proof.
 Schema 7 adds retained n8n receipt history; schema 8 adds the enrichment execution
 journal; schema 9 adds enrichment discovery cursors and backoff; schema 10 adds
 rotation across worker profiles and permitted metadata collections; schema 11
-adds durable discovery page delivery. Opening an outbox from schemas 1–10 promotes it
+adds durable discovery page delivery; schema 12 adds its dispatch cursors and
+backoff. Opening an outbox from schemas 1–11 promotes it
 in one SQLite transaction, preserving event bytes, receipts, dependencies,
 active delivery/submission leases, frozen requests and caller tickets. Old tickets
 are linked to the first covering submissions from their original request sequence;
@@ -2006,8 +2007,8 @@ This collector does not submit a job, advance a stored cursor, accept a source
 post match or certify an account scan as completed. Native discovery storage and
 the [scoped worker HTTP protocol](../../docs/native-ingestion.md#account-listing-discovery)
 now retain one page per owned job, releasing the service before the next page.
-The protocol advertises `discovery_protocol: 1` and
-`discovery_source_pacing_protocol: 1`; it does not advertise discovery dispatch.
+The protocol advertises `discovery_protocol: 1`,
+`discovery_source_pacing_protocol: 1` and `discovery_dispatch_protocol: 1`.
 It accepts existing definition UUIDs and their pinned hashes, not replacement
 source definitions or worker-selected initial cursors.
 
@@ -2100,10 +2101,49 @@ review or failed outcomes, and 1 for invalid input or an exception. The receipt'
 page nor completed enumeration establishes a candidate match or completed catalog
 import. `status` now includes the discovery journal's retained work.
 
-Discovery dispatch, reviewed activation, candidate
-matching and verified native page release remain required. These commands do not
+Reviewed activation, candidate matching and verified native page release remain
+required. These commands do not
 create listing definitions or activate imported accounts. Existing production
 workers and host/n8n launchers have not switched to native discovery.
+
+### Discovery dispatch across existing listings
+
+```sh
+stash-ingest --outbox /state/outbox.sqlite --endpoint https://stash.example \
+  --producer PRODUCER_UUID dispatch-discovery --collection COLLECTION_UUID \
+  --profile /worker/reddit-discovery.json
+```
+
+Each invocation first replays saved page/failure delivery for that collection,
+including evidence fetched with an older profile. It then resumes local owned
+work, discovers due admitted jobs, and finally admits one eligible existing
+listing by its pinned definition hash. Original page receipts remain the only
+acknowledgement of delivered observations. A matching profile can reclaim the
+same producer's expired pending page; a different profile leaves it waiting for
+the original one. Without `--profile`, this command only attempts saved delivery
+and never claims a lease or contacts a source website.
+
+Schema 12 persists independent delivery, local recovery, job and listing cursors
+per collection/policy, plus revision-checked changes and retry/idle delays. The
+dispatcher inspects at most 20 candidates per traversal, follows empty filtered
+pages and wraps admitted-job traversal before considering fresh admission.
+Contention on an existing claim must not fill the queue with additional jobs.
+Lost admission responses are recovered through the ready-job index. Saved
+selection and backoff survive process restart; failed polls use 5–320 second
+exponential delays, honoring longer server delays up to one day. Idle traversal
+waits 30 seconds. No loop inside the command continuously polls a website.
+
+Exit 0 means `page_delivered` or `idle`; neither proves all listings completed,
+candidate matches were accepted, or catalog import finished. Inspect the page
+receipt's `complete` flag and `discovery-status` separately. Other pending/review/
+retry outcomes return 2, and invalid command input returns 1. Global worker-profile
+rotation and production host/n8n activation remain separate transition work.
+
+Promotion from schema 11 adds only the dispatch table; exact pending pages,
+claims, receipts and every previous outbox table are preserved transactionally.
+Unknown name collisions roll back without replacing evidence. Schema-11 producer
+code refuses schema 12, so include the outbox in coordinated backups and preserve
+it during rollback. Native Stash schema 1000071 is unchanged.
 
 ## Validation
 
@@ -2159,3 +2199,9 @@ capacity, rejected pages, a later attempt's completion, empty final pages and a
 changed policy. Delivery-only CLI recovery has no website profile and preserves
 the original source numbers without refetching. Private access values never
 enter the outbox or command output.
+`TestPythonDiscoveryDispatchResumesWithoutRepeatingPages` starts a separate
+producer process for each cycle against native HTTP. Lost admission and page
+acknowledgements, delivery-only CLI recovery and filtered readiness pages reach
+the original final cursor with exactly two page fetches and one native attempt
+per page. Producer migration tests compare every retained table and pending page
+across schema 11 → 12, and reject table collisions without changing their data.

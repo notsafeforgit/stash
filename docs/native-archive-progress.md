@@ -6301,3 +6301,47 @@ started. Durable producer dispatch, reviewed legacy discovery activation,
 candidate matching, verified native page release and reviewed post consolidation
 remain open alongside the broader transition gates. Production and `develop`
 remain unchanged.
+
+## Durable per-collection discovery dispatch — 2026-10-04
+
+`dispatch-discovery --collection UUID --profile PATH` now advances existing
+reviewed account-listing definitions through scoped readiness. A cycle prioritizes
+saved deliveries from any previous profile, local recovery and due admitted jobs
+before fresh admission. Saved pages require their original matching profile only
+when new ownership is necessary. Delivery-only dispatch omits the website profile
+and cannot claim or fetch. The server advertises discovery dispatch protocol 1.
+
+Producer schema 12 retains separate delivery, local-work, job and listing cursors
+with revision-checked updates and persisted backoff. Empty filtered pages advance
+the inspection cursor; blocked claims cannot cause successive polls to fill the
+native queue. Lost admission responses are recovered through indexed job readiness.
+Idle traversal, successful page delivery, final enumeration and accepted post
+matches remain distinct results. This is an explicit collection/profile command;
+global worker-profile rotation and activation of imported definitions remain open.
+
+Promotion from producer schema 11 adds only the dispatch table. Tests preserve
+every existing table, exact staged pages and original claims/receipts; an unknown
+table collision leaves the prior version and evidence intact. Earlier migration
+fixtures now remove the new table when constructing historical outbox inputs.
+Native schema 1000071, the verified rehearsal and the original compatible snapshot
+are unchanged.
+
+All 441 producer tests pass in 40 seconds, including twelve dispatch/migration
+tests. Three real Go/Python restart scenarios pass in 18 seconds. Each cycle runs
+in a new process against native HTTP; lost admissions, lost page acknowledgements,
+delivery-only CLI recovery and empty filtered pages reach the final cursor with
+exactly two page fetches and one native attempt per page. Private website access
+values stay out of the outbox and command output. Go lint passes with zero issues.
+The existing discovery/enrichment transport and restart regressions pass in
+102 seconds. Their earlier run found one old assertion expecting dispatch to
+remain unadvertised; the expectation now checks the implemented protocol, and
+the entire selected set passes. Evidence is under
+`.local/native-discovery-client-20261004/`.
+
+The preceding readiness increment passed the complete pre-push gate. This producer
+increment still requires the remaining global dispatch integration, reviewed
+activation, matching, staging release and post-consolidation work before native
+discovery can replace the production recovery services. The full transition's
+remaining import, UI, caller conversion, compatibility removal, coordinated
+backup/restore, cutover and retirement requirements remain in effect. Production
+and `develop` remain unchanged.

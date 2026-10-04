@@ -184,7 +184,7 @@ func TestDiscoveryWorkerHTTPRejectsInvalidAndUnauthorizedRequests(t *testing.T) 
 	require.EqualValues(t, 1, capabilities["discovery_protocol"])
 	require.EqualValues(t, 1, capabilities["discovery_source_pacing_protocol"])
 	require.EqualValues(t, archive.MaxDiscoveryPageBytes, capabilities["max_discovery_page_bytes"])
-	require.NotContains(t, capabilities, "discovery_dispatch_protocol")
+	require.EqualValues(t, 1, capabilities["discovery_dispatch_protocol"])
 }
 
 func TestDiscoveryWorkerHTTPCollectionAndProducerIsolation(t *testing.T) {

@@ -124,6 +124,9 @@ def main(argv=None):
     discovery_deliver.add_argument("job_uuid")
     discovery_status = commands.add_parser("discovery-status", help="Inspect local page delivery; page success is not listing completion")
     discovery_status.add_argument("--job")
+    discovery_dispatch = commands.add_parser("dispatch-discovery", help="Recover saved pages and optionally advance reviewed account listings")
+    discovery_dispatch.add_argument("--collection", required=True)
+    discovery_dispatch.add_argument("--profile", help="Enable new pages with this reviewed profile; otherwise only deliver saved evidence")
     args = parser.parse_args(argv)
     box = None
     try:
@@ -247,6 +250,14 @@ def main(argv=None):
         elif args.command == "discovery-status":
             from .discovery_journal import DiscoveryJournal
             output = DiscoveryJournal(box).summary(args.job)
+        elif args.command == "dispatch-discovery":
+            from .discovery_dispatch import dispatch_once as dispatch_discovery
+            profile = None
+            if args.profile:
+                from .discovery_configuration import DiscoveryConfiguration
+                profile = DiscoveryConfiguration(args.profile)
+            with worker_output():
+                output = dispatch_discovery(box, client, args.collection, profile)
         else:
             from .backfill_calls import BackfillCalls
             from .enrichment_journal import EnrichmentJournal
@@ -274,6 +285,8 @@ def main(argv=None):
             return 0 if output["state"] == "completed" else 2
         if args.command in ("execute-discovery", "deliver-discovery"):
             return 0 if output["state"] == "page_delivered" else 2
+        if args.command == "dispatch-discovery":
+            return 0 if output["state"] in ("page_delivered", "idle") else 2
         if args.command == "dispatch-enrichment":
             return 0 if output["state"] in ("completed", "idle") else 2
         if args.command == "ticket-status":

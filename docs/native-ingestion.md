@@ -666,6 +666,7 @@ cursors survive retries; final enumeration and candidate matching are separate
 outcomes. See the [storage and scheduling contract](native-schema.md#durable-account-listing-pages).
 
 Capabilities advertise `discovery_protocol: 1`, `discovery_readiness_protocol: 1`,
+`discovery_dispatch_protocol: 1`,
 `discovery_source_pacing_protocol: 1` and `max_discovery_page_bytes: 33554432`.
 The following routes live under `/api/v3/ingest/discovery` and use the existing
 producer bearer credentials and collection/root grants. Authentication runs
@@ -711,7 +712,7 @@ exhaustion 429. Responses retain `Cache-Control: no-store`.
 The supported Python `DiscoveryClient` validates definition digests, original
 cursor bindings and receipt ownership before accepting responses. Its shared
 `JobLease` uses the server clock and stable owner identity for renewal and lost
-claim recovery. Producer schema 11 retains claim intents, exact page bytes and
+claim recovery. The producer retains claim intents, exact page bytes and
 acknowledgements in a durable local discovery journal. Its capacity reservations
 share the existing download/enrichment budget. Body removal requires a matching
 receipt; a terminal job description cannot discard pending local evidence.
@@ -737,12 +738,17 @@ preserves fetched pages, original producer attempts and receipt replay. It
 neither creates new listing definitions nor contacts a source website.
 
 These endpoints do not create listing definitions, activate imported work,
-explicitly retry a terminal job or accept a candidate match. No discovery
-dispatch capability is advertised. The selected-job producer worker delivers
+explicitly retry a terminal job or accept a candidate match. The selected-job producer worker delivers
 saved evidence before claiming or fetching; its delivery-only CLI needs no
 website profile and cannot claim another attempt. A listing profile explicitly
-binds `account.list_page`, separately from enrichment policies. Producer
-dispatch, reviewed activation and candidate matching remain
+binds `account.list_page`, separately from enrichment policies. Producer schema
+12 adds durable per-collection/policy cursors and backoff for `dispatch-discovery`.
+Each invocation replays saved deliveries before resuming owned work, visiting
+due jobs and admitting an eligible existing definition. Omitting the profile
+permits delivery only. A lost admission is recovered through the ready-job index;
+filtered empty pages advance using their inspection cursor. An idle dispatch
+does not establish enumeration completion. Global worker-profile integration,
+reviewed activation and candidate matching remain
 necessary before host/n8n callers switch to native discovery. In particular, a
 retained nonfinal page is successful page delivery, not successful enumeration
 or a completed catalog import.

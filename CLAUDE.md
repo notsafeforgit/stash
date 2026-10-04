@@ -465,7 +465,10 @@ uses bounded active-job and collection-definition indexes. Its listing cursor
 tracks inspected rows, so an empty filtered page can still have more work.
 Readiness must not load page bodies or confer ownership. Application maintenance
 ends stale source definitions and expired claims while retaining pages, receipts
-and retry deadlines. Discovery dispatch,
+and retry deadlines. Producer schema 12 adds `dispatch-discovery` for an explicit
+collection/profile, with durable cursors and backoff. Saved delivery precedes
+new source work; delivery-only mode requires no website profile. Idle traversal
+is not completed enumeration or matching. Global worker-profile integration,
 reviewed activation and matching remain transition work. See
 [listing storage](docs/native-schema.md#durable-account-listing-pages).
 

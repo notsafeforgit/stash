@@ -22,7 +22,7 @@ client = DiscoveryClient(Client(setup["endpoint"], setup["producer"], timeout=30
 capabilities = client.capabilities(readiness=True)
 assert capabilities["discovery_protocol"] == 1
 assert capabilities["discovery_source_pacing_protocol"] == 1
-assert "discovery_dispatch_protocol" not in capabilities
+assert capabilities["discovery_dispatch_protocol"] == 1
 listing = setup["listing"]
 admission = (listing["uuid"], listing["sha256"], listing["policy_sha256"], listing["extractor_version"])
 readiness = (listing["collection_uuid"], listing["policy_sha256"], listing["extractor_version"])

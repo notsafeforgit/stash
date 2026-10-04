@@ -6209,3 +6209,45 @@ rehearsal remain current. No new full database copy was created, and about
 and maintenance, reviewed activation, matching, verified native page release and
 reviewed post consolidation remain open, alongside the rest of the transition.
 Production and `develop` remain unchanged.
+
+## Selected discovery page execution — 2026-10-04
+
+The producer now executes or recovers one admitted listing page with
+`execute-discovery`, replays saved intents with `deliver-discovery`, and exposes
+`discovery-policy` and `discovery-status`. Account-listing profiles explicitly
+bind `account.list_page` under `stash-gallery-discovery-v1`; they accept the
+supported Reddit submitted or Twitter timeline forms for their reviewed service.
+Private access references stay worker-side. Shared profile preparation preserves
+the existing enrichment policy hash and its post-only scope.
+
+Execution delivers retained evidence first, records claim ownership before
+network access, reserves local capacity before extraction and supplies server
+lease/source checks to the isolated collector. A returned page is persisted
+before possibly expired ownership is checked. Recovery tries the original
+acknowledgement before acquiring a new attempt for unchanged same-producer bytes.
+A later attempt's completion cannot discard an unacknowledged page. Controlled
+source failures retain their own delivery intents and server retry deadlines;
+capacity failure releases the claimed attempt before any source fetch.
+
+The delivery-only CLI runs without a website profile and cannot claim or fetch.
+Exit 0 means `page_delivered`; the receipt still distinguishes a final from a
+nonfinal page. Neither result claims accepted matches or a completed catalog
+import. Dispatch across definitions and activation of imported accounts remain
+separate work.
+
+All 427 producer tests pass in 37 seconds. Ten real Go/Python worker scenarios
+pass in 33 seconds, using separate processes for recovery: lost claims, pages
+and failures; expired ownership; pause after extraction; capacity exhaustion;
+rejected pages; a later attempt's completion; empty final pages; and policy
+mismatch before claim. They retain exact source decimals, recover without
+refetching, preserve review evidence and exclude private access values from
+outbox and command output. Existing enrichment/discovery API regressions pass
+in 58 seconds, and the Go lint gate reports zero issues. Evidence remains under
+`.local/native-discovery-client-20261004/`.
+
+No native schema or rehearsal copy changed; producer schema 11 remains current.
+Discovery dispatch, readiness/stale-definition maintenance, reviewed activation,
+matching, verified native staging release and post consolidation remain open.
+The remaining import, native UI, host/n8n conversion, compatibility removal,
+coordinated backup/restore, production cutover and retirement gates still apply.
+Production and `develop` remain unchanged.

@@ -30,6 +30,10 @@ func newDiscoveryHTTPFixture(t *testing.T) *discoveryHTTPFixture {
 }
 
 func newDiscoveryHTTPFixtureAt(t *testing.T, now time.Time) *discoveryHTTPFixture {
+	return newDiscoveryHTTPFixtureForPolicy(t, now, strings.Repeat("a", 64))
+}
+
+func newDiscoveryHTTPFixtureForPolicy(t *testing.T, now time.Time, policy string) *discoveryHTTPFixture {
 	t.Helper()
 	f := &discoveryHTTPFixture{enrichmentHTTPFixture: newEnrichmentHTTPFixture(t)}
 	f.now = now
@@ -54,7 +58,7 @@ func newDiscoveryHTTPFixtureAt(t *testing.T, now time.Time) *discoveryHTTPFixtur
 		}
 		f.listing, err = f.repo.DiscoveryJob.CreateListing(ctx, models.DiscoveryListingInput{UUID: uuid.NewString(), AccountUUID: account.UUID,
 			CollectionUUID: f.collection.UUID, CollectionRevision: f.collection.Revision, ProfileURL: page.URL,
-			PolicySHA256: strings.Repeat("a", 64), ExtractorVersion: page.ExtractorVersion, NotBefore: f.now}, f.now)
+			PolicySHA256: policy, ExtractorVersion: page.ExtractorVersion, NotBefore: f.now}, f.now)
 		return err
 	}))
 	return f

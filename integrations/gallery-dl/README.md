@@ -2049,11 +2049,45 @@ one transaction. Unknown table collisions roll back. Older producer code
 refuses schema 11; include the outbox and its pending page bodies in coordinated
 backups. This does not change the native Stash schema or activate any worker.
 
-Discovery execution/dispatch, readiness and maintenance, reviewed activation,
-candidate matching and verified native page release remain required. The
-collector, protocol client and local journal are components, not an activated
-discovery CLI or host/n8n integration. Existing production workers have not
-switched to them.
+### Selected discovery page execution
+
+`discovery_worker.execute(outbox, client, profile, job_uuid)` executes or recovers
+one already-admitted page job. A discovery profile uses
+`schema: "stash-gallery-discovery-v1"`, `source_category` set to `reddit` or
+`twitter`, and the same `gallery` and private `bindings` structure as metadata
+enrichment profiles. Its policy hash explicitly binds `account.list_page` and
+cannot substitute for a `post.enrich` policy. Existing enrichment hashes remain
+unchanged. Website access values stay local; delivery of a saved page requires
+only the native producer API token.
+
+The CLI accepts the usual `--outbox`, `--endpoint`, `--producer` and `--token-env`
+arguments:
+
+| Command | Effect |
+| --- | --- |
+| `discovery-policy --profile PATH` | Validate an account-listing profile and print its portable policy hash and pinned runtime |
+| `execute-discovery JOB_UUID --profile PATH` | Deliver saved work first, then claim/fetch one page if its original listing and reviewed profile still match |
+| `deliver-discovery JOB_UUID` | Replay saved page/failure intents without loading a website profile or claiming another attempt |
+| `discovery-status [--job JOB_UUID]` | Inspect local delivery phases, retained bytes, pending intent and page receipt |
+
+Execution reserves local capacity before source access, passes lease and source
+reservation checks into the isolated collector, and persists its result before
+checking potentially expired ownership. A lost claim reuses its recorded owner.
+Delivery after an expired attempt first tries the original receipt; new ownership
+may reuse the exact same page bytes for this producer and job. A conflicting
+later completion leaves unacknowledged data in review. Capacity exhaustion ends
+the claimed attempt with a controlled failure before fetching source data.
+
+Execution/delivery exit 0 only for `page_delivered`, 2 for waiting, retry, capacity,
+review or failed outcomes, and 1 for invalid input or an exception. The receipt's
+`complete` flag distinguishes a final page from a nonfinal one. Neither a delivered
+page nor completed enumeration establishes a candidate match or completed catalog
+import. `status` now includes the discovery journal's retained work.
+
+Discovery dispatch, readiness and maintenance, reviewed activation, candidate
+matching and verified native page release remain required. These commands do not
+create listing definitions or activate imported accounts. Existing production
+workers and host/n8n launchers have not switched to native discovery.
 
 ## Validation
 
@@ -2102,3 +2136,10 @@ staged bytes only with the checked native receipt. The fixture checks lease
 renewal and source reservation, the next page's original cursor and the first
 page's receipt after the next job fails. Retaining
 a nonfinal page does not mark enumeration complete or publish native post matches.
+`TestPythonDiscoveryExecutionRecoversOwnedPagesWithoutRefetch` runs the selected
+worker through separate Python processes against the native API. Ten scenarios
+cover lost claims/pages/failures, expired ownership, pause after extraction,
+capacity, rejected pages, a later attempt's completion, empty final pages and a
+changed policy. Delivery-only CLI recovery has no website profile and preserves
+the original source numbers without refetching. Private access values never
+enter the outbox or command output.

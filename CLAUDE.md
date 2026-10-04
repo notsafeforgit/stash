@@ -456,7 +456,11 @@ page acknowledgements; it shares server-clock ownership with enrichment through
 policy/runtime. Producer schema 11 journals the original claim, exact page bytes
 and checked receipt; discovery, enrichment and file events share one outbox byte
 budget. Preserve saved bodies across restart and lease failover. A later native
-job status cannot discard unacknowledged local data. Producer execution/dispatch,
+job status cannot discard unacknowledged local data. `execute-discovery` now
+executes one admitted page using a separately pinned account-listing profile;
+`deliver-discovery` recovers original intents without website access or a new
+claim. Save returned evidence before testing possibly expired ownership. Page
+delivery is not completed enumeration or a published match. Discovery dispatch,
 reviewed activation and matching remain transition work. See
 [listing storage](docs/native-schema.md#durable-account-listing-pages).
 

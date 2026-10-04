@@ -115,6 +115,15 @@ def main(argv=None):
     enrichment_dispatch = commands.add_parser("dispatch-enrichment", help="Recover saved metadata and optionally admit/execute source work")
     enrichment_dispatch.add_argument("--collection", required=True)
     enrichment_dispatch.add_argument("--profile", help="Enable new lookups using this reviewed profile; otherwise only deliver saved results")
+    discovery_policy = commands.add_parser("discovery-policy", help="Validate a metadata-only account listing profile")
+    discovery_policy.add_argument("--profile", required=True)
+    discovery_execute = commands.add_parser("execute-discovery", help="Execute or recover one admitted account listing page")
+    discovery_execute.add_argument("job_uuid")
+    discovery_execute.add_argument("--profile", required=True)
+    discovery_deliver = commands.add_parser("deliver-discovery", help="Deliver saved discovery evidence without website access")
+    discovery_deliver.add_argument("job_uuid")
+    discovery_status = commands.add_parser("discovery-status", help="Inspect local page delivery; page success is not listing completion")
+    discovery_status.add_argument("--job")
     args = parser.parse_args(argv)
     box = None
     try:
@@ -222,13 +231,30 @@ def main(argv=None):
                 profile = EnrichmentConfiguration(args.profile)
             with worker_output():
                 output = dispatch_enrichment(box, client, args.collection, profile)
+        elif args.command == "discovery-policy":
+            from .discovery_configuration import DiscoveryConfiguration
+            profile = DiscoveryConfiguration(args.profile)
+            output = {"policy_sha256": profile.policy_sha256, "extractor_version": profile.extractor_version,
+                      "source_category": profile.source_category, "operation": profile.operation, "state": "validated"}
+        elif args.command in ("execute-discovery", "deliver-discovery"):
+            from .discovery_worker import execute as execute_discovery
+            profile = None
+            if args.command == "execute-discovery":
+                from .discovery_configuration import DiscoveryConfiguration
+                profile = DiscoveryConfiguration(args.profile)
+            with worker_output():
+                output = execute_discovery(box, client, profile, args.job_uuid)
+        elif args.command == "discovery-status":
+            from .discovery_journal import DiscoveryJournal
+            output = DiscoveryJournal(box).summary(args.job)
         else:
             from .backfill_calls import BackfillCalls
             from .enrichment_journal import EnrichmentJournal
+            from .discovery_journal import DiscoveryJournal
             from .n8n_receipts import LegacyReceipts
             output = {**box.status(), "source_requests": requests.status(), "source_calls": calls.summary(),
                       "backfill_calls": BackfillCalls(box).summary(), "legacy_n8n_receipts": LegacyReceipts(box).summary(),
-                      "enrichment": EnrichmentJournal(box).summary()}
+                      "enrichment": EnrichmentJournal(box).summary(), "discovery": DiscoveryJournal(box).summary()}
         print(json.dumps(output, sort_keys=True))
         if args.command == "lookup-collections":
             return 0 if all(item["state"] == "resolved" for item in output["targets"]) else 2
@@ -246,6 +272,8 @@ def main(argv=None):
             return 0 if output["state"] == "source_succeeded" else 2
         if args.command in ("execute-enrichment", "deliver-enrichment"):
             return 0 if output["state"] == "completed" else 2
+        if args.command in ("execute-discovery", "deliver-discovery"):
+            return 0 if output["state"] == "page_delivered" else 2
         if args.command == "dispatch-enrichment":
             return 0 if output["state"] in ("completed", "idle") else 2
         if args.command == "ticket-status":

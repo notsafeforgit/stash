@@ -657,8 +657,8 @@ completion of that later work.
 
 ## Account listing discovery
 
-The shared page parser, producer fetch component and scoped discovery worker
-API are implemented. Schema 1000071 retains pinned listing definitions,
+The shared page parser, selected-job producer executor and scoped discovery
+worker API are implemented. Schema 1000071 retains pinned listing definitions,
 producer-owned attempts and immutable compact page receipts. Each leased
 `account.list_page` job finishes after one retained page, releasing the shared
 service reservation before the next page can run. Earlier pages and imported
@@ -719,8 +719,11 @@ for the client contract and remaining execution work.
 
 These endpoints do not create listing definitions, activate imported work,
 explicitly retry a terminal job or accept a candidate match. No discovery
-dispatch capability is advertised. Producer execution/dispatch, readiness and
-maintenance, reviewed activation and candidate matching remain
+dispatch capability is advertised. The selected-job producer worker delivers
+saved evidence before claiming or fetching; its delivery-only CLI needs no
+website profile and cannot claim another attempt. A listing profile explicitly
+binds `account.list_page`, separately from enrichment policies. Producer
+dispatch, readiness and maintenance, reviewed activation and candidate matching remain
 necessary before host/n8n callers switch to native discovery. In particular, a
 retained nonfinal page is successful page delivery, not successful enumeration
 or a completed catalog import.

@@ -11,10 +11,14 @@ SCHEMA = "stash-gallery-enrichment-v1"
 
 
 class EnrichmentConfiguration(Configuration):
+    schema = SCHEMA
+    operation = "post.enrich"
+    categories = POSTS
+
     def _initialize(self, value, base):
         if (not isinstance(value, dict) or set(value) != {"schema", "source_category", "gallery", "bindings"}
-                or value["schema"] != SCHEMA or not isinstance(value["gallery"], dict)
-                or not isinstance(value["source_category"], str) or value["source_category"] not in POSTS):
+                or value["schema"] != self.schema or not isinstance(value["gallery"], dict)
+                or not isinstance(value["source_category"], str) or value["source_category"] not in self.categories):
             raise InvalidData("Invalid metadata-only worker configuration")
         self.source_category = value["source_category"]
         assets = self._bindings(value["bindings"], base)
@@ -24,7 +28,7 @@ class EnrichmentConfiguration(Configuration):
         expanded = self._expand(template)
         self._gallery = safe_config(expanded)
         self.extractor_version = SUPPORTED_VERSION
-        self.policy_sha256 = digest(encode({"version": SCHEMA, "operation": "post.enrich",
+        self.policy_sha256 = digest(encode({"version": self.schema, "operation": self.operation,
             "source_category": self.source_category, "runtime": runtime_identity(),
             "gallery_sha256": digest(profile_bytes(template)), "assets": assets}, CONFIG_LIMIT))
 

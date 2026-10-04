@@ -16,7 +16,7 @@ from .outbox import Capacity, Conflict, LeaseLost
 
 STATE_LIMIT = 64 << 10
 LOCAL_ERRORS = frozenset({"", "native_delivery_unavailable", "source_ownership_unavailable",
-    "unacknowledged_source_evidence", "page_requires_review", "native_job_failed", "native_job_cancelled"})
+    "unacknowledged_source_evidence", "page_requires_review", "failure_requires_review", "native_job_failed", "native_job_cancelled"})
 
 
 def migrate(db):

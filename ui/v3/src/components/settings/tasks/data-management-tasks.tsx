@@ -396,9 +396,6 @@ export function DataManagementTasks() {
   const [migrateHash] = useMutation(GQL.MigrateHashNamingDocument);
   const [migrateBlobs] = useMutation(GQL.MigrateBlobsDocument);
   const [migrateScreenshots] = useMutation(GQL.MigrateSceneScreenshotsDocument);
-  const [migrateLegacySavedFilters] = useMutation(
-    GQL.MigrateLegacySavedFiltersDocument,
-  );
 
   function added(op: string) {
     toast.success(
@@ -806,40 +803,6 @@ export function DataManagementTasks() {
               <FormattedMessage
                 id="actions.rename_gen_files"
                 defaultMessage="Rename generated files"
-              />
-            </Button>
-          }
-        />
-
-        <TaskSectionHeading
-          title={
-            <FormattedMessage
-              id="actions.migrate_saved_filters"
-              defaultMessage="Migrate saved filters"
-            />
-          }
-          description={intl.formatMessage({
-            id: "config.tasks.migrate_saved_filters.description",
-            defaultMessage:
-              "Convert legacy v2.5 saved filter criteria and default filters to the filter AST format.",
-          })}
-          actions={
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={() =>
-                void tryRun(
-                  intl.formatMessage({
-                    id: "actions.migrate_saved_filters",
-                    defaultMessage: "Migrate saved filters",
-                  }),
-                  () => migrateLegacySavedFilters(),
-                )
-              }
-            >
-              <FormattedMessage
-                id="actions.migrate_saved_filters"
-                defaultMessage="Migrate saved filters"
               />
             </Button>
           }

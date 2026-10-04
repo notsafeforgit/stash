@@ -45,7 +45,6 @@ require (
 	github.com/knadh/koanf/v2 v2.3.6
 	github.com/lucasb-eyer/go-colorful v1.4.1
 	github.com/mattn/go-sqlite3 v1.14.52
-	github.com/mitchellh/mapstructure v1.5.0
 	github.com/natefinch/pie v0.0.0-20170715172608-9a0d72014007
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/remeh/sizedwaitgroup v1.0.0
@@ -113,6 +112,7 @@ require (
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
+	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect

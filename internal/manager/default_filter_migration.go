@@ -130,7 +130,11 @@ func importDefaultFilterConfig(source string) (map[string]*models.SavedFilter, [
 				return nil, nil, fmt.Errorf("default filter %q: %w", view, err)
 			}
 		}
-		legacy := filter.ObjectFilter
+		// The historical representation belongs only to this import boundary.
+		legacy, ok := stringMap(entry["object_filter"])
+		if !ok && entry["object_filter"] != nil {
+			return nil, nil, fmt.Errorf("default filter %q: object_filter must be an object", view)
+		}
 		if canonical == nil {
 			canonical, err = models.FilterASTFromLegacySavedFilter(legacy)
 			if err != nil {
@@ -147,7 +151,7 @@ func importDefaultFilterConfig(source string) (map[string]*models.SavedFilter, [
 				pending, hasPending = legacy, true
 			}
 		}
-		filter.FilterAST, filter.ObjectFilter = canonical, nil
+		filter.FilterAST = canonical
 		if canonical != nil {
 			filter.FilterAST, err = canonical.Normalize()
 			if err != nil {

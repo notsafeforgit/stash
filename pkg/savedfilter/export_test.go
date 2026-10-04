@@ -24,29 +24,26 @@ const (
 )
 
 var (
-	findFilter   = models.FindFilterType{}
-	objectFilter = make(map[string]interface{})
-	uiOptions    = make(map[string]interface{})
+	findFilter = models.FindFilterType{}
+	uiOptions  = make(map[string]interface{})
 )
 
 func createSavedFilter(id int) models.SavedFilter {
 	return models.SavedFilter{
-		ID:           id,
-		Name:         filterName,
-		Mode:         mode,
-		FindFilter:   &findFilter,
-		ObjectFilter: objectFilter,
-		UIOptions:    uiOptions,
+		ID:         id,
+		Name:       filterName,
+		Mode:       mode,
+		FindFilter: &findFilter,
+		UIOptions:  uiOptions,
 	}
 }
 
 func createJSONSavedFilter() *jsonschema.SavedFilter {
 	return &jsonschema.SavedFilter{
-		Name:         filterName,
-		Mode:         mode,
-		FindFilter:   &findFilter,
-		ObjectFilter: objectFilter,
-		UIOptions:    uiOptions,
+		Name:       filterName,
+		Mode:       mode,
+		FindFilter: &findFilter,
+		UIOptions:  uiOptions,
 	}
 }
 

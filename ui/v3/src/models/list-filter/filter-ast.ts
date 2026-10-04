@@ -357,8 +357,7 @@ export function filterASTNodeToGraphQL(
 // `{group: {operator, children}} | {condition: {field, value}}` — the same
 // structure as FilterASTNodeInput. `field` is the client criterion type and
 // `value` is the labeled saved-criterion shape (`{modifier?, value?, field?}`)
-// that `applyToSavedCriterion` historically wrote into object_filter; the
-// backend flattens these values verbatim into the v2.5 compatibility view.
+// used when restoring editable criteria, including their display labels.
 
 export function encodeFilterASTNodeToSaved(node: FilterASTNode): SavedASTNode {
   if (node.kind === "condition") {
@@ -382,38 +381,6 @@ export function encodeFilterASTNodeToSaved(node: FilterASTNode): SavedASTNode {
       children: node.children.map(encodeFilterASTNodeToSaved),
     },
   };
-}
-
-/**
- * Renders the portion of an AST that v2.5 can read from object_filter. A
- * legacy filter is an implicit AND with one condition per field, so OR
- * groups, nested groups, and repeated fields cannot be represented.
- */
-export function filterASTNodeToLegacyObjectFilter(
-  node: FilterASTNode,
-): Record<string, unknown> {
-  if (node.kind === "condition") {
-    if (node.field === "names") return {};
-    const saved = encodeFilterASTNodeToSaved(node);
-    if (!("condition" in saved)) return {};
-    const value = saved.condition.value;
-    const keys = Object.keys(value);
-    return {
-      [node.field]:
-        keys.length === 1 && keys[0] === "value" ? value.value : value,
-    };
-  }
-
-  if (node.operator !== FilterGroupOperator.And) {
-    return {};
-  }
-
-  const result: Record<string, unknown> = {};
-  for (const child of node.children) {
-    if (child.kind !== "condition" || child.field in result) continue;
-    Object.assign(result, filterASTNodeToLegacyObjectFilter(child));
-  }
-  return result;
 }
 
 const SAVED_OPERATORS: readonly FilterGroupOperator[] = [

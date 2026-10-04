@@ -9,9 +9,114 @@ import (
 
 	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/pkg/models"
+	"github.com/stashapp/stash/pkg/models/jsonschema"
+	"github.com/stashapp/stash/pkg/savedfilter"
 	"github.com/stashapp/stash/pkg/sqlite"
 	"github.com/stretchr/testify/require"
 )
+
+func TestNativeSavedFilterExportAndHistoricalImport(t *testing.T) {
+	config.InitializeEmpty()
+	t.Cleanup(func() { config.InitializeEmpty() })
+	db := sqlite.NewDatabase()
+	require.NoError(t, db.Open(filepath.Join(t.TempDir(), "filters.sqlite")))
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	repo := db.Repository()
+	restoredDB := sqlite.NewDatabase()
+	require.NoError(t, restoredDB.Open(filepath.Join(t.TempDir(), "restored.sqlite")))
+	t.Cleanup(func() { require.NoError(t, restoredDB.Close()) })
+	restoredRepo := restoredDB.Repository()
+	ctx := context.Background()
+	const canonical = `{"root":{"group":{"operator":"OR","children":[
+		{"condition":{"field":"title","value":{"modifier":"INCLUDES","value":"café"}}},
+		{"group":{"operator":"AND","children":[
+			{"condition":{"field":"title","value":{"modifier":"EXCLUDES","value":"other"}}},
+			{"condition":{"field":"performers","value":{"modifier":"INCLUDES","value":[{"id":"42","label":"Name at save time"}]}}}
+		]}}
+	]}}}`
+	for _, tt := range []struct{ name, criteria string }{
+		{"canonical", `"filter_ast":` + canonical},
+		{"legacy", `"object_filter":{"title":{"modifier":"INCLUDES","value":"café"},"performers":{"modifier":"INCLUDES","value":{"items":[{"id":"42","label":"Name at save time"}],"excluded":[{"id":"43","label":"Excluded name"}]}}}`},
+		{"transitional", `"object_filter":{"__filter_ast":{"k":0,"o":1,"c":[{"k":1,"f":"title","m":6,"v":"café"},{"k":1,"f":"title","m":8,"v":"other"}]}}`},
+		{"canonical_precedence", `"filter_ast":` + canonical + `,"object_filter":{"title":{"modifier":"INCLUDES","value":"outdated"}}`},
+		{"empty", `"filter_ast":null`},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var input jsonschema.SavedFilter
+			require.NoError(t, json.Unmarshal([]byte(`{"mode":"SCENES","name":"Imported filter","find_filter":{"q":"search","sort":"title","per_page":40},"ui_options":{"retained":"option"},`+tt.criteria+`}`), &input))
+			input.Name += " " + tt.name
+			importOne := func(repo models.Repository, input jsonschema.SavedFilter) *models.SavedFilter {
+				t.Helper()
+				importer := savedfilter.Importer{ReaderWriter: repo.SavedFilter, Input: input}
+				require.NoError(t, importer.PreImport(ctx))
+				var id *int
+				require.NoError(t, repo.WithTxn(ctx, func(ctx context.Context) error {
+					var err error
+					id, err = importer.Create(ctx)
+					return err
+				}))
+				var stored *models.SavedFilter
+				require.NoError(t, repo.WithReadTxn(ctx, func(ctx context.Context) error {
+					var err error
+					stored, err = repo.SavedFilter.Find(ctx, *id)
+					return err
+				}))
+				return stored
+			}
+			original := importOne(repo, input)
+			if tt.name == "empty" {
+				require.Nil(t, original.FilterAST)
+			} else {
+				require.NotNil(t, original.FilterAST)
+				if tt.name == "canonical" || tt.name == "canonical_precedence" {
+					encoded, err := json.Marshal(original.FilterAST)
+					require.NoError(t, err)
+					require.JSONEq(t, canonical, string(encoded))
+				}
+			}
+			exported, err := savedfilter.ToJSON(ctx, original)
+			require.NoError(t, err)
+			encoded, err := json.Marshal(exported)
+			require.NoError(t, err)
+			var properties map[string]json.RawMessage
+			require.NoError(t, json.Unmarshal(encoded, &properties))
+			require.NotContains(t, properties, "object_filter")
+			if tt.name == "legacy" {
+				require.Contains(t, string(encoded), "Name at save time")
+				require.Contains(t, string(encoded), "Excluded name")
+				require.Contains(t, string(encoded), "EXCLUDES")
+			}
+			var restoredInput jsonschema.SavedFilter
+			require.NoError(t, json.Unmarshal(encoded, &restoredInput))
+			restored := importOne(restoredRepo, restoredInput)
+			restored.ID = original.ID
+			require.Equal(t, original, restored)
+		})
+	}
+
+	for _, criteria := range []string{
+		`"object_filter":{"__filter_ast":{"k":99}}`,
+		`"filter_ast":{"root":{}}`,
+	} {
+		var input jsonschema.SavedFilter
+		require.NoError(t, json.Unmarshal([]byte(`{"mode":"SCENES","name":"Invalid import",`+criteria+`}`), &input))
+		importer := savedfilter.Importer{ReaderWriter: repo.SavedFilter, Input: input}
+		err := importer.PreImport(ctx)
+		if err == nil {
+			err = repo.WithTxn(ctx, func(ctx context.Context) error {
+				_, err := importer.Create(ctx)
+				return err
+			})
+		}
+		require.Error(t, err)
+	}
+	require.NoError(t, repo.WithReadTxn(ctx, func(ctx context.Context) error {
+		all, err := repo.SavedFilter.All(ctx)
+		require.NoError(t, err)
+		require.Len(t, all, 5, "rejected imports must not leave partial records")
+		return nil
+	}))
+}
 
 func TestNativeSavedFilterPromotionValidatesBeforeReplacingState(t *testing.T) {
 	config.InitializeEmpty()
@@ -48,7 +153,6 @@ VALUES (10, '{"root":{}}', '{}');`)
 		got, err := repo.SavedFilter.Find(ctx, 10)
 		require.NoError(t, err)
 		require.Equal(t, want, got.FilterAST)
-		require.Nil(t, got.ObjectFilter)
 		return nil
 	}))
 }

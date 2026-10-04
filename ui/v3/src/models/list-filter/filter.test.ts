@@ -50,10 +50,15 @@ it.each(["u.%%%", "u.e30", "not-base64"])(
 it("round trips production dates through saved filters, URLs and query criteria", () => {
   const original = new ListFilterModel(FilterMode.Scenes);
   original.configureFromSavedFilter({
-    object_filter: {
-      production_date: {
-        modifier: CriterionModifier.Equals,
-        value: { value: "2010-06-15" },
+    filter_ast: {
+      root: {
+        condition: {
+          field: "production_date",
+          value: {
+            modifier: CriterionModifier.Equals,
+            value: { value: "2010-06-15" },
+          },
+        },
       },
     },
   });
@@ -69,4 +74,40 @@ it("round trips production dates through saved filters, URLs and query criteria"
   const saved = new ListFilterModel(FilterMode.Scenes);
   saved.configureFromSavedFilter({ filter_ast: restored.makeFilterAst() });
   expect(saved.makeFilterAST()).toEqual(original.makeFilterAST());
+});
+
+it("preserves nested alternatives and repeated fields in native saved filters", () => {
+  const title = (value: string) => ({
+    condition: {
+      field: "title",
+      value: { modifier: CriterionModifier.Includes, value },
+    },
+  });
+  const ast = {
+    root: {
+      group: {
+        operator: "OR",
+        children: [
+          title("first"),
+          {
+            group: {
+              operator: "AND",
+              children: [title("second"), title("third")],
+            },
+          },
+        ],
+      },
+    },
+  };
+  const original = new ListFilterModel(FilterMode.Scenes);
+  original.configureFromSavedFilter({ filter_ast: ast });
+  expect(original.makeFilterAst()).toEqual(ast);
+  const restored = new ListFilterModel(FilterMode.Scenes);
+  restored.configureFromSavedFilter({ filter_ast: original.makeFilterAst() });
+  expect(restored.makeFilterAst()).toEqual(ast);
+  expect(restored.makeFilterAST()).toEqual(original.makeFilterAST());
+
+  restored.configureFromSavedFilter({ filter_ast: null });
+  expect(restored.makeFilterAst()).toBeUndefined();
+  expect(restored.count()).toBe(0);
 });

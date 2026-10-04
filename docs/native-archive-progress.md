@@ -7062,9 +7062,10 @@ Alpine in 57 seconds, using its locked pnpm 12.4.2 toolchain.
 
 UI embedding and manager/configuration tests passed. An initial API run used an
 insufficient eight-minute package timeout and ended while translation migration
-fixtures were still progressing. The complete gate now uses the repository's
-standard twenty-minute timeout; 582 UI tests, 484 producer tests and Go lint
-passed, with the tagged backend suite still running. Reports are under
+fixtures were still progressing. The complete gate passed in 1,187 seconds using
+the repository's standard twenty-minute package timeout: 582 UI tests, 484
+producer tests, Go lint with zero issues and the tagged backend suite. Build,
+Lint, browser tests and image publication also passed for `dc774c4f5`. Reports are under
 `.local/native-discovery-client-20261004/native_ui_retirement_*`.
 
 Contributor, architecture, feature and deployment documentation now describes
@@ -7075,3 +7076,38 @@ flag until the prepared native replacement is activated at the reviewed cutover.
 No production unit, image, database or scraper was changed. Remaining API/plugin
 adapters, client conversion, import/reconciliation, backup/restore and production
 cutover gates are still open; this does not complete the transition.
+
+## Native saved-filter contract — 2026-10-04
+
+Saved filters now read and write canonical ASTs only. Removed the lossy flat
+projection, empty legacy string field, ignored legacy writes to complex filters,
+config-backed default-filter operations and obsolete manual migration task. The
+native UI no longer sends or decodes flat saved/default filters, and its settings
+page no longer offers that task. Default filters continue through the native
+revision-checked service. No new database schema is required.
+
+Historical database/configuration promotion and JSON imports still accept old
+criteria at their import boundaries. Native JSON exports carry only the AST;
+the runtime model no longer carries a second representation. The compact URL
+codec and historical reconciliation helpers remain. Malformed historical default
+criteria fail rather than becoming an empty native filter.
+
+Caller inspection found no filter-operation calls in 43 live n8n workflow
+definitions, 582 installed plugin source files, the catalog source or the
+retained catalog/title plugins. The wider source audit found the old manual
+`saved_filter_experiments.py` transformer and sibling upstream client checkouts;
+these are outside the native caller contract. No configured service, timer,
+workflow or proxy references them. The standalone TV checkout is documented as
+a behavioral reference; built-in native TV already uses canonical filters.
+The old transformer remains a compatible-release diagnostic, not a native
+automation entry point. Current v3 callers use canonical saved filters and
+`configureDefaultFilter`. Generation and the native build pass.
+All 583 UI tests and the retained plugin/application contract checks pass. Real
+GraphQL tests exercise nested/repeated criteria, edits, rejected legacy inputs,
+invalid-write rollback and explicit clearing. SQLite tests restore native and
+historical JSON into a separate database, preserving labels, exclusions and
+canonical precedence. Existing migration/restart/conflict tests also pass.
+
+The full fork gate is running; production, scraper launchers and the frozen
+compatible release remain unchanged. Reports are in
+`.local/native-discovery-client-20261004/saved_filter_native_*`.

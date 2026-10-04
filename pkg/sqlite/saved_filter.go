@@ -15,10 +15,7 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-const (
-	savedFilterTable       = "saved_filters"
-	savedFilterDefaultName = ""
-)
+const savedFilterTable = "saved_filters"
 
 type savedFilterRow struct {
 	ID         int               `db:"id" goqu:"skipinsert"`
@@ -55,14 +52,6 @@ func (r *savedFilterRow) fromSavedFilter(o models.SavedFilter) error {
 		return fmt.Errorf("encoding find filter: %w", err)
 	}
 	ast := o.FilterAST
-	if ast == nil && len(o.ObjectFilter) != 0 {
-		// Transitional callers and historical import files are converted at the
-		// boundary; only the canonical AST is persisted.
-		ast, err = models.FilterASTFromLegacySavedFilter(o.ObjectFilter)
-		if err != nil {
-			return fmt.Errorf("converting imported filter: %w", err)
-		}
-	}
 	if ast != nil {
 		ast, err = ast.Normalize()
 		if err != nil {

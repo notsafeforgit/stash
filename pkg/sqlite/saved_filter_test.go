@@ -54,9 +54,7 @@ func TestSavedFilterDestroy(t *testing.T) {
 		Sort:      &filterSort,
 		Direction: &filterDirection,
 	}
-	objectFilter := map[string]interface{}{
-		"test": "foo",
-	}
+	filterAST := &models.FilterAST{Root: &models.FilterASTNode{Condition: &models.FilterASTCondition{Field: "title", Value: map[string]interface{}{"value": "foo", "modifier": "INCLUDES"}}}}
 	uiOptions := map[string]interface{}{
 		"display_mode": 1,
 		"zoom_index":   1,
@@ -66,11 +64,11 @@ func TestSavedFilterDestroy(t *testing.T) {
 	// create the saved filter to destroy
 	withTxn(func(ctx context.Context) error {
 		newFilter := models.SavedFilter{
-			Name:         filterName,
-			Mode:         models.FilterModeScenes,
-			FindFilter:   &findFilter,
-			ObjectFilter: objectFilter,
-			UIOptions:    uiOptions,
+			Name:       filterName,
+			Mode:       models.FilterModeScenes,
+			FindFilter: &findFilter,
+			FilterAST:  filterAST,
+			UIOptions:  uiOptions,
 		}
 		err := db.SavedFilter.Create(ctx, &newFilter)
 

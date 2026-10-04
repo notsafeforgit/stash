@@ -277,7 +277,7 @@ The codebase has a two-filter system:
 - **Legacy object filter** (`FindFilter`, `*FilterType`) — existing filter arguments passed directly as GraphQL input types
 - **Filter AST** (`FilterAST`, `FilterASTNode`) in `pkg/models/filter_ast*.go` — a newer tree-based filter representation that can serialize to/from the legacy object filter format via `ToObjectFilter()`/`FilterASTFromObjectFilter()`
 
-### Saved filters — AST canonical, v2.5 API compat as a removable layer
+### Saved filters — canonical AST contract
 
 Saved filters persist criteria directly in `saved_filters.filter_ast` as of native schema 1000001. Historical conversion handles the transitional `__filter_ast` key, v2.5 excluded-value splits, and conflicting legacy edits once. Normal startup no longer reconciles database sidecars, and the old object-filter column and shadow table are removed. Pending legacy conflicts survive as review evidence in `saved_filter_import_conflicts`, with the canonical AST selected. Condition values inside the AST use the **labeled saved-criterion shape** (`{value, modifier, field?}`, e.g. `[{id, label}]` items), distinct from the GraphQL input shape used by `*_filter_ast` query arguments. See [native schema promotion](docs/native-schema.md).
 
@@ -285,15 +285,19 @@ Default filters persist in `default_filters` as of native schema 1000003. `inter
 
 `internal/manager/default_filter_update.go` updates one view transactionally through `configureDefaultFilter`. Choosing an imported alternative or keeping the current criteria requires the reviewed revision. The UI configuration response derives `defaultFilters` and `defaultFilterConflicts` from native records; these fields are not written back to YAML. Clients never replace the full UI configuration to change one default filter. See [native schema promotion](docs/native-schema.md) for import and recovery details.
 
+The saved-filter API reads and writes only `filter_ast`. `SavedFilter.filter`,
+`object_filter`, `findDefaultFilter`, `setDefaultFilter` and the obsolete
+`migrateLegacySavedFilters` task are removed. Omitted/null saved criteria clear
+the filter. Historical JSON exports, primary schemas and configuration are
+supported only through their import boundaries; `pkg/models/filter_ast_compat.go`
+retains those conversion/reconciliation helpers and the URL codec. Do not restore
+a live flat projection or silently discard edits to nested filters.
+
+v3 encodes/decodes the persisted shape via `encodeFilterASTNodeToSaved`/`decodeSavedFilterASTNode` (`filter-ast.ts`); `makeFilterAst()` folds non-builder criteria (custom_fields etc.) into the root AND group and `configureFromSavedFilter` splits them back out. The compact encoding (`{k,o,c}`/`{k,f,m,v,cf}`) survives only in URLs (`fa=` param) and its Go decoder (`DecodeCompactFilterAST`); its int tables mirror `COMPACT_OPERATORS`/`COMPACT_MODIFIERS` in `filter-ast.ts` and are append-only.
+
 ### Performer names
 
 Native schema 1000002 stores all names in `performer_names`, with ordered positions, a derived primary flag, and per-name auto-tag policy. Position zero is canonical. `performers.name`, `performer_aliases`, and the policy sidecar are removed; the model/API's name and aliases are read from this one set. Selecting an existing alias moves its policy with it and retains the previous canonical spelling. Performer merge and scrape-merge preserve name policies. Search and the `names` AST criterion include every name; `name` and `aliases` target their respective roles. Different performers may share the same name and disambiguation: matching must consider all candidates, never treat a display name as identity.
-
-The v2.5 saved-filter API keeps working for mainline clients through two shims (`pkg/models/filter_ast_compat.go` + resolvers), both deletable once v2.5 support is dropped:
-- **Read**: `SavedFilter.object_filter` resolves by flattening the AST into the flat v2.5 criteria map (`FlatObjectFilter`). Lossy for OR groups, nesting, and repeated fields; modifier-less wrapper values (custom_fields) unwrap to their bare legacy shape.
-- **Write**: legacy `saveFilter` inputs convert via `FilterASTFromLegacySavedFilter`. A legacy-path save targeting an existing filter whose AST is not flat-representable is **silently dropped** (logged, returns the filter unchanged) so v2.5 clients can't destroy filter structure they never saw.
-
-v3 encodes/decodes the persisted shape via `encodeFilterASTNodeToSaved`/`decodeSavedFilterASTNode` (`filter-ast.ts`); `makeFilterAst()` folds non-builder criteria (custom_fields etc.) into the root AND group and `configureFromSavedFilter` splits them back out. The compact encoding (`{k,o,c}`/`{k,f,m,v,cf}`) survives only in URLs (`fa=` param) and its Go decoder (`DecodeCompactFilterAST`); its int tables mirror `COMPACT_OPERATORS`/`COMPACT_MODIFIERS` in `filter-ast.ts` and are append-only.
 
 ### Code generation
 

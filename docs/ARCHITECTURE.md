@@ -150,12 +150,15 @@ The [native schema](native-schema.md) now owns saved/default filters and perform
 names. Other API bridges remain until their callers are converted:
 
 - Saved filters persist their canonical AST on `saved_filters`; the old sidecar
-  and projection column are removed. Migration evidence retains conflicts.
+  and projection column are removed. Their API and exports use `filter_ast`
+  exclusively; old flat JSON survives only as historical import input.
+  Migration evidence retains conflicts.
 - Default filters persist on `default_filters`. A durable config-import
   checkpoint publishes the cleaned configuration after native records commit.
   `configureDefaultFilter` updates one view; conflict resolution checks its
   revision. The UI configuration response includes derived defaults without
-  maintaining a second writable copy.
+  maintaining a second writable copy. The old default-filter API and migration
+  task are removed; configuration promotion runs before native library access.
 - `Scene.sceneStreams` keeps the legacy stream catalogue.
   [sceneStreamsV3](../internal/api/resolver_model_scene_v3.go) supplies v3's
   separate catalogue. The [legacy adapter](../internal/manager/scene_stream_legacy_compat.go)

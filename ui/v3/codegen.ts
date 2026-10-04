@@ -19,8 +19,6 @@ const config: CodegenConfig = {
       Int64: "number",
       Upload: "File",
       UIConfig: 'import("src/core/config").IUIConfig',
-      SavedObjectFilter:
-        'import("src/models/list-filter/types").SavedObjectFilter',
       SavedFilterAST: 'import("src/models/list-filter/types").SavedFilterAST',
       SavedUIOptions: 'import("src/models/list-filter/types").SavedUIOptions',
     },

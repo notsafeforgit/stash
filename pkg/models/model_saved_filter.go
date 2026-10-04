@@ -62,14 +62,10 @@ func (e FilterMode) MarshalGQL(w io.Writer) {
 }
 
 type SavedFilter struct {
-	ID         int             `db:"id" json:"id"`
-	Mode       FilterMode      `db:"mode" json:"mode"`
-	Name       string          `db:"name" json:"name"`
-	FindFilter *FindFilterType `json:"find_filter"`
-	// Historical criteria map accepted by one-time imports and the remaining
-	// legacy API adapter. Only FilterAST is persisted. The GraphQL object_filter
-	// field is resolved by flattening FilterAST, not from this field.
-	ObjectFilter map[string]interface{} `json:"object_filter"`
-	FilterAST    *FilterAST             `json:"filter_ast"`
-	UIOptions    map[string]interface{} `json:"ui_options"`
+	ID         int                    `db:"id" json:"id"`
+	Mode       FilterMode             `db:"mode" json:"mode"`
+	Name       string                 `db:"name" json:"name"`
+	FindFilter *FindFilterType        `json:"find_filter"`
+	FilterAST  *FilterAST             `json:"filter_ast"`
+	UIOptions  map[string]interface{} `json:"ui_options"`
 }

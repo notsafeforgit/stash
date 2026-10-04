@@ -503,10 +503,13 @@ explicit IDs. `internal/api/bulk_update.go` holds common selection/enqueue
 helpers. Background jobs commit each successful item atomically, report failures,
 and execute enabled post-hooks after successful writes.
 
-Saved/default filters retain a v2.5 projection alongside canonical v3 state.
-`configureDefaultFilter` updates one view atomically on the server and resolves
-legacy conflicts against current state. Do not replace the entire UI configuration
-to change one default. Complex conflicts preserve both versions for user review.
+Saved/default filters use canonical ASTs in the database and API. The old flat
+saved-filter projection, config-backed default API and manual migration task are
+removed. Historical database/configuration and JSON imports convert once before
+native use. `configureDefaultFilter` updates one view atomically and resolves
+imported conflicts against the reviewed revision. Do not replace the entire UI
+configuration to change one default. Complex conflicts retain both versions for
+user review; native saves preserve nested groups and repeated criteria.
 
 `internal/api/job_subscription.go` owns cancel-aware forwarding. Received
 lifecycle events are forwarded without dropping; progress can be dropped under
@@ -544,17 +547,17 @@ logs, diagnostic messages), not their labels or surrounding controls.
 ## Validation
 
 `make validate-ui-v3` runs generation, lint, TypeScript, formatting, locale checks,
-Vitest, and the pinned v2.5 compatibility check. `make validate-fork` adds backend
+Vitest, and current native/plugin contract checks. `make validate-fork` adds backend
 generation, Go lint, and integration tests. `make ui-v3-only` verifies the bundle.
 
-On a clean checkout, install both UI dependency trees, run `make generate`, then
-`make ui` and `make ui-v3-only` **before** `make validate-fork`. Go validation
+On a clean checkout, run `make pre-ui`, `make generate`, then `make ui`
+**before** `make validate-fork`. Go validation
 inspects the embedded v3 route chunks, so generated placeholder directories are
 not enough. The [development guide](development.md#validation) contains the full
 command sequence; the [deployment runbook](../../../docs/v3-deployment.md) covers
 the Stash publisher, stash-s6 bake, and local Quadlet verification.
 
-The compatibility checker validates mainline operations, additive schema changes,
-argument defaults, and the migration track. SQLite fixtures cover v3 close,
-mainline writes, and v3 reopen. These checks do not replace testing real v2.5
-clients or media gestures on physical iOS devices when changing those contracts.
+The contract checker validates current application operations and the retained
+versioned plugin API. SQLite fixtures cover one-time historical imports, native
+writes, restart recovery and reconciliation. Physical iOS checks remain necessary
+for changes to media gestures or playback behavior.

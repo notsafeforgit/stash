@@ -2094,9 +2094,7 @@ func createSavedFilters(ctx context.Context, qb models.SavedFilterReaderWriter, 
 			Mode:       getSavedFilterMode(i),
 			Name:       getSavedFilterName(i),
 			FindFilter: &findFilter,
-			ObjectFilter: map[string]interface{}{
-				"test": "object",
-			},
+			FilterAST:  &models.FilterAST{Root: &models.FilterASTNode{Condition: &models.FilterASTCondition{Field: "title", Value: map[string]interface{}{"value": "object", "modifier": "INCLUDES"}}}},
 			UIOptions: map[string]interface{}{
 				"display_mode": 1,
 				"zoom_index":   1,

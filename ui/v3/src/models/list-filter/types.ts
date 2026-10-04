@@ -1,9 +1,3 @@
-import type { CriterionValue, SavedCriterion } from "./criteria/criterion";
-
-export type SavedObjectFilter = {
-  [K in CriterionType]?: SavedCriterion<CriterionValue>;
-};
-
 // Persisted shape of SavedFilter.filter_ast: the canonical criteria tree.
 // `field` is the client criterion type; `value` is the labeled
 // saved-criterion shape ({modifier?, value?, field?}). Mirrors

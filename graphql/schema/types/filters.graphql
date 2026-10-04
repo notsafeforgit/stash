@@ -1012,16 +1012,7 @@ type SavedFilter {
   id: ID!
   mode: FilterMode!
   name: String!
-  "JSON-encoded filter string"
-  filter: String!
-    @deprecated(reason: "use find_filter and object_filter instead")
   find_filter: SavedFindFilterType
-  # maps to any of the AnyFilterInput types
-  # using a generic Map instead of creating and maintaining match types for inputs
-  object_filter: Map
-    @deprecated(
-      reason: "compatibility view derived from filter_ast; may be lossy for complex filters"
-    )
   """
   Canonical criteria representation: a FilterAST node tree
   (`{group: {operator, children}} | {condition: {field, value}}`) as a
@@ -1038,9 +1029,7 @@ input SaveFilterInput {
   mode: FilterMode!
   name: String!
   find_filter: FindFilterType
-  "Legacy v2.5 criteria map; converted to filter_ast when filter_ast is not provided"
-  object_filter: Map
-  "Canonical criteria representation; takes precedence over object_filter"
+  "Canonical criteria representation; null or omitted means no criteria"
   filter_ast: FilterASTInput
   # generic map for ui options
   ui_options: Map
@@ -1048,13 +1037,4 @@ input SaveFilterInput {
 
 input DestroyFilterInput {
   id: ID!
-}
-
-input SetDefaultFilterInput {
-  mode: FilterMode!
-  "null to clear"
-  find_filter: FindFilterType
-  object_filter: Map
-  # generic map for ui options
-  ui_options: Map
 }

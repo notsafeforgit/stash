@@ -3,8 +3,6 @@ type Query {
   # Filters
   findSavedFilter(id: ID!): SavedFilter
   findSavedFilters(mode: FilterMode): [SavedFilter!]!
-  findDefaultFilter(mode: FilterMode!): SavedFilter
-    @deprecated(reason: "default filter now stored in UI config")
 
   """
   Returns the distinct custom-field names that exist on at least one row of
@@ -530,8 +528,6 @@ type Mutation {
   # Saved filters
   saveFilter(input: SaveFilterInput!): SavedFilter!
   destroySavedFilter(input: DestroyFilterInput!): Boolean!
-  setDefaultFilter(input: SetDefaultFilterInput!): Boolean!
-    @deprecated(reason: "now uses UI config")
 
   "Change general configuration options"
   configureGeneral(input: ConfigGeneralInput!): ConfigGeneralResult!
@@ -589,8 +585,6 @@ type Mutation {
   migrateSceneScreenshots(input: MigrateSceneScreenshotsInput!): ID!
   "Migrates blobs from the old storage system to the current one"
   migrateBlobs(input: MigrateBlobsInput!): ID!
-  "Migrates legacy v2.5 saved filter criteria into the filter AST format"
-  migrateLegacySavedFilters: ID!
 
   "Anonymise the database in a separate file. Optionally returns a link to download the database file"
   anonymiseDatabase(input: AnonymiseDatabaseInput!): String

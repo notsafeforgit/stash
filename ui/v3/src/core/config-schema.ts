@@ -48,9 +48,7 @@ const savedFilterSchema = z.looseObject({
       direction: z.enum(SortDirectionEnum).nullish(),
     })
     .nullish(),
-  // These formats are intentionally decoded by ListFilterModel's legacy/AST
-  // adapters, which understand the criterion-specific values.
-  object_filter: z.unknown().optional(),
+  // ListFilterModel decodes canonical criteria, including their display labels.
   filter_ast: z.unknown().optional(),
 });
 

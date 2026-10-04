@@ -1,5 +1,4 @@
 scalar UIConfig
-scalar SavedObjectFilter
 scalar SavedFilterAST
 scalar SavedUIOptions
 
@@ -8,13 +7,11 @@ extend type ConfigResult {
 }
 
 extend type SavedFilter {
-  object_filter: SavedObjectFilter
   filter_ast: SavedFilterAST
   ui_options: SavedUIOptions
 }
 
 extend input SaveFilterInput {
-  object_filter: SavedObjectFilter
   filter_ast: SavedFilterAST
   ui_options: SavedUIOptions
 }

@@ -152,7 +152,9 @@ func TestHistoricalDefaultFilterConversion(t *testing.T) {
 	defaults, conflicts, err := importDefaultFilterConfig(importedConflictingDefault)
 	require.NoError(t, err)
 	require.Equal(t, models.FilterGroupOperatorOr, defaults["scenes"].FilterAST.Root.Group.Operator)
-	require.Nil(t, defaults["scenes"].ObjectFilter)
+	encoded, err := json.Marshal(defaults["scenes"])
+	require.NoError(t, err)
+	require.NotContains(t, string(encoded), `"object_filter"`)
 	require.Len(t, conflicts, 1)
 	projection, valid := conflicts[0].Alternative.FlatObjectFilter()
 	require.True(t, valid)
@@ -169,6 +171,8 @@ func TestHistoricalDefaultFilterConversion(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, defaults)
 	require.Empty(t, conflicts)
+	_, _, err = importDefaultFilterConfig(`{"defaultFilters":{"scenes":{"mode":"SCENES","object_filter":["malformed"]}}}`)
+	require.ErrorContains(t, err, "object_filter must be an object")
 }
 
 func TestDefaultFilterImportNormalizesHistoricalPagination(t *testing.T) {

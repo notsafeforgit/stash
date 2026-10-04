@@ -31,9 +31,8 @@ export interface ICustomFilter extends ITypename {
   direction: SortDirectionEnum;
 }
 
-// Values written by current builds carry filter_ast; older config values may
-// still carry the legacy object_filter shape — configureFromSavedFilter
-// handles both.
+// Default filters are native database records exposed through UIConfiguration.
+// Historical config values are promoted before the library becomes available.
 export type DefaultFilters = {
   [P in View]?: SavedFilterLike & { mode?: FilterMode };
 };

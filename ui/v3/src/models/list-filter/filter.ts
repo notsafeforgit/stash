@@ -31,7 +31,6 @@ import {
   decodeSavedFilterASTNode,
   encodeFilterASTNode,
   encodeFilterASTNodeToSaved,
-  filterASTNodeToLegacyObjectFilter,
   filterASTNodeToGraphQL,
   astSupportsCriterionType,
   pruneInvalidFilterASTNode,
@@ -64,22 +63,12 @@ const DEFAULT_PARAMS = {
   itemsPerPage: 40,
 };
 
-// object_filter key the transitional v3 format used to embed the compact
-// AST; still read from old saved default-filter config values.
-const FILTER_AST_SAVED_KEY = "__filter_ast";
-
-/**
- * Structural input for `configureFromSavedFilter`: covers the
- * SavedFilterData fragment (filter_ast) plus legacy shapes that may still
- * live in config `defaultFilters` values (object_filter with criterion
- * entries and/or an embedded compact AST).
- */
+// Canonical saved/default filter data returned by the native API.
 export interface SavedFilterLike {
   find_filter?: Pick<
     FindFilterType,
     "q" | "page" | "per_page" | "sort" | "direction"
   > | null;
-  object_filter?: unknown;
   filter_ast?: unknown;
 }
 
@@ -394,8 +383,7 @@ export class ListFilterModel {
   }
 
   public configureFromSavedFilter(savedFilter: SavedFilterLike) {
-    const { find_filter: findFilter, object_filter: objectFilter } =
-      savedFilter;
+    const { find_filter: findFilter } = savedFilter;
 
     this.itemsPerPage =
       typeof findFilter?.per_page === "string"
@@ -428,22 +416,6 @@ export class ListFilterModel {
         this.makeCriterion(type),
       );
       this.splitNonBuilderConditions(decoded);
-    } else if (objectFilter) {
-      // legacy shapes, still found in old config defaultFilters values:
-      // criterion entries keyed by type plus an optional embedded compact AST
-      const obj = objectFilter as Record<string, unknown>;
-      const astValue = obj[FILTER_AST_SAVED_KEY];
-
-      if (astValue) {
-        this.filterAst = decodeFilterASTNode(this.mode, astValue);
-      }
-
-      for (const [k, v] of Object.entries(obj)) {
-        if (k === FILTER_AST_SAVED_KEY) continue;
-        const criterion = this.makeCriterion(k as CriterionType);
-        criterion.setFromSavedCriterion(v);
-        this.criteria.push(criterion);
-      }
     }
 
     this.promoteLegacyCriteria();
@@ -694,11 +666,6 @@ export class ListFilterModel {
 
     if (!root) return undefined;
     return { root: encodeFilterASTNodeToSaved(root) };
-  }
-
-  public makeLegacyObjectFilter(): Record<string, unknown> {
-    const root = this.makeFilterASTNode(false);
-    return root ? filterASTNodeToLegacyObjectFilter(root) : {};
   }
 
   public makeSavedUIOptions(): SavedUIOptions {

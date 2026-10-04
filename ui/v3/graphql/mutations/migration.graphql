@@ -5,7 +5,3 @@ mutation MigrateSceneScreenshots($input: MigrateSceneScreenshotsInput!) {
 mutation MigrateBlobs($input: MigrateBlobsInput!) {
   migrateBlobs(input: $input)
 }
-
-mutation MigrateLegacySavedFilters {
-  migrateLegacySavedFilters
-}

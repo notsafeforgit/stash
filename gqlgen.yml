@@ -156,9 +156,6 @@ models:
         resolver: true
   SavedFilter:
     fields:
-      # v2.5 compatibility view flattened from FilterAST
-      object_filter:
-        resolver: true
       # *models.FilterAST -> generic Map
       filter_ast:
         resolver: true

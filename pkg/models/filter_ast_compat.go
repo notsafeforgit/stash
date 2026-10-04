@@ -6,18 +6,16 @@ import (
 	"slices"
 )
 
-// This file implements the v2.5 saved-filter compatibility layer around
-// FilterAST:
+// Historical saved-filter import and compact URL codecs for FilterAST:
 //
 //   - decoding the v3 UI's compact AST encoding (used in URLs and, in the
 //     transitional format, under the __filter_ast key of a saved filter's
 //     object_filter map);
 //   - converting a legacy v2.5 saved-filter criteria map into a FilterAST;
-//   - flattening a FilterAST back into the v2.5 flat criteria map for
-//     legacy API clients.
+//   - reconstructing historical flat criteria for migration reconciliation.
 //
 // Condition values throughout use the labeled saved-criterion shape
-// ({"value": ..., "modifier": ...}) that v2.5 clients read and write.
+// ({"value": ..., "modifier": ...}) retained by native saved filters.
 
 // LegacyFilterASTKey is the object_filter key the v3 UI transitionally used
 // to embed the compact-encoded AST alongside legacy criteria entries.

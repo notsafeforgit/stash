@@ -49,6 +49,33 @@ def page_bytes(value):
     return native_json(value, MAX_BYTES)
 
 
+def validate_listing_input(value):
+    if (not isinstance(value, dict) or set(value) != LISTING_KEYS
+            or not _integer(value["collection_revision"], 1)
+            or not _integer(value["historical_pages"], 0, 10000000)
+            or not sha256(value["policy_sha256"])):
+        raise InvalidData("Invalid discovery definition")
+    for key in ("uuid", "account_uuid", "collection_uuid"):
+        identifier(value[key])
+    if value["root_uuid"] is not None:
+        identifier(value["root_uuid"])
+    _time(value["not_before"], milliseconds=True)
+    _runtime(value["extractor_version"])
+    platform = profile_platform(value["profile_url"])
+    page_cursor(platform, value["initial_cursor"])
+    legacy = value["legacy"]
+    if legacy is None:
+        if value["initial_cursor"] is not None or value["historical_pages"] != 0:
+            raise InvalidData("A fresh listing cannot invent historical progress")
+    elif (not isinstance(legacy, dict) or set(legacy) != {"snapshot_uuid", "account_ordinal"}
+            or not _integer(legacy["account_ordinal"], 1)):
+        raise InvalidData("Invalid discovery resume reference")
+    else:
+        identifier(legacy["snapshot_uuid"])
+    native_json(value, 32768)
+    return platform
+
+
 class DiscoveryClient:
     def __init__(self, client):
         self.client = client
@@ -183,29 +210,12 @@ class DiscoveryClient:
     @staticmethod
     def _listing(value):
         if (not isinstance(value, dict) or set(value) != LISTING_KEYS | {"sha256", "created_at"}
-                or not _integer(value["collection_revision"], 1)
-                or not _integer(value["historical_pages"], 0, 10000000)
-                or not sha256(value["policy_sha256"]) or not sha256(value["sha256"])):
+                or not sha256(value["sha256"])):
             raise InvalidData("Invalid discovery definition")
-        for key in ("uuid", "account_uuid", "collection_uuid"):
-            identifier(value[key])
-        if value["root_uuid"] is not None:
-            identifier(value["root_uuid"])
-        _time(value["not_before"], milliseconds=True)
+        definition = {key: value[key] for key in LISTING_KEYS}
+        platform = validate_listing_input(definition)
         _time(value["created_at"])
-        _runtime(value["extractor_version"])
-        platform = profile_platform(value["profile_url"])
-        page_cursor(platform, value["initial_cursor"])
-        legacy = value["legacy"]
-        if legacy is None:
-            if value["initial_cursor"] is not None or value["historical_pages"] != 0:
-                raise InvalidData("A fresh listing cannot invent historical progress")
-        elif (not isinstance(legacy, dict) or set(legacy) != {"snapshot_uuid", "account_ordinal"}
-                or not _integer(legacy["account_ordinal"], 1)):
-            raise InvalidData("Invalid discovery resume reference")
-        else:
-            identifier(legacy["snapshot_uuid"])
-        body = native_json({key: value[key] for key in LISTING_KEYS}, 32768)
+        body = native_json(definition, 32768)
         if hashlib.sha256(body).hexdigest() != value["sha256"]:
             raise InvalidData("Discovery definition differs from its pinned digest")
         return platform

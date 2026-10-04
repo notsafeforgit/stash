@@ -44,6 +44,7 @@ stash-import-catalog-translations = "stash_ingest.catalog_translation_import:mai
 stash-activate-automation-enrichment = "stash_ingest.enrichment_activation:main"
 stash-import-automation-enrichment = "stash_ingest.automation_enrichment_import:main"
 stash-import-automation-discovery = "stash_ingest.automation_discovery_import:main"
+stash-activate-automation-discovery = "stash_ingest.discovery_activation:main"
 stash-import-enrichment-checkpoints = "stash_ingest.automation_checkpoint_import:main"
 stash-import-catalog-enrichment = "stash_ingest.catalog_enrichment_import:main"
 stash-import-catalog-documents = "stash_ingest.catalog_document_import:main"

@@ -6526,3 +6526,32 @@ Evidence is under `.local/native-discovery-client-20261004/` and
 of the real held accounts, historical coverage, detail execution, match
 publication and staging release remain open alongside the broader transition
 gates. Production and `develop` remain unchanged.
+
+## Saved discovery activation operator command — 2026-10-04
+
+`stash-activate-automation-discovery` now prepares, shows, applies and inspects a
+single reviewed listing/target batch through the native application API. It saves
+a private file atomically without overwriting an earlier review, checks its exact
+digest and endpoint before use, and preserves generated operation/listing UUIDs
+across retries. Original target ordinals/hashes, saved cursor/history, collection
+scope and exact deadline are validated before preview; the saved response also
+pins native post UUIDs/revisions. Website configuration and credentials remain
+local to the producer.
+
+Apply first looks for the original receipt. A lost committed response therefore
+recovers without issuing another binding request or refreshing the review.
+Conflicting source changes preserve the file and require a new explicit review;
+status and offline Show do not mutate native state. Results distinguish retained
+bindings from execution, accepted identities and historical coverage.
+
+All 458 producer tests pass, including six focused activation tests with the
+1,000-target boundary, changed files/endpoints, cursor and hash mismatches, exact
+deadline normalization, lost responses and stale review. The real Go/Python HTTP
+fixture now invokes the shipping command for prepare/show/status/apply and passes
+in 13 seconds, including response-loss recovery and unchanged saved plan bytes.
+Evidence is under `.local/native-discovery-client-20261004/`.
+
+The schema-73 full-copy rehearsal and full backend gate remain in progress. The
+real held accounts have not been activated. Native review UI, historical
+coverage, detail/publication/staging-release work and the full plan's remaining
+conversion, restore and cutover gates remain open.

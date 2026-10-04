@@ -123,6 +123,12 @@ old process ownership or creates completion proof. The native worker understands
 the original archive-key cursor; widened windows replay without archive stopping.
 Production source registration, final cutover bindings and recovery callers
 remain open.
+`stash-activate-automation-discovery` separately previews one explicit retained
+account listing and target selection into a private review file. Apply/status
+must reuse that file, endpoint and digest after interruption. Preserve the saved
+cursor/history, source record hashes, current collection/root and worker policy;
+binding targets does not admit source jobs or accept a post identity. Runtime
+and website-access configuration remain producer-local.
 `stash-backfill-source-albums` saves reviewed per-post previews and request UUIDs
 before historical album admission. Reuse the same plan/digest after interruption;
 status must match its original post, policy and signature. Explicit retry prepares

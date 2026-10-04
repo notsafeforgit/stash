@@ -18,8 +18,8 @@ from stash_ingest.catalog_snapshot import prepare as prepare_catalog
 from stash_ingest.catalog_upload import main as upload_catalog
 from stash_ingest.catalog_evidence_import import main as import_evidence
 from stash_ingest.catalog_enrichment_import import main as import_receipts
-from stash_ingest.client import Unavailable
-from stash_ingest.enrichment_activation_client import EnrichmentActivationClient
+from stash_ingest.discovery_activation import main as activation_main
+from stash_ingest.discovery_activation_client import DiscoveryActivationClient
 from test_automation_snapshot import automation_fixture
 from test_catalog_registry_import import registry_fixture
 from test_catalog_snapshot import catalog_fixture, CAPTURED
@@ -75,7 +75,7 @@ def run():
     imported = execute(discovery_main, args)
     assert imported["mapped_records"] == 3 and imported["review_records"] == 0, imported
 
-    client = EnrichmentActivationClient(setup["endpoint"])
+    client = DiscoveryActivationClient(setup["endpoint"])
     collection = next(c for c in client.request("GET", "/collections?limit=100") if c["uuid"] == uploaded["collection_uuid"])
     definition = {k: v for k, v in collection.items() if k in {"label", "kind", "namespace", "target_url", "account_uuid", "root_uuid", "path_prefix"}}
     definition.update(state="active", expected_revision=collection["revision"], reason="Reviewed discovery fixture collection")
@@ -92,16 +92,23 @@ def run():
                "not_before": account["not_before"]}
     request = {"uuid": str(uuid.uuid4()), "manifest_sha256": prepared["manifest_sha256"], "listing": listing,
                "targets": [{"source_ordinal": row["ordinal"], "source_sha256": row["sha256"]} for row in targets]}
-    preview = client.request("POST", "/discovery-activations/preview", request)
+    request_file, plan_file = directory / "discovery-binding.json", directory / "discovery-plan.json"
+    request_file.write_text(json.dumps(request))
+    prepared_plan = execute(activation_main, ["prepare", "--input", str(request_file), "--output", str(plan_file),
+                                               "--endpoint", setup["endpoint"]])
+    saved_plan = plan_file.read_bytes()
+    args = ["--plan", str(plan_file), "--expected-sha256", prepared_plan["plan_sha256"]]
+    preview = execute(activation_main, ["show", *args])["preview"]
     assert preview["input"] == request and len(preview["entries"]) == 2
     assert preview["input"]["listing"]["initial_cursor"] == {"after": "t3_prior"}
     apply = {"input": request, "expected_plan_sha256": preview["plan_sha256"]}
-    try:
-        client.request("POST", "/discovery-activations", apply)
-        raise AssertionError("expected a lost committed response")
-    except Unavailable as error:
-        assert error.code == "network_unavailable", error
-    receipt = client.request("GET", "/discovery-activations/" + request["uuid"])
+    assert execute(activation_main, ["status", *args, "--endpoint", setup["endpoint"]], wanted=3)["pending"] is True
+    failed = execute(activation_main, ["apply", *args, "--endpoint", setup["endpoint"]], wanted=1)
+    assert failed["error"] == "network_unavailable", failed
+    recovered = execute(activation_main, ["apply", *args, "--endpoint", setup["endpoint"]])
+    assert recovered["activated"] is True and recovered["execution_status"] == "not_checked"
+    assert plan_file.read_bytes() == saved_plan
+    receipt = client.status(preview)
     assert {key: receipt[key] for key in preview} == preview
     assert client.request("POST", "/discovery-activations", apply) == receipt
     assert client.request("GET", "/discovery-listings/" + listing["uuid"])["historical_pages"] == 67

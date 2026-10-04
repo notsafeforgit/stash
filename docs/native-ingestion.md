@@ -808,8 +808,11 @@ ordinal. All responses disable caching. A receipt proves only that reviewed
 bindings were retained. Producer admission, fetched-page receipts, compared
 listing completion and accepted post identity remain distinct states. Historical
 page counts do not become native receipt counts, and activation never certifies
-historical coverage or completed catalog import. Operator client/UI and the
-remaining detail/publication/release workflow are still being implemented.
+historical coverage or completed catalog import. The
+[`stash-activate-automation-discovery` operator command](../integrations/gallery-dl/README.md#reviewed-discovery-activation)
+saves a private, digest-bound review file and recovers the original operation
+after a lost Apply response. The review UI and remaining
+detail/publication/release workflow are still being implemented.
 
 ## Completed file events
 

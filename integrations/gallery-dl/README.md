@@ -1280,7 +1280,81 @@ Inspect `/api/v3/archive/automation-snapshots/SNAPSHOT_UUID/discovery-import`,
 native accounts, posts and collections where validated; selected-record details
 read original values from the retained snapshot rather than another payload
 copy. See the [schema contract](../../docs/native-schema.md#frozen-discovery-and-maintenance-history).
-Reviewed discovery activation and execution remain separate work.
+Use the separate reviewed activation command below to bind selected held targets.
+Importing this history never activates them automatically.
+
+### Reviewed discovery activation
+
+`stash-activate-automation-discovery` prepares a private review file for one
+account listing and 1–1,000 explicitly selected original discovery targets.
+It uses an application API key from `STASH_API_KEY`, as the importers do.
+Producer credentials cannot authorize these bindings.
+
+The input JSON contains `manifest_sha256`, `listing`, and `targets`:
+
+```json
+{
+  "manifest_sha256": "FROZEN_AUTOMATION_MANIFEST_SHA256",
+  "listing": {
+    "account_uuid": "NATIVE_ACCOUNT_UUID",
+    "collection_uuid": "REVIEWED_COLLECTION_UUID",
+    "collection_revision": 2,
+    "root_uuid": null,
+    "profile_url": "https://www.reddit.com/user/example/submitted/?sort=new",
+    "policy_sha256": "REVIEWED_DISCOVERY_WORKER_POLICY_SHA256",
+    "extractor_version": "1.32.15-dev",
+    "initial_cursor": {"after": "t3_SAVED_CURSOR"},
+    "historical_pages": 67,
+    "legacy": {"snapshot_uuid": "FROZEN_AUTOMATION_SNAPSHOT_UUID", "account_ordinal": 7},
+    "not_before": "2026-10-04T00:00:00Z"
+  },
+  "targets": [{"source_ordinal": 10, "source_sha256": "ORIGINAL_TARGET_RECORD_SHA256"}]
+}
+```
+
+Replace the example values with the selected retained records. The account and
+target details come from the discovery-import routes above; targets must belong
+to that account and collection. Preserve the original profile URL, cursor,
+historical count and retry deadline. Use `initial_cursor: null` when no cursor
+was retained. Select the reviewed current collection revision and its actual
+root, which may be null; imported collections start disabled. Worker policy and
+runtime come from the producer's profile inspection command:
+
+```sh
+stash-ingest --outbox /persistent/producer.sqlite --endpoint STASH_ORIGIN \
+  --producer PRODUCER_UUID discovery-policy --profile PROFILE_PATH
+```
+
+Website credentials and the worker's private configuration stay on the producer.
+The backend rejects unresolved historical staging and stale source bindings.
+
+```sh
+stash-activate-automation-discovery prepare --endpoint STASH_ORIGIN \
+  --input /migration/review/discovery-input.json \
+  --output /migration/review/discovery-plan.json
+stash-activate-automation-discovery show \
+  --plan /migration/review/discovery-plan.json --expected-sha256 PLAN_FILE_SHA256
+stash-activate-automation-discovery apply --endpoint STASH_ORIGIN \
+  --plan /migration/review/discovery-plan.json --expected-sha256 PLAN_FILE_SHA256
+stash-activate-automation-discovery status --endpoint STASH_ORIGIN \
+  --plan /migration/review/discovery-plan.json --expected-sha256 PLAN_FILE_SHA256
+```
+
+`prepare` only previews. It saves the returned post UUIDs/revisions, complete
+listing definition, original record hashes and operation ID before any Apply.
+The returned `plan_sha256` hashes the saved file; pass that value to subsequent
+commands. The server's separate preview hash is retained inside the file.
+An optional input `uuid` or `listing.uuid` can pin an existing identity; omitted
+ones are generated once during preparation. Additional batches for the same
+listing must reuse its saved UUID and exact definition.
+
+`show` works offline. Apply and status recheck the file and endpoint and recover
+the original server receipt after a lost response. Reuse the same file and hash;
+do not generate another operation to retry. A changed source returns exit 2 for
+review, an unapplied status returns 3, and invalid input or transport failure
+returns 1. Exit 0 from Apply proves the bindings were retained. It does not prove
+scraping, comparison, post identity, historical coverage or catalog import
+completion; those have separate native execution and review steps.
 
 ### Legacy enrichment checkpoints
 

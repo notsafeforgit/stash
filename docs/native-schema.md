@@ -2357,8 +2357,47 @@ retaining their original record ordinals. It does not copy post/profile payloads
 Several attachments from one post produce one candidate; separate posts with
 the same caption remain separate candidates. A stronger record can corroborate
 the same post's weak title, while a final or empty page never becomes a match
-on its own. Native candidate storage, cross-page reconciliation, activation and
-publication remain separate implementation work.
+on its own.
+
+Schema 1000072 binds each reviewed held target in `discovery_match_targets` to
+its original frozen record SHA-256, existing legacy-backed listing and exact
+native post revision. Unconverted historical candidate rows block binding;
+resuming from an old cursor cannot silently omit them. Migration creates no
+bindings or jobs. Bindings are idempotent, and later source or post edits stop
+fresh comparison without invalidating historical receipts.
+
+`discovery_match_pages` records each target/page comparison and its original
+page and result hashes. `discovery_match_evidence` keeps record ordinals and the
+comparison basis; it does not copy the source payload. The original page body
+is shared by every target that compares it. `discovery_match_candidates` groups
+qualified post IDs across pages, retaining first, strongest and latest evidence.
+Further media from one post do not become competing candidates. A stronger
+record can promote that post's provisional result, while all earlier evidence
+and distinct competing IDs remain available.
+
+Receipt, evidence, grouping and target cursor commit in one managed transaction.
+An interrupted write rolls back all four, even if its caller catches the error.
+Independent callers and retries return the original receipt. Each listing
+allows at most 10,000 bound targets; each target allows 4,096 distinct candidate
+posts. Exceeding a limit preserves the source page and prior progress and fails
+without truncating candidates or advancing the cursor.
+
+The application runs a comparison worker over explicitly bound targets and
+already retained pages. Its pending index bounds inspection to 32 target rows
+per step, including waiting and stale targets. Decoding and comparison use a
+read transaction; the subsequent short write rechecks the original target,
+page, native post revision and active collection/account/root before committing.
+The saved target cursor survives restart. This worker makes no source requests,
+does not admit listing jobs and does not publish identities or selected metadata.
+
+`enumeration_complete` on a match target means comparison reached the retained
+listing's final cursor. It does not certify coverage of earlier historical
+pages, choose a unique identity, complete an import, or authorize release of
+source evidence. Reviewed activation, historical-coverage reconciliation,
+weak-candidate detail execution and atomic match publication remain necessary.
+Startup verifies original target bindings, page/result digests, record
+references and candidate aggregates. Normal backups retain the entire graph;
+anonymised exports remove it before removing its source evidence.
 
 ## Durable account listing pages
 
@@ -2411,5 +2450,6 @@ The [scoped worker API](native-ingestion.md#account-listing-discovery) exposes
 admission of existing definitions, owned attempts, page delivery and failure
 receipts. It cannot create definitions or activate imported work. Durable
 producer delivery, selected-job execution and shared profile/collection dispatch
-are implemented. Reviewed activation, native candidate reconciliation/publication,
+are implemented, along with the native candidate comparison worker described
+above. Reviewed activation, complete-enumeration reconciliation, match publication,
 verified staging release and reviewed post consolidation remain required.

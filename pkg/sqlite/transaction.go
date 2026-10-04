@@ -215,6 +215,7 @@ func (db *Database) Repository() models.Repository {
 		EnrichmentWork:              &EnrichmentWorkStore{},
 		EnrichmentJob:               &EnrichmentJobStore{},
 		DiscoveryJob:                &DiscoveryJobStore{},
+		DiscoveryMatch:              &DiscoveryMatchStore{},
 		TranslationPolicy:           &TranslationPolicyStore{},
 		CatalogEnrichmentImport:     &CatalogEnrichmentImportStore{},
 		SourceEnrichmentReceipt:     &SourceEnrichmentReceiptStore{},

@@ -45,7 +45,7 @@ func TestDiscoveryListingMigrationPreservesCheckpointAndPacingHistory(t *testing
 			} else {
 				require.NoError(t, f.db.RunAllMigrations())
 				require.NoError(t, f.db.ReInitialise())
-				require.Equal(t, sqlite.NativeSchemaBaseline+71, f.db.Version())
+				require.Equal(t, f.db.AppSchemaVersion(), f.db.Version())
 				for _, name := range []string{"archive_jobs_running_resource", "archive_jobs_translation_request", "archive_jobs_enrichment_target", "enrichment_job_success", "source_enrichment_waiter_end", "archive_job_identity", "archive_job_transition"} {
 					var count int
 					require.NoError(t, raw.QueryRow("SELECT count(*) FROM sqlite_schema WHERE name=?", name).Scan(&count))

@@ -23,6 +23,7 @@ import (
 
 func removeDiscoveryListingSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeDiscoveryMatchSchema(t, raw)
 	_, err := raw.Exec(`DROP TRIGGER discovery_listing_success; DROP TRIGGER discovery_listing_pacing_bind;
  DROP INDEX archive_jobs_discovery_listing; DROP TABLE discovery_pages; DROP TABLE discovery_job_attempts;
  DROP TABLE discovery_listing_jobs; DROP TABLE discovery_listing_legacy; DROP TABLE discovery_listings;

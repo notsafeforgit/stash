@@ -481,8 +481,21 @@ matching and verified native page release remain transition work. See
 evidence when checking weak candidates after a detail fetch; inferred URLs must
 not acquire the lookup-only filename/account shortcuts. Multiple media/context
 records from one post share a candidate and retain record ordinals. Candidates
-do not select identities or establish completion; cross-page reconciliation,
-native choices and atomic publication remain necessary.
+do not select identities or establish completion; complete-enumeration
+reconciliation, native choices and atomic publication remain necessary.
+
+Schema 1000072 retains reviewed discovery target bindings, atomic per-page
+comparison receipts and candidates grouped across pages. Evidence points to
+original page record ordinals rather than copying source payloads. Bind the
+original held record SHA and native post revision; unconverted historical
+candidates must block activation. `DiscoveryComparisonWorker` uses bounded
+pending-target inspection and compares retained pages under a read transaction
+before committing their small result. Native edits between preparation and
+commit must fail. Keep original receipts replayable and preserve every competing
+post ID; candidate limits must roll back rather than truncate. Enumeration
+completion only describes the retained listing cursor, never historical
+coverage, accepted identity or import completion. This worker does not fetch,
+admit source jobs, publish metadata or release staging.
 
 `stash-import-catalog-evidence` maps a received snapshot's posts, profiles and
 captures through core services in schema 1000031. It uses exact manifest/ordinal

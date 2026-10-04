@@ -746,6 +746,15 @@ budget and retry backoff. A future deadline is not a source change. Maintenance
 preserves fetched pages, original producer attempts and receipt replay. It
 neither creates new listing definitions nor contacts a source website.
 
+A separate application worker compares retained batches with explicitly bound
+historical targets. Native schema 1000072 saves each target's comparison cursor,
+original page references and candidates grouped by qualified post ID. Comparison
+runs under a read transaction, followed by a short revision-checked commit.
+Restart continues from the saved cursor; later native source/post changes stop
+new comparison while preserving earlier receipts. This processing does not
+change the producer's page acknowledgement, publish a post identity or certify
+historical listing coverage. See [candidate storage](native-schema.md#account-listing-candidate-evidence).
+
 These endpoints do not create listing definitions, activate imported work,
 explicitly retry a terminal job or accept a candidate match. The selected-job producer worker delivers
 saved evidence before claiming or fetching; its delivery-only CLI needs no
@@ -761,7 +770,8 @@ profiles into `dispatch-all`, with durable collection/profile rotation and separ
 saved-delivery cursors for discovery and enrichment. Both saved deliveries run
 before website profiles load, preserving recovery when access bindings are
 unavailable. Selection commits before execution, so continuously busy profiles
-cannot reset the traversal after restart. Reviewed activation and candidate matching remain
+cannot reset the traversal after restart. Reviewed activation, complete-listing
+reconciliation, candidate detail execution and match publication remain
 necessary before host/n8n callers switch to native discovery. In particular, a
 retained nonfinal page is successful page delivery, not successful enumeration
 or a completed catalog import.

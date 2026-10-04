@@ -43,8 +43,10 @@ native mapping and inspection. Verified direct lookups can now attach an
 unclaimed native post ID to an existing legacy post atomically with publication;
 unverified or conflicting identities retain their checkpoints for review.
 Account listing definitions, owned one-page jobs, atomic cursor progress, shared
-scheduling and scoped worker HTTP are implemented. Reviewed activation, durable
-producer delivery/dispatch and candidate matching remain open.
+scheduling, scoped worker HTTP and durable producer delivery/dispatch are
+implemented. Native candidates now share original page references, group repeated
+post IDs across pages and resume comparison automatically. Reviewed activation,
+historical coverage, candidate detail execution and match publication remain open.
 Remaining import review resolution and the broader native management interfaces still
 require work.
 Native UI, live host/n8n conversion, compatibility removal, coordinated
@@ -6423,3 +6425,46 @@ the broader transition gates. The preceding shared-dispatch checkpoint passed
 the full fork gate. These pure helpers in `fa510dd13` additionally pass their
 focused checks, the full importer package suite and final Go lint. Production
 and `develop` remain unchanged.
+
+## Durable discovery candidate comparison — 2026-10-04
+
+Native schema 1000072 binds original held targets to an existing legacy-backed
+listing, exact frozen-record hash and reviewed native post revision. It keeps
+immutable per-page comparison receipts and original record references, with one
+candidate per qualified post ID across listing pages. Repeated attachments share
+that candidate, later corroboration retains earlier provisional evidence, and
+different IDs remain competitors. Original source payloads are not copied into
+candidate rows.
+
+Preparation runs under a read transaction. A short managed write rechecks the
+reviewed source and post, commits receipt/references/grouping/cursor together,
+and rejects a native edit made between preparation and commit. Caught errors
+cannot commit partial results. Exact receipts survive later source changes;
+new comparisons stop. Limits preserve pending source pages and roll back the
+entire comparison instead of truncating a candidate set.
+
+The HTTP server now owns a separate comparison worker. It inspects at most 32
+pending targets per step, advances through waiting/stale rows and resumes from
+durable per-target progress after restart. It reads retained batches without
+website access or source admission. A comparison reaching the final cursor
+does not establish coverage of historical pages, choose an identity, publish
+metadata, finish an import or authorize staging release.
+
+Focused tests pass for migration from schema 71, preservation of existing pages
+and scheduling/import rows, rollback on an unknown destination table, corrupt
+receipt/reference rejection, anonymisation, concurrent replay, interrupted
+writes, source changes, exact binding, capacity overflow, empty final pages,
+bounded readiness, worker restart and cancellation. The combined SQLite and
+server-lifecycle selection passes in 20 seconds. Initial failures were invalid
+corruption/capacity fixtures (a foreign-key guard prevented the injected orphan,
+and a compact record referenced itself); corrected fixtures exercise the intended
+invariants and pass. Evidence is under `.local/native-discovery-client-20261004/`.
+
+The complete fork gate and independent full-copy schema-72 migration/reconciliation
+are running at this checkpoint. The previous schema-71 rehearsal remains the
+verified baseline until those copy checks finish. The new copy leaves about
+159 GiB free, above the 50 GiB reserve. Reviewed activation, historical coverage,
+weak-detail execution, match publication, staging release and reviewed post
+consolidation remain open, alongside the full plan's remaining native UI, caller
+conversion, compatibility removal, coordinated backup/export/restore, production
+cutover and retirement gates. Production and `develop` remain unchanged.

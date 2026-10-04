@@ -657,6 +657,13 @@ completion of that later work.
 
 ## Account listing discovery
 
+Here, a **page** is one batch of post metadata returned during an account search.
+It can contain several posts, and each post can have several media records. A
+**cursor** is the source's bookmark for requesting the next batch. An imported
+cursor or page count records earlier progress; it does not recreate those
+batches' metadata. Missing batch records limit what the archive can verify about
+that search and do not establish that media downloads were missed.
+
 The shared page parser, selected-job producer executor and scoped discovery
 worker API are implemented. Schema 1000071 retains pinned listing definitions,
 producer-owned attempts and immutable compact page receipts. Each leased

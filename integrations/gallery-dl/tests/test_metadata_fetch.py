@@ -319,6 +319,33 @@ class FetchTests(unittest.TestCase):
             self.assertEqual(collect(URL, {}, factory=lambda url: factory(Post, url, [
                 (Message.Directory, "", post_data()), (Message.Url, CHILD, post_data())])), {"error": "result_too_large"})
 
+    def test_detail_can_retain_successful_empty_response_without_turning_errors_into_success(self):
+        result = collect(URL, {}, factory=lambda url: factory(Post, url, []), allow_empty=True)
+        self.assertEqual(Bundle(URL, SUPPORTED_VERSION, result).checkpoint()["records"], [])
+        for failure, code in ((exception.NotFoundError(), "not_found"),
+                              (exception.AuthenticationError(), "authentication")):
+            self.assertEqual(collect(URL, {}, factory=lambda url: factory(Post, url, [], failure), allow_empty=True),
+                             {"error": code})
+        script = '''
+from gallery_dl import extractor
+from gallery_dl.extractor.common import Extractor
+from stash_ingest.metadata_fetch import main
+class Empty(Extractor):
+    category = "reddit"
+    subcategory = "submission"
+    pattern = r"https://fixture.invalid/.*"
+    def items(self):
+        return iter(())
+extractor.find = Empty.from_url
+main()
+'''
+        request = {"url": URL, "settings": {}, "resume": None, "allow_empty": True}
+        result = _exchange([sys.executable, "-B", "-c", script], encode(request), 5)
+        self.assertEqual(Bundle(URL, SUPPORTED_VERSION, result).checkpoint()["records"], [])
+        for invalid in (False, 1, "true"):
+            result = _exchange([sys.executable, "-B", "-c", script], encode(dict(request, allow_empty=invalid)), 5)
+            self.assertIn("error", result)
+
     def test_real_extractors_only_admit_single_posts_without_source_requests(self):
         examples = [
             ("https://www.reddit.com/comments/abc123", "reddit"),

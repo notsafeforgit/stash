@@ -127,6 +127,25 @@ def main(argv=None):
     discovery_dispatch = commands.add_parser("dispatch-discovery", help="Recover saved pages and optionally advance reviewed account listings")
     discovery_dispatch.add_argument("--collection", required=True)
     discovery_dispatch.add_argument("--profile", help="Enable new pages with this reviewed profile; otherwise only deliver saved evidence")
+    detail_policy = commands.add_parser("detail-policy", help="Validate a candidate detail metadata profile")
+    detail_policy.add_argument("--profile", required=True)
+    detail_admit = commands.add_parser("admit-detail", help="Admit one selected weak candidate for metadata comparison")
+    detail_admit.add_argument("target_uuid")
+    detail_admit.add_argument("--revision", required=True, type=int)
+    detail_admit.add_argument("--candidate", required=True, type=int)
+    detail_admit.add_argument("--profile", required=True)
+    detail_retry = commands.add_parser("retry-detail", help="Explicitly retry an ended candidate detail job")
+    detail_retry.add_argument("job_uuid")
+    detail_execute = commands.add_parser("execute-detail", help="Execute or resume one admitted detail comparison")
+    detail_execute.add_argument("job_uuid")
+    detail_execute.add_argument("--profile", required=True)
+    detail_deliver = commands.add_parser("deliver-detail", help="Deliver saved detail evidence without website access")
+    detail_deliver.add_argument("job_uuid")
+    detail_status = commands.add_parser("detail-status", help="Inspect local evidence and comparison receipts; comparison is not publication")
+    detail_status.add_argument("--job")
+    detail_dispatch = commands.add_parser("dispatch-detail", help="Resume deliveries and execute already admitted candidate jobs")
+    detail_dispatch.add_argument("--collection", required=True)
+    detail_dispatch.add_argument("--profile", help="Enable source access with this detail profile; otherwise deliver saved evidence only")
     args = parser.parse_args(argv)
     box = None
     try:
@@ -258,14 +277,47 @@ def main(argv=None):
                 profile = DiscoveryConfiguration(args.profile)
             with worker_output():
                 output = dispatch_discovery(box, client, args.collection, profile)
+        elif args.command in ("detail-policy", "admit-detail"):
+            from .discovery_detail_configuration import DiscoveryDetailConfiguration
+            profile = DiscoveryDetailConfiguration(args.profile)
+            if args.command == "detail-policy":
+                output = {"operation": profile.operation, "policy_sha256": profile.policy_sha256,
+                          "extractor_version": profile.extractor_version, "source_category": profile.source_category}
+            else:
+                from .discovery_detail_client import DiscoveryDetailClient
+                detail = DiscoveryDetailClient(client)
+                detail.capabilities()
+                output = detail.admit(args.target_uuid, args.revision, args.candidate, profile.policy_sha256, profile.extractor_version)
+        elif args.command == "retry-detail":
+            from .discovery_detail_client import DiscoveryDetailClient
+            detail = DiscoveryDetailClient(client)
+            detail.capabilities()
+            output = detail.retry(args.job_uuid)
+        elif args.command in ("execute-detail", "deliver-detail"):
+            from .discovery_detail_worker import execute as execute_detail
+            from .discovery_detail_configuration import DiscoveryDetailConfiguration
+            profile = DiscoveryDetailConfiguration(args.profile) if args.command == "execute-detail" else None
+            with worker_output():
+                output = execute_detail(box, client, profile, args.job_uuid)
+        elif args.command == "detail-status":
+            from .discovery_detail_journal import DiscoveryDetailJournal
+            output = DiscoveryDetailJournal(box).summary(args.job)
+        elif args.command == "dispatch-detail":
+            from .discovery_detail_dispatch import dispatch_once as dispatch_detail
+            from .discovery_detail_configuration import DiscoveryDetailConfiguration
+            profile = DiscoveryDetailConfiguration(args.profile) if args.profile else None
+            with worker_output():
+                output = dispatch_detail(box, client, args.collection, profile)
         else:
             from .backfill_calls import BackfillCalls
             from .enrichment_journal import EnrichmentJournal
             from .discovery_journal import DiscoveryJournal
+            from .discovery_detail_journal import DiscoveryDetailJournal
             from .n8n_receipts import LegacyReceipts
             output = {**box.status(), "source_requests": requests.status(), "source_calls": calls.summary(),
                       "backfill_calls": BackfillCalls(box).summary(), "legacy_n8n_receipts": LegacyReceipts(box).summary(),
-                      "enrichment": EnrichmentJournal(box).summary(), "discovery": DiscoveryJournal(box).summary()}
+                      "enrichment": EnrichmentJournal(box).summary(), "discovery": DiscoveryJournal(box).summary(),
+                      "discovery_detail": DiscoveryDetailJournal(box).summary()}
         print(json.dumps(output, sort_keys=True))
         if args.command == "lookup-collections":
             return 0 if all(item["state"] == "resolved" for item in output["targets"]) else 2
@@ -281,13 +333,13 @@ def main(argv=None):
             return 2 if state["pending_windows"] or any(state["counts"][k] for k in ("pending", "sending", "review")) else 0
         if args.command == "execute-run":
             return 0 if output["state"] == "source_succeeded" else 2
-        if args.command in ("execute-enrichment", "deliver-enrichment"):
+        if args.command in ("execute-enrichment", "deliver-enrichment", "execute-detail", "deliver-detail"):
             return 0 if output["state"] == "completed" else 2
         if args.command in ("execute-discovery", "deliver-discovery"):
             return 0 if output["state"] == "page_delivered" else 2
         if args.command == "dispatch-discovery":
             return 0 if output["state"] in ("page_delivered", "idle") else 2
-        if args.command == "dispatch-enrichment":
+        if args.command in ("dispatch-enrichment", "dispatch-detail"):
             return 0 if output["state"] in ("completed", "idle") else 2
         if args.command == "ticket-status":
             return 0 if output["state"] == "source_succeeded" else 2
@@ -301,6 +353,7 @@ def main(argv=None):
             if args.command == "dispatch-all":
                 incomplete |= any(output["enrichment"]["counts"].get(k, 0) for k in ("active", "review"))
                 incomplete |= any(output["discovery"]["counts"].get(k, 0) for k in ("active", "review"))
+                incomplete |= any(output["discovery_detail"]["counts"].get(k, 0) for k in ("active", "review"))
                 incomplete |= any(item["state"] != "idle" for item in output.get("profiles", []))
             return 0 if output["state"] in ("idle", "source_succeeded", "completed", "page_delivered") and not incomplete else 2
         return 0

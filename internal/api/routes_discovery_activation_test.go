@@ -44,6 +44,14 @@ func discoveryActivationHTTP(t *testing.T, fresh bool) {
 }
 
 func discoveryActivationRecoveryHTTP(t *testing.T, fresh, recovery bool) {
+	discoveryActivationScenario(t, fresh, recovery, false)
+}
+
+func TestPythonDiscoveryDetailExecutionRecoversOriginalEvidence(t *testing.T) {
+	discoveryActivationScenario(t, false, false, true)
+}
+
+func discoveryActivationScenario(t *testing.T, fresh, recovery, pythonDetails bool) {
 	t.Helper()
 	python, packagePath := nativeProducerRuntime(t)
 	config.InitializeEmpty()
@@ -280,7 +288,11 @@ func discoveryActivationRecoveryHTTP(t *testing.T, fresh, recovery bool) {
 			require.Equal(t, review.Blockers, preview.Blockers, "preview does not clear missing history or detail_required")
 			require.Equal(t, review, enrichmentHTTPValue[models.DiscoveryMatchReview](t, request("GET", path+"/review", nil, http.StatusOK)))
 			request("POST", publicationPath, map[string]any{"expected_target_revision": 2}, http.StatusConflict)
-			exerciseDiscoveryDetailHTTP(t, service, producerHandler, token, review, listing, detailBody)
+			if pythonDetails {
+				exercisePythonDiscoveryDetailHTTP(t, service, token, review, detailBody)
+			} else {
+				exerciseDiscoveryDetailHTTP(t, service, producerHandler, token, review, listing, detailBody)
+			}
 			input.ExpectedTargetRevision++
 			request("POST", path+"/detail-preview", input, http.StatusConflict)
 			input.ExpectedTargetRevision--

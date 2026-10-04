@@ -12,6 +12,10 @@ from .discovery_collection_dispatch import DiscoveryCollectionDispatcher
 from .discovery_configuration import DiscoveryConfiguration
 from .discovery_journal import DiscoveryJournal
 from .discovery_worker import execute as deliver_discovery
+from .discovery_detail_configuration import DiscoveryDetailConfiguration
+from .discovery_detail_dispatch import DiscoveryDetailCollectionDispatcher
+from .discovery_detail_journal import DiscoveryDetailJournal
+from .discovery_detail_worker import execute as deliver_detail
 from .encoding import InvalidData, identifier
 from .enrichment_configuration import EnrichmentConfiguration
 from .enrichment_journal import EnrichmentJournal
@@ -35,7 +39,7 @@ class Profiles:
         for entry in value["profiles"]:
             if (not isinstance(entry, dict) or set(entry) != {"id", "operation", "profile"}
                     or not isinstance(entry["id"], str) or not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,63}", entry["id"])
-                    or entry["id"] in seen or entry["operation"] not in ("download", "post.enrich", "account.list_page")):
+                    or entry["id"] in seen or entry["operation"] not in ("download", "post.enrich", "account.list_page", "post.verify_candidate")):
                 raise InvalidData("Invalid or repeated worker profile entry")
             seen.add(entry["id"])
             self.entries.append({**entry, "profile": _path(entry["profile"], filename.parent)})
@@ -59,9 +63,9 @@ class WorkerDispatcher:
     def save(self, state, **changes):
         value = {**state, **changes}
         with self.box.transaction():
-            changed = self.box.db.execute("""UPDATE worker_dispatch SET after_entry=?,enrichment_delivery_after=?,discovery_delivery_after=?,revision=revision+1
+            changed = self.box.db.execute("""UPDATE worker_dispatch SET after_entry=?,enrichment_delivery_after=?,discovery_delivery_after=?,discovery_detail_delivery_after=?,revision=revision+1
                 WHERE uuid=? AND revision=?""", (value["after_entry"], value["enrichment_delivery_after"], value["discovery_delivery_after"],
-                    self.profiles.uuid, state["revision"])).rowcount
+                    value["discovery_detail_delivery_after"], self.profiles.uuid, state["revision"])).rowcount
         if changed:
             state.update(changes, revision=state["revision"] + 1)
         return bool(changed)
@@ -72,7 +76,8 @@ class WorkerDispatcher:
         # job's historical scope when receiving its exact pending operation.
         cursor = kind + "_delivery_after"
         table, deliver = {"enrichment": ("enrichment_executions", deliver_enrichment),
-                          "discovery": ("discovery_executions", deliver_discovery)}[kind]
+                          "discovery": ("discovery_executions", deliver_discovery),
+                          "discovery_detail": ("discovery_detail_executions", deliver_detail)}[kind]
         if state[cursor]:
             identifier(state[cursor])
         query = f"""SELECT job_uuid FROM {table} WHERE phase='active'
@@ -87,7 +92,7 @@ class WorkerDispatcher:
     def once(self):
         state = self.state()
         deliveries = {}
-        for kind in ("enrichment", "discovery"):
+        for kind in ("enrichment", "discovery", "discovery_detail"):
             delivery = self.recover_delivery(state, kind)
             deliveries[kind + "_delivery"] = delivery
             if delivery["state"] == "contended":
@@ -105,8 +110,10 @@ class WorkerDispatcher:
                     result = Dispatcher(self.box, self.transport, Configuration(entry["profile"])).once()
                 elif entry["operation"] == "post.enrich":
                     result = CollectionDispatcher(self.box, self.transport, EnrichmentConfiguration(entry["profile"])).once()
-                else:
+                elif entry["operation"] == "account.list_page":
                     result = DiscoveryCollectionDispatcher(self.box, self.transport, DiscoveryConfiguration(entry["profile"])).once()
+                else:
+                    result = DiscoveryDetailCollectionDispatcher(self.box, self.transport, DiscoveryDetailConfiguration(entry["profile"])).once()
             except (OSError, InvalidData, Capacity, Unavailable):
                 # An unavailable local profile cannot hold every other source.
                 # Do not return paths, access values or raw exception strings.
@@ -131,4 +138,5 @@ def dispatch_all(box, client, profiles):
             "outbox": box.status(), "source_requests": requests.status(), "source_calls": calls.summary(),
             "backfill_calls": backfills.summary(), "enrichment": EnrichmentJournal(box).summary(),
             "discovery": DiscoveryJournal(box).summary(),
+            "discovery_detail": DiscoveryDetailJournal(box).summary(),
             "intake_completion": "inspect_native_receipts"}

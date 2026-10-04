@@ -17,7 +17,7 @@ from .encoding import InvalidData, MAX_BATCH_BYTES, decode, digest, encode, iden
 from .endpoint import origin
 
 APPLICATION_ID = 0x5354494F  # STIO, not a Stash or gallery-dl archive database.
-SCHEMA = 13
+SCHEMA = 14
 
 
 class Conflict(InvalidData):
@@ -69,7 +69,7 @@ class Outbox:
                 tables = self.db.execute("SELECT name FROM sqlite_schema WHERE type='table'").fetchall()
             finally:
                 self.db.execute("ROLLBACK")
-            if not ((version in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, SCHEMA) and application == APPLICATION_ID)
+            if not ((version in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, SCHEMA) and application == APPLICATION_ID)
                     or (version == 0 and application == 0 and not tables)):
                 raise InvalidData("Unsupported or foreign outbox database")
             self.db.execute("PRAGMA foreign_keys=ON")
@@ -137,7 +137,7 @@ class Outbox:
         version = self.db.execute("PRAGMA user_version").fetchone()[0]
         if version == SCHEMA:
             return
-        if version not in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12):
+        if version not in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13):
             raise InvalidData("Unsupported outbox migration")
         if version == 1:
             self._migrate_runs()
@@ -170,7 +170,12 @@ class Outbox:
         if version < 12:
             from .discovery_dispatch import migrate
             migrate(self.db)
-        from .discovery_collection_dispatch import migrate
+        if version < 13:
+            from .discovery_collection_dispatch import migrate
+            migrate(self.db)
+        from .discovery_detail_journal import migrate
+        migrate(self.db)
+        from .discovery_detail_dispatch import migrate
         migrate(self.db)
         self.db.execute(f"PRAGMA user_version={SCHEMA}")
 
@@ -237,7 +242,8 @@ class Outbox:
         # cover bytes that an in-flight extractor can still return after a crash.
         return self.db.execute("""SELECT
             (SELECT coalesce(sum(reserved_bytes),0) FROM enrichment_executions) +
-            (SELECT coalesce(sum(reserved_bytes),0) FROM discovery_executions)""").fetchone()[0]
+            (SELECT coalesce(sum(reserved_bytes),0) FROM discovery_executions) +
+            (SELECT coalesce(sum(reserved_bytes),0) FROM discovery_detail_executions)""").fetchone()[0]
 
     def enqueue(self, body):
         event = events.validate(body)

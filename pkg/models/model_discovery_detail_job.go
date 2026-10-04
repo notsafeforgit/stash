@@ -56,6 +56,7 @@ type DiscoveryDetailResult struct {
 }
 
 type DiscoveryDetailReaderWriter interface {
+	Collections(context.Context, EnrichmentCollectionQuery, time.Time) ([]EnrichmentCollectionCandidate, error)
 	Admit(context.Context, DiscoveryDetailAdmission, time.Time) (*ArchiveJob, error)
 	Retry(context.Context, string, time.Time) (*ArchiveJob, error)
 	CheckJob(context.Context, string, time.Time) (*ArchiveJob, error)

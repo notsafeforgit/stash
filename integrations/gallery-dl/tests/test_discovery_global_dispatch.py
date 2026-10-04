@@ -124,7 +124,8 @@ class GlobalDiscoveryDispatchTests(unittest.TestCase):
             for table, rows in original.items():
                 self.assertEqual([tuple(r) for r in box.db.execute('SELECT * FROM "' + table + '"')], rows, table)
             current = WorkerDispatcher(box, self.transport, self.profiles).state()
-            expected = {**old, "enrichment_delivery_after": old["delivery_after"], "discovery_delivery_after": ""}
+            expected = {**old, "enrichment_delivery_after": old["delivery_after"], "discovery_delivery_after": "",
+                        "discovery_detail_delivery_after": ""}
             del expected["delivery_after"]
             self.assertEqual(current, expected)
             self.assertEqual(DiscoveryJournal(box).find(discovered.job_uuid), discovered)

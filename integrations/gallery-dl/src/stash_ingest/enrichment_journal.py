@@ -15,8 +15,10 @@ from .outbox import Capacity, Conflict, LeaseLost
 STATE_LIMIT = 64 << 10
 
 
-def migrate(db):
-    db.execute(f"""CREATE TABLE enrichment_executions(
+def migrate(db, name="enrichment"):
+    if name not in ("enrichment", "discovery_detail"):
+        raise InvalidData("Unknown metadata delivery journal")
+    db.execute(f"""CREATE TABLE {name}_executions(
         job_uuid TEXT PRIMARY KEY, definition BLOB NOT NULL, definition_sha256 TEXT NOT NULL,
         revision INTEGER NOT NULL CHECK(revision>0),
         phase TEXT NOT NULL CHECK(phase IN ('active','review','completed','failed')),
@@ -28,11 +30,11 @@ def migrate(db):
         CHECK(reserved_bytes>=coalesce(length(body),0)),
         CHECK(phase NOT IN ('completed','failed') OR (body IS NULL AND reserved_bytes=0))
     )""")
-    db.execute("CREATE INDEX enrichment_local_phase ON enrichment_executions(phase,updated_at,job_uuid)")
-    db.execute("""CREATE TRIGGER enrichment_definition_immutable
-        BEFORE UPDATE OF job_uuid,definition,definition_sha256 ON enrichment_executions
+    db.execute(f"CREATE INDEX {name}_local_phase ON {name}_executions(phase,updated_at,job_uuid)")
+    db.execute(f"""CREATE TRIGGER {name}_definition_immutable
+        BEFORE UPDATE OF job_uuid,definition,definition_sha256 ON {name}_executions
         BEGIN SELECT RAISE(ABORT,'enrichment definitions are immutable'); END""")
-    db.execute("""CREATE TRIGGER enrichment_local_completed BEFORE UPDATE ON enrichment_executions
+    db.execute(f"""CREATE TRIGGER {name}_local_completed BEFORE UPDATE ON {name}_executions
         WHEN OLD.phase='completed'
         BEGIN SELECT RAISE(ABORT,'completed enrichment acknowledgements are immutable'); END""")
 
@@ -49,6 +51,12 @@ class Execution:
 
 
 class EnrichmentJournal:
+    table = "enrichment_executions"
+    lock_name = "enrichment"
+    client_type = EnrichmentClient
+    completion_field = "publication"
+    completion_intent = "publish"
+
     def __init__(self, box, *, max_pending=10000, retained_finished=1000):
         if (type(max_pending) is not int or not 1 <= max_pending <= 1000000
                 or type(retained_finished) is not int or not 1 <= retained_finished <= 10000):
@@ -64,7 +72,7 @@ class EnrichmentJournal:
         # delivery and downloads continue to use short ordinary transactions.
         if self._locked:
             raise Conflict("Enrichment execution is already locked")
-        path = self.box.path.with_name(self.box.path.name + ".enrichment.lock")
+        path = self.box.path.with_name(self.box.path.name + "." + self.lock_name + ".lock")
         fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
         try:
             opened = os.fstat(fd)
@@ -100,7 +108,7 @@ class EnrichmentJournal:
 
     def find(self, job):
         identifier(job)
-        row = self.db.execute("SELECT * FROM enrichment_executions WHERE job_uuid=?", (job,)).fetchone()
+        row = self.db.execute(f"SELECT * FROM {self.table} WHERE job_uuid=?", (job,)).fetchone()
         if row is None:
             return None
         if (digest(row["definition"]) != row["definition_sha256"] or digest(row["state"]) != row["state_sha256"]
@@ -128,17 +136,17 @@ class EnrichmentJournal:
                 if encode(prior.definition, STATE_LIMIT) != body:
                     raise Conflict("Enrichment job already identifies a different source or policy")
                 return prior
-            if self.db.execute("SELECT count(*) FROM enrichment_executions WHERE phase IN ('active','review')").fetchone()[0] >= self.max_pending:
+            if self.db.execute(f"SELECT count(*) FROM {self.table} WHERE phase IN ('active','review')").fetchone()[0] >= self.max_pending:
                 raise Capacity("Enrichment journal is full; pending evidence was preserved")
             # Finished receipts are a bounded local convenience. Native jobs and
             # publications retain the authoritative completion history.
-            self.db.execute("""DELETE FROM enrichment_executions WHERE job_uuid IN (
-                SELECT job_uuid FROM enrichment_executions WHERE phase IN ('completed','failed')
+            self.db.execute(f"""DELETE FROM {self.table} WHERE job_uuid IN (
+                SELECT job_uuid FROM {self.table} WHERE phase IN ('completed','failed')
                 ORDER BY updated_at DESC,job_uuid LIMIT -1 OFFSET ?)""", (self.retained_finished,))
             initial = encode({"claim": None, "lease": None, "pending": None, "checkpoint": None,
-                              "publication": None, "error_code": ""})
+                              self.completion_field: None, "error_code": ""})
             now = self.box.clock()
-            self.db.execute("""INSERT INTO enrichment_executions(job_uuid,definition,definition_sha256,revision,phase,state,state_sha256,created_at,updated_at)
+            self.db.execute(f"""INSERT INTO {self.table}(job_uuid,definition,definition_sha256,revision,phase,state,state_sha256,created_at,updated_at)
                 VALUES(?,?,?,1,'active',?,?,?,?)""", (job, body, digest(body), initial, digest(initial), now, now))
         return self.find(job)
 
@@ -151,12 +159,12 @@ class EnrichmentJournal:
         if size > value.reserved_bytes:
             raise Conflict("Enrichment capacity must be reserved before use")
         if selected == "completed":
-            EnrichmentClient._publication(decode(state, STATE_LIMIT).get("publication"), value.job_uuid)
+            self.client_type._completion(decode(state, STATE_LIMIT).get(self.completion_field), value.job_uuid, work=value.definition["arguments"])
         with self.box.transaction():
             current = self.find(value.job_uuid)
             if current is None or current.revision != value.revision or current.phase == "completed":
                 raise Conflict("Enrichment execution changed")
-            self.db.execute("""UPDATE enrichment_executions SET revision=revision+1,phase=?,state=?,state_sha256=?,body=?,body_sha256=?,
+            self.db.execute(f"""UPDATE {self.table} SET revision=revision+1,phase=?,state=?,state_sha256=?,body=?,body_sha256=?,
                 reserved_bytes=?,updated_at=? WHERE job_uuid=?""", (selected, state, digest(state), data,
                 digest(data) if data is not None else None, size, self.box.clock(), value.job_uuid))
         return self.find(value.job_uuid)
@@ -169,16 +177,16 @@ class EnrichmentJournal:
             current = self.find(value.job_uuid)
             if current is None or current.revision != value.revision:
                 raise Conflict("Enrichment execution changed")
-            events = self.db.execute("SELECT coalesce(sum(length(body)),0) FROM events WHERE body IS NOT NULL").fetchone()[0]
+            events = self.db.execute(f"SELECT coalesce(sum(length(body)),0) FROM events WHERE body IS NOT NULL").fetchone()[0]
             used = self.box.metadata_reserved_bytes()
             if events + used - current.reserved_bytes + MAX_BYTES > self.box.max_bytes:
                 raise Capacity("Reserve a full enrichment checkpoint before fetching source data")
-            self.db.execute("UPDATE enrichment_executions SET reserved_bytes=?,revision=revision+1,updated_at=? WHERE job_uuid=?",
+            self.db.execute(f"UPDATE {self.table} SET reserved_bytes=?,revision=revision+1,updated_at=? WHERE job_uuid=?",
                             (MAX_BYTES, self.box.clock(), value.job_uuid))
         return self.find(value.job_uuid)
 
     def claim(self, value, job):
-        EnrichmentClient._job(job, value.job_uuid)
+        self.client_type._job(job, value.job_uuid)
         if job["arguments"] != value.definition["arguments"]:
             raise Conflict("Enrichment job changed its immutable definition")
         prior = value.state["claim"]
@@ -199,22 +207,22 @@ class EnrichmentJournal:
             raise Conflict("Enrichment extraction did not reserve its checkpoint")
         body = Bundle(value.definition["url"], value.definition["arguments"]["extractor_version"], body).checkpoint()
         raw = checkpoint_bytes(body)
-        pending = {"kind": "checkpoint", "lease": EnrichmentClient.lease(lease), "expected_revision": expected, "sha256": digest(raw)}
+        pending = {"kind": "checkpoint", "lease": self.client_type.lease(lease), "expected_revision": expected, "sha256": digest(raw)}
         return self.change(value, state={**value.state, "pending": pending}, body=raw, reserved=len(raw))
 
     def intent(self, value, lease, kind, payload):
-        if kind not in ("publish", "failure") or value.state["pending"] is not None or value.body is not None:
+        if kind not in (self.completion_intent, "failure") or value.state["pending"] is not None or value.body is not None:
             raise Conflict("Enrichment evidence still requires acknowledgement")
-        if kind == "publish":
+        if kind == self.completion_intent:
             if set(payload) != {"receipt"}:
                 raise InvalidData("Invalid enrichment publication intent")
-            EnrichmentClient._receipt(payload["receipt"], value.job_uuid)
+            self.client_type._receipt(payload["receipt"], value.job_uuid)
             if payload["receipt"]["pending_count"]:
                 raise Conflict("Pending children cannot be published")
         elif (set(payload) != {"error_code"} or not isinstance(payload["error_code"], str)
               or payload["error_code"] not in ERRORS | {"post_identity_conflict"}):
             raise InvalidData("Invalid enrichment failure intent")
-        pending = {"kind": kind, "lease": EnrichmentClient.lease(lease), **payload}
+        pending = {"kind": kind, "lease": self.client_type.lease(lease), **payload}
         return self.change(value, state={**value.state, "pending": pending}, reserved=0)
 
     def acknowledged(self, value, receipt):
@@ -224,7 +232,7 @@ class EnrichmentJournal:
         state = {**value.state, "pending": None, "error_code": ""}
         phase = value.phase
         if pending["kind"] == "checkpoint":
-            EnrichmentClient._receipt(receipt, value.job_uuid)
+            self.client_type._receipt(receipt, value.job_uuid)
             body = decode(value.body, MAX_BYTES, preserve_numbers=True)
             if (receipt["sha256"] != pending["sha256"] or receipt["fence"] > pending["lease"]["fence"]
                     or receipt["revision"] > pending["expected_revision"] + 1
@@ -239,12 +247,11 @@ class EnrichmentJournal:
                 state["pending"] = {"kind": "failure", "lease": pending["lease"],
                                     "error_code": code if code in ERRORS else "invalid_checkpoint"}
             else:
-                state["pending"] = {"kind": "publish", "lease": pending["lease"], "receipt": receipt}
-        elif pending["kind"] == "publish":
-            EnrichmentClient._publication(receipt, value.job_uuid)
-            if receipt["checkpoint_sha256"] != pending["receipt"]["sha256"]:
-                raise Conflict("Enrichment publication identifies another checkpoint")
-            state["publication"], phase = receipt, "completed"
+                state["pending"] = {"kind": self.completion_intent, "lease": pending["lease"], "receipt": receipt}
+        elif pending["kind"] == self.completion_intent:
+            self.client_type._completion(receipt, value.job_uuid, work=value.definition["arguments"],
+                                         receipt=pending["receipt"], lease=pending["lease"])
+            state[self.completion_field], phase = receipt, "completed"
         else:
             expected = "retry" if pending["error_code"] in RETRYABLE and pending["lease"]["fence"] < 8 else "failed"
             if (receipt.get("job_uuid") != value.job_uuid or receipt.get("producer_uuid") != self.box.producer
@@ -266,9 +273,9 @@ class EnrichmentJournal:
             return {"job_uuid": job, "phase": value.phase, "revision": value.revision,
                     "pending": pending["kind"] if pending else None,
                     "staged_bytes": len(value.body or b""), "reserved_bytes": value.reserved_bytes,
-                    "error_code": value.state["error_code"], "publication": value.state["publication"]}
+                    "error_code": value.state["error_code"], self.completion_field: value.state[self.completion_field]}
         counts = {key: 0 for key in ("active", "review", "completed", "failed")}
         counts.update({row["phase"]: row["total"] for row in self.db.execute(
-            "SELECT phase,count(*) AS total FROM enrichment_executions GROUP BY phase")})
-        used = self.db.execute("SELECT coalesce(sum(length(body)),0),coalesce(sum(reserved_bytes),0) FROM enrichment_executions").fetchone()
+            f"SELECT phase,count(*) AS total FROM {self.table} GROUP BY phase")})
+        used = self.db.execute(f"SELECT coalesce(sum(length(body)),0),coalesce(sum(reserved_bytes),0) FROM {self.table}").fetchone()
         return {"counts": counts, "staged_bytes": used[0], "reserved_bytes": used[1]}

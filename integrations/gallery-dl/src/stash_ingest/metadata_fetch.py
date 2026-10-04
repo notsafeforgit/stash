@@ -120,7 +120,7 @@ def classify(exc):
             "ConnectTimeout": "timeout"}.get(name, "extraction_failed")
 
 
-def collect(url, settings, resume=None, *, factory=None, check=lambda: None, reserve_source=None):
+def collect(url, settings, resume=None, *, factory=None, check=lambda: None, reserve_source=None, allow_empty=False):
     from gallery_dl import config, extractor, util, version
     from gallery_dl.extractor.common import Extractor, Message
     from .gallery import SUPPORTED_VERSION, twitter_evidence
@@ -208,7 +208,7 @@ def collect(url, settings, resume=None, *, factory=None, check=lambda: None, res
             if not is_post(target):
                 return {"error": "not_a_post_url"}
             walk(target)
-        if not any(item["kind"] == "post" or "retained_capture" in item for item in bundle.value["records"]):
+        if not allow_empty and not any(item["kind"] == "post" or "retained_capture" in item for item in bundle.value["records"]):
             return {"error": "not_found"}
         return bundle.checkpoint()
     except InvalidData:
@@ -305,16 +305,20 @@ def _exchange(command, body, timeout, check=lambda: None, reserve_source=None):
                 raise
 
 
-def fetch(url, settings, resume=None, *, timeout=180, check=lambda: None, reserve_source=None):
+def fetch(url, settings, resume=None, *, timeout=180, check=lambda: None, reserve_source=None, allow_empty=False):
     """Caller owns durable checkpoint publication and source lease management."""
     from .gallery import SUPPORTED_VERSION
     public_url(url)
     safe_config(settings)
     if type(timeout) not in {int, float} or not 0 < timeout <= 600:
         raise InvalidData("Metadata fetch timeout must be at most ten minutes")
+    if type(allow_empty) is not bool:
+        raise InvalidData("Invalid empty detail policy")
     if resume is not None:
         Bundle(url, SUPPORTED_VERSION, resume)
     request = {"url": url, "settings": settings, "resume": resume}
+    if allow_empty:
+        request["allow_empty"] = True
     if reserve_source is not None:
         request["source_pacing"] = True
     body = encode(request, INPUT_LIMIT)
@@ -342,9 +346,14 @@ def main(collector=None):
     try:
         raw = sys.stdin.buffer.readline(INPUT_LIMIT + 2)
         request = decode(raw.removesuffix(b"\n"), INPUT_LIMIT, preserve_numbers=True)
-        if not isinstance(request, dict) or set(request) not in (
-                {"url", "settings", "resume"}, {"url", "settings", "resume", "source_pacing"}):
+        if (not isinstance(request, dict) or not {"url", "settings", "resume"} <= set(request)
+                or set(request) - {"url", "settings", "resume", "source_pacing", "allow_empty"}):
             raise InvalidData("Invalid metadata fetch request")
+        options = {}
+        if "allow_empty" in request:
+            if request["allow_empty"] is not True:
+                raise InvalidData("Invalid empty detail policy")
+            options["allow_empty"] = True
         paced = "source_pacing" in request
         if paced and request["source_pacing"] is not True:
             raise InvalidData("Invalid metadata source protocol")
@@ -377,7 +386,7 @@ def main(collector=None):
             return reply["allowed"]
 
         result = (collector or collect)(request["url"], request["settings"], request["resume"],
-                                        reserve_source=reserve_source if paced else None)
+                                        reserve_source=reserve_source if paced else None, **options)
     except InvalidData:
         result = {"error": "invalid_checkpoint" if runtime_validated else "runtime_changed"}
     except Exception as exc:

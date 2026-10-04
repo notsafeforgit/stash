@@ -21,12 +21,15 @@ def checkpoint_bytes(body):
 
 
 class EnrichmentClient:
+    prefix = PREFIX
+    minimum_records = 1
+
     def __init__(self, client):
         self.client = client
 
-    @staticmethod
-    def path(job, suffix=""):
-        return PREFIX + "/jobs/" + identifier(job) + suffix
+    @classmethod
+    def path(cls, job, suffix=""):
+        return cls.prefix + "/jobs/" + identifier(job) + suffix
 
     def capabilities(self):
         capabilities = self.client.capabilities()
@@ -93,7 +96,7 @@ class EnrichmentClient:
                 or any(c in extractor for c in "\r\n\x00") or type(after) is not int or not 0 <= after <= 9223372036854775807
                 or type(limit) is not int or not 1 <= limit <= 100):
             raise InvalidData("Invalid enrichment job discovery")
-        result = self.client._request("POST", PREFIX + "/collections/" + identifier(collection) + "/jobs/ready", encode({
+        result = self.client._request("POST", self.prefix + "/collections/" + identifier(collection) + "/jobs/ready", encode({
             "policy_sha256": policy, "extractor_version": extractor, "after": after, "limit": limit}))
         if not isinstance(result, list) or len(result) > limit:
             raise Unavailable("invalid_response")
@@ -120,7 +123,7 @@ class EnrichmentClient:
             identifier(after)
         elif after != "":
             raise InvalidData("Invalid enrichment collection cursor")
-        result = self.client._request("POST", PREFIX + "/collections/ready", encode({
+        result = self.client._request("POST", self.prefix + "/collections/ready", encode({
             "policy_sha256": policy, "extractor_version": extractor, "after": after, "limit": limit}))
         if not isinstance(result, list) or len(result) > limit:
             raise Unavailable("invalid_response")
@@ -295,11 +298,11 @@ class EnrichmentClient:
             raise Unavailable("invalid_response")
         return value
 
-    @staticmethod
-    def _receipt(value, job):
+    @classmethod
+    def _receipt(cls, value, job):
         if (not isinstance(value, dict) or value.get("job_uuid") != job or not sha256(value.get("sha256"))
                 or any(type(value.get(k)) is not int or value[k] < minimum for k, minimum in
-                       (("revision", 1), ("fence", 1), ("record_count", 1), ("pending_count", 0), ("unresolved_count", 0)))
+                       (("revision", 1), ("fence", 1), ("record_count", cls.minimum_records), ("pending_count", 0), ("unresolved_count", 0)))
                 or value["record_count"] > MAX_RECORDS or value["pending_count"] > MAX_REFERENCES
                 or value["unresolved_count"] > MAX_REFERENCES):
             raise Unavailable("invalid_response")
@@ -360,6 +363,22 @@ class EnrichmentClient:
                 or value["unresolved_count"] != receipt["unresolved_count"]):
             raise Unavailable("invalid_response")
         return value
+
+    def completion(self, job):
+        return self.publication(job)
+
+    def complete(self, job, lease, receipt):
+        return self.publish(job, lease, receipt)
+
+    @classmethod
+    def _completion(cls, value, job, *, work=None, receipt=None, lease=None):
+        cls._publication(value, job)
+        if receipt is not None and any(value[k] != receipt[v] for k, v in (
+                ("checkpoint_revision", "revision"), ("checkpoint_sha256", "sha256"),
+                ("record_count", "record_count"), ("unresolved_count", "unresolved_count"))):
+            raise Unavailable("invalid_response")
+        if lease is not None and value["fence"] != lease["fence"]:
+            raise Unavailable("invalid_response")
 
     def fail(self, job, lease, code):
         if not isinstance(code, str) or code not in ERRORS | {"post_identity_conflict"}:

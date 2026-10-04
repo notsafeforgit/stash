@@ -207,6 +207,21 @@ func (c *DiscoveryDetailCoordinator) ReadyJobs(ctx context.Context, token, colle
 	return ret, err
 }
 
+func (c *DiscoveryDetailCoordinator) ReadyCollections(ctx context.Context, token, policy, extractor, after string, limit int) ([]models.EnrichmentCollectionCandidate, error) {
+	var ret []models.EnrichmentCollectionCandidate
+	err := c.Service.Repo.WithReadTxn(ctx, func(ctx context.Context) error {
+		credential, err := c.Service.authenticate(ctx, token)
+		if err != nil {
+			return err
+		}
+		ret, err = c.Service.Repo.DiscoveryDetail.Collections(ctx, models.EnrichmentCollectionQuery{
+			Scopes: credential.Scopes, Roots: credential.RootUUIDs, PolicySHA256: policy, ExtractorVersion: extractor, After: after, Limit: limit,
+		}, c.Now())
+		return err
+	})
+	return ret, err
+}
+
 func (c *DiscoveryDetailCoordinator) ReserveSource(ctx context.Context, token string, lease models.ArchiveJobLease, url string) (bool, error) {
 	var ready bool
 	err := c.Service.Repo.WithTxn(ctx, func(ctx context.Context) error {

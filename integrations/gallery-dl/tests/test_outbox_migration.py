@@ -15,7 +15,15 @@ from helpers import PRODUCER, capture, file_event, receipt
 from test_run_queue import request, admission
 
 
+def schema_thirteen(db):
+    for table in ("discovery_detail_executions", "discovery_detail_dispatch", "discovery_detail_collection_dispatch"):
+        db.execute("DROP TABLE " + table)
+    db.execute("ALTER TABLE worker_dispatch DROP COLUMN discovery_detail_delivery_after")
+    db.execute("PRAGMA user_version=13")
+
+
 def schema_twelve(db):
+    schema_thirteen(db)
     db.execute("DROP TABLE discovery_collection_dispatch")
     db.execute("ALTER TABLE worker_dispatch DROP COLUMN discovery_delivery_after")
     db.execute("ALTER TABLE worker_dispatch RENAME COLUMN enrichment_delivery_after TO delivery_after")

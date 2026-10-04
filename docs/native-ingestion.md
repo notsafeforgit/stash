@@ -1867,6 +1867,19 @@ publish metadata, accept a post identity or clear the current review blockers.
 The application `detail-preview` endpoint remains a separate read-only operation;
 supplied preview bytes cannot acknowledge a producer job.
 
-The backend workflow is implemented. The Python worker's detail-specific durable
-outbox/dispatch integration and publication from these receipts remain transition
-work. Existing production scrapers have not switched to these routes.
+The backend and Python detail worker are implemented. Producer schema 14 retains
+claims, exact checkpoint bytes, completion/failure intents and comparison receipts
+separately from enrichment publications. `deliver-detail` recovers persisted
+operations without loading website settings. `post.verify_candidate` profiles
+participate in `dispatch-all`, with independent delivery and collection cursors.
+See the [producer commands](../integrations/gallery-dl/README.md#candidate-detail-worker).
+
+`POST /api/v3/ingest/discovery-details/collections/ready` accepts
+`policy_sha256`, `extractor_version`, `after` (a collection UUID) and `limit`.
+Its sorted `{uuid}` entries come from the bounded active detail jobs and current
+collection/root grants; it reads no transcript bodies and cannot admit work.
+The capability is `discovery_detail_collections_protocol: 1`. Per-collection
+dispatch processes existing jobs; a new candidate requires explicit admission.
+Publication from detail receipts, automatic candidate admission and verified
+staging release remain transition work. Production scrapers have not switched
+to these routes.

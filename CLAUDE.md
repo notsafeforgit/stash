@@ -562,7 +562,15 @@ after source changes. Detail work shares metadata/download pacing, including
 saved child-service cooldowns. Job success retains a comparison, including an
 uncorroborated result; it cannot clear blockers or accept identity. Startup must
 rederive its saved proof, and anonymisation must remove its private transcripts.
-The Python detail outbox/dispatch and guarded publication remain to be integrated;
+Producer schema 14 adds the Python detail journal, selected execution and scoped
+collection/profile dispatch. Keep its `comparison` receipts distinct from
+enrichment `publication` receipts. Reuse the shared lease/checkpoint workflow,
+but preserve old outbox receipt shapes when extending it. Empty successful
+extractor responses can become uncorroborated detail evidence; extractor failures
+remain failures. Saved delivery must work before loading website profiles, and
+all metadata journals share the outbox byte budget. Readiness visits only the
+bounded active detail jobs and preserves current grants, runtime and retry delays.
+Automatic candidate admission and guarded publication remain to be integrated;
 ordinary post enrichment cannot treat an inferred URL as an accepted association.
 
 `stash-import-catalog-evidence` maps a received snapshot's posts, profiles and

@@ -440,7 +440,9 @@ journal; schema 9 adds enrichment discovery cursors and backoff; schema 10 adds
 rotation across worker profiles and permitted metadata collections; schema 11
 adds durable discovery page delivery; schema 12 adds its dispatch cursors and
 backoff; schema 13 adds discovery collection rotation and separates discovery
-and enrichment delivery cursors in the shared worker. Opening an outbox from schemas 1–12 promotes it
+and enrichment delivery cursors in the shared worker. Schema 14 adds candidate
+detail execution, collection dispatch and an independent delivery cursor.
+Opening an outbox from schemas 1–13 promotes it
 in one SQLite transaction, preserving event bytes, receipts, dependencies,
 active delivery/submission leases, frozen requests and caller tickets. Old tickets
 are linked to the first covering submissions from their original request sequence;
@@ -2007,7 +2009,8 @@ conversion still precede service activation.
 
 ### Dispatch across local profiles
 
-`dispatch-all` rotates across reviewed download, enrichment and account-listing profiles without
+`dispatch-all` rotates across reviewed download, enrichment, account-listing and
+candidate-detail profiles without
 requiring callers to enumerate every collection. Keep a stable UUID for the local
 worker list and stable entry IDs across restarts:
 
@@ -2019,7 +2022,8 @@ worker list and stable entry IDs across restarts:
     {"id": "reddit-download", "operation": "download", "profile": "reddit-download.json"},
     {"id": "reddit-metadata", "operation": "post.enrich", "profile": "reddit-metadata.json"},
     {"id": "twitter-metadata", "operation": "post.enrich", "profile": "twitter-metadata.json"},
-    {"id": "reddit-discovery", "operation": "account.list_page", "profile": "reddit-discovery.json"}
+    {"id": "reddit-discovery", "operation": "account.list_page", "profile": "reddit-discovery.json"},
+    {"id": "reddit-details", "operation": "post.verify_candidate", "profile": "reddit-details.json"}
   ]
 }
 ```
@@ -2030,13 +2034,13 @@ stash-ingest --outbox /persistent/producer.sqlite --endpoint STASH_ORIGIN \
 ```
 
 The list accepts 1–32 distinct entries. Relative profile paths resolve beside
-the list. Each entry uses its operation's download, enrichment or account-listing profile
+the list. Each entry uses its operation's download, enrichment, account-listing or detail profile
 contract; website access stays local, and the list does not confer native source
 permissions or enable unsupported extractors.
 
 One invocation delivers an ordinary event batch, advances a backfill call,
 resolves a caller page and submits one source request. It then tries one saved
-enrichment delivery and one saved discovery delivery before loading any website
+enrichment, discovery and detail delivery before loading any website
 profile, and rotates through the list until one profile performs work or all
 profiles have been checked. Saved
 metadata can therefore finish delivery even if its original website profile was
@@ -2061,8 +2065,8 @@ root grant are discovered without changing this worker list. Moved collections
 no longer belong to the old root grant. This does not create listing definitions
 or activate imported accounts.
 
-Producer schema 13 stores profile rotation, independent saved-delivery cursors
-for discovery and enrichment, and each operation's per-policy collection
+Producer schema 14 stores profile rotation, independent saved-delivery cursors
+for discovery, enrichment and candidate details, and each operation's per-policy collection
 cursors/backoff. Selection commits before execution, so a restart or a
 continually busy first profile/collection does not reset traversal.
 Revision checks reject competing stale selections. Idle or blocked entries give
@@ -2082,7 +2086,9 @@ Schema 12 → 13 adds discovery collection cursors and splits the worker's deliv
 cursor, retaining its original value for enrichment. Existing outbox rows,
 staged metadata/page bodies, claims and receipt bytes remain unchanged in one
 transaction. Unknown table/column collisions roll back promotion, including
-any preceding column rename. Older producer binaries refuse schema 13;
+any preceding column rename. Schema 13 → 14 adds the detail journal and its
+dispatch tables/cursor while preserving every existing value. Older producer
+binaries refuse schema 14;
 include the outbox in backups and retain its pending evidence during rollback.
 These outbox cursor tables do not require a separate native database migration.
 
@@ -2320,3 +2326,72 @@ compare retained tables and exact pending bodies across schema 11 → 12 and
 worker tests exercise all three busy operations across restarts, independently
 recover both delivery journals without website profiles, and retain a completed
 delivery receipt when another process advances the dispatch revision.
+
+### Candidate detail worker
+
+A detail worker fetches one inferred Reddit or Twitter post URL and saves a
+comparison with the original catalog/listing evidence. Its result can be
+`corroborated` or `uncorroborated`; neither accepts a post identity, clears review
+blockers or publishes metadata. Listing discovery and post enrichment have
+separate profiles and receipts.
+
+Use a detail profile for the candidate's service:
+
+```json
+{
+  "schema": "stash-gallery-discovery-detail-v1",
+  "source_category": "reddit",
+  "gallery": {"extractor": {"sleep-request": 5}},
+  "bindings": {}
+}
+```
+
+`source_category` supports `reddit` and `twitter` for the implemented candidate
+policy. Website access uses the same producer-local bindings as other metadata
+profiles. The policy hash includes the detail operation, runtime and reviewed
+settings; an enrichment or account-listing profile cannot replace it. The
+collector does not create media download writers, update cookies or write a
+gallery-dl archive. Successful empty responses are retained as negative detail
+evidence; authentication, missing-source and network failures remain failures.
+
+Use the usual `--outbox`, `--endpoint` and `--producer` arguments with these
+commands:
+
+| Command | Behavior |
+| --- | --- |
+| `detail-policy --profile PATH` | Validate a detail profile and print its policy/runtime |
+| `admit-detail TARGET_UUID --revision N --candidate SEQUENCE --profile PATH` | Pin one selected candidate and target revision to this detail policy |
+| `execute-detail JOB_UUID --profile PATH` | Claim, fetch or resume a selected job and deliver its comparison |
+| `deliver-detail JOB_UUID` | Recover saved checkpoint/completion/failure intents without website access |
+| `detail-status [--job JOB_UUID]` | Inspect local pending evidence and retained `comparison` receipts |
+| `retry-detail JOB_UUID` | Explicitly create or recover the next generation of a failed/cancelled job, retaining its original selection and retry delay |
+| `dispatch-detail --collection UUID [--profile PATH]` | Resume deliveries and rotate through already admitted jobs; omitting the profile permits delivery only |
+
+Target UUID, revision and candidate sequence come from native candidate review.
+Repeating identical admission returns its original job. Changing the profile or
+selection does not reinterpret an existing job. Automatic admission of weak
+candidates is a separate transition step. The dispatcher processes admitted
+work and does not restart terminal jobs.
+
+Add a `post.verify_candidate` entry to the shared worker list to discover
+permitted collections with due jobs for that profile. The server advertises
+`discovery_detail_protocol: 1` and `discovery_detail_collections_protocol: 1`.
+Collection lookup inspects at most 32 active detail jobs, applies current grants
+and source eligibility, and returns sorted UUIDs. Saved delivery runs before
+profile loading, and collection/profile selections persist before execution so
+restarts do not repeatedly favor the first account.
+
+Outbox schema 14 stores detail evidence in `discovery_detail_executions`, separate
+from enrichment and listing journals. A full checkpoint's capacity is reserved
+before source access; events and all three metadata journals share one byte
+budget. Checkpoint acknowledgement removes local source bytes only while staging
+the exact completion or child-failure intent in the same transaction. The native
+server retains the original observing producer and time for every record.
+A lost completion reply recovers the same comparison receipt. Unacknowledged
+local evidence stays available for review if a native job changes or ends.
+
+Include the producer outbox in backups. Its schema-13 promotion preserves
+existing rows, pending bytes, claims, receipts and rotation state; a conflicting
+unknown table rolls back the whole upgrade. Native archive schema 76 already
+contains the corresponding jobs and evidence; this producer increment requires
+no new native migration. Production launcher conversion remains a cutover step.

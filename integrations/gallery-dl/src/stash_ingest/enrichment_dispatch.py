@@ -25,6 +25,17 @@ def migrate(db):
 
 
 class EnrichmentDispatcher:
+    table = "enrichment_dispatch"
+    client_type = EnrichmentClient
+    journal_type = EnrichmentJournal
+    protocol = "enrichment_dispatch_protocol"
+    admit_targets = True
+    cursor_fields = ("delivery_after", "local_after", "job_after", "target_cursor")
+
+    @staticmethod
+    def execute_job(*args):
+        return execute(*args)
+
     def __init__(self, box, transport, collection, configuration=None):
         if (box.endpoint, box.producer) != (transport.endpoint, transport.producer):
             raise Conflict("Enrichment dispatcher and outbox identify different producers")
@@ -32,38 +43,39 @@ class EnrichmentDispatcher:
         if not sha256(policy):
             raise InvalidData("Enrichment dispatch requires a reviewed policy")
         self.box, self.transport, self.configuration = box, transport, configuration
-        self.client, self.journal = EnrichmentClient(transport), EnrichmentJournal(box)
+        self.client, self.journal = self.client_type(transport), self.journal_type(box)
         self.key = identifier(collection), policy
         with box.transaction():
             if self.state() is None:
-                if box.db.execute("SELECT count(*) FROM enrichment_dispatch").fetchone()[0] >= 10000:
+                if box.db.execute(f"SELECT count(*) FROM {self.table}").fetchone()[0] >= 10000:
                     raise Capacity("Enrichment discovery capacity exhausted")
-                box.db.execute("INSERT INTO enrichment_dispatch(collection_uuid,policy_sha256) VALUES(?,?)", self.key)
+                box.db.execute(f"INSERT INTO {self.table}(collection_uuid,policy_sha256) VALUES(?,?)", self.key)
 
     def state(self):
-        row = self.box.db.execute("SELECT * FROM enrichment_dispatch WHERE collection_uuid=? AND policy_sha256=?", self.key).fetchone()
+        row = self.box.db.execute(f"SELECT * FROM {self.table} WHERE collection_uuid=? AND policy_sha256=?", self.key).fetchone()
         if row is None:
             return None
         state = dict(row)
         for key in ("local_after", "delivery_after"):
             if state[key]:
                 identifier(state[key])
-        if state["target_cursor"] is not None:
+        if state.get("target_cursor") is not None:
             state["target_cursor"] = decode(state["target_cursor"], 1024)
             self.client._target_order(state["target_cursor"])
         return state
 
     def save(self, state, **changes):
         values = {**state, **changes}
-        cursor = values["target_cursor"]
+        cursor = values.get("target_cursor")
         if cursor is not None:
             self.client._target_order(cursor)
-            cursor = encode(cursor, 1024)
+            values["target_cursor"] = encode(cursor, 1024)
+        assignments = ",".join(key + "=?" for key in self.cursor_fields)
         with self.box.transaction():
-            changed = self.box.db.execute("""UPDATE enrichment_dispatch SET delivery_after=?,local_after=?,job_after=?,target_cursor=?,
+            changed = self.box.db.execute(f"""UPDATE {self.table} SET {assignments},
                 failures=?,available_at=?,error_code=?,revision=revision+1
                 WHERE collection_uuid=? AND policy_sha256=? AND revision=?""", (
-                values["delivery_after"], values["local_after"], values["job_after"], cursor, values["failures"], values["available_at"],
+                *(values[key] for key in self.cursor_fields), values["failures"], values["available_at"],
                 values["error_code"], *self.key, state["revision"])).rowcount
         if changed:
             state.update(changes, revision=state["revision"] + 1)
@@ -78,7 +90,7 @@ class EnrichmentDispatcher:
         return {"state": "unavailable", "error_code": code, "next_attempt_at": state["available_at"]}
 
     def _execute(self, state, job, configuration):
-        result = execute(self.box, self.transport, configuration, job)
+        result = self.execute_job(self.box, self.transport, configuration, job)
         if result["state"] == "delivery_pending":
             result["dispatch"] = self.unavailable(state, Unavailable("native_delivery_unavailable"))
         elif not self.save(state, failures=0, available_at=0, error_code=None):
@@ -92,7 +104,7 @@ class EnrichmentDispatcher:
         # Recovery ignores profile identity when a saved delivery is pending.
         key = "delivery_after" if deliveries else "local_after"
         previous = state[key]
-        query = """SELECT job_uuid FROM enrichment_executions
+        query = f"""SELECT job_uuid FROM {self.journal.table}
             WHERE phase='active' AND job_uuid>? AND json_extract(definition,'$.arguments.collection_uuid')=?
             AND """
         args = [previous, self.key[0]]
@@ -139,7 +151,7 @@ class EnrichmentDispatcher:
                 return local
             self.configuration.check()
             capabilities = self.client.capabilities()
-            if type(capabilities.get("enrichment_dispatch_protocol")) is not int or capabilities["enrichment_dispatch_protocol"] != 1:
+            if type(capabilities.get(self.protocol)) is not int or capabilities[self.protocol] != 1:
                 raise Unavailable("native_enrichment_dispatch_unavailable")
             previous = state["job_after"]
             page = self.client.ready_jobs(self.key[0], self.key[1], self.configuration.extractor_version,
@@ -160,6 +172,10 @@ class EnrichmentDispatcher:
                 # A runnable job whose claim is currently blocked must not
                 # cause successive polls to fill the queue with fresh work.
                 return {"state": "waiting"}
+            if not self.admit_targets:
+                if not self.save(state, failures=0, available_at=self.box.clock() + 30, error_code=None):
+                    return {"state": "contended"}
+                return {"state": "idle"}
             targets = self.client.ready(self.key[0], PAGE_SIZE, after=state["target_cursor"])
             for target in targets:
                 if not self.save(state, target_cursor=self.client.target_cursor(target)):

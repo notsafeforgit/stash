@@ -22,14 +22,14 @@ def _deliver(journal, client, value):
         if kind == "checkpoint":
             result = client.checkpoint(value.job_uuid, lease, pending["expected_revision"],
                                        decode(value.body, MAX_BYTES, preserve_numbers=True))
-        elif kind == "publish":
-            result = client.publish(value.job_uuid, lease, pending["receipt"])
+        elif kind == journal.completion_intent:
+            result = client.complete(value.job_uuid, lease, pending["receipt"])
         elif kind == "failure":
             result = client.fail(value.job_uuid, lease, pending["error_code"])
         else:
             raise InvalidData("Unknown enrichment delivery intent")
         value = journal.acknowledged(value, result)
-        if kind == "publish":
+        if kind == journal.completion_intent:
             return value, "completed"
         if kind == "failure":
             return value, "failed" if result["outcome"] == "failed" else "retry"
@@ -47,10 +47,15 @@ def _result(journal, job, state):
 
 def execute(box, transport, configuration, job_uuid, *, fetcher=fetch):
     """configuration=None delivers persisted intents but never claims/fetches."""
+    return execute_metadata(box, transport, configuration, job_uuid, EnrichmentJournal, EnrichmentClient, fetcher=fetcher)
+
+
+def execute_metadata(box, transport, configuration, job_uuid, journal_type, client_type, *, fetcher):
+    """Share ownership and durable delivery, with kind-specific receipt validation."""
     identifier(job_uuid)
     if (box.endpoint, box.producer) != (transport.endpoint, transport.producer):
         raise Conflict("Enrichment client and outbox identify different producers")
-    journal, client = EnrichmentJournal(box), EnrichmentClient(transport)
+    journal, client = journal_type(box), client_type(transport)
     with journal.execution() as owned:
         if not owned:
             return _result(journal, job_uuid, "waiting")
@@ -74,18 +79,19 @@ def execute(box, transport, configuration, job_uuid, *, fetcher=fetch):
             current = client.describe(job_uuid)
             if value is None and configuration is None:
                 return _result(journal, job_uuid, "not_recorded")
+            definition = journal.definition(current)
             if value is None and current["job"]["state"] not in ("succeeded", "failed", "cancelled"):
-                _configuration(configuration, current["job"], current["target"]["url"])
+                _configuration(configuration, current["job"], definition["url"])
             value = journal.prepare(current)
             job = current["job"]
             if job["state"] == "succeeded":
                 if value.body is not None:
                     _note(journal, value, "unacknowledged_source_evidence", review=True)
                     return _result(journal, job_uuid, "review")
-                publication = client.publication(job_uuid)
+                publication = client.completion(job_uuid)
                 if publication is None:
                     raise Unavailable("publication_unconfirmed")
-                journal.change(value, phase="completed", state={**value.state, "publication": publication,
+                journal.change(value, phase="completed", state={**value.state, journal.completion_field: publication,
                                "pending": None, "error_code": ""}, reserved=0)
                 return _result(journal, job_uuid, "completed")
             if job["state"] in ("failed", "cancelled"):
@@ -138,7 +144,7 @@ def execute(box, transport, configuration, job_uuid, *, fetcher=fetch):
             head = client.head(job_uuid, value.definition["url"], configuration.extractor_version)
             resume = head["body"] if head else client.seed(lease.job, value.definition["url"])
             if head is not None and head["pending_count"] == 0:
-                value = journal.intent(value, lease.job, "publish", {"receipt": {k: v for k, v in head.items() if k != "body"}})
+                value = journal.intent(value, lease.job, journal.completion_intent, {"receipt": {k: v for k, v in head.items() if k != "body"}})
             else:
                 try:
                     value = journal.reserve(value)

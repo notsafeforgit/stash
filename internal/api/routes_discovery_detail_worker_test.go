@@ -46,6 +46,9 @@ func exerciseDiscoveryDetailHTTP(t *testing.T, service *ingest.Service, handler 
 	require.Equal(t, review.Candidate.URL, work.URL)
 	ready := enrichmentHTTPValue[[]models.DiscoveryJobCandidate](t, request("POST", "/collections/"+listing.CollectionUUID+"/jobs/ready", map[string]any{"policy_sha256": listing.PolicySHA256, "extractor_version": listing.ExtractorVersion, "after": 0, "limit": 10}, token, 200))
 	require.Contains(t, ready, models.DiscoveryJobCandidate{Sequence: job.Sequence, UUID: job.UUID})
+	collections := enrichmentHTTPValue[[]models.EnrichmentCollectionCandidate](t, request("POST", "/collections/ready", map[string]any{"policy_sha256": listing.PolicySHA256, "extractor_version": listing.ExtractorVersion, "limit": 10}, token, 200))
+	require.Equal(t, []models.EnrichmentCollectionCandidate{{UUID: listing.CollectionUUID}}, collections)
+	request("POST", "/collections/ready", map[string]any{"policy_sha256": listing.PolicySHA256, "extractor_version": listing.ExtractorVersion, "after": "invalid"}, token, 400)
 	var outsider *models.IngestProducer
 	require.NoError(t, service.Repo.WithTxn(t.Context(), func(ctx context.Context) error {
 		var err error

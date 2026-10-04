@@ -3,11 +3,81 @@ package sqlite
 import (
 	"context"
 	"errors"
+	"reflect"
+	"sort"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/stashapp/stash/pkg/archive"
 	"github.com/stashapp/stash/pkg/models"
 )
+
+// Collections inspects only the bounded active detail jobs. It never scans
+// catalog history or interprets a candidate URL as an accepted association.
+func (s *DiscoveryDetailStore) Collections(ctx context.Context, q models.EnrichmentCollectionQuery, now time.Time) ([]models.EnrichmentCollectionCandidate, error) {
+	if len(q.Scopes)+len(q.Roots) < 1 || len(q.Scopes)+len(q.Roots) > 128 || !archive.ValidSHA256(q.PolicySHA256) ||
+		q.ExtractorVersion == "" || len(q.ExtractorVersion) > 128 || !utf8.ValidString(q.ExtractorVersion) || strings.ContainsAny(q.ExtractorVersion, "\r\n\x00") ||
+		(q.After != "" && !validSourceRunUUID(q.After)) || !validJobTime(now) {
+		return nil, models.ErrDiscoveryInvalid
+	}
+	limit, err := sourcePageLimit(q.Limit)
+	if err != nil {
+		return nil, models.ErrDiscoveryInvalid
+	}
+	for _, scope := range q.Scopes {
+		if !validSourceRunUUID(scope.CollectionUUID) || (scope.RootUUID != nil && !validSourceRunUUID(*scope.RootUUID)) {
+			return nil, models.ErrDiscoveryInvalid
+		}
+	}
+	for _, root := range q.Roots {
+		if !validSourceRunUUID(root) {
+			return nil, models.ErrDiscoveryInvalid
+		}
+	}
+	rows, err := activeDiscoveryDetails(ctx)
+	if err != nil {
+		return nil, err
+	}
+	seen := map[string]bool{}
+	ret := []models.EnrichmentCollectionCandidate{}
+	for _, row := range rows {
+		job := row.resolve()
+		if job.State != "queued" || now.Before(job.AvailableAt) {
+			continue
+		}
+		work, err := archive.DecodeDiscoveryDetailJob(job)
+		if err != nil {
+			return nil, err
+		}
+		if seen[work.CollectionUUID] || work.CollectionUUID <= q.After || work.PolicySHA256 != q.PolicySHA256 || work.ExtractorVersion != q.ExtractorVersion {
+			continue
+		}
+		allowed := false
+		for _, scope := range q.Scopes {
+			allowed = allowed || (scope.CollectionUUID == work.CollectionUUID && reflect.DeepEqual(scope.RootUUID, work.RootUUID))
+		}
+		for _, root := range q.Roots {
+			allowed = allowed || (work.RootUUID != nil && root == *work.RootUUID)
+		}
+		if !allowed {
+			continue
+		}
+		if err := discoveryDetailEligible(ctx, work, now); err != nil {
+			if errors.Is(err, models.ErrDiscoveryConflict) {
+				continue
+			}
+			return nil, err
+		}
+		seen[work.CollectionUUID] = true
+		ret = append(ret, models.EnrichmentCollectionCandidate{UUID: work.CollectionUUID})
+	}
+	sort.Slice(ret, func(i, j int) bool { return ret[i].UUID < ret[j].UUID })
+	if len(ret) > limit {
+		ret = ret[:limit]
+	}
+	return ret, nil
+}
 
 func activeDiscoveryDetails(ctx context.Context) ([]archiveJobRow, error) {
 	var rows []archiveJobRow

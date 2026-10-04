@@ -328,7 +328,7 @@ def fetch(url, settings, resume=None, *, timeout=180, check=lambda: None, reserv
         return {"error": "worker_failed"}
 
 
-def main():
+def main(collector=None):
     # Private child protocol: config/website access enters through stdin and is
     # never part of the returned transcript, logs or exception strings.
     output = os.dup(sys.stdout.fileno())
@@ -376,8 +376,8 @@ def main():
                 raise InvalidData("Invalid metadata source reservation")
             return reply["allowed"]
 
-        result = collect(request["url"], request["settings"], request["resume"],
-                         reserve_source=reserve_source if paced else None)
+        result = (collector or collect)(request["url"], request["settings"], request["resume"],
+                                        reserve_source=reserve_source if paced else None)
     except InvalidData:
         result = {"error": "invalid_checkpoint" if runtime_validated else "runtime_changed"}
     except Exception as exc:

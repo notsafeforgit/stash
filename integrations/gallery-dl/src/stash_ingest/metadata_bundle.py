@@ -76,7 +76,10 @@ def retained_ancestors(data, depth=0):
 
 
 class Bundle:
-    def __init__(self, url, extractor_version, resume=None):
+    def __init__(self, url, extractor_version, resume=None, *, max_records=None):
+        self._max_records = MAX_RECORDS if max_records is None else max_records
+        if type(self._max_records) is not int or not 1 <= self._max_records <= 4096:
+            raise InvalidData("Invalid compact record limit")
         self.value = {"schema": SCHEMA, "url": public_url(url), "retention_policy": POLICY,
                       "extractor_version": extractor_version, "records": [], "pending": [], "unresolved": []}
         self._metadata, self._seen = [], {}
@@ -89,7 +92,7 @@ class Bundle:
                     or any(saved[k] != self.value[k] for k in
                            ("schema", "url", "retention_policy", "extractor_version"))):
                 raise InvalidData("Metadata checkpoint belongs to another request or policy")
-            if not isinstance(saved["records"], list) or len(saved["records"]) > MAX_RECORDS:
+            if not isinstance(saved["records"], list) or len(saved["records"]) > self._max_records:
                 raise InvalidData("Invalid metadata checkpoint record count")
             for record in saved["records"]:
                 self._restore(record)
@@ -207,7 +210,7 @@ class Bundle:
         key = self._key(kind, parent, data)
         if key in self._seen:
             return self._seen[key]
-        if len(self._metadata) >= MAX_RECORDS:
+        if len(self._metadata) >= self._max_records:
             raise InvalidData("Metadata result contains too many records")
         previous = {} if base is None else self._metadata[base]
         record = {"kind": kind, "parent": parent, "base": base, "observed_at": utc_now(),

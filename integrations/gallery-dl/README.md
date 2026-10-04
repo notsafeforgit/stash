@@ -1975,7 +1975,31 @@ Schema 9 → 10 adds only these two cursor tables and preserves existing outbox
 rows, staged metadata bodies and receipt bytes in one transaction. A table
 collision rolls back promotion. Older producer binaries refuse schema 10;
 include the outbox in backups and retain its pending evidence during rollback.
-The native Stash database remains at schema 1000056.
+These outbox cursor tables do not require a separate native database migration.
+
+### Account listing page collector
+
+`stash_ingest.discovery_fetch` provides the isolated metadata collector for the
+native account-discovery worker. Its `fetch` helper reads one Reddit submitted
+listing page or Twitter timeline page using the pinned gallery-dl runtime. It
+accepts the original Reddit `after` or Twitter `cursor` continuation, acquires
+the service reservation before extractor initialization, and stops at the page
+boundary. It constructs no download job, archive or postprocessor and never
+follows queued media/child URLs. Website settings stay in the private child
+process input. The in-process `collect` helper is only for that child and tests.
+
+The `stash-discovery-page-v1` result binds the exact profile URL, input cursor,
+next cursor, extractor/retention versions and compact metadata records. Empty
+final pages are explicit; an unchanged cursor is a pagination error. Shared
+fields, original observation times, source number precision and reduced preview/
+profile data use the existing metadata bundle codec. Pages retain the historical
+4,096-record limit, within 32 MiB serialized and 128 MiB reconstructed bounds;
+ordinary single-post enrichment keeps its 1,024-record limit.
+
+This collector does not submit a job, advance a stored cursor, accept a source
+post match or certify an account scan as completed. Native discovery storage,
+activation, HTTP delivery and dispatch integration remain required transition
+work; existing production workers have not switched to it.
 
 ## Validation
 

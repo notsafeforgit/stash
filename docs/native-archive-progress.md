@@ -5990,3 +5990,32 @@ post consolidation and remaining association/policy migration, broader managemen
 UI, live host/n8n conversion, compatibility removal, coordinated backup/export/
 restore and reviewed production cutover remain required full-plan work.
 Production and `develop` remain unchanged.
+
+
+## Native account listing collector — 2026-10-04
+
+The producer now has an isolated metadata-only page collector for the retained
+Reddit submitted listings and Twitter timelines. It preserves the original
+cursor, returns the next page boundary separately from listing completion,
+uses source reservations before extractor initialization and does not construct
+media download jobs, archives or postprocessors. Empty final pages, unchanged
+cursors, fetch failures and rejected runtime/profile inputs have distinct
+outcomes. The compact page codec preserves observation times, source numbers,
+shared metadata and the existing retention/expansion limits. Discovery retains
+its historical 4,096-record page bound; individual post enrichment remains
+limited to 1,024 records.
+
+All 401 producer tests pass. Focused malformed-cursor and page-boundary checks
+pass, including an actual isolated child refusing source access before network
+initialization. The existing real Python enrichment/API recovery suite also
+passes after the shared child-process changes. Read-only reconciliation accepts
+all six retained account URLs and both saved cursors, preserving their 67
+historical pages. Evidence is alongside the identity increment under
+`.local/native-discovery-identity-20261004/`.
+
+This is the fetch component of the remaining native discovery implementation.
+It does not activate those accounts, commit cursor progress, accept matches or
+create completion receipts. Native page validation/storage, reviewed activation,
+worker delivery/dispatch and reviewed post consolidation remain open, alongside
+the remaining full transition phases. There is no new native schema or full
+rehearsal copy. Production and `develop` remain unchanged.

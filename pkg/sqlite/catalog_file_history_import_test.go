@@ -236,6 +236,7 @@ var fileHistoryTables = []string{"catalog_file_history_records", "catalog_file_h
 
 func removeSourceFileHistorySchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeMetadataFileReviewSchema(t, raw)
 	for _, table := range fileHistoryTables {
 		_, err := raw.Exec("DROP TABLE " + table)
 		require.NoError(t, err)

@@ -1024,6 +1024,62 @@ also retain their review summary in durable status. General API/scan edit hooks
 still use the existing after-commit delivery path; the ingestion worker retains
 its retryable notification checkpoint.
 
+### Historical metadata review API
+
+These application-authenticated routes live under `/api/v3/archive`; producer
+tokens do not grant access. The backend supports explicit review of imported
+catalog edits. Native UI controls are still being built.
+
+| Route | Result |
+| --- | --- |
+| `GET /entity-identities/<kind>/<local-id>` | Current native UUID/revision for an existing library link or picker selection |
+| `GET /entities/<uuid>/metadata-fields` | Typed curated fields, selected values, protection, provenance and relationship revisions |
+| `GET /entities/<uuid>/metadata-fields/<field>/history?after=<sequence>&limit=N` | Immutable decisions in ascending sequence order |
+| `GET /entities/<uuid>/file-edits?after_history=<uuid>&after_match=<uuid>&limit=N` | Historical alternatives linked to that scene/image's files; both cursor parts are required together |
+| `POST /metadata-file-edits/preview` | Current and proposed values, name candidates, file generations, status and digest; no writes |
+| `POST /metadata-file-edits/apply` | Revision-checked application and durable receipt |
+| `GET /metadata-file-edits/requests/<request-uuid>` | The original committed receipt, or 404 |
+
+List limits are 1–100, default 50. Existing integer library IDs remain valid
+navigation addresses; edits use the resolved native UUID. Historical alternatives
+identify their complete immutable source entry at `GET /file-history/<uuid>`.
+
+A preview request selects one source field, for example:
+
+```json
+{
+  "entity_uuid": "<scene-or-image-uuid>",
+  "history_uuid": "<history-uuid>",
+  "source_field": "actors",
+  "match_uuid": "<file-match-uuid>",
+  "selections": {
+    "An ambiguous source name": {"uuid": "<performer-uuid>", "revision": 3}
+  }
+}
+```
+
+`selections` is optional and only accepts names actually present in that edit.
+Unique canonical/alias matches can be proposed automatically; missing or
+ambiguous names return `unresolved_names`, never a partial replacement that drops
+the unresolved performers. Up to 100 candidates per name are returned with
+`more:true` when truncated. Requests allow up to 128 names; larger or unsupported
+retained values return `unsupported`. No new performer, account or relationship
+target is created by preview or apply. Studio, tag and group choices also use
+native UUIDs and reviewed target revisions.
+
+Only `ready` previews can be applied. Save the preview request plus its `digest`
+and a new `request_uuid` before posting to `/metadata-file-edits/apply`. Retry the
+exact saved body after a lost response, or inspect its receipt; a committed
+retry returns `replayed:true` without editing again. A changed preview or reused
+request UUID with different contents returns 409. Requests are limited to
+256 KiB and cannot specify arbitrary target columns or source payload changes.
+
+Legacy null removes field protection while keeping the displayed value until a
+permitted native policy updates it. The mode change is explicit in preview.
+Historical edits remain separate choices regardless of timestamps, duplicate
+content claims or file survivors. File/ZIP generations, ownership, selected
+entity revision and relationship candidates are checked again before commit.
+
 ## Automatic source translations
 
 Translation has a separate collection policy from scene/image metadata mapping.

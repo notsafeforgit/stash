@@ -62,6 +62,15 @@ func (r metadataFieldRow) resolve(ctx context.Context) (*models.MetadataFieldDec
 	} else if !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
+	var requestUUID string
+	if err := dbWrapper.Get(ctx, &requestUUID, "SELECT request_uuid FROM metadata_file_edit_reviews WHERE decision_uuid=?", r.UUID); err == nil {
+		ret.FileEdit, err = (&MetadataFieldStore{}).FileEditReview(ctx, requestUUID)
+		if err != nil {
+			return nil, err
+		}
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
+	}
 	return ret, nil
 }
 
@@ -332,7 +341,7 @@ func (s *MetadataFieldStore) Decide(ctx context.Context, input models.MetadataFi
 	if input.Origin != "review" && input.Origin != "migration" {
 		return nil, errors.New("metadata choice requires review or migration")
 	}
-	return s.apply(ctx, input, false)
+	return s.apply(ctx, input, false, false)
 }
 
 func (s *MetadataFieldStore) ApplyAutomatic(ctx context.Context, input models.MetadataFieldDecisionInput) (*models.MetadataFieldState, error) {
@@ -345,10 +354,10 @@ func (s *MetadataFieldStore) ApplyAutomatic(ctx context.Context, input models.Me
 	if input.Origin == "filename" && (input.Field != "title" || input.CaptureUUID != "") {
 		return nil, errors.New("filename fallback can set only title without source capture provenance")
 	}
-	return s.apply(ctx, input, true)
+	return s.apply(ctx, input, true, false)
 }
 
-func (s *MetadataFieldStore) apply(ctx context.Context, input models.MetadataFieldDecisionInput, automatic bool) (*models.MetadataFieldState, error) {
+func (s *MetadataFieldStore) apply(ctx context.Context, input models.MetadataFieldDecisionInput, automatic, forceDecision bool) (*models.MetadataFieldState, error) {
 	if !automatic && input.Policy != nil {
 		return nil, errors.New("reviewed field choices do not accept automatic policy provenance")
 	}
@@ -415,7 +424,7 @@ WHERE c.uuid=? AND p.state='active')`, id); err != nil {
 	if input.Origin == "source" && capture == nil {
 		return nil, errors.New("source metadata requires capture provenance")
 	}
-	if d := current.Decision; d != nil && d.Mode == input.Mode && d.Origin == input.Origin && d.Reason == input.Reason &&
+	if d := current.Decision; !forceDecision && d != nil && d.Mode == input.Mode && d.Origin == input.Origin && d.Reason == input.Reason &&
 		bytes.Equal(d.Value, value) && equalMetadataCapture(d.CaptureUUID, capture) && reflect.DeepEqual(d.Policy, input.Policy) {
 		return current, nil
 	}

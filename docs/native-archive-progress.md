@@ -30,8 +30,10 @@ Exact handoff review, seed inspection and reviewed worker execution are now
 implemented, including child retry, publication and recovery without assigning
 new observation times to retained evidence. File edits, state changes and
 deduplication assertions now have native history, bounded import and inspection,
-while preserving current Stash selections. Applying historical metadata
-alternatives and the remaining import review resolution still require work.
+while preserving current Stash selections. Historical metadata alternatives now
+have typed preview/application APIs, guarded relationship resolution and durable
+retry receipts. Their native review controls and the remaining import review
+resolution still require work.
 Native UI, live host/n8n conversion, compatibility removal, coordinated
 backup/export/restore, production cutover and retirement remain major release
 gates. The phase table below records that distinction; commit count is not a
@@ -5618,3 +5620,71 @@ remaining operational/policy families, refreshed snapshots, additional adapters,
 native UI, host/n8n conversion, compatibility removal, coordinated recovery and
 export, performance, owner-reviewed cutover and retirement still require work.
 Production and `develop` remain unchanged.
+
+## Reviewing historical metadata choices — 2026-10-03
+
+Schema 1000067 adds immutable receipts for explicitly selecting a retained
+catalog edit. The application API discovers alternatives through a selected
+scene/image's indexed file associations, without scanning all catalogs. Preview
+shows the current value, protection, proposed value and source context without
+writing. Applying a ready preview commits the typed field decision and its
+source-history/file-match receipt together. Unknown fields remain inspectable
+evidence and cannot select arbitrary database columns. Migration creates no
+reviews and changes no selected metadata.
+
+Performer candidates include canonical names and aliases without prioritizing
+either. Missing or ambiguous names block the complete relationship replacement
+until explicitly resolved; bounded results report truncation. Studio, tag and
+group selections also use native identities and revisions. Apply rechecks the
+entity, selected field, candidate revisions, file ownership and file/ZIP
+generations. A historical inherit choice releases protection while retaining
+the current value until an allowed policy evaluates it. Different historical
+paths remain separate choices even when their files were deduplicated.
+
+Clients can recover the original receipt after a lost response by replaying the
+same saved request UUID and body. Later edits, UUID adoption or deletion of the
+matched file do not reapply a committed request. Changed bodies are rejected.
+Late errors roll back the field decision and receipt together, including when a
+caller swallows the error. Successful new changes use the existing after-commit
+notification contract; retries do not register another notification. Current
+field summaries expose compact provenance without duplicating their values or
+including plugin settings. Native UI controls are still pending.
+
+Populated SQLite and HTTP fixtures cover exact and deduplicated alternatives,
+protected fields, inherit, URL normalization, name ambiguity and overflow,
+unmatched names, target revisions, ZIP containers, source ownership, retry,
+adoption/deletion, rollback, corrupt receipts, migration collisions and origin
+protection. The full fork gate passed in 1,080.440 seconds, including 528 v3
+tests, 391 producer tests, generated contracts, zero lint issues and the full Go
+integration suite. Final candidate-overflow/migration-collision and HTTP summary
+checks passed in 12.065 and 32.794 seconds. The last review-specific replay-error
+change passed affected API/SQLite tests in 23.704 seconds and lint in 16.735
+seconds. These final focused checks followed compilation of the full gate.
+
+One online backup took 132.558 seconds. Normal migration and reinitialisation
+passed in 996.212 seconds; a fresh process reopened the database in 205.753
+seconds. The reopen profile places most CPU time in SQLite stepping during
+earlier catalog validation. Startup performance remains a release gate; the
+checks used idle I/O priority alongside other host activity and are not isolated
+benchmarks.
+
+Independent reconciliation passed in 791.971 seconds. All 248 existing data
+tables retain their exact values and types, including capture rowids, clocks and
+signatures. Existing schema objects, previous migration history and sequence
+counters are unchanged. A separate generated-column comparison also verified
+all 1,927 performer primary-name flags and their table definitions. Integrity is
+clean with zero foreign-key violations. The database remains 20,265,979,904 bytes.
+The frozen catalogs have no metadata-edit rows, so populated review behavior is
+demonstrated by fixtures; the new receipt table is correctly empty in this copy.
+
+Evidence is under `.local/native-metadata-review-rehearsal-20261003/`, with the
+full fork gate report in the preceding file-history rehearsal directory. The
+verified copy supersedes schema 66 under the retention policy after commit/push
+and the host-visible open-file check. Free space was 178 GiB with both copies
+present, above the 50 GiB host reserve. Original compatible and frozen migration
+inputs remain available.
+
+Remaining work includes native review controls, other operational/policy import
+families, refreshed snapshots, additional adapters, host/n8n conversion,
+compatibility removal, coordinated recovery/export, performance and the reviewed
+production cutover. Production and `develop` remain unchanged.

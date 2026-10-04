@@ -1086,6 +1086,7 @@ func (db *Anonymiser) anonymiseArchiveUUIDs(ctx context.Context) error {
 func (db *Anonymiser) deleteSourceAccountEvidence(ctx context.Context) error {
 	return txn.WithTxn(ctx, db, func(ctx context.Context) error {
 		for _, table := range []string{
+			"metadata_file_edit_reviews",
 			"source_capture_contexts",
 			"enrichment_job_seed_services", "enrichment_job_retained_records", "enrichment_handoff_jobs",
 			"checkpoint_handoffs", "checkpoint_evidence_captures", "checkpoint_evidence_acceptances",

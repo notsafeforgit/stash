@@ -29,6 +29,13 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r := chi.NewRouter()
 	r.Use(nativeAdminOrigin)
 	r.Get("/metadata-fields/{kind}", rs.fields)
+	r.Get("/entity-identities/{kind}/{localID}", rs.metadataEntity)
+	r.Get("/entities/{entity}/metadata-fields", rs.entityMetadataFields)
+	r.Get("/entities/{entity}/metadata-fields/{field}/history", rs.entityMetadataHistory)
+	r.Get("/entities/{entity}/file-edits", rs.entityFileEdits)
+	r.Post("/metadata-file-edits/preview", rs.previewFileEdit)
+	r.Post("/metadata-file-edits/apply", rs.applyFileEdit)
+	r.Get("/metadata-file-edits/requests/{request}", rs.fileEditReview)
 	r.Get("/collections/{collection}/metadata-policy", rs.policy)
 	r.Put("/collections/{collection}/metadata-policy", rs.putPolicy)
 	r.Get("/collections/{collection}/metadata-policy/history", rs.policyHistory)
@@ -191,6 +198,14 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 }
 
 func nativeArchiveError(w http.ResponseWriter, err error) {
+	if errors.Is(err, models.ErrMetadataFileReviewInvalid) {
+		ingestError(w, ingest.ErrInvalid)
+		return
+	}
+	if errors.Is(err, models.ErrMetadataFileReviewReplay) {
+		ingestJSON(w, http.StatusConflict, map[string]string{"error": "request_conflict", "message": "This request UUID already names a different historical metadata review."})
+		return
+	}
 	if errors.Is(err, models.ErrMetadataPolicyInvalid) || errors.Is(err, models.ErrTranslationPolicyInvalid) {
 		ingestJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_policy", "message": err.Error()})
 		return

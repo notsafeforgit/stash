@@ -1016,6 +1016,58 @@ List limits are 1–100. There is no public history endpoint that deletes files 
 applies an edit. Ordinary database backup retains this graph; anonymisation
 removes the source history, import receipts and identifying values together.
 
+### Reviewing a retained metadata edit
+
+Schema 1000067 adds `metadata_file_edit_reviews`. Each immutable receipt joins
+one application request to its native field decision, source history entry,
+source field and file match. Import still leaves selected metadata unchanged.
+The explicit review operation uses the normal typed field-decision writer and
+commits the chosen value, provenance and retry receipt in one transaction.
+
+Discovery starts at a selected scene/image's file associations and pages by
+`(history_uuid, match_uuid)`; it does not read the whole catalog library. Edits
+at an exact path and at a deduplicated predecessor remain separate alternatives.
+The user selects the scene/image explicitly, including when several existing
+entities share a file. Review does not merge those entities or propagate the
+choice to other owners. Historical disabled roots need no live filesystem grant
+to review already retained metadata.
+
+Preview rechecks the original file-match basis, current file generation, ZIP
+container generation and selected entity's ownership of the file. Its digest
+also binds the entity revision, current field decision/value, proposed value,
+name candidates and chosen relationship revisions. Apply repeats these checks
+inside its write transaction. Unrelated matches, changed files, removed
+associations, renamed/deleted relationship targets and stale previews cannot
+silently apply a previously displayed choice.
+
+Relationship names use bounded lookups. Performer matching includes every
+canonical name and alias, without giving either priority. Missing/ambiguous names
+block the whole relationship replacement until explicitly selected; candidate
+overflow is visible. A reviewed selection may link a source name to a differently
+named native entity. Several names selecting one UUID produce one relationship.
+This choice changes depicted metadata only, not source-account ownership.
+Unsupported source fields/representations remain inspectable and cannot be
+selected as native targets.
+
+For legacy `inherit`, review releases the override while retaining the current
+selected value until a permitted native policy evaluates it. It neither clears
+the value nor invents a source/filename fallback. The preview shows that exact
+result. Ordinary source mappings continue to respect explicit set/clear choices.
+
+Clients save a request UUID and exact apply body before sending it. A retry
+recovers the original receipt even after later edits, UUID adoption or deletion
+of the matched file; it does not rerun the old change. Reusing a request UUID
+with a different body fails. Receipt signatures bind the request and decision;
+startup also checks source scope, normalized scalar choices and preserved UUID
+redirects. A late failure cannot commit a field without its receipt, even when
+the caller discards the error. Application notifications use the existing
+after-commit contract and are not registered again for a committed retry.
+
+Normal database backups retain the receipts; anonymisation removes them before
+their private source history. Migration creates no reviews and changes no
+selected fields. The [application API](native-ingestion.md#historical-metadata-review-api)
+is implemented; native review controls remain transition work.
+
 ## Retained source documents
 
 Migration 1000041 adds native document evidence without creating files, media,

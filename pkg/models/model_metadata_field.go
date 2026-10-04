@@ -44,17 +44,18 @@ func MetadataFields(kind ArchiveEntityKind) []MetadataFieldDefinition {
 }
 
 type MetadataFieldDecision struct {
-	UUID        string
-	Sequence    int
-	EntityUUID  string
-	Field       string
-	Mode        string // set, clear, inherit, preserved
-	Origin      string // library, review, migration, legacy, unattributed, source, policy, filename
-	Value       json.RawMessage
-	CaptureUUID *string
-	Reason      string
-	CreatedAt   time.Time
-	Policy      *MetadataPolicyRef
+	UUID        string                  `json:"uuid"`
+	Sequence    int                     `json:"sequence"`
+	EntityUUID  string                  `json:"entity_uuid"`
+	Field       string                  `json:"field"`
+	Mode        string                  `json:"mode"`   // set, clear, inherit, preserved
+	Origin      string                  `json:"origin"` // library, review, migration, legacy, unattributed, source, policy, filename
+	Value       json.RawMessage         `json:"value"`
+	CaptureUUID *string                 `json:"capture_uuid,omitempty"`
+	Reason      string                  `json:"reason"`
+	CreatedAt   time.Time               `json:"created_at"`
+	Policy      *MetadataPolicyRef      `json:"policy,omitempty"`
+	FileEdit    *MetadataFileEditReview `json:"file_edit,omitempty"`
 }
 
 type MetadataFieldState struct {
@@ -95,6 +96,10 @@ var (
 )
 
 type MetadataFieldReaderWriter interface {
+	FileEdits(context.Context, string, string, string, int) ([]MetadataFileEditCandidate, error)
+	PreviewFileEdit(context.Context, MetadataFileEditInput) (*MetadataFileEditPreview, error)
+	ApplyFileEdit(context.Context, MetadataFileEditApplyInput) (*MetadataFileEditReview, bool, error)
+	FileEditReview(context.Context, string) (*MetadataFileEditReview, error)
 	// Normalize validates a candidate without mutating the entity or history.
 	Normalize(context.Context, ArchiveEntityKind, string, json.RawMessage, map[string]int) (json.RawMessage, error)
 	State(context.Context, string, string) (*MetadataFieldState, error)

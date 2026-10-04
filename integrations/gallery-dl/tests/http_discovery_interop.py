@@ -19,12 +19,17 @@ from stash_ingest.outbox import Outbox
 
 setup = json.load(sys.stdin)
 client = DiscoveryClient(Client(setup["endpoint"], setup["producer"], timeout=30))
-capabilities = client.capabilities()
+capabilities = client.capabilities(readiness=True)
 assert capabilities["discovery_protocol"] == 1
 assert capabilities["discovery_source_pacing_protocol"] == 1
 assert "discovery_dispatch_protocol" not in capabilities
 listing = setup["listing"]
 admission = (listing["uuid"], listing["sha256"], listing["policy_sha256"], listing["extractor_version"])
+readiness = (listing["collection_uuid"], listing["policy_sha256"], listing["extractor_version"])
+candidates = client.ready_listings(*readiness, limit=1)
+assert candidates == {"listings": [{"uuid": listing["uuid"], "definition_sha256": listing["sha256"]}],
+    "after": listing["uuid"], "has_more": False}
+assert client.ready_jobs(*readiness) == []
 directory = tempfile.TemporaryDirectory()
 outbox_path = Path(directory.name) / "outbox.sqlite"
 
@@ -77,6 +82,8 @@ def lost_once(operation):
 
 
 job = lost_once(lambda: client.admit(*admission))
+assert client.ready_listings(*readiness)["listings"] == []
+assert client.ready_jobs(*readiness) == [{"uuid": job["uuid"], "sequence": job["sequence"]}]
 description = client.describe(job["uuid"])
 assert description["cursor"] is None and description["receipt"] is None
 assert description["listing"] == listing
@@ -109,6 +116,8 @@ assert receipt["ordinal"] == 1 and receipt["fence"] == 1 and receipt["record_cou
 assert receipt["complete"] is False
 assert client.describe(job["uuid"])["receipt"] == receipt
 assert client.append_page(description, lease.job, page) == receipt
+assert client.ready_jobs(*readiness) == []
+assert client.ready_listings(*readiness)["listings"] == candidates["listings"]
 
 following = client.admit(*admission)
 assert following["uuid"] != job["uuid"]
@@ -125,6 +134,8 @@ finally:
     next_lease.close()
 assert failed["outcome"] == "failed" and failed["job_uuid"] == following["uuid"]
 assert client.describe(following["uuid"])["job"]["state"] == "failed"
+assert client.ready_jobs(*readiness) == []
+assert client.ready_listings(*readiness)["listings"] == []
 assert client.describe(job["uuid"])["receipt"] == receipt
 with reopened_journal() as journal:
     assert journal.find(job["uuid"]).state["receipt"] == receipt

@@ -665,7 +665,7 @@ service reservation before the next page can run. Earlier pages and imported
 cursors survive retries; final enumeration and candidate matching are separate
 outcomes. See the [storage and scheduling contract](native-schema.md#durable-account-listing-pages).
 
-Capabilities advertise `discovery_protocol: 1`,
+Capabilities advertise `discovery_protocol: 1`, `discovery_readiness_protocol: 1`,
 `discovery_source_pacing_protocol: 1` and `max_discovery_page_bytes: 33554432`.
 The following routes live under `/api/v3/ingest/discovery` and use the existing
 producer bearer credentials and collection/root grants. Authentication runs
@@ -674,6 +674,8 @@ authorize these operations. Existing enrichment endpoints remain post-only.
 
 | Route | Request and result |
 | --- | --- |
+| `POST /collections/{collection}/jobs/ready` | Requires `policy_sha256` and `extractor_version`, with integer `after` and `limit` (1–100, default 50). Returns due queued `{uuid, sequence}` candidates from the bounded active queue. |
+| `POST /collections/{collection}/listings/ready` | Requires policy/runtime, optional UUID `after` and `limit`. Returns `{listings: [{uuid, definition_sha256}], after, has_more}` for definitions eligible to admit a page. The cursor tracks inspected definitions, including ineligible ones. |
 | `POST /listings/{listing}/jobs` | Requires `expected_definition_sha256`, `policy_sha256` and `extractor_version`. Admits or replays the current page job for an existing definition. After a successful nonfinal page, it admits the next page; after final success it returns that completed job. |
 | `GET /jobs/{job}` | Returns `{job, listing, cursor, receipt}`. The input cursor belongs to this particular page job, even after later jobs advance the listing. The optional receipt belongs only to this job. |
 | `POST /jobs/{job}/claim` | Requires `expected_revision`, stable `owner_uuid`, policy/runtime and `lease_seconds` between 5 and 900. Returns the running job or HTTP 204 while unavailable. Reusing the original owner recovers a lost claim response. |
@@ -717,13 +719,30 @@ Source number tokens and Unicode survive native canonical page encoding.
 See [producer discovery](../integrations/gallery-dl/README.md#account-listing-page-collector)
 for the client contract and remaining execution work.
 
+Readiness requires the collection's current grant and exact policy/runtime; it
+never admits or claims work. Listing scans inspect at most `limit` definitions
+plus one lookahead using the collection/UUID index. An empty `listings` array
+with `has_more: true` must advance using the returned `after`. Candidates skip
+future deadlines, stale sources, active/failed/cancelled jobs and completed
+listings. A succeeded nonfinal page permits admission of the next page. These
+reads use small receipt summaries without loading retained page bodies; admission
+and claim revalidate all selected work. Multiple calls do not form a snapshot.
+
+Application-owned maintenance runs with the HTTP server every 30 seconds,
+independently of connected producers. It inspects only the bounded active queue,
+cancels jobs after collection revision/state/root changes, disabled roots or
+account consolidation, and expires abandoned claims with the existing attempt
+budget and retry backoff. A future deadline is not a source change. Maintenance
+preserves fetched pages, original producer attempts and receipt replay. It
+neither creates new listing definitions nor contacts a source website.
+
 These endpoints do not create listing definitions, activate imported work,
 explicitly retry a terminal job or accept a candidate match. No discovery
 dispatch capability is advertised. The selected-job producer worker delivers
 saved evidence before claiming or fetching; its delivery-only CLI needs no
 website profile and cannot claim another attempt. A listing profile explicitly
 binds `account.list_page`, separately from enrichment policies. Producer
-dispatch, readiness and maintenance, reviewed activation and candidate matching remain
+dispatch, reviewed activation and candidate matching remain
 necessary before host/n8n callers switch to native discovery. In particular, a
 retained nonfinal page is successful page delivery, not successful enumeration
 or a completed catalog import.

@@ -31,7 +31,7 @@ func (rs *ingestRoutes) discoveryRoutes(r chi.Router) {
 					ingestError(w, err)
 					return
 				}
-				for _, key := range []string{"job", "listing"} {
+				for _, key := range []string{"job", "listing", "collection"} {
 					if id := chi.URLParam(r, key); id != "" && !ingest.ValidUUID(id) {
 						ingestError(w, ingest.ErrInvalid)
 						return
@@ -41,6 +41,8 @@ func (rs *ingestRoutes) discoveryRoutes(r chi.Router) {
 			})
 		})
 		r.Post("/listings/{listing}/jobs", rs.admitDiscovery)
+		r.Post("/collections/{collection}/jobs/ready", rs.readyDiscoveryJobs)
+		r.Post("/collections/{collection}/listings/ready", rs.readyDiscoveryListings)
 		r.Get("/jobs/{job}", rs.describeDiscovery)
 		r.Post("/jobs/{job}/claim", rs.claimDiscovery)
 		r.Post("/jobs/{job}/renew", rs.renewDiscovery)

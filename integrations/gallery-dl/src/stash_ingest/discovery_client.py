@@ -57,7 +57,7 @@ class DiscoveryClient:
     def path(job, suffix=""):
         return PREFIX + "/jobs/" + identifier(job) + suffix
 
-    def capabilities(self):
+    def capabilities(self, *, readiness=False):
         value = self.client.capabilities()
         if (type(value.get("discovery_protocol")) is not int or value["discovery_protocol"] != 1
                 or type(value.get("discovery_source_pacing_protocol")) is not int
@@ -65,6 +65,68 @@ class DiscoveryClient:
                 or type(value.get("max_discovery_page_bytes")) is not int
                 or value["max_discovery_page_bytes"] < MAX_BYTES):
             raise Unavailable("native_discovery_worker_unavailable")
+        if readiness and (type(value.get("discovery_readiness_protocol")) is not int
+                or value["discovery_readiness_protocol"] != 1):
+            raise Unavailable("native_discovery_readiness_unavailable")
+        return value
+
+    @staticmethod
+    def _ready_request(collection, policy, extractor, limit):
+        identifier(collection)
+        _runtime(extractor)
+        if not sha256(policy) or not _integer(limit, 1, 100):
+            raise InvalidData("Invalid discovery readiness request")
+        return {"policy_sha256": policy, "extractor_version": extractor, "limit": limit}
+
+    def ready_jobs(self, collection, policy, extractor, *, after=0, limit=20):
+        request = self._ready_request(collection, policy, extractor, limit)
+        if not _integer(after, 0):
+            raise InvalidData("Invalid discovery job cursor")
+        request["after"] = after
+        value = self.client._request("POST", PREFIX + "/collections/" + collection + "/jobs/ready", encode(request))
+        if not isinstance(value, list) or len(value) > limit:
+            raise Unavailable("invalid_response")
+        try:
+            seen = set()
+            for item in value:
+                if (not isinstance(item, dict) or set(item) != {"uuid", "sequence"}
+                        or not _integer(item["sequence"], after + 1)):
+                    raise InvalidData("Invalid discovery job candidate")
+                identifier(item["uuid"])
+                if item["uuid"] in seen:
+                    raise InvalidData("Repeated discovery job candidate")
+                seen.add(item["uuid"])
+                after = item["sequence"]
+        except InvalidData:
+            raise Unavailable("invalid_response") from None
+        return value
+
+    def ready_listings(self, collection, policy, extractor, *, after="", limit=20):
+        request = self._ready_request(collection, policy, extractor, limit)
+        if after != "":
+            identifier(after)
+        request["after"] = after
+        value = self.client._request("POST", PREFIX + "/collections/" + collection + "/listings/ready", encode(request))
+        if (not isinstance(value, dict) or set(value) != {"listings", "after", "has_more"}
+                or not isinstance(value["listings"], list) or len(value["listings"]) > limit
+                or type(value["has_more"]) is not bool):
+            raise Unavailable("invalid_response")
+        try:
+            cursor = value["after"]
+            if cursor != "":
+                identifier(cursor)
+            if cursor < after or ((value["has_more"] or value["listings"]) and cursor == after):
+                raise InvalidData("Discovery listing cursor did not advance")
+            for item in value["listings"]:
+                if (not isinstance(item, dict) or set(item) != {"uuid", "definition_sha256"}
+                        or not sha256(item["definition_sha256"])):
+                    raise InvalidData("Invalid discovery listing candidate")
+                identifier(item["uuid"])
+                if not after < item["uuid"] <= cursor:
+                    raise InvalidData("Discovery listing is outside the inspected page")
+                after = item["uuid"]
+        except InvalidData:
+            raise Unavailable("invalid_response") from None
         return value
 
     @staticmethod

@@ -460,7 +460,12 @@ job status cannot discard unacknowledged local data. `execute-discovery` now
 executes one admitted page using a separately pinned account-listing profile;
 `deliver-discovery` recovers original intents without website access or a new
 claim. Save returned evidence before testing possibly expired ownership. Page
-delivery is not completed enumeration or a published match. Discovery dispatch,
+delivery is not completed enumeration or a published match. Scoped readiness
+uses bounded active-job and collection-definition indexes. Its listing cursor
+tracks inspected rows, so an empty filtered page can still have more work.
+Readiness must not load page bodies or confer ownership. Application maintenance
+ends stale source definitions and expired claims while retaining pages, receipts
+and retry deadlines. Discovery dispatch,
 reviewed activation and matching remain transition work. See
 [listing storage](docs/native-schema.md#durable-account-listing-pages).
 

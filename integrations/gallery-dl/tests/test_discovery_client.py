@@ -80,6 +80,57 @@ class DiscoveryClientTests(unittest.TestCase):
         self.transport._request.return_value = retained
         self.assertEqual(self.client.describe(self.job["uuid"]), retained)
 
+    def test_readiness_negotiation_and_ordered_job_candidates(self):
+        caps = {"discovery_protocol": 1, "discovery_source_pacing_protocol": 1, "max_discovery_page_bytes": MAX_BYTES}
+        for version in (None, True, 2):
+            self.transport.capabilities.return_value = {**caps, "discovery_readiness_protocol": version}
+            with self.assertRaises(Unavailable):
+                self.client.capabilities(readiness=True)
+        self.transport.capabilities.return_value = {**caps, "discovery_readiness_protocol": 1}
+        self.client.capabilities(readiness=True)
+        args = self.listing["collection_uuid"], self.listing["policy_sha256"], self.listing["extractor_version"]
+        one = {"uuid": self.job["uuid"], "sequence": 8}
+        two = {"uuid": str(uuid.uuid4()), "sequence": 12}
+        self.transport._request.return_value = [one, two]
+        self.assertEqual(self.client.ready_jobs(*args, after=5, limit=2), [one, two])
+        for invalid in (None, {}, [two, one], [one, one], [one, {**two, "uuid": one["uuid"]}],
+                        [{**one, "sequence": 5}], [{**one, "sequence": True}], [{**one, "extra": 1}],
+                        [{**one, "uuid": "bad"}], [{**one, "sequence": 1 << 63}]):
+            self.transport._request.return_value = invalid
+            with self.subTest(invalid=invalid), self.assertRaises(Unavailable):
+                self.client.ready_jobs(*args, after=5, limit=2)
+        self.transport._request.reset_mock()
+        for kw in ({"after": True}, {"after": -1}, {"after": 1 << 63}, {"limit": 0}, {"limit": 101}):
+            with self.assertRaises(InvalidData):
+                self.client.ready_jobs(*args, **kw)
+        self.transport._request.assert_not_called()
+
+    def test_listing_readiness_advances_through_empty_filtered_pages(self):
+        args = self.listing["collection_uuid"], self.listing["policy_sha256"], self.listing["extractor_version"]
+        first, second, third = sorted(str(uuid.uuid4()) for _ in range(3))
+        candidate = {"uuid": second, "definition_sha256": self.listing["sha256"]}
+        for good in ({"listings": [], "after": second, "has_more": True},
+                     {"listings": [candidate], "after": third, "has_more": False},
+                     {"listings": [], "after": first, "has_more": False}):
+            self.transport._request.return_value = good
+            self.assertEqual(self.client.ready_listings(*args, after=first, limit=2), good)
+        base = {"listings": [candidate], "after": third, "has_more": False}
+        for invalid in (None, [], {**base, "after": first}, {**base, "after": None},
+                        {**base, "after": ""}, {**base, "has_more": 1}, {**base, "extra": None},
+                        {**base, "listings": [candidate, candidate]},
+                        {**base, "listings": [{**candidate, "uuid": first}]},
+                        {**base, "listings": [{**candidate, "definition_sha256": "bad"}]},
+                        {**base, "listings": [{**candidate, "extra": 1}]},
+                        {**base, "listings": [], "after": first, "has_more": True}):
+            self.transport._request.return_value = invalid
+            with self.subTest(invalid=invalid), self.assertRaises(Unavailable):
+                self.client.ready_listings(*args, after=first, limit=2)
+        self.transport._request.reset_mock()
+        for cursor in (None, True, "not-a-uuid"):
+            with self.assertRaises(InvalidData):
+                self.client.ready_listings(*args, after=cursor)
+        self.transport._request.assert_not_called()
+
     def test_admission_and_claim_cannot_switch_the_listing_page_or_attempt(self):
         self.transport._request.return_value = self.job
         args = (self.listing["uuid"], self.listing["sha256"], self.listing["policy_sha256"], self.listing["extractor_version"])

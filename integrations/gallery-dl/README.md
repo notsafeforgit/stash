@@ -2011,6 +2011,22 @@ The protocol advertises `discovery_protocol: 1` and
 It accepts existing definition UUIDs and their pinned hashes, not replacement
 source definitions or worker-selected initial cursors.
 
+`discovery_readiness_protocol: 1` adds bounded discovery for a selected collection
+and exact policy/runtime. Negotiate with `client.capabilities(readiness=True)`.
+`ready_jobs(...)` returns due admitted jobs by increasing sequence;
+`ready_listings(...)` returns definitions eligible for a new page, plus an
+inspection cursor and `has_more`. Follow that cursor even when the candidate
+array is empty. Filtering still inspects at most the requested number of
+definitions, so mismatched policies or future deadlines cannot force an
+unbounded historical scan. Listing summaries never repeat the retained bodies.
+Readiness is read-only; admission and claim validate eligibility again.
+
+The native server maintains stale/expired ownership every 30 seconds without a
+producer connection. It cancels changed sources and recovers expired claims
+with existing backoff and attempt limits. Account merges and disabled roots
+cannot redirect a previously authorized listing. Prior pages and original
+receipts survive; failed/cancelled jobs still require explicit reviewed retry.
+
 `discovery_client.DiscoveryClient(Client(...))` implements that protocol. It
 validates each listing's canonical definition hash, requested cursor, page job
 and completion receipt. `append_page(description, lease.job, page)` checks the
@@ -2084,7 +2100,7 @@ review or failed outcomes, and 1 for invalid input or an exception. The receipt'
 page nor completed enumeration establishes a candidate match or completed catalog
 import. `status` now includes the discovery journal's retained work.
 
-Discovery dispatch, readiness and maintenance, reviewed activation, candidate
+Discovery dispatch, reviewed activation, candidate
 matching and verified native page release remain required. These commands do not
 create listing definitions or activate imported accounts. Existing production
 workers and host/n8n launchers have not switched to native discovery.

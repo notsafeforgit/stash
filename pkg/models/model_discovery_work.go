@@ -80,6 +80,29 @@ type DiscoveryPage struct {
 	Body json.RawMessage `json:"body"`
 }
 
+type DiscoveryJobCandidate struct {
+	Sequence int64  `json:"sequence"`
+	UUID     string `json:"uuid"`
+}
+
+type DiscoveryListingCandidate struct {
+	UUID   string `json:"uuid"`
+	Digest string `json:"definition_sha256"`
+}
+
+// After tracks inspected definitions, including ineligible ones. Empty results
+// with HasMore still advance a bounded scan; they do not mean enumeration ended.
+type DiscoveryListingCandidates struct {
+	Listings []DiscoveryListingCandidate `json:"listings"`
+	After    string                      `json:"after"`
+	HasMore  bool                        `json:"has_more"`
+}
+
+type DiscoveryMaintenanceResult struct {
+	Recovered int `json:"recovered"`
+	Cancelled int `json:"cancelled"`
+}
+
 type DiscoveryJobReaderWriter interface {
 	CreateListing(context.Context, DiscoveryListingInput, time.Time) (*DiscoveryListing, error)
 	Listing(context.Context, string) (*DiscoveryListing, error)
@@ -95,4 +118,7 @@ type DiscoveryJobReaderWriter interface {
 	Page(context.Context, string, int) (*DiscoveryPage, error)
 	PageHead(context.Context, string) (*DiscoveryPage, error)
 	Pages(context.Context, string, int, int) ([]DiscoveryPageReceipt, error)
+	Ready(context.Context, string, string, string, int64, int, time.Time) ([]DiscoveryJobCandidate, error)
+	ReadyListings(context.Context, string, string, string, string, int, time.Time) (*DiscoveryListingCandidates, error)
+	Maintain(context.Context, time.Time) (*DiscoveryMaintenanceResult, error)
 }

@@ -6251,3 +6251,53 @@ matching, verified native staging release and post consolidation remain open.
 The remaining import, native UI, host/n8n conversion, compatibility removal,
 coordinated backup/restore, production cutover and retirement gates still apply.
 Production and `develop` remain unchanged.
+
+## Bounded discovery readiness and ownership maintenance — 2026-10-04
+
+The producer API now exposes scoped readiness for existing account-listing
+definitions and due admitted jobs. Collection UUID, pinned policy and extractor
+runtime are required. The listing endpoint limits inspected rows, including
+mismatched or stale definitions; its continuation cursor advances even when a
+filtered page contains no candidates. The active-job query uses the bounded
+queue index. Neither lookup admits work, claims a lease or loads large retained
+page bodies. Admission and claim still revalidate the selected definition.
+
+Successful nonfinal pages permit the next page's admission. Completed listings,
+failed/cancelled jobs, changed definitions and future retry deadlines are
+excluded. The Python client negotiates `discovery_readiness_protocol: 1` and
+validates candidate ordering, exact hashes, page sizes and forward cursor
+movement. The separate autonomous dispatch capability remains unadvertised.
+
+Application-owned maintenance runs with the HTTP server every 30 seconds,
+independently of producer connections. It cancels stale collection/account/root
+bindings and expires abandoned claims with the existing retry delay and attempt
+budget. Concurrent maintenance recovers an attempt once; a caught write error
+cannot commit an ended attempt without its job transition. Source account
+consolidation does not redirect previously authorized work. Prior pages and
+original producer/attempt receipts remain replayable after cancellation.
+
+Focused SQLite, HTTP and Python client tests pass, covering bounded filtered
+pagination, current grants, retries, terminal jobs, concurrent recovery, server
+shutdown, account consolidation, disabled roots and rollback after a write
+failure. A rooted-collection fixture initially omitted its required relative
+path; the fixture was corrected and that check passes. Real HTTP transport
+checks retain large-page/lost-acknowledgement behavior while exercising readiness.
+The complete `make validate-fork` pre-push gate passes in 1,048 seconds: backend
+generation, v3 validation with all 582 tests, all 429 producer tests, Go lint
+with zero issues and the full tagged Go suite. Evidence is retained under
+`.local/native-discovery-client-20261004/`. A separately prepared producer
+dispatcher is not included in this increment's gate or implementation claims.
+
+A read-only query-plan check on the 20.27 GB schema-71 rehearsal confirms the
+active-work, collection/UUID and listing/ordinal indexes. The empty readiness
+lookups take less than 0.1 ms each despite 2,182 historical archive jobs. Native
+discovery tables are not yet populated in this rehearsal, so these timings are
+an index check, not a throughput claim for activated discovery. Populated-state
+pagination and recovery are exercised by the SQLite fixtures.
+
+Native schema 1000071 and producer schema 11 are unchanged; no additional full
+database rehearsal copy is needed. About 182 GiB remained free when validation
+started. Durable producer dispatch, reviewed legacy discovery activation,
+candidate matching, verified native page release and reviewed post consolidation
+remain open alongside the broader transition gates. Production and `develop`
+remain unchanged.

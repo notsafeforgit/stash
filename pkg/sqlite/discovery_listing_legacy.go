@@ -11,6 +11,10 @@ import (
 )
 
 func verifyDiscoveryListingLegacy(get enrichmentGet, input models.DiscoveryListingInput) error {
+	if input.RecoveryOf != nil {
+		_, err := discoveryRecoveryOriginal(get, input)
+		return err
+	}
 	if input.Legacy == nil {
 		return nil
 	}

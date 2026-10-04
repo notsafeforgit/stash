@@ -21,6 +21,9 @@ func (s *DiscoveryMatchStore) PreviewActivation(ctx context.Context, input model
 	if err := verifyDiscoveryListingLegacy(get, input.Listing); err != nil {
 		return nil, err
 	}
+	if _, err := checkDiscoveryRecoveryReady(ctx, input.Listing); err != nil {
+		return nil, err
+	}
 	if err := discoveryListingEligible(ctx, input.Listing, input.Listing.NotBefore); err != nil {
 		return nil, err
 	}

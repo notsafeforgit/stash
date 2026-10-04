@@ -37,12 +37,19 @@ type discoveryMatchFixture struct {
 }
 
 func newDiscoveryMatchFixture(t *testing.T) *discoveryMatchFixture {
+	return newDiscoveryMatchHistoryFixture(t, false)
+}
+
+func newDiscoveryMatchHistoryFixture(t *testing.T, historical bool) *discoveryMatchFixture {
 	t.Helper()
 	f := &discoveryMatchFixture{now: time.Date(2026, 10, 4, 14, 0, 0, 0, time.UTC)}
 	f.automationSnapshotFixture = discoveryFixture(t, func(tables map[string][]map[string]any) {
 		tables["discovery_candidates"], tables["enrichment_cooldowns"] = nil, nil
 		account := tables["discovery_accounts"][0]
 		account["cursor_json"], account["pages"] = "null", 0
+		if historical {
+			account["cursor_json"], account["pages"] = `{"after":"t3_prior"}`, 67
+		}
 		for _, target := range tables["discovery_targets"] {
 			if target["status"] != "pending" {
 				continue
@@ -81,9 +88,13 @@ func newDiscoveryMatchFixture(t *testing.T) *discoveryMatchFixture {
 		if err != nil {
 			return err
 		}
-		f.listing, err = f.repo.DiscoveryJob.CreateListing(ctx, models.DiscoveryListingInput{UUID: uuid.NewString(), AccountUUID: *account.AccountUUID, CollectionUUID: collection.UUID,
+		listingInput := models.DiscoveryListingInput{UUID: uuid.NewString(), AccountUUID: *account.AccountUUID, CollectionUUID: collection.UUID,
 			CollectionRevision: collection.Revision, RootUUID: collection.RootUUID, ProfileURL: account.ProfileURL, PolicySHA256: strings.Repeat("a", 64), ExtractorVersion: "1.32.15-dev", NotBefore: *account.NotBefore,
-			Legacy: &models.DiscoveryListingLegacy{SnapshotUUID: f.manifest.UUID, AccountOrdinal: account.Ordinal}}, f.now)
+			Legacy: &models.DiscoveryListingLegacy{SnapshotUUID: f.manifest.UUID, AccountOrdinal: account.Ordinal}}
+		if historical {
+			listingInput.InitialCursor, listingInput.HistoricalPages = map[string]string{"after": "t3_prior"}, 67
+		}
+		f.listing, err = f.repo.DiscoveryJob.CreateListing(ctx, listingInput, f.now)
 		if err != nil {
 			return err
 		}

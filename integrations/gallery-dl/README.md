@@ -1357,6 +1357,24 @@ returns 1. Exit 0 from Apply proves the bindings were retained. It does not prov
 scraping, comparison, post identity, historical coverage or catalog import
 completion; those have separate native execution and review steps.
 
+For a listing that resumes after unavailable historical batches, prepare a
+separate recovery plan with a new listing UUID. Keep the same account, collection,
+profile URL and `legacy` reference, set `initial_cursor: null` and
+`historical_pages: 0`, and add:
+
+```json
+"recovery_of": {"listing_uuid": "ORIGINAL_LISTING_UUID", "sha256": "ORIGINAL_LISTING_SHA256"}
+```
+
+The original definition is available through `GET /api/v3/archive/discovery-listings/{listing}`.
+Select targets already bound to it, preserve its deadline and the latest attempt's
+available time, and review current collection/root and worker policy values.
+Use the same prepare/show/apply/status commands and a new saved plan file. Further
+target batches reuse the same recovery listing. A running producer must finish
+or be recovered before Apply; queued predecessor work is cancelled atomically.
+Earlier pages and candidate evidence remain reviewable and can still block a
+conflicting match. See [recovery semantics](../../docs/native-ingestion.md#recovering-a-search-with-missing-historical-batches).
+
 ### Legacy enrichment checkpoints
 
 After the frozen enrichment mapping finishes, convert saved collector results:

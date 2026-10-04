@@ -76,7 +76,7 @@ func (s *DiscoveryJobStore) CheckListing(ctx context.Context, id string, now tim
 	if listing == nil {
 		return nil, models.ErrDiscoveryInvalid
 	}
-	if err := discoveryListingEligible(ctx, listing.DiscoveryListingInput, now); err != nil {
+	if err := discoveryFetchEligible(ctx, listing.DiscoveryListingInput, now); err != nil {
 		return nil, err
 	}
 	return listing, nil
@@ -144,7 +144,19 @@ func (s *DiscoveryJobStore) CreateListing(ctx context.Context, input models.Disc
 	if err := verifyDiscoveryListingLegacy(func(out any, q string, args ...any) error { return dbWrapper.Get(ctx, out, q, args...) }, input); err != nil {
 		return nil, err
 	}
+	previous, err := checkDiscoveryRecoveryReady(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+	if previous != nil && now.Before(previous.UpdatedAt) {
+		return nil, models.ErrDiscoveryConflict
+	}
 	complete := discoveryAtomic(ctx)
+	if previous != nil && previous.State == "queued" {
+		if _, err := (&ArchiveJobStore{}).Cancel(ctx, previous.UUID, previous.Revision, now); err != nil {
+			return nil, err
+		}
+	}
 	_, err = dbWrapper.Exec(ctx, `INSERT INTO discovery_listings(uuid,account_uuid,collection_uuid,collection_revision,root_uuid,definition,digest,created_at) VALUES(?,?,?,?,?,?,?,?)`,
 		input.UUID, input.AccountUUID, input.CollectionUUID, input.CollectionRevision, input.RootUUID, string(body), digest, now.UTC())
 	if err != nil {
@@ -154,6 +166,14 @@ func (s *DiscoveryJobStore) CreateListing(ctx context.Context, input models.Disc
 		if _, err := dbWrapper.Exec(ctx, "INSERT INTO discovery_listing_legacy VALUES(?,?,?)", input.UUID, input.Legacy.SnapshotUUID, input.Legacy.AccountOrdinal); err != nil {
 			return nil, err
 		}
+	}
+	if recovery := input.RecoveryOf; recovery != nil {
+		if _, err := dbWrapper.Exec(ctx, "INSERT INTO discovery_listing_recoveries VALUES(?,?,?)", input.UUID, recovery.ListingUUID, recovery.SHA256); err != nil {
+			return nil, err
+		}
+		txn.AddPreCommitHook(ctx, func(ctx context.Context) error {
+			return validateDiscoveryRecovery(func(out any, q string, args ...any) error { return dbWrapper.Get(ctx, out, q, args...) }, input.UUID)
+		})
 	}
 	ret, err := s.Listing(ctx, input.UUID)
 	*complete = err == nil
@@ -237,7 +257,7 @@ func (s *DiscoveryJobStore) admit(ctx context.Context, id string, generation int
 	if listing == nil {
 		return nil, models.ErrDiscoveryInvalid
 	}
-	if err := discoveryListingEligible(ctx, listing.DiscoveryListingInput, maxTime(now, listing.NotBefore)); err != nil {
+	if err := discoveryFetchEligible(ctx, listing.DiscoveryListingInput, maxTime(now, listing.NotBefore)); err != nil {
 		return nil, err
 	}
 	head, err := s.PageHead(ctx, id)
@@ -281,7 +301,7 @@ func discoveryJobEligible(ctx context.Context, job *models.ArchiveJob, now time.
 	if listing == nil || listing.Digest != work.DefinitionSHA256 || listing.CollectionUUID != work.CollectionUUID {
 		return nil, models.ErrDiscoveryConflict
 	}
-	if err := discoveryListingEligible(ctx, listing.DiscoveryListingInput, now); err != nil {
+	if err := discoveryFetchEligible(ctx, listing.DiscoveryListingInput, now); err != nil {
 		return nil, err
 	}
 	var bound bool

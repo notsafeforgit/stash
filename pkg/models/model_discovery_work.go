@@ -20,19 +20,27 @@ type DiscoveryListingLegacy struct {
 	AccountOrdinal int64  `json:"account_ordinal"`
 }
 
+// Recovery retains the original incomplete search while a new search begins at
+// the source's first page. It does not claim to have recovered historical bodies.
+type DiscoveryListingRecovery struct {
+	ListingUUID string `json:"listing_uuid"`
+	SHA256      string `json:"sha256"`
+}
+
 type DiscoveryListingInput struct {
-	UUID               string                  `json:"uuid"`
-	AccountUUID        string                  `json:"account_uuid"`
-	CollectionUUID     string                  `json:"collection_uuid"`
-	CollectionRevision int                     `json:"collection_revision"`
-	RootUUID           *string                 `json:"root_uuid"`
-	ProfileURL         string                  `json:"profile_url"`
-	PolicySHA256       string                  `json:"policy_sha256"`
-	ExtractorVersion   string                  `json:"extractor_version"`
-	InitialCursor      map[string]string       `json:"initial_cursor"`
-	HistoricalPages    int64                   `json:"historical_pages"`
-	Legacy             *DiscoveryListingLegacy `json:"legacy"`
-	NotBefore          time.Time               `json:"not_before"`
+	UUID               string                    `json:"uuid"`
+	AccountUUID        string                    `json:"account_uuid"`
+	CollectionUUID     string                    `json:"collection_uuid"`
+	CollectionRevision int                       `json:"collection_revision"`
+	RootUUID           *string                   `json:"root_uuid"`
+	ProfileURL         string                    `json:"profile_url"`
+	PolicySHA256       string                    `json:"policy_sha256"`
+	ExtractorVersion   string                    `json:"extractor_version"`
+	InitialCursor      map[string]string         `json:"initial_cursor"`
+	HistoricalPages    int64                     `json:"historical_pages"`
+	Legacy             *DiscoveryListingLegacy   `json:"legacy"`
+	NotBefore          time.Time                 `json:"not_before"`
+	RecoveryOf         *DiscoveryListingRecovery `json:"recovery_of,omitempty"`
 }
 
 // A listing is a bounded source-history search. Its completion does not accept

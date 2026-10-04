@@ -111,6 +111,26 @@ func (s *DiscoveryMatchStore) Review(ctx context.Context, id string) (*models.Di
 			ret.Blockers = append(ret.Blockers, "identifier_in_use")
 		}
 	}
+	get := func(out any, q string, args ...any) error { return dbWrapper.Get(ctx, out, q, args...) }
+	ret.ReplacementListingUUID, err = discoveryReplacement(get, listing.UUID)
+	if err != nil {
+		return nil, err
+	}
+	if ret.ReplacementListingUUID != "" {
+		ret.Blockers = append(ret.Blockers, "search_replaced")
+	}
+	ret.RecoveryFrom, err = discoveryRecoveryReview(get, listing, target, ret.Candidate)
+	if err != nil {
+		return nil, err
+	}
+	if ret.RecoveryFrom != nil {
+		if ret.RecoveryFrom.UncomparedPages != 0 {
+			ret.Blockers = append(ret.Blockers, "earlier_comparison_pending")
+		}
+		if ret.RecoveryFrom.ConflictingCandidates != 0 {
+			ret.Blockers = append(ret.Blockers, "earlier_candidates_differ")
+		}
+	}
 	ret.Publication, err = s.Publication(ctx, id)
 	if err != nil {
 		return nil, err

@@ -34,6 +34,12 @@ func PrepareDiscoveryListing(input models.DiscoveryListingInput) (json.RawMessag
 	} else if !translationUUID(input.Legacy.SnapshotUUID) || input.Legacy.AccountOrdinal < 1 {
 		return nil, "", models.ErrDiscoveryInvalid
 	}
+	if recovery := input.RecoveryOf; recovery != nil {
+		if input.Legacy == nil || !translationUUID(recovery.ListingUUID) || recovery.ListingUUID == input.UUID ||
+			!ValidSHA256(recovery.SHA256) || input.InitialCursor != nil || input.HistoricalPages != 0 {
+			return nil, "", models.ErrDiscoveryInvalid
+		}
+	}
 	if input.InitialCursor != nil {
 		cursor := sourceObject{}
 		for key, value := range input.InitialCursor {

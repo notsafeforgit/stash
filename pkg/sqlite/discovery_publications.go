@@ -95,6 +95,13 @@ func prepareDiscoveryPublication(get enrichmentGet, selectRows enrichmentSelect,
 		return nil, models.ErrDiscoveryConflict
 	}
 	ret.candidate = candidates[0]
+	recovery, err := discoveryRecoveryReview(get, ret.listing, &ret.target, &ret.candidate)
+	if err != nil {
+		return nil, err
+	}
+	if recovery != nil && (recovery.UncomparedPages != 0 || recovery.ConflictingCandidates != 0) {
+		return nil, models.ErrDiscoveryConflict
+	}
 	var page discoveryPageRow
 	if err := get(&page, "SELECT * FROM discovery_pages WHERE listing_uuid=? AND ordinal=?", ret.listing.UUID, ret.candidate.BestPage); err != nil {
 		return nil, err

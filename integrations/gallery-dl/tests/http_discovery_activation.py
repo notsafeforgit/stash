@@ -1,6 +1,7 @@
 """Exercise native discovery review using real frozen inputs and lost HTTP ACKs."""
 
 import hashlib
+from copy import deepcopy
 import json
 from pathlib import Path
 import sqlite3
@@ -120,6 +121,39 @@ def run():
         assert target["last_page"] == 0 and target["enumeration_complete"] is False
         assert client.request("GET", "/discovery-match-targets/" + entry["target_uuid"] + "/candidates") == []
     assert source.read_bytes() == original
+    if setup.get("recovery"):
+        previous = receipt
+        request = deepcopy(previous["input"])
+        request["uuid"], request["listing"]["uuid"] = str(uuid.uuid4()), str(uuid.uuid4())
+        request["listing"].update(initial_cursor=None, historical_pages=0,
+                                  recovery_of={"listing_uuid": previous["input"]["listing"]["uuid"],
+                                               "sha256": previous["listing_sha256"]})
+        request_file, plan_file = directory / "recovery-input.json", directory / "recovery-plan.json"
+        request_file.write_text(json.dumps(request))
+        prepared_plan = execute(activation_main, ["prepare", "--input", str(request_file), "--output", str(plan_file),
+                                                "--endpoint", setup["endpoint"]])
+        saved_plan = plan_file.read_bytes()
+        args = ["--plan", str(plan_file), "--expected-sha256", prepared_plan["plan_sha256"]]
+        preview = execute(activation_main, ["show", *args])["preview"]
+        assert preview["input"] == request
+        assert execute(activation_main, ["status", *args, "--endpoint", setup["endpoint"]], wanted=3)["pending"]
+        failed = execute(activation_main, ["apply", *args, "--endpoint", setup["endpoint"]], wanted=1)
+        assert failed["error"] == "network_unavailable", failed
+        assert execute(activation_main, ["apply", *args, "--endpoint", setup["endpoint"]])["activated"]
+        assert plan_file.read_bytes() == saved_plan
+        receipt = client.status(preview)
+        assert client.apply(preview) == receipt
+        # Exercise explicit endpoint replay too; the client can recover via GET.
+        assert client.request("POST", "/discovery-activations", {"input": request,
+                              "expected_plan_sha256": preview["plan_sha256"]}) == receipt
+        before = client.request("GET", "/discovery-listings/" + previous["input"]["listing"]["uuid"])
+        assert before["historical_pages"] == 67 and before["initial_cursor"] == {"after": "t3_prior"}
+        for old, new in zip(previous["entries"], receipt["entries"]):
+            assert old["post_uuid"] == new["post_uuid"] and old["source_sha256"] == new["source_sha256"]
+            review = client.request("GET", "/discovery-match-targets/" + new["target_uuid"] + "/review")
+            assert review["recovery_from"]["target_uuid"] == old["target_uuid"]
+            assert review["coverage"]["historical_pages"] == 0 and not review["coverage"]["complete"]
+        assert source.read_bytes() == original
     print(json.dumps(receipt))
 
 

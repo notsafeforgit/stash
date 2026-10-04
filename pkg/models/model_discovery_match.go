@@ -98,19 +98,29 @@ type DiscoveryMatchCoverage struct {
 	Complete            bool  `json:"complete"`
 }
 
+type DiscoveryMatchRecovery struct {
+	ListingUUID           string `json:"listing_uuid"`
+	TargetUUID            string `json:"target_uuid"`
+	UncomparedPages       int    `json:"uncompared_pages"`
+	CandidateCount        int    `json:"candidate_count"`
+	ConflictingCandidates int    `json:"conflicting_candidates"`
+}
+
 // Review is a read-only view of one target in the current transaction. Without
 // Publication, empty Blockers identify a unique candidate for further validation,
 // not acceptance or a durable review token. Published work keeps its receipt.
 type DiscoveryMatchReview struct {
-	Target               DiscoveryMatchTarget       `json:"target"`
-	Coverage             DiscoveryMatchCoverage     `json:"coverage"`
-	CurrentPost          *SourcePost                `json:"current_post"`
-	CandidateCount       int                        `json:"candidate_count"`
-	DetailCandidateCount int                        `json:"detail_candidate_count"`
-	Candidate            *DiscoveryMatchCandidate   `json:"candidate,omitempty"`
-	CandidatePost        *SourcePost                `json:"candidate_post,omitempty"`
-	Publication          *DiscoveryMatchPublication `json:"publication,omitempty"`
-	Blockers             []string                   `json:"blockers"`
+	Target                 DiscoveryMatchTarget       `json:"target"`
+	Coverage               DiscoveryMatchCoverage     `json:"coverage"`
+	CurrentPost            *SourcePost                `json:"current_post"`
+	CandidateCount         int                        `json:"candidate_count"`
+	DetailCandidateCount   int                        `json:"detail_candidate_count"`
+	Candidate              *DiscoveryMatchCandidate   `json:"candidate,omitempty"`
+	CandidatePost          *SourcePost                `json:"candidate_post,omitempty"`
+	Publication            *DiscoveryMatchPublication `json:"publication,omitempty"`
+	RecoveryFrom           *DiscoveryMatchRecovery    `json:"recovery_from,omitempty"`
+	ReplacementListingUUID string                     `json:"replacement_listing_uuid,omitempty"`
+	Blockers               []string                   `json:"blockers"`
 }
 
 type DiscoveryMatchReaderWriter interface {

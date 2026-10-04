@@ -2434,8 +2434,8 @@ routes expose preview/apply/replay, retained listing summaries and the compariso
 targets, candidates and original record references. Producer tokens cannot use
 these review routes. See [activation API](native-ingestion.md#reviewed-discovery-activation).
 The operator command saves reviewed activations and recovers their original
-receipts. The review UI, historical-coverage resolution, detail execution,
-and staging-release workflow remain open.
+receipts. Missing-history searches can use reviewed recovery below; the review
+UI, detail execution and staging-release workflow remain open.
 
 ### Verified discovery publication
 
@@ -2462,8 +2462,35 @@ edits. Startup reconstructs the original proof and verifies every capture,
 collection association, identity/URL evidence row and record mapping. Ordinary
 backups retain the graph; anonymisation deletes publication children before their
 dependencies. Publication does not release page bodies, finish catalog import or
-assign depicted performers. Missing-history and weak-candidate resolution,
-automatic dispatch and verified staging release remain transition work.
+assign depicted performers. Automatic dispatch uses the same service. Actual
+source coverage, weak-candidate resolution and verified staging release remain
+transition work.
+
+### Reviewed discovery history recovery
+
+Schema 1000075 adds `discovery_listing_recoveries` and
+`discovery_recovery_targets`. Each original legacy search with missing historical
+batches may have one replacement beginning at the first page. The new definition
+pins the original listing UUID/digest and keeps the same frozen account reference,
+source account, collection and profile URL. Explicit review chooses the current
+collection/root and worker policy; original retry deadlines remain lower bounds.
+Definitions without recovery retain their original serialized form and digest.
+
+The ordinary activation preview/apply service commits the new definition,
+selected target links and immutable receipt atomically. It waits for running
+producers, cancels queued predecessor work and prevents further predecessor
+admissions/pages. Existing attempt/page/candidate evidence remains retained, and
+its pending comparisons may finish. Each replacement target preserves the same
+original source ordinal, hash and post UUID; it cannot invent a new association.
+
+Read-only reviews expose both search references. A new complete strong match
+cannot publish while the predecessor has uncompared retained pages or a differing
+candidate. Publication reconstruction checks those same facts on reopen, after
+which later native edits can still replay the original receipt. Foreign keys,
+unique predecessor constraints, mutation guards and startup graph checks preserve
+these relationships. Backups include both searches; anonymisation removes recovery
+links before their dependencies. New fetching supplies current evidence, not a
+claim that missing historical bodies were recovered or all past posts still exist.
 
 ## Durable account listing pages
 

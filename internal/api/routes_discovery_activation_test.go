@@ -34,7 +34,16 @@ func TestDiscoveryPublicationHTTPRecoversLostResponseAndRejectsImplicitPostMerge
 	discoveryActivationHTTP(t, true)
 }
 
+func TestDiscoveryRecoveryHTTPUsesSavedPlanAndPublishesFreshCoverage(t *testing.T) {
+	discoveryActivationRecoveryHTTP(t, false, true)
+}
+
 func discoveryActivationHTTP(t *testing.T, fresh bool) {
+	t.Helper()
+	discoveryActivationRecoveryHTTP(t, fresh, false)
+}
+
+func discoveryActivationRecoveryHTTP(t *testing.T, fresh, recovery bool) {
 	t.Helper()
 	python, packagePath := nativeProducerRuntime(t)
 	config.InitializeEmpty()
@@ -62,6 +71,7 @@ func discoveryActivationHTTP(t *testing.T, fresh bool) {
 	router := (&nativeArchiveRoutes{repo: repo}).router()
 	handler := http.StripPrefix("/api/v3/archive", router)
 	var lost atomic.Bool
+	var lostRecovery atomic.Bool
 	var lostPublication atomic.Bool
 	var applies atomic.Int64
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -73,7 +83,16 @@ func discoveryActivationHTTP(t *testing.T, fresh bool) {
 		handler.ServeHTTP(recorder, r)
 		if recorder.Code == http.StatusOK && r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/discovery-activations") {
 			applies.Add(1)
-			if !lost.Swap(true) {
+			var receipt models.DiscoveryActivation
+			if err := json.Unmarshal(recorder.Body.Bytes(), &receipt); err != nil {
+				t.Error(err)
+				return
+			}
+			lose := !lost.Swap(true)
+			if receipt.Input.Listing.RecoveryOf != nil {
+				lose = !lostRecovery.Swap(true)
+			}
+			if lose {
 				connection, _, err := w.(http.Hijacker).Hijack()
 				if err != nil {
 					t.Error(err)
@@ -99,7 +118,7 @@ func discoveryActivationHTTP(t *testing.T, fresh bool) {
 		_, _ = w.Write(recorder.Body.Bytes())
 	}))
 	defer server.Close()
-	setup, err := json.Marshal(map[string]any{"directory": directory, "source": source, "snapshot": uuid.NewString(), "endpoint": server.URL, "fresh": fresh})
+	setup, err := json.Marshal(map[string]any{"directory": directory, "source": source, "snapshot": uuid.NewString(), "endpoint": server.URL, "fresh": fresh, "recovery": recovery})
 	require.NoError(t, err)
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()
@@ -108,7 +127,13 @@ func discoveryActivationHTTP(t *testing.T, fresh bool) {
 	output, err := command.CombinedOutput()
 	require.NoError(t, err, string(output))
 	require.True(t, lost.Load())
-	require.EqualValues(t, 2, applies.Load())
+	if recovery {
+		require.EqualValues(t, 4, applies.Load())
+		require.True(t, lostRecovery.Load())
+		fresh = true
+	} else {
+		require.EqualValues(t, 2, applies.Load())
+	}
 	var receipt models.DiscoveryActivation
 	require.NoError(t, json.Unmarshal(output, &receipt))
 	require.Len(t, receipt.Entries, 2)

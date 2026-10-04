@@ -71,3 +71,30 @@ func TestDiscoveryActivationPlanRejectsChangedIdentityAndUnboundedSelections(t *
 	_, _, err = archive.PrepareDiscoveryActivation(input)
 	require.ErrorIs(t, err, models.ErrDiscoveryInvalid)
 }
+
+func TestDiscoveryRecoveryDefinitionPinsOriginalAndRequiresFreshCursor(t *testing.T) {
+	input := discoveryActivationExample()
+	input.Listing.InitialCursor, input.Listing.HistoricalPages = nil, 0
+	input.Listing.RecoveryOf = &models.DiscoveryListingRecovery{ListingUUID: uuid.NewString(), SHA256: strings.Repeat("e", 64)}
+	prepared, originalSHA, err := archive.PrepareDiscoveryActivation(input)
+	require.NoError(t, err)
+	input.Listing.RecoveryOf.SHA256 = strings.Repeat("f", 64)
+	_, changedSHA, err := archive.PrepareDiscoveryActivation(input)
+	require.NoError(t, err)
+	require.NotEqual(t, originalSHA, changedSHA)
+	require.Equal(t, strings.Repeat("e", 64), prepared.Listing.RecoveryOf.SHA256, "caller changes cannot alter a reviewed reference")
+	for _, change := range []func(*models.DiscoveryListingInput){
+		func(i *models.DiscoveryListingInput) { i.Legacy = nil },
+		func(i *models.DiscoveryListingInput) { i.InitialCursor = map[string]string{"after": "t3_saved"} },
+		func(i *models.DiscoveryListingInput) { i.HistoricalPages = 67 },
+		func(i *models.DiscoveryListingInput) { i.RecoveryOf.ListingUUID = i.UUID },
+		func(i *models.DiscoveryListingInput) { i.RecoveryOf.SHA256 = "bad" },
+	} {
+		listing := prepared.Listing
+		reference := *listing.RecoveryOf
+		listing.RecoveryOf = &reference
+		change(&listing)
+		_, _, err := archive.PrepareDiscoveryListing(listing)
+		require.ErrorIs(t, err, models.ErrDiscoveryInvalid)
+	}
+}

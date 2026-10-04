@@ -6,7 +6,7 @@ from unittest.mock import Mock
 import uuid
 
 from stash_ingest.client import Unavailable
-from stash_ingest.discovery_client import DiscoveryClient, LISTING_KEYS, MAX_BYTES, page_bytes
+from stash_ingest.discovery_client import DiscoveryClient, LISTING_KEYS, MAX_BYTES, page_bytes, validate_listing_input
 from stash_ingest.encoding import InvalidData, decode, native_json
 
 
@@ -54,6 +54,23 @@ class DiscoveryClientTests(unittest.TestCase):
             self.transport.capabilities.return_value = {**good, **change}
             with self.assertRaises(Unavailable):
                 self.client.capabilities()
+
+    def test_recovery_definition_retains_the_predecessor_in_its_digest(self):
+        listing = deepcopy(self.listing)
+        listing["legacy"] = {"snapshot_uuid": str(uuid.uuid4()), "account_ordinal": 7}
+        listing["recovery_of"] = {"listing_uuid": str(uuid.uuid4()), "sha256": "c" * 64}
+        definition = {k: v for k, v in listing.items() if k not in {"sha256", "created_at"}}
+        listing["sha256"] = hashlib.sha256(native_json(definition, 32768)).hexdigest()
+        self.assertEqual("reddit", DiscoveryClient._listing(listing))
+        changed = deepcopy(listing)
+        changed["recovery_of"]["sha256"] = "d" * 64
+        with self.assertRaises(InvalidData):
+            DiscoveryClient._listing(changed)
+        for change in ({"legacy": None}, {"initial_cursor": {"after": "t3_saved"}}, {"historical_pages": 67},
+                       {"recovery_of": None}, {"recovery_of": {"listing_uuid": listing["uuid"], "sha256": "c" * 64}},
+                       {"recovery_of": {"listing_uuid": "bad", "sha256": "c" * 64}}, {"extra": None}):
+            with self.subTest(change=change), self.assertRaises(InvalidData):
+                validate_listing_input({**definition, **change})
 
     def test_description_checks_definition_digest_and_original_cursor_binding(self):
         self.transport._request.return_value = self.description

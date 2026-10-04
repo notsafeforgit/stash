@@ -48,6 +48,13 @@ func discoveryMatchSource(get enrichmentGet, listing *models.DiscoveryListing, o
 	if sourceDigest([]byte(row.Data)) != row.SHA256 {
 		return nil, nil, models.ErrSourcePayloadCorrupt
 	}
+	previous, err := discoveryRecoveryTarget(get, listing, ordinal)
+	if err != nil {
+		return nil, nil, err
+	}
+	if previous != nil && (previous.SourceSHA256 != row.SHA256 || previous.PostUUID != row.PostUUID || previous.SnapshotUUID != listing.Legacy.SnapshotUUID) {
+		return nil, nil, models.ErrDiscoveryConflict
+	}
 	document, err := archive.DecodeJSONObject([]byte(row.Data), scrape.CatalogChunkLimit)
 	if err != nil {
 		return nil, nil, err
@@ -162,6 +169,14 @@ func (s *DiscoveryMatchStore) BindTarget(ctx context.Context, input models.Disco
  VALUES(:uuid,:listing_uuid,:snapshot_uuid,:source_ordinal,:source_sha256,:post_uuid,:post_revision,:policy,:created_at,:updated_at)`, target)
 	if err != nil {
 		return nil, err
+	}
+	if listing.RecoveryOf != nil {
+		if _, err := dbWrapper.Exec(ctx, "INSERT INTO discovery_recovery_targets VALUES(?,?)", id, discoveryTargetUUID(listing.RecoveryOf.ListingUUID, input.SourceOrdinal)); err != nil {
+			return nil, err
+		}
+		txn.AddPreCommitHook(ctx, func(ctx context.Context) error {
+			return validateDiscoveryRecoveryTarget(func(out any, q string, args ...any) error { return dbWrapper.Get(ctx, out, q, args...) }, id)
+		})
 	}
 	txn.AddPreCommitHook(ctx, func(ctx context.Context) error { return checkDiscoveryMatchTarget(ctx, target, now) })
 	result, err := s.Target(ctx, id)

@@ -98,7 +98,7 @@ func (s *DiscoveryJobStore) ReadyListings(ctx context.Context, collection, polic
 		if listing.PolicySHA256 != policy || listing.ExtractorVersion != extractor {
 			continue
 		}
-		if err := discoveryListingEligible(ctx, listing.DiscoveryListingInput, now); err != nil {
+		if err := discoveryFetchEligible(ctx, listing.DiscoveryListingInput, now); err != nil {
 			if errors.Is(err, models.ErrDiscoveryConflict) {
 				continue
 			}
@@ -166,7 +166,7 @@ func (s *DiscoveryJobStore) Maintain(ctx context.Context, now time.Time) (*model
 			return nil, models.ErrSourcePayloadCorrupt
 		}
 		// A future retry deadline is not a stale source definition.
-		err = discoveryListingEligible(ctx, listing.DiscoveryListingInput, maxTime(now, listing.NotBefore))
+		err = discoveryFetchEligible(ctx, listing.DiscoveryListingInput, maxTime(now, listing.NotBefore))
 		if err != nil && !errors.Is(err, models.ErrDiscoveryConflict) {
 			return nil, err
 		}

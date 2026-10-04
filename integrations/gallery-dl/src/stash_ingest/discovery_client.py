@@ -13,6 +13,7 @@ PREFIX = "/discovery"
 RETRYABLE = frozenset({"rate_limited", "timeout", "extraction_failed", "worker_failed", "source_busy"})
 LISTING_KEYS = frozenset({"uuid", "account_uuid", "collection_uuid", "collection_revision", "root_uuid",
     "profile_url", "policy_sha256", "extractor_version", "initial_cursor", "historical_pages", "legacy", "not_before"})
+LISTING_OPTIONAL_KEYS = frozenset({"recovery_of"})
 WORK_KEYS = frozenset({"version", "listing_uuid", "generation", "page_ordinal", "definition_sha256", "collection_uuid"})
 MAX_INT = 9223372036854775807
 
@@ -50,7 +51,8 @@ def page_bytes(value):
 
 
 def validate_listing_input(value):
-    if (not isinstance(value, dict) or set(value) != LISTING_KEYS
+    if (not isinstance(value, dict) or not LISTING_KEYS <= set(value)
+            or set(value) - LISTING_KEYS - LISTING_OPTIONAL_KEYS
             or not _integer(value["collection_revision"], 1)
             or not _integer(value["historical_pages"], 0, 10000000)
             or not sha256(value["policy_sha256"])):
@@ -72,6 +74,13 @@ def validate_listing_input(value):
         raise InvalidData("Invalid discovery resume reference")
     else:
         identifier(legacy["snapshot_uuid"])
+    if "recovery_of" in value:
+        recovery = value["recovery_of"]
+        if (not isinstance(recovery, dict) or set(recovery) != {"listing_uuid", "sha256"}
+                or not sha256(recovery["sha256"]) or recovery["listing_uuid"] == value["uuid"]
+                or legacy is None or value["initial_cursor"] is not None or value["historical_pages"] != 0):
+            raise InvalidData("Discovery recovery must retain its predecessor and start at the first page")
+        identifier(recovery["listing_uuid"])
     native_json(value, 32768)
     return platform
 
@@ -209,10 +218,12 @@ class DiscoveryClient:
 
     @staticmethod
     def _listing(value):
-        if (not isinstance(value, dict) or set(value) != LISTING_KEYS | {"sha256", "created_at"}
+        required = LISTING_KEYS | {"sha256", "created_at"}
+        if (not isinstance(value, dict) or not required <= set(value)
+                or set(value) - required - LISTING_OPTIONAL_KEYS
                 or not sha256(value["sha256"])):
             raise InvalidData("Invalid discovery definition")
-        definition = {key: value[key] for key in LISTING_KEYS}
+        definition = {key: item for key, item in value.items() if key not in {"sha256", "created_at"}}
         platform = validate_listing_input(definition)
         _time(value["created_at"])
         body = native_json(definition, 32768)

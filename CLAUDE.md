@@ -479,8 +479,9 @@ in `dispatch-all`, with independent saved-delivery cursors for enrichment and
 discovery before local profile loading. Collection lookup follows current grants
 and discovers later registrations under a root; returned containers still need
 policy/runtime readiness checks. Preserve profile/collection rotation across
-restart and both journals when upgrading an outbox. Historical coverage,
-weak-candidate details and native page release remain transition work. See
+restart and both journals when upgrading an outbox. Reviewed fresh searches now
+recover missing-history searches while preserving earlier evidence. Actual
+coverage, weak-candidate details and native page release remain transition work. See
 [listing storage](docs/native-schema.md#durable-account-listing-pages).
 `scrape.MatchDiscoveryListing` and `MatchDiscoveryPage` implement the pure
 `retained-discovery-listing-v1` candidate policy. Preserve unchanged original
@@ -535,6 +536,17 @@ reviews cannot starve later work. Both discovery workers must expose an idle
 boundary after a full traversal of waiting targets; never wrap an empty final
 batch directly to the start and keep polling busy. The server owns their
 cancellable lifetimes; restart recovers from durable receipts.
+
+Schema 1000075 retains reviewed discovery recovery as a new listing with
+`recovery_of`, preserving the original saved cursor and page count. Use the same
+activation preview/apply receipts. A recovery starts at the first page and
+inherits the original account, collection, profile and frozen source references.
+Keep retry delays, wait for a running producer, and cancel queued predecessor
+work atomically. The predecessor cannot admit more pages, but its retained pages
+remain comparable. New targets point to the original bindings: uncompared
+earlier batches and differing candidates must block publication. Never
+erase earlier evidence or claim that a fresh search recovers posts the source
+no longer exposes. Startup and backup must retain both searches and their links.
 
 `stash-import-catalog-evidence` maps a received snapshot's posts, profiles and
 captures through core services in schema 1000031. It uses exact manifest/ordinal

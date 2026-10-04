@@ -772,7 +772,7 @@ before website profiles load, preserving recovery when access bindings are
 unavailable. Selection commits before execution, so continuously busy profiles
 cannot reset the traversal after restart. Reviewed activation and publication of
 complete, unique strong matches are implemented, including background publication.
-Historical coverage and candidate detail execution remain necessary before
+Actual coverage and candidate detail execution remain necessary before
 host/n8n callers switch to native discovery. In particular, a
 retained nonfinal page is successful page delivery, not successful enumeration
 or a completed catalog import.
@@ -820,8 +820,8 @@ page counts do not become native receipt counts, and activation never certifies
 historical coverage or completed catalog import. The
 [`stash-activate-automation-discovery` operator command](../integrations/gallery-dl/README.md#reviewed-discovery-activation)
 saves a private, digest-bound review file and recovers the original operation
-after a lost Apply response. The review UI, historical coverage, detail execution
-and staging release are still being implemented.
+after a lost Apply response. Reviewed recovery of missing-history searches is
+described below. The review UI, detail execution and staging release remain open.
 
 The target review uses one database snapshot. `coverage.retained_pages` counts
 received batches of source posts, while `target.last_page` counts batches already
@@ -850,6 +850,9 @@ can contain:
 | `competing_candidates` | More than one distinct post remains a candidate. |
 | `detail_required` | At least one candidate still needs source detail verification. |
 | `identifier_in_use` | The sole candidate's identifier belongs to another native post, including a forgotten post. |
+| `search_replaced` | A reviewed recovery search replaced this listing; its original evidence is retained. |
+| `earlier_comparison_pending` | The predecessor search still has retained batches to compare with this target. |
+| `earlier_candidates_differ` | The predecessor contains a candidate other than the new search's sole candidate. |
 
 Before publication, an empty blocker list identifies a unique listing candidate
 for further publication validation. This response accepts no identity, publishes
@@ -889,6 +892,37 @@ Targets requiring review retain their evidence without holding up ready targets.
 Comparison and publication pause after a traversal finds no work, and resume
 from durable progress after restart. Neither worker admits a source job or
 contacts a website.
+
+### Recovering a search with missing historical batches
+
+Use the same discovery activation routes and saved-plan command with a new
+listing UUID and `recovery_of: {listing_uuid, sha256}` pointing to the original
+listing definition. Retain its `legacy` reference, account, collection and
+profile URL; select current collection/root and worker policy values explicitly.
+Set `initial_cursor` to null and `historical_pages` to zero for the new search.
+Its deadline must preserve both the original listing deadline and the latest
+attempt's available time. Each selected target must already be bound to the
+original search. Further target batches can reuse this recovery's exact listing
+definition; a second replacement of the original is rejected.
+
+Preview and Apply reject an active producer attempt. Once it finishes or queue
+maintenance recovers its expired lease, Apply can cancel queued predecessor work
+and commit the replacement, original-target links and activation receipt together.
+The original search stops admitting work. Its cursor, historical count, attempts,
+pages, comparisons and candidate references remain intact. Retry a failed page
+of the recovery through the ordinary job retry path.
+
+The target review returns `recovery_from` with the original listing/target UUIDs,
+uncompared batch count and earlier candidate counts. The original target review
+exposes `replacement_listing_uuid`. Retained earlier batches must finish
+comparison, and differing candidates require review even if the fresh search
+finds only one match. The same checks protect automatic/manual publication and
+startup verification. A recovery with no earlier conflict can publish only after
+the fresh search itself finishes and all its batches have been compared.
+
+This obtains new complete search evidence without inventing lost historical
+bodies. It cannot prove that a service still exposes posts deleted or hidden
+since the earlier scrape. Ordinary database backups retain both searches.
 
 ## Completed file events
 

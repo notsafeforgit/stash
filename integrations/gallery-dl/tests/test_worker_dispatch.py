@@ -148,6 +148,7 @@ class CollectionDispatchTests(unittest.TestCase):
             [{"uuid": value} for value in self.ids if value > after][:limit]).start()
         self.selected = patch("stash_ingest.collection_dispatch.EnrichmentDispatcher").start()
         self.selected.return_value.once.return_value = {"state": "completed"}
+        self.dispatcher = CollectionDispatcher
         self.addCleanup(patch.stopall)
 
     def open(self):
@@ -156,33 +157,33 @@ class CollectionDispatchTests(unittest.TestCase):
     def test_collection_rotation_survives_restarts_and_wraps_before_idle(self):
         for value in self.ids:
             with closing(self.open()) as box:
-                self.assertEqual(CollectionDispatcher(box, self.transport, self.profile).once()["collection_uuid"], value)
+                self.assertEqual(self.dispatcher(box, self.transport, self.profile).once()["collection_uuid"], value)
         with closing(self.open()) as box:
-            self.assertEqual(CollectionDispatcher(box, self.transport, self.profile).once()["state"], "waiting")
+            self.assertEqual(self.dispatcher(box, self.transport, self.profile).once()["state"], "waiting")
         with closing(self.open()) as box:
-            self.assertEqual(CollectionDispatcher(box, self.transport, self.profile).once()["collection_uuid"], self.ids[0])
+            self.assertEqual(self.dispatcher(box, self.transport, self.profile).once()["collection_uuid"], self.ids[0])
 
     def test_blocked_collection_does_not_prevent_a_peer_from_running(self):
         self.selected.return_value.once.side_effect = [{"state": "waiting"}, {"state": "completed"}]
         with closing(self.open()) as box:
-            self.assertEqual(CollectionDispatcher(box, self.transport, self.profile).once()["collection_uuid"], self.ids[1])
+            self.assertEqual(self.dispatcher(box, self.transport, self.profile).once()["collection_uuid"], self.ids[1])
 
     def test_discovery_outage_keeps_cursor_and_backoff_across_restart(self):
         self.pages.side_effect = Unavailable("native_unavailable", 503, 120)
         with closing(self.open()) as box:
-            worker = CollectionDispatcher(box, self.transport, self.profile)
+            worker = self.dispatcher(box, self.transport, self.profile)
             worker.save(worker.state(), after_collection=self.ids[1])
             self.assertEqual(worker.once()["next_attempt_at"], 1120)
         self.now = 1119
         with closing(self.open()) as box:
-            worker = CollectionDispatcher(box, self.transport, self.profile)
+            worker = self.dispatcher(box, self.transport, self.profile)
             self.assertEqual(worker.once()["state"], "backoff")
             self.assertEqual(worker.state()["after_collection"], self.ids[1])
         self.selected.assert_not_called()
 
     def test_competing_cursor_cannot_execute_an_outdated_selection(self):
         with closing(self.open()) as box, closing(self.open()) as peer:
-            one, two = CollectionDispatcher(box, self.transport, self.profile), CollectionDispatcher(peer, self.transport, self.profile)
+            one, two = self.dispatcher(box, self.transport, self.profile), self.dispatcher(peer, self.transport, self.profile)
             def discover(*args, **kwargs):
                 self.assertTrue(two.save(two.state(), after_collection=self.ids[1]))
                 return [{"uuid": self.ids[0]}]

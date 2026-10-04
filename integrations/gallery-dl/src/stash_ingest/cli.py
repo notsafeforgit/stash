@@ -300,8 +300,9 @@ def main(argv=None):
                           or any(output["backfill_calls"]["counts"][k] for k in ("pending", "active", "review")))
             if args.command == "dispatch-all":
                 incomplete |= any(output["enrichment"]["counts"].get(k, 0) for k in ("active", "review"))
+                incomplete |= any(output["discovery"]["counts"].get(k, 0) for k in ("active", "review"))
                 incomplete |= any(item["state"] != "idle" for item in output.get("profiles", []))
-            return 0 if output["state"] in ("idle", "source_succeeded", "completed") and not incomplete else 2
+            return 0 if output["state"] in ("idle", "source_succeeded", "completed", "page_delivered") and not incomplete else 2
         return 0
     except (InvalidData, Unavailable, Capacity, SourcePaused) as exc:
         print(str(exc), file=sys.stderr)

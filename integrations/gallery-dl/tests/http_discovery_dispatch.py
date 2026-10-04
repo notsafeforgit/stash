@@ -13,17 +13,19 @@ from stash_ingest.client import Client
 from stash_ingest.discovery_configuration import DiscoveryConfiguration, SCHEMA
 from stash_ingest.discovery_dispatch import dispatch_once
 from stash_ingest.discovery_worker import execute
-from stash_ingest.encoding import decode
+from stash_ingest.encoding import decode, encode
 from stash_ingest.outbox import Outbox
 
 
 setup = json.load(sys.stdin)
 directory = Path(setup["directory"])
 profile = None
+profile_document = None
 if not setup.get("delivery_only"):
-    profile = DiscoveryConfiguration.from_document({"schema": SCHEMA, "source_category": "reddit", "bindings": {
+    profile_document = {"schema": SCHEMA, "source_category": "reddit", "bindings": {
         "login": {"kind": "private", "env": "DISCOVERY_FIXTURE_LOGIN"}}, "gallery": {"extractor": {
-        "sleep-request": 0, "sleep-extractor": 0, "reddit": {"cookies": "${stash:login}"}}}}, directory)
+        "sleep-request": 0, "sleep-extractor": 0, "reddit": {"cookies": "${stash:login}"}}}}
+    profile = DiscoveryConfiguration.from_document(profile_document, directory)
 if setup.get("policy_only"):
     print(json.dumps({"policy_sha256": profile.policy_sha256}))
     raise SystemExit(0)
@@ -58,6 +60,26 @@ with closing(Outbox(directory / "outbox.sqlite", transport.endpoint, transport.p
                                "dispatch-discovery", "--collection", setup["collection"]])
             result = json.loads(output.getvalue())
             assert status == (0 if result["state"] in ("page_delivered", "idle") else 2)
+        elif setup.get("global"):
+            profile_path = directory / "discovery.json"
+            # Gallery configuration order is meaningful and part of the reviewed
+            # policy identity. Event encoding sorts maps and is unsuitable here.
+            profile_path.write_text(json.dumps(profile_document), encoding="utf-8")
+            assert DiscoveryConfiguration(profile_path).policy_sha256 == profile.policy_sha256
+            profiles = directory / "profiles.json"
+            profiles.write_bytes(encode({"schema": "stash-gallery-dispatch-v1", "uuid": setup["worker_uuid"], "profiles": [
+                {"id": "discovery", "operation": "account.list_page", "profile": "discovery.json"}]}))
+            # Use the supplied clock in the CLI-opened outbox, too. Each cycle
+            # is a separate process; advancing time never edits saved cursors.
+            with patch("stash_ingest.cli.Outbox", side_effect=lambda *a, **kw: Outbox(*a, **kw, clock=lambda: setup["clock"])):
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    status = main(["--outbox", str(box.path), "--endpoint", transport.endpoint, "--producer", transport.producer,
+                                   "dispatch-all", "--profiles", str(profiles)])
+            result = json.loads(output.getvalue())
+            assert status == (0 if result["state"] in ("page_delivered", "idle") else 2)
+            assert result["intake_completion"] == "inspect_native_receipts"
+            assert "discovery" in result and "discovery_delivery" in result
         else:
             result = dispatch_once(box, transport, setup["collection"], profile)
     assert "fixture-private-site-token" not in "\n".join(box.db.iterdump())

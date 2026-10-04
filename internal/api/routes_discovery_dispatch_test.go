@@ -78,6 +78,31 @@ func TestDiscoveryWorkerHTTPReadinessUsesCurrentScopeAndBoundedCursors(t *testin
 	}))
 }
 
+func TestDiscoveryWorkerHTTPCollectionCandidatesAreScopedAndReadOnly(t *testing.T) {
+	f := newDiscoveryHTTPFixture(t)
+	path := "/discovery/collections/ready"
+	body := &enrichmentUnreadBody{}
+	r := httptest.NewRequest("POST", ingestPath+path, body)
+	w := httptest.NewRecorder()
+	f.handler.ServeHTTP(w, r)
+	require.Equal(t, 401, w.Code)
+	require.False(t, body.read)
+	caps := enrichmentHTTPValue[map[string]any](t, f.request(t, "GET", "/capabilities", nil, 200))
+	require.EqualValues(t, 1, caps["discovery_collections_protocol"])
+	page := enrichmentHTTPValue[[]models.DiscoveryCollectionCandidate](t, f.request(t, "POST", path, map[string]any{"limit": 1}, 200))
+	require.Equal(t, []models.DiscoveryCollectionCandidate{{UUID: f.collection.UUID}}, page)
+	require.Empty(t, enrichmentHTTPValue[[]models.DiscoveryCollectionCandidate](t, f.request(t, "POST", path, map[string]any{"after": f.collection.UUID, "limit": 1}, 200)))
+	for _, input := range []map[string]any{{"after": "bad"}, {"limit": 101}, {"policy_sha256": strings.Repeat("a", 64)}} {
+		f.request(t, "POST", path, input, 400)
+	}
+	require.NoError(t, f.repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+		job, err := f.repo.DiscoveryJob.Job(ctx, f.listing.UUID)
+		require.NoError(t, err)
+		require.Nil(t, job)
+		return nil
+	}))
+}
+
 func TestDiscoveryMaintenanceRuntimeRecoversWithoutProducer(t *testing.T) {
 	f := newDiscoveryHTTPFixture(t)
 	job := f.admit(t)

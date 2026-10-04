@@ -180,6 +180,7 @@ func (rs *ingestRoutes) capabilities(w http.ResponseWriter, r *http.Request) {
 		"discovery_protocol":                1,
 		"discovery_readiness_protocol":      1,
 		"discovery_dispatch_protocol":       1,
+		"discovery_collections_protocol":    1,
 		"discovery_source_pacing_protocol":  1,
 		"max_discovery_page_bytes":          archive.MaxDiscoveryPageBytes,
 		"receipt_semantics":                 "source.capture commits source evidence; file.completed queues verification; poll receipt status for media completion",

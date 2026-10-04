@@ -6345,3 +6345,48 @@ discovery can replace the production recovery services. The full transition's
 remaining import, UI, caller conversion, compatibility removal, coordinated
 backup/restore, cutover and retirement requirements remain in effect. Production
 and `develop` remain unchanged.
+
+## Shared discovery worker dispatch — 2026-10-04
+
+`dispatch-all` now includes `account.list_page` profiles alongside downloads and
+post enrichment. It recovers one saved delivery from each metadata journal
+before loading website profiles, and persists independent cursors before each
+selection. Busy profiles and collections rotate across process restarts. A
+competing cursor update prevents further stale selection without losing an
+already returned delivery receipt.
+
+The scoped collection endpoint follows current active collection/root grants
+and returns small container references with existing listing definitions.
+Per-container readiness still checks policy, runtime, eligibility and deadlines.
+A root grant sees later registrations and excludes collections moved outside
+that root. Lookup neither admits work nor loads retained page bodies.
+
+Producer schema 13 adds discovery collection rotation and preserves the old
+worker delivery cursor as the enrichment cursor. Migration tests compare both
+journals and prior table contents, including exact pending bodies and receipts.
+A forced failure after the column rename rolls back all changes and preserves
+unknown input evidence. No native schema migration or full database copy is
+required; schema 1000071 and its verified rehearsal remain current.
+
+All 452 producer tests pass in 41 seconds, including eleven new global dispatch,
+collection traversal, protocol and migration checks. Native collection-scope and
+HTTP tests pass. Four real Go/Python restart scenarios pass in 14 seconds; the
+global case runs the actual CLI and discovers a later collection under the same
+root grant, finishing both listings with one attempt and fetch per page. Its
+initial fixture failure came from sorting the saved gallery configuration and
+therefore changing the reviewed policy hash; preserving configuration order
+fixes the fixture, with an explicit round-trip policy assertion.
+
+Read-only plans on the 20.27 GB rehearsal use the collection/root and listing
+indexes, returning in less than 0.3 ms with 2,612 collections. Native listing
+tables are empty there; these are access-plan checks, not populated throughput
+claims. Evidence is under `.local/native-discovery-client-20261004/`. The complete
+fork gate has passed v3 validation (582 tests), producer validation (452 tests)
+and Go lint (zero issues); its tagged Go integration suite is still running at
+this checkpoint. Publication waits for that result. About 180 GiB remains free.
+
+Reviewed legacy activation, candidate matching, verified native page release
+and post consolidation remain open, together with the full plan's remaining
+imports, native UI, actual host/n8n conversion, compatibility removal, coordinated
+backup/export/restore, reviewed production cutover and retirement. Production,
+`develop` and the frozen compatible release remain unchanged.

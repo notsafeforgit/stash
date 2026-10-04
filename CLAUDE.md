@@ -468,8 +468,13 @@ ends stale source definitions and expired claims while retaining pages, receipts
 and retry deadlines. Producer schema 12 adds `dispatch-discovery` for an explicit
 collection/profile, with durable cursors and backoff. Saved delivery precedes
 new source work; delivery-only mode requires no website profile. Idle traversal
-is not completed enumeration or matching. Global worker-profile integration,
-reviewed activation and matching remain transition work. See
+is not completed enumeration or matching. Producer schema 13 includes discovery
+in `dispatch-all`, with independent saved-delivery cursors for enrichment and
+discovery before local profile loading. Collection lookup follows current grants
+and discovers later registrations under a root; returned containers still need
+policy/runtime readiness checks. Preserve profile/collection rotation across
+restart and both journals when upgrading an outbox. Reviewed activation, candidate
+matching and verified native page release remain transition work. See
 [listing storage](docs/native-schema.md#durable-account-listing-pages).
 
 `stash-import-catalog-evidence` maps a received snapshot's posts, profiles and

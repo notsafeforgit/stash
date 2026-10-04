@@ -41,6 +41,7 @@ func (rs *ingestRoutes) discoveryRoutes(r chi.Router) {
 			})
 		})
 		r.Post("/listings/{listing}/jobs", rs.admitDiscovery)
+		r.Post("/collections/ready", rs.readyDiscoveryCollections)
 		r.Post("/collections/{collection}/jobs/ready", rs.readyDiscoveryJobs)
 		r.Post("/collections/{collection}/listings/ready", rs.readyDiscoveryListings)
 		r.Get("/jobs/{job}", rs.describeDiscovery)

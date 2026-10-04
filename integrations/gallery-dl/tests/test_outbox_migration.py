@@ -15,7 +15,15 @@ from helpers import PRODUCER, capture, file_event, receipt
 from test_run_queue import request, admission
 
 
+def schema_twelve(db):
+    db.execute("DROP TABLE discovery_collection_dispatch")
+    db.execute("ALTER TABLE worker_dispatch DROP COLUMN discovery_delivery_after")
+    db.execute("ALTER TABLE worker_dispatch RENAME COLUMN enrichment_delivery_after TO delivery_after")
+    db.execute("PRAGMA user_version=12")
+
+
 def schema_eleven(db):
+    schema_twelve(db)
     db.execute("DROP TABLE discovery_dispatch")
     db.execute("PRAGMA user_version=11")
 

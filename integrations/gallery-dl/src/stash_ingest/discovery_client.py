@@ -129,6 +129,26 @@ class DiscoveryClient:
             raise Unavailable("invalid_response") from None
         return value
 
+    def ready_collections(self, *, after="", limit=20):
+        if after != "":
+            identifier(after)
+        if not _integer(limit, 1, 100):
+            raise InvalidData("Invalid discovery collection limit")
+        value = self.client._request("POST", PREFIX + "/collections/ready", encode({"after": after, "limit": limit}))
+        if not isinstance(value, list) or len(value) > limit:
+            raise Unavailable("invalid_response")
+        try:
+            for item in value:
+                if not isinstance(item, dict) or set(item) != {"uuid"}:
+                    raise InvalidData("Invalid discovery collection candidate")
+                identifier(item["uuid"])
+                if item["uuid"] <= after:
+                    raise InvalidData("Discovery collection cursor did not advance")
+                after = item["uuid"]
+        except InvalidData:
+            raise Unavailable("invalid_response") from None
+        return value
+
     @staticmethod
     def _job(value, expected=None):
         work = value.get("arguments") if isinstance(value, dict) else None

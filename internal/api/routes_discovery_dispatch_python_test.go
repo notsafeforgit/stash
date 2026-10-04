@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stashapp/stash/internal/ingest"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stretchr/testify/require"
@@ -49,7 +50,7 @@ func TestPythonDiscoveryDispatchResumesWithoutRepeatingPages(t *testing.T) {
 	require.NoError(t, json.Unmarshal(invoke(t, map[string]any{"directory": t.TempDir(), "policy_only": true}, "", true), &policy))
 	fixture, err := filepath.Abs("../../pkg/archive/testdata/discovery-pages-v1.json")
 	require.NoError(t, err)
-	for _, scenario := range []string{"lost_admission", "lost_page", "filtered_page"} {
+	for _, scenario := range []string{"lost_admission", "lost_page", "filtered_page", "global_profile"} {
 		t.Run(scenario, func(t *testing.T) {
 			f := newDiscoveryHTTPFixtureForPolicy(t, time.Date(2026, 10, 4, 14, 0, 0, 0, time.UTC), policy.Digest)
 			worker := ingest.NewDiscoveryCoordinator(f.service)
@@ -57,6 +58,28 @@ func TestPythonDiscoveryDispatchResumesWithoutRepeatingPages(t *testing.T) {
 			now.Store(f.now.UnixMilli())
 			worker.Now = func() time.Time { return time.UnixMilli(now.Load()).UTC() }
 			f.handler = (&ingestRoutes{service: f.service, discovery: worker}).router()
+			var root *models.MediaRoot
+			if scenario == "global_profile" {
+				require.NoError(t, f.repo.WithTxn(t.Context(), func(ctx context.Context) error {
+					var err error
+					root, err = f.repo.MediaRoot.Put(ctx, models.MediaRootInput{Origin: "review", MediaRootDefinition: models.MediaRootDefinition{Label: "Discovery root", State: "active"}})
+					if err != nil {
+						return err
+					}
+					definition := f.collection.SourceCollectionDefinition
+					definition.RootUUID, definition.PathPrefix = &root.UUID, "."
+					f.collection, err = f.repo.SourceCollection.Put(ctx, models.SourceCollectionInput{UUID: f.collection.UUID, ExpectedRevision: f.collection.Revision, Origin: "review", SourceCollectionDefinition: definition})
+					if err != nil {
+						return err
+					}
+					input := f.listing.DiscoveryListingInput
+					input.UUID, input.RootUUID, input.CollectionRevision = uuid.NewString(), &root.UUID, f.collection.Revision
+					f.listing, err = f.repo.DiscoveryJob.CreateListing(ctx, input, worker.Now())
+					return err
+				}))
+				_, f.token, err = f.service.IssueCredential(t.Context(), f.producer.UUID, nil, nil, root.UUID)
+				require.NoError(t, err)
+			}
 			if scenario == "filtered_page" {
 				require.NoError(t, f.repo.WithTxn(t.Context(), func(ctx context.Context) error {
 					for i := range 25 {
@@ -76,7 +99,7 @@ func TestPythonDiscoveryDispatchResumesWithoutRepeatingPages(t *testing.T) {
 				if scenario == "lost_page" {
 					suffix = "/page"
 				}
-				if scenario != "filtered_page" && r.Method == "POST" && strings.HasSuffix(r.URL.Path, suffix) && lost.CompareAndSwap(false, true) {
+				if (scenario == "lost_admission" || scenario == "lost_page") && r.Method == "POST" && strings.HasSuffix(r.URL.Path, suffix) && lost.CompareAndSwap(false, true) {
 					committed := httptest.NewRecorder()
 					f.handler.ServeHTTP(committed, r)
 					require.Equal(t, 200, committed.Code, committed.Body.String())
@@ -89,6 +112,7 @@ func TestPythonDiscoveryDispatchResumesWithoutRepeatingPages(t *testing.T) {
 			}))
 			t.Cleanup(server.Close)
 			directory := t.TempDir()
+			workerID := uuid.NewString()
 			type dispatchResult struct {
 				Result struct {
 					State   string                       `json:"state"`
@@ -100,7 +124,8 @@ func TestPythonDiscoveryDispatchResumesWithoutRepeatingPages(t *testing.T) {
 				t.Helper()
 				var result dispatchResult
 				raw := invoke(t, map[string]any{"endpoint": server.URL, "producer": f.producer.UUID, "collection": f.collection.UUID,
-					"directory": directory, "fixture": fixture, "clock": 1000 + cycle*60, "delivery_only": delivery}, f.token, !delivery)
+					"directory": directory, "fixture": fixture, "clock": 1000 + cycle*60, "delivery_only": delivery,
+					"global": scenario == "global_profile", "worker_uuid": workerID}, f.token, !delivery)
 				require.NoError(t, json.Unmarshal(raw, &result))
 				return result
 			}
@@ -115,9 +140,31 @@ func TestPythonDiscoveryDispatchResumesWithoutRepeatingPages(t *testing.T) {
 			case "filtered_page":
 				require.Equal(t, "waiting", first.Result.State, "an empty filtered page is not the end of readiness traversal")
 				require.Zero(t, first.Fetches)
+			case "global_profile":
+				require.Equal(t, "page_delivered", first.Result.State)
+				require.Equal(t, 1, first.Fetches)
+			}
+			listings := []string{f.listing.UUID}
+			if scenario == "global_profile" {
+				// The original root grant must discover a later registration without
+				// replacing the local profile list or restarting native scheduling.
+				require.NoError(t, f.repo.WithTxn(t.Context(), func(ctx context.Context) error {
+					collection, err := f.repo.SourceCollection.Put(ctx, models.SourceCollectionInput{Origin: "review", SourceCollectionDefinition: models.SourceCollectionDefinition{
+						Label: "Later collection", Kind: "feed", Namespace: "native:reddit", State: "active", RootUUID: &root.UUID, PathPrefix: "."}})
+					if err != nil {
+						return err
+					}
+					input := f.listing.DiscoveryListingInput
+					input.UUID, input.CollectionUUID, input.CollectionRevision = uuid.NewString(), collection.UUID, collection.Revision
+					listing, err := f.repo.DiscoveryJob.CreateListing(ctx, input, worker.Now())
+					if err == nil {
+						listings = append(listings, listing.UUID)
+					}
+					return err
+				}))
 			}
 			completed := false
-			for cycle := 1; cycle <= 8; cycle++ {
+			for cycle := 1; cycle <= 16; cycle++ {
 				now.Add(int64(2 * time.Minute / time.Millisecond))
 				result := run(cycle, scenario == "lost_page" && cycle == 1)
 				require.Contains(t, []string{"waiting", "idle", "page_delivered"}, result.Result.State)
@@ -127,22 +174,36 @@ func TestPythonDiscoveryDispatchResumesWithoutRepeatingPages(t *testing.T) {
 				}
 				if result.Result.Receipt != nil && result.Result.Receipt.Complete {
 					require.Equal(t, "page_delivered", result.Result.State)
-					require.Equal(t, 2, result.Fetches)
 					completed = true
-					break
+					require.NoError(t, f.repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+						for _, id := range listings {
+							head, err := f.repo.DiscoveryJob.PageHead(ctx, id)
+							if err != nil {
+								return err
+							}
+							completed = completed && head != nil && head.Complete
+						}
+						return nil
+					}))
+					if completed {
+						require.Equal(t, 2*len(listings), result.Fetches)
+						break
+					}
 				}
 			}
 			require.True(t, completed)
 			require.NoError(t, f.repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
-				pages, err := f.repo.DiscoveryJob.Pages(ctx, f.listing.UUID, 0, 10)
-				require.NoError(t, err)
-				require.Len(t, pages, 2)
-				require.False(t, pages[0].Complete)
-				require.True(t, pages[1].Complete)
-				for _, page := range pages {
-					attempts, err := f.repo.ArchiveJob.Attempts(ctx, page.JobUUID, 0, 10)
+				for _, id := range listings {
+					pages, err := f.repo.DiscoveryJob.Pages(ctx, id, 0, 10)
 					require.NoError(t, err)
-					require.Len(t, attempts, 1, "restart and lost responses cannot duplicate a fetched page")
+					require.Len(t, pages, 2)
+					require.False(t, pages[0].Complete)
+					require.True(t, pages[1].Complete)
+					for _, page := range pages {
+						attempts, err := f.repo.ArchiveJob.Attempts(ctx, page.JobUUID, 0, 10)
+						require.NoError(t, err)
+						require.Len(t, attempts, 1, "restart and lost responses cannot duplicate a fetched page")
+					}
 				}
 				return nil
 			}))

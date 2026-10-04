@@ -439,7 +439,8 @@ Schema 7 adds retained n8n receipt history; schema 8 adds the enrichment executi
 journal; schema 9 adds enrichment discovery cursors and backoff; schema 10 adds
 rotation across worker profiles and permitted metadata collections; schema 11
 adds durable discovery page delivery; schema 12 adds its dispatch cursors and
-backoff. Opening an outbox from schemas 1–11 promotes it
+backoff; schema 13 adds discovery collection rotation and separates discovery
+and enrichment delivery cursors in the shared worker. Opening an outbox from schemas 1–12 promotes it
 in one SQLite transaction, preserving event bytes, receipts, dependencies,
 active delivery/submission leases, frozen requests and caller tickets. Old tickets
 are linked to the first covering submissions from their original request sequence;
@@ -586,7 +587,7 @@ is no command-line token argument.
 | `queue-run --collection UUID --revision N --profile FILE --until TIME` | Records/coalesces a download request using the profile digest; low-level callers may use `--policy SHA256` instead |
 | `submit-runs` | Submits one ready request; exits 2 while requests remain pending, in flight or in review |
 | `dispatch --profile FILE` | Resolves/delivers/submits queued work and discovers at most one source attempt; retains pagination and backoff |
-| `dispatch-all --profiles FILE` | Delivers saved work and rotates across local download/metadata profiles and permitted collections |
+| `dispatch-all --profiles FILE` | Delivers saved work and rotates across local download, enrichment and account-listing profiles and permitted collections |
 | `runs-status [--intent UUID \| --ticket UUID] [--after N]` | Local request counts and up to 50 relevant historical submissions |
 | `ticket-status UUID` | Checks the ticket's original source windows; exits 0 only for `source_succeeded`, otherwise 2 |
 | `retry-run-request UUID` | Retries a reviewed submission with the original UUID and bytes |
@@ -1913,7 +1914,7 @@ conversion still precede service activation.
 
 ### Dispatch across local profiles
 
-`dispatch-all` rotates across reviewed download and metadata profiles without
+`dispatch-all` rotates across reviewed download, enrichment and account-listing profiles without
 requiring callers to enumerate every collection. Keep a stable UUID for the local
 worker list and stable entry IDs across restarts:
 
@@ -1924,7 +1925,8 @@ worker list and stable entry IDs across restarts:
   "profiles": [
     {"id": "reddit-download", "operation": "download", "profile": "reddit-download.json"},
     {"id": "reddit-metadata", "operation": "post.enrich", "profile": "reddit-metadata.json"},
-    {"id": "twitter-metadata", "operation": "post.enrich", "profile": "twitter-metadata.json"}
+    {"id": "twitter-metadata", "operation": "post.enrich", "profile": "twitter-metadata.json"},
+    {"id": "reddit-discovery", "operation": "account.list_page", "profile": "reddit-discovery.json"}
   ]
 }
 ```
@@ -1935,19 +1937,20 @@ stash-ingest --outbox /persistent/producer.sqlite --endpoint STASH_ORIGIN \
 ```
 
 The list accepts 1–32 distinct entries. Relative profile paths resolve beside
-the list. Each entry still uses the existing download or metadata profile
+the list. Each entry uses its operation's download, enrichment or account-listing profile
 contract; website access stays local, and the list does not confer native source
 permissions or enable unsupported extractors.
 
 One invocation delivers an ordinary event batch, advances a backfill call,
 resolves a caller page and submits one source request. It then tries one saved
-enrichment delivery before loading any website profile, and rotates through the
-list until one profile performs work or all profiles have been checked. Saved
+enrichment delivery and one saved discovery delivery before loading any website
+profile, and rotates through the list until one profile performs work or all
+profiles have been checked. Saved
 metadata can therefore finish delivery even if its original website profile was
 removed or its access binding is unavailable. Native historical scope and
 ownership checks still apply; conflicting evidence remains retained for review.
 
-Download entries use existing scoped run discovery. Metadata entries require
+Download entries use existing scoped run discovery. Enrichment entries require
 `enrichment_collections_protocol: 1`: Stash lists permitted active collections
 with eligible unadmitted targets or due jobs for that runtime/policy. Current
 collection/root grants apply before pagination. A root grant includes subsequent
@@ -1956,9 +1959,19 @@ collection. The worker follows pages of at most 20 collections and uses the
 existing collection dispatcher for admission and execution. Unsupported URLs
 are skipped during target traversal; the server still validates every claim.
 
-Producer schema 10 stores profile rotation, global saved-delivery rotation and
-per-policy collection cursors/backoff. Selection commits before execution, so a
-restart or a continually busy first profile/collection does not reset traversal.
+Account-listing entries use `stash-gallery-discovery-v1` profiles and require
+`discovery_collections_protocol: 1`. Their collection lookup returns permitted
+active containers with existing listing definitions; each container's dispatcher
+then checks policy/runtime readiness. It can return idle when all its definitions
+are stale, complete or ineligible for that profile. Later registrations under a
+root grant are discovered without changing this worker list. Moved collections
+no longer belong to the old root grant. This does not create listing definitions
+or activate imported accounts.
+
+Producer schema 13 stores profile rotation, independent saved-delivery cursors
+for discovery and enrichment, and each operation's per-policy collection
+cursors/backoff. Selection commits before execution, so a restart or a
+continually busy first profile/collection does not reset traversal.
 Revision checks reject competing stale selections. Idle or blocked entries give
 peers a turn; an unreadable profile reports `worker_profile_unavailable` without
 printing its path, exception or access values. Metadata discovery honors native
@@ -1972,9 +1985,11 @@ a backfill is complete: callers must check their native receipts and source
 window completion. The dispatcher performs a bounded cycle; host/n8n scheduling
 and legacy queue/cooldown/history conversion remain activation work.
 
-Schema 9 → 10 adds only these two cursor tables and preserves existing outbox
-rows, staged metadata bodies and receipt bytes in one transaction. A table
-collision rolls back promotion. Older producer binaries refuse schema 10;
+Schema 12 → 13 adds discovery collection cursors and splits the worker's delivery
+cursor, retaining its original value for enrichment. Existing outbox rows,
+staged metadata/page bodies, claims and receipt bytes remain unchanged in one
+transaction. Unknown table/column collisions roll back promotion, including
+any preceding column rename. Older producer binaries refuse schema 13;
 include the outbox in backups and retain its pending evidence during rollback.
 These outbox cursor tables do not require a separate native database migration.
 
@@ -2136,8 +2151,9 @@ waits 30 seconds. No loop inside the command continuously polls a website.
 Exit 0 means `page_delivered` or `idle`; neither proves all listings completed,
 candidate matches were accepted, or catalog import finished. Inspect the page
 receipt's `complete` flag and `discovery-status` separately. Other pending/review/
-retry outcomes return 2, and invalid command input returns 1. Global worker-profile
-rotation and production host/n8n activation remain separate transition work.
+retry outcomes return 2, and invalid command input returns 1. Use `dispatch-all`
+for rotation across local profiles and permitted collections. Production host/n8n
+activation remains separate transition work.
 
 Promotion from schema 11 adds only the dispatch table; exact pending pages,
 claims, receipts and every previous outbox table are preserved transactionally.
@@ -2203,5 +2219,11 @@ enter the outbox or command output.
 producer process for each cycle against native HTTP. Lost admission and page
 acknowledgements, delivery-only CLI recovery and filtered readiness pages reach
 the original final cursor with exactly two page fetches and one native attempt
-per page. Producer migration tests compare every retained table and pending page
-across schema 11 → 12, and reject table collisions without changing their data.
+per page. Its global-profile scenario uses the actual `dispatch-all` CLI and a
+root grant issued before a later collection registration; both listings finish
+without duplicate fetches or new local configuration. Producer migration tests
+compare retained tables and exact pending bodies across schema 11 → 12 and
+12 → 13, and reject table/column collisions without changing their data. Shared
+worker tests exercise all three busy operations across restarts, independently
+recover both delivery journals without website profiles, and retain a completed
+delivery receipt when another process advances the dispatch revision.

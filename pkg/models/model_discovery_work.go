@@ -103,6 +103,19 @@ type DiscoveryMaintenanceResult struct {
 	Cancelled int `json:"cancelled"`
 }
 
+// Collection discovery returns current permitted containers with existing
+// listing definitions. Per-profile readiness is checked inside each container.
+type DiscoveryCollectionQuery struct {
+	Scopes []IngestScope
+	Roots  []string
+	After  string
+	Limit  int
+}
+
+type DiscoveryCollectionCandidate struct {
+	UUID string `json:"uuid" db:"uuid"`
+}
+
 type DiscoveryJobReaderWriter interface {
 	CreateListing(context.Context, DiscoveryListingInput, time.Time) (*DiscoveryListing, error)
 	Listing(context.Context, string) (*DiscoveryListing, error)
@@ -121,4 +134,5 @@ type DiscoveryJobReaderWriter interface {
 	Ready(context.Context, string, string, string, int64, int, time.Time) ([]DiscoveryJobCandidate, error)
 	ReadyListings(context.Context, string, string, string, string, int, time.Time) (*DiscoveryListingCandidates, error)
 	Maintain(context.Context, time.Time) (*DiscoveryMaintenanceResult, error)
+	Collections(context.Context, DiscoveryCollectionQuery) ([]DiscoveryCollectionCandidate, error)
 }

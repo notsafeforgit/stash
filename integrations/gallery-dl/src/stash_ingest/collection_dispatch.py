@@ -21,27 +21,41 @@ def migrate(db):
 
 
 class CollectionDispatcher:
+    table = "enrichment_collection_dispatch"
+    protocol = "enrichment_collections_protocol"
+    protocol_error = "native_enrichment_collections_unavailable"
+
+    @staticmethod
+    def make_client(transport):
+        return EnrichmentClient(transport)
+
+    def ready(self, after):
+        return self.client.ready_collections(self.policy, self.configuration.extractor_version, after=after, limit=PAGE_SIZE)
+
+    def selected(self, collection):
+        return EnrichmentDispatcher(self.box, self.transport, collection, self.configuration).once()
+
     def __init__(self, box, transport, configuration):
         if (box.endpoint, box.producer) != (transport.endpoint, transport.producer):
             raise Conflict("Collection dispatcher and outbox identify different producers")
         self.box, self.transport, self.configuration = box, transport, configuration
-        self.client, self.policy = EnrichmentClient(transport), configuration.policy_sha256
+        self.client, self.policy = self.make_client(transport), configuration.policy_sha256
         if not sha256(self.policy):
             raise InvalidData("Collection discovery requires a reviewed policy")
         with box.transaction():
             if self.state() is None:
-                if box.db.execute("SELECT count(*) FROM enrichment_collection_dispatch").fetchone()[0] >= 10000:
+                if box.db.execute(f"SELECT count(*) FROM {self.table}").fetchone()[0] >= 10000:
                     raise Capacity("Collection discovery capacity exhausted")
-                box.db.execute("INSERT INTO enrichment_collection_dispatch(policy_sha256) VALUES(?)", (self.policy,))
+                box.db.execute(f"INSERT INTO {self.table}(policy_sha256) VALUES(?)", (self.policy,))
 
     def state(self):
-        row = self.box.db.execute("SELECT * FROM enrichment_collection_dispatch WHERE policy_sha256=?", (self.policy,)).fetchone()
+        row = self.box.db.execute(f"SELECT * FROM {self.table} WHERE policy_sha256=?", (self.policy,)).fetchone()
         return dict(row) if row else None
 
     def save(self, state, **changes):
         value = {**state, **changes}
         with self.box.transaction():
-            changed = self.box.db.execute("""UPDATE enrichment_collection_dispatch SET after_collection=?,failures=?,available_at=?,error_code=?,revision=revision+1
+            changed = self.box.db.execute(f"""UPDATE {self.table} SET after_collection=?,failures=?,available_at=?,error_code=?,revision=revision+1
                 WHERE policy_sha256=? AND revision=?""", (value["after_collection"], value["failures"], value["available_at"],
                     value["error_code"], self.policy, state["revision"])).rowcount
         if changed:
@@ -57,17 +71,17 @@ class CollectionDispatcher:
         try:
             self.configuration.check()
             capabilities = self.client.capabilities()
-            if type(capabilities.get("enrichment_collections_protocol")) is not int or capabilities["enrichment_collections_protocol"] != 1:
-                raise Unavailable("native_enrichment_collections_unavailable")
+            if type(capabilities.get(self.protocol)) is not int or capabilities[self.protocol] != 1:
+                raise Unavailable(self.protocol_error)
             previous = state["after_collection"]
-            page = self.client.ready_collections(self.policy, self.configuration.extractor_version, after=previous, limit=PAGE_SIZE)
+            page = self.ready(previous)
             waiting = False
             for item in page:
                 # Persist before execution, including on process death or a
                 # continuously busy collection. The next pass visits its peers.
                 if not self.save(state, after_collection=item["uuid"], failures=0, available_at=0, error_code=None):
                     return {"state": "contended"}
-                result = EnrichmentDispatcher(self.box, self.transport, item["uuid"], self.configuration).once()
+                result = self.selected(item["uuid"])
                 if result["state"] not in ("waiting", "idle", "backoff"):
                     return {**result, "collection_uuid": item["uuid"]}
                 waiting |= result["state"] != "idle"

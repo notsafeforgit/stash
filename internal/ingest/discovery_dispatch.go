@@ -54,3 +54,18 @@ func (c *DiscoveryCoordinator) ReadyListings(ctx context.Context, token, collect
 	})
 	return ret, err
 }
+
+func (c *DiscoveryCoordinator) ReadyCollections(ctx context.Context, token, after string, limit int) ([]models.DiscoveryCollectionCandidate, error) {
+	var ret []models.DiscoveryCollectionCandidate
+	err := c.Service.Repo.WithReadTxn(ctx, func(ctx context.Context) error {
+		credential, err := c.Service.authenticate(ctx, token)
+		if err != nil {
+			return err
+		}
+		ret, err = c.Service.Repo.DiscoveryJob.Collections(ctx, models.DiscoveryCollectionQuery{
+			Scopes: credential.Scopes, Roots: credential.RootUUIDs, After: after, Limit: limit,
+		})
+		return err
+	})
+	return ret, err
+}

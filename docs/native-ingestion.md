@@ -666,7 +666,7 @@ cursors survive retries; final enumeration and candidate matching are separate
 outcomes. See the [storage and scheduling contract](native-schema.md#durable-account-listing-pages).
 
 Capabilities advertise `discovery_protocol: 1`, `discovery_readiness_protocol: 1`,
-`discovery_dispatch_protocol: 1`,
+`discovery_dispatch_protocol: 1`, `discovery_collections_protocol: 1`,
 `discovery_source_pacing_protocol: 1` and `max_discovery_page_bytes: 33554432`.
 The following routes live under `/api/v3/ingest/discovery` and use the existing
 producer bearer credentials and collection/root grants. Authentication runs
@@ -675,6 +675,7 @@ authorize these operations. Existing enrichment endpoints remain post-only.
 
 | Route | Request and result |
 | --- | --- |
+| `POST /collections/ready` | Optional UUID `after` and `limit` (1–100, default 50). Returns ordered `{uuid}` containers with listing definitions, under current collection/root grants. This does not assert that a listing is ready for a particular policy/runtime. |
 | `POST /collections/{collection}/jobs/ready` | Requires `policy_sha256` and `extractor_version`, with integer `after` and `limit` (1–100, default 50). Returns due queued `{uuid, sequence}` candidates from the bounded active queue. |
 | `POST /collections/{collection}/listings/ready` | Requires policy/runtime, optional UUID `after` and `limit`. Returns `{listings: [{uuid, definition_sha256}], after, has_more}` for definitions eligible to admit a page. The cursor tracks inspected definitions, including ineligible ones. |
 | `POST /listings/{listing}/jobs` | Requires `expected_definition_sha256`, `policy_sha256` and `extractor_version`. Admits or replays the current page job for an existing definition. After a successful nonfinal page, it admits the next page; after final success it returns that completed job. |
@@ -718,10 +719,18 @@ share the existing download/enrichment budget. Body removal requires a matching
 receipt; a terminal job description cannot discard pending local evidence.
 Source number tokens and Unicode survive native canonical page encoding.
 See [producer discovery](../integrations/gallery-dl/README.md#account-listing-page-collector)
-for the client contract and remaining execution work.
+for the client contract and dispatch commands.
 
-Readiness requires the collection's current grant and exact policy/runtime; it
-never admits or claims work. Listing scans inspect at most `limit` definitions
+Collection discovery uses current active source/root definitions and indexed
+collection/root grants. Each grant contributes at most `limit` containers before
+deduplication and the final limit; no listing or page bodies are loaded. A root
+grant includes later registered collections, and no longer includes a collection
+moved to another root. Disabled sources and containers without listings are
+excluded. Follow each container with policy/runtime-specific readiness; a
+container can contain only stale or completed definitions.
+
+Job and listing readiness require the collection's current grant and exact
+policy/runtime; they never admit or claim work. Listing scans inspect at most `limit` definitions
 plus one lookahead using the collection/UUID index. An empty `listings` array
 with `has_more: true` must advance using the returned `after`. Candidates skip
 future deadlines, stale sources, active/failed/cancelled jobs and completed
@@ -747,8 +756,12 @@ Each invocation replays saved deliveries before resuming owned work, visiting
 due jobs and admitting an eligible existing definition. Omitting the profile
 permits delivery only. A lost admission is recovered through the ready-job index;
 filtered empty pages advance using their inspection cursor. An idle dispatch
-does not establish enumeration completion. Global worker-profile integration,
-reviewed activation and candidate matching remain
+does not establish enumeration completion. Schema 13 integrates `account.list_page`
+profiles into `dispatch-all`, with durable collection/profile rotation and separate
+saved-delivery cursors for discovery and enrichment. Both saved deliveries run
+before website profiles load, preserving recovery when access bindings are
+unavailable. Selection commits before execution, so continuously busy profiles
+cannot reset the traversal after restart. Reviewed activation and candidate matching remain
 necessary before host/n8n callers switch to native discovery. In particular, a
 retained nonfinal page is successful page delivery, not successful enumeration
 or a completed catalog import.

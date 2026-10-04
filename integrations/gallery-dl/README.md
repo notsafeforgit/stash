@@ -929,6 +929,36 @@ Inspect `/api/v3/archive/catalog-snapshots/SNAPSHOT_UUID/media-import/records`
 for bounded summaries and append `/ORDINAL` for one full receipt. Results remain
 `imported:false` pending the other catalog families and final reconciliation.
 
+Map file edit, state and deduplication history with schema 1000066 after the
+reviewed media import completes:
+
+```sh
+stash-import-catalog-file-history --snapshot /migration/prepared/CATALOG_ID \
+  --expected-sha256 MANIFEST_SHA256 --endpoint STASH_ORIGIN
+```
+
+This pass reuses the frozen root/collection binding and retains the original
+event IDs, source timestamps, file locations and content claims. Each batch
+handles at most 50 records with a 16 MiB source-data budget. Resume the same
+command after an interrupted response; its cursor is the last source ordinal.
+Completed receipts remain stable after later collection edits.
+
+Metadata edits preserve each path separately. Old `null` values mean inherit;
+relationship values remain source names pending identity review. Unknown fields
+and unsupported representations remain inspectable extensions. Missing or
+conflicting deduplication members retain their declared paths for review.
+Historical state changes and deduplication never replay filesystem actions, and
+this import leaves current selected Stash fields untouched.
+
+Inspect `/api/v3/archive/catalog-snapshots/SNAPSHOT_UUID/file-history-import/records`
+for summaries and append `/ORDINAL` for the retained source row. Follow
+`history_uuid` to `/api/v3/archive/file-history/UUID` for the native event.
+Observation and claim history endpoints are documented in
+[source file history](../../docs/native-schema.md#source-file-history).
+Exit codes remain 0 (mapped), 2 (review), and 1 (failure/unavailable response).
+`imported:false` means final migration reconciliation and other families remain
+outstanding; a mapped history event does not mean its edits were applied.
+
 Map historical collection memberships with schema 1000039:
 
 ```sh

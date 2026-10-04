@@ -34,6 +34,7 @@ func migrationObject(t *testing.T, file, kind, name string) string {
 
 func removeEnrichmentHandoffSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeSourceFileHistorySchema(t, raw)
 	require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM archive_jobs WHERE kind='post.enrich' AND json_extract(arguments,'$.version')!=1"), "historical migration fixtures must create historical jobs")
 	_, err := raw.Exec(`DROP TABLE enrichment_job_seed_services; DROP TABLE enrichment_job_retained_records; DROP TABLE enrichment_handoff_jobs;
  DROP TRIGGER enrichment_job_target_scope; DROP TRIGGER enrichment_completion_capture_scope;

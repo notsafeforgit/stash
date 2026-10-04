@@ -65,6 +65,8 @@ type Repository struct {
 	CatalogDocumentImport       CatalogDocumentImportReaderWriter
 	SourcePostLinks             SourcePostLinksReaderWriter
 	SourceFile                  SourceFileReaderWriter
+	SourceFileHistory           SourceFileHistoryReaderWriter
+	CatalogFileHistoryImport    CatalogFileHistoryImportReaderWriter
 	CatalogMediaImport          CatalogMediaImportReaderWriter
 	CatalogMembershipImport     CatalogMembershipImportReaderWriter
 	SourceAttachment            SourceAttachmentReaderWriter

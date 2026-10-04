@@ -53,6 +53,11 @@ func mediaImportFixture(t *testing.T, count int, alter func([]map[string]any)) (
 		alter(rows)
 	}
 	receiveCatalogFixtureRows(t, f, rows)
+	return f, bindCatalogMediaFixture(t, f)
+}
+
+func bindCatalogMediaFixture(t *testing.T, f *catalogSnapshotFixture) models.CatalogMediaBinding {
+	t.Helper()
 	attachmentSQL(t, f.db, `INSERT INTO scenes_files(scene_id,file_id,"primary") VALUES(31,21,1)`)
 	root := putMediaRoot(t, f.repo, models.MediaRootInput{Origin: "migration", MediaRootDefinition: models.MediaRootDefinition{Label: "Reviewed old library root", State: "disabled"}})
 	var snapshot *models.CatalogSnapshot
@@ -67,7 +72,7 @@ func mediaImportFixture(t *testing.T, count int, alter func([]map[string]any)) (
 		return err
 	}))
 	binding := models.CatalogMediaBinding{SnapshotUUID: f.manifest.UUID, ManifestSHA256: f.sha, RootUUID: root.UUID, RootRevision: root.Revision, CollectionRevision: collection.Revision, LibraryRootPath: "/identity-fixture"}
-	return f, binding
+	return binding
 }
 
 func beginMediaImport(t *testing.T, f *catalogSnapshotFixture, binding models.CatalogMediaBinding) *models.CatalogMediaImport {

@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import sqlite3
 import shutil
+import subprocess
 import sys
 from unittest.mock import patch
 import uuid
@@ -66,6 +67,8 @@ def run():
         db.execute("CREATE TABLE IF NOT EXISTS post_aliases(alias_key TEXT PRIMARY KEY,post_key TEXT NOT NULL REFERENCES posts(post_key))")
         db.execute("INSERT INTO post_aliases VALUES('reddit:post:local-alias','reddit:post:album')")
         db.execute("INSERT INTO handles VALUES('reddit:handle:juniper','Juniper',?)", (CAPTURED,))
+        db.execute("CREATE TABLE metadata_edits(edit_id TEXT PRIMARY KEY,relpath TEXT NOT NULL,fields_json TEXT NOT NULL,created_at TEXT NOT NULL)")
+        db.execute("CREATE TABLE file_events(event_id TEXT PRIMARY KEY,relpath TEXT NOT NULL,old_state TEXT NOT NULL,new_state TEXT NOT NULL,reason TEXT NOT NULL,observed_at TEXT NOT NULL)")
         for index in range(55):
             db.execute("INSERT INTO translations VALUES(?,'reddit:post:album',?,?,?,NULL,?,NULL,'legacy',?)",
                        (f"translation-{index:02}", input_hash, original_text, "Retained translation", "en" if index == 54 else None, CAPTURED))
@@ -74,8 +77,12 @@ def run():
             asset, path = f"path:{index}", f"absent/{index}.mp4"
             db.execute("INSERT INTO assets(asset_id,created_at) VALUES(?,?)", (asset, CAPTURED))
             db.execute("INSERT INTO files(relpath,asset_id,state,first_observed,role) VALUES(?,?,'missing',?,'local')", (path, asset, CAPTURED))
+            fields = {"title": None, "actors": ["Unresolved name"]} if index < 54 else {"future": 9007199254740993123456789}
+            db.execute("INSERT INTO metadata_edits VALUES(?,?,?,?)", (str(index), path, json.dumps(fields), CAPTURED))
             db.execute("INSERT INTO appearances(post_key,attachment_key,asset_id,source_relpath) VALUES('reddit:post:album',?,?,?)", (path, asset, path))
             db.execute("INSERT INTO sidecar_sources SELECT ?,content_sha256,document_id,'reddit:post:album',? FROM sidecar_documents WHERE document_id=1", (f"literal\\folder/{index}.nfo", CAPTURED))
+        db.execute("INSERT INTO file_events VALUES('old-state','absent/0.mp4','present','missing','filesystem-reconciliation',?)", (CAPTURED,))
+        db.execute("INSERT INTO dedupe_events VALUES('old-dedupe','path:0',?,'absent/0.mp4','finished',?)", ('["absent/0.mp4","never-invented.mp4"]', CAPTURED))
     with closing(sqlite3.connect(source)) as db, db:
         db.execute("CREATE TABLE enrichment_receipts(post_key TEXT NOT NULL,version INTEGER NOT NULL,completed_at TEXT NOT NULL,details_json TEXT NOT NULL,PRIMARY KEY(post_key,version))")
         db.execute("INSERT INTO enrichment_receipts VALUES('reddit:post:album',1,?,?)", (CAPTURED,
@@ -128,6 +135,18 @@ def run():
     assert media["processed_records"] == media["source_records"] == 165
     assert media["mapped_records"] == 55 and media["unavailable_records"] == 110
     assert media["matched_files"] == media["media_associations"] == 0
+    # Each retry is a fresh CLI process: the committed cursor belongs to Stash.
+    history = None
+    for code in (1, 2, 2):
+        child = subprocess.run([sys.executable, "-m", "stash_ingest.catalog_file_history_import", *args], capture_output=True, text=True, timeout=30)
+        assert child.returncode == code, (child.returncode, child.stdout, child.stderr)
+        if code == 2:
+            current = json.loads(child.stdout)
+            assert history is None or history == current
+            history = current
+    assert history["state"] == "review" and history["imported"] is False
+    assert history["source_records"] == history["processed_records"] == 57
+    assert history["mapped_records"] == 55 and history["review_records"] == 2
     execute(membership_main, args, 1)  # Its first bounded transaction commits before connection loss.
     membership = execute(membership_main, args)
     assert membership == execute(membership_main, args)

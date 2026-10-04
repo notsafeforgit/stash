@@ -180,6 +180,13 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Post("/catalog-snapshots/{snapshot}/media-import/advance", rs.advanceCatalogMediaImport)
 	r.Get("/catalog-snapshots/{snapshot}/media-import/records", rs.catalogMediaRecords)
 	r.Get("/catalog-snapshots/{snapshot}/media-import/records/{ordinal}", rs.catalogMediaRecord)
+	r.Get("/catalog-snapshots/{snapshot}/file-history-import", rs.catalogFileHistoryImport)
+	r.Post("/catalog-snapshots/{snapshot}/file-history-import", rs.advanceCatalogFileHistoryImport)
+	r.Get("/catalog-snapshots/{snapshot}/file-history-import/records", rs.catalogFileHistoryRecords)
+	r.Get("/catalog-snapshots/{snapshot}/file-history-import/records/{ordinal}", rs.catalogFileHistoryRecord)
+	r.Get("/file-history/{history}", rs.sourceFileHistory)
+	r.Get("/file-observations/{observation}/history", rs.observationFileHistory)
+	r.Get("/content-claims/{claim}/history", rs.claimFileHistory)
 	return r
 }
 

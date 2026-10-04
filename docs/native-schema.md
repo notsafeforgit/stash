@@ -953,6 +953,69 @@ disabled roots can retain evidence without activating workers. Startup checks
 scope, target kinds and canonical relative paths before writes. Normal database
 backups include these tables; anonymised exports remove their private evidence.
 
+## Source file history
+
+Schema 1000066 promotes catalog metadata edits, file-state changes and
+deduplication assertions into `source_file_history`, with typed child tables
+for locations, edits, states and deduplication. An event pins the original
+collection/root revisions. Its source timestamp may be unknown; `observed_at`
+records receipt of the assertion, and `created_at` records native insertion.
+Signatures cover its provenance and complete child values. Partial event writes
+cannot commit, even when a caller discards a late error. Startup validates the
+graph, signatures and import receipts before normal opening.
+
+Locations refer to source file observations, including unavailable files and
+ZIP members. Deduplication points to a declared content claim, which need not be
+a verified digest. A member absent from that catalog, or currently associated
+with a different claim, keeps its declared path without an invented observation.
+The retained stage and survivor describe the historical assertion; neither is
+an instruction to mutate the filesystem. Copies in separate catalogs retain
+their respective scopes and timestamps, even when their source event IDs agree.
+
+Edit entries retain their source key, target field, representation and value.
+Known fields map as follows:
+
+| Source key | Native target | Representation |
+| --- | --- | --- |
+| title, details, director | same field | text |
+| date | date | calendar date |
+| urls | urls | URL strings |
+| actors | performers | source names |
+| tags, studio | same field | source names |
+| movie | groups | source name |
+
+Legacy `null` means `inherit`, not an explicit clear. Unknown fields and invalid
+known representations retain their exact JSON values as `unmapped` extensions,
+including large integers. Relationship names do not become native entity UUIDs.
+An exact-path edit remains separate from edits to other files sharing the source
+claim; importing history cannot replace it with a later duplicate-path value.
+Resolving and applying alternatives belongs to explicit metadata review. The
+existing Stash scene/image selections remain unchanged by this import.
+
+`catalog_file_history_imports` and `catalog_file_history_records` provide bounded,
+resumable mapping of the frozen `metadata_edits`, `file_events` and
+`dedupe_events` families after completed evidence/media mapping. Each source
+row receives one receipt, including invalid rows retained for review. The pass
+uses 50-record/16-MiB batches and the source ordinal as its cursor. It never
+executes retained SQL or reconstructs a filesystem operation. A completed pass
+retains `imported:false` until overall migration reconciliation is complete.
+
+Application-authenticated API routes:
+
+- `GET/POST /api/v3/archive/catalog-snapshots/UUID/file-history-import` reads or
+  advances progress. POST requires `expected_manifest_sha256` and `after`.
+- `GET .../file-history-import/records?after=ORDINAL&limit=N` returns summaries;
+  `GET .../records/ORDINAL` returns one receipt and its original source values.
+- `GET /api/v3/archive/file-history/UUID` returns one complete event.
+- `GET /api/v3/archive/file-observations/UUID/history?after=UUID&limit=N` returns
+  event summaries for that observation.
+- `GET /api/v3/archive/content-claims/UUID/history?after=UUID&limit=N` returns
+  deduplication event summaries for that claim.
+
+List limits are 1–100. There is no public history endpoint that deletes files or
+applies an edit. Ordinary database backup retains this graph; anonymisation
+removes the source history, import receipts and identifying values together.
+
 ## Retained source documents
 
 Migration 1000041 adds native document evidence without creating files, media,

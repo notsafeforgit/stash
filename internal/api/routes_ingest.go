@@ -120,6 +120,8 @@ func ingestErrorCode(err error) (int, string) {
 		return http.StatusConflict, "conflict"
 	case errors.Is(err, ingest.ErrInvalid), errors.Is(err, models.ErrSourceRunInvalid), errors.Is(err, models.ErrBackfillInvalid), errors.Is(err, models.ErrScanJournalInvalid), errors.Is(err, models.ErrCatalogIdentityImportInvalid), errors.Is(err, models.ErrCatalogRegistryImportInvalid), errors.Is(err, models.ErrCatalogSnapshotInvalid), errors.Is(err, models.ErrAutomationSnapshotInvalid):
 		return http.StatusBadRequest, "invalid_event"
+	case errors.Is(err, models.ErrSourceFileHistoryInvalid), errors.Is(err, models.ErrSourceFileEvidenceInvalid):
+		return http.StatusBadRequest, "invalid_event"
 	default:
 		return http.StatusServiceUnavailable, "temporarily_unavailable"
 	}

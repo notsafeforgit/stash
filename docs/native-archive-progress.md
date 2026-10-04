@@ -28,8 +28,10 @@ Native captures distinguish a missing historical observation time from the time
 the archive received retained evidence; acceptance retains the review hold.
 Exact handoff review, seed inspection and reviewed worker execution are now
 implemented, including child retry, publication and recovery without assigning
-new observation times to retained evidence. Import review resolution still
-requires work.
+new observation times to retained evidence. File edits, state changes and
+deduplication assertions now have native history, bounded import and inspection,
+while preserving current Stash selections. Applying historical metadata
+alternatives and the remaining import review resolution still require work.
 Native UI, live host/n8n conversion, compatibility removal, coordinated
 backup/export/restore, production cutover and retirement remain major release
 gates. The phase table below records that distinction; commit count is not a
@@ -5554,4 +5556,65 @@ The full transition remains active: refreshed coordinated snapshots, migration
 review, remaining operational/policy families, additional adapters, native UI,
 host/n8n conversion, compatibility removal, coordinated backup/export/restore,
 performance, owner-reviewed cutover and retirement are still required.
+Production and `develop` remain unchanged.
+
+## Native file edit and deduplication history — 2026-10-03
+
+Schema 1000066 promotes catalog metadata edits, file-state changes and
+deduplication assertions into native history, with source-file observations and
+declared content claims as its references. Events preserve source IDs, original
+timestamps and locations, including archive members. The receipt timestamp stays
+separate from an unknown source clock. Path-specific edits remain separate;
+legacy null means inherit, relationship values remain source names, and unknown
+fields or representations remain inspectable extensions. Importing this history
+does not change selected Stash fields, create files or execute old deletions.
+
+The catalog import uses the completed media mapping's frozen root/collection
+revisions and commits bounded 50-record/16-MiB batches. Its CLI resumes from the
+native cursor after a lost response. Application APIs expose import receipts,
+individual events and bounded observation/claim history. Startup verifies event
+signatures, complete children, scope and exact source receipts; backup and
+anonymisation include the graph.
+
+Populated fixtures cover path-specific alternatives, inherit, unknown fields,
+large integers, missing members, archive paths, prepared/finished assertions,
+replay, swallowed late errors, altered receipts, read-only corruption rejection
+and migration collisions. The real HTTP fixture drops a committed batch response
+and resumes through fresh CLI processes. The frozen inputs contain no metadata
+edits or file-state events, so their populated behavior is demonstrated by those
+fixtures rather than claimed from an empty production sample.
+
+The backend gate passed in 977.652 seconds with zero lint issues (API 774.741,
+ingestion 647.853, SQLite 939.224 seconds). After strengthening exact receipt
+verification, all affected history/HTTP tests passed in 35.640 seconds and final
+lint passed in 17.157 seconds. All 391 producer tests passed in 73.095 seconds.
+
+One SQLite online backup took 55.076 seconds. Normal migration and
+reinitialisation passed in 1,070.266 seconds. Importing all 1,697 frozen catalogs
+and verifying completed receipt replay took 210.964 seconds, including 194.690
+seconds to open the database. All 927 deduplication assertions mapped without
+review failures. A fresh process reopened the populated database in 209.793
+seconds. Large-copy checks used idle I/O priority alongside other host work;
+these are not isolated startup benchmarks. Startup/cutover performance remains
+a release gate.
+
+Independent comparison passed in 719.399 seconds. All 241 existing data tables
+retain their exact values and types, including 526,348 capture UUIDs, rowids,
+clocks and signatures. Existing schema objects, prior migration history and
+sequence counters remain unchanged. The 927 assertions preserve 913 source
+event IDs and 2,047 locations, including separate catalog copies and their
+original timestamps. Integrity is clean with zero foreign-key violations. The
+database remains 20,265,979,904 bytes.
+
+Evidence is under `.local/native-file-history-rehearsal-20261003/`. The verified
+replacement supersedes schema 65 under the retention policy after commit/push
+and the host-visible open-file check. Original compatible and frozen source
+inputs remain available. With both rehearsal copies present, free space stayed
+above 133 GiB; each import batch also checks the 50-GiB host reserve plus its
+write allowance.
+
+The full transition remains active: historical metadata review/application,
+remaining operational/policy families, refreshed snapshots, additional adapters,
+native UI, host/n8n conversion, compatibility removal, coordinated recovery and
+export, performance, owner-reviewed cutover and retirement still require work.
 Production and `develop` remain unchanged.

@@ -43,6 +43,7 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 	handler := http.StripPrefix("/api/v3/archive", router)
 	var lostBegin, lostChunk, lostEvidence, lostRelations, lostPublisher, lostAttachment atomic.Bool
 	var lostMediaBegin, lostMediaAdvance, lostMembership, lostDocument, lostTranslation, lostEnrichment atomic.Bool
+	var lostFileHistory atomic.Bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("ApiKey") != "fixture-application-key" || r.Header.Get("Authorization") != "" {
 			w.WriteHeader(http.StatusUnauthorized)
@@ -61,9 +62,10 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/membership-import") && !lostMembership.Swap(true)) ||
 			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/document-import") && !lostDocument.Swap(true)) ||
 			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/translation-import") && !lostTranslation.Swap(true)) ||
+			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/file-history-import") && !lostFileHistory.Swap(true)) ||
 			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/enrichment-import") && !lostEnrichment.Swap(true)))
 		if drop {
-			if strings.HasSuffix(r.URL.Path, "/evidence-import") || strings.HasSuffix(r.URL.Path, "/relations-import") || strings.HasSuffix(r.URL.Path, "/publisher-import") || strings.HasSuffix(r.URL.Path, "/attachment-import") || strings.HasSuffix(r.URL.Path, "/media-import/advance") || strings.HasSuffix(r.URL.Path, "/membership-import") || strings.HasSuffix(r.URL.Path, "/document-import") || strings.HasSuffix(r.URL.Path, "/translation-import") {
+			if strings.HasSuffix(r.URL.Path, "/evidence-import") || strings.HasSuffix(r.URL.Path, "/relations-import") || strings.HasSuffix(r.URL.Path, "/publisher-import") || strings.HasSuffix(r.URL.Path, "/attachment-import") || strings.HasSuffix(r.URL.Path, "/media-import/advance") || strings.HasSuffix(r.URL.Path, "/membership-import") || strings.HasSuffix(r.URL.Path, "/document-import") || strings.HasSuffix(r.URL.Path, "/translation-import") || strings.HasSuffix(r.URL.Path, "/file-history-import") {
 				var progress struct {
 					State     string `json:"state"`
 					Processed int    `json:"processed_records"`
@@ -110,9 +112,12 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 	require.True(t, lostDocument.Load())
 	require.True(t, lostTranslation.Load())
 	require.True(t, lostEnrichment.Load())
+	require.True(t, lostFileHistory.Load())
 	var relationOrdinal, publisherOrdinal, attachmentOrdinal, mediaOrdinal, membershipOrdinal, documentOrdinal int64
 	var translation models.CatalogTranslationRecord
 	var enrichment models.CatalogEnrichmentRecord
+	var fileHistory models.CatalogFileHistoryRecord
+	var history *models.SourceFileHistory
 	var membershipCollection, membershipPost string
 	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
 		receipt, err := repo.CatalogSnapshot.Find(ctx, snapshot)
@@ -154,6 +159,14 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, enrichments, 1)
 		enrichment = enrichments[0]
+		historyRows, err := repo.CatalogFileHistoryImport.Records(ctx, snapshot, 0, 1)
+		require.NoError(t, err)
+		require.Len(t, historyRows, 1)
+		fileHistory = historyRows[0]
+		history, err = repo.SourceFileHistory.Find(ctx, *fileHistory.HistoryUUID)
+		require.NoError(t, err)
+		require.NotNil(t, history.Locations[0].ObservationUUID)
+		require.Nil(t, history.Locations[1].ObservationUUID)
 		membershipCollection, membershipPost = *memberships[0].CollectionUUID, *memberships[0].PostUUID
 		return nil
 	}))
@@ -161,6 +174,26 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 		method, path, contentType string
 		status                    int
 	}{
+		{"GET", "/catalog-snapshots/" + snapshot + "/file-history-import", "", 200},
+		{"GET", "/catalog-snapshots/" + snapshot + "/file-history-import/records?limit=1", "", 200},
+		{"GET", "/catalog-snapshots/" + snapshot + "/file-history-import/records?limit=101", "", 400},
+		{"GET", "/catalog-snapshots/" + snapshot + "/file-history-import/records?after=-1", "", 400},
+		{"GET", "/catalog-snapshots/" + snapshot + "/file-history-import/records/" + strconv.FormatInt(fileHistory.Ordinal, 10), "", 200},
+		{"GET", "/catalog-snapshots/" + snapshot + "/file-history-import/records/999999", "", 404},
+		{"GET", "/catalog-snapshots/" + uuid.NewString() + "/file-history-import", "", 404},
+		{"POST", "/catalog-snapshots/" + snapshot + "/file-history-import", "application/json", 400},
+		{"GET", "/file-history/" + history.UUID, "", 200},
+		{"GET", "/file-history/invalid", "", 400},
+		{"GET", "/file-history/" + uuid.NewString(), "", 404},
+		{"GET", "/file-observations/" + *history.Locations[0].ObservationUUID + "/history?limit=1", "", 200},
+		{"GET", "/file-observations/" + *history.Locations[0].ObservationUUID + "/history?limit=101", "", 400},
+		{"GET", "/file-observations/" + *history.Locations[0].ObservationUUID + "/history?after=invalid", "", 400},
+		{"GET", "/file-observations/" + uuid.NewString() + "/history", "", 404},
+		{"GET", "/file-observations/invalid/history", "", 400},
+		{"GET", "/content-claims/" + history.Deduplication.ContentClaimUUID + "/history", "", 200},
+		{"GET", "/content-claims/" + history.Deduplication.ContentClaimUUID + "/history?limit=-1", "", 400},
+		{"GET", "/content-claims/invalid/history", "", 400},
+		{"GET", "/content-claims/" + uuid.NewString() + "/history", "", 404},
 		{"GET", "/catalog-snapshots/" + snapshot + "/enrichment-import", "", 200},
 		{"GET", "/catalog-snapshots/" + snapshot + "/enrichment-import/records?limit=1", "", 200},
 		{"GET", "/catalog-snapshots/" + snapshot + "/enrichment-import/records?limit=101", "", 400},

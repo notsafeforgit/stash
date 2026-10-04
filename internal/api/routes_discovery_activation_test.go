@@ -109,13 +109,19 @@ func TestDiscoveryActivationHTTPRecoversAndInspectsSharedCandidateEvidence(t *te
 		require.Equal(t, status, w.Code, w.Body.String())
 		return w.Body.Bytes()
 	}
-	for _, path := range []string{"/discovery-match-targets/bad", "/discovery-listings/bad", "/discovery-activations/bad", "/discovery-match-candidates/0/evidence",
+	for _, path := range []string{"/discovery-match-targets/bad", "/discovery-match-targets/bad/review", "/discovery-listings/bad", "/discovery-activations/bad", "/discovery-match-candidates/0/evidence",
 		"/discovery-match-candidates/1/evidence?after=10001", "/discovery-match-targets/" + receipt.Entries[0].TargetUUID + "/candidates?limit=101"} {
 		request("GET", path, nil, http.StatusBadRequest)
 	}
 	for _, path := range []string{"/discovery-activations/", "/discovery-match-targets/", "/discovery-listings/"} {
 		request("GET", path+uuid.NewString(), nil, http.StatusNotFound)
 	}
+	request("GET", "/discovery-match-targets/"+uuid.NewString()+"/review", nil, http.StatusNotFound)
+	initialReview := enrichmentHTTPValue[models.DiscoveryMatchReview](t, request("GET", "/discovery-match-targets/"+receipt.Entries[0].TargetUUID+"/review", nil, 200))
+	require.EqualValues(t, 67, initialReview.Coverage.HistoricalPages)
+	require.True(t, initialReview.Coverage.StartsAtSavedCursor)
+	require.False(t, initialReview.Coverage.Complete)
+	require.Equal(t, []string{"history_not_retained", "listing_incomplete"}, initialReview.Blockers)
 	request("POST", "/discovery-activations", map[string]any{"input": receipt.Input, "expected_plan_sha256": strings.Repeat("f", 64)}, http.StatusConflict)
 	csrf := httptest.NewRequest("POST", "/discovery-activations", bytes.NewBufferString(`{}`))
 	csrf.Header.Set("Origin", "https://unrelated.invalid")
@@ -140,6 +146,11 @@ func TestDiscoveryActivationHTTPRecoversAndInspectsSharedCandidateEvidence(t *te
 		producerHandler.ServeHTTP(w, r)
 		require.Equal(t, http.StatusNotFound, w.Code)
 	}
+	r := httptest.NewRequest("GET", "/api/v3/archive/discovery-match-targets/"+receipt.Entries[0].TargetUUID+"/review", nil)
+	r.Header.Set("Authorization", "Bearer "+token)
+	w = httptest.NewRecorder()
+	producerHandler.ServeHTTP(w, r)
+	require.Equal(t, http.StatusNotFound, w.Code, "producer credentials cannot inspect application reviews")
 	coordinator := ingest.NewDiscoveryCoordinator(service)
 	listing := receipt.Input.Listing
 	job, err := coordinator.Admit(t.Context(), token, listing.UUID, receipt.ListingSHA256, listing.PolicySHA256, listing.ExtractorVersion)
@@ -173,6 +184,15 @@ func TestDiscoveryActivationHTTPRecoversAndInspectsSharedCandidateEvidence(t *te
 	}
 	for _, entry := range receipt.Entries {
 		path := "/discovery-match-targets/" + entry.TargetUUID
+		review := enrichmentHTTPValue[models.DiscoveryMatchReview](t, request("GET", path+"/review", nil, 200))
+		require.EqualValues(t, 67, review.Coverage.HistoricalPages)
+		require.Equal(t, 1, review.Coverage.RetainedPages)
+		require.True(t, review.Coverage.RetainedComplete)
+		require.True(t, review.Target.EnumerationComplete)
+		require.False(t, review.Coverage.Complete, "resumed enumeration cannot prove missing historical coverage")
+		require.Equal(t, []string{"history_not_retained", "detail_required"}, review.Blockers)
+		require.Equal(t, 1, review.CandidateCount)
+		require.Equal(t, 1, review.DetailCandidateCount)
 		candidates := enrichmentHTTPValue[[]models.DiscoveryMatchCandidate](t, request("GET", path+"/candidates", nil, 200))
 		require.Len(t, candidates, 1, "multiple attachments produce one candidate per target")
 		evidence := enrichmentHTTPValue[[]models.DiscoveryMatchEvidence](t, request("GET", "/discovery-match-candidates/"+strconv.FormatInt(candidates[0].Sequence, 10)+"/evidence", nil, 200))

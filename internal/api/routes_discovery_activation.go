@@ -71,6 +71,19 @@ func (rs *nativeArchiveRoutes) discoveryMatchTarget(w http.ResponseWriter, r *ht
 	writeDiscoveryWorker(w, result, err)
 }
 
+func (rs *nativeArchiveRoutes) discoveryMatchReview(w http.ResponseWriter, r *http.Request) {
+	var result *models.DiscoveryMatchReview
+	err := rs.repo.WithReadTxn(r.Context(), func(ctx context.Context) error {
+		var err error
+		result, err = rs.repo.DiscoveryMatch.Review(ctx, chi.URLParam(r, "target"))
+		if err == nil && result == nil {
+			err = ingest.ErrNotFound
+		}
+		return err
+	})
+	writeDiscoveryWorker(w, result, err)
+}
+
 func discoveryReviewPagination(r *http.Request) (int64, int, error) {
 	after, limit := int64(0), 100
 	var err error

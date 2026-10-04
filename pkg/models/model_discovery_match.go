@@ -78,12 +78,39 @@ type DiscoveryComparisonCandidates struct {
 	HasMore bool                           `json:"has_more"`
 }
 
+// Coverage describes the saved search, not whether the source still exposes
+// every post it has ever hosted. Complete requires comparing a retained search
+// from its beginning through its final cursor. An imported page count cannot
+// supply the missing bodies from before a saved cursor.
+type DiscoveryMatchCoverage struct {
+	HistoricalPages     int64 `json:"historical_pages"`
+	StartsAtSavedCursor bool  `json:"starts_at_saved_cursor"`
+	RetainedPages       int   `json:"retained_pages"`
+	RetainedComplete    bool  `json:"retained_complete"`
+	Complete            bool  `json:"complete"`
+}
+
+// Review is a read-only view of one target in the current transaction. An empty
+// Blockers list identifies a unique listing candidate for further publication
+// validation; it is not acceptance, a durable review token or a capture receipt.
+type DiscoveryMatchReview struct {
+	Target               DiscoveryMatchTarget     `json:"target"`
+	Coverage             DiscoveryMatchCoverage   `json:"coverage"`
+	CurrentPost          *SourcePost              `json:"current_post"`
+	CandidateCount       int                      `json:"candidate_count"`
+	DetailCandidateCount int                      `json:"detail_candidate_count"`
+	Candidate            *DiscoveryMatchCandidate `json:"candidate,omitempty"`
+	CandidatePost        *SourcePost              `json:"candidate_post,omitempty"`
+	Blockers             []string                 `json:"blockers"`
+}
+
 type DiscoveryMatchReaderWriter interface {
 	PreviewActivation(context.Context, DiscoveryActivationInput) (*DiscoveryActivationPlan, error)
 	Activate(context.Context, DiscoveryActivationInput, string, time.Time) (*DiscoveryActivation, error)
 	Activation(context.Context, string) (*DiscoveryActivation, error)
 	BindTarget(context.Context, DiscoveryTargetInput, time.Time) (*DiscoveryMatchTarget, error)
 	Target(context.Context, string) (*DiscoveryMatchTarget, error)
+	Review(context.Context, string) (*DiscoveryMatchReview, error)
 	Pending(context.Context, string, int, time.Time) (*DiscoveryComparisonCandidates, error)
 	Prepare(context.Context, string, int, time.Time) (PreparedDiscoveryComparison, error)
 	Advance(context.Context, string, int, time.Time) (*DiscoveryMatchReceipt, error)

@@ -789,6 +789,7 @@ producer credentials do not grant review or source administration.
 | `GET /discovery-listings/{listing}` | Inspect the original definition, including saved cursor and historical page count. |
 | `GET /discovery-listings/{listing}/pages` | Page through compact received-page receipts without loading source bodies. |
 | `GET /discovery-match-targets/{target}` | Inspect the original target binding and durable comparison progress. |
+| `GET /discovery-match-targets/{target}/review` | Inspect current coverage, candidate counts and blockers without fetching or changing metadata. |
 | `GET /discovery-match-targets/{target}/candidates` | Inspect distinct candidate post IDs and their strongest retained evidence. |
 | `GET /discovery-match-candidates/{candidate}/evidence` | Inspect each original page's basis and record ordinals. |
 
@@ -817,6 +818,39 @@ historical coverage or completed catalog import. The
 saves a private, digest-bound review file and recovers the original operation
 after a lost Apply response. The review UI and remaining
 detail/publication/release workflow are still being implemented.
+
+The target review uses one database snapshot. `coverage.retained_pages` counts
+received batches of source posts, while `target.last_page` counts batches already
+compared against that target. `coverage.retained_complete` means the saved search
+reached its final cursor. `coverage.complete` additionally requires comparison
+through that cursor, no initial saved cursor and no missing historical batches.
+A resumed search can finish and still report `history_not_retained`; its original
+page count supplies no metadata with which to check competing matches. Complete
+coverage describes that retained search, not all posts a source ever hosted.
+
+`candidate_count` groups distinct source post IDs, and `detail_candidate_count`
+counts those whose best evidence still requires a detail fetch. A single
+candidate is included with its existing native post, if any. Multiple candidates
+remain available through the paginated candidates route. The `blockers` array
+can contain:
+
+| Blocker | Meaning |
+| --- | --- |
+| `history_not_retained` | The search resumes after batches whose source bodies are unavailable. |
+| `listing_incomplete` | The retained search has not reached its final cursor. |
+| `comparison_pending` | Received batches remain to be compared with the target. |
+| `source_changed` | The original account, collection revision or root is no longer eligible. |
+| `post_changed` | The reviewed post revision or active state changed. |
+| `post_already_identified` | The target already has an identifier outside the imported catalog namespace. |
+| `no_candidate` | The complete retained search produced no candidate. |
+| `competing_candidates` | More than one distinct post remains a candidate. |
+| `detail_required` | At least one candidate still needs source detail verification. |
+| `identifier_in_use` | The sole candidate's identifier belongs to another native post, including a forgotten post. |
+
+An empty blocker list identifies a unique listing candidate for further
+publication validation. This response accepts no identity, publishes no capture
+and supplies no durable approval token. Later changes require another review.
+Review reads compact receipts and references without loading source page bodies.
 
 ## Completed file events
 

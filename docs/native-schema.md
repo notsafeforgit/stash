@@ -2393,11 +2393,19 @@ does not admit listing jobs and does not publish identities or selected metadata
 `enumeration_complete` on a match target means comparison reached the retained
 listing's final cursor. It does not certify coverage of earlier historical
 pages, choose a unique identity, complete an import, or authorize release of
-source evidence. Reviewed activation, historical-coverage reconciliation,
+source evidence. Historical-coverage reconciliation,
 weak-candidate detail execution and atomic match publication remain necessary.
 Startup verifies original target bindings, page/result digests, record
 references and candidate aggregates. Normal backups retain the entire graph;
 anonymised exports remove it before removing its source evidence.
+
+The application review derives coverage and blockers from these indexed records
+in one read transaction. It distinguishes received and compared batches, missing
+history before a saved cursor, weak/competing candidates and changed native
+choices. It also reports when a sole candidate's identifier already belongs to
+another post, including a forgotten one. It loads no source bodies and creates
+no stored review state. An empty blocker list is not identity acceptance or
+metadata publication. See the [review response](native-ingestion.md#reviewed-discovery-activation).
 
 ### Reviewed discovery activation
 
@@ -2424,8 +2432,9 @@ identity. Scoped producers separately admit due listings. Application-only
 routes expose preview/apply/replay, retained listing summaries and the comparison
 targets, candidates and original record references. Producer tokens cannot use
 these review routes. See [activation API](native-ingestion.md#reviewed-discovery-activation).
-The API does not supply the remaining operator client/UI, historical-coverage
-resolution, detail execution, match publication or staging-release workflow.
+The operator command saves reviewed activations and recovers their original
+receipts. The review UI, historical-coverage resolution, detail execution, match
+publication and staging-release workflow remain open.
 
 ## Durable account listing pages
 
@@ -2438,7 +2447,8 @@ original account, profile, collection, cursor, historical page count and mapped
 cooldown. Unconverted staged results cannot be discarded by starting a listing.
 Historical page counts remain historical assertions, not native page receipts.
 
-Each `account.list_page` archive job fetches **one page**. The
+Each `account.list_page` archive job fetches **one page**: one batch of source
+posts and the cursor for requesting the next batch. The
 `discovery_listing_jobs` binding retains its generation and requested page
 ordinal; `discovery_job_attempts` records the authenticated producer for each
 fenced attempt. Failed attempts retry the same page with backoff. An explicit

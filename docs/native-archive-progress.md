@@ -6633,3 +6633,30 @@ and `predecessor-cleanup.json` under
 `.local/native-discovery-activation-20261004/`. This completes the isolated
 activation rehearsal; native matching/publication and the remaining transition
 work still precede production cutover.
+
+## Discovery coverage and candidate review — 2026-10-04
+
+The application API now reviews one discovery target's coverage and candidates
+in a single read transaction. It distinguishes received batches from completed
+comparisons and makes missing historical batches explicit. Finishing a resumed
+search cannot report complete coverage from a saved cursor or an imported page
+count. Reviews also report weak/competing candidates, changed source or post
+choices, already identified targets and candidate identifiers owned by another
+native post, including forgotten posts. The endpoint reads indexed receipts and
+references without loading source page bodies, admitting work or writing metadata.
+An empty blocker list is neither identity acceptance nor a publication receipt.
+
+Focused SQLite and real Go/Python HTTP tests passed in 16 seconds; Go lint
+reports zero issues. Coverage includes incomplete listing/comparison, stronger
+evidence replacing weak evidence, repeated attachments/pages sharing a candidate,
+competing IDs, empty searches, native edits, collisions, authorization and restart.
+The retained schema-73 archive also passed inspection of all 569 targets: 188
+correctly report the two saved cursors' 37 and 30 missing historical batches.
+Opening the archive took 191 seconds; all target reviews then took 112 ms total,
+with a median selected-target lookup of 0.16 ms. Evidence is under
+`.local/native-discovery-client-20261004/discovery_review_*` and
+`review-rehearsal.json`. No schema or production change was needed.
+
+Historical coverage resolution, detail execution, atomic publication, staging
+release and the broader transition gates remain open. This review provides
+inspection of those distinctions; it does not complete them.

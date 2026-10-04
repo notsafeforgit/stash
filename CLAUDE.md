@@ -479,8 +479,8 @@ in `dispatch-all`, with independent saved-delivery cursors for enrichment and
 discovery before local profile loading. Collection lookup follows current grants
 and discovers later registrations under a root; returned containers still need
 policy/runtime readiness checks. Preserve profile/collection rotation across
-restart and both journals when upgrading an outbox. Reviewed activation, candidate
-matching and verified native page release remain transition work. See
+restart and both journals when upgrading an outbox. Verified match publication
+and native page release remain transition work. See
 [listing storage](docs/native-schema.md#durable-account-listing-pages).
 `scrape.MatchDiscoveryListing` and `MatchDiscoveryPage` implement the pure
 `retained-discovery-listing-v1` candidate policy. Preserve unchanged original
@@ -510,8 +510,12 @@ Apply repeats the plan check and commits the listing, all bindings and receipt
 together. Lost responses must reuse the saved operation and hash, even after
 later native edits or comparison progress. Never interpret activation as job
 admission, source coverage, accepted identity or import completion. Producer
-tokens cannot use the archive review routes. Operator client/UI and the detail,
-publication and staging-release workflow remain open.
+tokens cannot use the archive review routes. The saved operator command is
+implemented; the review UI and detail/publication/staging-release workflow
+remain open. Target reviews derive coverage and blockers in one read transaction,
+without loading page bodies. Preserve missing-history, weak/competing-candidate,
+changed-source/post and existing-identifier distinctions. Empty blockers do not
+accept an identity or create a durable approval token.
 
 `stash-import-catalog-evidence` maps a received snapshot's posts, profiles and
 captures through core services in schema 1000031. It uses exact manifest/ordinal

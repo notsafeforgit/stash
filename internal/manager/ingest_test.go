@@ -34,7 +34,6 @@ func TestNativeFileWorkerGeneratesRealPreviewsForManualMedia(t *testing.T) {
 		t.Run(string(kind), func(t *testing.T) {
 			config.InitializeEmpty()
 			cfg := config.GetInstance()
-			cfg.SetBool(config.EnableV3UI, true)
 			cfg.SetBool(config.CalculateMD5, true)
 			db := sqlite.NewDatabase()
 			require.NoError(t, db.Open(filepath.Join(t.TempDir(), "manual.sqlite")))

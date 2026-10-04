@@ -6,7 +6,6 @@ import (
 
 	"github.com/stashapp/stash/pkg/logger"
 	"github.com/stashapp/stash/pkg/models"
-	"github.com/stashapp/stash/pkg/scene/generate"
 )
 
 type GenerateCoverTask struct {
@@ -27,7 +26,7 @@ func (t *GenerateCoverTask) Start(ctx context.Context) {
 	if err := t.generate(ctx); err != nil && ctx.Err() == nil {
 		logger.Error(err)
 		logErrorOutput(err)
-		if t.onError != nil && instance.Config.GetEnableV3UI() {
+		if t.onError != nil {
 			t.onError(err)
 		}
 	}
@@ -35,88 +34,17 @@ func (t *GenerateCoverTask) Start(ctx context.Context) {
 
 // generate returns failures to callers that expose the task as a monitored job.
 func (t *GenerateCoverTask) generate(ctx context.Context) error {
-	if instance.Config.GetEnableV3UI() {
-		return t.generateWithCoverSource(ctx)
-	}
-	scenePath := t.Scene.Path
-
-	r := t.repository
-
-	var required bool
-	if err := r.WithReadTxn(ctx, func(ctx context.Context) error {
-		required = t.required(ctx)
-
-		return t.Scene.LoadPrimaryFile(ctx, r.File)
-	}); err != nil {
-		return err
-	}
-
-	if !required {
-		return nil
-	}
-
-	videoFile := t.Scene.Files.Primary()
-	if videoFile == nil {
-		return fmt.Errorf("scene %d has no primary video file", t.Scene.ID)
-	}
-
-	var at float64
-	if t.ScreenshotAt == nil {
-		at = float64(videoFile.Duration) * 0.2
-	} else {
-		at = *t.ScreenshotAt
-	}
-
-	// we'll generate the screenshot, grab the generated data and set it
-	// in the database.
-
-	logger.Debugf("Creating screenshot for %s", scenePath)
-
-	g := generate.Generator{
-		Encoder:      instance.FFMpeg,
-		FFMpegConfig: instance.Config,
-		LockManager:  instance.ReadLockManager,
-		ScenePaths:   instance.Paths.Scene,
-		Overwrite:    true,
-	}
-
-	coverImageData, err := instance.generateCoverImage(ctx, &t.Scene, videoFile, at, g)
-	if err != nil {
-		return fmt.Errorf("error generating screenshot: %w", err)
-	}
-
-	return r.WithTxn(ctx, func(ctx context.Context) error {
-		qb := r.Scene
-		scenePartial := models.NewScenePartial()
-
-		// update the scene cover table
-		if err := qb.UpdateCover(ctx, t.Scene.ID, coverImageData); err != nil {
-			return fmt.Errorf("error setting screenshot: %v", err)
-		}
-
-		// update the scene with the update date
-		_, err = qb.UpdatePartial(ctx, t.Scene.ID, scenePartial)
-		if err != nil {
-			return fmt.Errorf("error updating scene: %v", err)
-		}
-
-		instance.registerSceneCoverHook(ctx, t.Scene.ID)
-		return nil
-	})
+	return t.generateWithCoverSource(ctx)
 }
 
-// required returns true if the sprite needs to be generated
+// required returns true if the cover needs to be generated
 // assumes in a transaction
 func (t *GenerateCoverTask) required(ctx context.Context) bool {
-	if t.Overwrite && instance.Config.GetEnableV3UI() {
+	if t.Overwrite {
 		return true
 	}
 	if t.Scene.Path == "" {
 		return false
-	}
-
-	if t.Overwrite {
-		return true
 	}
 
 	// if the scene has a cover, then we don't need to generate it

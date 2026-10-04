@@ -26,7 +26,6 @@ import (
 func sharedPreviewManager(t *testing.T, rs *shareRoutes) *manager.Manager {
 	t.Helper()
 	c := config.GetInstance()
-	c.SetBool(config.EnableV3UI, true)
 	c.SetString(config.Generated, t.TempDir())
 	p := paths.NewPaths(c.GetGeneratedPath(), "")
 	mgr := &manager.Manager{Config: c, Paths: &p, FFProbe: ffmpeg.NewFFProbe(filepath.Join(t.TempDir(), "no-ffprobe")), StreamManager: new(ffmpeg.StreamManager)}

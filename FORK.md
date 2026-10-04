@@ -93,10 +93,10 @@ mapping data without an explicit use case.
 
 ## Validation and documentation
 
-Never edit generated Go/TypeScript bindings by hand. Regenerate supported
-clients. During the conversion, existing build commands still build both UIs;
-their removal is a planned implementation step, not an ongoing support promise.
-Build real embedded assets before full Go validation.
+Never edit generated Go/TypeScript bindings by hand. `make generate` regenerates
+Go and v3 bindings; `make ui` builds the sole embedded application and login
+locales. Build real embedded assets before full Go validation. The retired UI
+and its toolchain remain available only at the frozen compatible tag.
 
 Test changed invariants and migration outcomes with real SQLite fixtures. Cover
 restarts, retries, integrity, unknown inputs, lossless promotion, API callers,

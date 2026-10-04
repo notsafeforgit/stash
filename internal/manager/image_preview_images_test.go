@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/pkg/ffmpeg"
 	"github.com/stashapp/stash/pkg/hash/md5"
 	"github.com/stashapp/stash/pkg/image"
@@ -70,9 +69,6 @@ func TestImageThumbnailBackfillAndIdentity(t *testing.T) {
 	changed := img
 	changed.Checksum = "replacement"
 	require.Nil(t, mgr.ImagePreviewImage(&changed))
-	mgr.Config.SetBool(config.EnableV3UI, false)
-	require.Nil(t, mgr.ImagePreviewImage(&img))
-	mgr.Config.SetBool(config.EnableV3UI, true)
 	require.NoError(t, os.Remove(f.Base().Path))
 	require.NotNil(t, mgr.ImagePreviewImage(&img), "offline originals should retain existing thumbnails")
 	task.Overwrite = true

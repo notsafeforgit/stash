@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 
 	"github.com/stashapp/stash/internal/manager"
@@ -24,8 +23,5 @@ func (r *sceneResolver) CoverOrigin(ctx context.Context, obj *models.Scene) (*Sc
 
 func (r *mutationResolver) SceneRegenerateCover(ctx context.Context, id string) (string, error) {
 	s := manager.GetInstance()
-	if !s.Config.GetEnableV3UI() {
-		return "", fmt.Errorf("v3 UI is not enabled")
-	}
 	return strconv.Itoa(s.RegenerateSceneCover(ctx, id)), nil
 }

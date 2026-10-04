@@ -170,7 +170,7 @@ func (t *GenerateMarkersTask) markersNeeded(ctx context.Context) int {
 	for _, sceneMarker := range sceneMarkers {
 		seconds := int(sceneMarker.Seconds)
 
-		if t.Overwrite || !t.markerExists(sceneHash, seconds) || (t.Screenshot && instance.Config.GetEnableV3UI() && instance.MarkerPreviewImage(t.Scene, sceneMarker) == nil) {
+		if t.Overwrite || !t.markerExists(sceneHash, seconds) || (t.Screenshot && instance.MarkerPreviewImage(t.Scene, sceneMarker) == nil) {
 			markers++
 		}
 	}

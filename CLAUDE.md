@@ -18,21 +18,19 @@ do not remove a required caller without converting and testing it.
 ## Development quickstart
 
 ```bash
-make pre-ui       # Install v2.5 dependencies for the embedded fallback
-make pre-ui-v3    # Install v3 dependencies
+make pre-ui       # Install v3 dependencies
 make pre-producer # Install the isolated gallery-dl producer test runtime
-make generate     # Generate Go and v2.5 GraphQL bindings
-make ui           # Build the embedded v2.5 UI
-make ui-v3-only   # Generate v3 bindings and build its embedded assets
+make generate     # Generate Go and v3 GraphQL bindings
+make ui           # Build the embedded v3 app and login locales
 # Terminal 1:
-STASH_PORT=9999 STASH_ENABLE_V3_UI=true make server-start
+STASH_PORT=9999 make server-start
 # Terminal 2:
 VITE_APP_PLATFORM_URL=http://127.0.0.1:9999 make ui-v3-start
 ```
 
 Open v3 at `http://localhost:3002/`. Set the backend URL explicitly; v3's proxy
-otherwise defaults to port 8010. `make ui-start` runs the v2.5 reference UI on
-port 3000. See the [v3 development guide](ui/v3/docs/development.md) for setup,
+otherwise defaults to port 8010. `make ui-start` and `make ui-v3-start` both
+run the native application on port 3002. See the [v3 development guide](ui/v3/docs/development.md) for setup,
 generation, and validation, and the [deployment runbook](docs/v3-deployment.md)
 for image publication and Quadlet restarts.
 
@@ -43,7 +41,7 @@ for image publication and Quadlet restarts.
 | `make build` | Build `stash` and `phasher` binaries |
 | `make build-release` | Release build (stripped debug info + PIE) |
 | `make stash` | Build only the main binary |
-| `make ui` | Build v2.5 embedded assets and login locales |
+| `make ui` | Generate, type-check and build v3 assets and login locales |
 | `make ui-v3-only` | Generate, type-check, and build v3 embedded assets |
 
 ## Testing and linting
@@ -56,11 +54,11 @@ make lint              # CI-pinned golangci-lint via go run
 make fmt               # Format Go source
 make validate-ui-v3    # Biome, generation/types, formatting, locales, tests, native contracts
 make fmt-ui-v3         # Format v3 source
-make validate          # Upstream/v2.5 UI validation and backend checks; excludes v3
-make validate-ui       # v2.5 Biome, Stylelint, TypeScript, and formatting checks
+make validate          # Alias for validate-fork, including producer tests
+make validate-ui       # Native UI validation; validate-ui-v3 is an alias
 ```
 
-Build both UIs before full Go tests or `make validate-fork`; embedded-asset tests
+Build the native UI before full Go tests or `make validate-fork`; embedded-asset tests
 require real v3 route chunks. Use the [validation sequence](ui/v3/docs/development.md#validation).
 To run a single Go test: `go test ./pkg/models/... -run TestFilterAST`.
 The shared `make test`/`make it` package timeout is twenty minutes for the growing
@@ -158,19 +156,11 @@ Browser → Vite dev server (dev) / embedded HTTP server (prod) → Chi router (
 - **`pkg/sqlite/`** — SQLite implementation of the repository interfaces, including migrations.
 - **`graphql/schema/`** — GraphQL schema. After editing, run `make generate` to regenerate Go bindings.
 
-### Frontend (`ui/v2.5/`)
-
-**Read-only reference — do not modify.** All active development is in `ui/v3/`.
-
-- React + Apollo Client for GraphQL
-- State: Apollo Client cache is the primary state layer; component state for UI-only concerns
-- Routing: React Router v5
-- UI: Bootstrap + custom SCSS components
-- All GraphQL queries/mutations live in `ui/v2.5/graphql/`; generated TypeScript types in `ui/v2.5/src/core/generated-graphql.ts`
-
 ### Frontend (`ui/v3/`)
 
-Active development target. A ground-up rewrite sharing the same GraphQL API.
+The sole application UI, embedded with its share and offline entry points.
+Native routes, preview generation and ingestion workers do not require a UI
+opt-in flag. Historical UI code is preserved at `v2.5-compatible-final`.
 
 **Routing — TanStack Router v1**
 - File-based routes under `src/routes/`. Route files use `createFileRoute`.
@@ -307,7 +297,7 @@ v3 encodes/decodes the persisted shape via `encodeFilterASTNodeToSaved`/`decodeS
 
 ### Code generation
 
-Running `make generate` runs gqlgen (Go GraphQL bindings) and graphql-codegen for **v2.5**. After modifying `graphql/schema/`, run it and regenerate v3 with `pnpm --dir ui/v3 gqlgen` (or its dev/build/check scripts). See the [generation guide](ui/v3/docs/development.md#generation-and-builds).
+Running `make generate` runs gqlgen (Go GraphQL bindings) and graphql-codegen for v3. Run it after modifying `graphql/schema/`. The v3 dev/build/check scripts also regenerate their own bindings. See the [generation guide](ui/v3/docs/development.md#generation-and-builds).
 
 Agent note for `make validate-ui-v3`: `ui/v3/src/core/generated-graphql.ts` is ignored, but `pnpm run gqlgen` still rewrites it. In a read-only sandbox, graphql-codegen can print `[SUCCESS]` for every step and then `pnpm run check` exits 1 with no TypeScript diagnostics because the hidden error is `EROFS: read-only file system, open '.../ui/v3/src/core/generated-graphql.ts'`. When validation fails with that exact shape, rerun `make validate-ui-v3` with workspace write access before chasing TypeScript, package scripts, or generated GraphQL content.
 

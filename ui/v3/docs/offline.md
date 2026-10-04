@@ -277,7 +277,7 @@ Range retry is **implemented, but best effort**:
 
 ## Backend endpoint and capability query
 
-With `STASH_ENABLE_V3_UI=true` (or `--enable-v3-ui`), the backend adds:
+The native backend exposes these authenticated routes by default:
 
 ```text
 GET  /scene/{id}/download.mp4?mode=copy

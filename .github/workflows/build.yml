@@ -34,7 +34,7 @@ jobs:
     - name: Install pnpm
       uses: pnpm/action-setup@v6
       with:
-        package_json_file: ui/v2.5/package.json
+        package_json_file: ui/v3/package.json
 
     # ensure pnpm store path exists to fix post setup node.js error
     # https://github.com/actions/setup-node/issues/1137#issuecomment-2508963254
@@ -53,13 +53,11 @@ jobs:
         node-version: '24'
         cache: 'pnpm'
         cache-dependency-path: |
-          ui/v2.5/pnpm-lock.yaml
           ui/v3/pnpm-lock.yaml
 
     - name: Install UI dependencies
       run: |
         make pre-ui
-        make pre-ui-v3
 
     - name: Generate
       run: make generate
@@ -69,34 +67,23 @@ jobs:
       id: cache-ui
       with:
         path: |
-          ui/v2.5/build
           ui/v3/build
         key: >-
           ${{ runner.os }}-ui-build-${{ hashFiles(
           '.github/workflows/build.yml', 'Makefile', '.npmrc',
-          'ui/v2.5/package.json', 'ui/v2.5/pnpm-lock.yaml', 'ui/v2.5/pnpm-workspace.yaml', 'ui/v2.5/.npmrc',
-          'ui/v2.5/vite.config.*', 'ui/v2.5/tsconfig*.json', 'ui/v2.5/index.html', 'ui/v2.5/codegen.*',
-          'ui/v2.5/graphql/**', 'ui/v2.5/public/**', 'ui/v2.5/src/**',
           'ui/v3/package.json', 'ui/v3/pnpm-lock.yaml', 'ui/v3/pnpm-workspace.yaml', 'ui/v3/.npmrc',
-          'ui/v3/vite.config.*', 'ui/v3/tsconfig*.json', 'ui/v3/index.html', 'ui/v3/codegen.*',
+          'ui/v3/vite.config.*', 'ui/v3/tsconfig*.json', 'ui/v3/*.html', 'ui/v3/codegen.*',
           'ui/v3/biome.jsonc', 'ui/v3/components.json', 'ui/v3/scripts/**',
           'ui/v3/public/**', 'ui/v3/src/**', 'ui/v3/graphql/**', 'graphql/**/*.graphql') }}
 
-    - name: Validate v3 and v2.5 compatibility
-      run: make validate-ui-v3
-
-    - name: Validate v2.5 UI
-      # skip UI validation for pull requests if UI is unchanged
-      if: ${{ github.event_name != 'pull_request' || steps.cache-ui.outputs.cache-hit != 'true' }}
-      run: |
-        make validate-ui
+    - name: Validate native UI
+      run: make validate-ui
 
     - name: Build UI
       # skip UI build for pull requests if UI is unchanged (UI was cached)
       if: ${{ github.event_name != 'pull_request' || steps.cache-ui.outputs.cache-hit != 'true' }}
       run: |
         make ui
-        make ui-v3-only
 
     # Bundle generated Go files + UI build for downstream jobs (test + build)
     - name: Upload generated artifacts
@@ -107,7 +94,6 @@ jobs:
         path: |
           internal/api/generated_exec.go
           internal/api/generated_models.go
-          ui/v2.5/build/
           ui/v3/build/
           ui/login/locales/
 
@@ -248,7 +234,7 @@ jobs:
 
     - name: Zip UI
       run: |
-        cd artifacts/generated/ui/v2.5/build && zip -r ../../../../../dist/stash-ui.zip .
+        cd artifacts/generated/ui/v3/build && zip -r ../../../../../dist/stash-ui.zip .
 
     - name: Generate checksums
       run: |
@@ -299,7 +285,9 @@ jobs:
 
     - name: Update latest_develop tag
       if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/develop' }}
-      run: git tag -f latest_develop; git push -f --tags
+      run: |
+        git tag -f latest_develop
+        git push origin +refs/tags/latest_develop
 
     - name: Development Release
       if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/develop' }}

@@ -17,11 +17,11 @@ RUN export LIBHEIF_LIBDIR=lib/$(dpkg-architecture -qDEB_HOST_MULTIARCH) \
 FROM node:24-alpine3.24 AS frontend
 RUN apk add --no-cache make git
 ## cache node_modules separately
-COPY ./ui/v2.5/package.json ./ui/v2.5/pnpm-lock.yaml /stash/ui/v2.5/
+COPY ./ui/v3/package.json ./ui/v3/pnpm-lock.yaml /stash/ui/v3/
 WORKDIR /stash
 COPY Makefile /stash/
 COPY ./graphql /stash/graphql/
-COPY ./ui /stash/ui/
+COPY ./ui/v3 /stash/ui/v3/
 # pnpm install with npm
 RUN npm install -g pnpm
 RUN make pre-ui
@@ -40,8 +40,10 @@ COPY ./scripts /stash/scripts/
 COPY ./pkg /stash/pkg/
 COPY ./cmd /stash/cmd
 COPY ./internal /stash/internal
-# needed for generate-login-locale
-COPY ./ui /stash/ui/
+# Embed native assets and generate login translations.
+COPY ./ui/*.go /stash/ui/
+COPY ./ui/login /stash/ui/login/
+COPY ./ui/v3/src/locales /stash/ui/v3/src/locales/
 RUN make generate-backend generate-login-locale
 COPY --from=frontend /stash /stash/
 ARG GITHASH

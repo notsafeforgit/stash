@@ -58,7 +58,7 @@ func (rs imageRoutes) serveThumbnail(w http.ResponseWriter, r *http.Request, img
 
 	// if the thumbnail doesn't exist, encode on the fly
 	exists, _ := fsutil.FileExists(filepath)
-	if !exists && mgr.Config.GetEnableV3UI() && mgr.Config.IsWriteImageThumbnails() {
+	if !exists && mgr.Config.IsWriteImageThumbnails() {
 		wg := &mgr.ImageThumbnailGenerateWaitGroup
 		wg.Add()
 		err := mgr.GenerateImagePreview(r.Context(), img)

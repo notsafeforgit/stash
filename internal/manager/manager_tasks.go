@@ -241,9 +241,6 @@ func (s *Manager) Generate(ctx context.Context, input GenerateMetadataInput) (in
 		return 0, err
 	}
 	if input.ResetCoversToDefault {
-		if !s.Config.GetEnableV3UI() {
-			return 0, fmt.Errorf("resetting scene covers requires v3")
-		}
 		if !input.Covers {
 			return 0, fmt.Errorf("covers must be selected when resetting to default")
 		}

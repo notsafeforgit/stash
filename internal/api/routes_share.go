@@ -162,7 +162,7 @@ func (rs *shareRoutes) page(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	data, err := fs.ReadFile(ui.Box(true), "share.html")
+	data, err := fs.ReadFile(ui.UIBox, "share.html")
 	if err != nil {
 		http.Error(w, "Share viewer unavailable", http.StatusServiceUnavailable)
 		return
@@ -179,7 +179,7 @@ func (rs *shareRoutes) asset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Read an explicit bundled file, never a directory or the general app shell.
-	data, err := fs.ReadFile(ui.Box(true), "assets/"+asset)
+	data, err := fs.ReadFile(ui.UIBox, "assets/"+asset)
 	if err != nil {
 		http.NotFound(w, r)
 		return

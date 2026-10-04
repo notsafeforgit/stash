@@ -2,41 +2,37 @@
 
 Use these instructions for the active rewrite. The root
 [development guide](../../../docs/DEVELOPMENT.md) retains upstream platform setup
-and v2.5 instructions. See the [documentation index](../../../docs/README.md) for
+instructions for the native build. See the [documentation index](../../../docs/README.md) for
 architecture, compatibility, feature guides, and operations.
 
 ## Prerequisites
 
 Run the commands below from the Git root. Use Go matching
 [go.mod](../../../go.mod), a C compiler for SQLite/CGO, Make, Git, FFmpeg/ffprobe,
-and Node.js 24.15 or newer in the 24 LTS line. v3 pins pnpm 12.4.2;
-v2.5 retains upstream's pnpm 10.33.0 and its unchanged lockfile. Let pnpm select
-the version from each UI's `packageManager` field. v3's build-script policy and
+and Node.js 24.15 or newer in the 24 LTS line. v3 pins pnpm 12.4.2. Let pnpm select the version from its `packageManager` field. v3's build-script policy and
 scoped dependency overrides live in `pnpm-workspace.yaml`. `make lint` runs the
 CI-pinned Go linter through
 `go run`, so a separate golangci-lint installation is unnecessary.
 
 ## First checkout and local development
 
-Install both UI dependency trees, generate shared bindings, and build both
-embedded bundles:
+Install the UI dependencies, generate supported bindings, and build the
+embedded application:
 
 ```bash
 make pre-ui
-make pre-ui-v3
 make generate
 make ui
-make ui-v3-only
 ```
 
-Both bundles are embedded in the Go binary. `make generate` creates placeholder
+The app, share viewer and offline library are embedded in the Go binary. `make generate` creates placeholder
 build directories when necessary, but placeholders do not satisfy the embedded
 asset tests. Keep the build steps in this order on a clean checkout.
 
 In one terminal, start a development backend:
 
 ```bash
-STASH_PORT=9999 STASH_ENABLE_V3_UI=true make server-start
+STASH_PORT=9999 make server-start
 ```
 
 This runs from `.local/` with `.local/config.yml`. Complete setup using a test
@@ -51,27 +47,27 @@ VITE_APP_PLATFORM_URL=http://127.0.0.1:9999 make ui-v3-start
 Open `http://localhost:3002/`. Vite regenerates v3 GraphQL types and the settings
 search index before starting, then hot reloads frontend changes. Set the backend
 URL explicitly: v3's Vite proxy defaults to port **8010**, whereas this quickstart
-uses **9999**. `make ui-start` runs the separate v2.5 dev server on port 3000.
+uses **9999**. `make ui-start` is the same native dev server as `ui-v3-start`.
 
-The backend flag selects the embedded v3 UI and enables its additional HTTP
-endpoints. v2.5 GraphQL clients continue to use the shared API. For compatibility
-checks, use the v2.5 dev UI or a mainline client against that backend; restart
-with `STASH_ENABLE_V3_UI=false` to exercise the embedded v2.5 fallback.
+V3 and its media/share endpoints are enabled by default. The old
+`--enable-v3-ui` flag is no longer accepted; remove it from native launch commands.
+Remove `STASH_ENABLE_V3_UI` and `enable-v3-ui` config entries when preparing the
+native deployment. The frozen compatible release retains its original flags.
 
 ## Generation and builds
 
 | Command | Scope |
 | --- | --- |
 | `make generate-backend` | Go GraphQL bindings |
-| `make generate` | Go bindings and **v2.5** GraphQL types |
+| `make generate` | Go bindings and v3 GraphQL types |
 | `pnpm --dir ui/v3 gqlgen` | v3 GraphQL types and typed operation documents |
 | `pnpm --dir ui/v3 check` | v3 GraphQL/settings generation and TypeScript |
 | `pnpm --dir ui/v3 check:watch` | Generate v3 bindings, then watch app types with TypeScript 7 |
-| `make ui` | v2.5 bundle and login locales |
+| `make ui` | v3 bundle and login locales |
 | `make ui-v3-only` | v3 generation, TypeScript, and production bundle |
-| `make stash` | Main binary, embedding the bundles already on disk |
+| `make stash` | Main binary, embedding the native build already on disk |
 
-After schema changes, run `make generate` and regenerate v3 as well. v3's `dev`,
+After schema changes, run `make generate`. v3's `dev`,
 `build`, and `check` scripts already include its generators. TanStack's Vite
 plugin generates `src/routeTree.gen.ts` during dev/build; rebuild after route-file
 changes before standalone type checks if the generated tree is stale. Never
@@ -104,7 +100,7 @@ Its local workspace settings can select the installed compiler:
 }
 ```
 
-Keep these editor settings scoped to v3. v2.5 retains its upstream toolchain.
+Keep these editor settings scoped to the UI workspace.
 
 ## Validation
 
@@ -113,27 +109,26 @@ The full fork gate, after installing dependencies, is:
 ```bash
 make generate
 make ui
-make ui-v3-only
 make validate-fork
 ```
 
-Build the UIs **before** `make validate-fork` or full Go tests. In particular,
+Build the UI **before** `make validate-fork` or full Go tests. In particular,
 [ui/ui_v3_test.go](../../../ui/ui_v3_test.go) checks that the binary embeds
 compressed underscore-prefixed route chunks. An empty/stale build directory
 can fail this check even when frontend lint and type checks pass. The
 [container publisher](../../../.github/workflows/ghcr-publish.yml) uses the same
-generate → build UIs → validate → compile order.
+generate → build UI → validate → compile order.
 
 | Command | Checks |
 | --- | --- |
 | `make validate-ui-v3` | Biome lint (including accessibility), React purity/type-contract lint, generation, TypeScript, formatting, locales, Vitest, and native contracts |
-| `make validate-fork` | Backend generation, v3 validation, Go lint, and Go unit/integration tests |
+| `make validate-fork` | Backend generation, v3 validation, producer tests, Go lint, and Go unit/integration tests |
 | `make lint` | CI-pinned golangci-lint via `go run` |
 | `make it` | Go tests with `sqlite_stat4 sqlite_math_functions sqlite_fts5 integration` build tags |
 | `pnpm --dir ui/v3 test --run` | Generate v3 GraphQL types and run Vitest once |
 | `make test-ui-v3-browser` | Generate/check v3 and run the Chromium/WebKit toolbar regression suite |
 | `make fmt-ui-v3` | Format v3 source with Biome |
-| `make validate` | Upstream/v2.5 UI validation plus backend checks; does not validate v3 |
+| `make validate` | Alias for `make validate-fork` |
 
 During iteration, choose checks for the changed contracts. The
 [native contract checker](../scripts/check-native-contracts.mjs) validates current
@@ -141,7 +136,7 @@ v3 application operations and the retained versioned plugin API. Historical
 database inputs are covered by one-time migration tests; upstream schema and
 client compatibility are no longer release gates. Follow
 [FORK.md](../../../FORK.md) for independent development and cutover policy.
-Do not add features to the retiring `ui/v2.5/` application.
+The retired application is available at `v2.5-compatible-final`.
 
 TypeScript enables `strict` and `noUncheckedIndexedAccess`: check lookup results
 or iterate actual entries. Do not add blanket non-null assertions to satisfy the

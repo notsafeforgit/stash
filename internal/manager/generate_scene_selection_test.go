@@ -5,7 +5,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -68,14 +67,11 @@ func TestGenerateSceneSelectionCannotExpandAnEmptyOrInvalidTarget(t *testing.T) 
 	}
 }
 
-func TestGenerateSceneSelectionIsOptIn(t *testing.T) {
+func TestGenerateSceneSelectionPreservesExplicitIDs(t *testing.T) {
 	mgr, db := coverTestManager(t)
-	mgr.Config.SetBool(config.EnableV3UI, false)
-	legacy := GenerateMetadataInput{SceneIDs: []string{"1"}, Covers: true}
-	input, err := mgr.resolveGenerateSceneSelection(context.Background(), legacy)
+	explicit := GenerateMetadataInput{SceneIDs: []string{"1"}, Covers: true}
+	input, err := mgr.resolveGenerateSceneSelection(context.Background(), explicit)
 	require.NoError(t, err)
-	require.Equal(t, legacy, input)
-	_, err = mgr.resolveGenerateSceneSelection(context.Background(), GenerateMetadataInput{SceneSelection: &models.GenerateSceneSelectionInput{}})
-	require.ErrorContains(t, err, "requires v3")
+	require.Equal(t, explicit, input)
 	db.Scene.AssertNotCalled(t, "QueryAST", mock.Anything, mock.Anything, mock.Anything)
 }

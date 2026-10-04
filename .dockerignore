@@ -17,7 +17,6 @@
 
 # GraphQL generated output
 pkg/models/generated_*.go
-ui/v2.5/src/core/generated-graphql.ts
 
 ####
 # Jetbrains
@@ -45,9 +44,6 @@ ui/v2.5/src/core/generated-graphql.ts
 ####
 # Random
 ####
-
-ui/v2.5/node_modules
-ui/v2.5/build
 
 *.db
 

@@ -60,10 +60,8 @@ endif
 .PHONY: release
 release: 
 	$(MAKE) pre-ui
-	$(MAKE) pre-ui-v3
 	$(MAKE) generate
 	$(MAKE) ui
-	$(MAKE) ui-v3-only
 	$(MAKE) build-release
 
 # targets to set various build flags
@@ -283,13 +281,11 @@ build-cc-all:
 .PHONY: touch-ui
 touch-ui:
 ifdef IS_WIN_SHELL
-	@if not exist "ui\\v2.5\\build" mkdir ui\\v2.5\\build
 	@if not exist "ui\\v3\\build" mkdir ui\\v3\\build
-	@type nul >> ui/v2.5/build/index.html
 	@type nul >> ui/v3/build/index.html
 else
-	@mkdir -p ui/v2.5/build ui/v3/build
-	@touch ui/v2.5/build/index.html ui/v3/build/index.html
+	@mkdir -p ui/v3/build
+	@touch ui/v3/build/index.html
 endif
 
 # Regenerates GraphQL files
@@ -298,7 +294,7 @@ generate: generate-backend generate-ui
 
 .PHONY: generate-ui
 generate-ui:
-	cd ui/v2.5 && pnpm run gqlgen
+	cd ui/v3 && pnpm run gqlgen
 
 .PHONY: generate-backend
 generate-backend: touch-ui
@@ -373,9 +369,9 @@ server-clean:
 .PHONY: pre-ui
 pre-ui:
 ifdef CI
-	cd ui/v2.5 && pnpm config set store-dir ~/.pnpm-store && pnpm install --frozen-lockfile
+	cd ui/v3 && pnpm install --frozen-lockfile --store-dir ~/.pnpm-store
 else
-	cd ui/v2.5 && pnpm install --frozen-lockfile
+	cd ui/v3 && pnpm install --frozen-lockfile
 endif
 
 .PHONY: ui-env
@@ -392,71 +388,45 @@ ui: ui-only generate-login-locale
 
 .PHONY: ui-only
 ui-only: ui-env
-	cd ui/v2.5 && pnpm run build
+	cd ui/v3 && pnpm run build
 
 .PHONY: zip-ui
 zip-ui:
 	rm -f dist/stash-ui.zip
-	cd ui/v2.5/build && zip -r ../../../dist/stash-ui.zip .
+	cd ui/v3/build && zip -r ../../../dist/stash-ui.zip .
 
 .PHONY: ui-start
 ui-start: ui-env
-	cd ui/v2.5 && pnpm run start --host
+	cd ui/v3 && pnpm run dev -- --host
 
 .PHONY: fmt-ui
 fmt-ui:
-	cd ui/v2.5 && pnpm run format
+	cd ui/v3 && pnpm run format
 
 # runs all of the frontend PR-acceptance steps
 .PHONY: validate-ui
 validate-ui:
-	cd ui/v2.5 && pnpm run validate
-
-.PHONY: pre-ui-v3
-pre-ui-v3:
-ifdef CI
-	cd ui/v3 && pnpm install --frozen-lockfile --store-dir ~/.pnpm-store
-else
-	cd ui/v3 && pnpm install --frozen-lockfile
-endif
-
-.PHONY: ui-v3-only
-ui-v3-only: ui-env
-	cd ui/v3 && pnpm run build
-
-.PHONY: ui-v3-start
-ui-v3-start: ui-env
-	cd ui/v3 && pnpm run dev -- --host
-
-.PHONY: fmt-ui-v3
-fmt-ui-v3:
-	cd ui/v3 && pnpm run format
-
-.PHONY: validate-ui-v3
-validate-ui-v3:
 	cd ui/v3 && pnpm run validate
+
+# Existing v3 command names refer to the same native application.
+.PHONY: pre-ui-v3 ui-v3-only ui-v3-start fmt-ui-v3 validate-ui-v3
+pre-ui-v3: pre-ui
+ui-v3-only: ui-only
+ui-v3-start: ui-start
+fmt-ui-v3: fmt-ui
+validate-ui-v3: validate-ui
 
 .PHONY: test-ui-v3-browser
 test-ui-v3-browser:
 	cd ui/v3 && pnpm run test:browser
 
-# these targets run the same steps as fmt-ui and validate-ui, but only on files that have changed
+# Bounded formatting/lint checks for the changed native UI files.
+.PHONY: fmt-ui-quick validate-ui-quick
 fmt-ui-quick:
-	cd ui/v2.5 && \
-	files=$$(git diff --name-only --relative --diff-filter d . ../../graphql); \
-	if [ -n "$$files" ]; then \
-	  pnpm exec biome format --write $$files; \
-	fi
+	cd ui/v3 && pnpm exec biome format --write --changed --since=HEAD --no-errors-on-unmatched
 
-# does not run tsc checks, as they are slow
 validate-ui-quick:
-	cd ui/v2.5 && \
-	tsfiles=$$(git diff --name-only --relative --diff-filter d src | grep -e "\.tsx\?\$$"); \
-	scssfiles=$$(git diff --name-only --relative --diff-filter d src | grep "\.scss"); \
-	prettyfiles=$$(git diff --name-only --relative --diff-filter d . ../../graphql); \
-	if [ -n "$$tsfiles" ]; then pnpm exec biome check $$tsfiles; fi && \
-	if [ -n "$$scssfiles" ]; then pnpm exec stylelint $$scssfiles; fi && \
-	if [ -n "$$prettyfiles" ]; then pnpm exec biome format $$prettyfiles; fi
+	cd ui/v3 && pnpm exec biome check --changed --since=HEAD --no-errors-on-unmatched
 
 # runs all of the backend PR-acceptance steps
 .PHONY: validate-backend
@@ -464,11 +434,11 @@ validate-backend: lint it
 
 # runs all of the tests and checks required for a PR to be accepted
 .PHONY: validate
-validate: validate-ui validate-backend
+validate: validate-fork
 
 # Full pre-push gate for the fork backend plus the active v3 UI.
 .PHONY: validate-fork
-validate-fork: generate-backend validate-ui-v3 validate-producer validate-backend
+validate-fork: generate-backend validate-ui validate-producer validate-backend
 
 .PHONY: validate-producer
 export PRODUCER_PYTHON ?= $(abspath .local/native-producer/bin/python)

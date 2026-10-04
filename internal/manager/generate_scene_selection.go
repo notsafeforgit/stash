@@ -13,9 +13,6 @@ func (s *Manager) resolveGenerateSceneSelection(ctx context.Context, input Gener
 	if selection == nil {
 		return input, nil
 	}
-	if !s.Config.GetEnableV3UI() {
-		return input, fmt.Errorf("generating scenes matching filters requires v3")
-	}
 	if len(input.SceneIDs)+len(input.ImageIDs)+len(input.GalleryIDs)+len(input.MarkerIDs)+len(input.Paths) != 0 {
 		return input, fmt.Errorf("scene selection cannot be combined with paths or explicit entity IDs")
 	}

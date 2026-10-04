@@ -18,7 +18,7 @@ import (
 )
 
 func (s *Manager) ImagePreviewImage(img *models.Image) *previewimage.Manifest {
-	if !s.Config.GetEnableV3UI() || img.Checksum == "" {
+	if img.Checksum == "" {
 		return nil
 	}
 	m, err := s.PreviewImageStore().Load(img.ID, "image", previewimage.ImageKey(img.Checksum))
@@ -29,8 +29,8 @@ func (s *Manager) ImagePreviewImage(img *models.Image) *previewimage.Manifest {
 }
 
 // GenerateImagePreview is shared by batch generation, scans and missing-cache
-// thumbnail requests. The legacy URL remains a JPEG, made from the same SDR
-// rendition; v3 gets the additive, display-adaptive rendition catalog.
+// thumbnail requests. The public thumbnail URL serves a JPEG made from the same
+// SDR rendition; the preview manifest supplies display-adaptive renditions.
 func (s *Manager) GenerateImagePreview(ctx context.Context, img *models.Image) error {
 	return s.generateImagePreview(ctx, img, nil)
 }

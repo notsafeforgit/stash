@@ -1,5 +1,13 @@
 # Retiring v2.5 Compatibility
 
+> Historical promotion proposal, superseded by the full
+> [native archive transition plan](native-archive-transition-plan.md).
+> The native branch has already removed the v2.5 UI and its opt-in selector;
+> [implementation progress](native-archive-progress.md) tracks remaining API
+> retirement and cutover work. The rollback-window choices below describe the
+> earlier proposal, not the current release contract.
+
+
 The [native archive and independent fork transition plan](native-archive-transition-plan.md)
 now covers the full requested transition, including all current sidecars,
 catalog import, gallery-dl/n8n ingestion, backups, and deployment. This document

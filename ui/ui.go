@@ -7,7 +7,7 @@ import (
 	"runtime"
 )
 
-//go:embed v2.5/build
+//go:embed all:v3/build
 var uiBox embed.FS
 var UIBox fs.FS
 
@@ -17,7 +17,7 @@ var LoginUIBox fs.FS
 
 func init() {
 	var err error
-	UIBox, err = fs.Sub(uiBox, "v2.5/build")
+	UIBox, err = fs.Sub(uiBox, "v3/build")
 	if err != nil {
 		panic(err)
 	}

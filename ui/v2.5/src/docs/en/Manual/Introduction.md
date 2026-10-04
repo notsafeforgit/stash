@@ -1,9 +1,0 @@
-# Introduction
-
-Stash works by cataloging your media using the paths that you provide. Once you have [configured](/settings?tab=library) the locations where your media is stored, you can click the Scan button in [`Settings -> Tasks`](/settings?tab=tasks) and Stash will begin scanning and importing your media into its library.
-
-For the best experience, it is recommended that after a scan is finished, you also generate video previews and sprites. You can do this in [`Settings -> Tasks`](/settings?tab=tasks).
-
-> **⚠️ Note:** Currently, it is only possible to perform one task at a time. However, there is a task queue, so you can queue generation tasks to be performed immediately after the scan is complete.
-
-Once your media is imported, you are ready to begin creating Performers, Studios, and Tags, and curating your content!

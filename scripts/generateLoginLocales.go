@@ -24,7 +24,7 @@ func main() {
 	// and extract only the login part
 
 	// assume running from ui directory
-	dirFS := os.DirFS(filepath.Join("v2.5", "src", "locales"))
+	dirFS := os.DirFS(filepath.Join("v3", "src", "locales"))
 
 	// ensure the login/locales directory exists
 	if err := fsutil.EnsureDir(filepath.Join("login", "locales")); err != nil {

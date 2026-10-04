@@ -1,6 +1,6 @@
 # Expiring media shares
 
-Sharing is a v3 feature (`enable_v3_ui: true`). Create a share from a scene,
+Sharing is available by default. Create a share from a scene,
 image or gallery's operations menu, from an explicit selection in either list
 toolbar, or in **Settings → Shares**. The settings page can combine scenes,
 images and galleries in one link. It also supports editing expiry and display
@@ -175,8 +175,9 @@ Do not use `handle_path`: it strips the namespace the backend authorizes. Do not
 forward the entire hostname to Stash or inject an owner API key. The share
 router is public by design; management remains on the authenticated hostname.
 Use the [normal v3 deployment procedure](v3-deployment.md) to deploy the binary
-and both embedded UIs together. Fork migration 8 adds `fork_shares` and
-`fork_share_sessions`; it does not alter upstream tables or schema version.
+and its main, share and offline entry points together. Shares and sessions
+are native database records; the promotion migration preserves existing grants
+from their historical fork tables.
 Backups containing active grants/sessions are sensitive. Revoke shares after
 restoring an older database if old capabilities must remain invalid.
 

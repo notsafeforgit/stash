@@ -31,7 +31,7 @@ fi
 
 # Favicon, used for web favicon, windows systray icon, windows executable icon
 convert stash-logo.png -define icon:auto-resize=256,64,48,32,16 favicon.ico
-cp favicon.ico ../ui/v2.5/public/
+cp favicon.ico ../ui/v3/public/
 
 # Build .syso for Windows icon, consumed by linker while building stash-win.exe
 "$GOPATH"/bin/rsrc -ico favicon.ico -o icon_windows.syso
@@ -39,7 +39,7 @@ mv icon_windows.syso ../pkg/desktop/
 
 # *nixes systray icon
 convert stash-logo.png -resize x256 favicon.png
-cp favicon.png ../ui/v2.5/public/
+cp favicon.png ../ui/v3/public/
 
 # MacOS, used for bundle icon
 # https://developer.apple.com/library/archive/documentation/CoreFoundation/Conceptual/CFBundles/BundleTypes/BundleTypes.html

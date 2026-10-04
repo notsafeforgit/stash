@@ -2,7 +2,7 @@
 
 ## Scope & Architecture
 
-`ui/v3/` is the active React 19/TypeScript application. It shares the Go backend and GraphQL API at the Git root. The [native archive transition](../../docs/native-archive-transition-plan.md) retires `ui/v2.5/`, its build, compatibility adapters, and the current `--enable-v3-ui`/`STASH_ENABLE_V3_UI=true` flag. Until those paths are removed, treat v2.5 as a migration reference; do not implement new features there.
+`ui/v3/` is the active React 19/TypeScript application. It shares the Go backend and GraphQL API at the Git root. It is the sole embedded UI; its media, share and ingestion routes run without an opt-in flag. The retired v2.5 source is preserved at `v2.5-compatible-final`. The [native archive transition](../../docs/native-archive-transition-plan.md) also tracks the remaining API adapters and production cutover.
 
 This is an independent fork of `stashapp/stash`. Read root-level `CLAUDE.md` and `FORK.md` for current architecture and migration policy. Preserve retained native contracts and convert their consumers together; v2.5 GraphQL and storage compatibility are no longer design requirements. Keep work on `v3-rewrite` until verification and the owner's success review permit merging into `develop`.
 
@@ -15,7 +15,7 @@ File-based TanStack routes live in `src/routes/`; feature components are in `src
 Run integrated workflows from the Git root. Follow the [development guide](docs/development.md) for first-checkout setup and generation:
 
 - `make pre-ui-v3` installs locked v3 dependencies.
-- `STASH_PORT=9999 STASH_ENABLE_V3_UI=true make server-start` runs the Go backend on port 9999.
+- `STASH_PORT=9999 make server-start` runs the Go backend on port 9999.
 - `VITE_APP_PLATFORM_URL=http://127.0.0.1:9999 make ui-v3-start` runs Vite on port 3002.
 - `make ui-v3-only` type-checks and builds the embedded v3 assets.
 - `make validate-ui-v3` runs generation, Biome (including accessibility), React purity/type-contract lint, TypeScript, formatting, locale checks, Vitest, and retained native contract checks.
@@ -24,7 +24,7 @@ Run integrated workflows from the Git root. Follow the [development guide](docs/
 - `make validate-fork` is the pre-push gate for backend generation, Go lint/integration tests, and v3 validation.
 - From `ui/v3`, `pnpm test --run` runs Vitest once and `pnpm gqlgen` refreshes GraphQL types.
 
-Before full Go tests or `make validate-fork`, install both UIs' dependencies and run `make generate`, `make ui`, then `make ui-v3-only`. Embedded-asset tests require real route chunks. `make generate` regenerates Go and v2.5 GraphQL bindings; v3 generation is separate and is included in its dev/build/check scripts. Publishing and Quadlet verification are documented in the [deployment runbook](../../docs/v3-deployment.md).
+Before full Go tests or `make validate-fork`, install dependencies with `make pre-ui`, then run `make generate` and `make ui`. Embedded-asset tests require real route chunks. `make generate` regenerates Go and v3 GraphQL bindings; the v3 dev/build/check scripts also regenerate their bindings. Publishing and Quadlet verification are documented in the [deployment runbook](../../docs/v3-deployment.md).
 
 ## Coding & Testing Conventions
 

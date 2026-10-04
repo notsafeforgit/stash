@@ -52,14 +52,14 @@ jobs:
         echo "short_sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
 
     - name: Install UI dependencies
-      run: make pre-ui pre-ui-v3
+      run: make pre-ui
 
     - name: Generate
       run: make generate
 
     # Go validation inspects embedded UI chunks, so build the bundles first.
     - name: Build UI
-      run: make ui ui-v3-only
+      run: make ui
 
     - name: Validate fork before publishing
       run: make pre-producer validate-fork

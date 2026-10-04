@@ -1,7 +1,5 @@
 package manager
 
-import "github.com/stashapp/stash/internal/manager/config"
-
 // ServerCapabilities is the static, server-determined capability flag
 // set surfaced to the v3 client via the `serverCapabilities` Query
 // field. Probed at server startup and treated as constant for the
@@ -19,10 +17,6 @@ type ServerCapabilities struct {
 // FFMpeg) so we don't memoise; if profiling shows it appearing in a
 // hot path, cache on the Manager.
 func (s *Manager) GetServerCapabilities() *ServerCapabilities {
-	if !config.GetInstance().GetEnableV3UI() {
-		return &ServerCapabilities{}
-	}
-
 	formats := []string{"auto", "copy", "copy-aac", "h264"}
 	if s.FFMpeg != nil && s.FFMpeg.HasHWHEVCEncoder() {
 		// HEVC is gated on HW encoder availability — see

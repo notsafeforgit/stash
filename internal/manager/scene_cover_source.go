@@ -107,7 +107,7 @@ func (s *Manager) coverOrigin(scene *models.Scene, source *models.SceneCoverSour
 }
 
 func (s *Manager) SceneCoverOrigin(ctx context.Context, scene *models.Scene) (*CoverOrigin, error) {
-	if !s.Config.GetEnableV3UI() || scene.CoverChecksum == "" {
+	if scene.CoverChecksum == "" {
 		return nil, nil
 	}
 	// Resolver objects can be shared by parallel GraphQL fields.

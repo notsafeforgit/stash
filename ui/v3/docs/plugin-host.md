@@ -1,6 +1,6 @@
 # Stash v3 plugin host (host v1)
 
-This document describes the contract for v3 UI plugins — plugins that add new top-level pages, navigation entries, and other React-rendered UI to Stash. Backend plugin features (hooks, scrapers, jobs, packaged plugin sources) are shared by both UIs.
+This document describes the contract for v3 UI plugins — plugins that add new top-level pages, navigation entries, and other React-rendered UI to Stash. Backend plugin features (hooks, scrapers, jobs, packaged plugin sources) belong to the same native application.
 
 Plugins that react to deletions or metadata edits use
 [backend notifications](../../../docs/plugin-events.md), independently of this

@@ -323,9 +323,8 @@ func Initialize() (*Server, error) {
 		uiFS = osFS(customUILocation)
 		staticUI = newReloadableStatigzServer(uiFS.(fs.ReadDirFS))
 	} else {
-		enableV3UI := cfg.GetEnableV3UI()
-		logger.Debugf("Serving embedded UI v3=%t", enableV3UI)
-		uiFS = ui.Box(enableV3UI)
+		logger.Debug("Serving embedded v3 UI")
+		uiFS = ui.UIBox
 		staticUI = statigz.FileServer(uiFS.(fs.ReadDirFS))
 	}
 
@@ -367,9 +366,7 @@ func Initialize() (*Server, error) {
 	})
 
 	logger.Infof("stash version: %s", build.VersionString())
-	if cfg.GetEnableV3UI() {
-		server.Handler = server.withShareRoutes(r)
-	}
+	server.Handler = server.withShareRoutes(r)
 	server.Handler = withIngestRoutes(server.Handler, ingestion, server.ingestWorker != nil)
 	go printLatestVersion(context.TODO())
 
@@ -713,11 +710,8 @@ func setPageSecurityHeaders(w http.ResponseWriter, r *http.Request, plugins []*p
 	connectSrc := strings.Join(connectSrcSlice, " ")
 	scriptSrc := strings.Join(scriptSrcSlice, " ")
 	styleSrc := strings.Join(styleSrcSlice, " ")
-	workerSrc := "blob:"
-	if c.GetEnableV3UI() {
-		// The v3 offline library registers a bundled, same-origin service worker.
-		workerSrc += " 'self'"
-	}
+	// The offline library registers a bundled, same-origin service worker.
+	workerSrc := "blob: 'self'"
 
 	cspDirectives := fmt.Sprintf("default-src %s; connect-src %s; img-src %s; script-src %s; style-src %s; media-src %s;", defaultSrc, connectSrc, imageSrc, scriptSrc, styleSrc, mediaSrc)
 	cspDirectives += fmt.Sprintf(" worker-src %s; child-src 'none'; object-src 'none'; form-action 'self';", workerSrc)

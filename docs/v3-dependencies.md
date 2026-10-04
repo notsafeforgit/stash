@@ -1,7 +1,8 @@
 # v3 dependency maintenance
 
 The 2026-09-19 refresh applies to v3, the shared Go backend, and runtime images.
-`ui/v2.5/` retains its upstream source, manifest, lockfile, and pnpm version.
+The v2.5 source, manifest and toolchain are now retired from this branch; they
+remain preserved in the frozen compatible release.
 
 ## Baseline
 
@@ -102,7 +103,7 @@ Run the [validation sequence](../ui/v3/docs/development.md#validation), browser
 tests, `pnpm --dir ui/v3 audit`, and
 `go run golang.org/x/vuln/cmd/govulncheck@latest ./...`. Verify HEIC/AVIF round
 trips through libvips in final images, not only in codec build stages. Do not
-upgrade v2.5 as part of this workflow.
+restore the retired v2.5 dependency tree.
 
 The Go scan reports no affected symbols or imported packages. Its module-level
 finding GO-2026-5932 concerns the unused `x/crypto/openpgp` package, which has no

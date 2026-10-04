@@ -206,9 +206,8 @@ blob media disables remote playback. Receivers must be able to fetch the source.
 [SceneStreamsV3](../../../internal/api/resolver_model_scene_v3.go) supplies the
 v3 source catalogue. The legacy `sceneStreams` field has its own
 [compatibility adapter](../../../internal/manager/scene_stream_legacy_compat.go).
-[Scene routes](../../../internal/api/routes_scene.go) gate the v3 HLS endpoint
-families on `enable-v3-ui`; GraphQL schema availability alone does not mean those
-HTTP endpoints are enabled.
+[Scene routes](../../../internal/api/routes_scene.go) expose the native HLS
+endpoint families by default, under the normal media authentication boundary.
 
 [pkg/ffmpeg/stream_v3_segmented.go](../../../pkg/ffmpeg/stream_v3_segmented.go)
 owns the v3 stream variants and segment serving;

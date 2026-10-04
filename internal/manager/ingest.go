@@ -18,7 +18,7 @@ import (
 // generators and after-success notifications. The API starts it only after the
 // plugin GraphQL handler is registered, and stops it before closing SQLite.
 func (s *Manager) NewIngestFileWorker(service *ingest.Service) *ingest.FileWorker {
-	if !s.Config.GetEnableV3UI() || s.validateFFmpeg() != nil {
+	if s.validateFFmpeg() != nil {
 		return nil
 	}
 	scanner := func(kind models.ArchiveEntityKind) *file.Scanner {

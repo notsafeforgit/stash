@@ -14,9 +14,7 @@ import (
 )
 
 func TestSceneStreamCatalogsRemainIsolated(t *testing.T) {
-	cfg := config.InitializeEmpty()
-	cfg.SetBool(config.EnableV3UI, true)
-	require.True(t, cfg.GetEnableV3UI())
+	config.InitializeEmpty()
 
 	scene := &models.Scene{
 		Files: models.NewRelatedVideoFiles([]*models.VideoFile{

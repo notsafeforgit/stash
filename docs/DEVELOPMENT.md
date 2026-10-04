@@ -1,9 +1,10 @@
 # Building from Source
 
-> These are the upstream platform and v2.5 build instructions. For this branch,
-> use the [v3 development guide](../ui/v3/docs/development.md), including building
-> both embedded UIs before `make validate-fork`. Deployment is covered in the
-> [v3 runbook](v3-deployment.md); other guides are in the [documentation index](README.md).
+> These platform notes use the native build targets. Follow the
+> [v3 development guide](../ui/v3/docs/development.md) for supported tool versions,
+> generation and validation. Deployment is covered in the
+> [native runbook](v3-deployment.md).
+
 
 ## Pre-requisites
 
@@ -69,7 +70,7 @@ NOTE: The `make` command in OpenBSD will be `gmake`. For example, `make pre-ui` 
 * `make validate-ui-quick` - (experimental) Runs tests and checks of changed UI code
 * `make server-start` - Runs a development stash server in the `.local` directory
 * `make server-clean` - Removes the `.local` directory and all of its contents
-* `make ui-start` - Runs the UI in development mode. Requires a running Stash server to connect to - the server URL can be changed from the default of `http://localhost:9999` using the environment variable `VITE_APP_PLATFORM_URL`, but keep in mind that authentication cannot be used since the session authorization cookie cannot be sent cross-origin. The UI runs on port `3000` or the next available port.
+* `make ui-start` - Runs the UI in development mode. Requires a running Stash server to connect to - the server URL can be changed from the default of `http://localhost:8010` using the environment variable `VITE_APP_PLATFORM_URL`, but keep in mind that authentication cannot be used since the session authorization cookie cannot be sent cross-origin. The UI runs on port `3002` or the next available port.
 
 When building, you can optionally prepend `flags-*` targets to the target list in your `make` command to use different build flags:
 

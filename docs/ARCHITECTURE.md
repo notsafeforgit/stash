@@ -2,10 +2,10 @@
 
 This is the system overview for the `v3-rewrite` independent fork. Stash runs one
 Go backend with a shared GraphQL API, a SQLite library, filesystem media, and
-embedded browser applications. Active frontend work belongs in `ui/v3/`;
-`ui/v2.5/` and the storage/API bridges described below are being retired under
-the [native archive transition](native-archive-transition-plan.md). They describe
-the starting implementation, not constraints on new development. The
+the embedded v3 application, including standalone share and offline entries.
+The v2.5 frontend and selector are removed. Remaining storage/API bridges are
+tracked under the [native archive transition](native-archive-transition-plan.md);
+they are not constraints on new development. The
 [progress record](native-archive-progress.md) tracks the migration and cutover.
 
 Start here for runtime and storage boundaries. The [v3 frontend guide](../ui/v3/docs/architecture.md)
@@ -18,7 +18,7 @@ for feature guides and explicitly labelled future plans.
 
 ```mermaid
 flowchart TD
-    owner["v3 app / v2.5 client"] --> private["Private Chi router: sessions and API authentication"]
+    owner["v3 app / supported API client"] --> private["Private Chi router: sessions and API authentication"]
     private --> graphql["/graphql: gqlgen resolvers and dataloaders"]
     private --> media["Media HTTP routes"]
     producer["Native capture producer"] --> ingest["/api/v3/ingest: scoped access tokens"]
@@ -45,20 +45,18 @@ entity services, sessions, plugin/scraper caches, jobs, and media processing.
 Setup and migration-required states leave the HTTP API available so the browser
 can complete setup before entering the library.
 
-Production serves embedded assets from [ui/ui.go](../ui/ui.go) and
-[ui/ui_v3.go](../ui/ui_v3.go). `--enable-v3-ui` / `STASH_ENABLE_V3_UI=true`
-selects v3 at the application mount point and enables supporting HTTP routes,
-including v3 segmented streaming, preview images, and shares. It does not add a
-`/v3` URL prefix. A configured custom UI directory overrides the embedded UI
-selection. The GraphQL schema is shared; the flag is **not** a separate API
-version or a switch that disables fork database migrations.
+The native server embeds [ui/ui.go](../ui/ui.go)'s v3 build at the application
+mount point, with no `/v3` prefix or UI selection flag. Segmented streaming,
+preview images, downloads and shares are always available through their normal
+authentication boundaries. A configured custom UI directory overrides the main
+embedded assets. Login translations are generated from v3 locales. Choosing a
+custom UI does not change the backend API or database lineage.
 
 | Browser entry point | Responsibility and boundary |
 | --- | --- |
 | [main.tsx](../ui/v3/src/main.tsx) → [app.tsx](../ui/v3/src/app.tsx) | Main v3 app: Apollo, system status, configuration/locales, plugin registration, then TanStack Router |
 | [offline-main.tsx](../ui/v3/src/pwa/offline-main.tsx) | Standalone offline library/player; boots from bundled assets and local downloads without the main app's server or plugin gates |
 | [share-main.tsx](../ui/v3/src/share-main.tsx) | Guest viewer; uses scoped share JSON/media endpoints without owner configuration, plugins, or the owner's Apollo session |
-| [ui/v2.5](../ui/v2.5/) | Upstream UI, served when v3 is disabled; its operations continue to work against the same backend when v3 is enabled |
 
 [vite.config.ts](../ui/v3/vite.config.ts) builds the three v3 HTML entries and
 their shared chunks. During development, Vite serves the UI on port 3002 and
@@ -308,9 +306,9 @@ replica of the server library.
 | Change guest or offline behavior | [Sharing](sharing.md) or [offline](../ui/v3/docs/offline.md); preserve their independent startup/data boundaries |
 
 Regenerate bindings instead of editing generated files. `make generate` updates
-Go and v2.5 GraphQL output; v3 generation is separate and included in its
+Go and v3 GraphQL output; the UI also generates its bindings in its
 dev/build/check scripts. TanStack generates the route tree during Vite dev/build.
-Build both embedded UIs before full Go validation. The
+Build the embedded native UI before full Go validation. The
 [development guide](../ui/v3/docs/development.md#validation) gives the validation
 sequence and browser/device limits; [deployment](v3-deployment.md) covers
 publication. Update the owning current guide when a documented contract changes.

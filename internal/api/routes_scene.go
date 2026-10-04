@@ -70,41 +70,39 @@ func (rs sceneRoutes) Routes() chi.Router {
 		r.Get("/stream.mpd/{segment}_v.webm", rs.StreamDASHVideoSegment)
 		r.Get("/stream.mpd/{segment}_a.webm", rs.StreamDASHAudioSegment)
 
-		if config.GetInstance().GetEnableV3UI() {
-			r.Get("/preview-image/{previewFile}", rs.PreviewImage)
-			r.Get("/scene_marker/{sceneMarkerId}/preview-image/{previewFile}", rs.MarkerPreviewImage)
-			// HLS transcode (re-encode to H.264 + AAC fMP4). The
-			// `.master.m3u8` endpoint serves a multivariant master playlist with
-			// EXT-X-MEDIA audio rendition + EXT-X-STREAM-INF video variant, both
-			// pointing at per-track media playlists under `/stream.m3u8/{track}.m3u8`.
-			r.Get("/stream.master.m3u8", rs.StreamV3HLSMaster)
-			r.Get("/stream.m3u8/{track}.m3u8", rs.StreamV3HLSTrackPlaylist)
-			r.Get("/stream.m3u8/{track}/init.mp4", rs.StreamV3HLSInitSegment)
-			r.Get("/stream.m3u8/{track}/{segment}.m4s", rs.StreamV3HLSSegment)
+		r.Get("/preview-image/{previewFile}", rs.PreviewImage)
+		r.Get("/scene_marker/{sceneMarkerId}/preview-image/{previewFile}", rs.MarkerPreviewImage)
+		// HLS transcode (re-encode to H.264 + AAC fMP4). The
+		// `.master.m3u8` endpoint serves a multivariant master playlist with
+		// EXT-X-MEDIA audio rendition + EXT-X-STREAM-INF video variant, both
+		// pointing at per-track media playlists under `/stream.m3u8/{track}.m3u8`.
+		r.Get("/stream.master.m3u8", rs.StreamV3HLSMaster)
+		r.Get("/stream.m3u8/{track}.m3u8", rs.StreamV3HLSTrackPlaylist)
+		r.Get("/stream.m3u8/{track}/init.mp4", rs.StreamV3HLSInitSegment)
+		r.Get("/stream.m3u8/{track}/{segment}.m4s", rs.StreamV3HLSSegment)
 
-			// HLS codec-copy fMP4 (no re-encode, source codecs only).
-			r.Get("/stream.fmp4.master.m3u8", rs.StreamV3HLSCopyFMP4Master)
-			r.Get("/stream.fmp4.m3u8/{track}.m3u8", rs.StreamV3HLSCopyFMP4TrackPlaylist)
-			r.Get("/stream.fmp4.m3u8/{track}/init.mp4", rs.StreamV3HLSCopyFMP4InitSegment)
-			r.Get("/stream.fmp4.m3u8/{track}/{segment}.m4s", rs.StreamV3HLSCopyFMP4Segment)
+		// HLS codec-copy fMP4 (no re-encode, source codecs only).
+		r.Get("/stream.fmp4.master.m3u8", rs.StreamV3HLSCopyFMP4Master)
+		r.Get("/stream.fmp4.m3u8/{track}.m3u8", rs.StreamV3HLSCopyFMP4TrackPlaylist)
+		r.Get("/stream.fmp4.m3u8/{track}/init.mp4", rs.StreamV3HLSCopyFMP4InitSegment)
+		r.Get("/stream.fmp4.m3u8/{track}/{segment}.m4s", rs.StreamV3HLSCopyFMP4Segment)
 
-			// HLS video-copy + AAC-transcode fMP4. Same fMP4 segment layout as
-			// the codec-copy variant, but the audio bitstream is re-encoded
-			// to AAC. Targets browsers that take the source video in fMP4 but
-			// not the source audio (notably iOS Safari rejecting Opus-in-MP4
-			// from ManagedMediaSource).
-			r.Get("/stream.fmp4.aac.master.m3u8", rs.StreamV3HLSCopyFMP4AACMaster)
-			r.Get("/stream.fmp4.aac.m3u8/{track}.m3u8", rs.StreamV3HLSCopyFMP4AACTrackPlaylist)
-			r.Get("/stream.fmp4.aac.m3u8/{track}/init.mp4", rs.StreamV3HLSCopyFMP4AACInitSegment)
-			r.Get("/stream.fmp4.aac.m3u8/{track}/{segment}.m4s", rs.StreamV3HLSCopyFMP4AACSegment)
+		// HLS video-copy + AAC-transcode fMP4. Same fMP4 segment layout as
+		// the codec-copy variant, but the audio bitstream is re-encoded
+		// to AAC. Targets browsers that take the source video in fMP4 but
+		// not the source audio (notably iOS Safari rejecting Opus-in-MP4
+		// from ManagedMediaSource).
+		r.Get("/stream.fmp4.aac.master.m3u8", rs.StreamV3HLSCopyFMP4AACMaster)
+		r.Get("/stream.fmp4.aac.m3u8/{track}.m3u8", rs.StreamV3HLSCopyFMP4AACTrackPlaylist)
+		r.Get("/stream.fmp4.aac.m3u8/{track}/init.mp4", rs.StreamV3HLSCopyFMP4AACInitSegment)
+		r.Get("/stream.fmp4.aac.m3u8/{track}/{segment}.m4s", rs.StreamV3HLSCopyFMP4AACSegment)
 
-			r.Post("/streams.stop", rs.StreamsStop)
-			r.Post("/streams.keepalive", rs.StreamsKeepalive)
+		r.Post("/streams.stop", rs.StreamsStop)
+		r.Post("/streams.keepalive", rs.StreamsKeepalive)
 
-			r.Get("/download.mp4", rs.DownloadMP4)
-			r.Head("/download.mp4", rs.DownloadMP4)
-			r.Get("/download/progress", rs.DownloadProgress)
-		}
+		r.Get("/download.mp4", rs.DownloadMP4)
+		r.Head("/download.mp4", rs.DownloadMP4)
+		r.Get("/download/progress", rs.DownloadProgress)
 
 		r.Get("/screenshot", rs.Screenshot)
 		r.Get("/preview", rs.Preview)

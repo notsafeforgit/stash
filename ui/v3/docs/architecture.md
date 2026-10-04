@@ -13,16 +13,16 @@ v3 uses React, TypeScript, TanStack Router, Apollo Client, shadcn components
 built on Base UI, Tailwind, and Video.js. [package.json](../package.json) and
 [pnpm-workspace.yaml](../pnpm-workspace.yaml) own versions and overrides.
 The independent fork owns its native schema and API contracts. Compatibility
-with upstream v2.5 is frozen at `v2.5-compatible-final`; treat `ui/v2.5/` as a
-read-only migration reference. Convert required callers and validate retained
+with upstream v2.5 is frozen at `v2.5-compatible-final`, which retains the
+retired application source for migration reference. Convert required callers and validate retained
 native invariants when changing contracts. The independent v3 plugin API and
 stash-box integration remain supported. See [FORK.md](../../../FORK.md) and the
 [transition plan](../../../docs/native-archive-transition-plan.md).
 
-The embedded v2.5 app and `--enable-v3-ui`/`STASH_ENABLE_V3_UI=true` selector
-still exist pending the compatibility-removal phase. Selecting an older UI
-does not reverse the native database migration. Production remains on the frozen
-compatible release until the full migration and reviewed cutover are complete.
+V3 is the sole embedded application. The old UI selector, dependency tree and
+build are removed; media, share and ingestion routes use native behavior by
+default. Production remains on the frozen compatible release until the full
+migration and reviewed cutover are complete.
 
 ## Module map
 

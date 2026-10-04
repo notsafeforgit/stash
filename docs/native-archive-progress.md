@@ -7019,9 +7019,9 @@ processes. Focused tests cover incomplete and competing searches, earlier
 recovery conflicts, native choices, all previous job states, transactional
 rollback, bounded empty-listing traversal and indexed query plans. All 484
 producer tests passed, including populated schema-14 preservation and upgrade
-collision rollback. The full fork gate was restarted after correcting resource
-cleanup in a query-plan test; UI validation, producer tests and Go lint now pass,
-with the tagged backend suite still running.
+collision rollback. After correcting resource cleanup in a query-plan test,
+the complete fork gate passed in 1,177 seconds, including the tagged backend
+suite. Commit `0dcc2c3da` also passed Build, Lint and image publication in CI.
 
 The retained schema-77 archive reopened in 114 seconds. Inspection found its six
 permitted collections in 0.35 milliseconds and traversed 757 bound targets in
@@ -7032,3 +7032,46 @@ jobs were admitted. The report is
 `.local/native-discovery-detail-admission-20261004/inspection.json`.
 Production and its scraper launchers remain unchanged. Actual source coverage,
 verified staging release and the broader transition remain open.
+
+## Sole native application and build — 2026-10-04
+
+Removed the v2.5 source, dependency tree, embedding and UI selector from the
+native branch. `make pre-ui`, `generate`, `ui`, formatting, validation and UI
+archives now target v3; existing v3 command names refer to those same targets.
+CI installs and packages one frontend, including the share/offline HTML inputs
+in its build cache. Both Docker recipes copy only native UI sources and login
+assets. The development-tag update now pushes only its named floating tag,
+without force-pushing every local tag. The frozen compatible tag is unchanged.
+
+Native file intake workers, preview/cover generation, scene selection, downloads,
+segmented streaming, shares and offline worker headers no longer depend on a UI
+flag. Required encoder checks, permissions and public media/share URLs remain.
+JPEG endpoints still have their encoding fallback. Login translations now come
+from v3; all 41 login objects matched the retired source and generation changed
+no translated output. The obsolete CLI flag is rejected. No schema change was
+needed; the verified archive remains at native schema 1000077.
+
+The actual native build and binary compiled with the old UI directory absent.
+The isolated HTTP check used a fresh temporary native database and verified
+owner authentication, login/locales, main and deep-link assets, proxy prefixes,
+share assets and isolation, offline entry/worker/manifest, icons and default
+download capabilities. It stopped its server and removed the test database.
+The native ZIP matched the built HTML and included all 769 archive entries.
+The shared standard/CUDA Docker frontend stage also built successfully on
+Alpine in 57 seconds, using its locked pnpm 12.4.2 toolchain.
+
+UI embedding and manager/configuration tests passed. An initial API run used an
+insufficient eight-minute package timeout and ended while translation migration
+fixtures were still progressing. The complete gate now uses the repository's
+standard twenty-minute timeout; 582 UI tests, 484 producer tests and Go lint
+passed, with the tagged backend suite still running. Reports are under
+`.local/native-discovery-client-20261004/native_ui_retirement_*`.
+
+Contributor, architecture, feature and deployment documentation now describes
+the sole native application. The deployment runbook was checked against the
+wrapper's actual digest-pinned native preview workflow. Its entrypoint does not
+inject the retired flag. The compatible production Quadlet retains its existing
+flag until the prepared native replacement is activated at the reviewed cutover.
+No production unit, image, database or scraper was changed. Remaining API/plugin
+adapters, client conversion, import/reconciliation, backup/restore and production
+cutover gates are still open; this does not complete the transition.

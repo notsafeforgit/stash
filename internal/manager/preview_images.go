@@ -25,7 +25,7 @@ func MarkerPreviewIdentity(seconds float64) string {
 }
 
 func (s *Manager) ScenePreviewImage(scene *models.Scene) *previewimage.Manifest {
-	if !s.Config.GetEnableV3UI() || scene.CoverChecksum == "" {
+	if scene.CoverChecksum == "" {
 		return nil
 	}
 	if m, err := s.PreviewImageStore().Load(scene.ID, "cover", previewimage.CoverKey(scene.CoverChecksum)); err == nil {
@@ -35,7 +35,7 @@ func (s *Manager) ScenePreviewImage(scene *models.Scene) *previewimage.Manifest 
 }
 
 func (s *Manager) MarkerPreviewImage(scene *models.Scene, marker *models.SceneMarker) *previewimage.Manifest {
-	if !s.Config.GetEnableV3UI() || marker.SceneID != scene.ID {
+	if marker.SceneID != scene.ID {
 		return nil
 	}
 	return s.loadPreviewImage(scene, "marker", MarkerPreviewIdentity(marker.Seconds))
@@ -103,58 +103,54 @@ func (s *Manager) generatePreviewImage(ctx context.Context, scene *models.Scene,
 	return data, nil
 }
 
-// The legacy cover writer consumes the SDR rendition of the same frame. It is
-// the compatibility adapter; the encoder and manifest have no v2.5 dependency.
-func (s *Manager) generateCoverImage(ctx context.Context, scene *models.Scene, file *models.VideoFile, at float64, legacy generate.Generator) ([]byte, error) {
-	if s.Config.GetEnableV3UI() {
-		data, err := s.generatePreviewImage(ctx, scene, "cover", "", at)
-		if err == nil {
-			return data, nil
-		}
-		if ctx.Err() != nil {
-			return nil, ctx.Err()
-		}
-		logger.Warnf("[preview image] scene %d: %v; using legacy screenshot generator", scene.ID, err)
+// Persist the SDR rendition for the public JPEG endpoint alongside the preview
+// manifest. A plain screenshot remains available if richer encoding fails.
+func (s *Manager) generateCoverImage(ctx context.Context, scene *models.Scene, file *models.VideoFile, at float64, fallback generate.Generator) ([]byte, error) {
+	data, err := s.generatePreviewImage(ctx, scene, "cover", "", at)
+	if err == nil {
+		return data, nil
 	}
-	return legacy.Screenshot(ctx, file.Path, file.Width, file.Duration, generate.ScreenshotOptions{At: &at})
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	logger.Warnf("[preview image] scene %d: %v; using JPEG screenshot generator", scene.ID, err)
+	return fallback.Screenshot(ctx, file.Path, file.Width, file.Duration, generate.ScreenshotOptions{At: &at})
 }
 
 func (t *GenerateMarkersTask) generateMarkerScreenshot(ctx context.Context, scene *models.Scene, marker *models.SceneMarker, videoFile *models.VideoFile) error {
 	s := instance
 	hash := scene.GetHash(t.fileNamingAlgorithm)
 	output := s.Paths.SceneMarkers.GetScreenshotPath(hash, int(marker.Seconds))
-	if s.Config.GetEnableV3UI() {
-		legacyExists, _ := fsutil.FileExists(output)
-		if !t.Overwrite && legacyExists && s.MarkerPreviewImage(scene, marker) != nil {
-			return nil
-		}
-		data, err := s.generatePreviewImage(ctx, scene, "marker", MarkerPreviewIdentity(marker.Seconds), marker.Seconds)
-		if err == nil {
-			// Stage beside the destination so publication remains atomic even
-			// when generated directories are mounted on separate filesystems.
-			if err := os.MkdirAll(filepath.Dir(output), 0755); err != nil {
-				return err
-			}
-			tmp, err := os.CreateTemp(filepath.Dir(output), ".preview-*.jpg")
-			if err != nil {
-				return err
-			}
-			defer os.Remove(tmp.Name())
-			_, writeErr := tmp.Write(data)
-			closeErr := tmp.Close()
-			if writeErr != nil {
-				return writeErr
-			}
-			if closeErr != nil {
-				return closeErr
-			}
-			return os.Rename(tmp.Name(), output)
-		}
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		logger.Warnf("[preview image] marker %d: %v; using legacy screenshot generator", marker.ID, err)
+	jpegExists, _ := fsutil.FileExists(output)
+	if !t.Overwrite && jpegExists && s.MarkerPreviewImage(scene, marker) != nil {
+		return nil
 	}
+	data, err := s.generatePreviewImage(ctx, scene, "marker", MarkerPreviewIdentity(marker.Seconds), marker.Seconds)
+	if err == nil {
+		// Stage beside the destination so publication remains atomic even
+		// when generated directories are mounted on separate filesystems.
+		if err := os.MkdirAll(filepath.Dir(output), 0755); err != nil {
+			return err
+		}
+		tmp, err := os.CreateTemp(filepath.Dir(output), ".preview-*.jpg")
+		if err != nil {
+			return err
+		}
+		defer os.Remove(tmp.Name())
+		_, writeErr := tmp.Write(data)
+		closeErr := tmp.Close()
+		if writeErr != nil {
+			return writeErr
+		}
+		if closeErr != nil {
+			return closeErr
+		}
+		return os.Rename(tmp.Name(), output)
+	}
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	logger.Warnf("[preview image] marker %d: %v; using JPEG screenshot generator", marker.ID, err)
 	if t.generator == nil {
 		return fmt.Errorf("missing marker generator")
 	}

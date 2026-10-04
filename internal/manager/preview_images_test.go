@@ -29,7 +29,6 @@ func coverTestManager(t *testing.T) (*Manager, *mocks.Database) {
 	t.Helper()
 	config.InitializeEmpty()
 	cfg := config.GetInstance()
-	cfg.SetBool(config.EnableV3UI, true)
 	db := mocks.NewDatabase()
 	jobs := job.NewManager()
 	jobs.SetSync(true)
@@ -152,11 +151,6 @@ func TestScenePreviewImageRequiresCurrentArtwork(t *testing.T) {
 		t.Fatal("uploaded artwork inherited generated renditions")
 	}
 	scene.CoverChecksum = "cover"
-	mgr.Config.SetBool(config.EnableV3UI, false)
-	if mgr.ScenePreviewImage(&scene) != nil {
-		t.Fatal("exposed v3 previews with v3 disabled")
-	}
-	mgr.Config.SetBool(config.EnableV3UI, true)
 	if err := os.WriteFile(scene.Path, []byte("replacement source"), 0600); err != nil {
 		t.Fatal(err)
 	}

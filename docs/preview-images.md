@@ -50,8 +50,7 @@ galleries are staged temporarily for decoders that require a seekable file.
 
 ## Generation and requirements
 
-Enable v3 using `--enable-v3-ui` / `STASH_ENABLE_V3_UI=true`. Generate a scene
-cover, use **Set cover** at a player timestamp, or generate marker screenshots.
+Preview generation is enabled by default. Generate a scene cover, use **Set cover** at a player timestamp, or generate marker screenshots.
 Existing covers need explicit regeneration to acquire HDR or stored card
 thumbnails. **Regenerate selected cover** reuses the original file and exact
 timestamp, or falls back to the default frame when no timestamp is known.

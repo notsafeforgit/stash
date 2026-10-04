@@ -196,10 +196,12 @@ export function AccountReview({
             rows: page.rows.flatMap((row) =>
               row.uuid !== account.uuid
                 ? [row]
-                : ownership === "all" ||
-                    (account.ownership?.state ?? "undecided") === ownership
-                  ? [account]
-                  : [],
+                : account.redirect_to
+                  ? []
+                  : ownership === "all" ||
+                      (account.ownership?.state ?? "undecided") === ownership
+                    ? [account]
+                    : [],
             ),
           }
         : page,

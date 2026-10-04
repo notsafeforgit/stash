@@ -99,6 +99,7 @@ export function ExistingEntityPicker({
     >
       <ComboboxInput
         id={id}
+        disabled={disabled}
         placeholder={msg(
           "archive_review.search_existing",
           "Search existing library entries",

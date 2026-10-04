@@ -103,4 +103,7 @@ type SourceAccountReaderWriter interface {
 	PreviewConsolidation(context.Context, string, string) (*AccountConsolidationPreview, error)
 	Consolidate(context.Context, AccountConsolidationInput) (*AccountConsolidation, error)
 	ConsolidationHistory(context.Context, string, int, int) ([]AccountConsolidation, error)
+	PreviewConsolidationReview(context.Context, AccountConsolidationReviewInput) (*AccountConsolidationReviewPreview, error)
+	ApplyConsolidationReview(context.Context, AccountConsolidationReviewApplyInput) (*AccountConsolidationReview, bool, error)
+	ConsolidationReview(context.Context, AccountConsolidationReviewApplyInput) (*AccountConsolidationReview, error)
 }

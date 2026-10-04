@@ -1182,6 +1182,71 @@ holds pending delivery; committed ownership and history are authoritative in the
 native database. The existing scene/image metadata journal retains its original
 storage name and format.
 
+### Account consolidation review API
+
+The same application session can explicitly join duplicate records for **one
+service account**. Native services and mirrors have distinct namespaces. Separate
+accounts belonging to one performer should retain separate account records and
+share their owner; a matching handle alone does not establish equivalence.
+
+| Route | Result |
+| --- | --- |
+| `POST /account-consolidation/preview` | The two account components, resulting owner, identifier conflicts and apply blockers; read-only |
+| `POST /account-consolidation/apply` | Atomic consolidation and original event receipt |
+| `POST /account-consolidation/requests/<request-uuid>/check` | Read-only match against the exact saved request, or 404 when uncommitted |
+| `GET /source-accounts/<uuid>/consolidation-history?after=<sequence>&limit=N` | Events involving that original account record, in sequence order |
+
+A preview identifies two distinct canonical accounts in the same qualified
+namespace:
+
+```json
+{
+  "source_uuid": "<record-to-redirect>",
+  "destination_uuid": "<record-to-keep>",
+  "ownership_mode": "preserve",
+  "accept_identifier_conflicts": false,
+  "reason": "Confirmed the captured ID and profile handle belong together"
+}
+```
+
+`preserve` keeps compatible existing ownership, including an explicit unlink.
+When one account is undecided, the other's choice is preserved. When choices
+conflict, use `ownership_mode:"choose"` with an `ownership` object containing
+`state` (`linked`, `unlinked` or `undecided`). A linked choice also requires
+`performer_uuid` and `performer_revision`; the other states omit those fields.
+Preserve mode omits the entire ownership object. Stable-ID disagreements require
+explicit acknowledgement with `accept_identifier_conflicts:true`. Preview
+returns `blockers` (`ownership` and/or `identifiers`) and `ready:false` until
+these choices are resolved. It does not auto-apply or discard conflicting claims.
+
+Preview's `digest` binds both account components, all retained identifier claims
+and their current owners. An explicit performer choice carries an independently
+checked revision. Apply sends the preview input, digest and a new `request_uuid`.
+The event's immutable request digest binds that entire request, including the
+ownership choice, reason and acknowledgement, for exact replay. These routes use
+the existing consolidation schema; they add no table or duplicate request body.
+
+Save the exact Apply body before transmission. Receipt checking POSTs that same
+body to the request's `/check` route, which performs only a primary-key event read
+and digest comparison. It never applies a change or reconstructs an outcome from
+current ownership. A matching check returns `{request,consolidation}`. Apply
+returns `{review:{request,consolidation},replayed:false}`; a committed retry returns
+the original event with `replayed:true`, even after further consolidation or
+performer changes. Changed input under the same UUID returns `request_conflict`.
+A new stale request returns `preview_changed`; unresolved choices return
+`ownership_resolution_required` or `identifier_resolution_required`. Requests
+remain bounded to 16 KiB, with strict JSON and same-origin checks.
+
+In **Account review**, expand **Consolidate duplicate account records**, select
+the account to keep, and preview the resulting identifiers and ownership. Search
+is limited to the same service and 25 candidates; refine it or enter an exact
+archive account UUID when necessary. Inspect each record's evidence before
+acknowledging conflicting IDs. After an interrupted Apply, **Check and retry saved
+consolidation** recovers its original request, including when the source already
+redirects. Successful confirmation refreshes the two affected cards and removes
+the redirected card from the retained queue. History is loaded on expansion.
+Consolidation does not merge performers, move files or change media attribution.
+
 ## Automatic source translations
 
 Translation has a separate collection policy from scene/image metadata mapping.

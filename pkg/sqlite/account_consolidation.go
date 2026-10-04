@@ -209,29 +209,54 @@ func (r accountConsolidationRow) resolve() *models.AccountConsolidation {
 		Origin: r.Origin, Reason: r.Reason, AcceptedIdentifierConflicts: r.AcceptedConflicts, CreatedAt: r.CreatedAt.Timestamp}
 }
 
-func (s *SourceAccountStore) Consolidate(ctx context.Context, input models.AccountConsolidationInput) (*models.AccountConsolidation, error) {
+func accountConsolidationRequest(input models.AccountConsolidationInput) (models.AccountConsolidationInput, string, error) {
 	var err error
 	input.SourceUUID, err = archiveUUID(input.SourceUUID)
 	if err != nil {
-		return nil, err
+		return input, "", err
 	}
 	input.DestinationUUID, err = archiveUUID(input.DestinationUUID)
 	if err != nil {
-		return nil, err
+		return input, "", err
 	}
 	if (input.Origin != "review" && input.Origin != "migration") || !validAccountText(input.Reason, 4096, true) {
-		return nil, errors.New("account consolidation requires review or migration and a valid reason")
+		return input, "", errors.New("account consolidation requires review or migration and a valid reason")
 	}
 	if input.OwnershipMode != "preserve" && input.OwnershipMode != "choose" {
-		return nil, errors.New("choose how account ownership will be resolved")
+		return input, "", errors.New("choose how account ownership will be resolved")
 	}
 	if input.OwnershipMode == "preserve" && input.Ownership != (models.AccountOwnershipSelection{}) {
-		return nil, errors.New("preserving ownership does not accept a replacement choice")
+		return input, "", errors.New("preserving ownership does not accept a replacement choice")
 	}
 	if len(input.Signature) != 64 {
-		return nil, models.ErrSourceAccountConflict
+		return input, "", models.ErrSourceAccountConflict
 	}
+	input.UUID = ""
+	digest, err := accountReviewDigest(input)
+	return input, digest, err
+}
+
+func findAccountConsolidationRequest(ctx context.Context, id, digest string) (*models.AccountConsolidation, error) {
+	var old accountConsolidationRow
+	err := dbWrapper.Get(ctx, &old, "SELECT * FROM source_account_consolidations WHERE uuid=?", id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if old.RequestDigest != digest {
+		return nil, models.ErrAccountConsolidationReplay
+	}
+	return old.resolve(), nil
+}
+
+func (s *SourceAccountStore) Consolidate(ctx context.Context, input models.AccountConsolidationInput) (*models.AccountConsolidation, error) {
 	id := input.UUID
+	input, digest, err := accountConsolidationRequest(input)
+	if err != nil {
+		return nil, err
+	}
 	if id == "" {
 		id = uuid.NewString()
 	} else {
@@ -240,21 +265,9 @@ func (s *SourceAccountStore) Consolidate(ctx context.Context, input models.Accou
 			return nil, err
 		}
 	}
-	input.UUID = ""
-	digest, err := accountReviewDigest(input)
-	if err != nil {
-		return nil, err
-	}
-	var old accountConsolidationRow
-	err = dbWrapper.Get(ctx, &old, "SELECT * FROM source_account_consolidations WHERE uuid=?", id)
-	if err == nil {
-		if old.RequestDigest != digest {
-			return nil, models.ErrAccountConsolidationReplay
-		}
-		return old.resolve(), nil
-	}
-	if !errors.Is(err, sql.ErrNoRows) {
-		return nil, err
+	old, err := findAccountConsolidationRequest(ctx, id, digest)
+	if err != nil || old != nil {
+		return old, err
 	}
 	preview, err := s.PreviewConsolidation(ctx, input.SourceUUID, input.DestinationUUID)
 	if err != nil {

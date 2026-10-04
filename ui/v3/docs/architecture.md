@@ -180,12 +180,26 @@ retains the loaded queue, updates only the affected card and uses the shared
 history load independently on expansion. Account ownership and depicted media
 performers are separate relationships.
 
+The selected account also offers explicit consolidation of duplicate records on
+one service. `account-consolidation-api.ts` validates the reviewed components,
+resulting owner, stable-ID conflicts and exact event receipt. The picker scopes
+search to the selected namespace and supports a direct UUID lookup. Conflicting
+owners require a choice; stable-ID disagreements require acknowledgement. The
+existing component digest and explicit performer revision guard application.
+Consolidation refreshes the source/destination cards and retains the queue cursor;
+redirected source cards disappear from canonical discovery. History and retained
+identifier evidence load separately.
+
 Review outboxes use `review-storage.ts` for strict IndexedDB transactions shared
 across tabs. Each protocol retains its own endpoint/target scope and request
 validation. Save before sending; recover a matching server receipt or retry the
 exact original body after interruption. Only a definitive rejection permits
 replacing a saved request. Committed choices and their history live in the native
 database. See [native review APIs](../../../docs/native-ingestion.md#account-ownership-review-api).
+Consolidation recovery POSTs the saved body to a read-only receipt-check route,
+which matches the existing event digest without adding a receipt table. Pending
+consolidation blocks replacement ownership edits in the selected editor, and
+stale-review recovery disables inputs before refreshing/remounting the form.
 
 ## Lists
 

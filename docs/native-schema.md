@@ -573,10 +573,15 @@ extend their time intervals. Anonymised exports remove the new history and
 context with the other account evidence. Migration begins with every existing
 account as its own canonical identity and invents no consolidations.
 
-Account consolidation remains a repository operation; application preview/apply
-routes and native equivalence-review controls are still required. The later
-ownership-review API and UI manage an account's performer association without
-implicitly consolidating accounts or equating their identifiers.
+Application preview/apply routes and native account review controls now expose
+explicit consolidation. A read-only receipt-check POST verifies the entire saved
+request against the existing event's request digest; it does not require another
+receipt table. The original domain input serialization remains unchanged so
+retained requests are replayable. Receipt lookup precedes current-state checks,
+including after subsequent consolidation and performer identity changes. The
+separate ownership-review API and UI manage a performer association without
+implicitly consolidating accounts or equating identifiers. See the
+[consolidation review contract](native-ingestion.md#account-consolidation-review-api).
 
 Migration 1000015 adds logical `media_roots` and `source_collections`, each with
 an immutable definition history and a current revision. Root UUIDs survive mount

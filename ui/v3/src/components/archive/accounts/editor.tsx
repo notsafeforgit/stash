@@ -25,6 +25,7 @@ import { ReviewError } from "@/components/detail/native-metadata/shared";
 import { AccountName, AccountOwner, AccountService } from "./shared";
 import { AccountHistory, AccountIdentifiers } from "./evidence";
 import { OwnershipForm } from "./ownership-form";
+import { AccountConsolidation } from "./consolidation";
 
 export function AccountEditor({
   api,
@@ -47,6 +48,7 @@ export function AccountEditor({
   const [error, setError] = useState<unknown>();
   const [applied, setApplied] = useState(false);
   const [refresh, setRefresh] = useState(0);
+  const [consolidationLocked, setConsolidationLocked] = useState(true);
   // biome-ignore lint/correctness/useExhaustiveDependencies: Explicit retry reloads this selected account and its browser journal.
   useEffect(() => {
     const controller = new AbortController();
@@ -117,6 +119,25 @@ export function AccountEditor({
       setError(error);
       setBusy(false);
     }
+  }
+  async function consolidated(source: string, destination: string) {
+    setAccountReady(false);
+    const [from, to] = await Promise.all([
+      api.account(source),
+      api.account(destination),
+    ]);
+    setAccount(from);
+    onChanged(from);
+    onChanged(to);
+    setAccountReady(true);
+  }
+  function refreshSelected() {
+    // Disable the current form in the same render as the refresh request. A
+    // rejected consolidation must not expose an editable form which the later
+    // account response will immediately replace.
+    setAccountReady(false);
+    setBusy(true);
+    setRefresh((value) => value + 1);
   }
   return (
     <div className="flex flex-col gap-4">
@@ -255,12 +276,27 @@ export function AccountEditor({
                 api={api}
                 account={account}
                 disabled={
-                  busy || !storageReady || !accountReady || saved !== null
+                  busy ||
+                  !storageReady ||
+                  !accountReady ||
+                  saved !== null ||
+                  consolidationLocked
                 }
                 onApply={deliver}
-                onRefresh={() => setRefresh((value) => value + 1)}
+                onRefresh={refreshSelected}
               />
             )}
+            <AccountConsolidation
+              account={account}
+              accounts={api}
+              disabled={
+                busy || !storageReady || !accountReady || saved !== null
+              }
+              onApplied={consolidated}
+              onRefresh={refreshSelected}
+              onLockChange={setConsolidationLocked}
+              onSelect={onSelect}
+            />
             <AccountIdentifiers
               key={`identifiers:${account.uuid}:${account.revision}`}
               api={api}

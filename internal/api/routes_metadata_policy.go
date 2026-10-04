@@ -37,6 +37,10 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Post("/account-ownership/preview", rs.previewAccountOwnership)
 	r.Post("/account-ownership/apply", rs.applyAccountOwnership)
 	r.Get("/account-ownership/requests/{request}", rs.accountOwnershipReview)
+	r.Post("/account-consolidation/preview", rs.previewAccountConsolidation)
+	r.Post("/account-consolidation/apply", rs.applyAccountConsolidation)
+	r.Post("/account-consolidation/requests/{request}/check", rs.checkAccountConsolidation)
+	r.Get("/source-accounts/{account}/consolidation-history", rs.accountConsolidationHistory)
 	r.Get("/metadata-fields/{kind}", rs.fields)
 	r.Get("/entity-identities/{kind}/{localID}", rs.metadataEntity)
 	r.Get("/entities/{entity}/metadata-fields", rs.entityMetadataFields)
@@ -207,12 +211,24 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 }
 
 func nativeArchiveError(w http.ResponseWriter, err error) {
-	if errors.Is(err, models.ErrMetadataFileReviewInvalid) || errors.Is(err, models.ErrAccountReviewInvalid) {
+	if errors.Is(err, models.ErrMetadataFileReviewInvalid) || errors.Is(err, models.ErrAccountReviewInvalid) || errors.Is(err, models.ErrAccountConsolidationReviewInvalid) {
 		ingestError(w, ingest.ErrInvalid)
 		return
 	}
 	if errors.Is(err, models.ErrAccountReviewReplay) {
 		ingestJSON(w, http.StatusConflict, map[string]string{"error": "request_conflict", "message": "This request UUID already names a different account ownership review."})
+		return
+	}
+	if errors.Is(err, models.ErrAccountConsolidationReplay) {
+		ingestJSON(w, http.StatusConflict, map[string]string{"error": "request_conflict", "message": "This request UUID already names a different account consolidation."})
+		return
+	}
+	if errors.Is(err, models.ErrAccountOwnershipResolution) {
+		ingestJSON(w, http.StatusConflict, map[string]string{"error": "ownership_resolution_required", "message": "Choose the resulting ownership before consolidating these accounts."})
+		return
+	}
+	if errors.Is(err, models.ErrAccountIdentifierResolution) {
+		ingestJSON(w, http.StatusConflict, map[string]string{"error": "identifier_resolution_required", "message": "Review and acknowledge the conflicting stable account identifiers."})
 		return
 	}
 	if errors.Is(err, models.ErrSourceAccountConflict) {

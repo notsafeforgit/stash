@@ -1,0 +1,955 @@
+{
+  "pages": [
+    {
+      "metadata": [
+        {
+          "author": {
+            "id": "123",
+            "name": "juniper"
+          },
+          "category": "twitter",
+          "date": "2026-10-03T12:00:00+00:00",
+          "exact_decimal": 1.2300e+05,
+          "negative_zero": -0,
+          "nullable": null,
+          "source_extractor_url": "https://x.com/id:123/timeline",
+          "subcategory": "timeline",
+          "title": "Shared original caption — 合集",
+          "tweet_id": 9223372036854775815,
+          "unused_field": "removed in media"
+        },
+        {
+          "_url": "https://media.invalid/1.jpg",
+          "author": {
+            "id": "123",
+            "name": "juniper"
+          },
+          "category": "twitter",
+          "date": "2026-10-03T12:00:00+00:00",
+          "exact_decimal": 1.2300e+05,
+          "negative_zero": -0,
+          "nullable": null,
+          "num": 1,
+          "source_extractor_url": "https://x.com/id:123/timeline",
+          "subcategory": "timeline",
+          "title": "Shared original caption — 合集",
+          "tweet_id": 9223372036854775815
+        },
+        {
+          "_url": "https://media.invalid/2.jpg",
+          "author": {
+            "id": "123",
+            "name": "juniper"
+          },
+          "category": "twitter",
+          "date": "2026-10-03T12:00:00+00:00",
+          "exact_decimal": 1.2300e+05,
+          "negative_zero": -0,
+          "nullable": null,
+          "num": 2,
+          "source_extractor_url": "https://x.com/id:123/timeline",
+          "subcategory": "timeline",
+          "title": "Shared original caption — 合集",
+          "tweet_id": 9223372036854775815
+        },
+        {
+          "author": {
+            "id": "123",
+            "name": "juniper"
+          },
+          "category": "twitter",
+          "date": "2026-10-03T12:00:00+00:00",
+          "discovery_external_reference": "https://imgur.com/linked",
+          "exact_decimal": 1.2300e+05,
+          "negative_zero": -0,
+          "nullable": null,
+          "source_extractor_url": "https://x.com/id:123/timeline",
+          "subcategory": "timeline",
+          "title": "Shared original caption — 合集",
+          "tweet_id": 9223372036854775815,
+          "unused_field": "removed in media"
+        }
+      ],
+      "name": "twitter shared album",
+      "page": {
+        "complete": false,
+        "cursor": {
+          "cursor": "1/saved"
+        },
+        "extractor_version": "1.32.15-dev",
+        "next_cursor": {
+          "cursor": "1/next"
+        },
+        "records": [
+          {
+            "base": null,
+            "kind": "post",
+            "observed_at": "2026-10-04T01:02:03.000000001Z",
+            "parent": null,
+            "patch": {
+              "author": {
+                "id": "123",
+                "name": "juniper"
+              },
+              "category": "twitter",
+              "date": "2026-10-03T12:00:00+00:00",
+              "exact_decimal": 1.2300e+05,
+              "negative_zero": -0,
+              "nullable": null,
+              "source_extractor_url": "https://x.com/id:123/timeline",
+              "subcategory": "timeline",
+              "title": "Shared original caption — 合集",
+              "tweet_id": 9223372036854775815,
+              "unused_field": "removed in media"
+            },
+            "removed": []
+          },
+          {
+            "base": 0,
+            "kind": "media",
+            "observed_at": "2026-10-04T01:02:03.000000002Z",
+            "parent": null,
+            "patch": {
+              "_url": "https://media.invalid/1.jpg",
+              "num": 1
+            },
+            "removed": [
+              "unused_field"
+            ]
+          },
+          {
+            "base": 0,
+            "kind": "media",
+            "observed_at": "2026-10-04T01:02:03.000000003Z",
+            "parent": null,
+            "patch": {
+              "_url": "https://media.invalid/2.jpg",
+              "num": 2
+            },
+            "removed": [
+              "unused_field"
+            ]
+          },
+          {
+            "base": 0,
+            "kind": "post",
+            "observed_at": "2026-10-04T01:02:03.000000004Z",
+            "parent": null,
+            "patch": {
+              "discovery_external_reference": "https://imgur.com/linked"
+            },
+            "removed": []
+          }
+        ],
+        "retention_policy": "gallery-dl-retained-v1",
+        "schema": "stash-discovery-page-v1",
+        "url": "https://x.com/id:123/timeline"
+      }
+    },
+    {
+      "metadata": [
+        {
+          "author": "juniper",
+          "author_fullname": "t2_abc",
+          "category": "reddit",
+          "gallery_data": {
+            "items": [
+              {
+                "media_id": "one"
+              },
+              {
+                "media_id": "two"
+              }
+            ]
+          },
+          "id": "abc123",
+          "source_extractor_url": "https://www.reddit.com/user/juniper/submitted/?sort=new",
+          "subcategory": "user",
+          "title": "Album with source positions"
+        },
+        {
+          "_url": "https://i.redd.it/one.jpg",
+          "author": "juniper",
+          "author_fullname": "t2_abc",
+          "category": "reddit",
+          "gallery_data": {
+            "items": [
+              {
+                "media_id": "one"
+              },
+              {
+                "media_id": "two"
+              }
+            ]
+          },
+          "id": "abc123",
+          "num": 1,
+          "source_extractor_url": "https://www.reddit.com/user/juniper/submitted/?sort=new",
+          "subcategory": "user",
+          "title": "Album with source positions"
+        },
+        {
+          "_url": "https://i.redd.it/two.jpg",
+          "author": "juniper",
+          "author_fullname": "t2_abc",
+          "category": "reddit",
+          "gallery_data": {
+            "items": [
+              {
+                "media_id": "one"
+              },
+              {
+                "media_id": "two"
+              }
+            ]
+          },
+          "id": "abc123",
+          "num": 2,
+          "source_extractor_url": "https://www.reddit.com/user/juniper/submitted/?sort=new",
+          "subcategory": "user",
+          "title": "Album with source positions"
+        }
+      ],
+      "name": "reddit first page",
+      "page": {
+        "complete": false,
+        "cursor": null,
+        "extractor_version": "1.32.15-dev",
+        "next_cursor": {
+          "after": "t3_abc123"
+        },
+        "records": [
+          {
+            "base": null,
+            "kind": "post",
+            "observed_at": "2026-10-04T01:02:03.000000001Z",
+            "parent": null,
+            "patch": {
+              "author": "juniper",
+              "author_fullname": "t2_abc",
+              "category": "reddit",
+              "gallery_data": {
+                "items": [
+                  {
+                    "media_id": "one"
+                  },
+                  {
+                    "media_id": "two"
+                  }
+                ]
+              },
+              "id": "abc123",
+              "source_extractor_url": "https://www.reddit.com/user/juniper/submitted/?sort=new",
+              "subcategory": "user",
+              "title": "Album with source positions"
+            },
+            "removed": []
+          },
+          {
+            "base": 0,
+            "kind": "media",
+            "observed_at": "2026-10-04T01:02:03.000000002Z",
+            "parent": null,
+            "patch": {
+              "_url": "https://i.redd.it/one.jpg",
+              "num": 1
+            },
+            "removed": []
+          },
+          {
+            "base": 0,
+            "kind": "media",
+            "observed_at": "2026-10-04T01:02:03.000000003Z",
+            "parent": null,
+            "patch": {
+              "_url": "https://i.redd.it/two.jpg",
+              "num": 2
+            },
+            "removed": []
+          }
+        ],
+        "retention_policy": "gallery-dl-retained-v1",
+        "schema": "stash-discovery-page-v1",
+        "url": "https://www.reddit.com/user/juniper/submitted/?sort=new"
+      }
+    },
+    {
+      "metadata": [
+        {
+          "author": "juniper",
+          "author_fullname": "t2_abc",
+          "category": "reddit",
+          "gallery_data": {
+            "items": [
+              {
+                "media_id": "one"
+              },
+              {
+                "media_id": "two"
+              }
+            ]
+          },
+          "id": "abc123",
+          "source_extractor_url": "https://www.reddit.com/user/juniper/submitted/?sort=new",
+          "subcategory": "user",
+          "title": "Album with source positions"
+        },
+        {
+          "_reddit": {
+            "author": "juniper",
+            "author_fullname": "t2_abc",
+            "category": "reddit",
+            "gallery_data": {
+              "items": [
+                {
+                  "media_id": "one"
+                },
+                {
+                  "media_id": "two"
+                }
+              ]
+            },
+            "id": "abc123",
+            "source_extractor_url": "https://www.reddit.com/user/juniper/submitted/?sort=new",
+            "subcategory": "user",
+            "title": "Album with source positions"
+          },
+          "category": "redgifs",
+          "id": "parent",
+          "source_extractor_url": "https://www.redgifs.com/watch/parent"
+        },
+        {
+          "_parent": {
+            "_reddit": {
+              "author": "juniper",
+              "author_fullname": "t2_abc",
+              "category": "reddit",
+              "gallery_data": {
+                "items": [
+                  {
+                    "media_id": "one"
+                  },
+                  {
+                    "media_id": "two"
+                  }
+                ]
+              },
+              "id": "abc123",
+              "source_extractor_url": "https://www.reddit.com/user/juniper/submitted/?sort=new",
+              "subcategory": "user",
+              "title": "Album with source positions"
+            },
+            "category": "redgifs",
+            "id": "parent",
+            "source_extractor_url": "https://www.redgifs.com/watch/parent"
+          },
+          "category": "redgifs",
+          "id": "child",
+          "source_extractor_url": "https://www.redgifs.com/watch/child"
+        }
+      ],
+      "name": "reddit nested context",
+      "page": {
+        "complete": true,
+        "cursor": {
+          "after": "t3_abc123"
+        },
+        "extractor_version": "1.32.15-dev",
+        "next_cursor": null,
+        "records": [
+          {
+            "base": null,
+            "kind": "post",
+            "observed_at": "2026-10-04T01:02:03.000000001Z",
+            "parent": null,
+            "patch": {
+              "author": "juniper",
+              "author_fullname": "t2_abc",
+              "category": "reddit",
+              "gallery_data": {
+                "items": [
+                  {
+                    "media_id": "one"
+                  },
+                  {
+                    "media_id": "two"
+                  }
+                ]
+              },
+              "id": "abc123",
+              "source_extractor_url": "https://www.reddit.com/user/juniper/submitted/?sort=new",
+              "subcategory": "user",
+              "title": "Album with source positions"
+            },
+            "removed": []
+          },
+          {
+            "base": null,
+            "kind": "context",
+            "observed_at": "2026-10-04T01:02:03.000000002Z",
+            "parent": 0,
+            "patch": {
+              "category": "redgifs",
+              "id": "parent",
+              "source_extractor_url": "https://www.redgifs.com/watch/parent"
+            },
+            "removed": []
+          },
+          {
+            "base": null,
+            "kind": "media",
+            "observed_at": "2026-10-04T01:02:03.000000003Z",
+            "parent": 1,
+            "patch": {
+              "category": "redgifs",
+              "id": "child",
+              "source_extractor_url": "https://www.redgifs.com/watch/child"
+            },
+            "removed": []
+          }
+        ],
+        "retention_policy": "gallery-dl-retained-v1",
+        "schema": "stash-discovery-page-v1",
+        "url": "https://www.reddit.com/user/juniper/submitted/?sort=new"
+      }
+    },
+    {
+      "metadata": [],
+      "name": "twitter empty final",
+      "page": {
+        "complete": true,
+        "cursor": {
+          "cursor": "1/next"
+        },
+        "extractor_version": "1.32.15-dev",
+        "next_cursor": null,
+        "records": [],
+        "retention_policy": "gallery-dl-retained-v1",
+        "schema": "stash-discovery-page-v1",
+        "url": "https://x.com/id:123/timeline"
+      }
+    },
+    {
+      "metadata": [],
+      "name": "reddit empty final",
+      "page": {
+        "complete": true,
+        "cursor": {
+          "after": "t3_next"
+        },
+        "extractor_version": "1.32.15-dev",
+        "next_cursor": null,
+        "records": [],
+        "retention_policy": "gallery-dl-retained-v1",
+        "schema": "stash-discovery-page-v1",
+        "url": "https://www.reddit.com/user/juniper/submitted/?sort=new"
+      }
+    },
+    {
+      "metadata": [],
+      "name": "empty advancing page",
+      "page": {
+        "complete": false,
+        "cursor": {
+          "cursor": "1/empty"
+        },
+        "extractor_version": "1.32.15-dev",
+        "next_cursor": {
+          "cursor": "1/later"
+        },
+        "records": [],
+        "retention_policy": "gallery-dl-retained-v1",
+        "schema": "stash-discovery-page-v1",
+        "url": "https://x.com/id:123/timeline"
+      }
+    }
+  ],
+  "profiles": [
+    {
+      "platform": "twitter",
+      "url": "https://x.com/id:123/timeline"
+    },
+    {
+      "platform": "twitter",
+      "url": "https://X.COM/juniper/timeline/"
+    },
+    {
+      "platform": "twitter",
+      "url": "https://www.twitter.com/juniper/timeline"
+    },
+    {
+      "platform": "twitter",
+      "url": "https://twitter.com/id:123/timeline"
+    },
+    {
+      "platform": "twitter",
+      "url": "https://www.x.com/a_1/timeline"
+    },
+    {
+      "platform": "reddit",
+      "url": "https://www.reddit.com/user/juniper/submitted/?sort=new"
+    },
+    {
+      "platform": "reddit",
+      "url": "https://reddit.com/user/a-b_1/submitted/"
+    },
+    {
+      "platform": "reddit",
+      "url": "https://WWW.REDDIT.COM/user/name/submitted/?sort=new&"
+    },
+    {
+      "platform": "",
+      "url": "http://x.com/juniper/timeline"
+    },
+    {
+      "platform": "",
+      "url": "HTTPS://x.com/juniper/timeline"
+    },
+    {
+      "platform": "",
+      "url": "https://x.com:/juniper/timeline"
+    },
+    {
+      "platform": "",
+      "url": "https://x.com:443/juniper/timeline"
+    },
+    {
+      "platform": "",
+      "url": "https://user:secret@x.com/juniper/timeline"
+    },
+    {
+      "platform": "",
+      "url": "https://x.com/juniper/timeline#fragment"
+    },
+    {
+      "platform": "",
+      "url": "https://x.com/juniper/timeline?cursor=secret"
+    },
+    {
+      "platform": "",
+      "url": "https://x.com/id%3A123/timeline"
+    },
+    {
+      "platform": "",
+      "url": "https://x.com/@juniper/timeline"
+    },
+    {
+      "platform": "",
+      "url": "https://x.com/juniper/status/123"
+    },
+    {
+      "platform": "",
+      "url": "https://x.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/timeline"
+    },
+    {
+      "platform": "",
+      "url": "https://example.invalid/juniper/timeline"
+    },
+    {
+      "platform": "",
+      "url": "https://reddit.com/user/a/submitted"
+    },
+    {
+      "platform": "",
+      "url": "https://reddit.com/user/a/submitted/?sort=top"
+    },
+    {
+      "platform": "",
+      "url": "https://reddit.com/user/a/submitted/?sort=new&sort=new"
+    },
+    {
+      "platform": "",
+      "url": "https://reddit.com/user/a/submitted/?after=t3_a"
+    },
+    {
+      "platform": "",
+      "url": "https://reddit.com/user/a/submitted/?sort=new;"
+    },
+    {
+      "platform": "",
+      "url": "https://reddit.com/r/community/"
+    },
+    {
+      "platform": "",
+      "url": "https://reddit.com/user/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/submitted/"
+    }
+  ],
+  "rejected": [
+    {
+      "name": "unknown schema",
+      "path": [
+        "schema"
+      ],
+      "value": "future"
+    },
+    {
+      "name": "unknown policy",
+      "path": [
+        "retention_policy"
+      ],
+      "value": "none"
+    },
+    {
+      "name": "unexpected settings",
+      "path": [
+        "settings"
+      ],
+      "value": {}
+    },
+    {
+      "name": "empty version",
+      "path": [
+        "extractor_version"
+      ],
+      "value": ""
+    },
+    {
+      "name": "version log",
+      "path": [
+        "extractor_version"
+      ],
+      "value": "version\nlog"
+    },
+    {
+      "name": "null version",
+      "path": [
+        "extractor_version"
+      ],
+      "value": null
+    },
+    {
+      "name": "version byte limit",
+      "path": [
+        "extractor_version"
+      ],
+      "value": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+    },
+    {
+      "name": "not a profile",
+      "path": [
+        "url"
+      ],
+      "value": "https://x.com/juniper/status/123"
+    },
+    {
+      "name": "cursor not object",
+      "path": [
+        "cursor"
+      ],
+      "value": "1/saved"
+    },
+    {
+      "name": "empty cursor",
+      "path": [
+        "cursor"
+      ],
+      "value": {}
+    },
+    {
+      "name": "cursor wrong service",
+      "path": [
+        "cursor"
+      ],
+      "value": {
+        "after": "t3_one"
+      }
+    },
+    {
+      "name": "cursor wrong type",
+      "path": [
+        "cursor"
+      ],
+      "value": {
+        "cursor": 1
+      }
+    },
+    {
+      "name": "cursor controls",
+      "path": [
+        "cursor"
+      ],
+      "value": {
+        "cursor": "bad\n"
+      }
+    },
+    {
+      "name": "cursor byte bound",
+      "path": [
+        "cursor"
+      ],
+      "value": {
+        "cursor": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      }
+    },
+    {
+      "name": "no next cursor",
+      "path": [
+        "next_cursor"
+      ],
+      "value": null
+    },
+    {
+      "name": "stalled cursor",
+      "path": [
+        "next_cursor"
+      ],
+      "value": {
+        "cursor": "1/saved"
+      }
+    },
+    {
+      "name": "invalid next cursor",
+      "path": [
+        "next_cursor"
+      ],
+      "value": {
+        "cursor": ""
+      }
+    },
+    {
+      "name": "completion with cursor",
+      "path": [
+        "complete"
+      ],
+      "value": true
+    },
+    {
+      "name": "boolean required",
+      "path": [
+        "complete"
+      ],
+      "value": 1
+    },
+    {
+      "name": "records array required",
+      "path": [
+        "records"
+      ],
+      "value": null
+    },
+    {
+      "name": "fresh timestamp required",
+      "path": [
+        "records",
+        0,
+        "observed_at"
+      ],
+      "value": null
+    },
+    {
+      "name": "invalid time",
+      "path": [
+        "records",
+        0,
+        "observed_at"
+      ],
+      "value": "2026-10-04"
+    },
+    {
+      "name": "unknown record field",
+      "path": [
+        "records",
+        0,
+        "extra"
+      ],
+      "value": true
+    },
+    {
+      "name": "no retained seed",
+      "path": [
+        "records",
+        0,
+        "retained_capture"
+      ],
+      "value": "11111111-1111-4111-8111-111111111111"
+    },
+    {
+      "name": "unknown record kind",
+      "path": [
+        "records",
+        0,
+        "kind"
+      ],
+      "value": "download"
+    },
+    {
+      "name": "base cycle",
+      "path": [
+        "records",
+        0,
+        "base"
+      ],
+      "value": 0
+    },
+    {
+      "name": "parent cycle",
+      "path": [
+        "records",
+        0,
+        "parent"
+      ],
+      "value": 0
+    },
+    {
+      "name": "patch object required",
+      "path": [
+        "records",
+        0,
+        "patch"
+      ],
+      "value": []
+    },
+    {
+      "name": "unobserved removal",
+      "path": [
+        "records",
+        0,
+        "removed"
+      ],
+      "value": [
+        "not_there"
+      ]
+    },
+    {
+      "name": "unretained secret",
+      "path": [
+        "records",
+        0,
+        "patch",
+        "cookies"
+      ],
+      "value": "secret"
+    },
+    {
+      "name": "invalid record source",
+      "path": [
+        "records",
+        0,
+        "patch",
+        "source_extractor_url"
+      ],
+      "value": "https://secret:secret@x.com/juniper/timeline"
+    },
+    {
+      "name": "duplicate records",
+      "path": [
+        "records"
+      ],
+      "value": [
+        {
+          "base": null,
+          "kind": "post",
+          "observed_at": "2026-10-04T01:02:03.000000001Z",
+          "parent": null,
+          "patch": {
+            "author": {
+              "id": "123",
+              "name": "juniper"
+            },
+            "category": "twitter",
+            "date": "2026-10-03T12:00:00+00:00",
+            "exact_decimal": 1.2300e+05,
+            "negative_zero": -0,
+            "nullable": null,
+            "source_extractor_url": "https://x.com/id:123/timeline",
+            "subcategory": "timeline",
+            "title": "Shared original caption — 合集",
+            "tweet_id": 9223372036854775815,
+            "unused_field": "removed in media"
+          },
+          "removed": []
+        },
+        {
+          "base": null,
+          "kind": "post",
+          "observed_at": "2026-10-04T01:02:03.000000001Z",
+          "parent": null,
+          "patch": {
+            "author": {
+              "id": "123",
+              "name": "juniper"
+            },
+            "category": "twitter",
+            "date": "2026-10-03T12:00:00+00:00",
+            "exact_decimal": 1.2300e+05,
+            "negative_zero": -0,
+            "nullable": null,
+            "source_extractor_url": "https://x.com/id:123/timeline",
+            "subcategory": "timeline",
+            "title": "Shared original caption — 合集",
+            "tweet_id": 9223372036854775815,
+            "unused_field": "removed in media"
+          },
+          "removed": []
+        }
+      ]
+    },
+    {
+      "name": "retained null seed",
+      "path": [
+        "records",
+        0,
+        "retained_capture"
+      ],
+      "value": null
+    },
+    {
+      "name": "missing source",
+      "path": [
+        "records",
+        0,
+        "patch",
+        "source_extractor_url"
+      ],
+      "value": null
+    },
+    {
+      "name": "float reference",
+      "path": [
+        "records",
+        1,
+        "base"
+      ],
+      "value": 0.0
+    },
+    {
+      "name": "unordered removal",
+      "path": [
+        "records",
+        1,
+        "removed"
+      ],
+      "value": [
+        "unused_field",
+        "nullable"
+      ]
+    },
+    {
+      "name": "patch removal overlap",
+      "path": [
+        "records",
+        1,
+        "removed"
+      ],
+      "value": [
+        "num"
+      ]
+    },
+    {
+      "name": "required input cursor",
+      "path": [
+        "cursor"
+      ],
+      "remove": true
+    },
+    {
+      "name": "required record key",
+      "path": [
+        "records",
+        0,
+        "base"
+      ],
+      "remove": true
+    }
+  ]
+}

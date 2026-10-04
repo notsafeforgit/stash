@@ -6019,3 +6019,34 @@ create completion receipts. Native page validation/storage, reviewed activation,
 worker delivery/dispatch and reviewed post consolidation remain open, alongside
 the remaining full transition phases. There is no new native schema or full
 rehearsal copy. Production and `develop` remain unchanged.
+
+## Shared native discovery page contract — 2026-10-04
+
+The backend now parses the producer's `stash-discovery-page-v1` envelopes without
+relaxing the existing post-only enrichment parser. It restores shared record
+deltas and parent context with the same retention, observation-time, exact-number
+and expansion checks. Discovery has its own invalid-work error and retains the
+4,096-record, 32 MiB serialized and 128 MiB expanded limits. Fresh pages cannot
+claim retained captures. An empty final page is valid; an incomplete page must
+advance its service-specific cursor. Unsupported profiles, embedded URL cursors,
+invalid versions, unknown envelope keys and malformed records fail validation.
+
+Go and Python use one corpus containing six page cases, 27 profile forms and 39
+rejected page variants. Both preserve original large integers, decimal spelling,
+negative zero, nanosecond timestamps, shared album metadata and nested context.
+Independent boundary tests cover UTF-8 cursor bytes, the full 4,096-record bound,
+compact expansion, duplicate JSON keys and retained provenance forgery. All
+archive tests, all 405 producer tests and the Go lint gate pass. The final cursor
+tests pass after their addition. Read-only validation of the current schema-70
+copy accepts all six original account profiles and both saved cursors, with 67
+historical pages unchanged. Those synthetic validation envelopes are not fetched
+pages or completion proof. Evidence is in
+`.local/native-discovery-jobs-20261004/`.
+
+This implements the page format, not cursor storage or discovery activation.
+Binding requests and owned attempts, atomic page receipts/cursor advancement,
+shared download/enrichment pacing, delivery/dispatch, matching and reviewed post
+consolidation remain open. No schema migration or extra database copy was needed;
+the verified schema-70 copy remains current. The remaining full transition phases
+and reviewed production cutover are still required. Production and `develop`
+remain unchanged, with over 180 GiB free during this increment.

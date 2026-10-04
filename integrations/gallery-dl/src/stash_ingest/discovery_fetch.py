@@ -22,9 +22,13 @@ KEYS = {"schema", "url", "retention_policy", "extractor_version", "cursor", "nex
 
 
 def profile_platform(url):
-    public_url(url)
+    try:
+        public_url(url)
+    except UnicodeError:
+        raise InvalidData("Expected a supported discovery profile") from None
     parsed = urlsplit(url)
-    if parsed.scheme != "https" or parsed.port is not None or parsed.fragment:
+    if (not url.startswith("https://") or parsed.netloc.lower() != parsed.hostname
+            or parsed.port is not None or parsed.fragment):
         raise InvalidData("Expected a supported discovery profile")
     if (parsed.hostname in {"x.com", "www.x.com", "twitter.com", "www.twitter.com"}
             and re.fullmatch(r"/(?:id:[0-9]+|[A-Za-z0-9_]{1,30})/timeline/?", parsed.path)
@@ -58,6 +62,12 @@ def page_cursor(platform, value):
 def validate_page(value, url, extractor_version, cursor=None):
     platform = profile_platform(url)
     cursor = page_cursor(platform, cursor)
+    try:
+        version_size = len(extractor_version.encode("utf-8")) if isinstance(extractor_version, str) else 0
+    except UnicodeError:
+        raise InvalidData("Invalid discovery extractor version") from None
+    if not 1 <= version_size <= 128 or any(c in extractor_version for c in "\r\n\x00"):
+        raise InvalidData("Invalid discovery extractor version")
     value = decode(encode(value, MAX_BYTES), MAX_BYTES, preserve_numbers=True)
     if (not isinstance(value, dict) or set(value) != KEYS or value["schema"] != SCHEMA
             or value["url"] != url or value["retention_policy"] != POLICY

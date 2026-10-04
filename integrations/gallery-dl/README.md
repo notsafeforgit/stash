@@ -1996,6 +1996,12 @@ profile data use the existing metadata bundle codec. Pages retain the historical
 4,096-record limit, within 32 MiB serialized and 128 MiB reconstructed bounds;
 ordinary single-post enrichment keeps its 1,024-record limit.
 
+The native backend validates this same page contract with
+`archive.ParseDiscoveryPage`; both implementations exercise a shared corpus for
+profile URLs, source numbers, compact metadata, cursor advancement and malformed
+pages. Fresh discovery records cannot claim retained capture provenance. Parsing
+is separate from binding the page to an authorized job or accepting a post match.
+
 This collector does not submit a job, advance a stored cursor, accept a source
 post match or certify an account scan as completed. Native discovery storage,
 activation, HTTP delivery and dispatch integration remain required transition

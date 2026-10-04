@@ -17,6 +17,7 @@ import (
 
 func removeDiscoveryRecoverySchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeDiscoveryDetailSchema(t, raw)
 	_, err := raw.Exec(`DROP TABLE discovery_recovery_targets; DROP TABLE discovery_listing_recoveries;
  DROP TRIGGER discovery_recovery_job_scope; DROP TRIGGER discovery_recovery_page_scope;
  DELETE FROM native_migration_history WHERE version=1000075`)

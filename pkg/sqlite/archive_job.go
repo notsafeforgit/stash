@@ -68,7 +68,7 @@ func validJobKind(kind string) bool {
 	return kind == models.ArchiveJobVerifyMedia || kind == models.ArchiveJobBackfillAlbum || kind == models.ArchiveJobTranslateText || metadataJobKind(kind)
 }
 func metadataJobKind(kind string) bool {
-	return kind == models.ArchiveJobEnrichPost || kind == models.ArchiveJobListAccount
+	return kind == models.ArchiveJobEnrichPost || kind == models.ArchiveJobListAccount || kind == models.ArchiveJobVerifyCandidate
 }
 func validJobState(state string) bool {
 	return state == "queued" || state == "running" || state == "succeeded" || state == "failed" || state == "cancelled"
@@ -143,6 +143,9 @@ func (s *ArchiveJobStore) Submit(ctx context.Context, input models.ArchiveJobSub
 	if err != nil {
 		return nil, err
 	}
+	if input.Kind == models.ArchiveJobVerifyCandidate {
+		discoveryDetailSubmissionGuard(ctx, input.RequestUUID)
+	}
 	if input.Kind == models.ArchiveJobTranslateText {
 		translationJobSubmissionGuard(ctx, input.RequestUUID)
 	}
@@ -191,6 +194,14 @@ func (s *ArchiveJobStore) Submit(ctx context.Context, input models.ArchiveJobSub
 		}
 	} else {
 		var active int
+		if input.Kind == models.ArchiveJobVerifyCandidate {
+			if err := dbWrapper.Get(ctx, &active, "SELECT count(*) FROM (SELECT 1 FROM archive_jobs WHERE kind='post.verify_candidate' AND state IN ('queued','running') LIMIT ?)", archive.MaxDiscoveryDetailJobs); err != nil {
+				return nil, err
+			}
+			if active >= archive.MaxDiscoveryDetailJobs {
+				return nil, models.ErrArchiveJobCapacity
+			}
+		}
 		if input.Kind == models.ArchiveJobEnrichPost {
 			if err := dbWrapper.Get(ctx, &active, "SELECT count(*) FROM (SELECT 1 FROM archive_jobs WHERE kind='post.enrich' AND state IN ('queued','running') LIMIT ?)", archive.MaxEnrichmentJobs); err != nil {
 				return nil, err
@@ -380,9 +391,12 @@ func (s *ArchiveJobStore) claim(ctx context.Context, job *models.ArchiveJob, own
 			return nil, err
 		}
 		*waiting = true
-		if job.Kind == models.ArchiveJobListAccount {
+		switch job.Kind {
+		case models.ArchiveJobVerifyCandidate:
+			discoveryDetailAttemptGuard(ctx, job.UUID, job.Fence+1)
+		case models.ArchiveJobListAccount:
 			discoveryJobAttemptGuard(ctx, job.UUID, job.Fence+1)
-		} else {
+		default:
 			enrichmentJobAttemptGuard(ctx, job.UUID, job.Fence+1)
 		}
 	}
@@ -498,7 +512,7 @@ func (s *ArchiveJobStore) Finish(ctx context.Context, lease models.ArchiveJobLea
 		return nil, err
 	}
 	var complete *bool
-	if job.Kind == models.ArchiveJobListAccount {
+	if job.Kind == models.ArchiveJobListAccount || job.Kind == models.ArchiveJobVerifyCandidate {
 		complete = discoveryAtomic(ctx)
 	} else if job.Kind == models.ArchiveJobEnrichPost && outcome.State != "succeeded" {
 		complete = sourcePacingAtomic(ctx)

@@ -61,6 +61,7 @@ type Repository struct {
 	EnrichmentJob               EnrichmentJobReaderWriter
 	DiscoveryJob                DiscoveryJobReaderWriter
 	DiscoveryMatch              DiscoveryMatchReaderWriter
+	DiscoveryDetail             DiscoveryDetailReaderWriter
 	TranslationPolicy           TranslationPolicyReaderWriter
 	CatalogEnrichmentImport     CatalogEnrichmentImportReaderWriter
 	SourceEnrichmentReceipt     SourceEnrichmentReceiptReader

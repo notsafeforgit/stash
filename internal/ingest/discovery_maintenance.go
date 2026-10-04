@@ -27,7 +27,16 @@ func (w *DiscoveryMaintenance) Process(ctx context.Context) (*models.DiscoveryMa
 	err := w.Service.Repo.WithTxn(ctx, func(ctx context.Context) error {
 		var err error
 		ret, err = w.Service.Repo.DiscoveryJob.Maintain(ctx, w.Now())
-		return err
+		if err != nil {
+			return err
+		}
+		details, err := w.Service.Repo.DiscoveryDetail.Maintain(ctx, w.Now())
+		if err != nil {
+			return err
+		}
+		ret.Recovered += details.Recovered
+		ret.Cancelled += details.Cancelled
+		return nil
 	})
 	return ret, err
 }

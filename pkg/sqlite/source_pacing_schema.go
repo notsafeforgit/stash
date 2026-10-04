@@ -30,7 +30,7 @@ func validateSourcePacingSchema(conn *sqlx.DB) error {
  WHERE p.scope IS NOT source_scope_v1(u.url) OR s.scope IS NULL)
  OR EXISTS(SELECT 1 FROM source_run_pacing p WHERE NOT EXISTS(SELECT 1 FROM source_runs r WHERE r.uuid=p.run_uuid))
  OR EXISTS(SELECT 1 FROM enrichment_job_pacing p WHERE NOT EXISTS(SELECT 1 FROM enrichment_job_targets b WHERE b.job_uuid=p.job_uuid)
- AND NOT EXISTS(SELECT 1 FROM archive_jobs j WHERE j.uuid=p.job_uuid AND j.kind='account.list_page'))
+ AND NOT EXISTS(SELECT 1 FROM archive_jobs j WHERE j.uuid=p.job_uuid AND j.kind IN ('account.list_page','post.verify_candidate')))
  OR EXISTS(SELECT 1 FROM archive_job_attempts a JOIN enrichment_job_pacing p ON p.job_uuid=a.job_uuid
  WHERE NOT EXISTS(SELECT 1 FROM enrichment_attempt_pacing s WHERE s.job_uuid=a.job_uuid AND s.fence=a.fence AND s.scope=p.scope))
  OR EXISTS(SELECT 1 FROM enrichment_attempt_pacing p

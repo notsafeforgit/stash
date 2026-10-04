@@ -2550,3 +2550,46 @@ are implemented, through both the application endpoint and a bounded server
 worker. Both use the same atomic publication checks and receipts. Historical
 coverage, weak-candidate detail execution, verified staging release and reviewed
 post consolidation remain required.
+
+### Durable candidate detail comparisons
+
+Schema 1000076 adds the `post.verify_candidate` job kind. Its immutable
+`discovery_detail_jobs` binding selects a target revision and candidate sequence,
+with a generation for explicit retries. Job arguments pin the frozen source
+hash, native post revision, original listing definition/page hashes, selected
+post identifier and URL, collection revision/root, capture policy and the detail
+worker's runtime/policy. This URL is a candidate fetch destination; admission
+never creates a native post URL or identifier.
+
+`discovery_detail_attempts` authenticates each fenced attempt. The
+`discovery_detail_checkpoints`, `discovery_detail_checkpoint_receipts` and
+`discovery_detail_checkpoint_records` tables retain one current compact body,
+small immutable acknowledgements and original per-record observation provenance.
+A resumed checkpoint must extend the previous records and resolve or retain
+its pending children. Empty responses are retained as uncorroborated evidence.
+Limits are 32 active jobs, 128 checkpoint revisions per job, 1,024 records and
+32 MiB per compact body, and 2 GiB total retained detail bodies. Storage includes
+failed, cancelled and completed work until a verified release is implemented.
+
+`discovery_detail_results` retains the comparison against the original frozen
+target and listing. A successful job means that comparison completed, including
+an uncorroborated result. It does not accept an identity, clear review blockers,
+remove another candidate, publish captures or finish an import. Pending child
+requests prevent completion. The result contains hashes and record ordinals;
+metadata remains in the shared compact checkpoint. Original attempt receipts
+remain replayable after expiry, cancellation, later source edits and restart.
+
+Detail jobs share collection exclusion, website reservations, child-service
+cooldowns and bounded download preference with existing metadata/download jobs.
+Application maintenance recovers expired ownership and cancels stale work.
+A new target revision can replace its obsolete selected job while preserving
+retry deadlines and old evidence. Explicit retry creates a new generation and
+cannot acknowledge the predecessor's checkpoint. The scoped worker coordinator
+rechecks credentials, source choices and the original lease deadline at commit.
+
+The migration preserves all prior jobs, attempts, receipts and pacing rows.
+Startup checks job bindings, generation continuity, checkpoint accounting,
+record hashes/times and rederives completed comparisons before opening a writer.
+Normal database backups contain these records; anonymisation removes their
+private source bodies and associations. Producer orchestration, guarded native
+publication from detail results and verified staging release remain open.

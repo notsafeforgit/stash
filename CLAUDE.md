@@ -554,9 +554,16 @@ the original frozen target evidence. The inferred URL/account/filename alone
 cannot establish identity. Keep all competing candidates, pending children,
 unresolved references and each record's original observing producer/time.
 Application `detail-preview` routes are read-only: supplied bytes do not clear
-blockers or become authenticated producer evidence. Candidate-specific durable
-execution and publication remain to be integrated; ordinary post enrichment
-cannot treat an inferred candidate URL as an accepted post association.
+blockers or become authenticated producer evidence. Schema 1000076 adds separate
+`post.verify_candidate` jobs with pinned target/candidate/page/source evidence,
+authenticated checkpoint provenance, immutable comparison results and scoped
+worker HTTP. Preserve original records across failover and old acknowledgements
+after source changes. Detail work shares metadata/download pacing, including
+saved child-service cooldowns. Job success retains a comparison, including an
+uncorroborated result; it cannot clear blockers or accept identity. Startup must
+rederive its saved proof, and anonymisation must remove its private transcripts.
+The Python detail outbox/dispatch and guarded publication remain to be integrated;
+ordinary post enrichment cannot treat an inferred URL as an accepted association.
 
 `stash-import-catalog-evidence` maps a received snapshot's posts, profiles and
 captures through core services in schema 1000031. It uses exact manifest/ordinal

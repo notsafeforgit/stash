@@ -539,7 +539,7 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 			}
 		}
 		if version >= NativeSchemaBaseline+56 {
-			if err := validateSourceFairnessSchema(conn, version >= NativeSchemaBaseline+65); err != nil {
+			if err := validateSourceFairnessSchema(conn, version >= NativeSchemaBaseline+65, version >= NativeSchemaBaseline+76); err != nil {
 				return err
 			}
 		}
@@ -640,6 +640,11 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 			}
 		}
 
+		if version >= NativeSchemaBaseline+76 {
+			if err := validateDiscoveryDetailSchema(conn); err != nil {
+				return err
+			}
+		}
 		return nil
 	}
 	if version >= NativeSchemaBaseline {

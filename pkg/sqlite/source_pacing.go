@@ -52,7 +52,7 @@ func sourcePacingReadyFor(ctx context.Context, scope, collection string, enrichm
  EXISTS(SELECT 1 FROM source_pacing WHERE scope=? AND (available_at_ms>? OR last_started_at_ms>?))
  OR EXISTS(SELECT 1 FROM archive_jobs j INDEXED BY archive_jobs_active_work
   JOIN enrichment_attempt_pacing p ON p.job_uuid=j.uuid AND p.fence=j.fence
-  WHERE j.kind IN ('post.enrich','account.list_page') AND j.state IN ('queued','running') AND j.state='running'
+  WHERE j.kind IN ('post.enrich','account.list_page','post.verify_candidate') AND j.state IN ('queued','running') AND j.state='running'
    AND j.uuid!=? AND (p.scope=? OR json_extract(j.arguments,'$.collection_uuid')=?))
  OR EXISTS(SELECT 1 FROM source_runs r INDEXED BY source_runs_expired
   JOIN source_run_attempt_pacing p ON p.run_uuid=r.uuid AND p.fence=r.fence AND p.reserved=1
@@ -117,6 +117,10 @@ func (s *EnrichmentJobStore) ReserveSource(ctx context.Context, lease models.Enr
 	if err != nil {
 		return false, err
 	}
+	return reserveMetadataSource(ctx, job, work.CollectionUUID, rawURL, now)
+}
+
+func reserveMetadataSource(ctx context.Context, job *models.ArchiveJob, collection, rawURL string, now time.Time) (bool, error) {
 	scope, err := scrape.SourceScopeV1(rawURL)
 	if err != nil {
 		return false, models.ErrEnrichmentInvalid
@@ -143,10 +147,10 @@ func (s *EnrichmentJobStore) ReserveSource(ctx context.Context, lease models.Enr
 	if _, err := (&SourceRunStore{}).Recover(ctx, now, 100); err != nil {
 		return false, err
 	}
-	if _, err := s.Maintain(ctx, now); err != nil {
+	if _, err := (&EnrichmentJobStore{}).Maintain(ctx, now); err != nil {
 		return false, err
 	}
-	ready, err := sourcePacingReadyFor(ctx, scope, work.CollectionUUID, true, job.UUID, "", now)
+	ready, err := sourcePacingReadyFor(ctx, scope, collection, true, job.UUID, "", now)
 	if err != nil || !ready {
 		return false, err
 	}
@@ -175,7 +179,7 @@ func sourcePacingStarted(ctx context.Context, scope string, now time.Time) error
 func enrichmentPendingPacingReady(ctx context.Context, job, collection, rootScope string, now time.Time) (bool, error) {
 	var scopes []string
 	if err := dbWrapper.Select(ctx, &scopes, `SELECT DISTINCT source_scope_v1(json_extract(p.value,'$.url'))
- FROM enrichment_checkpoints h,json_each(h.body,'$.pending') p WHERE h.job_uuid=?
+ FROM (SELECT job_uuid,body FROM enrichment_checkpoints UNION ALL SELECT job_uuid,body FROM discovery_detail_checkpoints) h,json_each(h.body,'$.pending') p WHERE h.job_uuid=?
  UNION SELECT scope FROM enrichment_job_seed_services WHERE job_uuid=?
  AND NOT EXISTS(SELECT 1 FROM enrichment_checkpoints WHERE job_uuid=?)`, job, job, job); err != nil {
 		return false, err
@@ -222,7 +226,7 @@ func sourcePacingEnrichmentFailure(ctx context.Context, job *models.ArchiveJob, 
 	}
 	scopes := map[string]bool{}
 	var pendingJSON string
-	err := dbWrapper.Get(ctx, &pendingJSON, "SELECT json_extract(body,'$.pending') FROM enrichment_checkpoints WHERE job_uuid=?", job.UUID)
+	err := dbWrapper.Get(ctx, &pendingJSON, "SELECT json_extract(body,'$.pending') FROM enrichment_checkpoints WHERE job_uuid=? UNION ALL SELECT json_extract(body,'$.pending') FROM discovery_detail_checkpoints WHERE job_uuid=?", job.UUID, job.UUID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return time.Time{}, err
 	}
@@ -242,14 +246,15 @@ func sourcePacingEnrichmentFailure(ctx context.Context, job *models.ArchiveJob, 
 		}
 	}
 	if len(scopes) == 0 {
-		work, err := archive.DecodeEnrichmentJob(job)
-		if err != nil {
-			return time.Time{}, err
-		}
-		// A seeded job does not refetch the parent. With no saved child
-		// failure, defer this job without inventing a parent service outage.
-		if work.Handoff != nil {
-			return maxTime(retry, now.Add(delay)), nil
+		if job.Kind == models.ArchiveJobEnrichPost {
+			work, err := archive.DecodeEnrichmentJob(job)
+			if err != nil {
+				return time.Time{}, err
+			}
+			// A seeded job never refetches the parent service.
+			if work.Handoff != nil {
+				return maxTime(retry, now.Add(delay)), nil
+			}
 		}
 		scope, err := sourcePacingScope(ctx, job.UUID, true)
 		if err != nil {
@@ -267,7 +272,7 @@ func sourcePacingEnrichmentFailure(ctx context.Context, job *models.ArchiveJob, 
 }
 
 func sourcePacingMetadataFailure(ctx context.Context, job *models.ArchiveJob, code string, retry time.Time, now time.Time) (time.Time, error) {
-	if job.Kind == models.ArchiveJobEnrichPost {
+	if job.Kind == models.ArchiveJobEnrichPost || job.Kind == models.ArchiveJobVerifyCandidate {
 		return sourcePacingEnrichmentFailure(ctx, job, code, retry, now)
 	}
 	delay := sourcePacingDelay(code, retry, now)

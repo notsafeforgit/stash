@@ -10,11 +10,12 @@ import (
 // Archive jobs are persisted work, separate from the legacy in-memory progress
 // queue. Only a service for the named kind may interpret Arguments.
 const (
-	ArchiveJobVerifyMedia   = "media.verify"
-	ArchiveJobBackfillAlbum = "album.backfill"
-	ArchiveJobTranslateText = "text.translate"
-	ArchiveJobEnrichPost    = "post.enrich"
-	ArchiveJobListAccount   = "account.list_page"
+	ArchiveJobVerifyMedia     = "media.verify"
+	ArchiveJobBackfillAlbum   = "album.backfill"
+	ArchiveJobTranslateText   = "text.translate"
+	ArchiveJobEnrichPost      = "post.enrich"
+	ArchiveJobListAccount     = "account.list_page"
+	ArchiveJobVerifyCandidate = "post.verify_candidate"
 )
 
 type ArchiveJob struct {

@@ -280,6 +280,7 @@ func discoveryActivationRecoveryHTTP(t *testing.T, fresh, recovery bool) {
 			require.Equal(t, review.Blockers, preview.Blockers, "preview does not clear missing history or detail_required")
 			require.Equal(t, review, enrichmentHTTPValue[models.DiscoveryMatchReview](t, request("GET", path+"/review", nil, http.StatusOK)))
 			request("POST", publicationPath, map[string]any{"expected_target_revision": 2}, http.StatusConflict)
+			exerciseDiscoveryDetailHTTP(t, service, producerHandler, token, review, listing, detailBody)
 			input.ExpectedTargetRevision++
 			request("POST", path+"/detail-preview", input, http.StatusConflict)
 			input.ExpectedTargetRevision--

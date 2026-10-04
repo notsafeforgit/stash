@@ -10,15 +10,19 @@ import (
 // ParseDiscoveryDetail reuses the compact metadata-fetch format. A detail is
 // about exactly the selected post; unrelated posts or retained unobserved
 // contexts cannot supply its proof. Parsing never authenticates a producer.
-func ParseDiscoveryDetail(raw json.RawMessage, selected models.SourcePostIdentifier, requestedURL, extractor string) (*EnrichmentTranscript, error) {
-	if (selected.Namespace != "native:reddit" && selected.Namespace != "native:twitter") || selected.Value == "" || extractor == "" {
-		return nil, models.ErrDiscoveryInvalid
+func validDiscoveryDetailURL(selected models.SourcePostIdentifier, requestedURL string) bool {
+	if (selected.Namespace != "native:reddit" && selected.Namespace != "native:twitter") || selected.Value == "" {
+		return false
 	}
 	canonical, alphabet := "https://www.reddit.com/comments/"+selected.Value, "abcdefghijklmnopqrstuvwxyz0123456789"
 	if selected.Namespace == "native:twitter" {
 		canonical, alphabet = "https://x.com/i/web/status/"+selected.Value, "0123456789"
 	}
-	if len(selected.Value) > 256 || strings.Trim(selected.Value, alphabet) != "" || requestedURL != canonical {
+	return len(selected.Value) <= 256 && strings.Trim(selected.Value, alphabet) == "" && requestedURL == canonical
+}
+
+func ParseDiscoveryDetail(raw json.RawMessage, selected models.SourcePostIdentifier, requestedURL, extractor string) (*EnrichmentTranscript, error) {
+	if !validDiscoveryDetailURL(selected, requestedURL) || extractor == "" {
 		return nil, models.ErrDiscoveryInvalid
 	}
 	transcript, err := ParseEnrichmentTranscript(raw)

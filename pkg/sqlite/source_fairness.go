@@ -12,6 +12,17 @@ import (
 const sourceDownloadTurn = 5 * time.Minute
 
 func metadataJobCollection(ctx context.Context, job *models.ArchiveJob, now time.Time) (string, error) {
+	if job.Kind == models.ArchiveJobVerifyCandidate {
+		work, err := archive.DecodeDiscoveryDetailJob(job)
+		if err != nil {
+			return "", err
+		}
+		if err := discoveryDetailEligible(ctx, work, now); err != nil {
+			return "", err
+		}
+		return work.CollectionUUID, nil
+	}
+
 	if job.Kind == models.ArchiveJobListAccount {
 		listing, err := discoveryJobEligible(ctx, job, now)
 		if err != nil {
@@ -45,14 +56,14 @@ func sourceEnrichmentWaiting(ctx context.Context, job *models.ArchiveJob, now ti
 		return err
 	}
 	if _, err := dbWrapper.Exec(ctx, `INSERT OR IGNORE INTO source_pacing(scope)
- SELECT source_scope_v1(json_extract(p.value,'$.url')) FROM enrichment_checkpoints h,json_each(h.body,'$.pending') p WHERE h.job_uuid=?
+ SELECT source_scope_v1(json_extract(p.value,'$.url')) FROM (SELECT job_uuid,body FROM enrichment_checkpoints UNION ALL SELECT job_uuid,body FROM discovery_detail_checkpoints) h,json_each(h.body,'$.pending') p WHERE h.job_uuid=?
  UNION SELECT scope FROM enrichment_job_seed_services WHERE job_uuid=? AND NOT EXISTS(SELECT 1 FROM enrichment_checkpoints WHERE job_uuid=?)`, job.UUID, job.UUID, job.UUID); err != nil {
 		return err
 	}
 	_, err := dbWrapper.Exec(ctx, `INSERT INTO source_enrichment_waiter_scopes(job_uuid,scope)
  SELECT job_uuid,scope FROM enrichment_job_pacing WHERE job_uuid=?
  UNION SELECT h.job_uuid,source_scope_v1(json_extract(p.value,'$.url'))
- FROM enrichment_checkpoints h,json_each(h.body,'$.pending') p WHERE h.job_uuid=?
+ FROM (SELECT job_uuid,body FROM enrichment_checkpoints UNION ALL SELECT job_uuid,body FROM discovery_detail_checkpoints) h,json_each(h.body,'$.pending') p WHERE h.job_uuid=?
  UNION SELECT job_uuid,scope FROM enrichment_job_seed_services WHERE job_uuid=? AND NOT EXISTS(SELECT 1 FROM enrichment_checkpoints WHERE job_uuid=?)`, job.UUID, job.UUID, job.UUID, job.UUID)
 	return err
 }
@@ -72,11 +83,11 @@ func sourceEnrichmentTurn(ctx context.Context, scope, collection string, now tim
  AND ((SELECT max(s.download_starts) FROM source_enrichment_waiter_scopes p JOIN source_service_turns s ON s.scope=p.scope WHERE p.job_uuid=w.job_uuid)>=4
  OR max(w.first_requested_at_ms,coalesce((SELECT max(s.enrichment_started_at_ms) FROM source_enrichment_waiter_scopes p JOIN source_service_turns s ON s.scope=p.scope WHERE p.job_uuid=w.job_uuid),0))<=?)
  ORDER BY w.first_requested_at_ms,w.job_uuid LIMIT ?`, now.UnixMilli(), now.UnixMilli(), now.UnixMilli(), collection, scope,
-		now.UnixMilli(), now.UnixMilli(), now.Add(-2*time.Minute).UnixMilli(), archive.MaxEnrichmentJobs+archive.MaxDiscoveryJobs+1)
+		now.UnixMilli(), now.UnixMilli(), now.Add(-2*time.Minute).UnixMilli(), archive.MaxEnrichmentJobs+archive.MaxDiscoveryJobs+archive.MaxDiscoveryDetailJobs+1)
 	if err != nil {
 		return "", err
 	}
-	if len(rows) > archive.MaxEnrichmentJobs+archive.MaxDiscoveryJobs {
+	if len(rows) > archive.MaxEnrichmentJobs+archive.MaxDiscoveryJobs+archive.MaxDiscoveryDetailJobs {
 		return "", models.ErrSourcePayloadCorrupt
 	}
 	for _, row := range rows {
@@ -94,7 +105,7 @@ func sourceEnrichmentTurn(ctx context.Context, scope, collection string, now tim
 		var busy bool
 		err = dbWrapper.Get(ctx, &busy, `SELECT EXISTS(SELECT 1 FROM archive_jobs a INDEXED BY archive_jobs_active_work
  JOIN enrichment_attempt_pacing p ON p.job_uuid=a.uuid AND p.fence=a.fence
- WHERE a.kind IN ('post.enrich','account.list_page') AND a.state IN ('queued','running') AND a.state='running'
+ WHERE a.kind IN ('post.enrich','account.list_page','post.verify_candidate') AND a.state IN ('queued','running') AND a.state='running'
  AND (json_extract(a.arguments,'$.collection_uuid')=? OR EXISTS(
   SELECT 1 FROM source_enrichment_waiter_scopes w WHERE w.job_uuid=? AND w.scope=p.scope)))
  OR EXISTS(SELECT 1 FROM source_runs r INDEXED BY source_runs_expired

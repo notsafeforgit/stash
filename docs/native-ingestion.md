@@ -1819,3 +1819,54 @@ Current workers require it and send `recovery_protocol: 1` when claiming a run.
 An older worker cannot claim recovered work: otherwise it could ignore the replay
 policy and incorrectly stop at archived items. Recovery policy remains fixed
 throughout the lease. Ordinary non-recovery requests keep the source-run protocol.
+
+### Candidate detail worker API
+
+The scoped producer API advertises `discovery_detail_protocol: 1` and
+`max_discovery_detail_bytes`. Routes below use the prefix
+`/api/v3/ingest/discovery-details` and the same bearer-only producer authentication,
+collection/root grants, strict JSON envelopes and no-store responses as listing
+workers. Website credentials remain in the external worker environment.
+
+| Operation | Route | Input |
+| --- | --- | --- |
+| Admit selected candidate | `POST /targets/{target}/jobs` | `expected_target_revision`, `candidate_sequence`, `policy_sha256`, `extractor_version` |
+| Find queued jobs | `POST /collections/{collection}/jobs/ready` | `policy_sha256`, `extractor_version`, `after`, `limit` |
+| Inspect original job | `GET /jobs/{job}` | None |
+| Claim | `POST /jobs/{job}/claim` | `expected_revision`, `owner_uuid`, `policy_sha256`, `extractor_version`, `lease_seconds` |
+| Renew | `POST /jobs/{job}/renew` | `owner_uuid`, `fence`, `lease_seconds` |
+| Reserve website service | `POST /jobs/{job}/source` | `owner_uuid`, `fence`, `url` |
+| Save checkpoint | `POST /jobs/{job}/checkpoint` | `owner_uuid`, `fence`, `expected_revision`, `body` |
+| Resume saved checkpoint | `GET /jobs/{job}/checkpoint` | None |
+| Complete comparison | `POST /jobs/{job}/complete` | `owner_uuid`, `fence`, `checkpoint_revision`, `checkpoint_sha256` |
+| Read completed result | `GET /jobs/{job}/result` | None |
+| Record controlled failure | `POST /jobs/{job}/failure` | `owner_uuid`, `fence`, `error_code` |
+| Explicitly retry failed/cancelled job | `POST /jobs/{job}/retry` | `{}` |
+
+Admission binds an existing weak candidate and the original listing evidence.
+The detail runtime/policy is explicitly selected; it need not equal the listing
+worker's policy. Exact admission replay returns its original job. Claims use
+5–900 second leases, check the authenticated producer and runtime, and return
+204 when scheduling prevents ownership. Readiness is a bounded active-job lookup;
+it does not claim work or load source bodies.
+
+`body` is a compact `stash-metadata-fetch-v1` JSON object for the exact canonical
+Reddit/Twitter post, at most 32 MiB. Checkpoints retain original record producers
+and times across attempt failover. A changed post/runtime, rewritten earlier
+record or unresolved pending request cannot become completed evidence. Empty
+responses can complete with `uncorroborated`. An unchanged original checkpoint
+acknowledgement can be recovered after its lease expires without granting a new
+lease. The server chooses retry delays and shared website cooldowns; failure
+requests contain controlled codes, not raw extractor output.
+
+Completion compares the retained transcript with the original frozen target and
+listing. Its immutable response includes the job, checkpoint revision, completing
+fence and compact `evidence` (`corroborated` or `uncorroborated`). Replay and
+`GET .../result` return that original result. A successful comparison does not
+publish metadata, accept a post identity or clear the current review blockers.
+The application `detail-preview` endpoint remains a separate read-only operation;
+supplied preview bytes cannot acknowledge a producer job.
+
+The backend workflow is implemented. The Python worker's detail-specific durable
+outbox/dispatch integration and publication from these receipts remain transition
+work. Existing production scrapers have not switched to these routes.

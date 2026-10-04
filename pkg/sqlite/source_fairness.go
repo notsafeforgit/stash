@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/stashapp/stash/pkg/archive"
@@ -9,6 +10,24 @@ import (
 )
 
 const sourceDownloadTurn = 5 * time.Minute
+
+func metadataJobCollection(ctx context.Context, job *models.ArchiveJob, now time.Time) (string, error) {
+	if job.Kind == models.ArchiveJobListAccount {
+		listing, err := discoveryJobEligible(ctx, job, now)
+		if err != nil {
+			return "", err
+		}
+		return listing.CollectionUUID, nil
+	}
+	work, err := archive.DecodeEnrichmentJob(job)
+	if err != nil {
+		return "", err
+	}
+	if _, err := enrichmentJobEligible(ctx, work, now); err != nil {
+		return "", err
+	}
+	return work.CollectionUUID, nil
+}
 
 // Only actual claim requests express interest. An unattended queue must not
 // reserve a service indefinitely; blocked workers refresh this short-lived hint.
@@ -53,21 +72,18 @@ func sourceEnrichmentTurn(ctx context.Context, scope, collection string, now tim
  AND ((SELECT max(s.download_starts) FROM source_enrichment_waiter_scopes p JOIN source_service_turns s ON s.scope=p.scope WHERE p.job_uuid=w.job_uuid)>=4
  OR max(w.first_requested_at_ms,coalesce((SELECT max(s.enrichment_started_at_ms) FROM source_enrichment_waiter_scopes p JOIN source_service_turns s ON s.scope=p.scope WHERE p.job_uuid=w.job_uuid),0))<=?)
  ORDER BY w.first_requested_at_ms,w.job_uuid LIMIT ?`, now.UnixMilli(), now.UnixMilli(), now.UnixMilli(), collection, scope,
-		now.UnixMilli(), now.UnixMilli(), now.Add(-2*time.Minute).UnixMilli(), archive.MaxEnrichmentJobs+1)
+		now.UnixMilli(), now.UnixMilli(), now.Add(-2*time.Minute).UnixMilli(), archive.MaxEnrichmentJobs+archive.MaxDiscoveryJobs+1)
 	if err != nil {
 		return "", err
 	}
-	if len(rows) > archive.MaxEnrichmentJobs {
+	if len(rows) > archive.MaxEnrichmentJobs+archive.MaxDiscoveryJobs {
 		return "", models.ErrSourcePayloadCorrupt
 	}
 	for _, row := range rows {
 		job := row.resolve()
-		work, err := archive.DecodeEnrichmentJob(job)
+		collection, err := metadataJobCollection(ctx, job, now)
 		if err != nil {
-			return "", err
-		}
-		if _, err := enrichmentJobEligible(ctx, work, now); err != nil {
-			if staleEnrichmentSource(err) {
+			if staleEnrichmentSource(err) || errors.Is(err, models.ErrDiscoveryConflict) {
 				continue
 			}
 			return "", err
@@ -78,7 +94,7 @@ func sourceEnrichmentTurn(ctx context.Context, scope, collection string, now tim
 		var busy bool
 		err = dbWrapper.Get(ctx, &busy, `SELECT EXISTS(SELECT 1 FROM archive_jobs a INDEXED BY archive_jobs_active_work
  JOIN enrichment_attempt_pacing p ON p.job_uuid=a.uuid AND p.fence=a.fence
- WHERE a.kind='post.enrich' AND a.state IN ('queued','running') AND a.state='running'
+ WHERE a.kind IN ('post.enrich','account.list_page') AND a.state IN ('queued','running') AND a.state='running'
  AND (json_extract(a.arguments,'$.collection_uuid')=? OR EXISTS(
   SELECT 1 FROM source_enrichment_waiter_scopes w WHERE w.job_uuid=? AND w.scope=p.scope)))
  OR EXISTS(SELECT 1 FROM source_runs r INDEXED BY source_runs_expired
@@ -86,7 +102,7 @@ func sourceEnrichmentTurn(ctx context.Context, scope, collection string, now tim
  WHERE r.state='running' AND r.operation='enrich' AND (r.collection_uuid=? OR EXISTS(
   SELECT 1 FROM source_enrichment_waiter_scopes w WHERE w.job_uuid=? AND w.scope=p.scope)))
  OR EXISTS(SELECT 1 FROM source_runs r JOIN source_run_cooldowns c ON c.target_key=r.target_key
- WHERE r.collection_uuid=? AND c.available_at_ms>?)`, work.CollectionUUID, job.UUID, work.CollectionUUID, job.UUID, work.CollectionUUID, now.UnixMilli())
+ WHERE r.collection_uuid=? AND c.available_at_ms>?)`, collection, job.UUID, collection, job.UUID, collection, now.UnixMilli())
 		if err != nil {
 			return "", err
 		}

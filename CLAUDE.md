@@ -440,6 +440,17 @@ cooldown/fairness and stale-job maintenance remain pending. See
 [enrichment work](docs/native-schema.md#post-enrichment-targets-and-completion)
 and [metadata-only extraction](integrations/gallery-dl/README.md#metadata-only-extraction-for-enrichment).
 
+Schema 1000071 adds immutable account listing definitions and one-page
+`account.list_page` jobs. Definitions pin account/profile, collection revision,
+root, runtime/policy and retry deadline; imported cursors require frozen mapping
+proof. Page retention, job success and source reservation release commit
+together. Preserve original producer/fence receipts, cursor continuity and the
+shared download/enrichment cooldown and fairness rules. A successful page is
+neither a completed listing nor matched/published post metadata. The internal
+scoped coordinator is implemented; producer HTTP/delivery/dispatch, reviewed
+activation and matching remain transition work. See
+[listing storage](docs/native-schema.md#durable-account-listing-pages).
+
 `stash-import-catalog-evidence` maps a received snapshot's posts, profiles and
 captures through core services in schema 1000031. It uses exact manifest/ordinal
 checkpoints, bounded transactions and immutable per-row outcomes. Preserve mirror

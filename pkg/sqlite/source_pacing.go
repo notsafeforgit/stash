@@ -52,7 +52,7 @@ func sourcePacingReadyFor(ctx context.Context, scope, collection string, enrichm
  EXISTS(SELECT 1 FROM source_pacing WHERE scope=? AND (available_at_ms>? OR last_started_at_ms>?))
  OR EXISTS(SELECT 1 FROM archive_jobs j INDEXED BY archive_jobs_active_work
   JOIN enrichment_attempt_pacing p ON p.job_uuid=j.uuid AND p.fence=j.fence
-  WHERE j.kind='post.enrich' AND j.state IN ('queued','running') AND j.state='running'
+  WHERE j.kind IN ('post.enrich','account.list_page') AND j.state IN ('queued','running') AND j.state='running'
    AND j.uuid!=? AND (p.scope=? OR json_extract(j.arguments,'$.collection_uuid')=?))
  OR EXISTS(SELECT 1 FROM source_runs r INDEXED BY source_runs_expired
   JOIN source_run_attempt_pacing p ON p.run_uuid=r.uuid AND p.fence=r.fence AND p.reserved=1
@@ -262,6 +262,25 @@ func sourcePacingEnrichmentFailure(ctx context.Context, job *models.ArchiveJob, 
 		if err := sourcePacingPause(ctx, scope, code, until); err != nil {
 			return time.Time{}, err
 		}
+	}
+	return maxTime(retry, until), nil
+}
+
+func sourcePacingMetadataFailure(ctx context.Context, job *models.ArchiveJob, code string, retry time.Time, now time.Time) (time.Time, error) {
+	if job.Kind == models.ArchiveJobEnrichPost {
+		return sourcePacingEnrichmentFailure(ctx, job, code, retry, now)
+	}
+	delay := sourcePacingDelay(code, retry, now)
+	if delay == 0 {
+		return retry, nil
+	}
+	scope, err := sourcePacingScope(ctx, job.UUID, true)
+	if err != nil {
+		return time.Time{}, err
+	}
+	until := now.Add(delay)
+	if err := sourcePacingPause(ctx, scope, code, until); err != nil {
+		return time.Time{}, err
 	}
 	return maxTime(retry, until), nil
 }

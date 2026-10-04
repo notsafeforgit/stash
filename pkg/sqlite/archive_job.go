@@ -65,7 +65,10 @@ func managedArchiveJobWrite(ctx context.Context) error {
 
 func validJobTime(value time.Time) bool { return value.UnixMilli() > 0 && value.UTC().Year() <= 9999 }
 func validJobKind(kind string) bool {
-	return kind == models.ArchiveJobVerifyMedia || kind == models.ArchiveJobBackfillAlbum || kind == models.ArchiveJobTranslateText || kind == models.ArchiveJobEnrichPost
+	return kind == models.ArchiveJobVerifyMedia || kind == models.ArchiveJobBackfillAlbum || kind == models.ArchiveJobTranslateText || metadataJobKind(kind)
+}
+func metadataJobKind(kind string) bool {
+	return kind == models.ArchiveJobEnrichPost || kind == models.ArchiveJobListAccount
 }
 func validJobState(state string) bool {
 	return state == "queued" || state == "running" || state == "succeeded" || state == "failed" || state == "cancelled"
@@ -146,6 +149,9 @@ func (s *ArchiveJobStore) Submit(ctx context.Context, input models.ArchiveJobSub
 	if input.Kind == models.ArchiveJobEnrichPost {
 		enrichmentJobSubmissionGuard(ctx, input.RequestUUID)
 	}
+	if input.Kind == models.ArchiveJobListAccount {
+		discoveryJobSubmissionGuard(ctx, input.RequestUUID)
+	}
 	var previous struct {
 		Digest string `db:"digest"`
 		Job    string `db:"job_uuid"`
@@ -190,6 +196,14 @@ func (s *ArchiveJobStore) Submit(ctx context.Context, input models.ArchiveJobSub
 				return nil, err
 			}
 			if active >= archive.MaxEnrichmentJobs {
+				return nil, models.ErrArchiveJobCapacity
+			}
+		}
+		if input.Kind == models.ArchiveJobListAccount {
+			if err := dbWrapper.Get(ctx, &active, "SELECT count(*) FROM (SELECT 1 FROM archive_jobs WHERE kind='account.list_page' AND state IN ('queued','running') LIMIT ?)", archive.MaxDiscoveryJobs); err != nil {
+				return nil, err
+			}
+			if active >= archive.MaxDiscoveryJobs {
 				return nil, models.ErrArchiveJobCapacity
 			}
 		}
@@ -339,12 +353,9 @@ WHERE j.uuid=? AND j.state='queued' AND j.available_at_ms<=? AND j.fence<j.max_a
 
 func (s *ArchiveJobStore) claim(ctx context.Context, job *models.ArchiveJob, owner string, now time.Time, duration time.Duration) (*models.ArchiveJob, error) {
 	var pacingScope string
-	if job.Kind == models.ArchiveJobEnrichPost {
-		work, err := archive.DecodeEnrichmentJob(job)
+	if metadataJobKind(job.Kind) {
+		collection, err := metadataJobCollection(ctx, job, now)
 		if err != nil {
-			return nil, err
-		}
-		if _, err := enrichmentJobEligible(ctx, work, now); err != nil {
 			return nil, err
 		}
 		if _, err := (&SourceRunStore{}).Recover(ctx, now, 100); err != nil {
@@ -358,18 +369,22 @@ func (s *ArchiveJobStore) claim(ctx context.Context, job *models.ArchiveJob, own
 		if err := sourceEnrichmentWaiting(ctx, job, now); err != nil {
 			return nil, err
 		}
-		ready, err := sourcePacingReadyFor(ctx, pacingScope, work.CollectionUUID, true, job.UUID, "", now)
+		ready, err := sourcePacingReadyFor(ctx, pacingScope, collection, true, job.UUID, "", now)
 		if err != nil || !ready {
 			*waiting = err == nil
 			return nil, err
 		}
-		ready, err = enrichmentPendingPacingReady(ctx, job.UUID, work.CollectionUUID, pacingScope, now)
+		ready, err = enrichmentPendingPacingReady(ctx, job.UUID, collection, pacingScope, now)
 		if err != nil || !ready {
 			*waiting = err == nil
 			return nil, err
 		}
 		*waiting = true
-		enrichmentJobAttemptGuard(ctx, job.UUID, job.Fence+1)
+		if job.Kind == models.ArchiveJobListAccount {
+			discoveryJobAttemptGuard(ctx, job.UUID, job.Fence+1)
+		} else {
+			enrichmentJobAttemptGuard(ctx, job.UUID, job.Fence+1)
+		}
 	}
 	// Do not commit the running head without its attempt, even if a caller
 	// catches a later error and tries to commit unrelated domain writes.
@@ -483,7 +498,9 @@ func (s *ArchiveJobStore) Finish(ctx context.Context, lease models.ArchiveJobLea
 		return nil, err
 	}
 	var complete *bool
-	if job.Kind == models.ArchiveJobEnrichPost && outcome.State != "succeeded" {
+	if job.Kind == models.ArchiveJobListAccount {
+		complete = discoveryAtomic(ctx)
+	} else if job.Kind == models.ArchiveJobEnrichPost && outcome.State != "succeeded" {
 		complete = sourcePacingAtomic(ctx)
 	}
 	state, attempt := outcome.State, outcome.State
@@ -493,15 +510,15 @@ func (s *ArchiveJobStore) Finish(ctx context.Context, lease models.ArchiveJobLea
 	available := job.AvailableAt.UnixMilli()
 	if state == "retry" {
 		state, available = "queued", outcome.RetryAt.UnixMilli()
-		if job.Kind == models.ArchiveJobEnrichPost {
+		if metadataJobKind(job.Kind) {
 			available = max(available, enrichmentRetryAt(job, now).UnixMilli())
 		}
 		if job.Fence >= int64(job.MaxAttempts) {
 			state, attempt = "failed", "failed"
 		}
 	}
-	if job.Kind == models.ArchiveJobEnrichPost && outcome.State != "succeeded" {
-		retry, err := sourcePacingEnrichmentFailure(ctx, job, outcome.ErrorCode, time.UnixMilli(available), now)
+	if metadataJobKind(job.Kind) && outcome.State != "succeeded" {
+		retry, err := sourcePacingMetadataFailure(ctx, job, outcome.ErrorCode, time.UnixMilli(available), now)
 		if err != nil {
 			return nil, err
 		}
@@ -582,7 +599,7 @@ func recoverArchiveJob(ctx context.Context, job *models.ArchiveJob, now time.Tim
 		state = "failed"
 	}
 	available := now.UnixMilli()
-	if job.Kind == models.ArchiveJobEnrichPost {
+	if metadataJobKind(job.Kind) {
 		available = max(job.AvailableAt.UnixMilli(), enrichmentRetryAt(job, now).UnixMilli())
 	}
 	_, err := dbWrapper.Exec(ctx, `UPDATE archive_jobs SET state=?,available_at_ms=?,owner_uuid=NULL,lease_until_ms=NULL,error_code='lease_expired',revision=revision+1,updated_at_ms=? WHERE uuid=?`, state, available, now.UnixMilli(), job.UUID)

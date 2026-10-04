@@ -21,6 +21,7 @@ import (
 
 func removeEnrichmentDiscoverySchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeDiscoveryListingSchema(t, raw)
 	_, err := raw.Exec(`DROP TABLE enrichment_discovery_resolutions; DROP INDEX automation_discovery_lookup;
  DELETE FROM native_migration_history WHERE version=1000070`)
 	require.NoError(t, err)

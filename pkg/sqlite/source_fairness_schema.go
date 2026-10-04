@@ -26,7 +26,7 @@ func validateSourceFairnessSchema(conn *sqlx.DB, handoffs bool) error {
  OR EXISTS(SELECT 1 FROM source_service_turns t WHERE NOT EXISTS(SELECT 1 FROM source_pacing p WHERE p.scope=t.scope))
  OR EXISTS(SELECT 1 FROM source_enrichment_waiters w
  WHERE NOT EXISTS(SELECT 1 FROM archive_jobs j JOIN enrichment_job_pacing p ON p.job_uuid=j.uuid
- WHERE j.uuid=w.job_uuid AND j.kind='post.enrich' AND j.state='queued' AND j.fence=w.fence)
+ WHERE j.uuid=w.job_uuid AND j.kind IN ('post.enrich','account.list_page') AND j.state='queued' AND j.fence=w.fence)
  OR NOT EXISTS(SELECT 1 FROM source_enrichment_waiter_scopes s JOIN enrichment_job_pacing p ON p.job_uuid=s.job_uuid AND p.scope=s.scope WHERE s.job_uuid=w.job_uuid))
  OR EXISTS(SELECT 1 FROM source_enrichment_waiter_scopes s
  WHERE NOT EXISTS(SELECT 1 FROM source_enrichment_waiters w WHERE w.job_uuid=s.job_uuid)

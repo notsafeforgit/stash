@@ -44,6 +44,9 @@ func validateAlbumJobSchema(conn *sqlx.DB, version uint) error {
 	if version >= NativeSchemaBaseline+51 {
 		allowed += ",'post.enrich'"
 	}
+	if version >= NativeSchemaBaseline+71 {
+		allowed += ",'account.list_page'"
+	}
 	if err := conn.Get(&invalid, "SELECT EXISTS(SELECT 1 FROM archive_jobs WHERE kind NOT IN ("+allowed+"))"); err != nil {
 		return err
 	}

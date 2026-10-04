@@ -2331,3 +2331,54 @@ before their dependencies; ordinary database backups retain them.
 The migration itself leaves existing jobs, identifiers and selected metadata
 unchanged. It does not activate workers. Account-listing discovery, reviewed
 post consolidation and production caller conversion remain transition work.
+
+## Durable account listing pages
+
+Schema 1000071 stores immutable discovery definitions in `discovery_listings`.
+Each binds a native source account, exact collection revision and logical root,
+Reddit submitted or Twitter timeline URL, worker policy/runtime, initial cursor
+and not-before deadline. A fresh listing starts without a cursor. Resuming a
+frozen listing requires a `discovery_listing_legacy` reference proving the
+original account, profile, collection, cursor, historical page count and mapped
+cooldown. Unconverted staged results cannot be discarded by starting a listing.
+Historical page counts remain historical assertions, not native page receipts.
+
+Each `account.list_page` archive job fetches **one page**. The
+`discovery_listing_jobs` binding retains its generation and requested page
+ordinal; `discovery_job_attempts` records the authenticated producer for each
+fenced attempt. Failed attempts retry the same page with backoff. An explicit
+retry of exhausted or cancelled work retains earlier pages and deadlines.
+Successful nonfinal pages permit a new job for the next cursor. A final page
+ends enumeration, including when that page contains no records.
+
+`discovery_pages` retains one compact `stash-discovery-page-v1` body per page,
+with an immutable digest, original producer/attempt and small receipt. The page
+must continue the exact saved cursor, profile and runtime. Repeated cursors,
+gaps, future observation times and writes after completion are rejected. Page
+retention, job success and reservation release commit together; generic job
+success cannot bypass that receipt. Lost acknowledgements replay the original
+receipt without restoring the old lease or contacting the source again.
+
+Listings share service reservations, cooldowns, collection exclusion and bounded
+download preference with enrichment and downloads. Releasing after each page
+allows a download turn before the next page. The original job and pacing rows,
+indexes and guards survive migration. Admission allows at most 16 active listing
+jobs, 10,000 new pages per listing and 2 GiB of retained discovery bodies across
+the database. Each page retains the 4,096-record, 32 MiB compact and 128 MiB
+expanded limits. Capacity exhaustion is an explicit failure, never a completed
+listing or discarded page.
+
+The internal coordinator authenticates collection/root grants and rechecks the
+original lease deadline, credential and source definition through commit.
+Descriptions return the requested job's original input cursor even after later
+pages advance the listing. Controlled failure receipts preserve the original
+attempt and cannot prolong cooldowns on replay. Startup validates definitions,
+import provenance, generations, cursor chains, page bodies and completion proofs.
+Anonymisation removes these records before their dependencies; ordinary database
+backups include them.
+
+Page success proves retained enumeration data only. It does not match candidate
+posts, publish native captures, assign performers or complete catalog migration.
+The schema and internal coordinator do not expose producer HTTP routes or
+activate imported work. Reviewed activation, durable producer page delivery and
+dispatch, candidate matching and reviewed post consolidation remain required.

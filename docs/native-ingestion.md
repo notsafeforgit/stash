@@ -655,6 +655,22 @@ a later automation row's success label. Production cutover uses coordinated fres
 inputs; a rehearsal made from snapshots taken at different times cannot certify
 completion of that later work.
 
+## Account listing discovery
+
+The shared page parser, producer fetch component and internal scoped discovery
+coordinator are implemented. Schema 1000071 retains pinned listing definitions,
+producer-owned attempts and immutable compact page receipts. Each leased
+`account.list_page` job finishes after one retained page, releasing the shared
+service reservation before the next page can run. Earlier pages and imported
+cursors survive retries; final enumeration and candidate matching are separate
+outcomes. See the [storage and scheduling contract](native-schema.md#durable-account-listing-pages).
+
+These are internal components. No discovery HTTP capability, producer delivery
+protocol or scheduled activation is available yet. Existing enrichment endpoints
+remain post-only. Connecting reviewed definitions, durable producer page delivery,
+dispatch and candidate matching is separate work before host/n8n callers can use
+native discovery.
+
 ## Completed file events
 
 A `file.completed` event is at most 16 KiB and has this shape:

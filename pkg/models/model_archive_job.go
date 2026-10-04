@@ -14,6 +14,7 @@ const (
 	ArchiveJobBackfillAlbum = "album.backfill"
 	ArchiveJobTranslateText = "text.translate"
 	ArchiveJobEnrichPost    = "post.enrich"
+	ArchiveJobListAccount   = "account.list_page"
 )
 
 type ArchiveJob struct {

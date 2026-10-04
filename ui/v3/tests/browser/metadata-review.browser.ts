@@ -298,6 +298,12 @@ test.describe("response recovery", () => {
     const bodies = await archive(page, { loseResponse: true });
     await openReview(page);
     await page.getByRole("button", { name: "Apply this choice" }).click();
+    // The pending banner appears as soon as the request is saved locally.
+    // Wait for the committed response to be lost before interrupting delivery.
+    await expect(
+      page.getByText("Could not complete this step", { exact: true }),
+    ).toBeVisible();
+    expect(bodies).toHaveLength(1);
     await expect(
       page.getByText("A saved change needs confirmation", { exact: true }),
     ).toBeVisible();

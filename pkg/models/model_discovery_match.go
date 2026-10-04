@@ -78,6 +78,14 @@ type DiscoveryComparisonCandidates struct {
 	HasMore bool                           `json:"has_more"`
 }
 
+// After advances over inspected rows, including incomplete or blocked targets.
+// Readiness is not a durable approval; publication rechecks the original binding.
+type DiscoveryPublicationCandidates struct {
+	Targets []DiscoveryPublicationInput `json:"targets"`
+	After   string                      `json:"after"`
+	HasMore bool                        `json:"has_more"`
+}
+
 // Coverage describes the saved search, not whether the source still exposes
 // every post it has ever hosted. Complete requires comparing a retained search
 // from its beginning through its final cursor. An imported page count cannot
@@ -115,6 +123,7 @@ type DiscoveryMatchReaderWriter interface {
 	PreparePublication(context.Context, DiscoveryPublicationInput) (PreparedDiscoveryPublication, error)
 	Publication(context.Context, string) (*DiscoveryMatchPublication, error)
 	PublishedRecords(context.Context, string, int, int) ([]DiscoveryPublishedRecord, error)
+	PendingPublications(context.Context, string, int, time.Time) (*DiscoveryPublicationCandidates, error)
 	Pending(context.Context, string, int, time.Time) (*DiscoveryComparisonCandidates, error)
 	Prepare(context.Context, string, int, time.Time) (PreparedDiscoveryComparison, error)
 	Advance(context.Context, string, int, time.Time) (*DiscoveryMatchReceipt, error)

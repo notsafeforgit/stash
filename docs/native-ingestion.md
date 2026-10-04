@@ -771,8 +771,8 @@ saved-delivery cursors for discovery and enrichment. Both saved deliveries run
 before website profiles load, preserving recovery when access bindings are
 unavailable. Selection commits before execution, so continuously busy profiles
 cannot reset the traversal after restart. Reviewed activation and publication of
-complete, unique strong matches are implemented. Historical coverage, candidate
-detail execution and automated publication dispatch remain necessary before
+complete, unique strong matches are implemented, including background publication.
+Historical coverage and candidate detail execution remain necessary before
 host/n8n callers switch to native discovery. In particular, a
 retained nonfinal page is successful page delivery, not successful enumeration
 or a completed catalog import.
@@ -820,8 +820,8 @@ page counts do not become native receipt counts, and activation never certifies
 historical coverage or completed catalog import. The
 [`stash-activate-automation-discovery` operator command](../integrations/gallery-dl/README.md#reviewed-discovery-activation)
 saves a private, digest-bound review file and recovers the original operation
-after a lost Apply response. The review UI, historical coverage, detail execution,
-automatic publication dispatch and staging release are still being implemented.
+after a lost Apply response. The review UI, historical coverage, detail execution
+and staging release are still being implemented.
 
 The target review uses one database snapshot. `coverage.retained_pages` counts
 received batches of source posts, while `target.last_page` counts batches already
@@ -879,6 +879,16 @@ target revision cannot reuse it. GET returns 404 before publication. Record
 pagination uses zero-based `record_ordinal`, with `after=-1` by default and
 `limit` from 1 to 100. These associations prove native capture publication only;
 they do not release listing staging or declare the whole catalog import complete.
+
+The server also publishes eligible matches automatically after comparison. Its
+worker inspects at most 32 target rows at a time, skips published and blocked
+targets, and calls the same publication service with the target's current
+revision. It rereads and validates the evidence before committing, so readiness
+cannot authorize a changed match. A competing worker shares the original receipt.
+Targets requiring review retain their evidence without holding up ready targets.
+Comparison and publication pause after a traversal finds no work, and resume
+from durable progress after restart. Neither worker admits a source job or
+contacts a website.
 
 ## Completed file events
 

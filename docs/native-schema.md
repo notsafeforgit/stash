@@ -2435,7 +2435,7 @@ targets, candidates and original record references. Producer tokens cannot use
 these review routes. See [activation API](native-ingestion.md#reviewed-discovery-activation).
 The operator command saves reviewed activations and recovers their original
 receipts. The review UI, historical-coverage resolution, detail execution,
-automatic publication dispatch and staging-release workflow remain open.
+and staging-release workflow remain open.
 
 ### Verified discovery publication
 
@@ -2518,7 +2518,8 @@ admission of existing definitions, owned attempts, page delivery and failure
 receipts. It cannot create definitions or activate imported work. Durable
 producer delivery, selected-job execution and shared profile/collection dispatch
 are implemented, along with the native candidate comparison worker described
-above. Reviewed activation and application publication of complete, unique strong
-matches are implemented. Historical coverage, weak-candidate detail execution,
-automatic publication dispatch, verified staging release and reviewed post
-consolidation remain required.
+above. Reviewed activation and publication of complete, unique strong matches
+are implemented, through both the application endpoint and a bounded server
+worker. Both use the same atomic publication checks and receipts. Historical
+coverage, weak-candidate detail execution, verified staging release and reviewed
+post consolidation remain required.

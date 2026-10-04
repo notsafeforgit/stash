@@ -480,8 +480,7 @@ discovery before local profile loading. Collection lookup follows current grants
 and discovers later registrations under a root; returned containers still need
 policy/runtime readiness checks. Preserve profile/collection rotation across
 restart and both journals when upgrading an outbox. Historical coverage,
-weak-candidate details, automatic publication dispatch and native page release
-remain transition work. See
+weak-candidate details and native page release remain transition work. See
 [listing storage](docs/native-schema.md#durable-account-listing-pages).
 `scrape.MatchDiscoveryListing` and `MatchDiscoveryPage` implement the pure
 `retained-discovery-listing-v1` candidate policy. Preserve unchanged original
@@ -512,7 +511,7 @@ together. Lost responses must reuse the saved operation and hash, even after
 later native edits or comparison progress. Never interpret activation as job
 admission, source coverage, accepted identity or import completion. Producer
 tokens cannot use the archive review routes. The saved operator command is
-implemented; the review UI and detail/automatic-dispatch/staging-release workflow
+implemented; the review UI and detail/staging-release workflow
 remain open. Target reviews derive coverage and blockers in one read transaction,
 without loading page bodies. Preserve missing-history, weak/competing-candidate,
 changed-source/post and existing-identifier distinctions. Empty blockers do not
@@ -529,6 +528,13 @@ history, weak/competing candidates and identifiers owned by another post require
 resolution; do not silently merge posts. Verify the retained receipt graph on
 reopen and preserve it through backup. This does not release pages, assign
 depicted performers or complete the catalog import.
+`DiscoveryPublicationWorker` inspects at most 32 target rows per batch and uses
+that same service for eligible matches. Readiness reads receipts and references,
+not page bodies, and grants no ownership. Published targets and unresolved
+reviews cannot starve later work. Both discovery workers must expose an idle
+boundary after a full traversal of waiting targets; never wrap an empty final
+batch directly to the start and keep polling busy. The server owns their
+cancellable lifetimes; restart recovers from durable receipts.
 
 `stash-import-catalog-evidence` maps a received snapshot's posts, profiles and
 captures through core services in schema 1000031. It uses exact manifest/ordinal

@@ -8,8 +8,10 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/stashapp/stash/internal/ingest"
 	"github.com/stashapp/stash/pkg/archive"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/txn"
@@ -279,6 +281,12 @@ func TestDiscoveryPublicationCannotBypassIncompleteWeakOrCompetingEvidence(t *te
 				require.ErrorIs(t, err, models.ErrDiscoveryConflict)
 				return nil
 			}))
+			worker := ingest.NewDiscoveryPublicationWorker(ingest.New(f.repo))
+			worker.Now = func() time.Time { return f.now }
+			progress, err := worker.Process(t.Context())
+			require.NoError(t, err, "blocked targets stay in review without interrupting the worker")
+			require.Nil(t, progress.Publication)
+			require.False(t, progress.HasMore)
 			raw := openRawDB(t, f.db.DatabasePath())
 			defer raw.Close()
 			require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM discovery_match_publications"))

@@ -13,6 +13,10 @@ import (
 // decodes source data under a read transaction; publication rechecks choices and
 // commits the verified identity, shared capture effects and receipt together.
 func (s *Service) PublishDiscoveryMatch(ctx context.Context, input models.DiscoveryPublicationInput) (*models.DiscoveryMatchPublication, error) {
+	return s.publishDiscoveryMatch(ctx, input, time.Now)
+}
+
+func (s *Service) publishDiscoveryMatch(ctx context.Context, input models.DiscoveryPublicationInput, clock func() time.Time) (*models.DiscoveryMatchPublication, error) {
 	var prepared models.PreparedDiscoveryPublication
 	err := s.Repo.WithReadTxn(ctx, func(ctx context.Context) error {
 		var err error
@@ -24,7 +28,7 @@ func (s *Service) PublishDiscoveryMatch(ctx context.Context, input models.Discov
 	}
 	var result *models.DiscoveryMatchPublication
 	err = s.Repo.WithTxn(ctx, func(ctx context.Context) error {
-		now := time.Now()
+		now := clock()
 		var err error
 		result, err = prepared.Publish(ctx, func(ctx context.Context, capture models.SourceCaptureInput, collection *models.SourceCollection) error {
 			raw, err := archive.RestoreCapture(&capture.Payload)

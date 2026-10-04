@@ -41,9 +41,6 @@ func (w *DiscoveryComparisonWorker) Process(ctx context.Context) (*DiscoveryComp
 	err := w.Service.Repo.WithReadTxn(ctx, func(ctx context.Context) error {
 		var err error
 		ready, err = w.Service.Repo.DiscoveryMatch.Pending(ctx, w.after, 32, w.Now())
-		if err == nil && len(ready.Targets) == 0 && !ready.HasMore && w.after != "" {
-			ready, err = w.Service.Repo.DiscoveryMatch.Pending(ctx, "", 32, w.Now())
-		}
 		return err
 	})
 	if err != nil {
@@ -53,6 +50,8 @@ func (w *DiscoveryComparisonWorker) Process(ctx context.Context) (*DiscoveryComp
 	if len(ready.Targets) == 0 {
 		w.after = ready.After
 		if !ready.HasMore {
+			// Expose the idle boundary before wrapping. An immediate retry
+			// from the start would keep a large set of waiting targets busy.
 			w.after = ""
 		}
 		return ret, nil
@@ -62,6 +61,9 @@ func (w *DiscoveryComparisonWorker) Process(ctx context.Context) (*DiscoveryComp
 	// stale target cannot starve the rest. Its database progress remains intact.
 	w.after = selected.UUID
 	ret.HasMore = ready.HasMore || len(ready.Targets) > 1
+	if !ret.HasMore {
+		w.after = ""
+	}
 	var prepared models.PreparedDiscoveryComparison
 	err = w.Service.Repo.WithReadTxn(ctx, func(ctx context.Context) error {
 		var err error

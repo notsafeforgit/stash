@@ -22,6 +22,7 @@ type ingestRoutes struct {
 	service       *ingest.Service
 	fileIngestion bool
 	enrichment    *ingest.EnrichmentCoordinator
+	discovery     *ingest.DiscoveryCoordinator
 }
 
 // A producer token reaches only this router. Session cookies, general API keys,
@@ -58,6 +59,7 @@ func (rs *ingestRoutes) router() http.Handler {
 		r.Post("/runs/{run}/lease", rs.changeRunLease)
 		r.Post("/runs/{run}/source", rs.reserveRunSource)
 		rs.enrichmentRoutes(r)
+		rs.discoveryRoutes(r)
 	})
 	return r
 }
@@ -175,6 +177,9 @@ func (rs *ingestRoutes) capabilities(w http.ResponseWriter, r *http.Request) {
 		"enrichment_dispatch_protocol":      1,
 		"enrichment_source_pacing_protocol": 1,
 		"max_enrichment_checkpoint_bytes":   archive.MaxEnrichmentTranscriptBytes,
+		"discovery_protocol":                1,
+		"discovery_source_pacing_protocol":  1,
+		"max_discovery_page_bytes":          archive.MaxDiscoveryPageBytes,
 		"receipt_semantics":                 "source.capture commits source evidence; file.completed queues verification; poll receipt status for media completion",
 	})
 }

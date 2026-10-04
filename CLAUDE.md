@@ -446,9 +446,11 @@ root, runtime/policy and retry deadline; imported cursors require frozen mapping
 proof. Page retention, job success and source reservation release commit
 together. Preserve original producer/fence receipts, cursor continuity and the
 shared download/enrichment cooldown and fairness rules. A successful page is
-neither a completed listing nor matched/published post metadata. The internal
-scoped coordinator is implemented; producer HTTP/delivery/dispatch, reviewed
-activation and matching remain transition work. See
+neither a completed listing nor matched/published post metadata. The scoped
+worker API now exposes existing-definition admission, owned attempts and page/
+failure acknowledgements. Preserve the original requested cursor and reject
+receipts belonging to a failed job's later replacement. Durable producer page
+delivery/dispatch, reviewed activation and matching remain transition work. See
 [listing storage](docs/native-schema.md#durable-account-listing-pages).
 
 `stash-import-catalog-evidence` maps a received snapshot's posts, profiles and

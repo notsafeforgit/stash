@@ -657,19 +657,62 @@ completion of that later work.
 
 ## Account listing discovery
 
-The shared page parser, producer fetch component and internal scoped discovery
-coordinator are implemented. Schema 1000071 retains pinned listing definitions,
+The shared page parser, producer fetch component and scoped discovery worker
+API are implemented. Schema 1000071 retains pinned listing definitions,
 producer-owned attempts and immutable compact page receipts. Each leased
 `account.list_page` job finishes after one retained page, releasing the shared
 service reservation before the next page can run. Earlier pages and imported
 cursors survive retries; final enumeration and candidate matching are separate
 outcomes. See the [storage and scheduling contract](native-schema.md#durable-account-listing-pages).
 
-These are internal components. No discovery HTTP capability, producer delivery
-protocol or scheduled activation is available yet. Existing enrichment endpoints
-remain post-only. Connecting reviewed definitions, durable producer page delivery,
-dispatch and candidate matching is separate work before host/n8n callers can use
-native discovery.
+Capabilities advertise `discovery_protocol: 1`,
+`discovery_source_pacing_protocol: 1` and `max_discovery_page_bytes: 33554432`.
+The following routes live under `/api/v3/ingest/discovery` and use the existing
+producer bearer credentials and collection/root grants. Authentication runs
+before reading page bodies; session cookies and application API keys cannot
+authorize these operations. Existing enrichment endpoints remain post-only.
+
+| Route | Request and result |
+| --- | --- |
+| `POST /listings/{listing}/jobs` | Requires `expected_definition_sha256`, `policy_sha256` and `extractor_version`. Admits or replays the current page job for an existing definition. After a successful nonfinal page, it admits the next page; after final success it returns that completed job. |
+| `GET /jobs/{job}` | Returns `{job, listing, cursor, receipt}`. The input cursor belongs to this particular page job, even after later jobs advance the listing. The optional receipt belongs only to this job. |
+| `POST /jobs/{job}/claim` | Requires `expected_revision`, stable `owner_uuid`, policy/runtime and `lease_seconds` between 5 and 900. Returns the running job or HTTP 204 while unavailable. Reusing the original owner recovers a lost claim response. |
+| `POST /jobs/{job}/renew` | Requires `owner_uuid`, `fence` and `lease_seconds`. Renews only the authenticated producer's current attempt. |
+| `POST /jobs/{job}/source` | Requires `owner_uuid`, `fence` and the exact listing `url`. Returns `{job_uuid, fence, ready}` for the held service reservation. Unrelated profiles and child services are rejected. |
+| `POST /jobs/{job}/page` | Requires `owner_uuid`, `fence`, the requested `ordinal` and an object-valued `body`. Commits the page receipt and job success together. |
+| `POST /jobs/{job}/failure` | Requires `owner_uuid`, `fence` and a controlled `error_code`. Returns the original immutable attempt outcome, including on replay after a successor succeeds. |
+
+The route supplies job identity and the credential supplies producer identity;
+requests cannot substitute either in their bodies. Unknown or duplicate JSON
+keys, compressed requests and oversized envelopes are rejected. The page body limit
+is 32 MiB, with 4,096 extra bytes allowed for its request envelope. Send that body
+as JSON, preserving source number tokens; do not encode it as an escaped string.
+The receipt's SHA-256 covers its native canonical page body, not the envelope.
+The wire and persisted forms retain compact shared metadata and original observation
+times. Descriptions return references and a small receipt rather than repeating
+the page body.
+
+Controlled retry codes are `rate_limited`, `timeout`, `extraction_failed`,
+`worker_failed` and `source_busy`; exhausting the attempt budget becomes a
+failure. Terminal codes are `authentication`, `access_denied`, `challenge`,
+`not_found`, `unsupported_extractor`, `result_too_large`, `invalid_checkpoint`,
+`not_a_post_url`, `runtime_changed`, `unsupported_profile` and
+`pagination_stalled`. Shared source cooldowns still apply. Failure replay cannot
+extend the deadline or finish another attempt.
+
+Changed definitions/cursors return HTTP 409 `discovery_work_changed`; stale or
+foreign attempt ownership returns HTTP 409 `lease_lost`. Invalid discovery data
+returns HTTP 400 `invalid_discovery_work`; malformed envelopes use the common
+HTTP 400 response. Missing records return 404, scope violations 403, and capacity
+exhaustion 429. Responses retain `Cache-Control: no-store`.
+
+These endpoints do not create listing definitions, activate imported work,
+explicitly retry a terminal job or accept a candidate match. No discovery
+dispatch capability is advertised. A supported Python discovery client, durable
+page outbox/lease execution, readiness and maintenance, reviewed activation and
+candidate matching remain necessary before host/n8n callers switch to native
+discovery. In particular, a retained nonfinal page is successful page delivery,
+not successful enumeration or a completed catalog import.
 
 ## Completed file events
 

@@ -2379,6 +2379,8 @@ backups include them.
 
 Page success proves retained enumeration data only. It does not match candidate
 posts, publish native captures, assign performers or complete catalog migration.
-The schema and internal coordinator do not expose producer HTTP routes or
-activate imported work. Reviewed activation, durable producer page delivery and
-dispatch, candidate matching and reviewed post consolidation remain required.
+The [scoped worker API](native-ingestion.md#account-listing-discovery) exposes
+admission of existing definitions, owned attempts, page delivery and failure
+receipts. It cannot create definitions or activate imported work. Reviewed
+activation, durable producer page delivery and dispatch, candidate matching,
+verified staging release and reviewed post consolidation remain required.

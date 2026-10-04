@@ -2003,9 +2003,19 @@ pages. Fresh discovery records cannot claim retained capture provenance. Parsing
 is separate from binding the page to an authorized job or accepting a post match.
 
 This collector does not submit a job, advance a stored cursor, accept a source
-post match or certify an account scan as completed. Native discovery storage,
-activation, HTTP delivery and dispatch integration remain required transition
-work; existing production workers have not switched to it.
+post match or certify an account scan as completed. Native discovery storage and
+the [scoped worker HTTP protocol](../../docs/native-ingestion.md#account-listing-discovery)
+now retain one page per owned job, releasing the service before the next page.
+The protocol advertises `discovery_protocol: 1` and
+`discovery_source_pacing_protocol: 1`; it does not advertise discovery dispatch.
+It accepts existing definition UUIDs and their pinned hashes, not replacement
+source definitions or worker-selected initial cursors.
+
+A dedicated producer client, durable page outbox/lease execution, readiness and
+maintenance, reviewed activation, candidate matching and verified page release
+remain required. The current collector and generic HTTP transport are components,
+not an activated discovery CLI or host/n8n integration. Existing production
+workers have not switched to them.
 
 ## Validation
 
@@ -2045,3 +2055,8 @@ the seven families, old extractor columns, timestamps and embedded JSON strings;
 unknown inputs and conflicting snapshot identities cannot partially publish.
 These checks are included in `make validate-fork`
 and the build workflow. No production endpoint or source website is contacted.
+`TestPythonDiscoveryHTTPPreservesLargePagesAndLostAcknowledgements` also runs the
+actual Python transport against the native server, preserving a page larger than
+4 MiB, exact source numbers and compact metadata. Lost admission, claim, page and
+failure responses replay without duplicate attempts. Retaining a nonfinal page
+does not mark enumeration complete or publish native post matches.

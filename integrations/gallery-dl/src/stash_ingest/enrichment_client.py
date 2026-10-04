@@ -5,7 +5,7 @@ from datetime import datetime
 import re
 
 from .client import Unavailable
-from .encoding import InvalidData, encode, identifier
+from .encoding import InvalidData, encode, identifier, native_json
 from .events import sha256
 from .metadata_bundle import Bundle, ERRORS, MAX_BYTES, MAX_RECORDS, MAX_REFERENCES, SCHEMA, RETAINED_SCHEMA, public_url
 
@@ -17,11 +17,7 @@ CAPTURE_POLICY = "source-retention-v1+capture-context-v1"
 
 
 def checkpoint_bytes(body):
-    # Match the native canonical JSON representation, including JS separators.
-    result = encode(body, MAX_BYTES).replace(b"\xe2\x80\xa8", b"\\u2028").replace(b"\xe2\x80\xa9", b"\\u2029")
-    if len(result) > MAX_BYTES:
-        raise InvalidData("Metadata checkpoint exceeds the native byte limit")
-    return result
+    return native_json(body, MAX_BYTES)
 
 
 class EnrichmentClient:

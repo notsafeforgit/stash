@@ -6,7 +6,7 @@ import sys
 
 from stash_ingest.client import Client, Unavailable
 from stash_ingest.enrichment_client import EnrichmentClient, checkpoint_bytes
-from stash_ingest.enrichment_lease import EnrichmentLease
+from stash_ingest.job_lease import JobLease
 from stash_ingest.encoding import decode
 from stash_ingest.metadata_bundle import Bundle
 from stash_ingest.runs import SourcePaused
@@ -47,7 +47,7 @@ assert client.ready(setup["collection"]) == []
 description = client.describe(job["uuid"])
 assert description["job"] == job and description["target"] == target
 owner = "b0d97f9c-84f2-4e7d-b315-322d451bb966"
-lease = lost_once(lambda: EnrichmentLease.claim(client, job, owner=owner, seconds=180))
+lease = lost_once(lambda: JobLease.claim(client, job, owner=owner, seconds=180))
 lease.check()
 lease.start()
 lease.renew()

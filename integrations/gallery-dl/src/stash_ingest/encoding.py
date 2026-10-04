@@ -127,6 +127,14 @@ def encode(value, limit=MAX_EVENT_BYTES):
     return body
 
 
+def native_json(value, limit):
+    """Native canonical bodies; ordinary event wire bytes keep their own hash."""
+    body = encode(value, limit).replace(b"\xe2\x80\xa8", b"\\u2028").replace(b"\xe2\x80\xa9", b"\\u2029")
+    if len(body) > limit:
+        raise InvalidData("Native JSON exceeds the protocol byte limit")
+    return body
+
+
 def decode(body, limit=MAX_EVENT_BYTES, *, preserve_numbers=False):
     if not isinstance(body, bytes) or len(body) > limit:
         raise InvalidData("Invalid JSON byte length")

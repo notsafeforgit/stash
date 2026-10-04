@@ -1,4 +1,4 @@
-"""Fail-closed enrichment ownership measured against the server's clock."""
+"""Fail-closed native job ownership measured against the server's clock."""
 
 from datetime import datetime
 from email.utils import parsedate_to_datetime
@@ -11,7 +11,7 @@ from .encoding import InvalidData, identifier
 from .runs import SourcePaused
 
 
-class EnrichmentLease:
+class JobLease:
     def __init__(self, client, owner, seconds=180, *, clock=time.monotonic):
         client._seconds(seconds)
         self.client, self.owner, self.seconds = client, identifier(owner), seconds
@@ -39,15 +39,15 @@ class EnrichmentLease:
             budget = min(self.seconds, (until - server_time).total_seconds() - 2)
             deadline = started + budget
         except (ValueError, TypeError, KeyError, OverflowError):
-            raise SourcePaused("Enrichment lease has no usable server deadline") from None
+            raise SourcePaused("Native job lease has no usable server deadline") from None
         if deadline <= self.clock():
-            raise SourcePaused("Enrichment lease expired before its response arrived")
+            raise SourcePaused("Native job lease expired before its response arrived")
         self.job, self.deadline = job, deadline
 
     def check(self):
         with self.lock:
             if self.failed or self.job is None or self.stop.is_set() or self.clock() >= self.deadline:
-                raise SourcePaused("Enrichment ownership is no longer confirmed")
+                raise SourcePaused("Native job ownership is no longer confirmed")
 
     def renew(self):
         with self.lock:
@@ -56,7 +56,7 @@ class EnrichmentLease:
                 self._accept(self.client.renew(self.job, self.seconds))
             except (Unavailable, InvalidData, SourcePaused):
                 self.failed = True
-                raise SourcePaused("Cannot renew enrichment ownership") from None
+                raise SourcePaused("Cannot renew native job ownership") from None
 
     def reserve_source(self, url):
         with self.lock:
@@ -68,7 +68,7 @@ class EnrichmentLease:
     def start(self):
         self.check()
         if self.thread is not None:
-            raise InvalidData("Enrichment heartbeat already started")
+            raise InvalidData("Native job heartbeat already started")
 
         def heartbeat():
             while not self.stop.wait(self.seconds / 3):
@@ -77,7 +77,7 @@ class EnrichmentLease:
                 except SourcePaused:
                     return
 
-        self.thread = threading.Thread(target=heartbeat, name="stash-enrichment-lease", daemon=True)
+        self.thread = threading.Thread(target=heartbeat, name="stash-job-lease", daemon=True)
         self.thread.start()
         return self
 
@@ -86,4 +86,4 @@ class EnrichmentLease:
         if self.thread is not None:
             self.thread.join(self.client.client.timeout + 1)
             if self.thread.is_alive():
-                raise SourcePaused("Enrichment heartbeat has not stopped")
+                raise SourcePaused("Native job heartbeat has not stopped")

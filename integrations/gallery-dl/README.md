@@ -1729,7 +1729,7 @@ credentials supply the producer identity. Checkpoint reads are bounded to
 32 MiB plus 4 KiB and verify the body digest, counts, URL and extractor version.
 An unchanged checkpoint may replay an older receipt without changing provenance.
 
-`enrichment_lease.EnrichmentLease.claim(client, job, owner=..., seconds=180)`
+`job_lease.JobLease.claim(client, job, owner=..., seconds=180)`
 returns an owned lease or `None` when the selected job is currently unavailable.
 `start()` starts heartbeats; pass `check` to the isolated extractor and call
 `close()` when the attempt ends. Deadlines use the server date and monotonic
@@ -2011,11 +2011,25 @@ The protocol advertises `discovery_protocol: 1` and
 It accepts existing definition UUIDs and their pinned hashes, not replacement
 source definitions or worker-selected initial cursors.
 
-A dedicated producer client, durable page outbox/lease execution, readiness and
-maintenance, reviewed activation, candidate matching and verified page release
-remain required. The current collector and generic HTTP transport are components,
-not an activated discovery CLI or host/n8n integration. Existing production
-workers have not switched to them.
+`discovery_client.DiscoveryClient(Client(...))` implements that protocol. It
+validates each listing's canonical definition hash, requested cursor, page job
+and completion receipt. `append_page(description, lease.job, page)` checks the
+page against its original request before sending its compact JSON body, then
+verifies the receipt's exact body hash, ordinal, producer and attempt fence.
+Admission, page and controlled-failure acknowledgements can be replayed after a
+lost response without creating another attempt or skipping the next cursor.
+
+Use `JobLease.claim(client, description, owner=..., seconds=180)` with the full
+discovery description; its immutable listing supplies the pinned policy/runtime.
+The returned lease shares enrichment's server-clock deadline, heartbeat and
+source-reservation handling. Keep the owner UUID across a lost claim response,
+start the heartbeat, pass its checks/reservations to extraction and close it when
+the attempt ends. Lease renewal alone does not persist a fetched page.
+
+Durable page outbox/lease execution, readiness and maintenance, reviewed
+activation, candidate matching and verified page release remain required. The
+collector and protocol client are components, not an activated discovery CLI or
+host/n8n integration. Existing production workers have not switched to them.
 
 ## Validation
 
@@ -2056,7 +2070,9 @@ unknown inputs and conflicting snapshot identities cannot partially publish.
 These checks are included in `make validate-fork`
 and the build workflow. No production endpoint or source website is contacted.
 `TestPythonDiscoveryHTTPPreservesLargePagesAndLostAcknowledgements` also runs the
-actual Python transport against the native server, preserving a page larger than
-4 MiB, exact source numbers and compact metadata. Lost admission, claim, page and
-failure responses replay without duplicate attempts. Retaining a nonfinal page
-does not mark enumeration complete or publish native post matches.
+supported discovery client and shared job lease against the native server,
+preserving a page larger than 4 MiB, exact source numbers and compact metadata.
+Lost admission, claim, page and failure responses replay without duplicate
+attempts. It checks lease renewal and source reservation, the next page's
+original cursor and the first page's receipt after the next job fails. Retaining
+a nonfinal page does not mark enumeration complete or publish native post matches.

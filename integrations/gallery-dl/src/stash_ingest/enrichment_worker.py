@@ -4,7 +4,7 @@ from .client import Unavailable
 from .encoding import InvalidData, decode, identifier
 from .enrichment_client import EnrichmentClient
 from .enrichment_journal import EnrichmentJournal
-from .enrichment_lease import EnrichmentLease
+from .job_lease import JobLease
 from .metadata_bundle import ERRORS, MAX_BYTES
 from .metadata_fetch import fetch
 from .outbox import Capacity, Conflict
@@ -103,7 +103,7 @@ def execute(box, transport, configuration, job_uuid, *, fetcher=fetch):
                 return _result(journal, job_uuid, "waiting")
             value = journal.claim(value, job)
             claim = value.state["claim"]
-            lease = EnrichmentLease.claim(client, claim["job"], owner=claim["owner_uuid"], seconds=180)
+            lease = JobLease.claim(client, claim["job"], owner=claim["owner_uuid"], seconds=180)
             if lease is None:
                 return _result(journal, job_uuid, "waiting")
             value = journal.claimed(value, lease.job)

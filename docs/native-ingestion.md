@@ -706,13 +706,20 @@ returns HTTP 400 `invalid_discovery_work`; malformed envelopes use the common
 HTTP 400 response. Missing records return 404, scope violations 403, and capacity
 exhaustion 429. Responses retain `Cache-Control: no-store`.
 
+The supported Python `DiscoveryClient` validates definition digests, original
+cursor bindings and receipt ownership before accepting responses. Its shared
+`JobLease` uses the server clock and stable owner identity for renewal and lost
+claim recovery. Source number tokens and Unicode survive native canonical page
+encoding. See [producer discovery](../integrations/gallery-dl/README.md#account-listing-page-collector)
+for the client contract and remaining execution work.
+
 These endpoints do not create listing definitions, activate imported work,
 explicitly retry a terminal job or accept a candidate match. No discovery
-dispatch capability is advertised. A supported Python discovery client, durable
-page outbox/lease execution, readiness and maintenance, reviewed activation and
-candidate matching remain necessary before host/n8n callers switch to native
-discovery. In particular, a retained nonfinal page is successful page delivery,
-not successful enumeration or a completed catalog import.
+dispatch capability is advertised. Durable page outbox/lease execution,
+readiness and maintenance, reviewed activation and candidate matching remain
+necessary before host/n8n callers switch to native discovery. In particular, a
+retained nonfinal page is successful page delivery, not successful enumeration
+or a completed catalog import.
 
 ## Completed file events
 

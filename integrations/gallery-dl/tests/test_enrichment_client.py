@@ -11,7 +11,7 @@ import uuid
 from stash_ingest.client import Client, Unavailable
 from stash_ingest.encoding import InvalidData, decode, encode
 from stash_ingest.enrichment_client import EnrichmentClient, MAX_RESPONSE, CAPTURE_POLICY, checkpoint_bytes
-from stash_ingest.enrichment_lease import EnrichmentLease
+from stash_ingest.job_lease import JobLease
 from stash_ingest.metadata_bundle import Bundle, MAX_BYTES
 from stash_ingest.metadata_fetch import _exchange
 from stash_ingest.runs import SourcePaused
@@ -251,11 +251,11 @@ class EnrichmentClientTests(unittest.TestCase):
                 self.client.publish(self.job["uuid"], self.lease, self.receipt)
 
 
-class EnrichmentLeaseTests(unittest.TestCase):
+class JobLeaseTests(unittest.TestCase):
     def setUp(self):
         self.client = EnrichmentClient(Mock(timeout=15))
         self.clock = 100.0
-        self.lease = EnrichmentLease(self.client, str(uuid.uuid4()), seconds=60, clock=lambda: self.clock)
+        self.lease = JobLease(self.client, str(uuid.uuid4()), seconds=60, clock=lambda: self.clock)
         self.date = datetime(2026, 10, 3, tzinfo=timezone.utc)
 
     def accept(self, seconds=60, started=100):

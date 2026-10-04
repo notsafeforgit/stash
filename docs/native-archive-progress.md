@@ -5364,7 +5364,6 @@ native UI, host/n8n conversion, compatibility removal, coordinated backup/export
 restore, performance and final cutover are still required. Production and
 `develop` remain unchanged.
 
-
 ## Retained context and child retry prerequisites — 2026-10-03
 
 Schema 1000063 introduces signed capture context bindings. A newly observed
@@ -6140,3 +6139,33 @@ verified staging release and reviewed post consolidation remain open. The full
 transition's remaining import, UI, caller conversion, compatibility removal,
 backup/restore, cutover and retirement gates still apply. Production and
 `develop` remain unchanged.
+
+## Validated discovery client and shared job lease — 2026-10-04
+
+The supported Python discovery client now verifies the exact protocol and page
+capacity, canonical listing definitions, original requested cursors, immutable
+job arguments and returned ownership. Page delivery checks its original request
+before sending a compact object-valued body, then validates the acknowledgement
+against the exact body hash, page ordinal, producer and attempt fence. Successful
+job descriptions require their own retained receipt; a failed predecessor cannot
+inherit a successor's completion. Controlled failure acknowledgements preserve
+the original attempt and outcome.
+
+Discovery and enrichment now share `JobLease`, retaining server-clock deadlines,
+monotonic elapsed time, stable claim owners, source reservations and heartbeat
+failure behavior. Their native body encoders also share canonical Unicode
+escaping without changing ordinary ingest event bytes or hashes.
+
+All 411 producer tests pass, including six new discovery client tests. Real
+Go/Python discovery, enrichment transport and enrichment restart tests pass in
+48 seconds. The discovery fixture now uses the supported client and shared lease
+to renew ownership, reserve the source and recover lost admission, claim, page
+and failure replies. It preserves a page larger than 4 MiB, exact number tokens
+and Unicode, and checks the next cursor without treating a nonfinal page as
+completed enumeration. Build and lint passed on the preceding API revision.
+Evidence is in `.local/native-discovery-client-20261004/`.
+
+This increment adds no database schema or full rehearsal copy. Durable discovery
+outbox/execution, readiness and maintenance, reviewed activation, matching,
+verified staging release and reviewed post consolidation remain open, along with
+the full transition's later phases. Production and `develop` remain unchanged.

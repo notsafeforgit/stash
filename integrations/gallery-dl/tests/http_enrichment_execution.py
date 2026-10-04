@@ -14,7 +14,7 @@ from stash_ingest.encoding import decode, encode
 from stash_ingest.enrichment_client import EnrichmentClient, checkpoint_bytes
 from stash_ingest.enrichment_configuration import EnrichmentConfiguration, SCHEMA
 from stash_ingest.enrichment_journal import EnrichmentJournal
-from stash_ingest.enrichment_lease import EnrichmentLease
+from stash_ingest.job_lease import JobLease
 from stash_ingest.enrichment_worker import execute
 from stash_ingest.outbox import Outbox
 from stash_ingest.runs import SourcePaused
@@ -40,7 +40,7 @@ raw = Path(setup["fixture"]).read_bytes().replace(b'"legacy_field": "old"',
 bodies = decode(raw, preserve_numbers=True)
 count_path = directory / "fetches.txt"
 source_paused = False
-original_check = EnrichmentLease.check
+original_check = JobLease.check
 
 
 def lease_check(lease):
@@ -69,7 +69,7 @@ box = Outbox(directory / "outbox.sqlite", transport.endpoint, transport.producer
              max_bytes=setup.get("max_bytes", 512 << 20))
 try:
     with (patch("requests.sessions.Session.request", side_effect=AssertionError("No website requests in native execution fixture")),
-          patch.object(EnrichmentLease, "check", lease_check)):
+          patch.object(JobLease, "check", lease_check)):
         if setup["deliver_only"]:
             output = io.StringIO()
             with redirect_stdout(output):

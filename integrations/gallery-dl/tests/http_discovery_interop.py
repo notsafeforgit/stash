@@ -5,23 +5,21 @@ import json
 import sys
 
 from stash_ingest.client import Client, Unavailable
+from stash_ingest.discovery_client import DiscoveryClient, page_bytes
 from stash_ingest.discovery_fetch import validate_page
-from stash_ingest.encoding import decode, encode
-from stash_ingest.enrichment_client import checkpoint_bytes
+from stash_ingest.encoding import decode
+from stash_ingest.job_lease import JobLease
 from stash_ingest.metadata_bundle import Bundle
 
 
 setup = json.load(sys.stdin)
-client = Client(setup["endpoint"], setup["producer"], timeout=30)
+client = DiscoveryClient(Client(setup["endpoint"], setup["producer"], timeout=30))
 capabilities = client.capabilities()
 assert capabilities["discovery_protocol"] == 1
 assert capabilities["discovery_source_pacing_protocol"] == 1
 assert "discovery_dispatch_protocol" not in capabilities
 listing = setup["listing"]
-prefix = "/discovery"
-admission = encode({"expected_definition_sha256": listing["sha256"],
-    "policy_sha256": listing["policy_sha256"], "extractor_version": listing["extractor_version"]})
-admit_path = prefix + "/listings/" + listing["uuid"] + "/jobs"
+admission = (listing["uuid"], listing["sha256"], listing["policy_sha256"], listing["extractor_version"])
 
 
 def lost_once(operation):
@@ -34,20 +32,10 @@ def lost_once(operation):
     return operation()
 
 
-job = lost_once(lambda: client._request("POST", admit_path, admission))
-path = prefix + "/jobs/" + job["uuid"]
-description = client._request("GET", path)
+job = lost_once(lambda: client.admit(*admission))
+description = client.describe(job["uuid"])
 assert description["cursor"] is None and description["receipt"] is None
 assert description["listing"] == listing
-owner = "12519d09-6b84-4f46-bd89-9a7848b6ee29"
-claim = encode({"expected_revision": job["revision"], "owner_uuid": owner,
-    "policy_sha256": listing["policy_sha256"], "extractor_version": listing["extractor_version"], "lease_seconds": 180})
-running = lost_once(lambda: client._request("POST", path + "/claim", claim))
-assert running["fence"] == 1 and running["owner_uuid"] == owner
-lease = {"owner_uuid": owner, "fence": running["fence"]}
-reservation = client._request("POST", path + "/source", encode({**lease, "url": listing["profile_url"]}))
-assert reservation["ready"] is True
-
 bundle = Bundle(listing["profile_url"], listing["extractor_version"], max_records=4096)
 numbers = decode(b'{"decimal":1.2300e+05,"precise":0.123456789012345678901234567890,"zero":-0}', preserve_numbers=True)
 for number in range(3):
@@ -58,27 +46,36 @@ page = validate_page({"schema": "stash-discovery-page-v1", "retention_policy": c
     "url": listing["profile_url"], "extractor_version": listing["extractor_version"],
     "cursor": None, "next_cursor": {"after": "t3_abc123"}, "complete": False,
     "records": bundle.checkpoint()["records"]}, listing["profile_url"], listing["extractor_version"])
-raw = checkpoint_bytes(page)
+raw = page_bytes(page)
 assert len(raw) > 4 << 20
-request = encode({**lease, "ordinal": 1})[:-1] + b',"body":' + raw + b'}'
-receipt = lost_once(lambda: client._request("POST", path + "/page", request))
+owner = "12519d09-6b84-4f46-bd89-9a7848b6ee29"
+lease = lost_once(lambda: JobLease.claim(client, description, owner=owner, seconds=180))
+assert lease.job["fence"] == 1 and lease.job["owner_uuid"] == owner
+lease.start()
+try:
+    lease.renew()
+    assert lease.reserve_source(listing["profile_url"]) is True
+    receipt = lost_once(lambda: client.append_page(description, lease.job, page))
+finally:
+    lease.close()
 assert receipt["sha256"] == hashlib.sha256(raw).hexdigest()
 assert receipt["job_uuid"] == job["uuid"] and receipt["producer_uuid"] == setup["producer"]
 assert receipt["ordinal"] == 1 and receipt["fence"] == 1 and receipt["record_count"] == 3
 assert receipt["complete"] is False
-assert client._request("GET", path)["receipt"] == receipt
-assert client._request("POST", path + "/page", request) == receipt
+assert client.describe(job["uuid"])["receipt"] == receipt
+assert client.append_page(description, lease.job, page) == receipt
 
-following = client._request("POST", admit_path, admission)
+following = client.admit(*admission)
 assert following["uuid"] != job["uuid"]
-next_path = prefix + "/jobs/" + following["uuid"]
-assert client._request("GET", next_path)["cursor"] == page["next_cursor"]
-claim_next = encode({"expected_revision": following["revision"], "owner_uuid": owner,
-    "policy_sha256": listing["policy_sha256"], "extractor_version": listing["extractor_version"], "lease_seconds": 180})
-next_running = client._request("POST", next_path + "/claim", claim_next)
-failed = lost_once(lambda: client._request("POST", next_path + "/failure", encode({"owner_uuid": owner,
-    "fence": next_running["fence"], "error_code": "pagination_stalled"})))
+next_description = client.describe(following["uuid"])
+assert next_description["cursor"] == page["next_cursor"]
+next_lease = JobLease.claim(client, next_description, owner=owner, seconds=180)
+next_lease.start()
+try:
+    failed = lost_once(lambda: client.fail(following["uuid"], next_lease.job, "pagination_stalled"))
+finally:
+    next_lease.close()
 assert failed["outcome"] == "failed" and failed["job_uuid"] == following["uuid"]
-assert client._request("GET", next_path)["job"]["state"] == "failed"
-assert client._request("GET", path)["receipt"] == receipt
+assert client.describe(following["uuid"])["job"]["state"] == "failed"
+assert client.describe(job["uuid"])["receipt"] == receipt
 print(json.dumps({"receipt": receipt, "failed_job": following["uuid"], "page_bytes": len(raw)}))

@@ -31,10 +31,10 @@ func TestOriginalStreamCatalogDoesNotSubstituteOwnerTranscode(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(transcode), 0o700))
 	require.NoError(t, os.WriteFile(transcode, []byte("owner MP4 transcode"), 0o600))
 	base := &url.URL{Path: "/share/grant/media/scene-1/stream"}
-	owner, err := GetV3SceneStreamPaths(scene, base, models.StreamingResolutionEnumFullHd)
+	owner, err := GetSceneStreamPaths(scene, base, models.StreamingResolutionEnumFullHd)
 	require.NoError(t, err)
 	require.Equal(t, ffmpeg.MimeMp4Video, *owner[0].MimeType)
-	original, err := GetV3OriginalSceneStreamPaths(scene, base, models.StreamingResolutionEnumFullHd)
+	original, err := GetOriginalSceneStreamPaths(scene, base, models.StreamingResolutionEnumFullHd)
 	require.NoError(t, err)
 	require.Equal(t, ffmpeg.MimeWebmVideo, *original[0].MimeType)
 	require.Greater(t, len(original), 1, "original playback must retain HLS compatibility options")

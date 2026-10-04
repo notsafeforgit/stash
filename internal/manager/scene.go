@@ -30,32 +30,6 @@ var (
 		mimeType:  ffmpeg.MimeMp4Video,
 		extension: "",
 	}
-	mp4EndpointType = endpointType{
-		label:     "MP4",
-		mimeType:  ffmpeg.MimeMp4Video,
-		extension: ".mp4",
-	}
-	mkvEndpointType = endpointType{
-		label: "MKV",
-		// use mp4 mimetype to trick the client, since many clients won't try mkv
-		mimeType:  ffmpeg.MimeMp4Video,
-		extension: ".mkv",
-	}
-	webmEndpointType = endpointType{
-		label:     "WEBM",
-		mimeType:  ffmpeg.MimeWebmVideo,
-		extension: ".webm",
-	}
-	legacyHLSEndpointType = endpointType{
-		label:     "HLS",
-		mimeType:  ffmpeg.MimeHLS,
-		extension: ".m3u8",
-	}
-	dashEndpointType = endpointType{
-		label:     "DASH",
-		mimeType:  ffmpeg.MimeDASH,
-		extension: ".mpd",
-	}
 	// HLS endpoints point at the master playlists (`.master.m3u8`)
 	// rather than the media playlists. The master is the spec-correct
 	// HLS entry point and is required by MSE-based clients (e.g.
@@ -108,13 +82,12 @@ func GetVideoFileContainer(file *models.VideoFile) (ffmpeg.Container, error) {
 	return container, nil
 }
 
-// GetV3SceneStreamPaths returns the direct and segmented stream catalog used
-// exclusively by the v3 player.
-func GetV3SceneStreamPaths(scene *models.Scene, directStreamURL *url.URL, maxStreamingTranscodeSize models.StreamingResolutionEnum) ([]*SceneStreamEndpoint, error) {
-	return getV3SceneStreamPaths(scene, directStreamURL, maxStreamingTranscodeSize, true)
+// GetSceneStreamPaths returns the native direct and segmented stream catalog.
+func GetSceneStreamPaths(scene *models.Scene, directStreamURL *url.URL, maxStreamingTranscodeSize models.StreamingResolutionEnum) ([]*SceneStreamEndpoint, error) {
+	return getSceneStreamPaths(scene, directStreamURL, maxStreamingTranscodeSize, true)
 }
 
-func getV3SceneStreamPaths(scene *models.Scene, directStreamURL *url.URL, maxStreamingTranscodeSize models.StreamingResolutionEnum, allowGeneratedTranscode bool) ([]*SceneStreamEndpoint, error) {
+func getSceneStreamPaths(scene *models.Scene, directStreamURL *url.URL, maxStreamingTranscodeSize models.StreamingResolutionEnum, allowGeneratedTranscode bool) ([]*SceneStreamEndpoint, error) {
 	if scene == nil {
 		return nil, fmt.Errorf("nil scene")
 	}
@@ -198,8 +171,7 @@ func getV3SceneStreamPaths(scene *models.Scene, directStreamURL *url.URL, maxStr
 	if hasTranscode || ffmpeg.IsValidAudioForContainer(audioCodec, container) {
 		actualDirectType := directEndpointType
 		if !hasTranscode {
-			// v3 uses the real source MIME for direct streams. The legacy
-			// catalog retains the upstream MP4 MIME shim for compatibility.
+			// Direct playback advertises the source container MIME type.
 			switch container {
 			case ffmpeg.Matroska:
 				actualDirectType.mimeType = ffmpeg.MimeMkvVideo

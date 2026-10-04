@@ -14,7 +14,6 @@ const queryFields = {
     "findDuplicateScenes",
     "findDuplicateSceneGroups",
     "sceneWall",
-    "sceneStreams",
     "parseSceneFilenames",
   ],
   marker: [

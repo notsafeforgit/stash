@@ -51,7 +51,7 @@ const detailQuery: TypedDocumentNode<{
   query CoverTestScene {
     findScene(id: "1") {
       id title resume_time files { id updated_at }
-      sceneStreams: sceneStreamsV3 { url mime_type label }
+      sceneStreams { url mime_type label }
       paths { screenshot stream sprite }
       preview_image { ...PreviewImageData }
       cover_origin { ...SceneCoverOriginData }

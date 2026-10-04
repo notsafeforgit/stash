@@ -91,9 +91,6 @@ type Query {
     filter: FindFilterType
   ): FindDuplicateImagesResultType!
 
-  "Return valid stream paths"
-  sceneStreams(id: ID): [SceneStreamEndpoint!]!
-
   parseSceneFilenames(
     filter: FindFilterType
     config: SceneParserInput!

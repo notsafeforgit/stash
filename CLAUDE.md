@@ -162,6 +162,11 @@ The sole application UI, embedded with its share and offline entry points.
 Native routes, preview generation and ingestion workers do not require a UI
 opt-in flag. Historical UI code is preserved at `v2.5-compatible-final`.
 
+`Scene.sceneStreams` is the sole direct/segmented playback catalog. Native
+fragments request it directly; the former `sceneStreamsV3` alias, root stream
+query and parallel legacy catalog are removed. Keep signed media URLs, source
+MIME types, codec/GOP/resolution checks and original-file share behavior intact.
+
 **Routing — TanStack Router v1**
 - File-based routes under `src/routes/`. Route files use `createFileRoute`.
 - Routes validate search parameters with `validateSearch`; existing detail/settings routes pass Zod schemas directly. List filter parsing belongs in the shared list/filter modules.

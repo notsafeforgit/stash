@@ -363,7 +363,7 @@ func (rs *shareRoutes) detail(w http.ResponseWriter, r *http.Request) {
 	ret := publicShareDetail{Media: rs.publicMedia(r, row, *item, scene), VideoCodec: item.VideoCodec, AudioCodec: item.AudioCodec, FrameRate: item.FrameRate, Streams: []*manager.SceneStreamEndpoint{}}
 	if scene != nil {
 		base := &url.URL{Path: shareBase(r, row.ID) + "media/" + item.Key + "/stream"}
-		streams, err := manager.GetV3OriginalSceneStreamPaths(scene, base, models.StreamingResolutionEnumFullHd)
+		streams, err := manager.GetOriginalSceneStreamPaths(scene, base, models.StreamingResolutionEnumFullHd)
 		if err != nil {
 			http.Error(w, "Media unavailable", http.StatusServiceUnavailable)
 			return

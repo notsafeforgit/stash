@@ -165,9 +165,10 @@ Three gaps require explicit work:
    completion independently of navigation callbacks.
 
 No backend schema or database migration is expected for the main scope.
-Normal playback uses `sceneStreamsV3`, as the existing v3 fragment already
-does. Preserve `sceneStreams` and legacy clients. Any demonstrated backend gap
-must be documented and addressed additively in fork-owned code.
+Normal playback now uses the native `Scene.sceneStreams` field. The independent
+archive transition removed the former `sceneStreamsV3` suffix and the upstream
+catalog adapter after converting the native fragments. The original requirement
+to preserve v2.5 clients is superseded by that transition's contract policy.
 
 ## 4. Required feature matrix
 
@@ -637,7 +638,7 @@ or a fixed tier from a validated subset of the generated streaming enum
 resolution ordering. Do not persist URLs, array positions or display labels,
 and do not add separate scene/marker defaults.
 
-Resolve the preference against the selected parent scene's `sceneStreamsV3`
+Resolve the preference against the selected parent scene's native `sceneStreams`
 catalog after browser and clip-mode eligibility checks. Classify endpoint kind
 and resolution once in the shared source adapter using validated URL parameters
 and actual source dimensions; do not infer them from display-label text or

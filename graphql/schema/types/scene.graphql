@@ -82,11 +82,8 @@ type Scene {
 
   custom_fields: Map!
 
-  "Return valid stream paths"
+  "Direct and segmented stream paths for browser playback"
   sceneStreams: [SceneStreamEndpoint!]!
-
-  "Return v3 segmented stream paths"
-  sceneStreamsV3: [SceneStreamEndpoint!]!
 }
 
 input SceneMovieInput {

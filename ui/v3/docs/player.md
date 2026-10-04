@@ -203,9 +203,12 @@ blob media disables remote playback. Receivers must be able to fetch the source.
 
 ## Backend streaming boundary
 
-[SceneStreamsV3](../../../internal/api/resolver_model_scene_v3.go) supplies the
-v3 source catalogue. The legacy `sceneStreams` field has its own
-[compatibility adapter](../../../internal/manager/scene_stream_legacy_compat.go).
+[`Scene.sceneStreams`](../../../internal/api/resolver_model_scene.go) supplies
+the native direct and segmented source catalogue. The duplicate `sceneStreamsV3`
+field, legacy root query and parallel upstream catalogue are removed. Native
+queries use this field directly; shared/offline players retain the same source
+shape. The [stream service](../../../internal/manager/scene.go) preserves real
+source MIME types, resolution limits and codec/GOP checks.
 [Scene routes](../../../internal/api/routes_scene.go) expose the native HLS
 endpoint families by default, under the normal media authentication boundary.
 

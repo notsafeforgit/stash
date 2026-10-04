@@ -159,10 +159,11 @@ names. Other API bridges remain until their callers are converted:
   revision. The UI configuration response includes derived defaults without
   maintaining a second writable copy. The old default-filter API and migration
   task are removed; configuration promotion runs before native library access.
-- `Scene.sceneStreams` keeps the legacy stream catalogue.
-  [sceneStreamsV3](../internal/api/resolver_model_scene_v3.go) supplies v3's
-  separate catalogue. The [legacy adapter](../internal/manager/scene_stream_legacy_compat.go)
-  preserves v2.5 behavior even with v3 enabled.
+- `Scene.sceneStreams` exposes the sole native direct/segmented stream catalogue.
+  The duplicate `sceneStreamsV3` field and legacy root stream query are removed.
+  Source MIME types, codec/GOP checks, signed URLs and resolution limits use the
+  shared [stream service](../internal/manager/scene.go); public HTTP media and
+  share paths remain supported independently of the retired GraphQL adapter.
 - Legacy bulk mutations retain their synchronous return contract; additive
   `bulk*UpdateJob` mutations support v3's background workflow.
 

@@ -7108,6 +7108,37 @@ invalid-write rollback and explicit clearing. SQLite tests restore native and
 historical JSON into a separate database, preserving labels, exclusions and
 canonical precedence. Existing migration/restart/conflict tests also pass.
 
-The full fork gate is running; production, scraper launchers and the frozen
-compatible release remain unchanged. Reports are in
+The saved-filter full fork gate passed in 1,203 seconds. The combined filter
+and playback gate also passed in 1,184 seconds. Production, scraper launchers
+and the frozen compatible release remain unchanged. Reports are in
 `.local/native-discovery-client-20261004/saved_filter_native_*`.
+
+## Single native playback catalog — 2026-10-04
+
+`Scene.sceneStreams` now exposes the native direct and segmented playback
+catalog. Removed the duplicate `sceneStreamsV3` field, unused legacy root query,
+parallel upstream catalog and its endpoint/MIME shims. Native fragments and
+Apollo cache tests use the field directly. The built-in TV, lightbox, shared and
+offline players retain their existing source shape. Public HTTP media paths
+remain available, and shares keep their original-file policy.
+
+The native catalog implementation is unchanged apart from function names and
+comments. Codec/GOP checks, rotation handling, source MIME types, generated
+transcodes and streaming-resolution limits remain in the shared service. Actual
+workflow/plugin/host inspection found no stream callers needing conversion;
+sibling upstream/reference checkouts remain outside the native release contract.
+
+Generation and the native build pass. All 583 frontend tests and the current
+application/plugin contract checks pass. Real SQLite/GraphQL tests verify direct
+WebM MIME, resolution caps, proxy prefixes, API keys, user signatures, missing
+authentication, empty scenes and rejection of removed entry points. The stream,
+signed-URL and original-share regressions passed in 109 seconds.
+
+All 70 focused scene-detail, lightbox, sharing and source-switching checks passed
+in Chromium and WebKit in 196 seconds, using the cached Playwright 1.63.0
+Resolute container with network access disabled. The initial host attempt could
+not launch because browser executables were absent. The full gate for this
+increment passed in 1,184 seconds: 583 UI tests, 484 producer tests, Go lint
+with zero issues and the complete tagged backend suite. Production and the
+verified schema-77 rehearsal are unchanged. Reports are under
+`.local/native-discovery-client-20261004/native_stream_contract_*`.

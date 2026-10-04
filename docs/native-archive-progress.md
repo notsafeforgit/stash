@@ -45,8 +45,12 @@ unverified or conflicting identities retain their checkpoints for review.
 Account listing definitions, owned one-page jobs, atomic cursor progress, shared
 scheduling, scoped worker HTTP and durable producer delivery/dispatch are
 implemented. Native candidates now share original page references, group repeated
-post IDs across pages and resume comparison automatically. Reviewed activation,
-historical coverage, candidate detail execution and match publication remain open.
+post IDs across pages and resume comparison automatically. Reviewed activation
+and current coverage inspection are implemented and rehearsed. Application
+publication now commits complete, unique strong matches through shared native
+capture services and is under full-copy verification. Historical coverage,
+candidate detail execution, automatic publication dispatch and staging release
+remain open.
 Remaining import review resolution and the broader native management interfaces still
 require work.
 Native UI, live host/n8n conversion, compatibility removal, coordinated
@@ -6660,3 +6664,33 @@ with a median selected-target lookup of 0.16 ms. Evidence is under
 Historical coverage resolution, detail execution, atomic publication, staging
 release and the broader transition gates remain open. This review provides
 inspection of those distinctions; it does not complete them.
+
+## Atomic discovery match publication — 2026-10-04
+
+Schema 74 now retains application publication of a complete, unique strong
+listing match. The operation preserves the imported native post UUID and keys,
+accepts its verified source ID, records canonical URL provenance and publishes
+the selected post's observations from the strongest page through shared native
+capture, publisher, album and translation services. The original observing
+producer, observation times, shared bodies/profiles and parent context survive.
+Publication and per-record capture associations commit atomically; unrelated
+page contents remain staged. Historical gaps, incomplete comparison, weak or
+competing candidates, changed native choices and an ID owned by another post
+continue to block publication.
+
+Focused capture, SQLite, migration/reopen and real Go/Python HTTP tests pass,
+including concurrent replay, a deliberately lost committed response, caught
+partial-write errors, forged capture metadata, pre-commit source changes,
+corroborating observation time and immutable replay after a post tombstone.
+The API test also verifies native publisher and album services and rejects an
+implicit merge of two imported posts claiming one source ID. Go lint reports
+zero issues. Captured titles retain their original source capitalization.
+
+The full schema-73 archive was copied without changing its source. Schema-74
+migration and the full fork gate are being verified; schema 73 remains the
+retained verified baseline. Evidence is under
+`.local/native-discovery-client-20261004/discovery_publication_*` and
+`.local/native-discovery-publication-20261004/`. Production, `develop` and the
+frozen compatible release remain unchanged. Historical coverage resolution,
+weak-candidate execution, automatic publication dispatch, staging release,
+explicit post consolidation and the broader transition gates remain open.

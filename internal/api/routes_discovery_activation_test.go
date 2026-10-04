@@ -27,6 +27,15 @@ import (
 )
 
 func TestDiscoveryActivationHTTPRecoversAndInspectsSharedCandidateEvidence(t *testing.T) {
+	discoveryActivationHTTP(t, false)
+}
+
+func TestDiscoveryPublicationHTTPRecoversLostResponseAndRejectsImplicitPostMerge(t *testing.T) {
+	discoveryActivationHTTP(t, true)
+}
+
+func discoveryActivationHTTP(t *testing.T, fresh bool) {
+	t.Helper()
 	python, packagePath := nativeProducerRuntime(t)
 	config.InitializeEmpty()
 	directory := t.TempDir()
@@ -53,6 +62,7 @@ func TestDiscoveryActivationHTTPRecoversAndInspectsSharedCandidateEvidence(t *te
 	router := (&nativeArchiveRoutes{repo: repo}).router()
 	handler := http.StripPrefix("/api/v3/archive", router)
 	var lost atomic.Bool
+	var lostPublication atomic.Bool
 	var applies atomic.Int64
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("ApiKey") != "fixture-application-key" || r.Header.Get("Authorization") != "" {
@@ -73,6 +83,15 @@ func TestDiscoveryActivationHTTPRecoversAndInspectsSharedCandidateEvidence(t *te
 				return
 			}
 		}
+		if recorder.Code == http.StatusOK && r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/publication") && !lostPublication.Swap(true) {
+			connection, _, err := w.(http.Hijacker).Hijack()
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			_ = connection.Close()
+			return
+		}
 		for key, values := range recorder.Header() {
 			w.Header()[key] = values
 		}
@@ -80,7 +99,7 @@ func TestDiscoveryActivationHTTPRecoversAndInspectsSharedCandidateEvidence(t *te
 		_, _ = w.Write(recorder.Body.Bytes())
 	}))
 	defer server.Close()
-	setup, err := json.Marshal(map[string]any{"directory": directory, "source": source, "snapshot": uuid.NewString(), "endpoint": server.URL})
+	setup, err := json.Marshal(map[string]any{"directory": directory, "source": source, "snapshot": uuid.NewString(), "endpoint": server.URL, "fresh": fresh})
 	require.NoError(t, err)
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()
@@ -118,10 +137,17 @@ func TestDiscoveryActivationHTTPRecoversAndInspectsSharedCandidateEvidence(t *te
 	}
 	request("GET", "/discovery-match-targets/"+uuid.NewString()+"/review", nil, http.StatusNotFound)
 	initialReview := enrichmentHTTPValue[models.DiscoveryMatchReview](t, request("GET", "/discovery-match-targets/"+receipt.Entries[0].TargetUUID+"/review", nil, 200))
-	require.EqualValues(t, 67, initialReview.Coverage.HistoricalPages)
-	require.True(t, initialReview.Coverage.StartsAtSavedCursor)
+	historical, initialBlockers := int64(67), []string{"history_not_retained", "listing_incomplete"}
+	if fresh {
+		historical, initialBlockers = 0, []string{"listing_incomplete"}
+	}
+	require.Equal(t, historical, initialReview.Coverage.HistoricalPages)
+	require.Equal(t, !fresh, initialReview.Coverage.StartsAtSavedCursor)
 	require.False(t, initialReview.Coverage.Complete)
-	require.Equal(t, []string{"history_not_retained", "listing_incomplete"}, initialReview.Blockers)
+	require.Equal(t, initialBlockers, initialReview.Blockers)
+	publicationPath := "/discovery-match-targets/" + receipt.Entries[0].TargetUUID + "/publication"
+	request("GET", publicationPath, nil, http.StatusNotFound)
+	request("POST", publicationPath, map[string]any{"expected_target_revision": 2}, http.StatusConflict)
 	request("POST", "/discovery-activations", map[string]any{"input": receipt.Input, "expected_plan_sha256": strings.Repeat("f", 64)}, http.StatusConflict)
 	csrf := httptest.NewRequest("POST", "/discovery-activations", bytes.NewBufferString(`{}`))
 	csrf.Header.Set("Origin", "https://unrelated.invalid")
@@ -139,7 +165,7 @@ func TestDiscoveryActivationHTTPRecoversAndInspectsSharedCandidateEvidence(t *te
 	_, token, err := service.IssueCredential(t.Context(), producer.UUID, []models.IngestScope{{CollectionUUID: receipt.Input.Listing.CollectionUUID}}, nil)
 	require.NoError(t, err)
 	producerHandler := withIngestRoutes(http.NotFoundHandler(), service, false)
-	for _, path := range []string{"/discovery-activations", "/discovery-activations/preview", "/discovery-activations/" + receipt.Input.UUID, "/discovery-match-targets/" + receipt.Entries[0].TargetUUID, "/discovery-listings/" + receipt.Input.Listing.UUID} {
+	for _, path := range []string{"/discovery-activations", "/discovery-activations/preview", "/discovery-activations/" + receipt.Input.UUID, "/discovery-match-targets/" + receipt.Entries[0].TargetUUID, "/discovery-listings/" + receipt.Input.Listing.UUID, publicationPath} {
 		r := httptest.NewRequest("POST", "/api/v3/archive"+path, bytes.NewBufferString(`{}`))
 		r.Header.Set("Authorization", "Bearer "+token)
 		w := httptest.NewRecorder()
@@ -171,6 +197,9 @@ func TestDiscoveryActivationHTTPRecoversAndInspectsSharedCandidateEvidence(t *te
 	page["url"], page["cursor"], page["complete"], page["next_cursor"] = listing.ProfileURL, listing.InitialCursor, true, nil
 	patch := page["records"].([]any)[0].(map[string]any)["patch"].(map[string]any)
 	patch["source_extractor_url"], patch["author"] = listing.ProfileURL, "deliberately-unlinked"
+	if fresh {
+		patch["date"] = "2026-10-03"
+	}
 	body, err = archive.EncodeSourceJSON(page)
 	require.NoError(t, err)
 	_, err = coordinator.AppendPage(t.Context(), token, running.Lease(), 1, body)
@@ -185,25 +214,82 @@ func TestDiscoveryActivationHTTPRecoversAndInspectsSharedCandidateEvidence(t *te
 	for _, entry := range receipt.Entries {
 		path := "/discovery-match-targets/" + entry.TargetUUID
 		review := enrichmentHTTPValue[models.DiscoveryMatchReview](t, request("GET", path+"/review", nil, 200))
-		require.EqualValues(t, 67, review.Coverage.HistoricalPages)
+		require.Equal(t, historical, review.Coverage.HistoricalPages)
 		require.Equal(t, 1, review.Coverage.RetainedPages)
 		require.True(t, review.Coverage.RetainedComplete)
 		require.True(t, review.Target.EnumerationComplete)
-		require.False(t, review.Coverage.Complete, "resumed enumeration cannot prove missing historical coverage")
-		require.Equal(t, []string{"history_not_retained", "detail_required"}, review.Blockers)
+		require.Equal(t, fresh, review.Coverage.Complete, "resumed enumeration cannot prove missing historical coverage")
+		if fresh {
+			require.Empty(t, review.Blockers)
+			require.Zero(t, review.DetailCandidateCount)
+		} else {
+			require.Equal(t, []string{"history_not_retained", "detail_required"}, review.Blockers)
+			require.Equal(t, 1, review.DetailCandidateCount)
+		}
 		require.Equal(t, 1, review.CandidateCount)
-		require.Equal(t, 1, review.DetailCandidateCount)
 		candidates := enrichmentHTTPValue[[]models.DiscoveryMatchCandidate](t, request("GET", path+"/candidates", nil, 200))
 		require.Len(t, candidates, 1, "multiple attachments produce one candidate per target")
 		evidence := enrichmentHTTPValue[[]models.DiscoveryMatchEvidence](t, request("GET", "/discovery-match-candidates/"+strconv.FormatInt(candidates[0].Sequence, 10)+"/evidence", nil, 200))
 		require.Len(t, evidence, 1)
 		require.Equal(t, []int{0, 1, 2}, evidence[0].RecordOrdinals)
-		require.True(t, evidence[0].NeedsDetail, "a retained cursor and title-only match cannot establish an accepted identity")
+		require.Equal(t, !fresh, evidence[0].NeedsDetail, "a title-only match cannot establish an accepted identity")
 	}
 	pages := enrichmentHTTPValue[[]models.DiscoveryPageReceipt](t, request("GET", "/discovery-listings/"+listing.UUID+"/pages", nil, 200))
 	require.Len(t, pages, 1, "both targets share the original stored page")
+	var publication *models.DiscoveryMatchPublication
+	if fresh {
+		postBody := bytes.NewBufferString(`{"expected_target_revision":2}`)
+		r, err := http.NewRequestWithContext(t.Context(), "POST", server.URL+"/api/v3/archive"+publicationPath, postBody)
+		require.NoError(t, err)
+		r.Header.Set("Content-Type", "application/json")
+		r.Header.Set("ApiKey", "fixture-application-key")
+		response, err := server.Client().Do(r)
+		if response != nil {
+			_ = response.Body.Close()
+		}
+		require.Error(t, err, "the committed publication response was deliberately lost")
+		require.True(t, lostPublication.Load())
+		value := enrichmentHTTPValue[models.DiscoveryMatchPublication](t, request("GET", publicationPath, nil, 200))
+		publication = &value
+		require.Equal(t, receipt.Entries[0].PostUUID, publication.PostUUID)
+		require.Equal(t, 3, publication.RecordCount)
+		replay := enrichmentHTTPValue[models.DiscoveryMatchPublication](t, request("POST", publicationPath, map[string]any{"expected_target_revision": 2}, 200))
+		require.Equal(t, *publication, replay)
+		records := enrichmentHTTPValue[[]models.DiscoveryPublishedRecord](t, request("GET", publicationPath+"/records?limit=1", nil, 200))
+		require.Len(t, records, 1)
+		require.Zero(t, records[0].Ordinal)
+		rest := enrichmentHTTPValue[[]models.DiscoveryPublishedRecord](t, request("GET", publicationPath+"/records?after=0", nil, 200))
+		require.Len(t, rest, 2)
+		request("GET", publicationPath+"/records?after=-2", nil, 400)
+		request("GET", publicationPath+"/records?limit=101", nil, 400)
+		request("POST", publicationPath, map[string]any{"expected_target_revision": 3}, 409)
+		request("POST", "/discovery-match-targets/"+receipt.Entries[1].TargetUUID+"/publication", map[string]any{"expected_target_revision": 2}, 409)
+		require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
+			captures, err := repo.SourceEvidence.Captures(ctx, publication.PostUUID, nil, 100)
+			require.NoError(t, err)
+			require.Len(t, captures, 3)
+			for _, capture := range captures {
+				preview, err := repo.CapturePublisher.Preview(ctx, capture.UUID, "")
+				require.NoError(t, err)
+				require.NotEqual(t, "unavailable", preview.Action, "publication uses the shared publisher domain service")
+				manifest, err := repo.SourceAttachment.ManifestForCapture(ctx, capture.UUID)
+				require.NoError(t, err)
+				require.NotNil(t, manifest, "album observations use the shared attachment domain service")
+			}
+			selection, err := repo.SourceAttachment.Selection(ctx, publication.PostUUID)
+			require.NoError(t, err)
+			require.NotNil(t, selection)
+			return nil
+		}))
+	} else {
+		request("POST", publicationPath, map[string]any{"expected_target_revision": 2}, 409)
+	}
 	require.NoError(t, db.Close())
 	require.NoError(t, db.Open(db.DatabasePath()))
 	replayed := enrichmentHTTPValue[models.DiscoveryActivation](t, request("GET", "/discovery-activations/"+receipt.Input.UUID, nil, 200))
 	require.Equal(t, receipt, replayed)
+	if publication != nil {
+		value := enrichmentHTTPValue[models.DiscoveryMatchPublication](t, request("POST", publicationPath, map[string]any{"expected_target_revision": 2}, 200))
+		require.Equal(t, *publication, value, "publication receipt survives reopening")
+	}
 }

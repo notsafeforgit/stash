@@ -18,6 +18,7 @@ import (
 
 func removeDiscoveryActivationSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeDiscoveryPublicationSchema(t, raw)
 	_, err := raw.Exec(`DROP TABLE discovery_activation_targets; DROP TABLE discovery_activations;
  DELETE FROM native_migration_history WHERE version=1000073`)
 	require.NoError(t, err)

@@ -27,6 +27,8 @@ from test_catalog_snapshot import catalog_fixture, CAPTURED
 
 def run():
     setup = json.loads(sys.argv[1])
+    historical_pages = 0 if setup.get("fresh") else 67
+    initial_cursor = None if setup.get("fresh") else {"after": "t3_prior"}
     directory = Path(setup["directory"])
     registry_path = directory / "registry.sqlite"
     identities, _ = registry_fixture(registry_path)
@@ -62,7 +64,7 @@ def run():
                            "candidate_url": None, "strict_filename_id": False})
     with sqlite3.connect(source) as db:
         db.execute("INSERT INTO discovery_accounts VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                   (job_key, "reddit", account_key, profile, "retry", '{"after":"t3_prior"}', None, 67, 5, 0,
+                   (job_key, "reddit", account_key, profile, "retry", json.dumps(initial_cursor), None, historical_pages, 5, 0,
                     "network unavailable", "2026-09-29T00:00:00Z", "2026-10-01T12:00:00Z"))
         for i in range(2):
             db.execute("INSERT INTO discovery_targets VALUES(?,?,?,?,?)", (catalog_id, f"reddit:post:activation{i:03d}", job_key, evidence, "pending"))
@@ -100,7 +102,7 @@ def run():
     args = ["--plan", str(plan_file), "--expected-sha256", prepared_plan["plan_sha256"]]
     preview = execute(activation_main, ["show", *args])["preview"]
     assert preview["input"] == request and len(preview["entries"]) == 2
-    assert preview["input"]["listing"]["initial_cursor"] == {"after": "t3_prior"}
+    assert preview["input"]["listing"]["initial_cursor"] == initial_cursor
     apply = {"input": request, "expected_plan_sha256": preview["plan_sha256"]}
     assert execute(activation_main, ["status", *args, "--endpoint", setup["endpoint"]], wanted=3)["pending"] is True
     failed = execute(activation_main, ["apply", *args, "--endpoint", setup["endpoint"]], wanted=1)
@@ -111,7 +113,7 @@ def run():
     receipt = client.status(preview)
     assert {key: receipt[key] for key in preview} == preview
     assert client.request("POST", "/discovery-activations", apply) == receipt
-    assert client.request("GET", "/discovery-listings/" + listing["uuid"])["historical_pages"] == 67
+    assert client.request("GET", "/discovery-listings/" + listing["uuid"])["historical_pages"] == historical_pages
     assert client.request("GET", "/discovery-listings/" + listing["uuid"] + "/pages") == []
     for entry in receipt["entries"]:
         target = client.request("GET", "/discovery-match-targets/" + entry["target_uuid"])

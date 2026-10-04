@@ -90,18 +90,19 @@ type DiscoveryMatchCoverage struct {
 	Complete            bool  `json:"complete"`
 }
 
-// Review is a read-only view of one target in the current transaction. An empty
-// Blockers list identifies a unique listing candidate for further publication
-// validation; it is not acceptance, a durable review token or a capture receipt.
+// Review is a read-only view of one target in the current transaction. Without
+// Publication, empty Blockers identify a unique candidate for further validation,
+// not acceptance or a durable review token. Published work keeps its receipt.
 type DiscoveryMatchReview struct {
-	Target               DiscoveryMatchTarget     `json:"target"`
-	Coverage             DiscoveryMatchCoverage   `json:"coverage"`
-	CurrentPost          *SourcePost              `json:"current_post"`
-	CandidateCount       int                      `json:"candidate_count"`
-	DetailCandidateCount int                      `json:"detail_candidate_count"`
-	Candidate            *DiscoveryMatchCandidate `json:"candidate,omitempty"`
-	CandidatePost        *SourcePost              `json:"candidate_post,omitempty"`
-	Blockers             []string                 `json:"blockers"`
+	Target               DiscoveryMatchTarget       `json:"target"`
+	Coverage             DiscoveryMatchCoverage     `json:"coverage"`
+	CurrentPost          *SourcePost                `json:"current_post"`
+	CandidateCount       int                        `json:"candidate_count"`
+	DetailCandidateCount int                        `json:"detail_candidate_count"`
+	Candidate            *DiscoveryMatchCandidate   `json:"candidate,omitempty"`
+	CandidatePost        *SourcePost                `json:"candidate_post,omitempty"`
+	Publication          *DiscoveryMatchPublication `json:"publication,omitempty"`
+	Blockers             []string                   `json:"blockers"`
 }
 
 type DiscoveryMatchReaderWriter interface {
@@ -111,6 +112,9 @@ type DiscoveryMatchReaderWriter interface {
 	BindTarget(context.Context, DiscoveryTargetInput, time.Time) (*DiscoveryMatchTarget, error)
 	Target(context.Context, string) (*DiscoveryMatchTarget, error)
 	Review(context.Context, string) (*DiscoveryMatchReview, error)
+	PreparePublication(context.Context, DiscoveryPublicationInput) (PreparedDiscoveryPublication, error)
+	Publication(context.Context, string) (*DiscoveryMatchPublication, error)
+	PublishedRecords(context.Context, string, int, int) ([]DiscoveryPublishedRecord, error)
 	Pending(context.Context, string, int, time.Time) (*DiscoveryComparisonCandidates, error)
 	Prepare(context.Context, string, int, time.Time) (PreparedDiscoveryComparison, error)
 	Advance(context.Context, string, int, time.Time) (*DiscoveryMatchReceipt, error)

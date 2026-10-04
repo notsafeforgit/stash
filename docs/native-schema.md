@@ -2329,8 +2329,9 @@ after compact staging has been released. Anonymisation removes resolutions
 before their dependencies; ordinary database backups retain them.
 
 The migration itself leaves existing jobs, identifiers and selected metadata
-unchanged. It does not activate workers. Account-listing match publication,
-reviewed post consolidation and production caller conversion remain transition work.
+unchanged. It does not activate workers. Account-listing historical coverage,
+detail execution, reviewed post consolidation and production caller conversion
+remain transition work.
 
 ### Account-listing candidate evidence
 
@@ -2393,8 +2394,8 @@ does not admit listing jobs and does not publish identities or selected metadata
 `enumeration_complete` on a match target means comparison reached the retained
 listing's final cursor. It does not certify coverage of earlier historical
 pages, choose a unique identity, complete an import, or authorize release of
-source evidence. Historical-coverage reconciliation,
-weak-candidate detail execution and atomic match publication remain necessary.
+source evidence. Historical-coverage reconciliation and weak-candidate detail
+execution remain necessary before those candidates can publish.
 Startup verifies original target bindings, page/result digests, record
 references and candidate aggregates. Normal backups retain the entire graph;
 anonymised exports remove it before removing its source evidence.
@@ -2433,8 +2434,36 @@ routes expose preview/apply/replay, retained listing summaries and the compariso
 targets, candidates and original record references. Producer tokens cannot use
 these review routes. See [activation API](native-ingestion.md#reviewed-discovery-activation).
 The operator command saves reviewed activations and recovers their original
-receipts. The review UI, historical-coverage resolution, detail execution, match
-publication and staging-release workflow remain open.
+receipts. The review UI, historical-coverage resolution, detail execution,
+automatic publication dispatch and staging-release workflow remain open.
+
+### Verified discovery publication
+
+Schema 1000074 adds immutable `discovery_match_publications` and
+`discovery_published_records`. Application publication accepts only a completely
+compared search retained from its beginning, one strong candidate, unchanged
+native choices and an unclaimed qualified post ID. Preparation decodes the
+original frozen target and strongest page under a read transaction. The write
+rechecks those bindings and commits identity/URL evidence, native capture-domain
+effects and the receipt together. Caught errors and failed commit checks roll
+back partial identities and metadata. Shared capture services retain publisher,
+album and translation behavior without a synthetic producer delivery receipt.
+
+The receipt pins the target revision, strongest page hash, matching basis and
+actual corroborating record ordinal. Record associations preserve original
+observing producer, times and parent contexts through deterministic capture IDs.
+All observations for the selected post on that page are published; unrelated
+posts remain staged. Native captures retain normalized shared bodies, profiles
+and patches. Original imported post UUIDs and legacy keys remain valid, and a
+source ID already owned by another post requires explicit consolidation.
+
+Replay returns the same receipt after lost responses, restarts and later native
+edits. Startup reconstructs the original proof and verifies every capture,
+collection association, identity/URL evidence row and record mapping. Ordinary
+backups retain the graph; anonymisation deletes publication children before their
+dependencies. Publication does not release page bodies, finish catalog import or
+assign depicted performers. Missing-history and weak-candidate resolution,
+automatic dispatch and verified staging release remain transition work.
 
 ## Durable account listing pages
 
@@ -2489,5 +2518,7 @@ admission of existing definitions, owned attempts, page delivery and failure
 receipts. It cannot create definitions or activate imported work. Durable
 producer delivery, selected-job execution and shared profile/collection dispatch
 are implemented, along with the native candidate comparison worker described
-above. Reviewed activation, complete-enumeration reconciliation, match publication,
-verified staging release and reviewed post consolidation remain required.
+above. Reviewed activation and application publication of complete, unique strong
+matches are implemented. Historical coverage, weak-candidate detail execution,
+automatic publication dispatch, verified staging release and reviewed post
+consolidation remain required.

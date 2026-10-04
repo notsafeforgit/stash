@@ -111,5 +111,14 @@ func (s *DiscoveryMatchStore) Review(ctx context.Context, id string) (*models.Di
 			ret.Blockers = append(ret.Blockers, "identifier_in_use")
 		}
 	}
+	ret.Publication, err = s.Publication(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if ret.Publication != nil {
+		// The immutable receipt is already terminal. Later native changes do
+		// not turn its original accepted publication back into pending work.
+		ret.Blockers = []string{}
+	}
 	return ret, nil
 }

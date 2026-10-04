@@ -479,8 +479,9 @@ in `dispatch-all`, with independent saved-delivery cursors for enrichment and
 discovery before local profile loading. Collection lookup follows current grants
 and discovers later registrations under a root; returned containers still need
 policy/runtime readiness checks. Preserve profile/collection rotation across
-restart and both journals when upgrading an outbox. Verified match publication
-and native page release remain transition work. See
+restart and both journals when upgrading an outbox. Historical coverage,
+weak-candidate details, automatic publication dispatch and native page release
+remain transition work. See
 [listing storage](docs/native-schema.md#durable-account-listing-pages).
 `scrape.MatchDiscoveryListing` and `MatchDiscoveryPage` implement the pure
 `retained-discovery-listing-v1` candidate policy. Preserve unchanged original
@@ -511,11 +512,23 @@ together. Lost responses must reuse the saved operation and hash, even after
 later native edits or comparison progress. Never interpret activation as job
 admission, source coverage, accepted identity or import completion. Producer
 tokens cannot use the archive review routes. The saved operator command is
-implemented; the review UI and detail/publication/staging-release workflow
+implemented; the review UI and detail/automatic-dispatch/staging-release workflow
 remain open. Target reviews derive coverage and blockers in one read transaction,
 without loading page bodies. Preserve missing-history, weak/competing-candidate,
 changed-source/post and existing-identifier distinctions. Empty blockers do not
 accept an identity or create a durable approval token.
+
+Schema 1000074 publishes complete, unique strong discovery matches through the
+application API. Decode retained evidence under a read transaction, recheck the
+original revision and current native choices, then commit the verified identity,
+canonical URL evidence, shared capture/publisher/album/translation effects and
+receipt together. Preserve the corroborating observation's actual time and all
+selected-post records from the strongest page. Other page records remain staged.
+Reuse original receipts after response loss or later native edits. Missing
+history, weak/competing candidates and identifiers owned by another post require
+resolution; do not silently merge posts. Verify the retained receipt graph on
+reopen and preserve it through backup. This does not release pages, assign
+depicted performers or complete the catalog import.
 
 `stash-import-catalog-evidence` maps a received snapshot's posts, profiles and
 captures through core services in schema 1000031. It uses exact manifest/ordinal

@@ -770,9 +770,10 @@ profiles into `dispatch-all`, with durable collection/profile rotation and separ
 saved-delivery cursors for discovery and enrichment. Both saved deliveries run
 before website profiles load, preserving recovery when access bindings are
 unavailable. Selection commits before execution, so continuously busy profiles
-cannot reset the traversal after restart. Reviewed activation, complete-listing
-reconciliation, candidate detail execution and match publication remain
-necessary before host/n8n callers switch to native discovery. In particular, a
+cannot reset the traversal after restart. Reviewed activation and publication of
+complete, unique strong matches are implemented. Historical coverage, candidate
+detail execution and automated publication dispatch remain necessary before
+host/n8n callers switch to native discovery. In particular, a
 retained nonfinal page is successful page delivery, not successful enumeration
 or a completed catalog import.
 
@@ -790,6 +791,9 @@ producer credentials do not grant review or source administration.
 | `GET /discovery-listings/{listing}/pages` | Page through compact received-page receipts without loading source bodies. |
 | `GET /discovery-match-targets/{target}` | Inspect the original target binding and durable comparison progress. |
 | `GET /discovery-match-targets/{target}/review` | Inspect current coverage, candidate counts and blockers without fetching or changing metadata. |
+| `POST /discovery-match-targets/{target}/publication` | Publish a complete, unique strong match with `{expected_target_revision}`, or replay its original receipt. |
+| `GET /discovery-match-targets/{target}/publication` | Retrieve the accepted identity and native publication receipt. |
+| `GET /discovery-match-targets/{target}/publication/records` | Inspect original page record ordinals and their native capture UUIDs. |
 | `GET /discovery-match-targets/{target}/candidates` | Inspect distinct candidate post IDs and their strongest retained evidence. |
 | `GET /discovery-match-candidates/{candidate}/evidence` | Inspect each original page's basis and record ordinals. |
 
@@ -816,8 +820,8 @@ page counts do not become native receipt counts, and activation never certifies
 historical coverage or completed catalog import. The
 [`stash-activate-automation-discovery` operator command](../integrations/gallery-dl/README.md#reviewed-discovery-activation)
 saves a private, digest-bound review file and recovers the original operation
-after a lost Apply response. The review UI and remaining
-detail/publication/release workflow are still being implemented.
+after a lost Apply response. The review UI, historical coverage, detail execution,
+automatic publication dispatch and staging release are still being implemented.
 
 The target review uses one database snapshot. `coverage.retained_pages` counts
 received batches of source posts, while `target.last_page` counts batches already
@@ -847,10 +851,34 @@ can contain:
 | `detail_required` | At least one candidate still needs source detail verification. |
 | `identifier_in_use` | The sole candidate's identifier belongs to another native post, including a forgotten post. |
 
-An empty blocker list identifies a unique listing candidate for further
-publication validation. This response accepts no identity, publishes no capture
-and supplies no durable approval token. Later changes require another review.
+Before publication, an empty blocker list identifies a unique listing candidate
+for further publication validation. This response accepts no identity, publishes
+no capture and supplies no durable approval token. Later changes require another
+review. After publication, the review includes its immutable `publication`
+receipt and clears blockers; later native edits do not undo committed work.
 Review reads compact receipts and references without loading source page bodies.
+
+Publication is application-authorized and makes no source request. It requires
+the exact completed target revision, a search retained from its beginning, one
+strong candidate, unchanged native source/post choices and an unclaimed source
+post identifier. It reparses the original evidence and selects the observation
+that actually supplied the matching basis. An earlier title-only observation
+cannot acquire the corroborating observation's time.
+
+Identity and canonical URL evidence, all selected-post observations from the
+candidate's strongest page, publisher/album/translation effects and the receipt
+commit together. The original producer, observation times, shared payload/profile
+data and parent context remain intact. Other posts on that page remain staged.
+The operation preserves the existing legacy post UUID and keys; a source ID owned
+by another post returns a conflict for explicit consolidation review. It neither
+downloads media nor chooses depicted performers.
+
+Recover a lost response with GET or repeat the same POST. Replay returns the
+original receipt even after a later source edit or post tombstone; a different
+target revision cannot reuse it. GET returns 404 before publication. Record
+pagination uses zero-based `record_ordinal`, with `after=-1` by default and
+`limit` from 1 to 100. These associations prove native capture publication only;
+they do not release listing staging or declare the whole catalog import complete.
 
 ## Completed file events
 

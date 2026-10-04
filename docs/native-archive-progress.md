@@ -5745,3 +5745,40 @@ Broader source/account/collection management, remaining import/policy families,
 source adapters, live host/n8n conversion, compatibility removal, coordinated
 recovery/export, performance and reviewed production cutover remain open.
 Production and `develop` remain unchanged.
+
+## Startup validation with stale import statistics — 2026-10-03
+
+Catalog receipt validation now requires the existing unique snapshot index when
+joining a publisher, attachment, media or document receipt to its import
+checkpoint. The rehearsal's publisher/attachment planner statistics still
+described one checkpoint after 1,697 catalogs had been imported. SQLite chose a
+complete checkpoint-table scan for every receipt. Validation runs before writes,
+so updating database statistics is not a prerequisite for opening it safely.
+All validation predicates, counters, reference checks and rejection behavior
+remain unchanged; no schema or stored-data migration is needed.
+
+Read-only probes of the retained schema-67 database measured publisher receipt
+validation at 26.464 seconds before and 0.837 seconds with the indexed lookup;
+attachment validation measured 27.349 and 0.564 seconds. Both returned the same
+valid result. Media/document lookups already chose that index in this snapshot;
+they receive the same protection against stale statistics, without claiming a
+measured query-plan improvement here. These are sequential checks under other
+host activity, not isolated benchmarks or production startup guarantees.
+
+The regression fixture builds the real native schema and installs the observed
+one-row planner estimate. Removing the index requirement through a temporary
+compiler overlay reproduces all four unwanted parent scans; the final code
+passes. Existing import, damaged-receipt and before-write rejection fixtures
+also pass. Complete read-only lineage validation passed before and after the
+change, taking 300.363 and 113.474 seconds respectively. Its sampled CPU cost
+fell from 175.08 to 112.03 seconds. Concurrent host load and cache state also
+affect elapsed time; the profiles identify removal of the repeated scans.
+The full fork gate passed in 979.024 seconds, including Go lint/integration tests,
+540 v3 tests and 391 producer tests. The final one-row-statistics regression also
+passed independently. Evidence is under
+`.local/native-startup-performance-20261003/`.
+
+The checks reuse the latest verified 20,265,979,904-byte native database through
+read-only connections. No extra database archive is created. The 50 GiB host
+reserve remains in force. Startup performance and the rest of the transition
+plan remain release gates; production and `develop` remain unchanged.

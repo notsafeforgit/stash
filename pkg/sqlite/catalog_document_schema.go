@@ -8,18 +8,9 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func validateCatalogDocumentSchema(conn *sqlx.DB) error {
-	for _, name := range []string{"catalog_document_imports", "catalog_document_records", "catalog_document_import_guard", "catalog_document_record_immutable", "catalog_document_review", "catalog_snapshot_documents_path"} {
-		var found bool
-		if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
-			return err
-		}
-		if !found {
-			return fmt.Errorf("native database schema is incomplete: missing %s", name)
-		}
-	}
-	var invalid bool
-	err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM catalog_document_imports i
+// Startup validates before planner statistics can be refreshed. Each receipt
+// must look up its parent by the unique snapshot key even with stale statistics.
+const catalogDocumentValidationQuery = `SELECT EXISTS(SELECT 1 FROM catalog_document_imports i
  LEFT JOIN catalog_snapshots s ON s.uuid=i.snapshot_uuid
  LEFT JOIN catalog_evidence_imports e ON e.snapshot_uuid=i.snapshot_uuid
  LEFT JOIN source_collection_revisions c ON c.collection_uuid=i.collection_uuid AND c.revision=i.collection_revision
@@ -38,7 +29,7 @@ func validateCatalogDocumentSchema(conn *sqlx.DB) error {
   WHERE r.snapshot_uuid=i.snapshot_uuid AND e.source_table=i.phase)!=(SELECT count(*) FROM catalog_snapshot_records e WHERE e.snapshot_uuid=i.snapshot_uuid AND e.source_table=i.phase AND e.ordinal<=i.last_ordinal)))
  OR EXISTS(SELECT 1 FROM catalog_document_records r
  LEFT JOIN catalog_snapshot_records e ON e.snapshot_uuid=r.snapshot_uuid AND e.ordinal=r.ordinal
- LEFT JOIN catalog_document_imports i ON i.snapshot_uuid=r.snapshot_uuid
+ LEFT JOIN catalog_document_imports i INDEXED BY sqlite_autoindex_catalog_document_imports_1 ON i.snapshot_uuid=r.snapshot_uuid
  LEFT JOIN catalog_snapshots snapshot ON snapshot.uuid=r.snapshot_uuid
  LEFT JOIN source_documents d ON d.uuid=r.document_uuid
  LEFT JOIN source_document_sources s ON s.uuid=r.source_uuid
@@ -82,7 +73,20 @@ func validateCatalogDocumentSchema(conn *sqlx.DB) error {
   OR r.ordinal IS NOT (SELECT candidate.ordinal FROM catalog_snapshot_records candidate
    WHERE candidate.snapshot_uuid=r.snapshot_uuid AND candidate.source_table=e.source_table AND candidate.source_table IN ('sidecars','sidecar_sources')
    AND json_extract(candidate.data,'$.values.relpath')=s.relative_path
-   ORDER BY json_extract(candidate.data,'$.values.captured_at') DESC,json_extract(candidate.data,'$.values.content_sha256') DESC LIMIT 1))))`)
+   ORDER BY json_extract(candidate.data,'$.values.captured_at') DESC,json_extract(candidate.data,'$.values.content_sha256') DESC LIMIT 1))))`
+
+func validateCatalogDocumentSchema(conn *sqlx.DB) error {
+	for _, name := range []string{"catalog_document_imports", "catalog_document_records", "catalog_document_import_guard", "catalog_document_record_immutable", "catalog_document_review", "catalog_snapshot_documents_path"} {
+		var found bool
+		if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
+			return err
+		}
+		if !found {
+			return fmt.Errorf("native database schema is incomplete: missing %s", name)
+		}
+	}
+	var invalid bool
+	err := conn.Get(&invalid, catalogDocumentValidationQuery)
 	if err != nil {
 		return err
 	}

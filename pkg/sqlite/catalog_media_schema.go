@@ -8,18 +8,9 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func validateCatalogMediaSchema(conn *sqlx.DB) error {
-	for _, name := range []string{"catalog_media_imports", "catalog_media_records", "catalog_media_import_guard", "catalog_media_record_immutable", "catalog_media_review", "catalog_media_claim", "catalog_snapshot_record_phase"} {
-		var found bool
-		if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
-			return err
-		}
-		if !found {
-			return fmt.Errorf("native database schema is incomplete: missing %s", name)
-		}
-	}
-	var invalid bool
-	err := conn.Get(&invalid, `SELECT EXISTS(SELECT 1 FROM catalog_media_imports i
+// Startup validates before planner statistics can be refreshed. Each receipt
+// must look up its parent by the unique snapshot key even with stale statistics.
+const catalogMediaValidationQuery = `SELECT EXISTS(SELECT 1 FROM catalog_media_imports i
  LEFT JOIN catalog_snapshots s ON s.uuid=i.snapshot_uuid
  LEFT JOIN catalog_evidence_imports e ON e.snapshot_uuid=i.snapshot_uuid
  LEFT JOIN source_collection_revisions c ON c.collection_uuid=s.collection_uuid AND c.revision=i.collection_revision
@@ -43,7 +34,7 @@ func validateCatalogMediaSchema(conn *sqlx.DB) error {
   WHERE r.snapshot_uuid=i.snapshot_uuid AND s.source_table=i.phase)!=(SELECT count(*) FROM catalog_snapshot_records r WHERE r.snapshot_uuid=i.snapshot_uuid AND r.source_table=i.phase AND r.ordinal<=i.last_ordinal)))
  OR EXISTS(SELECT 1 FROM catalog_media_records r
  LEFT JOIN catalog_snapshot_records e ON e.snapshot_uuid=r.snapshot_uuid AND e.ordinal=r.ordinal
- LEFT JOIN catalog_snapshots s ON s.uuid=r.snapshot_uuid LEFT JOIN catalog_media_imports i ON i.snapshot_uuid=r.snapshot_uuid
+ LEFT JOIN catalog_snapshots s ON s.uuid=r.snapshot_uuid LEFT JOIN catalog_media_imports i INDEXED BY sqlite_autoindex_catalog_media_imports_1 ON i.snapshot_uuid=r.snapshot_uuid
  LEFT JOIN source_content_claims c ON c.uuid=r.claim_uuid
  LEFT JOIN source_file_observations o ON o.uuid=r.observation_uuid
  LEFT JOIN source_file_matches m ON m.uuid=r.match_uuid
@@ -61,7 +52,20 @@ func validateCatalogMediaSchema(conn *sqlx.DB) error {
   OR json_extract(media.details,'$.source_post_file_evidence_uuid') IS NOT r.post_file_uuid OR json_extract(media.details,'$.source_file_match_uuid') IS NOT r.match_uuid))
  OR (e.source_table='assets' AND (r.observation_uuid IS NOT NULL OR r.post_uuid IS NOT NULL OR (r.outcome='mapped' AND r.claim_uuid IS NULL)))
  OR (e.source_table='files' AND (r.post_uuid IS NOT NULL OR (r.outcome='mapped' AND r.match_uuid IS NULL)))
- OR (e.source_table='appearances' AND r.outcome='mapped' AND r.media_evidence_uuid IS NULL))`)
+ OR (e.source_table='appearances' AND r.outcome='mapped' AND r.media_evidence_uuid IS NULL))`
+
+func validateCatalogMediaSchema(conn *sqlx.DB) error {
+	for _, name := range []string{"catalog_media_imports", "catalog_media_records", "catalog_media_import_guard", "catalog_media_record_immutable", "catalog_media_review", "catalog_media_claim", "catalog_snapshot_record_phase"} {
+		var found bool
+		if err := conn.Get(&found, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
+			return err
+		}
+		if !found {
+			return fmt.Errorf("native database schema is incomplete: missing %s", name)
+		}
+	}
+	var invalid bool
+	err := conn.Get(&invalid, catalogMediaValidationQuery)
 	if err != nil {
 		return err
 	}

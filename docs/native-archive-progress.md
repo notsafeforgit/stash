@@ -6607,3 +6607,29 @@ they pass. Evidence is under `.local/native-discovery-activation-20261004/` and
 `.local/native-discovery-client-20261004/`. Production, the frozen compatible
 release and `develop` remain unchanged. Historical coverage, detail execution,
 publication, staging release and the broader plan's remaining gates remain open.
+
+### Populated activation archive verification — 2026-10-04
+
+Schema 73 is now the verified rehearsal baseline. Reconciliation after activation
+preserved all 257 unaffected prior tables, including generated values, and
+independently verified the six receipt graphs, 569 target bindings and one
+expected collection revision. The original account cursors, 67 historical pages,
+retry deadlines, post revisions and record hashes remain intact. Integrity and
+foreign-key checks pass, with zero admitted account-listing jobs.
+
+A fresh populated reopen passed in 118 seconds; reading all six activation
+receipts took 17 ms, a 100-record import page took 8 ms, and one original record
+took 0.17 ms. The 89-file producer package used for the reviewed profiles is
+retained separately and reproduces both policy hashes, allowing later producer
+development without losing the matching runtime source. Expanded website
+credentials are not copied into these artifacts.
+
+After checking for open readers, the verified pointer was advanced to schema 73
+and the superseded schema-72 database and sidecars/search index were removed.
+That reclaimed 20.27 GB and left about 176 GiB free. The original compatible
+snapshot and frozen import inputs remain retained. Evidence is in
+`activation-reconciliation.json`, `reopen.json`, `pinned-profile-verification.json`
+and `predecessor-cleanup.json` under
+`.local/native-discovery-activation-20261004/`. This completes the isolated
+activation rehearsal; native matching/publication and the remaining transition
+work still precede production cutover.

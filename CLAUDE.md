@@ -453,8 +453,11 @@ receipts belonging to a failed job's later replacement. The Python
 `DiscoveryClient` validates canonical definitions, original cursors and exact
 page acknowledgements; it shares server-clock ownership with enrichment through
 `JobLease`. Discovery claims use the full description to bind the listing's
-policy/runtime. Durable producer page delivery/dispatch, reviewed activation
-and matching remain transition work. See
+policy/runtime. Producer schema 11 journals the original claim, exact page bytes
+and checked receipt; discovery, enrichment and file events share one outbox byte
+budget. Preserve saved bodies across restart and lease failover. A later native
+job status cannot discard unacknowledged local data. Producer execution/dispatch,
+reviewed activation and matching remain transition work. See
 [listing storage](docs/native-schema.md#durable-account-listing-pages).
 
 `stash-import-catalog-evidence` maps a received snapshot's posts, profiles and

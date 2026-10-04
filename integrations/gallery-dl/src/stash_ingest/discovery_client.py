@@ -254,9 +254,14 @@ class DiscoveryClient:
             raise InvalidData("Invalid discovery failure code")
         owned = self.lease(lease)
         value = self.client._request("POST", self.path(job, "/failure"), encode({**owned, "error_code": code}))
+        self._failure(value, job, owned, self.client.producer, code)
+        return value
+
+    @staticmethod
+    def _failure(value, job, owned, producer, code):
         outcome = "retry" if code in RETRYABLE and owned["fence"] < 8 else "failed"
         if (not isinstance(value, dict) or value.get("job_uuid") != job
-                or value.get("producer_uuid") != self.client.producer or value.get("owner_uuid") != owned["owner_uuid"]
+                or value.get("producer_uuid") != producer or value.get("owner_uuid") != owned["owner_uuid"]
                 or not _integer(value.get("fence"), 1, 8) or value["fence"] != owned["fence"]
                 or value.get("error_code") != code or value.get("outcome") != outcome):
             raise Unavailable("invalid_response")
@@ -265,4 +270,3 @@ class DiscoveryClient:
             _time(value.get("ended_at"), milliseconds=True)
         except InvalidData:
             raise Unavailable("invalid_response") from None
-        return value

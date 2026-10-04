@@ -6169,3 +6169,43 @@ This increment adds no database schema or full rehearsal copy. Durable discovery
 outbox/execution, readiness and maintenance, reviewed activation, matching,
 verified staging release and reviewed post consolidation remain open, along with
 the full transition's later phases. Production and `develop` remain unchanged.
+
+## Durable producer discovery journal — 2026-10-04
+
+Producer outbox schema 11 retains each selected discovery page's immutable
+listing/cursor definition, original claim intent, owned attempt, exact compact
+body and acknowledgement. Claims survive lost responses with their original
+owner. A verified page receipt and body removal commit together; a nonfinal page
+still means only page delivery. Controlled failures retain their attempt outcome
+and clear an ended claim only after acknowledgement. Same-producer failover can
+rebind saved bytes to a newly owned attempt without changing source observations.
+
+Discovery, enrichment and ordinary event admission now share one transactional
+byte budget. Extraction reserves a full 32 MiB page first, then retains only its
+actual bytes. Pending/review evidence is never evicted for capacity. The separate
+discovery process lock releases on process death without blocking ordinary
+delivery or enrichment. A native terminal status can settle a claim that fetched
+no data, but cannot discard an unacknowledged page or failure intent. Local
+finished receipts are bounded conveniences; native receipts remain authoritative.
+
+All 425 producer tests pass in 48 seconds, including 14 new journal tests. They
+cover forced process death, original claim recovery, receipt/body atomicity,
+wrong-cursor/owner rejection, shared concurrent capacity, retained review data,
+controlled failure replay, later-attempt byte reuse and foreign completion that
+cannot erase local evidence. A real SQLite schema-10 promotion fixture preserves
+every prior table and its exact staged enrichment bytes; a schema collision
+rolls back without replacing unknown evidence. Integrity and foreign keys pass.
+
+Real Go/Python discovery and enrichment interoperability checks pass in 50
+seconds. The discovery fixture reopens the outbox between claim and delivery
+attempts, recovers deliberately lost native replies and frees a page larger than
+4 MiB only with its checked receipt. Original source numbers, Unicode and cursor
+progress remain intact. Build and lint also passed on the preceding client
+commit. Evidence is in `.local/native-discovery-client-20261004/`.
+
+This changes the producer outbox only; native schema 1000071 and its verified
+rehearsal remain current. No new full database copy was created, and about
+182 GiB remained free after validation. Producer execution/dispatch, readiness
+and maintenance, reviewed activation, matching, verified native page release and
+reviewed post consolidation remain open, alongside the rest of the transition.
+Production and `develop` remain unchanged.

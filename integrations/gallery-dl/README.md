@@ -437,8 +437,8 @@ and unassigned ranges. Schema 5 adds caller snapshots and source bindings;
 schema 6 adds durable backfill calls, history checks and completion proof.
 Schema 7 adds retained n8n receipt history; schema 8 adds the enrichment execution
 journal; schema 9 adds enrichment discovery cursors and backoff; schema 10 adds
-rotation across worker profiles and permitted metadata collections. Opening an
-outbox from schemas 1–9 promotes it
+rotation across worker profiles and permitted metadata collections; schema 11
+adds durable discovery page delivery. Opening an outbox from schemas 1–10 promotes it
 in one SQLite transaction, preserving event bytes, receipts, dependencies,
 active delivery/submission leases, frozen requests and caller tickets. Old tickets
 are linked to the first covering submissions from their original request sequence;
@@ -2026,10 +2026,34 @@ source-reservation handling. Keep the owner UUID across a lost claim response,
 start the heartbeat, pass its checks/reservations to extraction and close it when
 the attempt ends. Lease renewal alone does not persist a fetched page.
 
-Durable page outbox/lease execution, readiness and maintenance, reviewed
-activation, candidate matching and verified page release remain required. The
-collector and protocol client are components, not an activated discovery CLI or
-host/n8n integration. Existing production workers have not switched to them.
+Producer schema 11 adds `discovery_journal.DiscoveryJournal` for durable delivery
+of a selected page job. It records the immutable listing/cursor binding and
+stable claim owner before network access, then retains exact compact page bytes
+with their original attempt. A verified acknowledgement and local body removal
+commit together. Nonfinal receipts finish only that page's delivery. Retryable
+failure acknowledgements clear the ended claim while preserving its outcome.
+
+Reserve the full 32 MiB page allowance before extraction; after saving a page,
+only its actual bytes remain reserved. Discovery, enrichment and ordinary event
+admission share the same outbox byte limit under SQLite transactions. Pending or
+review evidence is never evicted to make space. The discovery process lock is
+independent of enrichment and ordinary delivery; a process crash releases that
+lock while preserving saved work. A current owned attempt can rebind the same
+producer's saved bytes after the original attempt is definitively rejected.
+An observed terminal native job can settle an unfetched local claim, but cannot
+discard an unacknowledged page or failure intent.
+
+Schema 10 → 11 adds only the discovery journal and its guards/index. Promotion
+preserves prior outbox tables, staged enrichment bytes and receipt history in
+one transaction. Unknown table collisions roll back. Older producer code
+refuses schema 11; include the outbox and its pending page bodies in coordinated
+backups. This does not change the native Stash schema or activate any worker.
+
+Discovery execution/dispatch, readiness and maintenance, reviewed activation,
+candidate matching and verified native page release remain required. The
+collector, protocol client and local journal are components, not an activated
+discovery CLI or host/n8n integration. Existing production workers have not
+switched to them.
 
 ## Validation
 
@@ -2073,6 +2097,8 @@ and the build workflow. No production endpoint or source website is contacted.
 supported discovery client and shared job lease against the native server,
 preserving a page larger than 4 MiB, exact source numbers and compact metadata.
 Lost admission, claim, page and failure responses replay without duplicate
-attempts. It checks lease renewal and source reservation, the next page's
-original cursor and the first page's receipt after the next job fails. Retaining
+attempts. The local journal reopens between claim/delivery attempts and releases
+staged bytes only with the checked native receipt. The fixture checks lease
+renewal and source reservation, the next page's original cursor and the first
+page's receipt after the next job fails. Retaining
 a nonfinal page does not mark enumeration complete or publish native post matches.

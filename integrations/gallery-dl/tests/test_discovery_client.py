@@ -10,24 +10,30 @@ from stash_ingest.discovery_client import DiscoveryClient, LISTING_KEYS, MAX_BYT
 from stash_ingest.encoding import InvalidData, decode, native_json
 
 
+def execution_fixture():
+    fixture = Path(__file__).resolve().parents[3] / "pkg/archive/testdata/discovery-pages-v1.json"
+    page = decode(fixture.read_bytes(), preserve_numbers=True)["pages"][1]["page"]
+    when = "2026-10-04T14:00:00Z"
+    listing = {"uuid": str(uuid.uuid4()), "account_uuid": str(uuid.uuid4()),
+        "collection_uuid": str(uuid.uuid4()), "collection_revision": 1, "root_uuid": None,
+        "profile_url": page["url"], "policy_sha256": "a" * 64,
+        "extractor_version": page["extractor_version"], "initial_cursor": None,
+        "historical_pages": 0, "legacy": None, "not_before": when, "created_at": when}
+    listing["sha256"] = hashlib.sha256(native_json({k: listing[k] for k in LISTING_KEYS}, 32768)).hexdigest()
+    job = {"uuid": str(uuid.uuid4()), "kind": "account.list_page", "state": "queued", "revision": 1,
+        "fence": 0, "max_attempts": 8, "available_at": when, "created_at": when, "updated_at": when,
+        "result": {}, "arguments": {"version": 1, "listing_uuid": listing["uuid"], "generation": 1,
+            "page_ordinal": 1, "definition_sha256": listing["sha256"], "collection_uuid": listing["collection_uuid"]}}
+    return {"job": job, "listing": listing, "cursor": None, "receipt": None}, page
+
+
 class DiscoveryClientTests(unittest.TestCase):
     def setUp(self):
-        fixture = Path(__file__).resolve().parents[3] / "pkg/archive/testdata/discovery-pages-v1.json"
-        self.page = decode(fixture.read_bytes(), preserve_numbers=True)["pages"][1]["page"]
+        self.description, self.page = execution_fixture()
+        self.job, self.listing = self.description["job"], self.description["listing"]
+        self.when = self.listing["created_at"]
         self.transport = Mock(producer=str(uuid.uuid4()), timeout=15)
         self.client = DiscoveryClient(self.transport)
-        self.when = "2026-10-04T14:00:00Z"
-        self.listing = {"uuid": str(uuid.uuid4()), "account_uuid": str(uuid.uuid4()),
-            "collection_uuid": str(uuid.uuid4()), "collection_revision": 1, "root_uuid": None,
-            "profile_url": self.page["url"], "policy_sha256": "a" * 64,
-            "extractor_version": self.page["extractor_version"], "initial_cursor": None,
-            "historical_pages": 0, "legacy": None, "not_before": self.when, "created_at": self.when}
-        self.listing["sha256"] = self.digest(self.listing)
-        self.job = {"uuid": str(uuid.uuid4()), "kind": "account.list_page", "state": "queued", "revision": 1,
-            "fence": 0, "max_attempts": 8, "available_at": self.when, "created_at": self.when, "updated_at": self.when,
-            "result": {}, "arguments": {"version": 1, "listing_uuid": self.listing["uuid"], "generation": 1,
-                "page_ordinal": 1, "definition_sha256": self.listing["sha256"], "collection_uuid": self.listing["collection_uuid"]}}
-        self.description = {"job": self.job, "listing": self.listing, "cursor": None, "receipt": None}
         self.owner = str(uuid.uuid4())
         self.lease = {"owner_uuid": self.owner, "fence": 1}
         self.receipt = {"job_uuid": self.job["uuid"], "listing_uuid": self.listing["uuid"], "ordinal": 1,

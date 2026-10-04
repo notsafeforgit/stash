@@ -17,7 +17,7 @@ from .encoding import InvalidData, MAX_BATCH_BYTES, decode, digest, encode, iden
 from .endpoint import origin
 
 APPLICATION_ID = 0x5354494F  # STIO, not a Stash or gallery-dl archive database.
-SCHEMA = 10
+SCHEMA = 11
 
 
 class Conflict(InvalidData):
@@ -69,7 +69,7 @@ class Outbox:
                 tables = self.db.execute("SELECT name FROM sqlite_schema WHERE type='table'").fetchall()
             finally:
                 self.db.execute("ROLLBACK")
-            if not ((version in (1, 2, 3, 4, 5, 6, 7, 8, 9, SCHEMA) and application == APPLICATION_ID)
+            if not ((version in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, SCHEMA) and application == APPLICATION_ID)
                     or (version == 0 and application == 0 and not tables)):
                 raise InvalidData("Unsupported or foreign outbox database")
             self.db.execute("PRAGMA foreign_keys=ON")
@@ -137,7 +137,7 @@ class Outbox:
         version = self.db.execute("PRAGMA user_version").fetchone()[0]
         if version == SCHEMA:
             return
-        if version not in (1, 2, 3, 4, 5, 6, 7, 8, 9):
+        if version not in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10):
             raise InvalidData("Unsupported outbox migration")
         if version == 1:
             self._migrate_runs()
@@ -161,7 +161,10 @@ class Outbox:
         if version < 9:
             from .enrichment_dispatch import migrate
             migrate(self.db)
-        from .collection_dispatch import migrate
+        if version < 10:
+            from .collection_dispatch import migrate
+            migrate(self.db)
+        from .discovery_journal import migrate
         migrate(self.db)
         self.db.execute(f"PRAGMA user_version={SCHEMA}")
 
@@ -223,6 +226,13 @@ class Outbox:
     def close(self):
         self.db.close()
 
+    def metadata_reserved_bytes(self):
+        # Call inside the same transaction as capacity admission. Reservations
+        # cover bytes that an in-flight extractor can still return after a crash.
+        return self.db.execute("""SELECT
+            (SELECT coalesce(sum(reserved_bytes),0) FROM enrichment_executions) +
+            (SELECT coalesce(sum(reserved_bytes),0) FROM discovery_executions)""").fetchone()[0]
+
     def enqueue(self, body):
         event = events.validate(body)
         if event["producer_uuid"] != self.producer:
@@ -242,7 +252,7 @@ class Outbox:
                         or any(parent[k] != event[k] for k in ("collection_uuid", "collection_revision", "root_uuid"))):
                     raise Conflict("File source must already be queued for the same collection and root")
             count, size = self.db.execute("SELECT count(*),coalesce(sum(length(body)),0) FROM events WHERE body IS NOT NULL").fetchone()
-            size += self.db.execute("SELECT coalesce(sum(reserved_bytes),0) FROM enrichment_executions").fetchone()[0]
+            size += self.metadata_reserved_bytes()
             if count >= self.max_events or size + len(body) > self.max_bytes:
                 raise Capacity("Outbox capacity exhausted; pause new downloads and drain or review the queue")
             now = self.clock()

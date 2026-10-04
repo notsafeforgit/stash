@@ -170,7 +170,7 @@ class EnrichmentJournal:
             if current is None or current.revision != value.revision:
                 raise Conflict("Enrichment execution changed")
             events = self.db.execute("SELECT coalesce(sum(length(body)),0) FROM events WHERE body IS NOT NULL").fetchone()[0]
-            used = self.db.execute("SELECT coalesce(sum(reserved_bytes),0) FROM enrichment_executions").fetchone()[0]
+            used = self.box.metadata_reserved_bytes()
             if events + used - current.reserved_bytes + MAX_BYTES > self.box.max_bytes:
                 raise Capacity("Reserve a full enrichment checkpoint before fetching source data")
             self.db.execute("UPDATE enrichment_executions SET reserved_bytes=?,revision=revision+1,updated_at=? WHERE job_uuid=?",

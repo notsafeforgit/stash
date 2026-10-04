@@ -2463,7 +2463,7 @@ collection association, identity/URL evidence row and record mapping. Ordinary
 backups retain the graph; anonymisation deletes publication children before their
 dependencies. Publication does not release page bodies, finish catalog import or
 assign depicted performers. Automatic dispatch uses the same service. Actual
-source coverage, weak-candidate resolution and verified staging release remain
+source coverage, automatic candidate admission and verified staging release remain
 transition work.
 
 ### Reviewed discovery history recovery
@@ -2573,8 +2573,9 @@ failed, cancelled and completed work until a verified release is implemented.
 
 `discovery_detail_results` retains the comparison against the original frozen
 target and listing. A successful job means that comparison completed, including
-an uncorroborated result. It does not accept an identity, clear review blockers,
-remove another candidate, publish captures or finish an import. Pending child
+an uncorroborated result. It does not accept an identity, remove another candidate,
+publish captures or finish an import. Publication review can use a corroborated
+result under schema 1000077 below. Pending child
 requests prevent completion. The result contains hashes and record ordinals;
 metadata remains in the shared compact checkpoint. Original attempt receipts
 remain replayable after expiry, cancellation, later source edits and restart.
@@ -2591,5 +2592,34 @@ The migration preserves all prior jobs, attempts, receipts and pacing rows.
 Startup checks job bindings, generation continuity, checkpoint accounting,
 record hashes/times and rederives completed comparisons before opening a writer.
 Normal database backups contain these records; anonymisation removes their
-private source bodies and associations. Producer orchestration, guarded native
-publication from detail results and verified staging release remain open.
+private source bodies and associations. The Python producer executes and recovers
+these jobs. Automatic candidate admission and verified staging release remain open.
+
+### Publication from authenticated detail evidence
+
+Schema 1000077 extends `discovery_match_publications` with nullable
+`detail_job_uuid`, referencing the immutable `discovery_detail_results` receipt.
+Existing listing publications retain every original value and their policy.
+Detail publications use `retained-discovery-detail-publication-v1`; record ordinals
+refer to the saved detail transcript. Both paths share the same native identity,
+capture, publisher, album and translation transaction.
+
+Review selects the latest completed result for the sole weak candidate through
+an index on its target/candidate history. A negative result is retained, rather
+than searching backwards for positive evidence. It never drops a candidate or
+changes `needs_detail`. A completed detail may precede later listing comparisons,
+provided its original target, source, candidate, post revision, collection and
+page bindings remain valid. Missing historical batches, competing candidates,
+uncompared predecessor pages, changed native choices and an identifier owned by
+another post still block publication.
+
+Publication explicitly pins the detail job. Preparation rederives its comparison
+from original frozen input and authenticated checkpoint bytes, then prepares
+captures using each record's original observing producer and timestamp. The
+publication receipt and identity evidence reference that proof. The server
+rechecks current eligibility inside the transaction and verifies every native
+capture and association before commit. Response replay retains the selected
+proof even after later edits; it never reruns a fetch or repeats capture effects.
+Startup reconstructs both kinds of publication. Anonymisation deletes publication
+children before detail results. This migration does not release staged evidence,
+enable live scrapers or complete the broader catalog import.

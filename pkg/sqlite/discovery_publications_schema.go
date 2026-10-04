@@ -15,13 +15,14 @@ func verifyDiscoveryPublication(get enrichmentGet, selectRows enrichmentSelect, 
 	if !validSourceRunUUID(row.TargetUUID) || !validJobTime(row.CreatedAt) {
 		return models.ErrSourcePayloadCorrupt
 	}
-	p, err := prepareDiscoveryPublication(get, selectRows, models.DiscoveryPublicationInput{TargetUUID: row.TargetUUID, ExpectedTargetRevision: row.TargetRevision})
+	p, err := prepareDiscoveryPublication(get, selectRows, models.DiscoveryPublicationInput{TargetUUID: row.TargetUUID, ExpectedTargetRevision: row.TargetRevision, DetailJobUUID: publicationDetailUUID(&row)})
 	if err != nil {
 		return fmt.Errorf("%w: discovery publication source: %v", models.ErrSourcePayloadCorrupt, err)
 	}
 	expected := p.row
 	expected.CreatedAt, row.CreatedAt = row.CreatedAt.UTC(), row.CreatedAt.UTC()
-	if !reflect.DeepEqual(expected, row) || row.CreatedAt.Before(p.target.UpdatedAt) || row.CreatedAt.Before(p.page.CreatedAt) {
+	if !reflect.DeepEqual(expected, row) || row.CreatedAt.Before(p.target.UpdatedAt) || row.CreatedAt.Before(p.page.CreatedAt) ||
+		(p.detail != nil && row.CreatedAt.Before(p.detail.result.CreatedAt)) {
 		return models.ErrSourcePayloadCorrupt
 	}
 	var revision int
@@ -92,9 +93,20 @@ func verifyDiscoveryPublication(get enrichmentGet, selectRows enrichmentSelect, 
 	return nil
 }
 
-func validateDiscoveryPublicationSchema(conn *sqlx.DB) error {
-	for _, name := range []string{"discovery_match_publications", "discovery_match_publication_immutable", "discovery_match_publication_scope",
-		"discovery_published_records", "discovery_published_records_capture", "discovery_published_record_immutable", "discovery_published_record_scope"} {
+func validateDiscoveryPublicationSchema(conn *sqlx.DB, details bool) error {
+	names := []string{"discovery_match_publications", "discovery_match_publication_immutable", "discovery_match_publication_scope",
+		"discovery_published_records", "discovery_published_records_capture", "discovery_published_record_immutable", "discovery_published_record_scope"}
+	if details {
+		names = append(names, "discovery_detail_candidate_history", "discovery_publication_detail")
+		var columns int
+		if err := conn.Get(&columns, "SELECT count(*) FROM pragma_table_info('discovery_match_publications') WHERE name='detail_job_uuid'"); err != nil {
+			return err
+		}
+		if columns != 1 {
+			return models.ErrSourcePayloadCorrupt
+		}
+	}
+	for _, name := range names {
 		var exists bool
 		if err := conn.Get(&exists, "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name=?)", name); err != nil {
 			return err

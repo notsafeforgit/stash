@@ -81,6 +81,7 @@ func exerciseDiscoveryDetailHTTP(t *testing.T, service *ingest.Service, handler 
 	require.NoError(t, service.Repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
 		current, err := service.Repo.DiscoveryMatch.Review(ctx, review.Target.UUID)
 		require.NoError(t, err)
+		review.Detail, review.Blockers = &result, []string{"history_not_retained"}
 		require.Equal(t, review, *current)
 		return nil
 	}))

@@ -630,7 +630,7 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 			}
 		}
 		if version >= NativeSchemaBaseline+74 {
-			if err := validateDiscoveryPublicationSchema(conn); err != nil {
+			if err := validateDiscoveryPublicationSchema(conn, version >= NativeSchemaBaseline+77); err != nil {
 				return err
 			}
 		}

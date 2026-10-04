@@ -525,7 +525,7 @@ canonical URL evidence, shared capture/publisher/album/translation effects and
 receipt together. Preserve the corroborating observation's actual time and all
 selected-post records from the strongest page. Other page records remain staged.
 Reuse original receipts after response loss or later native edits. Missing
-history, weak/competing candidates and identifiers owned by another post require
+history, unverified/competing candidates and identifiers owned by another post require
 resolution; do not silently merge posts. Verify the retained receipt graph on
 reopen and preserve it through backup. This does not release pages, assign
 depicted performers or complete the catalog import.
@@ -560,7 +560,7 @@ authenticated checkpoint provenance, immutable comparison results and scoped
 worker HTTP. Preserve original records across failover and old acknowledgements
 after source changes. Detail work shares metadata/download pacing, including
 saved child-service cooldowns. Job success retains a comparison, including an
-uncorroborated result; it cannot clear blockers or accept identity. Startup must
+uncorroborated result; it cannot accept identity. Startup must
 rederive its saved proof, and anonymisation must remove its private transcripts.
 Producer schema 14 adds the Python detail journal, selected execution and scoped
 collection/profile dispatch. Keep its `comparison` receipts distinct from
@@ -570,8 +570,16 @@ extractor responses can become uncorroborated detail evidence; extractor failure
 remain failures. Saved delivery must work before loading website profiles, and
 all metadata journals share the outbox byte budget. Readiness visits only the
 bounded active detail jobs and preserves current grants, runtime and retry delays.
-Automatic candidate admission and guarded publication remain to be integrated;
-ordinary post enrichment cannot treat an inferred URL as an accepted association.
+Schema 1000077 connects authenticated detail results to the shared publication
+service and background worker. Review exposes the latest completed result for a
+sole weak candidate; negative results cannot be ignored in favour of older
+corroboration. A completed detail can survive later listing comparisons without
+changing the frozen source, original candidate evidence or native post revision.
+Explicit publication pins `detail_job_uuid`; preparation reconstructs that
+result's comparison and per-record provenance. All coverage, competing-candidate,
+recovery and native-edit guards still apply. Preserve publication and checkpoint
+replay after later edits. Automatic candidate admission and staging release remain
+to be integrated; ordinary enrichment cannot treat an inferred URL as accepted.
 
 `stash-import-catalog-evidence` maps a received snapshot's posts, profiles and
 captures through core services in schema 1000031. It uses exact manifest/ordinal

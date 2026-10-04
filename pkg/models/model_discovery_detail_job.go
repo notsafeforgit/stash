@@ -46,7 +46,8 @@ type DiscoveryDetailAdmission struct {
 }
 
 // Success here means the saved transcript was compared. It does not publish
-// captures or identities, clear review blockers or complete a catalog import.
+// captures or identities or complete a catalog import. Publication review may
+// use a corroborated result without rewriting the original weak candidate.
 type DiscoveryDetailResult struct {
 	JobUUID            string                  `json:"job_uuid" db:"job_uuid"`
 	CheckpointRevision int                     `json:"checkpoint_revision" db:"checkpoint_revision"`

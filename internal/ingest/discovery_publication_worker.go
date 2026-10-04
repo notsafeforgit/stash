@@ -10,7 +10,8 @@ import (
 )
 
 // DiscoveryPublicationWorker publishes only explicitly bound, completely
-// compared strong matches. It uses the same atomic service as application
+// compared matches corroborated by listing or authenticated detail evidence.
+// It uses the same atomic service as application
 // publication and never fetches, assigns performers or releases source pages.
 type DiscoveryPublicationWorker struct {
 	Service      *Service

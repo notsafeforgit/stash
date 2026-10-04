@@ -51,6 +51,10 @@ func TestPythonDiscoveryDetailExecutionRecoversOriginalEvidence(t *testing.T) {
 	discoveryActivationScenario(t, false, false, true)
 }
 
+func TestPythonDiscoveryDetailPublicationHTTPRecoversAndRejectsImplicitMerge(t *testing.T) {
+	discoveryActivationScenario(t, true, false, true)
+}
+
 func discoveryActivationScenario(t *testing.T, fresh, recovery, pythonDetails bool) {
 	t.Helper()
 	python, packagePath := nativeProducerRuntime(t)
@@ -230,7 +234,7 @@ func discoveryActivationScenario(t *testing.T, fresh, recovery, pythonDetails bo
 	page["url"], page["cursor"], page["complete"], page["next_cursor"] = listing.ProfileURL, listing.InitialCursor, true, nil
 	patch := page["records"].([]any)[0].(map[string]any)["patch"].(map[string]any)
 	patch["source_extractor_url"], patch["author"] = listing.ProfileURL, "deliberately-unlinked"
-	if fresh {
+	if fresh && !pythonDetails {
 		patch["date"] = "2026-10-03"
 	}
 	body, err = archive.EncodeSourceJSON(page)
@@ -244,6 +248,7 @@ func discoveryActivationScenario(t *testing.T, fresh, recovery, pythonDetails bo
 		require.NotNil(t, result.Receipt)
 		require.True(t, result.Receipt.Complete)
 	}
+	publicationInput := map[string]any{"expected_target_revision": 2}
 	for _, entry := range receipt.Entries {
 		path := "/discovery-match-targets/" + entry.TargetUUID
 		review := enrichmentHTTPValue[models.DiscoveryMatchReview](t, request("GET", path+"/review", nil, 200))
@@ -252,11 +257,15 @@ func discoveryActivationScenario(t *testing.T, fresh, recovery, pythonDetails bo
 		require.True(t, review.Coverage.RetainedComplete)
 		require.True(t, review.Target.EnumerationComplete)
 		require.Equal(t, fresh, review.Coverage.Complete, "resumed enumeration cannot prove missing historical coverage")
-		if fresh {
+		if fresh && !pythonDetails {
 			require.Empty(t, review.Blockers)
 			require.Zero(t, review.DetailCandidateCount)
 		} else {
-			require.Equal(t, []string{"history_not_retained", "detail_required"}, review.Blockers)
+			expected := []string{"history_not_retained", "detail_required"}
+			if fresh {
+				expected = []string{"detail_required"}
+			}
+			require.Equal(t, expected, review.Blockers)
 			require.Equal(t, 1, review.DetailCandidateCount)
 		}
 		require.Equal(t, 1, review.CandidateCount)
@@ -265,8 +274,8 @@ func discoveryActivationScenario(t *testing.T, fresh, recovery, pythonDetails bo
 		evidence := enrichmentHTTPValue[[]models.DiscoveryMatchEvidence](t, request("GET", "/discovery-match-candidates/"+strconv.FormatInt(candidates[0].Sequence, 10)+"/evidence", nil, 200))
 		require.Len(t, evidence, 1)
 		require.Equal(t, []int{0, 1, 2}, evidence[0].RecordOrdinals)
-		require.Equal(t, !fresh, evidence[0].NeedsDetail, "a title-only match cannot establish an accepted identity")
-		if !fresh {
+		require.Equal(t, !fresh || pythonDetails, evidence[0].NeedsDetail, "a title-only match cannot establish an accepted identity")
+		if !fresh || pythonDetails {
 			detailPage, err := archive.DecodeJSONObject(body, archive.MaxDiscoveryPageBytes)
 			require.NoError(t, err)
 			for _, record := range detailPage["records"].([]any) {
@@ -293,6 +302,14 @@ func discoveryActivationScenario(t *testing.T, fresh, recovery, pythonDetails bo
 			} else {
 				exerciseDiscoveryDetailHTTP(t, service, producerHandler, token, review, listing, detailBody)
 			}
+			current := enrichmentHTTPValue[models.DiscoveryMatchReview](t, request("GET", path+"/review", nil, http.StatusOK))
+			require.NotNil(t, current.Detail)
+			if fresh && entry.TargetUUID == receipt.Entries[0].TargetUUID {
+				publicationInput["detail_job_uuid"] = current.Detail.JobUUID
+			}
+			if !fresh {
+				request("POST", path+"/publication", map[string]any{"expected_target_revision": 2, "detail_job_uuid": current.Detail.JobUUID}, http.StatusConflict)
+			}
 			input.ExpectedTargetRevision++
 			request("POST", path+"/detail-preview", input, http.StatusConflict)
 			input.ExpectedTargetRevision--
@@ -313,7 +330,9 @@ func discoveryActivationScenario(t *testing.T, fresh, recovery, pythonDetails bo
 	require.Len(t, pages, 1, "both targets share the original stored page")
 	var publication *models.DiscoveryMatchPublication
 	if fresh {
-		postBody := bytes.NewBufferString(`{"expected_target_revision":2}`)
+		encoded, err := json.Marshal(publicationInput)
+		require.NoError(t, err)
+		postBody := bytes.NewBuffer(encoded)
 		r, err := http.NewRequestWithContext(t.Context(), "POST", server.URL+"/api/v3/archive"+publicationPath, postBody)
 		require.NoError(t, err)
 		r.Header.Set("Content-Type", "application/json")
@@ -328,7 +347,11 @@ func discoveryActivationScenario(t *testing.T, fresh, recovery, pythonDetails bo
 		publication = &value
 		require.Equal(t, receipt.Entries[0].PostUUID, publication.PostUUID)
 		require.Equal(t, 3, publication.RecordCount)
-		replay := enrichmentHTTPValue[models.DiscoveryMatchPublication](t, request("POST", publicationPath, map[string]any{"expected_target_revision": 2}, 200))
+		if pythonDetails {
+			require.Equal(t, archive.DiscoveryDetailPublicationPolicy, publication.Policy)
+			require.Equal(t, publicationInput["detail_job_uuid"], *publication.DetailJobUUID)
+		}
+		replay := enrichmentHTTPValue[models.DiscoveryMatchPublication](t, request("POST", publicationPath, publicationInput, 200))
 		require.Equal(t, *publication, replay)
 		records := enrichmentHTTPValue[[]models.DiscoveryPublishedRecord](t, request("GET", publicationPath+"/records?limit=1", nil, 200))
 		require.Len(t, records, 1)
@@ -338,7 +361,14 @@ func discoveryActivationScenario(t *testing.T, fresh, recovery, pythonDetails bo
 		request("GET", publicationPath+"/records?after=-2", nil, 400)
 		request("GET", publicationPath+"/records?limit=101", nil, 400)
 		request("POST", publicationPath, map[string]any{"expected_target_revision": 3}, 409)
-		request("POST", "/discovery-match-targets/"+receipt.Entries[1].TargetUUID+"/publication", map[string]any{"expected_target_revision": 2}, 409)
+		otherPath := "/discovery-match-targets/" + receipt.Entries[1].TargetUUID
+		other := enrichmentHTTPValue[models.DiscoveryMatchReview](t, request("GET", otherPath+"/review", nil, http.StatusOK))
+		require.Contains(t, other.Blockers, "identifier_in_use")
+		otherInput := map[string]any{"expected_target_revision": 2}
+		if other.Detail != nil {
+			otherInput["detail_job_uuid"] = other.Detail.JobUUID
+		}
+		request("POST", otherPath+"/publication", otherInput, 409)
 		require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
 			captures, err := repo.SourceEvidence.Captures(ctx, publication.PostUUID, nil, 100)
 			require.NoError(t, err)
@@ -364,7 +394,7 @@ func discoveryActivationScenario(t *testing.T, fresh, recovery, pythonDetails bo
 	replayed := enrichmentHTTPValue[models.DiscoveryActivation](t, request("GET", "/discovery-activations/"+receipt.Input.UUID, nil, 200))
 	require.Equal(t, receipt, replayed)
 	if publication != nil {
-		value := enrichmentHTTPValue[models.DiscoveryMatchPublication](t, request("POST", publicationPath, map[string]any{"expected_target_revision": 2}, 200))
+		value := enrichmentHTTPValue[models.DiscoveryMatchPublication](t, request("POST", publicationPath, publicationInput, 200))
 		require.Equal(t, *publication, value, "publication receipt survives reopening")
 	}
 }

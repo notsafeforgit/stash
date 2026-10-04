@@ -56,8 +56,11 @@ candidate-bound detail jobs, producer-authenticated checkpoints, retained origin
 evidence comparisons and scoped worker HTTP, and has passed full-copy
 reconciliation, restart inspection and the full fork gate. The isolated rehearsal
 admits no source jobs. Python detail delivery and collection/profile dispatch
-are implemented; actual source coverage, automatic candidate admission,
-publication from detail receipts and staging release remain open.
+are implemented. Schema 77 connects authenticated detail results to guarded native
+publication while preserving coverage, competing candidates and later native
+edits. Its full-copy rehearsal and fork gate are still required; schema 76 remains
+the retained verified database. Actual source coverage, automatic candidate
+admission and staging release remain open.
 Remaining import review resolution and the broader native management interfaces still
 require work.
 Native UI, live host/n8n conversion, compatibility removal, coordinated
@@ -6913,9 +6916,44 @@ native review stays unchanged. Populated outbox migration tests preserve every
 pre-existing value and pending body, while unknown-object collisions roll back.
 All 476 producer tests pass. The native detail and Python/Go interoperability
 suite passed in 115 seconds, including existing enrichment and listing workflows.
-The full fork gate has passed v3 validation, producer tests and Go lint; its
-tagged backend suite is still running. Its final outcome will be recorded here.
+The full fork gate passed in 1,152 seconds: v3 validation, all 476 producer tests,
+Go lint with zero issues, and the tagged backend suite (SQLite 1,051 seconds).
 
 Automatic candidate admission, publication from authenticated detail receipts,
 verified staging release and the broader transition gates remain open.
 Production, `develop` and the frozen compatible release remain unchanged.
+
+## Authenticated detail publication — 2026-10-04
+
+Schema 1000077 connects completed candidate detail results to the native
+publication service and its automatic worker. A unique weak candidate can use its
+latest authenticated corroboration after complete listing comparison; earlier
+successful detail work survives later listing progress without refetching the
+same post. Negative results remain visible, and a later negative result cannot
+be bypassed by selecting an older positive one. The original weak candidate,
+source values, page references and every competing candidate remain unchanged.
+
+Application publication pins `detail_job_uuid`. Preparation rederives the saved
+comparison and capture inputs; commit checks original native choices, complete
+coverage, recovery predecessors and identifier ownership again. Identity and URL
+evidence, native captures, publisher/album/translation effects and the receipt
+commit together. Each capture retains its original observing producer and time
+across worker failover. Existing listing publication receipts retain all values;
+the new nullable detail reference identifies the alternate observation source.
+Startup reconstructs either proof, and anonymisation removes children in foreign
+key order. Staging bodies remain retained for subsequent verified release.
+
+Focused SQLite/API tests passed in 63 seconds. They cover failover provenance,
+later listing comparisons, native edits, competing/earlier candidates, missing
+history, negative/preview-only evidence, caught-error rollback, forged captures,
+reopen corruption checks and anonymisation. The real Python/Go HTTP workflow
+loses checkpoint, comparison and publication responses, then recovers original
+receipts across processes and database reopen. It also proves that publication
+uses shared publisher/album services and refuses implicit post consolidation.
+Populated predecessor migration fixtures retain existing receipts, values and
+guards; unknown-object collisions fail without losing their input.
+
+The full fork gate and full-copy schema-77 migration/reconciliation follow this
+checkpoint. Schema 76 remains the verified retained rehearsal until they finish.
+Automatic candidate admission, actual source coverage, verified staging release
+and the broader transition remain open. Production is unchanged.

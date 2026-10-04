@@ -8,11 +8,13 @@ import (
 type DiscoveryPublicationInput struct {
 	TargetUUID             string `json:"target_uuid"`
 	ExpectedTargetRevision int    `json:"expected_target_revision"`
+	DetailJobUUID          string `json:"detail_job_uuid,omitempty"`
 }
 
 // A publication accepts one verified post identity and publishes the selected
-// page's observations through native capture services. Other retained pages are
-// still discovery evidence; this receipt does not release them or finish import.
+// page's observations (or the selected detail transcript) through native capture
+// services. Other retained pages are still discovery evidence; this receipt does
+// not release them or finish import. DetailJobUUID identifies the record source.
 type DiscoveryMatchPublication struct {
 	TargetUUID      string    `json:"target_uuid" db:"target_uuid"`
 	TargetRevision  int       `json:"target_revision" db:"target_revision"`
@@ -31,6 +33,7 @@ type DiscoveryMatchPublication struct {
 	RecordCount     int       `json:"record_count" db:"record_count"`
 	CaptureCount    int       `json:"capture_count" db:"capture_count"`
 	CreatedAt       time.Time `json:"created_at" db:"created_at"`
+	DetailJobUUID   *string   `json:"detail_job_uuid,omitempty" db:"detail_job_uuid"`
 }
 
 type DiscoveryPublishedRecord struct {

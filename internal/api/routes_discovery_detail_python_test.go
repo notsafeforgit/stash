@@ -27,7 +27,7 @@ func exercisePythonDiscoveryDetailHTTP(t *testing.T, service *ingest.Service, to
 	credential, err := service.Authenticate(t.Context(), token)
 	require.NoError(t, err)
 	worker := ingest.NewDiscoveryDetailCoordinator(service)
-	now := time.Now().Add(2 * time.Second).UTC().Truncate(time.Millisecond)
+	now := time.Now().UTC().Truncate(time.Millisecond)
 	worker.Now = func() time.Time { return now }
 	handler := (&ingestRoutes{service: service, detail: worker}).router()
 	var mu sync.Mutex
@@ -107,6 +107,10 @@ func exercisePythonDiscoveryDetailHTTP(t *testing.T, service *ingest.Service, to
 	require.NoError(t, service.Repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
 		current, err := service.Repo.DiscoveryMatch.Review(ctx, review.Target.UUID)
 		require.NoError(t, err)
+		review.Detail, review.Blockers = final.Journal.Comparison, []string{"history_not_retained"}
+		if review.Coverage.Complete {
+			review.Blockers = []string{}
+		}
 		require.Equal(t, review, *current, "comparison never accepts identity or clears coverage blockers")
 		checkpoint, err := service.Repo.DiscoveryDetail.CheckpointHead(ctx, final.JobUUID)
 		require.NoError(t, err)

@@ -29,6 +29,12 @@ func newDetailFixture(t *testing.T) *detailFixture {
 	f := &detailFixture{discoveryMatchFixture: newDiscoveryMatchFixture(t)}
 	f.append(t, f.page)
 	f.advance(t, 0)
+	return attachDetailFixture(t, f.discoveryMatchFixture)
+}
+
+func attachDetailFixture(t *testing.T, match *discoveryMatchFixture) *detailFixture {
+	t.Helper()
+	f := &detailFixture{discoveryMatchFixture: match}
 	review := f.review(t)
 	f.body = discoveryPreviewBody(t, f.page, review.Candidate.URL, f.listing.ExtractorVersion)
 	f.input = models.DiscoveryDetailAdmission{TargetUUID: f.target.UUID, ExpectedTargetRevision: review.Target.Revision, CandidateSequence: review.Candidate.Sequence,
@@ -114,7 +120,9 @@ func TestDiscoveryDetailJobsResumeOriginalProvenanceAndKeepReview(t *testing.T) 
 	require.NoError(t, err)
 	require.Equal(t, "corroborated", result.Evidence.Status)
 	require.Equal(t, "exact-title-and-date", result.Evidence.Basis)
-	require.Equal(t, before, f.review(t), "fetch completion is not identity publication")
+	before.Detail = result
+	before.Blockers = []string{"listing_incomplete"}
+	require.Equal(t, before, f.review(t), "corroboration preserves listing coverage and original candidates without publishing identity")
 	var records []models.EnrichmentCheckpointRecord
 	require.NoError(t, f.repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
 		var err error
@@ -167,6 +175,7 @@ func TestDiscoveryDetailJobsKeepNegativeAndEmptyResultsWithoutDroppingCandidates
 		require.NoError(t, err)
 		require.Equal(t, "uncorroborated", result.Evidence.Status)
 		require.Nil(t, result.Evidence.WitnessOrdinal)
+		original.Detail = result
 		require.Equal(t, original, f.review(t))
 		require.NoError(t, f.db.Close())
 		require.NoError(t, f.db.Open(f.db.DatabasePath()))
@@ -378,8 +387,9 @@ func TestDiscoveryDetailNewComparisonCancelsOnlyObsoleteSelectedWork(t *testing.
 	require.NotNil(t, running)
 	checkpoint, err := f.worker.Checkpoint(t.Context(), f.tokens[1], running.Lease(), 0, f.body)
 	require.NoError(t, err)
-	_, err = f.worker.Complete(t.Context(), f.tokens[1], running.Lease(), checkpoint.Revision, checkpoint.Digest)
+	result, err := f.worker.Complete(t.Context(), f.tokens[1], running.Lease(), checkpoint.Revision, checkpoint.Digest)
 	require.NoError(t, err)
+	current.Detail, current.Blockers = result, []string{}
 	require.Equal(t, current, f.review(t))
 	require.NoError(t, f.db.Close())
 	require.NoError(t, f.db.Open(f.db.DatabasePath()))

@@ -9,6 +9,8 @@ import (
 
 const DiscoveryPublicationPolicy = "retained-discovery-publication-v1"
 
+const DiscoveryDetailPublicationPolicy = "retained-discovery-detail-publication-v1"
+
 type DiscoveryCaptureRecord struct {
 	Ordinal int
 	Input   models.SourceCaptureInput

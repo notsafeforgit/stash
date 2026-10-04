@@ -15,6 +15,7 @@ import (
 
 func removeDiscoveryDetailSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeDiscoveryDetailPublicationSchema(t, raw)
 	_, err := raw.Exec(`DROP TRIGGER discovery_detail_success; DROP INDEX archive_jobs_discovery_detail;
  DROP TABLE discovery_detail_results; DROP TABLE discovery_detail_checkpoints;
  DROP TABLE discovery_detail_checkpoint_records; DROP TABLE discovery_detail_checkpoint_receipts;
@@ -54,7 +55,7 @@ func TestDiscoveryDetailMigrationPreservesListingRecoveryAndPacing(t *testing.T)
 			} else {
 				require.NoError(t, f.db.RunAllMigrations())
 				require.NoError(t, f.db.ReInitialise())
-				require.Equal(t, uint(1000076), f.db.Version())
+				require.Equal(t, f.db.AppSchemaVersion(), f.db.Version())
 				for _, name := range []string{"enrichment_job_success", "discovery_listing_success", "discovery_recovery_job_scope", "discovery_recovery_page_scope", "archive_jobs_discovery_listing", "source_enrichment_waiter_end"} {
 					require.EqualValues(t, 1, queryUint(t, raw, "SELECT count(*) FROM sqlite_schema WHERE name='"+name+"'"), name)
 				}

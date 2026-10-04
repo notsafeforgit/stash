@@ -2331,9 +2331,11 @@ delivery receipt when another process advances the dispatch revision.
 
 A detail worker fetches one inferred Reddit or Twitter post URL and saves a
 comparison with the original catalog/listing evidence. Its result can be
-`corroborated` or `uncorroborated`; neither accepts a post identity, clears review
-blockers or publishes metadata. Listing discovery and post enrichment have
-separate profiles and receipts.
+`corroborated` or `uncorroborated`. The comparison receipt itself does not publish
+metadata or accept identity. Stash's publication worker can subsequently use a
+corroborated result once listing coverage, uniqueness and native-edit checks pass.
+Review retains the original weak candidate and exposes its latest result. Listing
+discovery and post enrichment have separate profiles and receipts.
 
 Use a detail profile for the candidate's service:
 

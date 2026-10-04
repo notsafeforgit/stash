@@ -303,6 +303,11 @@ func TestDiscoveryRecoveryMigrationPreservesPublicationAndRejectsUnknownObjects(
 				before[table] = albumJobRows(t, raw, table)
 			}
 			removeDiscoveryRecoverySchema(t, raw)
+			if collision {
+				// A rejected predecessor migration retains its 17-column receipt
+				// layout; successful promotion adds the nullable detail reference.
+				before["discovery_match_publications"] = albumJobRows(t, raw, "discovery_match_publications")
+			}
 			_, err = raw.Exec("UPDATE schema_migrations SET version=1000074,dirty=0")
 			require.NoError(t, err)
 			if collision {

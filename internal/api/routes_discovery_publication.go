@@ -12,13 +12,14 @@ import (
 
 func (rs *nativeArchiveRoutes) publishDiscoveryMatch(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		Expected int `json:"expected_target_revision"`
+		Expected      int    `json:"expected_target_revision"`
+		DetailJobUUID string `json:"detail_job_uuid,omitempty"`
 	}
 	if err := readIngestJSON(w, r, 4096, &input); err != nil {
 		ingestError(w, err)
 		return
 	}
-	result, err := ingest.New(rs.repo).PublishDiscoveryMatch(r.Context(), models.DiscoveryPublicationInput{TargetUUID: chi.URLParam(r, "target"), ExpectedTargetRevision: input.Expected})
+	result, err := ingest.New(rs.repo).PublishDiscoveryMatch(r.Context(), models.DiscoveryPublicationInput{TargetUUID: chi.URLParam(r, "target"), ExpectedTargetRevision: input.Expected, DetailJobUUID: input.DetailJobUUID})
 	writeDiscoveryWorker(w, result, err)
 }
 

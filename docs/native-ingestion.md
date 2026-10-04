@@ -778,8 +778,9 @@ saved-delivery cursors for discovery and enrichment. Both saved deliveries run
 before website profiles load, preserving recovery when access bindings are
 unavailable. Selection commits before execution, so continuously busy profiles
 cannot reset the traversal after restart. Reviewed activation and publication of
-complete, unique strong matches are implemented, including background publication.
-Actual coverage and candidate detail execution remain necessary before
+complete, unique corroborated matches are implemented, including background publication
+from listing evidence or authenticated detail results. Actual coverage and automatic
+candidate admission remain necessary before
 host/n8n callers switch to native discovery. In particular, a
 retained nonfinal page is successful page delivery, not successful enumeration
 or a completed catalog import.
@@ -799,9 +800,9 @@ producer credentials do not grant review or source administration.
 | `GET /discovery-match-targets/{target}` | Inspect the original target binding and durable comparison progress. |
 | `GET /discovery-match-targets/{target}/review` | Inspect current coverage, candidate counts and blockers without fetching or changing metadata. |
 | `POST /discovery-match-targets/{target}/detail-preview` | Compare a supplied metadata-fetch transcript against one original weak candidate, without retaining it or changing the review. |
-| `POST /discovery-match-targets/{target}/publication` | Publish a complete, unique strong match with `{expected_target_revision}`, or replay its original receipt. |
+| `POST /discovery-match-targets/{target}/publication` | Publish a complete unique match with `{expected_target_revision}` and, for detail corroboration, the review's `detail_job_uuid`; replay requires the same proof. |
 | `GET /discovery-match-targets/{target}/publication` | Retrieve the accepted identity and native publication receipt. |
-| `GET /discovery-match-targets/{target}/publication/records` | Inspect original page record ordinals and their native capture UUIDs. |
+| `GET /discovery-match-targets/{target}/publication/records` | Inspect original page or detail-transcript record ordinals and their native capture UUIDs. |
 | `GET /discovery-match-targets/{target}/candidates` | Inspect distinct candidate post IDs and their strongest retained evidence. |
 | `GET /discovery-match-candidates/{candidate}/evidence` | Inspect each original page's basis and record ordinals. |
 
@@ -850,9 +851,8 @@ detail response cannot remove a competing candidate.
 
 Preview bytes have no authenticated producer receipt. Even a corroborated
 preview leaves `detail_required` and other blockers intact. This endpoint does
-not fetch a website, create a job, accept an identity or publish captures. Durable
-candidate-specific execution and publication are still required before automatic
-detail results can resolve a match.
+not fetch a website, create a job, accept an identity or publish captures. Only a
+saved, authenticated detail result can supply publication proof.
 
 The target review uses one database snapshot. `coverage.retained_pages` counts
 received batches of source posts, while `target.last_page` counts batches already
@@ -864,8 +864,12 @@ page count supplies no metadata with which to check competing matches. Complete
 coverage describes that retained search, not all posts a source ever hosted.
 
 `candidate_count` groups distinct source post IDs, and `detail_candidate_count`
-counts those whose best evidence still requires a detail fetch. A single
-candidate is included with its existing native post, if any. Multiple candidates
+counts candidates whose original listing evidence is weak; corroboration does
+not rewrite that evidence. A single candidate is included with its existing
+native post, if any, and its latest completed `detail` result when available.
+Only a corroborated result clears `detail_required`; all other blockers remain.
+A newer negative result cannot be bypassed by selecting an older positive one.
+Multiple candidates
 remain available through the paginated candidates route. The `blockers` array
 can contain:
 
@@ -879,7 +883,7 @@ can contain:
 | `post_already_identified` | The target already has an identifier outside the imported catalog namespace. |
 | `no_candidate` | The complete retained search produced no candidate. |
 | `competing_candidates` | More than one distinct post remains a candidate. |
-| `detail_required` | At least one candidate still needs source detail verification. |
+| `detail_required` | Weak listing evidence lacks usable authenticated corroboration for a sole candidate. |
 | `identifier_in_use` | The sole candidate's identifier belongs to another native post, including a forgotten post. |
 | `search_replaced` | A reviewed recovery search replaced this listing; its original evidence is retained. |
 | `earlier_comparison_pending` | The predecessor search still has retained batches to compare with this target. |
@@ -894,22 +898,32 @@ Review reads compact receipts and references without loading source page bodies.
 
 Publication is application-authorized and makes no source request. It requires
 the exact completed target revision, a search retained from its beginning, one
-strong candidate, unchanged native source/post choices and an unclaimed source
+corroborated candidate, unchanged native source/post choices and an unclaimed source
 post identifier. It reparses the original evidence and selects the observation
 that actually supplied the matching basis. An earlier title-only observation
 cannot acquire the corroborating observation's time.
 
 Identity and canonical URL evidence, all selected-post observations from the
-candidate's strongest page, publisher/album/translation effects and the receipt
+candidate's strongest page (or the selected detail transcript), publisher/album/translation effects and the receipt
 commit together. The original producer, observation times, shared payload/profile
 data and parent context remain intact. Other posts on that page remain staged.
 The operation preserves the existing legacy post UUID and keys; a source ID owned
 by another post returns a conflict for explicit consolidation review. It neither
 downloads media nor chooses depicted performers.
 
+For a weak candidate, send `detail_job_uuid` from the review's `detail.job_uuid`.
+Preparation reconstructs its comparison from the frozen source, original listing
+page and retained checkpoint. A detail completed before later listing comparisons
+can remain valid for the same candidate and native post revision. Its original
+`needs_detail` flag remains true. The publication uses policy
+`retained-discovery-detail-publication-v1` and retains `detail_job_uuid`; its record
+ordinals and corroborating timestamp refer to that transcript, not the weak listing
+record. Pending children cannot supply completion; unresolved child references
+stay in the retained evidence. Neither detail nor listing bodies are released.
+
 Recover a lost response with GET or repeat the same POST. Replay returns the
 original receipt even after a later source edit or post tombstone; a different
-target revision cannot reuse it. GET returns 404 before publication. Record
+target revision or detail job cannot reuse it. GET returns 404 before publication. Record
 pagination uses zero-based `record_ordinal`, with `after=-1` by default and
 `limit` from 1 to 100. These associations prove native capture publication only;
 they do not release listing staging or declare the whole catalog import complete.
@@ -917,7 +931,7 @@ they do not release listing staging or declare the whole catalog import complete
 The server also publishes eligible matches automatically after comparison. Its
 worker inspects at most 32 target rows at a time, skips published and blocked
 targets, and calls the same publication service with the target's current
-revision. It rereads and validates the evidence before committing, so readiness
+revision and selected detail result where needed. It rereads and validates the evidence before committing, so readiness
 cannot authorize a changed match. A competing worker shares the original receipt.
 Targets requiring review retain their evidence without holding up ready targets.
 Comparison and publication pause after a traversal finds no work, and resume
@@ -1880,6 +1894,7 @@ Its sorted `{uuid}` entries come from the bounded active detail jobs and current
 collection/root grants; it reads no transcript bodies and cannot admit work.
 The capability is `discovery_detail_collections_protocol: 1`. Per-collection
 dispatch processes existing jobs; a new candidate requires explicit admission.
-Publication from detail receipts, automatic candidate admission and verified
-staging release remain transition work. Production scrapers have not switched
+Authenticated results can now feed the guarded native publication service above.
+Automatic candidate admission and verified staging release remain transition
+work. Production scrapers have not switched
 to these routes.

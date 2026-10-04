@@ -44,7 +44,14 @@ func (s *DiscoveryMatchStore) PendingPublications(ctx context.Context, after str
 			return nil, err
 		}
 		if review != nil && review.Publication == nil && review.Coverage.Complete && len(review.Blockers) == 0 {
-			ret.Targets = append(ret.Targets, models.DiscoveryPublicationInput{TargetUUID: row.UUID, ExpectedTargetRevision: review.Target.Revision})
+			input := models.DiscoveryPublicationInput{TargetUUID: row.UUID, ExpectedTargetRevision: review.Target.Revision}
+			if review.Detail != nil {
+				if now.Before(review.Detail.CreatedAt) {
+					continue
+				}
+				input.DetailJobUUID = review.Detail.JobUUID
+			}
+			ret.Targets = append(ret.Targets, input)
 		}
 	}
 	return ret, nil

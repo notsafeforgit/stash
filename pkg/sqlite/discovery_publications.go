@@ -51,6 +51,7 @@ type preparedDiscoveryPublication struct {
 	row       models.DiscoveryMatchPublication
 	witness   time.Time
 	prior     *models.DiscoveryMatchPublication
+	detail    *preparedDiscoveryPublicationDetail
 }
 
 // prepareDiscoveryPublication derives the immutable publication from the saved
@@ -91,7 +92,7 @@ func prepareDiscoveryPublication(get enrichmentGet, selectRows enrichmentSelect,
 	if err := selectRows(&candidates, discoveryCandidateSelect+" WHERE c.target_uuid=? ORDER BY c.id LIMIT 2", ret.target.UUID); err != nil {
 		return nil, err
 	}
-	if len(candidates) != 1 || candidates[0].NeedsDetail {
+	if len(candidates) != 1 || candidates[0].NeedsDetail != (input.DetailJobUUID != "") {
 		return nil, models.ErrDiscoveryConflict
 	}
 	ret.candidate = candidates[0]
@@ -102,8 +103,16 @@ func prepareDiscoveryPublication(get enrichmentGet, selectRows enrichmentSelect,
 	if recovery != nil && (recovery.UncomparedPages != 0 || recovery.ConflictingCandidates != 0) {
 		return nil, models.ErrDiscoveryConflict
 	}
+	pageOrdinal := ret.candidate.BestPage
+	if input.DetailJobUUID != "" {
+		ret.detail, err = prepareDiscoveryPublicationDetail(get, selectRows, input.DetailJobUUID, ret.target, ret.listing, ret.candidate)
+		if err != nil {
+			return nil, err
+		}
+		pageOrdinal = ret.detail.work.PageOrdinal
+	}
 	var page discoveryPageRow
-	if err := get(&page, "SELECT * FROM discovery_pages WHERE listing_uuid=? AND ordinal=?", ret.listing.UUID, ret.candidate.BestPage); err != nil {
+	if err := get(&page, "SELECT * FROM discovery_pages WHERE listing_uuid=? AND ordinal=?", ret.listing.UUID, pageOrdinal); err != nil {
 		return nil, err
 	}
 	ret.page, err = page.resolve()
@@ -121,8 +130,8 @@ func prepareDiscoveryPublication(get enrichmentGet, selectRows enrichmentSelect,
 	if err != nil {
 		return nil, err
 	}
-	if len(matches) != 1 || matches[0].NeedsDetail || matches[0].Post.Namespace != ret.candidate.Namespace || matches[0].Post.Value != ret.candidate.Value ||
-		matches[0].Basis != ret.candidate.Basis || matches[0].URL != ret.candidate.URL {
+	if len(matches) != 1 || matches[0].NeedsDetail != (ret.detail != nil) || matches[0].Post.Namespace != ret.candidate.Namespace || matches[0].Post.Value != ret.candidate.Value ||
+		(ret.detail == nil && matches[0].Basis != ret.candidate.Basis) || matches[0].URL != ret.candidate.URL {
 		return nil, models.ErrSourcePayloadCorrupt
 	}
 	digest, err := discoveryMatchesDigest(matches)
@@ -136,10 +145,6 @@ func prepareDiscoveryPublication(get enrichmentGet, selectRows enrichmentSelect,
 	if receipt.PageSHA256 != ret.page.Digest || receipt.MatchesSHA256 != digest || receipt.CandidateCount != 1 {
 		return nil, models.ErrSourcePayloadCorrupt
 	}
-	ret.records, err = archive.PrepareDiscoveryCaptures(*ret.page, ret.target.PostUUID, matches[0].Post)
-	if err != nil {
-		return nil, err
-	}
 	parsed, err := archive.ParseDiscoveryPage(ret.page.Body)
 	if err != nil {
 		return nil, err
@@ -148,26 +153,35 @@ func prepareDiscoveryPublication(get enrichmentGet, selectRows enrichmentSelect,
 		return nil, models.ErrSourcePayloadCorrupt
 	}
 	witness := -1
-	unique := make(map[string]bool)
-	for _, record := range ret.records {
-		unique[record.Input.UUID] = true
-		if witness >= 0 {
-			continue
-		}
-		raw, err := parsed.Metadata(record.Ordinal)
+	if ret.detail != nil {
+		ret.records, ret.witness = ret.detail.records, ret.detail.witness
+		witness = *ret.detail.result.Evidence.WitnessOrdinal
+	} else {
+		ret.records, err = archive.PrepareDiscoveryCaptures(*ret.page, ret.target.PostUUID, matches[0].Post)
 		if err != nil {
 			return nil, err
 		}
-		match, err := scrape.MatchDiscoveryListing(values, raw)
-		if err != nil {
-			return nil, err
-		}
-		if match != nil && !match.NeedsDetail && match.Post == matches[0].Post && match.Basis == ret.candidate.Basis {
-			witness, ret.witness = record.Ordinal, record.Input.CapturedAt
+		for _, record := range ret.records {
+			raw, err := parsed.Metadata(record.Ordinal)
+			if err != nil {
+				return nil, err
+			}
+			match, err := scrape.MatchDiscoveryListing(values, raw)
+			if err != nil {
+				return nil, err
+			}
+			if match != nil && !match.NeedsDetail && match.Post == matches[0].Post && match.Basis == ret.candidate.Basis {
+				witness, ret.witness = record.Ordinal, record.Input.CapturedAt
+				break
+			}
 		}
 	}
 	if witness < 0 {
 		return nil, models.ErrSourcePayloadCorrupt
+	}
+	unique := make(map[string]bool)
+	for _, record := range ret.records {
+		unique[record.Input.UUID] = true
 	}
 	namespace := uuid.MustParse(ret.target.UUID)
 	ret.row = models.DiscoveryMatchPublication{TargetUUID: ret.target.UUID, TargetRevision: ret.target.Revision, ListingUUID: ret.listing.UUID,
@@ -175,11 +189,16 @@ func prepareDiscoveryPublication(get enrichmentGet, selectRows enrichmentSelect,
 		Namespace: ret.candidate.Namespace, Value: ret.candidate.Value, Policy: archive.DiscoveryPublicationPolicy, Basis: ret.candidate.Basis,
 		WitnessOrdinal: witness, EvidenceUUID: uuid.NewSHA1(namespace, []byte("discovery-publication-identity-v1")).String(),
 		URLEvidenceUUID: uuid.NewSHA1(namespace, []byte("discovery-publication-url-v1")).String(), RecordCount: len(ret.records), CaptureCount: len(unique)}
+	if ret.detail != nil {
+		ret.row.Policy, ret.row.Basis = archive.DiscoveryDetailPublicationPolicy, ret.detail.result.Evidence.Basis
+		ret.row.DetailJobUUID = &ret.detail.result.JobUUID
+	}
 	return ret, nil
 }
 
 func (s *DiscoveryMatchStore) PreparePublication(ctx context.Context, input models.DiscoveryPublicationInput) (models.PreparedDiscoveryPublication, error) {
-	if !validSourceRunUUID(input.TargetUUID) || input.ExpectedTargetRevision < 2 || input.ExpectedTargetRevision > archive.MaxDiscoveryPages+1 {
+	if !validSourceRunUUID(input.TargetUUID) || input.ExpectedTargetRevision < 2 || input.ExpectedTargetRevision > archive.MaxDiscoveryPages+1 ||
+		(input.DetailJobUUID != "" && !validSourceRunUUID(input.DetailJobUUID)) {
 		return nil, models.ErrDiscoveryInvalid
 	}
 	prior, err := s.Publication(ctx, input.TargetUUID)
@@ -187,7 +206,7 @@ func (s *DiscoveryMatchStore) PreparePublication(ctx context.Context, input mode
 		return nil, err
 	}
 	if prior != nil {
-		if prior.TargetRevision != input.ExpectedTargetRevision {
+		if prior.TargetRevision != input.ExpectedTargetRevision || publicationDetailUUID(prior) != input.DetailJobUUID {
 			return nil, models.ErrDiscoveryConflict
 		}
 		return &preparedDiscoveryPublication{input: input, prior: prior}, nil
@@ -196,7 +215,7 @@ func (s *DiscoveryMatchStore) PreparePublication(ctx context.Context, input mode
 	if err != nil {
 		return nil, err
 	}
-	if review == nil || len(review.Blockers) != 0 || review.Target.Revision != input.ExpectedTargetRevision {
+	if review == nil || len(review.Blockers) != 0 || review.Target.Revision != input.ExpectedTargetRevision || !discoveryPublicationDetailMatches(review, input.DetailJobUUID) {
 		return nil, models.ErrDiscoveryConflict
 	}
 	return prepareDiscoveryPublication(func(out any, q string, args ...any) error { return dbWrapper.Get(ctx, out, q, args...) },
@@ -204,13 +223,20 @@ func (s *DiscoveryMatchStore) PreparePublication(ctx context.Context, input mode
 }
 
 func discoveryPublicationLinks(p *preparedDiscoveryPublication) (models.SourcePostIdentifierInput, models.SourcePostURLInput, error) {
-	details, err := json.Marshal(struct {
-		Target  string `json:"target_uuid"`
-		Listing string `json:"listing_uuid"`
-		Page    int    `json:"page_ordinal"`
-		Record  int    `json:"record_ordinal"`
-		Policy  string `json:"policy"`
-	}{p.target.UUID, p.listing.UUID, p.page.Ordinal, p.row.WitnessOrdinal, p.row.Policy})
+	proof := struct {
+		Target         string `json:"target_uuid"`
+		Listing        string `json:"listing_uuid"`
+		Page           int    `json:"page_ordinal"`
+		Record         int    `json:"record_ordinal"`
+		Policy         string `json:"policy"`
+		DetailJob      string `json:"detail_job_uuid,omitempty"`
+		DetailRevision int    `json:"detail_checkpoint_revision,omitempty"`
+		DetailDigest   string `json:"detail_checkpoint_sha256,omitempty"`
+	}{Target: p.target.UUID, Listing: p.listing.UUID, Page: p.page.Ordinal, Record: p.row.WitnessOrdinal, Policy: p.row.Policy}
+	if p.detail != nil {
+		proof.DetailJob, proof.DetailRevision, proof.DetailDigest = p.detail.result.JobUUID, p.detail.result.CheckpointRevision, p.detail.result.Evidence.TranscriptSHA256
+	}
+	details, err := json.Marshal(proof)
 	if err != nil {
 		return models.SourcePostIdentifierInput{}, models.SourcePostURLInput{}, err
 	}
@@ -233,7 +259,7 @@ func (p *preparedDiscoveryPublication) Publish(ctx context.Context, writer model
 		return nil, err
 	}
 	if prior != nil {
-		if prior.TargetRevision != p.input.ExpectedTargetRevision {
+		if prior.TargetRevision != p.input.ExpectedTargetRevision || publicationDetailUUID(prior) != p.input.DetailJobUUID {
 			return nil, models.ErrDiscoveryConflict
 		}
 		return prior, nil
@@ -246,7 +272,8 @@ func (p *preparedDiscoveryPublication) Publish(ctx context.Context, writer model
 		return nil, err
 	}
 	if review == nil || len(review.Blockers) != 0 || !reflect.DeepEqual(review.Target, p.target) || review.Candidate == nil || !reflect.DeepEqual(*review.Candidate, p.candidate) ||
-		now.Before(p.target.UpdatedAt) || now.Before(p.page.CreatedAt) {
+		!discoveryPublicationDetailMatches(review, p.input.DetailJobUUID) || now.Before(p.target.UpdatedAt) || now.Before(p.page.CreatedAt) ||
+		(p.detail != nil && now.Before(p.detail.result.CreatedAt)) {
 		return nil, models.ErrDiscoveryConflict
 	}
 	for _, record := range p.records {
@@ -296,8 +323,8 @@ func (p *preparedDiscoveryPublication) Publish(ctx context.Context, writer model
 	row := p.row
 	row.CreatedAt = now.UTC()
 	_, err = dbWrapper.NamedExec(ctx, `INSERT INTO discovery_match_publications
- (target_uuid,target_revision,listing_uuid,page_ordinal,page_sha256,post_uuid,post_revision,namespace,value,policy,basis,witness_ordinal,evidence_uuid,url_evidence_uuid,record_count,capture_count,created_at)
- VALUES(:target_uuid,:target_revision,:listing_uuid,:page_ordinal,:page_sha256,:post_uuid,:post_revision,:namespace,:value,:policy,:basis,:witness_ordinal,:evidence_uuid,:url_evidence_uuid,:record_count,:capture_count,:created_at)`, row)
+ (target_uuid,target_revision,listing_uuid,page_ordinal,page_sha256,post_uuid,post_revision,namespace,value,policy,basis,witness_ordinal,evidence_uuid,url_evidence_uuid,record_count,capture_count,created_at,detail_job_uuid)
+ VALUES(:target_uuid,:target_revision,:listing_uuid,:page_ordinal,:page_sha256,:post_uuid,:post_revision,:namespace,:value,:policy,:basis,:witness_ordinal,:evidence_uuid,:url_evidence_uuid,:record_count,:capture_count,:created_at,:detail_job_uuid)`, row)
 	if err != nil {
 		return nil, err
 	}

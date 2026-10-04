@@ -10,7 +10,7 @@ import (
 
 // Review uses only indexed definitions, page receipts and candidate references.
 // Callers use one read transaction so progress and current native choices belong
-// to the same snapshot. No page bodies, jobs or identity mutations are needed.
+// to the same snapshot. Detail result references do not load transcript bodies.
 func (s *DiscoveryMatchStore) Review(ctx context.Context, id string) (*models.DiscoveryMatchReview, error) {
 	target, err := s.Target(ctx, id)
 	if err != nil || target == nil {
@@ -89,9 +89,6 @@ func (s *DiscoveryMatchStore) Review(ctx context.Context, id string) (*models.Di
 	if counts.Candidates > 1 {
 		ret.Blockers = append(ret.Blockers, "competing_candidates")
 	}
-	if counts.Details != 0 {
-		ret.Blockers = append(ret.Blockers, "detail_required")
-	}
 	if counts.Candidates == 1 {
 		candidates, err := s.Candidates(ctx, id, 0, 1)
 		if err != nil {
@@ -101,6 +98,12 @@ func (s *DiscoveryMatchStore) Review(ctx context.Context, id string) (*models.Di
 			return nil, models.ErrSourcePayloadCorrupt
 		}
 		ret.Candidate = &candidates[0]
+		if ret.Candidate.NeedsDetail {
+			ret.Detail, err = latestDiscoveryPublicationDetail(func(out any, q string, args ...any) error { return dbWrapper.Get(ctx, out, q, args...) }, *target, *ret.Candidate)
+			if err != nil {
+				return nil, err
+			}
+		}
 		ret.CandidatePost, err = (&SourceEvidenceStore{}).FindPostByIdentifier(ctx, models.SourcePostIdentifier{Namespace: ret.Candidate.Namespace, Value: ret.Candidate.Value})
 		if err != nil {
 			return nil, err
@@ -110,6 +113,9 @@ func (s *DiscoveryMatchStore) Review(ctx context.Context, id string) (*models.Di
 			// consolidate a different native post as a review side effect.
 			ret.Blockers = append(ret.Blockers, "identifier_in_use")
 		}
+	}
+	if counts.Details != 0 && (ret.Detail == nil || ret.Detail.Evidence.Status != "corroborated") {
+		ret.Blockers = append(ret.Blockers, "detail_required")
 	}
 	get := func(out any, q string, args ...any) error { return dbWrapper.Get(ctx, out, q, args...) }
 	ret.ReplacementListingUUID, err = discoveryReplacement(get, listing.UUID)

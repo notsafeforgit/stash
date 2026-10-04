@@ -118,6 +118,7 @@ type DiscoveryMatchReview struct {
 	Candidate              *DiscoveryMatchCandidate   `json:"candidate,omitempty"`
 	CandidatePost          *SourcePost                `json:"candidate_post,omitempty"`
 	Publication            *DiscoveryMatchPublication `json:"publication,omitempty"`
+	Detail                 *DiscoveryDetailResult     `json:"detail,omitempty"`
 	RecoveryFrom           *DiscoveryMatchRecovery    `json:"recovery_from,omitempty"`
 	ReplacementListingUUID string                     `json:"replacement_listing_uuid,omitempty"`
 	Blockers               []string                   `json:"blockers"`

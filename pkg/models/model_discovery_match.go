@@ -130,6 +130,7 @@ type DiscoveryMatchReaderWriter interface {
 	BindTarget(context.Context, DiscoveryTargetInput, time.Time) (*DiscoveryMatchTarget, error)
 	Target(context.Context, string) (*DiscoveryMatchTarget, error)
 	Review(context.Context, string) (*DiscoveryMatchReview, error)
+	PreviewDetail(context.Context, DiscoveryDetailPreviewInput) (*DiscoveryDetailPreview, error)
 	PreparePublication(context.Context, DiscoveryPublicationInput) (PreparedDiscoveryPublication, error)
 	Publication(context.Context, string) (*DiscoveryMatchPublication, error)
 	PublishedRecords(context.Context, string, int, int) ([]DiscoveryPublishedRecord, error)

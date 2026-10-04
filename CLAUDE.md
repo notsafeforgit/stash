@@ -548,6 +548,16 @@ earlier batches and differing candidates must block publication. Never
 erase earlier evidence or claim that a fresh search recovers posts the source
 no longer exposes. Startup and backup must retain both searches and their links.
 
+Discovery detail comparison reuses the compact metadata-only fetch transcript.
+It requires a weak candidate from the original retained listing and corroborates
+the original frozen target evidence. The inferred URL/account/filename alone
+cannot establish identity. Keep all competing candidates, pending children,
+unresolved references and each record's original observing producer/time.
+Application `detail-preview` routes are read-only: supplied bytes do not clear
+blockers or become authenticated producer evidence. Candidate-specific durable
+execution and publication remain to be integrated; ordinary post enrichment
+cannot treat an inferred candidate URL as an accepted post association.
+
 `stash-import-catalog-evidence` maps a received snapshot's posts, profiles and
 captures through core services in schema 1000031. It uses exact manifest/ordinal
 checkpoints, bounded transactions and immutable per-row outcomes. Preserve mirror

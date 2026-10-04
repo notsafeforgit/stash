@@ -182,6 +182,7 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Get("/discovery-match-targets/{target}/publication/records", rs.discoveryPublishedRecords)
 	r.Get("/discovery-match-targets/{target}/candidates", rs.discoveryMatchCandidates)
 	r.Get("/discovery-match-candidates/{candidate}/evidence", rs.discoveryMatchEvidence)
+	r.Post("/discovery-match-targets/{target}/detail-preview", rs.previewDiscoveryDetail)
 	r.Get("/discovery-listings/{listing}", rs.discoveryListingReview)
 	r.Get("/discovery-listings/{listing}/pages", rs.discoveryListingPages)
 	r.Post("/checkpoint-evidence/preview", rs.previewCheckpointEvidence)

@@ -190,7 +190,7 @@ func discoveryActivationRecoveryHTTP(t *testing.T, fresh, recovery bool) {
 	_, token, err := service.IssueCredential(t.Context(), producer.UUID, []models.IngestScope{{CollectionUUID: receipt.Input.Listing.CollectionUUID}}, nil)
 	require.NoError(t, err)
 	producerHandler := withIngestRoutes(http.NotFoundHandler(), service, false)
-	for _, path := range []string{"/discovery-activations", "/discovery-activations/preview", "/discovery-activations/" + receipt.Input.UUID, "/discovery-match-targets/" + receipt.Entries[0].TargetUUID, "/discovery-listings/" + receipt.Input.Listing.UUID, publicationPath} {
+	for _, path := range []string{"/discovery-activations", "/discovery-activations/preview", "/discovery-activations/" + receipt.Input.UUID, "/discovery-match-targets/" + receipt.Entries[0].TargetUUID, "/discovery-match-targets/" + receipt.Entries[0].TargetUUID + "/detail-preview", "/discovery-listings/" + receipt.Input.Listing.UUID, publicationPath} {
 		r := httptest.NewRequest("POST", "/api/v3/archive"+path, bytes.NewBufferString(`{}`))
 		r.Header.Set("Authorization", "Bearer "+token)
 		w := httptest.NewRecorder()
@@ -258,6 +258,43 @@ func discoveryActivationRecoveryHTTP(t *testing.T, fresh, recovery bool) {
 		require.Len(t, evidence, 1)
 		require.Equal(t, []int{0, 1, 2}, evidence[0].RecordOrdinals)
 		require.Equal(t, !fresh, evidence[0].NeedsDetail, "a title-only match cannot establish an accepted identity")
+		if !fresh {
+			detailPage, err := archive.DecodeJSONObject(body, archive.MaxDiscoveryPageBytes)
+			require.NoError(t, err)
+			for _, record := range detailPage["records"].([]any) {
+				patch := record.(map[string]any)["patch"].(map[string]any)
+				if _, exists := patch["source_extractor_url"]; exists {
+					patch["source_extractor_url"] = candidates[0].URL
+				}
+			}
+			detailPage["records"].([]any)[0].(map[string]any)["patch"].(map[string]any)["date"] = "2026-10-03"
+			detailBody, err := archive.EncodeSourceJSON(map[string]any{"schema": archive.EnrichmentTranscriptSchema,
+				"url": candidates[0].URL, "extractor_version": listing.ExtractorVersion, "retention_policy": archive.SourceRetentionVersion,
+				"records": detailPage["records"], "pending": []any{}, "unresolved": []any{}})
+			require.NoError(t, err)
+			input := models.DiscoveryDetailPreviewInput{ExpectedTargetRevision: review.Target.Revision, CandidateSequence: candidates[0].Sequence,
+				ExtractorVersion: listing.ExtractorVersion, Body: detailBody}
+			preview := enrichmentHTTPValue[models.DiscoveryDetailPreview](t, request("POST", path+"/detail-preview", input, http.StatusOK))
+			require.True(t, preview.PreviewOnly)
+			require.Equal(t, "corroborated", preview.Evidence.Status)
+			require.Equal(t, review.Blockers, preview.Blockers, "preview does not clear missing history or detail_required")
+			require.Equal(t, review, enrichmentHTTPValue[models.DiscoveryMatchReview](t, request("GET", path+"/review", nil, http.StatusOK)))
+			request("POST", publicationPath, map[string]any{"expected_target_revision": 2}, http.StatusConflict)
+			input.ExpectedTargetRevision++
+			request("POST", path+"/detail-preview", input, http.StatusConflict)
+			input.ExpectedTargetRevision--
+			input.Body = json.RawMessage(`"escaped transcript"`)
+			request("POST", path+"/detail-preview", input, http.StatusBadRequest)
+			input.Body = detailBody
+			request("POST", "/discovery-match-targets/"+uuid.NewString()+"/detail-preview", input, http.StatusNotFound)
+			for _, invalid := range []string{`{"expected_target_revision":2,"expected_target_revision":2}`, `{"settings":{}}`} {
+				r := httptest.NewRequest("POST", path+"/detail-preview", strings.NewReader(invalid))
+				r.Header.Set("Content-Type", "application/json")
+				w := httptest.NewRecorder()
+				router.ServeHTTP(w, r)
+				require.Equal(t, http.StatusBadRequest, w.Code)
+			}
+		}
 	}
 	pages := enrichmentHTTPValue[[]models.DiscoveryPageReceipt](t, request("GET", "/discovery-listings/"+listing.UUID+"/pages", nil, 200))
 	require.Len(t, pages, 1, "both targets share the original stored page")

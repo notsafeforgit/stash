@@ -798,6 +798,7 @@ producer credentials do not grant review or source administration.
 | `GET /discovery-listings/{listing}/pages` | Page through compact received-page receipts without loading source bodies. |
 | `GET /discovery-match-targets/{target}` | Inspect the original target binding and durable comparison progress. |
 | `GET /discovery-match-targets/{target}/review` | Inspect current coverage, candidate counts and blockers without fetching or changing metadata. |
+| `POST /discovery-match-targets/{target}/detail-preview` | Compare a supplied metadata-fetch transcript against one original weak candidate, without retaining it or changing the review. |
 | `POST /discovery-match-targets/{target}/publication` | Publish a complete, unique strong match with `{expected_target_revision}`, or replay its original receipt. |
 | `GET /discovery-match-targets/{target}/publication` | Retrieve the accepted identity and native publication receipt. |
 | `GET /discovery-match-targets/{target}/publication/records` | Inspect original page record ordinals and their native capture UUIDs. |
@@ -829,6 +830,29 @@ historical coverage or completed catalog import. The
 saves a private, digest-bound review file and recovers the original operation
 after a lost Apply response. Reviewed recovery of missing-history searches is
 described below. The review UI, detail execution and staging release remain open.
+
+The detail-preview input is `{expected_target_revision, candidate_sequence,
+extractor_version, body}`. `body` is the compact metadata-fetch JSON object,
+limited to 32 MiB; it is not an escaped string. The server loads the selected
+candidate's original page and frozen catalog evidence through indexed reads in
+one read transaction. The response has `preview_only: true`, compact `evidence`
+and the unchanged current `blockers`. Evidence includes page/transcript hashes,
+the selected post ID, record ordinals and, when corroborated, the witness ordinal
+and basis. It does not repeat the source payload or include worker settings.
+
+`evidence.status` is `corroborated`, `uncorroborated` or `pending`. The requested
+URL/runtime and every returned post must match the selection. Original caption,
+date or source-URL evidence must independently corroborate it; confirming the
+inferred URL, account or filename alone is insufficient. A contradictory
+publisher or another post in the response is rejected. Pending child requests
+remain pending; unresolved references remain explicit. A failed or changed
+detail response cannot remove a competing candidate.
+
+Preview bytes have no authenticated producer receipt. Even a corroborated
+preview leaves `detail_required` and other blockers intact. This endpoint does
+not fetch a website, create a job, accept an identity or publish captures. Durable
+candidate-specific execution and publication are still required before automatic
+detail results can resolve a match.
 
 The target review uses one database snapshot. `coverage.retained_pages` counts
 received batches of source posts, while `target.last_page` counts batches already

@@ -1154,7 +1154,33 @@ superseded link. A stale account/performer preview returns 409 `preview_changed`
 changed contents under the same request UUID return 409 `request_conflict`.
 Requests are bounded to 16 KiB and reject unknown fields. These routes require
 the application session and same-origin checks; producer grants cannot manage
-ownership. Native account review controls remain a separate UI increment.
+ownership.
+
+The v3 **Account review** screen is available from the desktop More options menu
+and the mobile navigation drawer. It starts with accounts needing review, with
+separate linked, unlinked and all-account filters. Search and paging fetch 25
+canonical accounts at a time. Handles and IDs already associated with the same
+account appear on one card; shared identifiers do not establish ownership or
+automatically consolidate accounts.
+
+Open **Review account**, or **Change link** for an existing owner, and search for
+an existing performer. Names, disambiguation and local IDs distinguish picker
+choices. **Preview ownership** resolves that exact selection to its native UUID
+and revision and shows the current and proposed owner. **Apply ownership change**
+records the decision and refreshes only the selected account/card. **Unlink**
+records no performer association; **Review later** returns the account to the
+undecided queue. Neither operation changes depicted performers. Identifiers,
+their retained evidence and ownership history load separately when expanded.
+
+Before applying, the browser saves the original request in IndexedDB, scoped to
+the public application endpoint and account UUID. After an interrupted request,
+reopen that account and choose **Check and retry saved change**. Recovery checks
+the original receipt before sending the same body again. Tabs share the saved
+choice, and an unconfirmed write cannot be replaced with a different one. Only
+a definitive stale-preview rejection enables **Review again**. Browser storage
+holds pending delivery; committed ownership and history are authoritative in the
+native database. The existing scene/image metadata journal retains its original
+storage name and format.
 
 ## Automatic source translations
 

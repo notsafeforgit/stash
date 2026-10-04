@@ -12,7 +12,14 @@ import {
   ComboboxItem,
 } from "@/components/ui/combobox";
 
-export type SearchChoice = { id: string; name: string };
+export type SearchChoice = {
+  id: string;
+  name: string;
+  disambiguation?: string | null;
+};
+export function searchChoiceLabel(item: SearchChoice): string {
+  return `${item.name}${item.disambiguation ? ` (${item.disambiguation})` : ""} (#${item.id})`;
+}
 export function ExistingEntityPicker({
   kind,
   id,
@@ -77,7 +84,7 @@ export function ExistingEntityPicker({
       filter={null}
       value={null}
       disabled={disabled}
-      itemToStringLabel={(item) => `${item.name} (#${item.id})`}
+      itemToStringLabel={searchChoiceLabel}
       itemToStringValue={(item) => item.id}
       onValueChange={(item) => {
         if (item) onChange(item);
@@ -109,7 +116,7 @@ export function ExistingEntityPicker({
         <ComboboxList>
           {(item: SearchChoice) => (
             <ComboboxItem key={item.id} value={item}>
-              {item.name} (#{item.id})
+              {searchChoiceLabel(item)}
             </ComboboxItem>
           )}
         </ComboboxList>

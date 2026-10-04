@@ -12,16 +12,17 @@ guides. The [original plan](archive/rewrite-plan.md) and
 v3 uses React, TypeScript, TanStack Router, Apollo Client, shadcn components
 built on Base UI, Tailwind, and Video.js. [package.json](../package.json) and
 [pnpm-workspace.yaml](../pnpm-workspace.yaml) own versions and overrides.
-It shares the Go backend with v2.5. `--enable-v3-ui` or
-`STASH_ENABLE_V3_UI=true` selects the embedded v3 app and supporting HTTP routes.
+The independent fork owns its native schema and API contracts. Compatibility
+with upstream v2.5 is frozen at `v2.5-compatible-final`; treat `ui/v2.5/` as a
+read-only migration reference. Convert required callers and validate retained
+native invariants when changing contracts. The independent v3 plugin API and
+stash-box integration remain supported. See [FORK.md](../../../FORK.md) and the
+[transition plan](../../../docs/native-archive-transition-plan.md).
 
-v3 route paths may evolve independently. Existing v2.5 clients must retain their
-GraphQL operations, response shapes, mutation semantics, and compatible database
-representation. Treat `ui/v2.5/` as a read-only reference. Keep GraphQL changes
-additive and store fork data in sidecars and idempotent reconcilers, leaving
-upstream's numeric migrations and primary schema version unchanged. Disabling
-the UI flag does not disable the fork's database migration track. See
-[FORK.md](../../../FORK.md).
+The embedded v2.5 app and `--enable-v3-ui`/`STASH_ENABLE_V3_UI=true` selector
+still exist pending the compatibility-removal phase. Selecting an older UI
+does not reverse the native database migration. Production remains on the frozen
+compatible release until the full migration and reviewed cutover are complete.
 
 ## Module map
 
@@ -32,6 +33,7 @@ Paths in this guide are relative to `ui/v3/src/` unless indicated otherwise.
 | [main.tsx](../src/main.tsx), [app.tsx](../src/app.tsx) | Main entry, shared providers, and startup gates |
 | [router.tsx](../src/router.tsx), [routes/](../src/routes/) | File-based routes, search validation, route loaders, base path, and plugin route composition |
 | [core/](../src/core/) | Shared Apollo transport/cache, typed navigation, configuration codecs, job monitoring, and mutation invalidation |
+| [core/native-archive/](../src/core/native-archive/), [components/archive/](../src/components/archive/) | Native review contracts, account ownership workflow, and durable browser request recovery |
 | [graphql/](../graphql/), [codegen.ts](../codegen.ts) | Authored operations/fragments and generated schema types / `TypedDocumentNode` operations |
 | [components/list/](../src/components/list/), [models/list-filter/](../src/models/list-filter/) | Entity list composition, source contracts, filter AST/URL conversion, selection, and layouts |
 | [components/detail/](../src/components/detail/), [components/forms/](../src/components/forms/) | Shared detail/editing shells and TanStack Form/Zod form contracts |
@@ -162,6 +164,28 @@ refreshes retain the existing player, including when a refresh fails.
 Motion belongs to empty reveal surfaces that preserve mounted media and
 scrollers. See [interaction contracts](interactions.md#motion-and-visual-lifetime)
 for route, local-view, card, lightbox, and mobile drawer behavior.
+
+### Native archive review
+
+`core/native-archive/client.ts` sends application-session JSON requests through
+the deployment prefix, with Zod validation and cancellation. Scene/image metadata
+review lives in detail tabs and mobile sections; the Account review route uses
+the shared desktop utility menu and mobile drawer. The existing Apollo performer
+picker resolves an explicit local selection to a native UUID/revision before a
+read-only ownership preview. Applying requires the preview digest.
+
+Account discovery uses bounded native keyset pages. Its selected-account editor
+retains the loaded queue, updates only the affected card and uses the shared
+`useListScrollRestoration` hook when returning. Identifier evidence and ownership
+history load independently on expansion. Account ownership and depicted media
+performers are separate relationships.
+
+Review outboxes use `review-storage.ts` for strict IndexedDB transactions shared
+across tabs. Each protocol retains its own endpoint/target scope and request
+validation. Save before sending; recover a matching server receipt or retry the
+exact original body after interruption. Only a definitive rejection permits
+replacing a saved request. Committed choices and their history live in the native
+database. See [native review APIs](../../../docs/native-ingestion.md#account-ownership-review-api).
 
 ## Lists
 

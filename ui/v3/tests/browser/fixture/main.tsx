@@ -1,4 +1,9 @@
 import { MetadataReviewFixture } from "./metadata-review";
+import { AccountReviewFixture } from "./account-review";
+import {
+  accountFilterSchema,
+  accountUUIDSchema,
+} from "@/core/native-archive/account-review-api";
 import { Pencil, Wand2, RotateCw, RotateCcw } from "lucide-react";
 import {
   EntityActionButton,
@@ -375,6 +380,14 @@ const router = createRouter({
       getParentRoute: () => rootRoute,
       path: "/metadata-review",
       component: MetadataReviewFixture,
+    }),
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/account-review",
+      validateSearch: accountFilterSchema.extend({
+        account: accountUUIDSchema.optional(),
+      }),
+      component: AccountReviewFixture,
     }),
     createRoute({
       getParentRoute: () => rootRoute,

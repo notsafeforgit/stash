@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { requestUUID, withReviewRecord } from "./review-storage";
 import {
   editApplySchema,
   editPreviewSchema,
@@ -25,28 +26,6 @@ const savedSchema = z
   })
   .strict();
 export type SavedReview = z.infer<typeof savedSchema>;
-const storeName = "requests";
-
-// getRandomValues remains available for self-hosted Stash over LAN HTTP, where
-// randomUUID may be unavailable. Keep the same cryptographically random v4 ID.
-function requestUUID(): string {
-  const hex = Array.from(
-    crypto.getRandomValues(new Uint8Array(16)),
-    (byte, index) => {
-      const value =
-        index === 6 ? (byte & 15) | 64 : index === 8 ? (byte & 63) | 128 : byte;
-      return value.toString(16).padStart(2, "0");
-    },
-  ).join("");
-  return [
-    hex.slice(0, 8),
-    hex.slice(8, 12),
-    hex.slice(12, 16),
-    hex.slice(16, 20),
-    hex.slice(20),
-  ].join("-");
-}
-
 function key(target: ReviewTarget): string {
   const checked = targetSchema.parse(target);
   return `${checked.kind}:${checked.localId}`;
@@ -68,51 +47,17 @@ function decode(value: unknown, target: ReviewTarget): SavedReview | null {
  * IndexedDB serializes competing tabs and reports transaction completion before
  * any request is sent. Opening the panel never sends a mutation. */
 export function createMetadataReviewOutbox(api: MetadataReviewAPI) {
-  async function transaction<T>(
+  function transaction<T>(
     target: ReviewTarget,
     mode: IDBTransactionMode,
     action: (saved: SavedReview | null, store: IDBObjectStore) => T,
   ): Promise<T> {
-    const recordKey = key(target);
-    const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open(
-        `stash-metadata-review:v1:${api.endpoint}`,
-        1,
-      );
-      request.onupgradeneeded = () =>
-        request.result.createObjectStore(storeName);
-      request.onerror = () => reject(request.error);
-      request.onblocked = () =>
-        reject(new NativeArchiveError(0, "storage_blocked"));
-      request.onsuccess = () => resolve(request.result);
-    });
-    try {
-      return await new Promise<T>((resolve, reject) => {
-        const tx = database.transaction(storeName, mode, {
-          durability: "strict",
-        });
-        let result: T;
-        let failure: unknown;
-        const store = tx.objectStore(storeName);
-        const request = store.get(recordKey);
-        request.onsuccess = () => {
-          try {
-            result = action(decode(request.result, target), store);
-          } catch (error) {
-            failure = error;
-            tx.abort();
-          }
-        };
-        tx.oncomplete = () => resolve(result);
-        tx.onabort = () =>
-          reject(
-            failure ?? tx.error ?? new NativeArchiveError(0, "storage_aborted"),
-          );
-        tx.onerror = () => reject(tx.error);
-      });
-    } finally {
-      database.close();
-    }
+    return withReviewRecord(
+      `stash-metadata-review:v1:${api.endpoint}`,
+      key(target),
+      mode,
+      (value, store) => action(decode(value, target), store),
+    );
   }
 
   function read(target: ReviewTarget) {

@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { applicationBaseURL, joinPlatformURL } from "../platform-url";
+import {
+  createArchiveRequest,
+  nativeArchiveEndpoint,
+  NativeArchiveError,
+} from "./client";
+export { NativeArchiveError } from "./client";
 
 const uuid = z.string().regex(/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/);
 const revision = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
@@ -161,28 +166,7 @@ export type FieldDecision = z.infer<typeof decisionSchema>;
 export type FileHistory = z.infer<typeof fileHistorySchema>;
 export type NameCandidate = z.infer<typeof nameCandidateSchema>;
 
-export class NativeArchiveError extends Error {
-  constructor(
-    readonly status: number,
-    readonly code: string,
-  ) {
-    super(`Native archive request failed (${status}, ${code})`);
-  }
-}
-
-// No credentials or URL fragments belong in a pending operation's scope.
-export function metadataReviewEndpoint(base = applicationBaseURL()): string {
-  const endpoint = joinPlatformURL(base, "api/v3/archive/");
-  if (
-    !/^https?:$/.test(endpoint.protocol) ||
-    endpoint.username ||
-    endpoint.password
-  )
-    throw new NativeArchiveError(0, "invalid_endpoint");
-  endpoint.search = "";
-  endpoint.hash = "";
-  return endpoint.href;
-}
+export const metadataReviewEndpoint = nativeArchiveEndpoint;
 
 export function normalizeEditInput(input: EditInput): EditInput {
   const result = editInputSchema.parse(input);
@@ -229,38 +213,7 @@ export function createMetadataReviewAPI(
   endpoint = metadataReviewEndpoint(),
   transport: typeof fetch = globalThis.fetch.bind(globalThis),
 ) {
-  async function request<T>(
-    path: string,
-    schema: z.ZodType<T>,
-    body?: string,
-    signal?: AbortSignal,
-  ): Promise<T> {
-    const response = await transport(new URL(path, endpoint), {
-      method: body === undefined ? "GET" : "POST",
-      credentials: "same-origin",
-      cache: "no-store",
-      redirect: "error",
-      headers:
-        body === undefined
-          ? { Accept: "application/json" }
-          : { Accept: "application/json", "Content-Type": "application/json" },
-      body,
-      signal,
-    });
-    if (!response.ok) {
-      const result = z
-        .object({ error: z.string() })
-        .safeParse(await response.json().catch(() => null));
-      throw new NativeArchiveError(
-        response.status,
-        result.success ? result.data.error : "request_failed",
-      );
-    }
-    const result = schema.safeParse(await response.json());
-    if (!result.success)
-      throw new NativeArchiveError(response.status, "invalid_response");
-    return result.data;
-  }
+  const request = createArchiveRequest(endpoint, transport);
   const pageLimit = 25;
   return {
     endpoint,

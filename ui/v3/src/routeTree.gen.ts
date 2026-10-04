@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AccountReviewRouteImport } from './routes/account-review'
 import { Route as ImageDuplicateCheckerRouteImport } from './routes/image-duplicate-checker'
 import { Route as SceneDuplicateCheckerRouteImport } from './routes/scene-duplicate-checker'
 import { Route as SettingsRouteImport } from './routes/settings'
@@ -52,6 +53,11 @@ import { Route as TagsTagIdRouteImport } from './routes/tags/$tagId'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccountReviewRoute = AccountReviewRouteImport.update({
+  id: '/account-review',
+  path: '/account-review',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ImageDuplicateCheckerRoute = ImageDuplicateCheckerRouteImport.update({
@@ -248,6 +254,7 @@ const TagsTagIdRoute = TagsTagIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/account-review': typeof AccountReviewRoute
   '/image-duplicate-checker': typeof ImageDuplicateCheckerRoute
   '/scene-duplicate-checker': typeof SceneDuplicateCheckerRoute
   '/settings': typeof SettingsRouteWithChildren
@@ -289,6 +296,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/account-review': typeof AccountReviewRoute
   '/image-duplicate-checker': typeof ImageDuplicateCheckerRoute
   '/scene-duplicate-checker': typeof SceneDuplicateCheckerRoute
   '/stats': typeof StatsRoute
@@ -330,6 +338,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/account-review': typeof AccountReviewRoute
   '/image-duplicate-checker': typeof ImageDuplicateCheckerRoute
   '/scene-duplicate-checker': typeof SceneDuplicateCheckerRoute
   '/settings': typeof SettingsRouteWithChildren
@@ -373,6 +382,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/account-review'
     | '/image-duplicate-checker'
     | '/scene-duplicate-checker'
     | '/settings'
@@ -414,6 +424,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/account-review'
     | '/image-duplicate-checker'
     | '/scene-duplicate-checker'
     | '/stats'
@@ -454,6 +465,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/account-review'
     | '/image-duplicate-checker'
     | '/scene-duplicate-checker'
     | '/settings'
@@ -496,6 +508,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AccountReviewRoute: typeof AccountReviewRoute
   ImageDuplicateCheckerRoute: typeof ImageDuplicateCheckerRoute
   SceneDuplicateCheckerRoute: typeof SceneDuplicateCheckerRoute
   SettingsRoute: typeof SettingsRouteWithChildren
@@ -528,6 +541,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/account-review': {
+      id: '/account-review'
+      path: '/account-review'
+      fullPath: '/account-review'
+      preLoaderRoute: typeof AccountReviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/image-duplicate-checker': {
@@ -841,6 +861,7 @@ const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AccountReviewRoute: AccountReviewRoute,
   ImageDuplicateCheckerRoute: ImageDuplicateCheckerRoute,
   SceneDuplicateCheckerRoute: SceneDuplicateCheckerRoute,
   SettingsRoute: SettingsRouteWithChildren,

@@ -12,6 +12,7 @@ import {
   Download,
   Tv,
   Puzzle,
+  Link2,
 } from "lucide-react";
 import { getRegisteredNavItems, type NavPlacement } from "@/plugins";
 
@@ -109,9 +110,23 @@ export function useNavItems(opts?: {
       hotkey: item.hotkey,
     }));
 
-  const items = placements.includes("main")
-    ? [...BUILTIN_NAV_ITEMS, ...pluginItems]
-    : pluginItems;
+  const archiveItems: NavItem[] = placements.includes("utility")
+    ? [
+        {
+          label: intl.formatMessage({
+            id: "account_review.title",
+            defaultMessage: "Account review",
+          }),
+          icon: <Link2 className="size-4" />,
+          to: "/account-review",
+        },
+      ]
+    : [];
+  const items = [
+    ...(placements.includes("main") ? BUILTIN_NAV_ITEMS : []),
+    ...archiveItems,
+    ...pluginItems,
+  ];
   // A destination registered for several surfaces appears once in a combined menu.
   return items.filter(
     (item, index) => items.findIndex((other) => other.to === item.to) === index,

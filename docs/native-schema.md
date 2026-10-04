@@ -164,8 +164,10 @@ Discovery pages canonical accounts and bounded identifier summaries. Account
 details, identifier evidence and ownership history use selected-record lookups
 with independent pagination. Ambiguous identifiers remain multiple candidates.
 Startup validates receipt integrity before writes, and anonymisation removes
-receipts before the private account evidence they reference. Native account
-review controls remain the next UI increment.
+receipts before the private account evidence they reference. The native
+[Account review screen](native-ingestion.md#account-ownership-review-api) uses
+these selected-record endpoints, with explicit performer choices, ownership
+history and browser request recovery on desktop and mobile.
 
 Migration 1000006 adds source posts and retained evidence. A post has its own
 UUID and qualified service identifiers; native and mirror identifiers cannot
@@ -571,8 +573,10 @@ extend their time intervals. Anonymised exports remove the new history and
 context with the other account evidence. Migration begins with every existing
 account as its own canonical identity and invents no consolidations.
 
-Producer evidence matching, account-review API/UI, and catalog import remain
-separate required integration work; no new public endpoint exposes these stores.
+Account consolidation remains a repository operation; application preview/apply
+routes and native equivalence-review controls are still required. The later
+ownership-review API and UI manage an account's performer association without
+implicitly consolidating accounts or equating their identifiers.
 
 Migration 1000015 adds logical `media_roots` and `source_collections`, each with
 an immutable definition history and a current revision. Root UUIDs survive mount

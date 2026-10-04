@@ -6381,9 +6381,9 @@ Read-only plans on the 20.27 GB rehearsal use the collection/root and listing
 indexes, returning in less than 0.3 ms with 2,612 collections. Native listing
 tables are empty there; these are access-plan checks, not populated throughput
 claims. Evidence is under `.local/native-discovery-client-20261004/`. The complete
-fork gate has passed v3 validation (582 tests), producer validation (452 tests)
-and Go lint (zero issues); its tagged Go integration suite is still running at
-this checkpoint. Publication waits for that result. About 180 GiB remains free.
+fork gate passed in 1,056 seconds against the shared-dispatch code checkpoint
+`b4df7c5de`: v3 validation (582 tests), producer validation (452 tests), Go lint
+(zero issues) and the full tagged Go suite. About 179 GiB remains free.
 
 Reviewed legacy activation, candidate matching, verified native page release
 and post consolidation remain open, together with the full plan's remaining
@@ -6419,6 +6419,7 @@ claim any accepted matches. Evidence remains under
 This increment adds the comparison policy only. Durable native candidate storage,
 cross-page reconciliation, reviewed activation, detail execution, atomic match
 publication, staging release and reviewed post consolidation remain open, as do
-the broader transition gates. The shared-dispatch full gate continues against
-its preceding code checkpoint; these new pure helpers have their own focused
-and package checks. Production and `develop` remain unchanged.
+the broader transition gates. The preceding shared-dispatch checkpoint passed
+the full fork gate. These pure helpers in `fa510dd13` additionally pass their
+focused checks, the full importer package suite and final Go lint. Production
+and `develop` remain unchanged.

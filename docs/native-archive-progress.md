@@ -6468,3 +6468,28 @@ weak-detail execution, match publication, staging release and reviewed post
 consolidation remain open, alongside the full plan's remaining native UI, caller
 conversion, compatibility removal, coordinated backup/export/restore, production
 cutover and retirement gates. Production and `develop` remain unchanged.
+
+### Candidate comparison verification — 2026-10-04
+
+Checkpoint `457ad026b` passed the complete fork gate in 1,219 seconds: generated
+bindings, v3 validation (582 tests), producer validation (452 tests), Go lint
+with zero issues and the full tagged backend suite. The schema-72 full-copy
+migration also passed: all 258 prior data tables and generated columns match
+exactly, all 6,744 frozen discovery records remain, existing schema objects are
+unchanged, integrity is clean and there are no foreign-key violations. The four
+new comparison tables are empty; importing a database did not activate discovery.
+
+Reopening the 20.27 GB archive passed using a verifier pinned to `457ad026b` while
+the next activation increment was developed separately. A 100-row discovery
+inspection took 8 ms and one original-record lookup took 0.16 ms. These are
+read-only inspection timings, not activated-work throughput claims. Schema 72 is
+now the verified rehearsal baseline. After confirming no readers remained, the
+superseded schema-71 database and its sidecars/search index were removed,
+reclaiming about 20.27 GB and leaving about 177 GiB free. The original compatible
+snapshot and frozen import inputs remain retained.
+
+Evidence is under `.local/native-discovery-match-20261004/` and
+`.local/native-discovery-client-20261004/`. The verification covers the candidate
+storage/worker checkpoint only; separately developed activation changes still
+require their own checks. Production, `develop` and the frozen compatible release
+remain unchanged, and the full transition goal remains open.

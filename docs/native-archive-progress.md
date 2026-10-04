@@ -6390,3 +6390,35 @@ and post consolidation remain open, together with the full plan's remaining
 imports, native UI, actual host/n8n conversion, compatibility removal, coordinated
 backup/export/restore, reviewed production cutover and retirement. Production,
 `develop` and the frozen compatible release remain unchanged.
+
+## Account-listing candidate comparison — 2026-10-04
+
+The native importer now has a pure, bounded candidate matcher for retained held
+discovery targets. It compares original title/text, UTC source date and qualified
+original post URLs, rejects contradictory publisher IDs and keeps title-only
+matches provisional. A repeated detail fetch cannot promote the inferred URL,
+matching publisher or strict filename into corroboration. It does not mutate
+the original target or select a native identity.
+
+Page matching reconstructs the compact source envelope and groups candidates by
+qualified post ID, retaining record ordinals instead of copying payloads.
+Multiple images, videos and nested source context from one post share one
+candidate. Distinct posts with identical captions remain competitors; final and
+empty pages do not establish a match or complete catalog import.
+
+The matching cases and the complete `pkg/scrape` suite pass, and Go lint reports
+zero issues. Cases cover weak detail rechecks, publisher conflicts, retained
+source context, renamed handles with stable IDs, Unicode lengths, UTC dates,
+translated/duplicate text, exact large source IDs, album grouping and competing
+posts. A read-only audit validates all 569 retained target inputs (356 Reddit,
+213 Twitter), checks their original source hashes and leaves the schema-71
+database unchanged. Preparation takes 18 ms; it does not fetch source data or
+claim any accepted matches. Evidence remains under
+`.local/native-discovery-client-20261004/`.
+
+This increment adds the comparison policy only. Durable native candidate storage,
+cross-page reconciliation, reviewed activation, detail execution, atomic match
+publication, staging release and reviewed post consolidation remain open, as do
+the broader transition gates. The shared-dispatch full gate continues against
+its preceding code checkpoint; these new pure helpers have their own focused
+and package checks. Production and `develop` remain unchanged.

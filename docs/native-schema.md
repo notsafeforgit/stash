@@ -2329,8 +2329,36 @@ after compact staging has been released. Anonymisation removes resolutions
 before their dependencies; ordinary database backups retain them.
 
 The migration itself leaves existing jobs, identifiers and selected metadata
-unchanged. It does not activate workers. Account-listing discovery, reviewed
-post consolidation and production caller conversion remain transition work.
+unchanged. It does not activate workers. Account-listing match publication,
+reviewed post consolidation and production caller conversion remain transition work.
+
+### Account-listing candidate evidence
+
+The pure `retained-discovery-listing-v1` matcher compares retained held targets
+with compact Reddit/Twitter listing records. It has no database writes. A
+corroborated candidate requires exact original title plus UTC source date,
+original text plus date, a distinct title and longer original text, or an
+original qualified post URL plus date. Text uses the retained Unicode word
+normalization and minimum lengths of 20 for titles, 40 for dated text and 64
+for text corroborating a distinct title. Duplicate title/text does not count as
+two facts. Media URLs, scrape/profile URLs, translated text, observed capture
+time and approximate captions cannot supply that proof. A contradictory captured
+publisher ID rejects the candidate.
+
+An exact title without corroboration stays `title-needs-verification`. Detail
+responses must be checked against the unchanged original target: confirming the
+inferred post URL or publisher cannot upgrade it through the separate lookup
+policy's filename/account shortcuts. Neither result accepts a post identity.
+The eventual publication service must check complete enumeration, all competing
+candidates, current native choices and identifier ownership atomically.
+
+Page matching groups media and parent-context records by qualified post ID,
+retaining their original record ordinals. It does not copy post/profile payloads.
+Several attachments from one post produce one candidate; separate posts with
+the same caption remain separate candidates. A stronger record can corroborate
+the same post's weak title, while a final or empty page never becomes a match
+on its own. Native candidate storage, cross-page reconciliation, activation and
+publication remain separate implementation work.
 
 ## Durable account listing pages
 
@@ -2381,6 +2409,7 @@ Page success proves retained enumeration data only. It does not match candidate
 posts, publish native captures, assign performers or complete catalog migration.
 The [scoped worker API](native-ingestion.md#account-listing-discovery) exposes
 admission of existing definitions, owned attempts, page delivery and failure
-receipts. It cannot create definitions or activate imported work. Reviewed
-activation, durable producer page delivery and dispatch, candidate matching,
+receipts. It cannot create definitions or activate imported work. Durable
+producer delivery, selected-job execution and shared profile/collection dispatch
+are implemented. Reviewed activation, native candidate reconciliation/publication,
 verified staging release and reviewed post consolidation remain required.

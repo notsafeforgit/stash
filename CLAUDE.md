@@ -476,6 +476,13 @@ policy/runtime readiness checks. Preserve profile/collection rotation across
 restart and both journals when upgrading an outbox. Reviewed activation, candidate
 matching and verified native page release remain transition work. See
 [listing storage](docs/native-schema.md#durable-account-listing-pages).
+`scrape.MatchDiscoveryListing` and `MatchDiscoveryPage` implement the pure
+`retained-discovery-listing-v1` candidate policy. Preserve unchanged original
+evidence when checking weak candidates after a detail fetch; inferred URLs must
+not acquire the lookup-only filename/account shortcuts. Multiple media/context
+records from one post share a candidate and retain record ordinals. Candidates
+do not select identities or establish completion; cross-page reconciliation,
+native choices and atomic publication remain necessary.
 
 `stash-import-catalog-evidence` maps a received snapshot's posts, profiles and
 captures through core services in schema 1000031. It uses exact manifest/ordinal

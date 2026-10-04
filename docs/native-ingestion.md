@@ -1102,6 +1102,60 @@ mount prefix. The Vite development proxy forwards `/api/v3/` while retaining the
 browser Host/Origin pair. These clients do not receive producer tokens, website
 credentials or plugin settings.
 
+### Account ownership review API
+
+The application-authenticated `/api/v3/archive` routes also support account
+owners independently of depicted scene/image performers. A source account can
+remain undecided or explicitly unlinked, including an aggregator. Accounts on
+different services remain separate while sharing a chosen performer UUID.
+
+| Route | Result |
+| --- | --- |
+| `GET /source-accounts?q=...&namespace=...&ownership=...&after=<uuid>&limit=N` | Canonical account cards with current ownership and at most eight identifiers |
+| `GET /source-accounts/lookup?namespace=...&kind=...&value=...&after=<uuid>&limit=N` | Exact qualified identifier candidates; matching a handle does not prove uniqueness |
+| `GET /source-accounts/<uuid>` | Current account revision, redirect if consolidated, identifiers and resolved owner |
+| `GET /source-accounts/<uuid>/identifiers?after=<uuid>&limit=N` | All identifiers, including those retained from consolidated accounts |
+| `GET /source-account-identifiers/<uuid>/evidence?after=<key>&limit=N` | Retained evidence and observation interval for the selected claim |
+| `GET /source-accounts/<uuid>/ownership-history?after=<revision>&limit=N` | Previous explicit decisions, in ascending revision order |
+| `POST /account-ownership/preview` | Reviewed current/proposed owner and digest; no writes |
+| `POST /account-ownership/apply` | Atomic ownership decision and retry receipt |
+| `GET /account-ownership/requests/<request-uuid>` | Original committed receipt, or 404 |
+
+These lists default to 25 rows and accept limits from 1 to 100. The last row's
+UUID, evidence key or ownership revision is the next cursor. Account card
+`more_identifiers` explicitly marks a truncated summary. `q` is a literal
+substring of labels or identifier values; namespace scopes remain distinct.
+Performer names and local IDs are display/navigation values. Deleted owners
+retain their UUID and state without a reusable local ID.
+
+A linking preview requires an explicit native performer identity:
+
+```json
+{
+  "account_uuid": "<account-uuid>",
+  "account_revision": 4,
+  "state": "linked",
+  "performer_uuid": "<performer-uuid>",
+  "performer_revision": 9,
+  "reason": "Confirmed from the account profile"
+}
+```
+
+Use `GET /entity-identities/performer/<local-id>` to resolve a picker selection.
+Neither a matching name nor alias selects an owner automatically. `unlinked`
+and `undecided` requests omit both performer fields. They respectively record
+an explicit no-owner choice or return the account to review.
+
+Save the request plus the preview's `digest` and a new `request_uuid` before
+Apply. Retry that identical body after response loss, or read its receipt.
+Successful Apply returns `{ "review": ..., "replayed": false }`; a committed
+retry returns the original receipt with `replayed:true` without restoring a
+superseded link. A stale account/performer preview returns 409 `preview_changed`;
+changed contents under the same request UUID return 409 `request_conflict`.
+Requests are bounded to 16 KiB and reject unknown fields. These routes require
+the application session and same-origin checks; producer grants cannot manage
+ownership. Native account review controls remain a separate UI increment.
+
 ## Automatic source translations
 
 Translation has a separate collection policy from scene/image metadata mapping.

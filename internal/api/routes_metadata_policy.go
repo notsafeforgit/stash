@@ -28,6 +28,15 @@ type nativeArchiveRoutes struct {
 func (rs *nativeArchiveRoutes) router() http.Handler {
 	r := chi.NewRouter()
 	r.Use(nativeAdminOrigin)
+	r.Get("/source-accounts", rs.reviewAccounts)
+	r.Get("/source-accounts/lookup", rs.lookupReviewAccounts)
+	r.Get("/source-accounts/{account}", rs.reviewAccount)
+	r.Get("/source-accounts/{account}/identifiers", rs.reviewAccountIdentifiers)
+	r.Get("/source-accounts/{account}/ownership-history", rs.reviewAccountHistory)
+	r.Get("/source-account-identifiers/{identifier}/evidence", rs.reviewAccountEvidence)
+	r.Post("/account-ownership/preview", rs.previewAccountOwnership)
+	r.Post("/account-ownership/apply", rs.applyAccountOwnership)
+	r.Get("/account-ownership/requests/{request}", rs.accountOwnershipReview)
 	r.Get("/metadata-fields/{kind}", rs.fields)
 	r.Get("/entity-identities/{kind}/{localID}", rs.metadataEntity)
 	r.Get("/entities/{entity}/metadata-fields", rs.entityMetadataFields)
@@ -198,8 +207,16 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 }
 
 func nativeArchiveError(w http.ResponseWriter, err error) {
-	if errors.Is(err, models.ErrMetadataFileReviewInvalid) {
+	if errors.Is(err, models.ErrMetadataFileReviewInvalid) || errors.Is(err, models.ErrAccountReviewInvalid) {
 		ingestError(w, ingest.ErrInvalid)
+		return
+	}
+	if errors.Is(err, models.ErrAccountReviewReplay) {
+		ingestJSON(w, http.StatusConflict, map[string]string{"error": "request_conflict", "message": "This request UUID already names a different account ownership review."})
+		return
+	}
+	if errors.Is(err, models.ErrSourceAccountConflict) {
+		ingestJSON(w, http.StatusConflict, map[string]string{"error": "preview_changed", "message": "The account or performer changed; load a fresh preview."})
 		return
 	}
 	if errors.Is(err, models.ErrMetadataFileReviewReplay) {

@@ -186,6 +186,7 @@ func TestMetadataFileReviewCorruptionIsRejectedWithoutWrites(t *testing.T) {
 
 func removeMetadataFileReviewSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeAccountReviewSchema(t, raw)
 	_, err := raw.Exec("DROP TABLE metadata_file_edit_reviews; DELETE FROM native_migration_history WHERE version=1000067")
 	require.NoError(t, err)
 }

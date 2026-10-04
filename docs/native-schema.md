@@ -142,8 +142,30 @@ Ownership references the typed archive performer identity. UUID adoption follows
 foreign keys, merges resolve through retained redirects, and deletion retains
 the decision against the tombstone for review. New choices cannot use stale or
 deleted performer identities. Anonymised exports remove source account evidence
-and decisions. Source-account equivalence plans, native review APIs/UI, capture
-references, and importing actual catalogs remain subsequent work.
+and decisions. Account equivalence and catalog import are described in the
+later migration sections; native ownership review uses the API described below.
+
+Migration 1000068 adds `account_ownership_reviews`, immutable receipts for
+explicit ownership choices through the native application API. Each receipt
+retains its original request and reviewed digest, and references the exact
+account/decision pair. It commits in the same transaction as that decision.
+Identical retries return the original receipt even after another link, unlink,
+account consolidation, performer UUID adoption, merge or deletion. Reusing a
+request UUID with different contents is a conflict. Existing ownership history
+is preserved without manufacturing review receipts for old choices.
+
+Preview binds the account revision, selected performer revision and current
+resolved owner. A changed identity claim, renamed or merged performer, or newer
+ownership decision requires another preview. Evidence timestamp updates alone
+do not invalidate it. Linking an account records its owner; it does not assign
+depicted performers, alter source payloads, or consolidate service accounts.
+
+Discovery pages canonical accounts and bounded identifier summaries. Account
+details, identifier evidence and ownership history use selected-record lookups
+with independent pagination. Ambiguous identifiers remain multiple candidates.
+Startup validates receipt integrity before writes, and anonymisation removes
+receipts before the private account evidence they reference. Native account
+review controls remain the next UI increment.
 
 Migration 1000006 adds source posts and retained evidence. A post has its own
 UUID and qualified service identifiers; native and mirror identifiers cannot

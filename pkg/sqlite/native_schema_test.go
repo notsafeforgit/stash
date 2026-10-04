@@ -84,6 +84,8 @@ func TestNativeLineageRejectsUnsafeInputsBeforeWriting(t *testing.T) {
 		{"dirty migration", "UPDATE schema_migrations SET dirty = 1", "is incomplete"},
 		{"active native fork ledger", "CREATE TABLE fork_schema_migrations(version INTEGER); INSERT INTO fork_schema_migrations VALUES (9)", "active fork migration ledger"},
 		{"missing authoritative data", "DROP TABLE video_file_metadata", "missing video_file_metadata"},
+		{"missing account review receipts", "DROP TABLE account_ownership_reviews", "missing account_ownership_reviews"},
+		{"missing account review guard", "DROP TRIGGER account_ownership_review_scope", "missing account_ownership_review_scope"},
 		{"missing migration evidence", "DROP TABLE saved_filter_import_conflicts", "missing saved_filter_import_conflicts"},
 		{"missing canonical filters", "ALTER TABLE saved_filters DROP COLUMN filter_ast", "missing saved_filters.filter_ast"},
 		{"missing name model", "DROP TABLE performer_names", "missing performer_names"},

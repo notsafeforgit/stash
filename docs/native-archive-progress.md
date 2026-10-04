@@ -48,14 +48,14 @@ implemented. Native candidates now share original page references, group repeate
 post IDs across pages and resume comparison automatically. Reviewed activation
 and current coverage inspection are implemented and rehearsed. Publication now
 commits complete, unique strong matches through shared native capture services,
-with automatic server dispatch. Schema 75 has passed full-copy reconciliation,
-restart inspection and the full fork gate. Two reviewed fresh searches now
+with automatic server dispatch. Two reviewed fresh searches now
 provide recovery bindings for 188 targets while preserving their original
 cursors and earlier evidence. Candidate detail comparison, native capture
 preparation and read-only application previews are implemented. Schema 76 adds
 candidate-bound detail jobs, producer-authenticated checkpoints, retained original-
-evidence comparisons and scoped worker HTTP. The isolated rehearsal admits no
-source jobs; actual source coverage, Python detail delivery/dispatch, publication
+evidence comparisons and scoped worker HTTP, and has passed full-copy
+reconciliation, restart inspection and the full fork gate. The isolated rehearsal
+admits no source jobs; actual source coverage, Python detail delivery/dispatch, publication
 from detail receipts and staging release remain open.
 Remaining import review resolution and the broader native management interfaces still
 require work.
@@ -6862,11 +6862,24 @@ and reconstructs completed comparisons; anonymisation removes the private bodies
 Focused tests cover producer handoff, lost acknowledgements, reopen, empty/negative
 results, changed selections, commit-time changes, retries/deadlines, shared child
 cooldowns, exact HTTP input/auth boundaries, migration rollback and corruption.
-The full fork gate passed in 1,212 seconds, including 582 v3 tests, 459 producer
-tests, zero Go lint findings and the tagged backend suite (SQLite: 1,110 seconds).
-The populated copy migrated successfully in 543 seconds. Independent row
-reconciliation and fresh-process reopening are still being verified; their
-final outcomes will be recorded here after completion.
+Checkpoint `334144b49` passed the full fork gate in 1,212 seconds, including
+582 v3 tests, 459 producer tests, zero Go lint findings and the tagged backend
+suite (SQLite: 1,110 seconds).
+The populated copy migrated successfully in 543 seconds. Independent typed row
+comparison, including generated values, preserved all 268 pre-existing domain
+tables. It verified exactly seven new tables and four changed SQL objects;
+SQLite integrity is clean, with no foreign-key violations. Reconciliation took
+1,076 seconds. A fresh process reopened schema 76 in 109 seconds and inspected
+all eight activation receipts, 757 target bindings and 188 recovery links in
+83 ms. The 6,744 frozen discovery records remain intact. These checks admitted
+no source jobs and accepted no real-target identities.
+
+After host open-file inspection, schema 76 became the retained verified copy.
+Removing only the superseded schema-75 database and sidecars reclaimed 20.27 GB,
+leaving about 169.7 GiB free. The original compatible snapshot, frozen inputs,
+saved plans, receipts, profiles and producer runtimes remain retained. Evidence
+is under `.local/native-discovery-detail-20261004/` and
+`.local/native-discovery-client-20261004/discovery_durable_*`.
 
 The Python detail worker's outbox/dispatch integration, publication of verified
 detail receipts and staging release remain open. The full transition also still

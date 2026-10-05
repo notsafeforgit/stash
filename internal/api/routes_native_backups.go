@@ -21,6 +21,8 @@ func (rs *nativeBackupRoutes) router() http.Handler {
 	r.Post("/checkpoints", rs.capture)
 	r.Get("/checkpoints/{checkpoint}", rs.read)
 	r.Get("/checkpoints/{checkpoint}/components/{component}", rs.component)
+	r.Post("/checkpoints/{checkpoint}/release", rs.release)
+	r.Get("/checkpoints/{checkpoint}/release", rs.released)
 	return r
 }
 
@@ -31,11 +33,38 @@ func nativeCheckpointError(w http.ResponseWriter, err error) {
 		status = http.StatusBadRequest
 	case errors.Is(err, manager.ErrNativeCheckpointBusy), errors.Is(err, manager.ErrNativeCheckpointIncomplete):
 		status = http.StatusConflict
+	case errors.Is(err, manager.ErrNativeCheckpointReleased):
+		status = http.StatusGone
 	case errors.Is(err, os.ErrNotExist):
 		status = http.StatusNotFound
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	ingestJSON(w, status, map[string]string{"error": err.Error()})
+}
+
+func (rs *nativeBackupRoutes) release(w http.ResponseWriter, r *http.Request) {
+	var input manager.NativeCheckpointReleaseInput
+	if err := readIngestJSON(w, r, 4096, &input); err != nil {
+		nativeCheckpointError(w, manager.ErrNativeCheckpointInvalid)
+		return
+	}
+	result, err := rs.manager.ReleaseNativeCheckpoint(r.Context(), chi.URLParam(r, "checkpoint"), input)
+	if err != nil {
+		nativeCheckpointError(w, err)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	ingestJSON(w, http.StatusOK, result)
+}
+
+func (rs *nativeBackupRoutes) released(w http.ResponseWriter, r *http.Request) {
+	result, err := rs.manager.ReadNativeCheckpointRelease(chi.URLParam(r, "checkpoint"))
+	if err != nil {
+		nativeCheckpointError(w, err)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	ingestJSON(w, http.StatusOK, result)
 }
 
 func (rs *nativeBackupRoutes) capture(w http.ResponseWriter, r *http.Request) {

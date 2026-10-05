@@ -17,6 +17,32 @@ var nativeCheckpointRoles = map[string]string{
 }
 
 func readNativeCheckpoint(directory, id string) (*NativeBackupCheckpoint, error) {
+	result, err := readNativeCheckpointManifest(directory, id)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := readNativeCheckpointRelease(directory, result); err == nil {
+		return nil, ErrNativeCheckpointReleased
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	root, err := os.OpenRoot(directory)
+	if err != nil {
+		return nil, err
+	}
+	defer root.Close()
+	for _, component := range result.Components {
+		info, err := root.Lstat(component.Name)
+		if err != nil || !info.Mode().IsRegular() || info.Size() != component.Bytes {
+			return nil, ErrNativeCheckpointInvalid
+		}
+	}
+	return result, nil
+}
+
+// The manifest remains after release so a UUID can never capture newer state.
+// Reading it does not require the temporary component files to remain present.
+func readNativeCheckpointManifest(directory, id string) (*NativeBackupCheckpoint, error) {
 	info, err := os.Lstat(directory)
 	if err != nil {
 		return nil, err
@@ -60,10 +86,6 @@ func readNativeCheckpoint(directory, id string) (*NativeBackupCheckpoint, error)
 			return nil, ErrNativeCheckpointInvalid
 		}
 		names[component.Name] = true
-		info, err := root.Lstat(component.Name)
-		if err != nil || !info.Mode().IsRegular() || info.Size() != component.Bytes {
-			return nil, ErrNativeCheckpointInvalid
-		}
 	}
 	for _, name := range []string{"library.sqlite", "deletions.zip", "config.yml", "runtime-overrides.yml"} {
 		if !names[name] {

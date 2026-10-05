@@ -97,6 +97,8 @@ func TestNativeBackupCheckpointHTTPAndPortableExport(t *testing.T) {
 	_, err = file.RestoreDeletionSnapshot(t.Context(), filepath.Join(result.Restored, "components", "file_journal", "deletions.zip"),
 		filepath.Join(directory, "rebound"), nil, nil)
 	require.NoError(t, err)
+	require.NoFileExists(t, filepath.Join(directory, "native-checkpoints", id, "library.sqlite"))
+	require.FileExists(t, filepath.Join(directory, "native-checkpoints", id, "release.json"))
 	for _, check := range []struct {
 		path, key, origin string
 		status            int
@@ -104,6 +106,9 @@ func TestNativeBackupCheckpointHTTPAndPortableExport(t *testing.T) {
 		{"/api/v3/backups/checkpoints/" + id, "", "", http.StatusUnauthorized},
 		{"/api/v3/backups/checkpoints/" + id, "producer-token", "", http.StatusUnauthorized},
 		{"/api/v3/backups/checkpoints/" + id, "http-backup-fixture", "https://foreign.example", http.StatusForbidden},
+		{"/api/v3/backups/checkpoints/" + id, "http-backup-fixture", "", http.StatusGone},
+		{"/api/v3/backups/checkpoints/" + id + "/components/library.sqlite", "http-backup-fixture", "", http.StatusGone},
+		{"/api/v3/backups/checkpoints/" + id + "/release", "http-backup-fixture", "", http.StatusOK},
 		{"/api/v3/backups/checkpoints/" + id + "/components/not-in-inventory", "http-backup-fixture", "", http.StatusBadRequest},
 	} {
 		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL+check.path, nil)

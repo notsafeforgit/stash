@@ -7663,3 +7663,44 @@ publication remain. Server checkpoint files currently remain after download;
 scheduled capture must wait for retention integration. Production-scale writer
 exclusion, copy duration and WAL growth still need measurement. No production
 deployment, branch merge or frozen release change has occurred.
+
+## Checkpoint release after archive publication — 2026-10-04
+
+An authorized publisher can now release a sealed server checkpoint's temporary
+components after verifying its durable enclosing archive. The release binds the
+exact checkpoint manifest digest to the portable archive UUID and manifest
+digest. The server records that binding atomically without replacing another
+writer's release, and flushes it before deleting any listed component. The small
+checkpoint/release records remain in the private cache; they must survive
+restarts and cache relocation. Released UUIDs return 410 for capture or component
+access, so retries cannot silently capture newer live state.
+
+Repeating the same release completes interrupted cleanup and returns the same
+receipt. A different archive binding, changed checkpoint digest, corrupt release
+record or nonregular component replacement is rejected. Unrelated files remain
+untouched. Reading a release receipt proves the retained binding, not completion
+of a previously interrupted cleanup. Normal export/download never releases a
+checkpoint automatically.
+
+The Python publisher helper validates the complete inventory, saved server
+report and all required checkpoint component digest/size bindings before
+requesting release, then checks the returned receipt. It does not claim to
+verify remote storage; production callers must finish object verification and
+the master-manifest commit first. This separation permits retrying cleanup after
+a lost response without republishing or recapturing data.
+
+The Go checkpoint tests pass in 20.9 seconds, including interrupted removal,
+fresh-manager retries, preservation of unexpected files, permanent rejection of
+recapture, competing archive bindings and real HTTP/Python interoperability.
+That integration exports a durable private bundle, fully restores it, releases
+the server components, retries the release and verifies the restored native
+database/recovery component. All 64 Python archive tests pass in 21.1 seconds,
+including wrong checkpoint, missing/replaced components and mismatched release
+receipts. Final lint reports zero issues in 9.6 seconds. Evidence labels are
+`native_checkpoint_release_go`, `native_checkpoint_release_python` and
+`native_checkpoint_release_lint_final` under the October 4 client rehearsal
+directory.
+
+Live S3 publication and automatic cleanup of unsealed abandoned captures are
+still outstanding. No production backup cadence, storage policy, current
+manifest, retention tags or running services changed.

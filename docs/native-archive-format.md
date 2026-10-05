@@ -146,9 +146,36 @@ worker profiles, source-access files, artwork and ordinary media still require
 the enclosing publisher's complete inventory and restore bindings.
 
 Checkpoint files live in `native-checkpoints/{uuid}` under the configured backup
-directory, with private directories/files. They currently remain there after
-download; publication-aware cleanup and abandoned-capture retention must be
-wired before enabling scheduled production exports. The default reserve is
+directory, with private directories/files. Export/download does not release them.
+The publisher releases temporary components only after verifying durable archive
+publication, using `POST /api/v3/backups/checkpoints/{uuid}/release`. Its body
+contains `checkpoint_sha256`, `archive_uuid` and `archive_manifest_sha256`.
+The first digest binds the exact canonical Go checkpoint manifest, not just the
+request parameters; the archive digest uses the portable format's canonical JSON.
+
+The server atomically publishes a private `release.json` without replacing a
+competing release, and flushes that record before removing any listed component.
+It permanently retains both `checkpoint.json` and `release.json`. Preserve this
+metadata when relocating the checkpoint cache; do not prune the whole directory
+after removing the large files. Capture/report/component requests for a released
+UUID return 410, preventing a retry from capturing later live state. The same
+release can be repeated to finish interrupted cleanup; a different archive
+binding is rejected. `GET .../{uuid}/release` retrieves the retained binding but
+does not assert that an interrupted cleanup has finished. Unexpected files and
+nonregular replacements are preserved.
+
+The Python publisher helper `release_published_checkpoint(archive, client)`
+checks the complete artifact inventory, the saved server report and every
+required checkpoint component's digest/size binding before sending the release.
+It checks the returned binding as well. This helper does not independently
+verify remote storage: its caller must first complete content/native/producer
+verification and durable publication/readback. The normal export command never
+calls it. Production S3 publication must reach its verified master-manifest
+commit point before release. Abandoned unsealed captures still require explicit
+inspection; automatic incomplete-capture retention and production publisher
+integration remain to be completed before scheduled native exports are enabled.
+
+The default reserve is
 50 GiB, checked on both output and live database volumes during capture. A pinned
 WAL reader allows ordinary writes during the database copy but retains newer WAL
 pages until the copy ends. Copy duration, source WAL growth and the shorter

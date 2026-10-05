@@ -1,5 +1,6 @@
 from contextlib import closing
 import base64
+import copy
 import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
@@ -10,7 +11,9 @@ import unittest
 from unittest.mock import patch
 import uuid
 
-from stash_archive.bundle import export_archive, import_archive, snapshot_database
+from stash_archive.bundle import export_archive, import_archive, iter_artifacts, snapshot_database
+from stash_archive.checkpoint_release import (RELEASE_FORMAT, archive_binding, checkpoint_digest,
+                                              release_published_checkpoint)
 from stash_archive.server_checkpoint import ServerCheckpoint, FORMAT, COVERAGE, ROLES, request_bytes
 from stash_archive.storage import InvalidArchive, store_file
 import test_bundle
@@ -42,6 +45,14 @@ class ServerCheckpointTests(unittest.TestCase):
                 owner.requests.append((self.command, self.path, self.headers.get("ApiKey")))
                 owner.order.append("server")
                 request = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                if self.path.endswith("/release"):
+                    reply = {"format": RELEASE_FORMAT, "version": 1, "uuid": owner.request_id,
+                             "request_sha256": owner.capture_request_hash, "archive": request,
+                             "released_at": "2026-10-05T00:00:00Z"}
+                    if owner.mode == "wrong-release":
+                        reply["archive"]["archive_manifest_sha256"] = "0" * 64
+                    self.reply(json.dumps(reply).encode(), "application/json")
+                    return
                 if owner.mode == "redirect":
                     self.send_response(302)
                     self.send_header("Location", "/credential-leak")
@@ -59,6 +70,7 @@ class ServerCheckpointTests(unittest.TestCase):
                             "committed_deletion_ids": None,
                             "components": [{"role": ROLES[name], "name": name, "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
                                            for name, data in owner.objects.items()]}
+                owner.capture_request_hash = manifest["request_sha256"]
                 if owner.mode == "wrong-request":
                     manifest["request_sha256"] = "0" * 64
                 elif owner.mode == "wrong-markers":
@@ -155,3 +167,43 @@ class ServerCheckpointTests(unittest.TestCase):
                 self.export(components=[component])
             self.assertEqual(self.requests, [])
             self.assertFalse(self.output.exists())
+
+    def test_release_binds_verified_enclosing_archive_and_checks_receipt(self):
+        self.export()
+        self.assertFalse(any(path.endswith("/release") for _, path, _ in self.requests))
+        # This isolated publisher has durably saved and fully restored its local
+        # archive. Remote publishers must also finish their own remote readback.
+        import_archive(self.output, self.root / "release-restore", reserve=0)
+        checkpoint, binding = archive_binding(self.output, self.client)
+        shuffled = dict(reversed(list(checkpoint.items())))
+        shuffled["components"] = [dict(reversed(list(c.items()))) for c in checkpoint["components"]]
+        self.assertEqual(checkpoint_digest(checkpoint), checkpoint_digest(shuffled))
+        receipt = release_published_checkpoint(self.output, self.client)
+        self.assertEqual(receipt["archive"], binding)
+        self.assertEqual(release_published_checkpoint(self.output, self.client), receipt)
+        self.mode = "wrong-release"
+        with self.assertRaisesRegex(InvalidArchive, "does not match"):
+            release_published_checkpoint(self.output, self.client)
+
+    def test_release_rejects_other_checkpoint_or_incomplete_archive_before_network(self):
+        self.export()
+        manifest = json.loads((self.output / "manifest.json").read_bytes())
+        original = list(iter_artifacts(self.output, manifest))
+        self.requests.clear()
+        other = ServerCheckpoint(self.client.server, self.client.api_key, str(uuid.uuid4()))
+        with self.assertRaises(InvalidArchive):
+            release_published_checkpoint(self.output, other)
+        for mode in ("missing-config", "different-library", "missing-checkpoint", "bad-checkpoint-digest"):
+            entries = copy.deepcopy(original)
+            if mode == "missing-config":
+                entries = [e for e in entries if (e["role"], e["name"]) != ("config", "config.yml")]
+            elif mode == "different-library":
+                next(e for e in entries if e["role"] == "library")["sha256"] = "0" * 64
+            elif mode == "missing-checkpoint":
+                entries = [e for e in entries if e["name"] != "server-checkpoint.json"]
+            else:
+                next(e for e in entries if e["name"] == "server-checkpoint.json")["sha256"] = "0" * 64
+            test_bundle.ArchiveTests.rewrite_inventory(self, manifest, entries)
+            with self.subTest(mode=mode), self.assertRaises(InvalidArchive):
+                release_published_checkpoint(self.output, self.client)
+        self.assertEqual(self.requests, [])

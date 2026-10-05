@@ -77,8 +77,10 @@ or operating-state components. See the [portable archive format](docs/native-arc
 Restore verifies complete contents into a new directory and never activates a
 server or worker. `export --server` captures the application's fixed WAL view,
 configuration, runtime overrides, TLS assets and deletion recovery trees after
-the declared producer/download snapshots. Complete external-file/media inventory,
-publication-aware checkpoint cleanup and S3/restore activation remain required;
+the declared producer/download snapshots. The authorized publisher can release
+temporary components after durable publication; retained checkpoint/release
+records prevent the same UUID from capturing newer state. Complete external-file/
+media inventory, publisher/abandoned-stage retention integration and S3/restore activation remain required;
 declared component coverage does not establish a complete production backup.
 The producer CLI can validate a portable worker profile and execute one claimed
 source attempt with concurrent outbox delivery. Website-access references stay

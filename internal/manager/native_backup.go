@@ -26,6 +26,7 @@ const NativeCheckpointDefaultReserve int64 = 50 << 30
 var ErrNativeCheckpointBusy = errors.New("a native checkpoint is already running")
 var ErrNativeCheckpointInvalid = errors.New("invalid native checkpoint request")
 var ErrNativeCheckpointIncomplete = errors.New("an incomplete native checkpoint already exists; inspect or remove that isolated directory before retrying")
+var ErrNativeCheckpointReleased = errors.New("the native checkpoint has been released to its enclosing archive")
 
 type NativeCheckpointRoot struct {
 	Name string `json:"name"`

@@ -10,6 +10,14 @@ with producer receipt checks on one temporary restore. Both proofs identify the
 exact archive and library bytes. This does not certify the remaining shared
 media, filesystem-journal and configuration boundary.
 
+`export --server` captures the running native application's fixed database,
+configuration and deletion recovery components after declared producer journals.
+Export never releases the server's retryable temporary files. An authorized
+publisher calls `release_published_checkpoint` only after it verifies durable
+enclosing publication; the server retains the archive binding before removing
+large components. S3 publication and abandoned-capture retention integration
+remain required before production scheduling.
+
 See the [format and commands](../../docs/native-archive-format.md) for installation,
 coverage, storage budgets, manifest rules and the remaining production backup
 coordination gates. Run `make validate-archive` from the repository root.

@@ -149,6 +149,7 @@ class ServerCheckpoint:
         if (not isinstance(manifest, dict) or set(manifest) != fields or manifest["format"] != FORMAT
                 or type(manifest["version"]) is not int or manifest["version"] != 1
                 or manifest["uuid"] != self.request_id or manifest["coverage"] != COVERAGE
+                or not isinstance(manifest["request_sha256"], str) or not HEX.fullmatch(manifest["request_sha256"])
                 or manifest["request_sha256"] != request_hash or not isinstance(manifest["created_at"], str)):
             raise InvalidArchive("Native checkpoint manifest does not match the requested capture")
         for key in ("source_database_path", "source_config_path", "source_working_directory"):

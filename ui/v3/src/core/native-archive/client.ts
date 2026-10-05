@@ -5,6 +5,7 @@ export class NativeArchiveError extends Error {
   constructor(
     readonly status: number,
     readonly code: string,
+    readonly detail?: string,
   ) {
     super(`Native archive request failed (${status}, ${code})`);
   }
@@ -50,11 +51,15 @@ export function createArchiveRequest(
     });
     if (!response.ok) {
       const result = z
-        .object({ error: z.string() })
+        .object({
+          error: z.string(),
+          message: z.string().max(16384).optional(),
+        })
         .safeParse(await response.json().catch(() => null));
       throw new NativeArchiveError(
         response.status,
         result.success ? result.data.error : "request_failed",
+        result.success ? result.data.message : undefined,
       );
     }
     const result = schema.safeParse(await response.json());

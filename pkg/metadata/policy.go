@@ -73,10 +73,10 @@ type Service struct{ Repo models.Repository }
 // Preview must run in a read transaction. It does not create decisions, source
 // evidence, entities, or missing name matches.
 func (s Service) Preview(ctx context.Context, input Input) (*Preview, error) {
-	return s.preview(ctx, input, true)
+	return s.preview(ctx, input, true, nil)
 }
 
-func (s Service) preview(ctx context.Context, input Input, inspectInactive bool) (*Preview, error) {
+func (s Service) preview(ctx context.Context, input Input, inspectInactive bool, draft *models.MetadataPolicyDefinition) (*Preview, error) {
 	if !archive.ValidRootRelativePath(input.RelativePath, false) || input.CollectionRevision <= 0 || input.PolicyRevision < 0 || input.ExpectedEntityRevision < 0 {
 		return nil, errors.New("invalid metadata policy context")
 	}
@@ -93,6 +93,15 @@ func (s Service) preview(ctx context.Context, input Input, inspectInactive bool)
 	policy, err := s.Repo.MetadataPolicy.Find(ctx, input.CollectionUUID)
 	if err != nil {
 		return nil, err
+	}
+	if draft != nil {
+		if (policy == nil && input.PolicyRevision != 0) || (policy != nil && policy.Revision != input.PolicyRevision) {
+			return nil, models.ErrMetadataPolicyConflict
+		}
+		// An unsaved definition is bound to the reviewed collection revision.
+		// Never publish it, or lend it the saved policy's Apply digest.
+		policy = &models.MetadataPolicy{MetadataPolicyRef: models.MetadataPolicyRef{CollectionUUID: input.CollectionUUID, Revision: input.PolicyRevision},
+			CollectionRevision: input.CollectionRevision, Definition: *draft}
 	}
 	if policy == nil {
 		if input.PolicyRevision != 0 {
@@ -377,7 +386,7 @@ func (s Service) precedence(ctx context.Context, input Input, current *models.Me
 // includes current field choices and name candidates, so a new collision makes
 // that preview stale. Background intake uses an empty digest and pinned policy.
 func (s Service) Apply(ctx context.Context, input Input, expectedDigest string) (*Preview, error) {
-	preview, err := s.preview(ctx, input, false)
+	preview, err := s.preview(ctx, input, false, nil)
 	if err != nil {
 		return nil, err
 	}

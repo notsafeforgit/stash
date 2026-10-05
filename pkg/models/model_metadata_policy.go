@@ -72,6 +72,35 @@ type MetadataPolicyReaderWriter interface {
 	// MatchScan returns only the most specific active directory scope. Multiple
 	// matches at that depth require review; disabled policies can mask a parent.
 	MatchScan(context.Context, string) ([]MetadataScanMatch, error)
+	SampleFiles(context.Context, MetadataPolicySampleScope, string, int) ([]MetadataPolicySampleFile, error)
+	SampleSources(context.Context, MetadataPolicySampleScope, *MetadataPolicySourceCursor, int) ([]MetadataPolicySampleSource, error)
+}
+
+// Sample lookups read only the selected entity's current associations. They do
+// not load source bodies or fabricate a source for directly scanned files.
+type MetadataPolicySampleScope struct {
+	CollectionUUID     string
+	CollectionRevision int
+	EntityUUID         string
+}
+
+type MetadataPolicySampleFile struct {
+	FileUUID     string `json:"file_uuid"`
+	RelativePath string `json:"relative_path"`
+}
+
+type MetadataPolicySourceCursor struct {
+	CaptureUUID    string `json:"capture_uuid"`
+	AttachmentUUID string `json:"attachment_uuid"`
+}
+
+type MetadataPolicySampleSource struct {
+	MetadataPolicySourceCursor
+	PostUUID   string     `json:"post_uuid"`
+	Title      string     `json:"title"`
+	Platform   string     `json:"platform"`
+	Origin     string     `json:"origin"`
+	CapturedAt *time.Time `json:"captured_at"`
 }
 
 // ScanMetadataHandler runs after registration and before the scan commits.

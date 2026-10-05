@@ -52,11 +52,15 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Get("/collections/{collection}/metadata-policy", rs.policy)
 	r.Put("/collections/{collection}/metadata-policy", rs.putPolicy)
 	r.Get("/collections/{collection}/metadata-policy/history", rs.policyHistory)
+	r.Get("/collections/{collection}/metadata-policy/samples/{entity}/files", rs.policySampleFiles)
+	r.Get("/collections/{collection}/metadata-policy/samples/{entity}/sources", rs.policySampleSources)
 	r.Get("/collections/{collection}/translation-policy", rs.translationPolicy)
 	r.Put("/collections/{collection}/translation-policy", rs.putTranslationPolicy)
 	r.Get("/collections/{collection}/translation-policy/history", rs.translationPolicyHistory)
 	r.Get("/captures/{capture}/translation-decision", rs.captureTranslationDecision)
 	r.Post("/metadata-policy/preview", rs.preview)
+	r.Post("/metadata-policy/draft-preview", rs.previewPolicyDraft)
+	r.Post("/metadata-policy/references", rs.policyReferences)
 	r.Post("/metadata-policy/apply", rs.apply)
 	r.Get("/media-roots", rs.roots)
 	r.Post("/media-roots", rs.putRoot)
@@ -281,6 +285,10 @@ func (rs *nativeArchiveRoutes) fields(w http.ResponseWriter, r *http.Request) {
 }
 
 func (rs *nativeArchiveRoutes) policy(w http.ResponseWriter, r *http.Request) {
+	if !ingest.ValidUUID(chi.URLParam(r, "collection")) {
+		ingestError(w, ingest.ErrInvalid)
+		return
+	}
 	var result *models.MetadataPolicy
 	err := rs.repo.WithReadTxn(r.Context(), func(ctx context.Context) error {
 		var err error
@@ -301,8 +309,12 @@ func (rs *nativeArchiveRoutes) putPolicy(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	input.CollectionUUID, input.Origin = chi.URLParam(r, "collection"), "review"
-	if !ingest.ValidUUID(input.CollectionUUID) || metadata.ValidateDefinition(input.Definition) != nil {
+	if !ingest.ValidUUID(input.CollectionUUID) {
 		ingestError(w, ingest.ErrInvalid)
+		return
+	}
+	if err := metadata.ValidateDefinition(input.Definition); err != nil {
+		nativeArchiveError(w, errors.Join(models.ErrMetadataPolicyInvalid, err))
 		return
 	}
 	var result *models.MetadataPolicy
@@ -319,19 +331,25 @@ func (rs *nativeArchiveRoutes) putPolicy(w http.ResponseWriter, r *http.Request)
 }
 
 func (rs *nativeArchiveRoutes) policyHistory(w http.ResponseWriter, r *http.Request) {
-	after := 0
-	if value := r.URL.Query().Get("after"); value != "" {
-		var err error
-		after, err = strconv.Atoi(value)
-		if err != nil || after < 0 {
-			ingestError(w, ingest.ErrInvalid)
-			return
+	after, limit := 0, 50
+	for key, dest := range map[string]*int{"after": &after, "limit": &limit} {
+		if value := r.URL.Query().Get(key); value != "" {
+			var err error
+			*dest, err = strconv.Atoi(value)
+			if err != nil || *dest < 0 {
+				ingestError(w, ingest.ErrInvalid)
+				return
+			}
 		}
+	}
+	if !ingest.ValidUUID(chi.URLParam(r, "collection")) || limit < 1 || limit > 100 {
+		ingestError(w, ingest.ErrInvalid)
+		return
 	}
 	var result []*models.MetadataPolicy
 	err := rs.repo.WithReadTxn(r.Context(), func(ctx context.Context) error {
 		var err error
-		result, err = rs.repo.MetadataPolicy.History(ctx, chi.URLParam(r, "collection"), after, 50)
+		result, err = rs.repo.MetadataPolicy.History(ctx, chi.URLParam(r, "collection"), after, limit)
 		return err
 	})
 	if err != nil {

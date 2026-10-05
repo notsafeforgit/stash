@@ -30,6 +30,7 @@ import {
 import { ReviewError } from "@/components/detail/native-metadata/shared";
 import { CollectionForm } from "./form";
 import { CollectionHistory } from "./history";
+import { MetadataPolicyEditor } from "../metadata-policy/editor";
 
 export function CollectionEditor({
   api,
@@ -303,6 +304,13 @@ export function CollectionEditor({
             </p>
           </CardContent>
         </Card>
+      )}
+      {data?.current && (
+        <MetadataPolicyEditor
+          collections={api}
+          collection={data.current}
+          disabled={!ready || busy || !!saved}
+        />
       )}
     </div>
   );

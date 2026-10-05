@@ -17,6 +17,7 @@ const CaptureStructureVersion = "post-capture-v1"
 
 var captureFileFields = sourceKeys("num filename extension _url media_id file_id")
 var captureTwitterFields = sourceKeys("width height type description duration bitrate source_id source_user sensitive_flags")
+var captureInstagramFields = sourceKeys("date shortcode display_url video_url width height width_original height_original expires subscription audience tagged_users owner author audio_title audio_duration audio_user audio_artist audio_timestamps")
 var captureProvenanceFields = sourceKeys("source_extractor_url subcategory nfo_path")
 
 // RetainSourcePayload applies the versioned gallery-dl policy to a decoded
@@ -65,7 +66,16 @@ func splitCapturePayload(origin string, payload sourceObject) (sourceObject, sou
 			for key := range captureTwitterFields {
 				keys[key] = true
 			}
-		case "reddit", "instagram", "bluesky", "tiktok", "coomer", "kemono", "tumblr":
+		case "instagram":
+			// Only the explicit new producer evidence opts into this partition.
+			// Historical captures must retain their original signatures on replay
+			// and when enrichment proofs are rederived at startup.
+			if evidence, err := capturedInstagramAlbum(payload, ""); err == nil && evidence != nil {
+				for key := range captureInstagramFields {
+					keys[key] = true
+				}
+			}
+		case "reddit", "bluesky", "tiktok", "coomer", "kemono", "tumblr":
 		default:
 			return payload, sourceObject{}
 		}

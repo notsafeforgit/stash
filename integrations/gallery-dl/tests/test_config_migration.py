@@ -170,6 +170,24 @@ class ConfigMigrationTests(unittest.TestCase):
             self.converter().convert()
         self.assertNotIn("hidden-password", str(failure.exception))
 
+    def test_instagram_profile_keeps_child_options_without_unrelated_private_bindings(self):
+        self.value['extractor']['instagram'] = {'include': 'stories,highlights,posts', 'videos': True,
+                                               'cookies': 'instagram-private', 'stories': {'skip': True}}
+        self.value['extractor']['instagram>instagram'] = {'sleep': 12}
+        self.path.write_text(json.dumps(self.value))
+        converter = Converter([self.path], self.root, self.locks, category='instagram')
+        value = converter.convert()
+        profile = Configuration.from_document(value, self.directory)
+        for site in ('reddit', 'coomer', 'kemono'):
+            self.assertNotIn(site, value['gallery']['extractor'])
+        self.assertEqual(value['gallery']['postprocessor'], {})
+        self.assertNotIn(b'instagram-private', profile_bytes(value))
+        with profile.activate():
+            self.assertEqual(config.get(('extractor', 'instagram'), 'cookies'), 'instagram-private')
+            self.assertEqual(config.get(('extractor', 'instagram'), 'include'), 'stories,highlights,posts')
+            self.assertTrue(config.get(('extractor', 'instagram', 'stories'), 'skip'))
+            self.assertEqual(config.get(('extractor', 'instagram>instagram'), 'sleep'), 12)
+
     def test_conditional_order_survives_writing_and_changes_policy_and_filename(self):
         value, original = self.profile()
         changed = copy.deepcopy(value)

@@ -144,6 +144,11 @@ func ExtractCapturedPost(raw []byte) (*models.SourcePostIdentifier, error) {
 	case "tiktok", "patreon", "fansly":
 		return capturedNumericPostReference("native:"+category, capturedFieldAt(data, path, "id"))
 	case "instagram":
+		if album, err := capturedInstagramAlbum(data, path); err != nil {
+			return nil, err
+		} else if album != nil {
+			return &album.Post, nil
+		}
 		if data["type"] == "story" || data["type"] == "highlight" {
 			return nil, nil // these are containers, not regular post IDs
 		}

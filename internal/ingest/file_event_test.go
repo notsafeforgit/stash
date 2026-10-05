@@ -134,6 +134,68 @@ func TestFileEventSingleRedditAttachmentLinksMediaWithoutCreatingGallery(t *test
 	require.Equal(t, "succeeded", status.State)
 }
 
+func TestInstagramFileEventsLinkSourceMediaAndOnlyCarouselPostsCreateGalleries(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		postID string
+		source string
+		album  bool
+	}{
+		{"partial carousel", "123", `{"category":"instagram","type":"post","post_id":"123","media_id":"701","instagram_media":{"version":1,"post_id":"123","album":true,"items":[{"id":"701","kind":"image"},null,{"id":"702","kind":"video"}]}}`, true},
+		{"individual story", "701", `{"category":"instagram","type":"story","post_id":"456","media_id":"701","instagram_media":{"version":1,"post_id":"701","album":false,"items":[{"id":"701","kind":"image"}],"container":{"id":"456","type":"story"}}}`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := intakePublicationFixture{publicationFixture: newPublicationFixture(t)}
+			repo := f.service.Repo
+			require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
+				definition := f.collection.SourceCollectionDefinition
+				definition.Namespace, definition.RootUUID, definition.PathPrefix = "native:instagram", &f.root.UUID, "."
+				var err error
+				f.collection, err = repo.SourceCollection.Put(ctx, models.SourceCollectionInput{
+					UUID: f.collection.UUID, ExpectedRevision: f.collection.Revision, SourceCollectionDefinition: definition, Origin: "review",
+				})
+				return err
+			}))
+			var err error
+			f.credential, f.token, err = f.service.IssueCredential(t.Context(), f.producer.UUID, []models.IngestScope{{CollectionUUID: f.collection.UUID, RootUUID: &f.root.UUID}}, nil)
+			require.NoError(t, err)
+			capture := f.event(t)
+			capture.RootUUID, capture.Post.Namespace, capture.Post.Value = &f.root.UUID, "native:instagram", tc.postID
+			capture.Source = json.RawMessage(tc.source)
+			f.receipt, err = f.submit(t, capture)
+			require.NoError(t, err)
+			require.Equal(t, "701", f.attachment(t, 0).Reference.Value)
+			event := f.fileEvent(t)
+			accepted, err := f.submitFile(t, event)
+			require.NoError(t, err)
+			durable := job.NewDurable(repo)
+			claimed, err := durable.Claim(t.Context(), models.ArchiveJobVerifyMedia, uuid.NewString(), time.Minute)
+			require.NoError(t, err)
+			require.Equal(t, accepted.JobUUID, claimed.UUID)
+			var work ingest.FileWork
+			require.NoError(t, json.Unmarshal(claimed.Arguments, &work))
+			_, err = durable.Publish(t.Context(), claimed.Lease(), func(ctx context.Context, _ *models.ArchiveJob) (models.ArchiveJobOutcome, error) {
+				published, err := f.prepared.PublishIntake(ctx, repo, work.Publication)
+				if err != nil {
+					return models.ArchiveJobOutcome{}, err
+				}
+				require.Equal(t, "linked", published.Result.SourceMedia)
+				require.NotEmpty(t, published.Result.MediaUUID)
+				require.Equal(t, tc.album, published.Result.GalleryUUID != "")
+				body, err := json.Marshal(published.Result)
+				return models.ArchiveJobOutcome{State: "succeeded", Result: body}, err
+			})
+			require.NoError(t, err)
+			status, err := f.service.ReceiptStatus(t.Context(), f.token, event.EventUUID)
+			require.NoError(t, err)
+			require.Equal(t, "succeeded", status.State)
+			replay, err := f.submitFile(t, event)
+			require.NoError(t, err)
+			require.Equal(t, accepted, replay)
+		})
+	}
+}
+
 func TestFileEventReplaySurvivesRestartMissingFileAndTokenRotation(t *testing.T) {
 	f := newIntakePublicationFixture(t, true)
 	event := f.fileEvent(t)

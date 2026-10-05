@@ -15,7 +15,7 @@ from .client import Client, Unavailable
 from .completion import inspect_call
 from .configuration import Configuration
 from .encoding import InvalidData, digest, encode, identifier
-from .launcher_inputs import date_min, reddit_list, reddit_name, reddit_urls, twitter_list, twitter_target
+from .launcher_inputs import date_min, instagram_list, instagram_target, reddit_list, reddit_name, reddit_urls, twitter_list, twitter_target
 from .outbox import Capacity, Outbox
 from .source_calls import SourceCalls
 from . import windows
@@ -27,7 +27,7 @@ def parser_for(service):
     targets.add_argument("--username")
     if service == "twitter":
         targets.add_argument("--user-id", "--gid", dest="user_id")
-    else:
+    elif service == "reddit":
         targets.add_argument("--subreddit")
         parser.add_argument("--mode", choices=("new", "top"), default="new")
         parser.add_argument("--saved", action="store_true")
@@ -57,6 +57,8 @@ def options(service, args):
     if service == "twitter":
         direct = twitter_target(args.username, "user") if args.username else twitter_target(args.user_id, "id") if args.user_id else None
         source = {"url": direct} if direct else {"list_file": str(Path(args.config_file).absolute())}
+    elif service == "instagram":
+        source = {"url": instagram_target(args.username)} if args.username else {"list_file": str(Path(args.config_file).absolute())}
     else:
         source = ({"user": reddit_name(args.username)} if args.username else
                   {"subreddit": reddit_name(args.subreddit, "subreddit")} if args.subreddit else
@@ -71,11 +73,11 @@ def options(service, args):
 
 def expand(service, value, now):
     source, ignored = value["source"], []
-    if service == "twitter":
+    if service in ("twitter", "instagram"):
         if "url" in source:
             urls = [source["url"]]
         else:
-            urls, ignored = twitter_list(source["list_file"])
+            urls, ignored = (twitter_list if service == "twitter" else instagram_list)(source["list_file"])
         since = None
     else:
         if "user" in source:
@@ -154,3 +156,7 @@ def twitter_main(argv=None):
 
 def reddit_main(argv=None):
     return main("reddit", argv)
+
+
+def instagram_main(argv=None):
+    return main("instagram", argv)

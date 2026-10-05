@@ -2,7 +2,7 @@
 
 The development server exposes a separate, versioned producer interface at
 `/api/v3/ingest`. Protocol 1 currently accepts `source.capture` events for
-Reddit, Twitter, Bluesky, TikTok, Instagram posts/reels, Patreon, Fansly and
+Reddit, Twitter, Bluesky, TikTok, Instagram posts/reels and individual stories, Patreon, Fansly and
 Kemono/Coomer post identities. It records sanitized source evidence,
 publisher choices, collection provenance, and supported album manifests with a
 durable receipt. This interface is not deployed to the compatible production
@@ -398,6 +398,7 @@ integers and rejecting disagreeing identifiers:
 | Bluesky | `native:bluesky`, `author.did/post_id`, verified against the feed-post AT URI when present |
 | TikTok, Patreon, Fansly | `native:<service>`, numeric post `id` |
 | Instagram posts/reels | `native:instagram`, numeric `post_id`, agreeing with `sidecar_media_id` when present |
+| Instagram stories/highlights | `native:instagram`, original story `media_id` with validated `instagram_media` evidence; container ID/type remains provenance |
 | Kemono/Coomer | `mirror:<extractor>:<service>`, captured `user/id` |
 
 A Bluesky handle cannot substitute for its DID; neither an Instagram file's
@@ -413,7 +414,13 @@ Imgur/Redgifs child hosts retain their enclosing post scope, caption and publish
 A social extractor's parent feed/profile does not replace its actual post.
 Unknown post adapters are rejected even when their account parser is supported.
 Post support alone does not establish attachment membership or enable a download
-worker: file selection and source-window adapters still cover Reddit/Twitter.
+worker: file selection and source-window adapters currently cover Reddit, Twitter
+and Instagram. Instagram requires versioned original attachment evidence for
+file linking, preserves carousel slots before filtering/reordering, and treats
+each story as its own post. Only evidenced carousel posts create source galleries.
+Historical metadata without this evidence can retain a regular post identity,
+but cannot establish attachment order from download numbering. See the
+[producer's Instagram contract](../integrations/gallery-dl/README.md#instagram-downloads-and-source-albums).
 
 ## Metadata enrichment checkpoints
 

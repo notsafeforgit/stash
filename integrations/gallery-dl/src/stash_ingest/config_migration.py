@@ -95,10 +95,10 @@ class Converter:
             section = merged.value.get("extractor")
             if section is None or not isinstance(section.value, dict):
                 raise InvalidData("Scoped conversion requires an extractor configuration object")
-            # The pinned Twitter adapter only queues Twitter extractors. Reddit
+            # Pinned Twitter and Instagram adapters only queue their own site. Reddit
             # can safely narrow its dependencies with the existing finite host
             # whitelist. Unknown dependency graphs retain all configured sites.
-            included = {"twitter"} if category == "twitter" else None
+            included = {category} if category in ("twitter", "instagram") else None
             if category == "reddit":
                 settings = section.plain()
                 whitelist = settings.get("reddit", {}).get("whitelist", settings.get("whitelist"))

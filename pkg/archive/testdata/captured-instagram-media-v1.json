@@ -1,0 +1,453 @@
+{
+  "cases": [
+    {
+      "name": "partial-carousel-keeps-source-order",
+      "source": {
+        "category": "instagram",
+        "type": "post",
+        "post_id": "123",
+        "sidecar_media_id": "123",
+        "media_id": "702",
+        "post_date": "2026-10-01T12:00:00Z",
+        "date": "2026-09-30T12:00:00Z",
+        "description": "Original caption",
+        "instagram_media": {
+          "version": 1,
+          "post_id": "123",
+          "album": true,
+          "items": [
+            {
+              "id": "701",
+              "kind": "image"
+            },
+            null,
+            {
+              "id": "702",
+              "kind": "video"
+            }
+          ]
+        }
+      },
+      "post": {
+        "namespace": "native:instagram",
+        "value": "123"
+      },
+      "attachment": "702",
+      "album": {
+        "declared": true,
+        "count": 3,
+        "entries": [
+          [
+            0,
+            "701",
+            "image"
+          ],
+          [
+            2,
+            "702",
+            "video"
+          ]
+        ],
+        "complete": false
+      },
+      "error": false
+    },
+    {
+      "name": "single-reel-is-not-an-album",
+      "source": {
+        "category": "instagram",
+        "type": "reel",
+        "post_id": "123",
+        "media_id": "123",
+        "post_date": "2026-10-01T12:00:00Z",
+        "date": "2026-09-30T12:00:00Z",
+        "description": "Original caption",
+        "instagram_media": {
+          "version": 1,
+          "post_id": "123",
+          "album": false,
+          "items": [
+            {
+              "id": "123",
+              "kind": "video"
+            }
+          ]
+        }
+      },
+      "post": {
+        "namespace": "native:instagram",
+        "value": "123"
+      },
+      "attachment": "123",
+      "album": {
+        "declared": false,
+        "count": 1,
+        "entries": [
+          [
+            0,
+            "123",
+            "video"
+          ]
+        ],
+        "complete": true
+      },
+      "error": false
+    },
+    {
+      "name": "story-uses-individual-media-not-container",
+      "source": {
+        "category": "instagram",
+        "type": "story",
+        "post_id": "456",
+        "media_id": "701",
+        "post_date": "2026-10-01T12:00:00Z",
+        "date": "2026-09-30T12:00:00Z",
+        "description": "Original caption",
+        "instagram_media": {
+          "version": 1,
+          "post_id": "701",
+          "album": false,
+          "items": [
+            {
+              "id": "701",
+              "kind": "image"
+            }
+          ],
+          "container": {
+            "id": "456",
+            "type": "story"
+          }
+        }
+      },
+      "post": {
+        "namespace": "native:instagram",
+        "value": "701"
+      },
+      "attachment": "701",
+      "album": {
+        "declared": false,
+        "count": 1,
+        "entries": [
+          [
+            0,
+            "701",
+            "image"
+          ]
+        ],
+        "complete": true
+      },
+      "error": false
+    },
+    {
+      "name": "highlight-uses-individual-media-not-container",
+      "source": {
+        "category": "instagram",
+        "type": "highlight",
+        "post_id": "987",
+        "media_id": "701",
+        "post_date": "2026-10-01T12:00:00Z",
+        "date": "2026-09-30T12:00:00Z",
+        "description": "Original caption",
+        "instagram_media": {
+          "version": 1,
+          "post_id": "701",
+          "album": false,
+          "items": [
+            {
+              "id": "701",
+              "kind": "image"
+            }
+          ],
+          "container": {
+            "id": "987",
+            "type": "highlight"
+          }
+        }
+      },
+      "post": {
+        "namespace": "native:instagram",
+        "value": "701"
+      },
+      "attachment": "701",
+      "album": {
+        "declared": false,
+        "count": 1,
+        "entries": [
+          [
+            0,
+            "701",
+            "image"
+          ]
+        ],
+        "complete": true
+      },
+      "error": false
+    },
+    {
+      "name": "legacy-post-without-source-membership",
+      "source": {
+        "category": "instagram",
+        "post_id": "123",
+        "media_id": "123"
+      },
+      "post": {
+        "namespace": "native:instagram",
+        "value": "123"
+      },
+      "attachment": null,
+      "album": null,
+      "error": false
+    },
+    {
+      "name": "legacy-story-container-is-not-a-post",
+      "source": {
+        "category": "instagram",
+        "type": "story",
+        "post_id": "456",
+        "media_id": "701"
+      },
+      "post": null,
+      "attachment": null,
+      "album": null,
+      "error": false
+    },
+    {
+      "name": "wrong-parent",
+      "source": {
+        "category": "instagram",
+        "type": "post",
+        "post_id": "123",
+        "sidecar_media_id": "123",
+        "media_id": "702",
+        "post_date": "2026-10-01T12:00:00Z",
+        "date": "2026-09-30T12:00:00Z",
+        "description": "Original caption",
+        "instagram_media": {
+          "version": 1,
+          "post_id": "999",
+          "album": true,
+          "items": [
+            {
+              "id": "701",
+              "kind": "image"
+            },
+            null,
+            {
+              "id": "702",
+              "kind": "video"
+            }
+          ]
+        }
+      },
+      "post": null,
+      "attachment": null,
+      "album": null,
+      "error": true
+    },
+    {
+      "name": "boolean-version",
+      "source": {
+        "category": "instagram",
+        "type": "post",
+        "post_id": "123",
+        "sidecar_media_id": "123",
+        "media_id": "702",
+        "post_date": "2026-10-01T12:00:00Z",
+        "date": "2026-09-30T12:00:00Z",
+        "description": "Original caption",
+        "instagram_media": {
+          "version": true,
+          "post_id": "123",
+          "album": true,
+          "items": [
+            {
+              "id": "701",
+              "kind": "image"
+            },
+            null,
+            {
+              "id": "702",
+              "kind": "video"
+            }
+          ]
+        }
+      },
+      "post": null,
+      "attachment": null,
+      "album": null,
+      "error": true
+    },
+    {
+      "name": "empty-list",
+      "source": {
+        "category": "instagram",
+        "type": "post",
+        "post_id": "123",
+        "sidecar_media_id": "123",
+        "media_id": "702",
+        "post_date": "2026-10-01T12:00:00Z",
+        "date": "2026-09-30T12:00:00Z",
+        "description": "Original caption",
+        "instagram_media": {
+          "version": 1,
+          "post_id": "123",
+          "album": true,
+          "items": []
+        }
+      },
+      "post": null,
+      "attachment": null,
+      "album": null,
+      "error": true
+    },
+    {
+      "name": "invalid-media-id",
+      "source": {
+        "category": "instagram",
+        "type": "post",
+        "post_id": "123",
+        "sidecar_media_id": "123",
+        "media_id": "702",
+        "post_date": "2026-10-01T12:00:00Z",
+        "date": "2026-09-30T12:00:00Z",
+        "description": "Original caption",
+        "instagram_media": {
+          "version": 1,
+          "post_id": "123",
+          "album": true,
+          "items": [
+            {
+              "id": "1.5",
+              "kind": "image"
+            },
+            null,
+            {
+              "id": "702",
+              "kind": "video"
+            }
+          ]
+        }
+      },
+      "post": null,
+      "attachment": null,
+      "album": null,
+      "error": true
+    },
+    {
+      "name": "audio-is-not-source-image",
+      "source": {
+        "category": "instagram",
+        "type": "post",
+        "post_id": "123",
+        "sidecar_media_id": "123",
+        "media_id": "702",
+        "post_date": "2026-10-01T12:00:00Z",
+        "date": "2026-09-30T12:00:00Z",
+        "description": "Original caption",
+        "instagram_media": {
+          "version": 1,
+          "post_id": "123",
+          "album": true,
+          "items": [
+            {
+              "id": "701",
+              "kind": "audio"
+            },
+            null,
+            {
+              "id": "702",
+              "kind": "video"
+            }
+          ]
+        }
+      },
+      "post": null,
+      "attachment": null,
+      "album": null,
+      "error": true
+    },
+    {
+      "name": "wrong-story-container",
+      "source": {
+        "category": "instagram",
+        "type": "story",
+        "post_id": "456",
+        "media_id": "701",
+        "post_date": "2026-10-01T12:00:00Z",
+        "date": "2026-09-30T12:00:00Z",
+        "description": "Original caption",
+        "instagram_media": {
+          "version": 1,
+          "post_id": "701",
+          "album": false,
+          "items": [
+            {
+              "id": "701",
+              "kind": "image"
+            }
+          ],
+          "container": {
+            "id": "999",
+            "type": "story"
+          }
+        }
+      },
+      "post": null,
+      "attachment": null,
+      "album": null,
+      "error": true
+    },
+    {
+      "name": "download-not-in-observed-source-list",
+      "source": {
+        "category": "instagram",
+        "type": "post",
+        "post_id": "123",
+        "sidecar_media_id": "123",
+        "media_id": "999",
+        "post_date": "2026-10-01T12:00:00Z",
+        "date": "2026-09-30T12:00:00Z",
+        "description": "Original caption",
+        "instagram_media": {
+          "version": 1,
+          "post_id": "123",
+          "album": true,
+          "items": [
+            {
+              "id": "701",
+              "kind": "image"
+            },
+            null,
+            {
+              "id": "702",
+              "kind": "video"
+            }
+          ]
+        }
+      },
+      "post": {
+        "namespace": "native:instagram",
+        "value": "123"
+      },
+      "attachment": null,
+      "album": {
+        "declared": true,
+        "count": 3,
+        "entries": [
+          [
+            0,
+            "701",
+            "image"
+          ],
+          [
+            2,
+            "702",
+            "video"
+          ]
+        ],
+        "complete": false
+      },
+      "error": false
+    }
+  ]
+}

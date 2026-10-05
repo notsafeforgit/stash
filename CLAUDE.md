@@ -210,7 +210,7 @@ responses expose truncation so a partial candidate set never appears unique.
 `queue-sources` freezes a caller's URL list, policy and absolute window before
 network access. Resolution commits each collection binding and ticket together;
 never reinterpret a bound target after a retry. `call-status` checks every
-original ticket and cannot certify media intake. Staged Twitter/Reddit host
+original ticket and cannot certify media intake. Staged Twitter/Reddit/Instagram host
 launchers now expand the existing lists/modes/dates into source calls. Full-history
 and Reddit top mode require a separate reviewed global `skip=true` profile.
 Local recording is not source completion; strict inspection returns pending until
@@ -218,6 +218,14 @@ all original tickets finish. The staged n8n adapter records stable execution
 identities, checks permanent history before source admission and retains its
 completion proof before submission. Pending workflow results must wait and
 inspect the same token; local recording cannot reach a success branch.
+Instagram downloads retain versioned `instagram_media` membership before the
+pinned extractor filters/reorders files. Preserve carousel slots and separate
+story identity/date from its tray or highlight container. Profile dispatch may
+queue only verified same-service child collections before a source date exists;
+each child still applies the original window. New capture partitioning requires
+that explicit evidence so historical Instagram signatures remain replayable.
+The staged Instagram timer still needs native registration, durable outbox and
+dispatcher/recovery activation at cutover.
 `source_backfill_decisions` now retains permanent account-backfill history in
 the native database. Historical acceptance/skip imports retain their entire
 source row without creating source-run coverage. Native completion proves every

@@ -1,8 +1,9 @@
-"""Account/list expansion used by the installed Twitter and Reddit launchers."""
+"""Account/list expansion used by the installed native source launchers."""
 
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import re
+from urllib.parse import urlsplit
 
 from .encoding import InvalidData
 from . import windows
@@ -55,6 +56,43 @@ def read_list(filename):
         return value.decode("utf-8").splitlines()
     except UnicodeError:
         raise InvalidData("Saved source list must be UTF-8") from None
+
+
+def instagram_target(value):
+    value = value.strip()
+    if re.fullmatch(r"@?[A-Za-z0-9_.]{1,30}", value):
+        value = "https://www.instagram.com/" + value.removeprefix("@") + "/"
+    try:
+        parsed = urlsplit(value)
+        if (parsed.scheme not in ("https", "http") or parsed.hostname not in ("instagram.com", "www.instagram.com")
+                or parsed.username is not None or parsed.password is not None or parsed.port is not None
+                or any(part in (".", "..") for part in parsed.path.split("/"))
+                or any(c.isspace() or ord(c) < 32 for c in value)):
+            raise ValueError()
+        # Preserve an explicit extractor URL and its query; do not convert a
+        # post/highlight target into an unrelated account name.
+        from gallery_dl import extractor
+        target = extractor.find(value)
+        if target is None or target.category != "instagram":
+            raise ValueError()
+        return value
+    except ValueError:
+        raise InvalidData("Invalid Instagram account name or extractor URL") from None
+
+
+def instagram_list(filename):
+    targets = []
+    for number, line in enumerate(read_list(filename), 1):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        try:
+            targets.append(instagram_target(line))
+        except InvalidData:
+            # gallery-dl input lists are explicit URLs, not a best-effort list
+            # of names. Do not silently turn a partial list into success.
+            raise InvalidData(f"Invalid Instagram saved-list target on line {number}") from None
+    return list(dict.fromkeys(targets)), []
 
 
 def twitter_list(filename):

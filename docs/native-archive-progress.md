@@ -71,6 +71,10 @@ inspection visited the six retained collections in 41 bounded requests totaling
 staging release remain open.
 Remaining import review resolution and the broader native management interfaces still
 require work.
+Instagram download ingestion and a staged host launcher now preserve carousel
+membership, individual story identity and source-date windows. The actual host
+profile/list and timer replacement have been inspected without activation; the
+native dispatcher, durable outbox and final API registration remain cutover work.
 Broader archive management UI, live host/n8n conversion, remaining compatibility removal, coordinated
 backup/export/restore, production cutover and retirement remain major release
 gates. The phase table below records that distinction; commit count is not a
@@ -8477,3 +8481,48 @@ No live backup, scraper, Stash schema, bucket policy, release pin or develop
 branch changed. Observed cloud expiration, final inventory, capture measurements,
 relocated restore and all broader migration/UI/client/cutover/retirement gates
 remain open.
+
+## Instagram download ingestion and staged host timer
+
+The pinned gallery-dl adapter now retains `instagram_media` version 1 before
+filtering unavailable items or reversing downloads. The Python producer and Go
+server share a fixture corpus for parent identity, attachment membership, missing
+slots and story/highlight containers. Each carousel file links to its source
+attachment; an evidenced carousel can create a gallery before every source file
+is available. Singleton posts and individual stories do not become albums.
+
+Stories use their original media IDs and publication times, so a later highlight
+capture identifies the same post. The profile dispatcher can route verified
+same-service children without a post timestamp; each child applies the original
+window. Disabled music-sticker audio does not block visual downloads or invent
+attachments. Static-video policy remains effective. File-specific capture fields
+share the enclosing post body only when explicit new membership evidence exists;
+historical capture signatures retain their original partition for replay and
+enrichment proof validation.
+
+The new packaged `stash-ingest-instagram` launcher freezes source-list URLs and
+the window into durable caller requests. It preserves explicit extractor URLs,
+fails on invalid list lines, and replays saved work after its input list/profile
+disappears. Exit 0 means locally recorded; actual scraping requires the separate
+dispatcher and receipt inspection. Source-scoped configuration conversion now
+excludes unrelated extractors and their private references.
+
+Read-only inspection of the actual host timer and its one saved profile produced
+`.local/native-instagram-conversion-20261005/host-instagram-worker.json`, a staged
+unit override and `review.json`. The effective `stories,highlights,posts` selection,
+video flag, `abort:4` rule and `{username}, instagram` directory remain. The
+validated dispatcher routes were stories, highlights and posts. Input hashes
+were unchanged; no website/API requests or download-archive writes occurred.
+The staged root UUID is explicitly unregistered rehearsal state, not final
+production registration. Outbox/environment provisioning, dispatcher/recovery
+scheduling, runtime installation and observed native receipts remain required.
+
+Pinned extractor tests cover reversed mixed-media carousels, missing source slots,
+story/highlight reuse, per-story time boundaries, profile dispatch, music stickers
+and static-video outputs. Real native capture/file publication tests verify gallery
+creation versus singleton attribution and immutable receipt replay. Existing
+historical retention fixtures and all archive package tests pass. The installed
+launcher help check passes. All 499 producer tests pass in 44 seconds; package
+installation and scoped Go lint also pass. No live timer, scraper, archive, Stash schema or frozen
+release changed; this work does not close the remaining service/caller coverage
+or any production release gate.

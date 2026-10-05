@@ -9,7 +9,8 @@ from .windows import normalize
 
 EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 PROTECTED_KEYWORDS = frozenset(("category", "subcategory", "date", "created_utc", "created_at",
-                                "id", "tweet_id", "rest_id", "id_str", "legacy", "_reddit"))
+                                "id", "tweet_id", "rest_id", "id_str", "legacy", "_reddit",
+                                "post_id", "post_date", "sidecar_media_id", "media_id", "instagram_media"))
 
 
 def _datetime(value):
@@ -27,9 +28,16 @@ def _datetime(value):
 def published(metadata, category):
     """Date of the source post, including its wrapper when it is a repost."""
     data, category = _context({**metadata, "category": category})
-    if category not in ("reddit", "twitter"):
+    if category not in ("reddit", "twitter", "instagram"):
         raise UnsupportedSource("This extractor needs a native source-date adapter")
     try:
+        if category == "instagram":
+            from .instagram import CONTAINERS, manifest
+            if data.get("type") in CONTAINERS:
+                if manifest(data) is None:
+                    raise ValueError()
+                return _datetime(data.get("date"))
+            return _datetime(data.get("post_date"))
         if category == "reddit":
             if "created_utc" in data:
                 value = data["created_utc"]

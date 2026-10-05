@@ -4,6 +4,7 @@ import re
 from urllib.parse import urlsplit
 
 from .encoding import InvalidData
+from . import instagram
 
 
 class UnsupportedSource(InvalidData):
@@ -86,6 +87,9 @@ def post(source):
     elif category in {"tiktok", "patreon", "fansly"}:
         value = _numeric(_id(data.get("id")))
     elif category == "instagram":
+        evidence = instagram.manifest(data)
+        if evidence is not None:
+            return {"namespace": "native:instagram", "value": evidence["post_id"]}
         if data.get("type") in ("story", "highlight"):
             raise UnsupportedSource("Instagram story/highlight containers need a separate identity adapter")
         value = _numeric(_agree([data.get("post_id"), data.get("sidecar_media_id")]))
@@ -114,7 +118,7 @@ def metadata(source):
     elif category == "tiktok":
         text_keys = ("desc", "title")
     elif category == "instagram":
-        text_keys, date_keys = ("description",), ("post_date",)
+        text_keys, date_keys = ("description",), (("date",) if data.get("type") in instagram.CONTAINERS else ("post_date",))
     elif category == "patreon":
         date_keys = ("published_at", "date")
     elif category in {"kemono", "coomer"}:
@@ -227,4 +231,10 @@ def attachment(source):
                 matches.add(key)
         if len(matches) == 1:
             return {"namespace": ref["namespace"], "value": matches.pop()}
+    elif category == "instagram":
+        evidence = instagram.manifest(data)
+        if evidence is not None:
+            selected = _numeric(_id(data.get("media_id")))
+            if any(item is not None and item["id"] == selected for item in evidence["items"]):
+                return {"namespace": ref["namespace"], "value": selected}
     raise UnsupportedSource("Downloaded media cannot be uniquely matched to the captured source list")

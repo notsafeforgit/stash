@@ -12,8 +12,9 @@ import requests
 
 from gallery_dl import config, exception, job, version
 from gallery_dl import path as gallery_path
+from gallery_dl.extractor.common import Message
 
-from . import filename
+from . import filename, instagram
 from .encoding import InvalidData
 from .filesystem import destination_lock
 from .runs import SourceFailure, SourcePaused, SourceTurnComplete
@@ -172,6 +173,8 @@ class NativeDownloadJob(job.DownloadJob):
         self._native_parent = parent
         self._native_source_date = None if parent is None else parent._native_queued_date
         self._native_queued_date = None
+        self._native_collection_child = False
+        self._native_collection_route = None
         self._native_scope = None
         super().__init__(extractor, parent)
         extractor = self.extractor
@@ -179,7 +182,8 @@ class NativeDownloadJob(job.DownloadJob):
             raise InvalidData("Extractor does not match this worker profile's source category")
         if parent is None and extractor.url != self.producer.lease.run["target_url"]:
             raise InvalidData("Extractor target differs from the claimed collection")
-        if parent is not None and self._native_source_date is None:
+        if (parent is not None and self._native_source_date is None
+                and not (parent._native_collection_child and extractor.category == parent.extractor.category == "instagram")):
             raise InvalidData("Child extraction has no approved source-post window")
         self.producer.window.configure(extractor, inherited=parent is not None)
         if hasattr(extractor, "_async_items"):
@@ -220,6 +224,8 @@ class NativeDownloadJob(job.DownloadJob):
         self._source_operation(super()._init)
         if self.extractor.category == "twitter":
             twitter_evidence(self.extractor)
+        elif self.extractor.category == "instagram":
+            instagram.install(self.extractor)
 
     def _source_operation(self, call, *args):
         try:
@@ -255,6 +261,15 @@ class NativeDownloadJob(job.DownloadJob):
                     kind, url, data = self._source_operation(next, iterator)
                 except StopIteration:
                     return
+                if kind == Message.Queue and instagram.collection_queue(self.extractor, url, data):
+                    # This is routing to a post collection, not a dated post.
+                    # The child applies the original window to each source item.
+                    self._native_collection_route = (url, data["_extractor"])
+                    try:
+                        yield kind, url, dict(data)
+                    finally:
+                        self._native_collection_route = None
+                    continue
                 value = self._native_source_date or published(data, self.extractor.category)
                 if self.producer.window.contains(value):
                     # Upstream augments/mutates keywords in place. Preserve the
@@ -369,6 +384,12 @@ class NativeDownloadJob(job.DownloadJob):
 
     def handle_queue(self, url, kwdict):
         self.producer.check()
+        if self._native_collection_route == (url, kwdict.get("_extractor")):
+            self._native_collection_child = True
+            try:
+                return super().handle_queue(url, kwdict)
+            finally:
+                self._native_collection_child = False
         value = self._native_source_date or published(kwdict, self.extractor.category)
         if not self.producer.window.contains(value):
             return

@@ -182,6 +182,11 @@ func ExtractCapturedAlbum(raw []byte) (*CapturedAlbum, error) {
 		if err := capturedAlbumEntries(result, entities["media"], nil, false); err != nil {
 			return nil, err
 		}
+	case "instagram":
+		result, err = capturedInstagramAlbum(data, path)
+		if err != nil || result == nil {
+			return nil, err
+		}
 	default:
 		return nil, nil
 	}

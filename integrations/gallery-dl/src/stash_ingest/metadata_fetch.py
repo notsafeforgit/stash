@@ -124,6 +124,7 @@ def collect(url, settings, resume=None, *, factory=None, check=lambda: None, res
     from gallery_dl import config, extractor, util, version
     from gallery_dl.extractor.common import Extractor, Message
     from .gallery import SUPPORTED_VERSION, twitter_evidence
+    from . import instagram
 
     if version.__version__ != SUPPORTED_VERSION:
         return {"error": "runtime_changed"}
@@ -151,6 +152,8 @@ def collect(url, settings, resume=None, *, factory=None, check=lambda: None, res
             target.sleep(pause(), "extractor")
         if target.category == "twitter":
             twitter_evidence(target)
+        elif target.category == "instagram":
+            instagram.install(target)
         base = None
         for kind, media_url, original in target:
             check()

@@ -14,8 +14,8 @@ from gallery_dl import config
 
 from stash_ingest.configuration import Configuration
 from stash_ingest.encoding import InvalidData
-from stash_ingest.launcher_inputs import date_min, reddit_list, reddit_name, reddit_urls, twitter_list, twitter_target
-from stash_ingest.launchers import caller_uuid, reddit_main, twitter_main
+from stash_ingest.launcher_inputs import date_min, instagram_list, instagram_target, reddit_list, reddit_name, reddit_urls, twitter_list, twitter_target
+from stash_ingest.launchers import caller_uuid, instagram_main, reddit_main, twitter_main
 from stash_ingest.outbox import Outbox
 from stash_ingest.source_calls import SourceCalls
 from helpers import PRODUCER
@@ -76,6 +76,47 @@ class LauncherTests(unittest.TestCase):
         self.assertEqual(len(reddit_urls(users, subs, mode="top", saved=True)), 12)
         with self.assertRaises(InvalidData):
             reddit_name("me")
+
+    def test_instagram_list_preserves_explicit_extractors_and_fails_on_invalid_lines(self):
+        source = self.directory / 'instagram.conf'
+        urls = ['https://www.instagram.com/example/', 'https://www.instagram.com/p/Example/?img_index=2',
+                'https://www.instagram.com/stories/highlights/123/']
+        source.write_text('# profiles and selected posts\n@example\n' + '\n'.join(urls) + '\n')
+        self.assertEqual(instagram_list(source), (urls, []))
+        for invalid in ('..', '.', 'https://www.instagram.com/../example/', 'https://x.com/example',
+                        'https://private@www.instagram.com/example/', 'https://www.instagram.com:443/example/',
+                        'https://www.instagram.com/example/ # ignored?'):
+            with self.subTest(value=invalid), self.assertRaises(InvalidData):
+                instagram_target(invalid)
+        source.write_text(urls[0] + '\nhttps://x.com/example\n')
+        with self.assertRaisesRegex(InvalidData, 'line 2'):
+            instagram_list(source)
+
+    def test_instagram_dry_run_and_durable_request_replay_do_not_claim_source_completion(self):
+        source = self.directory / 'instagram.conf'
+        source.write_text('https://www.instagram.com/example/\n')
+        status, preview, errors = self.invoke(instagram_main, ['--config-file', str(source), '--dry-run',
+                                                              '--outbox', str(self.outbox)])
+        self.assertEqual((status, errors), (0, ''))
+        self.assertEqual(preview['targets'], ['https://www.instagram.com/example/'])
+        self.assertFalse(self.outbox.exists())
+        args = [*self.base, '--config-file', str(source), '--profile', str(self.profile)]
+        status, _, error = self.invoke(instagram_main, args)
+        self.assertEqual(status, 1)
+        self.assertIn('source category', error)
+        self.value['source_category'] = 'instagram'
+        self.profile.write_text(json.dumps(self.value))
+        status, original, errors = self.invoke(instagram_main, args)
+        self.assertEqual((status, errors), (0, ''))
+        self.assertEqual(original['state'], 'recorded')
+        source.unlink()
+        self.profile.unlink()
+        status, replay, errors = self.invoke(instagram_main, args)
+        self.assertEqual((status, replay, errors), (0, original, ''))
+        status, unfinished, _ = self.invoke(instagram_main, [*args, '--strict-errors'])
+        self.assertEqual((status, unfinished['state']), (2, 'pending'))
+        with closing(Outbox(self.outbox, 'http://fixture.invalid', PRODUCER)) as box:
+            self.assertEqual(SourceCalls(box).summary(self.call)['target_count'], 1)
 
     @unittest.skipUnless(hasattr(time, "tzset"), "host launcher timezone fixture requires tzset")
     def test_date_filters_keep_gallery_dl_boundaries_absolute_precedence_and_frozen_relative_time(self):

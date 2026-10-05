@@ -3,7 +3,7 @@
 This package implements durable delivery and a gallery-dl download adapter.
 It is development code on `v3-rewrite`; the installed host and n8n download
 helpers still use their existing catalogs. Durable caller URL snapshots now feed
-the native dispatcher. Staged Twitter/Reddit host launchers preserve saved-list,
+the native dispatcher. Staged Twitter/Reddit/Instagram host launchers preserve saved-list,
 mode and date inputs. The staged n8n adapter preserves stable execution tokens,
 historical backfill decisions and actual source completion. Recovery caller
 conversion, operational-history migration, activation of reviewed worker profiles,
@@ -377,7 +377,7 @@ must not be hidden as a credential change. Input files remain the private access
 source, so the eventual cutover must keep those references valid when retiring
 legacy settings. No credentials are printed in the conversion report.
 
-`--category twitter` removes unrelated extractor settings and unused named
+`--category twitter` and `--category instagram` remove unrelated extractor settings and unused named
 processors. Reddit can do the same when its existing whitelist limits children
 to Reddit, Imgur, Redgifs and direct links; their base and parent-specific
 settings remain. Unrecognized dependency graphs retain all configured sites.
@@ -536,23 +536,27 @@ and its backup/restore boundary; schema migration invents no past caller runs.
 
 ## Staged host launchers
 
-The package entry points `stash-ingest-twitter` and `stash-ingest-reddit`, also
-available as `bin/update-twitter-media` and `bin/update-reddit-media`, record
-source calls through this queue. Run the scripts with the installed producer's
+The package entry points `stash-ingest-twitter`, `stash-ingest-reddit` and
+`stash-ingest-instagram` record source calls through this queue. The first two
+are also available as `bin/update-twitter-media` and `bin/update-reddit-media`.
+Run the scripts with the installed producer's
 Python. They are staged replacements; the existing host scripts and n8n workflow
 commands have not switched.
 
 | Input | Retained behavior |
 |---|---|
 | Twitter `--username`, `--user-id`/`--gid` | Handles, profile URLs and numeric account IDs use the existing normalized X URLs |
+| Instagram `--username` | Handles become profile URLs; explicit post/reel/story/highlight URLs keep their path and query |
 | `--config-file` | Twitter retains first-token/comment handling and input order; Reddit sorts profile/community names before expansion |
+| Instagram `--config-file` | Preserves URL order and removes exact duplicates; blank/comment-only lines are ignored and invalid lines stop the request |
 | Reddit `--mode new\|top`, `--subreddit`, `--saved` | Retains profile/search URLs, all/year top variants, communities and explicit saved-post targets |
 | Reddit `--date-min`, `--date-min-relative`, `--date-min-days` | Freezes the first request's lower bound; the absolute option takes precedence |
 | `--full-history`, Reddit top mode | Requires the reviewed profile with global `skip=true`; retains any date minimum |
 | `--dry-run` | Prints URL/window expansion without a profile, API request or outbox creation |
 
-Saved-list defaults remain `~/.config/gallery-dl/twitter-list.conf` and
-`reddit-list.conf`, overridden by `TWITTER_LIST_CONFIG` / `REDDIT_LIST_CONFIG`.
+Saved-list defaults remain `~/.config/gallery-dl/twitter-list.conf`,
+`reddit-list.conf` and `instagram-list.conf`, overridden by `TWITTER_LIST_CONFIG`,
+`REDDIT_LIST_CONFIG` and `INSTAGRAM_LIST_CONFIG`.
 Ignored input lines are reported by line number. Empty lists and invalid date
 filters fail instead of claiming completed work. Reddit `me` is accepted only
 through the saved-post option; use Twitter's ID option for `/i/user/ID` URLs.
@@ -560,10 +564,10 @@ Raw gallery-dl flags and `--gallery-dl-bin` are replaced by the reviewed profile
 
 Set `STASH_INGEST_OUTBOX`, `STASH_INGEST_ENDPOINT`, `STASH_INGEST_PRODUCER`, and
 the Stash API token environment reference. `--profile` chooses an explicit
-profile; otherwise the launcher selects `STASH_INGEST_TWITTER_PROFILE` or
-`STASH_INGEST_REDDIT_PROFILE`. Full-history/top requests select the corresponding
-`STASH_INGEST_TWITTER_FULL_HISTORY_PROFILE` or
-`STASH_INGEST_REDDIT_FULL_HISTORY_PROFILE`. These profiles must have the matching
+profile; otherwise the launcher selects `STASH_INGEST_<SERVICE>_PROFILE`, where
+`<SERVICE>` is `TWITTER`, `REDDIT` or `INSTAGRAM`. Full-history/top requests select
+the corresponding `STASH_INGEST_<SERVICE>_FULL_HISTORY_PROFILE`.
+These profiles must have the matching
 source category. Website access remains in their local gallery-dl references.
 
 ```sh
@@ -1737,6 +1741,33 @@ An old user acceptance remains an acceptance even when it states that exhaustive
 history was unverified. Imported skips remain distinguishable from completion;
 neither kind creates native source-run coverage or successful media receipts.
 
+## Instagram downloads and source albums
+
+The pinned adapter adds `instagram_media` version 1 before gallery-dl filters
+unavailable media or reverses its output order. It contains the enclosing post ID,
+an explicit album flag and ordered media IDs/kinds; null entries retain missing
+source slots. Per-file `media_id` must match that evidence. Carousels can create a
+source gallery as files arrive; one ordinary image/reel does not become an album.
+
+Stories and highlights are containers of individual posts. The adapter preserves
+the container ID/type as evidence but keys each post by its original media ID and
+filters on that item's publication time. Finding the same story in a highlight
+therefore does not create another post. A profile's posts, photos, reels, tagged,
+stories and highlights children each apply the original run window. Container
+timestamps, download order and output numbering cannot supply post identity/order.
+
+Extra audio, previews and highlight covers must be disabled for native download
+intake. Music stickers still retain their metadata while their disabled audio
+outputs are ignored. The existing static-video choice is preserved. New captures
+share post fields and keep per-file dates, sizes, URLs and attribution in patches;
+older captures without the versioned evidence retain their original partition
+for migration, proof verification and replay.
+
+The installed `stash-ingest-instagram` command records work for a separate native
+dispatcher. An exit code of zero does not confirm that a timer has finished
+scraping. The host timer, durable outbox, dispatcher/recovery schedule and API
+registration must be converted together at reviewed cutover.
+
 ## Metadata-only extraction for enrichment
 
 `stash_ingest.metadata_fetch.fetch(url, settings, resume=None, timeout=180,
@@ -1761,11 +1792,12 @@ Other links remain unresolved references without expanding into another feed.
 
 The Python producer and Go server share post-identity fixtures for these root
 services. Bluesky uses a DID plus record key; Kemono/Coomer use mirror, service,
-account and post ID together. Instagram uses the enclosing post ID, never a
-selected image ID or story/highlight container. Linked media hosts inherit their
+account and post ID together. Instagram regular posts use the enclosing post ID,
+never a selected carousel image ID. Story downloads use each original story's
+media ID, retaining the story/highlight container separately. Linked media hosts inherit their
 enclosing post; a social account/feed parent does not replace its post. These
 adapters allow verified metadata capture/publication, while file selection and
-source-window adapters for services beyond Reddit/Twitter remain unfinished.
+source-window adapters for services beyond Reddit/Twitter/Instagram remain unfinished.
 
 Metadata projection preserves source post captions and dates rather than image
 alt text or per-file dates. Kemono/Coomer only use `published` for publication

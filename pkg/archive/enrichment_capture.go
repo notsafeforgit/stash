@@ -28,6 +28,9 @@ func CapturedMetadata(raw []byte) (models.SourcePostMetadata, error) {
 		textKeys = []string{"desc", "title"}
 	case "instagram":
 		textKeys, dateKeys = []string{"description"}, []string{"post_date"}
+		if data["type"] == "story" || data["type"] == "highlight" {
+			dateKeys = []string{"date"}
+		}
 	case "patreon":
 		dateKeys = []string{"published_at", "date"}
 	case "kemono", "coomer":

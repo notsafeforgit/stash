@@ -18,4 +18,4 @@ stash-s3-test-restore = "s3_test_restore:main"
 
 [tool.setuptools]
 package-dir = {"" = "host"}
-py-modules = ["s3_log_backup", "s3_restore_performer", "s3_restore_native", "s3_backup_audit", "s3_test_restore", "native_backup", "native_store"]
+py-modules = ["s3_log_backup", "s3_restore_performer", "s3_restore_native", "s3_backup_audit", "s3_test_restore", "native_backup", "native_store", "object_receipts"]

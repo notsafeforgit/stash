@@ -1,7 +1,8 @@
 """Host-owned S3 Standard publication of content-addressed native archives.
 
-S3 verifies the supplied SHA-256 on single-part PUT. Every reused/new object must
-also return that full-object checksum on HEAD; size or ETag alone never suffices.
+S3 verifies the supplied SHA-256 on single-part PUT. New/unknown objects must
+return that checksum on HEAD. Publication reuses prior verified upload receipts
+when a fresh LIST reports the same object identity; audits bypass those receipts.
 No credentials, cloud scheduling or cloud SDK enter the Stash application.
 """
 
@@ -11,6 +12,8 @@ import hashlib
 import io
 from pathlib import Path
 import tempfile
+
+from object_receipts import ObjectReceipts, inventory as list_objects
 
 from stash_archive.bundle import iter_artifacts, validate_manifest
 from stash_archive.filesystem_boundary import canonical_uuid
@@ -135,7 +138,7 @@ def validate_reference(reference):
 
 
 class NativeStore:
-    def __init__(self, client, bucket, prefix="", *, workers=16):
+    def __init__(self, client, bucket, prefix="", *, workers=16, receipts_path=None):
         if (not isinstance(bucket, str) or not bucket or "/" in bucket or ":" in bucket
                 or not isinstance(prefix, str) or prefix.startswith("/")
                 or any(part in (".", "..") for part in prefix.split("/"))
@@ -143,6 +146,7 @@ class NativeStore:
             raise InvalidArchive("Invalid host metadata bucket, prefix or upload concurrency")
         self.client, self.bucket = client, bucket
         self.prefix, self.workers = prefix.rstrip("/") + "/" if prefix else "", workers
+        self.receipts_path = receipts_path
 
     def head(self, key):
         try:
@@ -153,7 +157,13 @@ class NativeStore:
                 return None
             raise
 
-    def verified(self, key, sha256, size):
+    def verified(self, key, sha256, size, *, receipts=None, listed=None):
+        if receipts is not None and listed is not None:
+            full_key = self.prefix + key
+            if full_key not in listed:
+                return False
+            if receipts.matches(full_key, sha256, size, listed[full_key]):
+                return True
         head = self.head(key)
         if head is None:
             return False
@@ -162,10 +172,12 @@ class NativeStore:
                 or head.get("ChecksumType", "FULL_OBJECT") != "FULL_OBJECT"
                 or head.get("StorageClass", "STANDARD") != "STANDARD"):
             raise InvalidArchive("S3 native object lacks its exact SHA-256, size or Standard storage class")
+        if receipts is not None:
+            receipts.remember(self.prefix + key, sha256, head)
         return True
 
-    def put(self, key, body, sha256, size):
-        if self.verified(key, sha256, size):
+    def put(self, key, body, sha256, size, *, receipts=None, listed=None):
+        if self.verified(key, sha256, size, receipts=receipts, listed=listed):
             return
         try:
             self.client.put_object(Bucket=self.bucket, Key=self.prefix + key, Body=body,
@@ -174,17 +186,18 @@ class NativeStore:
         except Exception:
             # A lost reply or a competing identical immutable upload may already
             # have completed. Only independently checked durable bytes suffice.
-            if not self.verified(key, sha256, size):
+            if not self.verified(key, sha256, size, receipts=receipts):
                 raise
-        if not self.verified(key, sha256, size):
+            return
+        if not self.verified(key, sha256, size, receipts=receipts):
             raise InvalidArchive("Uploaded native object is unavailable for checksum verification")
 
-    def put_file(self, key, path, expected_sha256, expected_size):
+    def put_file(self, key, path, expected_sha256, expected_size, *, receipts=None, listed=None):
         with open_regular(path) as incoming:
             if regular(path).st_size != expected_size or hashlib.file_digest(incoming, "sha256").hexdigest() != expected_sha256:
                 raise InvalidArchive("Native publication input differs from its declared bytes")
             incoming.seek(0)
-            self.put(key, incoming, expected_sha256, expected_size)
+            self.put(key, incoming, expected_sha256, expected_size, receipts=receipts, listed=listed)
 
     def put_bytes(self, key, body):
         value = descriptor(key, body)
@@ -265,12 +278,19 @@ class NativeStore:
             "objects_prefix": PREFIX + "objects/", "manifest": descriptor(base + "manifest.json", manifest_body),
             "inventory": {"key": base + "artifacts.jsonl", "sha256": inventory["sha256"], "bytes": inventory["size"]},
             "verification": descriptor(base + "verification.json", proof_body)})
-        def upload(item):
-            name, size = item
-            self.put_file(PREFIX + "objects/" + name + ".gz", source / "objects" / (name + ".gz"), name, size)
-        with ThreadPoolExecutor(max_workers=self.workers) as pool:
-            for _ in pool.map(upload, objects.items()):
-                pass
+        receipts = ObjectReceipts(self.receipts_path, self.bucket) if self.receipts_path is not None else None
+        try:
+            listed = list_objects(self.client, self.bucket, self.prefix + PREFIX + "objects/") if receipts is not None else None
+            def upload(item):
+                name, size = item
+                self.put_file(PREFIX + "objects/" + name + ".gz", source / "objects" / (name + ".gz"), name, size,
+                              receipts=receipts, listed=listed)
+            with ThreadPoolExecutor(max_workers=self.workers) as pool:
+                for _ in pool.map(upload, objects.items()):
+                    pass
+        finally:
+            if receipts is not None:
+                receipts.close()
         self.put_file(base + "artifacts.jsonl", source / "artifacts.jsonl", inventory["sha256"], inventory["size"])
         self.put_bytes(base + "verification.json", proof_body)
         self.put_bytes(base + "manifest.json", manifest_body)

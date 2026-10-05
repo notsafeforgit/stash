@@ -263,11 +263,11 @@ class NativeBackupSession:
             raise InvalidArchive("Invalid native media path inside the dataset")
         if (Path(media["mountpoint"]) / relative).resolve(strict=True) != self.live_media:
             raise InvalidArchive("Native backup media binding differs from the existing host source")
-        self.store = NativeStore(s3_client, bucket, prefix)
         self.journal = NativeRunJournal(config["state_directory"], run_id,
                                         {"config_sha256": hashlib.sha256(body).hexdigest(), "live_media": str(self.live_media),
                                          "bucket": bucket, "prefix": prefix}, {} if options is None else options)
         saved, state = self.journal.record, self.journal.state
+        self.store = NativeStore(s3_client, bucket, prefix, receipts_path=state / "object-receipts.sqlite3")
         self.run_id, self.root, self.created_epoch = saved["run_id"], self.journal.root, saved["created_epoch"]
         self.options, self.resumed = saved["options"], self.journal.resumed
         self.archive = self.root / "archive"

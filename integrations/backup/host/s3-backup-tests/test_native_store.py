@@ -1,7 +1,9 @@
 """Native publication/restore contracts against real bundles and a fake S3."""
 
 from contextlib import closing
+import base64
 import copy
+from datetime import timedelta
 import fcntl
 import hashlib
 import io
@@ -115,6 +117,86 @@ class NativeStoreTests(unittest.TestCase):
         import_archive(downloaded, restored, reserve=0)
         self.assertEqual((restored / 'components/config/config.yml').read_bytes(), b'database: library.sqlite\n')
         self.assertEqual((restored / 'components/media_manifest/s3-media.json').read_bytes(), json_bytes(self.media))
+
+    def cached_store(self, *, bucket='metadata'):
+        return NativeStore(self.s3, bucket, 'prefix', receipts_path=self.root / 'object-receipts.sqlite3')
+
+    def object_requests(self, operation):
+        return [op for op in self.s3.operations if op[0] == operation and op[1].startswith('prefix/' + PREFIX + 'objects/')]
+
+    def test_restarted_publication_uses_receipts_and_paged_list_without_object_heads(self):
+        self.store = self.cached_store()
+        reference = self.publish()
+        self.assertGreater(len(self.object_requests('put')), 0)
+        self.s3.operations.clear()
+        self.s3.page_size = 2
+        self.store = self.cached_store()  # A new process has no in-memory proof.
+        self.assertEqual(self.publish(), reference)
+        self.assertEqual(self.object_requests('head'), [])
+        self.assertEqual(self.object_requests('put'), [])
+        self.assertGreater(len(self.object_requests('list')), 1)
+        # Reading/restoring still verifies every object without trusting LIST.
+        self.store.download(reference, self.root / 'receipt-restore', reserve=0)
+        import_archive(self.root / 'receipt-restore', self.root / 'receipt-restored', reserve=0)
+        self.assertGreater(len(self.object_requests('head')), 0)
+
+    def test_missing_cached_object_is_repaired_and_individually_verified(self):
+        self.store = self.cached_store()
+        self.publish()
+        key = self.object_requests('put')[0][1]
+        (self.cloud / key).unlink()
+        self.s3.operations.clear()
+        self.store = self.cached_store()
+        self.publish()
+        self.assertEqual(self.object_requests('put'), [('put', key)])
+        self.assertEqual(self.object_requests('head'), [('head', key)])
+
+    def test_changed_remote_identity_forces_checksum_validation_before_reuse(self):
+        self.store = self.cached_store()
+        self.publish()
+        key = self.object_requests('put')[0][1]
+        self.s3.headers[key]['LastModified'] += timedelta(seconds=1)
+        self.s3.headers[key]['ChecksumSHA256'] = 'invalid'
+        self.s3.operations.clear()
+        self.store = self.cached_store()
+        with self.assertRaises(InvalidArchive):
+            self.publish()
+        self.assertIn(('head', key), self.object_requests('head'))
+        self.assertEqual(self.object_requests('put'), [])
+
+    def test_cache_loss_or_different_bucket_rechecks_without_reuploading(self):
+        self.store = self.cached_store()
+        self.publish()
+        (self.root / 'object-receipts.sqlite3').unlink()
+        for bucket in ('metadata', 'different-bucket'):
+            with self.subTest(bucket=bucket):
+                self.s3.operations.clear()
+                self.store = self.cached_store(bucket=bucket)
+                self.publish()
+                self.assertGreater(len(self.object_requests('head')), 0)
+                self.assertEqual(self.object_requests('put'), [])
+
+    def test_denied_or_incomplete_inventory_cannot_publish_from_receipts(self):
+        self.store = self.cached_store()
+        self.publish()
+        self.s3.operations.clear()
+        self.s3.list_failure = 'AccessDenied'
+        with self.assertRaises(S3Error):
+            self.publish()
+        self.s3.list_failure = None
+        for page in ({}, {'IsTruncated': True}, {'IsTruncated': False, 'Contents': [{'Key': 'outside-scope'}]}):
+            with self.subTest(page=page), patch.object(self.s3, 'list_objects_v2', return_value=page):
+                with self.assertRaises(InvalidArchive):
+                    self.publish()
+        self.assertFalse(any(op[0] == 'put' for op in self.s3.operations))
+
+    def test_explicit_audit_never_uses_cached_checksum_evidence(self):
+        self.store = self.cached_store()
+        reference = self.publish()
+        key = self.object_requests('put')[0][1]
+        self.s3.headers[key]['ChecksumSHA256'] = 'invalid'
+        with self.assertRaises(InvalidArchive):
+            self.store.audit(reference, reserve=0)
 
     def test_missing_checksums_wrong_class_and_composite_rejected(self):
         value = self.store.put_bytes('object', b'some bytes')

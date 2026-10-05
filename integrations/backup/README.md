@@ -24,8 +24,13 @@ and checkpoint UUID. A selection digest excludes timestamps and publication
 references, avoiding a circular hash. The same selection is packed inside the
 archive with the sealed filesystem-boundary digest. Content restore, native
 binary validation and producer receipt verification precede publication. Every
-new or reused S3 metadata object requires full-object SHA-256, exact length and
-Standard storage class. ETag or size alone cannot pass. Immutable archive objects
+new or previously unverified S3 metadata object requires full-object SHA-256,
+exact length and Standard storage class. Publication records that proof in a
+private local SQLite index. Subsequent runs use a complete paginated LIST and
+reuse the proof only when the expected checksum/length and the object's ETag,
+modification time and storage class still match. LIST and ETag are change checks,
+not content hashes. Changed or unknown objects require a new checksum HEAD;
+missing immutable objects are uploaded and verified again. Immutable archive objects
 and per-run manifests precede the current JSON pointer. Remote obsolete tagging
 follows that commit; verification failures preserve the preceding generation.
 
@@ -72,6 +77,43 @@ The current-manifest update records its original S3 ETag and uses a conditional
 write. ETag is only a concurrency token; SHA-256 remains the content check. A
 retry may adopt its exact already-published bytes after a lost reply, but cannot
 replace a newer publication. Immutable per-run records remain available.
+
+## Storage and request costs
+
+The database, original record photos/logos/covers and small restore manifests
+remain in Standard; bulk media stays in Deep Archive. Unchanged encoded chunks
+share immutable keys across runs. New archives use a maximum 64 MiB raw chunk
+instead of 1 MiB, reducing requests for changing database snapshots. Readers
+continue to accept earlier 1 MiB archives and enforce each manifest's limit.
+The larger chunk is a storage/request tradeoff: an edit replaces its whole
+chunk, while reducing the number of upload requests. Retention and real daily
+change volume still need production-scale measurement before activation.
+
+`state_directory/object-receipts.sqlite3` is a rebuildable upload index, not
+required restore state. It is scoped by bucket and full object key. It contains
+only independently verified checksums and the remote identities needed for
+subsequent LIST comparisons. Entries are committed in small batches; interruption
+can require verifying a few uploads again. Missing index state triggers a new
+verification pass without reuploading matching objects. An invalid index or
+incomplete/denied inventory stops publication. The normal backup lock excludes
+cooperating writers; an inventory is not a new checksum audit or a guarantee
+against unrelated concurrent cloud mutations.
+
+Publication uses listings for unchanged archive chunks. Explicit checksum audit
+and download commands still verify remote checksums directly. At the measured
+258,014-object baseline, a daily listing takes approximately 259 requests rather
+than one HEAD per object. At the October 2026 Oregon rates that is about $0.04
+per 30 days for those listings; new uploads, unknown/changed objects, small
+manifest operations and explicit audits incur additional requests. The regression
+suite checks actual fake-transport operation counts across publisher restart.
+See [AWS request pricing](https://aws.amazon.com/s3/pricing/) and
+[LIST pagination](https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjectsV2.html).
+
+The unreleased prototype requiring enabled bucket versioning and version-read
+permissions was withdrawn. Cold-media replacement identity still needs the
+immutable-key integration before cutover; stable filename keys are not proof
+that an older backup will restore the original bytes. Do not activate this
+staged publisher until that and the remaining cutover gates are verified.
 
 ## Configuration and development
 

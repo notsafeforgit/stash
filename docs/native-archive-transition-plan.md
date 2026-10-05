@@ -712,6 +712,19 @@ current/latest manifest only when every required object and receipt boundary
 has been verified. Failed metadata backup must not publish a new successful media
 manifest or trigger obsolete-object marking.
 
+The owner's October 5 cost clarification keeps native database snapshots and
+saved record photos/covers in Standard; the measured baseline is about 38.6 GiB
+compressed. Bulk media remains in Deep Archive. Reuse immutable objects and
+existing archived media rather than copying them for migration. Normal daily
+checks must use paginated inventories and retained upload verification evidence,
+not one cloud request per unchanged object. Verify new/changed/unknown objects,
+preserve explicit checksum audits and restored-content verification, and test
+request counts across restarts. Bound snapshot retention and measure new-chunk
+upload volume so lower read-request costs do not conceal excessive PUT or storage
+costs. Routine inventory request costs should be cents per month at this scale.
+The design must not require bucket versioning solely to compensate for reusing
+mutable media filename keys; use immutable media identities and restore mappings.
+
 Measure the cost of replacing many small source databases with a larger native
 snapshot. Compress/deduplicate retained payloads and monitor backup duration and
 temporary space. Do not silently weaken backup cadence or move metadata to cold

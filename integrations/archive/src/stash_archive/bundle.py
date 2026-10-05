@@ -18,7 +18,7 @@ import time
 import uuid
 from urllib.parse import urlsplit
 
-from .storage import (CHUNK_SIZE, HEX, MAX_MANIFEST, RESERVE_BYTES, InvalidArchive,
+from .storage import (CHUNK_SIZE, LEGACY_CHUNK_SIZE, HEX, MAX_MANIFEST, RESERVE_BYTES, InvalidArchive,
                       json_bytes, load_manifest, open_regular, publish_bytes,
                       regular, require_space, store_file, sync_directory,
                       check_descriptor, decode_json, write_artifact)
@@ -257,7 +257,8 @@ def validate_manifest(manifest):
             "format", "version", "uuid", "created_at", "coverage", "chunk_size", "inventory"}:
         raise InvalidArchive("Invalid archive manifest fields")
     if (manifest["format"] != FORMAT or type(manifest["version"]) is not int
-            or manifest["version"] != VERSION or type(manifest["chunk_size"]) is not int or manifest["chunk_size"] != CHUNK_SIZE
+            or manifest["version"] != VERSION or type(manifest["chunk_size"]) is not int
+            or manifest["chunk_size"] not in (LEGACY_CHUNK_SIZE, CHUNK_SIZE)
             or manifest["coverage"] != "declared-components"):
         raise InvalidArchive("Unsupported archive format, version or coverage")
     try:
@@ -309,7 +310,7 @@ def iter_artifacts(source, manifest):
             if type(entry["size"]) is not int or entry["size"] < 0 or not isinstance(entry["sha256"], str) or not HEX.fullmatch(entry["sha256"]) or not isinstance(entry["chunks"], list):
                 raise InvalidArchive("Invalid artifact dimensions or digest")
             for chunk in entry["chunks"]:
-                check_descriptor(chunk)
+                check_descriptor(chunk, chunk_size=manifest["chunk_size"])
             if sum(chunk["size"] for chunk in entry["chunks"]) != entry["size"]:
                 raise InvalidArchive("Artifact size does not match its chunks")
             count += 1

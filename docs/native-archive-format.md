@@ -591,8 +591,12 @@ Format version 1 is a directory containing:
   Database entries also carry their native or producer identity/version metadata.
 - `objects/<sha256>.gz`: compressed chunks addressed by their encoded SHA-256.
   Each descriptor also records encoded size, uncompressed size and uncompressed
-  SHA-256. Chunks contain at most 1 MiB of raw data; deterministic gzip headers
-  allow identical chunks to share an object across artifacts and future uploads.
+  SHA-256. New archives declare a 64 MiB maximum raw chunk, reducing request
+  counts for database snapshots. Readers also accept earlier archives declaring
+  1 MiB and enforce the declared limit. Deterministic gzip headers allow identical
+  chunks to share an object across artifacts and future uploads. A small edit
+  changes its entire chunk; changing the writer's chunk size does not rewrite
+  or invalidate an existing archive.
 
 The stream inventory avoids retaining hundreds of thousands of artwork records
 in memory. SQLite snapshots retain page layout, allowing unchanged chunks to be
@@ -607,7 +611,10 @@ An archive digest detects corruption and identifies the exact archive. Trust in
 a downloaded manifest comes from the enclosing backup's verified publication
 record. The [host backup integration](../integrations/backup/README.md) now binds
 the retained native/filesystem view to a v3 media selection and verifies S3
-Standard object checksums before committing its current manifest. Credentials,
+Standard object checksums before committing its current manifest. Repeated
+publication can reuse a durable checksum receipt when a fresh paginated inventory
+reports the same remote object identity. Explicit audit and restore always check
+remote checksums; listing metadata alone cannot establish initial integrity. Credentials,
 scheduling and S3 publication belong to that host package, not this component
 transport or the Stash server. Complete production inventory and cutover proof
 remain separate gates.

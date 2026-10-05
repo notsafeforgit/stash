@@ -6,9 +6,9 @@ that plan's scope or replace its completion criteria. Development remains on
 `v3-rewrite`; merge into `develop` requires verification and the owner's success
 review. Production has not been migrated.
 
-## Current release position — 2026-10-04
+## Current release position — 2026-10-05
 
-Implementation remains in phases 1–4. The native schema, archive services and
+Implementation spans phases 1–6. The native schema, archive services and
 producer transport are substantial, and all 1,697 frozen catalog bodies have
 been imported and reconciled on isolated copies. This does not close catalog
 migration: historical policies, remaining operational families, review resolution
@@ -177,7 +177,7 @@ it does not remove source files or recovery inputs.
 | 3 Catalog importer and full-copy reconciliation | Permanent backfill decisions, retained scan journals/reviewed recovery activation, performer UUIDs and saved ownership, and account/catalog registry imports are implemented and rehearsed against full copies. All 1,697 frozen catalog bodies have bounded snapshot receipt and native mappings for posts/profiles/captures, account/post relationships, captured publishers, attachment lists, assets/files/appearances, collection memberships, retained documents and translation results. Historical album backfill is resumable and rehearsed. Original evidence, replay receipts and unresolved conflicts are retained. Shared native translation request/cache/target storage, bounded execution, provider workers and application inspection/control are implemented. Automation snapshot preparation preserves all ten operational families and has passed full-source reconciliation. Resumable native receipt, translation request/cache/target mapping and reviewed activation are implemented. The saved-plan bulk client has activated 324,169 imported holds in a full-copy rehearsal with lost-response recovery and independent reconciliation. Automatic capture scheduling now records revisioned collection-policy decisions with its requests and targets in the capture transaction. Native enrichment targets preserve revisioned scheduling choices and exact capture-completion evidence, with application inspection/control. Internal execution binds jobs to exact source/target revisions, authenticates each attempt producer and retains compact checkpoints with original observation provenance. Verified publication now uses native capture, publisher, album and translation services and commits record associations with target/job completion. Completed staging is verified and released atomically, retaining native captures, acknowledgement/provenance rows and unresolved references. Scoped enrichment routes and the Python transport/lease client now expose those services, with controlled failure replay, bounded checkpoint transfer and exact source-number preservation. Selected-job execution now journals stable claims, returned checkpoints and pending delivery intents in producer outbox schema 8; reviewed metadata-only profiles and delivery-only recovery are implemented. Collection-scoped dispatch now discovers admitted retries before new targets, with durable producer cursors/backoff and pagination past incompatible URLs. Native server maintenance recovers expired attempts and cancels stale work without discarding checkpoints. Native shared service reservations and cooldowns now coordinate downloads with enrichment, including fenced reservations before contacting newly discovered child services. Download-side linked-service reservations, typed failures, bounded download preference and cooperative source turns are implemented. Persistent worker/profile rotation and automatic collection discovery are also implemented. Historical catalog enrichment receipts now have resumable native import and application inspection, preserving the old assertion without creating native attempts. Frozen legacy enrichment jobs, cooldowns and seed/source progress now have bounded native mapping with held work, scoped historical completion, explicit review and retained exclusions. Reviewed legacy enrichment activation is implemented, including explicit collection-revision handoffs. Retained staged results now have conversion, evidence acceptance and exact handoff review; scoped native admission, worker resume, child service scheduling, publication and released proofs preserve original observations separately from fresh child captures. Frozen discovery listings, pending targets, candidate associations and maintenance history now have bounded native mapping and inspection, with original cursors and retry delays retained. Immutable account listings and producer-owned page jobs have scoped worker HTTP support and shared pacing. Reviewed discovery activation, durable producer delivery/dispatch, native candidate comparison and current coverage inspection are implemented and rehearsed. Complete, unique strong matches now have atomic native publication, verified on the populated archive, and bounded automatic server dispatch. Reviewed recovery of missing-history listings is implemented and rehearsed on the populated archive, preserving earlier cursors, bindings and evidence. Original-evidence detail comparison, native capture preparation, read-only application previews, candidate-bound detail jobs, authenticated checkpoint/result retention and scoped worker HTTP are implemented. Python detail delivery/dispatch and scoped collection discovery are implemented. Authenticated detail results now publish through shared native services, with full-copy reconciliation, restart inspection and the full validation gate passed. Automatic candidate-detail admission now uses selected worker profiles and bounded indexed inspection, with durable producer cursors and transactional review guards. Actual discovery source coverage, verified staging release, explicit post consolidation, additional download adapters, existing policy migration, remaining historical/operational conversion, validated source routing, review resolution, global reconciliation and cutover import remain unfinished. |
 | 4 Native UI and client conversion | In progress: scene/image metadata review is available through desktop tabs and mobile sections, with explicit relationship choices and browser request recovery. Account ownership review has native controls, desktop/mobile navigation, bounded discovery, explicit performer choice, selected-account refresh and saved-request recovery. Account consolidation review supports same-service selection, ownership conflict resolution, stable-ID acknowledgement, retained history and exact recovery. Broader source/account/collection management and remaining caller conversion are unfinished. |
 | 5 Compatibility removal and packaging | Preview packaging is isolated. V3 is the sole embedded UI; native plugin manifests, playback, bulk edits and entity queries have replaced their former runtime contracts. Group aliases are removed in the current increment. Remaining API, configuration and export/import bridges still require conversion/removal. |
-| 6 Backup and cutover rehearsal | Not yet implemented |
+| 6 Backup and cutover rehearsal | In progress: full-library portable export/restore and reconciliation passed; native/producer/filesystem checkpoints, host publication, interrupted-run recovery and scoped cleanup are implemented. Standard-storage publication now reuses checksum receipts with paginated inventories and larger database chunks to reduce requests. Complete worker/config inventory, immutable cold-media identities, retention/cost measurements, full capture pause/WAL measurements and relocated restore/cutover review remain. |
 | 7 Production cutover | Not started; compatible production continues |
 | 8 Retirement and acceptance | Not started |
 
@@ -8107,3 +8107,60 @@ No live provider/S3 mutation or installed-script/service change was performed.
 Complete worker/config inventory, cold-media generation reconciliation,
 production-sized capture measurements and relocated restore/cutover review
 remain required by the transition plan.
+
+## Backup storage policy and request reduction — 2026-10-05
+
+The owner's cost clarification keeps native database snapshots and saved record
+photos/logos/covers in S3 Standard, with bulk media in Deep Archive. The retained
+full-library rehearsal has 5,257,301,389 compressed database bytes and
+36,211,164,884 compressed original-image bytes: about 38.6 GiB total. At the
+verified Oregon first-tier Standard rate, the one-baseline storage estimate is
+about $0.89/month before requests, retained changes or other components. These
+are measurements and estimates, not deployed usage or a billing report.
+
+Native publication now maintains private, bucket/key-scoped full-checksum
+receipts in `state_directory/object-receipts.sqlite3`. A fresh complete LIST can
+reuse a receipt only when the expected content digest/size and remote ETag,
+modification time and storage class agree. New or unknown objects still require
+full SHA-256 HEAD verification. A missing immutable object is uploaded and
+verified again. Denied/incomplete inventories and mismatched checksums fail
+publication. Receipt loss causes re-verification without unnecessary upload.
+Receipts are rebuildable; they are not required for restore. Explicit audit and
+download ignore cached evidence and retain full verification.
+
+The portable writer now uses 64 MiB maximum raw chunks, reducing the measured
+20,265,979,904-byte library from 19,328 potential 1 MiB chunk uploads to 302
+64 MiB chunks. Actual changed-chunk volume still needs measurement. Larger
+chunks trade increased bytes per small edit for fewer requests; retained-history
+limits remain required. Existing 1 MiB archives stay readable and keep their
+own enforced chunk limit. No existing archive was repacked or cloud object moved.
+
+Verification:
+
+- `native_request_cost_host_corrected`: 147 host tests pass in 47.8 seconds.
+  A persisted/reopened index lets 1,003 unchanged objects use exactly two LIST
+  requests and no HEAD or PUT. Real bundle publication/reopen/restore fixtures
+  cover missing objects, changed remote identities, cache loss, bucket isolation,
+  failed/truncated inventories, and explicit audits bypassing the cache.
+- `native_request_cost_archive_corrected`: 108 archive tests pass in 36.2 seconds,
+  including legacy archive restore, declared chunk limits and a 64 MiB boundary.
+- `native_request_cost_http`: the real Go HTTP/Python portable-export,
+  release/abandonment fixture passes in 7.0 seconds.
+- `native_request_cost_package`: isolated package installation passes in 4.6
+  seconds; all five installed host entry points load. The retained full-size
+  archive's inventory still validates with its original 238,575 artifacts and
+  258,014 objects. This inspection is not a repeated full content restore.
+- The initial checks found a function/local-name collision in the new inventory
+  path and two old tests assuming multi-chunk small fixtures. The implementation
+  and fixtures were corrected before the passing checks above.
+
+The uncommitted cold-media version-ID prototype was withdrawn after the owner's
+clarification. It is not a released backup format and has not changed IAM,
+versioning, storage classes or remote objects. Its small source diff is retained
+locally as design/test reference. Cold-media checksum identity and immutable-key
+replacement still need integration, including existing-key reuse, restore path
+mapping, and cleanup protections. No stable filename/size manifest is being
+claimed as complete historical-content proof. Installed scripts, production
+services and schedules remain unchanged. Parent `c5d781ee0` has successful Build,
+lint and GHCR workflows. All wider migration/UI/caller, restore, cutover and
+retirement gates remain in the full transition plan.

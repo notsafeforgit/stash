@@ -1,8 +1,10 @@
 """Strict local single-part S3 transport; no network or SDK credentials."""
 
 import base64
+from datetime import datetime, timedelta, timezone
 import hashlib
 import io
+
 
 
 class S3Error(RuntimeError):
@@ -20,6 +22,24 @@ class FakeS3:
         self.lost_reply = set()
         self.head_failure = None
         self.corrupt_read = False
+        self.list_failure = None
+        self.page_size = 1000
+
+    def list_objects_v2(self, *, Bucket, Prefix, MaxKeys, ContinuationToken=None):
+        self.operations.append(("list", Prefix))
+        if self.list_failure:
+            raise S3Error(self.list_failure)
+        keys = sorted(key for key in self.headers if key.startswith(Prefix) and (self.root / key).is_file())
+        start = int(ContinuationToken or 0)
+        selected = keys[start:start + min(MaxKeys, self.page_size)]
+        end = start + len(selected)
+        result = {"IsTruncated": end < len(keys), "Contents": [
+            {"Key": key, "Size": self.headers[key]["ContentLength"],
+             "ETag": self.headers[key]["ETag"], "LastModified": self.headers[key]["LastModified"],
+             "StorageClass": self.headers[key]["StorageClass"]} for key in selected]}
+        if result["IsTruncated"]:
+            result["NextContinuationToken"] = str(end)
+        return result
 
     def head_object(self, *, Bucket, Key, ChecksumMode):
         assert ChecksumMode == "ENABLED"
@@ -46,6 +66,7 @@ class FakeS3:
         path.write_bytes(body)
         self.headers[Key] = {"ContentLength": len(body), "ChecksumSHA256": ChecksumSHA256,
                              "ChecksumType": "FULL_OBJECT", "StorageClass": StorageClass,
+                             "LastModified": datetime(2026, 10, 5, tzinfo=timezone.utc) + timedelta(seconds=len(self.operations)),
                              "ETag": '"' + hashlib.md5(body, usedforsecurity=False).hexdigest() + '"'}
         if Key in self.lost_reply:
             raise OSError("lost upload reply")

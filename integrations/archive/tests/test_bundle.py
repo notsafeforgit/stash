@@ -11,8 +11,8 @@ from unittest.mock import patch
 from stash_archive.bundle import (FORMAT, export_archive, import_archive, summary,
                                   iter_artifacts, validate_manifest, verify_archive)
 from stash_archive.cli import list_records, main
-from stash_archive.storage import (CHUNK_SIZE, InvalidArchive, json_bytes,
-                                   read_chunk, store_file)
+from stash_archive.storage import (CHUNK_SIZE, LEGACY_CHUNK_SIZE, InvalidArchive, json_bytes,
+                                   read_chunk, store_file, write_artifact)
 
 
 class ArchiveTests(unittest.TestCase):
@@ -67,10 +67,15 @@ class ArchiveTests(unittest.TestCase):
         self.config.write_bytes(b"database: native.sqlite\nprivate_setting: exact original bytes\n")
         self.output = self.root / "export"
 
-    def export(self, output=None):
-        return export_archive(self.database, output or self.output, blob_paths=[self.blobs], reserve=0,
-                              components=[{"role": "producer_outbox", "name": "worker.sqlite", "path": self.outbox},
-                                          {"role": "config", "name": "config.yml", "path": self.config}])
+    def export(self, output=None, *, legacy=False):
+        with contextlib.ExitStack() as stack:
+            if legacy:
+                stack.enter_context(patch('stash_archive.bundle.CHUNK_SIZE', LEGACY_CHUNK_SIZE))
+                stack.enter_context(patch('stash_archive.bundle.store_file',
+                                          side_effect=lambda *a, **k: store_file(*a, **k, chunk_size=LEGACY_CHUNK_SIZE)))
+            return export_archive(self.database, output or self.output, blob_paths=[self.blobs], reserve=0,
+                                  components=[{"role": "producer_outbox", "name": "worker.sqlite", "path": self.outbox},
+                                              {"role": "config", "name": "config.yml", "path": self.config}])
 
     def rewrite_inventory(self, manifest, entries):
         changed = dict(manifest)
@@ -110,8 +115,32 @@ class ArchiveTests(unittest.TestCase):
         a = next(e for e in iter_artifacts(self.output, first) if e["role"] == "library")
         b = next(e for e in iter_artifacts(self.root / "second", second) if e["role"] == "library")
         self.assertEqual(a, b)
-        self.assertGreater(len(a["chunks"]), 1)
+        self.assertEqual(first['chunk_size'], 64 << 20)
+        self.assertGreater(a['size'], LEGACY_CHUNK_SIZE)
+        self.assertEqual(len(a["chunks"]), 1)
         self.assertLess(summary(self.output)["compressed_bytes"], summary(self.output)["uncompressed_bytes"])
+
+    def test_legacy_small_chunk_archives_still_restore_and_enforce_their_limit(self):
+        manifest = self.export(legacy=True)
+        self.assertEqual(manifest['chunk_size'], LEGACY_CHUNK_SIZE)
+        entries = list(iter_artifacts(self.output, manifest))
+        self.assertGreater(len(entries[0]['chunks']), 1)
+        import_archive(self.output, self.root / 'legacy-restored', reserve=0)
+        entries[0]['chunks'][0]['size'] = LEGACY_CHUNK_SIZE + 1
+        changed = self.rewrite_inventory(manifest, entries)
+        with self.assertRaisesRegex(InvalidArchive, 'chunk size'):
+            list(iter_artifacts(self.output, changed))
+
+    def test_large_chunks_have_bounded_sizes_and_restore_across_boundary(self):
+        source = self.root / 'large component'
+        with source.open('wb') as output:
+            output.truncate(CHUNK_SIZE + 1)
+        self.output.mkdir()
+        (self.output / 'objects').mkdir()
+        artifact = store_file(self.output, source, reserve=0)
+        self.assertEqual([c['size'] for c in artifact['chunks']], [CHUNK_SIZE, 1])
+        write_artifact(self.output, artifact)
+        self.assertEqual(store_file(self.output, source, reserve=0), artifact)
 
     def test_corruption_missing_objects_and_decompression_limits_fail_closed(self):
         manifest = self.export()
@@ -203,7 +232,7 @@ class ArchiveTests(unittest.TestCase):
             self.assertFalse(destination.exists())
 
     def test_chunk_order_and_database_identity_are_verified(self):
-        manifest = self.export()
+        manifest = self.export(legacy=True)
         entries = list(iter_artifacts(self.output, manifest))
         changed = json.loads(json_bytes(entries))
         library = next(e for e in changed if e["role"] == "library")

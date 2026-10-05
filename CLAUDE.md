@@ -115,6 +115,15 @@ manifests through host-owned S3 clients, require exact full-object checksums,
 and support native download/audit plus historical media restore inputs. Their
 isolated runtime (`make pre-backup`) and regression gate (`make validate-backup`)
 are separate from the server. Installed scripts and scheduling remain unchanged.
+Native archive publication reuses full-checksum receipts from a private,
+rebuildable `object-receipts.sqlite3` index after a complete paginated inventory
+confirms unchanged object identity. New/unknown/changed objects still require
+checksum verification; explicit audits and downloads bypass cached evidence.
+Use 64 MiB raw chunks for new portable exports while retaining 1 MiB input support.
+Keep database/record images in Standard and bulk media in Deep Archive, with
+bounded retention and request-count tests. Cold media still needs immutable-key
+replacement handling before activation; do not require bucket versioning to
+compensate for reusing mutable filename keys.
 The host now journals one active attempt and resumes its original sealed view,
 media selection or published cleanup after restart. Owned scratch is reclaimed
 only under backup exclusion, which upload/validator children inherit. The S3

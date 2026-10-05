@@ -12,7 +12,8 @@ import stat
 import tempfile
 import zlib
 
-CHUNK_SIZE = 1 << 20
+LEGACY_CHUNK_SIZE = 1 << 20
+CHUNK_SIZE = 64 << 20
 MAX_MANIFEST = 128 << 20
 RESERVE_BYTES = 50 << 30
 HEX = re.compile(r"[0-9a-f]{64}\Z")
@@ -86,7 +87,9 @@ def object_path(root, checksum):
     return path / (checksum + ".gz")
 
 
-def store_file(root, source, *, reserve=RESERVE_BYTES, expected_md5=None):
+def store_file(root, source, *, reserve=RESERVE_BYTES, expected_md5=None, chunk_size=CHUNK_SIZE):
+    if type(chunk_size) is not int or chunk_size not in (LEGACY_CHUNK_SIZE, CHUNK_SIZE):
+        raise InvalidArchive("Unsupported archive chunk size")
     if expected_md5 is not None and (not isinstance(expected_md5, str) or not re.fullmatch(r"[0-9a-f]{32}", expected_md5)):
         raise InvalidArchive("Invalid retained artwork checksum")
     before = regular(source)
@@ -96,7 +99,7 @@ def store_file(root, source, *, reserve=RESERVE_BYTES, expected_md5=None):
         opened = os.fstat(incoming.fileno())
         if (before.st_dev, before.st_ino) != (opened.st_dev, opened.st_ino):
             raise InvalidArchive("Archive input changed before opening")
-        while raw := incoming.read(CHUNK_SIZE):
+        while raw := incoming.read(chunk_size):
             digest.update(raw)
             if artwork_digest is not None:
                 artwork_digest.update(raw)
@@ -131,14 +134,14 @@ def store_file(root, source, *, reserve=RESERVE_BYTES, expected_md5=None):
     return {"sha256": digest.hexdigest(), "size": size, "chunks": chunks}
 
 
-def check_descriptor(value):
+def check_descriptor(value, *, chunk_size=CHUNK_SIZE):
     if not isinstance(value, dict) or set(value) != {"sha256", "encoded_size", "size", "raw_sha256"}:
         raise InvalidArchive("Invalid chunk descriptor")
     if any(not isinstance(value[k], str) or not HEX.fullmatch(value[k]) for k in ("sha256", "raw_sha256")):
         raise InvalidArchive("Invalid chunk digest")
-    if type(value["size"]) is not int or not 0 < value["size"] <= CHUNK_SIZE:
+    if type(value["size"]) is not int or not 0 < value["size"] <= chunk_size:
         raise InvalidArchive("Invalid uncompressed chunk size")
-    if type(value["encoded_size"]) is not int or not 0 < value["encoded_size"] <= CHUNK_SIZE + 65536:
+    if type(value["encoded_size"]) is not int or not 0 < value["encoded_size"] <= chunk_size + 65536:
         raise InvalidArchive("Invalid compressed chunk size")
 
 

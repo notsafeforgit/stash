@@ -1,6 +1,8 @@
 import { MetadataReviewFixture } from "./metadata-review";
 import { AccountReviewFixture } from "./account-review";
 import { CollectionsFixture } from "./collections";
+import { MediaRootsFixture } from "./media-roots";
+import { mediaRootSearchSchema } from "@/core/native-archive/media-root-api";
 import { collectionSearchSchema } from "@/core/native-archive/collection-api";
 import {
   accountFilterSchema,
@@ -391,6 +393,12 @@ const router = createRouter({
         account: accountUUIDSchema.optional(),
       }),
       component: AccountReviewFixture,
+    }),
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/media-roots",
+      validateSearch: mediaRootSearchSchema,
+      component: MediaRootsFixture,
     }),
     createRoute({
       getParentRoute: () => rootRoute,

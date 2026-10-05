@@ -111,7 +111,7 @@ const historySchema = collectionSchema.extend({
   reason: z.string(),
   recorded_at: z.string(),
 });
-const rootSchema = z.object({
+export const mediaRootSchema = z.object({
   uuid,
   label: z.string(),
   state: definitionStateSchema,
@@ -124,7 +124,7 @@ const rootSchema = z.object({
 export type Collection = z.infer<typeof collectionSchema>;
 export type CollectionInput = z.infer<typeof collectionInputSchema>;
 export type CollectionFilter = z.infer<typeof collectionFilterSchema>;
-export type MediaRoot = z.infer<typeof rootSchema>;
+export type MediaRoot = z.infer<typeof mediaRootSchema>;
 export type CollectionRevision = z.infer<typeof historySchema>;
 
 export function sameCollectionDefinition(
@@ -234,14 +234,14 @@ export function createCollectionAPI(
     roots: (q: string, signal?: AbortSignal) =>
       request(
         `media-roots?${query({ q, state: "active", kind: "" })}`,
-        z.array(rootSchema).max(pageLimit),
+        z.array(mediaRootSchema).max(pageLimit),
         undefined,
         signal,
       ),
     async root(id: string, signal?: AbortSignal) {
       const root = await request(
         `media-roots/${uuid.parse(id)}`,
-        rootSchema,
+        mediaRootSchema,
         undefined,
         signal,
       );

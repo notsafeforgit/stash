@@ -1291,7 +1291,9 @@ other native administration. JSON uses snake_case keys.
 | Method and path | Contract |
 | --- | --- |
 | `GET /media-roots?after=<uuid>` | Up to 50 logical roots and their reviewed local bindings |
-| `POST /media-roots`, `PUT /media-roots/<uuid>` | Complete definition: `expected_revision` (zero on create), `label`, `state`, `server_path` (null unbinds), `reason`; the server probes and records directory identity |
+| `POST /media-roots/probe` | Read-only check of `server_path`; returns canonical `path` and `directory_identity` without creating a root |
+| `POST /media-roots`, `PUT /media-roots/<uuid>` | Complete definition: `expected_revision` (zero on create), `label`, `state`, checked `binding: {path, directory_identity}` (null unbinds), `reason`; new bindings/reactivation reverify the directory. Optional body `uuid` must match the PUT path |
+| `GET /media-roots/<uuid>/history?after=<revision>` | Immutable definitions and bindings, default 25, bounded `limit` from 1 to 100 |
 | `GET /collections?after=<uuid>` | Up to 50 current source collections |
 | `POST /collections`, `PUT /collections/<uuid>` | Complete definition: `expected_revision`, `label`, `kind`, `namespace`, `state`, `target_url`, nullable `account_uuid` and `root_uuid`, `path_prefix`, `reason`; path prefix is `.` for the whole root |
 | `GET /metadata-fields/scene`, `/image`, `/gallery` | Native field names, value types, clear values and relationship kinds; intake policies currently target scenes/images |

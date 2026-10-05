@@ -41,7 +41,11 @@ func TestNativeMetadataHTTPPreviewApplyAndSchema(t *testing.T) {
 		return w
 	}
 	dir := t.TempDir()
-	w := request(http.MethodPost, "/media-roots", map[string]interface{}{"label": "Manual", "state": "active", "server_path": dir})
+	w := request(http.MethodPost, "/media-roots/probe", map[string]interface{}{"server_path": dir})
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var binding models.MediaRootBinding
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &binding))
+	w = request(http.MethodPost, "/media-roots", map[string]interface{}{"label": "Manual", "state": "active", "binding": binding})
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	var root models.MediaRoot
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &root))

@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountReviewRouteImport } from './routes/account-review'
 import { Route as CollectionsRouteImport } from './routes/collections'
 import { Route as ImageDuplicateCheckerRouteImport } from './routes/image-duplicate-checker'
+import { Route as MediaRootsRouteImport } from './routes/media-roots'
 import { Route as SceneDuplicateCheckerRouteImport } from './routes/scene-duplicate-checker'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as StatsRouteImport } from './routes/stats'
@@ -69,6 +70,11 @@ const CollectionsRoute = CollectionsRouteImport.update({
 const ImageDuplicateCheckerRoute = ImageDuplicateCheckerRouteImport.update({
   id: '/image-duplicate-checker',
   path: '/image-duplicate-checker',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MediaRootsRoute = MediaRootsRouteImport.update({
+  id: '/media-roots',
+  path: '/media-roots',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SceneDuplicateCheckerRoute = SceneDuplicateCheckerRouteImport.update({
@@ -263,6 +269,7 @@ export interface FileRoutesByFullPath {
   '/account-review': typeof AccountReviewRoute
   '/collections': typeof CollectionsRoute
   '/image-duplicate-checker': typeof ImageDuplicateCheckerRoute
+  '/media-roots': typeof MediaRootsRoute
   '/scene-duplicate-checker': typeof SceneDuplicateCheckerRoute
   '/settings': typeof SettingsRouteWithChildren
   '/stats': typeof StatsRoute
@@ -306,6 +313,7 @@ export interface FileRoutesByTo {
   '/account-review': typeof AccountReviewRoute
   '/collections': typeof CollectionsRoute
   '/image-duplicate-checker': typeof ImageDuplicateCheckerRoute
+  '/media-roots': typeof MediaRootsRoute
   '/scene-duplicate-checker': typeof SceneDuplicateCheckerRoute
   '/stats': typeof StatsRoute
   '/test': typeof TestRoute
@@ -349,6 +357,7 @@ export interface FileRoutesById {
   '/account-review': typeof AccountReviewRoute
   '/collections': typeof CollectionsRoute
   '/image-duplicate-checker': typeof ImageDuplicateCheckerRoute
+  '/media-roots': typeof MediaRootsRoute
   '/scene-duplicate-checker': typeof SceneDuplicateCheckerRoute
   '/settings': typeof SettingsRouteWithChildren
   '/stats': typeof StatsRoute
@@ -394,6 +403,7 @@ export interface FileRouteTypes {
     | '/account-review'
     | '/collections'
     | '/image-duplicate-checker'
+    | '/media-roots'
     | '/scene-duplicate-checker'
     | '/settings'
     | '/stats'
@@ -437,6 +447,7 @@ export interface FileRouteTypes {
     | '/account-review'
     | '/collections'
     | '/image-duplicate-checker'
+    | '/media-roots'
     | '/scene-duplicate-checker'
     | '/stats'
     | '/test'
@@ -479,6 +490,7 @@ export interface FileRouteTypes {
     | '/account-review'
     | '/collections'
     | '/image-duplicate-checker'
+    | '/media-roots'
     | '/scene-duplicate-checker'
     | '/settings'
     | '/stats'
@@ -523,6 +535,7 @@ export interface RootRouteChildren {
   AccountReviewRoute: typeof AccountReviewRoute
   CollectionsRoute: typeof CollectionsRoute
   ImageDuplicateCheckerRoute: typeof ImageDuplicateCheckerRoute
+  MediaRootsRoute: typeof MediaRootsRoute
   SceneDuplicateCheckerRoute: typeof SceneDuplicateCheckerRoute
   SettingsRoute: typeof SettingsRouteWithChildren
   StatsRoute: typeof StatsRoute
@@ -575,6 +588,13 @@ declare module '@tanstack/react-router' {
       path: '/image-duplicate-checker'
       fullPath: '/image-duplicate-checker'
       preLoaderRoute: typeof ImageDuplicateCheckerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/media-roots': {
+      id: '/media-roots'
+      path: '/media-roots'
+      fullPath: '/media-roots'
+      preLoaderRoute: typeof MediaRootsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/scene-duplicate-checker': {
@@ -884,6 +904,7 @@ const rootRouteChildren: RootRouteChildren = {
   AccountReviewRoute: AccountReviewRoute,
   CollectionsRoute: CollectionsRoute,
   ImageDuplicateCheckerRoute: ImageDuplicateCheckerRoute,
+  MediaRootsRoute: MediaRootsRoute,
   SceneDuplicateCheckerRoute: SceneDuplicateCheckerRoute,
   SettingsRoute: SettingsRouteWithChildren,
   StatsRoute: StatsRoute,

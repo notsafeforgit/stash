@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+	"path/filepath"
 	"reflect"
 
 	"github.com/google/uuid"
@@ -68,10 +70,10 @@ func sourceDefinitionPage(after string, limit int) (string, int, error) {
 func (s *MediaRootStore) Put(ctx context.Context, input models.MediaRootInput) (*models.MediaRoot, error) {
 	id, err := sourceDefinitionID(input.UUID, input.ExpectedRevision)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %v", models.ErrSourceDefinitionInvalid, err)
 	}
 	if !sourceDefinitionText(input.Label, input.State, input.Reason) || (input.Origin != "review" && input.Origin != "migration") {
-		return nil, errors.New("invalid media root definition")
+		return nil, models.ErrSourceDefinitionInvalid
 	}
 	current, err := s.Find(ctx, id)
 	if err != nil {
@@ -83,12 +85,12 @@ func (s *MediaRootStore) Put(ctx context.Context, input models.MediaRootInput) (
 	// Labels and disabling an offline mount do not need that mount online.
 	// A new binding or reactivation always rechecks the actual open directory.
 	if input.Binding != nil {
-		if !validAccountText(input.Binding.DirectoryIdentity, 128, false) {
-			return nil, errors.New("invalid directory identity")
+		if !validAccountText(input.Binding.DirectoryIdentity, 128, false) || !validAccountText(input.Binding.Path, 4096, false) || !filepath.IsAbs(input.Binding.Path) || filepath.Clean(input.Binding.Path) != input.Binding.Path {
+			return nil, models.ErrMediaRootBindingInvalid
 		}
 		if current == nil || !reflect.DeepEqual(input.Binding, current.Binding) || (current.State != "active" && input.State == "active") {
 			if err := archive.VerifyMediaRootBinding(*input.Binding); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("%w: %v", models.ErrMediaRootBindingInvalid, err)
 			}
 		}
 	}

@@ -23,8 +23,43 @@ Retiring a collection is permanent and preserves its definition history. Merely
 creating a collection does not schedule downloads or assign performer metadata.
 Worker activation and metadata policy remain separate operations. Existing
 collections now expose **Edit metadata rules**, including fixed performer
-selection for folder scans. Root creation, mount review and historical policy
-import remain unfinished; this page does not imply their completion.
+selection for folder scans. **Media roots** provides folder registration and
+binding review. Historical policy import and live worker activation remain
+unfinished.
+
+## Media roots and server folders
+
+Open **Media roots** from the desktop utility menu or mobile navigation drawer.
+A root has a stable UUID and a name; its optional local binding records an
+existing directory on the Stash server. Collections retain this UUID and their
+relative folders, so a root can be restored or relocated without changing their
+portable paths. Search root names and current server paths, filter by state,
+and inspect one root at a time. Lists and history use pages of 25.
+
+To bind a new folder, enable **Associate a folder on this server**, enter its
+absolute path as seen by Stash (including container mounts), then choose
+**Check folder**. The check returns the canonical path and opened directory's
+identity. It creates no database record or folder. Save records that exact
+binding and verifies that the directory has not changed since the check.
+Editing the path clears the check. Saving never moves files, starts scans,
+rewrites existing scene/image file paths or grants a worker access.
+
+An unbound root preserves its identity and collection paths but cannot accept
+file ingestion. Disabling a root preserves its binding; reactivation verifies
+the directory again. Labels can be changed and roots disabled while their
+unchanged folder is offline. Retirement is permanent and preserves history.
+Neither disabling nor retiring deletes media or collections. Restoring a root's
+binding is only one part of deployment relocation; file-path reconciliation and
+worker configuration still need to agree with the restored filesystem.
+
+Root saves use their own durable browser journal and caller UUID. Recovery
+checks the original immutable revision before retrying the exact binding,
+including after a later relocation or mount loss. It never silently checks and
+accepts a replacement directory. Rejected changes require **Review current
+root**, which reloads the saved definition so a replacement folder can be
+checked again. A successful save remains confirmed if refreshing the view fails.
+Expand **Media root history** to see prior names, states, paths and reasons;
+technical directory identities are separately expandable.
 
 ## Metadata rules and direct file imports
 
@@ -116,6 +151,9 @@ administration. Responses use `Cache-Control: no-store`.
 | `GET /collections/{uuid}/history` | Immutable definitions including reason/origin; integer revision `after` and `limit` |
 | `GET /media-roots` | Current root bindings; optional `q`, `state`, UUID `after`, and `limit` |
 | `GET /media-roots/{uuid}` | One root, including its local binding |
+| `POST /media-roots/probe` | Read-only directory check from `server_path`; returns canonical `path` and `directory_identity` |
+| `PUT /media-roots/{uuid}` | Create/edit a root with `expected_revision`, `label`, `state`, nullable checked `binding` and `reason`; optional body `uuid` must match the path |
+| `GET /media-roots/{uuid}/history` | Immutable root definitions including bindings, reason/origin and time; integer revision `after` and bounded `limit` |
 | `GET /collections/{uuid}/metadata-policy` | Current saved policy or null |
 | `PUT /collections/{uuid}/metadata-policy` | Save a definition against expected collection and policy revisions |
 | `GET /collections/{uuid}/metadata-policy/history` | Immutable policy revisions; integer `after` and bounded `limit` |
@@ -132,6 +170,14 @@ library rows are read. Existing target-history lookup APIs retain their own
 semantics. Unknown roots, mismatched account namespaces, invalid definitions and
 invalid filters return a correctable client error without leaving a partial
 collection identity.
+
+Root writes accept the exact `binding: {path, directory_identity}` returned by
+the probe, or null to unbind. The earlier write-only `server_path` input is
+rejected. New bindings and reactivation verify the actual directory before
+creating a revision. Invalid folders return HTTP 400 `invalid_root_binding` with
+a diagnostic; competing revisions and edits to retired roots return HTTP 409.
+Anonymous `POST /media-roots` remains available, but browser creation uses a
+caller UUID with PUT for safe recovery. A no-op save creates no history row.
 
 Policy history defaults to 50 results and samples to 25, with explicit API limits
 of 1–100. The application uses 25. Sample queries begin with the chosen entity's

@@ -32,7 +32,11 @@ func TestNativeCollectionManagement(t *testing.T) {
 		return w
 	}
 	rootID := "10000000-0000-4000-8000-000000000001"
-	w := request(http.MethodPut, "/media-roots/"+rootID, map[string]interface{}{"label": "Archive %_", "state": "active", "server_path": t.TempDir()})
+	w := request(http.MethodPost, "/media-roots/probe", map[string]interface{}{"server_path": t.TempDir()})
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var binding models.MediaRootBinding
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &binding))
+	w = request(http.MethodPut, "/media-roots/"+rootID, map[string]interface{}{"label": "Archive %_", "state": "active", "binding": binding})
 	require.Equal(t, 200, w.Code, w.Body.String())
 	var root models.MediaRoot
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &root))

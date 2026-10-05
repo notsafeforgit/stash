@@ -248,22 +248,8 @@ def release_published_artwork(source, client, pins):
     cleanup to the server's permanent release receipt. No S3 access happens here.
     Keep small receipts; remove inventories only after durable cleanup completion.
     """
-    import io
-    from .bundle import iter_artifacts
-    from .checkpoint_release import archive_binding, release_published_checkpoint
-    from .filesystem_boundary import MAX_RECORD as BOUNDARY_LIMIT, validate_record
-    from .storage import load_manifest, write_artifact
-
-    checkpoint, _ = archive_binding(source, client)
-    boundary_entry = None
-    for entry in iter_artifacts(source, load_manifest(source)):
-        if (entry["role"], entry["name"]) == ("operating_state", "filesystem-boundary.json"):
-            boundary_entry = entry
-    if boundary_entry is None or boundary_entry["size"] > BOUNDARY_LIMIT:
-        raise InvalidArchive("Published archive has no bounded filesystem checkpoint")
-    output = io.BytesIO()
-    write_artifact(Path(source), boundary_entry, output)
-    boundary = validate_record(decode_json(output.getvalue()), client, checkpoint["request_sha256"])
+    from .checkpoint_release import archived_boundary, release_published_checkpoint
+    boundary = archived_boundary(source, client)
     view = pins.open_bound(boundary, _released=True)
     # Server release is retryable and verifies this exact enclosing archive.
     release = release_published_checkpoint(source, client)

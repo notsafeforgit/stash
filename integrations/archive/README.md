@@ -24,9 +24,20 @@ the confirmation, and sealed retries reuse the original view. The host-side
 `ArtworkPins` provider retains original artwork inodes during this callback;
 exports and retries use those pins after live changes or deletion. Its release
 helper verifies the archived association and supports interrupted cleanup.
-Media snapshots and producer barriers still need integration; the receipt alone
-does not prove a complete filesystem backup. S3 uploads remain the responsibility
-of the existing host backup script.
+`ZFSMedia` creates and retains actual Linux ZFS media snapshots, binding their
+dataset/snapshot GUIDs and hold to the sealed checkpoint. `HostFilesystemCapture`
+acquires the declared native worker barriers first, captures both providers,
+then releases workers before the database copy. Sealed replay releases them
+without recapturing. The caller retains the existing backup/dedupe exclusion.
+Publication-aware media release keeps permanent bindings and resumes interrupted
+cleanup without recursive or forced destruction.
+
+These providers do not establish complete worker/configuration inventory or a
+matching published media manifest. Daily-script integration and remote readback
+remain required. S3 uploads remain the responsibility of the existing host
+backup script. An explicit disposable-dataset rehearsal is available in
+`tests/zfs_media_probe.py`; it requires existing host ZFS permissions and is not
+part of automatic tests.
 
 See the [format and commands](../../docs/native-archive-format.md) for installation,
 coverage, storage budgets, manifest rules and the remaining production backup

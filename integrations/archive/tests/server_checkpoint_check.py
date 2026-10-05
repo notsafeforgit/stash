@@ -1,9 +1,11 @@
 """Exercise the portable CLI against the real native checkpoint HTTP handler."""
 
 from contextlib import redirect_stdout
+import fcntl
 import io
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
 import sys
@@ -15,6 +17,7 @@ from stash_archive.artwork_pins import ArtworkPins, release_published_artwork, p
 from stash_archive.cli import main
 from stash_archive.checkpoint_release import release_published_checkpoint
 from stash_archive.server_checkpoint import ServerCheckpoint
+from stash_ingest.publication_lock import ACTIVE, PublicationBarrier
 
 args = json.load(sys.stdin)
 root = Path(args["directory"])
@@ -28,8 +31,22 @@ if args.get("boundary"):
     cache = root / "artwork-pins"
     cache.mkdir(mode=0o700)
     pins = ArtworkPins(cache, [args["blobs"]], reserve=0)
+    worker_locks = root / "worker-locks"
+    worker_locks.mkdir()
+
+    def locked():
+        fd = os.open(worker_locks / ACTIVE, os.O_RDWR)
+        try:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                return False
+            except BlockingIOError:
+                return True
+        finally:
+            os.close(fd)
 
     def capture(ready):
+        assert locked()
         captures.append(ready)
         record = pins.capture(ready)
         # Once the inodes are retained, a later live deletion cannot alter this
@@ -37,14 +54,36 @@ if args.get("boundary"):
         shutil.rmtree(args["blobs"])
         return {"artwork": record, "large_identifier": 18446744073709551615}
 
-    client = ServerCheckpoint(args["server"], key, args["request_id"], json.loads(Path(args["roots_file"]).read_text()), boundary=capture)
-    export_archive(None, output, reserve=0, server_checkpoint=client, artwork_pins=pins)
+    def coordinated_export(destination):
+        with PublicationBarrier([worker_locks]) as barrier:
+            validated = []
+            def validate_boundary(record):
+                assert not locked()
+                pins.open_bound(record)
+                validated.append(record)
+            client = ServerCheckpoint(args["server"], key, args["request_id"],
+                                      json.loads(Path(args["roots_file"]).read_text()),
+                                      boundary=capture, boundary_release=barrier.release, boundary_validate=validate_boundary)
+            transport = client.open
+            def checked_transport(suffix, data=None):
+                if suffix.endswith("/boundary") or "/components/" in suffix:
+                    assert not locked(), "workers remained locked during checkpoint copy/download"
+                if suffix.endswith("/components/library.sqlite"):
+                    assert len(validated) == 1, "large library download preceded retained-view validation"
+                return transport(suffix, data)
+            with patch.object(client, "open", side_effect=checked_transport):
+                export_archive(None, destination, reserve=0, server_checkpoint=client, artwork_pins=pins)
+            assert not locked()
+            assert len(validated) == 1
+            return client
+
+    client = coordinated_export(output)
     first_receipt = client.boundary_receipt
     assert first_receipt["details"]["large_identifier"] == 18446744073709551615
     assert len(captures) == 1
     # A sealed server replay must return the same view without invoking capture.
     pins = ArtworkPins(cache, [args["blobs"]], reserve=0)
-    export_archive(None, root / "replayed", reserve=0, server_checkpoint=client, artwork_pins=pins)
+    client = coordinated_export(root / "replayed")
     assert client.boundary_receipt == first_receipt and len(captures) == 1
 else:
     with redirect_stdout(io.StringIO()):

@@ -106,7 +106,7 @@ def _blob_rows(connection):
 
 
 def export_archive(database, destination, *, blob_paths=(), components=(), reserve=RESERVE_BYTES,
-                   progress=None, producer_origin=None, server_checkpoint=None, artwork_pins=None):
+                   progress=None, producer_origin=None, server_checkpoint=None, artwork_pins=None, media_snapshot=None):
     # Capture every download archive before any outbox, then the server last.
     # The native adapter durably queues file completion before archive.add; an
     # acknowledged queue row in turn follows the server's committed receipt.
@@ -115,6 +115,8 @@ def export_archive(database, destination, *, blob_paths=(), components=(), reser
     components = list(components)
     if artwork_pins is not None and (server_checkpoint is None or blob_paths):
         raise InvalidArchive("Artwork pins require a server checkpoint and replace live blob paths")
+    if media_snapshot is not None and server_checkpoint is None:
+        raise InvalidArchive("A retained media view requires a server checkpoint")
     if server_checkpoint is not None:
         from .server_checkpoint import RESERVED
         if database is not None:
@@ -186,6 +188,8 @@ def export_archive(database, destination, *, blob_paths=(), components=(), reser
                 native, metadata, captured, expected = server_checkpoint.capture(Path(temp) / "server", reserve=reserve)
                 server_expected.update(expected)
                 components.extend(captured)
+            if media_snapshot is not None:
+                media_snapshot.open_bound(server_checkpoint.boundary_receipt).verify()
             if producer_origin is not None:
                 from .receipts import verify_snapshot_receipts
                 verify_snapshot_receipts(native, [snapshots[index][0] for index, component in enumerate(components)

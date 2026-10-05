@@ -7838,3 +7838,53 @@ protocol does not pause the installed legacy scrapers, dedupe or unrelated
 filesystem tools. Actual ZFS snapshot orchestration, worker inventory, existing
 backup/dedupe exclusion and daily-script/S3 integration remain required before
 cutover. No running worker, schedule or production service changed.
+
+## Retained ZFS media and host capture coordination — 2026-10-05
+
+`ZFSMedia` now creates an actual retained media snapshot during the native
+filesystem handshake. It checks an explicit dataset GUID, physical mountpoint,
+ZFS descendants and the Linux mount namespace. Child datasets or other nested
+mounts fail closed. Private intent precedes creation; the snapshot has a unique
+checkpoint/token name and properties, a retention hold, and a sealed record of
+its dataset/snapshot GUIDs and creation transaction. Replay verifies that exact
+view and its read-only path. Failed attempts retain inspectable identities and
+never recapture newer files under an existing challenge.
+
+Publication-aware media release validates the archived association, obtains the
+matching permanent server release and records intent before removing its own
+hold and exact snapshot. It never recurses, forces destruction or removes other
+holds. Interrupted cleanup resumes after either hold removal or destruction;
+small identity and release receipts remain. This helper requires the host to
+verify durable media and archive publication first; it performs no S3 operations.
+
+`HostFilesystemCapture` now acquires the inventoried native worker barriers
+before requesting the server guard, then captures both artwork and media. The
+checkpoint client releases those barriers before acknowledgement/large copying,
+on sealed replay and on failures, including local setup failures. It retrieves
+the sealed filesystem component first and validates retained views and the
+original worker inventory before the large library download. The existing host
+backup/dedupe exclusion must still surround the operation.
+
+All 86 archive tests pass in 24.3 seconds. The actual Go HTTP/Python checkpoint,
+export, restore and release fixture passes in 10.9 seconds, checking both fresh
+capture and sealed replay free the real worker lock and validate retained views
+before library transfer. API lint reports zero issues. An initial test selector
+matched no Go test and is not verification evidence; the exact named fixture was
+then run successfully. Final evidence labels are `native_zfs_archive_final`,
+`native_zfs_host_http_final` and `native_zfs_host_lint` under the October 4 client
+rehearsal directory.
+
+The explicit real-ZFS probe created a unique disposable dataset with a 64 MiB
+quota, captured its held snapshot in 0.68 seconds, edited the live file, verified
+the original bytes and read-only rejection, reopened without recapturing, and
+released/retried cleanup. The owned dataset and snapshot were removed. Small
+evidence remains in `zfs-media-probe-20261005`; this isolates actual filesystem
+behavior and does not claim a production archive/S3 restore. No production media
+snapshot, service switch, delegation change or installed backup-script change
+occurred.
+
+The daily host publisher/restore tools still need conversion, complete worker
+and external-configuration inventory, persistent staged producer components for
+replay, a matching media-manifest binding and verified remote publication.
+Abandoned capture retention and full-inventory pin/pause measurements also remain
+before cutover. Existing compatible production and frozen release remain intact.

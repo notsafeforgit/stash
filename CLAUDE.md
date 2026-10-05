@@ -93,7 +93,13 @@ interrupted cleanup. Native gallery-dl mutations share a cooperative publication
 lock. The host acquires `PublicationBarrier` across the inventoried worker lock
 roots before the database guard, then releases it after retaining immutable
 views. Existing backup/dedupe exclusion is still required; legacy workers do not
-participate. Actual media snapshots and host orchestration remain to be integrated.
+participate. `ZFSMedia` retains a held, GUID-bound snapshot of an explicitly
+inventoried Linux ZFS dataset; nested datasets/mounts fail closed.
+`HostFilesystemCapture` coordinates that view and artwork pins with the native
+handshake, releasing producer barriers before the large database copy and on
+sealed replay. The enclosing host backup keeps its existing backup/dedupe lock.
+Daily-script integration, complete component/media-manifest inventory and remote
+publication verification remain required; the providers do not upload to S3.
 Filesystem artwork writes publish flushed replacement inodes; never truncate a
 blob in place because readers and backup pins may retain that inode. Orphan
 cleanup must recheck references under a write transaction and use the deletion

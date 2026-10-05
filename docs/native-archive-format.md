@@ -150,7 +150,8 @@ writes before the large database copy. The stream ends with a `sealed` event or
 an error; a confirmation alone is not a sealed checkpoint.
 
 The Python `ServerCheckpoint` client accepts a trusted local `boundary`
-callback and `boundary_timeout`. It validates the challenge before invoking the
+callback, `boundary_timeout`, and optional `boundary_release` and
+`boundary_validate` callbacks. It validates the challenge before invoking the
 callback, sends its returned evidence, and checks the sealed component against
 the acknowledgement. An identical sealed retry returns ordinary JSON and
 reuses the original evidence without invoking the callback again. Matching
@@ -159,14 +160,24 @@ changed evidence and stale tokens are rejected. Expiry, cancellation or a
 disconnected client cannot leave the server waiting indefinitely or seal an
 unconfirmed capture.
 
+The release callback frees producer barriers after immutable views are retained,
+before acknowledging and waiting for the large server copy. A sealed JSON replay
+also invokes it before component downloads, without running capture again. Error
+cleanup releases any remaining barrier; an enclosing host context still owns
+setup/acquisition failures. Release never means deleting the retained views.
+The sealed filesystem component is downloaded and passed to the validator before
+the large library download. `HostFilesystemCapture` checks the original worker
+barrier inventory, pin manifest and held media snapshot at that point, including
+on replay; changed caller inventory cannot silently reuse the checkpoint.
+
 This handshake does not implement or certify a filesystem provider. The trusted
 host must establish its producer barrier **before** requesting the native writer
 guard, validate and retain the actual immutable views, and clean up failed
 external captures. Otherwise a producer waiting on the server while holding the
 host's barrier can deadlock the capture. The server never runs provider commands
 from a request. The command-line exporter does not yet select a provider;
-production media snapshots, producer barriers and publication integration
-remain required. Checkpoint coverage remains
+complete production inventory and publication integration remain required.
+Checkpoint coverage remains
 `database-configuration-deletion-recovery`.
 
 Native artwork writes now publish flushed replacement inodes instead of
@@ -210,7 +221,52 @@ continue, but downloads, postprocessors, archive completion and filesystem
 callbacks share exclusion. The adapter holds a file's lock across its download,
 so long current downloads can delay capture. The protocol does not cover legacy
 workers, manual filesystem changes or dedupe; retain their existing exclusion
-and inventory requirements. Host snapshot orchestration is still outstanding.
+and inventory requirements.
+
+`stash_archive.zfs_media.ZFSMedia` provides an actual retained media view for one
+explicitly configured Linux dataset, dataset GUID and physical mountpoint. It
+checks ZFS topology and the process's mount namespace; child datasets, nested
+bind/other mounts, missing mounts and changed dataset identities are rejected.
+The [ZFS snapshot](https://openzfs.github.io/openzfs-docs/man/master/8/zfs-snapshot.8.html)
+name contains the checkpoint UUID and one-use token. Creation also writes their
+binding as snapshot properties, and a [ZFS hold](https://openzfs.github.io/openzfs-docs/man/master/8/zfs-hold.8.html)
+retains the view. The provider verifies snapshot GUID, creation transaction,
+request digest, hold and a read-only `.zfs/snapshot` path before acknowledging.
+
+Private local intent precedes ZFS effects. Failed or uncertain attempts retain
+that identity and any created snapshot; they never silently recapture under the
+same challenge. The sealed `details.media` record must equal the retained local
+manifest on replay. Changed/missing snapshots, absent holds and pending deferred
+destruction prevent use. `MediaView.resolve(relative)` rejects paths and symlinks
+escaping the view. The provider supports explicitly configured host commands;
+it does not install sudo/delegation rules or run commands chosen by the server.
+
+The host coordinator joins both providers with the native worker barrier:
+
+```python
+# The existing host backup/dedupe lock must already be held. pins and media are
+# configured ArtworkPins/ZFSMedia providers; all worker lock roots are inventoried.
+with HostFilesystemCapture(worker_lock_roots, pins, media) as capture:
+    client = capture.client(server, api_key, checkpoint_uuid, recovery_roots,
+                            boundary_timeout=120)
+    export_archive(None, bundle, components=components, producer_origin=origin,
+                   server_checkpoint=client, artwork_pins=pins, media_snapshot=media)
+view = media.open_bound(client.boundary_receipt).verify()
+media_source = view.resolve("porn")
+```
+
+The exporter validates the sealed media association but does not pack ordinary
+media into the metadata archive. The host publisher must read that retained view
+when building/uploading the matching media manifest. Once both media and native
+archive publication have been durably verified, it may call
+`release_published_media(archive, client, media)`. The helper binds release to the
+archived checkpoint and permanent server release, persists local intent, removes
+only its own hold and destroys only the exact verified snapshot. It never forces,
+recurses or defers destruction; other holds/clones block cleanup. A crash after
+hold removal or destruction is retryable. Identity/release records remain, and
+ordinary export never releases snapshots. Abandoned-attempt retention, complete
+worker/configuration inventory, matching media manifests and daily S3-script
+publication still need integration before production use.
 
 The server captures the native database, raw deletion recovery trees, main
 configuration, runtime overrides and configured TLS certificate/key assets.

@@ -64,6 +64,7 @@ def read_checkpoint_response(client, response, request_hash):
         body = response.read((1 << 20) + 1)
         if len(body) > 1 << 20:
             raise InvalidArchive("Native checkpoint manifest exceeds its size limit")
+        client.release_boundary()
         return body
     if kind != "application/x-ndjson" or client.boundary is None:
         raise InvalidArchive("Unexpected native checkpoint response format")
@@ -81,6 +82,9 @@ def read_checkpoint_response(client, response, request_hash):
     details = client.boundary(dict(ready))
     if not isinstance(details, dict) or not details or len(request_bytes(details)) > MAX_DETAILS:
         raise InvalidArchive("Filesystem checkpoint provider returned invalid evidence")
+    # The views are now immutable. Unblock producers before waiting for the
+    # server's potentially large database copy, and before downloading it.
+    client.release_boundary()
     confirmation = {"token": ready["token"], "details": details}
     with client.open(f"/{client.request_id}/boundary", request_bytes(confirmation)) as acknowledgement:
         if acknowledgement.headers.get_content_type() != "application/json":

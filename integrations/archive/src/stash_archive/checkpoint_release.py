@@ -85,3 +85,18 @@ def release_published_checkpoint(source, client):
             or receipt["archive"] != binding or not isinstance(receipt["released_at"], str)):
         raise InvalidArchive("Checkpoint release receipt does not match the published archive")
     return receipt
+
+
+def archived_boundary(source, client):
+    """Read the bounded filesystem evidence bound to all archived components."""
+    from .filesystem_boundary import MAX_RECORD, validate_record
+    checkpoint, _ = archive_binding(source, client)
+    selected = None
+    for entry in iter_artifacts(source, load_manifest(source)):
+        if (entry["role"], entry["name"]) == ("operating_state", "filesystem-boundary.json"):
+            selected = entry
+    if selected is None or selected["size"] > MAX_RECORD:
+        raise InvalidArchive("Published archive has no bounded filesystem checkpoint")
+    output = io.BytesIO()
+    write_artifact(Path(source), selected, output)
+    return validate_record(decode_json(output.getvalue()), client, checkpoint["request_sha256"])

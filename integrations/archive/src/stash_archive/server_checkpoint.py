@@ -45,7 +45,8 @@ def request_bytes(request):
 
 
 class ServerCheckpoint:
-    def __init__(self, server, api_key, request_id, roots=(), *, timeout=3600, boundary=None, boundary_timeout=30):
+    def __init__(self, server, api_key, request_id, roots=(), *, timeout=3600, boundary=None, boundary_timeout=30,
+                 boundary_release=None, boundary_validate=None):
         try:
             url = urllib.parse.urlsplit(server)
             port = url.port
@@ -61,6 +62,10 @@ class ServerCheckpoint:
         if ((boundary is not None and not callable(boundary)) or type(boundary_timeout) is not int
                 or not 1 <= boundary_timeout <= 120):
             raise InvalidArchive("Invalid filesystem checkpoint provider or deadline")
+        if boundary_release is not None and (boundary is None or not callable(boundary_release)):
+            raise InvalidArchive("A boundary release callback requires a filesystem provider")
+        if boundary_validate is not None and (boundary is None or not callable(boundary_validate)):
+            raise InvalidArchive("A boundary validator requires a filesystem provider")
         roots = list(roots)
         if len(roots) > 1024 or any(not isinstance(r, dict) or set(r) != {"name", "path"}
                                   or not all(isinstance(r[k], str) for k in r) for r in roots):
@@ -69,7 +74,15 @@ class ServerCheckpoint:
         self.roots = [{"name": r["name"], "path": r["path"]} for r in roots]
         self.timeout = timeout
         self.boundary, self.boundary_timeout, self.boundary_receipt = boundary, boundary_timeout, None
+        self.boundary_release, self._boundary_released = boundary_release, False
+        self.boundary_validate = boundary_validate
         self.opener = urllib.request.build_opener(NoRedirect())
+
+    def release_boundary(self):
+        """Free host producer barriers before large copies, also on sealed replay."""
+        if self.boundary_release is not None and not self._boundary_released:
+            self.boundary_release()
+            self._boundary_released = True
 
     def open(self, suffix, data=None):
         request = urllib.request.Request(self.server + "/api/v3/backups/checkpoints" + suffix, data=data,
@@ -87,6 +100,13 @@ class ServerCheckpoint:
         return response
 
     def capture(self, destination, *, reserve):
+        self._boundary_released = False
+        try:
+            return self._capture(destination, reserve=reserve)
+        finally:
+            self.release_boundary()
+
+    def _capture(self, destination, *, reserve):
         from .bundle import connect_readonly, database_metadata
         from .filesystem_boundary import read_checkpoint_response, validate_record
         destination = Path(destination)
@@ -104,7 +124,9 @@ class ServerCheckpoint:
             self.validate(manifest, request_hash)
             components = []
             expected = {}
-            for component in manifest["components"]:
+            # Validate retained external views before downloading the large
+            # library, including on replay when no provider callback runs.
+            for component in sorted(manifest["components"], key=lambda c: c["name"] != "filesystem-boundary.json"):
                 name = component["name"]
                 expected[(component["role"], "library" if component["role"] == "library" else name)] = (component["sha256"], component["bytes"])
                 require_space(destination, component["bytes"], reserve)
@@ -138,6 +160,8 @@ class ServerCheckpoint:
                     if self.boundary_receipt is not None and record != self.boundary_receipt:
                         raise InvalidArchive("Sealed filesystem checkpoint differs from its acknowledgement")
                     self.boundary_receipt = record
+                    if self.boundary_validate is not None:
+                        self.boundary_validate(record)
             native = destination / "library.sqlite"
             with closing(connect_readonly(native)) as db:
                 metadata = database_metadata(db, "library")

@@ -1,0 +1,81 @@
+{
+  "measured_at": "2026-10-05",
+  "schema_version": 1000077,
+  "scope": "Controlled SQL title edits on a copy; not measured daily production churn",
+  "source_bytes": 20265979904,
+  "source_sha256": "a763238374ed89732a044a19a01aaef979b90902c35b3c288f7f9c6cd7d83a20",
+  "chunk_size": 67108864,
+  "cloud_requests": 0,
+  "scenarios": [
+    {
+      "title_edits": 0,
+      "database_sha256": "b9d589d6307327799ca8b76d85d8218d2e3fb0de6dbd68a9921335645367f828",
+      "database_bytes": 20265979904,
+      "chunks": 302,
+      "unique_objects": 302,
+      "encoded_bytes": 5242807047,
+      "new_objects": 302,
+      "new_encoded_bytes": 5242807047,
+      "changed_objects_from_previous": 302,
+      "changed_encoded_bytes_from_previous": 5242807047,
+      "all_retained_bytes": 5242807047,
+      "seconds": 158.93283879299997
+    },
+    {
+      "title_edits": 1,
+      "database_sha256": "2e27ee5850e8f2a060884a7bc2bffb0d1219c794e2c906bab963e94f8c328cbd",
+      "database_bytes": 20265979904,
+      "chunks": 302,
+      "unique_objects": 302,
+      "encoded_bytes": 5242807006,
+      "new_objects": 8,
+      "new_encoded_bytes": 188399162,
+      "changed_objects_from_previous": 8,
+      "changed_encoded_bytes_from_previous": 188399162,
+      "all_retained_bytes": 5431206209,
+      "seconds": 181.66725552102434
+    },
+    {
+      "title_edits": 100,
+      "database_sha256": "fc5ffd61b65cc2591fbb491916fc66f0abd8bc0c569ee4316d1f95a9cb99d304",
+      "database_bytes": 20265979904,
+      "chunks": 302,
+      "unique_objects": 302,
+      "encoded_bytes": 5242777272,
+      "new_objects": 24,
+      "new_encoded_bytes": 600577622,
+      "changed_objects_from_previous": 24,
+      "changed_encoded_bytes_from_previous": 600577622,
+      "all_retained_bytes": 6031783831,
+      "seconds": 183.40912670100806
+    },
+    {
+      "title_edits": 1000,
+      "database_sha256": "76d7c76a7bd24d554c8c52f2b76beb5c8b82c1c327b864854e66c05f5a59072d",
+      "database_bytes": 20265979904,
+      "chunks": 302,
+      "unique_objects": 302,
+      "encoded_bytes": 5242212580,
+      "new_objects": 24,
+      "new_encoded_bytes": 600012930,
+      "changed_objects_from_previous": 24,
+      "changed_encoded_bytes_from_previous": 600012930,
+      "all_retained_bytes": 6631796761,
+      "seconds": 186.79655527099385
+    }
+  ],
+  "elapsed_seconds": 745.843495196983,
+  "source_signature_unchanged": true,
+  "scratch_removed": true,
+  "method": "Copied a closed verified native rehearsal SQLite database, switched only the copy to DELETE journal mode, then applied cumulative batches of 1, 100 and 1000 evenly spaced image-title SQL updates. Each stage used stash_archive.storage.store_file with 64 MiB raw chunks and gzip level 6. Upload bytes count new encoded object hashes across retained scenarios. These synthetic changes do not model real daily ingestion or artwork changes.",
+  "pricing_source": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonS3/current/us-west-2/index.json",
+  "pricing_publication": "2026-09-28T23:04:16Z",
+  "standard_usd_per_1000_put": 0.005,
+  "standard_usd_per_1000_get": 0.0004,
+  "hypothetical_30_day_database_requests": {
+    "assumption": "All 302 database chunks change each day; one PUT and one verifying HEAD per chunk; excludes listings, other components, retirement, retries, audits and restores.",
+    "put_requests": 9060,
+    "head_requests": 9060,
+    "usd": 0.04892400000000001
+  }
+}

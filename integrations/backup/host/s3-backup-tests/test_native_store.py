@@ -24,6 +24,7 @@ sys.path.insert(0, str(ROOT))
 from fake_s3 import FakeS3, S3Error
 from native_backup import CONFIG_FORMAT, NativeBackupSession, NativeRunJournal, OwnedWorkspace, copy_ledger
 from native_store import MEDIA_FORMAT, NativeStore, PREFIX, selection_digest, media_selection
+from native_history import record_publication, publication_key
 from stash_archive.bundle import FORMAT, export_archive, import_archive, iter_artifacts
 from stash_archive.checkpoint_abandon import FORMAT as ABANDON_FORMAT
 from stash_archive.filesystem_boundary import FORMAT as BOUNDARY_FORMAT
@@ -431,6 +432,31 @@ class NativeStoreTests(unittest.TestCase):
         self.assertTrue(session.committed)
         self.assertEqual(sum(op[0] == 'put' for op in self.s3.operations), puts)
 
+    def test_failed_history_receipt_keeps_original_capture_until_commit_retry(self):
+        reference = self.publish()
+        session = NativeBackupSession.__new__(NativeBackupSession)
+        session.root, session.store = self.root, self.store
+        session.run_id, session.publication = 'test', reference
+        session.view, session.committed = Mock(), False
+        body = json_bytes(dict(self.catalog, native_archive=reference))
+        session.prepare_master(body)
+        history_key = self.store.prefix + publication_key(reference['archive_uuid'])
+        def reject(key):
+            if key == history_key:
+                raise S3Error('AccessDenied')
+        self.s3.before_put = reject
+        with self.assertRaisesRegex(S3Error, 'AccessDenied'):
+            session.commit_master(body)
+        self.assertFalse(session.committed)
+        self.assertFalse((self.root / 'master.json').exists())
+        self.assertTrue(self.store.verified('current_manifest.json', hashlib.sha256(body).hexdigest(), len(body)))
+        self.s3.before_put = lambda key: None
+        self.s3.operations.clear()
+        session.commit_master(body)
+        self.assertTrue(session.committed)
+        self.assertEqual((self.root / 'master.json').read_bytes(), body)
+        self.assertEqual([key for op, key in self.s3.operations if op == 'put'], [history_key])
+
     def test_run_journal_preserves_identity_options_and_recovers_missing_pointer(self):
         state = self.root / 'state'
         binding = {'config_sha256': '2' * 64, 'bucket': 'metadata', 'prefix': '', 'live_media': '/example/media'}
@@ -582,6 +608,7 @@ class NativeStoreTests(unittest.TestCase):
         master = json_bytes(dict(self.catalog, run_id='first', native_archive=reference))
         (journal.root / 'master.json').write_bytes(master)
         self.store.put_bytes('manifests/runs/first/manifest.json', master)
+        record_publication(self.store, master)
         with patch('native_backup.HostFilesystemCapture', side_effect=AssertionError('must not recapture')), \
              patch('native_backup.release_published_artwork') as artwork, \
              patch('native_backup.release_published_media', side_effect=OSError('interrupted release')):

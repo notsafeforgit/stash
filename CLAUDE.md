@@ -136,7 +136,17 @@ proofs; matching renamed/duplicate videos share objects. Cleanup protects all
 current references and rechecks returning or changed live paths before tagging.
 Retained selections verify every selected object without rescanning. Historical
 v3 in-flight native attempts require their original writer. Production inventory,
-retention reconciliation, real cost measurements and cutover review remain open.
+Standard reclamation, full cost measurements and cutover review remain open.
+Successful native commits now publish immutable history receipts before releasing
+their captures. Retain seven successful snapshots by default plus configured
+archive UUID pins. Retirement decisions are durable; every retained snapshot's
+cold-media references protect cleanup, and deferred historical deletion intents
+remain queued. History caches rebuild from remote receipts and verified masters
+using paginated listings without daily per-media HEAD requests. The real 64 MiB
+encoder measurement is recorded in `docs/native-backup-cost-measurement.json`;
+synthetic title edits do not establish daily production churn. Standard chunk
+expiration and large local run-metadata reclamation still require implementation,
+versioning/lifecycle verification and reviewed activation.
 An optional `worker_inventory` declaration resolves download/metadata worker
 profiles, layered private references, helper assets, cookie files and archive
 templates under the declared worker barriers. The host retains the closure per

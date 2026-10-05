@@ -73,6 +73,7 @@ except Exception:
 # ==========================================
 BASE_DIR = "/tank/media/porn/"
 SOURCE_VIEW = None
+RETAINED_MEDIA_KEYS = frozenset()
 LEDGER_DIR = "/tank/media/backup_ledgers/"
 TMP_BASE_DIR = "/home/andrew/s3_backup_tmp/"
 
@@ -394,6 +395,8 @@ def tag_legacy_dated_tarballs_obsolete(
     candidates = dated_by_safe.get(safe, [])
 
     for _date_int, key in candidates:
+        if key in RETAINED_MEDIA_KEYS:
+            continue
         # Skip the one explicit legacy key we still want to preserve, if any.
         if keep_key and key == keep_key:
             continue
@@ -444,6 +447,8 @@ def tag_superseded_stable_tarballs_obsolete(
         parsed = parse_unit_id(unit_id)
         stable_key = stable_tarball_key_for_unit(parsed["rel_dir"], parsed["kind"])
         if stable_key not in stable_keys:
+            continue
+        if stable_key in RETAINED_MEDIA_KEYS:
             continue
 
         base_key = base_key_map.get(unit_id)
@@ -608,6 +613,8 @@ def tag_superseded_remote_delta_tarballs_obsolete(
     skipped_unparsed = 0
 
     for key in list_remote_delta_tarball_keys(dry_run=dry_run):
+        if key in RETAINED_MEDIA_KEYS:
+            continue
         parsed = parse_delta_tarball_key(key)
         if not parsed:
             skipped_unparsed += 1
@@ -774,6 +781,9 @@ def tombstone_remote_accidental_nonvideo_objects(dry_run: bool, delete_budget: i
         if not key:
             continue
         total_visible += 1
+
+        if key in RETAINED_MEDIA_KEYS:
+            continue
 
         # Keep tarballs
         if key.startswith(("tarballs/", media_objects.PREFIX)):
@@ -1195,6 +1205,8 @@ class S3ObjectTagger:
         marking_obsolete = tag_key == OBSOLETE_TAG_KEY and tag_value == OBSOLETE_TAG_VALUE
         if marking_obsolete:
             assert_source_ready()
+            if rel_key in RETAINED_MEDIA_KEYS:
+                raise RuntimeError("Retained native backup still references this media object")
 
         try:
             existing = self.s3.get_object_tagging(Bucket=self.bucket, Key=full_key).get("TagSet", [])
@@ -1216,6 +1228,8 @@ class S3ObjectTagger:
         # confirming a tag that was already set by an interrupted attempt.
         if marking_obsolete:
             assert_source_ready()
+            if rel_key in RETAINED_MEDIA_KEYS:
+                raise RuntimeError("Retained native backup still references this media object")
         if before_write is not None and not before_write():
             return False
         if tagset.get(tag_key) == tag_value:
@@ -3026,6 +3040,11 @@ def finish_remote_cleanup(catalog, tagger, delete_budget):
                 with conn:
                     conn.execute("DELETE FROM pending_gc WHERE key=?", (key,))
                 continue
+            if key in RETAINED_MEDIA_KEYS:
+                # This path may already be absent from the current library.
+                # Preserve its GC intent and source-path evidence so it can be
+                # revisited when the last historical snapshot retires.
+                continue
             # Migrate queued legacy 'delete' actions to tag-only cleanup too.
             is_archive = key.startswith("tarballs/") and key.endswith(".tar")
             if not is_archive:
@@ -3136,6 +3155,7 @@ def _run_backup(args):
 
 
 def publish_completed_backup(args, catalog, current_video_manifest, stable, budget):
+    global RETAINED_MEDIA_KEYS
     MEDIA_INDEX.verify_catalog(catalog)
     local_ids = {unit["unit_id"] for unit in catalog["units"]}
     # The native database, retained originals, worker state and this exact media
@@ -3154,6 +3174,8 @@ def publish_completed_backup(args, catalog, current_video_manifest, stable, budg
     if getattr(args, "defer_cleanup", False):
         log("Backup published. All remote cleanup is deferred; queued cleanup remains pending.", 1)
         return
+    RETAINED_MEDIA_KEYS = SOURCE_VIEW.retained_media(
+        catalog, {"bucket": REMOTE_S3_BUCKET, "prefix": REMOTE_S3_PREFIX}, MEDIA_INDEX.listed)
     tagger = S3ObjectTagger(REMOTE_S3_BUCKET, REMOTE_S3_PREFIX, region=args.aws_region)
     finish_remote_cleanup(catalog, tagger, budget)
     # Preserve the existing orphan/legacy-object maintenance, but only after
@@ -3183,9 +3205,10 @@ def open_native_session(args):
 
 
 def run_backup(args):
-    global TAR_DELTA_DB, BASE_DIR, SOURCE_VIEW, RUN_ID, current_epoch, MEDIA_INDEX
+    global TAR_DELTA_DB, BASE_DIR, SOURCE_VIEW, RUN_ID, current_epoch, MEDIA_INDEX, RETAINED_MEDIA_KEYS
     original_db, original_base, original_view, original_id, original_epoch = TAR_DELTA_DB, BASE_DIR, SOURCE_VIEW, RUN_ID, current_epoch
     original_index = MEDIA_INDEX
+    original_retained = RETAINED_MEDIA_KEYS
     try:
         assert_source_ready()
         if not args.dry_run:
@@ -3216,6 +3239,7 @@ def run_backup(args):
         if MEDIA_INDEX is not None and MEDIA_INDEX is not original_index:
             MEDIA_INDEX.close()
         MEDIA_INDEX = original_index
+        RETAINED_MEDIA_KEYS = original_retained
         TAR_DELTA_DB, BASE_DIR, SOURCE_VIEW = original_db, original_base, original_view
         RUN_ID, current_epoch = original_id, original_epoch
 

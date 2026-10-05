@@ -31,8 +31,10 @@ reuse the proof only when the expected checksum/length and the object's ETag,
 modification time and storage class still match. LIST and ETag are change checks,
 not content hashes. Changed or unknown objects require a new checksum HEAD;
 missing immutable objects are uploaded and verified again. Immutable archive objects
-and per-run manifests precede the current JSON pointer. Remote obsolete tagging
-follows that commit; verification failures preserve the preceding generation.
+and per-run manifests precede the current JSON pointer. A successful pointer
+commit receives an immutable backup-history receipt before local release or
+cleanup is eligible. Remote obsolete tagging follows that receipt and retention
+verification; verification failures preserve the preceding generation.
 
 After publication and the last use of the retained view, the host releases the
 server checkpoint, artwork pins, ZFS snapshot and external component copies.
@@ -78,6 +80,58 @@ write. ETag is only a concurrency token; SHA-256 remains the content check. A
 retry may adopt its exact already-published bytes after a lost reply, but cannot
 replace a newer publication. Immutable per-run records remain available.
 
+## Snapshot history and media retention
+
+Native backups retain the seven most recent successful snapshots by default,
+including the current publication. Configure `retention` as
+`{"keep_last": 7, "pins": ["<archive UUID>"]}` to retain additional named snapshots.
+Pins use the native archive UUID from `native_archive.archive_uuid`, not a run
+name or checkpoint UUID. `keep_last` accepts 1–365; pins are additional to that
+count. Capture timestamps order snapshots, with UUIDs breaking ties and the
+current publication always counted. No snapshot expires merely because several
+scheduled runs failed or did not execute.
+
+Immutable receipts live under `native-archives/history/publications/<uuid>.json`
+in the metadata bucket. Each binds the successful run's exact master manifest
+and native archive reference. A prepared per-run manifest alone does not prove
+successful publication. If the current pointer succeeds but the receipt write
+fails, the host keeps its original capture and retries the receipt before
+releasing it; it does not create a newer snapshot under the same identity.
+
+Retention first verifies the active receipts and selected media graphs, including
+the cold bucket/prefix and presence in the run's complete cold inventory. It then
+records immutable `history/retirements/<uuid>.json` decisions for old snapshots.
+The current snapshot and pins cannot retire. Unknown or already-retired pins,
+changed/missing history, invalid inventories and mismatched storage bindings
+stop cleanup. A retired snapshot is no longer promised to be restorable;
+increasing `keep_last` or adding a pin later cannot resurrect it. Existing
+unregistered native backups need explicit history reconciliation before this
+writer replaces an earlier native publisher. Compatible media-only backups do
+not become native snapshots automatically.
+
+Cold-media cleanup protects the union of every retained snapshot's video,
+base-tar and delta-tar keys. A file removed from the live library stays protected
+while an older retained snapshot needs it. Its cleanup intent and source-path
+evidence remain queued until the last reference retires. All existing optional
+legacy/orphan cleanup paths honor that protection too. `--defer-cleanup` records
+the new successful publication but defers snapshot retirement and media tagging.
+Retirement changes no cold object bytes or storage class, and leaves the existing
+Deep Archive obsolete-object lifecycle in charge of physical expiration.
+
+`state_directory/snapshot-history` is a private, destination-scoped, rebuildable
+cache. A complete paginated history LIST verifies unchanged receipt identities;
+only new/changed receipts and uncached master graphs are downloaded. Large
+derived graphs are removed after retirement; small identity receipts remain.
+Losing the cache rebuilds protection from the remote receipts and verified
+masters. Corrupt caches stop cleanup and require inspection/rebuilding.
+
+This implements bounded **restore history and cold-media protection**. Garbage
+collection of unreferenced Standard chunks, old Standard per-run files and large
+local run inventories remains a cutover gate. Do not treat a retirement receipt
+as proof that those storage bytes have expired. The inspected metadata bucket
+has no lifecycle rule, and its versioning status still needs authorized
+verification before a scoped expiration policy can be activated.
+
 ## Storage and request costs
 
 The database, original record photos/logos/covers and small restore manifests
@@ -86,8 +140,31 @@ share immutable keys across runs. New archives use a maximum 64 MiB raw chunk
 instead of 1 MiB, reducing requests for changing database snapshots. Readers
 continue to accept earlier 1 MiB archives and enforce each manifest's limit.
 The larger chunk is a storage/request tradeoff: an edit replaces its whole
-chunk, while reducing the number of upload requests. Retention and real daily
-change volume still need production-scale measurement before activation.
+chunk, while reducing the number of upload requests. Standard reclamation and
+real daily change volume still need validation before activation.
+
+The [2026-10-05 encoder measurement](../../docs/native-backup-cost-measurement.json)
+used a disposable copy of the verified schema-1000077 rehearsal database. It
+made no cloud requests and left the source unchanged. The 20,265,979,904-byte
+database compressed to 5,242,807,047 bytes in 302 objects. Controlled SQL image-title
+updates produced these additional objects relative to earlier scenarios:
+
+| Scenario | New objects | New compressed bytes |
+| --- | ---: | ---: |
+| Initial snapshot | 302 | 5,242,807,047 |
+| One title edit | 8 | 188,399,162 |
+| 100 spaced title edits | 24 | 600,577,622 |
+| 1,000 spaced title edits | 24 | 600,012,930 |
+
+The edit batches are cumulative; these are synthetic examples, not measured
+daily production churn. Each encoding took about 159–187 seconds. If all 302
+database objects changed daily, 30 days of their PUTs and verifying HEADs would
+cost about **$0.049** at the inspected Oregon rates ($0.005 per 1,000 PUTs and
+$0.0004 per 1,000 GET/other requests). This excludes listings, other components,
+retirement operations, retries, audits and restores; it is not the entire S3 bill.
+Rates come from the [official regional price list](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonS3/current/us-west-2/index.json)
+(publication 2026-09-28). Actual retained storage also depends on completing the
+Standard reclamation policy above.
 
 `state_directory/object-receipts.sqlite3` is a rebuildable upload index, not
 required restore state. It is scoped by bucket and full object key. It contains
@@ -145,13 +222,13 @@ New tar bases/deltas keep their append-only keys and receive the same independen
 full-checksum verification. Checksum metadata written by the uploader alone is
 not accepted as proof. Known objects with changed bytes stop publication.
 
-Cleanup starts after publication and protects every current object key, including
-objects shared by multiple paths. Pending upload intentions retain their paths
+Cleanup starts after publication and protects every retained snapshot's object
+keys, including objects shared by multiple paths. Pending upload intentions retain their paths
 even after interruption. A file that returns or changes after the captured view
 defers obsolete tagging; the path is rechecked after the remote tag read. Removed
 path bindings are retired independently of shared objects. Superseded bytes remain
 subject to the existing obsolete-object lifecycle; this is not indefinite retention
-of every historical backup. Retention reconciliation remains a cutover gate.
+of every historical backup. Standard-object reclamation remains a cutover gate.
 
 The local NUL video manifests contain source paths. `current_manifest.txt` is
 only a deduplicated object allowlist; content-addressed keys require the JSON
@@ -198,6 +275,7 @@ Non-dry publication requires `--native-config /private/host-backup.json` or
 | `worker_lock_roots` | Every native worker publication-lock root |
 | `components` | Complete `{role, name, path}` inventory of outboxes, download archives, profiles and referenced private files |
 | `worker_inventory` | Optional path to the worker dependency declaration described below; resolved under publication barriers and retained for retries |
+| `retention` | Optional `{keep_last, pins}` policy; default seven successful snapshots with no extra pinned archive UUIDs |
 | `recovery_roots` | Native deletion-recovery `{name, path}` bindings |
 | `producer_origin` | Original endpoint used to validate producer receipts |
 | `native_validator` | Trusted local native Stash executable |

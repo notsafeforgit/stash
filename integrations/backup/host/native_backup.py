@@ -26,6 +26,7 @@ from stash_archive.zfs_media import ZFSMedia, mounts, release_published_media
 
 from native_store import (MEDIA_FORMAT, NativeStore, archive_objects, media_selection, selection_digest,
                           validate_reference, validate_selection_binding)
+from native_history import SnapshotHistory, policy as retention_policy, publication, publication_key, record_publication
 import worker_inventory
 
 CONFIG_FORMAT = "org.notsafeforgit.stash.host-backup"
@@ -245,7 +246,7 @@ class NativeBackupSession:
         config = decode_json(body)
         required = {"format", "version", "server", "api_key_file", "state_directory", "artwork_sources", "media",
                     "worker_lock_roots", "components", "recovery_roots", "producer_origin", "native_validator"}
-        optional = {"reserve_bytes", "boundary_timeout", "validator_timeout", "zfs_command", "worker_inventory"}
+        optional = {"reserve_bytes", "boundary_timeout", "validator_timeout", "zfs_command", "worker_inventory", "retention"}
         if (not isinstance(config, dict) or not required <= config.keys() or config.keys() - required - optional
                 or config["format"] != CONFIG_FORMAT or type(config["version"]) is not int or config["version"] != 1):
             raise InvalidArchive("Invalid native host backup configuration")
@@ -256,6 +257,7 @@ class NativeBackupSession:
         if type(self.reserve) is not int or self.reserve < 0:
             raise InvalidArchive("Invalid native backup space reserve")
         self.validator_timeout = config.get("validator_timeout", 3600)
+        self.retention_policy = retention_policy(config.get("retention"))
         self.validator = validator_path(config["native_validator"], self.validator_timeout)
         self.producer_origin = config["producer_origin"]
         self.live_media = Path(live_media).resolve(strict=True)
@@ -269,6 +271,7 @@ class NativeBackupSession:
                                          "bucket": bucket, "prefix": prefix}, {} if options is None else options)
         saved, state = self.journal.record, self.journal.state
         self.store = NativeStore(s3_client, bucket, prefix, receipts_path=state / "object-receipts.sqlite3")
+        self.history = SnapshotHistory(self.store, state / "snapshot-history")
         self.run_id, self.root, self.created_epoch = saved["run_id"], self.journal.root, saved["created_epoch"]
         self.options, self.resumed = saved["options"], self.journal.resumed
         self.archive = self.root / "archive"
@@ -426,7 +429,7 @@ class NativeBackupSession:
         if len(body) > 128 << 20:
             raise InvalidArchive("Master manifest exceeds its publication size limit")
         catalog = decode_json(body)
-        if (self.publication is None or catalog.get("native_archive") != self.publication
+        if (self.publication is None or catalog.get("run_id") != self.run_id or catalog.get("native_archive") != self.publication
                 or selection_digest(catalog) != self.publication["selection_sha256"]):
             raise InvalidArchive("Master manifest does not match the verified native/media publication")
         self.view.verify()
@@ -465,6 +468,7 @@ class NativeBackupSession:
         if already_committed:
             # An interrupted caller can adopt only its exact confirmed bytes.
             self.store.verified("current_manifest.json", digest, len(body))
+            record_publication(self.store, body)
             same_or_publish(self.root / "master.json", body)
             self.committed = True
             return
@@ -481,8 +485,20 @@ class NativeBackupSession:
                 raise
         if not self.store.verified("current_manifest.json", digest, len(body)):
             raise InvalidArchive("Current native manifest could not be verified")
+        record_publication(self.store, body)
         same_or_publish(self.root / "master.json", body)
         self.committed = True
+
+    def retained_media(self, catalog, media_store, available_media):
+        body = json_bytes(catalog)
+        with open_regular(self.root / "master.json") as incoming:
+            if incoming.read(len(body) + 1) != body:
+                raise InvalidArchive("Retention requires this run's exact committed master")
+        result = self.history.retain(body, media_store, self.retention_policy, available_media=available_media)
+        # Retain a compact, inspectable decision; the immutable remote receipts
+        # remain authoritative if this local report is lost.
+        same_or_publish(self.root / "retention.json", json_bytes({key: result[key] for key in ("retained", "retired")}))
+        return result["protected_media"]
 
     def finish(self):
         with open_regular(self.root / "master.json") as incoming:
@@ -492,6 +508,10 @@ class NativeBackupSession:
         key = "manifests/runs/" + self.run_id + "/manifest.json"
         if not self.store.verified(key, hashlib.sha256(body).hexdigest(), len(body)):
             raise InvalidArchive("Cannot release an unpublished native backup")
+        record = publication(body)
+        receipt = json_bytes(record)
+        if not self.store.verified(publication_key(record["archive_uuid"]), hashlib.sha256(receipt).hexdigest(), len(receipt)):
+            raise InvalidArchive("Cannot release a backup without its durable publication history")
         released = self.root / "released.json"
         release_body = json_bytes({"master_sha256": hashlib.sha256(body).hexdigest(), "publication": self.publication})
         if not released.exists():

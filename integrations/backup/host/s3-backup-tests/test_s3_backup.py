@@ -25,6 +25,7 @@ import s3_test_restore as restore_test
 from fake_s3 import FakeS3, FakeColdS3, S3Error
 import media_objects
 from native_backup import NativeBackupSession
+from native_history import SnapshotHistory, policy as retention_policy
 from native_store import FORMAT, PREFIX, NativeStore, selection_digest, validate_reference
 from stash_archive.storage import json_bytes
 
@@ -42,6 +43,8 @@ class PolicyNativeSession(NativeBackupSession):
         self.run_id, self.created_epoch = fixture.m.RUN_ID, fixture.m.current_epoch
         self.view = SimpleNamespace(verify=lambda: None)
         self.store = NativeStore(fixture.native_s3, "metadata")
+        self.history = SnapshotHistory(self.store, fixture.root / "history-cache")
+        self.retention_policy = retention_policy(fixture.snapshot_retention)
         self.committed = False
         self.publication = None
 
@@ -115,6 +118,9 @@ class BackupTests(unittest.TestCase):
         self.cold_s3 = FakeColdS3(self.archive)
         m._get_s3_delete_client = lambda: self.cold_s3
         self.native_finishes = 0
+        # Existing cleanup cases exercise the explicit current-only policy;
+        # history/default/pin integration is covered separately below.
+        self.snapshot_retention = {"keep_last": 1, "pins": []}
         m.open_native_session = lambda args: PolicyNativeSession(self)
         self.published_video_keys = {}
         self.operations = []
@@ -226,6 +232,59 @@ class BackupTests(unittest.TestCase):
 
     def catalog(self):
         return restore.load_manifest(self.standard / 'current_manifest.json')
+
+    def test_retained_snapshots_keep_deleted_video_and_compacted_archives_until_retirement(self):
+        self.snapshot_retention = {'keep_last': 2, 'pins': []}
+        self.m.COMPACT_DELTA_THRESHOLD = 0
+        def step(number, **kwargs):
+            with patch.object(self.m.time, 'time', return_value=1800000000 + number):
+                self.run_backup(**kwargs)
+        step(1)
+        first = self.catalog()
+        video = first['videos'][0]['key']
+        base = first['units'][0]['base_key']
+        (self.source / 'sample/clip.mp4').unlink()
+        self.write('sample/a.jpg', b'replacement image')
+        step(2, compact=True)
+        self.assertNotEqual(self.catalog()['units'][0]['base_key'], base)
+        self.assertNotIn(video, self.tagged)
+        self.assertNotIn(base, self.tagged)
+        with sqlite3.connect(self.m.TAR_DELTA_DB) as db:
+            self.assertIsNotNone(db.execute('SELECT key FROM pending_gc WHERE key=?', (video,)).fetchone())
+            self.assertIsNotNone(db.execute('SELECT key FROM media_paths WHERE key=?', (video,)).fetchone())
+        # Rebuild protection after losing its disposable local cache.
+        shutil.rmtree(self.root / 'history-cache')
+        step(3)
+        self.assertIn(video, self.tagged)
+        self.assertIn(base, self.tagged)
+        with sqlite3.connect(self.m.TAR_DELTA_DB) as db:
+            self.assertIsNone(db.execute('SELECT key FROM pending_gc WHERE key=?', (video,)).fetchone())
+
+    def test_pinned_snapshot_protects_old_media_after_later_snapshots(self):
+        self.run_backup()
+        first = self.catalog()
+        video = first['videos'][0]['key']
+        self.snapshot_retention = {'keep_last': 1, 'pins': [first['native_archive']['archive_uuid']]}
+        (self.source / 'sample/clip.mp4').unlink()
+        for _ in range(3):
+            self.run_backup()
+        self.assertNotIn(video, self.tagged)
+        self.snapshot_retention['pins'] = []
+        self.run_backup()
+        self.assertIn(video, self.tagged)
+
+    def test_history_failure_after_publication_prevents_every_cleanup_path(self):
+        self.snapshot_retention = {'keep_last': 2, 'pins': []}
+        self.run_backup()
+        video = self.video_key()
+        (self.source / 'sample/clip.mp4').unlink()
+        self.snapshot_retention['pins'] = [str(uuid.uuid4())]
+        with self.assertRaisesRegex(ValueError, 'Pinned backup'):
+            self.run_backup()
+        self.assertNotIn(video, self.tagged)
+        self.assertEqual(self.native_finishes, 2)
+        with sqlite3.connect(self.m.TAR_DELTA_DB) as db:
+            self.assertIsNotNone(db.execute('SELECT key FROM pending_gc WHERE key=?', (video,)).fetchone())
 
     def test_next_run_removes_crashed_workspace_but_preserves_pending_archives(self):
         self.m.initialize_runtime()
@@ -1203,6 +1262,13 @@ class LifecycleTagTests(unittest.TestCase):
         self.tagger.s3.put_object_tagging.assert_called_once_with(
             Bucket='test-bucket', Key='clip.mp4', Tagging={'TagSet': [{'Key': 'owner', 'Value': 'keep'}]})
         self.tagger.s3.delete_object.assert_not_called()
+
+    def test_retained_backup_guard_rejects_bypassing_cleanup_filters(self):
+        self.m.RETAINED_MEDIA_KEYS = {'historical.mp4'}
+        with self.assertRaisesRegex(RuntimeError, 'Retained native backup'):
+            self.tagger.ensure_tag('historical.mp4', 'obsolete', 'true', False)
+        self.tagger.s3.get_object_tagging.assert_not_called()
+        self.tagger.s3.put_object_tagging.assert_not_called()
 
     def test_reactivation_can_clear_the_last_tag(self):
         self.tagger.s3.get_object_tagging.return_value = {'TagSet': [{'Key': 'obsolete', 'Value': 'true'}]}

@@ -33,8 +33,32 @@ After publication and the last use of the retained view, the host releases the
 server checkpoint, artwork pins, ZFS snapshot and external component copies.
 It reclaims the run's compressed archive objects and copied ledgers, keeping
 manifests and release receipts. Unknown files are preserved. Failed unpublished
-runs retain original data for recovery; automated discovery, resume and pruning
-of those attempts remain a required installation gate.
+runs retain original data for recovery. The private `active.json` journal now
+selects the original run, checkpoint UUID, configuration, destination and options
+after restart. It is recorded before capture and removed only after publication
+and release finish. Once the media selection is saved, retries skip rescanning
+and compaction. A current `--defer-cleanup` request still takes precedence.
+
+An invocation with a published but unfinished attempt only completes its cleanup;
+a subsequent invocation captures newer state. Cleanup reopens the permanent
+release records without requesting a new capture or requiring already released
+media/artwork views. Finished run identities remain reserved. Changed
+configuration/destination or ambiguous unfinished runs fail for inspection.
+Attempts that never sealed still need the abandonment/pruning workflow before
+production installation; removing their identity files is not a recovery method.
+
+Interrupted packing and verification use private scratch directories with
+durable inode ownership records. A fully sealed bundle is promoted without
+re-export; incomplete copies can be rebuilt from the retained original view.
+Cleanup rejects replaced scratch roots and nested mounts, and does not follow
+symlinks into source data. Upload and native-validator child processes inherit
+the existing backup lock, so losing their Python parent cannot let another run
+remove scratch data while those children are still using it.
+
+The current-manifest update records its original S3 ETag and uses a conditional
+write. ETag is only a concurrency token; SHA-256 remains the content check. A
+retry may adopt its exact already-published bytes after a lost reply, but cannot
+replace a newer publication. Immutable per-run records remain available.
 
 ## Configuration and development
 
@@ -102,8 +126,8 @@ restore tool. Mount rebinding and deletion recovery require the reviewed cutover
 procedure. Retained publication proofs do not replace validation by the selected
 local native binary.
 
-Installation remains gated on complete worker/config inventory, interrupted-run
-recovery/retention, full artwork capture timing and writer/WAL measurements, and
-the relocated restore and owner review in the
+Installation remains gated on complete worker/config inventory, unsealed-attempt
+abandonment/retention, media-generation reconciliation, full artwork capture
+timing and writer/WAL measurements, and the relocated restore and owner review in the
 [transition plan](../../docs/native-archive-transition-plan.md). This conversion
 performs no live cloud writes or installed host-script changes.

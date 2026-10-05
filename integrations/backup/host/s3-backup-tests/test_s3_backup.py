@@ -744,6 +744,69 @@ class BackupTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Media selection differs'):
             restore.select_plan(catalog, 'sample')
 
+    def test_retained_media_selection_resumes_without_scan_or_compaction(self):
+        self.run_backup()
+        retained = self.catalog()
+        retained.pop('native_archive')
+        self.write('sample/later.jpg', b'after the original capture')
+        def resume(args):
+            session = PolicyNativeSession(self)
+            session.catalog = retained
+            session.resumed = True
+            session.run_id = retained['run_id']
+            return session
+        self.m.open_native_session = resume
+        with patch.object(self.m, 'scan_changes_scandir', side_effect=AssertionError('must not rescan')), \
+             patch.object(self.m, 'process_tarballs_incremental_deltas', side_effect=AssertionError('must not compact')):
+            # The earlier fixture already published the same run with a different
+            # native UUID. Stop at the immutable master conflict, proving that no
+            # historical run can be silently replaced by the resumed publisher.
+            with self.assertRaises(ValueError):
+                self.run_backup(compact=True)
+        self.assertEqual(self.catalog()['units'], retained['units'])
+
+    def test_retained_media_publication_replays_identical_master(self):
+        self.run_backup()
+        retained = self.catalog()
+        reference = retained.pop('native_archive')
+        original = (self.standard / 'current_manifest.json').read_bytes()
+        self.write('sample/later.jpg', b'after capture')
+        def resume(args):
+            session = PolicyNativeSession(self)
+            session.catalog, session.publication = retained, reference
+            session.publish = lambda catalog, ledgers: reference
+            session.run_id, session.created_epoch = retained['run_id'], retained['created_epoch']
+            session.options = {'compact': False}
+            return session
+        self.m.open_native_session = resume
+        with patch.object(self.m, 'scan_changes_scandir', side_effect=AssertionError('must not rescan')), \
+             patch.object(self.m, 'process_tarballs_incremental_deltas', side_effect=AssertionError('must not compact')):
+            self.run_backup(compact=True)
+        self.assertEqual((self.standard / 'current_manifest.json').read_bytes(), original)
+
+    def test_commands_inherit_owned_backup_lock(self):
+        module = import_backup()
+        with module.exclusive_run_lock(str(self.ledger / 'child.lock')) as fd:
+            for capture in (False, True):
+                with patch.object(module.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0)) as run:
+                    module.run_cmd(['fixture-command'], capture=capture)
+                self.assertEqual(run.call_args.kwargs['pass_fds'], (fd,))
+        self.assertIsNone(module.RUN_LOCK_FD)
+
+    def test_current_defer_flag_overrides_retained_cleanup_option(self):
+        self.run_backup()
+        (self.source / 'sample/clip.mp4').unlink()
+        def resume(args):
+            session = PolicyNativeSession(self)
+            session.options = {'defer_cleanup': False}
+            session.resumed = True
+            return session
+        self.m.open_native_session = resume
+        self.operations.clear()
+        self.run_backup(defer_cleanup=True)
+        self.assertNotIn('sample/clip.mp4', self.tagged)
+        self.assertFalse([op for op in self.operations if op[0] in ('tag', 'delete')])
+
     def test_returning_video_disappearing_after_failed_copy_is_retombstoned(self):
         self.run_backup()
         video = self.source / 'sample/clip.mp4'

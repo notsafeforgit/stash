@@ -8002,3 +8002,50 @@ The package is staged, not production-ready: complete worker/config inventory,
 interrupted/unpublished-run discovery/resume/pruning, complete media generation
 and restore reconciliation, full artwork capture timing and writer/WAL costs,
 relocated restore and cutover review remain required.
+
+### Durable host run recovery — 2026-10-05
+
+The host now records one active attempt before capture and resumes its original
+run ID, checkpoint UUID, configuration, destination and options after restart.
+It saves the completed media selection before native packing; publication retries
+skip scans and compaction and cannot substitute a newer selection. A current
+request to defer cleanup remains effective. Published attempts reopen only the
+state needed to complete release, without requesting a new native view or
+reopening already removed snapshots. Release interruption and partial local
+object reclamation resume across new session instances. Finished identities
+remain reserved, and the active pointer clears only after durable completion.
+An invocation that recovers an already published attempt performs cleanup only;
+the following invocation can capture newer state.
+
+Packing and verification use privately owned scratch directories with durable
+inode identities. Interrupted copies can be removed without following symlinks
+into original data; replaced roots and nested mounts are rejected. A bundle
+sealed before a crash is promoted without re-export. Upload and verifier child
+processes inherit the enclosing backup lock so a surviving child continues to
+exclude a competing backup after its parent dies. The current S3 pointer retains
+its original conditional-write token; retries can adopt exact published bytes
+after lost replies but cannot overwrite a newer publication. SHA-256 remains the
+content check; ETag serves only to exclude concurrent pointer replacement.
+
+`native_host_recovery_package_gate` passes all 133 host cases in 33.2 seconds
+(37.9 seconds including package installation). `native_archive_inherited_lock_gate`
+passes all 97 archive cases in 35.0 seconds. Evidence is under the October 4
+client rehearsal directory. Coverage includes identical master replay, immutable
+run conflicts, saved options and defer overrides, missing-pointer recovery,
+new-instance partial-release cleanup, owned scratch replacement/mount/symlink
+checks and a real child process retaining the lock after the parent closes its
+descriptor. Earlier checks in this change also passed 123 and 131 host cases;
+the final package run covers the added defer-cleanup regression.
+
+For parent commit `920875c3e`, Build and lint succeeded. Its image-publication
+workflow failed because it invoked `validate-fork` without installing the newly
+required backup runtime. The workflow now runs `pre-backup` before that gate,
+matching the successful local package setup and the Build workflow.
+
+This closes sealed/published host retry handling, not unsealed abandonment.
+Attempts that never established a valid native/filesystem boundary still need a
+permanent abandonment record and scoped cleanup before the host can safely
+advance to another UUID. Complete worker/config inventory, media-generation
+reconciliation, full capture measurements and relocated restore/cutover review
+remain open. Installed scripts, production services, credentials and cloud objects
+were not changed.

@@ -4,9 +4,12 @@ from contextlib import closing, redirect_stderr, redirect_stdout
 import hashlib
 import io
 import json
+import fcntl
+import os
 from pathlib import Path
 import sqlite3
 import sys
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -14,7 +17,7 @@ from unittest.mock import patch
 from stash_archive.bundle import FORMAT, export_archive, import_archive, iter_artifacts
 from stash_archive.cli import main
 from stash_archive.storage import InvalidArchive, json_bytes
-from stash_archive.verification import verify_archive_proofs
+from stash_archive.verification import verify_archive_proofs, validator_output
 
 
 def contract_validator(root, *, mode="ok", overrides=None):
@@ -62,6 +65,43 @@ if mode == 'failed':
 
 
 class NativeVerificationTests(unittest.TestCase):
+    def test_validator_keeps_host_lock_after_parent_descriptor_closes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            lock = root / 'host.lock'
+            released = root / 'finish'
+            executable = root / 'validator'
+            executable.write_text(f'#!{sys.executable}\n' +
+                                  'from pathlib import Path\nimport time\n' +
+                                  f'release = Path({str(released)!r})\n' +
+                                  'deadline = time.monotonic() + 5\n' +
+                                  'while not release.exists() and time.monotonic() < deadline:\n    time.sleep(0.01)\n' +
+                                  'assert release.exists()\nprint("{}")\n')
+            executable.chmod(0o700)
+            fd = os.open(lock, os.O_CREAT | os.O_RDWR, 0o600)
+            held = [fd]
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            real_popen = subprocess.Popen
+            def child_owns_lock(*args, **kwargs):
+                child = real_popen(*args, **kwargs)
+                os.close(fd)
+                held.clear()
+                try:
+                    with lock.open('rb') as competing:
+                        with self.assertRaises(BlockingIOError):
+                            fcntl.flock(competing, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                finally:
+                    released.touch()
+                return child
+            try:
+                with patch('stash_archive.verification.subprocess.Popen', side_effect=child_owns_lock):
+                    self.assertEqual(validator_output(executable, root / 'library.sqlite', 10, lock_fd=fd), b'{}\n')
+                with lock.open('rb') as competing:
+                    fcntl.flock(competing, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            finally:
+                for remaining in held:
+                    os.close(remaining)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

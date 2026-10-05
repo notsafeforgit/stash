@@ -115,7 +115,12 @@ manifests through host-owned S3 clients, require exact full-object checksums,
 and support native download/audit plus historical media restore inputs. Their
 isolated runtime (`make pre-backup`) and regression gate (`make validate-backup`)
 are separate from the server. Installed scripts and scheduling remain unchanged.
-Complete production worker/config inventory, failed-run resume/pruning, full
+The host now journals one active attempt and resumes its original sealed view,
+media selection or published cleanup after restart. Owned scratch is reclaimed
+only under backup exclusion, which upload/validator children inherit. The S3
+current pointer uses a retained conditional-write token and cannot replace a
+newer publication on retry. Complete production worker/config inventory,
+unsealed-attempt abandonment/pruning, media-generation reconciliation, full
 capture measurements and relocated restore/cutover review remain required.
 Filesystem artwork writes publish flushed replacement inodes; never truncate a
 blob in place because readers and backup pins may retain that inode. Orphan

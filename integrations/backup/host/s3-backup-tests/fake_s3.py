@@ -30,11 +30,13 @@ class FakeS3:
             raise S3Error("404")
         return dict(self.headers[Key])
 
-    def put_object(self, *, Bucket, Key, Body, ContentLength, StorageClass, ChecksumSHA256, IfNoneMatch=None):
+    def put_object(self, *, Bucket, Key, Body, ContentLength, StorageClass, ChecksumSHA256, IfNoneMatch=None, IfMatch=None):
         self.operations.append(("put", Key))
         self.before_put(Key)
         path = self.root / Key
         if IfNoneMatch == "*" and path.exists():
+            raise S3Error("PreconditionFailed")
+        if IfMatch is not None and (not path.exists() or self.headers[Key]['ETag'] != IfMatch):
             raise S3Error("PreconditionFailed")
         body = Body.read() if hasattr(Body, "read") else Body
         assert ContentLength == len(body)
@@ -43,7 +45,8 @@ class FakeS3:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(body)
         self.headers[Key] = {"ContentLength": len(body), "ChecksumSHA256": ChecksumSHA256,
-                             "ChecksumType": "FULL_OBJECT", "StorageClass": StorageClass}
+                             "ChecksumType": "FULL_OBJECT", "StorageClass": StorageClass,
+                             "ETag": '"' + hashlib.md5(body, usedforsecurity=False).hexdigest() + '"'}
         if Key in self.lost_reply:
             raise OSError("lost upload reply")
         return {}

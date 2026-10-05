@@ -17,6 +17,7 @@ import tarfile
 import hashlib
 import base64
 import argparse
+import copy
 import tempfile
 import subprocess
 import shlex
@@ -28,6 +29,7 @@ import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError, NoCredentialsError, PartialCredentialsError
 from native_backup import NativeBackupSession
+from stash_archive.storage import json_bytes
 from contextlib import contextmanager
 from datetime import datetime
 
@@ -148,6 +150,7 @@ MAX_OBSOLETE_TAG_OPS_PER_RUN = 2000  # max S3 object-tagging ops per run (compac
 # Runtime initialization is explicit so imports and --help never touch state.
 current_epoch = 0
 RUN_ID = ""
+RUN_LOCK_FD = None
 TMP_DIR = ""
 TARBALL_TMP_DIR = ""
 DELTA_TMP_DIR = ""
@@ -341,6 +344,7 @@ def run_cmd(
                 check=check,
                 env=env,
                 cwd=cwd,
+                pass_fds=() if RUN_LOCK_FD is None else (RUN_LOCK_FD,),
             )
         else:
             # stream stdout/stderr directly (best for journald and progress output)
@@ -350,6 +354,7 @@ def run_cmd(
                 check=check,
                 env=env,
                 cwd=cwd,
+                pass_fds=() if RUN_LOCK_FD is None else (RUN_LOCK_FD,),
             )
     except subprocess.CalledProcessError as e:
         # In trace mode, include traceback; otherwise just a clear error line.
@@ -874,11 +879,15 @@ def exclusive_run_lock(lock_path: str):
     """
     Prevent overlapping runs (systemd timer + manual run).
     """
+    global RUN_LOCK_FD
+    previous = RUN_LOCK_FD
     fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
     try:
         fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        yield
+        RUN_LOCK_FD = fd
+        yield fd
     finally:
+        RUN_LOCK_FD = previous
         try:
             fcntl.flock(fd, fcntl.LOCK_UN)
         finally:
@@ -2791,7 +2800,7 @@ def build_and_upload_master_manifest(current_video_manifest_nul, current_tarball
     # Both forms describe exactly the same validated scan. JSON is authoritative
     # and self-contained; the text allowlist is retained for existing tools.
     manifest = os.path.join(TMP_DIR, "current_manifest.json")
-    atomic_write_bytes(manifest, (json.dumps(catalog, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8"))
+    atomic_write_bytes(manifest, json_bytes(catalog))
     keys = [v["key"] for v in catalog["videos"]] + sorted(set(current_tarball_keys))
     for key in keys:
         validate_list_path(key)
@@ -2993,7 +3002,6 @@ def finish_remote_cleanup(catalog, tagger, delete_budget):
 def _run_backup(args):
     global REMOTE_TAR_KEYS, TAR_DELTA_DB
     assert_source_ready()
-    defer_cleanup = getattr(args, "defer_cleanup", False)
     # Dry runs work on an isolated SQLite snapshot, including schema migrations.
     if args.dry_run:
         original_db = TAR_DELTA_DB
@@ -3011,6 +3019,19 @@ def _run_backup(args):
         require_boto3_tagging=not args.dry_run,
         aws_region=args.aws_region,
     )
+    retained = getattr(SOURCE_VIEW, "catalog", None)
+    if not args.dry_run and retained is not None:
+        # Once media publication is complete, never rebuild this selection from
+        # newer ledger state or run another compaction on an interrupted retry.
+        REMOTE_TAR_KEYS, stable, _, _ = list_remote_tarballs_once(False)
+        required = {key for unit in retained["units"] for key in (unit["base_key"], *unit["deltas"])}
+        if not required <= REMOTE_TAR_KEYS:
+            raise RuntimeError("Retained native run is missing a required media archive")
+        current_video_manifest = os.path.join(TMP_DIR, "native-resume-videos.nul")
+        for video in retained["videos"]:
+            validate_list_path(video["key"])
+        atomic_write_bytes(current_video_manifest, b"".join(v["key"].encode("utf-8") + b"\0" for v in retained["videos"]))
+        return publish_completed_backup(args, copy.deepcopy(retained), current_video_manifest, stable, budget)
     fp_store = load_tarball_fp_store()
     if not args.dry_run:
         resume_archives(fp_store)
@@ -3047,6 +3068,11 @@ def _run_backup(args):
     if {u["unit_id"] for u in collect_partitioned_tar_units(BASE_DIR)} != local_ids:
         raise RuntimeError("Source directory layout changed during backup; manifest unchanged")
     catalog = build_restore_catalog(tar_units)
+    return publish_completed_backup(args, catalog, current_video_manifest, stable, budget)
+
+
+def publish_completed_backup(args, catalog, current_video_manifest, stable, budget):
+    local_ids = {unit["unit_id"] for unit in catalog["units"]}
     # The native database, retained originals, worker state and this exact media
     # selection must be verified in Standard before publishing or retiring keys.
     catalog["native_archive"] = SOURCE_VIEW.publish(catalog, [
@@ -3060,7 +3086,7 @@ def _run_backup(args):
     build_and_upload_master_manifest(current_video_manifest, tar_keys, False, catalog)
     assert_source_ready()
     atomic_copy(current_video_manifest, VIDEO_PREV_MANIFEST)
-    if defer_cleanup:
+    if getattr(args, "defer_cleanup", False):
         log("Backup published. All remote cleanup is deferred; queued cleanup remains pending.", 1)
         return
     tagger = S3ObjectTagger(REMOTE_S3_BUCKET, REMOTE_S3_PREFIX, region=args.aws_region)
@@ -3087,16 +3113,31 @@ def open_native_session(args):
     bucket, prefix = parse_remote_bucket_and_prefix(STANDARD_REMOTE_PATH)
     client = boto3.client("s3", region_name=args.aws_region,
                           config=Config(max_pool_connections=20, retries={"mode": "standard", "max_attempts": 5}))
-    return NativeBackupSession(config, RUN_ID, BASE_DIR, bucket, prefix, client)
+    options = {key: bool(getattr(args, key, False)) for key in ("init_run", "compact", "delta_cutover_now", "defer_cleanup")}
+    return NativeBackupSession(config, RUN_ID, BASE_DIR, bucket, prefix, client, options=options, lock_fd=RUN_LOCK_FD)
 
 
 def run_backup(args):
-    global TAR_DELTA_DB, BASE_DIR, SOURCE_VIEW
-    original_db, original_base, original_view = TAR_DELTA_DB, BASE_DIR, SOURCE_VIEW
+    global TAR_DELTA_DB, BASE_DIR, SOURCE_VIEW, RUN_ID, current_epoch
+    original_db, original_base, original_view, original_id, original_epoch = TAR_DELTA_DB, BASE_DIR, SOURCE_VIEW, RUN_ID, current_epoch
     try:
         assert_source_ready()
         if not args.dry_run:
             SOURCE_VIEW = open_native_session(args)
+            RUN_ID, current_epoch = SOURCE_VIEW.run_id, SOURCE_VIEW.created_epoch
+            defer_now = bool(getattr(args, "defer_cleanup", False))
+            args = copy.copy(args)
+            for key, value in getattr(SOURCE_VIEW, "options", {}).items():
+                setattr(args, key, value)
+            # A current explicit request to defer cleanup can always make a
+            # resumed attempt more conservative without changing its snapshot.
+            args.defer_cleanup = defer_now or bool(getattr(args, "defer_cleanup", False))
+            if getattr(SOURCE_VIEW, "resumed", False):
+                log(f"Resuming native backup {RUN_ID} from its retained original checkpoint.", 1)
+            if SOURCE_VIEW.committed:
+                SOURCE_VIEW.finish()
+                log("Recovered published native backup cleanup; a subsequent run can capture newer state.", 1)
+                return
             BASE_DIR = os.fspath(SOURCE_VIEW.media_path)
         try:
             _run_backup(args)
@@ -3107,6 +3148,7 @@ def run_backup(args):
                 SOURCE_VIEW.finish()
     finally:
         TAR_DELTA_DB, BASE_DIR, SOURCE_VIEW = original_db, original_base, original_view
+        RUN_ID, current_epoch = original_id, original_epoch
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="S3 Deep Archive backup with durable upload tracking and restorable manifests.")

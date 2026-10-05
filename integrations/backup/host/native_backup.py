@@ -6,6 +6,7 @@ import hashlib
 import os
 from pathlib import Path
 import re
+import shutil
 import sqlite3
 import tempfile
 import time
@@ -16,15 +17,17 @@ from stash_archive.bundle import export_archive
 from stash_archive.component_stage import release_published_components
 from stash_archive.filesystem_boundary import canonical_uuid
 from stash_archive.host_boundary import HostFilesystemCapture
-from stash_archive.storage import (InvalidArchive, decode_json, json_bytes, load_manifest, open_regular,
+from stash_archive.storage import (HEX, InvalidArchive, decode_json, json_bytes, load_manifest, open_regular,
                                    publish_bytes, regular, require_space, sync_directory)
+from stash_archive.server_checkpoint import ServerCheckpoint
 from stash_archive.verification import verify_archive_proofs, validator_path
-from stash_archive.zfs_media import ZFSMedia, release_published_media
+from stash_archive.zfs_media import ZFSMedia, mounts, release_published_media
 
 from native_store import (MEDIA_FORMAT, NativeStore, archive_objects, media_selection, selection_digest,
-                          validate_selection_binding)
+                          validate_reference, validate_selection_binding)
 
 CONFIG_FORMAT = "org.notsafeforgit.stash.host-backup"
+RUN_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}\Z")
 
 
 def private_directory(path):
@@ -41,6 +44,137 @@ def same_or_publish(path, body):
                 raise InvalidArchive("A retained host backup record changed")
     except FileNotFoundError:
         publish_bytes(path, body)
+
+
+def read_record(path, *, limit=128 << 20, optional=False):
+    try:
+        with open_regular(path) as incoming:
+            body = incoming.read(limit + 1)
+    except FileNotFoundError:
+        if optional:
+            return None
+        raise
+    if len(body) > limit:
+        raise InvalidArchive("Retained host record exceeds its size limit")
+    return decode_json(body)
+
+
+class OwnedWorkspace:
+    """Private scratch with durable inode ownership, never a source location."""
+    def __init__(self, root, name):
+        if name not in {"pack", "verify"}:
+            raise InvalidArchive("Unknown native scratch workspace")
+        self.path = Path(root) / ("scratch-" + name)
+        record_path = Path(root) / ("scratch-" + name + ".json")
+        saved = read_record(record_path, limit=4096, optional=True)
+        if saved is None:
+            self.path.mkdir(mode=0o700, exist_ok=True)
+            identity = directory(self.path, private=True)
+            if any(self.path.iterdir()):
+                raise InvalidArchive("Unowned native scratch data requires inspection")
+            saved = {"format": CONFIG_FORMAT + ".scratch", "version": 1, "name": name,
+                     "device": identity[0], "inode": identity[1]}
+            publish_bytes(record_path, json_bytes(saved))
+        if (not isinstance(saved, dict) or set(saved) != {"format", "version", "name", "device", "inode"}
+                or saved["format"] != CONFIG_FORMAT + ".scratch" or type(saved["version"]) is not int or saved["version"] != 1
+                or saved["name"] != name or type(saved["device"]) is not int or type(saved["inode"]) is not int):
+            raise InvalidArchive("Invalid native scratch ownership record")
+        self.identity = saved["device"], saved["inode"]
+        self.verify()
+
+    def verify(self):
+        if directory(self.path, private=True) != self.identity:
+            raise InvalidArchive("Native scratch workspace was replaced")
+
+    def clear(self):
+        self.verify()
+        # The enclosing run lock excludes the original packer and is inherited
+        # by the validator, including if its Python parent died unexpectedly.
+        # Never traverse a mounted filesystem inside the owned scratch tree.
+        if any(path.is_relative_to(self.path) for path, _, _ in mounts()):
+            raise InvalidArchive("Native scratch contains an unexpected mounted filesystem")
+        for root, dirs, files in os.walk(self.path, followlinks=False):
+            for name in dirs + files:
+                info = (Path(root) / name).lstat()
+                if info.st_dev != self.identity[0]:
+                    raise InvalidArchive("Native scratch contains an unexpected mounted filesystem")
+        for path in self.path.iterdir():
+            if path.is_symlink() or not path.is_dir():
+                path.unlink()
+            else:
+                shutil.rmtree(path)
+        sync_directory(self.path)
+
+
+class NativeRunJournal:
+    """One durable attempt under the caller's existing backup/dedupe lock.
+
+    Never replace the active attempt with a new capture after a restart. The
+    pointer is retired only after its publication and local release complete.
+    """
+    def __init__(self, state, proposed_id, binding, options):
+        if not isinstance(proposed_id, str) or not RUN_NAME.fullmatch(proposed_id):
+            raise InvalidArchive("Invalid host backup run identity")
+        if (not isinstance(options, dict) or options.keys() - {"init_run", "compact", "delta_cutover_now", "defer_cleanup"}
+                or any(type(value) is not bool for value in options.values())):
+            raise InvalidArchive("Invalid retained host backup options")
+        self.state = private_directory(state)
+        self.runs = private_directory(self.state / "runs")
+        self.active = self.state / "active.json"
+        saved = read_record(self.active, limit=16384, optional=True)
+        self.resumed = saved is not None
+        if saved is None:
+            # Recover the small window after an operator restored the journal
+            # files, rather than quietly abandoning an older retained attempt.
+            pending = []
+            for path in self.runs.iterdir():
+                if not RUN_NAME.fullmatch(path.name):
+                    continue
+                directory(path, private=True)
+                record = read_record(path / "identity.json", limit=16384, optional=True)
+                finished = read_record(path / "finished.json", limit=16384, optional=True)
+                if finished is not None:
+                    if (not isinstance(finished, dict) or set(finished) != {"master_sha256", "publication"}
+                            or not isinstance(finished["master_sha256"], str) or not HEX.fullmatch(finished["master_sha256"])
+                            or not isinstance(record, dict)
+                            or validate_reference(finished["publication"])["checkpoint_uuid"] != record.get("checkpoint_uuid")):
+                        raise InvalidArchive("Invalid completed native run receipt")
+                if record is not None and finished is None:
+                    pending.append(record)
+            if len(pending) > 1:
+                raise InvalidArchive("Multiple unfinished native runs require explicit recovery")
+            if pending:
+                saved, self.resumed = pending[0], True
+            else:
+                if (self.runs / proposed_id).exists():
+                    proposed_id = proposed_id[:95] + "-" + uuid.uuid4().hex
+                saved = {"format": CONFIG_FORMAT + ".run", "version": 1, **binding,
+                         "run_id": proposed_id, "checkpoint_uuid": str(uuid.uuid4()),
+                         "created_epoch": int(time.time()), "options": options}
+        fields = {"format", "version", "run_id", "checkpoint_uuid", "created_epoch", "options", *binding}
+        if (not isinstance(saved, dict) or set(saved) != fields or saved["format"] != CONFIG_FORMAT + ".run"
+                or type(saved["version"]) is not int or saved["version"] != 1
+                or not isinstance(saved["run_id"], str) or not RUN_NAME.fullmatch(saved["run_id"])
+                or not canonical_uuid(saved["checkpoint_uuid"]) or type(saved["created_epoch"]) is not int
+                or saved["created_epoch"] <= 0 or any(saved[k] != value for k, value in binding.items())
+                or not isinstance(saved["options"], dict)
+                or saved["options"].keys() - {"init_run", "compact", "delta_cutover_now", "defer_cleanup"}
+                or any(type(value) is not bool for value in saved["options"].values())):
+            raise InvalidArchive("Host backup retry changed its original identity, configuration or destination")
+        self.record = saved
+        # The pointer and full original identity precede every capture side effect.
+        same_or_publish(self.active, json_bytes(saved))
+        self.root = private_directory(self.runs / saved["run_id"])
+        same_or_publish(self.root / "identity.json", json_bytes(saved))
+
+    def complete(self, receipt):
+        same_or_publish(self.root / "finished.json", json_bytes(receipt))
+        current = read_record(self.active, limit=16384, optional=True)
+        if current is not None:
+            if current != self.record:
+                raise InvalidArchive("The active native backup changed before completion")
+            self.active.unlink()
+            sync_directory(self.state)
 
 
 def copy_ledger(source, target, reserve):
@@ -83,9 +217,8 @@ def copy_ledger(source, target, reserve):
 
 
 class NativeBackupSession:
-    def __init__(self, filename, run_id, live_media, bucket, prefix, s3_client):
-        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}", run_id):
-            raise InvalidArchive("Invalid host backup run identity")
+    def __init__(self, filename, run_id, live_media, bucket, prefix, s3_client, *, options=None, lock_fd=None):
+        self.lock_fd = lock_fd
         filename = Path(filename).resolve(strict=True)
         with open_regular(filename) as incoming:
             body = incoming.read((4 << 20) + 1)
@@ -114,25 +247,25 @@ class NativeBackupSession:
         if (Path(media["mountpoint"]) / relative).resolve(strict=True) != self.live_media:
             raise InvalidArchive("Native backup media binding differs from the existing host source")
         self.store = NativeStore(s3_client, bucket, prefix)
-        state = private_directory(config["state_directory"])
-        self.run_id, self.root = run_id, private_directory(state / "runs" / run_id)
-        identity_path = self.root / "identity.json"
-        identity = {"format": CONFIG_FORMAT + ".run", "version": 1, "run_id": run_id,
-                    "config_sha256": hashlib.sha256(body).hexdigest(), "live_media": str(self.live_media),
-                    "bucket": bucket, "prefix": prefix}
-        if identity_path.exists():
-            with open_regular(identity_path) as incoming:
-                saved = decode_json(incoming.read(16385))
-            if (not isinstance(saved, dict) or set(saved) != set(identity) | {"checkpoint_uuid", "created_epoch"}
-                    or any(saved[k] != v for k, v in identity.items())):
-                raise InvalidArchive("Host backup retry changed its original configuration or destination")
-        else:
-            saved = {**identity, "checkpoint_uuid": str(uuid.uuid4()), "created_epoch": int(time.time())}
-            publish_bytes(identity_path, json_bytes(saved))
-        if (not canonical_uuid(saved["checkpoint_uuid"]) or type(saved["created_epoch"]) is not int
-                or saved["created_epoch"] <= 0):
-            raise InvalidArchive("Invalid retained native backup identity")
-        self.created_epoch = saved["created_epoch"]
+        self.journal = NativeRunJournal(config["state_directory"], run_id,
+                                        {"config_sha256": hashlib.sha256(body).hexdigest(), "live_media": str(self.live_media),
+                                         "bucket": bucket, "prefix": prefix}, {} if options is None else options)
+        saved, state = self.journal.record, self.journal.state
+        self.run_id, self.root, self.created_epoch = saved["run_id"], self.journal.root, saved["created_epoch"]
+        self.options, self.resumed = saved["options"], self.journal.resumed
+        self.archive = self.root / "archive"
+        self.catalog = read_record(self.root / "catalog.json", optional=True)
+        self.publication = read_record(self.root / "publication.json", optional=True)
+        if self.publication is not None:
+            validate_reference(self.publication)
+        master = read_record(self.root / "master.json", optional=True)
+        self.committed = master is not None
+        if self.committed:
+            if not isinstance(master, dict) or master.get("native_archive") != self.publication or self.publication is None:
+                raise InvalidArchive("Retained master is missing its native publication")
+            self.generated = self.read_generated()
+            if (self.root / "released.json").exists():
+                return
         pins_cache, media_cache, component_cache = [private_directory(state / name) for name in ("artwork", "media", "components")]
         self.pins = ArtworkPins(pins_cache, config["artwork_sources"], reserve=self.reserve)
         self.media = ZFSMedia(media_cache, media["dataset"], media["guid"], media["mountpoint"],
@@ -141,6 +274,12 @@ class NativeBackupSession:
         api_file = Path(config["api_key_file"]).resolve(strict=True)
         with open_regular(api_file) as incoming:
             key = incoming.read(8194).decode("ascii").strip()
+        if self.committed:
+            # Release may already have removed server components, pins or the
+            # media snapshot. Do not reopen or request any capture for cleanup.
+            self.client = ServerCheckpoint(config["server"], key, saved["checkpoint_uuid"],
+                                           config["recovery_roots"], existing_only=True)
+            return
         components = list(config["components"]) + [
             {"role": "config", "name": "host-backup.json", "path": filename},
             {"role": "config", "name": "host-backup-api-key", "path": api_file}]
@@ -152,8 +291,21 @@ class NativeBackupSession:
         self.view = self.media.open_bound(self.client.boundary_receipt).verify()
         self.media_path = self.view.resolve(relative)
         self.view_identity = (self.view.root.stat().st_dev, self.view.root.stat().st_ino)
-        self.publication = None
-        self.committed = False
+
+    def read_generated(self):
+        result = read_record(self.root / "generated.json", limit=1 << 20)
+        if not isinstance(result, list) or not result or len(result) > 128:
+            raise InvalidArchive("Invalid retained host ledger inventory")
+        names = set()
+        for entry in result:
+            if (not isinstance(entry, dict) or set(entry) != {"name", "sha256", "bytes"}
+                    or not isinstance(entry["name"], str) or Path(entry["name"]).name != entry["name"]
+                    or (entry["name"] != "media.json" and not re.fullmatch(r"ledger-[0-9]+-[^/\\\x00]+", entry["name"]))
+                    or entry["name"] in names or not isinstance(entry["sha256"], str) or not HEX.fullmatch(entry["sha256"])
+                    or type(entry["bytes"]) is not int or entry["bytes"] < 0):
+                raise InvalidArchive("Unsafe or changed host ledger inventory")
+            names.add(entry["name"])
+        return result
 
     def check_source(self):
         info = self.view.root.stat()
@@ -165,6 +317,9 @@ class NativeBackupSession:
     def publish(self, catalog, ledger_paths):
         self.view.verify()
         self.check_source()
+        retained = {key: value for key, value in catalog.items() if key != "native_archive"}
+        same_or_publish(self.root / "catalog.json", json_bytes(retained))
+        self.catalog = retained
         selection = selection_digest(catalog)
         media_document = {"format": MEDIA_FORMAT, "version": 1,
                           "checkpoint_uuid": self.client.request_id,
@@ -190,14 +345,28 @@ class NativeBackupSession:
         same_or_publish(self.root / "generated.json", json_bytes(self.generated))
         self.archive = self.root / "archive"
         if not self.archive.exists():
-            export_archive(None, self.archive, components=generated, producer_origin=self.producer_origin,
-                           server_checkpoint=self.client, artwork_pins=self.pins, media_snapshot=self.media,
-                           component_stage=self.stage, reserve=self.reserve)
+            workspace = OwnedWorkspace(self.root, "pack")
+            pending = workspace.path / "archive"
+            if not (pending / "manifest.json").exists():
+                workspace.clear()
+                export_archive(None, pending, components=generated, producer_origin=self.producer_origin,
+                               server_checkpoint=self.client, artwork_pins=self.pins, media_snapshot=self.media,
+                               component_stage=self.stage, reserve=self.reserve)
+            # A crash after sealing but before promotion must reuse those bytes.
+            directory(pending, private=True)
+            validate_selection_binding(pending, self.client.request_id, selection)
+            pending.rename(self.archive)
+            sync_directory(workspace.path)
+            sync_directory(self.root)
+        directory(self.archive, private=True)
         media = validate_selection_binding(self.archive, self.client.request_id, selection)
         if media != media_document:
             raise InvalidArchive("Retained archive differs from the original native/media selection")
+        workspace = OwnedWorkspace(self.root, "verify")
+        workspace.clear()
         proof = verify_archive_proofs(self.archive, native_validator=self.validator, producer_origin=self.producer_origin,
-                                      timeout=self.validator_timeout, temp_parent=self.root, reserve=self.reserve)
+                                      timeout=self.validator_timeout, temp_parent=workspace.path, reserve=self.reserve,
+                                      lock_fd=getattr(self, "lock_fd", None))
         self.publication = self.store.publish_archive(self.archive, proof, self.client.request_id, selection)
         same_or_publish(self.root / "publication.json", json_bytes(self.publication))
         return self.publication
@@ -210,6 +379,21 @@ class NativeBackupSession:
                 or selection_digest(catalog) != self.publication["selection_sha256"]):
             raise InvalidArchive("Master manifest does not match the verified native/media publication")
         self.view.verify()
+        intent_path = self.root / "commit-intent.json"
+        intent = read_record(intent_path, limit=4096, optional=True)
+        digest = hashlib.sha256(body).hexdigest()
+        if intent is None:
+            head = self.store.head("current_manifest.json")
+            etag = head.get("ETag") if head is not None else None
+            if head is not None and (not isinstance(etag, str) or not 1 <= len(etag) <= 1024
+                                     or any(ord(c) < 32 or ord(c) > 126 for c in etag)):
+                raise InvalidArchive("Current S3 manifest has no usable conditional-write identity")
+            intent = {"master_sha256": digest, "bytes": len(body), "expected_etag": etag}
+            publish_bytes(intent_path, json_bytes(intent))
+        if (not isinstance(intent, dict) or set(intent) != {"master_sha256", "bytes", "expected_etag"}
+                or intent["master_sha256"] != digest or intent["bytes"] != len(body)
+                or intent["expected_etag"] is not None and not isinstance(intent["expected_etag"], str)):
+            raise InvalidArchive("The retained manifest publication attempt changed")
         self.store.put_bytes("manifests/runs/" + self.run_id + "/manifest.json", body)
         same_or_publish(self.root / "prepared-master.json", body)
 
@@ -221,10 +405,26 @@ class NativeBackupSession:
         # This mutable pointer is the final publication commit. Its checksum is
         # supplied to S3 and checked again before any cleanup becomes eligible.
         digest = hashlib.sha256(body).hexdigest()
+        intent = read_record(self.root / "commit-intent.json", limit=4096)
+        if intent.get("master_sha256") != digest or intent.get("bytes") != len(body):
+            raise InvalidArchive("Current manifest differs from the original commit attempt")
+        head = self.store.head("current_manifest.json")
+        checksum = base64.b64encode(bytes.fromhex(digest)).decode("ascii")
+        already_committed = head is not None and head.get("ChecksumSHA256") == checksum and head.get("ContentLength") == len(body)
+        if already_committed:
+            # An interrupted caller can adopt only its exact confirmed bytes.
+            self.store.verified("current_manifest.json", digest, len(body))
+            same_or_publish(self.root / "master.json", body)
+            self.committed = True
+            return
+        expected = intent["expected_etag"]
+        if (head.get("ETag") if head is not None else None) != expected:
+            raise InvalidArchive("The current S3 manifest changed; refusing to replace a newer publication")
+        condition = {"IfNoneMatch": "*"} if expected is None else {"IfMatch": expected}
         try:
             self.store.client.put_object(Bucket=self.store.bucket, Key=self.store.prefix + "current_manifest.json",
                                          Body=body, ContentLength=len(body), StorageClass="STANDARD",
-                                         ChecksumSHA256=base64.b64encode(bytes.fromhex(digest)).decode("ascii"))
+                                         ChecksumSHA256=checksum, **condition)
         except Exception:
             if not self.store.verified("current_manifest.json", digest, len(body)):
                 raise
@@ -250,6 +450,8 @@ class NativeBackupSession:
         same_or_publish(released, release_body)
         # All providers have durable release receipts. Reclaim only this run's
         # inventoried private copies, preserving manifests and unknown files.
+        directory(self.archive, private=True)
+        directory(self.archive / "objects", private=True)
         for name, size in archive_objects(self.archive, load_manifest(self.archive)).items():
             path = self.archive / "objects" / (name + ".gz")
             try:
@@ -271,3 +473,5 @@ class NativeBackupSession:
                 continue
             path.unlink()
         sync_directory(self.root)
+        if hasattr(self, "journal"):
+            self.journal.complete(decode_json(release_body))

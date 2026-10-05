@@ -22,13 +22,17 @@ MAX_OUTPUT = 64 << 10
 DEFAULT_TIMEOUT = 3600
 
 
-def validator_output(executable, database, timeout):
+def validator_output(executable, database, timeout, *, lock_fd=None):
     """Bound both output streams and runtime, including a child that stops talking."""
     outputs = {"stdout": bytearray(), "stderr": bytearray()}
+    if lock_fd is not None:
+        if type(lock_fd) is not int or lock_fd < 0 or not stat.S_ISREG(os.fstat(lock_fd).st_mode):
+            raise InvalidArchive("The host verification lock must be an open regular file")
     deadline = time.monotonic() + timeout
     with subprocess.Popen([str(executable), "--verify-native-snapshot", str(database)],
                           stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                          stderr=subprocess.PIPE, cwd=database.parent) as process:
+                          stderr=subprocess.PIPE, cwd=database.parent,
+                          pass_fds=() if lock_fd is None else (lock_fd,)) as process:
         try:
             with selectors.DefaultSelector() as selector:
                 selector.register(process.stdout, selectors.EVENT_READ, "stdout")
@@ -76,11 +80,11 @@ def validator_path(executable, timeout):
     return executable
 
 
-def verify_native_snapshot(restored, entry, executable, *, timeout=DEFAULT_TIMEOUT):
+def verify_native_snapshot(restored, entry, executable, *, timeout=DEFAULT_TIMEOUT, lock_fd=None):
     """Require the matching binary's exact v1 report for the packed library bytes."""
     executable = validator_path(executable, timeout)
     database = Path(restored).absolute() / "library.sqlite"
-    body = validator_output(executable, database, timeout)
+    body = validator_output(executable, database, timeout, lock_fd=lock_fd)
     report = decode_json(body)
     fields = {"format", "version", "lineage", "schema_version", "sha256", "bytes",
               "database_verified", "pending_file_deletions", "filesystem_recovery_verified"}
@@ -102,7 +106,7 @@ def verify_native_snapshot(restored, entry, executable, *, timeout=DEFAULT_TIMEO
 
 
 def verify_archive_proofs(source, *, native_validator=None, producer_origin=None,
-                         timeout=DEFAULT_TIMEOUT, temp_parent=None, reserve=RESERVE_BYTES):
+                         timeout=DEFAULT_TIMEOUT, temp_parent=None, reserve=RESERVE_BYTES, lock_fd=None):
     """Return success only after every requested check passes on the same restore."""
     from .receipts import origin, verify_restored_receipts
 
@@ -120,7 +124,7 @@ def verify_archive_proofs(source, *, native_validator=None, producer_origin=None
         result = {"uuid": manifest["uuid"], "manifest_sha256": manifest_sha256,
                   "coverage": manifest["coverage"], "contents_verified": True}
         if native_validator is not None:
-            proof = verify_native_snapshot(restored, library, native_validator, timeout=timeout)
+            proof = verify_native_snapshot(restored, library, native_validator, timeout=timeout, lock_fd=lock_fd)
             result["native_snapshot"] = dict(proof, archive_uuid=manifest["uuid"],
                                              manifest_sha256=manifest_sha256,
                                              component={"role": "library", "name": library["name"]})

@@ -137,6 +137,38 @@ reuses and revalidates its original sealed capture, even if live settings have
 changed. A different request or an incomplete existing directory is rejected.
 Failed new requests remove only their own output. The manifest is written last.
 
+An authorized host coordinator can request `external_boundary` with
+`{"timeout_seconds":30}` (1–120 seconds). After capturing configuration and
+deletion recovery, the server keeps its database writer guard while it streams
+an NDJSON `boundary_ready` event containing the checkpoint UUID, request digest,
+one-use token and expiry. The coordinator captures its external filesystem view
+and posts `{"token":"…","details":{…}}` to
+`/api/v3/backups/checkpoints/{uuid}/boundary`. Details must be a nonempty JSON
+object no larger than 64 KiB after canonical encoding. The server records the
+accepted confirmation in `filesystem-boundary.json`, then releases ordinary
+writes before the large database copy. The stream ends with a `sealed` event or
+an error; a confirmation alone is not a sealed checkpoint.
+
+The Python `ServerCheckpoint` client accepts a trusted local `boundary`
+callback and `boundary_timeout`. It validates the challenge before invoking the
+callback, sends its returned evidence, and checks the sealed component against
+the acknowledgement. An identical sealed retry returns ordinary JSON and
+reuses the original evidence without invoking the callback again. Matching
+acknowledgements are retryable during the copy and from the sealed component;
+changed evidence and stale tokens are rejected. Expiry, cancellation or a
+disconnected client cannot leave the server waiting indefinitely or seal an
+unconfirmed capture.
+
+This handshake does not implement or certify a filesystem provider. The trusted
+host must establish its producer barrier **before** requesting the native writer
+guard, validate and retain the actual immutable views, and clean up failed
+external captures. Otherwise a producer waiting on the server while holding the
+host's barrier can deadlock the capture. The server never runs provider commands
+from a request. The command-line exporter does not yet select a provider;
+production media snapshots, artwork preservation and publication integration
+remain required. Checkpoint coverage remains
+`database-configuration-deletion-recovery`.
+
 The server captures the native database, raw deletion recovery trees, main
 configuration, runtime overrides and configured TLS certificate/key assets.
 Settings and overrides remain separate, and private values appear only in the

@@ -24,7 +24,8 @@ from .storage import InvalidArchive, HEX, decode_json, publish_bytes, require_sp
 FORMAT = "org.notsafeforgit.stash.server-checkpoint"
 COVERAGE = "database-configuration-deletion-recovery"
 ROLES = {"library.sqlite": "library", "deletions.zip": "file_journal",
-         "config.yml": "config", "runtime-overrides.yml": "config", "tls.crt": "config", "tls.key": "config"}
+         "config.yml": "config", "runtime-overrides.yml": "config", "tls.crt": "config", "tls.key": "config",
+         "filesystem-boundary.json": "operating_state"}
 RESERVED = {(role, name) for name, role in ROLES.items() if role != "library"} | {("operating_state", "server-checkpoint.json")}
 
 
@@ -44,7 +45,7 @@ def request_bytes(request):
 
 
 class ServerCheckpoint:
-    def __init__(self, server, api_key, request_id, roots=(), *, timeout=3600):
+    def __init__(self, server, api_key, request_id, roots=(), *, timeout=3600, boundary=None, boundary_timeout=30):
         try:
             url = urllib.parse.urlsplit(server)
             port = url.port
@@ -57,6 +58,9 @@ class ServerCheckpoint:
             raise InvalidArchive("Invalid native checkpoint connection options")
         if not isinstance(api_key, str) or not re.fullmatch(r"[!-~]{1,8192}", api_key):
             raise InvalidArchive("A native checkpoint requires an application API key")
+        if ((boundary is not None and not callable(boundary)) or type(boundary_timeout) is not int
+                or not 1 <= boundary_timeout <= 120):
+            raise InvalidArchive("Invalid filesystem checkpoint provider or deadline")
         roots = list(roots)
         if len(roots) > 1024 or any(not isinstance(r, dict) or set(r) != {"name", "path"}
                                   or not all(isinstance(r[k], str) for k in r) for r in roots):
@@ -64,6 +68,7 @@ class ServerCheckpoint:
         self.server, self.api_key, self.request_id = server.rstrip("/"), api_key, request_id
         self.roots = [{"name": r["name"], "path": r["path"]} for r in roots]
         self.timeout = timeout
+        self.boundary, self.boundary_timeout, self.boundary_receipt = boundary, boundary_timeout, None
         self.opener = urllib.request.build_opener(NoRedirect())
 
     def open(self, suffix, data=None):
@@ -83,18 +88,18 @@ class ServerCheckpoint:
 
     def capture(self, destination, *, reserve):
         from .bundle import connect_readonly, database_metadata
+        from .filesystem_boundary import read_checkpoint_response, validate_record
         destination = Path(destination)
         request = {"uuid": self.request_id, "recovery_roots": self.roots, "reserve_bytes": reserve}
+        if self.boundary is not None:
+            request["external_boundary"] = {"timeout_seconds": self.boundary_timeout}
         request_hash = hashlib.sha256(request_bytes(request)).hexdigest()
+        self.boundary_receipt = None
         require_space(destination.parent, 0, reserve)
         destination.mkdir(mode=0o700)
         try:
             with self.open("", request_bytes(request)) as response:
-                if response.headers.get_content_type() != "application/json":
-                    raise InvalidArchive("Native checkpoint response is not JSON")
-                body = response.read((1 << 20) + 1)
-            if len(body) > 1 << 20:
-                raise InvalidArchive("Native checkpoint manifest exceeds its size limit")
+                body = read_checkpoint_response(self, response, request_hash)
             manifest = decode_json(body)
             self.validate(manifest, request_hash)
             components = []
@@ -128,6 +133,11 @@ class ServerCheckpoint:
                         os.fsync(output.fileno())
                 if component["role"] != "library":
                     components.append({"role": component["role"], "name": name, "path": destination / name})
+                if name == "filesystem-boundary.json":
+                    record = validate_record(decode_json((destination / name).read_bytes()), self, request_hash)
+                    if self.boundary_receipt is not None and record != self.boundary_receipt:
+                        raise InvalidArchive("Sealed filesystem checkpoint differs from its acknowledgement")
+                    self.boundary_receipt = record
             native = destination / "library.sqlite"
             with closing(connect_readonly(native)) as db:
                 metadata = database_metadata(db, "library")
@@ -144,6 +154,7 @@ class ServerCheckpoint:
             raise
 
     def validate(self, manifest, request_hash):
+        from .filesystem_boundary import MAX_RECORD
         fields = {"format", "version", "uuid", "coverage", "created_at", "request_sha256", "source_database_path",
                   "source_config_path", "source_working_directory", "committed_deletion_ids", "components"}
         if (not isinstance(manifest, dict) or set(manifest) != fields or manifest["format"] != FORMAT
@@ -177,5 +188,9 @@ class ServerCheckpoint:
                     raise InvalidArchive("Invalid configuration asset source path")
                 base64.b64decode(entry["source_path"], validate=True)
             names.add(entry["name"])
+            if entry["name"] == "filesystem-boundary.json" and entry["bytes"] > MAX_RECORD:
+                raise InvalidArchive("Filesystem checkpoint receipt exceeds its size limit")
         if not {"library.sqlite", "deletions.zip", "config.yml", "runtime-overrides.yml"} <= names:
             raise InvalidArchive("Native checkpoint is missing required components")
+        if self.boundary is not None and "filesystem-boundary.json" not in names:
+            raise InvalidArchive("Native checkpoint is missing the requested filesystem boundary")

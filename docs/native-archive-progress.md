@@ -7704,3 +7704,40 @@ directory.
 Live S3 publication and automatic cleanup of unsealed abandoned captures are
 still outstanding. No production backup cadence, storage policy, current
 manifest, retention tags or running services changed.
+
+## External filesystem checkpoint coordination — 2026-10-04
+
+The application checkpoint API can now hold the native writer guard for a
+bounded host confirmation after configuration/deletion capture. A streamed
+challenge binds the request digest, checkpoint UUID, fresh token and expiry.
+The authorized host supplies evidence for its own filesystem view through a
+separate confirmation route. The server seals that record before releasing
+ordinary writers for the large database copy. It never executes a requested
+provider command. Timeouts, cancellation and failed stream delivery remove the
+unsealed output and release the guard.
+
+Matching confirmations return the same receipt during the copy and from the
+sealed component after restart. Changed evidence or a token from an abandoned
+attempt is rejected. The Python client verifies the challenge, acknowledgement,
+terminal stream event and downloaded component. Replaying a sealed checkpoint
+does not invoke the provider again. The record is bounded, preserves large
+filesystem identifiers without float conversion, and is removed by the existing
+publication-aware component release.
+
+All checkpoint manager/API tests pass in 31.5 seconds, including a separate
+SQLite writer blocked during confirmation, timeout/cancel recovery, stale-token
+rejection, receipt tampering, large identifiers and actual Go HTTP/Python
+export/restore/release. The HTTP test uses a temporary view as a provider
+stand-in; it is not a ZFS snapshot test. All 68 Python archive tests pass in
+28.9 seconds. Lint reports zero issues in 11.5 seconds. Evidence labels are
+`native_checkpoint_boundary_final_go`, `native_checkpoint_boundary_python` and
+`native_checkpoint_boundary_lint_final` under the October 4 client rehearsal
+directory. The preceding checkpoint-release commit passed Build, lint and GHCR
+publication on its exact revision.
+
+Actual immutable media snapshots, producer publication barriers and original
+artwork preservation remain to be integrated. The host must acquire its producer
+barrier before the server's writer guard to avoid a producer/server lock cycle.
+The confirmation is coordination evidence, not independent proof of its caller's
+filesystem claims; declared coverage remains database/configuration/deletion
+recovery. No production deployment, scheduled backup or storage policy changed.

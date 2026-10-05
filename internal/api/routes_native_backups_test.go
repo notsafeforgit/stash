@@ -23,6 +23,16 @@ import (
 )
 
 func TestNativeBackupCheckpointHTTPAndPortableExport(t *testing.T) {
+	for _, boundary := range []bool{false, true} {
+		name := "ordinary"
+		if boundary {
+			name = "filesystem-boundary"
+		}
+		t.Run(name, func(t *testing.T) { testNativeBackupCheckpointHTTP(t, boundary) })
+	}
+}
+
+func testNativeBackupCheckpointHTTP(t *testing.T, boundary bool) {
 	python, err := exec.LookPath("python3")
 	if err != nil {
 		t.Skip("Python 3 is required for the portable archive interoperability check")
@@ -74,8 +84,8 @@ func TestNativeBackupCheckpointHTTPAndPortableExport(t *testing.T) {
 	script := filepath.Join(archive, "tests", "server_checkpoint_check.py")
 	_, err = os.ReadFile(script)
 	require.NoError(t, err)
-	body, err := json.Marshal(map[string]string{"server": server.URL, "directory": directory,
-		"request_id": id, "roots_file": rootsFile, "key_file": keyFile})
+	body, err := json.Marshal(map[string]interface{}{"server": server.URL, "directory": directory,
+		"request_id": id, "roots_file": rootsFile, "key_file": keyFile, "boundary": boundary})
 	require.NoError(t, err)
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()
@@ -87,9 +97,17 @@ func TestNativeBackupCheckpointHTTPAndPortableExport(t *testing.T) {
 	var result struct {
 		Verified bool   `json:"verified"`
 		Restored string `json:"restored"`
+		FailedID string `json:"failed_id"`
 	}
 	require.NoError(t, json.Unmarshal(output, &result))
 	require.True(t, result.Verified)
+	if boundary {
+		require.NotEmpty(t, result.FailedID)
+		require.Eventually(t, func() bool {
+			_, err := os.Stat(filepath.Join(directory, "native-checkpoints", result.FailedID))
+			return os.IsNotExist(err)
+		}, 5*time.Second, 10*time.Millisecond, "disconnected provider retained its unsealed checkpoint")
+	}
 	require.Equal(t, filepath.Join(directory, "restored"), result.Restored)
 	proof, err := sqlite.VerifyNativeSnapshot(t.Context(), filepath.Join(result.Restored, "library.sqlite"))
 	require.NoError(t, err)

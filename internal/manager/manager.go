@@ -48,7 +48,9 @@ type JobManager interface {
 }
 
 type Manager struct {
-	nativeBackupMu sync.Mutex
+	nativeBackupMu   sync.Mutex
+	nativeBoundaryMu sync.Mutex
+	nativeBoundary   *nativeCheckpointBoundaryPending
 
 	Config *config.Config
 	Logger *log.Logger

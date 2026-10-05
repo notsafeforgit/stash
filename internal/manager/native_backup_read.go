@@ -14,6 +14,7 @@ import (
 var nativeCheckpointRoles = map[string]string{
 	"library.sqlite": "library", "deletions.zip": "file_journal",
 	"config.yml": "config", "runtime-overrides.yml": "config", "tls.crt": "config", "tls.key": "config",
+	"filesystem-boundary.json": "operating_state",
 }
 
 func readNativeCheckpoint(directory, id string) (*NativeBackupCheckpoint, error) {

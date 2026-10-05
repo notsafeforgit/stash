@@ -82,6 +82,11 @@ temporary components after durable publication; retained checkpoint/release
 records prevent the same UUID from capturing newer state. Complete external-file/
 media inventory, publisher/abandoned-stage retention integration and S3/restore activation remain required;
 declared component coverage does not establish a complete production backup.
+The optional external-boundary handshake keeps the native writer guard until a
+bounded host confirmation and seals that evidence with the checkpoint. Establish
+producer barriers before requesting that guard; the server never executes
+filesystem provider commands. Sealed retries must reuse the original view.
+Actual media snapshots and original-artwork preservation still need integration.
 The producer CLI can validate a portable worker profile and execute one claimed
 source attempt with concurrent outbox delivery. Website-access references stay
 local, and source completion remains distinct from verified media intake.

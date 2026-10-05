@@ -34,9 +34,10 @@ type NativeCheckpointRoot struct {
 }
 
 type NativeCheckpointInput struct {
-	UUID          string                 `json:"uuid"`
-	RecoveryRoots []NativeCheckpointRoot `json:"recovery_roots"`
-	ReserveBytes  *int64                 `json:"reserve_bytes,omitempty"`
+	UUID             string                         `json:"uuid"`
+	RecoveryRoots    []NativeCheckpointRoot         `json:"recovery_roots"`
+	ReserveBytes     *int64                         `json:"reserve_bytes,omitempty"`
+	ExternalBoundary *NativeCheckpointBoundaryInput `json:"external_boundary,omitempty"`
 }
 
 type NativeCheckpointComponent struct {
@@ -75,6 +76,9 @@ func nativeCheckpointRequest(input NativeCheckpointInput) (string, int64, error)
 		reserve = *input.ReserveBytes
 	}
 	if reserve < 0 {
+		return "", 0, ErrNativeCheckpointInvalid
+	}
+	if input.ExternalBoundary != nil && (input.ExternalBoundary.TimeoutSeconds < 1 || input.ExternalBoundary.TimeoutSeconds > 120) {
 		return "", 0, ErrNativeCheckpointInvalid
 	}
 	// Semantically identical omitted/default reserve values have one identity.
@@ -116,6 +120,20 @@ func (s *Manager) nativeCheckpointDirectory(id string) (string, error) {
 // trees, then copies the fixed WAL view with ordinary writers released. The
 // manifest is published last; failed requests remove only their own new output.
 func (s *Manager) CaptureNativeCheckpoint(ctx context.Context, input NativeCheckpointInput) (_ *NativeBackupCheckpoint, retErr error) {
+	return s.captureNativeCheckpoint(ctx, input, nil)
+}
+
+// CaptureNativeCheckpointWithBoundary lets the authorized coordinator capture
+// an external filesystem view while native writes are excluded. The callback
+// publishes a bounded, one-use challenge, never an arbitrary server command.
+func (s *Manager) CaptureNativeCheckpointWithBoundary(ctx context.Context, input NativeCheckpointInput, ready func(NativeCheckpointBoundaryReady) error) (*NativeBackupCheckpoint, error) {
+	return s.captureNativeCheckpoint(ctx, input, ready)
+}
+
+func (s *Manager) captureNativeCheckpoint(ctx context.Context, input NativeCheckpointInput, ready func(NativeCheckpointBoundaryReady) error) (_ *NativeBackupCheckpoint, retErr error) {
+	if input.ExternalBoundary != nil && ready == nil {
+		return nil, ErrNativeCheckpointInvalid
+	}
 	requestHash, reserve, err := nativeCheckpointRequest(input)
 	if err != nil {
 		return nil, err
@@ -124,6 +142,7 @@ func (s *Manager) CaptureNativeCheckpoint(ctx context.Context, input NativeCheck
 		return nil, ErrNativeCheckpointBusy
 	}
 	defer s.nativeBackupMu.Unlock()
+	defer s.clearNativeCheckpointBoundary(input.UUID)
 	directory, err := s.nativeCheckpointDirectory(input.UUID)
 	if err != nil {
 		return nil, err
@@ -257,6 +276,25 @@ func (s *Manager) CaptureNativeCheckpoint(ctx context.Context, input NativeCheck
 		}
 		if err := c.CopyDeletionSnapshot(filepath.Join(directory, "deletions.zip"), roots, checkSpace); err != nil {
 			return err
+		}
+		if input.ExternalBoundary != nil {
+			record, err := s.awaitNativeCheckpointBoundary(ctx, input, requestHash, ready)
+			if err != nil {
+				return err
+			}
+			body, err := json.Marshal(record)
+			if err != nil {
+				return err
+			}
+			if err := checkSpace(int64(len(body))); err != nil {
+				return err
+			}
+			if err := fsutil.WriteFileAtomic(filepath.Join(directory, "filesystem-boundary.json"), body, 0600); err != nil {
+				return err
+			}
+			if err := add("operating_state", "filesystem-boundary.json"); err != nil {
+				return err
+			}
 		}
 		// Hash the component after writer release; this file is already frozen.
 		return nil

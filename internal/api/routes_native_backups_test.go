@@ -70,6 +70,15 @@ func testNativeBackupCheckpointHTTP(t *testing.T, boundary bool) {
 	require.NoError(t, os.WriteFile(rootsFile, roots, 0600))
 	require.NoError(t, os.WriteFile(keyFile, []byte("http-backup-fixture\n"), 0600))
 	id := uuid.NewString()
+	blobs := filepath.Join(directory, "artwork")
+	if boundary {
+		require.NoError(t, os.Mkdir(blobs, 0700))
+		db.SetBlobStoreOptions(sqlite.BlobStoreOptions{UseFilesystem: true, Path: blobs})
+		require.NoError(t, mgr.Repository.WithTxn(t.Context(), func(ctx context.Context) error {
+			_, err := db.Blobs.Write(ctx, []byte("original checkpoint artwork"))
+			return err
+		}))
+	}
 	archive, err := filepath.Abs("../../integrations/archive")
 	require.NoError(t, err)
 	source := filepath.Join(archive, "src")
@@ -85,7 +94,7 @@ func testNativeBackupCheckpointHTTP(t *testing.T, boundary bool) {
 	_, err = os.ReadFile(script)
 	require.NoError(t, err)
 	body, err := json.Marshal(map[string]interface{}{"server": server.URL, "directory": directory,
-		"request_id": id, "roots_file": rootsFile, "key_file": keyFile, "boundary": boundary})
+		"request_id": id, "roots_file": rootsFile, "key_file": keyFile, "boundary": boundary, "blobs": blobs})
 	require.NoError(t, err)
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()

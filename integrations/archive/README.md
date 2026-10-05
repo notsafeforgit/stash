@@ -20,9 +20,13 @@ remain required before production scheduling.
 
 `ServerCheckpoint` also accepts a trusted host callback to capture an external
 filesystem view during a bounded database writer guard. It verifies and retains
-the confirmation, and sealed retries reuse the original view. Actual snapshot
-providers, producer barriers and artwork preservation still need integration;
-the receipt alone does not prove a complete filesystem backup.
+the confirmation, and sealed retries reuse the original view. The host-side
+`ArtworkPins` provider retains original artwork inodes during this callback;
+exports and retries use those pins after live changes or deletion. Its release
+helper verifies the archived association and supports interrupted cleanup.
+Media snapshots and producer barriers still need integration; the receipt alone
+does not prove a complete filesystem backup. S3 uploads remain the responsibility
+of the existing host backup script.
 
 See the [format and commands](../../docs/native-archive-format.md) for installation,
 coverage, storage budgets, manifest rules and the remaining production backup

@@ -106,13 +106,15 @@ def _blob_rows(connection):
 
 
 def export_archive(database, destination, *, blob_paths=(), components=(), reserve=RESERVE_BYTES,
-                   progress=None, producer_origin=None, server_checkpoint=None):
+                   progress=None, producer_origin=None, server_checkpoint=None, artwork_pins=None):
     # Capture every download archive before any outbox, then the server last.
     # The native adapter durably queues file completion before archive.add; an
     # acknowledged queue row in turn follows the server's committed receipt.
     # Snapshotting the library first can lose that causal prefix while packing
     # many artwork objects. Transport still cannot certify media/config/journals.
     components = list(components)
+    if artwork_pins is not None and (server_checkpoint is None or blob_paths):
+        raise InvalidArchive("Artwork pins require a server checkpoint and replace live blob paths")
     if server_checkpoint is not None:
         from .server_checkpoint import RESERVED
         if database is not None:
@@ -144,12 +146,13 @@ def export_archive(database, destination, *, blob_paths=(), components=(), reser
         inventory_bytes, count, total = 0, 0, 0
         inventory_path = destination / "artifacts.jsonl"
         inventory_fd = os.open(inventory_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        def add(path, role, name, sqlite_metadata=None):
+        def add(path, role, name, sqlite_metadata=None, *, retained_blob=False):
             nonlocal inventory_bytes, count, total
             if not NAME.fullmatch(name) or (role, name) in names:
                 raise InvalidArchive("Invalid or duplicate component name")
             names.add((role, name))
-            entry = store_file(destination, path, reserve=reserve)
+            options = {"expected_md5": name} if retained_blob else {}
+            entry = store_file(destination, path, reserve=reserve, **options)
             if (role, name) in server_expected and (entry["sha256"], entry["size"]) != server_expected[(role, name)]:
                 raise InvalidArchive("Packed server checkpoint component differs from its captured digest")
             entry.update(role=role, name=name)
@@ -188,9 +191,10 @@ def export_archive(database, destination, *, blob_paths=(), components=(), reser
                 verify_snapshot_receipts(native, [snapshots[index][0] for index, component in enumerate(components)
                                                    if component["role"] == "producer_outbox"], producer_origin)
             add(native, "library", "library", metadata)
+            pinned = artwork_pins.open_bound(server_checkpoint.boundary_receipt).verify() if artwork_pins is not None else None
             with closing(connect_readonly(native)) as connection:
                 for checksum in _blob_rows(connection):
-                    found = None
+                    found = pinned.resolve(checksum) if pinned is not None else None
                     for root in blob_paths:
                         candidate = Path(root) / checksum[:2] / checksum[2:4] / checksum
                         if candidate.exists() or candidate.is_symlink():
@@ -198,7 +202,7 @@ def export_archive(database, destination, *, blob_paths=(), components=(), reser
                             break
                     if found is None:
                         raise InvalidArchive(f"Required original artwork is unavailable: {checksum}")
-                    entry = add(found, "blob", checksum)
+                    entry = add(found, "blob", checksum, retained_blob=pinned is not None)
                     # Check the actual bytes packed, not a second live-file read.
                     digest = hashlib.md5(usedforsecurity=False)
                     from .storage import read_chunk

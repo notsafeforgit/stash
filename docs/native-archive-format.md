@@ -165,15 +165,40 @@ guard, validate and retain the actual immutable views, and clean up failed
 external captures. Otherwise a producer waiting on the server while holding the
 host's barrier can deadlock the capture. The server never runs provider commands
 from a request. The command-line exporter does not yet select a provider;
-production media snapshots, artwork preservation and publication integration
+production media snapshots, producer barriers and publication integration
 remain required. Checkpoint coverage remains
 `database-configuration-deletion-recovery`.
 
 Native artwork writes now publish flushed replacement inodes instead of
 truncating a file that a reader or backup might retain. Orphan cleanup rechecks
 references under a write transaction and uses the deletion journal, sharing the
-checkpoint guard. These are prerequisites for safely retaining hard-linked
-artwork during export; they do not yet create or retain those backup pins.
+checkpoint guard.
+
+The host-side `ArtworkPins` provider retains those inodes in a private cache on
+the same filesystem as the original artwork. Invoke it from the authenticated
+boundary callback and return its record as `details.artwork`. Pass that same
+provider to `export_archive(..., artwork_pins=pins)`, without live `blob_paths`.
+The exporter verifies the record against the sealed server component and reads
+only the retained files. It verifies each packed artwork's checksum against the
+captured database. A retry can reuse the pins even after their live source tree
+has disappeared; it cannot silently fall back to later live artwork.
+
+Pins use flat private directories, retaining the original inodes without another
+copy of all artwork bytes or all hash-prefix directories. Flushed inventories
+record their identities, lengths and modification times. The provider bounds
+capture by the server challenge's deadline and the normal disk reserve; a failed
+capture removes only its own attempt. It requires the native atomic artwork
+writer and journaled cleanup. Other tools must not modify original artwork in
+place. Capture duration still needs measurement against the full live inventory.
+
+After verifying durable enclosing publication, the host publisher calls
+`release_published_artwork(archive, client, pins)`. It checks the archived server
+and filesystem components, obtains the matching permanent server release,
+records the local binding, then unlinks only the listed retained inodes. An
+interrupted cleanup resumes from that binding. It retains small identity/release
+records and removes inventories after durable completion; unexpected files and
+changed inodes are preserved. Export never calls release automatically. This
+provider does not upload to S3 or establish the ordinary-media/producer boundary.
 
 The server captures the native database, raw deletion recovery trees, main
 configuration, runtime overrides and configured TLS certificate/key assets.

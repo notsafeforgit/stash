@@ -86,15 +86,20 @@ def object_path(root, checksum):
     return path / (checksum + ".gz")
 
 
-def store_file(root, source, *, reserve=RESERVE_BYTES):
+def store_file(root, source, *, reserve=RESERVE_BYTES, expected_md5=None):
+    if expected_md5 is not None and (not isinstance(expected_md5, str) or not re.fullmatch(r"[0-9a-f]{32}", expected_md5)):
+        raise InvalidArchive("Invalid retained artwork checksum")
     before = regular(source)
     chunks, digest, size = [], hashlib.sha256(), 0
+    artwork_digest = hashlib.md5(usedforsecurity=False) if expected_md5 is not None else None
     with open_regular(source) as incoming:
         opened = os.fstat(incoming.fileno())
         if (before.st_dev, before.st_ino) != (opened.st_dev, opened.st_ino):
             raise InvalidArchive("Archive input changed before opening")
         while raw := incoming.read(CHUNK_SIZE):
             digest.update(raw)
+            if artwork_digest is not None:
+                artwork_digest.update(raw)
             size += len(raw)
             buffer = io.BytesIO()
             with gzip.GzipFile(filename="", mode="wb", fileobj=buffer,
@@ -114,9 +119,15 @@ def store_file(root, source, *, reserve=RESERVE_BYTES):
                 publish_bytes(target, encoded)
             chunks.append(descriptor)
         after = os.fstat(incoming.fileno())
-    signature = lambda st: (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns)
+    # Removing another link to a retained artwork inode changes ctime, without
+    # changing these bytes. Only pins with an expected content checksum use
+    # this exception; ordinary live inputs retain their strict ctime guard.
+    signature = lambda st: (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns,
+                            st.st_ctime_ns if artwork_digest is None else None)
     if signature(before) != signature(after) or signature(after) != signature(regular(source)):
         raise InvalidArchive("Archive input changed while being read")
+    if artwork_digest is not None and artwork_digest.hexdigest() != expected_md5:
+        raise InvalidArchive("Retained artwork checksum mismatch")
     return {"sha256": digest.hexdigest(), "size": size, "chunks": chunks}
 
 

@@ -86,7 +86,10 @@ The optional external-boundary handshake keeps the native writer guard until a
 bounded host confirmation and seals that evidence with the checkpoint. Establish
 producer barriers before requesting that guard; the server never executes
 filesystem provider commands. Sealed retries must reuse the original view.
-Actual media snapshots and original-artwork preservation still need integration.
+The host-side `ArtworkPins` provider retains original artwork inodes during that
+callback and binds export/retry to the sealed evidence. Retire pins only through
+the publication-aware release helper, which keeps small receipts and resumes
+interrupted cleanup. Media snapshots and producer barriers still need integration.
 Filesystem artwork writes publish flushed replacement inodes; never truncate a
 blob in place because readers and backup pins may retain that inode. Orphan
 cleanup must recheck references under a write transaction and use the deletion

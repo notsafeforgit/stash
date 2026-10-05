@@ -7770,3 +7770,38 @@ client rehearsal directory.
 The backup provider still needs to create and retain artwork pins. This change
 makes that mechanism safe against native artwork writes and cleanup; it does
 not establish a complete media snapshot or alter the running compatible server.
+
+## Retained artwork provider and archive integration — 2026-10-04
+
+The host-side `ArtworkPins` provider now captures real hard links during the
+authenticated filesystem boundary callback. It uses a private cache on the
+artwork filesystem, flat pin directories, flushed files/inventories and bounded
+capture deadlines with the normal free-space reserve. Each record binds its
+checkpoint UUID, one-use token, request digest and original source roots. Failed
+attempts remove only their own output; existing attempts are never recaptured.
+
+Portable export can now use these pins instead of live artwork paths. It checks
+the manifest and inode inventory against the sealed server component, then
+checks each packed artwork checksum against the fixed database. Retained bytes
+survive later atomic replacement, unlinking and removal of the live source tree.
+Link-count/ctime changes during packing are allowed only for retained artwork
+with a verified expected checksum; ordinary live-file checks remain strict.
+
+The publication-aware artwork release helper derives its association from the
+verified archive, obtains the matching server release, and durably records the
+local binding before unlinking any listed inode. Interrupted cleanup is
+retryable. Small identity/release records remain; inventories are removed only
+after durable cleanup completion. Unexpected files, altered records and changed
+inodes cannot be silently removed. Export never releases pins automatically.
+
+All 73 archive tests pass in 21.4 seconds. The real Go HTTP/Python integration
+passes in 8.9 seconds: it captures actual artwork, removes the live tree, exports
+and restores from the pins, replays the same server capture, and resumes pin
+cleanup interrupted immediately before its completion marker. Lint reports zero
+issues. Evidence labels are `native_artwork_pins_durable_python`,
+`native_artwork_pins_durable_http` and `native_artwork_pins_lint` under the October
+4 client rehearsal directory.
+
+Media snapshots, producer barriers, full-inventory timing and daily-script/S3
+integration remain. The installed daily backup script and running production
+server are unchanged; this provider runs in the host backup tooling.

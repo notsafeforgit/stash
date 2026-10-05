@@ -288,7 +288,14 @@ func (s Service) preview(ctx context.Context, input Input, inspectInactive bool,
 			selected = selected || (change.Origin != "filename" && (change.Status == "ready" || change.Status == "unchanged"))
 		}
 		if selected && !unresolved && !bytes.Equal(states["organized"].Value, []byte("true")) {
-			ret.Changes = append(ret.Changes, Change{Field: "organized", Current: states["organized"].Value, Value: json.RawMessage("true"), Origin: "policy", Status: "ready"})
+			missing := missingOrganizedFields(rule.OrganizedRequires, states, ret.Changes)
+			change := Change{Field: "organized", Current: states["organized"].Value, Origin: "policy", Status: "omitted"}
+			if len(missing) == 0 {
+				change.Status, change.Value = "ready", json.RawMessage("true")
+			} else {
+				change.Message = "Required metadata is missing: " + strings.Join(missing, ", ")
+			}
+			ret.Changes = append(ret.Changes, change)
 		}
 	}
 	return finishPreview(ret)

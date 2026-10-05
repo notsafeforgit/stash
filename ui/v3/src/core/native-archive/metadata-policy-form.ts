@@ -20,6 +20,7 @@ const rule = z.object({
   on_existing: z.boolean(),
   skip_organized_on_create: z.boolean(),
   mark_organized: z.boolean(),
+  organized_requires: z.array(z.string()).max(32),
   filename_title_fallback: z.boolean(),
   mappings: z.array(mapping).max(32),
 });
@@ -46,6 +47,7 @@ export function policyFormValues(
       on_existing: saved?.on_existing ?? false,
       skip_organized_on_create: saved?.skip_organized_on_create ?? false,
       mark_organized: saved?.mark_organized ?? false,
+      organized_requires: saved?.organized_requires ?? [],
       filename_title_fallback: saved?.filename_title_fallback ?? true,
       mappings: Object.entries(saved?.mappings ?? {}).map(
         ([target, value]) => ({
@@ -72,10 +74,11 @@ export function policyDefinitionFromForm(
 ): PolicyDefinition {
   const rules: Partial<Record<PolicyKind, PolicyRule>> = {};
   for (const kind of ["scene", "image"] as const) {
-    const { enabled, mappings, ...flags } = values[kind];
+    const { enabled, mappings, organized_requires, ...flags } = values[kind];
     if (!enabled) continue;
     rules[kind] = {
       ...flags,
+      ...(organized_requires.length ? { organized_requires } : {}),
       mappings: Object.fromEntries(
         mappings.map((row) => [
           row.target,
@@ -108,6 +111,16 @@ export function policyFormSchema(fields: PolicyFields) {
     for (const kind of ["scene", "image"] as const) {
       const rules = values[kind];
       if (!rules.enabled) continue;
+      const required = new Set<string>();
+      for (const target of rules.organized_requires) {
+        if (
+          target === "organized" ||
+          required.has(target) ||
+          !fields[kind].some((field) => field.name === target)
+        )
+          issue([kind, "organized_requires"], "invalid_requirement");
+        required.add(target);
+      }
       const seen = new Set<string>();
       for (const [index, row] of rules.mappings.entries()) {
         const path = [kind, "mappings", index];

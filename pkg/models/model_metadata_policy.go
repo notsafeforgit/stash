@@ -20,6 +20,7 @@ type MetadataPolicyRule struct {
 	OnExisting            bool                       `json:"on_existing"`
 	SkipOrganizedOnCreate bool                       `json:"skip_organized_on_create"`
 	MarkOrganized         bool                       `json:"mark_organized"`
+	OrganizedRequires     []string                   `json:"organized_requires,omitempty"`
 	FilenameTitleFallback bool                       `json:"filename_title_fallback"`
 	Mappings              map[string]MetadataMapping `json:"mappings"`
 }

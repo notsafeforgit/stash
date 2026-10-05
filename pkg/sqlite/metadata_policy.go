@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -79,6 +80,15 @@ func (s *MetadataPolicyStore) History(ctx context.Context, collection string, af
 }
 
 func (s *MetadataPolicyStore) Put(ctx context.Context, input models.MetadataPolicyInput) (*models.MetadataPolicy, error) {
+	// Empty optional requirements have the same meaning as an omitted field.
+	// Normalize without mutating the caller's map, so repeated saves remain no-ops.
+	input.Definition.Rules = maps.Clone(input.Definition.Rules)
+	for kind, rule := range input.Definition.Rules {
+		if len(rule.OrganizedRequires) == 0 {
+			rule.OrganizedRequires = nil
+			input.Definition.Rules[kind] = rule
+		}
+	}
 	if input.ExpectedRevision < 0 || input.ExpectedCollectionRevision <= 0 || (input.Origin != "review" && input.Origin != "migration") || !validAccountText(input.Reason, 4096, true) {
 		return nil, fmt.Errorf("%w: invalid review", models.ErrMetadataPolicyInvalid)
 	}

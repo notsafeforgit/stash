@@ -27,18 +27,25 @@ export const policyMappingSchema = mappingSchema.transform(
     return performer_names ? { ...value, performer_names: true } : value;
   },
 );
-export const policyRuleSchema = z
+const ruleSchema = z
   .object({
     on_create: z.boolean(),
     on_existing: z.boolean(),
     skip_organized_on_create: z.boolean(),
     mark_organized: z.boolean(),
+    organized_requires: z.array(z.string().min(1).max(128)).max(32).optional(),
     filename_title_fallback: z.boolean(),
     mappings: z
       .record(z.string().min(1).max(128), policyMappingSchema)
       .nullable(),
   })
   .strict();
+export const policyRuleSchema = ruleSchema.transform(
+  (rule): z.infer<typeof ruleSchema> => {
+    const { organized_requires, ...rest } = rule;
+    return organized_requires?.length ? { ...rest, organized_requires } : rest;
+  },
+);
 export const policyDefinitionSchema = z
   .object({
     enabled: z.boolean(),

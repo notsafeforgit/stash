@@ -1,5 +1,9 @@
 import { expect, it } from "vitest";
 import {
+  policyDefinitionSchema,
+  samePolicyDefinition,
+} from "./metadata-policy-api";
+import {
   policyDefinitionFromForm,
   policyFormSchema,
   policyFormValues,
@@ -106,4 +110,34 @@ it("keeps new policies disabled and permits deactivating a kind without deleting
   const definition = policyDefinitionFromForm(values);
   expect(definition.rules).not.toHaveProperty("scene");
   expect(definition.rules?.image?.filename_title_fallback).toBe(true);
+});
+
+it("preserves selected completeness fields and rejects unsupported, repeated and recursive requirements", () => {
+  const values = policyFormValues(null);
+  values.scene.mark_organized = true;
+  values.scene.organized_requires = ["title", "performers"];
+  const definition = policyDefinitionFromForm(
+    policyFormSchema(fields).parse(values),
+  );
+  expect(definition.rules?.scene?.organized_requires).toEqual([
+    "title",
+    "performers",
+  ]);
+  expect(policyFormValues({ definition }).scene.organized_requires).toEqual([
+    "title",
+    "performers",
+  ]);
+  for (const targets of [["unknown"], ["title", "title"], ["organized"]]) {
+    values.scene.organized_requires = targets;
+    expect(policyFormSchema(fields).safeParse(values).success).toBe(false);
+  }
+});
+
+it("treats omitted and empty completeness lists identically for old policies and save recovery", () => {
+  const original = policyDefinitionFromForm(policyFormValues(null));
+  expect(original.rules?.scene).not.toHaveProperty("organized_requires");
+  const withEmpty = structuredClone(original);
+  if (withEmpty.rules?.scene) withEmpty.rules.scene.organized_requires = [];
+  const parsed = policyDefinitionSchema.parse(withEmpty);
+  expect(samePolicyDefinition(original, parsed)).toBe(true);
 });

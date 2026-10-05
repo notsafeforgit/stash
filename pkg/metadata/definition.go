@@ -26,6 +26,16 @@ func ValidateDefinition(def models.MetadataPolicyDefinition) error {
 		for _, field := range models.MetadataFields(kind) {
 			fields[field.Name] = field
 		}
+		if len(rule.OrganizedRequires) > len(fields)-1 {
+			return errors.New("too many organized requirements")
+		}
+		required := make(map[string]bool)
+		for _, field := range rule.OrganizedRequires {
+			if _, ok := fields[field]; !ok || field == "organized" || required[field] {
+				return fmt.Errorf("invalid or repeated %s organized requirement %q", kind, field)
+			}
+			required[field] = true
+		}
 		for field, mapping := range rule.Mappings {
 			if _, ok := fields[field]; !ok {
 				return fmt.Errorf("unsupported %s policy field %q", kind, field)

@@ -3196,5 +3196,7 @@
     "reload": "Review current root",
     "editor_help": "A stable root identity connects portable collection paths to a folder on this server.",
     "retired_help": "This root is retired. Its definition and binding history remain available for reference."
-  }
+  },
+  "metadata_policy.required_fields": "Required metadata",
+  "metadata_policy.required_fields_help": "Select fields that must have values before this rule marks an item organized. Existing selected values count. These requirements never unmark an item."
 }

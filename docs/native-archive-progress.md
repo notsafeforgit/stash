@@ -8785,3 +8785,43 @@ imports, caller activation, reconciliation, backup activation and reviewed
 production cutover remain open. Live services,
 databases, workers, bucket policies and the frozen compatible release are
 unchanged. See [media-root management](native-source-collections.md#media-roots-and-server-folders).
+
+## Native organized completeness requirements — 2026-10-05
+
+Collection metadata rules now accept optional required fields before marking a
+scene or image organized. The editor offers that media kind's schema fields,
+excluding the organized flag itself. Requirements use the values left after
+permitted changes: protected current values count, proposed clears leave a field
+empty, and rejected candidates cannot fill it. Blank strings, empty containers
+and null are missing; zero is a valid selected rating. Unmet requirements explain
+the omitted organized change. They never clear an existing organized flag and
+remain separate from successful-mapping and unresolved-name checks. An empty or
+omitted requirement list adds no restriction or repeated no-op revision.
+
+The installed catalog plugin assessment found a concrete migration need for
+this behavior: its undeclared Python defaults require seven fields before
+marking organized. That list includes `cover_image`, which is not a supported
+native metadata-policy target; its conversion still needs an explicit
+disposition. No legacy requirement is silently omitted from the assessment.
+The seven retained folder documents were verified against their stored hashes
+and parsed from original XML. Five performer defaults and one studio default
+each have a unique current name/alias candidate; one document is empty. Their
+historical collections have no local root/folder binding, so usable directory
+scopes must be established before importing these rules. These read-only findings
+are retained under `.local/native-policy-migration-20261005/` and do not activate
+policies or assign source publishers as depicted performers.
+
+Focused SQLite and pure service tests pass, including restart, preserved values,
+explicit clears, schema restrictions, unchanged definitions and protection of
+already organized items. The complete UI gate passes 610 tests; all 12 existing
+Chromium/WebKit metadata-policy workflows pass with schema-driven completeness
+selection and save persistence. Two final Chromium/WebKit checks also verified
+the disable/re-enable behavior and retained mobile/desktop screenshots.
+
+The embedded-UI build and complete fork gate passed in 1,351 seconds as
+`organized_completeness_full_gate`: 610 UI tests, 524 producer tests, 8 library
+tests, 108 archive tests, 262 backup tests, zero Go lint issues and the full tagged
+Go suite. SQLite took 1,156 seconds with the documented 30-minute package timeout
+override. Historical policy migration remains open; these requirements do not
+activate or import any live policy. Production services and the frozen compatible
+release are unchanged.

@@ -1,4 +1,5 @@
 import { useCallback, useId, useState } from "react";
+import { useIntl } from "react-intl";
 import { useForm } from "@tanstack/react-form";
 import { useMsg } from "@/hooks/message";
 import type {
@@ -16,6 +17,8 @@ import {
 import { requestUUID } from "@/core/native-archive/review-storage";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import { fieldMessages } from "@/components/detail/native-metadata/shared";
 import { Input } from "@/components/ui/input";
 import {
   Field,
@@ -46,6 +49,7 @@ function RuleFields({
 }) {
   const id = useId();
   const msg = useMsg();
+  const intl = useIntl();
   const options = [
     {
       key: "enabled",
@@ -145,6 +149,57 @@ function RuleFields({
           })}
         </FieldGroup>
       </FieldSet>
+      {(value.mark_organized || value.organized_requires.length > 0) && (
+        <FieldSet
+          disabled={disabled || !value.enabled || !value.mark_organized}
+        >
+          <FieldLegend>
+            {msg("metadata_policy.required_fields", "Required metadata")}
+          </FieldLegend>
+          <FieldDescription>
+            {msg(
+              "metadata_policy.required_fields_help",
+              "Select fields that must have values before this rule marks an item organized. Existing selected values count. These requirements never unmark an item.",
+            )}
+          </FieldDescription>
+          <FieldGroup className="grid gap-3 sm:grid-cols-2">
+            {fields
+              .filter((field) => field.name !== "organized")
+              .map((field) => {
+                const blocked =
+                  disabled || !value.enabled || !value.mark_organized;
+                return (
+                  <Field
+                    key={field.name}
+                    orientation="horizontal"
+                    data-disabled={blocked}
+                  >
+                    <Checkbox
+                      id={`${id}-require-${field.name}`}
+                      checked={value.organized_requires.includes(field.name)}
+                      disabled={blocked}
+                      onCheckedChange={(checked) =>
+                        onChange({
+                          ...value,
+                          organized_requires: checked
+                            ? [...value.organized_requires, field.name]
+                            : value.organized_requires.filter(
+                                (name) => name !== field.name,
+                              ),
+                        })
+                      }
+                    />
+                    <FieldLabel htmlFor={`${id}-require-${field.name}`}>
+                      {intl.formatMessage({
+                        id: fieldMessages[field.name] ?? field.name,
+                      })}
+                    </FieldLabel>
+                  </Field>
+                );
+              })}
+          </FieldGroup>
+        </FieldSet>
+      )}
       {value.mappings.map((row, index) => (
         <PolicyMappingEditor
           key={row.id}

@@ -1361,6 +1361,17 @@ unprotected organized field only when a non-filename mapping selected a value
 and no mapping/name conflict remains. It never clears an existing organized
 choice and never treats organization as identity or download completeness.
 
+An optional `organized_requires` list adds completeness requirements from that
+media kind's metadata field schema, excluding `organized` itself. Duplicate or
+unknown names are rejected. Requirements inspect the effective values after
+applying permitted changes: protected current selections count; proposed clears
+do not, and rejected candidates cannot fill a missing field. Blank strings,
+empty lists/objects and null are missing; zero is a valid selected rating.
+Unsatisfied requirements produce an omitted organized change with a diagnostic.
+An omitted or empty list retains the ordinary behavior, and repeated empty-list
+saves are no-ops. These requirements remain separate from the rule's successful-
+mapping and unresolved-name checks.
+
 Preserved legacy values and explicit set/clear decisions always win. Filename
 fallback initializes an empty inherited title; another file attached to the same
 item cannot oscillate it between filenames. A permitted source mapping can later

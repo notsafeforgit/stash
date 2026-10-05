@@ -329,6 +329,20 @@ test("selects a fixed performer for folder scans and records schema-constrained 
     performer.getByText("River (#10)", { exact: true }),
   ).toBeVisible();
   await page
+    .getByRole("switch", {
+      name: "Mark organized after metadata is selected",
+      exact: true,
+    })
+    .check();
+  const required = page.getByRole("group", {
+    name: "Required metadata",
+    exact: true,
+  });
+  await required.getByRole("checkbox", { name: "Title", exact: true }).check();
+  await required
+    .getByRole("checkbox", { name: "Performers", exact: true })
+    .check();
+  await page
     .getByRole("button", { name: "Save metadata policy", exact: true })
     .click();
   await expect(
@@ -338,11 +352,44 @@ test("selects a fixed performer for folder scans and records schema-constrained 
   expect(
     remote.writes[0]?.definition.rules?.scene?.mappings?.performers,
   ).toEqual({ value: [policyIDs.performer] });
+  expect(remote.writes[0]?.definition.rules?.scene?.organized_requires).toEqual(
+    ["title", "performers"],
+  );
+  await expect(
+    required.getByRole("checkbox", { name: "Title", exact: true }),
+  ).toBeChecked();
+  await expect(
+    required.getByRole("checkbox", { name: "Performers", exact: true }),
+  ).toBeChecked();
+  await page
+    .getByRole("switch", {
+      name: "Mark organized after metadata is selected",
+      exact: true,
+    })
+    .uncheck();
+  await expect(
+    required.getByRole("checkbox", { name: "Title", exact: true }),
+  ).toBeDisabled();
+  await page
+    .getByRole("switch", {
+      name: "Mark organized after metadata is selected",
+      exact: true,
+    })
+    .check();
+  await expect(
+    required.getByRole("checkbox", { name: "Title", exact: true }),
+  ).toBeEnabled();
   expect(remote.previews).toEqual([]);
+  await page.screenshot({
+    path: test.info().outputPath("metadata-completeness-mobile.png"),
+    fullPage: true,
+    animations: "disabled",
+  });
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.screenshot({
     path: test.info().outputPath("metadata-policy-desktop.png"),
     fullPage: true,
+    animations: "disabled",
   });
 });
 

@@ -90,6 +90,15 @@ creation request; ordinary file scans usually start unorganized. **Mark organize
 after metadata is selected** requires a successful mapping without unresolved
 names. A filename-only title fallback does not mark the item organized.
 
+When marking organized is enabled, **Required metadata** lets you choose fields
+that must have values after processing. For example, require both **Title** and
+**Performers** for a purchased-video folder. Proposed values count only if they
+can be applied; protected existing values count, while explicit clears remain
+empty. Blank text, empty lists/objects and null do not meet a requirement. A
+rating of zero is a selected rating. With no fields selected, there is no extra
+completeness requirement. These checks only control setting the organized flag;
+they never unmark an already organized item. Previews explain missing fields.
+
 For scans, the most specific matching folder wins. A disabled policy with scan
 selection enabled masks parent-folder policies. Equal folder matches require
 review. Rules bind to a collection revision: after changing its folder or source,

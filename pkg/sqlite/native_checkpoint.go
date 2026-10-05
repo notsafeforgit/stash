@@ -52,6 +52,9 @@ func checkpointURI(path, mode string) string {
 // recovery; it owns any non-database files it creates and must seal only after
 // this function succeeds. This is a capture primitive, not a complete backup.
 func WithNativeCheckpoint(ctx context.Context, database string, capture func(*NativeCheckpoint) error) (retErr error) {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if capture == nil {
 		return errors.New("native checkpoint requires a capture callback")
 	}
@@ -84,8 +87,15 @@ func WithNativeCheckpoint(ctx context.Context, database string, capture func(*Na
 	}
 	defer writer.Close()
 	writer.SetMaxOpenConns(1)
-	guard, err := writer.BeginTx(ctx, nil)
+	// database/sql automatically rolls back a transaction when its BeginTx
+	// context is cancelled. Keep this guard alive until the callback (including
+	// in-flight filesystem copies) has actually stopped. Acquisition remains
+	// bounded by SQLite's busy timeout; all capture queries/copies use ctx.
+	guard, err := writer.BeginTx(context.WithoutCancel(ctx), nil)
 	if err != nil {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		return fmt.Errorf("acquiring native checkpoint writer lock: %w", err)
 	}
 	defer func() {
@@ -93,6 +103,9 @@ func WithNativeCheckpoint(ctx context.Context, database string, capture func(*Na
 			retErr = errors.Join(retErr, err)
 		}
 	}()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	var version uint
 	var dirty, validLineage bool
 	var versions int

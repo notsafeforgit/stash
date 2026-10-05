@@ -7538,3 +7538,13 @@ This is the server-side capture primitive. Production export still needs the
 configuration/recovery-tree capture coordinator, portable identity/path rebinding,
 complete media/download inventory and S3 publication. No production services or
 backup publication changed. The full-library restore remains active.
+
+Checkpoint cancellation also retains writer exclusion until capture finishes.
+The SQL guard's lifetime is deliberately independent of request cancellation;
+otherwise `database/sql` could roll it back while a filesystem copy was still
+running. Copy/query work still uses the request context, and a cancelled callback
+cannot produce success. A regression test cancels during capture and proves an
+independent writer remains blocked until the callback returns. The complete
+checkpoint suite passes in 45.9 seconds and lint reports zero issues in 11.4
+seconds (`native_server_checkpoint_cancel.json` and
+`native_server_checkpoint_cancel_lint.json`).

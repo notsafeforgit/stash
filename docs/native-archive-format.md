@@ -168,7 +168,11 @@ does not run close-time optimization or commit application changes.
 
 The callback must finish capturing matching configuration, raw journal and
 staged/trash bytes before returning, and must not write to the guarded library
-or invoke recovery. Full native validation can run on the copy after releasing
+or invoke recovery. Cancellation makes capture fail but keeps writer exclusion
+until that callback and any in-flight database copy have actually stopped;
+callbacks must honor their capture context. Lock acquisition has a five-second
+SQLite busy limit, with cancellation checked before and after acquisition.
+Full native validation can run on the copy after releasing
 the writer lock. This primitive is not yet wired into the portable export or
 production backup. It does not discover/copy complete recovery trees, rebind old
 file identities for a renamed-root restore, or freeze external media writers;

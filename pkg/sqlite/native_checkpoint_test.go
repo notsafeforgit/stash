@@ -146,6 +146,36 @@ func TestNativeCheckpointRefusesForeignDirtyAndMissingSources(t *testing.T) {
 	require.Error(t, sqlite.WithNativeCheckpoint(t.Context(), fixture, nil))
 }
 
+func TestNativeCheckpointCancellationKeepsGuardUntilCaptureStops(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "native.sqlite")
+	writeEmptyNativeFixture(t, path)
+	raw := openRawDB(t, path)
+	defer raw.Close()
+	raw.SetMaxOpenConns(1)
+	_, err := raw.Exec("PRAGMA busy_timeout=5000")
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	started, finished := make(chan struct{}), make(chan error, 1)
+	err = sqlite.WithNativeCheckpoint(ctx, path, func(*sqlite.NativeCheckpoint) error {
+		cancel()
+		go func() {
+			close(started)
+			_, err := raw.Exec("INSERT INTO file_deletions(id) VALUES('after-cancel')")
+			finished <- err
+		}()
+		<-started
+		select {
+		case err := <-finished:
+			t.Fatalf("cancellation released the guard while capture was active: %v", err)
+		case <-time.After(75 * time.Millisecond):
+		}
+		return nil // Even an uncooperative callback cannot report success.
+	})
+	require.ErrorIs(t, err, context.Canceled)
+	require.NoError(t, <-finished)
+}
+
 func TestNativeCheckpointCopyFailureCancellationAndOutputProtection(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "native.sqlite")
 	writeEmptyNativeFixture(t, path)

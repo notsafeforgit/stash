@@ -286,10 +286,16 @@ List aggregates cover all matching rows independently of pagination. See
 [native queries](docs/native-queries.md).
 
 `FilterAST` and `FilterASTNode` live in `pkg/models/filter_ast*.go`. Historical
-object conversion remains at import boundaries. File/folder nested filters,
-remaining movie aliases and internal repository callers still use object filter
-types while their separate retirement proceeds; do not delete those models
+object conversion remains at import boundaries. File/folder nested filters and
+internal repository callers still use object filter types while their separate
+retirement proceeds; do not delete those models
 solely because the entity query arguments have been removed.
+
+Group is the sole native API collection type. Scene inputs, filename parser
+results and notifications use `groups`/`group_id`; the Movie API and duplicate
+Movie hooks are removed. Provider movie-shaped input and historical filename
+patterns normalize into native groups at the input boundary. Historical export
+files and saved configuration are separate migration inputs.
 
 ### Saved filters — canonical AST contract
 

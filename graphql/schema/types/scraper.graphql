@@ -11,7 +11,6 @@ enum ScrapeType {
 enum ScrapeContentType {
   GALLERY
   IMAGE
-  MOVIE
   GROUP
   PERFORMER
   SCENE
@@ -24,7 +23,6 @@ union ScrapedContent =
   | ScrapedScene
   | ScrapedGallery
   | ScrapedImage
-  | ScrapedMovie
   | ScrapedGroup
   | ScrapedPerformer
 
@@ -45,8 +43,6 @@ type Scraper {
   gallery: ScraperSpec
   "Details for image scraper"
   image: ScraperSpec
-  "Details for movie scraper"
-  movie: ScraperSpec @deprecated(reason: "use group")
   "Details for group scraper"
   group: ScraperSpec
 }
@@ -95,7 +91,6 @@ type ScrapedScene {
   studio: ScrapedStudio
   tags: [ScrapedTag!]
   performers: [ScrapedPerformer!]
-  movies: [ScrapedMovie!] @deprecated(reason: "use groups")
   groups: [ScrapedGroup!]
 
   remote_site_id: String
@@ -240,15 +235,6 @@ input ScrapeSingleImageInput {
   image_id: ID
   "Instructs to query by image fragment"
   image_input: ScrapedImageInput
-}
-
-input ScrapeSingleMovieInput {
-  "Instructs to query by string"
-  query: String
-  "Instructs to query by movie id"
-  movie_id: ID
-  "Instructs to query by movie fragment"
-  movie_input: ScrapedMovieInput
 }
 
 input ScrapeSingleGroupInput {

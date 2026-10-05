@@ -85,16 +85,10 @@ func (r *mutationResolver) SceneCreate(ctx context.Context, input models.SceneCr
 		return nil, fmt.Errorf("converting gallery ids: %w", err)
 	}
 
-	// prefer groups over movies
 	if len(input.Groups) > 0 {
 		newScene.Groups, err = translator.relatedGroups(input.Groups)
 		if err != nil {
 			return nil, fmt.Errorf("converting groups: %w", err)
-		}
-	} else if len(input.Movies) > 0 {
-		newScene.Groups, err = translator.relatedGroupsFromMovies(input.Movies)
-		if err != nil {
-			return nil, fmt.Errorf("converting movies: %w", err)
 		}
 	}
 
@@ -244,11 +238,6 @@ func scenePartialFromInput(input models.SceneUpdateInput, translator changesetTr
 		updatedScene.GroupIDs, err = translator.updateGroupIDs(input.Groups, "groups")
 		if err != nil {
 			return nil, fmt.Errorf("converting groups: %w", err)
-		}
-	} else if translator.hasField("movies") {
-		updatedScene.GroupIDs, err = translator.updateGroupIDsFromMovies(input.Movies, "movies")
-		if err != nil {
-			return nil, fmt.Errorf("converting movies: %w", err)
 		}
 	}
 

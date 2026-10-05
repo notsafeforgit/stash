@@ -87,6 +87,8 @@ func initParserFields() {
 	ret["rating100"] = newParserField("rating100", `\d`, true)
 	ret["performer"] = newParserField("performer", ".*", true)
 	ret["studio"] = newParserField("studio", ".*", true)
+	ret["group"] = newParserField("group", ".*", true)
+	// Historical saved filename patterns remain valid input.
 	ret["movie"] = newParserField("movie", ".*", true)
 	ret["tag"] = newParserField("tag", ".*", true)
 
@@ -339,7 +341,7 @@ func (h *sceneHolder) setField(field parserField, value interface{}) {
 		h.performers = append(h.performers, value.(string))
 	case "studio":
 		h.studio = value.(string)
-	case "movie":
+	case "group", "movie":
 		h.groups = append(h.groups, value.(string))
 	case "tag":
 		h.tags = append(h.tags, value.(string))
@@ -673,8 +675,8 @@ func (p *FilenameParser) setGroups(ctx context.Context, qb GroupNameFinder, h sc
 			group := p.queryGroup(ctx, qb, groupName)
 			if group != nil {
 				if _, found := groupsSet[group.ID]; !found {
-					result.Movies = append(result.Movies, &models.SceneMovieID{
-						MovieID: strconv.Itoa(group.ID),
+					result.Groups = append(result.Groups, &models.SceneGroupID{
+						GroupID: strconv.Itoa(group.ID),
 					})
 					groupsSet[group.ID] = true
 				}

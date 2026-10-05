@@ -21,11 +21,6 @@ type ScenePathsType {
   caption: String # Resolver
 }
 
-type SceneMovie {
-  movie: Movie!
-  scene_index: Int
-}
-
 type SceneGroup {
   group: Group!
   scene_index: Int
@@ -75,7 +70,6 @@ type Scene {
   galleries: [Gallery!]!
   studio: Studio
   groups: [SceneGroup!]!
-  movies: [SceneMovie!]! @deprecated(reason: "Use groups")
   tags: [Tag!]!
   performers: [Performer!]!
   stash_ids: [StashID!]!
@@ -84,11 +78,6 @@ type Scene {
 
   "Direct and segmented stream paths for browser playback"
   sceneStreams: [SceneStreamEndpoint!]!
-}
-
-input SceneMovieInput {
-  movie_id: ID!
-  scene_index: Int
 }
 
 input SceneGroupInput {
@@ -112,7 +101,6 @@ input SceneCreateInput {
   gallery_ids: [ID!]
   performer_ids: [ID!]
   groups: [SceneGroupInput!]
-  movies: [SceneMovieInput!] @deprecated(reason: "Use groups")
   tag_ids: [ID!]
   "This should be a URL or a base64 encoded data URL"
   cover_image: String
@@ -148,7 +136,6 @@ input SceneUpdateInput {
   gallery_ids: [ID!]
   performer_ids: [ID!]
   groups: [SceneGroupInput!]
-  movies: [SceneMovieInput!] @deprecated(reason: "Use groups")
   tag_ids: [ID!]
   "This should be a URL or a base64 encoded data URL"
   cover_image: String
@@ -202,7 +189,6 @@ input BulkSceneUpdateInput {
   performer_ids: BulkUpdateIds
   tag_ids: BulkUpdateIds
   group_ids: BulkUpdateIds
-  movie_ids: BulkUpdateIds @deprecated(reason: "Use group_ids")
 
   custom_fields: CustomFieldsInput
 }
@@ -273,8 +259,8 @@ input SceneParserInput {
   ignoreOrganized: Boolean
 }
 
-type SceneMovieID {
-  movie_id: ID!
+type SceneGroupID {
+  group_id: ID!
   scene_index: String
 }
 
@@ -293,7 +279,7 @@ type SceneParserResult {
   studio_id: ID
   gallery_ids: [ID!]
   performer_ids: [ID!]
-  movies: [SceneMovieID!]
+  groups: [SceneGroupID!]
   tag_ids: [ID!]
 }
 

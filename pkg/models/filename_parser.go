@@ -20,11 +20,11 @@ type SceneParserResult struct {
 	StudioID     *string         `json:"studio_id"`
 	GalleryIds   []string        `json:"gallery_ids"`
 	PerformerIds []string        `json:"performer_ids"`
-	Movies       []*SceneMovieID `json:"movies"`
+	Groups       []*SceneGroupID `json:"groups"`
 	TagIds       []string        `json:"tag_ids"`
 }
 
-type SceneMovieID struct {
-	MovieID    string  `json:"movie_id"`
+type SceneGroupID struct {
+	GroupID    string  `json:"group_id"`
 	SceneIndex *string `json:"scene_index"`
 }

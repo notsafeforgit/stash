@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/stashapp/stash/internal/manager"
-	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/pkg/group"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/stashapp/stash/pkg/plugin/hook"
@@ -16,23 +15,12 @@ import (
 // filter results. Both paths return an explicit completion acknowledgment.
 
 type groupBulkUpdateOperation struct {
-	groupService   manager.GroupService
-	updatedGroup   models.GroupPartial
-	hookExecutor   hookExecutor
-	input          interface{}
-	inputFields    []string
-	runCompatHooks bool
+	groupService manager.GroupService
+	updatedGroup models.GroupPartial
 }
 
 func (o groupBulkUpdateOperation) Update(ctx context.Context, id int) error {
 	_, err := o.groupService.UpdatePartial(ctx, id, o.updatedGroup, group.ImageInput{}, group.ImageInput{})
-
-	// for backwards compatibility - run both movie and group hooks
-	// BulkUpdate will run the GroupUpdatePost hook, we manually run MovieUpdatePost
-	if err == nil && o.runCompatHooks && o.hookExecutor != nil {
-		o.hookExecutor.ExecutePostHooks(ctx, id, hook.MovieUpdatePost, o.input, o.inputFields)
-	}
-
 	return err
 }
 
@@ -76,19 +64,11 @@ func (r *mutationResolver) BulkGroupUpdate(ctx context.Context, input BulkGroupU
 	}
 
 	operation := groupBulkUpdateOperation{
-		groupService:   r.groupService,
-		updatedGroup:   updatedGroup,
-		hookExecutor:   r.hookExecutor,
-		input:          input,
-		inputFields:    translator.getFields(),
-		runCompatHooks: true,
-	}
-	if useBackgroundJob {
-		operation.runCompatHooks = config.GetBulkUpdateHooks()
+		groupService: r.groupService,
+		updatedGroup: updatedGroup,
 	}
 
 	if !useBackgroundJob {
-		operation.runCompatHooks = false
 		if err := r.withTxn(ctx, func(ctx context.Context) error {
 			for _, groupID := range groupIDs {
 				if err := operation.Update(ctx, groupID); err != nil {
@@ -102,7 +82,6 @@ func (r *mutationResolver) BulkGroupUpdate(ctx context.Context, input BulkGroupU
 
 		for _, groupID := range groupIDs {
 			r.hookExecutor.ExecutePostHooks(ctx, groupID, hook.GroupUpdatePost, input, translator.getFields())
-			r.hookExecutor.ExecutePostHooks(ctx, groupID, hook.MovieUpdatePost, input, translator.getFields())
 		}
 
 		return completedBulkUpdate(groupIDs), nil

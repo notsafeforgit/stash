@@ -23,6 +23,7 @@ func TestScenePartial_UpdateInput(t *testing.T) {
 		organized      = true
 		studioID       = 2
 		studioIDStr    = "2"
+		groupIndex     = 1
 	)
 
 	dateObj, _ := ParseDate(date)
@@ -51,6 +52,9 @@ func TestScenePartial_UpdateInput(t *testing.T) {
 				Rating:         NewOptionalInt(rating100),
 				Organized:      NewOptionalBool(organized),
 				StudioID:       NewOptionalInt(studioID),
+				GroupIDs: &UpdateGroupIDs{Groups: []GroupsScenes{
+					{GroupID: 3, SceneIndex: &groupIndex}, {GroupID: 4},
+				}},
 			},
 			SceneUpdateInput{
 				ID:             idStr,
@@ -64,7 +68,16 @@ func TestScenePartial_UpdateInput(t *testing.T) {
 				Rating100:      &rating100,
 				Organized:      &organized,
 				StudioID:       &studioIDStr,
+				Groups: []SceneGroupInput{
+					{GroupID: "3", SceneIndex: &groupIndex}, {GroupID: "4"},
+				},
 			},
+		},
+		{
+			"explicitly cleared groups",
+			id,
+			ScenePartial{GroupIDs: &UpdateGroupIDs{}},
+			SceneUpdateInput{ID: idStr, Groups: []SceneGroupInput{}},
 		},
 		{
 			"empty",

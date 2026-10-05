@@ -21,7 +21,12 @@ import (
 
 func nativeQueryCaller(t *testing.T, repo models.Repository) func(string, map[string]any) string {
 	t.Helper()
-	server := handler.New(NewExecutableSchema(Config{Resolvers: &Resolver{repository: repo}}))
+	return nativeResolverCaller(t, &Resolver{repository: repo})
+}
+
+func nativeResolverCaller(t *testing.T, resolver *Resolver) func(string, map[string]any) string {
+	t.Helper()
+	server := handler.New(NewExecutableSchema(Config{Resolvers: resolver}))
 	server.AddTransport(transport.POST{})
 	return func(query string, variables map[string]any) string {
 		t.Helper()

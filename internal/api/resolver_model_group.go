@@ -23,23 +23,6 @@ func (r *groupResolver) Rating100(ctx context.Context, obj *models.Group) (*int,
 	return obj.Rating, nil
 }
 
-func (r *groupResolver) URL(ctx context.Context, obj *models.Group) (*string, error) {
-	if !obj.URLs.Loaded() {
-		if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-			return obj.LoadURLs(ctx, r.repository.Group)
-		}); err != nil {
-			return nil, err
-		}
-	}
-
-	urls := obj.URLs.List()
-	if len(urls) == 0 {
-		return nil, nil
-	}
-
-	return &urls[0], nil
-}
-
 func (r *groupResolver) Urls(ctx context.Context, obj *models.Group) ([]string, error) {
 	if !obj.URLs.Loaded() {
 		if err := r.withReadTxn(ctx, func(ctx context.Context) error {

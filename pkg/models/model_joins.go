@@ -1,9 +1,6 @@
 package models
 
-import (
-	"fmt"
-	"strconv"
-)
+import "strconv"
 
 type GroupsScenes struct {
 	GroupID int `json:"movie_id"`
@@ -11,9 +8,9 @@ type GroupsScenes struct {
 	SceneIndex *int `json:"scene_index"`
 }
 
-func (s GroupsScenes) SceneMovieInput() SceneMovieInput {
-	return SceneMovieInput{
-		MovieID:    strconv.Itoa(s.GroupID),
+func (s GroupsScenes) SceneGroupInput() SceneGroupInput {
+	return SceneGroupInput{
+		GroupID:    strconv.Itoa(s.GroupID),
 		SceneIndex: s.SceneIndex,
 	}
 }
@@ -28,14 +25,14 @@ type UpdateGroupIDs struct {
 	Mode   RelationshipUpdateMode `json:"mode"`
 }
 
-func (u *UpdateGroupIDs) SceneMovieInputs() []SceneMovieInput {
+func (u *UpdateGroupIDs) SceneGroupInputs() []SceneGroupInput {
 	if u == nil {
 		return nil
 	}
 
-	ret := make([]SceneMovieInput, 0, len(u.Groups))
+	ret := make([]SceneGroupInput, 0, len(u.Groups))
 	for _, id := range u.Groups {
-		ret = append(ret, id.SceneMovieInput())
+		ret = append(ret, id.SceneGroupInput())
 	}
 
 	return ret
@@ -49,24 +46,6 @@ func (u *UpdateGroupIDs) AddUnique(v GroupsScenes) {
 	}
 
 	u.Groups = append(u.Groups, v)
-}
-
-func GroupsScenesFromInput(input []SceneMovieInput) ([]GroupsScenes, error) {
-	ret := make([]GroupsScenes, len(input))
-
-	for i, v := range input {
-		mID, err := strconv.Atoi(v.MovieID)
-		if err != nil {
-			return nil, fmt.Errorf("invalid movie ID: %s", v.MovieID)
-		}
-
-		ret[i] = GroupsScenes{
-			GroupID:    mID,
-			SceneIndex: v.SceneIndex,
-		}
-	}
-
-	return ret, nil
 }
 
 type GroupIDDescription struct {

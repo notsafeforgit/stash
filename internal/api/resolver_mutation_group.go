@@ -105,9 +105,7 @@ func (r *mutationResolver) GroupCreate(ctx context.Context, input GroupCreateInp
 		return nil, err
 	}
 
-	// for backwards compatibility - run both movie and group hooks
 	r.hookExecutor.ExecutePostHooks(ctx, createGroupInput.Group.ID, hook.GroupCreatePost, input, nil)
-	r.hookExecutor.ExecutePostHooks(ctx, createGroupInput.Group.ID, hook.MovieCreatePost, input, nil)
 	return r.getGroup(ctx, createGroupInput.Group.ID)
 }
 
@@ -216,9 +214,7 @@ func (r *mutationResolver) GroupUpdate(ctx context.Context, input GroupUpdateInp
 		return nil, err
 	}
 
-	// for backwards compatibility - run both movie and group hooks
 	r.hookExecutor.ExecutePostHooks(ctx, groupID, hook.GroupUpdatePost, input, translator.getFields())
-	r.hookExecutor.ExecutePostHooks(ctx, groupID, hook.MovieUpdatePost, input, translator.getFields())
 	return r.getGroup(ctx, groupID)
 }
 
@@ -282,9 +278,7 @@ func (r *mutationResolver) GroupDestroy(ctx context.Context, input GroupDestroyI
 		return false, err
 	}
 
-	// for backwards compatibility - run both movie and group hooks
 	r.hookExecutor.ExecutePostHooks(ctx, id, hook.GroupDestroyPost, input, nil)
-	r.hookExecutor.ExecutePostHooks(ctx, id, hook.MovieDestroyPost, input, nil)
 
 	return true, nil
 }
@@ -309,9 +303,7 @@ func (r *mutationResolver) GroupsDestroy(ctx context.Context, groupIDs []string)
 	}
 
 	for _, id := range ids {
-		// for backwards compatibility - run both movie and group hooks
 		r.hookExecutor.ExecutePostHooks(ctx, id, hook.GroupDestroyPost, groupIDs, nil)
-		r.hookExecutor.ExecutePostHooks(ctx, id, hook.MovieDestroyPost, groupIDs, nil)
 	}
 
 	return true, nil
@@ -385,4 +377,16 @@ func (r *mutationResolver) ReorderSubGroups(ctx context.Context, input ReorderSu
 
 	r.groupFieldsUpdated(ctx, groupID, "sub_groups")
 	return true, nil
+}
+
+// used to refetch group after hooks run
+func (r *mutationResolver) getGroup(ctx context.Context, id int) (ret *models.Group, err error) {
+	if err := r.withTxn(ctx, func(ctx context.Context) error {
+		ret, err = r.repository.Group.Find(ctx, id)
+		return err
+	}); err != nil {
+		return nil, err
+	}
+
+	return ret, nil
 }

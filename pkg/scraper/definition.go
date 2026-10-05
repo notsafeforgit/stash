@@ -339,7 +339,6 @@ func (c Definition) spec() Scraper {
 	}
 
 	if len(group.SupportedScrapes) > 0 {
-		ret.Movie = &group
 		ret.Group = &group
 	}
 

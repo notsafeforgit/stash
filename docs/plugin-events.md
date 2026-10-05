@@ -10,6 +10,7 @@ and `catalogMetadata` can remain backend-only plugins.
 Declare the events in the plugin manifest:
 
 ```yaml
+apiVersion: 3
 name: Library change listener
 version: 1.0.0
 exec:
@@ -141,7 +142,12 @@ and the affected field names:
 | Change image counter | `Image.Update.Post` | `o_counter` |
 | Add/remove gallery images | `Gallery.Update.Post` | `image_ids` |
 | Set/reset gallery cover | `Gallery.Update.Post` | `cover_image_id` |
-| Add/remove/reorder subgroups | `Group.Update.Post` and legacy `Movie.Update.Post` | `sub_groups` |
+| Add/remove/reorder subgroups | `Group.Update.Post` | `sub_groups` |
+
+Groups emit only `Group.Create.Post`, `Group.Update.Post` and
+`Group.Destroy.Post`. The former `Movie.*` triggers are rejected by native
+plugin manifests. Scene relationship inputs use `groups` with `group_id` and
+`scene_index`; background scene update payloads use that same native shape.
 
 File edits use `File.Update.Post`. This includes moves/renames, scanned file
 metadata, fingerprints, and captions. Its `input` contains `id`, `before`, and

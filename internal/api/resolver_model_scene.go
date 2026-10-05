@@ -249,37 +249,6 @@ func (r *sceneResolver) Studio(ctx context.Context, obj *models.Scene) (ret *mod
 	return loaders.From(ctx).StudioByID.Load(*obj.StudioID)
 }
 
-func (r *sceneResolver) Movies(ctx context.Context, obj *models.Scene) (ret []*SceneMovie, err error) {
-	if !obj.Groups.Loaded() {
-		if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-			qb := r.repository.Scene
-
-			return obj.LoadGroups(ctx, qb)
-		}); err != nil {
-			return nil, err
-		}
-	}
-
-	loader := loaders.From(ctx).GroupByID
-
-	for _, sm := range obj.Groups.List() {
-		movie, err := loader.Load(sm.GroupID)
-		if err != nil {
-			return nil, err
-		}
-
-		sceneIdx := sm.SceneIndex
-		sceneMovie := &SceneMovie{
-			Movie:      movie,
-			SceneIndex: sceneIdx,
-		}
-
-		ret = append(ret, sceneMovie)
-	}
-
-	return ret, nil
-}
-
 func (r *sceneResolver) Groups(ctx context.Context, obj *models.Scene) (ret []*SceneGroup, err error) {
 	if !obj.Groups.Loaded() {
 		if err := r.withReadTxn(ctx, func(ctx context.Context) error {

@@ -81,9 +81,6 @@ func (r *Resolver) Studio() StudioResolver {
 func (r *Resolver) Group() GroupResolver {
 	return &groupResolver{r}
 }
-func (r *Resolver) Movie() MovieResolver {
-	return &movieResolver{&groupResolver{r}}
-}
 
 func (r *Resolver) Subscription() SubscriptionResolver {
 	return &subscriptionResolver{r}
@@ -126,9 +123,7 @@ type sceneMarkerResolver struct{ *Resolver }
 type imageResolver struct{ *Resolver }
 type studioResolver struct{ *Resolver }
 
-// movie is group under the hood
 type groupResolver struct{ *Resolver }
-type movieResolver struct{ *groupResolver }
 
 type tagResolver struct{ *Resolver }
 type galleryFileResolver struct{ *Resolver }
@@ -195,7 +190,7 @@ func (r *queryResolver) Stats(ctx context.Context) (*StatsResultType, error) {
 		galleryQB := repo.Gallery
 		studioQB := repo.Studio
 		performerQB := repo.Performer
-		movieQB := repo.Group
+		groupQB := repo.Group
 		tagQB := repo.Tag
 
 		// embrace the error
@@ -240,7 +235,7 @@ func (r *queryResolver) Stats(ctx context.Context) (*StatsResultType, error) {
 			return err
 		}
 
-		groupsCount, err := movieQB.Count(ctx)
+		groupsCount, err := groupQB.Count(ctx)
 		if err != nil {
 			return err
 		}
@@ -285,7 +280,6 @@ func (r *queryResolver) Stats(ctx context.Context) (*StatsResultType, error) {
 			PerformerCount:    performersCount,
 			StudioCount:       studiosCount,
 			GroupCount:        groupsCount,
-			MovieCount:        groupsCount,
 			TagCount:          tagsCount,
 			TotalOCount:       totalOCount,
 			TotalPlayDuration: totalPlayDuration,

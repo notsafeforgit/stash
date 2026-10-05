@@ -54,10 +54,10 @@ func (c *postScraper) postScrape(ctx context.Context, content ScrapedContent) (_
 		return c.postScrapeImage(ctx, v)
 	case *models.ScrapedMovie:
 		if v != nil {
-			return c.postScrapeMovie(ctx, *v, related)
+			return c.postScrapeGroup(ctx, v.ScrapedGroup(), related)
 		}
 	case models.ScrapedMovie:
-		return c.postScrapeMovie(ctx, v, related)
+		return c.postScrapeGroup(ctx, v.ScrapedGroup(), related)
 	case *models.ScrapedGroup:
 		if v != nil {
 			return c.postScrapeGroup(ctx, *v, related)
@@ -183,50 +183,6 @@ func (c *postScraper) postProcessCareerLength(p *models.ScrapedPerformer) {
 	}
 }
 
-func (c *postScraper) postScrapeMovie(ctx context.Context, m models.ScrapedMovie, related bool) (_ ScrapedContent, err error) {
-	r := c.repository
-	tqb := r.TagFinder
-	tags, err := postProcessTags(ctx, tqb, m.Tags)
-	if err != nil {
-		return nil, err
-	}
-	m.Tags = c.filterTags(tags)
-
-	if m.Studio != nil {
-		if err := match.ScrapedStudio(ctx, r.StudioFinder, m.Studio, ""); err != nil {
-			return nil, err
-		}
-	}
-
-	// populate URL/URLs
-	// if URLs are provided, only use those
-	if len(m.URLs) > 0 {
-		m.URL = &m.URLs[0]
-	} else {
-		urls := []string{}
-		if m.URL != nil {
-			urls = append(urls, *m.URL)
-		}
-
-		if len(urls) > 0 {
-			m.URLs = urls
-		}
-	}
-
-	// post-process - set the image if applicable
-	// don't set images for related movies to avoid excessive network calls
-	if !related {
-		if err := processImageField(ctx, m.FrontImage, c.client, c.globalConfig); err != nil {
-			logger.Warnf("could not set front image using URL %s: %v", *m.FrontImage, err)
-		}
-		if err := processImageField(ctx, m.BackImage, c.client, c.globalConfig); err != nil {
-			logger.Warnf("could not set back image using URL %s: %v", *m.BackImage, err)
-		}
-	}
-
-	return m, nil
-}
-
 func (c *postScraper) postScrapeGroup(ctx context.Context, m models.ScrapedGroup, related bool) (_ ScrapedContent, err error) {
 	r := c.repository
 	tqb := r.TagFinder
@@ -291,29 +247,6 @@ func (c *postScraper) postScrapeRelatedPerformers(ctx context.Context, items []*
 			return err
 		}
 	}
-	return nil
-}
-
-func (c *postScraper) postScrapeRelatedMovies(ctx context.Context, items []*models.ScrapedMovie) error {
-	for _, p := range items {
-		const related = true
-		sc, err := c.postScrapeMovie(ctx, *p, related)
-		if err != nil {
-			return err
-		}
-		newP := sc.(models.ScrapedMovie)
-		*p = newP
-
-		matchedID, err := match.ScrapedGroup(ctx, c.repository.GroupFinder, p.StoredID, p.Name)
-		if err != nil {
-			return err
-		}
-
-		if matchedID != nil {
-			p.StoredID = matchedID
-		}
-	}
-
 	return nil
 }
 
@@ -413,26 +346,19 @@ func (c *postScraper) postScrapeScene(ctx context.Context, scene models.ScrapedS
 		return nil, err
 	}
 
-	if err = c.postScrapeRelatedMovies(ctx, scene.Movies); err != nil {
-		return nil, err
+	// Accept movie-shaped provider input, but expose only native groups.
+	// Explicit group input retains the precedence used by the native UI.
+	if len(scene.Groups) == 0 {
+		for _, movie := range scene.Movies {
+			if movie != nil {
+				group := movie.ScrapedGroup()
+				scene.Groups = append(scene.Groups, &group)
+			}
+		}
 	}
-
+	scene.Movies = nil
 	if err = c.postScrapeRelatedGroups(ctx, scene.Groups); err != nil {
 		return nil, err
-	}
-
-	// HACK - if movies was returned but not groups, add the groups from the movies
-	// if groups was returned but not movies, add the movies from the groups for backward compatibility
-	if len(scene.Movies) > 0 && len(scene.Groups) == 0 {
-		for _, m := range scene.Movies {
-			g := m.ScrapedGroup()
-			scene.Groups = append(scene.Groups, &g)
-		}
-	} else if len(scene.Groups) > 0 && len(scene.Movies) == 0 {
-		for _, g := range scene.Groups {
-			m := g.ScrapedMovie()
-			scene.Movies = append(scene.Movies, &m)
-		}
 	}
 
 	tags, err := postProcessTags(ctx, tqb, scene.Tags)

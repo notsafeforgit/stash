@@ -68,9 +68,28 @@ members of duplicate groups; `ANY` includes the whole group when a member
 matches. The distance, duration and pagination controls remain unchanged.
 
 This retirement covers the eight list queries and duplicate queries above.
-File/folder nested filters, remaining movie aliases and internal repository
-object filters have separate consumers and are tracked in the transition plan.
+File/folder nested filters and internal repository object filters have separate
+consumers and are tracked in the transition plan.
 StashDB protocol bindings and public media/share URLs are unchanged.
+
+## Groups
+
+Groups are the sole collection model for these API relationships. Use
+`findGroup`, `findGroups`, `groupCreate`, `groupUpdate`, `groupDestroy` and
+`groupsDestroy`. Entity relationships/counts use `groups`/`group_count`.
+Scene create/update inputs use `groups: [{group_id, scene_index}]`; bulk scene
+updates use `group_ids`. Export requests select `groups`.
+
+The `Movie` types, query/mutation aliases, nested movie fields and `MOVIE`
+scrape enum are removed. Scraper discovery and results expose `GROUP` and
+`ScrapedGroup`; provider data using the old movie shape is normalized once at
+the input boundary. An explicit provider `groups` list takes precedence.
+Filename parsing supports `{group}` and returns `groups` with `group_id`.
+Historical `{movie}` patterns remain readable input and produce the same result.
+Plugins receive one `Group.*` event after a successful change.
+
+This does not rewrite historical metadata export files or saved configuration
+keys. Their one-time migration remains separate from the native API contract.
 
 The catalog plugin's native client conversion is staged on its
 `native-api-transition` branch. Its group requests replace movie aliases, and

@@ -236,7 +236,7 @@ func (s ScenePartial) UpdateInput(id int) SceneUpdateInput {
 		StudioID:       s.StudioID.StringPtr(),
 		GalleryIds:     s.GalleryIDs.IDStrings(),
 		PerformerIds:   s.PerformerIDs.IDStrings(),
-		Movies:         s.GroupIDs.SceneMovieInputs(),
+		Groups:         s.GroupIDs.SceneGroupInputs(),
 		TagIds:         s.TagIDs.IDStrings(),
 		StashIds:       stashIDs.ToStashIDInputs(),
 	}

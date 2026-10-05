@@ -133,8 +133,8 @@ query ParseSceneFilenames(
       rating
       studio_id
       gallery_ids
-      movies {
-        movie_id
+      groups {
+        group_id
       }
       performer_ids
       tag_ids

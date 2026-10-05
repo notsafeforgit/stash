@@ -87,49 +87,13 @@ func (r *queryResolver) ScrapeImageURL(ctx context.Context, url string) (*models
 	return marshalScrapedImage(content)
 }
 
-func (r *queryResolver) ScrapeMovieURL(ctx context.Context, url string) (*models.ScrapedMovie, error) {
-	content, err := r.scraperCache().ScrapeURL(ctx, url, scraper.ScrapeContentTypeMovie)
-	if err != nil {
-		return nil, err
-	}
-
-	ret, err := marshalScrapedMovie(content)
-	if err != nil {
-		return nil, err
-	}
-
-	return ret, nil
-}
-
 func (r *queryResolver) ScrapeGroupURL(ctx context.Context, url string) (*models.ScrapedGroup, error) {
 	content, err := r.scraperCache().ScrapeURL(ctx, url, scraper.ScrapeContentTypeGroup)
 	if err != nil {
 		return nil, err
 	}
 
-	ret, err := marshalScrapedGroup(content)
-	if err != nil {
-		return nil, err
-	}
-
-	// convert to scraped group
-	group := &models.ScrapedGroup{
-		StoredID:   ret.StoredID,
-		Name:       ret.Name,
-		Aliases:    ret.Aliases,
-		Duration:   ret.Duration,
-		Date:       ret.Date,
-		Rating:     ret.Rating,
-		Director:   ret.Director,
-		URLs:       ret.URLs,
-		Synopsis:   ret.Synopsis,
-		Studio:     ret.Studio,
-		Tags:       ret.Tags,
-		FrontImage: ret.FrontImage,
-		BackImage:  ret.BackImage,
-	}
-
-	return group, nil
+	return marshalScrapedGroup(content)
 }
 
 func (r *queryResolver) ScrapeSingleScene(ctx context.Context, source scraper.Source, input ScrapeSingleSceneInput) ([]*models.ScrapedScene, error) {
@@ -598,10 +562,6 @@ func (r *queryResolver) ScrapeSingleImage(ctx context.Context, source scraper.So
 	default:
 		return nil, ErrNotImplemented
 	}
-}
-
-func (r *queryResolver) ScrapeSingleMovie(ctx context.Context, source scraper.Source, input ScrapeSingleMovieInput) ([]*models.ScrapedMovie, error) {
-	return nil, ErrNotSupported
 }
 
 func (r *queryResolver) ScrapeSingleGroup(ctx context.Context, source scraper.Source, input ScrapeSingleGroupInput) ([]*models.ScrapedGroup, error) {

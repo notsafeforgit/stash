@@ -35,5 +35,4 @@ func (r *mutationResolver) galleryFieldsUpdated(ctx context.Context, id int, fie
 
 func (r *mutationResolver) groupFieldsUpdated(ctx context.Context, id int, fields ...string) {
 	r.hookExecutor.ExecutePostHooks(ctx, id, hook.GroupUpdatePost, nil, fields)
-	r.hookExecutor.ExecutePostHooks(ctx, id, hook.MovieUpdatePost, nil, fields)
 }

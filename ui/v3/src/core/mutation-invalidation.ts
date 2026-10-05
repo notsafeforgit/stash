@@ -31,7 +31,7 @@ const queryFields = {
   gallery: ["findGallery", "findGalleries"],
   performer: ["findPerformer", "findPerformers"],
   studio: ["findStudio", "findStudios"],
-  group: ["findGroup", "findGroups", "findMovie", "findMovies"],
+  group: ["findGroup", "findGroups"],
   tag: ["findTag", "findTags"],
   file: ["findFile", "findFiles", "findFolder", "findFolders"],
 } as const;

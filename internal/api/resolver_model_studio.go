@@ -149,11 +149,6 @@ func (r *studioResolver) SceneMarkerCount(ctx context.Context, obj *models.Studi
 	return ret, nil
 }
 
-// deprecated
-func (r *studioResolver) MovieCount(ctx context.Context, obj *models.Studio, depth *int) (ret int, err error) {
-	return r.GroupCount(ctx, obj, depth)
-}
-
 func (r *studioResolver) OCounter(ctx context.Context, obj *models.Studio, depth *int) (ret int, err error) {
 	var res_scene int
 	var res_image int
@@ -231,9 +226,4 @@ func (r *studioResolver) CustomFields(ctx context.Context, obj *models.Studio) (
 	}
 
 	return m, nil
-}
-
-// deprecated
-func (r *studioResolver) Movies(ctx context.Context, obj *models.Studio) (ret []*models.Group, err error) {
-	return r.Groups(ctx, obj)
 }

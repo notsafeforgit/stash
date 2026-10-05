@@ -141,10 +141,6 @@ func (r *tagResolver) GroupCount(ctx context.Context, obj *models.Tag, depth *in
 	return ret, nil
 }
 
-func (r *tagResolver) MovieCount(ctx context.Context, obj *models.Tag, depth *int) (ret int, err error) {
-	return r.GroupCount(ctx, obj, depth)
-}
-
 func (r *tagResolver) ImagePath(ctx context.Context, obj *models.Tag) (*string, error) {
 	var hasImage bool
 	if err := r.withReadTxn(ctx, func(ctx context.Context) error {

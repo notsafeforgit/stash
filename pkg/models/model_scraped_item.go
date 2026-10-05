@@ -659,30 +659,6 @@ type ScrapedGroup struct {
 
 func (ScrapedGroup) IsScrapedContent() {}
 
-func (g ScrapedGroup) ScrapedMovie() ScrapedMovie {
-	ret := ScrapedMovie{
-		StoredID:   g.StoredID,
-		Name:       g.Name,
-		Aliases:    g.Aliases,
-		Duration:   g.Duration,
-		Date:       g.Date,
-		Rating:     g.Rating,
-		Director:   g.Director,
-		URLs:       g.URLs,
-		Synopsis:   g.Synopsis,
-		Studio:     g.Studio,
-		Tags:       g.Tags,
-		FrontImage: g.FrontImage,
-		BackImage:  g.BackImage,
-	}
-
-	if len(g.URLs) > 0 {
-		ret.URL = &g.URLs[0]
-	}
-
-	return ret
-}
-
 type ScrapedScene struct {
 	Title          *string  `json:"title"`
 	Code           *string  `json:"code"`

@@ -369,15 +369,6 @@ func (t changesetTranslator) updateStashIDs(value models.StashIDInputs, field st
 	}
 }
 
-func (t changesetTranslator) relatedGroupsFromMovies(value []models.SceneMovieInput) (models.RelatedGroups, error) {
-	groupsScenes, err := models.GroupsScenesFromInput(value)
-	if err != nil {
-		return models.RelatedGroups{}, err
-	}
-
-	return models.NewRelatedGroups(groupsScenes), nil
-}
-
 func groupsScenesFromGroupInput(input []models.SceneGroupInput) ([]models.GroupsScenes, error) {
 	ret := make([]models.GroupsScenes, len(input))
 
@@ -403,22 +394,6 @@ func (t changesetTranslator) relatedGroups(value []models.SceneGroupInput) (mode
 	}
 
 	return models.NewRelatedGroups(groupsScenes), nil
-}
-
-func (t changesetTranslator) updateGroupIDsFromMovies(value []models.SceneMovieInput, field string) (*models.UpdateGroupIDs, error) {
-	if !t.hasField(field) {
-		return nil, nil
-	}
-
-	groupsScenes, err := models.GroupsScenesFromInput(value)
-	if err != nil {
-		return nil, err
-	}
-
-	return &models.UpdateGroupIDs{
-		Groups: groupsScenes,
-		Mode:   models.RelationshipUpdateModeSet,
-	}, nil
 }
 
 func (t changesetTranslator) updateGroupIDs(value []models.SceneGroupInput, field string) (*models.UpdateGroupIDs, error) {

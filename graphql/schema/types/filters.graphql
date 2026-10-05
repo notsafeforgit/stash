@@ -316,8 +316,6 @@ input SceneFilterType {
   is_missing: String
   "Filter to only include scenes with this studio"
   studios: HierarchicalMultiCriterionInput
-  "Filter to only include scenes with this movie"
-  movies: MultiCriterionInput @deprecated(reason: "use groups instead")
   "Filter to only include scenes with this group"
   groups: HierarchicalMultiCriterionInput
   "Filter to only include scenes with this gallery"
@@ -376,9 +374,6 @@ input SceneFilterType {
   studios_filter: StudioFilterType
   "Filter by related tags that meet this criteria"
   tags_filter: TagFilterType
-  "Filter by related movies that meet this criteria"
-  movies_filter: MovieFilterType
-    @deprecated(reason: "use groups_filter instead")
   "Filter by related groups that meet this criteria"
   groups_filter: GroupFilterType
   "Filter by related markers that meet this criteria"
@@ -387,44 +382,6 @@ input SceneFilterType {
   files_filter: FileFilterType
 
   custom_fields: [CustomFieldCriterionInput!]
-}
-
-input MovieFilterType {
-  AND: MovieFilterType
-  OR: MovieFilterType
-  NOT: MovieFilterType
-
-  name: StringCriterionInput
-  director: StringCriterionInput
-  synopsis: StringCriterionInput
-
-  "Filter by duration (in seconds)"
-  duration: IntCriterionInput
-  # rating expressed as 1-100
-  rating100: IntCriterionInput
-  "Filter to only include movies with this studio"
-  studios: HierarchicalMultiCriterionInput
-  "Filter to only include movies missing this property"
-  is_missing: String
-  "Filter by url"
-  url: StringCriterionInput
-  "Filter to only include movies where performer appears in a scene"
-  performers: MultiCriterionInput
-  "Filter to only include movies with these tags"
-  tags: HierarchicalMultiCriterionInput
-  "Filter by tag count"
-  tag_count: IntCriterionInput
-  "Filter by date"
-  date: DateCriterionInput
-  "Filter by creation time"
-  created_at: TimestampCriterionInput
-  "Filter by last update time"
-  updated_at: TimestampCriterionInput
-
-  "Filter by related scenes that meet this criteria"
-  scenes_filter: SceneFilterType
-  "Filter by related studios that meet this criteria"
-  studios_filter: StudioFilterType
 }
 
 input GroupFilterType {
@@ -660,9 +617,6 @@ input TagFilterType {
 
   "Filter by number of studios with this tag"
   studio_count: HierarchicalCountInput
-
-  "Filter by number of movies with this tag"
-  movie_count: HierarchicalCountInput
 
   "Filter by number of group with this tag"
   group_count: HierarchicalCountInput

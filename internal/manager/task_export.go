@@ -67,7 +67,6 @@ type ExportObjectsInput struct {
 	Performers          *ExportObjectTypeInput `json:"performers"`
 	Tags                *ExportObjectTypeInput `json:"tags"`
 	Groups              *ExportObjectTypeInput `json:"groups"`
-	Movies              *ExportObjectTypeInput `json:"movies"` // deprecated
 	Galleries           *ExportObjectTypeInput `json:"galleries"`
 	IncludeDependencies *bool                  `json:"includeDependencies"`
 }
@@ -101,19 +100,13 @@ func CreateExportTask(a models.HashAlgorithm, input ExportObjectsInput) *ExportT
 		includeDeps = *input.IncludeDependencies
 	}
 
-	// handle deprecated Movies field
-	groupSpec := input.Groups
-	if groupSpec == nil && input.Movies != nil {
-		groupSpec = input.Movies
-	}
-
 	return &ExportTask{
 		repository:          GetInstance().Repository,
 		fileNamingAlgorithm: a,
 		scenes:              newExportSpec(input.Scenes),
 		images:              newExportSpec(input.Images),
 		performers:          newExportSpec(input.Performers),
-		groups:              newExportSpec(groupSpec),
+		groups:              newExportSpec(input.Groups),
 		tags:                newExportSpec(input.Tags),
 		studios:             newExportSpec(input.Studios),
 		galleries:           newExportSpec(input.Galleries),

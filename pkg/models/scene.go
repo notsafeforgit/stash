@@ -175,12 +175,6 @@ type SceneQueryResult struct {
 	resolveErr error
 }
 
-// SceneMovieInput is used for groups and movies
-type SceneMovieInput struct {
-	MovieID    string `json:"movie_id"`
-	SceneIndex *int   `json:"scene_index"`
-}
-
 type SceneGroupInput struct {
 	GroupID    string `json:"group_id"`
 	SceneIndex *int   `json:"scene_index"`
@@ -200,7 +194,6 @@ type SceneCreateInput struct {
 	StudioID       *string           `json:"studio_id"`
 	GalleryIds     []string          `json:"gallery_ids"`
 	PerformerIds   []string          `json:"performer_ids"`
-	Movies         []SceneMovieInput `json:"movies"`
 	Groups         []SceneGroupInput `json:"groups"`
 	TagIds         []string          `json:"tag_ids"`
 	// This should be a URL or a base64 encoded data URL
@@ -230,7 +223,6 @@ type SceneUpdateInput struct {
 	StudioID         *string           `json:"studio_id"`
 	GalleryIds       []string          `json:"gallery_ids"`
 	PerformerIds     []string          `json:"performer_ids"`
-	Movies           []SceneMovieInput `json:"movies"`
 	Groups           []SceneGroupInput `json:"groups"`
 	TagIds           []string          `json:"tag_ids"`
 	// This should be a URL or a base64 encoded data URL

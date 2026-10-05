@@ -215,11 +215,6 @@ func (r *performerResolver) GroupCount(ctx context.Context, obj *models.Performe
 	return ret, nil
 }
 
-// deprecated
-func (r *performerResolver) MovieCount(ctx context.Context, obj *models.Performer) (ret int, err error) {
-	return r.GroupCount(ctx, obj)
-}
-
 func (r *performerResolver) PerformerCount(ctx context.Context, obj *models.Performer) (ret int, err error) {
 	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
 		ret, err = performer.CountByAppearsWith(ctx, r.repository.Performer, obj.ID)
@@ -304,11 +299,6 @@ func (r *performerResolver) CustomFields(ctx context.Context, obj *models.Perfor
 	}
 
 	return m, nil
-}
-
-// deprecated
-func (r *performerResolver) Movies(ctx context.Context, obj *models.Performer) (ret []*models.Group, err error) {
-	return r.Groups(ctx, obj)
 }
 
 func (r *performerResolver) Aliases(ctx context.Context, obj *models.Performer) ([]*models.PerformerAlias, error) {

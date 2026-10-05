@@ -127,11 +127,6 @@ func (r *mutationResolver) BulkSceneUpdate(ctx context.Context, input BulkSceneU
 		if err != nil {
 			return nil, fmt.Errorf("converting group ids: %w", err)
 		}
-	} else if translator.hasField("movie_ids") {
-		updatedScene.GroupIDs, err = translator.updateGroupIDsBulk(input.MovieIds, "movie_ids")
-		if err != nil {
-			return nil, fmt.Errorf("converting movie ids: %w", err)
-		}
 	}
 
 	var customFields *models.CustomFieldsInput

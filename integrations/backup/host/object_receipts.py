@@ -18,13 +18,14 @@ from stash_archive.storage import HEX, InvalidArchive, regular, sync_directory
 APPLICATION_ID = 0x534F5243
 
 
-def identity(value, *, listed=False):
+def identity(value, *, listed=False, storage_classes=("STANDARD",)):
     size = value.get("Size" if listed else "ContentLength")
     etag, modified = value.get("ETag"), value.get("LastModified")
     storage = value.get("StorageClass", "STANDARD")
     if (type(size) is not int or size < 0 or not isinstance(etag, str) or not 1 <= len(etag) <= 1024
             or any(ord(c) < 32 or ord(c) > 126 for c in etag)
-            or not isinstance(modified, datetime) or modified.tzinfo is None or storage != "STANDARD"):
+            or not isinstance(modified, datetime) or modified.tzinfo is None
+            or not isinstance(storage, str) or storage not in storage_classes):
         return None
     return size, etag, modified.astimezone(timezone.utc).isoformat(), storage
 

@@ -118,6 +118,8 @@ def load_legacy_manifest(manifest_path, ledger_db, footprints):
     archive is fatal; silently dropping an unknown delta would corrupt a restore.
     """
     keys = set(Path(manifest_path).read_text(encoding="utf-8").splitlines()) - {""}
+    if any(key.startswith(media_objects.PREFIX) for key in keys):
+        raise ValueError("Content-addressed media requires its JSON manifest with restore paths")
     for key in keys:
         relative_path(key)
     tar_keys = {key for key in keys if key.startswith("tarballs/")}

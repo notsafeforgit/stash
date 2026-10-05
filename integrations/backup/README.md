@@ -19,7 +19,7 @@ and ZFS media view before scanning. Media uploads read that retained view. Live
 mount, nonempty-source and returning-file protections still inspect the live
 source. Dry runs create no native checkpoint, artwork pins or ZFS snapshot.
 
-`current_manifest.json` version 3 binds the media selection to one native archive
+`current_manifest.json` version 4 binds the media selection to one native archive
 and checkpoint UUID. A selection digest excludes timestamps and publication
 references, avoiding a circular hash. The same selection is packed inside the
 archive with the sealed filesystem-boundary digest. Content restore, native
@@ -110,16 +110,15 @@ See [AWS request pricing](https://aws.amazon.com/s3/pricing/) and
 [LIST pagination](https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjectsV2.html).
 
 The unreleased prototype requiring enabled bucket versioning and version-read
-permissions was withdrawn. Cold-media replacement identity still needs the
-publisher and cleanup integration before cutover; stable filename keys are not proof
-that an older backup will restore the original bytes. Do not activate this
-staged publisher until that and the remaining cutover gates are verified.
+permissions was withdrawn. Cold publication now preserves replacement bytes under
+separate keys and reuses verified existing uploads. Production inventory, retention,
+cost measurements and restore/cutover review still precede activation.
 
-## Immutable media restore contract
+## Immutable media publication and restore
 
-Readers now accept version 4 media manifests in preparation for immutable media
-publication. The publisher still writes version 3; this reader work does not
-upgrade existing backups or establish immutable replacement handling by itself.
+The staged publisher writes version 4 manifests. Readers also retain historical
+text/v2/v3 support; existing backups are not rewritten. A retained unpublished
+v3 native attempt must finish with its original writer before this writer is used.
 
 A version 4 manifest separates each video's relative restore `path` from its
 S3 `key`. Several paths can reference one object; planning, status, thaw and
@@ -130,6 +129,35 @@ Video descriptors require that local SHA-256. New content keys use
 `media/sha256/<sha256>`; historical keys remain valid when their full checksum
 can be checked against local bytes. Unsupported/composite-only evidence is an
 error for review, never authorization to upload existing media again.
+
+The existing `TAR_DELTA_DB` ledger now contains the cold-store binding, verified
+object receipts, current video path bindings and pending path associations.
+One complete paginated inventory serves verification and maintenance for each
+run. A previously verified, unchanged object needs no HEAD, upload or tag request.
+Lost checksum receipts require re-verification; matching bytes are reused.
+Do not discard path associations or pending cleanup as if they were disposable
+checksum cache entries. The ledger is included in the native backup.
+
+New or replaced videos use content keys and explicitly upload to Deep Archive
+with rclone's immutable mode. Identical files and renamed paths reuse one object;
+historical filename keys are adopted only after comparison with local bytes.
+New tar bases/deltas keep their append-only keys and receive the same independent
+full-checksum verification. Checksum metadata written by the uploader alone is
+not accepted as proof. Known objects with changed bytes stop publication.
+
+Cleanup starts after publication and protects every current object key, including
+objects shared by multiple paths. Pending upload intentions retain their paths
+even after interruption. A file that returns or changes after the captured view
+defers obsolete tagging; the path is rechecked after the remote tag read. Removed
+path bindings are retired independently of shared objects. Superseded bytes remain
+subject to the existing obsolete-object lifecycle; this is not indefinite retention
+of every historical backup. Retention reconciliation remains a cutover gate.
+
+The local NUL video manifests contain source paths. `current_manifest.txt` is
+only a deduplicated object allowlist; content-addressed keys require the JSON
+manifest to reconstruct paths. Historical filename-based text restores remain
+supported. Retrying a retained v4 selection verifies every selected video and
+archive without rescanning newer files or silently repairing missing objects.
 
 `media_store` binds the bucket and prefix. A full native manifest uses
 `scope: native` and includes those bindings, object identities and restore paths

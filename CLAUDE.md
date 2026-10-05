@@ -110,7 +110,7 @@ they cannot create a later snapshot with old worker state. The stage inventory
 is bound into the server's filesystem receipt and checked again while packing.
 Publication-aware component release validates the complete archived inventory,
 supports interrupted cleanup and keeps permanent identity/receipt files.
-The tracked host tools in `integrations/backup` now publish v3 native/media
+The tracked host tools in `integrations/backup` now publish v4 native/media
 manifests through host-owned S3 clients, require exact full-object checksums,
 and support native download/audit plus historical media restore inputs. Their
 isolated runtime (`make pre-backup`) and regression gate (`make validate-backup`)
@@ -121,17 +121,22 @@ confirms unchanged object identity. New/unknown/changed objects still require
 checksum verification; explicit audits and downloads bypass cached evidence.
 Use 64 MiB raw chunks for new portable exports while retaining 1 MiB input support.
 Keep database/record images in Standard and bulk media in Deep Archive, with
-bounded retention and request-count tests. Cold media still needs immutable-key
-replacement handling before activation; do not require bucket versioning to
-compensate for reusing mutable filename keys.
+bounded retention and request-count tests. New cold-media objects use immutable
+content keys in Deep Archive; existing verified filename objects can be reused.
+Do not require bucket versioning to compensate for mutable filename keys.
 The media readers accept v4 object descriptors with separate restore paths and
 a bound cold store, retaining v2/v3 historical input. Native selection v2 binds
 those identities into the portable archive. Deduplicate remote requests by
 object key; different source paths can share bytes. Offline restore verifies all
 selected bytes before extraction and rejects changed inputs and path collisions.
 Cold checksum audits are explicit (`--media-checksums`), never a routine daily
-HEAD sweep. The v4 publisher, durable object index and cleanup conversion remain
-pending; do not present reader support as completed replacement protection.
+HEAD sweep. The cold ledger now retains full-checksum receipts, path bindings
+and interrupted-upload associations. One complete inventory reuses unchanged
+proofs; matching renamed/duplicate videos share objects. Cleanup protects all
+current references and rechecks returning or changed live paths before tagging.
+Retained selections verify every selected object without rescanning. Historical
+v3 in-flight native attempts require their original writer. Production inventory,
+retention reconciliation, real cost measurements and cutover review remain open.
 The host now journals one active attempt and resumes its original sealed view,
 media selection or published cleanup after restart. Owned scratch is reclaimed
 only under backup exclusion, which upload/validator children inherit. The S3

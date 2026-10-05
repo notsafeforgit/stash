@@ -15,7 +15,6 @@ import shutil
 import signal
 import tarfile
 import hashlib
-import base64
 import argparse
 import copy
 import tempfile
@@ -29,6 +28,8 @@ import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError, NoCredentialsError, PartialCredentialsError
 from native_backup import NativeBackupSession
+import media_objects
+from media_index import MediaIndex, initialize as initialize_media_index
 from stash_archive.storage import json_bytes
 from contextlib import contextmanager
 from datetime import datetime
@@ -159,6 +160,7 @@ SOURCE_MOUNT = "/tank/media"
 # is unavailable. An ordinary directory at the mountpoint is not a valid source.
 VIDEO_SCAN = {}
 REMOTE_TAR_KEYS = set()
+MEDIA_INDEX = None
 
 # -----------------------
 # LOGGING
@@ -550,6 +552,8 @@ def db_base_state_map_for_units(conn, unit_ids: set):
 
 
 def list_remote_delta_tarball_keys(dry_run: bool):
+    if MEDIA_INDEX is not None:
+        return sorted(key for key in MEDIA_INDEX.listed if key.startswith(TAR_DELTA_PREFIX + "/") and key.endswith(".tar"))
     if dry_run:
         log("[DRY RUN] Would list remote delta tarballs via rclone lsf.", 1)
         return []
@@ -752,22 +756,27 @@ def tombstone_remote_accidental_nonvideo_objects(dry_run: bool, delete_budget: i
     if LOG_LEVEL >= 2:
         _LOGGER.debug("Running (stream): %s", _cmd_str(cmd))
 
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, text=True)
-    if proc.stdout is None:
-        log("WARNING: could not read rclone listing stdout; skipping accidental non-video cleanup.", 1)
-        return {"candidates": 0, "deleted": 0, "already_absent": 0, "failed": 0}
+    proc = None
+    if MEDIA_INDEX is not None:
+        lines = (key + "\n" for key in MEDIA_INDEX.listed)
+    else:
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, text=True)
+        if proc.stdout is None:
+            log("WARNING: could not read rclone listing stdout; skipping accidental non-video cleanup.", 1)
+            return {"candidates": 0, "deleted": 0, "already_absent": 0, "failed": 0}
+        lines = proc.stdout
 
     candidates = []
     total_visible = 0
 
-    for raw in proc.stdout:
+    for raw in lines:
         key = raw.removesuffix("\n")
         if not key:
             continue
         total_visible += 1
 
         # Keep tarballs
-        if key.startswith("tarballs/"):
+        if key.startswith(("tarballs/", media_objects.PREFIX)):
             continue
 
         # Keep videos
@@ -780,8 +789,9 @@ def tombstone_remote_accidental_nonvideo_objects(dry_run: bool, delete_budget: i
 
 
     # Ensure the listing completed successfully before taking any destructive action.
-    proc.stdout.close()
-    rc = proc.wait()
+    if proc is not None:
+        proc.stdout.close()
+    rc = proc.wait() if proc is not None else 0
     if rc != 0:
         log(f"WARNING: remote audit listing failed (rc={rc}); skipping accidental non-video cleanup.", 1)
         return {"candidates": 0, "deleted": 0, "already_absent": 0, "failed": 0}
@@ -1174,7 +1184,7 @@ class S3ObjectTagger:
         rel_key = rel_key.lstrip("/")
         return f"{self.prefix}{rel_key}"
 
-    def ensure_tag(self, rel_key: str, tag_key: str, tag_value: str, dry_run: bool) -> bool:
+    def ensure_tag(self, rel_key: str, tag_key: str, tag_value: str, dry_run: bool, before_write=None) -> bool:
         """Add/ensure a tag on the CURRENT version of an object key (does not change object data)."""
         full_key = self._full_key(rel_key)
 
@@ -1201,16 +1211,18 @@ class S3ObjectTagger:
 
         # Merge tag set (preserve existing tags)
         tagset = {t.get("Key"): t.get("Value") for t in existing if t.get("Key")}
+        # A source outage during the metadata request must not become evidence
+        # of deletion. Also retain pending state if a live path returned while
+        # confirming a tag that was already set by an interrupted attempt.
+        if marking_obsolete:
+            assert_source_ready()
+        if before_write is not None and not before_write():
+            return False
         if tagset.get(tag_key) == tag_value:
             return True
 
         tagset[tag_key] = tag_value
         merged = [{"Key": k, "Value": v} for k, v in tagset.items()]
-
-        # A source outage during the metadata request must not become evidence
-        # of deletion. This guard also covers legacy/orphan cleanup callers.
-        if marking_obsolete:
-            assert_source_ready()
         try:
             self.s3.put_object_tagging(Bucket=self.bucket, Key=full_key, Tagging={"TagSet": merged})
             return True
@@ -1220,7 +1232,7 @@ class S3ObjectTagger:
             return False
 
     def clear_obsolete(self, rel_key: str) -> bool:
-        """Protect a returning current object before size-only reconciliation.
+        """Protect a returning current object before its reuse is committed.
 
         Never fetch object contents. A missing object will be uploaded normally.
         Preserve unrelated tags, including when removing the last obsolete tag.
@@ -1574,6 +1586,7 @@ def open_delta_db(path: str):
         )
     """)
     conn.execute("CREATE TABLE IF NOT EXISTS pending_archives(key TEXT PRIMARY KEY, payload TEXT NOT NULL)")
+    initialize_media_index(conn)
     conn.commit()
     sync_directory(os.path.dirname(path))
     return conn
@@ -1857,8 +1870,8 @@ def compute_nfo_hash(path: str):
 def scan_changes_scandir(init_run: bool):
     """Inventory every video; only successfully checked/uploaded signatures count.
 
-    An empty upload ledger deliberately schedules a full size-only reconciliation
-    against S3. The old local manifest is not evidence of successful uploads.
+    Unverified legacy paths require local content checks against full S3 checksum
+    evidence. The old path/size ledger alone cannot authorize publication.
     """
     global VIDEO_SCAN
     assert_source_ready()
@@ -1868,6 +1881,8 @@ def scan_changes_scandir(init_run: bool):
             "SELECT path, size, mtime_ns, ctime_ns FROM video_uploads"
         )}
         cleanup_keys = {r[0] for r in conn.execute("SELECT key FROM pending_gc UNION SELECT key FROM gc_tags")}
+        bindings = dict(conn.execute("SELECT path,key FROM video_objects"))
+        verified = {r[0] for r in conn.execute("SELECT key FROM media_objects WHERE sha256 IS NOT NULL")}
     finally:
         conn.close()
     VIDEO_SCAN = {}
@@ -1889,7 +1904,9 @@ def scan_changes_scandir(init_run: bool):
                         st = entry.stat(follow_symlinks=False)
                         signature = (st.st_size, st.st_mtime_ns, st.st_ctime_ns)
                         VIDEO_SCAN[rel] = signature
-                        if init_run or uploaded.get(rel) != signature or rel in cleanup_keys:
+                        key = bindings.get(rel)
+                        if (init_run or uploaded.get(rel) != signature or key not in verified
+                                or key in cleanup_keys or (MEDIA_INDEX is not None and key not in MEDIA_INDEX.listed)):
                             pending.append(rel)
                     elif ext in TAR_INCLUDE_EXTENSIONS:
                         tar_dirs.add(directory)
@@ -1973,11 +1990,15 @@ def expected_historical_tar_units(fp_store: dict):
 def list_remote_tarballs_once(dry_run: bool):
     # LIST/HEAD metadata only, including append-only bases and deltas. No restore
     # or GET of archived object contents is needed to verify chain membership.
-    res = run_cmd([
-        "rclone", "lsjson", f"{REMOTE_PATH}tarballs", "-R", "--files-only",
-        "--fast-list", "--no-mimetype", "--use-server-modtime",
-    ], capture=True)
-    items = json.loads(res.stdout)
+    if MEDIA_INDEX is not None:
+        items = [{"Path": key[len("tarballs/"):], "ModTime": value["LastModified"].isoformat()}
+                 for key, value in MEDIA_INDEX.listed.items() if key.startswith("tarballs/") and key.endswith(".tar")]
+    else:
+        res = run_cmd([
+            "rclone", "lsjson", f"{REMOTE_PATH}tarballs", "-R", "--files-only",
+            "--fast-list", "--no-mimetype", "--use-server-modtime",
+        ], capture=True)
+        items = json.loads(res.stdout)
     if not isinstance(items, list):
         raise RuntimeError("Invalid remote tarball inventory")
     tar_keys, stable_keys, dated_by_safe, modtimes = set(), set(), {}, {}
@@ -2628,11 +2649,19 @@ def map_videos_and_tombstone_deletions(dry_run, delete_budget):
     try:
         # Include uploads made by a run that failed before publishing its manifest.
         deleted = set(deleted) | {r[0] for r in conn.execute("SELECT path FROM video_uploads") if r[0] not in VIDEO_SCAN}
+        deleted.update(r[0] for r in conn.execute(
+            "SELECT DISTINCT path FROM media_paths WHERE key IN (SELECT key FROM pending_gc)") if r[0] not in VIDEO_SCAN)
         if not delete_budget.allow_video_tombstones(len(deleted)):
             raise RuntimeError(f"Refusing {len(deleted)} video deletions: safety limit exceeded; manifest unchanged")
         if not dry_run:
             with conn:
-                queue_gc(conn, deleted, "tag")
+                for path in deleted:
+                    keys = {r[0] for r in conn.execute("SELECT key FROM media_paths WHERE path=?", (path,))}
+                    keys.update(r[0] for r in conn.execute("SELECT key FROM video_objects WHERE path=?", (path,)))
+                    if not keys:
+                        keys.add(path)  # Historical filename object without a binding yet.
+                    conn.executemany("INSERT OR IGNORE INTO media_paths VALUES (?,?)", [(key, path) for key in keys])
+                    queue_gc(conn, keys, "tag")
     finally:
         conn.close()
     return current
@@ -2641,47 +2670,6 @@ def map_videos_and_tombstone_deletions(dry_run, delete_budget):
 # ==========================================
 # PHASE 4: VIDEO UPLOAD + MASTER MANIFEST
 # ==========================================
-def remote_upload_head(key):
-    # HEAD only: this neither retrieves nor restores Glacier payloads.
-    client = _get_s3_delete_client()
-    if client is None:
-        raise RuntimeError("S3 client unavailable for upload reconciliation")
-    try:
-        head = client.head_object(Bucket=REMOTE_S3_BUCKET, Key=_full_s3_key(key))
-    except Exception as error:
-        code = getattr(error, "response", {}).get("Error", {}).get("Code")
-        if str(code) in {"404", "NoSuchKey", "NotFound"}:
-            return None
-        raise
-    return head
-
-
-def remote_upload_matches(key, size, metadata_key, value):
-    head = remote_upload_head(key)
-    return head is not None and head["ContentLength"] == size and head.get("Metadata", {}).get(metadata_key) == value
-
-
-def remote_video_matches(key, local, size, signature):
-    head = remote_upload_head(key)
-    if head is None or head["ContentLength"] != size:
-        return False
-    metadata = head.get("Metadata", {})
-    if metadata.get("backup-source-signature") == signature:
-        return True
-    # Older rclone uploads predate our signature header. Compare their MD5
-    # evidence locally, so an initial audit does not reupload unchanged Glacier
-    # objects. Multipart uploads store this in Md5chksum; their ETag is not MD5.
-    encoded = metadata.get("md5chksum")
-    try:
-        checksum = base64.b64decode(encoded, validate=True).hex() if encoded else str(head.get("ETag", "")).strip('"')
-    except (ValueError, TypeError):
-        return False
-    if not re.fullmatch('[0-9a-fA-F]{32}', checksum):
-        return False
-    with open(local, "rb") as source:
-        return hashlib.file_digest(source, "md5").hexdigest() == checksum.lower()
-
-
 def upload_new_videos_if_any(has_new_videos, dry_run):
     if dry_run or not has_new_videos:
         return
@@ -2689,45 +2677,75 @@ def upload_new_videos_if_any(has_new_videos, dry_run):
         pending = [line.removesuffix("\n") for line in source]
     if not pending:
         raise RuntimeError("Expected pending video uploads but the upload list is empty")
-    conn = open_delta_db(TAR_DELTA_DB)
-    try:
-        with conn:
-            queue_gc(conn, pending, "tag")
-    finally:
-        conn.close()
     tagger = S3ObjectTagger(REMOTE_S3_BUCKET, REMOTE_S3_PREFIX)
+
     def upload(path):
         expected = VIDEO_SCAN[path]
         local = os.path.join(BASE_DIR, path)
+
         def verify_source():
             st = os.stat(local, follow_symlinks=False)
             if not stat.S_ISREG(st.st_mode) or (st.st_size, st.st_mtime_ns, st.st_ctime_ns) != expected:
                 raise RuntimeError(f"Video changed during backup: {path!r}; retry required")
+
         verify_source()
-        signature = hashlib.sha256(json.dumps(expected).encode()).hexdigest()
-        if not tagger.clear_obsolete(path):
-            raise RuntimeError("Cannot safely reuse video path: clearing obsolete tag failed")
-        if not remote_video_matches(path, local, expected[0], signature):
-            # Size alone cannot establish that a changed video was uploaded.
-            run_cmd(["rclone", "copyto", local, REMOTE_PATH + path, "--ignore-times",
-                     "--metadata", "--metadata-set", "backup-source-signature=" + signature,
-                     "--s3-chunk-size", "16M", "--s3-upload-concurrency", "4", "--stats", "30s"], long_running=True)
-            if not remote_upload_matches(path, expected[0], "backup-source-signature", signature):
-                raise RuntimeError(f"Uploaded video could not be verified: {path!r}")
+        content = media_objects.hash_file(local)
         verify_source()
-        db = open_delta_db(TAR_DELTA_DB)
-        try:
-            with db:
-                db.execute("""INSERT INTO video_uploads(path,size,mtime_ns,ctime_ns) VALUES (?,?,?,?)
-                    ON CONFLICT(path) DO UPDATE SET size=excluded.size,
-                    mtime_ns=excluded.mtime_ns,ctime_ns=excluded.ctime_ns""", (path, *expected))
-                db.execute("DELETE FROM gc_tags WHERE key=?", (path,))
-                db.execute("DELETE FROM pending_gc WHERE key=?", (path,))
-        finally:
-            db.close()
+        sha256 = content.sha256.hexdigest()
+        # Files hash concurrently, but identical content has only one upload in
+        # flight under this process's enclosing backup/dedupe exclusion.
+        with MEDIA_INDEX.content_lock(sha256):
+            db = open_delta_db(TAR_DELTA_DB)
+            try:
+                previous = db.execute("SELECT key FROM video_objects WHERE path=?", (path,)).fetchone()
+                previous = previous[0] if previous else path
+                target = media_objects.object_key(sha256)
+                candidates = list(dict.fromkeys([previous, *MEDIA_INDEX.same_content_keys(sha256), path, target]))
+                key, matched = target, None
+                for candidate in candidates:
+                    listed = MEDIA_INDEX.listed.get(candidate)
+                    known, _ = MEDIA_INDEX.previous(candidate)
+                    # A differently sized unadopted filename object cannot be
+                    # these bytes. Missing checksum evidence for matching-sized
+                    # bytes instead stops for review, never triggers reupload.
+                    if known is None and listed is not None and listed.get("Size") != content.size and candidate != target:
+                        continue
+                    record = MEDIA_INDEX.get(candidate, local=content)
+                    if record is not None and media_objects.matches_local(record, content):
+                        key, matched = candidate, record
+                        break
+                    if candidate == target and record is not None:
+                        raise RuntimeError("Immutable media key contains different content")
+                with db:
+                    # Record source associations before upload/tag removal so
+                    # failed unpublished objects remain safe to reconcile.
+                    db.execute("INSERT OR IGNORE INTO media_paths VALUES (?,?)", (key, path))
+                    queue_gc(db, [key])
+                    if previous != key and (previous in MEDIA_INDEX.listed or previous != path):
+                        db.execute("INSERT OR IGNORE INTO media_paths VALUES (?,?)", (previous, path))
+                        queue_gc(db, [previous])
+                if matched is not None and key not in MEDIA_INDEX.reactivated:
+                    if not tagger.clear_obsolete(key):
+                        raise RuntimeError("Cannot safely reuse media: clearing obsolete tag failed")
+                    MEDIA_INDEX.reactivated.add(key)
+                if matched is None:
+                    run_cmd(["rclone", "copyto", local, REMOTE_PATH + key, "--immutable",
+                             "--s3-storage-class", "DEEP_ARCHIVE", "--metadata", "--metadata-set", "backup-sha256=" + sha256,
+                             "--s3-chunk-size", "16M", "--s3-upload-concurrency", "4", "--stats", "30s"], long_running=True)
+                    MEDIA_INDEX.verify_upload(key, content)
+                    MEDIA_INDEX.reactivated.add(key)
+                verify_source()
+                with db:
+                    db.execute("""INSERT INTO video_uploads(path,size,mtime_ns,ctime_ns) VALUES (?,?,?,?)
+                        ON CONFLICT(path) DO UPDATE SET size=excluded.size,
+                        mtime_ns=excluded.mtime_ns,ctime_ns=excluded.ctime_ns""", (path, *expected))
+                    db.execute("INSERT OR REPLACE INTO video_objects VALUES (?,?)", (path, key))
+                    db.execute("DELETE FROM gc_tags WHERE key=?", (key,))
+                    db.execute("DELETE FROM pending_gc WHERE key=?", (key,))
+            finally:
+                db.close()
     with ThreadPoolExecutor(max_workers=8) as pool:
-        # Consume all futures; successful files commit independently of failures.
-        results = list(pool.map(upload, pending))
+        list(pool.map(upload, pending))
 
 
 def prepare_archive(conn, local, payload):
@@ -2748,17 +2766,18 @@ def prepare_archive(conn, local, payload):
 
 
 def finish_archive(conn, payload, fp_store):
-    key = payload["key"]
-    if not remote_upload_matches(key, payload["size"], "backup-sha256", payload["sha256"]):
-        local = payload["local"]
-        with open(local, "rb") as source:
-            if hashlib.file_digest(source, "sha256").hexdigest() != payload["sha256"]:
-                raise RuntimeError("Prepared archive failed integrity verification")
-        run_cmd(["rclone", "copyto", local, REMOTE_PATH + key, "--ignore-times", "--metadata",
+    key, local = payload["key"], payload["local"]
+    content = media_objects.hash_file(local)
+    if content.sha256.hexdigest() != payload["sha256"] or content.size != payload["size"]:
+        raise RuntimeError("Prepared archive failed integrity verification")
+    record = MEDIA_INDEX.get(key, local=content)
+    if record is not None and not media_objects.matches_local(record, content):
+        raise RuntimeError("Immutable archive key contains different content")
+    if record is None:
+        run_cmd(["rclone", "copyto", local, REMOTE_PATH + key, "--immutable", "--s3-storage-class", "DEEP_ARCHIVE", "--metadata",
                  "--metadata-set", "backup-sha256=" + payload["sha256"],
                  "--s3-chunk-size", "16M", "--stats", "30s"], long_running=True)
-        if not remote_upload_matches(key, payload["size"], "backup-sha256", payload["sha256"]):
-            raise RuntimeError("Uploaded archive could not be verified")
+        MEDIA_INDEX.verify_upload(key, content)
     uid = payload["unit_id"]
     with conn:
         if payload["rebuild"]:
@@ -2796,11 +2815,11 @@ def build_and_upload_master_manifest(current_video_manifest_nul, current_tarball
     if catalog is None:
         raise RuntimeError("A validated restore catalog is required before publication")
     assert_source_ready()
-    # Both forms describe exactly the same validated scan. JSON is authoritative
-    # and self-contained; the text allowlist is retained for existing tools.
+    # JSON includes all restore paths. The text file is an object allowlist only;
+    # content keys cannot be reconstructed into source paths from text alone.
     manifest = os.path.join(TMP_DIR, "current_manifest.json")
     atomic_write_bytes(manifest, json_bytes(catalog))
-    keys = [v["key"] for v in catalog["videos"]] + sorted(set(current_tarball_keys))
+    keys = sorted({v["key"] for v in catalog["videos"]} | set(current_tarball_keys))
     for key in keys:
         validate_list_path(key)
     legacy = os.path.join(TMP_DIR, "current_manifest.txt")
@@ -2932,7 +2951,8 @@ def build_restore_catalog(tar_units):
     conn = open_delta_db(TAR_DELTA_DB)
     try:
         uploaded = {r[0]: tuple(r[1:]) for r in conn.execute("SELECT path,size,mtime_ns,ctime_ns FROM video_uploads")}
-        missing_videos = [p for p, signature in VIDEO_SCAN.items() if uploaded.get(p) != signature]
+        bindings = dict(conn.execute("SELECT path,key FROM video_objects"))
+        missing_videos = [p for p, signature in VIDEO_SCAN.items() if uploaded.get(p) != signature or p not in bindings]
         if missing_videos:
             raise RuntimeError(f"Manifest refused: {len(missing_videos)} videos have no successful upload record")
         units = []
@@ -2945,12 +2965,19 @@ def build_restore_catalog(tar_units):
             if any(key not in REMOTE_TAR_KEYS for key in required):
                 raise RuntimeError(f"Manifest refused: incomplete archive chain for {unit['unit_id']}")
             units.append({k: unit[k] for k in ("unit_id", "rel_dir", "kind")} | {"base_key": state["base_key"], "deltas": deltas})
-        return {
-            "format": "s3-log-backup", "version": 3, "run_id": RUN_ID,
+        catalog = {
+            "format": "s3-log-backup", "version": 4, "scope": "native", "run_id": RUN_ID,
             "created_epoch": SOURCE_VIEW.created_epoch,
-            "videos": [{"key": p, "size": VIDEO_SCAN[p][0]} for p in sorted(VIDEO_SCAN)],
+            "videos": [{"key": bindings[p], "path": p, "size": VIDEO_SCAN[p][0]} for p in sorted(VIDEO_SCAN)],
             "units": units,
+            "media_store": MEDIA_INDEX.store,
         }
+        keys = {v["key"] for v in catalog["videos"]}
+        keys.update(key for unit in units for key in [unit["base_key"], *unit["deltas"]])
+        catalog["objects"] = MEDIA_INDEX.objects(keys)
+        from s3_restore_performer import validate_manifest
+        validate_manifest(dict(catalog, scope="media"))  # Native reference follows packing.
+        return catalog
     finally:
         conn.close()
 
@@ -2963,22 +2990,55 @@ def finish_remote_cleanup(catalog, tagger, delete_budget):
     failed = []
     video_tags = 0
     try:
+        captured = {v["path"]: v["key"] for v in catalog["videos"]}
+        # Retire absent path bindings after publication even when the object
+        # remains shared by another path, or its remote tagging needs retry.
+        with conn:
+            for path, in conn.execute("SELECT path FROM video_uploads").fetchall():
+                if path not in captured:
+                    conn.execute("DELETE FROM video_uploads WHERE path=?", (path,))
+                    conn.execute("DELETE FROM video_objects WHERE path=?", (path,))
+
+        def may_retire_video(key):
+            paths = [r[0] for r in conn.execute("SELECT path FROM media_paths WHERE key=?", (key,))]
+            if not paths:
+                if key.startswith(media_objects.PREFIX):
+                    raise RuntimeError("Pending content object has no source-path evidence for cleanup")
+                paths = [key]  # Legacy queued filename object.
+            live = SOURCE_VIEW.live_media if SOURCE_VIEW is not None else BASE_DIR
+            for path in paths:
+                media_objects.relative_path(path)
+                filename = os.path.join(live, path)
+                if not os.path.lexists(filename):
+                    continue
+                if path not in captured or captured[path] == key:
+                    return False
+                row = conn.execute("""SELECT v.key,u.size,u.mtime_ns,u.ctime_ns
+                    FROM video_objects v JOIN video_uploads u ON u.path=v.path WHERE v.path=?""", (path,)).fetchone()
+                info = os.stat(filename, follow_symlinks=False)
+                if (row is None or row[0] != captured[path] or not stat.S_ISREG(info.st_mode)
+                        or tuple(row[1:]) != (info.st_size, info.st_mtime_ns, info.st_ctime_ns)):
+                    return False  # Live path changed after the captured replacement.
+            return True
+
         for key, action in conn.execute("SELECT key, action FROM pending_gc ORDER BY key").fetchall():
             if key in protected:
                 with conn:
                     conn.execute("DELETE FROM pending_gc WHERE key=?", (key,))
                 continue
             # Migrate queued legacy 'delete' actions to tag-only cleanup too.
-            if not key.startswith("tarballs/"):
+            is_archive = key.startswith("tarballs/") and key.endswith(".tar")
+            if not is_archive:
                 validate_list_path(key)
                 if video_tags >= MAX_VIDEO_DELETE_MARKERS_PER_RUN:
                     continue
-                # A path reintroduced after the scan is not safe to tombstone.
-                live = SOURCE_VIEW.live_media if SOURCE_VIEW is not None else BASE_DIR
-                if os.path.lexists(os.path.join(live, key)):
+                if not may_retire_video(key):
                     continue
                 video_tags += 1
-                ok = tagger.ensure_tag(key, OBSOLETE_TAG_KEY, OBSOLETE_TAG_VALUE, dry_run=False)
+                ok = key not in MEDIA_INDEX.listed or tagger.ensure_tag(
+                    key, OBSOLETE_TAG_KEY, OBSOLETE_TAG_VALUE, dry_run=False, before_write=lambda: may_retire_video(key))
+                if not ok and not may_retire_video(key):
+                    continue
             else:
                 if not delete_budget.allow_tag_op(key):
                     continue
@@ -2989,8 +3049,8 @@ def finish_remote_cleanup(catalog, tagger, delete_budget):
                 with conn:
                     conn.execute("DELETE FROM pending_gc WHERE key=?", (key,))
                     db_gc_mark_tagged(conn, key, int(time.time()))
-                    if not key.startswith("tarballs/"):
-                        conn.execute("DELETE FROM video_uploads WHERE path=?", (key,))
+                    if not is_archive:
+                        conn.execute("DELETE FROM media_paths WHERE key=?", (key,))
             else:
                 failed.append(key)
     finally:
@@ -2999,7 +3059,7 @@ def finish_remote_cleanup(catalog, tagger, delete_budget):
         raise RuntimeError(f"Manifest published, but {len(failed)} cleanup operations failed; queued for retry")
 
 def _run_backup(args):
-    global REMOTE_TAR_KEYS, TAR_DELTA_DB
+    global REMOTE_TAR_KEYS, TAR_DELTA_DB, MEDIA_INDEX
     assert_source_ready()
     # Dry runs work on an isolated SQLite snapshot, including schema migrations.
     if args.dry_run:
@@ -3018,18 +3078,23 @@ def _run_backup(args):
         require_boto3_tagging=not args.dry_run,
         aws_region=args.aws_region,
     )
+    if not args.dry_run:
+        client = _get_s3_delete_client()
+        if client is None:
+            raise RuntimeError("S3 client unavailable for media checksum verification")
+        MEDIA_INDEX = MediaIndex(TAR_DELTA_DB, client, {"bucket": REMOTE_S3_BUCKET, "prefix": REMOTE_S3_PREFIX})
     retained = getattr(SOURCE_VIEW, "catalog", None)
     if not args.dry_run and retained is not None:
         # Once media publication is complete, never rebuild this selection from
         # newer ledger state or run another compaction on an interrupted retry.
         REMOTE_TAR_KEYS, stable, _, _ = list_remote_tarballs_once(False)
-        required = {key for unit in retained["units"] for key in (unit["base_key"], *unit["deltas"])}
-        if not required <= REMOTE_TAR_KEYS:
-            raise RuntimeError("Retained native run is missing a required media archive")
+        if retained.get("version") != 4:
+            raise RuntimeError("Retained attempt predates immutable media publication; it requires its original writer")
+        MEDIA_INDEX.verify_catalog(retained)
         current_video_manifest = os.path.join(TMP_DIR, "native-resume-videos.nul")
         for video in retained["videos"]:
-            validate_list_path(video["key"])
-        atomic_write_bytes(current_video_manifest, b"".join(v["key"].encode("utf-8") + b"\0" for v in retained["videos"]))
+            validate_list_path(video["path"])
+        atomic_write_bytes(current_video_manifest, b"".join(v["path"].encode("utf-8") + b"\0" for v in retained["videos"]))
         return publish_completed_backup(args, copy.deepcopy(retained), current_video_manifest, stable, budget)
     fp_store = load_tarball_fp_store()
     if not args.dry_run:
@@ -3071,6 +3136,7 @@ def _run_backup(args):
 
 
 def publish_completed_backup(args, catalog, current_video_manifest, stable, budget):
+    MEDIA_INDEX.verify_catalog(catalog)
     local_ids = {unit["unit_id"] for unit in catalog["units"]}
     # The native database, retained originals, worker state and this exact media
     # selection must be verified in Standard before publishing or retiring keys.
@@ -3117,8 +3183,9 @@ def open_native_session(args):
 
 
 def run_backup(args):
-    global TAR_DELTA_DB, BASE_DIR, SOURCE_VIEW, RUN_ID, current_epoch
+    global TAR_DELTA_DB, BASE_DIR, SOURCE_VIEW, RUN_ID, current_epoch, MEDIA_INDEX
     original_db, original_base, original_view, original_id, original_epoch = TAR_DELTA_DB, BASE_DIR, SOURCE_VIEW, RUN_ID, current_epoch
+    original_index = MEDIA_INDEX
     try:
         assert_source_ready()
         if not args.dry_run:
@@ -3146,6 +3213,9 @@ def run_backup(args):
             if not args.dry_run and SOURCE_VIEW.committed:
                 SOURCE_VIEW.finish()
     finally:
+        if MEDIA_INDEX is not None and MEDIA_INDEX is not original_index:
+            MEDIA_INDEX.close()
+        MEDIA_INDEX = original_index
         TAR_DELTA_DB, BASE_DIR, SOURCE_VIEW = original_db, original_base, original_view
         RUN_ID, current_epoch = original_id, original_epoch
 

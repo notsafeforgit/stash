@@ -77,3 +77,46 @@ class FakeS3:
         self.operations.append(("get", Key))
         body = (self.root / Key).read_bytes()
         return {"Body": io.BytesIO(body + b"changed" if self.corrupt_read else body)}
+
+
+class FakeColdS3(FakeS3):
+    """rclone writes local files; S3 exposes independently computed CRC metadata."""
+    def __init__(self, root):
+        super().__init__(root)
+        self.signatures = {}
+
+    def reconcile(self, key):
+        from awscrt.checksums import crc64nvme
+        path = self.root / key
+        if not path.is_file():
+            return
+        info = path.stat()
+        signature = (info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+        if self.signatures.get(key) == signature:
+            return
+        body = path.read_bytes()
+        self.headers[key] = {'ContentLength': len(body), 'ChecksumType': 'FULL_OBJECT',
+                             'ChecksumCRC64NVME': base64.b64encode(crc64nvme(body).to_bytes(8, 'big')).decode(),
+                             'ETag': '"' + hashlib.md5(body, usedforsecurity=False).hexdigest() + '-2"',
+                             'LastModified': datetime.fromtimestamp(info.st_mtime, timezone.utc),
+                             'StorageClass': 'DEEP_ARCHIVE'}
+        self.signatures[key] = signature
+
+    def list_objects_v2(self, **args):
+        for path in self.root.rglob('*'):
+            if path.is_file():
+                self.reconcile(path.relative_to(self.root).as_posix())
+        return super().list_objects_v2(**args)
+
+    def head_object(self, **args):
+        self.reconcile(args['Key'])
+        return super().head_object(**args)
+
+    def get_object(self, **args):
+        raise AssertionError('Backup must not download cold objects')
+
+    def restore_object(self, **args):
+        raise AssertionError('Backup must not thaw cold objects')
+
+    def put_object(self, **args):
+        raise AssertionError('Bulk uploads must use the exercised rclone transport')

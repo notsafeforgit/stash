@@ -610,7 +610,7 @@ Symbolic-link objects and paths outside the fixed output layout are rejected.
 An archive digest detects corruption and identifies the exact archive. Trust in
 a downloaded manifest comes from the enclosing backup's verified publication
 record. The [host backup integration](../integrations/backup/README.md) now binds
-the retained native/filesystem view to a v3 media selection and verifies S3
+the retained native/filesystem view to a v4 media manifest and verifies S3
 Standard object checksums before committing its current manifest. Repeated
 publication can reuse a durable checksum receipt when a fresh paginated inventory
 reports the same remote object identity. Explicit audit and restore always check
@@ -619,13 +619,14 @@ scheduling and S3 publication belong to that host package, not this component
 transport or the Stash server. Complete production inventory and cutover proof
 remain separate gates.
 
-The host readers also accept version 4 media manifests, whose version 2 selection
+The host publishes version 4 media manifests, whose version 2 selection
 binds each restore path to a distinct object descriptor and explicitly records
 the cold bucket/prefix. Multiple paths may share one checksum-verified object.
 The complete native archive binding includes those descriptors, paths and store;
 subset media plans drop the whole-library native claim. Historical selection
-version 1 remains readable. The publisher/cleanup conversion is still pending;
-see the [immutable media restore contract](../integrations/backup/README.md#immutable-media-restore-contract).
+version 1 remains readable. Immutable uploads, durable cold-object receipts and
+path-aware cleanup preserve replacement identities while sharing unchanged bytes;
+see [immutable media publication and restore](../integrations/backup/README.md#immutable-media-publication-and-restore).
 This does not require S3 object versions or change the portable bundle format.
 
 ## Validation

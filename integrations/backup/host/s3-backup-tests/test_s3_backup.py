@@ -3,6 +3,7 @@ import argparse
 import fcntl
 import importlib.util
 import io
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -21,7 +22,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 import s3_restore_performer as restore
 import s3_test_restore as restore_test
-from fake_s3 import FakeS3
+from fake_s3 import FakeS3, FakeColdS3, S3Error
+import media_objects
 from native_backup import NativeBackupSession
 from native_store import FORMAT, PREFIX, NativeStore, selection_digest, validate_reference
 from stash_archive.storage import json_bytes
@@ -107,13 +109,14 @@ class BackupTests(unittest.TestCase):
         m.run_cmd = self.run_cmd
         m.ensure_s3_delete_marker = self.delete
         m.S3ObjectTagger = lambda *a, **kw: self
+        self.accidental_audit = m.tombstone_remote_accidental_nonvideo_objects
         m.tombstone_remote_accidental_nonvideo_objects = lambda **kwargs: None
         self.native_s3 = FakeS3(self.standard)
+        self.cold_s3 = FakeColdS3(self.archive)
+        m._get_s3_delete_client = lambda: self.cold_s3
         self.native_finishes = 0
         m.open_native_session = lambda args: PolicyNativeSession(self)
-        self.remote_metadata = {}
-        m.remote_upload_matches = lambda key,size,name,value: (self.archive/key).is_file() and (self.archive/key).stat().st_size == size and self.remote_metadata.get(key,{}).get(name) == value
-        m.remote_video_matches = lambda key,local,size,value: m.remote_upload_matches(key,size,"backup-source-signature",value)
+        self.published_video_keys = {}
         self.operations = []
         self.tagged = set()
         self.failure = None
@@ -135,6 +138,11 @@ class BackupTests(unittest.TestCase):
             return self.standard / text[len(self.m.STANDARD_REMOTE_PATH):]
         return Path(text)
 
+    def video_key(self, path='sample/clip.mp4'):
+        if path in self.published_video_keys:
+            return self.published_video_keys[path]
+        return media_objects.object_key(hashlib.sha256((self.source / path).read_bytes()).hexdigest())
+
     def run_cmd(self, cmd, **kwargs):
         self.assertEqual(cmd[0], 'rclone')
         self.assertNotIn('backend', cmd, 'Backup must never initiate Glacier restores')
@@ -153,10 +161,15 @@ class BackupTests(unittest.TestCase):
         if cmd[1] == 'copyto':
             source, destination = self.remote_path(cmd[2]), self.remote_path(cmd[3])
             destination.parent.mkdir(parents=True, exist_ok=True)
+            if cmd[3].startswith(self.m.REMOTE_PATH):
+                self.assertIn('--immutable', cmd)
+                self.assertNotIn('--ignore-times', cmd)
+                self.assertEqual(cmd[cmd.index('--s3-storage-class') + 1], 'DEEP_ARCHIVE')
+                if destination.exists():
+                    if destination.read_bytes() != source.read_bytes():
+                        raise subprocess.CalledProcessError(1, cmd)
+                    return subprocess.CompletedProcess(cmd, 0, '', '')
             shutil.copyfile(source, destination)
-            if "--metadata-set" in cmd:
-                name,value=cmd[cmd.index("--metadata-set")+1].split("=",1)
-                self.remote_metadata[str(destination.relative_to(self.archive))]={name:value}
         elif cmd[1] == 'copy' and '--files-from-raw' not in cmd:
             source, destination = self.remote_path(cmd[2]), self.remote_path(cmd[3])
             destination.mkdir(parents=True, exist_ok=True)
@@ -174,7 +187,9 @@ class BackupTests(unittest.TestCase):
             raise AssertionError(f'Unexpected command: {cmd}')
         return subprocess.CompletedProcess(cmd, 0, '', '')
 
-    def ensure_tag(self, key, tag_key, tag_value, dry_run):
+    def ensure_tag(self, key, tag_key, tag_value, dry_run, before_write=None):
+        if before_write is not None and not before_write():
+            return False
         self.assertTrue((self.standard / 'current_manifest.json').exists())
         self.assertNotIn(key, restore.required_keys(self.catalog()))
         self.tagged.add(key)
@@ -201,7 +216,13 @@ class BackupTests(unittest.TestCase):
                                   delta_cutover_now=False, aws_region=None)
         for key, value in overrides.items():
             setattr(args, key, value)
-        self.m.run_backup(args)
+        try:
+            self.m.run_backup(args)
+        finally:
+            current = self.standard / 'current_manifest.json'
+            if current.exists():
+                self.published_video_keys.update({video.get('path', video['key']): video['key']
+                                                 for video in json.loads(current.read_bytes())['videos']})
 
     def catalog(self):
         return restore.load_manifest(self.standard / 'current_manifest.json')
@@ -288,7 +309,7 @@ class BackupTests(unittest.TestCase):
         self.run_backup()
         catalog = self.catalog()
         ref = catalog['native_archive']
-        self.assertEqual(catalog['version'], 3)
+        self.assertEqual(catalog['version'], 4)
         self.assertTrue((self.standard / ref['manifest']['key']).is_file())
         old_manifest = (self.standard / 'current_manifest.json').read_bytes()
         (self.source / 'sample/clip.mp4').unlink()
@@ -299,7 +320,7 @@ class BackupTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'native upload failed'):
             self.run_backup()
         self.assertEqual((self.standard / 'current_manifest.json').read_bytes(), old_manifest)
-        self.assertNotIn('sample/clip.mp4', self.tagged)
+        self.assertNotIn(self.video_key(), self.tagged)
 
     def test_full_backup_delta_delete_and_readd_round_trip(self):
         self.run_backup()
@@ -350,15 +371,15 @@ class BackupTests(unittest.TestCase):
         # No time filter may hide an untracked path, even after a long outage.
         with patch.object(self.m.os.path, 'getctime', return_value=1):
             self.run_backup()
-        self.assertTrue((self.archive / 'sample/clip.mp4').exists())
-        copies = sum(op[1:2] == ('copyto',) and op[3].endswith('/sample/clip.mp4') for op in self.operations)
+        self.assertTrue((self.archive / self.video_key()).exists())
+        copies = sum(op[1:2] == ('copyto',) and op[2].endswith('/sample/clip.mp4') for op in self.operations)
         self.run_backup()
-        self.assertEqual(sum(op[1:2] == ('copyto',) and op[3].endswith('/sample/clip.mp4') for op in self.operations), copies)
+        self.assertEqual(sum(op[1:2] == ('copyto',) and op[2].endswith('/sample/clip.mp4') for op in self.operations), copies)
         self.run_backup(init_run=True)
-        self.assertEqual(sum(op[1:2] == ('copyto',) and op[3].endswith('/sample/clip.mp4') for op in self.operations), copies)  # HEAD reconciliation avoids reuploading unchanged bytes
+        self.assertEqual(sum(op[1:2] == ('copyto',) and op[2].endswith('/sample/clip.mp4') for op in self.operations), copies)  # HEAD reconciliation avoids reuploading unchanged bytes
 
     def test_video_upload_failure_remains_pending(self):
-        self.failure = lambda cmd: cmd[1] == 'copyto' and cmd[3].endswith('/sample/clip.mp4')
+        self.failure = lambda cmd: cmd[1] == 'copyto' and cmd[2].endswith('/sample/clip.mp4')
         with self.assertRaises(subprocess.CalledProcessError):
             self.run_backup()
         conn = self.m.open_delta_db(self.m.TAR_DELTA_DB)
@@ -376,7 +397,7 @@ class BackupTests(unittest.TestCase):
             return original(*args, **kwargs)
         with patch.object(self.m, 'upload_new_videos_if_any', side_effect=upload):
             self.run_backup()
-        self.assertNotIn('sample/late.mp4', [v['key'] for v in self.catalog()['videos']])
+        self.assertNotIn('sample/late.mp4', [v['path'] for v in self.catalog()['videos']])
         self.run_backup()
         self.assert_round_trip()
 
@@ -384,7 +405,7 @@ class BackupTests(unittest.TestCase):
         original = self.m.run_cmd
         def mutate(cmd, **kwargs):
             result = original(cmd, **kwargs)
-            if cmd[1] == 'copyto' and cmd[3].endswith('/sample/clip.mp4'):
+            if cmd[1] == 'copyto' and cmd[2].endswith('/sample/clip.mp4'):
                 self.write('sample/clip.mp4', b'changed during upload')
             return result
         with patch.object(self.m, 'run_cmd', side_effect=mutate):
@@ -422,7 +443,7 @@ class BackupTests(unittest.TestCase):
         self.operations.clear()
         self.run_backup()
         self.assertTrue(removed_archives.issubset(self.tagged))
-        self.assertIn('removed/clip.mp4', self.tagged)
+        self.assertIn(self.video_key('removed/clip.mp4'), self.tagged)
         self.assertTrue(set(restore.required_keys(self.catalog())).isdisjoint(self.tagged))
         self.assertFalse([op for op in self.operations if op[0] == 'delete'])
         self.assert_round_trip()
@@ -460,15 +481,15 @@ class BackupTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'source directory is unavailable'):
                 self.run_backup()
         self.assertFalse([op for op in self.operations if op[0] in ('tag', 'delete')])
-        self.assertTrue((self.archive / 'sample/clip.mp4').exists())
+        self.assertTrue((self.archive / self.video_key()).exists())
         conn = self.m.open_delta_db(self.m.TAR_DELTA_DB)
         try:
-            self.assertIsNotNone(conn.execute('SELECT 1 FROM pending_gc WHERE key=?', ('sample/clip.mp4',)).fetchone())
+            self.assertIsNotNone(conn.execute('SELECT 1 FROM pending_gc WHERE key=?', (self.video_key(),)).fetchone())
         finally:
             conn.close()
         (self.root / 'unavailable-source').rename(self.source)
         self.run_backup()
-        self.assertIn('sample/clip.mp4', self.tagged)
+        self.assertIn(self.video_key(), self.tagged)
         self.assert_round_trip()
 
     def test_video_delete_breaker_blocks_publication(self):
@@ -499,8 +520,8 @@ class BackupTests(unittest.TestCase):
     def test_failed_remote_listing_blocks_publication(self):
         self.run_backup()
         previous = (self.standard / 'current_manifest.json').read_bytes()
-        self.failure = lambda cmd: cmd[1] == 'lsjson'
-        with self.assertRaises(subprocess.CalledProcessError):
+        self.cold_s3.list_failure = 'AccessDenied'
+        with self.assertRaises(S3Error):
             self.run_backup()
         self.assertEqual((self.standard / 'current_manifest.json').read_bytes(), previous)
 
@@ -604,9 +625,19 @@ class BackupTests(unittest.TestCase):
         self.run_backup()
         (self.source / 'sample/b.jpg').unlink()
         self.run_backup()
-        converted = restore.load_legacy_manifest(
-            self.standard / 'current_manifest.txt', self.m.TAR_DELTA_DB, self.m.TARBALL_FP_JSONL,
-        )
+        with self.assertRaisesRegex(ValueError, 'requires its JSON manifest'):
+            restore.load_legacy_manifest(self.standard / 'current_manifest.txt', self.m.TAR_DELTA_DB, self.m.TARBALL_FP_JSONL)
+        # Construct the actual historical layout, where keys were filenames.
+        catalog = self.catalog()
+        keys = [key for unit in catalog['units'] for key in (unit['base_key'], *unit['deltas'])]
+        for video in catalog['videos']:
+            target = self.archive / video['path']
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(self.archive / video['key'], target)
+            keys.append(video['path'])
+        old_manifest = self.root / 'historical-manifest.txt'
+        old_manifest.write_text('\n'.join(keys) + '\n')
+        converted = restore.load_legacy_manifest(old_manifest, self.m.TAR_DELTA_DB, self.m.TARBALL_FP_JSONL)
         destination = self.root / 'legacy-restore'
         restore.restore_local(converted, self.archive, destination)
         restore.verify_tree(destination, self.source)
@@ -663,10 +694,10 @@ class BackupTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'queued for retry'):
                 self.run_backup()
         self.assertEqual(self.catalog()['videos'], [])
-        self.assertTrue((self.archive / 'sample/clip.mp4').exists())
+        self.assertTrue((self.archive / self.video_key()).exists())
         self.run_backup()
-        self.assertTrue((self.archive / 'sample/clip.mp4').exists())
-        self.assertIn('sample/clip.mp4', self.tagged)
+        self.assertTrue((self.archive / self.video_key()).exists())
+        self.assertIn(self.video_key(), self.tagged)
         self.assertFalse([op for op in self.operations if op[0] == 'delete'])
         self.assert_round_trip()
 
@@ -683,26 +714,30 @@ class BackupTests(unittest.TestCase):
         self.assertEqual(conn.execute('SELECT COUNT(*) FROM pending_gc').fetchone()[0], 0)
         conn.close()
 
-    def test_returning_video_clears_obsolete_before_reupload(self):
+    def test_returning_video_clears_obsolete_before_reuse(self):
         self.run_backup()
         original = (self.source / 'sample/clip.mp4').read_bytes()
         (self.source / 'sample/clip.mp4').unlink()
         self.run_backup()
-        self.assertIn('sample/clip.mp4', self.tagged)
+        self.assertIn(self.video_key(), self.tagged)
         self.write('sample/clip.mp4', original)
         self.operations.clear()
         self.run_backup()
-        self.assertNotIn('sample/clip.mp4', self.tagged)
-        untag = self.operations.index(('clear_obsolete', 'sample/clip.mp4'))
-        copy = next(i for i, op in enumerate(self.operations)
-                    if op[:2] == ('rclone', 'copyto') and op[3] == self.m.REMOTE_PATH + 'sample/clip.mp4')
-        self.assertLess(untag, copy)
+        self.assertNotIn(self.video_key(), self.tagged)
+        untag = self.operations.index(('clear_obsolete', self.video_key()))
+        publication = next(i for i, op in enumerate(self.operations)
+                           if op[:2] == ('rclone', 'copyto') and op[3] == self.m.STANDARD_REMOTE_PATH + 'current_manifest.txt')
+        self.assertLess(untag, publication)
+        self.assertFalse(any(op[:2] == ('rclone', 'copyto') and op[3] == self.m.REMOTE_PATH + self.video_key()
+                             for op in self.operations))
         self.assert_round_trip()
 
     def test_tag_removal_failure_blocks_upload_and_publication(self):
         self.run_backup()
         previous = (self.standard / 'current_manifest.json').read_bytes()
         self.write('sample/new.mp4', b'new video')
+        (self.archive / 'sample').mkdir(exist_ok=True)
+        (self.archive / 'sample/new.mp4').write_bytes(b'new video')
         self.operations.clear()
         with patch.object(self, 'clear_obsolete', return_value=False):
             with self.assertRaisesRegex(RuntimeError, 'obsolete tag failed'):
@@ -732,18 +767,18 @@ class BackupTests(unittest.TestCase):
             self.write('sample/clip.mp4', b'returned after snapshot')
         with patch.object(self.m, 'build_and_upload_master_manifest', side_effect=publish):
             self.run_backup()
-        self.assertNotIn('sample/clip.mp4', self.tagged)
-        self.assertNotIn('sample/clip.mp4', restore.required_keys(self.catalog()))
+        self.assertNotIn(self.video_key(), self.tagged)
+        self.assertNotIn(self.video_key(), restore.required_keys(self.catalog()))
         self.assertEqual(self.m.BASE_DIR, str(self.source))
 
     def test_media_subset_cannot_claim_full_native_binding(self):
         self.run_backup()
         catalog = self.catalog()
         plan = restore.select_plan(catalog, 'sample')
-        self.assertEqual(plan['version'], 2)
+        self.assertEqual(plan['version'], 4)
         self.assertNotIn('native_archive', plan)
         catalog['videos'][0]['size'] += 1
-        with self.assertRaisesRegex(ValueError, 'Media selection differs'):
+        with self.assertRaises(ValueError):
             restore.select_plan(catalog, 'sample')
 
     def test_retained_media_selection_resumes_without_scan_or_compaction(self):
@@ -822,37 +857,37 @@ class BackupTests(unittest.TestCase):
         self.m.open_native_session = resume
         self.operations.clear()
         self.run_backup(defer_cleanup=True)
-        self.assertNotIn('sample/clip.mp4', self.tagged)
+        self.assertNotIn(self.video_key(), self.tagged)
         self.assertFalse([op for op in self.operations if op[0] in ('tag', 'delete')])
 
-    def test_returning_video_disappearing_after_failed_copy_is_retombstoned(self):
+    def test_returning_video_disappearing_after_failed_publication_is_retombstoned(self):
         self.run_backup()
         video = self.source / 'sample/clip.mp4'
         original = video.read_bytes()
         video.unlink()
         self.run_backup()
         self.write('sample/clip.mp4', original)
-        self.failure = lambda cmd: cmd[1] == 'copyto' and cmd[3].endswith('/sample/clip.mp4')
-        with self.assertRaises(subprocess.CalledProcessError):
-            self.run_backup()
-        self.assertNotIn('sample/clip.mp4', self.tagged)
+        with patch.object(self.m, 'build_and_upload_master_manifest', side_effect=RuntimeError('publication interrupted')):
+            with self.assertRaisesRegex(RuntimeError, 'publication interrupted'):
+                self.run_backup()
+        self.assertNotIn(self.video_key(), self.tagged)
         video.unlink()
         self.failure = None
         self.run_backup()
-        self.assertIn('sample/clip.mp4', self.tagged)
-        self.assertTrue((self.archive / 'sample/clip.mp4').exists())
+        self.assertIn(self.video_key(), self.tagged)
+        self.assertTrue((self.archive / self.video_key()).exists())
         self.assert_round_trip()
 
     def test_cleanup_intent_forces_reconciliation_of_unchanged_video(self):
         self.run_backup()
         conn = self.m.open_delta_db(self.m.TAR_DELTA_DB)
         with conn:
-            self.m.queue_gc(conn, ['sample/clip.mp4'], 'delete')
+            self.m.queue_gc(conn, [self.video_key()], 'delete')
         conn.close()
         # Simulate a tag write followed by a crash before recording its result.
-        self.tagged.add('sample/clip.mp4')
+        self.tagged.add(self.video_key())
         self.run_backup()
-        self.assertNotIn('sample/clip.mp4', self.tagged)
+        self.assertNotIn(self.video_key(), self.tagged)
         self.assert_round_trip()
 
     def test_old_delete_queue_is_migrated_to_tagging(self):
@@ -860,17 +895,17 @@ class BackupTests(unittest.TestCase):
         (self.source / 'sample/clip.mp4').unlink()
         conn = self.m.open_delta_db(self.m.TAR_DELTA_DB)
         with conn:
-            self.m.queue_gc(conn, ['sample/clip.mp4'], 'delete')
+            self.m.queue_gc(conn, [self.video_key()], 'delete')
         conn.close()
         self.run_backup()
-        self.assertIn('sample/clip.mp4', self.tagged)
-        self.assertTrue((self.archive / 'sample/clip.mp4').exists())
+        self.assertIn(self.video_key(), self.tagged)
+        self.assertTrue((self.archive / self.video_key()).exists())
         self.assertFalse([op for op in self.operations if op[0] == 'delete'])
 
     def test_missing_source_file_is_not_treated_as_successful_rclone_copy(self):
         original = self.m.run_cmd
         def disappear(cmd, **kwargs):
-            if cmd[1] == 'copyto' and cmd[3].endswith('/sample/clip.mp4'):
+            if cmd[1] == 'copyto' and cmd[2].endswith('/sample/clip.mp4'):
                 (self.source / 'sample/clip.mp4').unlink()
             return original(cmd, **kwargs)
         with patch.object(self.m, 'run_cmd', side_effect=disappear):
@@ -900,6 +935,11 @@ class BackupTests(unittest.TestCase):
             member = tarfile.TarInfo('__delta_meta__.json')
             member.size = len(payload)
             archive.addfile(member, io.BytesIO(payload))
+        # Give the malformed delta an internally consistent outer checksum so
+        # this still exercises chain validation after the new integrity gate.
+        self.cold_s3.reconcile(key)
+        plan['objects'][key] = media_objects.object_from_head(self.cold_s3.headers[key], local=media_objects.hash_file(path))
+        plan['native_archive']['selection_sha256'] = selection_digest(plan)
         with self.assertRaisesRegex(ValueError, 'mismatched base_key'):
             restore.restore_local(plan, self.archive, self.root / 'wrong-chain')
 
@@ -930,6 +970,217 @@ class BackupTests(unittest.TestCase):
         self.run_backup()
         self.assertNotEqual(self.catalog()['units'][0]['base_key'], 'tarballs/sample.tar')
         self.assert_round_trip()
+
+
+    def test_unchanged_cold_backup_reuses_one_inventory_without_heads_or_uploads(self):
+        self.run_backup()
+        self.cold_s3.operations.clear()
+        self.operations.clear()
+        # Exercise the actual optional audit as well: it reuses the inventory
+        # and must leave extensionless content keys alone.
+        self.m.tombstone_remote_accidental_nonvideo_objects = self.accidental_audit
+        self.run_backup()
+        self.assertEqual(self.cold_s3.operations, [('list', '')])
+        self.assertFalse([op for op in self.operations if op[0] == 'tag'
+                          or (op[:2] == ('rclone', 'copyto') and op[3].startswith(self.m.REMOTE_PATH))])
+        self.assertFalse([op for op in self.operations if op[:2] in (('rclone', 'lsf'), ('rclone', 'lsjson'))])
+
+    def test_duplicate_and_renamed_videos_share_one_upload_and_protected_object(self):
+        body = (self.source / 'sample/clip.mp4').read_bytes()
+        self.write('sample/duplicate.mp4', body)
+        self.run_backup()
+        key = self.video_key()
+        self.assertEqual({v['key'] for v in self.catalog()['videos']}, {key})
+        uploads = lambda: [op for op in self.operations if op[:2] == ('rclone', 'copyto')
+                           and op[3].startswith(self.m.REMOTE_PATH + media_objects.PREFIX)]
+        self.assertEqual(len(uploads()), 1)
+        (self.source / 'sample/clip.mp4').rename(self.source / 'sample/renamed.mp4')
+        self.run_backup()
+        self.assertEqual(self.video_key('sample/renamed.mp4'), key)
+        self.assertEqual(len(uploads()), 1)
+        self.assertNotIn(key, self.tagged)
+        with self.m.open_delta_db(self.m.TAR_DELTA_DB) as db:
+            self.assertIsNone(db.execute('SELECT 1 FROM video_objects WHERE path=?', ('sample/clip.mp4',)).fetchone())
+        (self.source / 'sample/duplicate.mp4').unlink()
+        self.run_backup()
+        self.assertNotIn(key, self.tagged)
+        self.m.MAX_VIDEO_DELETE_MARKERS_PER_RUN = 0
+        self.run_backup()  # Removed shared paths do not count as new deletions forever.
+        self.assertEqual(len(uploads()), 1)
+        self.assert_round_trip()
+
+    def test_replacement_preserves_old_manifest_bytes_and_cleans_only_old_key(self):
+        self.run_backup()
+        previous = self.catalog()
+        old_key = self.video_key()
+        original = (self.archive / old_key).read_bytes()
+        self.write('sample/clip.mp4', b'new replacement')
+        self.run_backup()
+        self.assertNotEqual(self.video_key(), old_key)
+        self.assertEqual((self.archive / old_key).read_bytes(), original)
+        self.assertIn(old_key, self.tagged)
+        self.assertNotIn(self.video_key(), self.tagged)
+        target = self.root / 'previous-generation'
+        restore.restore_local(previous, self.archive, target)
+        self.assertEqual((target / 'sample/clip.mp4').read_bytes(), original)
+        self.assert_round_trip()
+
+    def test_replacement_upload_before_failed_publication_leaves_previous_restore_intact(self):
+        self.run_backup()
+        previous = self.catalog()
+        original_manifest = (self.standard / 'current_manifest.json').read_bytes()
+        old_key = self.video_key()
+        original = (self.archive / old_key).read_bytes()
+        self.write('sample/clip.mp4', b'replacement before native failure')
+        with patch.object(PolicyNativeSession, 'publish', side_effect=RuntimeError('native failure')):
+            with self.assertRaisesRegex(RuntimeError, 'native failure'):
+                self.run_backup()
+        self.assertEqual((self.standard / 'current_manifest.json').read_bytes(), original_manifest)
+        self.assertNotIn(old_key, self.tagged)
+        target = self.root / 'failed-publication-restore'
+        restore.restore_local(previous, self.archive, target)
+        self.assertEqual((target / 'sample/clip.mp4').read_bytes(), original)
+        self.operations.clear()
+        self.run_backup()
+        self.assertFalse([op for op in self.operations if op[:2] == ('rclone', 'copyto')
+                          and op[3].startswith(self.m.REMOTE_PATH + media_objects.PREFIX)])
+        self.assert_round_trip()
+
+    def test_missing_current_video_is_repaired_from_the_original_bytes(self):
+        self.run_backup()
+        key = self.video_key()
+        (self.archive / key).unlink()
+        self.operations.clear()
+        self.cold_s3.operations.clear()
+        self.run_backup()
+        self.assertEqual(self.video_key(), key)
+        self.assertEqual([op for op in self.cold_s3.operations if op[0] == 'head'], [('head', key)])
+        self.assertEqual(sum(op[:2] == ('rclone', 'copyto') and op[3] == self.m.REMOTE_PATH + key for op in self.operations), 1)
+        self.assert_round_trip()
+
+    def test_existing_unverifiable_legacy_video_stops_without_reupload(self):
+        legacy = self.archive / 'sample/clip.mp4'
+        legacy.parent.mkdir()
+        legacy.write_bytes((self.source / 'sample/clip.mp4').read_bytes())
+        self.cold_s3.reconcile('sample/clip.mp4')
+        self.cold_s3.headers['sample/clip.mp4']['ChecksumType'] = 'COMPOSITE'
+        with self.assertRaisesRegex(ValueError, 'refusing automatic reupload'):
+            self.run_backup()
+        self.assertFalse(self.operations)
+        self.assertFalse((self.standard / 'current_manifest.json').exists())
+
+    def test_overwritten_known_cold_object_is_not_adopted_or_reuploaded(self):
+        self.run_backup()
+        previous = (self.standard / 'current_manifest.json').read_bytes()
+        (self.archive / self.video_key()).write_bytes(b'externally replaced')
+        self.operations.clear()
+        with self.assertRaisesRegex(ValueError, 'missing or changed'):
+            self.run_backup()
+        self.assertEqual((self.standard / 'current_manifest.json').read_bytes(), previous)
+        self.assertFalse(self.operations)
+
+    def test_existing_content_key_with_wrong_bytes_is_never_overwritten(self):
+        key = self.video_key()
+        path = self.archive / key
+        path.parent.mkdir(parents=True)
+        wrong = b'wrong data'
+        self.assertEqual(len(wrong), (self.source / 'sample/clip.mp4').stat().st_size)
+        path.write_bytes(wrong)
+        with self.assertRaisesRegex(RuntimeError, 'Immutable media key contains different content'):
+            self.run_backup()
+        self.assertEqual(path.read_bytes(), wrong)
+        self.assertFalse(self.operations)
+        self.assertFalse((self.standard / 'current_manifest.json').exists())
+
+    def test_lost_checksum_receipts_reverify_without_uploading_existing_bytes(self):
+        self.run_backup()
+        with self.m.open_delta_db(self.m.TAR_DELTA_DB) as db:
+            db.execute('DELETE FROM media_objects')
+        self.cold_s3.operations.clear()
+        self.operations.clear()
+        self.run_backup()
+        keys = set(self.catalog()['objects'])
+        self.assertEqual({op[1] for op in self.cold_s3.operations if op[0] == 'head'}, keys)
+        self.assertFalse([op for op in self.operations if op[:2] == ('rclone', 'copyto')
+                          and op[3].startswith(self.m.REMOTE_PATH)])
+        self.assert_round_trip()
+
+    def test_retained_selection_missing_video_stops_without_repair_or_rescan(self):
+        self.run_backup()
+        retained = self.catalog()
+        reference = retained.pop('native_archive')
+        previous = (self.standard / 'current_manifest.json').read_bytes()
+        (self.archive / self.video_key()).unlink()
+        self.operations.clear()
+        def resume(args):
+            session = PolicyNativeSession(self)
+            session.catalog, session.publication = retained, reference
+            session.run_id, session.created_epoch = retained['run_id'], retained['created_epoch']
+            return session
+        self.m.open_native_session = resume
+        with patch.object(self.m, 'scan_changes_scandir', side_effect=AssertionError('must not rescan')), \
+             patch.object(self.m, 'process_tarballs_incremental_deltas', side_effect=AssertionError('must not compact')):
+            with self.assertRaisesRegex(ValueError, 'Required cold media object is missing'):
+                self.run_backup()
+        self.assertEqual((self.standard / 'current_manifest.json').read_bytes(), previous)
+        self.assertFalse(self.operations)
+
+    def test_file_returning_during_tag_read_keeps_cleanup_pending(self):
+        self.run_backup()
+        key = self.video_key()
+        body = (self.source / 'sample/clip.mp4').read_bytes()
+        (self.source / 'sample/clip.mp4').unlink()
+        original = self.ensure_tag
+        def returning(key, tag_key, tag_value, dry_run, before_write=None):
+            self.write('sample/clip.mp4', body)
+            self.assertIsNotNone(before_write)
+            return original(key, tag_key, tag_value, dry_run, before_write)
+        with patch.object(self, 'ensure_tag', side_effect=returning):
+            self.run_backup()
+        self.assertNotIn(key, self.tagged)
+        with self.m.open_delta_db(self.m.TAR_DELTA_DB) as db:
+            self.assertIsNotNone(db.execute('SELECT 1 FROM pending_gc WHERE key=?', (key,)).fetchone())
+
+    def test_live_replacement_changed_after_capture_protects_previous_object(self):
+        self.run_backup()
+        old_key = self.video_key()
+        self.write('sample/clip.mp4', b'captured replacement')
+        snapshot = self.root / 'retained-replacement'
+        shutil.copytree(self.source, snapshot)
+        def capture(args):
+            session = PolicyNativeSession(self)
+            session.media_path = snapshot
+            return session
+        self.m.open_native_session = capture
+        original = self.m.build_and_upload_master_manifest
+        def publish(*args, **kwargs):
+            original(*args, **kwargs)
+            self.write('sample/clip.mp4', b'changed again after snapshot')
+        with patch.object(self.m, 'build_and_upload_master_manifest', side_effect=publish):
+            self.run_backup()
+        self.assertNotIn(old_key, self.tagged)
+        with self.m.open_delta_db(self.m.TAR_DELTA_DB) as db:
+            self.assertIsNotNone(db.execute('SELECT 1 FROM pending_gc WHERE key=?', (old_key,)).fetchone())
+
+    def test_new_upload_intent_survives_failure_before_binding_and_later_deletion(self):
+        original = self.m.run_cmd
+        key = self.video_key()
+        def upload_then_fail(cmd, **kwargs):
+            result = original(cmd, **kwargs)
+            if cmd[:2] == ['rclone', 'copyto'] and cmd[3] == self.m.REMOTE_PATH + key:
+                raise RuntimeError('response lost')
+            return result
+        with patch.object(self.m, 'run_cmd', side_effect=upload_then_fail):
+            with self.assertRaisesRegex(RuntimeError, 'response lost'):
+                self.run_backup()
+        with self.m.open_delta_db(self.m.TAR_DELTA_DB) as db:
+            self.assertEqual(db.execute('SELECT path FROM media_paths WHERE key=?', (key,)).fetchall(), [('sample/clip.mp4',)])
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM video_uploads').fetchone()[0], 0)
+        (self.source / 'sample/clip.mp4').unlink()
+        self.run_backup()
+        self.assertIn(key, self.tagged)
+        self.assertEqual(self.catalog()['videos'], [])
+
 
 
 class LifecycleTagTests(unittest.TestCase):
@@ -992,6 +1243,21 @@ class LifecycleTagTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'Direct S3 deletion is disabled'):
             self.m.ensure_s3_delete_marker('clip.mp4', False)
 
+    def test_source_path_is_rechecked_after_tag_read_before_remote_write(self):
+        path = Path(self.temp.name) / 'returned.mp4'
+        def returned(**kwargs):
+            path.write_bytes(b'returned during network request')
+            return {'TagSet': tags}
+        self.tagger.s3.get_object_tagging.side_effect = returned
+        for tags in ([{'Key': 'owner', 'Value': 'keep'}], [{'Key': 'obsolete', 'Value': 'true'}]):
+            with self.subTest(tags=tags):
+                path.unlink(missing_ok=True)
+                self.assertFalse(self.tagger.ensure_tag(
+                    'old-key', 'obsolete', 'true', False, before_write=lambda: not path.exists()))
+        self.assertEqual(self.tagger.s3.get_object_tagging.call_count, 2)
+        self.tagger.s3.put_object_tagging.assert_not_called()
+
+
 
 if __name__ == '__main__':
     unittest.main()
@@ -1016,30 +1282,33 @@ class PowerRecoveryTests(BackupTests):
         original=self.m.run_cmd
         def crash(cmd,**kwargs):
             result=original(cmd,**kwargs)
-            if cmd[1]=='copyto' and cmd[3].endswith('/sample/clip.mp4'):raise SystemExit('power boundary')
+            if cmd[1]=='copyto' and cmd[2].endswith('/sample/clip.mp4'):raise SystemExit('power boundary')
             return result
         with patch.object(self.m,'run_cmd',side_effect=crash):
             with self.assertRaises(SystemExit):self.run_backup()
         self.run_backup();self.assert_round_trip()
-        self.assertEqual(sum(op[1:2]==('copyto',) and op[3].endswith('/sample/clip.mp4') for op in self.operations),1)
+        self.assertEqual(sum(op[1:2]==('copyto',) and op[2].endswith('/sample/clip.mp4') for op in self.operations),1)
     def test_same_size_changed_video_is_uploaded(self):
         self.run_backup()
-        before=(self.archive/'sample/clip.mp4').read_bytes()
+        before=(self.archive/self.video_key()).read_bytes()
         self.write('sample/clip.mp4',b'x'*len(before))
         self.run_backup()
-        self.assertEqual((self.archive/'sample/clip.mp4').read_bytes(),b'x'*len(before))
+        self.assertEqual((self.archive/self.video_key()).read_bytes(),b'x'*len(before))
         self.assert_round_trip()
 
-    def test_legacy_multipart_video_can_be_verified_without_glacier_download(self):
-        import hashlib,base64
-        module=import_backup()
-        local=self.source/'sample/clip.mp4'
-        digest=base64.b64encode(hashlib.md5(local.read_bytes()).digest()).decode()
-        head={'ContentLength':local.stat().st_size,'ETag':'"multipart-3"','Metadata':{'md5chksum':digest}}
-        with patch.object(module,'remote_upload_head',return_value=head):
-            self.assertTrue(module.remote_video_matches('fixture',str(local),local.stat().st_size,'new-signature'))
-            local.write_bytes(b'x'*local.stat().st_size)
-            self.assertFalse(module.remote_video_matches('fixture',str(local),local.stat().st_size,'new-signature'))
+    def test_legacy_multipart_video_is_reused_without_copy_or_download(self):
+        old = self.archive / 'sample/clip.mp4'
+        old.parent.mkdir(parents=True)
+        original = (self.source / 'sample/clip.mp4').read_bytes()
+        old.write_bytes(original)
+        self.run_backup()
+        self.assertEqual(self.video_key(), 'sample/clip.mp4')
+        self.assertFalse(any(op[:2] == ('rclone', 'copyto') and op[2].endswith('/sample/clip.mp4') for op in self.operations))
+        self.write('sample/clip.mp4', b'x' * len(original))
+        self.run_backup()
+        self.assertTrue(self.video_key().startswith(media_objects.PREFIX))
+        self.assertEqual(old.read_bytes(), original)
+        self.assert_round_trip()
 
     def test_interrupted_marker_survives_failure_and_clears_after_success(self):
         marker=self.ledger/'.backup-interrupted.json'

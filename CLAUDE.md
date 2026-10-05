@@ -51,6 +51,7 @@ make validate-fork     # Fork gate: backend generation, v3 validation, Go lint/t
 make it                # Go unit + integration tests only
 make validate-producer # Python delivery, lease and gallery-dl lifecycle tests
 make validate-library  # Native manual tag/performer helper contracts
+make validate-archive  # Portable archive integrity, restore and offline access
 make lint              # CI-pinned golangci-lint via go run
 make fmt               # Format Go source
 make validate-ui-v3    # Biome, generation/types, formatting, locales, tests, native contracts
@@ -70,6 +71,12 @@ the pinned gallery-dl/yt-dlp test dependencies into `.local/native-producer`;
 `PRODUCER_PYTHON` can select another prepared environment. The supported package
 in `integrations/gallery-dl` uses only the standard library for delivery.
 Host/n8n launch paths have not switched to the native adapter.
+`integrations/archive` provides the standard-library `stash-archive` tool for
+compressed native SQLite snapshots, original artwork and explicit configuration
+or operating-state components. See the [portable archive format](docs/native-archive-format.md).
+Restore verifies complete contents into a new directory and never activates a
+server or worker. Declared component coverage does not establish a coordinated
+live producer/server/media backup boundary; that integration remains required.
 The producer CLI can validate a portable worker profile and execute one claimed
 source attempt with concurrent outbox delivery. Website-access references stay
 local, and source completion remains distinct from verified media intake.

@@ -438,7 +438,11 @@ validate: validate-fork
 
 # Full pre-push gate for the fork backend plus the active v3 UI.
 .PHONY: validate-fork
-validate-fork: generate-backend validate-ui validate-producer validate-library validate-backend
+validate-fork: generate-backend validate-ui validate-producer validate-library validate-archive validate-backend
+
+.PHONY: validate-archive
+validate-archive:
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=integrations/archive/src "$(PRODUCER_PYTHON)" -m unittest discover -s integrations/archive/tests -v
 
 .PHONY: validate-library
 validate-library:

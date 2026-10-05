@@ -18,7 +18,7 @@ Total path length limits still apply to the extra directory component.
 
 Before moving a file, Stash writes and flushes a small recovery record beside
 the database, under `.stash-deletions-<database-name-hash>/`. It also inserts a
-marker into `fork_file_deletions` in the same transaction as the database edit.
+marker into the native `file_deletions` table in the same transaction as the database edit.
 The journal stores paths and filesystem identities, not media contents.
 
 After the transaction ends, and whenever the database opens, recovery checks

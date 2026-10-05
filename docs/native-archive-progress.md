@@ -7306,3 +7306,35 @@ The production instance, database, installed plugin and active scrapers remain
 unchanged. This completes another contract increment, not the full archive
 transition. Backup/restore, live producer activation and production cutover
 remain open alongside the other plan gates.
+
+## Portable archive foundation — 2026-10-04
+
+The independent `stash-archive` command exports native SQLite snapshots,
+original artwork and explicitly declared configuration/operating-state
+components. The versioned format streams its inventory and stores deterministic
+compressed chunks by SHA-256, retaining every database value and binary source
+document. The manifest is published last. Import requires a new directory,
+checks every object, database and original-artwork reference, and writes its
+restore receipt only after successful verification and filesystem durability.
+Offline list/inspect/verify/import commands require neither a running server
+nor the old plugin. See [portable archives](native-archive-format.md).
+
+Thirteen temporary SQLite regression tests cover committed WAL state,
+merged/manual performers, ordered album attachments, binary documents, pending
+producer events and interrupted-operation bytes. They also cover changed inputs,
+missing/corrupt artwork and chunks, altered chunk order, malformed/duplicate
+inventories, foreign database/producer identities, broken foreign keys, space
+reserve failures and bounded offline output. The package runs in the fork gate
+and backend CI.
+
+A read-only inventory found all 238,574 original artworks referenced by the
+verified native rehearsal database: 36,496,053,336 bytes, with none missing or
+invalid. A complete export/restore rehearsal is running against that copied
+20,265,979,904-byte database. Its terminal reconciliation and native repository
+reopen remain pending; the inventory alone does not prove a successful restore.
+The tool retains 50 GiB of free space by default.
+
+Coverage is explicitly **declared components**. Coordinated live server and
+producer snapshots, acknowledged-event verification, matching media manifests,
+S3 publication and the remaining restore/cutover drills are still required.
+This increment does not change the production backup or deployment.

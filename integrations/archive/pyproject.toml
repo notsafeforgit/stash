@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stash-native-archive"
+version = "0.1.0"
+description = "Portable native Stash archive snapshots and offline verification"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+stash-archive = "stash_archive.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

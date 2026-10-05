@@ -126,11 +126,17 @@ func TestNativeBackupCheckpointExternalBoundaryFailureReleasesGuard(t *testing.T
 			}
 			directory, err := m.nativeCheckpointDirectory(request.UUID)
 			require.NoError(t, err)
-			require.NoDirExists(t, directory)
+			require.FileExists(t, filepath.Join(directory, "attempt.json"))
 			_, err = writer.Exec("BEGIN IMMEDIATE; ROLLBACK")
 			require.NoError(t, err)
-			// A failed unsealed request may retry, but an old challenge can never
-			// acknowledge its newly captured native view.
+			// A failed request permanently reserves its UUID. A new capture must
+			// use a fresh identity, and cannot acknowledge the older challenge.
+			_, err = m.CaptureNativeCheckpointWithBoundary(t.Context(), request, func(NativeCheckpointBoundaryReady) error {
+				t.Fatal("failed attempt tried to capture newer state")
+				return nil
+			})
+			require.ErrorIs(t, err, ErrNativeCheckpointIncomplete)
+			request.UUID = uuid.NewString()
 			_, err = m.CaptureNativeCheckpointWithBoundary(t.Context(), request, func(ready NativeCheckpointBoundaryReady) error {
 				require.NotEqual(t, token, ready.Token)
 				confirmation := NativeCheckpointBoundaryConfirmation{Token: token, Details: json.RawMessage(`{"snapshot":"old"}`)}

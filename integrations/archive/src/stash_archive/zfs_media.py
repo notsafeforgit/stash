@@ -44,7 +44,7 @@ def mounts():
 
 
 class ZFSMedia:
-    def __init__(self, cache, dataset, dataset_guid, mountpoint, *, command=("/usr/sbin/zfs",), reserve=50 << 30):
+    def __init__(self, cache, dataset, dataset_guid, mountpoint, *, command=("/usr/sbin/zfs",), reserve=50 << 30, lock_fd=None):
         if (not isinstance(dataset, str) or not DATASET.fullmatch(dataset) or len(dataset) > 150
                 or any(part in (".", "..") for part in dataset.split("/")) or not number(dataset_guid)):
             raise InvalidArchive("A media snapshot requires an explicit dataset and GUID")
@@ -55,6 +55,10 @@ class ZFSMedia:
             raise InvalidArchive("Media mountpoint must not contain symlinks")
         self.dataset, self.dataset_guid = dataset, dataset_guid
         self.command, self.reserve = tuple(command), reserve
+        self.lock_fd = lock_fd
+        if lock_fd is not None:
+            from .locked_command import validate_lock
+            validate_lock(lock_fd)
         if (not self.command or not all(isinstance(v, str) and v and "\0" not in v for v in self.command)
                 or not Path(self.command[0]).is_absolute()):
             raise InvalidArchive("ZFS requires an explicitly configured absolute executable")
@@ -64,9 +68,13 @@ class ZFSMedia:
         if remaining <= 0:
             raise InvalidArchive("ZFS capture exceeded the checkpoint deadline")
         try:
-            result = subprocess.run([*self.command, *args], check=False, capture_output=True,
-                                    encoding="utf-8", errors="surrogateescape", timeout=min(remaining, 120),
-                                    env={**os.environ, "LC_ALL": "C"}, stdin=subprocess.DEVNULL)
+            if self.lock_fd is not None:
+                from .locked_command import run_locked
+                result = run_locked([*self.command, *args], self.lock_fd, min(remaining, 120))
+            else:
+                result = subprocess.run([*self.command, *args], check=False, capture_output=True,
+                                        encoding="utf-8", errors="surrogateescape", timeout=min(remaining, 120),
+                                        env={**os.environ, "LC_ALL": "C"}, stdin=subprocess.DEVNULL)
         except (OSError, subprocess.TimeoutExpired) as error:
             raise InvalidArchive(f"ZFS {args[0]} did not complete") from error
         if result.returncode:
@@ -171,6 +179,8 @@ class ZFSMedia:
             raise InvalidArchive("Media view differs from its sealed checkpoint binding")
         path = self.path(record["uuid"], record["token"])
         directory(path, private=True)
+        if any((path / name).exists() or (path / name).is_symlink() for name in ("abandoning.json", "abandoned.json")):
+            raise InvalidArchive("Media snapshot was abandoned without publication")
         with open_regular(path / "manifest.json") as incoming:
             body = incoming.read(MAX_RECORD + 1)
         if len(body) > MAX_RECORD or decode_json(body) != record:

@@ -35,17 +35,25 @@ It reclaims the run's compressed archive objects and copied ledgers, keeping
 manifests and release receipts. Unknown files are preserved. Failed unpublished
 runs retain original data for recovery. The private `active.json` journal now
 selects the original run, checkpoint UUID, configuration, destination and options
-after restart. It is recorded before capture and removed only after publication
-and release finish. Once the media selection is saved, retries skip rescanning
-and compaction. A current `--defer-cleanup` request still takes precedence.
+after restart. It is recorded before capture and removed after publication and
+release finish, or after fenced abandonment of an unsealed attempt. Once the
+media selection is saved, retries skip rescanning and compaction. A current
+`--defer-cleanup` request still takes precedence.
 
 An invocation with a published but unfinished attempt only completes its cleanup;
 a subsequent invocation captures newer state. Cleanup reopens the permanent
 release records without requesting a new capture or requiring already released
 media/artwork views. Finished run identities remain reserved. Changed
 configuration/destination or ambiguous unfinished runs fail for inspection.
-Attempts that never sealed still need the abandonment/pruning workflow before
-production installation; removing their identity files is not a recovery method.
+For an attempt that never sealed, a resumed run reads the authenticated server
+status under backup/dedupe and worker exclusion, then records server abandonment
+before cleaning its known components, artwork pins and owned ZFS snapshot. A
+missing server record still requires this fence: it prevents a delayed capture
+request from reusing the UUID. Sealed attempts continue toward publication.
+The abandoned run exits with an error and no backup-success claim; the next
+invocation gets a new UUID. Both server and host keep permanent failure receipts.
+Unknown/legacy files without ownership evidence require inspection, and identity
+records must never be removed as a shortcut to recovery.
 
 Interrupted packing and verification use private scratch directories with
 durable inode ownership records. A fully sealed bundle is promoted without
@@ -54,6 +62,11 @@ Cleanup rejects replaced scratch roots and nested mounts, and does not follow
 symlinks into source data. Upload and native-validator child processes inherit
 the existing backup lock, so losing their Python parent cannot let another run
 remove scratch data while those children are still using it.
+ZFS commands retain the same lock through a host supervisor, including when
+`sudo` closes child descriptors or the caller times out. Closing the caller's
+descriptor does not unlock a surviving command. Retirement rejects replaced
+directories, symlinks, nested mounts, mismatched snapshot properties/GUIDs,
+foreign holds and clones; it never uses forced or recursive ZFS destruction.
 
 The current-manifest update records its original S3 ETag and uses a conditional
 write. ETag is only a concurrency token; SHA-256 remains the content check. A
@@ -126,8 +139,8 @@ restore tool. Mount rebinding and deletion recovery require the reviewed cutover
 procedure. Retained publication proofs do not replace validation by the selected
 local native binary.
 
-Installation remains gated on complete worker/config inventory, unsealed-attempt
-abandonment/retention, media-generation reconciliation, full artwork capture
+Installation remains gated on complete worker/config inventory,
+media-generation reconciliation, full artwork capture
 timing and writer/WAL measurements, and the relocated restore and owner review in the
 [transition plan](../../docs/native-archive-transition-plan.md). This conversion
 performs no live cloud writes or installed host-script changes.

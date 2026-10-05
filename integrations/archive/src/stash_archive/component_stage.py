@@ -136,7 +136,7 @@ class ComponentStage:
         except FileNotFoundError:
             if optional:
                 return None
-            raise InvalidArchive("Incomplete external backup stage; use a new checkpoint UUID") from None
+            raise InvalidArchive("Incomplete external backup stage; abandon this attempt before using a new UUID") from None
         if len(data) > MAX_MANIFEST:
             raise InvalidArchive("Oversized external backup stage record")
         return decode_json(data)
@@ -164,7 +164,7 @@ class ComponentStage:
         if directory(self.cache, private=True) != self.cache_identity:
             raise InvalidArchive("External backup cache was replaced")
         directory(self.path, private=True)
-        if any((self.path / name).exists() or (self.path / name).is_symlink() for name in ("release.json", "released.json")):
+        if any((self.path / name).exists() or (self.path / name).is_symlink() for name in ("release.json", "released.json", "abandoned.json")):
             raise InvalidArchive("External backup components have been released")
         if digest_file(self.path / "manifest.json") != (self.manifest_sha256, self.manifest_size):
             raise InvalidArchive("External backup manifest changed")

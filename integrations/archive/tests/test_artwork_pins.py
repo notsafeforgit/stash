@@ -71,18 +71,26 @@ class ArtworkPinTests(unittest.TestCase):
         retained.write_bytes(self.originals[checksum][1])
         with self.assertRaises(InvalidArchive): view.verify()
 
-    def test_failed_capture_cleans_only_its_attempt_and_never_recaptures(self):
+    def test_failed_capture_keeps_its_attempt_and_never_recaptures(self):
         boundary = self.capture()
         path = self.pins.open_bound(boundary).path
         with self.assertRaises(FileExistsError): self.capture()
         self.assertTrue((path / "manifest.json").is_file())
         self.ready["token"] = str(uuid.uuid4())
-        with patch("stash_archive.artwork_pins.os.link", side_effect=OSError("failed link")):
+        link = os.link
+        def failed_link(source, target, **kwargs):
+            if kwargs.get("src_dir_fd") is not None:
+                raise OSError("failed link")
+            return link(source, target, **kwargs)
+        with patch("stash_archive.artwork_pins.os.link", side_effect=failed_link):
             with self.assertRaises(OSError): self.capture()
-        self.assertEqual(list(self.cache.iterdir()), [path])
+        failed = self.pins.path(self.ready["uuid"], self.ready["token"])
+        self.assertEqual(set(self.cache.iterdir()), {path, failed})
+        self.assertTrue((failed / "intent.json").is_file())
+        self.assertFalse((failed / "manifest.json").exists())
         self.ready["expires_at"] = "2000-01-01T00:00:00+00:00"
         with self.assertRaises(InvalidArchive): self.capture()
-        self.assertEqual(list(self.cache.iterdir()), [path])
+        self.assertEqual(set(self.cache.iterdir()), {path, failed})
 
     def test_symlinks_space_and_live_path_fallback_are_rejected(self):
         path, _ = next(iter(self.originals.values()))
@@ -91,7 +99,7 @@ class ArtworkPinTests(unittest.TestCase):
         path.unlink()
         path.symlink_to(external)
         with self.assertRaises(InvalidArchive): self.capture()
-        self.assertEqual(list(self.cache.iterdir()), [])
+        self.assertTrue((self.pins.path(self.ready["uuid"], self.ready["token"]) / "intent.json").is_file())
         self.pins.reserve = 1 << 100
         with self.assertRaises(InvalidArchive): self.capture()
         with self.assertRaises(InvalidArchive):

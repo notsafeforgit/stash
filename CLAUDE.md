@@ -89,9 +89,9 @@ bounded host confirmation and seals that evidence with the checkpoint. Establish
 producer barriers before requesting that guard; the server never executes
 filesystem provider commands. Sealed retries must reuse the original view.
 The host-side `ArtworkPins` provider retains original artwork inodes during that
-callback and binds export/retry to the sealed evidence. Retire pins only through
-the publication-aware release helper, which keeps small receipts and resumes
-interrupted cleanup. Native gallery-dl mutations share a cooperative publication
+callback and binds export/retry to the sealed evidence. Retire pins through
+publication-aware release or server-fenced unsealed abandonment, keeping small
+receipts and resuming interrupted cleanup. Native gallery-dl mutations share a cooperative publication
 lock. The host acquires `PublicationBarrier` across the inventoried worker lock
 roots before the database guard, then releases it after retaining immutable
 views. Existing backup/dedupe exclusion is still required; legacy workers do not
@@ -120,8 +120,15 @@ media selection or published cleanup after restart. Owned scratch is reclaimed
 only under backup exclusion, which upload/validator children inherit. The S3
 current pointer uses a retained conditional-write token and cannot replace a
 newer publication on retry. Complete production worker/config inventory,
-unsealed-attempt abandonment/pruning, media-generation reconciliation, full
-capture measurements and relocated restore/cutover review remain required.
+media-generation reconciliation, full capture measurements and relocated
+restore/cutover review remain required.
+Unsealed retries use the authenticated checkpoint status/abandon protocol before
+scoped host cleanup. Admission and abandonment records permanently reserve UUIDs;
+neither partial output nor a missing GET authorizes recapture. Preserve unknown
+files, reject foreign mounts/holds/clones, and never force ZFS cleanup. ZFS command
+supervisors retain the existing backup lock through sudo and caller timeout;
+close the caller's descriptor rather than explicitly unlocking shared ownership.
+Abandonment is a failed backup invocation; only the next run gets a fresh UUID.
 Filesystem artwork writes publish flushed replacement inodes; never truncate a
 blob in place because readers and backup pins may retain that inode. Orphan
 cleanup must recheck references under a write transaction and use the deletion

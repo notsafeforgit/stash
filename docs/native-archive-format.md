@@ -306,9 +306,10 @@ archived checkpoint and permanent server release, persists local intent, removes
 only its own hold and destroys only the exact verified snapshot. It never forces,
 recurses or defers destruction; other holds/clones block cleanup. A crash after
 hold removal or destruction is retryable. Identity/release records remain, and
-ordinary export never releases snapshots. Abandoned-attempt retention, complete
-worker/configuration inventory, matching media manifests and daily S3-script
-publication still need integration before production use.
+ordinary export never releases snapshots. The host daily caller coordinates
+publication and unsealed-attempt retirement. Complete worker/configuration
+inventory, media-generation reconciliation and restore/capture measurements
+remain required before production use.
 
 The server captures the native database, raw deletion recovery trees, main
 configuration, runtime overrides and configured TLS certificate/key assets.
@@ -320,6 +321,8 @@ the enclosing publisher's complete inventory and restore bindings.
 
 Checkpoint files live in `native-checkpoints/{uuid}` under the configured backup
 directory, with private directories/files. Export/download does not release them.
+The server flushes `attempt.json` before any capture effects and retains it even
+on failure. An incomplete request cannot recapture newer state under that UUID.
 The publisher releases temporary components only after verifying durable archive
 publication, using `POST /api/v3/backups/checkpoints/{uuid}/release`. Its body
 contains `checkpoint_sha256`, `archive_uuid` and `archive_manifest_sha256`.
@@ -344,9 +347,34 @@ It checks the returned binding as well. This helper does not independently
 verify remote storage: its caller must first complete content/native/producer
 verification and durable publication/readback. The normal export command never
 calls it. Production S3 publication must reach its verified master-manifest
-commit point before release. Abandoned unsealed captures still require explicit
-inspection; automatic incomplete-capture retention and production publisher
-integration remain to be completed before scheduled native exports are enabled.
+commit point before release.
+
+`GET /api/v3/backups/checkpoints/{uuid}/status` returns `missing`, `partial`,
+`sealed`, `released` or `abandoned`, with the original request digest when known
+and the checkpoint digest for sealed/released states. Active capture or cleanup
+returns 409. Status serializes with the native checkpoint guard; malformed or
+unknown legacy directories fail rather than appearing missing.
+
+For an unsealed attempt, the host sends `POST .../{uuid}/abandon` with its exact
+`request_sha256`. The server refuses sealed snapshots and active capture, writes
+and flushes a permanent `abandoned.json`, then removes only fixed regular
+component files belonging to its recorded attempt. Missing UUIDs can also be
+reserved this way to fence delayed capture requests. Unknown files, symlinks and
+directories are preserved. Repeating the same request completes interrupted
+cleanup; different request identities fail. Capture/read/component requests for
+an abandoned UUID return 410. This receipt is never a publication certificate.
+
+The host records the filesystem challenge before provider effects, retains
+artwork admission evidence before linking, and keeps its existing ZFS intent
+before snapshot creation. With backup/dedupe and worker barriers held, a resumed
+unsealed run obtains the server fence and retires only those owned resources.
+Missing manifests are permitted for partial output; missing ownership records
+require inspection. Provider cleanup preserves original media/artwork and unknown
+files, refuses unexpected mounts and foreign snapshot holds/clones, and retains
+small identity/failure records permanently. ZFS subprocess supervision keeps the
+backup lock alive through `sudo`, caller cancellation and timeout until the actual
+command exits. Abandonment ends the current invocation with a failure, allowing
+the following invocation to allocate a fresh run without reporting a backup.
 
 The default reserve is
 50 GiB, checked on both output and live database volumes during capture. A pinned
@@ -526,7 +554,8 @@ the restored SQLite file also supports independent SQLite tools.
 The tools reserve 50 GiB of free space by default, check additional space before
 snapshot/restore and recheck while writing. `--reserve-bytes` changes that reserve
 for another installation. A failed operation removes only its newly created
-output. A killed process can leave an unsealed directory; an existing destination
+output (server checkpoints retain their admission records as described above).
+A killed portable export/import process can leave an unsealed directory; an existing destination
 is always refused. Preserve that evidence or remove the abandoned directory
 before choosing a new destination.
 

@@ -113,10 +113,9 @@ func testNativeBackupCheckpointHTTP(t *testing.T, boundary bool) {
 	require.True(t, result.Verified)
 	if boundary {
 		require.NotEmpty(t, result.FailedID)
-		require.Eventually(t, func() bool {
-			_, err := os.Stat(filepath.Join(directory, "native-checkpoints", result.FailedID))
-			return os.IsNotExist(err)
-		}, 5*time.Second, 10*time.Millisecond, "disconnected provider retained its unsealed checkpoint")
+		require.FileExists(t, filepath.Join(directory, "native-checkpoints", result.FailedID, "attempt.json"))
+		require.FileExists(t, filepath.Join(directory, "native-checkpoints", result.FailedID, "abandoned.json"))
+		require.NoFileExists(t, filepath.Join(directory, "native-checkpoints", result.FailedID, "config.yml"))
 	}
 	require.Equal(t, filepath.Join(directory, "restored"), result.Restored)
 	proof, err := sqlite.VerifyNativeSnapshot(t.Context(), filepath.Join(result.Restored, "library.sqlite"))
@@ -137,12 +136,35 @@ func testNativeBackupCheckpointHTTP(t *testing.T, boundary bool) {
 		{"/api/v3/backups/checkpoints/" + id, "http-backup-fixture", "", http.StatusGone},
 		{"/api/v3/backups/checkpoints/" + id + "/components/library.sqlite", "http-backup-fixture", "", http.StatusGone},
 		{"/api/v3/backups/checkpoints/" + id + "/release", "http-backup-fixture", "", http.StatusOK},
+		{"/api/v3/backups/checkpoints/" + id + "/status", "http-backup-fixture", "", http.StatusOK},
+		{"/api/v3/backups/checkpoints/" + id + "/status", "producer-token", "", http.StatusUnauthorized},
+		{"/api/v3/backups/checkpoints/" + id + "/status", "http-backup-fixture", "https://foreign.example", http.StatusForbidden},
 		{"/api/v3/backups/checkpoints/" + id + "/components/not-in-inventory", "http-backup-fixture", "", http.StatusBadRequest},
 	} {
 		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL+check.path, nil)
 		require.NoError(t, err)
 		req.Header.Set("ApiKey", check.key)
 		req.Header.Set("Origin", check.origin)
+		response, err := server.Client().Do(req)
+		require.NoError(t, err)
+		require.Equal(t, check.status, response.StatusCode)
+		require.NoError(t, response.Body.Close())
+	}
+	for _, check := range []struct {
+		key, origin string
+		status      int
+	}{
+		{"", "", http.StatusUnauthorized},
+		{"producer-token", "", http.StatusUnauthorized},
+		{"http-backup-fixture", "https://foreign.example", http.StatusForbidden},
+		{"http-backup-fixture", "", http.StatusConflict},
+	} {
+		body := `{"request_sha256":"` + strings.Repeat("a", 64) + `"}`
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, server.URL+"/api/v3/backups/checkpoints/"+id+"/abandon", strings.NewReader(body))
+		require.NoError(t, err)
+		req.Header.Set("ApiKey", check.key)
+		req.Header.Set("Origin", check.origin)
+		req.Header.Set("Content-Type", "application/json")
 		response, err := server.Client().Do(req)
 		require.NoError(t, err)
 		require.Equal(t, check.status, response.StatusCode)

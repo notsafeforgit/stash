@@ -18,6 +18,11 @@ var nativeCheckpointRoles = map[string]string{
 }
 
 func readNativeCheckpoint(directory, id string) (*NativeBackupCheckpoint, error) {
+	if _, err := readNativeCheckpointAbandonment(directory, id); err == nil {
+		return nil, ErrNativeCheckpointAbandoned
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
 	result, err := readNativeCheckpointManifest(directory, id)
 	if err != nil {
 		return nil, err

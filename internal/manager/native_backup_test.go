@@ -109,11 +109,16 @@ func TestNativeBackupCheckpointFailureAndAdmission(t *testing.T) {
 			if mode == "busy" {
 				require.ErrorIs(t, err, ErrNativeCheckpointBusy)
 			}
-			if mode == "incomplete" {
+			switch mode {
+			case "incomplete":
 				require.ErrorIs(t, err, ErrNativeCheckpointIncomplete)
 				require.FileExists(t, filepath.Join(directory, "keep"))
-			} else {
+			case "cancel", "busy":
 				require.NoDirExists(t, directory)
+			default:
+				require.FileExists(t, filepath.Join(directory, "attempt.json"))
+				_, err = m.CaptureNativeCheckpoint(t.Context(), request)
+				require.ErrorIs(t, err, ErrNativeCheckpointIncomplete)
 			}
 		})
 	}

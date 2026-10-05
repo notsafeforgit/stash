@@ -1,8 +1,10 @@
 """Regression tests: every cloud boundary is mocked; never contact AWS/rclone."""
 import argparse
+import fcntl
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import shutil
 import sqlite3
@@ -792,6 +794,22 @@ class BackupTests(unittest.TestCase):
                     module.run_cmd(['fixture-command'], capture=capture)
                 self.assertEqual(run.call_args.kwargs['pass_fds'], (fd,))
         self.assertIsNone(module.RUN_LOCK_FD)
+
+    def test_backup_context_exit_keeps_lock_held_by_surviving_child(self):
+        module = import_backup()
+        path = self.ledger / 'surviving-command.lock'
+        with module.exclusive_run_lock(str(path)) as fd:
+            child = os.dup(fd)
+        contender = os.open(path, os.O_RDWR)
+        try:
+            with self.assertRaises(BlockingIOError):
+                fcntl.flock(contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        finally:
+            os.close(child)
+        try:
+            fcntl.flock(contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        finally:
+            os.close(contender)
 
     def test_current_defer_flag_overrides_retained_cleanup_option(self):
         self.run_backup()

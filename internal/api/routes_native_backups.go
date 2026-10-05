@@ -26,6 +26,8 @@ func (rs *nativeBackupRoutes) router() http.Handler {
 	r.Get("/checkpoints/{checkpoint}/components/{component}", rs.component)
 	r.Post("/checkpoints/{checkpoint}/release", rs.release)
 	r.Get("/checkpoints/{checkpoint}/release", rs.released)
+	r.Get("/checkpoints/{checkpoint}/status", rs.status)
+	r.Post("/checkpoints/{checkpoint}/abandon", rs.abandon)
 	r.Post("/checkpoints/{checkpoint}/boundary", rs.boundary)
 	return r
 }
@@ -35,9 +37,9 @@ func nativeCheckpointError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, manager.ErrNativeCheckpointInvalid):
 		status = http.StatusBadRequest
-	case errors.Is(err, manager.ErrNativeCheckpointBusy), errors.Is(err, manager.ErrNativeCheckpointIncomplete):
+	case errors.Is(err, manager.ErrNativeCheckpointBusy), errors.Is(err, manager.ErrNativeCheckpointIncomplete), errors.Is(err, manager.ErrNativeCheckpointSealed):
 		status = http.StatusConflict
-	case errors.Is(err, manager.ErrNativeCheckpointReleased):
+	case errors.Is(err, manager.ErrNativeCheckpointReleased), errors.Is(err, manager.ErrNativeCheckpointAbandoned):
 		status = http.StatusGone
 	case errors.Is(err, manager.ErrNativeCheckpointBoundaryExpired):
 		status = http.StatusGone
@@ -48,6 +50,31 @@ func nativeCheckpointError(w http.ResponseWriter, err error) {
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	ingestJSON(w, status, map[string]string{"error": err.Error()})
+}
+
+func (rs *nativeBackupRoutes) status(w http.ResponseWriter, r *http.Request) {
+	result, err := rs.manager.NativeCheckpointState(r.Context(), chi.URLParam(r, "checkpoint"))
+	if err != nil {
+		nativeCheckpointError(w, err)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	ingestJSON(w, http.StatusOK, result)
+}
+
+func (rs *nativeBackupRoutes) abandon(w http.ResponseWriter, r *http.Request) {
+	var input manager.NativeCheckpointAbandonInput
+	if err := readIngestJSON(w, r, 4096, &input); err != nil {
+		nativeCheckpointError(w, manager.ErrNativeCheckpointInvalid)
+		return
+	}
+	result, err := rs.manager.AbandonNativeCheckpoint(r.Context(), chi.URLParam(r, "checkpoint"), input)
+	if err != nil {
+		nativeCheckpointError(w, err)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	ingestJSON(w, http.StatusOK, result)
 }
 
 func (rs *nativeBackupRoutes) release(w http.ResponseWriter, r *http.Request) {

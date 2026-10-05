@@ -11,7 +11,6 @@ import hashlib
 import os
 from pathlib import Path
 import re
-import shutil
 import stat
 import time
 
@@ -106,6 +105,11 @@ class ArtworkPins:
         # Each one-use server challenge gets fresh output. Never replace or
         # recapture an existing directory after an interrupted invocation.
         target.mkdir(mode=0o700)
+        device, inode = directory(target, private=True)
+        publish_bytes(target / "intent.json", json_bytes({"format": FORMAT + "-attempt", "version": 1,
+                      **{k: ready[k] for k in ("uuid", "token", "request_sha256")}, "device": device, "inode": inode,
+                      "sources": [base64.b64encode(os.fsencode(p)).decode("ascii") for p in self.sources]}))
+        sync_directory(self.cache)
         try:
             roots = []
             for index, (source, expected) in enumerate(zip(self.sources, self.identities)):
@@ -156,7 +160,8 @@ class ArtworkPins:
             check()
             return record
         except BaseException:
-            shutil.rmtree(target)
+            # Keep admission evidence and partial pins for fenced abandonment.
+            # A failed callback is not proof that the server has stopped yet.
             sync_directory(self.cache)
             raise
 
@@ -169,6 +174,8 @@ class ArtworkPins:
             raise InvalidArchive("Artwork pins do not match the server checkpoint")
         path = self.path(record["uuid"], record["token"])
         directory(path, private=True)
+        if any((path / name).exists() or (path / name).is_symlink() for name in ("abandoned.json",)):
+            raise InvalidArchive("Artwork pins were abandoned without publication")
         if ((path / "release.json").exists() or (path / "release.json").is_symlink()) and not _released:
             raise InvalidArchive("Artwork pins have already been released")
         with open_regular(path / "manifest.json") as incoming:

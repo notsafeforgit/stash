@@ -888,10 +888,9 @@ def exclusive_run_lock(lock_path: str):
         yield fd
     finally:
         RUN_LOCK_FD = previous
-        try:
-            fcntl.flock(fd, fcntl.LOCK_UN)
-        finally:
-            os.close(fd)
+        # Closing releases our reference. Explicit LOCK_UN would also unlock
+        # the shared description retained by a surviving upload/ZFS supervisor.
+        os.close(fd)
 
 def sync_directory(path):
     fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY)

@@ -8049,3 +8049,61 @@ advance to another UUID. Complete worker/config inventory, media-generation
 reconciliation, full capture measurements and relocated restore/cutover review
 remain open. Installed scripts, production services, credentials and cloud objects
 were not changed.
+
+### Unsealed host backup retirement (2026-10-05)
+
+Native checkpoint admission now flushes a permanent `attempt.json` before
+database, recovery-tree or filesystem-provider effects. Failed capture no longer
+removes that identity or permits the same UUID to capture newer state. The
+application-authenticated status endpoint distinguishes missing, partial,
+sealed, released and abandoned attempts under the same exclusion as capture.
+The abandonment endpoint refuses active or sealed checkpoints, binds the exact
+request digest, and flushes a permanent failure receipt before removing only
+known regular components. Missing UUIDs can be fenced against delayed requests;
+repeated retirement completes interrupted cleanup without claiming publication.
+
+The actual host session now inspects resumed unsealed attempts while holding its
+backup/dedupe and worker barriers. It obtains the server fence before cleaning
+partial component copies, artwork links or a media snapshot. The filesystem
+challenge is saved before either provider runs; artwork admission records bind
+the retained directory inode and source paths before linking. Cleanup preserves
+unknown files and originals, rejects symlinks and nested mounts, and validates
+ZFS ownership properties plus any retained GUID/creation transaction. Foreign
+holds and clones block retirement; no force, recursive or deferred destruction
+is used. Small server/provider/host receipts remain permanently. The retired
+invocation reports failure; its next scheduled/manual invocation uses a fresh
+identity. Sealed runs still follow publication and archive-bound release.
+
+ZFS commands now run under a small host supervisor that retains the existing
+backup lock independently of the configured command, including `sudo`. Caller
+timeout or cancellation leaves the supervisor draining that command while
+excluding a competing backup. The daily lock context closes its descriptor
+instead of explicitly unlocking a shared description retained by children.
+This also preserves exclusion for surviving upload/validator children on normal
+exception exit, extending the earlier parent-death protection.
+
+Verification under the October 4 client rehearsal directory:
+
+- `native_checkpoint_abandon_server_gate`: all native checkpoint manager tests
+  pass in 28.2 seconds, including missing/partial fencing, active/sealed rejection,
+  restart replay, symlink refusal and preservation of unknown files.
+- `native_abandon_api_auth_gate`: real Go HTTP/Python portable export,
+  publication release and abandonment pass in 12.7 seconds; application-key and
+  same-origin enforcement also cover the new endpoints.
+- `native_abandon_archive_final_gate`: 106 archive cases pass in 27.5 seconds.
+  The nine retirement/supervisor tests also pass after the final validation
+  adjustment (`native_abandon_final_targeted_gate`). They exercise partial links,
+  failed ZFS holds, foreign holds/clones, replaced snapshot identity, lost destroy
+  completion, incomplete worker/config stages and real inherited flock exclusion.
+- `native_abandon_host_corrected_gate`: 137 host cases pass in 34.3 seconds,
+  including the real session's incomplete-request retirement without recapture,
+  interrupted terminal-pointer cleanup, fresh UUID allocation and close-only
+  backup-lock release. Every cloud boundary remains fake.
+
+The first new fixture runs omitted the worker-lock directory required by the
+publication barrier; supplying an isolated real lock directory fixed those
+fixture errors. Parent `d2a98211d` now has successful Build, lint and GHCR runs.
+No live provider/S3 mutation or installed-script/service change was performed.
+Complete worker/config inventory, cold-media generation reconciliation,
+production-sized capture measurements and relocated restore/cutover review
+remain required by the transition plan.

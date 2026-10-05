@@ -54,6 +54,8 @@ class HostFilesystemCapture:
         if self.components is not None:
             if ready["uuid"] != self.components.intent["uuid"] or ready["request_sha256"] != self.components.intent["request_sha256"]:
                 raise InvalidArchive("Host component capture request changed")
+            from .storage import json_bytes, publish_bytes
+            publish_bytes(self.components.path / "boundary-ready.json", json_bytes(ready))
         # Both captures happen while the server holds its writer guard. Nothing
         # waits for the server while acquiring these producer barriers.
         artwork = self.artwork.capture(ready)

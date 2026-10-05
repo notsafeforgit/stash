@@ -52,7 +52,11 @@ func validCheckpointRelease(input NativeCheckpointReleaseInput) bool {
 }
 
 func publishCheckpointRelease(directory string, body []byte) error {
-	f, err := os.CreateTemp(directory, ".release-*")
+	return publishCheckpointRecord(directory, "release.json", body)
+}
+
+func publishCheckpointRecord(directory, name string, body []byte) error {
+	f, err := os.CreateTemp(directory, ".record-*")
 	if err != nil {
 		return err
 	}
@@ -65,8 +69,8 @@ func publishCheckpointRelease(directory string, body []byte) error {
 		return err
 	}
 	// An atomic hard link publishes without replacing another process's
-	// release. Both names are private files on the same checkpoint volume.
-	return os.Link(f.Name(), filepath.Join(directory, "release.json"))
+	// record. Both names are private files on the same checkpoint volume.
+	return os.Link(f.Name(), filepath.Join(directory, name))
 }
 
 func readNativeCheckpointRelease(directory string, manifest *NativeBackupCheckpoint) (*NativeCheckpointRelease, error) {

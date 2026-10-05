@@ -14,6 +14,7 @@ import uuid
 
 from stash_archive.artwork_pins import ArtworkPins, directory, release_published_artwork
 from stash_archive.bundle import export_archive
+from stash_archive.checkpoint_abandon import abandon_host_capture, checkpoint_status, validate_abandonment
 from stash_archive.component_stage import release_published_components
 from stash_archive.filesystem_boundary import canonical_uuid
 from stash_archive.host_boundary import HostFilesystemCapture
@@ -110,7 +111,7 @@ class NativeRunJournal:
     """One durable attempt under the caller's existing backup/dedupe lock.
 
     Never replace the active attempt with a new capture after a restart. The
-    pointer is retired only after its publication and local release complete.
+    pointer is retired after publication/release or fenced unsealed abandonment.
     """
     def __init__(self, state, proposed_id, binding, options):
         if not isinstance(proposed_id, str) or not RUN_NAME.fullmatch(proposed_id):
@@ -133,13 +134,18 @@ class NativeRunJournal:
                 directory(path, private=True)
                 record = read_record(path / "identity.json", limit=16384, optional=True)
                 finished = read_record(path / "finished.json", limit=16384, optional=True)
+                abandoned = read_record(path / "abandoned.json", limit=4096, optional=True)
+                if abandoned is not None:
+                    if finished is not None or not isinstance(record, dict):
+                        raise InvalidArchive("Conflicting native backup terminal receipts")
+                    validate_abandonment(abandoned, record.get("checkpoint_uuid"))
                 if finished is not None:
                     if (not isinstance(finished, dict) or set(finished) != {"master_sha256", "publication"}
                             or not isinstance(finished["master_sha256"], str) or not HEX.fullmatch(finished["master_sha256"])
                             or not isinstance(record, dict)
                             or validate_reference(finished["publication"])["checkpoint_uuid"] != record.get("checkpoint_uuid")):
                         raise InvalidArchive("Invalid completed native run receipt")
-                if record is not None and finished is None:
+                if record is not None and finished is None and abandoned is None:
                     pending.append(record)
             if len(pending) > 1:
                 raise InvalidArchive("Multiple unfinished native runs require explicit recovery")
@@ -169,6 +175,17 @@ class NativeRunJournal:
 
     def complete(self, receipt):
         same_or_publish(self.root / "finished.json", json_bytes(receipt))
+        self.clear_active()
+
+    def abandon(self, receipt):
+        validate_abandonment(receipt, self.record["checkpoint_uuid"])
+        for name in ("finished.json", "publication.json", "master.json", "catalog.json", "prepared-master.json"):
+            if (self.root / name).exists() or (self.root / name).is_symlink():
+                raise InvalidArchive("Cannot abandon a run that reached publication")
+        same_or_publish(self.root / "abandoned.json", json_bytes(receipt))
+        self.clear_active()
+
+    def clear_active(self):
         current = read_record(self.active, limit=16384, optional=True)
         if current is not None:
             if current != self.record:
@@ -254,6 +271,10 @@ class NativeBackupSession:
         self.run_id, self.root, self.created_epoch = saved["run_id"], self.journal.root, saved["created_epoch"]
         self.options, self.resumed = saved["options"], self.journal.resumed
         self.archive = self.root / "archive"
+        abandoned = read_record(self.root / "abandoned.json", limit=4096, optional=True)
+        if abandoned is not None:
+            self.journal.abandon(abandoned)
+            raise InvalidArchive("Unsealed backup attempt was abandoned; the next run will use a new identity")
         self.catalog = read_record(self.root / "catalog.json", optional=True)
         self.publication = read_record(self.root / "publication.json", optional=True)
         if self.publication is not None:
@@ -269,7 +290,7 @@ class NativeBackupSession:
         pins_cache, media_cache, component_cache = [private_directory(state / name) for name in ("artwork", "media", "components")]
         self.pins = ArtworkPins(pins_cache, config["artwork_sources"], reserve=self.reserve)
         self.media = ZFSMedia(media_cache, media["dataset"], media["guid"], media["mountpoint"],
-                             command=config.get("zfs_command", ["/usr/sbin/zfs"]), reserve=self.reserve)
+                             command=config.get("zfs_command", ["/usr/sbin/zfs"]), reserve=self.reserve, lock_fd=lock_fd)
         self.component_cache = component_cache
         api_file = Path(config["api_key_file"]).resolve(strict=True)
         with open_regular(api_file) as incoming:
@@ -286,6 +307,21 @@ class NativeBackupSession:
         with HostFilesystemCapture(config["worker_lock_roots"], self.pins, self.media) as capture:
             self.client = capture.client(config["server"], key, saved["checkpoint_uuid"], config["recovery_roots"],
                                          boundary_timeout=config.get("boundary_timeout", 120))
+            if self.resumed:
+                status = checkpoint_status(self.client, self.reserve)
+                if status["state"] in {"missing", "partial", "abandoned"}:
+                    if self.catalog is not None or self.publication is not None or self.archive.exists() or self.archive.is_symlink():
+                        raise InvalidArchive("Unsealed server attempt contradicts retained publication data")
+                    if lock_fd is None:
+                        raise InvalidArchive("Abandoning a host capture requires backup/dedupe exclusion")
+                    from stash_archive.locked_command import validate_lock
+                    validate_lock(lock_fd)
+                    receipt = abandon_host_capture(self.client, self.reserve, component_cache, self.pins, self.media)
+                    self.journal.abandon(receipt)
+                    raise InvalidArchive("Unsealed backup attempt was abandoned; the next run will use a new identity")
+                self.client.existing_only = True
+                if not (component_cache / saved["checkpoint_uuid"] / "manifest.json").is_file():
+                    raise InvalidArchive("Sealed backup is missing its original external component stage")
             self.stage = capture.prepare(component_cache, self.client, components, reserve=self.reserve)
             self.stage.seal()
         self.view = self.media.open_bound(self.client.boundary_receipt).verify()

@@ -2,8 +2,11 @@
 
 from contextlib import closing
 import copy
+import fcntl
 import hashlib
 import io
+import json
+import os
 from pathlib import Path
 import sqlite3
 import shutil
@@ -20,6 +23,7 @@ from fake_s3 import FakeS3, S3Error
 from native_backup import CONFIG_FORMAT, NativeBackupSession, NativeRunJournal, OwnedWorkspace, copy_ledger
 from native_store import MEDIA_FORMAT, NativeStore, PREFIX, selection_digest, media_selection
 from stash_archive.bundle import FORMAT, export_archive, import_archive, iter_artifacts
+from stash_archive.checkpoint_abandon import FORMAT as ABANDON_FORMAT
 from stash_archive.filesystem_boundary import FORMAT as BOUNDARY_FORMAT
 from stash_archive.server_checkpoint import FORMAT as CHECKPOINT_FORMAT, COVERAGE
 from stash_archive.storage import InvalidArchive, json_bytes, store_file
@@ -320,6 +324,74 @@ class NativeStoreTests(unittest.TestCase):
         with self.assertRaises(InvalidArchive):
             NativeRunJournal(state, 'later', dict(binding, bucket='unrelated'), {})
         self.assertEqual(first.active.read_bytes(), old)
+
+    def test_resumed_unsealed_host_attempt_retires_before_a_new_capture(self):
+        live = self.root / 'live'
+        live.mkdir()
+        worker = self.root / 'worker-locks'
+        worker.mkdir(mode=0o700)
+        originals = self.root / 'originals'
+        originals.mkdir()
+        key = self.root / 'key'
+        key.write_text('fixture-key\n')
+        config = {'format': CONFIG_FORMAT, 'version': 1, 'server': 'https://stash.example',
+                  'api_key_file': str(key), 'state_directory': str(self.root / 'state'),
+                  'artwork_sources': [str(originals)], 'components': [], 'worker_lock_roots': [str(worker)],
+                  'media': {'dataset': 'pool/library', 'guid': '123', 'mountpoint': str(self.root), 'relative_path': 'live'},
+                  'producer_origin': 'https://stash.example', 'native_validator': sys.executable,
+                  'recovery_roots': [], 'reserve_bytes': 0}
+        path = self.root / 'host.json'
+        path.write_bytes(json_bytes(config))
+        fd = os.open(self.root / 'backup.lock', os.O_CREAT | os.O_RDWR, 0o600)
+        self.addCleanup(os.close, fd)
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        with patch('stash_archive.server_checkpoint.ServerCheckpoint.seal', side_effect=OSError('interrupted request')):
+            with self.assertRaisesRegex(OSError, 'interrupted request'):
+                NativeBackupSession(path, 'first', live, 'metadata', '', self.s3, lock_fd=fd)
+        state = Path(config['state_directory'])
+        saved = json.loads((state / 'active.json').read_bytes())
+        stage = state / 'components' / saved['checkpoint_uuid']
+        self.assertEqual(len(list(stage.glob('component-*'))), 2)
+        def abandoned(client, reserve):
+            self.assertEqual(client.request_id, saved['checkpoint_uuid'])
+            return {'format': ABANDON_FORMAT, 'version': 1, 'uuid': client.request_id,
+                    'request_sha256': client.request_hash(reserve), 'abandoned_at': '2026-10-05T00:00:00Z'}
+        with patch('native_backup.checkpoint_status', return_value={'state': 'missing'}), \
+                patch('stash_archive.checkpoint_abandon.abandon_checkpoint', side_effect=abandoned), \
+                patch('stash_archive.server_checkpoint.ServerCheckpoint.seal', side_effect=AssertionError('must not recapture')):
+            with self.assertRaisesRegex(InvalidArchive, 'was abandoned'):
+                NativeBackupSession(path, 'second', live, 'metadata', '', self.s3, lock_fd=fd)
+        self.assertFalse((state / 'active.json').exists())
+        self.assertEqual(list(stage.glob('component-*')), [])
+        self.assertTrue((stage / 'abandoned.json').is_file())
+        self.assertTrue((state / 'runs/first/abandoned.json').is_file())
+        self.assertFalse((state / 'runs/first/finished.json').exists())
+        binding = {k: saved[k] for k in ('config_sha256', 'live_media', 'bucket', 'prefix')}
+        following = NativeRunJournal(state, 'third', binding, {})
+        self.assertFalse(following.resumed)
+        self.assertNotEqual(following.record['checkpoint_uuid'], saved['checkpoint_uuid'])
+        self.assertEqual(self.s3.operations, [])
+
+    def test_abandoned_journal_does_not_claim_publication_or_reuse_uuid(self):
+        state = self.root / 'retirement'
+        binding = {'config_sha256': 'a' * 64, 'bucket': 'metadata', 'prefix': '', 'live_media': '/example/media'}
+        journal = NativeRunJournal(state, 'attempt', binding, {})
+        record = {'format': ABANDON_FORMAT, 'version': 1, 'uuid': journal.record['checkpoint_uuid'],
+                  'request_sha256': 'b' * 64, 'abandoned_at': '2026-10-05T00:00:00Z'}
+        (journal.root / 'publication.json').write_bytes(b'{}')
+        with self.assertRaisesRegex(InvalidArchive, 'reached publication'):
+            journal.abandon(record)
+        self.assertTrue(journal.active.exists())
+        (journal.root / 'publication.json').unlink()
+        with patch.object(journal, 'clear_active', side_effect=OSError('interrupted pointer cleanup')):
+            with self.assertRaises(OSError):
+                journal.abandon(record)
+        reopened = NativeRunJournal(state, 'later', binding, {})
+        self.assertEqual(reopened.record, journal.record)
+        reopened.abandon(record)
+        following = NativeRunJournal(state, 'attempt', binding, {})
+        self.assertNotEqual(following.record['run_id'], journal.record['run_id'])
+        self.assertNotEqual(following.record['checkpoint_uuid'], journal.record['checkpoint_uuid'])
 
     def test_owned_scratch_reclaims_interruption_but_rejects_replacement_or_mount(self):
         work = OwnedWorkspace(self.root, 'verify')

@@ -25,7 +25,7 @@ const NativeCheckpointDefaultReserve int64 = 50 << 30
 
 var ErrNativeCheckpointBusy = errors.New("a native checkpoint is already running")
 var ErrNativeCheckpointInvalid = errors.New("invalid native checkpoint request")
-var ErrNativeCheckpointIncomplete = errors.New("an incomplete native checkpoint already exists; inspect or remove that isolated directory before retrying")
+var ErrNativeCheckpointIncomplete = errors.New("an incomplete native checkpoint already exists; abandon this attempt before using a new UUID")
 var ErrNativeCheckpointReleased = errors.New("the native checkpoint has been released to its enclosing archive")
 
 type NativeCheckpointRoot struct {
@@ -118,7 +118,8 @@ func (s *Manager) nativeCheckpointDirectory(id string) (string, error) {
 // CaptureNativeCheckpoint is the application-side checkpoint coordinator. It
 // acquires database exclusion before reading configuration, captures recovery
 // trees, then copies the fixed WAL view with ordinary writers released. The
-// manifest is published last; failed requests remove only their own new output.
+// manifest is published last. An attempt record permanently reserves the UUID,
+// including after failure; explicit abandonment retires its temporary output.
 func (s *Manager) CaptureNativeCheckpoint(ctx context.Context, input NativeCheckpointInput) (_ *NativeBackupCheckpoint, retErr error) {
 	return s.captureNativeCheckpoint(ctx, input, nil)
 }
@@ -136,6 +137,9 @@ func (s *Manager) captureNativeCheckpoint(ctx context.Context, input NativeCheck
 	}
 	requestHash, reserve, err := nativeCheckpointRequest(input)
 	if err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	if !s.nativeBackupMu.TryLock() {
@@ -175,11 +179,9 @@ func (s *Manager) captureNativeCheckpoint(ctx context.Context, input NativeCheck
 		}
 		return nil, err
 	}
-	defer func() {
-		if retErr != nil {
-			retErr = errors.Join(retErr, os.RemoveAll(directory))
-		}
-	}()
+	if err := startNativeCheckpointAttempt(directory, input.UUID, requestHash); err != nil {
+		return nil, err
+	}
 	checkSpace := func(remaining int64) error {
 		if err := ctx.Err(); err != nil {
 			return err

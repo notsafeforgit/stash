@@ -11,6 +11,7 @@ from pathlib import Path
 import shutil
 import sqlite3
 import sys
+import time
 import uuid
 from unittest.mock import patch
 
@@ -18,6 +19,8 @@ from stash_archive.bundle import export_archive, import_archive
 from stash_archive.artwork_pins import ArtworkPins, release_published_artwork, publish_bytes
 from stash_archive.cli import main
 from stash_archive.checkpoint_release import release_published_checkpoint
+from stash_archive.checkpoint_abandon import checkpoint_status, abandon_checkpoint
+from stash_archive.storage import InvalidArchive
 from stash_archive.component_stage import ComponentStage, release_published_components
 from stash_archive.server_checkpoint import ServerCheckpoint
 from stash_ingest.publication_lock import ACTIVE, PublicationBarrier
@@ -209,4 +212,32 @@ if args.get("boundary"):
     except RuntimeError as error:
         assert str(error) == "isolated provider failure"
     assert not (root / "failed").exists()
+    deadline = time.monotonic() + 5
+    while True:
+        try:
+            state = checkpoint_status(failed, 0)
+            assert state["state"] == "partial"
+            break
+        except InvalidArchive as error:
+            if "HTTP 409" not in str(error) or time.monotonic() >= deadline:
+                raise
+            time.sleep(0.01)
+    abandoned = abandon_checkpoint(failed, 0)
+    assert abandon_checkpoint(failed, 0) == abandoned
+    assert checkpoint_status(failed, 0)["state"] == "abandoned"
+    try:
+        failed.seal(reserve=0)
+        raise AssertionError("abandoned UUID captured newer state")
+    except InvalidArchive as error:
+        assert "HTTP 410" in str(error)
+missing = ServerCheckpoint(args["server"], key, str(uuid.uuid4()))
+assert checkpoint_status(missing, 0)["state"] == "missing"
+abandoned_missing = abandon_checkpoint(missing, 0)
+assert abandon_checkpoint(missing, 0) == abandoned_missing
+assert checkpoint_status(missing, 0)["state"] == "abandoned"
+try:
+    missing.seal(reserve=0)
+    raise AssertionError("delayed capture was not fenced")
+except InvalidArchive as error:
+    assert "HTTP 410" in str(error)
 print(json.dumps({"verified": True, "restored": str(restored), "checkpoint": checkpoint["uuid"], "failed_id": failed_id}))

@@ -725,6 +725,16 @@ costs. Routine inventory request costs should be cents per month at this scale.
 The design must not require bucket versioning solely to compensate for reusing
 mutable media filename keys; use immutable media identities and restore mappings.
 
+Native Standard reclamation must protect the complete union of retained/pinned
+snapshot references, resume interrupted retirement, and cancel an expiration tag
+before reusing shared content. Keep small permanent publication/retirement
+receipts while reclaiming known large local files only after release. The host
+implementation and fake-transport recovery/request tests now cover this path;
+reviewed metadata-bucket lifecycle/versioning verification and activation remain
+cutover requirements. No daily process installs cloud policies. Exact host
+ledgers are archived as components, without duplicate mutable/per-run uploads.
+Previously published compatible ledger copies require separate retirement review.
+
 Measure the cost of replacing many small source databases with a larger native
 snapshot. Compress/deduplicate retained payloads and monitor backup duration and
 temporary space. Do not silently weaken backup cadence or move metadata to cold

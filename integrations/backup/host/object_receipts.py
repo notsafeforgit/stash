@@ -78,18 +78,23 @@ class ObjectReceipts:
                     raise InvalidArchive("Foreign object receipt database")
                 self.db.executescript(f"""
                     PRAGMA application_id={APPLICATION_ID};
-                    PRAGMA user_version=1;
+                    PRAGMA user_version=2;
                     CREATE TABLE receipts(bucket TEXT NOT NULL, key TEXT NOT NULL, sha256 TEXT NOT NULL,
                         size INTEGER NOT NULL, etag TEXT NOT NULL, modified TEXT NOT NULL, storage TEXT NOT NULL,
+                        tag_state TEXT NOT NULL DEFAULT 'unknown',
                         PRIMARY KEY(bucket,key)) WITHOUT ROWID;
                 """)
                 sync_directory(self.path.parent)
             if (self.db.execute("PRAGMA application_id").fetchone()[0] != APPLICATION_ID
-                    or self.db.execute("PRAGMA user_version").fetchone()[0] != 1
+                    or self.db.execute("PRAGMA user_version").fetchone()[0] not in (1, 2)
                     or self.db.execute("PRAGMA quick_check").fetchall() != [("ok",)]):
                 raise InvalidArchive("Invalid object receipt database")
             self.db.execute("PRAGMA journal_mode=WAL")
             self.db.execute("PRAGMA synchronous=FULL")
+            if self.db.execute("PRAGMA user_version").fetchone()[0] == 1:
+                with self.db:
+                    self.db.execute("ALTER TABLE receipts ADD COLUMN tag_state TEXT NOT NULL DEFAULT 'unknown'")
+                    self.db.execute("PRAGMA user_version=2")
         except BaseException:
             self.db.close()
             raise
@@ -103,7 +108,24 @@ class ObjectReceipts:
                                        (self.bucket, key)).fetchone()
         return previous == (sha256, *current)
 
-    def remember(self, key, sha256, head):
+    def tags_match(self, key, sha256, size, listed, state):
+        if not self.matches(key, sha256, size, listed):
+            return False
+        with self.lock:
+            row = self.db.execute("SELECT tag_state FROM receipts WHERE bucket=? AND key=?", (self.bucket, key)).fetchone()
+        return row == (state,)
+
+    def invalidate_tags(self, key):
+        # S3 tag writes do not change the LIST identity. Commit this BEFORE
+        # sending a retirement request, including requests whose reply is lost.
+        with self.lock:
+            self.db.execute("UPDATE receipts SET tag_state='unknown' WHERE bucket=? AND key=?", (self.bucket, key))
+            self.db.commit()
+            self.pending = 0
+
+    def remember(self, key, sha256, head, *, tag_state=None):
+        if tag_state not in (None, "live", "retired"):
+            raise InvalidArchive("Invalid object tag receipt state")
         if (not isinstance(sha256, str) or not HEX.fullmatch(sha256)
                 or head.get("ChecksumType") != "FULL_OBJECT"
                 or head.get("ChecksumSHA256") != base64.b64encode(bytes.fromhex(sha256)).decode("ascii")
@@ -113,7 +135,10 @@ class ObjectReceipts:
         if current is None:
             return  # Full checksum was checked, but no reusable LIST identity.
         with self.lock:
-            self.db.execute("INSERT OR REPLACE INTO receipts VALUES (?,?,?,?,?,?,?)", (self.bucket, key, sha256, *current))
+            old = self.db.execute("SELECT sha256,size,etag,modified,storage,tag_state FROM receipts WHERE bucket=? AND key=?",
+                                  (self.bucket, key)).fetchone()
+            state = tag_state or (old[-1] if old is not None and old[:-1] == (sha256, *current) else "unknown")
+            self.db.execute("INSERT OR REPLACE INTO receipts VALUES (?,?,?,?,?,?,?,?)", (self.bucket, key, sha256, *current, state))
             self.pending += 1
             if self.pending >= 256:
                 self.db.commit()

@@ -17,6 +17,7 @@ import tempfile
 from manifest_limits import MASTER_BYTES, MEDIA_BINDING_BYTES, INVENTORY_BYTES, TRANSFER_BYTES
 from object_receipts import ObjectReceipts, inventory as list_objects
 from media_objects import validate_inventory as validate_media_inventory
+import native_tags
 
 from stash_archive.bundle import iter_artifacts, validate_manifest
 from stash_archive.filesystem_boundary import canonical_uuid
@@ -171,7 +172,15 @@ class NativeStore:
                 return None
             raise
 
-    def verified(self, key, sha256, size, *, receipts=None, listed=None):
+    @staticmethod
+    def check_head(head, sha256, size):
+        expected = base64.b64encode(bytes.fromhex(sha256)).decode("ascii")
+        if (head.get("ContentLength") != size or head.get("ChecksumSHA256") != expected
+                or head.get("ChecksumType", "FULL_OBJECT") != "FULL_OBJECT"
+                or head.get("StorageClass", "STANDARD") != "STANDARD"):
+            raise InvalidArchive("S3 native object lacks its exact SHA-256, size or Standard storage class")
+
+    def verified(self, key, sha256, size, *, receipts=None, listed=None, tag_state=None):
         if receipts is not None and listed is not None:
             full_key = self.prefix + key
             if full_key not in listed:
@@ -181,18 +190,16 @@ class NativeStore:
         head = self.head(key)
         if head is None:
             return False
-        expected = base64.b64encode(bytes.fromhex(sha256)).decode("ascii")
-        if (head.get("ContentLength") != size or head.get("ChecksumSHA256") != expected
-                or head.get("ChecksumType", "FULL_OBJECT") != "FULL_OBJECT"
-                or head.get("StorageClass", "STANDARD") != "STANDARD"):
-            raise InvalidArchive("S3 native object lacks its exact SHA-256, size or Standard storage class")
+        self.check_head(head, sha256, size)
         if receipts is not None:
-            receipts.remember(self.prefix + key, sha256, head)
+            receipts.remember(self.prefix + key, sha256, head, tag_state=tag_state)
         return True
 
     def put(self, key, body, sha256, size, *, receipts=None, listed=None):
+        managed = native_tags.MANAGED.fullmatch(key) is not None
         if self.verified(key, sha256, size, receipts=receipts, listed=listed):
-            return
+            if not managed or native_tags.reconcile(self, key, sha256, size, "live", receipts=receipts, listed=listed):
+                return
         try:
             self.client.put_object(Bucket=self.bucket, Key=self.prefix + key, Body=body,
                                    ContentLength=size, StorageClass="STANDARD", IfNoneMatch="*",
@@ -202,8 +209,12 @@ class NativeStore:
             # have completed. Only independently checked durable bytes suffice.
             if not self.verified(key, sha256, size, receipts=receipts):
                 raise
+            if managed and not native_tags.reconcile(self, key, sha256, size, "live", receipts=receipts):
+                raise InvalidArchive("Native object expired while recovering its publication")
             return
-        if not self.verified(key, sha256, size, receipts=receipts):
+        # A successful new PUT has no retirement tag. It still needs the full
+        # checksum HEAD; only then may future unchanged LISTs reuse that fact.
+        if not self.verified(key, sha256, size, receipts=receipts, tag_state="live" if managed else None):
             raise InvalidArchive("Uploaded native object is unavailable for checksum verification")
 
     def put_file(self, key, path, expected_sha256, expected_size, *, receipts=None, listed=None):

@@ -1523,7 +1523,7 @@ def save_tarball_fp_store(store: dict):
 # We use a small local sqlite DB to avoid:
 #   - re-uploading the same file in overlapping delta windows
 #   - missing deletions (so restores don't resurrect junk)
-# This DB is backed up to STANDARD_REMOTE_PATH/ledgers/ by backup_ledgers_to_standard().
+# This DB is captured as an operating-state component in the native archive.
 #
 # Schema:
 #   unit_state(unit_id PRIMARY KEY, base_key, base_mod_epoch, last_success_epoch, last_delta_epoch, last_delta_key)
@@ -2850,56 +2850,6 @@ def build_and_upload_master_manifest(current_video_manifest_nul, current_tarball
     SOURCE_VIEW.commit_master(body)
 
 # ==========================================
-# LEDGER BACKUP TO STANDARD BUCKET
-# ==========================================
-def backup_ledgers_to_standard(dry_run: bool):
-    """
-    Back up critical local ledgers:
-      - latest copies
-      - per-run snapshots
-    """
-    ledger_paths = [
-        TARBALL_FP_JSONL,
-        TAR_DELTA_DB,
-        VIDEO_PREV_MANIFEST,
-        TOMBSTONES_LEDGER,
-        VIDEO_TOMBSTONE_PROGRESS,
-    ]
-
-    existing = [p for p in ledger_paths if os.path.exists(p)]
-    if not existing:
-        log("No ledger files to back up.", 1)
-        return
-
-    for path in existing:
-        name = os.path.basename(path)
-        latest_dst = f"{STANDARD_REMOTE_PATH}ledgers/latest/{name}"
-        snapshot_dst = f"{STANDARD_REMOTE_PATH}ledgers/runs/{RUN_ID}/{name}"
-
-        if dry_run:
-            log(f"[DRY RUN] Would backup ledger {path} -> {latest_dst}", 1)
-            log(f"[DRY RUN] Would backup ledger {path} -> {snapshot_dst}", 1)
-            continue
-
-        if path.endswith(".sqlite3"):
-            snapshot = os.path.join(TMP_DIR, "ledger-" + name)
-            source_conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
-            dest_conn = sqlite3.connect(snapshot)
-            try:
-                source_conn.backup(dest_conn)
-            finally:
-                source_conn.close()
-                dest_conn.close()
-            path = snapshot
-        log(f"Backing up ledger: {name}", 1)
-        run_cmd([
-"rclone", "copyto", path, latest_dst
-])
-        run_cmd([
-"rclone", "copyto", path, snapshot_dst
-])
-
-# ==========================================
 # MAIN
 # ==========================================
 
@@ -3165,9 +3115,8 @@ def publish_completed_backup(args, catalog, current_video_manifest, stable, budg
         TOMBSTONES_LEDGER, VIDEO_TOMBSTONE_PROGRESS,
     ])
     tar_keys = [key for u in catalog["units"] for key in [u["base_key"], *u["deltas"]]]
-    # Recoverable per-run state is uploaded before publishing the self-contained
-    # manifest. Any failure above or here leaves remote cleanup unexecuted.
-    backup_ledgers_to_standard(False)
+    # The verified native archive already contains the exact ledger snapshots.
+    # Publish its binding before any cleanup; no duplicate mutable ledger copies.
     build_and_upload_master_manifest(current_video_manifest, tar_keys, False, catalog)
     assert_source_ready()
     atomic_copy(current_video_manifest, VIDEO_PREV_MANIFEST)

@@ -24,6 +24,35 @@ class FakeS3:
         self.corrupt_read = False
         self.list_failure = None
         self.page_size = 1000
+        self.tags = {}
+        self.before_tags = lambda key: None
+        self.lost_tag_reply = set()
+        self.lifecycle = {"Rules": []}
+        self.versioning = {}
+
+    def get_bucket_lifecycle_configuration(self, *, Bucket):
+        self.operations.append(("lifecycle", Bucket))
+        return self.lifecycle
+
+    def get_bucket_versioning(self, *, Bucket):
+        self.operations.append(("versioning", Bucket))
+        return self.versioning
+
+    def get_object_tagging(self, *, Bucket, Key, VersionId=None):
+        self.operations.append(("get-tags", Key))
+        if not (self.root / Key).is_file():
+            raise S3Error("NoSuchKey")
+        return {"TagSet": [{"Key": k, "Value": v} for k, v in self.tags.get(Key, {}).items()]}
+
+    def put_object_tagging(self, *, Bucket, Key, Tagging, VersionId=None):
+        self.operations.append(("put-tags", Key))
+        self.before_tags(Key)
+        if not (self.root / Key).is_file():
+            raise S3Error("NoSuchKey")
+        self.tags[Key] = {tag["Key"]: tag["Value"] for tag in Tagging["TagSet"]}
+        if Key in self.lost_tag_reply:
+            raise OSError("lost tag reply")
+        return {}
 
     def list_objects_v2(self, *, Bucket, Prefix, MaxKeys, ContinuationToken=None):
         self.operations.append(("list", Prefix))
@@ -64,6 +93,7 @@ class FakeS3:
         assert StorageClass == "STANDARD"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(body)
+        self.tags[Key] = {}
         self.headers[Key] = {"ContentLength": len(body), "ChecksumSHA256": ChecksumSHA256,
                              "ChecksumType": "FULL_OBJECT", "StorageClass": StorageClass,
                              "LastModified": datetime(2026, 10, 5, tzinfo=timezone.utc) + timedelta(seconds=len(self.operations)),

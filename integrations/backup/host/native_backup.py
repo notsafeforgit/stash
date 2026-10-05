@@ -27,6 +27,7 @@ from stash_archive.zfs_media import ZFSMedia, mounts, release_published_media
 from native_store import (MEDIA_FORMAT, NativeStore, archive_objects, media_selection, selection_digest,
                           validate_reference, validate_selection_binding)
 from native_history import SnapshotHistory, policy as retention_policy, publication, publication_key, record_publication
+from native_cleanup import NativeCleanup
 import worker_inventory
 from manifest_limits import MASTER_BYTES
 
@@ -247,7 +248,7 @@ class NativeBackupSession:
         config = decode_json(body)
         required = {"format", "version", "server", "api_key_file", "state_directory", "artwork_sources", "media",
                     "worker_lock_roots", "components", "recovery_roots", "producer_origin", "native_validator"}
-        optional = {"reserve_bytes", "boundary_timeout", "validator_timeout", "zfs_command", "worker_inventory", "retention"}
+        optional = {"reserve_bytes", "boundary_timeout", "validator_timeout", "zfs_command", "worker_inventory", "retention", "standard_cleanup"}
         if (not isinstance(config, dict) or not required <= config.keys() or config.keys() - required - optional
                 or config["format"] != CONFIG_FORMAT or type(config["version"]) is not int or config["version"] != 1):
             raise InvalidArchive("Invalid native host backup configuration")
@@ -259,6 +260,9 @@ class NativeBackupSession:
             raise InvalidArchive("Invalid native backup space reserve")
         self.validator_timeout = config.get("validator_timeout", 3600)
         self.retention_policy = retention_policy(config.get("retention"))
+        self.standard_cleanup = config.get("standard_cleanup", False)
+        if type(self.standard_cleanup) is not bool:
+            raise InvalidArchive("standard_cleanup must be a boolean")
         self.validator = validator_path(config["native_validator"], self.validator_timeout)
         self.producer_origin = config["producer_origin"]
         self.live_media = Path(live_media).resolve(strict=True)
@@ -499,6 +503,8 @@ class NativeBackupSession:
         # Retain a compact, inspectable decision; the immutable remote receipts
         # remain authoritative if this local report is lost.
         same_or_publish(self.root / "retention.json", json_bytes({key: result[key] for key in ("retained", "retired")}))
+        if getattr(self, "standard_cleanup", False):
+            self.cleanup_report = NativeCleanup(self.history, reserve=self.reserve).run(body, runs=self.journal.runs)
         return result["protected_media"]
 
     def finish(self):

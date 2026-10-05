@@ -144,9 +144,16 @@ cold-media references protect cleanup, and deferred historical deletion intents
 remain queued. History caches rebuild from remote receipts and verified masters
 using paginated listings without daily per-media HEAD requests. The real 64 MiB
 encoder measurement is recorded in `docs/native-backup-cost-measurement.json`;
-synthetic title edits do not establish daily production churn. Standard chunk
-expiration and large local run-metadata reclamation still require implementation,
-versioning/lifecycle verification and reviewed activation.
+synthetic title edits do not establish daily production churn. Opt-in Standard
+cleanup now protects all retained native graphs, records chunk retirement before
+expiring per-run inventories, and reclaims known large local metadata after
+release/retirement. Tag state is invalidated durably before mutation; publication
+cancels expiration and verifies presence before reusing an object. Unchanged
+runs avoid per-object tag/HEAD sweeps. Native archives already contain the host
+ledgers; duplicate mutable/per-run ledger uploads are removed. Existing legacy
+ledger backups remain untouched. Review and verify the scoped lifecycle and
+versioning configuration before enabling `standard_cleanup`; the publisher
+cannot install policy. Actual policy activation and expiration remain open.
 Host publication/history/recovery/audit/restore share a 512 MiB master JSON
 limit, with 1 MiB extra for the archived media-binding envelope. Native artifact
 inventories have a separate 1 GiB streamed transport limit; the portable small

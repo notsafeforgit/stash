@@ -1,0 +1,69 @@
+{
+  "Rules": [
+    {
+      "ID": "StashNativeRetired",
+      "Status": "Enabled",
+      "Filter": {
+        "Tag": {
+          "Key": "stash-native-retired",
+          "Value": "true"
+        }
+      },
+      "Expiration": {
+        "Days": 1
+      }
+    },
+    {
+      "ID": "StashNativeArchiveVersions",
+      "Status": "Enabled",
+      "Filter": {
+        "Prefix": "native-archives/"
+      },
+      "NoncurrentVersionExpiration": {
+        "NoncurrentDays": 1
+      },
+      "Expiration": {
+        "ExpiredObjectDeleteMarker": true
+      }
+    },
+    {
+      "ID": "StashNativeManifestsVersions",
+      "Status": "Enabled",
+      "Filter": {
+        "Prefix": "manifests/runs/"
+      },
+      "NoncurrentVersionExpiration": {
+        "NoncurrentDays": 1
+      },
+      "Expiration": {
+        "ExpiredObjectDeleteMarker": true
+      }
+    },
+    {
+      "ID": "StashNativeCurrentVersions",
+      "Status": "Enabled",
+      "Filter": {
+        "Prefix": "current_manifest.json"
+      },
+      "NoncurrentVersionExpiration": {
+        "NoncurrentDays": 1
+      },
+      "Expiration": {
+        "ExpiredObjectDeleteMarker": true
+      }
+    },
+    {
+      "ID": "StashNativeCurrentTextVersions",
+      "Status": "Enabled",
+      "Filter": {
+        "Prefix": "current_manifest.txt"
+      },
+      "NoncurrentVersionExpiration": {
+        "NoncurrentDays": 1
+      },
+      "Expiration": {
+        "ExpiredObjectDeleteMarker": true
+      }
+    }
+  ]
+}

@@ -160,12 +160,65 @@ derived graphs are removed after retirement; small identity receipts remain.
 Losing the cache rebuilds protection from the remote receipts and verified
 masters. Corrupt caches stop cleanup and require inspection/rebuilding.
 
-This implements bounded **restore history and cold-media protection**. Garbage
-collection of unreferenced Standard chunks, old Standard per-run files and large
-local run inventories remains a cutover gate. Do not treat a retirement receipt
-as proof that those storage bytes have expired. The inspected metadata bucket
-has no lifecycle rule, and its versioning status still needs authorized
-verification before a scoped expiration policy can be activated.
+Set `standard_cleanup: true` only after reviewing and installing the metadata
+bucket policy below. The default is false until that activation review. Cleanup
+verifies the bucket's lifecycle and versioning configuration on every run; it
+never modifies either. Extra enabled lifecycle rules require review rather than
+being silently accepted. Versioning does not have to be enabled. The daily
+publisher needs read access to these two bucket configurations, plus object
+tag reads/writes for owned native keys. It does not need permission to change
+bucket policies or delete objects.
+For an already-versioned bucket, tag requests target the checked version and
+also require the corresponding object-version tagging permissions; this does
+not enable versioning or copy existing data.
+
+Standard cleanup protects every active snapshot's full native object graph,
+including pins. It tags only chunks found in retired snapshots and their four
+per-run metadata files (master, native manifest, inventory and verification).
+Unknown uploads are left alone. Chunk-retirement receipts under
+`native-archives/cleanup/completed/<uuid>.json` are permanent and precede tagging
+the old inventory. A failed/lost tag request can therefore resume, and rebuilding
+the local cache does not require an inventory that has already expired.
+
+Reusing a retired chunk removes its retirement tag and checks its checksum and
+presence before publication. Unrelated tags survive. If expiration won the race,
+the publisher uploads the retained local bytes again. Receipt schema 2 caches
+verified live/retired tag state together with object identity; cleanup durably
+invalidates this state **before** each tag change. A lost cache or schema-1
+upgrade requires one reconciliation pass. Normal unchanged runs use paginated
+listings, without per-object tag or checksum requests. The host backup lock and
+exclusive ownership of the retirement tag are required.
+
+Released local runs lose only their verified `master.json`,
+`prepared-master.json`, `catalog.json` and `archive/artifacts.jsonl` after
+retirement. A small durable intent lets that cleanup resume after a crash.
+Identity, release, completion and publication receipts remain, as do unknown
+files and every unfinished/active attempt. Large derived native graphs are
+pruned as well. Native publication already captures the exact host ledgers in
+the portable archive, so it no longer uploads duplicate `ledgers/latest/` and
+`ledgers/runs/` copies. Existing compatible ledger backups remain untouched for
+historical restores and need separate inventory/retirement review.
+
+Generate the reviewable policy for the exact native metadata prefix (empty here):
+
+```bash
+python -c 'import json; from native_cleanup import lifecycle_rules; print(json.dumps({"Rules": lifecycle_rules("")}, indent=2))'
+```
+
+Run that command in the installed host backup environment. It only prints JSON.
+The dedicated `stash-native-retired=true` rule expires tagged objects after
+one day of **object age**, not one day after tagging. Additional rules bound
+noncurrent versions and expired delete markers under the native archive,
+per-run manifest and current-pointer prefixes. They do not change Deep Archive
+media lifecycle rules. See the checked-in
+[empty-prefix example](native-lifecycle.example.json) and AWS's
+[expiration and tag evaluation rules](https://docs.aws.amazon.com/AmazonS3/latest/userguide/lifecycle-expire-general-considerations.html).
+Do not install this example over unrelated rules without review.
+
+The inspected metadata bucket has no lifecycle rule, and its versioning status
+still needs authorized verification. Policy installation, production activation
+and observed expiration remain cutover gates; a retirement receipt alone does
+not prove that storage bytes have expired.
 
 ## Storage and request costs
 
@@ -175,8 +228,9 @@ share immutable keys across runs. New archives use a maximum 64 MiB raw chunk
 instead of 1 MiB, reducing requests for changing database snapshots. Readers
 continue to accept earlier 1 MiB archives and enforce each manifest's limit.
 The larger chunk is a storage/request tradeoff: an edit replaces its whole
-chunk, while reducing the number of upload requests. Standard reclamation and
-real daily change volume still need validation before activation.
+chunk, while reducing the number of upload requests. Standard reclamation now
+has retry/reuse and request-count tests; cloud-policy activation and real daily
+change volume still need validation.
 
 The [2026-10-05 encoder measurement](../../docs/native-backup-cost-measurement.json)
 used a disposable copy of the verified schema-1000077 rehearsal database. It
@@ -263,7 +317,8 @@ even after interruption. A file that returns or changes after the captured view
 defers obsolete tagging; the path is rechecked after the remote tag read. Removed
 path bindings are retired independently of shared objects. Superseded bytes remain
 subject to the existing obsolete-object lifecycle; this is not indefinite retention
-of every historical backup. Standard-object reclamation remains a cutover gate.
+of every historical backup. Activation of Standard-object reclamation remains a
+cutover gate.
 
 The local NUL video manifests contain source paths. `current_manifest.txt` is
 only a deduplicated object allowlist; content-addressed keys require the JSON
@@ -311,6 +366,7 @@ Non-dry publication requires `--native-config /private/host-backup.json` or
 | `components` | Complete `{role, name, path}` inventory of outboxes, download archives, profiles and referenced private files |
 | `worker_inventory` | Optional path to the worker dependency declaration described below; resolved under publication barriers and retained for retries |
 | `retention` | Optional `{keep_last, pins}` policy; default seven successful snapshots with no extra pinned archive UUIDs |
+| `standard_cleanup` | Optional boolean, default false; enable after reviewing/installing the native lifecycle policy and granting configuration/tag reads and tag writes |
 | `recovery_roots` | Native deletion-recovery `{name, path}` bindings |
 | `producer_origin` | Original endpoint used to validate producer receipts |
 | `native_validator` | Trusted local native Stash executable |

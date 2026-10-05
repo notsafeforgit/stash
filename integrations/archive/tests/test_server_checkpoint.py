@@ -77,10 +77,17 @@ class ServerCheckpointTests(unittest.TestCase):
                     manifest["committed_deletion_ids"] = [str(uuid.uuid4())]
                 elif owner.mode == "unknown-component":
                     manifest["components"][0]["name"] = "../outside"
+                owner.manifest = manifest
                 self.reply(json.dumps(manifest).encode(), "application/json")
 
             def do_GET(self):
                 owner.requests.append((self.command, self.path, self.headers.get("ApiKey")))
+                if self.path.endswith("/" + owner.request_id):
+                    if not hasattr(owner, "manifest"):
+                        self.send_error(404)
+                    else:
+                        self.reply(json.dumps(owner.manifest).encode(), "application/json")
+                    return
                 name = self.path.rsplit("/", 1)[-1]
                 data = owner.objects[name]
                 digest = hashlib.sha256(data).hexdigest()
@@ -112,6 +119,34 @@ class ServerCheckpointTests(unittest.TestCase):
         self.assertEqual(manifest["uuid"], self.request_id)
         self.assertTrue(all(key == "private-test-key" for _, _, key in self.requests))
         self.assertEqual(sum(method == "POST" for method, _, _ in self.requests), 1)
+
+    def test_sealing_then_existing_only_download_keeps_original_database(self):
+        body = self.client.seal(reserve=0)
+        self.assertEqual(len(self.requests), 1)
+        self.client.expected_checkpoint_sha256 = checkpoint_digest(json.loads(body))
+        self.client.existing_only = True
+        self.db.execute("UPDATE performers SET name='Later live update' WHERE id=7")
+        self.db.commit()
+        self.export()
+        import_archive(self.output, self.root / "restored", reserve=0)
+        with closing(sqlite3.connect(self.root / "restored/library.sqlite")) as db:
+            self.assertEqual(db.execute("SELECT name FROM performers WHERE id=7").fetchone(), ("Canonical",))
+        self.assertEqual(sum(method == "POST" for method, _, _ in self.requests), 1)
+
+    def test_missing_existing_only_checkpoint_cannot_create_new_capture(self):
+        self.client.existing_only = True
+        with self.assertRaisesRegex(InvalidArchive, "HTTP 404"):
+            self.client.capture(self.root / "missing", reserve=0)
+        self.assertEqual([method for method, _, _ in self.requests], ["GET"])
+        self.assertFalse((self.root / "missing").exists())
+
+    def test_changed_expected_manifest_stops_before_any_component_download(self):
+        self.client.seal(reserve=0)
+        self.client.expected_checkpoint_sha256 = "0" * 64
+        self.client.existing_only = True
+        with self.assertRaisesRegex(InvalidArchive, "original sealed manifest"):
+            self.export()
+        self.assertFalse(any("/components/" in path for _, path, _ in self.requests))
 
     def test_downloads_and_outboxes_precede_server_and_receipts_precede_pack(self):
         downloads = self.root / "downloads.sqlite"

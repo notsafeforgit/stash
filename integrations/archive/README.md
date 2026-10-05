@@ -32,6 +32,14 @@ without recapturing. The caller retains the existing backup/dedupe exclusion.
 Publication-aware media release keeps permanent bindings and resumes interrupted
 cleanup without recursive or forced destruction.
 
+`HostFilesystemCapture.prepare` retains the original producer/download snapshots
+and external configuration in a private `ComponentStage`. Seal it before scanning
+the retained media view, then pass `component_stage=stage` to the exporter. Retries
+reuse those exact copies and only read an existing sealed server checkpoint;
+they never pair old worker state with a newly captured server. A stage manifest
+is included in the portable archive and bound to the server receipt. Its release
+helper requires the complete matching archive and retains permanent records.
+
 These providers do not establish complete worker/configuration inventory or a
 matching published media manifest. Daily-script integration and remote readback
 remain required. S3 uploads remain the responsibility of the existing host

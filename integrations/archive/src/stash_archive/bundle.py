@@ -106,13 +106,20 @@ def _blob_rows(connection):
 
 
 def export_archive(database, destination, *, blob_paths=(), components=(), reserve=RESERVE_BYTES,
-                   progress=None, producer_origin=None, server_checkpoint=None, artwork_pins=None, media_snapshot=None):
+                   progress=None, producer_origin=None, server_checkpoint=None, artwork_pins=None, media_snapshot=None,
+                   component_stage=None):
     # Capture every download archive before any outbox, then the server last.
     # The native adapter durably queues file completion before archive.add; an
     # acknowledged queue row in turn follows the server's committed receipt.
     # Snapshotting the library first can lose that causal prefix while packing
     # many artwork objects. Transport still cannot certify media/config/journals.
     components = list(components)
+    if component_stage is not None:
+        if server_checkpoint is None or database is not None:
+            raise InvalidArchive("Staged external components require their original server checkpoint")
+        if any(c.get("role") not in ("media_manifest", "operating_state") for c in components if isinstance(c, dict)):
+            raise InvalidArchive("Additional staged-export components must describe generated backup state")
+        components = component_stage.export_components(server_checkpoint, reserve) + components
     if artwork_pins is not None and (server_checkpoint is None or blob_paths):
         raise InvalidArchive("Artwork pins require a server checkpoint and replace live blob paths")
     if media_snapshot is not None and server_checkpoint is None:
@@ -143,7 +150,7 @@ def export_archive(database, destination, *, blob_paths=(), components=(), reser
     try:
         (destination / "objects").mkdir(mode=0o700)
         names = set()
-        server_expected = {}
+        server_expected = component_stage.expected() if component_stage is not None else {}
         inventory_digest = hashlib.sha256()
         inventory_bytes, count, total = 0, 0, 0
         inventory_path = destination / "artifacts.jsonl"
@@ -156,7 +163,7 @@ def export_archive(database, destination, *, blob_paths=(), components=(), reser
             options = {"expected_md5": name} if retained_blob else {}
             entry = store_file(destination, path, reserve=reserve, **options)
             if (role, name) in server_expected and (entry["sha256"], entry["size"]) != server_expected[(role, name)]:
-                raise InvalidArchive("Packed server checkpoint component differs from its captured digest")
+                raise InvalidArchive("Packed checkpoint component differs from its captured digest")
             entry.update(role=role, name=name)
             if sqlite_metadata is not None:
                 entry["sqlite"] = sqlite_metadata
@@ -173,9 +180,13 @@ def export_archive(database, destination, *, blob_paths=(), components=(), reser
             return entry
         with os.fdopen(inventory_fd, "wb") as inventory, tempfile.TemporaryDirectory(prefix=".snapshot-", dir=destination) as temp:
             snapshots = {}
+            retained = component_stage.databases() if component_stage is not None else {}
             for role in ("download_archive", "producer_outbox"):
                 for index, component in enumerate(components):
                     if component["role"] == role:
+                        if (role, component["name"]) in retained:
+                            snapshots[index] = (component["path"], retained[(role, component["name"])])
+                            continue
                         path = Path(temp) / f"component-{index}.sqlite"
                         meta = snapshot_database(component["path"], path, role, reserve)
                         snapshots[index] = (path, meta)
@@ -188,6 +199,8 @@ def export_archive(database, destination, *, blob_paths=(), components=(), reser
                 native, metadata, captured, expected = server_checkpoint.capture(Path(temp) / "server", reserve=reserve)
                 server_expected.update(expected)
                 components.extend(captured)
+            if component_stage is not None:
+                component_stage.validate_boundary(server_checkpoint.boundary_receipt)
             if media_snapshot is not None:
                 media_snapshot.open_bound(server_checkpoint.boundary_receipt).verify()
             if producer_origin is not None:

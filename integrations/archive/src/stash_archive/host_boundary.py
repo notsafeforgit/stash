@@ -16,6 +16,7 @@ class HostFilesystemCapture:
         from stash_ingest.publication_lock import PublicationBarrier
         self.barrier = PublicationBarrier(worker_lock_roots, timeout=timeout)
         self.artwork, self.media = artwork, media
+        self.components = None
 
     def __enter__(self):
         self.barrier.__enter__()
@@ -32,20 +33,35 @@ class HostFilesystemCapture:
                  "device": identity[0], "inode": identity[1]}
                 for identity, path in self.barrier.roots]
 
+    def prepare(self, cache, client, components, *, reserve=50 << 30):
+        from .component_stage import ComponentStage
+        if self.components is not None or client.boundary is not self:
+            raise InvalidArchive("Host component staging requires its original checkpoint client")
+        self.components = ComponentStage(cache, client, components, self.barrier, reserve=reserve)
+        return self.components
+
     def validate(self, boundary):
         if boundary.get("details", {}).get("producer_barriers") != self.worker_roots():
             raise InvalidArchive("Worker barrier inventory differs from the sealed checkpoint")
+        if self.components is not None:
+            self.components.validate_boundary(boundary)
         self.artwork.open_bound(boundary)
         self.media.open_bound(boundary).verify()
 
     def __call__(self, ready):
         if not self.barrier.acquired:
             raise InvalidArchive("Producer barriers were released before filesystem capture")
+        if self.components is not None:
+            if ready["uuid"] != self.components.intent["uuid"] or ready["request_sha256"] != self.components.intent["request_sha256"]:
+                raise InvalidArchive("Host component capture request changed")
         # Both captures happen while the server holds its writer guard. Nothing
         # waits for the server while acquiring these producer barriers.
         artwork = self.artwork.capture(ready)
         media = self.media.capture(ready)
-        return {"artwork": artwork, "media": media, "producer_barriers": self.worker_roots()}
+        result = {"artwork": artwork, "media": media, "producer_barriers": self.worker_roots()}
+        if self.components is not None:
+            result["components"] = self.components.binding()
+        return result
 
     def __exit__(self, *_):
         self.barrier.release()

@@ -7888,3 +7888,46 @@ and external-configuration inventory, persistent staged producer components for
 replay, a matching media-manifest binding and verified remote publication.
 Abandoned capture retention and full-inventory pin/pause measurements also remain
 before cutover. Existing compatible production and frozen release remain intact.
+
+## Persistent external components and sealed-only retries — 2026-10-05
+
+The host coordinator now prepares a private `ComponentStage` under the original
+worker barriers. It snapshots all declared download archives before outboxes,
+copies exact external profile/configuration bytes, and persists their original
+paths, SQLite identities, sizes and hashes. The stage inventory is bound into
+the native filesystem receipt and included in the portable archive. Export uses
+these retained copies directly and verifies their actual packed hashes, while
+retaining the existing native/producer receipt proof.
+
+Only the original uninterrupted preparation may request a new native capture.
+Request intent is durable before transport. Reopened stages and uncertain first
+requests only GET an already sealed server checkpoint; missing/incomplete views
+cannot trigger a later capture with old worker state. A lost response after
+sealing reopens the original view. Changed component inventory, server request,
+retained bytes or sealed manifest fails closed. `ServerCheckpoint.seal` obtains
+the manifest and filesystem receipt without downloading the library, allowing
+the host publisher to build its media manifest from the retained media view
+before packing the metadata archive.
+
+The component release helper validates the full archived stage association and
+every declared component before requesting release. It records intent before
+removing private copies, resumes interrupted cleanup, preserves unknown files,
+and keeps small permanent manifests/receipts. It does not read or remove live
+source files, acquire worker barriers for cleanup, or verify S3 publication.
+
+All 96 archive tests pass in 26.7 seconds. New cases exercise real producer WAL
+queues and SQLite snapshots, later live events/profile edits, restoration of the
+original pending payload, lost responses, incomplete preparation, altered
+inventory and tampering during packing. The real native Go HTTP/Python fixture
+passes in 10.6 seconds: it seals before library download, exports/reopens using
+the original download archive after live changes and deletion of its profile
+input, restores exact bytes, refuses incomplete-archive release and resumes
+cleanup interrupted after file removal. Evidence labels are
+`native_component_stage_suite` and `native_component_stage_http` under the
+October 4 client rehearsal directory. The preceding ZFS-provider commit's lint,
+Build and image publication all passed.
+
+Complete active-worker/configuration inventory, the installed daily publisher
+and restore/audit conversion, matching media-manifest/S3 publication, abandoned
+capture retention and production-scale pause/restore gates remain. Production,
+installed scripts and schedules have not switched.

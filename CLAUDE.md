@@ -100,6 +100,14 @@ handshake, releasing producer barriers before the large database copy and on
 sealed replay. The enclosing host backup keeps its existing backup/dedupe lock.
 Daily-script integration, complete component/media-manifest inventory and remote
 publication verification remain required; the providers do not upload to S3.
+Host backup retries use `HostFilesystemCapture.prepare` to persist the original
+download archives, producer outboxes and external configuration in a private
+`ComponentStage`. Seal that stage before media publication, then pass it to the
+exporter. Reopened or uncertain attempts only GET an already sealed server view;
+they cannot create a later snapshot with old worker state. The stage inventory
+is bound into the server's filesystem receipt and checked again while packing.
+Publication-aware component release validates the complete archived inventory,
+supports interrupted cleanup and keeps permanent identity/receipt files.
 Filesystem artwork writes publish flushed replacement inodes; never truncate a
 blob in place because readers and backup pins may retain that inode. Orphan
 cleanup must recheck references under a write transaction and use the deletion

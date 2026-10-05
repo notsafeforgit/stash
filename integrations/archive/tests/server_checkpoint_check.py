@@ -1,6 +1,7 @@
 """Exercise the portable CLI against the real native checkpoint HTTP handler."""
 
 from contextlib import redirect_stdout
+from contextlib import closing
 import fcntl
 import io
 import hashlib
@@ -8,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import sqlite3
 import sys
 import uuid
 from unittest.mock import patch
@@ -16,6 +18,7 @@ from stash_archive.bundle import export_archive, import_archive
 from stash_archive.artwork_pins import ArtworkPins, release_published_artwork, publish_bytes
 from stash_archive.cli import main
 from stash_archive.checkpoint_release import release_published_checkpoint
+from stash_archive.component_stage import ComponentStage, release_published_components
 from stash_archive.server_checkpoint import ServerCheckpoint
 from stash_ingest.publication_lock import ACTIVE, PublicationBarrier
 
@@ -28,11 +31,22 @@ options = ["export", "--server", args["server"], "--api-key-file", args["key_fil
 key = Path(args["key_file"]).read_text().strip()
 if args.get("boundary"):
     captures = []
+    stages = []
     cache = root / "artwork-pins"
     cache.mkdir(mode=0o700)
     pins = ArtworkPins(cache, [args["blobs"]], reserve=0)
     worker_locks = root / "worker-locks"
     worker_locks.mkdir()
+    stage_cache = root / "component-stages"
+    stage_cache.mkdir(mode=0o700)
+    downloads, profile = root / "download-archive.sqlite", root / "worker-profile.json"
+    with closing(sqlite3.connect(downloads)) as db:
+        db.execute("CREATE TABLE archive(entry TEXT PRIMARY KEY)")
+        db.execute("INSERT INTO archive VALUES('original')")
+        db.commit()
+    profile.write_bytes(b'{"profile":"original"}\n')
+    external = [{"role": "download_archive", "name": "downloads.sqlite", "path": downloads},
+                {"role": "worker_profile", "name": "profile.json", "path": profile}]
 
     def locked():
         fd = os.open(worker_locks / ACTIVE, os.O_RDWR)
@@ -52,7 +66,7 @@ if args.get("boundary"):
         # Once the inodes are retained, a later live deletion cannot alter this
         # database's artwork. Remove the source to require the real pin provider.
         shutil.rmtree(args["blobs"])
-        return {"artwork": record, "large_identifier": 18446744073709551615}
+        return {"artwork": record, "large_identifier": 18446744073709551615, "components": stages[-1].binding()}
 
     def coordinated_export(destination):
         with PublicationBarrier([worker_locks]) as barrier:
@@ -60,27 +74,42 @@ if args.get("boundary"):
             def validate_boundary(record):
                 assert not locked()
                 pins.open_bound(record)
+                stages[-1].validate_boundary(record)
                 validated.append(record)
             client = ServerCheckpoint(args["server"], key, args["request_id"],
                                       json.loads(Path(args["roots_file"]).read_text()),
                                       boundary=capture, boundary_release=barrier.release, boundary_validate=validate_boundary)
+            stage = ComponentStage(stage_cache, client, external, barrier, reserve=0)
+            stages.append(stage)
+            was_fresh = stage.fresh
             transport = client.open
+            requests = []
             def checked_transport(suffix, data=None):
+                requests.append((suffix, data is None))
+                if not was_fresh:
+                    assert data is None, "reopened stage attempted a new server capture"
                 if suffix.endswith("/boundary") or "/components/" in suffix:
                     assert not locked(), "workers remained locked during checkpoint copy/download"
                 if suffix.endswith("/components/library.sqlite"):
-                    assert len(validated) == 1, "large library download preceded retained-view validation"
+                    assert validated, "large library download preceded retained-view validation"
                 return transport(suffix, data)
             with patch.object(client, "open", side_effect=checked_transport):
-                export_archive(None, destination, reserve=0, server_checkpoint=client, artwork_pins=pins)
+                stage.seal()
+                assert not any(suffix.endswith("/components/library.sqlite") for suffix, _ in requests)
+                export_archive(None, destination, reserve=0, server_checkpoint=client, artwork_pins=pins,
+                               component_stage=stage, producer_origin=args["server"])
             assert not locked()
-            assert len(validated) == 1
+            assert len(validated) == 2
             return client
 
     client = coordinated_export(output)
     first_receipt = client.boundary_receipt
     assert first_receipt["details"]["large_identifier"] == 18446744073709551615
     assert len(captures) == 1
+    with closing(sqlite3.connect(downloads)) as db:
+        db.execute("INSERT INTO archive VALUES('later')")
+        db.commit()
+    profile.unlink()
     # A sealed server replay must return the same view without invoking capture.
     pins = ArtworkPins(cache, [args["blobs"]], reserve=0)
     client = coordinated_export(root / "replayed")
@@ -93,6 +122,9 @@ if args.get("boundary"):
     data = b"original checkpoint artwork"
     checksum = hashlib.md5(data).hexdigest()
     assert (restored / "blobs" / checksum[:2] / checksum[2:4] / checksum).read_bytes() == data
+    assert (restored / "components/worker_profile/profile.json").read_bytes() == b'{"profile":"original"}\n'
+    with closing(sqlite3.connect(restored / "components/download_archive/downloads.sqlite")) as db:
+        assert db.execute("SELECT entry FROM archive").fetchall() == [("original",)]
 checkpoint = json.loads((restored / "components/operating_state/server-checkpoint.json").read_bytes())
 assert checkpoint["uuid"] == args["request_id"]
 assert "http-backup-fixture" in (restored / "components/config/config.yml").read_text()
@@ -123,6 +155,46 @@ if args.get("boundary"):
     assert release_published_artwork(output, client, pins) == release
     assert (view.path / "manifest.json").is_file() and (view.path / "released.json").is_file()
     assert list((view.path / "0").iterdir()) == []
+    component_path = stages[-1].path
+    (component_path / "unrelated").write_bytes(b"keep unrelated files")
+    # A structurally valid enclosing inventory that omits one staged artifact
+    # cannot authorize even the server release request or local deletion.
+    from stash_archive.storage import InvalidArchive, json_bytes
+    original_manifest = (output / "manifest.json").read_bytes()
+    original_inventory = (output / "artifacts.jsonl").read_bytes()
+    entries = [json.loads(line) for line in original_inventory.splitlines()]
+    entries = [entry for entry in entries if entry["role"] != "worker_profile"]
+    changed_inventory = b"".join(json_bytes(entry) for entry in entries)
+    changed_manifest = json.loads(original_manifest)
+    changed_manifest["inventory"] = {"sha256": hashlib.sha256(changed_inventory).hexdigest(),
+                                     "size": len(changed_inventory), "count": len(entries),
+                                     "total_bytes": sum(entry["size"] for entry in entries)}
+    try:
+        (output / "manifest.json").write_bytes(json_bytes(changed_manifest))
+        (output / "artifacts.jsonl").write_bytes(changed_inventory)
+        with patch.object(client, "open", side_effect=AssertionError("incomplete archive must not request release")):
+            try:
+                release_published_components(output, client, stage_cache)
+                raise AssertionError("incomplete external inventory authorized release")
+            except InvalidArchive as error:
+                assert "exact staged component" in str(error)
+    finally:
+        (output / "manifest.json").write_bytes(original_manifest)
+        (output / "artifacts.jsonl").write_bytes(original_inventory)
+    with patch("stash_archive.component_stage.publish_bytes", side_effect=fail_completion):
+        try:
+            release_published_components(output, client, stage_cache)
+            raise AssertionError("injected external cleanup interruption did not fail")
+        except RuntimeError as error:
+            assert str(error) == "lost completion before durable marker"
+    assert (component_path / "release.json").is_file() and not (component_path / "released.json").exists()
+    assert release_published_components(output, client, stage_cache) == release
+    assert release_published_components(output, client, stage_cache) == release
+    assert (component_path / "unrelated").read_bytes() == b"keep unrelated files"
+    assert (component_path / "manifest.json").is_file() and (component_path / "released.json").is_file()
+    assert not list(component_path.glob("component-*"))
+    with closing(sqlite3.connect(downloads)) as db:
+        assert db.execute("SELECT entry FROM archive ORDER BY entry").fetchall() == [("later",), ("original",)]
 failed_id = ""
 if args.get("boundary"):
     failed_id = str(uuid.uuid4())

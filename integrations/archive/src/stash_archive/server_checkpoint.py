@@ -46,7 +46,7 @@ def request_bytes(request):
 
 class ServerCheckpoint:
     def __init__(self, server, api_key, request_id, roots=(), *, timeout=3600, boundary=None, boundary_timeout=30,
-                 boundary_release=None, boundary_validate=None):
+                 boundary_release=None, boundary_validate=None, existing_only=False):
         try:
             url = urllib.parse.urlsplit(server)
             port = url.port
@@ -66,6 +66,8 @@ class ServerCheckpoint:
             raise InvalidArchive("A boundary release callback requires a filesystem provider")
         if boundary_validate is not None and (boundary is None or not callable(boundary_validate)):
             raise InvalidArchive("A boundary validator requires a filesystem provider")
+        if type(existing_only) is not bool:
+            raise InvalidArchive("Existing checkpoint selection must be boolean")
         roots = list(roots)
         if len(roots) > 1024 or any(not isinstance(r, dict) or set(r) != {"name", "path"}
                                   or not all(isinstance(r[k], str) for k in r) for r in roots):
@@ -76,7 +78,63 @@ class ServerCheckpoint:
         self.boundary, self.boundary_timeout, self.boundary_receipt = boundary, boundary_timeout, None
         self.boundary_release, self._boundary_released = boundary_release, False
         self.boundary_validate = boundary_validate
+        self.existing_only, self.boundary_bytes = existing_only, None
+        self.expected_checkpoint_sha256 = None
         self.opener = urllib.request.build_opener(NoRedirect())
+
+    def request(self, reserve):
+        result = {"uuid": self.request_id, "recovery_roots": self.roots, "reserve_bytes": reserve}
+        if self.boundary is not None:
+            result["external_boundary"] = {"timeout_seconds": self.boundary_timeout}
+        return result
+
+    def request_hash(self, reserve):
+        return hashlib.sha256(request_bytes(self.request(reserve))).hexdigest()
+
+    def seal(self, *, reserve):
+        """Retain the server/filesystem boundary without downloading the library.
+
+        Existing-only reads cannot create a checkpoint. A persistent host stage
+        uses them after any interrupted/uncertain first request, never combining
+        older worker state with a newly captured server/media view.
+        """
+        from .filesystem_boundary import MAX_RECORD, read_checkpoint_response, validate_record
+        self._boundary_released = False
+        self.boundary_receipt, self.boundary_bytes = None, None
+        try:
+            request_hash = self.request_hash(reserve)
+            suffix, data = (f"/{self.request_id}", None) if self.existing_only else ("", request_bytes(self.request(reserve)))
+            with self.open(suffix, data) as response:
+                if self.existing_only and response.headers.get_content_type() != "application/json":
+                    raise InvalidArchive("Existing checkpoint read did not return a sealed manifest")
+                body = read_checkpoint_response(self, response, request_hash)
+            manifest = decode_json(body)
+            self.validate(manifest, request_hash)
+            if self.expected_checkpoint_sha256 is not None:
+                from .checkpoint_release import checkpoint_digest
+                if checkpoint_digest(manifest) != self.expected_checkpoint_sha256:
+                    raise InvalidArchive("Existing native checkpoint differs from its original sealed manifest")
+            for component in manifest["components"]:
+                if component["name"] != "filesystem-boundary.json":
+                    continue
+                with self.open(f"/{self.request_id}/components/filesystem-boundary.json") as response:
+                    if response.headers.get("X-Stash-SHA256") != component["sha256"]:
+                        raise InvalidArchive("Native checkpoint component digest header differs")
+                    length = response.headers.get("Content-Length")
+                    if length is not None and length != str(component["bytes"]):
+                        raise InvalidArchive("Native checkpoint component length differs")
+                    boundary = response.read(MAX_RECORD + 1)
+                if len(boundary) != component["bytes"] or hashlib.sha256(boundary).hexdigest() != component["sha256"]:
+                    raise InvalidArchive("Native filesystem component size/digest mismatch")
+                record = validate_record(decode_json(boundary), self, request_hash)
+                if self.boundary_receipt is not None and record != self.boundary_receipt:
+                    raise InvalidArchive("Sealed filesystem checkpoint differs from its acknowledgement")
+                self.boundary_receipt, self.boundary_bytes = record, boundary
+                if self.boundary_validate is not None:
+                    self.boundary_validate(record)
+            return body
+        finally:
+            self.release_boundary()
 
     def release_boundary(self):
         """Free host producer barriers before large copies, also on sealed replay."""
@@ -93,6 +151,8 @@ class ServerCheckpoint:
         except (urllib.error.HTTPError, urllib.error.URLError) as error:
             # Do not include request headers or credential-bearing exception data.
             status = getattr(error, "code", None)
+            if isinstance(error, urllib.error.HTTPError):
+                error.close()
             raise InvalidArchive(f"Native checkpoint request failed{f' (HTTP {status})' if status else ''}") from None
         if response.status != 200 or response.headers.get("Content-Encoding", "identity") != "identity":
             response.close()
@@ -108,20 +168,12 @@ class ServerCheckpoint:
 
     def _capture(self, destination, *, reserve):
         from .bundle import connect_readonly, database_metadata
-        from .filesystem_boundary import read_checkpoint_response, validate_record
         destination = Path(destination)
-        request = {"uuid": self.request_id, "recovery_roots": self.roots, "reserve_bytes": reserve}
-        if self.boundary is not None:
-            request["external_boundary"] = {"timeout_seconds": self.boundary_timeout}
-        request_hash = hashlib.sha256(request_bytes(request)).hexdigest()
-        self.boundary_receipt = None
         require_space(destination.parent, 0, reserve)
         destination.mkdir(mode=0o700)
         try:
-            with self.open("", request_bytes(request)) as response:
-                body = read_checkpoint_response(self, response, request_hash)
+            body = self.seal(reserve=reserve)
             manifest = decode_json(body)
-            self.validate(manifest, request_hash)
             components = []
             expected = {}
             # Validate retained external views before downloading the large
@@ -130,6 +182,10 @@ class ServerCheckpoint:
                 name = component["name"]
                 expected[(component["role"], "library" if component["role"] == "library" else name)] = (component["sha256"], component["bytes"])
                 require_space(destination, component["bytes"], reserve)
+                if name == "filesystem-boundary.json":
+                    publish_bytes(destination / name, self.boundary_bytes)
+                    components.append({"role": component["role"], "name": name, "path": destination / name})
+                    continue
                 with self.open(f"/{self.request_id}/components/{name}") as response:
                     if response.headers.get("X-Stash-SHA256") != component["sha256"]:
                         raise InvalidArchive("Native checkpoint component digest header differs")
@@ -155,13 +211,6 @@ class ServerCheckpoint:
                         os.fsync(output.fileno())
                 if component["role"] != "library":
                     components.append({"role": component["role"], "name": name, "path": destination / name})
-                if name == "filesystem-boundary.json":
-                    record = validate_record(decode_json((destination / name).read_bytes()), self, request_hash)
-                    if self.boundary_receipt is not None and record != self.boundary_receipt:
-                        raise InvalidArchive("Sealed filesystem checkpoint differs from its acknowledgement")
-                    self.boundary_receipt = record
-                    if self.boundary_validate is not None:
-                        self.boundary_validate(record)
             native = destination / "library.sqlite"
             with closing(connect_readonly(native)) as db:
                 metadata = database_metadata(db, "library")

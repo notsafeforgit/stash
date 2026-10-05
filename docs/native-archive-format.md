@@ -249,11 +249,53 @@ The host coordinator joins both providers with the native worker barrier:
 with HostFilesystemCapture(worker_lock_roots, pins, media) as capture:
     client = capture.client(server, api_key, checkpoint_uuid, recovery_roots,
                             boundary_timeout=120)
-    export_archive(None, bundle, components=components, producer_origin=origin,
-                   server_checkpoint=client, artwork_pins=pins, media_snapshot=media)
+    stage = capture.prepare(component_cache, client, components)
+    stage.seal()
 view = media.open_bound(client.boundary_receipt).verify()
 media_source = view.resolve("porn")
+# Build/upload the matching media manifest from media_source, under the same
+# enclosing backup/dedupe lock. Then package the captured native components:
+export_archive(None, bundle, components=generated_components, producer_origin=origin,
+               server_checkpoint=client, artwork_pins=pins, media_snapshot=media,
+               component_stage=stage)
 ```
+
+`ComponentStage` persists every declared download-archive SQLite snapshot before
+any producer-outbox snapshot. It also copies the declared external profiles,
+configuration and other operating files with size/identity checks, retaining
+exact private bytes. A durable manifest records component identities, original
+byte-encoded paths, SQLite metadata, lengths and SHA-256 digests; its digest is
+sealed as `details.components` and the manifest itself is an archive component.
+Names cannot override required server components. Stage directories are private
+and named by checkpoint UUID; existing files are never overwritten or silently
+recaptured. This records a caller-supplied inventory, not proof that every active
+worker and configuration dependency was inventoried.
+
+Only the invocation that prepared a new stage, while still holding its original
+worker barrier, may request a new native capture. The request intent is durable
+before transport. A reopened stage or uncertain request uses the existing
+checkpoint GET route exclusively. Missing or incomplete server captures stop the
+retry; a new coordinated attempt needs a new UUID. Incomplete local preparation
+also needs a new UUID. A lost response after server sealing can reopen that
+original view. Changed inventory, request options, component bytes, server
+manifest or receipt binding prevents reuse. Current live sources may change or
+disappear without changing the retained stage.
+
+`ServerCheckpoint.seal` retrieves the sealed manifest and filesystem evidence
+without downloading the large library. The host can therefore establish its
+retained media source before media publication. Later export downloads that same
+native view and packs the staged external files directly, without recopying live
+SQLite inputs. Both actual packed digests and the existing native/producer
+receipt proof are checked. Additional components in this mode are generated
+media manifests or operating-state artifacts, not replacement live inputs.
+
+After durable enclosing publication, `release_published_components(archive,
+client, component_cache)` verifies the archived stage inventory and every exact
+declared artifact before requesting server release or removing local copies. It
+persists release intent, removes only unchanged numbered stage files, and can
+resume after interruption. It retains small manifests, identities and receipts;
+unknown files and all original live source paths are untouched. This helper
+does not verify remote publication itself or retire abandoned incomplete stages.
 
 The exporter validates the sealed media association but does not pack ordinary
 media into the metadata archive. The host publisher must read that retained view

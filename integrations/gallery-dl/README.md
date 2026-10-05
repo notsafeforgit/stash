@@ -3,20 +3,26 @@
 This package implements durable delivery and a gallery-dl download adapter.
 It is development code on `v3-rewrite`; the installed host and n8n download
 helpers still use their existing catalogs. Durable caller URL snapshots now feed
-the native dispatcher. Staged Twitter/Reddit/Instagram/Coomer/Kemono host launchers
-preserve saved-list, mode and date inputs. The staged n8n adapter preserves stable execution tokens,
+the native dispatcher. Staged host launchers cover Twitter, Reddit, Instagram,
+Coomer, Kemono, Bluesky and TikTok, preserving saved-list, mode and date inputs.
+The staged n8n adapter preserves stable execution tokens,
 historical backfill decisions and actual source completion. Recovery caller
 conversion, operational-history migration, activation of reviewed worker profiles,
 additional source adapters and production cutover remain unfinished.
 
 Python 3.12 or newer is required. Runtime delivery uses only the standard
-library. Install the local package with `pip install ./integrations/gallery-dl`
+library. Install the local package with `python -I -m pip install ./integrations/gallery-dl`
 in the runner's environment when integrating it; do not replace a live wrapper
 with this CLI. The CLI can queue source requests, drain captured events and
 execute one claimed download attempt using an explicitly reviewed local profile.
 The optional `[gallery]` extra pins the gallery-dl source revision and yt-dlp
 version used to verify downloader integration. Run `make pre-producer` to install
 that test runtime into `.local/native-producer`, independently of live workers.
+The setup target also checks installed modules against current sources without
+workspace imports. Wheel builds remove obsolete modules from reused `build/lib`
+output; they must not alter a worker's policy fingerprint. Use Python `-I` for
+package installation so a development `PYTHONPATH` cannot redirect pip's uninstall
+lookup to the source tree.
 
 ## Authentication boundary
 
@@ -377,7 +383,7 @@ must not be hidden as a credential change. Input files remain the private access
 source, so the eventual cutover must keep those references valid when retiring
 legacy settings. No credentials are printed in the conversion report.
 
-`--category twitter`, `instagram`, `coomer` and `kemono` remove unrelated extractor
+`--category twitter`, `instagram`, `coomer`, `kemono`, `bluesky` and `tiktok` remove unrelated extractor
 settings and unused named processors. Reddit can do the same when its existing whitelist limits children
 to Reddit, Imgur, Redgifs and direct links; their base and parent-specific
 settings remain. Unrecognized dependency graphs retain all configured sites.
@@ -537,8 +543,8 @@ and its backup/restore boundary; schema migration invents no past caller runs.
 ## Staged host launchers
 
 The package entry points `stash-ingest-twitter`, `stash-ingest-reddit`,
-`stash-ingest-instagram`, `stash-ingest-coomer` and `stash-ingest-kemono` record
-source calls through this queue. The first two
+`stash-ingest-instagram`, `stash-ingest-coomer`, `stash-ingest-kemono`,
+`stash-ingest-bluesky` and `stash-ingest-tiktok` record source calls through this queue. The first two
 are also available as `bin/update-twitter-media` and `bin/update-reddit-media`.
 Run the scripts with the installed producer's
 Python. They are staged replacements; the existing host scripts and n8n workflow
@@ -549,15 +555,17 @@ commands have not switched.
 | Twitter `--username`, `--user-id`/`--gid` | Handles, profile URLs and numeric account IDs use the existing normalized X URLs |
 | Instagram `--username` | Handles become profile URLs; explicit post/reel/story/highlight URLs keep their path and query |
 | Coomer/Kemono `--url` | Explicit account, post or posts-listing URLs retain their underlying service, account ID, path and query; other container types require separate adapters |
+| Bluesky/TikTok `--url` | Keeps exact supported post/profile/collection URLs and TikTok shortlinks; standalone artwork and following traversal require separate adapters |
 | `--config-file` | Twitter retains first-token/comment handling and input order; Reddit sorts profile/community names before expansion |
-| Instagram/Coomer/Kemono `--config-file` | Preserves URL order and removes exact duplicates; blank/comment-only lines are ignored and invalid lines stop the request |
+| Instagram/Coomer/Kemono/Bluesky/TikTok `--config-file` | Preserves URL order and removes exact duplicates; blank/comment-only lines are ignored and invalid lines stop the request |
 | Reddit `--mode new\|top`, `--subreddit`, `--saved` | Retains profile/search URLs, all/year top variants, communities and explicit saved-post targets |
 | Reddit `--date-min`, `--date-min-relative`, `--date-min-days` | Freezes the first request's lower bound; the absolute option takes precedence |
 | `--full-history`, Reddit top mode | Requires the reviewed profile with global `skip=true`; retains any date minimum |
 | `--dry-run` | Prints URL/window expansion without a profile, API request or outbox creation |
 
 Saved-list defaults remain `~/.config/gallery-dl/twitter-list.conf`,
-`reddit-list.conf`, `instagram-list.conf`, `coomer-list.conf` and `kemono-list.conf`,
+`reddit-list.conf`, `instagram-list.conf`, `coomer-list.conf`, `kemono-list.conf`,
+`bluesky-list.conf` and `tiktok-list.conf`,
 overridden by the corresponding `<SERVICE>_LIST_CONFIG` variable, such as
 `COOMER_LIST_CONFIG`. A missing list requires an explicit target or list path;
 installing a launcher does not create a list or schedule.
@@ -569,7 +577,8 @@ Raw gallery-dl flags and `--gallery-dl-bin` are replaced by the reviewed profile
 Set `STASH_INGEST_OUTBOX`, `STASH_INGEST_ENDPOINT`, `STASH_INGEST_PRODUCER`, and
 the Stash API token environment reference. `--profile` chooses an explicit
 profile; otherwise the launcher selects `STASH_INGEST_<SERVICE>_PROFILE`, where
-`<SERVICE>` is `TWITTER`, `REDDIT`, `INSTAGRAM`, `COOMER` or `KEMONO`. Full-history/top requests select
+`<SERVICE>` is `TWITTER`, `REDDIT`, `INSTAGRAM`, `COOMER`, `KEMONO`, `BLUESKY` or
+`TIKTOK`. Full-history/top requests select
 the corresponding `STASH_INGEST_<SERVICE>_FULL_HISTORY_PROFILE`.
 These profiles must have the matching
 source category. Website access remains in their local gallery-dl references.
@@ -1807,6 +1816,46 @@ dispatcher/recovery and actual host/n8n caller activation remain deployment work
 Discord, favorites and artist-dispatch containers are explicitly unsupported by
 this adapter and require their own identity/traversal contracts.
 
+## Bluesky/TikTok downloads and source albums
+
+`bluesky_media` and `tiktok_media` version 1 retain the qualified post reference
+and original ordered media entries before selection. Producer and backend derive
+and validate membership against the same original source fields. Null entries
+retain unavailable positions, and repeated source positions remain distinct.
+One source item is attributable without becoming a gallery; multiple evidenced
+slots can create an album before every image/video is available.
+
+Bluesky posts use author DID plus record key, while attachments use original blob
+CIDs. Image alt text remains per-file metadata. Embedded mixed media and quoted
+posts retain their own membership; a quoted post has its own identity and source
+date. Disabling videos does not remove them from the original attachment list.
+Windows use full `createdAt` precision instead of the extractor's truncated date.
+
+TikTok photo keys derive from the original CDN filename before rendition suffixes;
+changing a URL signature or CDN host does not create another attachment. Video
+keys are scoped to the source post. Unavailable photos are omitted from download
+iteration while their original list and source numbering remain in captures.
+Photo numbers and the chosen image cannot replace the post ID. Windows use the
+original `createTime`. Extractor errors remain failed work, including errors the
+pinned upstream loop catches internally.
+
+TikTok requires `audio`, `covers` and `subtitles` disabled for native media intake.
+The original music, cover and subtitle references remain source metadata. Native
+profile dispatch defaults to posts; explicit includes may select posts, reposts,
+stories, likes and saved posts. An explicit unsupported include fails before
+source access. Bluesky supports media/posts/replies/video/likes profile routes and
+post-producing feed/list/search/hashtag/bookmark targets. TikTok shortlinks route
+only to the supported post extractor. Child routes enforce the original window.
+Standalone avatar/banner/info targets and following traversal require separate
+account/artwork adapters, and are not silently treated as posts.
+
+Only versioned new captures opt into shared post-body partitioning. Per-file
+descriptions, dimensions, selected images and generated titles remain patches;
+historical capture partitions stay replayable. The packaged
+`stash-ingest-bluesky --url ...` and `stash-ingest-tiktok --url ...` launchers
+record durable work for the dispatcher. Native registration, reviewed effective
+profiles and observed file receipts are still required before replacing callers.
+
 ## Metadata-only extraction for enrichment
 
 `stash_ingest.metadata_fetch.fetch(url, settings, resume=None, timeout=180,
@@ -1836,8 +1885,8 @@ never a selected carousel image ID. Story downloads use each original story's
 media ID, retaining the story/highlight container separately. Linked media hosts inherit their
 enclosing post; a social account/feed parent does not replace its post. These
 adapters allow verified metadata capture/publication, while file selection and
-source-window adapters for services beyond Reddit/Twitter/Instagram/Coomer/Kemono
-remain unfinished.
+source-window adapters for services beyond Reddit, Twitter, Instagram, Coomer,
+Kemono, Bluesky and TikTok remain unfinished.
 
 Metadata projection preserves source post captions and dates rather than image
 alt text or per-file dates. Kemono/Coomer only use `published` for publication

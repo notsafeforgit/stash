@@ -72,6 +72,11 @@ Native producer tests require Python 3.12 or newer. `make pre-producer` installs
 the pinned gallery-dl/yt-dlp test dependencies into `.local/native-producer`;
 `PRODUCER_PYTHON` can select another prepared environment. The supported package
 in `integrations/gallery-dl` uses only the standard library for delivery.
+Producer/backup installation uses Python `-I` so workspace `PYTHONPATH` cannot
+redirect pip's uninstall discovery. Producer wheel builds discard obsolete
+`build/lib` modules, and both setup targets verify installed source files with
+`scripts/verify_producer_install.py`. A staged worker policy must fingerprint the
+same code as the actual installed runtime; source-import tests alone cannot prove it.
 Host/n8n launch paths have not switched to the native adapter.
 `integrations/archive` provides the standard-library `stash-archive` tool for
 compressed native SQLite snapshots, original artwork and explicit configuration
@@ -210,8 +215,8 @@ responses expose truncation so a partial candidate set never appears unique.
 `queue-sources` freezes a caller's URL list, policy and absolute window before
 network access. Resolution commits each collection binding and ticket together;
 never reinterpret a bound target after a retry. `call-status` checks every
-original ticket and cannot certify media intake. Staged Twitter/Reddit/Instagram/
-Coomer/Kemono host launchers expand the existing lists/modes/dates into source calls. Full-history
+original ticket and cannot certify media intake. Staged host launchers for Twitter,
+Reddit, Instagram, Coomer, Kemono, Bluesky and TikTok expand lists/modes/dates into source calls. Full-history
 and Reddit top mode require a separate reviewed global `skip=true` profile.
 Local recording is not source completion; strict inspection returns pending until
 all original tickets finish. The staged n8n adapter records stable execution
@@ -235,6 +240,17 @@ file receipts or download-archive acknowledgements. Windows require original
 `published` timestamps. New shared-body partitioning requires explicit evidence;
 historical signatures remain unchanged. The staged mirror profiles/launchers are
 inactive; Discord, favorites and artist containers still need separate adapters.
+Bluesky/TikTok downloads retain `bluesky_media`/`tiktok_media` version 1 with
+backend validation against original blobs/photos/videos. Keep missing slots,
+repeat positions, DID-qualified posts, quoted post identity and original source
+timestamps. TikTok image keys exclude signed URL/rendition changes; its generated
+titles and selected images are per-file patches. Preserve historical capture
+partitions. TikTok requires audio/covers/subtitles disabled and defaults to post
+collections rather than profile avatars. Explicit unsupported includes fail;
+following/artwork need separate adapters. Profile and shortlink children must
+apply the original run window. Never allow the pinned TikTok loop's caught
+extraction errors to certify a completed source run. Host profiles are staged
+only, with the intentional TikTok media choices recorded for cutover review.
 `source_backfill_decisions` now retains permanent account-backfill history in
 the native database. Historical acceptance/skip imports retain their entire
 source row without creating source-run coverage. Native completion proves every

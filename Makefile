@@ -445,7 +445,8 @@ export BACKUP_PYTHON ?= $(abspath .local/native-backup/bin/python)
 .PHONY: pre-backup validate-backup
 pre-backup:
 	python3 -m venv .local/native-backup
-	.local/native-backup/bin/python -m pip install ./integrations/archive ./integrations/gallery-dl ./integrations/backup
+	.local/native-backup/bin/python -I -m pip install ./integrations/archive ./integrations/gallery-dl ./integrations/backup
+	.local/native-backup/bin/python -I -B scripts/verify_producer_install.py
 
 validate-backup:
 	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=integrations/archive/src:integrations/gallery-dl/src "$(BACKUP_PYTHON)" -m unittest discover -s integrations/backup/host/s3-backup-tests -v
@@ -464,7 +465,8 @@ export PRODUCER_PYTHON ?= $(abspath .local/native-producer/bin/python)
 .PHONY: pre-producer
 pre-producer:
 	python3 -m venv .local/native-producer
-	.local/native-producer/bin/python -m pip install './integrations/gallery-dl[gallery]'
+	.local/native-producer/bin/python -I -m pip install './integrations/gallery-dl[gallery]'
+	.local/native-producer/bin/python -I -B scripts/verify_producer_install.py
 
 validate-producer:
 	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=integrations/gallery-dl/src "$(PRODUCER_PYTHON)" -m unittest discover -s integrations/gallery-dl/tests -v

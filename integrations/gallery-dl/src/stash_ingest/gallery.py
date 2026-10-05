@@ -14,7 +14,7 @@ from gallery_dl import config, exception, job, version
 from gallery_dl import path as gallery_path
 from gallery_dl.extractor.common import Message
 
-from . import filename, instagram, mirror
+from . import filename, instagram, mirror, social_media
 from .encoding import InvalidData
 from .filesystem import destination_lock
 from .runs import SourceFailure, SourcePaused, SourceTurnComplete
@@ -183,7 +183,8 @@ class NativeDownloadJob(job.DownloadJob):
         if parent is None and extractor.url != self.producer.lease.run["target_url"]:
             raise InvalidData("Extractor target differs from the claimed collection")
         if (parent is not None and self._native_source_date is None
-                and not (parent._native_collection_child and extractor.category == parent.extractor.category == "instagram")):
+                and not (parent._native_collection_child and extractor.category == parent.extractor.category
+                         and extractor.category in ('instagram', 'bluesky', 'tiktok'))):
             raise InvalidData("Child extraction has no approved source-post window")
         self.producer.window.configure(extractor, inherited=parent is not None)
         if hasattr(extractor, "_async_items"):
@@ -228,6 +229,8 @@ class NativeDownloadJob(job.DownloadJob):
             instagram.install(self.extractor)
         elif self.extractor.category in ("kemono", "coomer"):
             mirror.install(self.extractor)
+        elif self.extractor.category in ('bluesky', 'tiktok'):
+            social_media.install(self.extractor)
 
     def _source_operation(self, call, *args):
         try:
@@ -263,7 +266,8 @@ class NativeDownloadJob(job.DownloadJob):
                     kind, url, data = self._source_operation(next, iterator)
                 except StopIteration:
                     return
-                if kind == Message.Queue and instagram.collection_queue(self.extractor, url, data):
+                if kind == Message.Queue and (instagram.collection_queue(self.extractor, url, data)
+                                              or social_media.collection_queue(self.extractor, url, data)):
                     # This is routing to a post collection, not a dated post.
                     # The child applies the original window to each source item.
                     self._native_collection_route = (url, data["_extractor"])

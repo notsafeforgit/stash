@@ -14,8 +14,8 @@ from gallery_dl import config
 
 from stash_ingest.configuration import Configuration
 from stash_ingest.encoding import InvalidData
-from stash_ingest.launcher_inputs import date_min, instagram_list, instagram_target, mirror_list, mirror_target, reddit_list, reddit_name, reddit_urls, twitter_list, twitter_target
-from stash_ingest.launchers import caller_uuid, coomer_main, instagram_main, kemono_main, reddit_main, twitter_main
+from stash_ingest.launcher_inputs import date_min, instagram_list, instagram_target, mirror_list, mirror_target, reddit_list, reddit_name, reddit_urls, social_list, social_target, twitter_list, twitter_target
+from stash_ingest.launchers import bluesky_main, caller_uuid, coomer_main, instagram_main, kemono_main, reddit_main, tiktok_main, twitter_main
 from stash_ingest.outbox import Outbox
 from stash_ingest.source_calls import SourceCalls
 from helpers import PRODUCER
@@ -150,6 +150,38 @@ class LauncherTests(unittest.TestCase):
             self.assertEqual((status, pending['state']), (2, 'pending'))
             status, preview, error = self.invoke(main, ['--url', f'https://{category}.st/onlyfans/user/123', '--dry-run'])
             self.assertEqual((status, error, preview['targets']), (0, '', [f'https://{category}.st/onlyfans/user/123']))
+
+    def test_social_urls_preserve_exact_targets_and_fail_on_unsupported_lists(self):
+        for category, urls, invalid in (
+            ('bluesky', ['https://bsky.app/profile/did:plc:example', 'https://bsky.app/profile/example.test/post/3abc',
+                         'https://bsky.app/search?q=example'], 'https://bsky.app/profile/example.test/avatar'),
+            ('tiktok', ['https://www.tiktok.com/@example', 'https://www.tiktok.com/@example/photo/123',
+                        'https://vm.tiktok.com/abc123'], 'https://www.tiktok.com/@example/avatar'),
+        ):
+            path = self.directory / (category + '.conf')
+            path.write_text('# Selected sources\n' + '\n'.join([*urls, urls[0]]))
+            self.assertEqual(social_list(path, category), (urls, []))
+            path.write_text('\n'.join([urls[0], invalid]))
+            with self.assertRaisesRegex(InvalidData, 'line 2'):
+                social_list(path, category)
+            with self.assertRaises(InvalidData):
+                social_target(urls[0], 'tiktok' if category == 'bluesky' else 'bluesky')
+
+    def test_social_launchers_preserve_saved_requests_and_report_pending(self):
+        for category, main, url in (('bluesky', bluesky_main, 'https://bsky.app/profile/example.test'),
+                                    ('tiktok', tiktok_main, 'https://www.tiktok.com/@example')):
+            self.value['source_category'] = category
+            self.value['gallery']['extractor'][category] = {'audio': False}
+            self.profile.write_text(json.dumps(self.value))
+            args = [*self.base, '--call', str(uuid.uuid4()), '--url', url, '--profile', str(self.profile)]
+            status, original, error = self.invoke(main, args)
+            self.assertEqual((status, error, original['state']), (0, '', 'recorded'))
+            self.profile.unlink()
+            self.assertEqual(self.invoke(main, args), (0, original, ''))
+            status, pending, _ = self.invoke(main, [*args, '--strict-errors'])
+            self.assertEqual((status, pending['state']), (2, 'pending'))
+            status, preview, error = self.invoke(main, ['--url', url, '--dry-run'])
+            self.assertEqual((status, error, preview['targets']), (0, '', [url]))
 
     @unittest.skipUnless(hasattr(time, "tzset"), "host launcher timezone fixture requires tzset")
     def test_date_filters_keep_gallery_dl_boundaries_absolute_precedence_and_frozen_relative_time(self):

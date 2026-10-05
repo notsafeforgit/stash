@@ -98,7 +98,7 @@ class Converter:
             # These pinned adapters stay within their root source. Reddit
             # can safely narrow its dependencies with the existing finite host
             # whitelist. Unknown dependency graphs retain all configured sites.
-            included = {category} if category in ("twitter", "instagram", "coomer", "kemono") else None
+            included = {category} if category in ("twitter", "instagram", "coomer", "kemono", "bluesky", "tiktok") else None
             if category == "reddit":
                 settings = section.plain()
                 whitelist = settings.get("reddit", {}).get("whitelist", settings.get("whitelist"))

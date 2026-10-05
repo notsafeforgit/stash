@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 import math
 
 from .encoding import InvalidData
-from .source import _agree, _context, UnsupportedSource
+from .source import _agree, _context, _id, _numeric, UnsupportedSource
 from .windows import normalize
 
 EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
@@ -29,9 +29,13 @@ def _datetime(value):
 def published(metadata, category):
     """Date of the source post, including its wrapper when it is a repost."""
     data, category = _context({**metadata, "category": category})
-    if category not in ("reddit", "twitter", "instagram", "coomer", "kemono"):
+    if category not in ("reddit", "twitter", "instagram", "coomer", "kemono", "bluesky", "tiktok"):
         raise UnsupportedSource("This extractor needs a native source-date adapter")
     try:
+        if category == 'bluesky':
+            return _datetime(data.get('createdAt'))
+        if category == 'tiktok':
+            return EPOCH + timedelta(seconds=int(_numeric(_id(data.get('createTime')))))
         if category in ("coomer", "kemono"):
             # The transformed date can fall back to the mirror import date.
             # Only the original publication timestamp owns a source window.
@@ -105,6 +109,10 @@ def validate_keywords(extractor):
     protected = PROTECTED_KEYWORDS
     if extractor.category in ('coomer', 'kemono'):
         protected = protected | {'user', 'path', 'file', 'attachments', 'content', 'native_file_exclusion'}
+    elif extractor.category == 'bluesky':
+        protected = protected | {'author', 'uri', 'embed', 'createdAt', 'filename', 'bluesky_media'}
+    elif extractor.category == 'tiktok':
+        protected = protected | {'createTime', 'imagePost', 'video', 'image', 'type', 'tiktok_media'}
     for key in ("keywords", "keywords-global"):
         values = extractor.config(key)
         if values and (not isinstance(values, dict) or protected.intersection(values)):

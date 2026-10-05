@@ -415,7 +415,7 @@ A social extractor's parent feed/profile does not replace its actual post.
 Unknown post adapters are rejected even when their account parser is supported.
 Post support alone does not establish attachment membership or enable a download
 worker: file selection and source-window adapters currently cover Reddit, Twitter,
-Instagram, Coomer and Kemono. Instagram requires versioned original attachment evidence for
+Instagram, Coomer, Kemono, Bluesky and TikTok. Instagram requires versioned original attachment evidence for
 file linking, preserves carousel slots before filtering/reordering, and treats
 each story as its own post. Only evidenced carousel posts create source galleries.
 Historical metadata without this evidence can retain a regular post identity,
@@ -433,6 +433,18 @@ never the mirror's `added` time. New manifests enable shared post-body storage
 without changing the partition of historical captures. See the
 [mirror contract](../integrations/gallery-dl/README.md#kemonocoomer-downloads-and-source-albums)
 for coverage and container limitations.
+
+Bluesky/TikTok use `bluesky_media`/`tiktok_media` version 1 with source membership
+validated against original embeds or photo/video fields. Bluesky attachment IDs
+are blob CIDs, within DID/record post scope. TikTok photo IDs are original image
+keys independent of signed URLs/renditions; videos have a post-scoped key.
+Missing slots and repeated positions survive file selection. Windows use original
+`createdAt`/`createTime`, and undated profile/shortlink routes only admit verified
+post-producing child extractors. TikTok extraction failures cannot acknowledge a
+complete source run. See the
+[Bluesky/TikTok contract](../integrations/gallery-dl/README.md#blueskytiktok-downloads-and-source-albums)
+for supported collections, auxiliary-output choices and preserved historical
+capture partitions.
 
 ## Metadata enrichment checkpoints
 

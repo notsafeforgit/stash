@@ -9,7 +9,12 @@ import (
 )
 
 func TestMirrorAttachmentMembershipSharesProducerContract(t *testing.T) {
-	body, err := os.ReadFile("testdata/captured-mirror-media-v1.json")
+	testCapturedMembershipContract(t, "testdata/captured-mirror-media-v1.json")
+}
+
+func testCapturedMembershipContract(t *testing.T, path string) {
+	t.Helper()
+	body, err := os.ReadFile(path)
 	require.NoError(t, err)
 	var fixtures struct {
 		Cases []struct {

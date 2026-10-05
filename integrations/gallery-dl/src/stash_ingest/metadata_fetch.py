@@ -88,6 +88,7 @@ def safe_config(settings):
         "reddit": {"comments": 0, "morecomments": False, "recursion": 0, "previews": False, "videos": True},
         "twitter": {"replies": True, "retweets": True, "quoted": False, "conversations": False,
                     "text-tweets": True, "cards": False, "videos": True, "images": True, "twitpic": False},
+        "tiktok": {"photos": True, "videos": True, "audio": False, "covers": False, "subtitles": False},
     }.items():
         selected = extractors.setdefault(category, {})
         selected.update(values)
@@ -157,6 +158,9 @@ def collect(url, settings, resume=None, *, factory=None, check=lambda: None, res
         elif target.category in ("kemono", "coomer"):
             from . import mirror
             mirror.install(target)
+        elif target.category in ('bluesky', 'tiktok'):
+            from . import social_media
+            social_media.install(target)
         base = None
         for kind, media_url, original in target:
             check()

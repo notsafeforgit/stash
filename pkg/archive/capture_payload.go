@@ -19,6 +19,8 @@ var captureFileFields = sourceKeys("num filename extension _url media_id file_id
 var captureTwitterFields = sourceKeys("width height type description duration bitrate source_id source_user sensitive_flags")
 var captureInstagramFields = sourceKeys("date shortcode display_url video_url width height width_original height_original expires subscription audience tagged_users owner author audio_title audio_duration audio_user audio_artist audio_timestamps")
 var captureMirrorFields = sourceKeys("path name url hash type native_file_exclusion")
+var captureBlueskyFields = sourceKeys("description width height count")
+var captureTiktokFields = sourceKeys("image type title duration width height")
 var captureProvenanceFields = sourceKeys("source_extractor_url subcategory nfo_path")
 
 // RetainSourcePayload applies the versioned gallery-dl policy to a decoded
@@ -82,7 +84,17 @@ func splitCapturePayload(origin string, payload sourceObject) (sourceObject, sou
 					keys[key] = true
 				}
 			}
-		case "reddit", "bluesky", "tiktok", "tumblr":
+		case "bluesky", "tiktok":
+			if evidence, err := capturedSocialAlbum(payload, "", category); err == nil && evidence != nil {
+				fields := captureBlueskyFields
+				if category == "tiktok" {
+					fields = captureTiktokFields
+				}
+				for key := range fields {
+					keys[key] = true
+				}
+			}
+		case "reddit", "tumblr":
 		default:
 			return payload, sourceObject{}
 		}

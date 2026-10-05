@@ -4,7 +4,7 @@ import re
 from urllib.parse import urlsplit
 
 from .encoding import InvalidData
-from . import instagram, mirror
+from . import instagram, mirror, social_media
 
 
 class UnsupportedSource(InvalidData):
@@ -243,4 +243,8 @@ def attachment(source):
             selected = mirror.reference(data.get("path"), category)
             if any(item is not None and item['id'] == selected for item in evidence['items']):
                 return {"namespace": ref["namespace"], "value": selected}
+    elif category in ('bluesky', 'tiktok'):
+        selected = social_media.attachment(data, category, download_url)
+        if selected is not None:
+            return selected
     raise UnsupportedSource("Downloaded media cannot be uniquely matched to the captured source list")

@@ -15,16 +15,18 @@ from .client import Client, Unavailable
 from .completion import inspect_call
 from .configuration import Configuration
 from .encoding import InvalidData, digest, encode, identifier
-from .launcher_inputs import date_min, instagram_list, instagram_target, mirror_list, mirror_target, reddit_list, reddit_name, reddit_urls, twitter_list, twitter_target
+from .launcher_inputs import date_min, instagram_list, instagram_target, mirror_list, mirror_target, reddit_list, reddit_name, reddit_urls, social_list, social_target, twitter_list, twitter_target
 from .outbox import Capacity, Outbox
 from .source_calls import SourceCalls
 from . import windows
+
+URL_SERVICES = ('coomer', 'kemono', 'bluesky', 'tiktok')
 
 
 def parser_for(service):
     parser = argparse.ArgumentParser(description=f"Record native {service} scrape requests; source execution runs through the dispatcher.")
     targets = parser.add_mutually_exclusive_group()
-    targets.add_argument('--url' if service in ('coomer', 'kemono') else '--username', dest='username')
+    targets.add_argument('--url' if service in URL_SERVICES else '--username', dest='username')
     if service == "twitter":
         targets.add_argument("--user-id", "--gid", dest="user_id")
     elif service == "reddit":
@@ -59,8 +61,9 @@ def options(service, args):
         source = {"url": direct} if direct else {"list_file": str(Path(args.config_file).absolute())}
     elif service == "instagram":
         source = {"url": instagram_target(args.username)} if args.username else {"list_file": str(Path(args.config_file).absolute())}
-    elif service in ('coomer', 'kemono'):
-        source = {'url': mirror_target(args.username, service)} if args.username else {'list_file': str(Path(args.config_file).absolute())}
+    elif service in URL_SERVICES:
+        target = mirror_target if service in ('coomer', 'kemono') else social_target
+        source = {'url': target(args.username, service)} if args.username else {'list_file': str(Path(args.config_file).absolute())}
     else:
         source = ({"user": reddit_name(args.username)} if args.username else
                   {"subreddit": reddit_name(args.subreddit, "subreddit")} if args.subreddit else
@@ -75,11 +78,13 @@ def options(service, args):
 
 def expand(service, value, now):
     source, ignored = value["source"], []
-    if service in ("twitter", "instagram", "coomer", "kemono"):
+    if service in ('twitter', 'instagram', *URL_SERVICES):
         if "url" in source:
             urls = [source["url"]]
         elif service in ('coomer', 'kemono'):
             urls, ignored = mirror_list(source['list_file'], service)
+        elif service in ('bluesky', 'tiktok'):
+            urls, ignored = social_list(source['list_file'], service)
         else:
             urls, ignored = (twitter_list if service == "twitter" else instagram_list)(source["list_file"])
         since = None
@@ -172,3 +177,11 @@ def coomer_main(argv=None):
 
 def kemono_main(argv=None):
     return main('kemono', argv)
+
+
+def bluesky_main(argv=None):
+    return main('bluesky', argv)
+
+
+def tiktok_main(argv=None):
+    return main('tiktok', argv)

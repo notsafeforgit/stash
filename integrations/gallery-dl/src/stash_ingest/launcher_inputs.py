@@ -107,6 +107,30 @@ def mirror_list(filename, category):
     return _explicit_list(filename, lambda value: mirror_target(value, category), category)
 
 
+def social_target(value, category):
+    from gallery_dl import extractor
+    from .social_media import supported
+
+    value = value.strip()
+    try:
+        parsed = urlsplit(value)
+        if (category not in ('bluesky', 'tiktok') or parsed.scheme not in ('http', 'https')
+                or parsed.username is not None or parsed.password is not None or parsed.port is not None
+                or any(part in ('.', '..') for part in parsed.path.split('/'))
+                or any(c.isspace() or ord(c) < 32 for c in value)):
+            raise ValueError()
+        target = extractor.find(value)
+        if target is None or target.category != category or not supported(target):
+            raise ValueError()
+        return value
+    except ValueError:
+        raise InvalidData('Choose a supported ' + category + ' post or collection URL') from None
+
+
+def social_list(filename, category):
+    return _explicit_list(filename, lambda value: social_target(value, category), category)
+
+
 def _explicit_list(filename, target, label):
     targets = []
     for number, line in enumerate(read_list(filename), 1):

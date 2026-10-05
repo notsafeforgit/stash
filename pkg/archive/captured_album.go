@@ -192,6 +192,11 @@ func ExtractCapturedAlbum(raw []byte) (*CapturedAlbum, error) {
 		if err != nil || result == nil {
 			return nil, err
 		}
+	case "bluesky", "tiktok":
+		result, err = capturedSocialAlbum(data, path, category)
+		if err != nil || result == nil {
+			return nil, err
+		}
 	default:
 		return nil, nil
 	}

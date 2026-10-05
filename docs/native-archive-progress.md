@@ -79,6 +79,11 @@ Coomer/Kemono user/post/listing ingestion now preserves original attachment
 membership, enforces original downloads and retains excluded nonvisual evidence.
 Host profiles and URL/list launchers are staged and tested; special mirror
 containers and actual caller activation remain open.
+Bluesky/TikTok post media ingestion and staged launchers now retain source
+membership, missing slots and source-time windows. Profile/shortlink dispatch,
+shared post-body storage and explicit TikTok failure handling are tested. Actual
+host profiles are staged, including reviewed media-only TikTok choices; native
+registration and live caller conversion remain open.
 Broader archive management UI, live host/n8n conversion, remaining compatibility removal, coordinated
 backup/export/restore, production cutover and retirement remain major release
 gates. The phase table below records that distinction; commit count is not a
@@ -8576,3 +8581,63 @@ both installed launchers' help/dry-run checks pass without workspace `PYTHONPATH
 No live service, Stash schema, frozen release, bucket policy or develop merge
 changed. This increment does not close the remaining source coverage or release
 gates.
+
+## Bluesky/TikTok post ingestion and staged launchers — 2026-10-05
+
+The pinned producer now records `bluesky_media`/`tiktok_media` version 1 with the
+qualified post reference and original ordered source membership. Backend
+validation recomputes that evidence from original embeds or photo/video fields.
+Bluesky attachments use blob CIDs within DID/record post scope; TikTok photo keys
+exclude URL signatures and rendition suffixes, while videos use post-scoped keys.
+Missing source slots and repeated positions remain visible. Multiple source slots
+can create a gallery as files arrive; one photo remains attributable without a
+new gallery. New captures share post bodies, keeping selected images, alt text,
+dimensions and generated titles in patches. Historical unmarked partitions remain
+unchanged for replay and import proofs.
+
+Bluesky windows retain full `createdAt` precision, and quoted posts keep separate
+identity and source time. Video selection does not shrink source membership.
+TikTok uses original `createTime`, skips unavailable photo outputs while retaining
+their original positions/numbers, and propagates extraction errors that the pinned
+upstream loop otherwise catches. Supported profile and shortlink dispatch keeps
+the claimed window in every child. Native TikTok profile defaults select posts;
+explicit unsupported artwork/following includes fail before source access.
+
+The new packaged URL/list launchers record durable caller requests and preserve
+pending status and replay after input profiles disappear. Source-scoped conversion
+retains relevant settings/private references and excludes unrelated extractors.
+Actual host settings produced normal/full-history profiles in
+`.local/native-social-conversion-20261005/`. A separate inactive TikTok overlay
+disables audio/covers/subtitle files and removes avatar from the configured
+`avatar,posts,stories` selection, retaining posts and stories. The original
+references remain in captured source metadata. The review records these
+intentional differences; source configuration hashes are unchanged. No saved
+Bluesky/TikTok lists or dedicated host user units were found in the inventoried
+paths, so this stages explicit URL callers rather than adding schedules. Synthetic
+profile route checks made no website/API requests or download-archive accesses.
+Root/producer/collection registration, durable outboxes, dispatch/recovery and
+actual caller activation remain cutover work.
+
+The shared 27-case Go/Python corpus covers identity, partial/repeated membership,
+URL variants, invalid evidence and retained payloads. Pinned offline download
+tests cover source windows, quotes, video selection, missing photos, profiles,
+shortlinks, rejected auxiliary outputs and extraction failures. Real native
+capture/file publication tests cover Bluesky partial albums and TikTok album versus
+singleton behavior with receipt replay. All 524 producer tests pass in 44 seconds;
+the full archive suite, focused backend checks and scoped Go lint also pass.
+Isolated package installation and both installed launchers' help/dry-run checks
+pass without workspace `PYTHONPATH`. No live scraper, service, database schema,
+bucket policy, frozen release or develop merge changed. Remaining service
+adapters, native management interfaces, historical policies, full caller
+conversion and the production release gates remain open.
+
+Installed runtime comparison also found an obsolete `enrichment_lease.py` in
+reused wheel output. Development `PYTHONPATH` caused pip to locate source metadata
+instead of uninstalling the old installed distribution, retaining the removed
+module in the test environments. Producer wheel builds now discard obsolete
+Python modules from their build output. Both setup targets run pip in Python
+isolated mode and verify the installed module set and file digests. An
+intentionally stale build-module fixture was removed during wheel creation;
+producer and backup installs both match all 98 current source modules. The
+installed producer fingerprint now exactly matches the staged profiles. These
+checks correct packaging evidence without activating any live worker.

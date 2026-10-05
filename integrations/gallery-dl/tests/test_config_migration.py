@@ -200,6 +200,19 @@ class ConfigMigrationTests(unittest.TestCase):
                 self.assertIs(config.interpolate(('extractor', category), 'original'), True)
                 self.assertEqual(config.interpolate(('extractor', category), 'postprocessors'), ['helper'])
 
+    def test_social_profiles_preserve_explicit_collection_and_media_choices(self):
+        for category in ('bluesky', 'tiktok'):
+            options = {'audio': False, 'videos': True, 'include': ['posts', 'stories'] if category == 'tiktok' else ['media'],
+                       'postprocessors': ['helper']}
+            self.value['extractor'][category] = options
+            self.path.write_text(json.dumps(self.value))
+            value = Converter([self.path], self.root, self.locks, category=category).convert()
+            self.assertNotIn('reddit', value['gallery']['extractor'])
+            self.assertNotIn('coomer', value['gallery']['extractor'])
+            with Configuration.from_document(value, self.directory).activate():
+                for key in ('audio', 'videos', 'include', 'postprocessors'):
+                    self.assertEqual(config.interpolate(('extractor', category), key), options[key])
+
     def test_conditional_order_survives_writing_and_changes_policy_and_filename(self):
         value, original = self.profile()
         changed = copy.deepcopy(value)

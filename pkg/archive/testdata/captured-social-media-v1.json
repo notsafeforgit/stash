@@ -1,0 +1,1575 @@
+{
+  "cases": [
+    {
+      "name": "bluesky preserves missing source slot",
+      "source": {
+        "category": "bluesky",
+        "uri": "at://did:plc:example/app.bsky.feed.post/3abc",
+        "author": {
+          "did": "did:plc:example",
+          "handle": "example.test"
+        },
+        "post_id": "3abc",
+        "createdAt": "2026-10-01T12:00:00.123456Z",
+        "text": "Original post",
+        "embed": {
+          "images": [
+            {
+              "alt": "Source alt blobA",
+              "image": {
+                "ref": {
+                  "$link": "blobA"
+                },
+                "mimeType": "image/jpeg"
+              }
+            },
+            null,
+            {
+              "alt": "Source alt blobB",
+              "image": {
+                "ref": {
+                  "$link": "blobB"
+                },
+                "mimeType": "image/jpeg"
+              }
+            }
+          ]
+        },
+        "filename": "blobA",
+        "bluesky_media": {
+          "version": 1,
+          "post": {
+            "namespace": "native:bluesky",
+            "value": "did:plc:example/3abc"
+          },
+          "items": [
+            {
+              "id": "blobA",
+              "kind": "image"
+            },
+            null,
+            {
+              "id": "blobB",
+              "kind": "image"
+            }
+          ]
+        }
+      },
+      "items": [
+        {
+          "id": "blobA",
+          "kind": "image"
+        },
+        null,
+        {
+          "id": "blobB",
+          "kind": "image"
+        }
+      ],
+      "error": false,
+      "attachment": {
+        "namespace": "native:bluesky",
+        "value": "blobA"
+      }
+    },
+    {
+      "name": "bluesky repeated blob positions",
+      "source": {
+        "category": "bluesky",
+        "uri": "at://did:plc:example/app.bsky.feed.post/3abc",
+        "author": {
+          "did": "did:plc:example",
+          "handle": "example.test"
+        },
+        "post_id": "3abc",
+        "createdAt": "2026-10-01T12:00:00.123456Z",
+        "text": "Original post",
+        "embed": {
+          "images": [
+            {
+              "alt": "Source alt blobA",
+              "image": {
+                "ref": {
+                  "$link": "blobA"
+                },
+                "mimeType": "image/jpeg"
+              }
+            },
+            {
+              "alt": "Source alt blobA",
+              "image": {
+                "ref": {
+                  "$link": "blobA"
+                },
+                "mimeType": "image/jpeg"
+              }
+            }
+          ]
+        },
+        "filename": "blobA",
+        "bluesky_media": {
+          "version": 1,
+          "post": {
+            "namespace": "native:bluesky",
+            "value": "did:plc:example/3abc"
+          },
+          "items": [
+            {
+              "id": "blobA",
+              "kind": "image"
+            },
+            {
+              "id": "blobA",
+              "kind": "image"
+            }
+          ]
+        }
+      },
+      "items": [
+        {
+          "id": "blobA",
+          "kind": "image"
+        },
+        {
+          "id": "blobA",
+          "kind": "image"
+        }
+      ],
+      "error": false,
+      "attachment": {
+        "namespace": "native:bluesky",
+        "value": "blobA"
+      }
+    },
+    {
+      "name": "bluesky mixed record-with-media",
+      "source": {
+        "category": "bluesky",
+        "uri": "at://did:plc:example/app.bsky.feed.post/3abc",
+        "author": {
+          "did": "did:plc:example",
+          "handle": "example.test"
+        },
+        "post_id": "3abc",
+        "createdAt": "2026-10-01T12:00:00.123456Z",
+        "text": "Original post",
+        "embed": {
+          "record": {
+            "uri": "at://did:plc:quoted/app.bsky.feed.post/other"
+          },
+          "media": {
+            "items": [
+              {
+                "alt": "Source alt blobA",
+                "image": {
+                  "ref": {
+                    "$link": "blobA"
+                  },
+                  "mimeType": "image/jpeg"
+                }
+              },
+              {
+                "video": {
+                  "cid": "blobV",
+                  "mimeType": "video/mp4"
+                }
+              }
+            ]
+          }
+        },
+        "filename": "blobA",
+        "bluesky_media": {
+          "version": 1,
+          "post": {
+            "namespace": "native:bluesky",
+            "value": "did:plc:example/3abc"
+          },
+          "items": [
+            {
+              "id": "blobA",
+              "kind": "image"
+            },
+            {
+              "id": "blobV",
+              "kind": "video"
+            }
+          ]
+        }
+      },
+      "items": [
+        {
+          "id": "blobA",
+          "kind": "image"
+        },
+        {
+          "id": "blobV",
+          "kind": "video"
+        }
+      ],
+      "error": false,
+      "attachment": {
+        "namespace": "native:bluesky",
+        "value": "blobA"
+      }
+    },
+    {
+      "name": "bluesky standalone video",
+      "source": {
+        "category": "bluesky",
+        "uri": "at://did:plc:example/app.bsky.feed.post/3abc",
+        "author": {
+          "did": "did:plc:example",
+          "handle": "example.test"
+        },
+        "post_id": "3abc",
+        "createdAt": "2026-10-01T12:00:00.123456Z",
+        "text": "Original post",
+        "embed": {
+          "video": {
+            "ref": {
+              "$link": "blobV"
+            },
+            "mimeType": "video/mp4"
+          }
+        },
+        "filename": "blobV",
+        "bluesky_media": {
+          "version": 1,
+          "post": {
+            "namespace": "native:bluesky",
+            "value": "did:plc:example/3abc"
+          },
+          "items": [
+            {
+              "id": "blobV",
+              "kind": "video"
+            }
+          ]
+        }
+      },
+      "items": [
+        {
+          "id": "blobV",
+          "kind": "video"
+        }
+      ],
+      "error": false,
+      "attachment": {
+        "namespace": "native:bluesky",
+        "value": "blobV"
+      }
+    },
+    {
+      "name": "bluesky conflicting blob aliases",
+      "source": {
+        "category": "bluesky",
+        "uri": "at://did:plc:example/app.bsky.feed.post/3abc",
+        "author": {
+          "did": "did:plc:example",
+          "handle": "example.test"
+        },
+        "post_id": "3abc",
+        "createdAt": "2026-10-01T12:00:00.123456Z",
+        "text": "Original post",
+        "embed": {
+          "images": [
+            {
+              "alt": "Source alt blobA",
+              "image": {
+                "ref": {
+                  "$link": "blobA"
+                },
+                "mimeType": "image/jpeg",
+                "cid": "blobWrong"
+              }
+            },
+            null,
+            {
+              "alt": "Source alt blobB",
+              "image": {
+                "ref": {
+                  "$link": "blobB"
+                },
+                "mimeType": "image/jpeg"
+              }
+            }
+          ]
+        },
+        "filename": "blobA",
+        "bluesky_media": {
+          "version": 1,
+          "post": {
+            "namespace": "native:bluesky",
+            "value": "did:plc:example/3abc"
+          },
+          "items": [
+            {
+              "id": "blobA",
+              "kind": "image"
+            },
+            null,
+            {
+              "id": "blobB",
+              "kind": "image"
+            }
+          ]
+        }
+      },
+      "items": null,
+      "error": true,
+      "attachment": null
+    },
+    {
+      "name": "bluesky wrong blob kind",
+      "source": {
+        "category": "bluesky",
+        "uri": "at://did:plc:example/app.bsky.feed.post/3abc",
+        "author": {
+          "did": "did:plc:example",
+          "handle": "example.test"
+        },
+        "post_id": "3abc",
+        "createdAt": "2026-10-01T12:00:00.123456Z",
+        "text": "Original post",
+        "embed": {
+          "images": [
+            {
+              "alt": "Source alt blobA",
+              "image": {
+                "ref": {
+                  "$link": "blobA"
+                },
+                "mimeType": "video/mp4"
+              }
+            },
+            null,
+            {
+              "alt": "Source alt blobB",
+              "image": {
+                "ref": {
+                  "$link": "blobB"
+                },
+                "mimeType": "image/jpeg"
+              }
+            }
+          ]
+        },
+        "filename": "blobA",
+        "bluesky_media": {
+          "version": 1,
+          "post": {
+            "namespace": "native:bluesky",
+            "value": "did:plc:example/3abc"
+          },
+          "items": [
+            {
+              "id": "blobA",
+              "kind": "image"
+            },
+            null,
+            {
+              "id": "blobB",
+              "kind": "image"
+            }
+          ]
+        }
+      },
+      "items": null,
+      "error": true,
+      "attachment": null
+    },
+    {
+      "name": "bluesky numeric blob id",
+      "source": {
+        "category": "bluesky",
+        "uri": "at://did:plc:example/app.bsky.feed.post/3abc",
+        "author": {
+          "did": "did:plc:example",
+          "handle": "example.test"
+        },
+        "post_id": "3abc",
+        "createdAt": "2026-10-01T12:00:00.123456Z",
+        "text": "Original post",
+        "embed": {
+          "images": [
+            {
+              "alt": "Source alt blobA",
+              "image": {
+                "ref": {
+                  "$link": 123
+                },
+                "mimeType": "image/jpeg"
+              }
+            },
+            null,
+            {
+              "alt": "Source alt blobB",
+              "image": {
+                "ref": {
+                  "$link": "blobB"
+                },
+                "mimeType": "image/jpeg"
+              }
+            }
+          ]
+        },
+        "filename": "blobA",
+        "bluesky_media": {
+          "version": 1,
+          "post": {
+            "namespace": "native:bluesky",
+            "value": "did:plc:example/3abc"
+          },
+          "items": [
+            {
+              "id": "blobA",
+              "kind": "image"
+            },
+            null,
+            {
+              "id": "blobB",
+              "kind": "image"
+            }
+          ]
+        }
+      },
+      "items": null,
+      "error": true,
+      "attachment": null
+    },
+    {
+      "name": "bluesky malformed blob reference",
+      "source": {
+        "category": "bluesky",
+        "uri": "at://did:plc:example/app.bsky.feed.post/3abc",
+        "author": {
+          "did": "did:plc:example",
+          "handle": "example.test"
+        },
+        "post_id": "3abc",
+        "createdAt": "2026-10-01T12:00:00.123456Z",
+        "text": "Original post",
+        "embed": {
+          "images": [
+            {
+              "alt": "Source alt blobA",
+              "image": {
+                "ref": false,
+                "mimeType": "image/jpeg"
+              }
+            },
+            null,
+            {
+              "alt": "Source alt blobB",
+              "image": {
+                "ref": {
+                  "$link": "blobB"
+                },
+                "mimeType": "image/jpeg"
+              }
+            }
+          ]
+        },
+        "filename": "blobA",
+        "bluesky_media": {
+          "version": 1,
+          "post": {
+            "namespace": "native:bluesky",
+            "value": "did:plc:example/3abc"
+          },
+          "items": [
+            {
+              "id": "blobA",
+              "kind": "image"
+            },
+            null,
+            {
+              "id": "blobB",
+              "kind": "image"
+            }
+          ]
+        }
+      },
+      "items": null,
+      "error": true,
+      "attachment": null
+    },
+    {
+      "name": "bluesky hidden missing slot",
+      "source": {
+        "category": "bluesky",
+        "uri": "at://did:plc:example/app.bsky.feed.post/3abc",
+        "author": {
+          "did": "did:plc:example",
+          "handle": "example.test"
+        },
+        "post_id": "3abc",
+        "createdAt": "2026-10-01T12:00:00.123456Z",
+        "text": "Original post",
+        "embed": {
+          "images": [
+            {
+              "alt": "Source alt blobA",
+              "image": {
+                "ref": {
+                  "$link": "blobA"
+                },
+                "mimeType": "image/jpeg"
+              }
+            },
+            null,
+            {
+              "alt": "Source alt blobB",
+              "image": {
+                "ref": {
+                  "$link": "blobB"
+                },
+                "mimeType": "image/jpeg"
+              }
+            }
+          ]
+        },
+        "filename": "blobA",
+        "bluesky_media": {
+          "version": 1,
+          "post": {
+            "namespace": "native:bluesky",
+            "value": "did:plc:example/3abc"
+          },
+          "items": [
+            {
+              "id": "blobA",
+              "kind": "image"
+            },
+            {
+              "id": "blobB",
+              "kind": "image"
+            }
+          ]
+        }
+      },
+      "items": null,
+      "error": true,
+      "attachment": null
+    },
+    {
+      "name": "bluesky other post",
+      "source": {
+        "category": "bluesky",
+        "uri": "at://did:plc:example/app.bsky.feed.post/3abc",
+        "author": {
+          "did": "did:plc:example",
+          "handle": "example.test"
+        },
+        "post_id": "3abc",
+        "createdAt": "2026-10-01T12:00:00.123456Z",
+        "text": "Original post",
+        "embed": {
+          "images": [
+            {
+              "alt": "Source alt blobA",
+              "image": {
+                "ref": {
+                  "$link": "blobA"
+                },
+                "mimeType": "image/jpeg"
+              }
+            },
+            null,
+            {
+              "alt": "Source alt blobB",
+              "image": {
+                "ref": {
+                  "$link": "blobB"
+                },
+                "mimeType": "image/jpeg"
+              }
+            }
+          ]
+        },
+        "filename": "blobA",
+        "bluesky_media": {
+          "version": 1,
+          "post": {
+            "namespace": "native:bluesky",
+            "value": "did:plc:other/3abc"
+          },
+          "items": [
+            {
+              "id": "blobA",
+              "kind": "image"
+            },
+            null,
+            {
+              "id": "blobB",
+              "kind": "image"
+            }
+          ]
+        }
+      },
+      "items": null,
+      "error": true,
+      "attachment": null
+    },
+    {
+      "name": "bluesky boolean version",
+      "source": {
+        "category": "bluesky",
+        "uri": "at://did:plc:example/app.bsky.feed.post/3abc",
+        "author": {
+          "did": "did:plc:example",
+          "handle": "example.test"
+        },
+        "post_id": "3abc",
+        "createdAt": "2026-10-01T12:00:00.123456Z",
+        "text": "Original post",
+        "embed": {
+          "images": [
+            {
+              "alt": "Source alt blobA",
+              "image": {
+                "ref": {
+                  "$link": "blobA"
+                },
+                "mimeType": "image/jpeg"
+              }
+            },
+            null,
+            {
+              "alt": "Source alt blobB",
+              "image": {
+                "ref": {
+                  "$link": "blobB"
+                },
+                "mimeType": "image/jpeg"
+              }
+            }
+          ]
+        },
+        "filename": "blobA",
+        "bluesky_media": {
+          "version": true,
+          "post": {
+            "namespace": "native:bluesky",
+            "value": "did:plc:example/3abc"
+          },
+          "items": [
+            {
+              "id": "blobA",
+              "kind": "image"
+            },
+            null,
+            {
+              "id": "blobB",
+              "kind": "image"
+            }
+          ]
+        }
+      },
+      "items": null,
+      "error": true,
+      "attachment": null
+    },
+    {
+      "name": "bluesky unknown evidence field",
+      "source": {
+        "category": "bluesky",
+        "uri": "at://did:plc:example/app.bsky.feed.post/3abc",
+        "author": {
+          "did": "did:plc:example",
+          "handle": "example.test"
+        },
+        "post_id": "3abc",
+        "createdAt": "2026-10-01T12:00:00.123456Z",
+        "text": "Original post",
+        "embed": {
+          "images": [
+            {
+              "alt": "Source alt blobA",
+              "image": {
+                "ref": {
+                  "$link": "blobA"
+                },
+                "mimeType": "image/jpeg"
+              }
+            },
+            null,
+            {
+              "alt": "Source alt blobB",
+              "image": {
+                "ref": {
+                  "$link": "blobB"
+                },
+                "mimeType": "image/jpeg"
+              }
+            }
+          ]
+        },
+        "filename": "blobA",
+        "bluesky_media": {
+          "version": 1,
+          "post": {
+            "namespace": "native:bluesky",
+            "value": "did:plc:example/3abc"
+          },
+          "items": [
+            {
+              "id": "blobA",
+              "kind": "image"
+            },
+            null,
+            {
+              "id": "blobB",
+              "kind": "image"
+            }
+          ],
+          "extra": "bad"
+        }
+      },
+      "items": null,
+      "error": true,
+      "attachment": null
+    },
+    {
+      "name": "bluesky legacy capture",
+      "source": {
+        "category": "bluesky",
+        "uri": "at://did:plc:example/app.bsky.feed.post/3abc",
+        "author": {
+          "did": "did:plc:example",
+          "handle": "example.test"
+        },
+        "post_id": "3abc",
+        "createdAt": "2026-10-01T12:00:00.123456Z",
+        "text": "Original post",
+        "embed": {
+          "images": [
+            {
+              "alt": "Source alt blobA",
+              "image": {
+                "ref": {
+                  "$link": "blobA"
+                },
+                "mimeType": "image/jpeg"
+              }
+            },
+            null,
+            {
+              "alt": "Source alt blobB",
+              "image": {
+                "ref": {
+                  "$link": "blobB"
+                },
+                "mimeType": "image/jpeg"
+              }
+            }
+          ]
+        },
+        "filename": "blobA"
+      },
+      "items": null,
+      "error": false,
+      "attachment": null
+    },
+    {
+      "name": "bluesky post without media",
+      "source": {
+        "category": "bluesky",
+        "uri": "at://did:plc:example/app.bsky.feed.post/3abc",
+        "author": {
+          "did": "did:plc:example",
+          "handle": "example.test"
+        },
+        "post_id": "3abc",
+        "createdAt": "2026-10-01T12:00:00.123456Z",
+        "text": "Original post",
+        "embed": {},
+        "filename": "blobA",
+        "bluesky_media": {
+          "version": 1,
+          "post": {
+            "namespace": "native:bluesky",
+            "value": "did:plc:example/3abc"
+          },
+          "items": []
+        }
+      },
+      "items": [],
+      "error": false,
+      "attachment": null
+    },
+    {
+      "name": "tiktok missing photo and large id",
+      "source": {
+        "category": "tiktok",
+        "id": "9007199254740993",
+        "desc": "Original caption",
+        "createTime": "1790856000",
+        "imagePost": {
+          "images": [
+            {
+              "imageURL": {
+                "urlList": [
+                  "https://media.example.test/photoA~tplv-image.jpeg?token=first"
+                ]
+              },
+              "imageWidth": 1024,
+              "imageHeight": 2048
+            },
+            null,
+            {
+              "imageURL": {
+                "urlList": [
+                  "https://media.example.test/photoB~tplv-image.jpeg?token=first"
+                ]
+              },
+              "imageWidth": 1024,
+              "imageHeight": 2048
+            }
+          ]
+        },
+        "image": {
+          "imageURL": {
+            "urlList": [
+              "https://media.example.test/photoA~tplv-image.jpeg?token=first"
+            ]
+          },
+          "imageWidth": 1024,
+          "imageHeight": 2048
+        },
+        "type": "image",
+        "_url": "https://media.example.test/photoA~tplv-image.jpeg?token=first",
+        "tiktok_media": {
+          "version": 1,
+          "post": {
+            "namespace": "native:tiktok",
+            "value": "9007199254740993"
+          },
+          "items": [
+            {
+              "id": "image:photoA",
+              "kind": "image"
+            },
+            null,
+            {
+              "id": "image:photoB",
+              "kind": "image"
+            }
+          ]
+        }
+      },
+      "items": [
+        {
+          "id": "image:photoA",
+          "kind": "image"
+        },
+        null,
+        {
+          "id": "image:photoB",
+          "kind": "image"
+        }
+      ],
+      "error": false,
+      "attachment": {
+        "namespace": "native:tiktok",
+        "value": "image:photoA"
+      }
+    },
+    {
+      "name": "tiktok URL signatures and renditions",
+      "source": {
+        "category": "tiktok",
+        "id": "9007199254740993",
+        "desc": "Original caption",
+        "createTime": "1790856000",
+        "imagePost": {
+          "images": [
+            {
+              "imageURL": {
+                "urlList": [
+                  "https://media.example.test/photoA~tplv-image.jpeg?token=first"
+                ]
+              },
+              "imageWidth": 1024,
+              "imageHeight": 2048
+            },
+            null,
+            {
+              "imageURL": {
+                "urlList": [
+                  "https://media.example.test/photoB~tplv-image.jpeg?token=first"
+                ]
+              },
+              "imageWidth": 1024,
+              "imageHeight": 2048
+            }
+          ]
+        },
+        "image": {
+          "imageURL": {
+            "urlList": [
+              "https://media.example.test/photoA~tplv-image.jpeg?token=first"
+            ]
+          },
+          "imageWidth": 1024,
+          "imageHeight": 2048
+        },
+        "type": "image",
+        "_url": "https://other.example.test/photoA~another-rendition.webp?token=second",
+        "tiktok_media": {
+          "version": 1,
+          "post": {
+            "namespace": "native:tiktok",
+            "value": "9007199254740993"
+          },
+          "items": [
+            {
+              "id": "image:photoA",
+              "kind": "image"
+            },
+            null,
+            {
+              "id": "image:photoB",
+              "kind": "image"
+            }
+          ]
+        }
+      },
+      "items": [
+        {
+          "id": "image:photoA",
+          "kind": "image"
+        },
+        null,
+        {
+          "id": "image:photoB",
+          "kind": "image"
+        }
+      ],
+      "error": false,
+      "attachment": {
+        "namespace": "native:tiktok",
+        "value": "image:photoA"
+      }
+    },
+    {
+      "name": "tiktok percent encoded image key",
+      "source": {
+        "category": "tiktok",
+        "id": "9007199254740993",
+        "desc": "Original caption",
+        "createTime": "1790856000",
+        "imagePost": {
+          "images": [
+            {
+              "imageURL": {
+                "urlList": [
+                  "https://media.example.test/photo%41~tplv-image.jpeg?token=first"
+                ]
+              },
+              "imageWidth": 1024,
+              "imageHeight": 2048
+            },
+            null,
+            {
+              "imageURL": {
+                "urlList": [
+                  "https://media.example.test/photoB~tplv-image.jpeg?token=first"
+                ]
+              },
+              "imageWidth": 1024,
+              "imageHeight": 2048
+            }
+          ]
+        },
+        "image": {
+          "imageURL": {
+            "urlList": [
+              "https://media.example.test/photoA~tplv-image.jpeg?token=first"
+            ]
+          },
+          "imageWidth": 1024,
+          "imageHeight": 2048
+        },
+        "type": "image",
+        "_url": "https://media.example.test/photoA~tplv-image.jpeg?token=first",
+        "tiktok_media": {
+          "version": 1,
+          "post": {
+            "namespace": "native:tiktok",
+            "value": "9007199254740993"
+          },
+          "items": [
+            {
+              "id": "image:photoA",
+              "kind": "image"
+            },
+            null,
+            {
+              "id": "image:photoB",
+              "kind": "image"
+            }
+          ]
+        }
+      },
+      "items": [
+        {
+          "id": "image:photoA",
+          "kind": "image"
+        },
+        null,
+        {
+          "id": "image:photoB",
+          "kind": "image"
+        }
+      ],
+      "error": false,
+      "attachment": {
+        "namespace": "native:tiktok",
+        "value": "image:photoA"
+      }
+    },
+    {
+      "name": "tiktok repeated source photos",
+      "source": {
+        "category": "tiktok",
+        "id": "9007199254740993",
+        "desc": "Original caption",
+        "createTime": "1790856000",
+        "imagePost": {
+          "images": [
+            {
+              "imageURL": {
+                "urlList": [
+                  "https://media.example.test/photoA~tplv-image.jpeg?token=first"
+                ]
+              },
+              "imageWidth": 1024,
+              "imageHeight": 2048
+            },
+            {
+              "imageURL": {
+                "urlList": [
+                  "https://media.example.test/photoA~tplv-image.jpeg?token=first"
+                ]
+              },
+              "imageWidth": 1024,
+              "imageHeight": 2048
+            }
+          ]
+        },
+        "image": {
+          "imageURL": {
+            "urlList": [
+              "https://media.example.test/photoA~tplv-image.jpeg?token=first"
+            ]
+          },
+          "imageWidth": 1024,
+          "imageHeight": 2048
+        },
+        "type": "image",
+        "_url": "https://media.example.test/photoA~tplv-image.jpeg?token=first",
+        "tiktok_media": {
+          "version": 1,
+          "post": {
+            "namespace": "native:tiktok",
+            "value": "9007199254740993"
+          },
+          "items": [
+            {
+              "id": "image:photoA",
+              "kind": "image"
+            },
+            {
+              "id": "image:photoA",
+              "kind": "image"
+            }
+          ]
+        }
+      },
+      "items": [
+        {
+          "id": "image:photoA",
+          "kind": "image"
+        },
+        {
+          "id": "image:photoA",
+          "kind": "image"
+        }
+      ],
+      "error": false,
+      "attachment": {
+        "namespace": "native:tiktok",
+        "value": "image:photoA"
+      }
+    },
+    {
+      "name": "tiktok encoded slash",
+      "source": {
+        "category": "tiktok",
+        "id": "9007199254740993",
+        "desc": "Original caption",
+        "createTime": "1790856000",
+        "imagePost": {
+          "images": [
+            {
+              "imageURL": {
+                "urlList": [
+                  "https://media.example.test/parent%2FphotoA~tplv-image.jpeg?token=first"
+                ]
+              },
+              "imageWidth": 1024,
+              "imageHeight": 2048
+            },
+            null,
+            {
+              "imageURL": {
+                "urlList": [
+                  "https://media.example.test/photoB~tplv-image.jpeg?token=first"
+                ]
+              },
+              "imageWidth": 1024,
+              "imageHeight": 2048
+            }
+          ]
+        },
+        "image": {
+          "imageURL": {
+            "urlList": [
+              "https://media.example.test/photoA~tplv-image.jpeg?token=first"
+            ]
+          },
+          "imageWidth": 1024,
+          "imageHeight": 2048
+        },
+        "type": "image",
+        "_url": "https://media.example.test/photoA~tplv-image.jpeg?token=first",
+        "tiktok_media": {
+          "version": 1,
+          "post": {
+            "namespace": "native:tiktok",
+            "value": "9007199254740993"
+          },
+          "items": [
+            {
+              "id": "image:photoA",
+              "kind": "image"
+            },
+            null,
+            {
+              "id": "image:photoB",
+              "kind": "image"
+            }
+          ]
+        }
+      },
+      "items": null,
+      "error": true,
+      "attachment": null
+    },
+    {
+      "name": "tiktok wrong original list",
+      "source": {
+        "category": "tiktok",
+        "id": "9007199254740993",
+        "desc": "Original caption",
+        "createTime": "1790856000",
+        "imagePost": {
+          "images": []
+        },
+        "image": {
+          "imageURL": {
+            "urlList": [
+              "https://media.example.test/photoA~tplv-image.jpeg?token=first"
+            ]
+          },
+          "imageWidth": 1024,
+          "imageHeight": 2048
+        },
+        "type": "image",
+        "_url": "https://media.example.test/photoA~tplv-image.jpeg?token=first",
+        "tiktok_media": {
+          "version": 1,
+          "post": {
+            "namespace": "native:tiktok",
+            "value": "9007199254740993"
+          },
+          "items": [
+            {
+              "id": "image:photoA",
+              "kind": "image"
+            },
+            null,
+            {
+              "id": "image:photoB",
+              "kind": "image"
+            }
+          ]
+        }
+      },
+      "items": null,
+      "error": true,
+      "attachment": null
+    },
+    {
+      "name": "tiktok malformed images",
+      "source": {
+        "category": "tiktok",
+        "id": "9007199254740993",
+        "desc": "Original caption",
+        "createTime": "1790856000",
+        "imagePost": {
+          "images": false
+        },
+        "image": {
+          "imageURL": {
+            "urlList": [
+              "https://media.example.test/photoA~tplv-image.jpeg?token=first"
+            ]
+          },
+          "imageWidth": 1024,
+          "imageHeight": 2048
+        },
+        "type": "image",
+        "_url": "https://media.example.test/photoA~tplv-image.jpeg?token=first",
+        "tiktok_media": {
+          "version": 1,
+          "post": {
+            "namespace": "native:tiktok",
+            "value": "9007199254740993"
+          },
+          "items": [
+            {
+              "id": "image:photoA",
+              "kind": "image"
+            },
+            null,
+            {
+              "id": "image:photoB",
+              "kind": "image"
+            }
+          ]
+        }
+      },
+      "items": null,
+      "error": true,
+      "attachment": null
+    },
+    {
+      "name": "tiktok missing original images",
+      "source": {
+        "category": "tiktok",
+        "id": "9007199254740993",
+        "desc": "Original caption",
+        "createTime": "1790856000",
+        "imagePost": {},
+        "image": {
+          "imageURL": {
+            "urlList": [
+              "https://media.example.test/photoA~tplv-image.jpeg?token=first"
+            ]
+          },
+          "imageWidth": 1024,
+          "imageHeight": 2048
+        },
+        "type": "image",
+        "_url": "https://media.example.test/photoA~tplv-image.jpeg?token=first",
+        "tiktok_media": {
+          "version": 1,
+          "post": {
+            "namespace": "native:tiktok",
+            "value": "9007199254740993"
+          },
+          "items": [
+            {
+              "id": "image:photoA",
+              "kind": "image"
+            },
+            null,
+            {
+              "id": "image:photoB",
+              "kind": "image"
+            }
+          ]
+        }
+      },
+      "items": null,
+      "error": true,
+      "attachment": null
+    },
+    {
+      "name": "tiktok other post",
+      "source": {
+        "category": "tiktok",
+        "id": "9007199254740993",
+        "desc": "Original caption",
+        "createTime": "1790856000",
+        "imagePost": {
+          "images": [
+            {
+              "imageURL": {
+                "urlList": [
+                  "https://media.example.test/photoA~tplv-image.jpeg?token=first"
+                ]
+              },
+              "imageWidth": 1024,
+              "imageHeight": 2048
+            },
+            null,
+            {
+              "imageURL": {
+                "urlList": [
+                  "https://media.example.test/photoB~tplv-image.jpeg?token=first"
+                ]
+              },
+              "imageWidth": 1024,
+              "imageHeight": 2048
+            }
+          ]
+        },
+        "image": {
+          "imageURL": {
+            "urlList": [
+              "https://media.example.test/photoA~tplv-image.jpeg?token=first"
+            ]
+          },
+          "imageWidth": 1024,
+          "imageHeight": 2048
+        },
+        "type": "image",
+        "_url": "https://media.example.test/photoA~tplv-image.jpeg?token=first",
+        "tiktok_media": {
+          "version": 1,
+          "post": {
+            "namespace": "native:tiktok",
+            "value": "123"
+          },
+          "items": [
+            {
+              "id": "image:photoA",
+              "kind": "image"
+            },
+            null,
+            {
+              "id": "image:photoB",
+              "kind": "image"
+            }
+          ]
+        }
+      },
+      "items": null,
+      "error": true,
+      "attachment": null
+    },
+    {
+      "name": "tiktok invented kind",
+      "source": {
+        "category": "tiktok",
+        "id": "9007199254740993",
+        "desc": "Original caption",
+        "createTime": "1790856000",
+        "imagePost": {
+          "images": [
+            {
+              "imageURL": {
+                "urlList": [
+                  "https://media.example.test/photoA~tplv-image.jpeg?token=first"
+                ]
+              },
+              "imageWidth": 1024,
+              "imageHeight": 2048
+            },
+            null,
+            {
+              "imageURL": {
+                "urlList": [
+                  "https://media.example.test/photoB~tplv-image.jpeg?token=first"
+                ]
+              },
+              "imageWidth": 1024,
+              "imageHeight": 2048
+            }
+          ]
+        },
+        "image": {
+          "imageURL": {
+            "urlList": [
+              "https://media.example.test/photoA~tplv-image.jpeg?token=first"
+            ]
+          },
+          "imageWidth": 1024,
+          "imageHeight": 2048
+        },
+        "type": "image",
+        "_url": "https://media.example.test/photoA~tplv-image.jpeg?token=first",
+        "tiktok_media": {
+          "version": 1,
+          "post": {
+            "namespace": "native:tiktok",
+            "value": "9007199254740993"
+          },
+          "items": [
+            {
+              "id": "image:photoA",
+              "kind": "video"
+            },
+            null,
+            {
+              "id": "image:photoB",
+              "kind": "image"
+            }
+          ]
+        }
+      },
+      "items": null,
+      "error": true,
+      "attachment": null
+    },
+    {
+      "name": "tiktok floating version",
+      "source": {
+        "category": "tiktok",
+        "id": "9007199254740993",
+        "desc": "Original caption",
+        "createTime": "1790856000",
+        "imagePost": {
+          "images": [
+            {
+              "imageURL": {
+                "urlList": [
+                  "https://media.example.test/photoA~tplv-image.jpeg?token=first"
+                ]
+              },
+              "imageWidth": 1024,
+              "imageHeight": 2048
+            },
+            null,
+            {
+              "imageURL": {
+                "urlList": [
+                  "https://media.example.test/photoB~tplv-image.jpeg?token=first"
+                ]
+              },
+              "imageWidth": 1024,
+              "imageHeight": 2048
+            }
+          ]
+        },
+        "image": {
+          "imageURL": {
+            "urlList": [
+              "https://media.example.test/photoA~tplv-image.jpeg?token=first"
+            ]
+          },
+          "imageWidth": 1024,
+          "imageHeight": 2048
+        },
+        "type": "image",
+        "_url": "https://media.example.test/photoA~tplv-image.jpeg?token=first",
+        "tiktok_media": {
+          "version": 1.0,
+          "post": {
+            "namespace": "native:tiktok",
+            "value": "9007199254740993"
+          },
+          "items": [
+            {
+              "id": "image:photoA",
+              "kind": "image"
+            },
+            null,
+            {
+              "id": "image:photoB",
+              "kind": "image"
+            }
+          ]
+        }
+      },
+      "items": null,
+      "error": true,
+      "attachment": null
+    },
+    {
+      "name": "tiktok legacy capture",
+      "source": {
+        "category": "tiktok",
+        "id": "9007199254740993",
+        "desc": "Original caption",
+        "createTime": "1790856000",
+        "imagePost": {
+          "images": [
+            {
+              "imageURL": {
+                "urlList": [
+                  "https://media.example.test/photoA~tplv-image.jpeg?token=first"
+                ]
+              },
+              "imageWidth": 1024,
+              "imageHeight": 2048
+            },
+            null,
+            {
+              "imageURL": {
+                "urlList": [
+                  "https://media.example.test/photoB~tplv-image.jpeg?token=first"
+                ]
+              },
+              "imageWidth": 1024,
+              "imageHeight": 2048
+            }
+          ]
+        },
+        "image": {
+          "imageURL": {
+            "urlList": [
+              "https://media.example.test/photoA~tplv-image.jpeg?token=first"
+            ]
+          },
+          "imageWidth": 1024,
+          "imageHeight": 2048
+        },
+        "type": "image",
+        "_url": "https://media.example.test/photoA~tplv-image.jpeg?token=first"
+      },
+      "items": null,
+      "error": false,
+      "attachment": null
+    },
+    {
+      "name": "tiktok standalone video",
+      "source": {
+        "category": "tiktok",
+        "id": "9007199254740993",
+        "createTime": 1790856000,
+        "type": "video",
+        "video": {
+          "playAddr": "https://media.example.test/original.mp4"
+        },
+        "tiktok_media": {
+          "version": 1,
+          "post": {
+            "namespace": "native:tiktok",
+            "value": "9007199254740993"
+          },
+          "items": [
+            {
+              "id": "video:9007199254740993",
+              "kind": "video"
+            }
+          ]
+        }
+      },
+      "items": [
+        {
+          "id": "video:9007199254740993",
+          "kind": "video"
+        }
+      ],
+      "error": false,
+      "attachment": {
+        "namespace": "native:tiktok",
+        "value": "video:9007199254740993"
+      }
+    }
+  ]
+}

@@ -76,6 +76,33 @@ fractional timestamps and year limits.
 
 ## Commands
 
+After restoring a bundle, the matching native Stash binary can verify the
+database's full schema, source evidence and retained provenance:
+
+```sh
+stash --verify-native-snapshot /restore-work/library.sqlite
+```
+
+This command runs before application/configuration initialization and outputs a
+JSON receipt containing the database's SHA-256, byte count, schema version and
+pending file-deletion marker count. It reuses the native startup validators,
+including the complete release/capture proof checks. It requires this binary's
+exact clean native schema and never upgrades an older snapshot. Missing, foreign,
+dirty, newer or logically inconsistent databases fail with a nonzero exit status.
+
+Use a closed, SQLite-aware snapshot or isolated restored copy. A nonempty WAL or
+rollback journal is rejected. The validator holds a read transaction, compares
+the database's bytes before and after validation, and rejects a changed file.
+It does not call the application database's normal open/recovery path: pending
+deletion markers and staged media remain available for the coordinated restore.
+`filesystem_recovery_verified` stays false; successful database validation does
+not certify the media, deletion-journal or producer boundary.
+
+Ordinary [SQLite readers in WAL mode](https://www.sqlite.org/wal.html#read_only_databases)
+can create empty WAL/shared-memory sidecars. These are rebuildable reader state,
+not additional archive components. The validator never reads or recovers the
+separate Stash file-deletion journal.
+
 Install into a prepared Python environment:
 
 ```sh

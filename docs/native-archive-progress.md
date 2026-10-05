@@ -7408,3 +7408,33 @@ The receipt proof's coverage is `capture-file-run-and-job-receipts`. Coordinated
 producer/download/config/filesystem snapshots, a matching media manifest, remote
 publication, the full restore drill and production cutover remain outstanding.
 Production services and backup publication are unchanged.
+
+## Native snapshot validation before recovery — 2026-10-04
+
+`stash --verify-native-snapshot PATH` now checks a closed native database before
+application/configuration initialization. It requires the exact clean current
+schema, checks SQLite integrity and foreign keys, and reuses every native startup
+lineage/domain/provenance validator, including released enrichment proofs. It
+holds a read transaction, verifies that the database's identity/size/timestamp and
+SHA-256 remain unchanged, and returns a JSON receipt bound to those exact bytes.
+Nonempty WAL or rollback-journal inputs require a SQLite-aware snapshot first.
+
+The command never calls the normal application database open or file-deletion
+recovery path. Real crash fixtures before and after a deletion commit retain
+their staged media, gob journal and database bytes unchanged. Pending deletion
+markers are reported; `filesystem_recovery_verified` remains false. A deliberately
+altered enrichment release proof is rejected even with intact SQLite foreign
+keys and guards. Missing/foreign/dirty/newer/older schemas, broken references,
+changed guards, uncheckpointed WAL, cancellation and symlinks are also exercised.
+
+All new SQLite and command tests pass in 80.6 seconds; the affected packages pass
+lint with zero issues. The standalone binary builds, and direct empty/missing
+input checks exit without creating configuration or starting the application.
+Evidence is under `.local/native-discovery-client-20261004/` with labels
+`native_archive_snapshot_final`, `native_archive_snapshot_lint_final`,
+`native_archive_snapshot_binary_final` and `native_archive_snapshot_binary_smoke`.
+
+This provides the native semantic validation step for the coordinated restore;
+connecting its receipt to archive publication, matching filesystem/media/producer
+state and S3 publication remain required. The full-library export/restore drill
+is still running. Production remains on the frozen compatible release.

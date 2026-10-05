@@ -2,6 +2,8 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -23,6 +25,7 @@ import (
 	"github.com/stashapp/stash/internal/manager"
 	"github.com/stashapp/stash/internal/manager/config"
 	"github.com/stashapp/stash/pkg/logger"
+	"github.com/stashapp/stash/pkg/sqlite"
 	"github.com/stashapp/stash/ui"
 
 	_ "github.com/golang-migrate/migrate/v4/database/sqlite3"
@@ -50,6 +53,8 @@ func main() {
 
 	cpuProfilePath := ""
 	pflag.StringVar(&cpuProfilePath, "cpuprofile", "", "write cpu profile to file")
+	verifySnapshot := ""
+	pflag.StringVar(&verifySnapshot, "verify-native-snapshot", "", "verify a closed native database snapshot and print JSON without starting Stash")
 
 	pflag.Parse()
 
@@ -60,6 +65,21 @@ func main() {
 
 	if versionFlag {
 		fmt.Println(build.VersionString())
+		return
+	}
+	if pflag.CommandLine.Changed("verify-native-snapshot") {
+		report, err := sqlite.VerifyNativeSnapshot(context.Background(), verifySnapshot)
+		if err != nil {
+			// Machine-readable success is stdout only. Do not use exitError,
+			// whose normal application path also writes a message to stdout.
+			_, _ = fmt.Fprintln(os.Stderr, err)
+			exitCode = 1
+			return
+		}
+		if err := json.NewEncoder(os.Stdout).Encode(report); err != nil {
+			_, _ = fmt.Fprintln(os.Stderr, err)
+			exitCode = 1
+		}
 		return
 	}
 

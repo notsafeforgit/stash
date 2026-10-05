@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountReviewRouteImport } from './routes/account-review'
+import { Route as CollectionsRouteImport } from './routes/collections'
 import { Route as ImageDuplicateCheckerRouteImport } from './routes/image-duplicate-checker'
 import { Route as SceneDuplicateCheckerRouteImport } from './routes/scene-duplicate-checker'
 import { Route as SettingsRouteImport } from './routes/settings'
@@ -58,6 +59,11 @@ const IndexRoute = IndexRouteImport.update({
 const AccountReviewRoute = AccountReviewRouteImport.update({
   id: '/account-review',
   path: '/account-review',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CollectionsRoute = CollectionsRouteImport.update({
+  id: '/collections',
+  path: '/collections',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ImageDuplicateCheckerRoute = ImageDuplicateCheckerRouteImport.update({
@@ -255,6 +261,7 @@ const TagsTagIdRoute = TagsTagIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/account-review': typeof AccountReviewRoute
+  '/collections': typeof CollectionsRoute
   '/image-duplicate-checker': typeof ImageDuplicateCheckerRoute
   '/scene-duplicate-checker': typeof SceneDuplicateCheckerRoute
   '/settings': typeof SettingsRouteWithChildren
@@ -297,6 +304,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/account-review': typeof AccountReviewRoute
+  '/collections': typeof CollectionsRoute
   '/image-duplicate-checker': typeof ImageDuplicateCheckerRoute
   '/scene-duplicate-checker': typeof SceneDuplicateCheckerRoute
   '/stats': typeof StatsRoute
@@ -339,6 +347,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/account-review': typeof AccountReviewRoute
+  '/collections': typeof CollectionsRoute
   '/image-duplicate-checker': typeof ImageDuplicateCheckerRoute
   '/scene-duplicate-checker': typeof SceneDuplicateCheckerRoute
   '/settings': typeof SettingsRouteWithChildren
@@ -383,6 +392,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/account-review'
+    | '/collections'
     | '/image-duplicate-checker'
     | '/scene-duplicate-checker'
     | '/settings'
@@ -425,6 +435,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/account-review'
+    | '/collections'
     | '/image-duplicate-checker'
     | '/scene-duplicate-checker'
     | '/stats'
@@ -466,6 +477,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/account-review'
+    | '/collections'
     | '/image-duplicate-checker'
     | '/scene-duplicate-checker'
     | '/settings'
@@ -509,6 +521,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountReviewRoute: typeof AccountReviewRoute
+  CollectionsRoute: typeof CollectionsRoute
   ImageDuplicateCheckerRoute: typeof ImageDuplicateCheckerRoute
   SceneDuplicateCheckerRoute: typeof SceneDuplicateCheckerRoute
   SettingsRoute: typeof SettingsRouteWithChildren
@@ -548,6 +561,13 @@ declare module '@tanstack/react-router' {
       path: '/account-review'
       fullPath: '/account-review'
       preLoaderRoute: typeof AccountReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/collections': {
+      id: '/collections'
+      path: '/collections'
+      fullPath: '/collections'
+      preLoaderRoute: typeof CollectionsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/image-duplicate-checker': {
@@ -862,6 +882,7 @@ const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountReviewRoute: AccountReviewRoute,
+  CollectionsRoute: CollectionsRoute,
   ImageDuplicateCheckerRoute: ImageDuplicateCheckerRoute,
   SceneDuplicateCheckerRoute: SceneDuplicateCheckerRoute,
   SettingsRoute: SettingsRouteWithChildren,

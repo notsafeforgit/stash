@@ -13,6 +13,7 @@ import {
   Tv,
   Puzzle,
   Link2,
+  FolderOpen,
 } from "lucide-react";
 import { getRegisteredNavItems, type NavPlacement } from "@/plugins";
 
@@ -112,6 +113,14 @@ export function useNavItems(opts?: {
 
   const archiveItems: NavItem[] = placements.includes("utility")
     ? [
+        {
+          label: intl.formatMessage({
+            id: "collections.title",
+            defaultMessage: "Source collections",
+          }),
+          icon: <FolderOpen className="size-4" />,
+          to: "/collections",
+        },
         {
           label: intl.formatMessage({
             id: "account_review.title",

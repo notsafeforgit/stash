@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/url"
 	"reflect"
 	"strings"
@@ -49,6 +50,14 @@ func validCollectionURL(value string) bool {
 	return err == nil && (parsed.Scheme == "http" || parsed.Scheme == "https") && parsed.Hostname() != "" && parsed.User == nil
 }
 
+func validCollectionKind(kind string) bool {
+	switch kind {
+	case "account", "feed", "subreddit", "search", "manual_batch", "directory", "legacy_catalog", "collection":
+		return true
+	}
+	return false
+}
+
 func normalizeCollectionDefinition(input *models.SourceCollectionInput) error {
 	if !sourceDefinitionText(input.Label, input.State, input.Reason) ||
 		(input.Origin != "review" && input.Origin != "migration" && input.Origin != "ingest") ||
@@ -56,9 +65,7 @@ func normalizeCollectionDefinition(input *models.SourceCollectionInput) error {
 		(input.TargetURL != "" && !validCollectionURL(input.TargetURL)) {
 		return errors.New("invalid source collection definition")
 	}
-	switch input.Kind {
-	case "account", "feed", "subreddit", "search", "manual_batch", "directory", "legacy_catalog", "collection":
-	default:
+	if !validCollectionKind(input.Kind) {
 		return errors.New("invalid source collection kind")
 	}
 	if input.AccountUUID != nil {
@@ -91,10 +98,10 @@ func normalizeCollectionDefinition(input *models.SourceCollectionInput) error {
 func (s *SourceCollectionStore) Put(ctx context.Context, input models.SourceCollectionInput) (*models.SourceCollection, error) {
 	id, err := sourceDefinitionID(input.UUID, input.ExpectedRevision)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %s", models.ErrSourceDefinitionInvalid, err)
 	}
 	if err := normalizeCollectionDefinition(&input); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %s", models.ErrSourceDefinitionInvalid, err)
 	}
 	current, err := s.Find(ctx, id)
 	if err != nil {
@@ -105,6 +112,18 @@ func (s *SourceCollectionStore) Put(ctx context.Context, input models.SourceColl
 	}
 	if current != nil && reflect.DeepEqual(current.SourceCollectionDefinition, input.SourceCollectionDefinition) {
 		return current, nil
+	}
+	// Return a correctable client error for nonexistent or mismatched references,
+	// rather than leaving a browser's durable request retrying an SQL error forever.
+	var referencesExist bool
+	if err := dbWrapper.Get(ctx, &referencesExist, `SELECT
+ (? IS NULL OR EXISTS(SELECT 1 FROM media_roots WHERE uuid=?)) AND
+ (? IS NULL OR EXISTS(SELECT 1 FROM source_accounts WHERE uuid=? AND namespace=?))`,
+		input.RootUUID, input.RootUUID, input.AccountUUID, input.AccountUUID, input.Namespace); err != nil {
+		return nil, err
+	}
+	if !referencesExist {
+		return nil, models.ErrSourceDefinitionInvalid
 	}
 	if current == nil {
 		if _, err := dbWrapper.Exec(ctx, "INSERT INTO source_collections(uuid) VALUES(?)", id); err != nil {

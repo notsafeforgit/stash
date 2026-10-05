@@ -60,10 +60,12 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Post("/metadata-policy/apply", rs.apply)
 	r.Get("/media-roots", rs.roots)
 	r.Post("/media-roots", rs.putRoot)
+	r.Get("/media-roots/{root}", rs.root)
 	r.Put("/media-roots/{root}", rs.putRoot)
 	r.Get("/collections", rs.collections)
 	r.Post("/collections", rs.putCollection)
 	r.Get("/collections/{collection}", rs.collection)
+	r.Get("/collections/{collection}/history", rs.collectionHistory)
 	r.Put("/collections/{collection}", rs.putCollection)
 	r.Get("/collections/{collection}/post-memberships", rs.collectionPostMemberships)
 	r.Get("/posts/{post}/collection-memberships", rs.postCollectionMemberships)
@@ -230,7 +232,7 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 }
 
 func nativeArchiveError(w http.ResponseWriter, err error) {
-	if errors.Is(err, models.ErrMetadataFileReviewInvalid) || errors.Is(err, models.ErrAccountReviewInvalid) || errors.Is(err, models.ErrAccountConsolidationReviewInvalid) {
+	if errors.Is(err, models.ErrSourceDefinitionInvalid) || errors.Is(err, models.ErrMetadataFileReviewInvalid) || errors.Is(err, models.ErrAccountReviewInvalid) || errors.Is(err, models.ErrAccountConsolidationReviewInvalid) {
 		ingestError(w, ingest.ErrInvalid)
 		return
 	}

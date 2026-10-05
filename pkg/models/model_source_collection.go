@@ -81,6 +81,16 @@ type CollectionCapture struct {
 	CreatedAt          time.Time `json:"created_at"`
 }
 
+// SourceDefinitionFilter searches current definitions only, never capture bodies
+// or historical definitions. After and Limit bound each response.
+type SourceDefinitionFilter struct {
+	Query string
+	State string
+	Kind  string // collections only
+	After string
+	Limit int
+}
+
 // A capture can belong to more than one historical definition of a collection.
 // Both fields are required to page those facts without skipping a revision.
 type CollectionCaptureCursor struct {
@@ -102,6 +112,7 @@ type CollectionMediaIntake struct {
 }
 
 var (
+	ErrSourceDefinitionInvalid  = errors.New("invalid source definition")
 	ErrSourceDefinitionConflict = errors.New("source definition changed or is retired")
 	ErrCollectionIntakeReplay   = errors.New("collection intake UUID has different contents")
 )
@@ -110,6 +121,7 @@ type MediaRootReaderWriter interface {
 	Put(context.Context, MediaRootInput) (*MediaRoot, error)
 	Find(context.Context, string) (*MediaRoot, error)
 	List(context.Context, string, int) ([]*MediaRoot, error)
+	Search(context.Context, SourceDefinitionFilter) ([]*MediaRoot, error)
 	History(context.Context, string, int, int) ([]MediaRootRevision, error)
 }
 
@@ -117,6 +129,7 @@ type SourceCollectionReaderWriter interface {
 	Put(context.Context, SourceCollectionInput) (*SourceCollection, error)
 	Find(context.Context, string) (*SourceCollection, error)
 	List(context.Context, string, int) ([]*SourceCollection, error)
+	Search(context.Context, SourceDefinitionFilter) ([]*SourceCollection, error)
 	LookupTarget(context.Context, string, string, int) ([]*SourceCollection, error)
 	LookupCurrentTargets(context.Context, []string, []string, *string, bool) ([]*SourceCollection, error)
 	History(context.Context, string, int, int) ([]SourceCollectionRevision, error)

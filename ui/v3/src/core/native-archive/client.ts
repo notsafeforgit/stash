@@ -34,9 +34,10 @@ export function createArchiveRequest(
     schema: z.ZodType<T>,
     body?: string,
     signal?: AbortSignal,
+    method: "GET" | "POST" | "PUT" = body === undefined ? "GET" : "POST",
   ): Promise<T> {
     const response = await transport(new URL(path, endpoint), {
-      method: body === undefined ? "GET" : "POST",
+      method,
       credentials: "same-origin",
       cache: "no-store",
       redirect: "error",

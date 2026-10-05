@@ -12,10 +12,45 @@ import (
 )
 
 func (rs *nativeArchiveRoutes) roots(w http.ResponseWriter, r *http.Request) {
+	filter, err := definitionFilter(r)
+	if err != nil || filter.Kind != "" {
+		ingestError(w, ingest.ErrInvalid)
+		return
+	}
 	var result []*models.MediaRoot
+	err = rs.repo.WithReadTxn(r.Context(), func(ctx context.Context) error {
+		var err error
+		result, err = rs.repo.MediaRoot.Search(ctx, filter)
+		return err
+	})
+	if err != nil {
+		nativeArchiveError(w, err)
+		return
+	}
+	ingestJSON(w, http.StatusOK, result)
+}
+
+func definitionFilter(r *http.Request) (models.SourceDefinitionFilter, error) {
+	after, limit, err := accountReviewPage(r)
+	if r.URL.Query().Get("limit") == "" {
+		limit = 50
+	}
+	return models.SourceDefinitionFilter{After: after, Limit: limit, Query: r.URL.Query().Get("q"), State: r.URL.Query().Get("state"), Kind: r.URL.Query().Get("kind")}, err
+}
+
+func (rs *nativeArchiveRoutes) root(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "root")
+	if !ingest.ValidUUID(id) {
+		ingestError(w, ingest.ErrInvalid)
+		return
+	}
+	var result *models.MediaRoot
 	err := rs.repo.WithReadTxn(r.Context(), func(ctx context.Context) error {
 		var err error
-		result, err = rs.repo.MediaRoot.List(ctx, r.URL.Query().Get("after"), 50)
+		result, err = rs.repo.MediaRoot.Find(ctx, id)
+		if err == nil && result == nil {
+			return ingest.ErrNotFound
+		}
 		return err
 	})
 	if err != nil {
@@ -60,10 +95,45 @@ func (rs *nativeArchiveRoutes) putRoot(w http.ResponseWriter, r *http.Request) {
 }
 
 func (rs *nativeArchiveRoutes) collections(w http.ResponseWriter, r *http.Request) {
+	filter, err := definitionFilter(r)
+	if err != nil {
+		ingestError(w, err)
+		return
+	}
 	var result []*models.SourceCollection
-	err := rs.repo.WithReadTxn(r.Context(), func(ctx context.Context) error {
+	err = rs.repo.WithReadTxn(r.Context(), func(ctx context.Context) error {
 		var err error
-		result, err = rs.repo.SourceCollection.List(ctx, r.URL.Query().Get("after"), 50)
+		result, err = rs.repo.SourceCollection.Search(ctx, filter)
+		return err
+	})
+	if err != nil {
+		nativeArchiveError(w, err)
+		return
+	}
+	ingestJSON(w, http.StatusOK, result)
+}
+
+func (rs *nativeArchiveRoutes) collectionHistory(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "collection")
+	after, limit, err := accountReviewPage(r)
+	revision := 0
+	if after != "" && err == nil {
+		revision, err = strconv.Atoi(after)
+	}
+	if err != nil || revision < 0 || !ingest.ValidUUID(id) {
+		ingestError(w, ingest.ErrInvalid)
+		return
+	}
+	var result []models.SourceCollectionRevision
+	err = rs.repo.WithReadTxn(r.Context(), func(ctx context.Context) error {
+		collection, err := rs.repo.SourceCollection.Find(ctx, id)
+		if err != nil {
+			return err
+		}
+		if collection == nil {
+			return ingest.ErrNotFound
+		}
+		result, err = rs.repo.SourceCollection.History(ctx, id, revision, limit)
 		return err
 	})
 	if err != nil {

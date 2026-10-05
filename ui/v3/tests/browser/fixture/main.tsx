@@ -1,5 +1,7 @@
 import { MetadataReviewFixture } from "./metadata-review";
 import { AccountReviewFixture } from "./account-review";
+import { CollectionsFixture } from "./collections";
+import { collectionSearchSchema } from "@/core/native-archive/collection-api";
 import {
   accountFilterSchema,
   accountUUIDSchema,
@@ -389,6 +391,12 @@ const router = createRouter({
         account: accountUUIDSchema.optional(),
       }),
       component: AccountReviewFixture,
+    }),
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/collections",
+      validateSearch: collectionSearchSchema,
+      component: CollectionsFixture,
     }),
     createRoute({
       getParentRoute: () => rootRoute,

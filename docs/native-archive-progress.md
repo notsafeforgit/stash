@@ -8641,3 +8641,52 @@ intentionally stale build-module fixture was removed during wheel creation;
 producer and backup installs both match all 98 current source modules. The
 installed producer fingerprint now exactly matches the staged profiles. These
 checks correct packaging evidence without activating any live worker.
+
+## Native collection management — 2026-10-05
+
+The application now has a Source collections route in shared desktop/mobile
+navigation. It searches current names, URLs and relative folders with bounded
+pages and type/state filters. The editor supports source targets, qualified
+accounts, registered roots and relative folders, manual-batch/folder types,
+active/disabled/retired state and recorded reasons. Source accounts remain
+publishers, independently of depicted performers. Account/root choices search
+the server rather than downloading every catalog. Immutable collection history
+loads only when expanded. Existing-card updates preserve the page cursor and
+remove a card when the updated definition no longer matches its filter.
+
+Collection/root list APIs support bounded literal-text searches without reading
+captures or library media. New root-detail and collection-history endpoints make
+selected lookups and uncertain-save recovery possible. Existing anonymous list
+callers retain their default page size. Invalid definitions and missing or
+mismatched root/account references return client errors without partial records.
+The populated rehearsal has 2,612 collections and 3,428 definition revisions.
+Read-only measurements confirm indexed current-revision joins; the recorded
+SQLite timings include warm cache and are not end-to-end UI latency claims.
+
+The browser persists a caller UUID and exact revision-guarded PUT before sending.
+Recovery verifies its historical definition, even after a later concurrent edit.
+Competing choices require review, while unchanged definitions create no revision.
+Pending writes survive reload, coordinate across tabs and remain isolated by
+backend mount. Confirmed success remains visible if refreshing the saved view
+fails. The full UI gate passes 591 tests. Chromium and WebKit pass 34 collection
+and account-review checks, including both navigation surfaces, folder/account
+selection, invalid paths, concurrent edits, lost responses, same-origin deployment
+isolation, filtered-card updates and failed post-save refresh. Reviewed screenshots
+and query measurements are retained under `.local/native-collection-ui-20261005/`.
+
+All required fork checks pass, including the full Go integration suite. The
+SQLite package took 1,203 seconds, just beyond the default 20-minute limit; this
+run used the documented `GO_TEST_TIMEOUT=30m` override without changing the
+repository default. The earlier collection assertion now tests early reference
+validation separately from the SQL constraints that prevent orphan identities.
+The original runner lost its terminal report during continuation, so the finished
+log was reconciled against every tagged Go package and each prerequisite stage;
+that evidence is in `collection_management_gate_reconciliation.json` under the
+local verification directory. No production service, database, worker, frozen
+release or bucket policy changed. Root creation/mount review and
+metadata-policy/manual performer controls still need management screens. The
+current populated rehearsal has no metadata policies; their historical import
+and actual saved choices remain required. A collection definition change also
+requires reviewing policies bound to the previous revision. Remaining source
+adapters, host/n8n activation, full reconciliation and production release gates
+remain open. See [collection management](native-source-collections.md).

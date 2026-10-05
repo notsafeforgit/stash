@@ -155,10 +155,23 @@ WHERE target_url=? AND target_url!='' AND collection_uuid>? GROUP BY collection_
 	bad.UUID, bad.ExpectedRevision, bad.Namespace = uuid.NewString(), 0, "native:twitter"
 	err = repo.WithTxn(context.Background(), func(ctx context.Context) error {
 		_, err := repo.SourceCollection.Put(ctx, bad)
+		require.ErrorIs(t, err, models.ErrSourceDefinitionInvalid)
+		return nil
+	})
+	require.NoError(t, err, "reference validation happens before any identity is inserted")
+	require.Equal(t, uint(3), queryUint(t, raw, "SELECT count(*) FROM source_collections"))
+	// The SQL boundary must still reject a wrong service and prevent a caller
+	// that ignores that failure from committing an orphan identity.
+	err = repo.WithTxn(context.Background(), func(ctx context.Context) error {
+		_, _, err := db.ExecSQL(ctx, "INSERT INTO source_collections(uuid) VALUES(?)", []interface{}{bad.UUID})
+		require.NoError(t, err)
+		_, _, err = db.ExecSQL(ctx, `INSERT INTO source_collection_revisions
+(collection_uuid,revision,label,kind,namespace,state,target_url,account_uuid,path_prefix,origin,reason)
+VALUES(?,1,'Invalid service','account','native:twitter','active','',?,'','review','')`, []interface{}{bad.UUID, account.UUID})
 		require.Error(t, err)
 		return nil
 	})
-	require.Error(t, err, "ignoring the failed definition must not commit its orphan identity")
+	require.Error(t, err, "SQL constraints prevent an orphan identity when the failed insert is ignored")
 	require.Equal(t, uint(3), queryUint(t, raw, "SELECT count(*) FROM source_collections"))
 }
 

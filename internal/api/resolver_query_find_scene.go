@@ -76,17 +76,13 @@ func (r *queryResolver) FindSceneByHash(ctx context.Context, input SceneHashInpu
 
 func (r *queryResolver) FindScenes(
 	ctx context.Context,
-	sceneFilter *models.SceneFilterType,
 	sceneFilterAST *models.FilterAST,
-	sceneIDs []int,
 	ids []string,
 	filter *models.FindFilterType,
 ) (ret *FindScenesResultType, err error) {
-	if len(ids) > 0 {
-		sceneIDs, err = handleIDList(ids, "ids")
-		if err != nil {
-			return nil, err
-		}
+	sceneIDs, err := handleIDList(ids, "ids")
+	if err != nil {
+		return nil, err
 	}
 
 	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
@@ -116,40 +112,12 @@ func (r *queryResolver) FindScenes(
 					result.TotalSize += float64(f.Size)
 				}
 			}
-		case sceneFilterAST != nil && (slices.Contains(fields, "duration") || slices.Contains(fields, "filesize")):
-			var total int
-			scenes, total, err = r.repository.Scene.QueryAST(ctx, sceneFilterAST, filter)
-			if err != nil {
-				return err
-			}
-
-			result.Count = total
-			result.IDs = make([]int, 0, len(scenes))
-			for _, s := range scenes {
-				result.IDs = append(result.IDs, s.ID)
-			}
-			if slices.Contains(fields, "duration") || slices.Contains(fields, "filesize") {
-				for _, s := range scenes {
-					if err = s.LoadPrimaryFile(ctx, r.repository.File); err != nil {
-						return err
-					}
-
-					f := s.Files.Primary()
-					if f == nil {
-						continue
-					}
-
-					result.TotalDuration += f.Duration
-					result.TotalSize += float64(f.Size)
-				}
-			}
 		default:
 			result, err = r.repository.Scene.Query(ctx, models.SceneQueryOptions{
 				QueryOptions: models.QueryOptions{
 					FindFilter: filter,
 					Count:      slices.Contains(fields, "count"),
 				},
-				SceneFilter:    sceneFilter,
 				SceneFilterAST: sceneFilterAST,
 				SkipItems:      !slices.Contains(fields, "scenes"),
 				TotalDuration:  slices.Contains(fields, "duration"),
@@ -258,7 +226,7 @@ func (r *queryResolver) ParseSceneFilenames(ctx context.Context, filter *models.
 	return ret, nil
 }
 
-func (r *queryResolver) FindDuplicateScenes(ctx context.Context, distance *int, durationDiff *float64, sceneFilter *models.SceneFilterType, sceneFilterAST *models.FilterAST, filterMode models.DuplicateFilterMode) (ret [][]*models.Scene, err error) {
+func (r *queryResolver) FindDuplicateScenes(ctx context.Context, distance *int, durationDiff *float64, sceneFilterAST *models.FilterAST, filterMode models.DuplicateFilterMode) (ret [][]*models.Scene, err error) {
 	dist := 0
 	durDiff := -1.
 	if distance != nil {
@@ -268,7 +236,7 @@ func (r *queryResolver) FindDuplicateScenes(ctx context.Context, distance *int, 
 		durDiff = *durationDiff
 	}
 	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
-		ret, err = r.repository.Scene.FindDuplicates(ctx, dist, durDiff, sceneFilter, sceneFilterAST, filterMode)
+		ret, err = r.repository.Scene.FindDuplicates(ctx, dist, durDiff, nil, sceneFilterAST, filterMode)
 		return err
 	}); err != nil {
 		return nil, err
@@ -277,7 +245,7 @@ func (r *queryResolver) FindDuplicateScenes(ctx context.Context, distance *int, 
 	return ret, nil
 }
 
-func (r *queryResolver) FindDuplicateSceneGroups(ctx context.Context, distance *int, durationDiff *float64, sceneFilter *models.SceneFilterType, sceneFilterAST *models.FilterAST, filterMode models.DuplicateFilterMode, filter *models.FindFilterType) (ret *FindDuplicateScenesResultType, err error) {
+func (r *queryResolver) FindDuplicateSceneGroups(ctx context.Context, distance *int, durationDiff *float64, sceneFilterAST *models.FilterAST, filterMode models.DuplicateFilterMode, filter *models.FindFilterType) (ret *FindDuplicateScenesResultType, err error) {
 	dist := 0
 	durDiff := -1.
 	if distance != nil {
@@ -289,7 +257,7 @@ func (r *queryResolver) FindDuplicateSceneGroups(ctx context.Context, distance *
 	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
 		var groups [][]*models.Scene
 		var count int
-		groups, count, err = r.repository.Scene.FindDuplicateGroups(ctx, dist, durDiff, sceneFilter, sceneFilterAST, filterMode, filter)
+		groups, count, err = r.repository.Scene.FindDuplicateGroups(ctx, dist, durDiff, nil, sceneFilterAST, filterMode, filter)
 		if err != nil {
 			return err
 		}

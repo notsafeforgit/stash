@@ -182,16 +182,14 @@ export function PerformerMergeDialog({
   const [choices, setChoices] = useState<Record<string, MergeChoice>>({});
   const [destinationId, setDestinationId] = useState("");
   const fullDataIds = useMemo(() => {
-    if (!destinationId) return [] as number[];
+    if (!destinationId) return [];
     const ids = new Set<string>([destinationId, ...sourceIds]);
-    return Array.from(ids)
-      .map((id) => parseInt(id, 10))
-      .filter((n) => Number.isFinite(n));
+    return Array.from(ids);
   }, [destinationId, sourceIds]);
   const { data: fullData, loading: fullDataLoading } = useQuery(
     GQL.FindPerformersDocument,
     {
-      variables: { performer_ids: fullDataIds },
+      variables: { ids: fullDataIds },
       skip: fullDataIds.length === 0,
       fetchPolicy: "cache-and-network",
     },

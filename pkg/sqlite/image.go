@@ -995,7 +995,7 @@ func (qb *ImageStore) queryGroupedFields(ctx context.Context, options models.Ima
 			},
 		)
 		query.addColumn("COALESCE(image_files.width, 0) * COALESCE(image_files.height, 0) as megapixels")
-		aggregateQuery.addColumn("COALESCE(SUM(temp.megapixels), 0) / 1000000 as megapixels")
+		aggregateQuery.addColumn("COALESCE(SUM(temp.megapixels), 0) / 1000000.0 as megapixels")
 	}
 
 	if options.TotalSize {

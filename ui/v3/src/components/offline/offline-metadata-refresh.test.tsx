@@ -68,6 +68,9 @@ it("finishes metadata refresh across Strict Mode and progress updates", async ()
     ),
   );
   const requests = mocks.query.mock.calls.length;
+  expect(mocks.query).toHaveBeenCalledWith(
+    expect.objectContaining({ variables: { ids: ["1"] } }),
+  );
   await act(async () =>
     root.render(
       <StrictMode>

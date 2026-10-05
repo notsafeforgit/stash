@@ -23,12 +23,10 @@ func (r *queryResolver) FindPerformer(ctx context.Context, id string) (ret *mode
 	return ret, nil
 }
 
-func (r *queryResolver) FindPerformers(ctx context.Context, performerFilter *models.PerformerFilterType, performerFilterAST *models.FilterAST, filter *models.FindFilterType, performerIDs []int, ids []string) (ret *FindPerformersResultType, err error) {
-	if len(ids) > 0 {
-		performerIDs, err = handleIDList(ids, "ids")
-		if err != nil {
-			return nil, err
-		}
+func (r *queryResolver) FindPerformers(ctx context.Context, performerFilterAST *models.FilterAST, filter *models.FindFilterType, ids []string) (ret *FindPerformersResultType, err error) {
+	performerIDs, err := handleIDList(ids, "ids")
+	if err != nil {
+		return nil, err
 	}
 
 	if err := r.withReadTxn(ctx, func(ctx context.Context) error {
@@ -40,10 +38,8 @@ func (r *queryResolver) FindPerformers(ctx context.Context, performerFilter *mod
 		case len(performerIDs) > 0:
 			performers, err = r.repository.Performer.FindMany(ctx, performerIDs)
 			total = len(performers)
-		case performerFilterAST != nil:
-			performers, total, err = r.repository.Performer.QueryAST(ctx, performerFilterAST, filter)
 		default:
-			performers, total, err = r.repository.Performer.Query(ctx, performerFilter, filter)
+			performers, total, err = r.repository.Performer.QueryAST(ctx, performerFilterAST, filter)
 		}
 
 		if err != nil {

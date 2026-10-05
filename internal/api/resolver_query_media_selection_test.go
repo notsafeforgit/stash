@@ -39,7 +39,7 @@ func TestMediaListSelectsCountIndependentlyOfRows(t *testing.T) {
 						QueryOptions:   models.QueryOptions{FindFilter: find, Count: countOnly},
 						SceneFilterAST: filterAST, SkipItems: countOnly,
 					}).Return(result, nil).Once()
-					got, err := r.Query().FindScenes(ctx, nil, filterAST, nil, nil, find)
+					got, err := r.Query().FindScenes(ctx, filterAST, nil, find)
 					require.NoError(t, err)
 					if countOnly {
 						require.Equal(t, 500, got.Count)
@@ -58,7 +58,7 @@ func TestMediaListSelectsCountIndependentlyOfRows(t *testing.T) {
 						QueryOptions:   models.QueryOptions{FindFilter: find, Count: countOnly},
 						ImageFilterAST: filterAST, SkipItems: countOnly,
 					}).Return(result, nil).Once()
-					got, err := r.Query().FindImages(ctx, nil, filterAST, nil, nil, find)
+					got, err := r.Query().FindImages(ctx, filterAST, nil, find)
 					require.NoError(t, err)
 					if countOnly {
 						require.Equal(t, 500, got.Count)

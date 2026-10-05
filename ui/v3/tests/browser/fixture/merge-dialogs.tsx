@@ -107,21 +107,46 @@ const sceneResult = {
     findScenes: { count: scenes.length, duration: 0, filesize: 0, scenes },
   },
 };
+function selectedIDs(variables: { ids?: string[] | null }) {
+  const expected = new URLSearchParams(location.search).has("bulk")
+    ? ["1", "2", "3", "4"]
+    : ["1", "2"];
+  return (
+    variables.ids?.length === expected.length &&
+    variables.ids.every((id, index) => id === expected[index])
+  );
+}
 const mocks = [
   ...[GQL.FindPerformersForSelectDocument, GQL.FindPerformersDocument].map(
     (query) => ({
-      request: { query, variables: () => true },
+      request: {
+        query,
+        variables:
+          query === GQL.FindPerformersDocument ? selectedIDs : () => true,
+      },
       result: performerResult,
       maxUsageCount: Infinity,
       delay: 0,
     }),
   ),
   ...[GQL.FindScenesForSelectDocument, GQL.FindScenesDocument].map((query) => ({
-    request: { query, variables: () => true },
+    request: {
+      query,
+      variables: query === GQL.FindScenesDocument ? selectedIDs : () => true,
+    },
     result: sceneResult,
     maxUsageCount: Infinity,
     delay: 0,
   })),
+  {
+    request: {
+      query: GQL.FindScenesDocument,
+      variables: { filter: { q: "Destination", page: 1, per_page: 20 } },
+    },
+    result: sceneResult,
+    maxUsageCount: Infinity,
+    delay: 0,
+  },
 ];
 
 export function MergeDialogsFixture() {

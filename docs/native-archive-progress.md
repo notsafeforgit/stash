@@ -7229,3 +7229,45 @@ No production deployment or database migration occurred. Schema 1000077 and
 the verified archive rehearsal remain unchanged. Remaining client retirement,
 imports, native review, general durable notifications, backup/restore and cutover
 continue under the full transition plan.
+
+## Native entity query contract — 2026-10-04
+
+The eight entity list queries and scene/image duplicate queries now accept only
+their filter-expression arguments. Removed the old flat arguments and the
+scene/image/performer integer-ID aliases. Pagination/search remain separate,
+and string `ids` retains explicit selection. Updated the native query documents,
+gallery image viewer, offline refresh and scene/performer merge clients.
+Offline refresh and merge loading continue to skip empty ID selections.
+
+Scene and image aggregates now use the repository's filtered aggregate path.
+This corrects page-only scene totals and zero image totals under expression
+filters. Megapixel division now retains fractions. Filtered totals include
+secondary files; explicit-ID lookups keep their existing primary-file semantics.
+File/folder nested filters, movie aliases and internal object-filter models
+remain separate retirement work. See [native queries](native-queries.md).
+
+The caller audit covers source/installed plugins, host helpers, wrapper code,
+producer code and 43 live n8n workflow definitions. Catalog Metadata 1.15.0 is
+staged at CommunityScripts `native-api-transition` commit
+`07112bf2d05c302bca61e6e64b72d8668076c5ac`. It uses native expressions and group
+requests, preserves existing group imports, fixes its unapplied group-name
+filter, retains group URLs and removes the empty-result full-library image
+retry. Its published package branch and installed compatible copy are unchanged.
+The native manual helper replacements were staged in the preceding bulk commit.
+
+Generation and embedded builds pass. SQLite/GraphQL tests cover all eight list
+queries, boolean expressions with search, paging, explicit IDs, rejected old
+arguments, gallery membership, full-selection/fractional aggregates and both
+duplicate filtering modes. All 583 frontend tests and native contracts pass.
+The staged plugin passes 108 tests; ten actual generated plugin requests and
+their variables validate against the native schema. All 24 Chromium/WebKit
+merge-dialog checks pass at 320, 390 and 1280 pixels, with strict checks on the
+selected string IDs. The full fork gate passed in 1,283.1 seconds, including
+backend generation, frontend/producer/helper checks, zero Go lint issues and
+the tagged backend integration suite. Reports are under
+`.local/native-discovery-client-20261004/native_query_*`.
+
+No production service, database, installed plugin or scraper was changed. Schema
+1000077 and the verified archive rehearsal remain unchanged. The full transition
+still requires remaining client/model retirement, imports, native review,
+durable notifications, backup/restore and coordinated cutover verification.

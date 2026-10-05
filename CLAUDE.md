@@ -279,9 +279,17 @@ To verify hardware transcode performance (vs. blaming the server again next time
 
 ### Filter AST
 
-The codebase has a two-filter system:
-- **Legacy object filter** (`FindFilter`, `*FilterType`) — existing filter arguments passed directly as GraphQL input types
-- **Filter AST** (`FilterAST`, `FilterASTNode`) in `pkg/models/filter_ast*.go` — a newer tree-based filter representation that can serialize to/from the legacy object filter format via `ToObjectFilter()`/`FilterASTFromObjectFilter()`
+The eight native entity list queries and scene/image duplicate queries accept
+only their `*_filter_ast` expressions. `FindFilterType` remains the pagination,
+sorting and search envelope; nonempty string `ids` selects explicit entities.
+List aggregates cover all matching rows independently of pagination. See
+[native queries](docs/native-queries.md).
+
+`FilterAST` and `FilterASTNode` live in `pkg/models/filter_ast*.go`. Historical
+object conversion remains at import boundaries. File/folder nested filters,
+remaining movie aliases and internal repository callers still use object filter
+types while their separate retirement proceeds; do not delete those models
+solely because the entity query arguments have been removed.
 
 ### Saved filters — canonical AST contract
 

@@ -1,15 +1,9 @@
 query FindScenes(
   $filter: FindFilterType
-  $scene_filter: SceneFilterType
   $scene_filter_ast: FilterASTInput
-  $scene_ids: [Int!]
+  $ids: [ID!]
 ) {
-  findScenes(
-    filter: $filter
-    scene_filter: $scene_filter
-    scene_filter_ast: $scene_filter_ast
-    scene_ids: $scene_ids
-  ) {
+  findScenes(filter: $filter, scene_filter_ast: $scene_filter_ast, ids: $ids) {
     count
     scenes {
       ...SlimSceneData
@@ -19,14 +13,9 @@ query FindScenes(
 
 query FindScenesMobile(
   $filter: FindFilterType
-  $scene_filter: SceneFilterType
   $scene_filter_ast: FilterASTInput
 ) {
-  findScenes(
-    filter: $filter
-    scene_filter: $scene_filter
-    scene_filter_ast: $scene_filter_ast
-  ) {
+  findScenes(filter: $filter, scene_filter_ast: $scene_filter_ast) {
     count
     scenes {
       ...MobileSceneData
@@ -64,7 +53,6 @@ query FindDuplicateScenesFiltered(
   $distance: Int
   $duration_diff: Float
   $filter: FindFilterType
-  $scene_filter: SceneFilterType
   $scene_filter_ast: FilterASTInput
   $filter_mode: DuplicateFilterMode!
 ) {
@@ -72,7 +60,6 @@ query FindDuplicateScenesFiltered(
     distance: $distance
     duration_diff: $duration_diff
     filter: $filter
-    scene_filter: $scene_filter
     scene_filter_ast: $scene_filter_ast
     filter_mode: $filter_mode
   ) {
@@ -107,8 +94,8 @@ query FindSceneCovers($ids: [ID!]!) {
   }
 }
 
-query FindFullScenes($ids: [Int!]) {
-  findScenes(scene_ids: $ids) {
+query FindFullScenes($ids: [ID!]) {
+  findScenes(ids: $ids) {
     scenes {
       ...SceneData
     }
@@ -167,16 +154,10 @@ query SceneStreams($id: ID!) {
 
 query FindScenesForSelect(
   $filter: FindFilterType
-  $scene_filter: SceneFilterType
   $scene_filter_ast: FilterASTInput
   $ids: [ID!]
 ) {
-  findScenes(
-    filter: $filter
-    scene_filter: $scene_filter
-    scene_filter_ast: $scene_filter_ast
-    ids: $ids
-  ) {
+  findScenes(filter: $filter, scene_filter_ast: $scene_filter_ast, ids: $ids) {
     count
     scenes {
       ...SelectSceneData

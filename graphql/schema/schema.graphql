@@ -37,9 +37,7 @@ type Query {
 
   "A function which queries Scene objects"
   findScenes(
-    scene_filter: SceneFilterType
     scene_filter_ast: FilterASTInput
-    scene_ids: [Int!] @deprecated(reason: "use ids")
     ids: [ID!]
     filter: FindFilterType
   ): FindScenesResultType!
@@ -57,7 +55,6 @@ type Query {
     Fractional seconds are ok: 0.5 will mean only files that have durations within 0.5 seconds between them will be matched based on PHash distance.
     """
     duration_diff: Float
-    scene_filter: SceneFilterType
     scene_filter_ast: FilterASTInput
     filter_mode: DuplicateFilterMode! = ALL
   ): [[Scene!]!]!
@@ -69,7 +66,6 @@ type Query {
     Fractional seconds are ok: 0.5 will mean only files that have durations within 0.5 seconds between them will be matched based on PHash distance.
     """
     duration_diff: Float
-    scene_filter: SceneFilterType
     scene_filter_ast: FilterASTInput
     filter_mode: DuplicateFilterMode! = ALL
     filter: FindFilterType
@@ -78,14 +74,12 @@ type Query {
   "Find duplicate images"
   findDuplicateImages(
     distance: Int! = 0
-    image_filter: ImageFilterType
     image_filter_ast: FilterASTInput
     filter_mode: DuplicateFilterMode! = ALL
   ): [[Image!]!]!
 
   findDuplicateImageGroups(
     distance: Int! = 0
-    image_filter: ImageFilterType
     image_filter_ast: FilterASTInput
     filter_mode: DuplicateFilterMode! = ALL
     filter: FindFilterType
@@ -98,7 +92,6 @@ type Query {
 
   "A function which queries SceneMarker objects"
   findSceneMarkers(
-    scene_marker_filter: SceneMarkerFilterType
     scene_marker_filter_ast: FilterASTInput
     filter: FindFilterType
     ids: [ID!]
@@ -108,9 +101,7 @@ type Query {
 
   "A function which queries Scene objects"
   findImages(
-    image_filter: ImageFilterType
     image_filter_ast: FilterASTInput
-    image_ids: [Int!] @deprecated(reason: "use ids")
     ids: [ID!]
     filter: FindFilterType
   ): FindImagesResultType!
@@ -119,10 +110,8 @@ type Query {
   findPerformer(id: ID!): Performer
   "A function which queries Performer objects"
   findPerformers(
-    performer_filter: PerformerFilterType
     performer_filter_ast: FilterASTInput
     filter: FindFilterType
-    performer_ids: [Int!] @deprecated(reason: "use ids")
     ids: [ID!]
   ): FindPerformersResultType!
 
@@ -130,7 +119,6 @@ type Query {
   findStudio(id: ID!): Studio
   "A function which queries Studio objects"
   findStudios(
-    studio_filter: StudioFilterType
     studio_filter_ast: FilterASTInput
     filter: FindFilterType
     ids: [ID!]
@@ -149,7 +137,6 @@ type Query {
   findGroup(id: ID!): Group
   "A function which queries Group objects"
   findGroups(
-    group_filter: GroupFilterType
     group_filter_ast: FilterASTInput
     filter: FindFilterType
     ids: [ID!]
@@ -157,7 +144,6 @@ type Query {
 
   findGallery(id: ID!): Gallery
   findGalleries(
-    gallery_filter: GalleryFilterType
     gallery_filter_ast: FilterASTInput
     filter: FindFilterType
     ids: [ID!]
@@ -165,7 +151,6 @@ type Query {
 
   findTag(id: ID!): Tag
   findTags(
-    tag_filter: TagFilterType
     tag_filter_ast: FilterASTInput
     filter: FindFilterType
     ids: [ID!]

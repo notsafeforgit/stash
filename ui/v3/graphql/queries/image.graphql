@@ -1,15 +1,9 @@
 query FindImages(
   $filter: FindFilterType
-  $image_filter: ImageFilterType
   $image_filter_ast: FilterASTInput
-  $image_ids: [Int!]
+  $ids: [ID!]
 ) {
-  findImages(
-    filter: $filter
-    image_filter: $image_filter
-    image_filter_ast: $image_filter_ast
-    image_ids: $image_ids
-  ) {
+  findImages(filter: $filter, image_filter_ast: $image_filter_ast, ids: $ids) {
     count
     images {
       ...SlimImageData
@@ -19,16 +13,10 @@ query FindImages(
 
 query FindImagesMetadata(
   $filter: FindFilterType
-  $image_filter: ImageFilterType
   $image_filter_ast: FilterASTInput
-  $image_ids: [Int!]
+  $ids: [ID!]
 ) {
-  findImages(
-    filter: $filter
-    image_filter: $image_filter
-    image_filter_ast: $image_filter_ast
-    image_ids: $image_ids
-  ) {
+  findImages(filter: $filter, image_filter_ast: $image_filter_ast, ids: $ids) {
     megapixels
     filesize
   }
@@ -52,14 +40,12 @@ query FindDuplicateImages($distance: Int!, $filter: FindFilterType) {
 query FindDuplicateImagesFiltered(
   $distance: Int!
   $filter: FindFilterType
-  $image_filter: ImageFilterType
   $image_filter_ast: FilterASTInput
   $filter_mode: DuplicateFilterMode!
 ) {
   findDuplicateImageGroups(
     distance: $distance
     filter: $filter
-    image_filter: $image_filter
     image_filter_ast: $image_filter_ast
     filter_mode: $filter_mode
   ) {

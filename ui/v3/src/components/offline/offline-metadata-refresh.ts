@@ -42,11 +42,9 @@ export function useOfflineMetadataRefresh({ entries }: RefreshDeps): void {
   useEffect(() => {
     const sceneIds = membership
       .split(",")
-      .filter((id) => /^[1-9]\d*$/.test(id))
-      .map(Number)
-      .filter(Number.isSafeInteger);
+      .filter((id) => /^[1-9]\d*$/.test(id));
     if (sceneIds.length === 0) return;
-    const requested = new Set(sceneIds.map(String));
+    const requested = new Set(sceneIds);
     let disposed = false;
     let generation = 0;
     async function refresh() {
@@ -54,7 +52,7 @@ export function useOfflineMetadataRefresh({ entries }: RefreshDeps): void {
       try {
         const { data } = await client.query({
           query: FindScenesDocument,
-          variables: { scene_ids: sceneIds },
+          variables: { ids: sceneIds },
           fetchPolicy: "network-only",
         });
         if (disposed || request !== generation || !data?.findScenes) return;

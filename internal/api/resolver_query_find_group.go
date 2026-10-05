@@ -23,7 +23,7 @@ func (r *queryResolver) FindGroup(ctx context.Context, id string) (ret *models.G
 	return ret, nil
 }
 
-func (r *queryResolver) FindGroups(ctx context.Context, groupFilter *models.GroupFilterType, groupFilterAST *models.FilterAST, filter *models.FindFilterType, ids []string) (ret *FindGroupsResultType, err error) {
+func (r *queryResolver) FindGroups(ctx context.Context, groupFilterAST *models.FilterAST, filter *models.FindFilterType, ids []string) (ret *FindGroupsResultType, err error) {
 	idInts, err := handleIDList(ids, "ids")
 	if err != nil {
 		return nil, err
@@ -38,10 +38,8 @@ func (r *queryResolver) FindGroups(ctx context.Context, groupFilter *models.Grou
 		case len(idInts) > 0:
 			groups, err = r.repository.Group.FindMany(ctx, idInts)
 			total = len(groups)
-		case groupFilterAST != nil:
-			groups, total, err = r.repository.Group.QueryAST(ctx, groupFilterAST, filter)
 		default:
-			groups, total, err = r.repository.Group.Query(ctx, groupFilter, filter)
+			groups, total, err = r.repository.Group.QueryAST(ctx, groupFilterAST, filter)
 		}
 
 		if err != nil {

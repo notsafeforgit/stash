@@ -605,10 +605,15 @@ function useGalleryImageLightbox() {
       const result = await fetchImages({
         variables: {
           filter: { page, per_page: pageSize, sort: "path" },
-          image_filter: {
-            galleries: {
-              modifier: GQL.CriterionModifier.Includes,
-              value: [galleryId],
+          image_filter_ast: {
+            root: {
+              condition: {
+                field: "galleries",
+                value: {
+                  modifier: GQL.CriterionModifier.Includes,
+                  value: [galleryId],
+                },
+              },
             },
           },
         },

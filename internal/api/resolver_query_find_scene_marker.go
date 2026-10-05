@@ -6,7 +6,7 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-func (r *queryResolver) FindSceneMarkers(ctx context.Context, sceneMarkerFilter *models.SceneMarkerFilterType, sceneMarkerFilterAST *models.FilterAST, filter *models.FindFilterType, ids []string) (ret *FindSceneMarkersResultType, err error) {
+func (r *queryResolver) FindSceneMarkers(ctx context.Context, sceneMarkerFilterAST *models.FilterAST, filter *models.FindFilterType, ids []string) (ret *FindSceneMarkersResultType, err error) {
 	idInts, err := handleIDList(ids, "ids")
 	if err != nil {
 		return nil, err
@@ -21,10 +21,8 @@ func (r *queryResolver) FindSceneMarkers(ctx context.Context, sceneMarkerFilter 
 		case len(idInts) > 0:
 			sceneMarkers, err = r.repository.SceneMarker.FindMany(ctx, idInts)
 			total = len(sceneMarkers)
-		case sceneMarkerFilterAST != nil:
-			sceneMarkers, total, err = r.repository.SceneMarker.QueryAST(ctx, sceneMarkerFilterAST, filter)
 		default:
-			sceneMarkers, total, err = r.repository.SceneMarker.Query(ctx, sceneMarkerFilter, filter)
+			sceneMarkers, total, err = r.repository.SceneMarker.QueryAST(ctx, sceneMarkerFilterAST, filter)
 		}
 
 		if err != nil {

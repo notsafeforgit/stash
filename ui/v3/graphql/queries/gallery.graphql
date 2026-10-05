@@ -1,13 +1,8 @@
 query FindGalleries(
   $filter: FindFilterType
-  $gallery_filter: GalleryFilterType
   $gallery_filter_ast: FilterASTInput
 ) {
-  findGalleries(
-    gallery_filter: $gallery_filter
-    gallery_filter_ast: $gallery_filter_ast
-    filter: $filter
-  ) {
+  findGalleries(gallery_filter_ast: $gallery_filter_ast, filter: $filter) {
     count
     galleries {
       ...SlimGalleryData
@@ -23,10 +18,14 @@ query FindGallery($id: ID!) {
 
 query FindGalleriesForSelect(
   $filter: FindFilterType
-  $gallery_filter: GalleryFilterType
+  $gallery_filter_ast: FilterASTInput
   $ids: [ID!]
 ) {
-  findGalleries(filter: $filter, gallery_filter: $gallery_filter, ids: $ids) {
+  findGalleries(
+    filter: $filter
+    gallery_filter_ast: $gallery_filter_ast
+    ids: $ids
+  ) {
     count
     galleries {
       ...SelectGalleryData

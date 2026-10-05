@@ -5,66 +5,84 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"sort"
 
 	"github.com/stashapp/stash/pkg/models"
 )
 
-func (s Service) matchNames(ctx context.Context, raw json.RawMessage) (json.RawMessage, []NameMatch, error) {
-	names, err := PerformerNames(raw)
+func (s Service) matchNames(ctx context.Context, field models.MetadataFieldDefinition, raw json.RawMessage) (json.RawMessage, []NameMatch, error) {
+	names, err := referenceNames(field, raw)
 	if err != nil {
 		return nil, nil, err
 	}
 	ids, matches := []string{}, []NameMatch{}
-	for _, name := range names {
-		candidates, err := s.Repo.Performer.FindByNameOrAlias(ctx, name, 101)
-		if err != nil {
-			return nil, nil, err
-		}
-		match := NameMatch{Name: name, Status: "unmatched", Candidates: []PerformerCandidate{}, More: len(candidates) > 100}
-		if len(candidates) > 100 {
-			candidates = candidates[:100]
-		}
-		for _, candidate := range candidates {
-			identity, err := s.Repo.ArchiveEntity.FindByLocalID(ctx, models.ArchivePerformer, candidate.ID)
+	groups := []groupReference{}
+	seen := make(map[string]NameMatch)
+	for _, ref := range names {
+		match, found := seen[ref.Name]
+		if !found {
+			match, err = s.matchName(ctx, field.ReferenceKind, ref.Name)
 			if err != nil {
 				return nil, nil, err
 			}
-			if identity == nil || identity.State != models.ArchiveEntityActive {
-				return nil, nil, models.ErrMetadataFieldConflict
-			}
-			match.Candidates = append(match.Candidates, PerformerCandidate{UUID: identity.UUID, Name: candidate.Name, Disambiguation: candidate.Disambiguation, Revision: identity.Revision})
+			seen[ref.Name] = match
+			matches = append(matches, match)
 		}
-		sort.Slice(match.Candidates, func(i, j int) bool { return match.Candidates[i].UUID < match.Candidates[j].UUID })
-		switch {
-		case match.More || len(match.Candidates) > 1:
-			match.Status = "ambiguous"
-		case len(match.Candidates) == 1:
-			match.Status = "matched"
+		if match.Status == "matched" {
 			ids = append(ids, match.Candidates[0].UUID)
+			groups = append(groups, groupReference{UUID: match.Candidates[0].UUID, SceneIndex: ref.SceneIndex})
 		}
-		matches = append(matches, match)
 	}
 	if len(names) != 0 && len(ids) == 0 {
 		return nil, matches, unresolvedNames()
 	}
-	value, err := json.Marshal(ids)
+	var selected any = ids
+	switch field.Type {
+	case "reference":
+		selected = nil
+		if len(ids) > 0 {
+			selected = ids[0]
+		}
+	case "groups":
+		selected = groups
+	}
+	value, err := json.Marshal(selected)
 	return value, matches, err
+}
+
+func (s Service) matchName(ctx context.Context, kind models.ArchiveEntityKind, name string) (NameMatch, error) {
+	match := NameMatch{Name: name, Status: "unmatched", Candidates: []ReferenceCandidate{}}
+	candidates, err := s.Repo.MetadataField.NameCandidates(ctx, kind, name)
+	if err != nil {
+		return match, err
+	}
+	match.More = len(candidates) > 100
+	if match.More {
+		candidates = candidates[:100]
+	}
+	for _, candidate := range candidates {
+		match.Candidates = append(match.Candidates, ReferenceCandidate{UUID: candidate.UUID, Name: candidate.Name, Disambiguation: candidate.Disambiguation, Revision: candidate.Revision})
+	}
+	if match.More || len(match.Candidates) > 1 {
+		match.Status = "ambiguous"
+	} else if len(match.Candidates) == 1 {
+		match.Status = "matched"
+	}
+	return match, nil
 }
 
 func (s Service) normalize(ctx context.Context, kind models.ArchiveEntityKind, field string, value json.RawMessage, names bool) (json.RawMessage, map[string]int, []NameMatch, error) {
 	var matches []NameMatch
 	var err error
-	if names {
-		value, matches, err = s.matchNames(ctx, value)
-		if err != nil {
-			return nil, nil, matches, err
-		}
-	}
 	var definition models.MetadataFieldDefinition
 	for _, candidate := range models.MetadataFields(kind) {
 		if candidate.Name == field {
 			definition = candidate
+		}
+	}
+	if names {
+		value, matches, err = s.matchNames(ctx, definition, value)
+		if err != nil {
+			return nil, nil, matches, err
 		}
 	}
 	revisions := make(map[string]int)
@@ -79,10 +97,6 @@ func (s Service) normalize(ctx context.Context, kind models.ArchiveEntityKind, f
 }
 
 func (s Service) resolveReferences(ctx context.Context, field models.MetadataFieldDefinition, raw json.RawMessage) (json.RawMessage, map[string]int, error) {
-	type groupReference struct {
-		UUID       string `json:"uuid"`
-		SceneIndex *int   `json:"scene_index,omitempty"`
-	}
 	var ids []string
 	var groups []groupReference
 	switch field.Type {

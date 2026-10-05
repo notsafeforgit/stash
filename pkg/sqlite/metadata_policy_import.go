@@ -120,7 +120,7 @@ func (s *MetadataPolicyImportStore) Preview(ctx context.Context, input models.Me
 		FolderSources: input.FolderSources, ReviewKeys: review}
 	for kind, rule := range input.Policy.Definition.Rules {
 		for field, mapping := range rule.Mappings {
-			if len(mapping.Value) == 0 || mapping.PerformerNames {
+			if len(mapping.Value) == 0 || mapping.UsesNames() {
 				continue
 			}
 			value := mapping.Value

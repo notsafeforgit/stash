@@ -13,6 +13,7 @@ const mapping = z.object({
   mode: z.enum(["jq", "value"]),
   text: z.string(),
   performer_names: z.boolean(),
+  reference_names: z.boolean(),
 });
 const rule = z.object({
   enabled: z.boolean(),
@@ -56,6 +57,7 @@ export function policyFormValues(
           mode: "jq" in value ? "jq" : "value",
           text: "jq" in value ? value.jq : JSON.stringify(value.value, null, 2),
           performer_names: value.performer_names ?? false,
+          reference_names: value.reference_names ?? false,
         }),
       ),
     };
@@ -87,6 +89,7 @@ export function policyDefinitionFromForm(
               ? { jq: row.text }
               : { value: JSON.parse(row.text) }),
             ...(row.performer_names ? { performer_names: true } : {}),
+            ...(row.reference_names ? { reference_names: true } : {}),
           },
         ]),
       ),
@@ -98,6 +101,30 @@ export function policyDefinitionFromForm(
     rules,
   };
 }
+
+const referenceName = z
+  .string()
+  .refine(
+    (name) =>
+      !!name &&
+      name.trim() === name &&
+      new TextEncoder().encode(name).length <= 1024 &&
+      !/\p{Cc}/u.test(name),
+  );
+const nameValues = {
+  reference: referenceName.nullable(),
+  references: z.array(referenceName).max(128),
+  groups: z
+    .array(
+      z
+        .object({
+          name: referenceName,
+          scene_index: z.number().int().safe().nullable().optional(),
+        })
+        .strict(),
+    )
+    .max(128),
+};
 
 export function policyFormSchema(fields: PolicyFields) {
   return form.superRefine((values, ctx) => {
@@ -124,32 +151,32 @@ export function policyFormSchema(fields: PolicyFields) {
       const seen = new Set<string>();
       for (const [index, row] of rules.mappings.entries()) {
         const path = [kind, "mappings", index];
+        const field = fields[kind].find((field) => field.name === row.target);
         if (
           !fields[kind].some((field) => field.name === row.target) ||
           seen.has(row.target)
         )
           issue([...path, "target"], "invalid_target");
         seen.add(row.target);
-        if (row.performer_names && row.target !== "performers")
-          issue([...path, "performer_names"], "invalid_names");
+        if (
+          (row.performer_names &&
+            (row.target !== "performers" || row.reference_names)) ||
+          (row.reference_names && !field?.reference_kind)
+        )
+          issue([...path, "reference_names"], "invalid_names");
         if (row.mode === "jq") {
           if (!row.text.trim()) issue([...path, "text"], "empty_expression");
         } else {
           try {
             const value: unknown = JSON.parse(row.text);
-            if (
-              row.performer_names &&
-              (!Array.isArray(value) ||
-                value.length > 128 ||
-                value.some(
-                  (name) =>
-                    typeof name !== "string" ||
-                    !name.trim() ||
-                    name.trim() !== name ||
-                    /\p{Cc}/u.test(name),
-                ))
-            )
-              issue([...path, "text"], "invalid_names");
+            if (row.reference_names || row.performer_names) {
+              const schema =
+                field && field.type in nameValues
+                  ? nameValues[field.type as keyof typeof nameValues]
+                  : null;
+              if (!schema?.safeParse(value).success)
+                issue([...path, "text"], "invalid_names");
+            }
           } catch {
             issue([...path, "text"], "invalid_value");
           }

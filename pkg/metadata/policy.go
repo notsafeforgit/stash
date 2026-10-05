@@ -34,7 +34,7 @@ type Input struct {
 	Source                 *Source `json:"source,omitempty"`
 }
 
-type PerformerCandidate struct {
+type ReferenceCandidate struct {
 	UUID           string `json:"uuid"`
 	Name           string `json:"name"`
 	Disambiguation string `json:"disambiguation"`
@@ -44,7 +44,7 @@ type PerformerCandidate struct {
 type NameMatch struct {
 	Name       string               `json:"name"`
 	Status     string               `json:"status"`
-	Candidates []PerformerCandidate `json:"candidates"`
+	Candidates []ReferenceCandidate `json:"candidates"`
 	More       bool                 `json:"more"`
 }
 
@@ -211,24 +211,16 @@ func (s Service) preview(ctx context.Context, input Input, inspectInactive bool,
 			}
 		}
 		change.Origin = origin
-		change.Value, change.ReferenceRevisions, change.Names, err = s.normalize(ctx, entity.Kind, field, value, mapping.PerformerNames)
-		if err == nil && mapping.PerformerNames {
+		change.Value, change.ReferenceRevisions, change.Names, err = s.normalize(ctx, entity.Kind, field, value, mapping.UsesNames())
+		if err == nil && mapping.UsesNames() {
 			unresolved := false
 			for _, name := range change.Names {
 				unresolved = unresolved || name.Status != "matched"
 			}
 			if unresolved {
-				// A collision must not erase previously inherited attribution while the
-				// remaining names are resolved. New unambiguous names can still be added.
-				var existing, selected []string
-				if err = json.Unmarshal(state.Value, &existing); err == nil {
-					err = json.Unmarshal(change.Value, &selected)
-				}
+				var merged json.RawMessage
+				merged, err = preserveUnresolvedReferences(field, state.Value, change.Value)
 				if err == nil {
-					merged, encodeErr := json.Marshal(append(existing, selected...))
-					if encodeErr != nil {
-						return nil, encodeErr
-					}
 					change.Value, change.ReferenceRevisions, _, err = s.normalize(ctx, entity.Kind, field, merged, false)
 				}
 			}
@@ -453,5 +445,5 @@ func (p *Preview) AppliedFields() []string {
 }
 
 func unresolvedNames() error {
-	return errors.New("no unambiguous performer name matches; choose an explicit UUID")
+	return errors.New("no unambiguous name matches; choose explicit native UUIDs")
 }

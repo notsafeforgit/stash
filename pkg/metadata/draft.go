@@ -27,7 +27,7 @@ func (s Service) PreviewDraft(ctx context.Context, input Input, definition model
 	// sample. Name collisions are review results, not malformed definitions.
 	for kind, rule := range definition.Rules {
 		for field, mapping := range rule.Mappings {
-			if len(mapping.Value) == 0 || mapping.PerformerNames {
+			if len(mapping.Value) == 0 || mapping.UsesNames() {
 				continue
 			}
 			if _, _, _, err := s.normalize(ctx, kind, field, mapping.Value, false); err != nil {

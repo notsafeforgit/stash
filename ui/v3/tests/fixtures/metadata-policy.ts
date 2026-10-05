@@ -23,6 +23,14 @@ export const policyFields: PolicyField[] = [
     clear_value: [],
   },
   { name: "organized", type: "boolean", clear_value: false },
+  {
+    name: "studio",
+    type: "reference",
+    clear_value: null,
+    reference_kind: "studio",
+  },
+  { name: "tags", type: "references", clear_value: [], reference_kind: "tag" },
+  { name: "groups", type: "groups", clear_value: [], reference_kind: "group" },
 ];
 export function policyDefinition(): PolicyDefinition {
   return {

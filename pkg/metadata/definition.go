@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
-	"unicode"
 
 	"github.com/stashapp/stash/pkg/jq"
 	"github.com/stashapp/stash/pkg/models"
@@ -50,12 +48,15 @@ func ValidateDefinition(def models.MetadataPolicyDefinition) error {
 			} else if !json.Valid(mapping.Value) {
 				return fmt.Errorf("mapping %q requires valid JSON", field)
 			}
-			if mapping.PerformerNames {
-				if field != "performers" {
-					return errors.New("name matching is supported only for performers")
+			if mapping.PerformerNames && (field != "performers" || mapping.ReferenceNames) {
+				return errors.New("performer_names is only for performers and cannot be combined with reference_names")
+			}
+			if mapping.UsesNames() {
+				if fields[field].ReferenceKind == "" {
+					return errors.New("name matching requires a relationship field")
 				}
 				if len(mapping.Value) != 0 {
-					if _, err := PerformerNames(mapping.Value); err != nil {
+					if _, err := referenceNames(fields[field], mapping.Value); err != nil {
 						return err
 					}
 				}
@@ -66,17 +67,4 @@ func ValidateDefinition(def models.MetadataPolicyDefinition) error {
 		}
 	}
 	return nil
-}
-
-func PerformerNames(raw json.RawMessage) ([]string, error) {
-	var names []string
-	if err := json.Unmarshal(raw, &names); err != nil || names == nil || len(names) > 128 {
-		return nil, errors.New("performer name matching requires at most 128 names")
-	}
-	for _, name := range names {
-		if name == "" || strings.TrimSpace(name) != name || len(name) > 1024 || strings.ContainsFunc(name, unicode.IsControl) {
-			return nil, errors.New("performer name must be nonempty text within 1024 bytes")
-		}
-	}
-	return names, nil
 }

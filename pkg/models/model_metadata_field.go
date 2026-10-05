@@ -96,6 +96,9 @@ var (
 )
 
 type MetadataFieldReaderWriter interface {
+	// NameCandidates returns at most 101 exact canonical-name/alias matches.
+	// A caller displaying 100 uses the extra row to distinguish truncation.
+	NameCandidates(context.Context, ArchiveEntityKind, string) ([]MetadataNameCandidate, error)
 	FileEdits(context.Context, string, string, string, int) ([]MetadataFileEditCandidate, error)
 	PreviewFileEdit(context.Context, MetadataFileEditInput) (*MetadataFileEditPreview, error)
 	ApplyFileEdit(context.Context, MetadataFileEditApplyInput) (*MetadataFileEditReview, bool, error)

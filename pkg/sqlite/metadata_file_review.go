@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"sort"
 
 	"github.com/stashapp/stash/pkg/archive"
 	"github.com/stashapp/stash/pkg/models"
@@ -184,42 +183,6 @@ func (s *MetadataFieldStore) PreviewFileEdit(ctx context.Context, input models.M
 	return ret, err
 }
 
-func fileEditNameCandidates(ctx context.Context, kind models.ArchiveEntityKind, name string) ([]models.MetadataNameCandidate, error) {
-	ret := []models.MetadataNameCandidate{}
-	if kind == models.ArchivePerformer {
-		performers, err := NewPerformerStore(nil).FindByNameOrAlias(ctx, name, 101)
-		if err != nil {
-			return nil, err
-		}
-		for _, performer := range performers {
-			id, err := (&ArchiveEntityStore{}).FindByLocalID(ctx, kind, performer.ID)
-			if err != nil {
-				return nil, err
-			}
-			if id == nil || id.State != models.ArchiveEntityActive {
-				return nil, models.ErrMetadataFieldConflict
-			}
-			ret = append(ret, models.MetadataNameCandidate{UUID: id.UUID, LocalID: performer.ID, Revision: id.Revision, Name: performer.Name, Disambiguation: performer.Disambiguation})
-		}
-		sort.Slice(ret, func(i, j int) bool { return ret[i].UUID < ret[j].UUID })
-		return ret, nil
-	}
-	table, column := "", ""
-	switch kind {
-	case models.ArchiveTag:
-		table, column = "tags", "tag_id"
-	case models.ArchiveStudio:
-		table, column = "studios", "studio_id"
-	case models.ArchiveGroup:
-		table, column = "groups", "group_id"
-	default:
-		return nil, models.ErrMetadataFileReviewInvalid
-	}
-	err := dbWrapper.Select(ctx, &ret, `SELECT e.uuid,t.id AS local_id,e.revision,t.name,'' AS disambiguation FROM `+table+` t
- JOIN archive_entities e ON e.`+column+`=t.id AND e.state='active' WHERE t.name=? COLLATE NOCASE ORDER BY e.uuid LIMIT 101`, name)
-	return ret, err
-}
-
 func fileEditSelectedName(ctx context.Context, kind models.ArchiveEntityKind, choice models.MetadataNameSelection) (*models.MetadataNameCandidate, error) {
 	id, err := (&ArchiveEntityStore{}).Find(ctx, choice.UUID)
 	if err != nil {
@@ -274,7 +237,7 @@ func (s *MetadataFieldStore) previewFileEditNames(ctx context.Context, ret *mode
 			ret.Status, ret.Value = "unsupported", nil
 			return nil
 		}
-		candidates, err := fileEditNameCandidates(ctx, def.ReferenceKind, name)
+		candidates, err := s.NameCandidates(ctx, def.ReferenceKind, name)
 		if err != nil {
 			return err
 		}

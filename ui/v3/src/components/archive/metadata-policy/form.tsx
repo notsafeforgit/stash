@@ -243,6 +243,7 @@ function RuleFields({
                   mode: "jq",
                   text: "empty",
                   performer_names: false,
+                  reference_names: false,
                 },
               ],
             });

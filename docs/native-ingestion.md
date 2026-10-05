@@ -1352,14 +1352,38 @@ existing entity; requests cannot impersonate a creation event.
 Only typed curated fields from `MetadataFields` are accepted. Identity, file
 fingerprints, jobs and raw source evidence are not mapping targets. Relationships
 use native UUIDs; redirects resolve to the surviving identity and deleted targets
-require review. To opt into canonical/alias matching, a `performers` mapping may
-set `performer_names: true` and return an array of names. The indexed lookup
-reports all candidates (up to 100, with an explicit overflow flag). It never
-chooses between a canonical name and a colliding alias, creates a performer, or
-uses approximate matches. Unambiguous names can be added while collisions remain
-for review; an unresolved name cannot erase existing inherited attribution.
-Use an explicit UUID to resolve ambiguity. Publisher/account ownership alone
-never supplies depicted performers.
+require review. A relationship mapping can opt into name resolution with
+`reference_names: true`. Its constant value or jq output uses the target's shape:
+
+| Target | Name value | Matching |
+| --- | --- | --- |
+| `studio` | `"Studio name"` or `null` to clear | Canonical name and individual aliases |
+| `performers` | `["Performer name", "Known alias"]` | Canonical names and individual aliases |
+| `tags` | `["Tag name"]` | Canonical names and individual aliases |
+| `groups` | `[{"name":"Album","scene_index":2}]` | Canonical names; `scene_index` is optional |
+
+The editor offers the name option only for relationship fields, a plain text
+studio input and one-name-per-line performer/tag inputs. Group constants use one
+structured JSON value. Empty arrays clear list relationships. Values are limited
+to 128 names, each nonblank, without surrounding whitespace or control characters,
+and at most 1,024 UTF-8 bytes. Group free-form alias text is not split into names.
+
+Schema 1000079 adds case-insensitive name/alias indexes for studios, tags and
+groups. These and the existing performer-name index use SQLite `NOCASE` (ASCII
+case folding); non-ASCII spelling remains exact. Shared lookups report up to 100
+candidates with an explicit overflow flag, deduplicating repeated spellings of
+one entity before applying the limit. Retained catalog-edit review uses the same
+resolver. Neither path chooses between a canonical name and a colliding alias,
+creates missing entities, or uses approximate matches.
+
+Unambiguous names can be added while collisions remain for review. Unresolved
+names cannot erase existing inherited relationships; known groups retain their
+selected scene index while unrelated existing groups remain. Any unresolved name
+prevents automatic organization. An explicit native UUID resolves ambiguity.
+Previously saved native `performer_names` definitions remain readable without
+rewriting immutable history; that flag is restricted to performers and cannot
+be combined with `reference_names`. Publisher/account ownership alone never
+supplies depicted performers.
 
 `on_create` and `on_existing` control automatic application independently.
 `skip_organized_on_create` reproduces the old creation-only condition, including

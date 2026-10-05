@@ -111,7 +111,7 @@ func (s *MetadataPolicyStore) Put(ctx context.Context, input models.MetadataPoli
 	}
 	for kind, rule := range input.Definition.Rules {
 		for field, mapping := range rule.Mappings {
-			if len(mapping.Value) == 0 || mapping.PerformerNames {
+			if len(mapping.Value) == 0 || mapping.UsesNames() {
 				continue
 			}
 			value := mapping.Value

@@ -10,21 +10,32 @@ import {
 
 const revision = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 export const policyKindSchema = z.enum(["scene", "image"]);
-const mappingSchema = z.union([
-  z
-    .object({
-      jq: z.string().min(1).max(131072),
-      performer_names: z.boolean().optional(),
-    })
-    .strict(),
-  z
-    .object({ value: z.json(), performer_names: z.boolean().optional() })
-    .strict(),
-]);
+const mappingSchema = z
+  .union([
+    z
+      .object({
+        jq: z.string().min(1).max(131072),
+        performer_names: z.boolean().optional(),
+        reference_names: z.boolean().optional(),
+      })
+      .strict(),
+    z
+      .object({
+        value: z.json(),
+        performer_names: z.boolean().optional(),
+        reference_names: z.boolean().optional(),
+      })
+      .strict(),
+  ])
+  .refine((mapping) => !(mapping.performer_names && mapping.reference_names));
 export const policyMappingSchema = mappingSchema.transform(
   (mapping): z.infer<typeof mappingSchema> => {
-    const { performer_names, ...value } = mapping;
-    return performer_names ? { ...value, performer_names: true } : value;
+    const { performer_names, reference_names, ...value } = mapping;
+    return {
+      ...value,
+      ...(performer_names ? { performer_names: true } : {}),
+      ...(reference_names ? { reference_names: true } : {}),
+    };
   },
 );
 const ruleSchema = z

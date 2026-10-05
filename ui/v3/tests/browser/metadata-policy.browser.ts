@@ -118,7 +118,11 @@ async function archive(
           .slice(0, Number(url.searchParams.get("limit"))),
       });
     if (path.startsWith("metadata-fields/"))
-      return route.fulfill({ json: policyFields });
+      return route.fulfill({
+        json: policyFields.filter(
+          (field) => !path.endsWith("image") || field.name !== "groups",
+        ),
+      });
     if (path.startsWith("entity-identities/")) {
       const [, kind, local] = path.split("/");
       return route.fulfill({
@@ -391,6 +395,83 @@ test("selects a fixed performer for folder scans and records schema-constrained 
     fullPage: true,
     animations: "disabled",
   });
+});
+
+test("saves studio, tag and group name mappings with clear value controls", async ({
+  page,
+}) => {
+  const remote = await archive(page);
+  await open(page);
+  for (const [label, value] of [
+    ["Studio", "Studio alias"],
+    ["Tags", "Tag alias\nSecond tag"],
+    ["Groups", '[{"name":"Source album","scene_index":2}]'],
+  ] as const) {
+    await page
+      .getByRole("button", { name: "Add field mapping", exact: true })
+      .click();
+    const added = page.getByRole("group", { name: "Performers", exact: true });
+    await added
+      .getByRole("combobox", { name: "Target field", exact: true })
+      .click();
+    await page.getByRole("option", { name: label, exact: true }).click();
+    const mapping = page.getByRole("group", { name: label, exact: true });
+    await mapping
+      .getByRole("button", { name: "Fixed value", exact: true })
+      .click();
+    await mapping
+      .getByRole("checkbox", { name: "Match names", exact: true })
+      .check();
+    await mapping
+      .getByRole("textbox", { name: "Fixed value", exact: true })
+      .fill(value);
+  }
+  await expect(
+    page
+      .getByRole("group", { name: "Title", exact: true })
+      .getByRole("checkbox", { name: "Match names", exact: true }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Save metadata policy", exact: true })
+    .click();
+  await expect(
+    page.getByText("Metadata policy saved", { exact: true }),
+  ).toBeVisible();
+  expect(remote.writes).toHaveLength(1);
+  const mappings = remote.writes[0]?.definition.rules?.scene?.mappings;
+  expect(mappings?.studio).toEqual({
+    value: "Studio alias",
+    reference_names: true,
+  });
+  expect(mappings?.tags).toEqual({
+    value: ["Tag alias", "Second tag"],
+    reference_names: true,
+  });
+  expect(mappings?.groups).toEqual({
+    value: [{ name: "Source album", scene_index: 2 }],
+    reference_names: true,
+  });
+  await page.getByRole("group", { name: "Studio", exact: true }).screenshot({
+    path: test.info().outputPath("metadata-names-mobile.png"),
+    animations: "disabled",
+  });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.getByRole("group", { name: "Studio", exact: true }).screenshot({
+    path: test.info().outputPath("metadata-names-desktop.png"),
+    animations: "disabled",
+  });
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Edit metadata rules", exact: true })
+    .click();
+  const studio = page.getByRole("group", { name: "Studio", exact: true });
+  await expect(
+    studio.getByRole("checkbox", { name: "Match names", exact: true }),
+  ).toBeChecked();
+  await expect(
+    studio.getByRole("textbox", { name: "Fixed value", exact: true }),
+  ).toHaveValue("Studio alias");
+  expect(remote.previews).toEqual([]);
 });
 
 test("recovers a committed policy save after reload without sending another PUT", async ({

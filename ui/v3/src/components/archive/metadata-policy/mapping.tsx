@@ -220,7 +220,8 @@ function ConstantValue({
   }
   const msg = useMsg();
   if (
-    row.performer_names &&
+    (row.reference_names || row.performer_names) &&
+    field?.type === "references" &&
     Array.isArray(value) &&
     value.every((item) => typeof item === "string")
   )
@@ -235,6 +236,21 @@ function ConstantValue({
               event.target.value ? event.target.value.split("\n") : [],
             ),
           )
+        }
+      />
+    );
+  if (
+    row.reference_names &&
+    field?.type === "reference" &&
+    (value === null || typeof value === "string")
+  )
+    return (
+      <Input
+        id={id}
+        disabled={disabled}
+        value={value ?? ""}
+        onChange={(event) =>
+          onChange(JSON.stringify(event.target.value || null))
         }
       />
     );
@@ -388,6 +404,7 @@ export function PolicyMappingEditor({
                   ...row,
                   target,
                   performer_names: false,
+                  reference_names: false,
                   text:
                     row.mode === "jq"
                       ? "empty"
@@ -442,31 +459,32 @@ export function PolicyMappingEditor({
             </ToggleGroupItem>
           </ToggleGroup>
         </Field>
-        {row.target === "performers" && (
-          <Field orientation="horizontal">
+        {field?.reference_kind && (
+          <Field orientation="horizontal" data-disabled={disabled}>
             <Checkbox
               id={`${id}-names`}
-              checked={row.performer_names}
+              checked={row.reference_names || row.performer_names}
               disabled={disabled}
               onCheckedChange={(checked) =>
                 onChange({
                   ...row,
-                  performer_names: checked,
-                  text: row.mode === "value" ? "[]" : row.text,
+                  performer_names: false,
+                  reference_names: checked,
+                  text:
+                    row.mode === "value"
+                      ? JSON.stringify(field.clear_value)
+                      : row.text,
                 })
               }
             />
             <FieldContent>
               <FieldLabel htmlFor={`${id}-names`}>
-                {msg(
-                  "metadata_policy.match_names",
-                  "Match performer names and aliases",
-                )}
+                {msg("metadata_policy.match_names", "Match names")}
               </FieldLabel>
               <FieldDescription>
                 {msg(
                   "metadata_policy.match_names_help",
-                  "Ambiguous names remain for review. Leave this off to select library performers directly by their stable identities.",
+                  "Match exact names and performer, studio or tag aliases. Missing or ambiguous names stay for review; existing relationships are preserved.",
                 )}
               </FieldDescription>
             </FieldContent>
@@ -506,6 +524,24 @@ export function PolicyMappingEditor({
             </FieldDescription>
           )}
         </Field>
+        {(row.reference_names || row.performer_names) && (
+          <FieldDescription>
+            {field?.type === "reference"
+              ? msg(
+                  "metadata_policy.name_shape_studio",
+                  "Use one studio name, or null to clear it. A blank fixed value means null.",
+                )
+              : field?.type === "groups"
+                ? msg(
+                    "metadata_policy.name_shape_groups",
+                    "Use an array of objects with name and optional scene_index. Group matching uses canonical names.",
+                  )
+                : msg(
+                    "metadata_policy.name_shape_list",
+                    "Use an array of names. For a fixed value, enter one name per line. An empty list clears the field.",
+                  )}
+          </FieldDescription>
+        )}
         <Button
           type="button"
           variant="outline"

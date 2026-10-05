@@ -59,8 +59,8 @@ admits no source jobs. Python detail delivery and collection/profile dispatch
 are implemented. Schema 77 connects authenticated detail results to guarded native
 publication while preserving coverage, competing candidates and later native
 edits. The schema-77 full-copy migration, independent comparison, fresh reopen
-and full fork gate have now passed. The schema-78 policy-import rehearsal below
-has also passed, preserving that discovery state. The superseded schema-76
+and full fork gate have now passed. The schema-78 policy-import and schema-79 relationship-name rehearsals below
+have also passed, preserving that discovery state. The superseded schema-76
 database was removed after
 verification, recovering 20.27 GB while preserving the original compatible
 snapshot and saved activation plans. Automatic candidate-detail admission is now
@@ -8900,3 +8900,50 @@ that successful run. Schema 1000078 is the latest fully verified rehearsal;
 the seven imported policies remain disabled pending complete rule conversion.
 Production and worker configuration are unchanged.
 See [policy migration](native-metadata-policy-migration.md).
+
+
+## Native relationship name mapping — 2026-10-05
+
+Collection rules can now resolve studio, tag and performer names and individual
+aliases, plus group names with optional scene indexes. The editor exposes the
+option only for relationship fields, using plain studio text, one name per line
+for performers/tags and structured group values. Existing native performer-name
+rules retain their immutable representation; new edits use `reference_names`.
+No v2.5 plugin or runtime adapter is introduced.
+
+Shared exact lookups serve both intake rules and retained file-edit review.
+Canonical-name/alias collisions remain explicit candidates, repeated spellings
+of one entity count once, and more than 100 candidates produce an overflow flag.
+Schema 1000079 adds five nonunique name/alias indexes for studios, tags and groups;
+startup validates their table, columns and collations. Matching uses SQLite's
+ASCII case folding and exact non-ASCII spelling. It does not create missing
+entities, choose approximate names or assign account owners as depicted performers.
+Partial unambiguous results preserve unrelated inherited relationships. Unresolved
+names prevent automatic organization, and changed candidates invalidate previews.
+
+Pure service, real SQLite and native HTTP checks pass, including stale aliases,
+canonical/alias collisions, repeated input names, large alias sets, partial group
+results, schema rollback and invalid-index refusal. All 14 Chromium/WebKit policy
+workflows pass; two further browser checks retain mobile/desktop screenshots under
+`.local/native-policy-name-mapping-20261005/screenshots/`. The actual UI validation
+and embedded build pass. An actual-source staticcheck suggestion was corrected
+before the complete fork gate passed in 1,409 seconds: 612 UI tests, 526 producer
+tests, eight library tests, 108 archive tests, 262 backup tests, zero lint issues
+and every tagged Go package. SQLite took 1,218 seconds with the documented
+30-minute package timeout override. All 30 frozen input source hashes still match.
+
+The populated migration passed in 306 seconds. Independent comparison verified
+36,972,108 typed rows across all 277 pre-existing data tables, unchanged original
+schema objects, exactly the five new indexes, clean integrity and no foreign-key
+violations. The comparison took 803 seconds alongside the full test suite.
+A fresh application reopen passed in 193 seconds, preserving seven disabled policy
+imports with 39 source settings each, their original folder references, eight
+activation receipts, 757 bound targets and 188 recovery targets. All 795 indexed
+lookup calls matched 159 independently derived name samples; they took 55 ms
+combined on the rehearsal copy. This measures lookup work, not whole-app startup
+or browser latency.
+
+Schema 1000079 is the latest fully verified rehearsal. Historical rule conversion,
+remaining cleanup intent, complete source coverage, broader UI/caller conversion,
+backup activation and reviewed production cutover remain open. Live services,
+workers, bucket policies and the frozen compatible release are unchanged.

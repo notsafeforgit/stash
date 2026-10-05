@@ -13,7 +13,12 @@ type MetadataMapping struct {
 	JQ             string          `json:"jq,omitempty"`
 	Value          json.RawMessage `json:"value,omitempty"`
 	PerformerNames bool            `json:"performer_names,omitempty"`
+	ReferenceNames bool            `json:"reference_names,omitempty"`
 }
+
+// PerformerNames remains readable in immutable native policy history. New
+// definitions can resolve any supported relationship with ReferenceNames.
+func (m MetadataMapping) UsesNames() bool { return m.PerformerNames || m.ReferenceNames }
 
 type MetadataPolicyRule struct {
 	OnCreate              bool                       `json:"on_create"`

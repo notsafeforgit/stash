@@ -283,6 +283,7 @@ it("normalizes false name-matching flags before persisting an exact save body", 
     value.definition.rules.scene.mappings.title = {
       jq: ".entity.title",
       performer_names: false,
+      reference_names: false,
     };
   }
   const saved = await outbox.prepare(value);

@@ -72,6 +72,11 @@ INSERT INTO video_files(file_id,duration,video_codec,format,audio_codec,width,he
 INSERT INTO scenes(id,created_at,updated_at) VALUES(1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
 INSERT INTO performers(id,created_at,updated_at) VALUES(100,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
 INSERT INTO performer_names(performer_id,name,position) VALUES(100,'Selected performer',0);
+INSERT INTO studios(id,name,created_at,updated_at) VALUES(100,'Canonical studio',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
+INSERT INTO studio_aliases(studio_id,alias) VALUES(100,'Studio alias');
+INSERT INTO tags(id,name,created_at,updated_at) VALUES(100,'Canonical tag',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
+INSERT INTO tag_aliases(tag_id,alias) VALUES(100,'Tag alias');
+INSERT INTO groups(id,name,created_at,updated_at) VALUES(100,'Source album',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
 INSERT INTO scenes_files(scene_id,file_id,"primary") VALUES(1,1,1);`, nil)
 		if err != nil {
 			return err
@@ -110,6 +115,27 @@ INSERT INTO scenes_files(scene_id,file_id,"primary") VALUES(1,1,1);`, nil)
 	require.Equal(t, true, draft["context"].(map[string]interface{})["created"])
 	require.JSONEq(t, "null", request(http.MethodGet, policyPath, nil).Body.String(), "draft leaves the policy absent")
 	require.Zero(t, notified)
+	nameDraft := draftRequest
+	nameDraft.Definition = models.MetadataPolicyDefinition{Enabled: true, Rules: map[models.ArchiveEntityKind]models.MetadataPolicyRule{
+		models.ArchiveScene: {OnCreate: true, Mappings: map[string]models.MetadataMapping{
+			"studio": {Value: json.RawMessage(`"STUDIO ALIAS"`), ReferenceNames: true},
+			"tags":   {Value: json.RawMessage(`["Tag alias"]`), ReferenceNames: true},
+			"groups": {Value: json.RawMessage(`[{"name":"source album","scene_index":2}]`), ReferenceNames: true},
+		}},
+	}}
+	w = request(http.MethodPost, "/metadata-policy/draft-preview", nameDraft)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var namePreview metadata.DraftPreview
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &namePreview))
+	require.Len(t, namePreview.Changes, 3)
+	for _, change := range namePreview.Changes {
+		require.Equal(t, "ready", change.Status)
+		require.Equal(t, "matched", change.Names[0].Status)
+	}
+	require.JSONEq(t, "null", request(http.MethodGet, policyPath, nil).Body.String(), "name previews cannot save a policy")
+	require.Zero(t, notified)
+	nameDraft.Definition.Rules[models.ArchiveScene].Mappings["title"] = models.MetadataMapping{Value: json.RawMessage(`"Invalid name target"`), ReferenceNames: true}
+	require.Equal(t, http.StatusBadRequest, request(http.MethodPost, "/metadata-policy/draft-preview", nameDraft).Code)
 	w = request(http.MethodPost, "/metadata-policy/apply", draftRequest)
 	require.Equal(t, http.StatusBadRequest, w.Code, "Apply cannot accept a draft definition or simulated creation")
 	draftRequest.ExpectedCollectionRevision++

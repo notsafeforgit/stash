@@ -14,6 +14,7 @@ import (
 
 func removeMetadataPolicyImportSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeMetadataNameSchema(t, raw)
 	_, err := raw.Exec(`DROP TABLE metadata_policy_import_documents;
  DROP TABLE metadata_policy_imports;
  DELETE FROM native_migration_history WHERE version=1000078;`)
@@ -59,7 +60,7 @@ func TestMetadataPolicyImportMigrationPreservesPoliciesAndDocuments(t *testing.T
 				require.Equal(t, f.db.AppSchemaVersion(), f.db.Version())
 				require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM metadata_policy_imports"))
 				require.Zero(t, queryUint(t, raw, "SELECT count(*) FROM metadata_policy_import_documents"))
-				require.EqualValues(t, len(before["native_migration_history"])+1, queryUint(t, raw, "SELECT count(*) FROM native_migration_history"))
+				require.EqualValues(t, len(before["native_migration_history"])+int(f.db.AppSchemaVersion()-1000077), queryUint(t, raw, "SELECT count(*) FROM native_migration_history"))
 				delete(before, "native_migration_history")
 			}
 			for table, rows := range before {

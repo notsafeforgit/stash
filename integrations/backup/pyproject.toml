@@ -7,7 +7,7 @@ name = "stash-host-backup"
 version = "0.1.0"
 description = "Host-owned S3 publication and restore of native Stash archives"
 requires-python = ">=3.12"
-dependencies = ["boto3==1.43.90", "stash-native-archive==0.1.0", "stash-ingest==0.1.0"]
+dependencies = ["boto3==1.43.90", "awscrt==0.36.0", "stash-native-archive==0.1.0", "stash-ingest==0.1.0"]
 
 [project.scripts]
 stash-s3-backup = "s3_log_backup:main"
@@ -18,4 +18,4 @@ stash-s3-test-restore = "s3_test_restore:main"
 
 [tool.setuptools]
 package-dir = {"" = "host"}
-py-modules = ["s3_log_backup", "s3_restore_performer", "s3_restore_native", "s3_backup_audit", "s3_test_restore", "native_backup", "native_store", "object_receipts"]
+py-modules = ["s3_log_backup", "s3_restore_performer", "s3_restore_native", "s3_backup_audit", "s3_test_restore", "native_backup", "native_store", "object_receipts", "media_objects"]

@@ -14,6 +14,9 @@ import shutil
 import sqlite3
 import sys
 import tempfile
+import media_objects
+from object_receipts import inventory as list_objects
+from s3_restore_performer import video_path
 
 sys.dont_write_bytecode = True
 BIN_DIR = Path(__file__).resolve().parent
@@ -33,20 +36,14 @@ class MetadataReader:
     def __init__(self, client):
         self.client = client
 
-    def inventory(self):
+    def inventory(self, store=None):
+        store = media_objects.validate_store(store or {'bucket': ARCHIVE_BUCKET, 'prefix': ''})
+        entries = list_objects(self.client, store['bucket'], store['prefix'])
         result = {}
-        request = {'Bucket': ARCHIVE_BUCKET, 'MaxKeys': 1000}
-        pages = 0
-        while True:
-            page = self.client.list_objects_v2(**request)
-            for entry in page.get('Contents', []):
-                result[entry['Key']] = {'size': entry['Size'], 'storage_class': entry.get('StorageClass')}
-            pages += 1
-            if pages % 50 == 0:
-                print(f'Listed {len(result):,} current S3 objects...', flush=True)
-            if not page.get('IsTruncated'):
-                break
-            request['ContinuationToken'] = page['NextContinuationToken']
+        for key, entry in entries.items():
+            if type(entry.get('Size')) is not int or entry['Size'] < 0:
+                raise ValueError('Remote inventory contains an invalid object size')
+            result[key[len(store['prefix']):]] = {'size': entry['Size'], 'storage_class': entry.get('StorageClass')}
         return result
 
     def manifest(self, key):
@@ -107,7 +104,7 @@ def audit_local(backup, snapshot, catalog, inventory, issues_file, hash_nfo=Fals
             value = json.loads(line)
             footprints[value.get('unit') or 'R:' + value['rel_dir']] = value.get('fp')
     published = {unit['unit_id']: unit for unit in catalog['units']} if catalog else {}
-    published_videos = {video['key'] for video in catalog['videos']} if catalog else set()
+    published_videos = {video_path(catalog, video): video for video in catalog['videos']} if catalog else {}
     local_units = backup.collect_partitioned_tar_units(backup.BASE_DIR)
     local_ids = {unit['unit_id'] for unit in local_units}
     counts['local_tar_units'] = len(local_units)
@@ -197,7 +194,8 @@ def audit_local(backup, snapshot, catalog, inventory, issues_file, hash_nfo=Fals
                         local_videos.add(key)
                         size = entry.stat(follow_symlinks=False).st_size
                         if inventory is not None:
-                            remote = inventory.get(key)
+                            remote_key = published_videos[key]['key'] if key in published_videos else key
+                            remote = inventory.get(remote_key)
                             if remote is None:
                                 issue('local_videos_missing_remote', path=key, size=size, in_published_manifest=key in published_videos)
                             elif remote['size'] != size:
@@ -208,10 +206,10 @@ def audit_local(backup, snapshot, catalog, inventory, issues_file, hash_nfo=Fals
                             issue('local_videos_not_in_published_manifest', path=key)
         counts['local_videos'] = len(local_videos)
         if catalog:
-            for key in sorted(published_videos - local_videos):
+            for key in sorted(published_videos.keys() - local_videos):
                 issue('published_videos_pending_deletion', path=key)
         if inventory is not None:
-            referenced = set(published_videos)
+            referenced = {video['key'] for video in published_videos.values()}
             for unit in published.values():
                 referenced.update([unit['base_key'], *unit['deltas']])
             counts['published_object_references'] = len(referenced)
@@ -221,9 +219,16 @@ def audit_local(backup, snapshot, catalog, inventory, issues_file, hash_nfo=Fals
                     issue('published_objects_missing_remote', path=key)
                 else:
                     counts['published_objects_present_remote'] += 1
+                    if catalog and catalog['version'] == 4:
+                        descriptor = catalog['objects'][key]
+                        if (inventory[key]['size'] != descriptor['size']
+                                or inventory[key]['storage_class'] != descriptor['storage_class']):
+                            issue('published_objects_remote_metadata_mismatch', path=key)
             counts['remote_tar_archives_not_in_current_manifest'] = sum(key.startswith('tarballs/') and key not in referenced for key in inventory)
+            live_keys = {published_videos[path]['key'] if path in published_videos else path for path in local_videos}
             for key in inventory:
-                if not key.startswith('tarballs/') and key.lower().endswith(backup.VIDEO_EXTENSIONS) and key not in local_videos:
+                if (key.startswith(media_objects.PREFIX)
+                        or (not key.startswith('tarballs/') and key.lower().endswith(backup.VIDEO_EXTENSIONS))) and key not in live_keys:
                     counts['remote_videos_without_current_local_path'] += 1
     connection.close()
     return dict(counts)
@@ -236,6 +241,7 @@ def write_report(output, result):
         f"Finished: {result['finished_utc']}", f"Published manifest: {result['manifest_format']}",
         f"Manifest last modified: {result.get('manifest_last_modified') or 'not checked'}", '',
         f"Native archive verification: {result.get('native_archive', {}).get('coverage', 'not checked')}", '',
+        f"Cold-media checksum verification: {result.get('media_archive', {}).get('coverage', 'not requested')}", '',
         f"Rehashed indexed NFO content: {result.get('indexed_nfo_content_hashed', False)}", '',
         'Read-only: no source deletions, S3 writes, Glacier restores, or archive payload reads.', '',
         '| Check | Count |', '| --- | ---: |',
@@ -261,12 +267,15 @@ def main(argv=None):
     parser.add_argument('--output-dir', type=Path)
     parser.add_argument('--remote', action='store_true', help='List current S3 objects and read the Standard-storage manifest; never fetch archived data.')
     parser.add_argument('--native-checksums', action='store_true', help='With --remote, verify SHA-256 metadata for every native Standard-storage object.')
+    parser.add_argument('--media-checksums', action='store_true', help='With --remote, explicitly HEAD each immutable cold-media object to verify its retained checksum; never thaw or download.')
     parser.add_argument('--hash-nfo', action='store_true', help='Also rehash indexed NFO contents; all image paths and deletions are checked regardless.')
     parser.add_argument('--base-dir', type=Path, default=Path('/tank/media/porn'))
     parser.add_argument('--ledger-dir', type=Path, default=Path('/tank/media/backup_ledgers'))
     args = parser.parse_args(argv)
     if args.native_checksums and not args.remote:
         parser.error('--native-checksums requires --remote')
+    if args.media_checksums and not args.remote:
+        parser.error('--media-checksums requires --remote')
     output = args.output_dir or Path(tempfile.mkdtemp(prefix='s3-backup-audit-'))
     output.mkdir(mode=0o700, parents=True, exist_ok=True)
     result = {'started_utc': datetime.now(timezone.utc).isoformat(), 'manifest_format': 'local state only', 'indexed_nfo_content_hashed': args.hash_nfo}
@@ -288,7 +297,9 @@ def main(argv=None):
                                                                    max_pool_connections=20, retries={'max_attempts': 3})))
             catalog, modified, manifest_format = fetch_catalog(reader, snapshot, work, restorer)
             result.update(manifest_last_modified=modified, manifest_format=manifest_format)
-            if catalog['version'] == 3:
+            if args.media_checksums and catalog['version'] != 4:
+                raise ValueError('Historical media manifests do not retain full object checksums')
+            if 'native_archive' in catalog:
                 if args.native_checksums:
                     from native_store import NativeStore
                     result['native_archive'] = NativeStore(reader.client, METADATA_BUCKET).audit(catalog['native_archive'])
@@ -298,7 +309,11 @@ def main(argv=None):
             elif args.native_checksums:
                 raise ValueError('Historical backups have no native archive to verify')
             print('Reading current S3 object metadata; archived payloads remain untouched.', flush=True)
-            inventory = reader.inventory()
+            inventory = reader.inventory(catalog.get('media_store'))
+            if args.media_checksums:
+                for key, descriptor in catalog['objects'].items():
+                    media_objects.restore_status(reader.client, catalog['media_store'], key, descriptor)
+                result['media_archive'] = {'coverage': 'full-object-checksums', 'objects_verified': len(catalog['objects'])}
         print('Comparing local files with the ledger snapshot...', flush=True)
         result['counts'] = audit_local(backup, snapshot, catalog, inventory, output / 'issues.jsonl', hash_nfo=args.hash_nfo)
     result['finished_utc'] = datetime.now(timezone.utc).isoformat()

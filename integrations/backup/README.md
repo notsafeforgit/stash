@@ -111,9 +111,39 @@ See [AWS request pricing](https://aws.amazon.com/s3/pricing/) and
 
 The unreleased prototype requiring enabled bucket versioning and version-read
 permissions was withdrawn. Cold-media replacement identity still needs the
-immutable-key integration before cutover; stable filename keys are not proof
+publisher and cleanup integration before cutover; stable filename keys are not proof
 that an older backup will restore the original bytes. Do not activate this
 staged publisher until that and the remaining cutover gates are verified.
+
+## Immutable media restore contract
+
+Readers now accept version 4 media manifests in preparation for immutable media
+publication. The publisher still writes version 3; this reader work does not
+upgrade existing backups or establish immutable replacement handling by itself.
+
+A version 4 manifest separates each video's relative restore `path` from its
+S3 `key`. Several paths can reference one object; planning, status, thaw and
+download operate once per distinct key. Each required video/base/delta key has
+exactly one descriptor in `objects`: size, cold storage class, full-object S3
+checksum algorithm/value, and an optional independently checked local SHA-256.
+Video descriptors require that local SHA-256. New content keys use
+`media/sha256/<sha256>`; historical keys remain valid when their full checksum
+can be checked against local bytes. Unsupported/composite-only evidence is an
+error for review, never authorization to upload existing media again.
+
+`media_store` binds the bucket and prefix. A full native manifest uses
+`scope: native` and includes those bindings, object identities and restore paths
+in its version 2 media-selection digest. A selected subset uses `scope: media`
+and retains only its required descriptors, without a whole-library native claim.
+No S3 VersionId or bucket-versioning permission is required by this format.
+
+Offline reconstruction verifies every required object's bytes before creating
+output, then checks source-file identities through reconstruction. Duplicate
+paths, unsafe paths and collisions with archive members fail. A failure during
+extraction can leave a partial new output directory; it never reports a complete
+restore or activates that directory. Remote downloads verify response checksums
+and streamed bytes before retaining a file. Missing/changed objects fail without
+substituting newer content, requesting a thaw or uploading a replacement.
 
 ## Configuration and development
 
@@ -154,14 +184,24 @@ host-owned and unchanged.
 
 ## Restore and audit
 
-`stash-s3-restore-media` validates v3 native/media references before selecting a
-subset. A subset is a media-only plan and cannot inherit a whole-library native
-binding. Historical text/v2 backup inputs remain readable.
+`stash-s3-restore-media` validates v3/v4 native/media references before selecting
+a subset. A subset is a media-only plan and cannot inherit a whole-library native
+binding. Historical text/v2 backup inputs remain readable. Default planning
+does not construct a cold-storage client. For v4, explicit `--check-status`,
+`--request-thaw` and `--download` use the manifest's bound bucket/prefix and
+verify its object checksums. A download never initiates a thaw itself.
 
 `stash-s3-restore-native --manifest /private/current_manifest.json` audits native
 metadata and all object SHA-256 headers. It never requests Glacier restores.
 `stash-s3-audit --remote --native-checksums` includes this in the coverage report;
 without the extra flag, native coverage is reported as a manifest reference only.
+For v4 media, `stash-s3-audit --remote` uses the bound store's paginated inventory
+and checks restore paths separately from object keys. Add `--media-checksums`
+only for an explicit full-checksum HEAD audit of the selected cold objects;
+this adds one request per distinct object. It never reads cold payloads or
+requests a thaw. Historical media manifests lack those checksum descriptors
+and cannot use that option. Neither checksum audit runs as part of the normal
+scheduled backup.
 
 Download and independently verify a bundle with:
 

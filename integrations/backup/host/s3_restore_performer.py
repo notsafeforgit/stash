@@ -19,6 +19,7 @@ import subprocess
 import tarfile
 import tempfile
 from native_store import selection_digest, validate_reference
+import media_objects
 
 STANDARD_REMOTE_PATH = "s3-standard:metadata-backup-andrew/"
 REMOTE_PATH = "glacier:video-backup-andrew/"
@@ -41,17 +42,26 @@ def beneath(root, relative):
     return path
 
 
+def video_path(manifest, video):
+    return video["path"] if manifest["version"] == 4 else video["key"]
+
+
 def validate_manifest(manifest):
-    if (manifest.get("format") != "s3-log-backup" or type(manifest.get("version")) is not int
-            or manifest["version"] not in (2, 3)):
+    if (not isinstance(manifest, dict) or manifest.get("format") != "s3-log-backup"
+            or type(manifest.get("version")) is not int or manifest["version"] not in (2, 3, 4)):
         raise ValueError("Unsupported restore manifest format")
     if not isinstance(manifest.get("units"), list) or not isinstance(manifest.get("videos"), list):
         raise ValueError("Manifest must contain units and videos lists")
     seen_units, seen_videos, seen_archives = set(), set(), set()
     directories = {}
     for unit in manifest["units"]:
+        if (not isinstance(unit, dict)
+                or not {'rel_dir', 'kind', 'unit_id', 'base_key', 'deltas'} <= unit.keys()):
+            raise ValueError("Invalid archive unit")
         rel = str(relative_path(unit["rel_dir"]))
         kind = unit["kind"]
+        if not isinstance(kind, str):
+            raise ValueError("Invalid archive kind")
         prefix = {"recursive": "R:", "rootfiles": "F:"}.get(kind)
         if prefix is None or unit["unit_id"] != prefix + rel or unit["unit_id"] in seen_units:
             raise ValueError("Invalid or duplicate archive unit")
@@ -71,19 +81,33 @@ def validate_manifest(manifest):
             if directories.get(str(parent)) == "recursive":
                 raise ValueError("Recursive archive units overlap")
     for video in manifest["videos"]:
+        if not isinstance(video, dict) or "key" not in video:
+            raise ValueError("Invalid video entry")
         key = video["key"]
         relative_path(key)
-        if key in seen_videos or key in seen_archives:
-            raise ValueError(f"Duplicate restore key: {key!r}")
-        if video.get("size") is not None and (not isinstance(video["size"], int) or video["size"] < 0):
+        path = video.get("path") if manifest["version"] == 4 else key
+        relative_path(path)
+        if path in seen_videos or key in seen_archives:
+            raise ValueError(f"Duplicate restore path or conflicting key: {path!r}")
+        if video.get("size") is not None and (type(video["size"]) is not int or video["size"] < 0):
             raise ValueError(f"Invalid video size: {key!r}")
-        seen_videos.add(key)
-    if manifest["version"] == 3:
+        seen_videos.add(path)
+    for path in seen_videos:
+        if any(str(parent) in seen_videos for parent in PurePosixPath(path).parents):
+            raise ValueError("Video restore paths overlap")
+    for directory in directories:
+        if any(str(part) in seen_videos for part in (PurePosixPath(directory), *PurePosixPath(directory).parents)):
+            raise ValueError("Video restore path overlaps an archive directory")
+    if manifest["version"] == 4:
+        media_objects.validate_inventory(manifest)
+        if manifest.get("scope") not in ("native", "media"):
+            raise ValueError("Immutable manifests require an explicit native or media scope")
+    if manifest["version"] == 3 or (manifest["version"] == 4 and manifest["scope"] == "native"):
         reference = validate_reference(manifest.get("native_archive"))
         if selection_digest(manifest) != reference["selection_sha256"]:
             raise ValueError("Media selection differs from its native archive publication")
     elif "native_archive" in manifest:
-        raise ValueError("Historical media manifests cannot claim a native archive binding")
+        raise ValueError("Media-only manifests cannot claim a native archive binding")
     return manifest
 
 
@@ -178,17 +202,23 @@ def select_plan(manifest, search_term, include_videos=False):
     validate_manifest(manifest)
     term = search_term.casefold()
     units = [unit for unit in manifest["units"] if term in unit["rel_dir"].casefold()]
-    videos = [video for video in manifest["videos"] if include_videos and term in video["key"].casefold()]
+    videos = [video for video in manifest["videos"]
+              if include_videos and term in video_path(manifest, video).casefold()]
     if not units and not videos:
         raise ValueError(f"No backup entries match {search_term!r}")
     # A subset restores media only. It cannot claim the whole-library native
     # binding after removing files from the original selection.
-    return validate_manifest({"format": "s3-log-backup", "version": 2,
-                              "run_id": manifest.get("run_id"), "units": units, "videos": videos})
+    selected = {"format": "s3-log-backup", "version": 2,
+                "run_id": manifest.get("run_id"), "units": units, "videos": videos}
+    if manifest["version"] == 4:
+        selected.update(version=4, scope="media", media_store=manifest["media_store"],
+                        objects={key: manifest["objects"][key] for key in required_keys(selected)})
+    return validate_manifest(selected)
 
 
 def required_keys(plan):
-    return [key for unit in plan["units"] for key in [unit["base_key"], *unit["deltas"]]] + [v["key"] for v in plan["videos"]]
+    return list(dict.fromkeys([key for unit in plan["units"] for key in [unit["base_key"], *unit["deltas"]]]
+                              + [v["key"] for v in plan["videos"]]))
 
 
 def show_plan(plan):
@@ -197,7 +227,7 @@ def show_plan(plan):
     for unit in plan["units"]:
         print(f"  {unit['rel_dir']} ({unit['kind']}): base + {len(unit['deltas'])} deltas")
     for video in plan["videos"]:
-        print(f"  video: {video['key']}")
+        print(f"  video: {video_path(plan, video)}")
     return keys
 
 
@@ -278,22 +308,39 @@ def restore_local(plan, objects_dir, destination):
     if destination.is_symlink() or (destination.exists() and (not destination.is_dir() or any(destination.iterdir()))):
         raise ValueError("Restore destination must be a new or empty directory")
     paths = {key: beneath(objects_dir, key) for key in required_keys(plan)}
+    signatures = {}
     for key, path in paths.items():
         if not path.is_file():
             raise FileNotFoundError(f"Required backup object is missing: {key}")
+        if plan["version"] == 4:
+            signatures[key] = media_objects.signature(path.lstat())
+            media_objects.verify_local(plan["objects"][key], path)
+            if signatures[key] != media_objects.signature(path.lstat()):
+                raise ValueError("Media object changed during restore verification")
     for video in plan["videos"]:
         if video.get("size") is not None and paths[video["key"]].stat().st_size != video["size"]:
             raise ValueError(f"Video size does not match manifest: {video['key']}")
+
+    def checked(key):
+        path = paths[key]
+        if key in signatures and signatures[key] != media_objects.signature(path.lstat()):
+            raise ValueError("Media object changed after restore verification")
+        return path
+
     destination.mkdir(parents=True, exist_ok=True)
     for unit in plan["units"]:
-        apply_archive(paths[unit["base_key"]], unit, destination, False)
+        apply_archive(checked(unit["base_key"]), unit, destination, False)
         epoch = None
         for key in unit["deltas"]:
-            epoch = apply_archive(paths[key], unit, destination, True, epoch)
+            epoch = apply_archive(checked(key), unit, destination, True, epoch)
     for video in plan["videos"]:
-        target = beneath(destination, video["key"])
+        target = beneath(destination, video_path(plan, video))
+        if target.exists():
+            raise ValueError("Video restore path collides with an archive member")
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(paths[video["key"]], target)
+        shutil.copy2(checked(video["key"]), target)
+    for key in signatures:
+        checked(key)
     return destination
 
 
@@ -316,10 +363,23 @@ def verify_tree(actual, expected):
     return len(actual_files)
 
 
+def media_client():
+    import boto3
+    from botocore.config import Config
+    return boto3.client("s3", config=Config(connect_timeout=10, read_timeout=60, retries={"max_attempts": 3}))
+
+
 def request_thaw(plan, directory, lifetime):
-    if lifetime < 1:
+    validate_manifest(plan)
+    if type(lifetime) is not int or lifetime < 1:
         raise ValueError("Thaw lifetime must be positive")
     keys = required_keys(plan)
+    if plan["version"] == 4:
+        client = media_client()
+        for key in keys:
+            media_objects.request_restore(client, plan["media_store"], key, plan["objects"][key], lifetime)
+        print(f"Requested Bulk thaw for {len(keys)} objects. No payloads were downloaded.")
+        return
     if not keys or any("\n" in key or "\r" in key for key in keys):
         raise ValueError("Cannot safely represent this selection as a thaw file list")
     listing = directory / "thaw-objects.txt"
@@ -366,15 +426,24 @@ def main(argv=None):
         if args.request_thaw:
             request_thaw(plan, directory, args.lifetime)
         elif args.check_status:
-            # restore-status ignores rclone filters: scope each call to one key.
-            for key in keys:
-                subprocess.run(["rclone", "backend", "restore-status", REMOTE_PATH + key, "-o", "all"], check=True)
+            if plan["version"] == 4:
+                client = media_client()
+                for key in keys:
+                    print(json.dumps(media_objects.restore_status(client, plan["media_store"], key, plan["objects"][key])))
+            else:
+                # restore-status ignores rclone filters: scope each call to one key.
+                for key in keys:
+                    subprocess.run(["rclone", "backend", "restore-status", REMOTE_PATH + key, "-o", "all"], check=True)
         elif args.download:
             objects = directory / "objects"
+            client = media_client() if plan["version"] == 4 else None
             for key in keys:
                 target = beneath(objects, key)
                 target.parent.mkdir(parents=True, exist_ok=True)
-                subprocess.run(["rclone", "copyto", REMOTE_PATH + key, str(target)], check=True)
+                if plan["version"] == 4:
+                    media_objects.download(client, plan["media_store"], key, plan["objects"][key], target)
+                else:
+                    subprocess.run(["rclone", "copyto", REMOTE_PATH + key, str(target)], check=True)
             restore_local(plan, objects, args.destination)
             print(f"Restore complete: {args.destination}")
         elif args.objects_dir:

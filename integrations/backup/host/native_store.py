@@ -14,6 +14,7 @@ from pathlib import Path
 import tempfile
 
 from object_receipts import ObjectReceipts, inventory as list_objects
+from media_objects import validate_inventory as validate_media_inventory
 
 from stash_archive.bundle import iter_artifacts, validate_manifest
 from stash_archive.filesystem_boundary import canonical_uuid
@@ -64,7 +65,9 @@ def validate_selection_binding(source, checkpoint_uuid, selection_sha256):
             or media["filesystem_boundary_sha256"] != filesystem["sha256"]
             or media["selection_sha256"] != selection_sha256
             or not isinstance(media["selection"], dict)
-            or set(media["selection"]) != {"format", "version", "videos", "units"}
+            or media["selection"].get("format") != SELECTION_FORMAT
+            or type(media["selection"].get("version")) is not int
+            or media["selection"]["version"] not in (1, 2)
             or media["selection"] != media_selection(media["selection"])
             or selection_digest(media["selection"]) != selection_sha256):
         raise InvalidArchive("Native backup and media selection do not share the same checkpoint")
@@ -105,6 +108,14 @@ def archive_objects(source, manifest):
 
 def media_selection(catalog):
     """Exclude publication timestamps/references, avoiding a circular digest."""
+    immutable = ((catalog.get("format") == "s3-log-backup" and catalog.get("version") == 4)
+                 or (catalog.get("format") == SELECTION_FORMAT and catalog.get("version") == 2))
+    if immutable:
+        validate_media_inventory(catalog)
+        return {"format": SELECTION_FORMAT, "version": 2,
+                "videos": sorted(catalog["videos"], key=lambda item: item["path"]),
+                "units": sorted(catalog["units"], key=lambda item: item["unit_id"]),
+                "media_store": catalog["media_store"], "objects": catalog["objects"]}
     return {"format": SELECTION_FORMAT, "version": 1,
             "videos": sorted(catalog["videos"], key=lambda item: item["key"]),
             "units": sorted(catalog["units"], key=lambda item: item["unit_id"])}

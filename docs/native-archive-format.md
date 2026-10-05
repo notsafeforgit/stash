@@ -619,6 +619,15 @@ scheduling and S3 publication belong to that host package, not this component
 transport or the Stash server. Complete production inventory and cutover proof
 remain separate gates.
 
+The host readers also accept version 4 media manifests, whose version 2 selection
+binds each restore path to a distinct object descriptor and explicitly records
+the cold bucket/prefix. Multiple paths may share one checksum-verified object.
+The complete native archive binding includes those descriptors, paths and store;
+subset media plans drop the whole-library native claim. Historical selection
+version 1 remains readable. The publisher/cleanup conversion is still pending;
+see the [immutable media restore contract](../integrations/backup/README.md#immutable-media-restore-contract).
+This does not require S3 object versions or change the portable bundle format.
+
 ## Validation
 
 `make validate-archive` runs temporary SQLite/WAL, restore, artwork, pending-work,

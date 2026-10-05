@@ -8164,3 +8164,54 @@ claimed as complete historical-content proof. Installed scripts, production
 services and schedules remain unchanged. Parent `c5d781ee0` has successful Build,
 lint and GHCR workflows. All wider migration/UI/caller, restore, cutover and
 retirement gates remain in the full transition plan.
+
+## Immutable media restore identities — 2026-10-05
+
+The host readers now accept a version 4 media manifest with a bound bucket/prefix,
+full-object checksum descriptors, and separate video restore paths. Different
+paths can reference shared bytes without duplicate download or thaw requests.
+New content keys use `media/sha256/<sha256>`; historical keys remain valid when
+their complete checksum evidence is available. The descriptor supports S3's
+full SHA-256/SHA-1/CRC64NVME/CRC32C/CRC32 checksums, including cold multipart
+objects with full CRC evidence. Adoption does not copy or thaw existing objects;
+missing/composite-only evidence requires review, not automatic reupload.
+
+Native selection version 2 covers the media store, every required descriptor,
+and all restore paths. It survives real portable packing, Standard publication,
+download and reconstruction; changing a path/store/checksum breaks the original
+binding. Selection version 1 and historical text/v2/v3 inputs remain readable.
+Subset plans retain only their required descriptors and cannot inherit the
+whole-library native claim.
+
+Offline restore checks all required bytes before creating output, detects source
+replacement during reconstruction, and rejects colliding paths or overwrites of
+archive members. Explicit v4 status/thaw/download use the bound store, deduplicate
+keys and verify checksum evidence. Corrupt downloads are removed, existing files
+are preserved, and missing/changed objects never select newer replacement bytes.
+Planning constructs no cold client. Default remote coverage audit uses only a
+complete paginated listing for cold objects; the new `--media-checksums` option
+explicitly requests one HEAD per distinct object, without payload reads or thaw.
+
+Verification:
+
+- `native_immutable_restore_host_final`: all 166 host tests pass in 35.9 seconds,
+  including 19 new identity/restore/audit and real-bundle binding regressions.
+  The previous receipt/request-count regression remains passing. The first
+  164-test pass was followed by additional archive-member collision and explicit
+  checksum-audit coverage; this final gate includes both.
+- `native_immutable_restore_readers_final`: all 18 focused reader/audit tests
+  pass after the final report-label and fixture-resource cleanup.
+- `native_immutable_restore_package`: isolated package installation passes in
+  4.6 seconds with the pinned native checksum dependency. No installed host
+  script or live service is changed.
+- Parent `8c0721a52ab5edf7cf6e4ef11bd00d940a174451` Build, lint and GHCR workflows
+  are all successful. No production cloud request or data migration was performed
+  by these tests.
+
+This commits the read/verification contract before converting the publisher.
+The daily writer still produces v3 path/size selections. Durable cold upload
+receipts, immutable replacement publication, existing-object reuse, shared-path
+cleanup and interrupted-run reconciliation remain necessary before activation.
+Reader support alone does not close that cutover gate. The earlier full-size
+archive rehearsal remains retained and was not repeated. Wider migration,
+caller/UI, scheduling, restore and owner-review gates remain unchanged.

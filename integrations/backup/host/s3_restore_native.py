@@ -13,7 +13,7 @@ from stash_archive.verification import verify_archive_proofs, validator_path
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--manifest", type=Path, required=True, help="Published v3 master JSON from the Standard bucket.")
+    parser.add_argument("--manifest", type=Path, required=True, help="Published native master JSON from the Standard bucket.")
     parser.add_argument("--metadata-bucket", default="metadata-backup-andrew")
     parser.add_argument("--prefix", default="")
     parser.add_argument("--aws-region")
@@ -24,7 +24,7 @@ def main(argv=None):
     parser.add_argument("--validator-timeout", type=int, default=3600)
     args = parser.parse_args(argv)
     catalog = load_manifest(args.manifest)
-    if catalog["version"] != 3:
+    if "native_archive" not in catalog:
         raise InvalidArchive("This backup predates native archive publication; use its historical restore tools")
     if args.reserve_bytes < 0:
         parser.error("--reserve-bytes must be nonnegative")

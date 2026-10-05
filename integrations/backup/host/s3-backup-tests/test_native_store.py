@@ -244,6 +244,47 @@ class NativeStoreTests(unittest.TestCase):
             self.store.publish_archive(self.archive, proof, self.checkpoint, selection_digest(self.catalog))
         self.assertEqual(self.s3.operations, [])
 
+    def test_immutable_selection_survives_real_bundle_publication_and_restore(self):
+        from media_objects import object_key
+        body = b'one video, two filenames'
+        sha = hashlib.sha256(body).hexdigest()
+        key = object_key(sha)
+        self.catalog = {'format': 's3-log-backup', 'version': 4, 'scope': 'media', 'units': [],
+                        'media_store': {'bucket': 'archive-bucket', 'prefix': 'media/'},
+                        'videos': [{'path': path, 'key': key, 'size': len(body)} for path in ('one.mp4', 'two.mp4')],
+                        'objects': {key: {'size': len(body), 'sha256': sha, 'storage_class': 'DEEP_ARCHIVE',
+                                         'checksum': {'algorithm': 'sha256', 'value': base64.b64encode(bytes.fromhex(sha)).decode()}}}}
+        self.media.update(selection=media_selection(self.catalog), selection_sha256=selection_digest(self.catalog))
+        path = self.root / 's3-media.json'
+        path.write_bytes(json_bytes(self.media))
+        entry = store_file(self.archive, path, reserve=0)
+        entry.update(role='media_manifest', name=path.name)
+        self.entries = [entry if previous['role'] == 'media_manifest' else previous for previous in self.entries]
+        inventory = b''.join(json_bytes(e) for e in self.entries)
+        self.manifest['inventory'] = {'sha256': hashlib.sha256(inventory).hexdigest(), 'size': len(inventory),
+                                     'count': len(self.entries), 'total_bytes': sum(e['size'] for e in self.entries)}
+        (self.archive / 'artifacts.jsonl').write_bytes(inventory)
+        (self.archive / 'manifest.json').write_bytes(json_bytes(self.manifest))
+        library = self.entries[0]
+        report = {'format': FORMAT + '.snapshot-verification', 'version': 1, 'lineage': FORMAT,
+                  'schema_version': 1000077, 'sha256': library['sha256'], 'bytes': library['size'],
+                  'database_verified': True, 'pending_file_deletions': 0, 'filesystem_recovery_verified': False}
+        with patch('stash_archive.verification.validator_output', return_value=json_bytes(report)):
+            self.proof = verify_archive_proofs(self.archive, native_validator=sys.executable,
+                                                producer_origin='https://stash.example', reserve=0, temp_parent=self.root)
+        reference = self.publish()
+        self.store.audit(reference, reserve=0)
+        self.store.download(reference, self.root / 'immutable-download', reserve=0)
+        import_archive(self.root / 'immutable-download', self.root / 'immutable-restored', reserve=0)
+        restored = json.loads((self.root / 'immutable-restored/components/media_manifest/s3-media.json').read_bytes())
+        self.assertEqual(restored['selection']['version'], 2)
+        self.assertEqual(restored['selection'], media_selection(self.catalog))
+        before = list(self.s3.operations)
+        self.catalog['videos'][0]['path'] = 'changed.mp4'
+        with self.assertRaises(InvalidArchive):
+            self.publish()
+        self.assertEqual(self.s3.operations, before)
+
     def test_audit_missing_object_and_corrupt_download_fail(self):
         reference = self.publish()
         self.s3.corrupt_read = True

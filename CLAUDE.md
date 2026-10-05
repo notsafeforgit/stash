@@ -124,6 +124,14 @@ Keep database/record images in Standard and bulk media in Deep Archive, with
 bounded retention and request-count tests. Cold media still needs immutable-key
 replacement handling before activation; do not require bucket versioning to
 compensate for reusing mutable filename keys.
+The media readers accept v4 object descriptors with separate restore paths and
+a bound cold store, retaining v2/v3 historical input. Native selection v2 binds
+those identities into the portable archive. Deduplicate remote requests by
+object key; different source paths can share bytes. Offline restore verifies all
+selected bytes before extraction and rejects changed inputs and path collisions.
+Cold checksum audits are explicit (`--media-checksums`), never a routine daily
+HEAD sweep. The v4 publisher, durable object index and cleanup conversion remain
+pending; do not present reader support as completed replacement protection.
 The host now journals one active attempt and resumes its original sealed view,
 media selection or published cleanup after restart. Owned scratch is reclaimed
 only under backup exclusion, which upload/validator children inherit. The S3

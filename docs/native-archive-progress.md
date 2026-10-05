@@ -177,7 +177,7 @@ it does not remove source files or recovery inputs.
 | 3 Catalog importer and full-copy reconciliation | Permanent backfill decisions, retained scan journals/reviewed recovery activation, performer UUIDs and saved ownership, and account/catalog registry imports are implemented and rehearsed against full copies. All 1,697 frozen catalog bodies have bounded snapshot receipt and native mappings for posts/profiles/captures, account/post relationships, captured publishers, attachment lists, assets/files/appearances, collection memberships, retained documents and translation results. Historical album backfill is resumable and rehearsed. Original evidence, replay receipts and unresolved conflicts are retained. Shared native translation request/cache/target storage, bounded execution, provider workers and application inspection/control are implemented. Automation snapshot preparation preserves all ten operational families and has passed full-source reconciliation. Resumable native receipt, translation request/cache/target mapping and reviewed activation are implemented. The saved-plan bulk client has activated 324,169 imported holds in a full-copy rehearsal with lost-response recovery and independent reconciliation. Automatic capture scheduling now records revisioned collection-policy decisions with its requests and targets in the capture transaction. Native enrichment targets preserve revisioned scheduling choices and exact capture-completion evidence, with application inspection/control. Internal execution binds jobs to exact source/target revisions, authenticates each attempt producer and retains compact checkpoints with original observation provenance. Verified publication now uses native capture, publisher, album and translation services and commits record associations with target/job completion. Completed staging is verified and released atomically, retaining native captures, acknowledgement/provenance rows and unresolved references. Scoped enrichment routes and the Python transport/lease client now expose those services, with controlled failure replay, bounded checkpoint transfer and exact source-number preservation. Selected-job execution now journals stable claims, returned checkpoints and pending delivery intents in producer outbox schema 8; reviewed metadata-only profiles and delivery-only recovery are implemented. Collection-scoped dispatch now discovers admitted retries before new targets, with durable producer cursors/backoff and pagination past incompatible URLs. Native server maintenance recovers expired attempts and cancels stale work without discarding checkpoints. Native shared service reservations and cooldowns now coordinate downloads with enrichment, including fenced reservations before contacting newly discovered child services. Download-side linked-service reservations, typed failures, bounded download preference and cooperative source turns are implemented. Persistent worker/profile rotation and automatic collection discovery are also implemented. Historical catalog enrichment receipts now have resumable native import and application inspection, preserving the old assertion without creating native attempts. Frozen legacy enrichment jobs, cooldowns and seed/source progress now have bounded native mapping with held work, scoped historical completion, explicit review and retained exclusions. Reviewed legacy enrichment activation is implemented, including explicit collection-revision handoffs. Retained staged results now have conversion, evidence acceptance and exact handoff review; scoped native admission, worker resume, child service scheduling, publication and released proofs preserve original observations separately from fresh child captures. Frozen discovery listings, pending targets, candidate associations and maintenance history now have bounded native mapping and inspection, with original cursors and retry delays retained. Immutable account listings and producer-owned page jobs have scoped worker HTTP support and shared pacing. Reviewed discovery activation, durable producer delivery/dispatch, native candidate comparison and current coverage inspection are implemented and rehearsed. Complete, unique strong matches now have atomic native publication, verified on the populated archive, and bounded automatic server dispatch. Reviewed recovery of missing-history listings is implemented and rehearsed on the populated archive, preserving earlier cursors, bindings and evidence. Original-evidence detail comparison, native capture preparation, read-only application previews, candidate-bound detail jobs, authenticated checkpoint/result retention and scoped worker HTTP are implemented. Python detail delivery/dispatch and scoped collection discovery are implemented. Authenticated detail results now publish through shared native services, with full-copy reconciliation, restart inspection and the full validation gate passed. Automatic candidate-detail admission now uses selected worker profiles and bounded indexed inspection, with durable producer cursors and transactional review guards. Actual discovery source coverage, verified staging release, explicit post consolidation, additional download adapters, existing policy migration, remaining historical/operational conversion, validated source routing, review resolution, global reconciliation and cutover import remain unfinished. |
 | 4 Native UI and client conversion | In progress: scene/image metadata review is available through desktop tabs and mobile sections, with explicit relationship choices and browser request recovery. Account ownership review has native controls, desktop/mobile navigation, bounded discovery, explicit performer choice, selected-account refresh and saved-request recovery. Account consolidation review supports same-service selection, ownership conflict resolution, stable-ID acknowledgement, retained history and exact recovery. Broader source/account/collection management and remaining caller conversion are unfinished. |
 | 5 Compatibility removal and packaging | Preview packaging is isolated. V3 is the sole embedded UI; native plugin manifests, playback, bulk edits and entity queries have replaced their former runtime contracts. Group aliases are removed in the current increment. Remaining API, configuration and export/import bridges still require conversion/removal. |
-| 6 Backup and cutover rehearsal | In progress: full-library portable export/restore and reconciliation passed; native/producer/filesystem checkpoints, host publication, interrupted-run recovery and scoped cleanup are implemented. Standard and cold publication now reuse checksum receipts with paginated inventories; larger database chunks reduce upload requests. Immutable cold objects have separate restore paths and shared-reference cleanup. Complete worker/config inventory, retention/cost measurements, full capture pause/WAL measurements and relocated restore/cutover review remain. |
+| 6 Backup and cutover rehearsal | In progress: full-library portable export/restore and reconciliation passed; native/producer/filesystem checkpoints, host publication, interrupted-run recovery and scoped cleanup are implemented. Standard and cold publication now reuse checksum receipts with paginated inventories; larger database chunks reduce upload requests. Immutable cold objects have separate restore paths and shared-reference cleanup. Declared worker dependencies are resolved and bound to captured files. Final deployment/environment inventory, retention/cost measurements, full capture pause/WAL measurements and relocated restore/cutover review remain. |
 | 7 Production cutover | Not started; compatible production continues |
 | 8 Retirement and acceptance | Not started |
 
@@ -8264,3 +8264,59 @@ restore evidence is retained without repeating the large rehearsal. Remaining
 release gates include complete component inventory, retention/cost measurements,
 full capture timings, relocated restore, migration/UI/caller completion and the
 owner's production cutover review.
+
+
+## Worker backup dependency closure — 2026-10-05
+
+The host publisher can now resolve an explicit `worker_inventory` under the
+worker publication barriers. It follows download/enrichment/listing/detail
+profiles, layered private JSON references, reviewed helper assets, cookie files,
+yt-dlp file arguments and fixed-directory download archive templates. Container
+paths use declared longest-prefix mappings; relative bindings use the profile
+folder, while gallery paths use the declared worker cwd/home. Reports retain
+paths and hashes without resolved credentials. Duplicate paths share one captured
+component; conflicting backup roles and unheld publication roots fail.
+
+A run retains its resolved report before staging. Parsed dependency hashes must
+match the actual staged bytes before requesting the native checkpoint. A retry
+uses that original report and component stage, even after live profiles or cookie
+files disappear. New backups re-enumerate archive templates so a newly used
+service's archive is included. Standalone `stash-s3-inventory` provides read-only
+inspection, with a private non-overwriting output file. This is dependency proof
+for declared workers, not automatic discovery or activation of every launcher.
+
+Verification:
+
+- `native_worker_inventory_final`: all 211 host tests pass in 46.3 seconds,
+  including 11 new tests for private references, mount mappings, new archives,
+  helper changes, missing/symlink files, metadata profiles, barrier coverage,
+  real SQLite component snapshots, captured-file drift and original retry state.
+- `native_worker_inventory_package`: isolated installation passes in 4.6 seconds.
+  All six entrypoints pass `--help`; the installed inventory command reproduces
+  the source implementation's report and creates it with mode 0600.
+- Seven previously staged host/n8n profiles were inspected against current
+  production dependencies: 15 download archives, 11 shared configuration/cookie/
+  helper files, the inventory declaration and seven profiles. Their shared lock
+  root resolves to `/tank/media/scrape_metadata/.download-locks`. This inspection
+  used an explicitly synthetic local outbox; native production outboxes are not
+  yet provisioned and the profiles were not activated.
+- A separate read-only inventory records 49 current unit/launcher/list/build
+  files, three legacy operational databases and 14 relevant n8n workflows. All
+  nine active relevant workflows have matching draft, active-history and published
+  graph evidence. The live status check found Stash and n8n running and the
+  scheduled Reddit service in progress. No service was changed.
+
+Private evidence is retained in `.local/native-backup-inventory-20261005/`.
+The earlier service read initially encountered an approval-review capacity
+failure; the approved retry completed successfully. Disk free remains 164.1 GiB,
+above the 50 GiB reserve. Parent `3e7eeee0d` Build/lint succeeded; GHCR passed its
+validation step and was building the image at the last observation. The older
+`12b05abcb` GHCR retry was superseded/cancelled, not mistaken for successful
+publication.
+
+Complete the final native launcher/profile/outbox/environment declarations and
+reviewed host configuration after staging their actual deployment locations.
+Include source lists, unit/environment files and workflow exports in explicit
+components; profile closure alone does not establish complete deployment coverage.
+No production writer, S3 policy or schedule was changed. Retention/cost/capture
+measurements and all remaining migration/UI/caller/restore/cutover gates stay open.

@@ -197,6 +197,7 @@ Non-dry publication requires `--native-config /private/host-backup.json` or
 | `media` | Explicit `dataset`, `guid`, `mountpoint`, and media `relative_path` within that dataset |
 | `worker_lock_roots` | Every native worker publication-lock root |
 | `components` | Complete `{role, name, path}` inventory of outboxes, download archives, profiles and referenced private files |
+| `worker_inventory` | Optional path to the worker dependency declaration described below; resolved under publication barriers and retained for retries |
 | `recovery_roots` | Native deletion-recovery `{name, path}` bindings |
 | `producer_origin` | Original endpoint used to validate producer receipts |
 | `native_validator` | Trusted local native Stash executable |
@@ -209,6 +210,66 @@ some files does not prove completeness. Reconcile production components,
 including layered profile references and environment assets, against every active
 worker before installation. The daily 03:00 America/Los_Angeles schedule remains
 host-owned and unchanged.
+
+### Worker dependencies
+
+`stash-s3-inventory --inventory /private/workers.json --output /private/inspection.json`
+checks a declaration without starting workers, contacting Stash/S3, or printing
+resolved credentials. The output must be a new file. A declaration has this shape:
+
+```json
+{
+  "format": "org.notsafeforgit.stash.worker-inventory",
+  "version": 1,
+  "workers": [
+    {
+      "name": "host",
+      "profile": "/private/host-worker.json",
+      "home": "/home/archive",
+      "working_directory": "/media",
+      "outboxes": ["/private/outbox.sqlite"]
+    }
+  ]
+}
+```
+
+Each entry represents a declared deployment/profile. Multiple entries can share
+outboxes, archives and private files; each path is captured once. Include download,
+enrichment, account-listing and detail-verification profiles. Download profiles
+contribute their identity-checked publication root; `lock_roots` can declare
+additional roots. All such roots must already be covered by the host backup's
+`worker_lock_roots` before inspection.
+
+For containers, `path_mappings` is an array of `{"from": "/container/path",
+"to": "/host/path"}` mounts. The longest matching prefix wins. Profile binding
+paths resolve relative to the profile directory, while cookie/command paths use
+the declared worker home and working directory. The inspector never uses its own
+ambient home, working directory or environment values to guess a worker's paths.
+
+The resolver follows private JSON files and layered references, checked helper
+assets, cookie-file paths (including yt-dlp arguments), and download archive
+templates with a fixed directory. New matching archive files are included on
+each new backup. `.bak` files are excluded unless the configured template matches
+them. Missing files, changed helper digests, symlinks and unresolved dynamic paths
+stop inspection. Browser credential stores require a portable cookie-file policy.
+An environment binding requires an `environment` entry mapping its variable name
+to the explicit JSON `file`/`pointer` used to provision it. Capture dotenv files,
+launcher units, source lists, reviewed n8n workflow exports and other operating
+inputs through the host's explicit `components` list.
+
+With `worker_inventory` configured, the host resolves this closure while holding
+worker publication barriers. It retains the report with the run and adds every
+dependency to the component stage. Parsed profile/private/helper hashes must match
+the actual staged bytes before requesting the native checkpoint. A retry uses
+the original report and staged files, even if live profiles or archive membership
+have changed. The report itself is included in the native archive.
+
+This proves the dependencies of declared workers. It does not discover every
+running process, provision outboxes/tokens, validate installed runtime versions,
+or prove that the declaration covers all active launchers. Reconcile that scope
+against host services, manual entrypoints and published n8n workflow versions
+before cutover. Standalone inspection does not hold publication barriers and is
+not a coordinated backup.
 
 ## Restore and audit
 

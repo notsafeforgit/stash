@@ -137,6 +137,14 @@ current references and rechecks returning or changed live paths before tagging.
 Retained selections verify every selected object without rescanning. Historical
 v3 in-flight native attempts require their original writer. Production inventory,
 retention reconciliation, real cost measurements and cutover review remain open.
+An optional `worker_inventory` declaration resolves download/metadata worker
+profiles, layered private references, helper assets, cookie files and archive
+templates under the declared worker barriers. The host retains the closure per
+run and verifies parsed dependency hashes against the actual component snapshots
+before sealing. Retries use the original closure. `stash-s3-inventory` performs
+read-only inspection with explicit container mappings and never prints resolved
+credentials. Match declarations to actual launchers and published workflows;
+automatic dependency resolution does not prove that every deployment was listed.
 The host now journals one active attempt and resumes its original sealed view,
 media selection or published cleanup after restart. Owned scratch is reclaimed
 only under backup exclusion, which upload/validator children inherit. The S3

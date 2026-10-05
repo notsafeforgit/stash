@@ -26,6 +26,7 @@ from stash_archive.zfs_media import ZFSMedia, mounts, release_published_media
 
 from native_store import (MEDIA_FORMAT, NativeStore, archive_objects, media_selection, selection_digest,
                           validate_reference, validate_selection_binding)
+import worker_inventory
 
 CONFIG_FORMAT = "org.notsafeforgit.stash.host-backup"
 RUN_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}\Z")
@@ -244,7 +245,7 @@ class NativeBackupSession:
         config = decode_json(body)
         required = {"format", "version", "server", "api_key_file", "state_directory", "artwork_sources", "media",
                     "worker_lock_roots", "components", "recovery_roots", "producer_origin", "native_validator"}
-        optional = {"reserve_bytes", "boundary_timeout", "validator_timeout", "zfs_command"}
+        optional = {"reserve_bytes", "boundary_timeout", "validator_timeout", "zfs_command", "worker_inventory"}
         if (not isinstance(config, dict) or not required <= config.keys() or config.keys() - required - optional
                 or config["format"] != CONFIG_FORMAT or type(config["version"]) is not int or config["version"] != 1):
             raise InvalidArchive("Invalid native host backup configuration")
@@ -322,7 +323,21 @@ class NativeBackupSession:
                 self.client.existing_only = True
                 if not (component_cache / saved["checkpoint_uuid"] / "manifest.json").is_file():
                     raise InvalidArchive("Sealed backup is missing its original external component stage")
+            inventory = None
+            if "worker_inventory" in config:
+                report_path = self.root / "worker-inventory.json"
+                if self.resumed:
+                    # Recover the original closure even if profiles, mounts or
+                    # archive membership have since changed or disappeared.
+                    inventory = worker_inventory.validate_report(read_record(report_path))
+                else:
+                    inventory = worker_inventory.collect(config["worker_inventory"])
+                    same_or_publish(report_path, json_bytes(inventory))
+                components = worker_inventory.components_for_capture(inventory, components, config["worker_lock_roots"])
+                components.append({"role": "operating_state", "name": "worker-inventory.json", "path": report_path})
             self.stage = capture.prepare(component_cache, self.client, components, reserve=self.reserve)
+            if inventory is not None:
+                worker_inventory.verify_stage(inventory, self.stage)
             self.stage.seal()
         self.view = self.media.open_bound(self.client.boundary_receipt).verify()
         self.media_path = self.view.resolve(relative)

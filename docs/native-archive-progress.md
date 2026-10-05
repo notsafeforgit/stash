@@ -7931,3 +7931,23 @@ Complete active-worker/configuration inventory, the installed daily publisher
 and restore/audit conversion, matching media-manifest/S3 publication, abandoned
 capture retention and production-scale pause/restore gates remain. Production,
 installed scripts and schedules have not switched.
+
+## Host backup tooling rollback baseline — 2026-10-05
+
+The daily publisher, performer restore helper, backup audit, offline restore
+tester, regression suite and installed policy documentation are now tracked in
+`integrations/backup/host`. `integrations/backup/baseline.json` records their
+original lengths and SHA-256 digests. All six copies match the installed files
+byte for byte. No installed file, timer, cloud object or delegation changed.
+
+All 103 existing host regression cases pass in 42.5 seconds from the repository
+copies. The fixture blocks real subprocess/AWS access and uses temporary local
+object stores. Evidence is `native_host_backup_baseline_tests` under the October
+4 client rehearsal directory. This establishes the existing upload, publication,
+restore and cleanup behavior as a rollback point before conversion.
+
+These files still invoke the old catalog publisher, and their baseline tests
+still use the installed old catalog package. That live dependency must be removed
+in the next conversion; this baseline is not a completed native integration or a
+second supported runtime. Historical backup restore formats remain input data,
+independent of the retired v2.5 application contract.

@@ -1,0 +1,39 @@
+{
+  "format": "org.notsafeforgit.stash.host-backup-baseline",
+  "version": 1,
+  "captured_at": "2026-10-05T08:10:11.906321+00:00",
+  "source_directory": "/home/andrew/bin",
+  "status": "Unmodified installed-script baseline before native conversion; never install this directory implicitly.",
+  "files": [
+    {
+      "file": "s3_log_backup.py",
+      "bytes": 122808,
+      "sha256": "84f028dcf545ed8f3c589149c871fae5313c725622dcb4ae4002d203e1f72e45"
+    },
+    {
+      "file": "s3_restore_performer.py",
+      "bytes": 18943,
+      "sha256": "0be0c29ca954fe6628de8283b5fdafc66b0212469f17a8d18574e187a04433da"
+    },
+    {
+      "file": "s3_backup_audit.py",
+      "bytes": 16826,
+      "sha256": "92a818812b46cef145822cca9f4b2f6bf6087ae2a58b06e3b949338abef200ec"
+    },
+    {
+      "file": "s3_test_restore.py",
+      "bytes": 1849,
+      "sha256": "d18ef5bd0dee444ace808524cef9ea5883c27e3cb74b49d66641d991c27f6d2b"
+    },
+    {
+      "file": "s3-backup-tests/test_s3_backup.py",
+      "bytes": 44465,
+      "sha256": "6d48e9adf4be23c493a6f153826fe0e719c3f28830a8ba737e973d837d73fa86"
+    },
+    {
+      "file": "s3-backup-README.md",
+      "bytes": 12749,
+      "sha256": "94a5e7a7aa3c9b8e7159206781ed0a684804ac32bce61ec15f6d3baeead0967d"
+    }
+  ]
+}

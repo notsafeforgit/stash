@@ -16,6 +16,43 @@ state, a matching media manifest, verified remote publication and the complete
 restore drill in the [transition plan](native-archive-transition-plan.md).
 Supplying several live database paths does not establish that shared boundary.
 
+The optional producer receipt check verifies capture/file events and source-run
+admissions after a complete verified restore:
+
+```sh
+stash-archive verify /backups/native-archive --temp-parent /restore-work \
+  --producer-origin https://stash.example
+```
+
+Every registered producer must have exactly one matching outbox snapshot for
+that origin. An acknowledged event whose payload has been discarded must have
+the same native receipt, including its digest, scope, result and commit time.
+Pending, sending and review events retain their original bytes. If Stash already
+accepted an event but its response was lost, matching native acceptance is
+reported separately and the retained payload remains available for replay.
+Missing or conflicting receipts fail verification; the check changes no queue
+state. It also rejects newer outbox versions until their receipt contract is
+supported. Retired producers still need their retained outboxes until an explicit
+retirement/checkpoint protocol allows their removal.
+
+Source requests retain their original template and window after admission.
+Verification reconstructs their submitted bytes and checks Stash's separately
+normalized request digest. Coalesced requests retain their own identities; a
+later run state does not rewrite an earlier admission. Unsubmitted windows,
+leased requests and requests awaiting review remain pending work. Admission
+does not certify scrape completion.
+
+The returned proof identifies the archive, canonical manifest digest, exact
+library/outbox component hashes and bounded per-producer counts/digests. Its
+coverage is `capture-file-and-run-admission-receipts`. This does **not** certify
+enrichment/discovery journals, download archives, media or config.
+Those remain required parts of the coordinated production backup. The copied
+library used for the large restore rehearsal currently has no native producers;
+nonempty receipt checks use the real producer outbox, request queue and native
+receipt table definitions in SQLite regression fixtures. The backend and Python
+verifier also check the same source-request digest corpus, including offsets,
+fractional timestamps and year limits.
+
 ## Commands
 
 Install into a prepared Python environment:

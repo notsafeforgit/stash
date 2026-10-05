@@ -1,0 +1,98 @@
+[
+  {
+    "name": "open_history",
+    "input": {
+      "request_uuid": "33333333-3333-4333-8333-333333333333",
+      "collection_uuid": "22222222-2222-4222-8222-222222222222",
+      "collection_revision": 7,
+      "operation": "download",
+      "policy_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "window": {
+        "since": null,
+        "until": "2026-10-01T00:00:00Z"
+      },
+      "cooldown_seconds": 30
+    },
+    "native_sha256": "8a344118eb4d20989701788ece1880a9a1f4cbde48185805ba3a4bf4e168ff03"
+  },
+  {
+    "name": "offset_and_fraction",
+    "input": {
+      "request_uuid": "33333333-3333-4333-8333-333333333333",
+      "collection_uuid": "22222222-2222-4222-8222-222222222222",
+      "collection_revision": 7,
+      "operation": "download",
+      "policy_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "window": {
+        "since": "2026-09-30T01:02:03.12+02:30",
+        "until": "2026-10-01T03:04:05.01-07:00"
+      },
+      "cooldown_seconds": 30
+    },
+    "native_sha256": "b90fa8a4ee4ed42b3bc3975d1dc6f50db2923c5519108fd92833dbfaf4ab43d0"
+  },
+  {
+    "name": "utc_fraction",
+    "input": {
+      "request_uuid": "33333333-3333-4333-8333-333333333333",
+      "collection_uuid": "22222222-2222-4222-8222-222222222222",
+      "collection_revision": 7,
+      "operation": "download",
+      "policy_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "window": {
+        "since": "2026-09-01T00:00:00.001Z",
+        "until": "2026-09-30T23:59:59.999Z"
+      },
+      "cooldown_seconds": 30
+    },
+    "native_sha256": "a454b7c7da011f58e8c661cc3e58055d382428dcac74d2e6a1ab3612801ffe97"
+  },
+  {
+    "name": "early_year",
+    "input": {
+      "request_uuid": "33333333-3333-4333-8333-333333333333",
+      "collection_uuid": "22222222-2222-4222-8222-222222222222",
+      "collection_revision": 7,
+      "operation": "download",
+      "policy_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "window": {
+        "since": "0001-01-01T00:00:00Z",
+        "until": "0001-01-01T00:00:00.001Z"
+      },
+      "cooldown_seconds": 30
+    },
+    "native_sha256": "a62a9bb4b8b06e8ae588d63e2fcb873a4d88f13d74dc0ceb507126d04fe98ad7"
+  },
+  {
+    "name": "late_year",
+    "input": {
+      "request_uuid": "33333333-3333-4333-8333-333333333333",
+      "collection_uuid": "22222222-2222-4222-8222-222222222222",
+      "collection_revision": 7,
+      "operation": "download",
+      "policy_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "window": {
+        "since": "9999-12-30T00:00:00Z",
+        "until": "9999-12-31T23:59:59.999Z"
+      },
+      "cooldown_seconds": 30
+    },
+    "native_sha256": "a14837ce3d2fdfa2c4b277fb05b41010e12ea33455718301e04ba36f69a9d4ab"
+  },
+  {
+    "name": "enrichment_with_max_revision",
+    "input": {
+      "request_uuid": "33333333-3333-4333-8333-333333333333",
+      "collection_uuid": "22222222-2222-4222-8222-222222222222",
+      "collection_revision": 2147483647,
+      "operation": "enrich",
+      "policy_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "window": {
+        "since": "2026-09-01T00:00:00Z",
+        "until": "2026-10-01T00:00:00Z"
+      },
+      "cooldown_seconds": 86400
+    },
+    "native_sha256": "b3165d107483e830b0013a8d27493d7c6311600b016f15a92c071a67d259c4c2"
+  }
+]

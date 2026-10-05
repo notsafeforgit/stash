@@ -7338,3 +7338,40 @@ Coverage is explicitly **declared components**. Coordinated live server and
 producer snapshots, acknowledged-event verification, matching media manifests,
 S3 publication and the remaining restore/cutover drills are still required.
 This increment does not change the production backup or deployment.
+
+## Backup producer receipt verification — 2026-10-04
+
+`stash-archive verify --producer-origin` now verifies capture/file acknowledgements
+and source-run admissions after restoring and checking every archive component.
+It requires an outbox for each registered producer and binds the resulting proof
+to the archive manifest and exact library/outbox hashes. Missing or conflicting
+native acknowledgements fail verification. Unacknowledged events retain their
+original bytes, including when the server accepted them before a response was
+lost. Sending and review states are preserved rather than reset.
+
+The admission check reconstructs each frozen request from its retained template
+and window, verifies the producer's original byte digest, then checks the native
+normalized digest and original run association. Coalesced requests keep separate
+receipts and unsubmitted windows remain queued. A later run state never turns an
+admission receipt into scrape-completion proof. The check also rejects a downgraded
+producer schema that would hide retained source requests.
+
+Thirty-two Python tests pass using actual Outbox/RunQueue transitions, the native
+receipt table definitions and the complete verified archive CLI. A shared six-case
+digest corpus also passes against the backend's actual hashing function, covering
+offsets, fractional times and year limits. The core storage format is unchanged.
+Reports use `native_archive_receipts_root` and
+`native_archive_run_digest_go` under `.local/native-discovery-client-20261004/`.
+Package-scoped Go lint also passes with zero issues.
+
+The preceding full gate passed all frontend, producer, helper, archive and lint
+checks and all other Go packages. API and SQLite exhausted their aggregate
+20-minute package timeout during concurrent archive I/O, without assertion
+failures. Both unchanged packages passed their targeted retry with a 45-minute
+budget: API in 1,443.8 seconds and SQLite in 1,559.7 seconds. The full-library
+export/restore/reconciliation rehearsal remains running.
+
+This verifies ingestion and admission receipts only. Enrichment/discovery journal
+acknowledgements, matching filesystem/config/download state, media manifests,
+remote publication and complete restore/cutover verification remain required.
+Production services and backup publication are unchanged.

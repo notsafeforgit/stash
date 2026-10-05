@@ -442,7 +442,7 @@ validate-fork: generate-backend validate-ui validate-producer validate-library v
 
 .PHONY: validate-archive
 validate-archive:
-	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=integrations/archive/src "$(PRODUCER_PYTHON)" -m unittest discover -s integrations/archive/tests -v
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=integrations/archive/src:integrations/gallery-dl/src "$(PRODUCER_PYTHON)" -m unittest discover -s integrations/archive/tests -v
 
 .PHONY: validate-library
 validate-library:

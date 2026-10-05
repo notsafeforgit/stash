@@ -83,6 +83,7 @@ def main(argv=None):
     verify = commands.add_parser("verify")
     verify.add_argument("archive")
     verify.add_argument("--temp-parent")
+    verify.add_argument("--producer-origin", help="Also verify registered producers' ingestion and source admission receipts")
     inspect = commands.add_parser("inspect")
     inspect.add_argument("archive")
     listing = commands.add_parser("list")
@@ -107,8 +108,15 @@ def main(argv=None):
             result = {"uuid": manifest["uuid"], "restored": str(Path(args.output).absolute()),
                       "coverage": manifest["coverage"], "contents_verified": True}
         elif args.command == "verify":
-            manifest = verify_archive(args.archive, temp_parent=args.temp_parent, reserve=args.reserve_bytes)
-            result = {"uuid": manifest["uuid"], "coverage": manifest["coverage"], "contents_verified": True}
+            if args.producer_origin:
+                from .receipts import verify_receipt_archive
+                proof = verify_receipt_archive(args.archive, args.producer_origin,
+                                               temp_parent=args.temp_parent, reserve=args.reserve_bytes)
+                result = {"uuid": proof["archive_uuid"], "coverage": "declared-components",
+                          "contents_verified": True, "ingestion_receipts": proof}
+            else:
+                manifest = verify_archive(args.archive, temp_parent=args.temp_parent, reserve=args.reserve_bytes)
+                result = {"uuid": manifest["uuid"], "coverage": manifest["coverage"], "contents_verified": True}
         elif args.command == "inspect":
             result = summary(args.archive)
         else:

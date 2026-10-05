@@ -17,13 +17,14 @@ import (
 	"github.com/stashapp/stash/pkg/fsutil"
 )
 
-// NativeCheckpoint is valid only inside WithNativeCheckpoint's callback. The
+// NativeCheckpoint is valid only during a checkpoint capture. The
 // source writer lock excludes application deletion staging/recovery as well as
 // database writes. Filesystem/config capture must finish inside that callback;
 // external download/media writers still need their own boundary verification.
 type NativeCheckpoint struct {
 	mu        sync.Mutex
 	active    bool
+	guardHeld bool
 	ctx       context.Context
 	reader    *sql.Conn
 	database  string
@@ -44,7 +45,30 @@ func (c *NativeCheckpoint) CopyDeletionSnapshot(destination string, roots []file
 	if !c.active {
 		return errors.New("native checkpoint is no longer active")
 	}
+	if !c.guardHeld {
+		return errors.New("native checkpoint filesystem capture has ended")
+	}
 	return file.CaptureDeletionSnapshot(c.ctx, c.journal, destination, roots, c.committed, checkSpace)
+}
+
+// CaptureNativeSnapshot fixes a WAL read transaction while the writer guard is
+// held, captures config/filesystem state, then releases the writer before the
+// potentially large SQLite copy. The read view stays fixed across later commits.
+// capture has the same exclusion/cancellation contract as WithNativeCheckpoint.
+// Non-WAL sources are refused rather than blocking ordinary writers for the copy.
+func CaptureNativeSnapshot(ctx context.Context, database, destination string, checkSpace func(int64) error, capture func(*NativeCheckpoint) error) error {
+	written := false
+	err := withNativeCheckpoint(ctx, database, capture, func(c *NativeCheckpoint) error {
+		if err := c.CopyDatabase(destination, checkSpace); err != nil {
+			return err
+		}
+		written = true
+		return nil
+	})
+	if err != nil && written {
+		_ = os.Remove(destination)
+	}
+	return err
 }
 
 func checkpointURI(path, mode string) string {
@@ -65,6 +89,10 @@ func checkpointURI(path, mode string) string {
 // recovery; it owns any non-database files it creates and must seal only after
 // this function succeeds. This is a capture primitive, not a complete backup.
 func WithNativeCheckpoint(ctx context.Context, database string, capture func(*NativeCheckpoint) error) (retErr error) {
+	return withNativeCheckpoint(ctx, database, capture, nil)
+}
+
+func withNativeCheckpoint(ctx context.Context, database string, capture, afterCapture func(*NativeCheckpoint) error) (retErr error) {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -149,9 +177,31 @@ func WithNativeCheckpoint(ctx context.Context, database string, capture func(*Na
 		return err
 	}
 	defer reader.Close()
+	if afterCapture != nil {
+		var mode string
+		if err := reader.QueryRowContext(ctx, "PRAGMA journal_mode").Scan(&mode); err != nil {
+			return err
+		}
+		if mode != "wal" {
+			return errors.New("live native snapshot requires WAL mode")
+		}
+		if _, err := reader.ExecContext(ctx, "BEGIN"); err != nil {
+			return err
+		}
+		defer func() {
+			_, err := reader.ExecContext(context.WithoutCancel(ctx), "ROLLBACK")
+			retErr = errors.Join(retErr, err)
+		}()
+		// BEGIN alone does not establish a read snapshot. Read a database page
+		// before the writer can advance, then keep this transaction through copy.
+		var count int
+		if err := reader.QueryRowContext(ctx, "SELECT count(*) FROM native_schema").Scan(&count); err != nil {
+			return err
+		}
+	}
 	// No Database.Open call: even an interrupted, uncommitted deletion keeps its
 	// staged bytes and raw journal available to the capture callback.
-	c := &NativeCheckpoint{active: true, ctx: ctx, reader: reader, database: path,
+	c := &NativeCheckpoint{active: true, guardHeld: true, ctx: ctx, reader: reader, database: path,
 		journal: (&Database{dbPath: path}).FileDeletionJournalPath(), committed: committed}
 	defer func() {
 		c.mu.Lock()
@@ -160,6 +210,23 @@ func WithNativeCheckpoint(ctx context.Context, database string, capture func(*Na
 	}()
 	if err := capture(c); err != nil {
 		return err
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if afterCapture != nil {
+		// Wait for any in-flight filesystem capture before unlocking, including
+		// when cancellation has already reached a copying goroutine.
+		c.mu.Lock()
+		err := guard.Rollback()
+		c.guardHeld = false
+		c.mu.Unlock()
+		if err != nil {
+			return err
+		}
+		if err := afterCapture(c); err != nil {
+			return err
+		}
 	}
 	if err := ctx.Err(); err != nil {
 		return err
@@ -192,9 +259,9 @@ func checkpointDeletionIDs(ctx context.Context, tx *sql.Tx) ([]string, error) {
 }
 
 // CopyDatabase uses SQLite's online backup API through a separate read-only
-// connection while the source writer guard is held. Unlike VACUUM INTO on the
-// guarded connection, this works inside the checkpoint. No existing output is
-// overwritten. checkSpace, when provided, runs before allocation and each step;
+// connection protected by the writer guard or a pinned WAL read transaction.
+// Unlike VACUUM INTO on the guarded connection, this works inside a checkpoint.
+// No existing output is overwritten. checkSpace runs before allocation and each step;
 // it must preserve the coordinator's disk reserve for the remaining bytes.
 func (c *NativeCheckpoint) CopyDatabase(destination string, checkSpace func(int64) error) (retErr error) {
 	c.mu.Lock()

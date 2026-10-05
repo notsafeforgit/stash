@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/remeh/sizedwaitgroup"
@@ -47,6 +48,8 @@ type JobManager interface {
 }
 
 type Manager struct {
+	nativeBackupMu sync.Mutex
+
 	Config *config.Config
 	Logger *log.Logger
 

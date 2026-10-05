@@ -7588,3 +7588,78 @@ This completes the recovery-component capture/rebinding primitive, not the
 assembled production backup. Configuration capture, complete producer/media
 inventory, remote publication and the final restore/cutover gates remain open.
 The separate full-library restore is still running; production is unchanged.
+
+## Full portable library restore verified — 2026-10-04
+
+The full-copy rehearsal has completed successfully. The exported archive contains
+238,575 artifacts: the native library and all 238,574 original artwork files.
+It contains 56,762,033,240 uncompressed bytes in 41,468,466,273 compressed object
+bytes. Restore verified every artifact, then compared all schema objects and
+36,974,038 typed rows across 280 native/internal SQLite tables against the frozen
+source. The matching native validator subsequently passed the full schema,
+integrity, foreign-key and retained-provenance checks. Its receipt is bound to
+the archive UUID, manifest digest and exact library bytes.
+
+The restored library then opened successfully through the actual native
+repositories at schema 1000077, without starting an API or workers. Retained
+discovery records, the selected detail, all eight activation receipts, 757 bound
+targets and 188 recovery bindings passed the reopen checks. The copied fixture
+has no registered producers, ingestion receipts or pending deletion markers;
+nonempty protocol/recovery cases are covered by separate integration fixtures.
+This rehearsal verifies the declared library/artwork round trip, not the still
+unfinished complete production backup and cutover.
+
+Measured export/restore/comparison times were 8,744.2 / 4,522.8 / 508.7 seconds
+under concurrent validation and idle I/O priority. Native semantic validation
+took 733.0 seconds and repository reopening took 179.4 seconds. Reports are
+`reconciliation.json`, `native-verification.json` and `reopen.json` under
+`.local/native-backup-rehearsal-20261004/`. After all processes exited, only the
+disposable `restored/` tree was removed, reclaiming about 54 GiB. The compressed
+bundle, source snapshots and reports remain. Production is unchanged.
+
+## Application checkpoint API and portable export — 2026-10-04
+
+The native server now has an application-authenticated checkpoint API, consumed
+by `stash-archive export --server`. It captures the main settings, separate
+runtime overrides, configured TLS assets, deletion recovery trees and native
+database. Private settings remain in private components. Requests have stable
+UUIDs and a sealed manifest written last; matching retries rehash and reuse the
+original capture. Changed requests, overlapping captures, incomplete directories,
+redirected cache directories, corruption and disk-reserve failures are rejected.
+New failed captures remove only their own output.
+
+`CaptureNativeSnapshot` pins a WAL read transaction while holding the database
+writer guard. Configuration/recovery capture runs under that guard; the large
+database copy then runs with ordinary writers released while retaining the same
+read view. Configuration locking follows database exclusion and ends before large
+recovery/database copies. The default 50 GiB reserve is checked on both the output
+and live database volumes, including the latter's retained WAL growth. Non-WAL
+sources are rejected. A cancelled operation cannot release writer exclusion while
+its configuration/filesystem callback is still active.
+
+The Python exporter snapshots declared download archives and producer outboxes
+before requesting the server view. It verifies response identity, component
+digests and deletion markers, then receipt correspondence before packing. Server
+components are checked again during packing, and the downloaded library does
+not undergo a second SQLite copy. Producer-aware server exports require an
+explicit origin; API keys remain in headers and redirects are refused.
+
+The checkpoint/configuration tests and actual Go HTTP → Python CLI export/import
+→ native verification/recovery-component restoration pass in 38.0 seconds.
+All 62 portable archive tests pass in 27.9 seconds; lint reports zero issues in
+19.1 seconds. The fixed-read test proves independent writers remain blocked
+during filesystem capture but can commit during subsequent copy steps, while the
+copied database keeps its original rows. Configuration updates remain excluded
+through asset capture and resume after a failed callback. Reports are
+`native_server_checkpoint_final_regressions`,
+`native_server_checkpoint_final_python` and
+`native_server_checkpoint_final_lint` under the October 4 client rehearsal
+directory.
+
+This is implemented development code, not an enabled production backup job.
+Publication-aware checkpoint cleanup, complete external configuration/worker
+inventory, matching ordinary-media coverage, restore root bindings and S3
+publication remain. Server checkpoint files currently remain after download;
+scheduled capture must wait for retention integration. Production-scale writer
+exclusion, copy duration and WAL growth still need measurement. No production
+deployment, branch merge or frozen release change has occurred.

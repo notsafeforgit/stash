@@ -75,8 +75,11 @@ Host/n8n launch paths have not switched to the native adapter.
 compressed native SQLite snapshots, original artwork and explicit configuration
 or operating-state components. See the [portable archive format](docs/native-archive-format.md).
 Restore verifies complete contents into a new directory and never activates a
-server or worker. Declared component coverage does not establish a coordinated
-live producer/server/media backup boundary; that integration remains required.
+server or worker. `export --server` captures the application's fixed WAL view,
+configuration, runtime overrides, TLS assets and deletion recovery trees after
+the declared producer/download snapshots. Complete external-file/media inventory,
+publication-aware checkpoint cleanup and S3/restore activation remain required;
+declared component coverage does not establish a complete production backup.
 The producer CLI can validate a portable worker profile and execute one claimed
 source attempt with concurrent outbox delivery. Website-access references stay
 local, and source completion remains distinct from verified media intake.

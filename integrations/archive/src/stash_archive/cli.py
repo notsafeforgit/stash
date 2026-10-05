@@ -6,6 +6,7 @@ from contextlib import closing
 import json
 from pathlib import Path
 import sqlite3
+import uuid
 
 from .bundle import (FORMAT, connect_readonly, export_archive, import_archive,
                      summary, verify_archive)
@@ -73,7 +74,13 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="Portable native Stash archives; no server required")
     commands = parser.add_subparsers(dest="command", required=True)
     export = commands.add_parser("export")
-    export.add_argument("--database", required=True)
+    source = export.add_mutually_exclusive_group(required=True)
+    source.add_argument("--database")
+    source.add_argument("--server", help="Capture the running native application's database, settings and deletion recovery state")
+    export.add_argument("--api-key-file", help="Private file containing the application's API key; never a producer token")
+    export.add_argument("--request-id", help="Stable checkpoint UUID for retries (generated if omitted)")
+    export.add_argument("--recovery-roots", help="JSON array of server-side recovery root name/path objects")
+    export.add_argument("--server-timeout", type=float, default=3600)
     export.add_argument("--output", required=True)
     export.add_argument("--blobs", action="append", default=[])
     export.add_argument("--components", help="JSON array of explicit role/name/path objects")
@@ -104,8 +111,20 @@ def main(argv=None):
             components = json.loads(Path(args.components).read_text()) if args.components else []
             if not isinstance(components, list):
                 raise InvalidArchive("Components must be a JSON array")
+            checkpoint = None
+            if args.server:
+                from .server_checkpoint import ServerCheckpoint
+                if not args.api_key_file:
+                    raise InvalidArchive("Server export requires --api-key-file")
+                with open(args.api_key_file, "r", encoding="ascii") as key_file:
+                    key = key_file.read(8194).strip()
+                roots = json.loads(Path(args.recovery_roots).read_text()) if args.recovery_roots else []
+                checkpoint = ServerCheckpoint(args.server, key, args.request_id or str(uuid.uuid4()), roots, timeout=args.server_timeout)
+            elif args.api_key_file or args.request_id or args.recovery_roots:
+                raise InvalidArchive("Server checkpoint options require --server")
             export_archive(args.database, args.output, blob_paths=args.blobs,
-                           components=components, reserve=args.reserve_bytes, producer_origin=args.producer_origin)
+                           components=components, reserve=args.reserve_bytes, producer_origin=args.producer_origin,
+                           server_checkpoint=checkpoint)
             result = summary(args.output)
         elif args.command == "import":
             manifest = import_archive(args.archive, args.output, reserve=args.reserve_bytes)

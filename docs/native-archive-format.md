@@ -36,8 +36,9 @@ stash-archive export --database /srv/stash/native.sqlite \
 
 Missing registered outboxes, a wrong origin or inconsistent acknowledgements
 abort the export before packing. The flag does not discover every download
-archive, certify third-party writers' ordering, freeze configuration or preserve
-the filesystem recovery/media boundary. Those remain coordinator requirements.
+archive or certify third-party writers' ordering. The server checkpoint described
+below adds application configuration and deletion recovery capture; complete
+media coverage and external-writer coordination remain publisher requirements.
 The portable coverage stays `declared-components`. Verification after restore
 rechecks receipts and binds its proof to the final archive/library/outbox hashes.
 
@@ -100,6 +101,60 @@ verifier also check the same source-request digest corpus, including offsets,
 fractional timestamps and year limits.
 
 ## Commands
+
+For a running native application, select `--server` instead of `--database`:
+
+```sh
+stash-archive export --server https://stash.example \
+  --api-key-file /private/stash-backup-api-key \
+  --request-id "$CHECKPOINT_UUID" \
+  --recovery-roots /backup-work/recovery-roots.json \
+  --blobs /srv/stash/blobs --components /backup-work/components.json \
+  --producer-origin https://stash.example --output /backups/native-archive
+```
+
+The enclosing backup job should persist a new checkpoint UUID for each backup
+and reuse it on retries. If omitted, the CLI generates one. Recovery roots are
+a JSON array of `{"name":"media","path":"/media"}` objects interpreted in
+the server's filesystem. Include every root needed by pending deletion journals,
+including any separate trash root. Roots must be explicit and nonoverlapping;
+they do not request a recursive backup of all ordinary media under them.
+
+After copying the declared download archives and producer outboxes, the exporter
+requests a server checkpoint and downloads its sealed components. It verifies
+the request identity, inventory, lengths, digests and database deletion markers,
+then checks receipt correspondence before packing. It copies the server's library
+only once and checks component hashes again while packing. Server exports that
+include producer/download state require `--producer-origin`; redirects are
+refused and the application API key is sent only in a request header. Producer
+tokens cannot create or retrieve these private application backups.
+
+The authenticated API is `POST /api/v3/backups/checkpoints`, with `uuid`,
+`recovery_roots` and optional `reserve_bytes`; `GET /checkpoints/{uuid}` and
+`GET /checkpoints/{uuid}/components/{name}` under the same prefix retrieve sealed
+results. Concurrent capture requests receive 409. An identical request UUID
+reuses and revalidates its original sealed capture, even if live settings have
+changed. A different request or an incomplete existing directory is rejected.
+Failed new requests remove only their own output. The manifest is written last.
+
+The server captures the native database, raw deletion recovery trees, main
+configuration, runtime overrides and configured TLS certificate/key assets.
+Settings and overrides remain separate, and private values appear only in the
+private backup components. Original configured paths and working directory are
+retained as byte-encoded metadata for later relocation. Other external settings,
+worker profiles, source-access files, artwork and ordinary media still require
+the enclosing publisher's complete inventory and restore bindings.
+
+Checkpoint files live in `native-checkpoints/{uuid}` under the configured backup
+directory, with private directories/files. They currently remain there after
+download; publication-aware cleanup and abandoned-capture retention must be
+wired before enabling scheduled production exports. The default reserve is
+50 GiB, checked on both output and live database volumes during capture. A pinned
+WAL reader allows ordinary writes during the database copy but retains newer WAL
+pages until the copy ends. Copy duration, source WAL growth and the shorter
+configuration/recovery-tree writer exclusion still need production-scale
+measurement. This API and client do not by themselves certify complete archive
+coverage, remote publication or readiness to activate restored workers.
 
 The portable verifier can run the matching native Stash executable after its
 transport checks and combine that result with the producer receipt check:
@@ -172,11 +227,16 @@ or invoke recovery. Cancellation makes capture fail but keeps writer exclusion
 until that callback and any in-flight database copy have actually stopped;
 callbacks must honor their capture context. Lock acquisition has a five-second
 SQLite busy limit, with cancellation checked before and after acquisition.
-Full native validation can run on the copy after releasing
-the writer lock. `CopyDeletionSnapshot` captures recovery state under the same
-guard and commit-marker view. These primitives are not yet wired into the
-production export coordinator. Configuration, external media writers, complete
-media/download inventories and activation remain separate requirements.
+Full native validation can run on the copy after releasing the writer lock.
+`CopyDeletionSnapshot` captures recovery state under the same guard and
+commit-marker view. The application coordinator uses `CaptureNativeSnapshot`:
+it fixes a separate WAL read transaction under that guard, captures configuration
+and recovery trees, then releases the writer before copying the pinned view.
+Non-WAL sources are refused. Filesystem capture cannot run after writer release.
+The coordinator takes the database guard before the configuration read lock and
+releases the latter after copying the small configuration assets. External media
+writers, complete media/download inventories and activation remain separate
+requirements.
 
 `CopyDeletionSnapshot(destination, roots, checkSpace)` creates a private regular
 ZIP file suitable for a `file_journal` component. Roots explicitly authorize
@@ -213,8 +273,8 @@ all library/media bindings and remaining components are restored and checked.
 This component is not a complete media backup, a general library-root migration,
 or proof that every pending deletion can complete. Source path syntax must be
 supported by the restoring operating system. Production export still needs the
-assembled configuration/filesystem coordinator, full media inventory and remote
-publication; opening an unmatched database can otherwise prune deletion markers.
+complete media/configuration inventory and remote publication; opening an
+unmatched database can otherwise prune deletion markers.
 
 Install into a prepared Python environment:
 

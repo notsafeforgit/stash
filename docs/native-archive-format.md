@@ -173,10 +173,48 @@ until that callback and any in-flight database copy have actually stopped;
 callbacks must honor their capture context. Lock acquisition has a five-second
 SQLite busy limit, with cancellation checked before and after acquisition.
 Full native validation can run on the copy after releasing
-the writer lock. This primitive is not yet wired into the portable export or
-production backup. It does not discover/copy complete recovery trees, rebind old
-file identities for a renamed-root restore, or freeze external media writers;
-those coordinator and restore steps remain required.
+the writer lock. `CopyDeletionSnapshot` captures recovery state under the same
+guard and commit-marker view. These primitives are not yet wired into the
+production export coordinator. Configuration, external media writers, complete
+media/download inventories and activation remain separate requirements.
+
+`CopyDeletionSnapshot(destination, roots, checkSpace)` creates a private regular
+ZIP file suitable for a `file_journal` component. Roots explicitly authorize
+nonoverlapping source directories; they cannot authorize the whole filesystem.
+The component contains each required file body once per filesystem identity,
+plus a final canonical JSON manifest. ZIP uses stored entries so the enclosing
+portable archive performs compression. SHA-256 and byte counts identify file
+contents. Raw gob journals, byte-encoded paths and symlink targets preserve
+non-UTF-8 filenames. The manifest also retains commit markers, directory modes,
+file times, hard-link identities and explicit trash-root alias bindings.
+
+Capture follows nested staged parent directories and includes staged trees,
+replacement files, reserved trash directories, unfinished copies and completed
+trash destinations. Ancestors are directory skeletons; unrelated media files
+are not included. Prepared journal fragments remain opaque. Unknown/corrupt
+journals, unsupported special files, undeclared paths, unsafe symlink ancestors,
+overlapping roots and observed changes stop capture. Native writer exclusion
+does not freeze external writers; the coordinator must still establish that
+boundary. No source recovery occurs during capture.
+
+`file.RestoreDeletionSnapshot` requires the matching copied database's commit
+markers and a new destination outside the original roots. It validates the
+manifest and object inventory, streams and verifies file contents, recreates
+hard links, and rewrites journal paths and file identities into private
+`roots/<name>` directories. Symlink targets are preserved literally and never
+followed during extraction. Missing expected identities become deliberately
+unmatchable sentinels, reported as `UnresolvedIdentities`, so a replacement never
+becomes the original merely because a new inode number was allocated. Existing
+replacement conflicts remain pending for normal recovery to report.
+
+Restore does not activate a database or execute deletions. Its returned journal
+directory must be paired with the restored database's journal path only after
+all library/media bindings and remaining components are restored and checked.
+This component is not a complete media backup, a general library-root migration,
+or proof that every pending deletion can complete. Source path syntax must be
+supported by the restoring operating system. Production export still needs the
+assembled configuration/filesystem coordinator, full media inventory and remote
+publication; opening an unmatched database can otherwise prune deletion markers.
 
 Install into a prepared Python environment:
 

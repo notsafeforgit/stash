@@ -192,6 +192,15 @@ func finishTrash(r *deletionRecord, staged string, rr RenamerRemover, save func(
 			if !identityMatches(copyDir, r.CopyDirID) {
 				return fmt.Errorf("trash copy directory %q has been replaced", copyDir)
 			}
+			if r.CopyID == "" && identityMatches(r.Destination, r.SourceID) {
+				// A previously cross-device move may now succeed as a rename
+				// (for example after an isolated restore changes mount layout).
+				// The original is durably published; discard only its unfinished
+				// private copy, retaining any other unexpected wrapper contents.
+				if err := os.RemoveAll(filepath.Join(copyDir, filepath.Base(r.Original))); err != nil {
+					return err
+				}
+			}
 			if err := os.Remove(copyDir); err != nil {
 				return err
 			}

@@ -65,8 +65,73 @@ func TestNativeCheckpointPreservesInterruptedDeletion(t *testing.T) {
 			require.Equal(t, mediaBefore, snapshotTreeHashes(t, staged[0]))
 			require.NoFileExists(t, source)
 			require.ErrorContains(t, retained.CopyDatabase(filepath.Join(destination, "too-late.sqlite"), nil), "no longer active")
+			require.ErrorContains(t, retained.CopyDeletionSnapshot(filepath.Join(destination, "too-late.zip"), nil, nil), "no longer active")
 			require.NoFileExists(t, filepath.Join(destination, "too-late.sqlite"))
 		})
+	}
+}
+
+func TestNativeCheckpointRestoresInterruptedDeletionAtNewRoot(t *testing.T) {
+	for _, phase := range []string{"before_commit", "after_commit"} {
+		for _, trash := range []bool{false, true} {
+			t.Run(phase+map[bool]string{false: "/delete", true: "/trash"}[trash], func(t *testing.T) {
+				db, source, id := newDeletionDatabase(t)
+				path, journal := db.DatabasePath(), db.FileDeletionJournalPath()
+				require.NoError(t, db.Close())
+				roots := []file.DeletionSnapshotRoot{{Name: "media", Path: filepath.Dir(source)}}
+				trashPath := ""
+				if trash {
+					trashPath = t.TempDir()
+					roots = append(roots, file.DeletionSnapshotRoot{Name: "trash", Path: trashPath})
+				}
+				command := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestDeletionCrashHelper$")
+				command.Env = append(os.Environ(), "STASH_TEST_DELETION_CRASH="+phase,
+					"STASH_TEST_DELETION_DATABASE="+path, "STASH_TEST_DELETION_SOURCE="+source,
+					"STASH_TEST_DELETION_TRASH="+trashPath)
+				output, err := command.CombinedOutput()
+				var exited *exec.ExitError
+				require.ErrorAs(t, err, &exited, string(output))
+				require.Equal(t, deletionCrashExit, exited.ExitCode())
+				journalBefore := snapshotTreeHashes(t, journal)
+				mediaBefore := snapshotTreeHashes(t, filepath.Dir(source))
+				destination := t.TempDir()
+				copiedDB, archive := filepath.Join(destination, "library.sqlite"), filepath.Join(destination, "deletions.zip")
+				var ids []string
+				require.NoError(t, sqlite.WithNativeCheckpoint(t.Context(), path, func(c *sqlite.NativeCheckpoint) error {
+					ids = c.CommittedDeletionIDs()
+					if err := c.CopyDeletionSnapshot(archive, roots, nil); err != nil {
+						return err
+					}
+					return c.CopyDatabase(copiedDB, nil)
+				}))
+				restored, err := file.RestoreDeletionSnapshot(t.Context(), archive, filepath.Join(destination, "recovery"), ids, nil)
+				require.NoError(t, err)
+				require.Empty(t, restored.UnresolvedIdentities)
+				newSource := filepath.Join(restored.Roots[0].Path, filepath.Base(source))
+				// This fixture has one plain folder binding. The production restore
+				// coordinator must relocate all media bindings before activation.
+				raw := openRawDB(t, copiedDB)
+				_, err = raw.Exec("UPDATE folders SET path=? WHERE path=?", restored.Roots[0].Path, filepath.Dir(source))
+				require.NoError(t, err)
+				require.NoError(t, raw.Close())
+				require.NoError(t, fsutil.RenameNoReplace(restored.JournalPath, filepath.Join(destination, filepath.Base(journal))))
+				db = sqlite.NewDatabase()
+				require.NoError(t, db.Open(copiedDB)) // Actual startup recovery uses the rebound journal.
+				requireDeletionState(t, db, newSource, id, phase == "after_commit")
+				require.NoError(t, db.Close())
+				if trash && phase == "after_commit" {
+					matches, err := filepath.Glob(filepath.Join(restored.Roots[1].Path, "stash-trash-*", filepath.Base(source)))
+					require.NoError(t, err)
+					require.Len(t, matches, 1)
+					body, err := os.ReadFile(matches[0])
+					require.NoError(t, err)
+					require.Equal(t, "original", string(body))
+				}
+				require.Equal(t, journalBefore, snapshotTreeHashes(t, journal))
+				require.Equal(t, mediaBefore, snapshotTreeHashes(t, filepath.Dir(source)))
+				require.NoFileExists(t, source)
+			})
+		}
 	}
 }
 

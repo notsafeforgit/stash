@@ -7548,3 +7548,43 @@ independent writer remains blocked until the callback returns. The complete
 checkpoint suite passes in 45.9 seconds and lint reports zero issues in 11.4
 seconds (`native_server_checkpoint_cancel.json` and
 `native_server_checkpoint_cancel_lint.json`).
+
+## Portable deletion recovery state — 2026-10-04
+
+`NativeCheckpoint.CopyDeletionSnapshot` now packages the raw deletion journals
+and their actual staged/replacement/trash trees while retaining the checkpoint's
+writer exclusion and commit markers. Explicit source roots bound reads. The
+single ZIP component stores each hard-linked file body once, hashes its contents,
+and preserves byte filenames, nested staged directories, trash aliases and
+unfinished copies. Unknown or corrupt journal entries, unsafe paths, special
+files, observed changes and disk-reserve failures prevent publication.
+
+`file.RestoreDeletionSnapshot` verifies that component against the copied
+database's commit markers and restores it into a new isolated directory. It
+recreates hard links and rebinds all journal paths and inode identities. Missing
+expected identities remain explicitly unmatchable; existing replacements stay
+conflicts. Recovery is not executed by extraction, and the original absolute
+paths are never used as restore destinations. The coordinator still owns full
+media/library root relocation, journal placement and activation.
+
+The tests exposed a recovery issue when an interrupted cross-filesystem trash
+copy is restored onto one filesystem: the original rename can now succeed while
+an unfinished private copy remains. Recovery now removes that partial copy only
+after verifying and durably publishing the original destination. Unexpected
+files in the copy wrapper remain intact and keep the operation pending.
+
+The full file-package suite passes. The deletion/checkpoint suite passes in
+82.7 seconds, including actual process crashes before and after deletion commit,
+then startup recovery at new media/trash roots. Original journal and staged-media
+hashes remain unchanged. Nested rollback/commit, replacement conflicts, partial
+and completed copies, byte filenames, hard links, symlinks, missing identities,
+corruption, cancellation and reserve failures pass. The additional unexpected
+wrapper-content regression also passes. Lint reports zero issues in 11.0 seconds.
+Reports are `native_deletion_snapshot_file_final`,
+`native_deletion_snapshot_final`, `native_deletion_snapshot_wrapper_protection`
+and `native_deletion_snapshot_lint_final` under the October 4 rehearsal directory.
+
+This completes the recovery-component capture/rebinding primitive, not the
+assembled production backup. Configuration capture, complete producer/media
+inventory, remote publication and the final restore/cutover gates remain open.
+The separate full-library restore is still running; production is unchanged.

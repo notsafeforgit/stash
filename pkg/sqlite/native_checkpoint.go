@@ -13,6 +13,7 @@ import (
 	"time"
 
 	sqlite3 "github.com/mattn/go-sqlite3"
+	"github.com/stashapp/stash/pkg/file"
 	"github.com/stashapp/stash/pkg/fsutil"
 )
 
@@ -33,6 +34,18 @@ type NativeCheckpoint struct {
 func (c *NativeCheckpoint) DatabasePath() string            { return c.database }
 func (c *NativeCheckpoint) FileDeletionJournalPath() string { return c.journal }
 func (c *NativeCheckpoint) CommittedDeletionIDs() []string  { return slices.Clone(c.committed) }
+
+// CopyDeletionSnapshot preserves journal/staged/trash state under the same
+// writer exclusion and commit-marker view as CopyDatabase. Explicit roots bound
+// the filesystem read scope. External writers still need coordinator exclusion.
+func (c *NativeCheckpoint) CopyDeletionSnapshot(destination string, roots []file.DeletionSnapshotRoot, checkSpace func(int64) error) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !c.active {
+		return errors.New("native checkpoint is no longer active")
+	}
+	return file.CaptureDeletionSnapshot(c.ctx, c.journal, destination, roots, c.committed, checkSpace)
+}
 
 func checkpointURI(path, mode string) string {
 	values := url.Values{"mode": {mode}, "_busy_timeout": {"5000"}, "_fk": {"1"}}

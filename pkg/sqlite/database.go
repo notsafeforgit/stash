@@ -6,6 +6,7 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"time"
@@ -34,7 +35,7 @@ const (
 	cacheSizeEnv = "STASH_SQLITE_CACHE_SIZE"
 )
 
-var appSchemaVersion = NativeSchemaBaseline + 77
+var appSchemaVersion = NativeSchemaBaseline + 78
 
 //go:embed migrations/*.sql
 var migrationsBox embed.FS
@@ -261,6 +262,10 @@ func (db *Database) Close() error {
 }
 
 func (db *Database) open(disableForeignKeys bool, writable bool) (*sqlx.DB, error) {
+	abs, err := filepath.Abs(db.dbPath)
+	if err != nil {
+		return nil, err
+	}
 	// https://github.com/mattn/go-sqlite3
 	// 5s timeout is the default.
 	synchronous := "NORMAL"
@@ -269,24 +274,28 @@ func (db *Database) open(disableForeignKeys bool, writable bool) (*sqlx.DB, erro
 		// cleanup runs. SQLite cannot change synchronous inside a transaction.
 		synchronous = "FULL"
 	}
-	url := "file:" + db.dbPath + "?_journal=WAL&_sync=" + synchronous + "&_busy_timeout=5000"
+	query := url.Values{"_journal": {"WAL"}, "_sync": {synchronous}, "_busy_timeout": {"5000"}}
 	if !disableForeignKeys {
-		url += "&_fk=true"
+		query.Set("_fk", "true")
 	}
 
 	if writable {
-		url += "&_txlock=immediate"
+		query.Set("_txlock", "immediate")
 	} else {
-		url += "&mode=ro"
+		query.Set("mode", "ro")
 	}
 
 	// #5155 - set the cache size if the environment variable is set
 	// default is -2000 which is 2MB
 	if cacheSize := os.Getenv(cacheSizeEnv); cacheSize != "" {
-		url += "&_cache_size=" + cacheSize
+		query.Set("_cache_size", cacheSize)
 	}
 
-	conn, err := sqlx.Open(sqlite3Driver, url)
+	// Paths are literal filenames, including '#' and percent-encoded-looking
+	// text. Use the same encoding as the pre-write lineage validator so both
+	// connections address the database that was actually checked.
+	uri := url.URL{Scheme: "file", Path: filepath.ToSlash(abs), RawQuery: query.Encode()}
+	conn, err := sqlx.Open(sqlite3Driver, uri.String())
 	if err != nil {
 		return nil, fmt.Errorf("db.Open(): %w", err)
 	}
@@ -384,7 +393,7 @@ func (db *Database) Reset() error {
 func (db *Database) Backup(backupPath string) (err error) {
 	thisDB := db.writeDB
 	if thisDB == nil {
-		thisDB, err = sqlx.Connect(sqlite3Driver, "file:"+db.dbPath+"?_fk=true")
+		thisDB, err = db.open(false, true)
 		if err != nil {
 			return fmt.Errorf("open database %s failed: %w", db.dbPath, err)
 		}

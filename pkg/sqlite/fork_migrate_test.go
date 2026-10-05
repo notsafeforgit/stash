@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
@@ -235,7 +236,12 @@ func TestPrivateForkVersionFourUpgradesToConsolidatedMigration(t *testing.T) {
 func openRawDB(t *testing.T, dbPath string) *sql.DB {
 	t.Helper()
 
-	db, err := sql.Open("sqlite3ex", "file:"+dbPath+"?_fk=true")
+	abs, err := filepath.Abs(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	uri := url.URL{Scheme: "file", Path: filepath.ToSlash(abs), RawQuery: "_fk=true"}
+	db, err := sql.Open("sqlite3ex", uri.String())
 	if err != nil {
 		t.Fatalf("opening raw sqlite db: %v", err)
 	}

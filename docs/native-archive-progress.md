@@ -59,8 +59,9 @@ admits no source jobs. Python detail delivery and collection/profile dispatch
 are implemented. Schema 77 connects authenticated detail results to guarded native
 publication while preserving coverage, competing candidates and later native
 edits. The schema-77 full-copy migration, independent comparison, fresh reopen
-and full fork gate have now passed. Schema 77 is the retained verified rehearsal;
-its superseded schema-76 database was removed after
+and full fork gate have now passed. The schema-78 policy-import rehearsal below
+has also passed, preserving that discovery state. The superseded schema-76
+database was removed after
 verification, recovering 20.27 GB while preserving the original compatible
 snapshot and saved activation plans. Automatic candidate-detail admission is now
 implemented using selected worker profiles, bounded inspection and transactional
@@ -8825,3 +8826,77 @@ Go suite. SQLite took 1,156 seconds with the documented 30-minute package timeou
 override. Historical policy migration remains open; these requirements do not
 activate or import any live policy. Production services and the frozen compatible
 release are unchanged.
+
+## Historical metadata policy import — 2026-10-05
+
+Native policy migration now has a bounded preview/apply API and immutable
+receipts containing original source values, per-setting conversion decisions,
+and the exact resulting policy revision. Its schema-1000078 tables reference
+native policy revisions and selected folder document heads. Preview guards the
+current collection, policy and fixed relationship targets. Changed selections
+require a fresh preview; replay after a successful commit returns its original
+receipt even after later policy edits. Failed or interrupted transactions cannot
+leave a policy without its receipt. Migration does not edit existing media.
+
+The standard-library client validates native input and plan hashes, retains
+frozen bindings for retry, and handles lost responses. Its source reader
+inspects Python literal settings without executing plugin code and preserves
+Python, manifest and saved-override layers. Every retained setting requires an
+explicit mapped, replaced, retired or review disposition. Unresolved settings
+require a disabled policy. Selected folder evidence must describe the target
+folder; publisher links cannot supply depicted-performer defaults implicitly.
+Database reopening verifies receipt hashes/references, and anonymisation removes
+private settings and their migration provenance.
+
+Focused pure-service, SQLite and real Python/HTTP tests pass, including lost
+responses, restart, later edits, object-valued constants, stale target revisions,
+changed document selections, rollback and a receipt failure whose caller ignored
+the error. Python settings-reader tests also pass. The isolated draft was copied
+only after the organized-completeness increment was validated, committed and
+pushed as `81393477f`. The populated schema migration completed in 300 seconds.
+Independent comparison preserved all 275 pre-existing tables, every old schema
+object and the retained discovery/recovery records; integrity and foreign-key
+checks passed. A fresh application reopen took 110 seconds and verified eight
+activation receipts, 757 bound targets and 188 recovery targets.
+
+The real retained documents exposed an invalid assumption: all seven selected
+`folder.nfo` sources also retain historical catalog post identities. Folder scope
+now follows the selected document head and exact folder path while preserving
+those post references. A regression reproduced the rejection before the fix;
+the corrected tests also reject unrelated documents and folder paths.
+
+Seven frozen bindings preserve five performer defaults, one studio default and
+one empty folder document. Each retains 39 original source values with explicit
+conversion dispositions. The real Python client imported them through an
+isolated application API in 284 milliseconds after opening the database.
+Lost-response retry and a fresh restart returned the same plans and receipts
+without creating another policy revision. These are disabled migration drafts:
+cover completeness, implicit source mappings and tag filtering remain unresolved.
+No rule has been activated and no existing scene/image metadata was changed by
+the import operation.
+
+The first full Go run exposed predecessor fixtures that had changed the schema
+version without removing the two new tables. Their shared fixture chain now
+constructs the actual older layout. Focused tagged tests verify policy/document
+preservation, rollback on either unknown-table collision, corrupt-provenance
+rejection and the corrected fixture chain. Independent post-import comparison
+passed: all 275 original tables remain unchanged except the exact seven new
+scope/policy additions, all seven original document/post links survive, and
+integrity and foreign-key checks pass. The new scopes have review origin through
+the ordinary collection API; imported policies retain migration origin.
+
+The next full fork gate exposed a database-path bug: connection strings treated
+a literal `#` as a URI fragment. Repeated migration tests consequently reused a
+truncated filename. A regression also reproduced incorrect writes and percent
+escape handling. Main connections and closed-database backups now encode literal
+paths consistently with the lineage validator; the independent test connection
+does the same. Focused repeat-run validation passed in 22 seconds, including the
+new path/backup regression and predecessor migration checks. The final complete
+fork gate passed in 1,396 seconds: 610 UI tests, 526 producer tests, eight library
+tests, 108 archive tests, 262 backup tests, zero lint issues and every tagged Go
+package. API and SQLite tests took 1,109 and 1,225 seconds respectively, using the
+documented 30-minute package timeout override. All 22 final source hashes match
+that successful run. Schema 1000078 is the latest fully verified rehearsal;
+the seven imported policies remain disabled pending complete rule conversion.
+Production and worker configuration are unchanged.
+See [policy migration](native-metadata-policy-migration.md).

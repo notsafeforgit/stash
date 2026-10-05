@@ -1277,6 +1277,13 @@ recorded collection revision, and token scope. Anonymised exports remove them wi
 
 ## Native metadata policies
 
+Historical plugin settings and folder rules enter through the separate
+[metadata policy migration API](native-metadata-policy-migration.md). It retains
+every source value and its conversion disposition, guards reviewed native
+references and publishes a policy with an immutable receipt. Unresolved
+conversions require a disabled policy. Producer intake does not migrate settings
+or obtain access to these application-authenticated routes.
+
 Policies belong to a source collection, including an unsourced directory or
 manual batch. Definitions and their history live in the native database; there
 is no plugin settings JSON or parallel catalog writer. Migration creates no

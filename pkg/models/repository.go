@@ -77,6 +77,7 @@ type Repository struct {
 	SourceGallery               SourceGalleryReaderWriter
 	MetadataField               MetadataFieldReaderWriter
 	MetadataPolicy              MetadataPolicyReaderWriter
+	MetadataPolicyImport        MetadataPolicyImportReaderWriter
 	Share                       ShareReaderWriter
 }
 

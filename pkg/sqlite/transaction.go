@@ -232,6 +232,7 @@ func (db *Database) Repository() models.Repository {
 		SourceGallery:               &SourceGalleryStore{gallery: db.Gallery},
 		MetadataField:               &MetadataFieldStore{},
 		MetadataPolicy:              &MetadataPolicyStore{},
+		MetadataPolicyImport:        &MetadataPolicyImportStore{},
 		Share:                       &ShareStore{},
 	}
 }

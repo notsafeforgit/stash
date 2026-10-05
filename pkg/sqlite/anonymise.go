@@ -1138,6 +1138,7 @@ func (db *Anonymiser) deleteSourceAccountEvidence(ctx context.Context) error {
 			"enrichment_target_history", "enrichment_completion_captures", "enrichment_completions", "enrichment_targets",
 			"source_enrichment_receipts",
 			"source_translation_evidence", "source_translations",
+			"metadata_policy_import_documents", "metadata_policy_imports",
 			"source_document_heads", "source_document_head_decisions", "source_document_head_claims", "source_document_sources", "source_documents", "source_document_contents",
 			"ingest_credential_scopes", "ingest_credential_roots", "ingest_credentials", "ingest_producers",
 			"metadata_decision_policies", "metadata_policy_revisions", "metadata_policies",

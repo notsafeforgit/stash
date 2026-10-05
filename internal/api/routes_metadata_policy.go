@@ -49,6 +49,10 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Post("/metadata-file-edits/preview", rs.previewFileEdit)
 	r.Post("/metadata-file-edits/apply", rs.applyFileEdit)
 	r.Get("/metadata-file-edits/requests/{request}", rs.fileEditReview)
+	r.Post("/metadata-policy-imports/preview", rs.previewPolicyImport)
+	r.Post("/metadata-policy-imports", rs.applyPolicyImport)
+	r.Get("/metadata-policy-imports/{import}", rs.policyImport)
+	r.Get("/collections/{collection}/metadata-policy-imports", rs.policyImports)
 	r.Get("/collections/{collection}/metadata-policy", rs.policy)
 	r.Put("/collections/{collection}/metadata-policy", rs.putPolicy)
 	r.Get("/collections/{collection}/metadata-policy/history", rs.policyHistory)
@@ -266,11 +270,11 @@ func nativeArchiveError(w http.ResponseWriter, err error) {
 		ingestJSON(w, http.StatusConflict, map[string]string{"error": "request_conflict", "message": "This request UUID already names a different historical metadata review."})
 		return
 	}
-	if errors.Is(err, models.ErrMetadataPolicyInvalid) || errors.Is(err, models.ErrTranslationPolicyInvalid) {
+	if errors.Is(err, models.ErrMetadataPolicyImportInvalid) || errors.Is(err, models.ErrMetadataPolicyInvalid) || errors.Is(err, models.ErrTranslationPolicyInvalid) {
 		ingestJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_policy", "message": err.Error()})
 		return
 	}
-	if errors.Is(err, models.ErrMetadataPolicyConflict) || errors.Is(err, models.ErrMetadataFieldConflict) || errors.Is(err, models.ErrSourceDefinitionConflict) || errors.Is(err, models.ErrTranslationPolicyConflict) {
+	if errors.Is(err, models.ErrMetadataPolicyImportConflict) || errors.Is(err, models.ErrMetadataPolicyConflict) || errors.Is(err, models.ErrMetadataFieldConflict) || errors.Is(err, models.ErrSourceDefinitionConflict) || errors.Is(err, models.ErrTranslationPolicyConflict) {
 		ingestJSON(w, http.StatusConflict, map[string]string{"error": "preview_changed", "message": "The collection, policy, or metadata changed; load a fresh preview."})
 		return
 	}

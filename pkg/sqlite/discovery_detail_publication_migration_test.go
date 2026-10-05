@@ -18,6 +18,7 @@ import (
 // columns and guards rather than just changing its version marker.
 func removeDiscoveryDetailPublicationSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeMetadataPolicyImportSchema(t, raw)
 	legacy, err := os.ReadFile("migrations/1000074_discovery_publications.up.sql")
 	require.NoError(t, err)
 	definition := strings.Split(string(legacy), "CREATE TABLE discovery_published_records")[0]

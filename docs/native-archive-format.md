@@ -156,6 +156,24 @@ can create empty WAL/shared-memory sidecars. These are rebuildable reader state,
 not additional archive components. The validator never reads or recovers the
 separate Stash file-deletion journal.
 
+The backend's `sqlite.WithNativeCheckpoint` provides the writer exclusion needed
+by the server/filesystem coordinator. It opens an existing exact-schema native
+database without application initialization or deletion recovery, obtains
+`BEGIN IMMEDIATE`, and exposes the corresponding journal path and committed
+deletion IDs to a capture callback. `CopyDatabase` uses SQLite's online backup
+API through a separate read-only connection while that guard remains held.
+It refuses existing outputs/sidecars, flushes the new copy, supports per-step
+disk-reserve checks and removes its failed output. The checkpoint connection
+does not run close-time optimization or commit application changes.
+
+The callback must finish capturing matching configuration, raw journal and
+staged/trash bytes before returning, and must not write to the guarded library
+or invoke recovery. Full native validation can run on the copy after releasing
+the writer lock. This primitive is not yet wired into the portable export or
+production backup. It does not discover/copy complete recovery trees, rebind old
+file identities for a renamed-root restore, or freeze external media writers;
+those coordinator and restore steps remain required.
+
 Install into a prepared Python environment:
 
 ```sh

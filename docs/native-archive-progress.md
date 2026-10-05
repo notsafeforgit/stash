@@ -7504,3 +7504,37 @@ The full-copy export on the separate frozen rehearsal runtime completed in
 artifacts, 56,762,033,240 uncompressed bytes and 41,468,466,273 compressed object
 bytes. Restore and full semantic reconciliation are still running; export alone
 does not establish a successful round trip. Production remains unchanged.
+
+## Native server checkpoint exclusion — 2026-10-04
+
+`sqlite.WithNativeCheckpoint` now holds the same SQLite writer exclusion used by
+file-deletion staging and recovery while a capture callback copies state. It
+requires an existing regular database, exact clean native schema/lineage and
+regular SQLite sidecars. The callback receives the matching journal directory
+and committed deletion IDs. It never calls `Database.Open`, configuration
+initialization, migration or deletion recovery, and never commits application
+changes. Its dedicated driver retains native functions/collations while omitting
+the normal close-time optimization.
+
+The guarded `CopyDatabase` method uses the online backup API through a separate
+read-only source connection. It preserves committed WAL state, supports escaped
+paths, refuses existing outputs and stale destination sidecars, permits disk
+reserve checks before allocation and each step, handles cancellation, and flushes
+the finished copy. A retained checkpoint cannot copy after its callback ends.
+The guard remains held until a copy already in progress finishes.
+
+Tests pass in 44.9 seconds; SQLite package lint reports zero issues in 12.5
+seconds. Real subprocess crashes before/after deletion commit preserve their
+original gob journals and staged media byte-for-byte while the matching native
+copy and raw filesystem pieces are captured. Native semantic validation reports
+the expected deletion-marker count without recovering those files. A concurrent
+real repository deletion cannot stage bytes until capture releases its guard;
+the captured database and media retain the earlier state. Invalid sources,
+callback/space failures, cancellation, retries and output protection also pass.
+Evidence is under `.local/native-discovery-client-20261004/` with labels
+`native_server_checkpoint_tests` and `native_server_checkpoint_lint`.
+
+This is the server-side capture primitive. Production export still needs the
+configuration/recovery-tree capture coordinator, portable identity/path rebinding,
+complete media/download inventory and S3 publication. No production services or
+backup publication changed. The full-library restore remains active.

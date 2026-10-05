@@ -11,10 +11,24 @@ import (
 )
 
 const sqlite3Driver = "sqlite3ex"
+const checkpointSQLiteDriver = "sqlite3checkpoint"
 
 func init() {
 	// register custom driver
 	sql.Register(sqlite3Driver, &CustomSQLiteDriver{})
+	sql.Register(checkpointSQLiteDriver, &checkpointDriver{})
+}
+
+// Checkpoint connections need the same functions/collations, but closing one
+// must not run PRAGMA optimize against a live source after releasing its lock.
+type checkpointDriver struct{}
+
+func (*checkpointDriver) Open(dsn string) (driver.Conn, error) {
+	conn, err := (&CustomSQLiteDriver{}).Open(dsn)
+	if err != nil {
+		return nil, err
+	}
+	return conn.(*CustomSQLiteConn).SQLiteConn, nil
 }
 
 type CustomSQLiteDriver struct{}

@@ -75,6 +75,10 @@ Instagram download ingestion and a staged host launcher now preserve carousel
 membership, individual story identity and source-date windows. The actual host
 profile/list and timer replacement have been inspected without activation; the
 native dispatcher, durable outbox and final API registration remain cutover work.
+Coomer/Kemono user/post/listing ingestion now preserves original attachment
+membership, enforces original downloads and retains excluded nonvisual evidence.
+Host profiles and URL/list launchers are staged and tested; special mirror
+containers and actual caller activation remain open.
 Broader archive management UI, live host/n8n conversion, remaining compatibility removal, coordinated
 backup/export/restore, production cutover and retirement remain major release
 gates. The phase table below records that distinction; commit count is not a
@@ -8526,3 +8530,49 @@ launcher help check passes. All 499 producer tests pass in 44 seconds; package
 installation and scoped Go lint also pass. No live timer, scraper, archive, Stash schema or frozen
 release changed; this work does not close the remaining service/caller coverage
 or any production release gate.
+
+## Original Kemono/Coomer ingestion and staged launchers — 2026-10-05
+
+The pinned mirror user, post and posts-listing adapters now retain `mirror_media`
+version 1 before file selection, download ordering or mutation of attachment
+dictionaries. Producer and backend share a manually specified contract corpus.
+Membership preserves primary files, ordered attachment arrays, missing source
+slots, repeated positions and deduplicated inline references. A primary alias of
+an attachment does not invent a second slot or turn a singleton into an album.
+Configured file selection cannot shrink the original source list.
+
+Both mirrors require `original=true`. Scan windows use the original `published`
+timestamp with fractional precision, without falling back to import time. Audio,
+archives and other unsupported outputs retain explicitly excluded captures and
+checkpoints without downloads, file receipts or download-archive acknowledgements.
+Native and retained legacy cursors can resume past those exclusions. GIF conversion
+keeps the reviewed host helper. Qualified mirror/service/account/post identities
+remain separate from native service identities. New captures share post bodies
+and retain file details in patches; historical unmarked capture partitions remain
+unchanged for replay and migration proofs.
+
+Packaged `stash-ingest-coomer` and `stash-ingest-kemono` launchers preserve explicit
+URLs, saved-list order, original windows and caller recovery after input files
+disappear. Invalid list lines fail the request, and strict status retains pending
+work. Source-scoped configuration conversion excludes unrelated extractors while
+retaining original quality, filenames, skip/archive behavior and helper bindings.
+
+Actual host configuration inspection staged normal and full-history profiles for
+both mirrors in `.local/native-mirror-conversion-20261005/`. All 39 saved Coomer
+targets use the supported user extractor. No saved Kemono list or dedicated
+Coomer/Kemono timer was found in the inventoried paths; Kemono is staged for
+explicit URL callers. Input hashes were unchanged, with no website/native API
+requests or download-archive access. The root UUID remains unregistered rehearsal
+state. Final producer/root/collection registration, outbox/environment, dispatcher,
+recovery and actual host/n8n activation remain open. Discord, favorites and artist
+containers require separate adapters.
+
+All 510 producer tests pass in 45 seconds. Pinned extractor tests cover source
+order, missing slots, configured file selection, source dates, nonvisual exclusion
+and native/legacy cursor recovery. Real capture/file publication tests cover a
+singleton primary alias and a mixed-media album with replay. The archive package,
+focused backend suite and scoped Go lint pass. Isolated package installation and
+both installed launchers' help/dry-run checks pass without workspace `PYTHONPATH`.
+No live service, Stash schema, frozen release, bucket policy or develop merge
+changed. This increment does not close the remaining source coverage or release
+gates.

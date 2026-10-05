@@ -81,17 +81,44 @@ def instagram_target(value):
 
 
 def instagram_list(filename):
+    return _explicit_list(filename, instagram_target, 'Instagram')
+
+
+def mirror_target(value, category):
+    value = value.strip()
+    try:
+        parsed = urlsplit(value)
+        if (category not in ('coomer', 'kemono') or parsed.scheme not in ('http', 'https')
+                or not re.fullmatch(r'(?:www\.|beta\.)?' + category + r'\.(?:cr|st|su|party)', parsed.hostname or '')
+                or parsed.username is not None or parsed.password is not None or parsed.port is not None
+                or any(c.isspace() or ord(c) < 32 for c in value)):
+            raise ValueError()
+        from gallery_dl import extractor
+        from gallery_dl.extractor.kemono import KemonoUserExtractor, KemonoPostExtractor, KemonoPostsExtractor
+        target = extractor.find(value)
+        if target is None or target.category != category or not isinstance(target, (KemonoUserExtractor, KemonoPostExtractor, KemonoPostsExtractor)):
+            raise ValueError()
+        return value
+    except ValueError:
+        raise InvalidData('Choose a supported ' + category + ' account, post or listing URL') from None
+
+
+def mirror_list(filename, category):
+    return _explicit_list(filename, lambda value: mirror_target(value, category), category)
+
+
+def _explicit_list(filename, target, label):
     targets = []
     for number, line in enumerate(read_list(filename), 1):
         line = line.strip()
         if not line or line.startswith("#"):
             continue
         try:
-            targets.append(instagram_target(line))
+            targets.append(target(line))
         except InvalidData:
             # gallery-dl input lists are explicit URLs, not a best-effort list
             # of names. Do not silently turn a partial list into success.
-            raise InvalidData(f"Invalid Instagram saved-list target on line {number}") from None
+            raise InvalidData(f"Invalid {label} saved-list target on line {number}") from None
     return list(dict.fromkeys(targets)), []
 
 

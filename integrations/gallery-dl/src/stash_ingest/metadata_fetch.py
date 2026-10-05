@@ -154,6 +154,9 @@ def collect(url, settings, resume=None, *, factory=None, check=lambda: None, res
             twitter_evidence(target)
         elif target.category == "instagram":
             instagram.install(target)
+        elif target.category in ("kemono", "coomer"):
+            from . import mirror
+            mirror.install(target)
         base = None
         for kind, media_url, original in target:
             check()

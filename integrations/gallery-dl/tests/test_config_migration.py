@@ -188,6 +188,18 @@ class ConfigMigrationTests(unittest.TestCase):
             self.assertTrue(config.get(('extractor', 'instagram', 'stories'), 'skip'))
             self.assertEqual(config.get(('extractor', 'instagram>instagram'), 'sleep'), 12)
 
+    def test_mirror_profiles_keep_originals_and_their_helpers_without_other_services(self):
+        for category, other in (('coomer', 'kemono'), ('kemono', 'coomer')):
+            self.value['extractor'][category]['postprocessors'] = ['helper']
+            self.path.write_text(json.dumps(self.value))
+            value = Converter([self.path], self.root, self.locks, category=category).convert()
+            self.assertNotIn(other, value['gallery']['extractor'])
+            self.assertNotIn('reddit', value['gallery']['extractor'])
+            self.assertEqual(set(value['gallery']['postprocessor']), {'helper'})
+            with Configuration.from_document(value, self.directory).activate():
+                self.assertIs(config.interpolate(('extractor', category), 'original'), True)
+                self.assertEqual(config.interpolate(('extractor', category), 'postprocessors'), ['helper'])
+
     def test_conditional_order_survives_writing_and_changes_policy_and_filename(self):
         value, original = self.profile()
         changed = copy.deepcopy(value)

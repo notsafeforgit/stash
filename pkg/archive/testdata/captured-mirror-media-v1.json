@@ -1,0 +1,812 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "name": "coomer partial ordered post",
+      "source": {
+        "category": "coomer",
+        "service": "onlyfans",
+        "user": "456",
+        "id": "123",
+        "published": "2026-10-01T12:00:00.123456",
+        "content": "Caption",
+        "file": {
+          "path": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+          "name": "image.jpg"
+        },
+        "attachments": [
+          {
+            "path": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+            "name": "video.mp4"
+          },
+          null
+        ],
+        "path": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+        "mirror_media": {
+          "version": 1,
+          "post": {
+            "namespace": "mirror:coomer:onlyfans",
+            "value": "456/123"
+          },
+          "items": [
+            {
+              "id": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+              "kind": "image"
+            },
+            {
+              "id": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+              "kind": "video"
+            },
+            null
+          ]
+        }
+      },
+      "error": false,
+      "items": [
+        {
+          "id": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+          "kind": "image"
+        },
+        {
+          "id": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+          "kind": "video"
+        },
+        null
+      ],
+      "attachment": {
+        "namespace": "mirror:coomer:onlyfans",
+        "value": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4"
+      }
+    },
+    {
+      "name": "kemono service qualification",
+      "source": {
+        "category": "kemono",
+        "service": "patreon",
+        "user": "456",
+        "id": "123",
+        "published": "2026-10-01T12:00:00.123456",
+        "content": "Caption",
+        "file": {
+          "path": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+          "name": "image.jpg"
+        },
+        "attachments": [
+          {
+            "path": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+            "name": "video.mp4"
+          },
+          null
+        ],
+        "path": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+        "mirror_media": {
+          "version": 1,
+          "post": {
+            "namespace": "mirror:kemono:patreon",
+            "value": "456/123"
+          },
+          "items": [
+            {
+              "id": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+              "kind": "image"
+            },
+            {
+              "id": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+              "kind": "video"
+            },
+            null
+          ]
+        }
+      },
+      "error": false,
+      "items": [
+        {
+          "id": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+          "kind": "image"
+        },
+        {
+          "id": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+          "kind": "video"
+        },
+        null
+      ],
+      "attachment": {
+        "namespace": "mirror:kemono:patreon",
+        "value": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4"
+      }
+    },
+    {
+      "name": "primary aliases listed attachment",
+      "source": {
+        "category": "coomer",
+        "service": "onlyfans",
+        "user": "456",
+        "id": "123",
+        "published": "2026-10-01T12:00:00.123456",
+        "content": "Caption",
+        "file": {
+          "path": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+          "name": "image.jpg"
+        },
+        "attachments": [
+          {
+            "path": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4"
+          },
+          {
+            "path": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg"
+          }
+        ],
+        "path": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+        "mirror_media": {
+          "version": 1,
+          "post": {
+            "namespace": "mirror:coomer:onlyfans",
+            "value": "456/123"
+          },
+          "items": [
+            {
+              "id": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+              "kind": "video"
+            },
+            {
+              "id": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+              "kind": "image"
+            }
+          ]
+        }
+      },
+      "error": false,
+      "items": [
+        {
+          "id": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+          "kind": "video"
+        },
+        {
+          "id": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+          "kind": "image"
+        }
+      ],
+      "attachment": {
+        "namespace": "mirror:coomer:onlyfans",
+        "value": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4"
+      }
+    },
+    {
+      "name": "missing primary slot",
+      "source": {
+        "category": "coomer",
+        "service": "onlyfans",
+        "user": "456",
+        "id": "123",
+        "published": "2026-10-01T12:00:00.123456",
+        "content": "Caption",
+        "file": {
+          "name": "unavailable"
+        },
+        "attachments": [
+          {
+            "path": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4"
+          }
+        ],
+        "path": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+        "mirror_media": {
+          "version": 1,
+          "post": {
+            "namespace": "mirror:coomer:onlyfans",
+            "value": "456/123"
+          },
+          "items": [
+            null,
+            {
+              "id": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+              "kind": "video"
+            }
+          ]
+        }
+      },
+      "error": false,
+      "items": [
+        null,
+        {
+          "id": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+          "kind": "video"
+        }
+      ],
+      "attachment": {
+        "namespace": "mirror:coomer:onlyfans",
+        "value": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4"
+      }
+    },
+    {
+      "name": "repeated source slots remain",
+      "source": {
+        "category": "coomer",
+        "service": "onlyfans",
+        "user": "456",
+        "id": "123",
+        "published": "2026-10-01T12:00:00.123456",
+        "content": "Caption",
+        "file": {},
+        "attachments": [
+          {
+            "path": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg"
+          },
+          {
+            "path": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg"
+          }
+        ],
+        "path": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+        "mirror_media": {
+          "version": 1,
+          "post": {
+            "namespace": "mirror:coomer:onlyfans",
+            "value": "456/123"
+          },
+          "items": [
+            {
+              "id": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+              "kind": "image"
+            },
+            {
+              "id": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+              "kind": "image"
+            }
+          ]
+        }
+      },
+      "error": false,
+      "items": [
+        {
+          "id": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+          "kind": "image"
+        },
+        {
+          "id": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+          "kind": "image"
+        }
+      ],
+      "attachment": {
+        "namespace": "mirror:coomer:onlyfans",
+        "value": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg"
+      }
+    },
+    {
+      "name": "mirror domain alias source path",
+      "source": {
+        "category": "coomer",
+        "service": "onlyfans",
+        "user": "456",
+        "id": "123",
+        "published": "2026-10-01T12:00:00.123456",
+        "content": "Caption",
+        "file": {
+          "path": "https://coomer.su/data/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+          "name": "image.jpg"
+        },
+        "attachments": [
+          {
+            "path": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+            "name": "video.mp4"
+          },
+          null
+        ],
+        "path": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+        "mirror_media": {
+          "version": 1,
+          "post": {
+            "namespace": "mirror:coomer:onlyfans",
+            "value": "456/123"
+          },
+          "items": [
+            {
+              "id": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+              "kind": "image"
+            },
+            {
+              "id": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+              "kind": "video"
+            },
+            null
+          ]
+        }
+      },
+      "error": false,
+      "items": [
+        {
+          "id": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+          "kind": "image"
+        },
+        {
+          "id": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+          "kind": "video"
+        },
+        null
+      ],
+      "attachment": {
+        "namespace": "mirror:coomer:onlyfans",
+        "value": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4"
+      }
+    },
+    {
+      "name": "inline source order without primary duplication",
+      "source": {
+        "category": "coomer",
+        "service": "onlyfans",
+        "user": "456",
+        "id": "123",
+        "published": "2026-10-01T12:00:00.123456",
+        "content": "<img src=\"/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg\"><img src=\"/inline/original.png\">",
+        "file": {
+          "path": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+          "name": "image.jpg"
+        },
+        "attachments": [
+          {
+            "path": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+            "name": "video.mp4"
+          },
+          null
+        ],
+        "path": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+        "mirror_media": {
+          "version": 1,
+          "post": {
+            "namespace": "mirror:coomer:onlyfans",
+            "value": "456/123"
+          },
+          "items": [
+            {
+              "id": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+              "kind": "image"
+            },
+            {
+              "id": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+              "kind": "video"
+            },
+            null,
+            {
+              "id": "/inline/original.png",
+              "kind": "image"
+            }
+          ]
+        }
+      },
+      "error": false,
+      "items": [
+        {
+          "id": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+          "kind": "image"
+        },
+        {
+          "id": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+          "kind": "video"
+        },
+        null,
+        {
+          "id": "/inline/original.png",
+          "kind": "image"
+        }
+      ],
+      "attachment": {
+        "namespace": "mirror:coomer:onlyfans",
+        "value": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4"
+      }
+    },
+    {
+      "name": "legacy requires explicit new evidence",
+      "source": {
+        "category": "coomer",
+        "service": "onlyfans",
+        "user": "456",
+        "id": "123",
+        "published": "2026-10-01T12:00:00.123456",
+        "content": "Caption",
+        "file": {
+          "path": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+          "name": "image.jpg"
+        },
+        "attachments": [
+          {
+            "path": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+            "name": "video.mp4"
+          },
+          null
+        ],
+        "path": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4"
+      },
+      "error": false,
+      "items": null,
+      "attachment": null
+    },
+    {
+      "name": "wrong source post",
+      "source": {
+        "category": "coomer",
+        "service": "onlyfans",
+        "user": "456",
+        "id": "123",
+        "published": "2026-10-01T12:00:00.123456",
+        "content": "Caption",
+        "file": {
+          "path": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+          "name": "image.jpg"
+        },
+        "attachments": [
+          {
+            "path": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+            "name": "video.mp4"
+          },
+          null
+        ],
+        "path": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+        "mirror_media": {
+          "version": 1,
+          "post": {
+            "namespace": "mirror:coomer:onlyfans",
+            "value": "other/123"
+          },
+          "items": [
+            {
+              "id": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+              "kind": "image"
+            },
+            {
+              "id": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+              "kind": "video"
+            },
+            null
+          ]
+        }
+      },
+      "error": true,
+      "items": null,
+      "attachment": null
+    },
+    {
+      "name": "wrong mirror namespace",
+      "source": {
+        "category": "coomer",
+        "service": "onlyfans",
+        "user": "456",
+        "id": "123",
+        "published": "2026-10-01T12:00:00.123456",
+        "content": "Caption",
+        "file": {
+          "path": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+          "name": "image.jpg"
+        },
+        "attachments": [
+          {
+            "path": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+            "name": "video.mp4"
+          },
+          null
+        ],
+        "path": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+        "mirror_media": {
+          "version": 1,
+          "post": {
+            "namespace": "mirror:kemono:onlyfans",
+            "value": "456/123"
+          },
+          "items": [
+            {
+              "id": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+              "kind": "image"
+            },
+            {
+              "id": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+              "kind": "video"
+            },
+            null
+          ]
+        }
+      },
+      "error": true,
+      "items": null,
+      "attachment": null
+    },
+    {
+      "name": "boolean version",
+      "source": {
+        "category": "coomer",
+        "service": "onlyfans",
+        "user": "456",
+        "id": "123",
+        "published": "2026-10-01T12:00:00.123456",
+        "content": "Caption",
+        "file": {
+          "path": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+          "name": "image.jpg"
+        },
+        "attachments": [
+          {
+            "path": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+            "name": "video.mp4"
+          },
+          null
+        ],
+        "path": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+        "mirror_media": {
+          "version": true,
+          "post": {
+            "namespace": "mirror:coomer:onlyfans",
+            "value": "456/123"
+          },
+          "items": [
+            {
+              "id": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+              "kind": "image"
+            },
+            {
+              "id": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+              "kind": "video"
+            },
+            null
+          ]
+        }
+      },
+      "error": true,
+      "items": null,
+      "attachment": null
+    },
+    {
+      "name": "invented media kind",
+      "source": {
+        "category": "coomer",
+        "service": "onlyfans",
+        "user": "456",
+        "id": "123",
+        "published": "2026-10-01T12:00:00.123456",
+        "content": "Caption",
+        "file": {
+          "path": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+          "name": "image.jpg"
+        },
+        "attachments": [
+          {
+            "path": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+            "name": "video.mp4"
+          },
+          null
+        ],
+        "path": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+        "mirror_media": {
+          "version": 1,
+          "post": {
+            "namespace": "mirror:coomer:onlyfans",
+            "value": "456/123"
+          },
+          "items": [
+            {
+              "id": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+              "kind": "video"
+            },
+            {
+              "id": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+              "kind": "video"
+            },
+            null
+          ]
+        }
+      },
+      "error": true,
+      "items": null,
+      "attachment": null
+    },
+    {
+      "name": "missing original list",
+      "source": {
+        "category": "coomer",
+        "service": "onlyfans",
+        "user": "456",
+        "id": "123",
+        "published": "2026-10-01T12:00:00.123456",
+        "content": "Caption",
+        "file": {
+          "path": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+          "name": "image.jpg"
+        },
+        "path": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+        "mirror_media": {
+          "version": 1,
+          "post": {
+            "namespace": "mirror:coomer:onlyfans",
+            "value": "456/123"
+          },
+          "items": [
+            {
+              "id": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+              "kind": "image"
+            },
+            {
+              "id": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+              "kind": "video"
+            },
+            null
+          ]
+        }
+      },
+      "error": true,
+      "items": null,
+      "attachment": null
+    },
+    {
+      "name": "source positions reordered",
+      "source": {
+        "category": "coomer",
+        "service": "onlyfans",
+        "user": "456",
+        "id": "123",
+        "published": "2026-10-01T12:00:00.123456",
+        "content": "Caption",
+        "file": {
+          "path": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+          "name": "image.jpg"
+        },
+        "attachments": [
+          {
+            "path": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+            "name": "video.mp4"
+          },
+          null
+        ],
+        "path": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+        "mirror_media": {
+          "version": 1,
+          "post": {
+            "namespace": "mirror:coomer:onlyfans",
+            "value": "456/123"
+          },
+          "items": [
+            null,
+            {
+              "id": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+              "kind": "video"
+            },
+            {
+              "id": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+              "kind": "image"
+            }
+          ]
+        }
+      },
+      "error": true,
+      "items": null,
+      "attachment": null
+    },
+    {
+      "name": "unknown evidence fields",
+      "source": {
+        "category": "coomer",
+        "service": "onlyfans",
+        "user": "456",
+        "id": "123",
+        "published": "2026-10-01T12:00:00.123456",
+        "content": "Caption",
+        "file": {
+          "path": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+          "name": "image.jpg"
+        },
+        "attachments": [
+          {
+            "path": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+            "name": "video.mp4"
+          },
+          null
+        ],
+        "path": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+        "mirror_media": {
+          "version": 1,
+          "post": {
+            "namespace": "mirror:coomer:onlyfans",
+            "value": "456/123"
+          },
+          "items": [
+            {
+              "id": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+              "kind": "image"
+            },
+            {
+              "id": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+              "kind": "video"
+            },
+            null
+          ],
+          "extra": true
+        }
+      },
+      "error": true,
+      "items": null,
+      "attachment": null
+    },
+    {
+      "name": "foreign file host",
+      "source": {
+        "category": "coomer",
+        "service": "onlyfans",
+        "user": "456",
+        "id": "123",
+        "published": "2026-10-01T12:00:00.123456",
+        "content": "Caption",
+        "file": {
+          "path": "https://example.invalid/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+          "name": "image.jpg"
+        },
+        "attachments": [
+          {
+            "path": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+            "name": "video.mp4"
+          },
+          null
+        ],
+        "path": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+        "mirror_media": {
+          "version": 1,
+          "post": {
+            "namespace": "mirror:coomer:onlyfans",
+            "value": "456/123"
+          },
+          "items": [
+            {
+              "id": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+              "kind": "image"
+            },
+            {
+              "id": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+              "kind": "video"
+            },
+            null
+          ]
+        }
+      },
+      "error": true,
+      "items": null,
+      "attachment": null
+    },
+    {
+      "name": "unsafe path segments",
+      "source": {
+        "category": "coomer",
+        "service": "onlyfans",
+        "user": "456",
+        "id": "123",
+        "published": "2026-10-01T12:00:00.123456",
+        "content": "Caption",
+        "file": {
+          "path": "/../image.jpg",
+          "name": "image.jpg"
+        },
+        "attachments": [
+          {
+            "path": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+            "name": "video.mp4"
+          },
+          null
+        ],
+        "path": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+        "mirror_media": {
+          "version": 1,
+          "post": {
+            "namespace": "mirror:coomer:onlyfans",
+            "value": "456/123"
+          },
+          "items": [
+            {
+              "id": "/aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg",
+              "kind": "image"
+            },
+            {
+              "id": "/bb/bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4",
+              "kind": "video"
+            },
+            null
+          ]
+        }
+      },
+      "error": true,
+      "items": null,
+      "attachment": null
+    }
+  ]
+}

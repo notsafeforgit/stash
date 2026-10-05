@@ -210,8 +210,8 @@ responses expose truncation so a partial candidate set never appears unique.
 `queue-sources` freezes a caller's URL list, policy and absolute window before
 network access. Resolution commits each collection binding and ticket together;
 never reinterpret a bound target after a retry. `call-status` checks every
-original ticket and cannot certify media intake. Staged Twitter/Reddit/Instagram host
-launchers now expand the existing lists/modes/dates into source calls. Full-history
+original ticket and cannot certify media intake. Staged Twitter/Reddit/Instagram/
+Coomer/Kemono host launchers expand the existing lists/modes/dates into source calls. Full-history
 and Reddit top mode require a separate reviewed global `skip=true` profile.
 Local recording is not source completion; strict inspection returns pending until
 all original tickets finish. The staged n8n adapter records stable execution
@@ -226,6 +226,15 @@ each child still applies the original window. New capture partitioning requires
 that explicit evidence so historical Instagram signatures remain replayable.
 The staged Instagram timer still needs native registration, durable outbox and
 dispatcher/recovery activation at cutover.
+Coomer/Kemono user/post/posts-listing downloads require `original=true` and retain
+`mirror_media` version 1 before upstream file selection or mutation. Revalidate
+primary/attachment/inline membership in the backend; primary aliases must not
+create false albums, and selected download order must not replace source order.
+Unsupported audio/archive outputs retain excluded captures without downloads,
+file receipts or download-archive acknowledgements. Windows require original
+`published` timestamps. New shared-body partitioning requires explicit evidence;
+historical signatures remain unchanged. The staged mirror profiles/launchers are
+inactive; Discord, favorites and artist containers still need separate adapters.
 `source_backfill_decisions` now retains permanent account-backfill history in
 the native database. Historical acceptance/skip imports retain their entire
 source row without creating source-run coverage. Native completion proves every

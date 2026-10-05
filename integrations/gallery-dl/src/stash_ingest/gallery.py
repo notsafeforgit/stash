@@ -14,7 +14,7 @@ from gallery_dl import config, exception, job, version
 from gallery_dl import path as gallery_path
 from gallery_dl.extractor.common import Message
 
-from . import filename, instagram
+from . import filename, instagram, mirror
 from .encoding import InvalidData
 from .filesystem import destination_lock
 from .runs import SourceFailure, SourcePaused, SourceTurnComplete
@@ -226,6 +226,8 @@ class NativeDownloadJob(job.DownloadJob):
             twitter_evidence(self.extractor)
         elif self.extractor.category == "instagram":
             instagram.install(self.extractor)
+        elif self.extractor.category in ("kemono", "coomer"):
+            mirror.install(self.extractor)
 
     def _source_operation(self, call, *args):
         try:
@@ -372,6 +374,21 @@ class NativeDownloadJob(job.DownloadJob):
     @publication_guard
     def handle_url(self, url, kwdict):
         self.producer.check()
+        if self.extractor.category in ("kemono", "coomer") and kwdict.get('extension', '').lower() not in mirror.VISUAL:
+            # Keep non-playable source evidence, but do not download audio or
+            # archives which cannot produce a supported native file receipt.
+            kept = dict(kwdict, _url=url, source_extractor_url=self.extractor.url,
+                        native_file_exclusion='unsupported_image_or_video_extension')
+            prepared = self.producer.prepare(kept)
+            old_cursor = None
+            if self.producer.legacy_resume:
+                candidate = copy.copy(self.pathfmt)
+                candidate.set_filename(dict(kwdict))
+                old_cursor = legacy_cursor(self, candidate)
+            cursor, replay = self.producer.cursor(prepared, legacy_cursor=old_cursor)
+            self.producer.checkpoint(cursor, replay, False)
+            self.log.info('Excluded unsupported source file type: %s', kwdict.get('extension', ''))
+            return
         self._native_url = url
         try:
             return super().handle_url(url, kwdict)

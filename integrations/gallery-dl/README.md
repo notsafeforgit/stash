@@ -3,8 +3,8 @@
 This package implements durable delivery and a gallery-dl download adapter.
 It is development code on `v3-rewrite`; the installed host and n8n download
 helpers still use their existing catalogs. Durable caller URL snapshots now feed
-the native dispatcher. Staged Twitter/Reddit/Instagram host launchers preserve saved-list,
-mode and date inputs. The staged n8n adapter preserves stable execution tokens,
+the native dispatcher. Staged Twitter/Reddit/Instagram/Coomer/Kemono host launchers
+preserve saved-list, mode and date inputs. The staged n8n adapter preserves stable execution tokens,
 historical backfill decisions and actual source completion. Recovery caller
 conversion, operational-history migration, activation of reviewed worker profiles,
 additional source adapters and production cutover remain unfinished.
@@ -377,8 +377,8 @@ must not be hidden as a credential change. Input files remain the private access
 source, so the eventual cutover must keep those references valid when retiring
 legacy settings. No credentials are printed in the conversion report.
 
-`--category twitter` and `--category instagram` remove unrelated extractor settings and unused named
-processors. Reddit can do the same when its existing whitelist limits children
+`--category twitter`, `instagram`, `coomer` and `kemono` remove unrelated extractor
+settings and unused named processors. Reddit can do the same when its existing whitelist limits children
 to Reddit, Imgur, Redgifs and direct links; their base and parent-specific
 settings remain. Unrecognized dependency graphs retain all configured sites.
 This prevents unrelated ThisVid recovery settings from splitting otherwise
@@ -536,8 +536,9 @@ and its backup/restore boundary; schema migration invents no past caller runs.
 
 ## Staged host launchers
 
-The package entry points `stash-ingest-twitter`, `stash-ingest-reddit` and
-`stash-ingest-instagram` record source calls through this queue. The first two
+The package entry points `stash-ingest-twitter`, `stash-ingest-reddit`,
+`stash-ingest-instagram`, `stash-ingest-coomer` and `stash-ingest-kemono` record
+source calls through this queue. The first two
 are also available as `bin/update-twitter-media` and `bin/update-reddit-media`.
 Run the scripts with the installed producer's
 Python. They are staged replacements; the existing host scripts and n8n workflow
@@ -547,16 +548,19 @@ commands have not switched.
 |---|---|
 | Twitter `--username`, `--user-id`/`--gid` | Handles, profile URLs and numeric account IDs use the existing normalized X URLs |
 | Instagram `--username` | Handles become profile URLs; explicit post/reel/story/highlight URLs keep their path and query |
+| Coomer/Kemono `--url` | Explicit account, post or posts-listing URLs retain their underlying service, account ID, path and query; other container types require separate adapters |
 | `--config-file` | Twitter retains first-token/comment handling and input order; Reddit sorts profile/community names before expansion |
-| Instagram `--config-file` | Preserves URL order and removes exact duplicates; blank/comment-only lines are ignored and invalid lines stop the request |
+| Instagram/Coomer/Kemono `--config-file` | Preserves URL order and removes exact duplicates; blank/comment-only lines are ignored and invalid lines stop the request |
 | Reddit `--mode new\|top`, `--subreddit`, `--saved` | Retains profile/search URLs, all/year top variants, communities and explicit saved-post targets |
 | Reddit `--date-min`, `--date-min-relative`, `--date-min-days` | Freezes the first request's lower bound; the absolute option takes precedence |
 | `--full-history`, Reddit top mode | Requires the reviewed profile with global `skip=true`; retains any date minimum |
 | `--dry-run` | Prints URL/window expansion without a profile, API request or outbox creation |
 
 Saved-list defaults remain `~/.config/gallery-dl/twitter-list.conf`,
-`reddit-list.conf` and `instagram-list.conf`, overridden by `TWITTER_LIST_CONFIG`,
-`REDDIT_LIST_CONFIG` and `INSTAGRAM_LIST_CONFIG`.
+`reddit-list.conf`, `instagram-list.conf`, `coomer-list.conf` and `kemono-list.conf`,
+overridden by the corresponding `<SERVICE>_LIST_CONFIG` variable, such as
+`COOMER_LIST_CONFIG`. A missing list requires an explicit target or list path;
+installing a launcher does not create a list or schedule.
 Ignored input lines are reported by line number. Empty lists and invalid date
 filters fail instead of claiming completed work. Reddit `me` is accepted only
 through the saved-post option; use Twitter's ID option for `/i/user/ID` URLs.
@@ -565,7 +569,7 @@ Raw gallery-dl flags and `--gallery-dl-bin` are replaced by the reviewed profile
 Set `STASH_INGEST_OUTBOX`, `STASH_INGEST_ENDPOINT`, `STASH_INGEST_PRODUCER`, and
 the Stash API token environment reference. `--profile` chooses an explicit
 profile; otherwise the launcher selects `STASH_INGEST_<SERVICE>_PROFILE`, where
-`<SERVICE>` is `TWITTER`, `REDDIT` or `INSTAGRAM`. Full-history/top requests select
+`<SERVICE>` is `TWITTER`, `REDDIT`, `INSTAGRAM`, `COOMER` or `KEMONO`. Full-history/top requests select
 the corresponding `STASH_INGEST_<SERVICE>_FULL_HISTORY_PROFILE`.
 These profiles must have the matching
 source category. Website access remains in their local gallery-dl references.
@@ -1768,6 +1772,41 @@ dispatcher. An exit code of zero does not confirm that a timer has finished
 scraping. The host timer, durable outbox, dispatcher/recovery schedule and API
 registration must be converted together at reviewed cutover.
 
+## Kemono/Coomer downloads and source albums
+
+The pinned user, post and posts-listing extractors require `original=true`.
+The adapter records `mirror_media` version 1 before configured file selection,
+download ordering or the extractor's mutation of file dictionaries. Its qualified
+post identity includes the mirror, underlying service, account ID and post ID;
+mirror IDs do not establish an association with a native OnlyFans/Patreon account.
+
+Membership preserves original attachment-array order, including unavailable slots
+and repeated positions. A primary file precedes that list unless it aliases an
+existing attachment. Inline source files follow in text order with existing paths
+deduplicated. Selecting only attachments or changing download order cannot shrink
+or reorder this source evidence. A singleton primary-file alias does not create an
+album; multiple evidenced source slots can create a gallery as visual files arrive.
+
+The backend revalidates the manifest against the retained original file,
+attachment and inline-content fields. Full source paths identify attachments;
+their hash-like filenames are not verified local content checksums. New captures
+share the post body while retaining selected-file paths, URLs, types and exclusions
+in per-capture patches. Unmarked historical payloads keep their original partition.
+
+Audio, archives and other unsupported file extensions retain source captures with
+`native_file_exclusion: "unsupported_image_or_video_extension"`. They produce no
+download, file receipt or download-archive acknowledgement. Supported GIF conversion
+still uses the reviewed host processor. Scan windows use the original `published`
+timestamp, preserving fractional precision; missing publication time fails rather
+than substituting the mirror's import timestamp.
+
+`stash-ingest-coomer` and `stash-ingest-kemono` record durable source requests for
+the separate dispatcher. Their reviewed profiles retain existing filenames,
+archive/skip rules and helper bindings. Native root/producer registration, outbox,
+dispatcher/recovery and actual host/n8n caller activation remain deployment work.
+Discord, favorites and artist-dispatch containers are explicitly unsupported by
+this adapter and require their own identity/traversal contracts.
+
 ## Metadata-only extraction for enrichment
 
 `stash_ingest.metadata_fetch.fetch(url, settings, resume=None, timeout=180,
@@ -1797,7 +1836,8 @@ never a selected carousel image ID. Story downloads use each original story's
 media ID, retaining the story/highlight container separately. Linked media hosts inherit their
 enclosing post; a social account/feed parent does not replace its post. These
 adapters allow verified metadata capture/publication, while file selection and
-source-window adapters for services beyond Reddit/Twitter/Instagram remain unfinished.
+source-window adapters for services beyond Reddit/Twitter/Instagram/Coomer/Kemono
+remain unfinished.
 
 Metadata projection preserves source post captions and dates rather than image
 alt text or per-file dates. Kemono/Coomer only use `published` for publication

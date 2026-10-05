@@ -14,8 +14,8 @@ from gallery_dl import config
 
 from stash_ingest.configuration import Configuration
 from stash_ingest.encoding import InvalidData
-from stash_ingest.launcher_inputs import date_min, instagram_list, instagram_target, reddit_list, reddit_name, reddit_urls, twitter_list, twitter_target
-from stash_ingest.launchers import caller_uuid, instagram_main, reddit_main, twitter_main
+from stash_ingest.launcher_inputs import date_min, instagram_list, instagram_target, mirror_list, mirror_target, reddit_list, reddit_name, reddit_urls, twitter_list, twitter_target
+from stash_ingest.launchers import caller_uuid, coomer_main, instagram_main, kemono_main, reddit_main, twitter_main
 from stash_ingest.outbox import Outbox
 from stash_ingest.source_calls import SourceCalls
 from helpers import PRODUCER
@@ -117,6 +117,39 @@ class LauncherTests(unittest.TestCase):
         self.assertEqual((status, unfinished['state']), (2, 'pending'))
         with closing(Outbox(self.outbox, 'http://fixture.invalid', PRODUCER)) as box:
             self.assertEqual(SourceCalls(box).summary(self.call)['target_count'], 1)
+
+    def test_mirror_targets_preserve_service_ids_and_reject_other_collection_kinds(self):
+        for category in ('coomer', 'kemono'):
+            account = f'https://{category}.su/onlyfans/user/123'
+            detail = f'https://{category}.st/patreon/user/456/post/789'
+            listing = f'https://{category}.cr/posts?q=example'
+            source = self.directory / (category + '.conf')
+            source.write_text('# selected sources\n' + '\n'.join([account, detail, account, listing]))
+            self.assertEqual(mirror_list(source, category), ([account, detail, listing], []))
+            for invalid in ('https://example.invalid/onlyfans/user/123', f'https://{category}.st/discord/server/1/2',
+                            f'https://{category}.st/favorites', f'https://private@{category}.st/onlyfans/user/123'):
+                with self.subTest(url=invalid), self.assertRaises(InvalidData):
+                    mirror_target(invalid, category)
+        with self.assertRaises(InvalidData):
+            mirror_target('https://coomer.st/onlyfans/user/123', 'kemono')
+
+    def test_mirror_launchers_keep_pending_calls_and_replay_without_the_source_list(self):
+        for category, main in (('coomer', coomer_main), ('kemono', kemono_main)):
+            source = self.directory / (category + '.conf')
+            source.write_text(f'https://{category}.st/onlyfans/user/123\n')
+            self.value['source_category'] = category
+            self.value['gallery']['extractor'][category] = {'original': True}
+            self.profile.write_text(json.dumps(self.value))
+            args = [*self.base, '--call', str(uuid.uuid4()), '--config-file', str(source), '--profile', str(self.profile)]
+            status, original, error = self.invoke(main, args)
+            self.assertEqual((status, error, original['state']), (0, '', 'recorded'))
+            source.unlink()
+            self.profile.unlink()
+            self.assertEqual(self.invoke(main, args), (0, original, ''))
+            status, pending, _ = self.invoke(main, [*args, '--strict-errors'])
+            self.assertEqual((status, pending['state']), (2, 'pending'))
+            status, preview, error = self.invoke(main, ['--url', f'https://{category}.st/onlyfans/user/123', '--dry-run'])
+            self.assertEqual((status, error, preview['targets']), (0, '', [f'https://{category}.st/onlyfans/user/123']))
 
     @unittest.skipUnless(hasattr(time, "tzset"), "host launcher timezone fixture requires tzset")
     def test_date_filters_keep_gallery_dl_boundaries_absolute_precedence_and_frozen_relative_time(self):

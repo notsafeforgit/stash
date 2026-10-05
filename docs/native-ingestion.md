@@ -414,13 +414,25 @@ Imgur/Redgifs child hosts retain their enclosing post scope, caption and publish
 A social extractor's parent feed/profile does not replace its actual post.
 Unknown post adapters are rejected even when their account parser is supported.
 Post support alone does not establish attachment membership or enable a download
-worker: file selection and source-window adapters currently cover Reddit, Twitter
-and Instagram. Instagram requires versioned original attachment evidence for
+worker: file selection and source-window adapters currently cover Reddit, Twitter,
+Instagram, Coomer and Kemono. Instagram requires versioned original attachment evidence for
 file linking, preserves carousel slots before filtering/reordering, and treats
 each story as its own post. Only evidenced carousel posts create source galleries.
 Historical metadata without this evidence can retain a regular post identity,
 but cannot establish attachment order from download numbering. See the
 [producer's Instagram contract](../integrations/gallery-dl/README.md#instagram-downloads-and-source-albums).
+
+Coomer/Kemono user, post and posts-listing downloads require `original=true` and
+`mirror_media` version 1. The producer and backend validate the same qualified
+post reference and original primary/attachment/inline membership. Primary aliases
+do not invent another slot; missing attachments and repeated source positions
+remain visible. File selection and download order cannot change album membership.
+Unsupported audio/archive outputs retain excluded captures without file receipts
+or download-archive acknowledgements. Windows use the source `published` timestamp,
+never the mirror's `added` time. New manifests enable shared post-body storage
+without changing the partition of historical captures. See the
+[mirror contract](../integrations/gallery-dl/README.md#kemonocoomer-downloads-and-source-albums)
+for coverage and container limitations.
 
 ## Metadata enrichment checkpoints
 

@@ -134,22 +134,26 @@ func TestFileEventSingleRedditAttachmentLinksMediaWithoutCreatingGallery(t *test
 	require.Equal(t, "succeeded", status.State)
 }
 
-func TestInstagramFileEventsLinkSourceMediaAndOnlyCarouselPostsCreateGalleries(t *testing.T) {
+func TestSourceFileEventsLinkMediaAndOnlyDeclaredAlbumsCreateGalleries(t *testing.T) {
 	for _, tc := range []struct {
-		name   string
-		postID string
-		source string
-		album  bool
+		name       string
+		namespace  string
+		postID     string
+		attachment string
+		source     string
+		album      bool
 	}{
-		{"partial carousel", "123", `{"category":"instagram","type":"post","post_id":"123","media_id":"701","instagram_media":{"version":1,"post_id":"123","album":true,"items":[{"id":"701","kind":"image"},null,{"id":"702","kind":"video"}]}}`, true},
-		{"individual story", "701", `{"category":"instagram","type":"story","post_id":"456","media_id":"701","instagram_media":{"version":1,"post_id":"701","album":false,"items":[{"id":"701","kind":"image"}],"container":{"id":"456","type":"story"}}}`, false},
+		{"partial carousel", "native:instagram", "123", "701", `{"category":"instagram","type":"post","post_id":"123","media_id":"701","instagram_media":{"version":1,"post_id":"123","album":true,"items":[{"id":"701","kind":"image"},null,{"id":"702","kind":"video"}]}}`, true},
+		{"individual story", "native:instagram", "701", "701", `{"category":"instagram","type":"story","post_id":"456","media_id":"701","instagram_media":{"version":1,"post_id":"701","album":false,"items":[{"id":"701","kind":"image"}],"container":{"id":"456","type":"story"}}}`, false},
+		{"coomer primary alias", "mirror:coomer:onlyfans", "456/123", "/image.png", `{"category":"coomer","service":"onlyfans","user":"456","id":"123","file":{"path":"/image.png"},"attachments":[{"path":"/image.png"}],"mirror_media":{"version":1,"post":{"namespace":"mirror:coomer:onlyfans","value":"456/123"},"items":[{"id":"/image.png","kind":"image"}]}}`, false},
+		{"kemono mixed post", "mirror:kemono:patreon", "456/123", "/image.png", `{"category":"kemono","service":"patreon","user":"456","id":"123","file":{"path":"/image.png"},"attachments":[{"path":"/video.mp4"}],"mirror_media":{"version":1,"post":{"namespace":"mirror:kemono:patreon","value":"456/123"},"items":[{"id":"/image.png","kind":"image"},{"id":"/video.mp4","kind":"video"}]}}`, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := intakePublicationFixture{publicationFixture: newPublicationFixture(t)}
 			repo := f.service.Repo
 			require.NoError(t, repo.WithTxn(t.Context(), func(ctx context.Context) error {
 				definition := f.collection.SourceCollectionDefinition
-				definition.Namespace, definition.RootUUID, definition.PathPrefix = "native:instagram", &f.root.UUID, "."
+				definition.Namespace, definition.RootUUID, definition.PathPrefix = tc.namespace, &f.root.UUID, "."
 				var err error
 				f.collection, err = repo.SourceCollection.Put(ctx, models.SourceCollectionInput{
 					UUID: f.collection.UUID, ExpectedRevision: f.collection.Revision, SourceCollectionDefinition: definition, Origin: "review",
@@ -160,11 +164,11 @@ func TestInstagramFileEventsLinkSourceMediaAndOnlyCarouselPostsCreateGalleries(t
 			f.credential, f.token, err = f.service.IssueCredential(t.Context(), f.producer.UUID, []models.IngestScope{{CollectionUUID: f.collection.UUID, RootUUID: &f.root.UUID}}, nil)
 			require.NoError(t, err)
 			capture := f.event(t)
-			capture.RootUUID, capture.Post.Namespace, capture.Post.Value = &f.root.UUID, "native:instagram", tc.postID
+			capture.RootUUID, capture.Post.Namespace, capture.Post.Value = &f.root.UUID, tc.namespace, tc.postID
 			capture.Source = json.RawMessage(tc.source)
 			f.receipt, err = f.submit(t, capture)
 			require.NoError(t, err)
-			require.Equal(t, "701", f.attachment(t, 0).Reference.Value)
+			require.Equal(t, tc.attachment, f.attachment(t, 0).Reference.Value)
 			event := f.fileEvent(t)
 			accepted, err := f.submitFile(t, event)
 			require.NoError(t, err)

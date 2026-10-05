@@ -10,7 +10,8 @@ from .windows import normalize
 EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 PROTECTED_KEYWORDS = frozenset(("category", "subcategory", "date", "created_utc", "created_at",
                                 "id", "tweet_id", "rest_id", "id_str", "legacy", "_reddit",
-                                "post_id", "post_date", "sidecar_media_id", "media_id", "instagram_media"))
+                                "post_id", "post_date", "sidecar_media_id", "media_id", "instagram_media",
+                                "published", "service", "mirror_media"))
 
 
 def _datetime(value):
@@ -28,9 +29,13 @@ def _datetime(value):
 def published(metadata, category):
     """Date of the source post, including its wrapper when it is a repost."""
     data, category = _context({**metadata, "category": category})
-    if category not in ("reddit", "twitter", "instagram"):
+    if category not in ("reddit", "twitter", "instagram", "coomer", "kemono"):
         raise UnsupportedSource("This extractor needs a native source-date adapter")
     try:
+        if category in ("coomer", "kemono"):
+            # The transformed date can fall back to the mirror import date.
+            # Only the original publication timestamp owns a source window.
+            return _datetime(data.get("published"))
         if category == "instagram":
             from .instagram import CONTAINERS, manifest
             if data.get("type") in CONTAINERS:
@@ -97,7 +102,10 @@ class SourceWindow:
 
 
 def validate_keywords(extractor):
+    protected = PROTECTED_KEYWORDS
+    if extractor.category in ('coomer', 'kemono'):
+        protected = protected | {'user', 'path', 'file', 'attachments', 'content', 'native_file_exclusion'}
     for key in ("keywords", "keywords-global"):
         values = extractor.config(key)
-        if values and (not isinstance(values, dict) or PROTECTED_KEYWORDS.intersection(values)):
+        if values and (not isinstance(values, dict) or protected.intersection(values)):
             raise InvalidData("Extractor keywords cannot replace native source identity or publication dates")

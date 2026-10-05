@@ -1,11 +1,6 @@
-#!/usr/bin/env -S uv run --script
-# /// script
-# requires-python = ">=3.12"
-# dependencies = [
-#     "boto3[crt]>=1.42.68",
-#     "logging-journald>=0.6.11",
-# ]
-# ///
+#!/usr/bin/env python3
+# Install the host integration package and its local native dependencies before
+# cutover. The original installed script remains pinned until then.
 from __future__ import annotations
 
 import os
@@ -30,7 +25,9 @@ import sqlite3
 import logging
 from concurrent.futures import ThreadPoolExecutor
 import boto3
+from botocore.config import Config
 from botocore.exceptions import ClientError, NoCredentialsError, PartialCredentialsError
+from native_backup import NativeBackupSession
 from contextlib import contextmanager
 from datetime import datetime
 
@@ -72,6 +69,7 @@ except Exception:
 # CONFIGURATION
 # ==========================================
 BASE_DIR = "/tank/media/porn/"
+SOURCE_VIEW = None
 LEDGER_DIR = "/tank/media/backup_ledgers/"
 TMP_BASE_DIR = "/home/andrew/s3_backup_tmp/"
 
@@ -2799,12 +2797,16 @@ def build_and_upload_master_manifest(current_video_manifest_nul, current_tarball
         validate_list_path(key)
     legacy = os.path.join(TMP_DIR, "current_manifest.txt")
     atomic_write_lines(legacy, [key + "\n" for key in keys])
-    run_cmd(["rclone", "copyto", manifest, f"{STANDARD_REMOTE_PATH}manifests/runs/{RUN_ID}/manifest.json"], long_running=True)
+    if SOURCE_VIEW is None:
+        raise RuntimeError("Native publication requires a retained source checkpoint")
+    with open(manifest, "rb") as incoming:
+        body = incoming.read()
+    SOURCE_VIEW.prepare_master(body)
     assert_source_ready()
     run_cmd(["rclone", "copyto", legacy, f"{STANDARD_REMOTE_PATH}current_manifest.txt"], long_running=True)
     # Commit point: no remote tombstoning/tagging happens before this succeeds.
     assert_source_ready()
-    run_cmd(["rclone", "copyto", manifest, f"{STANDARD_REMOTE_PATH}current_manifest.json"], long_running=True)
+    SOURCE_VIEW.commit_master(body)
 
 # ==========================================
 # LEDGER BACKUP TO STANDARD BUCKET
@@ -2876,13 +2878,17 @@ def initialize_runtime():
 def assert_source_ready():
     if SOURCE_MOUNT and not os.path.ismount(SOURCE_MOUNT):
         raise RuntimeError(f"Backup source filesystem is not mounted: {SOURCE_MOUNT}")
-    if not os.path.isdir(BASE_DIR):
-        raise RuntimeError(f"Backup source directory is unavailable: {BASE_DIR}")
-    if SOURCE_MOUNT and os.stat(BASE_DIR).st_dev != os.stat(SOURCE_MOUNT).st_dev:
+    live = str(SOURCE_VIEW.live_media) if SOURCE_VIEW is not None else BASE_DIR
+    if not os.path.isdir(live):
+        raise RuntimeError(f"Backup source directory is unavailable: {live}")
+    if SOURCE_MOUNT and os.stat(live).st_dev != os.stat(SOURCE_MOUNT).st_dev:
         raise RuntimeError("Backup source is on an unexpected filesystem")
-    with os.scandir(BASE_DIR) as entries:
-        if next(entries, None) is None:
-            raise RuntimeError("Backup source is empty; refusing to replace the restore manifest")
+    if SOURCE_VIEW is not None:
+        SOURCE_VIEW.check_source()
+    for source in {live, BASE_DIR}:
+        with os.scandir(source) as entries:
+            if next(entries, None) is None:
+                raise RuntimeError("Backup source is empty; refusing to replace the restore manifest")
 
 def validate_list_path(path):
     # Installed rclone supports --files-from-raw, but not NUL-delimited input.
@@ -2932,8 +2938,8 @@ def build_restore_catalog(tar_units):
                 raise RuntimeError(f"Manifest refused: incomplete archive chain for {unit['unit_id']}")
             units.append({k: unit[k] for k in ("unit_id", "rel_dir", "kind")} | {"base_key": state["base_key"], "deltas": deltas})
         return {
-            "format": "s3-log-backup", "version": 2, "run_id": RUN_ID,
-            "created_epoch": int(time.time()),
+            "format": "s3-log-backup", "version": 3, "run_id": RUN_ID,
+            "created_epoch": SOURCE_VIEW.created_epoch,
             "videos": [{"key": p, "size": VIDEO_SCAN[p][0]} for p in sorted(VIDEO_SCAN)],
             "units": units,
         }
@@ -2960,7 +2966,8 @@ def finish_remote_cleanup(catalog, tagger, delete_budget):
                 if video_tags >= MAX_VIDEO_DELETE_MARKERS_PER_RUN:
                     continue
                 # A path reintroduced after the scan is not safe to tombstone.
-                if os.path.lexists(os.path.join(BASE_DIR, key)):
+                live = SOURCE_VIEW.live_media if SOURCE_VIEW is not None else BASE_DIR
+                if os.path.lexists(os.path.join(live, key)):
                     continue
                 video_tags += 1
                 ok = tagger.ensure_tag(key, OBSOLETE_TAG_KEY, OBSOLETE_TAG_VALUE, dry_run=False)
@@ -3040,22 +3047,18 @@ def _run_backup(args):
     if {u["unit_id"] for u in collect_partitioned_tar_units(BASE_DIR)} != local_ids:
         raise RuntimeError("Source directory layout changed during backup; manifest unchanged")
     catalog = build_restore_catalog(tar_units)
-    # Rich source-post metadata is snapshotted separately in Standard storage.
-    # Failure aborts publication and obsolete tagging; existing generations stay valid.
-    from scrape_catalog.backup import publish as publish_scrape_catalog
-    catalog_root = os.environ.get("SCRAPE_CATALOG_ROOT", "/tank/media/scrape_metadata")
-    catalog["scrape_metadata"] = publish_scrape_catalog(
-        catalog_root, BASE_DIR, RUN_ID, os.path.join(TMP_DIR, "scrape-catalog-backup"),
-        STANDARD_REMOTE_PATH, lambda command: run_cmd(command, long_running=True),
-    )
+    # The native database, retained originals, worker state and this exact media
+    # selection must be verified in Standard before publishing or retiring keys.
+    catalog["native_archive"] = SOURCE_VIEW.publish(catalog, [
+        TARBALL_FP_JSONL, TAR_DELTA_DB, VIDEO_PREV_MANIFEST,
+        TOMBSTONES_LEDGER, VIDEO_TOMBSTONE_PROGRESS,
+    ])
     tar_keys = [key for u in catalog["units"] for key in [u["base_key"], *u["deltas"]]]
     # Recoverable per-run state is uploaded before publishing the self-contained
     # manifest. Any failure above or here leaves remote cleanup unexecuted.
     backup_ledgers_to_standard(False)
     build_and_upload_master_manifest(current_video_manifest, tar_keys, False, catalog)
     assert_source_ready()
-    run_cmd(["rclone", "copyto", os.path.join(TMP_DIR, "scrape-catalog-backup", "scrape-catalog-manifest.json"),
-             f"{STANDARD_REMOTE_PATH}scrape-catalogs/latest.json", "--s3-storage-class", "STANDARD"], long_running=True)
     atomic_copy(current_video_manifest, VIDEO_PREV_MANIFEST)
     if defer_cleanup:
         log("Backup published. All remote cleanup is deferred; queued cleanup remains pending.", 1)
@@ -3077,13 +3080,33 @@ def _run_backup(args):
     tombstone_remote_accidental_nonvideo_objects(dry_run=False, delete_budget=2000)
     log(budget.summary(), 1)
 
+def open_native_session(args):
+    config = getattr(args, "native_config", None) or os.environ.get("STASH_NATIVE_BACKUP_CONFIG")
+    if not config:
+        raise RuntimeError("Native backup requires --native-config or STASH_NATIVE_BACKUP_CONFIG")
+    bucket, prefix = parse_remote_bucket_and_prefix(STANDARD_REMOTE_PATH)
+    client = boto3.client("s3", region_name=args.aws_region,
+                          config=Config(max_pool_connections=20, retries={"mode": "standard", "max_attempts": 5}))
+    return NativeBackupSession(config, RUN_ID, BASE_DIR, bucket, prefix, client)
+
+
 def run_backup(args):
-    global TAR_DELTA_DB
-    original_db = TAR_DELTA_DB
+    global TAR_DELTA_DB, BASE_DIR, SOURCE_VIEW
+    original_db, original_base, original_view = TAR_DELTA_DB, BASE_DIR, SOURCE_VIEW
     try:
-        return _run_backup(args)
+        assert_source_ready()
+        if not args.dry_run:
+            SOURCE_VIEW = open_native_session(args)
+            BASE_DIR = os.fspath(SOURCE_VIEW.media_path)
+        try:
+            _run_backup(args)
+        finally:
+            # The complete backup is durable even if later tagging failed.
+            # Once this attempt stops using the view, retain only its receipts.
+            if not args.dry_run and SOURCE_VIEW.committed:
+                SOURCE_VIEW.finish()
     finally:
-        TAR_DELTA_DB = original_db
+        TAR_DELTA_DB, BASE_DIR, SOURCE_VIEW = original_db, original_base, original_view
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="S3 Deep Archive backup with durable upload tracking and restorable manifests.")
@@ -3093,6 +3116,7 @@ def main(argv=None):
     parser.add_argument("--compact", action="store_true")
     parser.add_argument("--defer-cleanup", action="store_true", help="Publish the backup and keep obsolete tagging queued; returning videos still have obsolete tags cleared.")
     parser.add_argument("--aws-region")
+    parser.add_argument("--native-config", help="Private host checkpoint/worker inventory JSON (or STASH_NATIVE_BACKUP_CONFIG). Required except for dry runs.")
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument("--trace", action="store_true")
     parser.add_argument("--log-file")

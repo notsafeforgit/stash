@@ -118,10 +118,10 @@ jobs:
         name: generated
 
     - name: Install native producer test runtime
-      run: make pre-producer
+      run: make pre-producer pre-backup
 
     - name: Test Backend
-      run: make validate-producer validate-library validate-archive it
+      run: make validate-producer validate-library validate-archive validate-backup it
 
   # Job 3: Build the active Linux target in parallel with backend tests.
   # Other cross-compilation targets require the updated compiler Dockerfile.

@@ -576,8 +576,12 @@ Symbolic-link objects and paths outside the fixed output layout are rejected.
 
 An archive digest detects corruption and identifies the exact archive. Trust in
 a downloaded manifest comes from the enclosing backup's verified publication
-record. Common-boundary certification and S3 current/latest publication are not
-implemented by this component transport.
+record. The [host backup integration](../integrations/backup/README.md) now binds
+the retained native/filesystem view to a v3 media selection and verifies S3
+Standard object checksums before committing its current manifest. Credentials,
+scheduling and S3 publication belong to that host package, not this component
+transport or the Stash server. Complete production inventory and cutover proof
+remain separate gates.
 
 ## Validation
 

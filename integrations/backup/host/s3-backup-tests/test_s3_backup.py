@@ -11,12 +11,53 @@ import sys
 import tarfile
 import tempfile
 import unittest
+import uuid
+from types import SimpleNamespace
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 import s3_restore_performer as restore
 import s3_test_restore as restore_test
+from fake_s3 import FakeS3
+from native_backup import NativeBackupSession
+from native_store import FORMAT, PREFIX, NativeStore, selection_digest, validate_reference
+from stash_archive.storage import json_bytes
+
+
+class PolicyNativeSession(NativeBackupSession):
+    """Media-policy fixture: capture/packing separately tested with real bundles.
+
+    Uses the real immutable/master publication methods and checksum transport.
+    """
+    def __init__(self, fixture):
+        self.fixture = fixture
+        self.live_media = self.media_path = fixture.source
+        self.root = fixture.root / "native-runs" / fixture.m.RUN_ID
+        self.root.mkdir(parents=True)
+        self.run_id, self.created_epoch = fixture.m.RUN_ID, fixture.m.current_epoch
+        self.view = SimpleNamespace(verify=lambda: None)
+        self.store = NativeStore(fixture.native_s3, "metadata")
+        self.committed = False
+        self.publication = None
+
+    def check_source(self):
+        pass
+
+    def publish(self, catalog, ledger_paths):
+        archive = str(uuid.uuid4())
+        base = PREFIX + "runs/" + archive + "/"
+        self.publication = validate_reference({
+            "format": FORMAT, "version": 1, "archive_uuid": archive, "checkpoint_uuid": str(uuid.uuid4()),
+            "selection_sha256": selection_digest(catalog), "objects_prefix": PREFIX + "objects/",
+            **{name: self.store.put_bytes(base + filename, json_bytes({"fixture": name}))
+               for name, filename in (("inventory", "artifacts.jsonl"), ("verification", "verification.json"), ("manifest", "manifest.json"))},
+        })
+        return self.publication
+
+    def finish(self):
+        assert self.committed
+        self.fixture.native_finishes += 1
 
 
 def import_backup():
@@ -65,14 +106,9 @@ class BackupTests(unittest.TestCase):
         m.ensure_s3_delete_marker = self.delete
         m.S3ObjectTagger = lambda *a, **kw: self
         m.tombstone_remote_accidental_nonvideo_objects = lambda **kwargs: None
-        from scrape_catalog.store import Store
-        self.catalog_root = self.root / 'scrape-catalogs'
-        with Store(self.catalog_root, self.source):
-            pass
-        import os
-        self.catalog_env = patch.dict(os.environ, {'SCRAPE_CATALOG_ROOT': str(self.catalog_root)})
-        self.catalog_env.start()
-        self.addCleanup(self.catalog_env.stop)
+        self.native_s3 = FakeS3(self.standard)
+        self.native_finishes = 0
+        m.open_native_session = lambda args: PolicyNativeSession(self)
         self.remote_metadata = {}
         m.remote_upload_matches = lambda key,size,name,value: (self.archive/key).is_file() and (self.archive/key).stat().st_size == size and self.remote_metadata.get(key,{}).get(name) == value
         m.remote_video_matches = lambda key,local,size,value: m.remote_upload_matches(key,size,"backup-source-signature",value)
@@ -246,15 +282,19 @@ class BackupTests(unittest.TestCase):
         self.assertGreater(restore.verify_tree(destination, self.source), 0)
         return destination
 
-    def test_rich_metadata_snapshot_is_referenced_and_upload_failure_stops_cleanup(self):
+    def test_native_snapshot_is_referenced_and_upload_failure_stops_cleanup(self):
         self.run_backup()
         catalog = self.catalog()
-        ref = catalog['scrape_metadata']
-        self.assertTrue((self.standard / ref['manifest_key']).is_file())
+        ref = catalog['native_archive']
+        self.assertEqual(catalog['version'], 3)
+        self.assertTrue((self.standard / ref['manifest']['key']).is_file())
         old_manifest = (self.standard / 'current_manifest.json').read_bytes()
         (self.source / 'sample/clip.mp4').unlink()
-        self.failure = lambda cmd: cmd[1] == 'copy' and any('scrape-catalogs/objects/' in str(arg) for arg in cmd)
-        with self.assertRaises(subprocess.CalledProcessError):
+        def failure(key):
+            if key.startswith(PREFIX):
+                raise RuntimeError('native upload failed')
+        self.native_s3.before_put = failure
+        with self.assertRaisesRegex(RuntimeError, 'native upload failed'):
             self.run_backup()
         self.assertEqual((self.standard / 'current_manifest.json').read_bytes(), old_manifest)
         self.assertNotIn('sample/clip.mp4', self.tagged)
@@ -495,12 +535,15 @@ class BackupTests(unittest.TestCase):
         previous = (self.standard / 'current_manifest.json').read_bytes()
         self.write('sample/child/new.jpg', b'new child')
         self.operations.clear()
-        self.failure = lambda cmd: cmd[1] == 'copyto' and cmd[3] == self.m.STANDARD_REMOTE_PATH + 'current_manifest.json'
-        with self.assertRaises(subprocess.CalledProcessError):
+        def failure(key):
+            if key == 'current_manifest.json':
+                raise RuntimeError('master upload failed')
+        self.native_s3.before_put = failure
+        with self.assertRaises(ValueError):
             self.run_backup()
         self.assertEqual((self.standard / 'current_manifest.json').read_bytes(), previous)
         self.assertFalse([op for op in self.operations if op[0] in ('tag', 'delete')])
-        self.failure = None
+        self.native_s3.before_put = lambda key: None
         self.run_backup()
         self.assert_round_trip()
 
@@ -638,7 +681,7 @@ class BackupTests(unittest.TestCase):
         self.assertEqual(conn.execute('SELECT COUNT(*) FROM pending_gc').fetchone()[0], 0)
         conn.close()
 
-    def test_returning_video_clears_obsolete_before_size_only_copy(self):
+    def test_returning_video_clears_obsolete_before_reupload(self):
         self.run_backup()
         original = (self.source / 'sample/clip.mp4').read_bytes()
         (self.source / 'sample/clip.mp4').unlink()
@@ -649,7 +692,8 @@ class BackupTests(unittest.TestCase):
         self.run_backup()
         self.assertNotIn('sample/clip.mp4', self.tagged)
         untag = self.operations.index(('clear_obsolete', 'sample/clip.mp4'))
-        copy = next(i for i, op in enumerate(self.operations) if op[:2] == ('rclone', 'copy'))
+        copy = next(i for i, op in enumerate(self.operations)
+                    if op[:2] == ('rclone', 'copyto') and op[3] == self.m.REMOTE_PATH + 'sample/clip.mp4')
         self.assertLess(untag, copy)
         self.assert_round_trip()
 
@@ -662,7 +706,43 @@ class BackupTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'obsolete tag failed'):
                 self.run_backup()
         self.assertEqual((self.standard / 'current_manifest.json').read_bytes(), previous)
-        self.assertFalse([op for op in self.operations if op[:2] == ('rclone', 'copy')])
+        self.assertFalse([op for op in self.operations if op[:2] == ('rclone', 'copyto')
+                          and op[3] == self.m.REMOTE_PATH + 'sample/new.mp4'])
+
+    def test_dry_run_never_creates_native_or_filesystem_checkpoint(self):
+        with patch.object(self.m, 'open_native_session', side_effect=AssertionError('must not capture')):
+            self.run_backup(dry_run=True)
+        self.assertEqual(self.native_s3.operations, [])
+
+    def test_video_returned_after_snapshot_is_protected_by_live_path(self):
+        self.run_backup()
+        (self.source / 'sample/clip.mp4').unlink()
+        snapshot = self.root / 'retained-media'
+        shutil.copytree(self.source, snapshot)
+        def capture(args):
+            session = PolicyNativeSession(self)
+            session.media_path = snapshot
+            return session
+        self.m.open_native_session = capture
+        original = self.m.build_and_upload_master_manifest
+        def publish(*args, **kwargs):
+            original(*args, **kwargs)
+            self.write('sample/clip.mp4', b'returned after snapshot')
+        with patch.object(self.m, 'build_and_upload_master_manifest', side_effect=publish):
+            self.run_backup()
+        self.assertNotIn('sample/clip.mp4', self.tagged)
+        self.assertNotIn('sample/clip.mp4', restore.required_keys(self.catalog()))
+        self.assertEqual(self.m.BASE_DIR, str(self.source))
+
+    def test_media_subset_cannot_claim_full_native_binding(self):
+        self.run_backup()
+        catalog = self.catalog()
+        plan = restore.select_plan(catalog, 'sample')
+        self.assertEqual(plan['version'], 2)
+        self.assertNotIn('native_archive', plan)
+        catalog['videos'][0]['size'] += 1
+        with self.assertRaisesRegex(ValueError, 'Media selection differs'):
+            restore.select_plan(catalog, 'sample')
 
     def test_returning_video_disappearing_after_failed_copy_is_retombstoned(self):
         self.run_backup()

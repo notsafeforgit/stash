@@ -20,6 +20,7 @@ do not remove a required caller without converting and testing it.
 ```bash
 make pre-ui       # Install v3 dependencies
 make pre-producer # Install the isolated gallery-dl producer test runtime
+make pre-backup   # Install the isolated host backup test runtime
 make generate     # Generate Go and v3 GraphQL bindings
 make ui           # Build the embedded v3 app and login locales
 # Terminal 1:
@@ -52,6 +53,7 @@ make it                # Go unit + integration tests only
 make validate-producer # Python delivery, lease and gallery-dl lifecycle tests
 make validate-library  # Native manual tag/performer helper contracts
 make validate-archive  # Portable archive integrity, restore and offline access
+make validate-backup   # Host publication, native/media bindings and restore policy
 make lint              # CI-pinned golangci-lint via go run
 make fmt               # Format Go source
 make validate-ui-v3    # Biome, generation/types, formatting, locales, tests, native contracts
@@ -108,6 +110,13 @@ they cannot create a later snapshot with old worker state. The stage inventory
 is bound into the server's filesystem receipt and checked again while packing.
 Publication-aware component release validates the complete archived inventory,
 supports interrupted cleanup and keeps permanent identity/receipt files.
+The tracked host tools in `integrations/backup` now publish v3 native/media
+manifests through host-owned S3 clients, require exact full-object checksums,
+and support native download/audit plus historical media restore inputs. Their
+isolated runtime (`make pre-backup`) and regression gate (`make validate-backup`)
+are separate from the server. Installed scripts and scheduling remain unchanged.
+Complete production worker/config inventory, failed-run resume/pruning, full
+capture measurements and relocated restore/cutover review remain required.
 Filesystem artwork writes publish flushed replacement inodes; never truncate a
 blob in place because readers and backup pins may retain that inode. Orphan
 cleanup must recheck references under a write transaction and use the deletion

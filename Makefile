@@ -438,7 +438,17 @@ validate: validate-fork
 
 # Full pre-push gate for the fork backend plus the active v3 UI.
 .PHONY: validate-fork
-validate-fork: generate-backend validate-ui validate-producer validate-library validate-archive validate-backend
+validate-fork: generate-backend validate-ui validate-producer validate-library validate-archive validate-backup validate-backend
+
+export BACKUP_PYTHON ?= $(abspath .local/native-backup/bin/python)
+
+.PHONY: pre-backup validate-backup
+pre-backup:
+	python3 -m venv .local/native-backup
+	.local/native-backup/bin/python -m pip install ./integrations/archive ./integrations/gallery-dl ./integrations/backup
+
+validate-backup:
+	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=integrations/archive/src:integrations/gallery-dl/src "$(BACKUP_PYTHON)" -m unittest discover -s integrations/backup/host/s3-backup-tests -v
 
 .PHONY: validate-archive
 validate-archive:

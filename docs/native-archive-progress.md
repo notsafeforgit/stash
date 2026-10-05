@@ -7951,3 +7951,54 @@ still use the installed old catalog package. That live dependency must be remove
 in the next conversion; this baseline is not a completed native integration or a
 second supported runtime. Historical backup restore formats remain input data,
 independent of the retired v2.5 application contract.
+
+### Host native publication and restore conversion — 2026-10-05
+
+The tracked daily caller now seals the native checkpoint, external components,
+artwork pins and ZFS media view before media scanning. It publishes a v3 media
+manifest bound to the native archive UUID, checkpoint UUID and exact selection
+digest. The same selection and filesystem receipt digest are packed inside the
+archive. Real archive restore, native snapshot validation and complete producer
+receipt checks precede upload. Host-owned boto3 publication requires the exact
+full-object SHA-256, length and Standard storage class for every archive object;
+it uses immutable conditional writes and independently checks lost replies.
+Immutable per-run manifests precede the current JSON pointer and remote cleanup.
+No AWS credentials or SDK enter the Stash server.
+
+The existing host lock, media storage tiers, mounted/nonempty-source guards,
+upload retry ledgers, pending/last-copy safeguards and cleanup order remain.
+Media reads use the retained ZFS view; the returning-video guard uses the live
+path so a file restored after capture cannot be marked obsolete. Dry runs never
+create a native or filesystem checkpoint. Successful publication releases all
+retained providers after their last use, including when later obsolete tagging
+fails. Completed runs reclaim their own compressed objects and copied host
+ledgers, retaining release receipts/manifests and preserving unknown files.
+
+The media restore tool now validates native references before subset selection;
+subsets cannot claim whole-library native coverage. The new native restore tool
+audits remote SHA-256 metadata or downloads the complete bundle for isolated
+content/native/producer verification. The existing audit can opt into these
+checks with `--native-checksums`; otherwise it explicitly reports reference-only
+native coverage. Historical text/v2 media inputs remain readable. Native restore
+does not activate the server, workers, mounts or deletion recovery.
+
+`make pre-backup validate-backup` installs the isolated package and passes all
+119 host regression cases in 29.2 seconds (33.9 seconds including installation).
+Evidence is `native_host_package_gate` under the October 4 client rehearsal
+directory. Tests use strict fake S3 and real portable bundle export/restore,
+exercise wrong/missing/composite checksums, denied HEAD, lost PUT replies,
+cross-checkpoint/selection/proof rejection, native-validation failure, WAL ledger
+capture, publication/cleanup ordering, returning live files and owned-copy
+release. The native schema executable is a protocol fixture in these host unit
+tests; the real Go/Python checkpoint interoperability gate is recorded above.
+Two inherited assertions accidentally targeted an unrelated catalog copy and
+were corrected to check the actual video upload. The old catalog Python package
+is no longer required. All five packaged entry points load successfully. CI and
+the fork gate now include the host suite.
+
+All six installed baseline files still match their recorded lengths and SHA-256
+digests. No installed script, service, timer, bucket object or privilege changed.
+The package is staged, not production-ready: complete worker/config inventory,
+interrupted/unpublished-run discovery/resume/pruning, complete media generation
+and restore reconciliation, full artwork capture timing and writer/WAL costs,
+relocated restore and cutover review remain required.

@@ -26,6 +26,7 @@ provides the frozen fallback for users who do not migrate.
 | [Native bulk updates](native-bulk-updates.md) | Completed versus queued edits, caller conversion, cache refresh and host helpers |
 | [Native entity queries](native-queries.md) | Filter expressions, explicit IDs, full-selection totals and converted clients |
 | [Portable native archives](native-archive-format.md) | Compressed database/artwork snapshots, explicit operating-state components, verified restores and offline inspection |
+| [Host backup integration](../integrations/backup/README.md) | Staged native/media publication, host-owned S3 verification and restore tools; installed daily scripts remain unchanged |
 | [Repository guidance](../CLAUDE.md) and [v3 contributor guidance](../ui/v3/AGENTS.md) | Coding conventions and backend/player constraints |
 | [Plugin host](../ui/v3/docs/plugin-host.md) | Current v3 UI plugin API, startup lifecycle, and failure handling |
 | [Versioned plugin manifests](plugin-manifests.md) | Independent v3 plugin contract, rejected packages, and API generations |

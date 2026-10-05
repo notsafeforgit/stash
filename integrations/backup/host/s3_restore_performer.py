@@ -18,6 +18,7 @@ import sqlite3
 import subprocess
 import tarfile
 import tempfile
+from native_store import selection_digest, validate_reference
 
 STANDARD_REMOTE_PATH = "s3-standard:metadata-backup-andrew/"
 REMOTE_PATH = "glacier:video-backup-andrew/"
@@ -41,7 +42,8 @@ def beneath(root, relative):
 
 
 def validate_manifest(manifest):
-    if manifest.get("format") != "s3-log-backup" or manifest.get("version") != 2:
+    if (manifest.get("format") != "s3-log-backup" or type(manifest.get("version")) is not int
+            or manifest["version"] not in (2, 3)):
         raise ValueError("Unsupported restore manifest format")
     if not isinstance(manifest.get("units"), list) or not isinstance(manifest.get("videos"), list):
         raise ValueError("Manifest must contain units and videos lists")
@@ -76,6 +78,12 @@ def validate_manifest(manifest):
         if video.get("size") is not None and (not isinstance(video["size"], int) or video["size"] < 0):
             raise ValueError(f"Invalid video size: {key!r}")
         seen_videos.add(key)
+    if manifest["version"] == 3:
+        reference = validate_reference(manifest.get("native_archive"))
+        if selection_digest(manifest) != reference["selection_sha256"]:
+            raise ValueError("Media selection differs from its native archive publication")
+    elif "native_archive" in manifest:
+        raise ValueError("Historical media manifests cannot claim a native archive binding")
     return manifest
 
 
@@ -167,12 +175,16 @@ def fetch_manifest(directory):
 
 
 def select_plan(manifest, search_term, include_videos=False):
+    validate_manifest(manifest)
     term = search_term.casefold()
     units = [unit for unit in manifest["units"] if term in unit["rel_dir"].casefold()]
     videos = [video for video in manifest["videos"] if include_videos and term in video["key"].casefold()]
     if not units and not videos:
         raise ValueError(f"No backup entries match {search_term!r}")
-    return validate_manifest(dict(manifest, units=units, videos=videos))
+    # A subset restores media only. It cannot claim the whole-library native
+    # binding after removing files from the original selection.
+    return validate_manifest({"format": "s3-log-backup", "version": 2,
+                              "run_id": manifest.get("run_id"), "units": units, "videos": videos})
 
 
 def required_keys(plan):

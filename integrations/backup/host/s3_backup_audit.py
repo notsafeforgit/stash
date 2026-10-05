@@ -16,7 +16,7 @@ import sys
 import tempfile
 
 sys.dont_write_bytecode = True
-BIN_DIR = Path('/home/andrew/bin')
+BIN_DIR = Path(__file__).resolve().parent
 ARCHIVE_BUCKET = 'video-backup-andrew'
 METADATA_BUCKET = 'metadata-backup-andrew'
 
@@ -235,6 +235,7 @@ def write_report(output, result):
         '# S3 backup audit', '', f"Started: {result['started_utc']}",
         f"Finished: {result['finished_utc']}", f"Published manifest: {result['manifest_format']}",
         f"Manifest last modified: {result.get('manifest_last_modified') or 'not checked'}", '',
+        f"Native archive verification: {result.get('native_archive', {}).get('coverage', 'not checked')}", '',
         f"Rehashed indexed NFO content: {result.get('indexed_nfo_content_hashed', False)}", '',
         'Read-only: no source deletions, S3 writes, Glacier restores, or archive payload reads.', '',
         '| Check | Count |', '| --- | ---: |',
@@ -259,10 +260,13 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output-dir', type=Path)
     parser.add_argument('--remote', action='store_true', help='List current S3 objects and read the Standard-storage manifest; never fetch archived data.')
+    parser.add_argument('--native-checksums', action='store_true', help='With --remote, verify SHA-256 metadata for every native Standard-storage object.')
     parser.add_argument('--hash-nfo', action='store_true', help='Also rehash indexed NFO contents; all image paths and deletions are checked regardless.')
     parser.add_argument('--base-dir', type=Path, default=Path('/tank/media/porn'))
     parser.add_argument('--ledger-dir', type=Path, default=Path('/tank/media/backup_ledgers'))
     args = parser.parse_args(argv)
+    if args.native_checksums and not args.remote:
+        parser.error('--native-checksums requires --remote')
     output = args.output_dir or Path(tempfile.mkdtemp(prefix='s3-backup-audit-'))
     output.mkdir(mode=0o700, parents=True, exist_ok=True)
     result = {'started_utc': datetime.now(timezone.utc).isoformat(), 'manifest_format': 'local state only', 'indexed_nfo_content_hashed': args.hash_nfo}
@@ -280,9 +284,19 @@ def main(argv=None):
         if args.remote:
             import boto3
             from botocore.config import Config
-            reader = MetadataReader(boto3.client('s3', config=Config(connect_timeout=10, read_timeout=60, retries={'max_attempts': 3})))
+            reader = MetadataReader(boto3.client('s3', config=Config(connect_timeout=10, read_timeout=60,
+                                                                   max_pool_connections=20, retries={'max_attempts': 3})))
             catalog, modified, manifest_format = fetch_catalog(reader, snapshot, work, restorer)
             result.update(manifest_last_modified=modified, manifest_format=manifest_format)
+            if catalog['version'] == 3:
+                if args.native_checksums:
+                    from native_store import NativeStore
+                    result['native_archive'] = NativeStore(reader.client, METADATA_BUCKET).audit(catalog['native_archive'])
+                else:
+                    result['native_archive'] = {'archive_uuid': catalog['native_archive']['archive_uuid'],
+                                                'coverage': 'manifest-reference-only'}
+            elif args.native_checksums:
+                raise ValueError('Historical backups have no native archive to verify')
             print('Reading current S3 object metadata; archived payloads remain untouched.', flush=True)
             inventory = reader.inventory()
         print('Comparing local files with the ledger snapshot...', flush=True)

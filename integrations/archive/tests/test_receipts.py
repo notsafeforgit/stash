@@ -222,6 +222,7 @@ class ReceiptBoundaryTests(ReceiptFixture):
         self.assertEqual(before, self.box.db.execute("SELECT * FROM events ORDER BY seq").fetchall())
 
     def test_cli_proof_is_bound_to_verified_archive_components(self):
+        from test_verification import contract_validator
         self.accepted(self.event())
         self.box.enqueue(encode(self.event()))
         archive = self.root / "archive"
@@ -230,6 +231,7 @@ class ReceiptBoundaryTests(ReceiptFixture):
         output = io.StringIO()
         with redirect_stdout(output):
             main(["verify", str(archive), "--producer-origin", ORIGIN,
+                  "--native-validator", str(contract_validator(self.root)),
                   "--temp-parent", str(self.root), "--reserve-bytes", "0"])
         value = json.loads(output.getvalue())
         self.assertTrue(value["contents_verified"])
@@ -238,7 +240,10 @@ class ReceiptBoundaryTests(ReceiptFixture):
         self.assertTrue(proof["registered_producers_complete"])
         self.assertEqual({e["role"] for e in proof["components"]}, {"library", "producer_outbox"})
         self.assertEqual(proof["producers"][0]["counts"]["pending"], 1)
+        self.assertEqual(value["native_snapshot"]["sha256"],
+                         next(e["sha256"] for e in proof["components"] if e["role"] == "library"))
         self.assertEqual(list(self.root.glob('stash-archive-receipts-*')), [])
+        self.assertEqual(list(self.root.glob('stash-archive-verify-*')), [])
 
 
 if __name__ == "__main__":

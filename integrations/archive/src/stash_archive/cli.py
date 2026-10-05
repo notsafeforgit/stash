@@ -84,6 +84,9 @@ def main(argv=None):
     verify.add_argument("archive")
     verify.add_argument("--temp-parent")
     verify.add_argument("--producer-origin", help="Also verify registered producers' ingestion, source admission and job receipts")
+    verify.add_argument("--native-validator", help="Path to the matching native Stash executable; also verify its full schema/provenance report")
+    verify.add_argument("--native-validator-timeout", type=float, default=3600,
+                        help="Maximum seconds for native validation (default: 3600)")
     inspect = commands.add_parser("inspect")
     inspect.add_argument("archive")
     listing = commands.add_parser("list")
@@ -108,12 +111,12 @@ def main(argv=None):
             result = {"uuid": manifest["uuid"], "restored": str(Path(args.output).absolute()),
                       "coverage": manifest["coverage"], "contents_verified": True}
         elif args.command == "verify":
-            if args.producer_origin:
-                from .receipts import verify_receipt_archive
-                proof = verify_receipt_archive(args.archive, args.producer_origin,
+            if args.producer_origin is not None or args.native_validator is not None:
+                from .verification import verify_archive_proofs
+                result = verify_archive_proofs(args.archive, producer_origin=args.producer_origin,
+                                               native_validator=args.native_validator,
+                                               timeout=args.native_validator_timeout,
                                                temp_parent=args.temp_parent, reserve=args.reserve_bytes)
-                result = {"uuid": proof["archive_uuid"], "coverage": "declared-components",
-                          "contents_verified": True, "ingestion_receipts": proof}
             else:
                 manifest = verify_archive(args.archive, temp_parent=args.temp_parent, reserve=args.reserve_bytes)
                 result = {"uuid": manifest["uuid"], "coverage": manifest["coverage"], "contents_verified": True}

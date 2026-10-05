@@ -76,6 +76,34 @@ fractional timestamps and year limits.
 
 ## Commands
 
+The portable verifier can run the matching native Stash executable after its
+transport checks and combine that result with the producer receipt check:
+
+```sh
+stash-archive verify /backups/native-archive --temp-parent /restore-work \
+  --native-validator /opt/stash/stash \
+  --producer-origin https://stash.example
+```
+
+Both checks use the **same single temporary restore**. Native validation must
+return the exact library SHA-256, byte count and schema from that archive's
+inventory. The resulting `native_snapshot` proof includes the archive UUID,
+canonical manifest digest and library component identity; `ingestion_receipts`
+is bound to the same archive. The command prints a success result only after
+every requested check succeeds, then removes the temporary restore. Failed,
+malformed, mismatched or unsupported reports do not produce a partial success.
+The coverage remains `declared-components`; neither proof certifies filesystem
+recovery or a matching media/download/configuration boundary.
+
+`--native-validator` is an explicit trusted local executable path, never a
+program selected by an archive. It receives only `--verify-native-snapshot` and
+the isolated library path, with no shell interpretation. Output is bounded to
+64 KiB per stream and validation has a one-hour deadline; use
+`--native-validator-timeout SECONDS` for a different positive deadline. Invalid
+options or an unavailable executable fail before restoring any data. Omitting
+this option keeps the standalone Python transport/SQLite checks available
+without an installed Stash binary.
+
 After restoring a bundle, the matching native Stash binary can verify the
 database's full schema, source evidence and retained provenance:
 

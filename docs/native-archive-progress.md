@@ -7438,3 +7438,35 @@ This provides the native semantic validation step for the coordinated restore;
 connecting its receipt to archive publication, matching filesystem/media/producer
 state and S3 publication remain required. The full-library export/restore drill
 is still running. Production remains on the frozen compatible release.
+
+## Archive-bound native validation — 2026-10-04
+
+`stash-archive verify --native-validator /path/to/stash` now verifies native
+schema/provenance after the complete transport restore and binds the returned
+database SHA-256, byte count and schema to the archive inventory. Its proof
+includes the same archive UUID and canonical manifest digest used by the producer
+receipt proof. Supplying `--producer-origin` runs both checks against one temporary
+restore, avoiding a second database/artwork copy. Success is printed only after
+all requested checks pass; failed verification discards only that temporary copy.
+
+The validator path is explicit local configuration, never supplied by an archive.
+Invocation uses no shell, bounds both output streams, and enforces a configurable
+deadline. Invalid options fail before the restore. Malformed, duplicate-key,
+unsupported, mismatched, failed, oversized or stalled responses cannot produce a
+success proof. Native database validation still reports filesystem recovery as
+unverified, including when pending deletion markers are present.
+
+All 51 Python archive tests pass in 61.1 seconds. Command tests pass in 24.7
+seconds and lint reports zero issues. A real native SQLite fixture passes through
+the portable CLI and the actual Stash main/flag path, with both native and producer
+proofs bound to its artifact. Removing a required native guard leaves ordinary
+SQLite/transport checks valid but makes the combined command fail without a
+success result, application configuration or a leftover temporary restore.
+The existing nonempty producer fixture also exercises the combined protocol.
+Evidence is under `.local/native-discovery-client-20261004/` with labels
+`native_archive_proof_python_final`, `native_archive_proof_go` and
+`native_archive_proof_lint`.
+
+The full-library rehearsal continues on its frozen transport runtime. Coordinated
+download/configuration/filesystem/media snapshots, S3 publication and production
+cutover are still required; this commit changes no production services.

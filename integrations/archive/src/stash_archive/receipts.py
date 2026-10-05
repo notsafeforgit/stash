@@ -206,23 +206,28 @@ def verify_ingestion_receipts(library, outboxes, expected_origin):
             "producers": sorted(reports, key=lambda report: report["producer_uuid"])}
 
 
+def verify_restored_receipts(source, restored, manifest, expected_origin):
+    """Check an isolated, fully restored archive before its owner discards it."""
+    entries = [entry for entry in iter_artifacts(source, manifest)
+               if entry["role"] in ("library", "producer_outbox")]
+    with ExitStack() as stack:
+        library = stack.enter_context(closing(connect_readonly(Path(restored) / "library.sqlite")))
+        library.execute("BEGIN")
+        queues = []
+        for entry in entries:
+            if entry["role"] == "producer_outbox":
+                queue = stack.enter_context(closing(connect_readonly(_target(Path(restored), entry))))
+                queue.execute("BEGIN")
+                queues.append(queue)
+        report = verify_ingestion_receipts(library, queues, expected_origin)
+    report.update(archive_uuid=manifest["uuid"], manifest_sha256=hashlib.sha256(json_bytes(manifest)).hexdigest(),
+                  components=[{"role": e["role"], "name": e["name"], "sha256": e["sha256"]} for e in entries])
+    return report
+
+
 def verify_receipt_archive(source, expected_origin, *, temp_parent=None, reserve=RESERVE_BYTES):
     """Verify a complete transport, then bind receipt proof to its component hashes."""
     with tempfile.TemporaryDirectory(prefix="stash-archive-receipts-", dir=temp_parent) as temp:
         restored = Path(temp) / "restored"
         manifest = import_archive(source, restored, reserve=reserve)
-        entries = [entry for entry in iter_artifacts(source, manifest)
-                   if entry["role"] in ("library", "producer_outbox")]
-        with ExitStack() as stack:
-            library = stack.enter_context(closing(connect_readonly(restored / "library.sqlite")))
-            library.execute("BEGIN")
-            queues = []
-            for entry in entries:
-                if entry["role"] == "producer_outbox":
-                    queue = stack.enter_context(closing(connect_readonly(_target(restored, entry))))
-                    queue.execute("BEGIN")
-                    queues.append(queue)
-            report = verify_ingestion_receipts(library, queues, expected_origin)
-        report.update(archive_uuid=manifest["uuid"], manifest_sha256=hashlib.sha256(json_bytes(manifest)).hexdigest(),
-                      components=[{"role": e["role"], "name": e["name"], "sha256": e["sha256"]} for e in entries])
-        return report
+        return verify_restored_receipts(source, restored, manifest, expected_origin)

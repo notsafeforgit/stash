@@ -7741,3 +7741,32 @@ barrier before the server's writer guard to avoid a producer/server lock cycle.
 The confirmation is coordination evidence, not independent proof of its caller's
 filesystem claims; declared coverage remains database/configuration/deletion
 recovery. No production deployment, scheduled backup or storage policy changed.
+
+## Artwork publication and cleanup exclusion — 2026-10-04
+
+Filesystem artwork writes now publish a complete, flushed replacement inode and
+close the file before returning. Rewriting or repairing a checksum no longer
+truncates an inode retained by a reader or hard-linked backup. Existing file
+permissions and configured symlink targets retain the atomic-file helper's
+behavior. Failed publication leaves the existing destination intact.
+
+Orphan-artwork cleanup first checks references in a read transaction, then
+rechecks only possible orphans under the native writer guard. Deletion uses the
+persistent journal and normal transaction hooks. A concurrently added reference
+survives cleanup, checkpoints exclude removal, and failed commits restore staged
+artwork. Empty-directory cleanup now uses nonrecursive removal so files created
+after the empty check cannot be erased.
+
+The blob/filesystem/file suites pass in 2.7 seconds. Native SQLite deletion and
+checkpoint regressions pass in 44.7 seconds. Cleanup tests pass in 8.5 seconds,
+covering a real concurrent reference, an independent checkpoint guard, dry run
+and rollback after actual staging. The first task test run lacked the required
+migration registration import; that fixture setup was corrected before the
+successful rerun. Lint reports zero issues. Evidence labels are
+`native_blob_atomic_tests`, `native_blob_cleanup_tests`,
+`native_blob_cleanup_final` and `native_blob_atomic_lint` under the October 4
+client rehearsal directory.
+
+The backup provider still needs to create and retain artwork pins. This change
+makes that mechanism safe against native artwork writes and cleanup; it does
+not establish a complete media snapshot or alter the running compatible server.

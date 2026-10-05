@@ -87,6 +87,10 @@ bounded host confirmation and seals that evidence with the checkpoint. Establish
 producer barriers before requesting that guard; the server never executes
 filesystem provider commands. Sealed retries must reuse the original view.
 Actual media snapshots and original-artwork preservation still need integration.
+Filesystem artwork writes publish flushed replacement inodes; never truncate a
+blob in place because readers and backup pins may retain that inode. Orphan
+cleanup must recheck references under a write transaction and use the deletion
+journal, so it cannot bypass a native checkpoint or delete a newly adopted blob.
 The producer CLI can validate a portable worker profile and execute one claimed
 source attempt with concurrent outbox delivery. Website-access references stay
 local, and source completion remains distinct from verified media intake.

@@ -30,6 +30,10 @@ func (f *OsFS) Create(name string) (*os.File, error) {
 	return os.Create(name)
 }
 
+func (f *OsFS) WriteFileAtomic(name string, data []byte, perm fs.FileMode) error {
+	return fsutil.WriteFileAtomic(name, data, perm)
+}
+
 func (f *OsFS) MkdirAll(path string, perm fs.FileMode) error {
 	return os.MkdirAll(path, perm)
 }

@@ -10,6 +10,7 @@ import (
 	"strconv"
 
 	"github.com/stashapp/stash/internal/manager/config"
+	"github.com/stashapp/stash/pkg/file"
 	"github.com/stashapp/stash/pkg/job"
 	"github.com/stashapp/stash/pkg/logger"
 	"github.com/stashapp/stash/pkg/models"
@@ -299,20 +300,7 @@ func (j *CleanGeneratedJob) cleanBlobFiles(ctx context.Context, progress *job.Pr
 			return nil
 		}
 
-		// if blob entry does not exist, delete the file
-		if err := j.Repository.WithReadTxn(ctx, func(ctx context.Context) error {
-			exists, err := j.BlobCleaner.EntryExists(ctx, blobname)
-			if err != nil {
-				return err
-			}
-
-			if !exists {
-				j.logDelete("deleting unused blob file: %s", blobname)
-				j.deleteFile(path)
-			}
-
-			return nil
-		}); err != nil {
+		if err := j.cleanBlobFile(ctx, path); err != nil {
 			logger.Errorf("error checking blob entry: %v", err)
 			return nil
 		}
@@ -326,6 +314,35 @@ func (j *CleanGeneratedJob) cleanBlobFiles(ctx context.Context, progress *job.Pr
 	j.removeEmptyDirs(j.Paths.Blobs)
 
 	return nil
+}
+
+func (j *CleanGeneratedJob) cleanBlobFile(ctx context.Context, path string) error {
+	checksum := filepath.Base(path)
+	var exists bool
+	if err := j.Repository.WithReadTxn(ctx, func(ctx context.Context) error {
+		var err error
+		exists, err = j.BlobCleaner.EntryExists(ctx, checksum)
+		return err
+	}); err != nil || exists {
+		return err
+	}
+	if j.Options.DryRun {
+		j.logDelete("deleting unused blob file: %s", checksum)
+		return nil
+	}
+	// Only possible orphans acquire the writer guard. Recheck after acquisition:
+	// a new artwork reference may have committed since the read transaction.
+	// Journal the removal so checkpoints and crash recovery share that guard.
+	return j.Repository.WithTxn(ctx, func(ctx context.Context) error {
+		exists, err := j.BlobCleaner.EntryExists(ctx, checksum)
+		if err != nil || exists {
+			return err
+		}
+		j.logDelete("deleting unused blob file: %s", checksum)
+		deleter := file.NewDeleter()
+		deleter.RegisterHooks(ctx)
+		return deleter.FilesWithoutTrash([]string{path})
+	})
 }
 
 func (j *CleanGeneratedJob) removeEmptyDirs(root string) {
@@ -347,7 +364,8 @@ func (j *CleanGeneratedJob) removeEmptyDirs(root string) {
 
 		if len(subEntries) == 0 {
 			j.logDelete("removing empty directory: %s", entry.Name())
-			j.deleteDir(dirPath)
+			// os.Remove refuses a directory populated after the empty check.
+			j.deleteFile(dirPath)
 		}
 	}
 }

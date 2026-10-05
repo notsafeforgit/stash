@@ -1,12 +1,10 @@
 package blob
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"io/fs"
-	"os"
 	"path/filepath"
 
 	"github.com/stashapp/stash/pkg/file"
@@ -24,7 +22,7 @@ type FSReader interface {
 }
 
 type FSWriter interface {
-	Create(name string) (*os.File, error)
+	WriteFileAtomic(name string, data []byte, perm fs.FileMode) error
 	MkdirAll(path string, perm fs.FileMode) error
 
 	Remove(name string) error
@@ -80,6 +78,9 @@ func NewReadonlyFilesystemStore(path string, fs FSReader) *FilesystemReader {
 }
 
 func (s *FilesystemStore) Write(ctx context.Context, checksum string, data []byte) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	fs, ok := s.fs.(FS)
 	if !ok {
 		return fmt.Errorf("internal error: fs is not an FS")
@@ -97,15 +98,11 @@ func (s *FilesystemStore) Write(ctx context.Context, checksum string, data []byt
 	}
 
 	logger.Debugf("Writing blob file %s", fn)
-	out, err := fs.Create(fn)
-	if err != nil {
-		return fmt.Errorf("creating file %q: %w", fn, err)
-	}
-
-	r := bytes.NewReader(data)
-
-	if _, err = io.Copy(out, r); err != nil {
-		return fmt.Errorf("writing file %q: %w", fn, err)
+	// Never truncate an existing inode: a reader or a backup may retain it.
+	// Publish a complete, flushed replacement and close its descriptor before
+	// the database transaction is allowed to commit.
+	if err := fs.WriteFileAtomic(fn, data, 0644); err != nil {
+		return fmt.Errorf("publishing file %q: %w", fn, err)
 	}
 
 	return nil

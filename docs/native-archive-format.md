@@ -169,6 +169,12 @@ production media snapshots, artwork preservation and publication integration
 remain required. Checkpoint coverage remains
 `database-configuration-deletion-recovery`.
 
+Native artwork writes now publish flushed replacement inodes instead of
+truncating a file that a reader or backup might retain. Orphan cleanup rechecks
+references under a write transaction and uses the deletion journal, sharing the
+checkpoint guard. These are prerequisites for safely retaining hard-linked
+artwork during export; they do not yet create or retain those backup pins.
+
 The server captures the native database, raw deletion recovery trees, main
 configuration, runtime overrides and configured TLS certificate/key assets.
 Settings and overrides remain separate, and private values appear only in the

@@ -147,6 +147,14 @@ encoder measurement is recorded in `docs/native-backup-cost-measurement.json`;
 synthetic title edits do not establish daily production churn. Standard chunk
 expiration and large local run-metadata reclamation still require implementation,
 versioning/lifecycle verification and reviewed activation.
+Host publication/history/recovery/audit/restore share a 512 MiB master JSON
+limit, with 1 MiB extra for the archived media-binding envelope. Native artifact
+inventories have a separate 1 GiB streamed transport limit; the portable small
+manifest and record bounds remain unchanged. Download inventories and encoded
+objects in bounded reads, verify their complete digest/length, then publish a
+new local file. The measured 272,373-video shape exceeds the former 128 MiB cap
+with SHA-256 descriptors; see `docs/native-backup-manifest-scale.json` for the
+isolated publication/history/restore proof and its synthetic-data limits.
 An optional `worker_inventory` declaration resolves download/metadata worker
 profiles, layered private references, helper assets, cookie files and archive
 templates under the declared worker barriers. The host retains the closure per

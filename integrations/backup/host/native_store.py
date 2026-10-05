@@ -10,9 +10,11 @@ import base64
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import io
+import os
 from pathlib import Path
 import tempfile
 
+from manifest_limits import MASTER_BYTES, MEDIA_BINDING_BYTES, INVENTORY_BYTES, TRANSFER_BYTES
 from object_receipts import ObjectReceipts, inventory as list_objects
 from media_objects import validate_inventory as validate_media_inventory
 
@@ -20,8 +22,8 @@ from stash_archive.bundle import iter_artifacts, validate_manifest
 from stash_archive.filesystem_boundary import canonical_uuid
 from stash_archive.checkpoint_release import archived_boundary
 from stash_archive.server_checkpoint import ServerCheckpoint
-from stash_archive.storage import (HEX, InvalidArchive, decode_json, json_bytes, load_manifest,
-                                   open_regular, regular, publish_bytes, require_space, write_artifact)
+from stash_archive.storage import (HEX, MAX_MANIFEST, InvalidArchive, decode_json, json_bytes, load_manifest,
+                                   open_regular, regular, require_space, sync_directory, write_artifact)
 
 PREFIX = "native-archives/"
 FORMAT = "org.notsafeforgit.stash.s3-native-archive"
@@ -57,7 +59,7 @@ def validate_selection_binding(source, checkpoint_uuid, selection_sha256):
             selected = entry
         if (entry["role"], entry["name"]) == ("operating_state", "filesystem-boundary.json"):
             filesystem = entry
-    media = decode_json(read_artifact(source, selected, 128 << 20))
+    media = decode_json(read_artifact(source, selected, MEDIA_BINDING_BYTES))
     fields = {"format", "version", "checkpoint_uuid", "filesystem_boundary_sha256", "selection_sha256", "selection"}
     if (not isinstance(media, dict) or set(media) != fields or media["format"] != MEDIA_FORMAT
             or type(media["version"]) is not int or media["version"] != 1
@@ -141,9 +143,10 @@ def validate_reference(reference):
     base = PREFIX + "runs/" + reference["archive_uuid"] + "/"
     for name, filename in (("manifest", "manifest.json"), ("inventory", "artifacts.jsonl"), ("verification", "verification.json")):
         value = reference[name]
+        limit = INVENTORY_BYTES if name == "inventory" else MAX_MANIFEST
         if (not isinstance(value, dict) or set(value) != {"key", "sha256", "bytes"}
                 or value["key"] != base + filename or not isinstance(value["sha256"], str) or not HEX.fullmatch(value["sha256"])
-                or type(value["bytes"]) is not int or not 0 < value["bytes"] <= 128 << 20):
+                or type(value["bytes"]) is not int or not 0 < value["bytes"] <= limit):
             raise InvalidArchive("Invalid native archive object reference")
     return reference
 
@@ -215,7 +218,17 @@ class NativeStore:
         self.put(key, io.BytesIO(body), value["sha256"], value["bytes"])
         return value
 
+    def validate_read(self, value, limit):
+        if (not isinstance(value, dict) or set(value) != {"key", "sha256", "bytes"}
+                or not isinstance(value["key"], str) or not value["key"]
+                or any(part in ("", ".", "..") for part in value["key"].split("/"))
+                or any(c in value["key"] for c in "\0\r\n")
+                or not isinstance(value["sha256"], str) or not HEX.fullmatch(value["sha256"])
+                or type(value["bytes"]) is not int or not 0 <= value["bytes"] <= limit):
+            raise InvalidArchive("Invalid or oversized native object read descriptor")
+
     def read(self, value):
+        self.validate_read(value, MASTER_BYTES)
         if not self.verified(value["key"], value["sha256"], value["bytes"]):
             raise InvalidArchive("Required native object is missing from S3")
         response = self.client.get_object(Bucket=self.bucket, Key=self.prefix + value["key"], ChecksumMode="ENABLED")
@@ -225,12 +238,49 @@ class NativeStore:
             raise InvalidArchive("Downloaded native object differs from its publication digest")
         return body
 
+    def download_file(self, value, destination, *, reserve=50 << 30, limit=INVENTORY_BYTES):
+        """Verify large metadata/encoded objects without loading them in RAM.
+
+        Publish a new local file only after its complete digest matches. Failed
+        and truncated transfers remove their temporary file; existing outputs
+        and unrelated files are never replaced.
+        """
+        self.validate_read(value, limit)
+        destination = Path(destination)
+        require_space(destination.parent, value["bytes"], reserve)
+        if destination.exists() or destination.is_symlink():
+            raise InvalidArchive("Native download destination already exists")
+        if not self.verified(value["key"], value["sha256"], value["bytes"]):
+            raise InvalidArchive("Required native object is missing from S3")
+        fd, temporary = tempfile.mkstemp(prefix=".native-download-", dir=destination.parent)
+        try:
+            digest, remaining = hashlib.sha256(), value["bytes"]
+            with os.fdopen(fd, "wb") as output:
+                response = self.client.get_object(Bucket=self.bucket, Key=self.prefix + value["key"], ChecksumMode="ENABLED")
+                with response["Body"] as incoming:
+                    while remaining:
+                        block = incoming.read(min(TRANSFER_BYTES, remaining))
+                        if not block or len(block) > remaining:
+                            raise InvalidArchive("Downloaded native object has an incorrect length")
+                        require_space(destination.parent, len(block), reserve)
+                        digest.update(block)
+                        output.write(block)
+                        remaining -= len(block)
+                    if incoming.read(1) or digest.hexdigest() != value["sha256"]:
+                        raise InvalidArchive("Downloaded native object differs from its publication digest")
+                output.flush()
+                os.fsync(output.fileno())
+            os.link(temporary, destination, follow_symlinks=False)
+            sync_directory(destination.parent)
+        finally:
+            Path(temporary).unlink(missing_ok=True)
+
     def fetch_metadata(self, reference, destination, *, reserve=50 << 30):
         reference = validate_reference(reference)
         destination = Path(destination)
         for name, filename in (("manifest", "manifest.json"), ("inventory", "artifacts.jsonl"), ("verification", "verification.json")):
-            require_space(destination, reference[name]["bytes"], reserve)
-            publish_bytes(destination / filename, self.read(reference[name]))
+            self.download_file(reference[name], destination / filename, reserve=reserve,
+                               limit=INVENTORY_BYTES if name == "inventory" else MAX_MANIFEST)
         manifest = validate_manifest(load_manifest(destination))
         if (manifest["uuid"] != reference["archive_uuid"]
                 or (manifest["inventory"]["sha256"], manifest["inventory"]["size"])
@@ -263,9 +313,8 @@ class NativeStore:
         (destination / "objects").mkdir(mode=0o700)
         # Sequential writes keep disk-space checks meaningful at the reserve.
         for name, size in objects.items():
-            require_space(destination, size, reserve)
-            body = self.read({"key": PREFIX + "objects/" + name + ".gz", "sha256": name, "bytes": size})
-            publish_bytes(destination / "objects" / (name + ".gz"), body)
+            self.download_file({"key": PREFIX + "objects/" + name + ".gz", "sha256": name, "bytes": size},
+                               destination / "objects" / (name + ".gz"), reserve=reserve, limit=MASTER_BYTES)
         validate_selection_binding(destination, reference["checkpoint_uuid"], reference["selection_sha256"])
         return manifest
 

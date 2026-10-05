@@ -13,6 +13,7 @@ from pathlib import Path
 import re
 import tempfile
 
+from manifest_limits import MASTER_BYTES
 from media_objects import relative_path, validate_store
 from native_store import PREFIX, descriptor, selection_digest, validate_reference
 from object_receipts import identity, inventory
@@ -37,7 +38,7 @@ def policy(value=None):
 
 
 def publication(body):
-    if not isinstance(body, bytes) or not 0 < len(body) <= 128 << 20:
+    if not isinstance(body, bytes) or not 0 < len(body) <= MASTER_BYTES:
         raise InvalidArchive("Invalid bounded native master manifest")
     catalog = decode_json(body)
     if (not isinstance(catalog, dict) or catalog.get("format") != "s3-log-backup"
@@ -84,7 +85,7 @@ def validate_publication(record, archive_uuid):
     if (not isinstance(master, dict) or set(master) != {"key", "sha256", "bytes"}
             or master["key"] != "manifests/runs/" + record["run_id"] + "/manifest.json"
             or not isinstance(master["sha256"], str) or not HEX.fullmatch(master["sha256"])
-            or type(master["bytes"]) is not int or not 0 < master["bytes"] <= 128 << 20):
+            or type(master["bytes"]) is not int or not 0 < master["bytes"] <= MASTER_BYTES):
         raise InvalidArchive("Invalid backup history master reference")
     return record
 
@@ -180,7 +181,7 @@ class SnapshotHistory:
 
     def _media_graph(self, record):
         name = "media-" + record["archive_uuid"] + ".json"
-        graph = self._read_cache(name, 128 << 20)
+        graph = self._read_cache(name, MASTER_BYTES)
         if graph is None:
             body = self.store.read(record["master"])
             if publication(body) != record:
@@ -242,7 +243,7 @@ class SnapshotHistory:
         # small publication/retirement receipts keep their remote UUID history.
         for archive_uuid in sorted(set(retired) | expired):
             name = "media-" + archive_uuid + ".json"
-            graph = self._read_cache(name, 128 << 20)
+            graph = self._read_cache(name, MASTER_BYTES)
             if graph is not None:
                 if not isinstance(graph, dict) or graph.get("master") != records[archive_uuid]["master"]:
                     raise InvalidArchive("Retired media cache differs from its original publication")

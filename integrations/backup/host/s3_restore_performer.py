@@ -19,6 +19,8 @@ import subprocess
 import tarfile
 import tempfile
 from native_store import selection_digest, validate_reference
+from manifest_limits import MASTER_BYTES
+from stash_archive.storage import decode_json
 import media_objects
 
 STANDARD_REMOTE_PATH = "s3-standard:metadata-backup-andrew/"
@@ -111,13 +113,23 @@ def validate_manifest(manifest):
     return manifest
 
 
+def read_manifest_bytes(path):
+    with Path(path).open("rb") as incoming:
+        if os.fstat(incoming.fileno()).st_size > MASTER_BYTES:
+            raise ValueError("Restore manifest exceeds the supported size")
+        body = incoming.read(MASTER_BYTES + 1)
+    if len(body) > MASTER_BYTES:
+        raise ValueError("Restore manifest exceeds the supported size")
+    return body
+
+
 def load_legacy_manifest(manifest_path, ledger_db, footprints):
     """Adapt the currently deployed text allowlist and backed-up SQLite ledger.
 
     Only keys in the allowlist may be restored. Failure to account for any listed
     archive is fatal; silently dropping an unknown delta would corrupt a restore.
     """
-    keys = set(Path(manifest_path).read_text(encoding="utf-8").splitlines()) - {""}
+    keys = set(read_manifest_bytes(manifest_path).decode("utf-8").splitlines()) - {""}
     if any(key.startswith(media_objects.PREFIX) for key in keys):
         raise ValueError("Content-addressed media requires its JSON manifest with restore paths")
     for key in keys:
@@ -176,7 +188,7 @@ def load_legacy_manifest(manifest_path, ledger_db, footprints):
 def load_manifest(path, ledger_db=None, footprints=None):
     path = Path(path)
     if path.suffix.lower() == ".json":
-        return validate_manifest(json.loads(path.read_text(encoding="utf-8")))
+        return validate_manifest(decode_json(read_manifest_bytes(path)))
     if not ledger_db or not footprints:
         raise ValueError("A legacy text manifest requires --ledger-db and --footprints")
     return load_legacy_manifest(path, ledger_db, footprints)

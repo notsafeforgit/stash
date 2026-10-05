@@ -1,0 +1,65 @@
+{
+  "measured_at": "2026-10-05",
+  "measurement": {
+    "scope": "Representative catalogs with actual video paths/sizes and active archive keys from a locked ledger copy. Assumes one unique content object per path; hashes/checksums and archive object sizes are synthetic. No media bodies or cloud objects read; no source modified.",
+    "video_paths": 272373,
+    "archive_units": 1328,
+    "capture_lock_seconds": 1.2236980210000183,
+    "scenarios": [
+      {
+        "checksum": "sha256",
+        "bytes": 137128906,
+        "sha256": "8287a7971e2f08f06c11b4501dffc4d1591a988ccb4264a925e7882f7000428c",
+        "exceeds_128mib": true,
+        "accepted_by_initial_history_reader": false,
+        "objects": 281421,
+        "seconds": 9.988791195006343
+      },
+      {
+        "checksum": "crc64nvme",
+        "bytes": 128967697,
+        "sha256": "ca60c441461ade4e5cb8f57b3370fb619fa4a28c9ecacd69734f0ed4ed2a3897",
+        "exceeds_128mib": false,
+        "accepted_by_initial_history_reader": true,
+        "objects": 281421,
+        "seconds": 13.50030064501334
+      }
+    ],
+    "cloud_requests": 0,
+    "elapsed_seconds": 25.081396951980423,
+    "peak_rss_kib": 1963068,
+    "ledger_copy_removed": true
+  },
+  "verification": {
+    "scope": "Measured-size synthetic-checksum catalog through real JSON/archive codecs, native host publication/history and streamed download/portable restore against fake S3. Uses existing tiny native database verification fixture; not another full populated-database restore and not cloud publication.",
+    "video_paths": 272373,
+    "media_objects": 281421,
+    "bound_media_bytes": 137128318,
+    "bound_media_sha256": "d1cc2a9a88c038cc3c99459230f1a477164ea3cf7bcc442b36d2208930fb41ce",
+    "large_master_bytes": 137128914,
+    "published": true,
+    "history_rebuilt": true,
+    "bound_metadata_restored": true,
+    "cloud_requests": 0,
+    "fake_transport_operations": 77,
+    "elapsed_seconds": 62.858485230011865,
+    "peak_rss_kib": 2223324
+  },
+  "implemented_limits": {
+    "master_bytes": 536870912,
+    "media_binding_bytes": 537919488,
+    "streamed_inventory_bytes": 1073741824,
+    "stream_read_bytes": 1048576
+  },
+  "limitations": [
+    "Representative content hashes/checksums and tar object sizes are synthetic. This proves supported manifest capacity for real path/count/size shape, not actual S3 object identity or complete production coverage.",
+    "Large-metadata publication/restore used fake S3 and an existing tiny native schema fixture. The separate full-library restore proof remains authoritative for populated database coverage.",
+    "JSON masters still require a parsed in-memory representation. The artifact inventory and encoded-object downloads now stream; measured process RSS covers this particular full-size fixture, not every future input."
+  ],
+  "installed_package_verification": {
+    "scope": "Installed wheel accepted the measured-size SHA256 master through restore and history readers. No cloud requests.",
+    "master_bytes": 137128906,
+    "videos": 272373,
+    "objects": 281421
+  }
+}

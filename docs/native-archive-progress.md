@@ -177,7 +177,7 @@ it does not remove source files or recovery inputs.
 | 3 Catalog importer and full-copy reconciliation | Permanent backfill decisions, retained scan journals/reviewed recovery activation, performer UUIDs and saved ownership, and account/catalog registry imports are implemented and rehearsed against full copies. All 1,697 frozen catalog bodies have bounded snapshot receipt and native mappings for posts/profiles/captures, account/post relationships, captured publishers, attachment lists, assets/files/appearances, collection memberships, retained documents and translation results. Historical album backfill is resumable and rehearsed. Original evidence, replay receipts and unresolved conflicts are retained. Shared native translation request/cache/target storage, bounded execution, provider workers and application inspection/control are implemented. Automation snapshot preparation preserves all ten operational families and has passed full-source reconciliation. Resumable native receipt, translation request/cache/target mapping and reviewed activation are implemented. The saved-plan bulk client has activated 324,169 imported holds in a full-copy rehearsal with lost-response recovery and independent reconciliation. Automatic capture scheduling now records revisioned collection-policy decisions with its requests and targets in the capture transaction. Native enrichment targets preserve revisioned scheduling choices and exact capture-completion evidence, with application inspection/control. Internal execution binds jobs to exact source/target revisions, authenticates each attempt producer and retains compact checkpoints with original observation provenance. Verified publication now uses native capture, publisher, album and translation services and commits record associations with target/job completion. Completed staging is verified and released atomically, retaining native captures, acknowledgement/provenance rows and unresolved references. Scoped enrichment routes and the Python transport/lease client now expose those services, with controlled failure replay, bounded checkpoint transfer and exact source-number preservation. Selected-job execution now journals stable claims, returned checkpoints and pending delivery intents in producer outbox schema 8; reviewed metadata-only profiles and delivery-only recovery are implemented. Collection-scoped dispatch now discovers admitted retries before new targets, with durable producer cursors/backoff and pagination past incompatible URLs. Native server maintenance recovers expired attempts and cancels stale work without discarding checkpoints. Native shared service reservations and cooldowns now coordinate downloads with enrichment, including fenced reservations before contacting newly discovered child services. Download-side linked-service reservations, typed failures, bounded download preference and cooperative source turns are implemented. Persistent worker/profile rotation and automatic collection discovery are also implemented. Historical catalog enrichment receipts now have resumable native import and application inspection, preserving the old assertion without creating native attempts. Frozen legacy enrichment jobs, cooldowns and seed/source progress now have bounded native mapping with held work, scoped historical completion, explicit review and retained exclusions. Reviewed legacy enrichment activation is implemented, including explicit collection-revision handoffs. Retained staged results now have conversion, evidence acceptance and exact handoff review; scoped native admission, worker resume, child service scheduling, publication and released proofs preserve original observations separately from fresh child captures. Frozen discovery listings, pending targets, candidate associations and maintenance history now have bounded native mapping and inspection, with original cursors and retry delays retained. Immutable account listings and producer-owned page jobs have scoped worker HTTP support and shared pacing. Reviewed discovery activation, durable producer delivery/dispatch, native candidate comparison and current coverage inspection are implemented and rehearsed. Complete, unique strong matches now have atomic native publication, verified on the populated archive, and bounded automatic server dispatch. Reviewed recovery of missing-history listings is implemented and rehearsed on the populated archive, preserving earlier cursors, bindings and evidence. Original-evidence detail comparison, native capture preparation, read-only application previews, candidate-bound detail jobs, authenticated checkpoint/result retention and scoped worker HTTP are implemented. Python detail delivery/dispatch and scoped collection discovery are implemented. Authenticated detail results now publish through shared native services, with full-copy reconciliation, restart inspection and the full validation gate passed. Automatic candidate-detail admission now uses selected worker profiles and bounded indexed inspection, with durable producer cursors and transactional review guards. Actual discovery source coverage, verified staging release, explicit post consolidation, additional download adapters, existing policy migration, remaining historical/operational conversion, validated source routing, review resolution, global reconciliation and cutover import remain unfinished. |
 | 4 Native UI and client conversion | In progress: scene/image metadata review is available through desktop tabs and mobile sections, with explicit relationship choices and browser request recovery. Account ownership review has native controls, desktop/mobile navigation, bounded discovery, explicit performer choice, selected-account refresh and saved-request recovery. Account consolidation review supports same-service selection, ownership conflict resolution, stable-ID acknowledgement, retained history and exact recovery. Broader source/account/collection management and remaining caller conversion are unfinished. |
 | 5 Compatibility removal and packaging | Preview packaging is isolated. V3 is the sole embedded UI; native plugin manifests, playback, bulk edits and entity queries have replaced their former runtime contracts. Group aliases are removed in the current increment. Remaining API, configuration and export/import bridges still require conversion/removal. |
-| 6 Backup and cutover rehearsal | In progress: full-library portable export/restore and reconciliation passed; native/producer/filesystem checkpoints, host publication, interrupted-run recovery and scoped cleanup are implemented. Standard and cold publication now reuse checksum receipts with paginated inventories; larger database chunks reduce upload requests. Immutable cold objects have separate restore paths and shared-reference cleanup. Declared worker dependencies are resolved and bound to captured files. Successful publications now have durable history; configurable snapshot retention and pins protect historical cold media. Real 64 MiB database encoding and controlled edit costs are measured. Final deployment/environment inventory, Standard object/local metadata reclamation, real daily churn and full capture pause/WAL measurements, plus relocated restore/cutover review remain. |
+| 6 Backup and cutover rehearsal | In progress: full-library portable export/restore and reconciliation passed; native/producer/filesystem checkpoints, host publication, interrupted-run recovery and scoped cleanup are implemented. Standard and cold publication now reuse checksum receipts with paginated inventories; larger database chunks reduce upload requests. Immutable cold objects have separate restore paths and shared-reference cleanup. Declared worker dependencies are resolved and bound to captured files. Successful publications now have durable history; configurable snapshot retention and pins protect historical cold media. Real 64 MiB database encoding and controlled edit costs are measured. Large manifests have shared reader/writer limits and streamed artifact/object downloads, verified against the actual 272,373-video inventory shape. Final deployment/environment inventory, Standard object/local metadata reclamation, real daily churn and full capture pause/WAL measurements, plus relocated restore/cutover review remain. |
 | 7 Production cutover | Not started; compatible production continues |
 | 8 Retirement and acceptance | Not started |
 
@@ -8376,3 +8376,54 @@ verified bucket versioning/lifecycle and final production inventory remain open.
 No bucket policy, production service, native schema, frozen compatible release
 or scraper configuration changed. Full capture/pause measurements, relocated
 restore and all broader migration/UI/client/cutover/retirement gates still apply.
+
+
+## Full-size host manifests and streamed native downloads — 2026-10-05
+
+A locked copy of the host ledger/video manifest established the current shape:
+272,373 video paths with recorded sizes, 1,328 active archive units and 281,421
+representative objects. The backup lock was held for 1.22 seconds while copying;
+all subsequent processing used the copy. Synthetic distinct content keys and
+full SHA-256 descriptors produced a valid 137,128,906-byte master, which the old
+128 MiB history/publication cap rejected. CRC64NVME produced 128,967,697 bytes,
+already close to that cap. These measurements are not a remote checksum audit.
+
+Host publication, history, retained-run recovery, audit and restore now share a
+512 MiB master bound. The archived media-selection envelope permits another
+1 MiB. Portable artifact inventories have a separate 1 GiB host transport bound;
+the portable small manifest and individual inventory-record limits remain
+unchanged. Formats and existing backup identities are unchanged.
+
+Native metadata and encoded-object downloads now use bounded 1 MiB reads within
+one GET per object. Complete SHA-256 and length verification, flush and fsync
+precede publication to a new local file. Existing outputs remain protected;
+truncated, oversized, corrupt, interrupted and space-constrained transfers remove
+their temporary files. The streamed inventory is validated through the existing
+portable reader rather than loaded as one byte buffer. JSON master parsing still
+uses memory proportional to the declared bounded document.
+
+The measured SHA-256 case passed local readers, real archive packing/binding,
+checksum-verified host publication, history reconstruction, streamed download
+and portable restore with a fake S3 transport. The restored 137,128,318-byte
+media binding matched its complete original SHA-256. That round trip took
+63 seconds, used 77 fake transport operations, made no cloud requests and peaked
+at about 2.12 GiB RSS. It used the existing tiny native-schema verification
+fixture and does not replace the earlier populated-database restore proof.
+Sanitized evidence is in `docs/native-backup-manifest-scale.json`.
+
+All 247 host tests passed in 59.2 seconds, including a generated inventory larger
+than 128 MiB whose transport rejects unbounded reads. Shared exact-limit/overflow
+checks cover publication, history, recovery, audit and restore; transfer tests
+cover wrong hashes, length mismatches, network errors, existing destinations and
+reserved disk headroom. Isolated packaging passed in 5.0 seconds; all six installed
+entrypoints and the installed limit module passed their smoke checks. The
+installed restore/history readers also accepted the 137,128,906-byte measured
+master. The ledger copy, fake transport/bundle and generated full-size master
+files were removed after verification, preserving only small scripts/reports.
+Parent `fa72a4d3f` passed Build, Lint and image-publication CI.
+
+Standard expiration/resurrection and local run-metadata reclamation remain the
+next backup implementation work. Final deployment inventory, real capture and
+writer-pause measurements, relocated restore and the full migration/UI/client/
+cutover/retirement requirements remain open. No production service, scraper,
+bucket policy, native database schema or frozen compatible release changed.

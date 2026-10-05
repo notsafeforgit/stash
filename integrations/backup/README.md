@@ -80,6 +80,41 @@ write. ETag is only a concurrency token; SHA-256 remains the content check. A
 retry may adopt its exact already-published bytes after a lost reply, but cannot
 replace a newer publication. Immutable per-run records remain available.
 
+## Manifest capacity and streamed downloads
+
+Publication, run recovery, history, audit and restore share a **512 MiB** limit
+for complete host master JSON. The embedded `s3-media.json` selection has another
+1 MiB of envelope allowance. Portable `artifacts.jsonl` inventories have a
+separate **1 GiB** host transport limit; their records are already validated as
+a stream. The portable archive's small manifest, verification document and
+per-inventory-record bounds remain unchanged. These limits are in
+`host/manifest_limits.py` and do not change the stored format versions.
+
+Native metadata and encoded-object downloads stream in 1 MiB reads within one
+GET per object. Each download verifies the declared size and complete SHA-256,
+flushes its temporary file, then publishes the new destination. Truncation,
+excess bytes, wrong hashes, network failures and insufficient reserved disk
+space discard that temporary file. Existing destinations are never replaced.
+JSON masters still need an in-memory parsed representation; streaming the
+artifact inventory does not make all backup memory use constant.
+
+The [2026-10-05 scale rehearsal](../../docs/native-backup-manifest-scale.json)
+copied the current ledger and video manifest under the backup lock for 1.22
+seconds, then released it. Its 272,373 video paths and sizes, 1,328 archive units
+and 281,421 representative objects produced valid masters of 137,128,906 bytes
+with SHA-256 descriptors and 128,967,697 bytes with CRC64NVME. Content identities,
+checksums and tar sizes were synthetic; these are supported representations of
+the library's shape, not a remote-object audit. The SHA-256 representation was
+rejected by the old 128 MiB cap.
+
+The larger case then passed real JSON/archive codecs, publication/history and
+streamed download/portable restore through a fake S3 transport, restoring the
+137,128,318-byte embedded selection with the exact original hash. That check
+took 63 seconds and peaked at about 2.12 GiB RSS. It used the existing tiny
+native-schema verification fixture; the separate populated-database restore
+rehearsal remains required evidence. No media bodies, cloud objects or live
+configuration were changed.
+
 ## Snapshot history and media retention
 
 Native backups retain the seven most recent successful snapshots by default,

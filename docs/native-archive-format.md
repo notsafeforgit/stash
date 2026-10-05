@@ -629,6 +629,17 @@ path-aware cleanup preserve replacement identities while sharing unchanged bytes
 see [immutable media publication and restore](../integrations/backup/README.md#immutable-media-publication-and-restore).
 This does not require S3 object versions or change the portable bundle format.
 
+The host transport distinguishes large media masters from the portable bundle's
+small manifest. Host master JSON is bounded at 512 MiB, and its archived media
+selection permits another 1 MiB for the binding envelope. The host permits a
+1 GiB complete `artifacts.jsonl` inventory and streams it to a new verified file
+in 1 MiB reads; each individual record retains the portable format's existing
+limit. Encoded-object downloads use the same digest-checked streaming path.
+Only a complete matching file is published; failed downloads remove their
+temporary output and do not overwrite existing destinations. See the
+[manifest-capacity rehearsal](native-backup-manifest-scale.json) for the measured
+272,373-video shape, original cap failure and isolated metadata round trip.
+
 ## Validation
 
 `make validate-archive` runs temporary SQLite/WAL, restore, artwork, pending-work,

@@ -28,6 +28,7 @@ from native_store import (MEDIA_FORMAT, NativeStore, archive_objects, media_sele
                           validate_reference, validate_selection_binding)
 from native_history import SnapshotHistory, policy as retention_policy, publication, publication_key, record_publication
 import worker_inventory
+from manifest_limits import MASTER_BYTES
 
 CONFIG_FORMAT = "org.notsafeforgit.stash.host-backup"
 RUN_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}\Z")
@@ -49,7 +50,7 @@ def same_or_publish(path, body):
         publish_bytes(path, body)
 
 
-def read_record(path, *, limit=128 << 20, optional=False):
+def read_record(path, *, limit=MASTER_BYTES, optional=False):
     try:
         with open_regular(path) as incoming:
             body = incoming.read(limit + 1)
@@ -426,7 +427,7 @@ class NativeBackupSession:
         return self.publication
 
     def prepare_master(self, body):
-        if len(body) > 128 << 20:
+        if len(body) > MASTER_BYTES:
             raise InvalidArchive("Master manifest exceeds its publication size limit")
         catalog = decode_json(body)
         if (self.publication is None or catalog.get("run_id") != self.run_id or catalog.get("native_archive") != self.publication
@@ -502,8 +503,8 @@ class NativeBackupSession:
 
     def finish(self):
         with open_regular(self.root / "master.json") as incoming:
-            body = incoming.read((128 << 20) + 1)
-        if len(body) > 128 << 20 or decode_json(body).get("native_archive") != self.publication:
+            body = incoming.read(MASTER_BYTES + 1)
+        if len(body) > MASTER_BYTES or decode_json(body).get("native_archive") != self.publication:
             raise InvalidArchive("Cannot release an unrelated native backup")
         key = "manifests/runs/" + self.run_id + "/manifest.json"
         if not self.store.verified(key, hashlib.sha256(body).hexdigest(), len(body)):

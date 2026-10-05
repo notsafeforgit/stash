@@ -17,6 +17,7 @@ import tempfile
 import media_objects
 from object_receipts import inventory as list_objects
 from s3_restore_performer import video_path
+from manifest_limits import MASTER_BYTES
 
 sys.dont_write_bytecode = True
 BIN_DIR = Path(__file__).resolve().parent
@@ -32,7 +33,7 @@ def load_module(name, path):
 
 
 class MetadataReader:
-    """Restrict S3 access to LISTs and small manifests in Standard storage."""
+    """Restrict S3 access to LISTs and bounded manifests in Standard storage."""
     def __init__(self, client):
         self.client = client
 
@@ -57,7 +58,12 @@ class MetadataReader:
                 return None, None
             raise
         with response['Body'] as body:
-            payload = body.read()
+            size = response.get('ContentLength')
+            if size is not None and (type(size) is not int or not 0 <= size <= MASTER_BYTES):
+                raise ValueError('Remote backup manifest exceeds the supported size')
+            payload = body.read(MASTER_BYTES + 1)
+            if len(payload) > MASTER_BYTES or size is not None and len(payload) != size:
+                raise ValueError('Remote backup manifest exceeds its size limit or declared length')
         modified = response.get('LastModified')
         return payload, modified.isoformat() if modified else None
 

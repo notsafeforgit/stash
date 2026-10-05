@@ -18,6 +18,7 @@ from .encoding import InvalidData
 from .filesystem import destination_lock
 from .runs import SourceFailure, SourcePaused, SourceTurnComplete
 from .outbox import Capacity
+from .publication_lock import publication_lock
 from .source_window import published, validate_keywords
 from .scan_resume import legacy_cursor
 
@@ -68,9 +69,29 @@ class InitializationLog:
 
 
 def callback_owner(callback):
-    while isinstance(callback, functools.partial):
-        callback = callback.args[0] if callback.args and callable(callback.args[0]) else callback.func
+    while isinstance(callback, functools.partial) or hasattr(callback, "__wrapped__"):
+        if isinstance(callback, functools.partial):
+            callback = callback.args[0] if callback.args and callable(callback.args[0]) else callback.func
+        else:
+            callback = callback.__wrapped__
     return getattr(callback, "__self__", None)
+
+
+def publication_guard(method):
+    @functools.wraps(method)
+    def guarded(self, *args, **kwargs):
+        check = self.producer.root.verify if method.__name__ == "handle_finalize" else self.producer.check
+        with publication_lock(self.lock_directory, check):
+            return method(self, *args, **kwargs)
+    return guarded
+
+
+def publication_callback(owner, callback):
+    @functools.wraps(callback)
+    def guarded(*args, **kwargs):
+        with publication_lock(owner.lock_directory, owner.producer.root.verify):
+            return callback(*args, **kwargs)
+    return guarded
 
 
 @contextmanager
@@ -248,6 +269,7 @@ class NativeDownloadJob(job.DownloadJob):
                                           "source_lease_lost" if isinstance(exc, SourcePaused) else "source_rejected")
             raise exception.AbortExtraction(str(exc)) from None
 
+    @publication_guard
     def initialize(self, kwdict=None):
         if kwdict is None:
             raise InvalidData("Native file processing requires an accepted source post")
@@ -308,12 +330,15 @@ class NativeDownloadJob(job.DownloadJob):
         self.hooks["skip"].insert(0, self._repair_skip)
         self.hooks["skip"].append(functools.partial(self._complete, skipped=True))
         self.hooks["error"].append(lambda _: self._release())
+        for event, callbacks in self.hooks.items():
+            self.hooks[event] = [publication_callback(self, callback) for callback in callbacks]
         filename.install(self)
 
     def get_logger(self, name):
         logger = super().get_logger(name)
         return InitializationLog(self, logger) if name == "postprocessor" else logger
 
+    @publication_guard
     def handle_directory(self, kwdict):
         self.producer.check()
         if self.pathfmt is not None:
@@ -329,6 +354,7 @@ class NativeDownloadJob(job.DownloadJob):
         candidate.set_directory(dict(kwdict))
         self.producer.relative(candidate.realdirectory)
 
+    @publication_guard
     def handle_url(self, url, kwdict):
         self.producer.check()
         self._native_url = url
@@ -336,6 +362,10 @@ class NativeDownloadJob(job.DownloadJob):
             return super().handle_url(url, kwdict)
         finally:
             self._release()
+
+    @publication_guard
+    def handle_finalize(self):
+        return super().handle_finalize()
 
     def handle_queue(self, url, kwdict):
         self.producer.check()

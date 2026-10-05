@@ -1,9 +1,11 @@
 """Real gallery-dl scheduling and postprocessing with local fixture downloads."""
 
 import copy
+import fcntl
 from contextlib import closing
 from datetime import datetime
 import hashlib
+import os
 from pathlib import Path
 import sqlite3
 import tempfile
@@ -23,6 +25,7 @@ from stash_ingest.filesystem import Root
 from stash_ingest.gallery import NativeDownloadJob
 from stash_ingest.outbox import Outbox
 from stash_ingest.producer import Producer
+from stash_ingest.publication_lock import ACTIVE, PublicationBarrier
 from stash_ingest.runs import SourceFailure, SourcePaused
 from stash_ingest.source_window import SourceWindow
 from stash_ingest.scan_resume import legacy_cursor, PREFIX as LEGACY_CURSOR_PREFIX
@@ -143,6 +146,43 @@ class GalleryTests(unittest.TestCase):
     def archive_count(self):
         with sqlite3.connect(self.directory / "downloads.sqlite") as db:
             return db.execute("SELECT count(*) FROM archive").fetchone()[0]
+
+    def test_download_and_every_postprocessor_phase_hold_publication_lock(self):
+        seen = []
+
+        def held(event, _):
+            fd = os.open(self.locks / ACTIVE, os.O_RDWR)
+            try:
+                with self.assertRaises(BlockingIOError):
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            finally:
+                os.close(fd)
+            seen.append(event)
+
+        class Processor:
+            def __init__(self, task, _):
+                for event in ("init", "post", "prepare", "file", "after", "skip", "child", "child-after", "post-after", "finalize"):
+                    task.hooks[event].append(lambda pathfmt, event=event: held(event, pathfmt))
+
+        config.set(("extractor",), "postprocessors", [{"name": "publication-fixture"}])
+        with patch("gallery_dl.postprocessor.find", return_value=Processor):
+            for _ in range(2):
+                task = self.task()
+                original = task.download
+
+                def download(url):
+                    held("download", task.pathfmt)
+                    return original(url)
+
+                task.download = download
+                self.assertEqual(task.run(), 0)
+                # Queue callbacks can run outside a file's enclosing lock.
+                for event in ("child", "child-after"):
+                    for callback in task.hooks[event]:
+                        callback(task.pathfmt)
+        self.assertEqual(set(seen), {"init", "post", "prepare", "file", "after", "skip", "child", "child-after", "post-after", "finalize", "download"})
+        with PublicationBarrier([self.locks], timeout=1):
+            pass
 
     def narrow_window(self):
         self.lease.run["window"] = {"since": "2026-10-01T00:00:00.100Z", "until": "2026-10-01T00:00:00.300Z"}

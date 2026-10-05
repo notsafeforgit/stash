@@ -100,6 +100,30 @@ mount identity and live lease before extraction/download boundaries. Child jobs
 inherit those objects, and asynchronous extraction is disabled. Destination
 locks cover a filename stem and its transformed encodings.
 
+Native jobs also hold a shared filesystem-publication lock through each file's
+download, postprocessing, completion and archive update. Initialization,
+directory/finalization work and callbacks outside a file are guarded too. A
+current file can finish after lease loss; new file work still checks the lease.
+The locks are reentrant within a worker thread, including nested callbacks.
+
+The host backup coordinator uses
+`stash_ingest.publication_lock.PublicationBarrier(lock_directories)` to exclude
+these mutations across every reviewed worker lock root. It acquires the barrier
+**before** requesting Stash's native database writer guard. A gate blocks new
+mutations while existing downloads finish; the default acquisition timeout is
+five minutes. A timeout fails capture instead of claiming a filesystem boundary.
+Call `barrier.release()` as soon as immutable filesystem views have been retained,
+before the large database copy, packing or uploads. Context exit also releases
+locks after an error or an earlier explicit release. Multiple roots are acquired
+in stable physical-identity order.
+
+The two `native-publication-*.lock` files are permanent coordination objects.
+Host/container profiles must share the same physical lock directories; never
+remove or replace their lock files while workers are active. This protocol does
+not pause legacy gallery-dl processes or unrelated filesystem tools. The existing
+backup/dedupe lock is still required, and the host snapshot orchestration remains
+to be integrated before production uses this barrier.
+
 The executor requires native `source_run_pacing_protocol: 1`. It reserves the root
 service and each supported linked service before extractor initialization, which
 may log in. Currently the reviewed linked services are Redgifs and Imgur. A busy

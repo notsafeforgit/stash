@@ -7805,3 +7805,36 @@ issues. Evidence labels are `native_artwork_pins_durable_python`,
 Media snapshots, producer barriers, full-inventory timing and daily-script/S3
 integration remain. The installed daily backup script and running production
 server are unchanged; this provider runs in the host backup tooling.
+
+## Native producer filesystem publication barrier — 2026-10-05
+
+Native gallery-dl jobs now hold cooperative shared locks through file download,
+postprocessing, final publication, durable completion and archive updates.
+Initialization, directory/finalization work and callbacks outside a file also
+participate. Reentrant callbacks can finish a current file after lease loss
+without reacquiring the gate; new work continues to validate its lease. Existing
+destination-stem locks and after-completion ordering remain in place.
+
+The host-side `PublicationBarrier` acquires exclusive gates and active locks
+across explicitly inventoried worker lock directories in physical-identity
+order. Waiting for existing downloads stops new mutations from entering.
+Acquisition has a bounded timeout and releases every acquired handle on failure.
+Explicit early release lets the host resume downloads after retaining immutable
+views; context cleanup is idempotent. Lock files remain permanent shared objects,
+and redirected, nonregular or replaced files/directories are rejected.
+
+All 489 producer tests pass in 44.3 seconds. Three actual multiprocess lock tests
+cover a waiting backup, existing/nested/new mutations, early release, acquisition
+failure, timeout, cancelled waits and redirected lock files. All 30 gallery-dl
+lifecycle tests pass, including lock checks inside downloads and every supported
+postprocessor phase, skip repair and callbacks outside a file. Evidence labels
+are `native_publication_lock_tests`, `native_gallery_publication_tests` and
+`native_publication_producer_suite` under the October 4 client rehearsal
+directory.
+
+Host orchestration must acquire these barriers before Stash's database guard,
+then release them after snapshot capture, before the large copy/upload. This
+protocol does not pause the installed legacy scrapers, dedupe or unrelated
+filesystem tools. Actual ZFS snapshot orchestration, worker inventory, existing
+backup/dedupe exclusion and daily-script/S3 integration remain required before
+cutover. No running worker, schedule or production service changed.

@@ -200,6 +200,18 @@ records and removes inventories after durable completion; unexpected files and
 changed inodes are preserved. Export never calls release automatically. This
 provider does not upload to S3 or establish the ordinary-media/producer boundary.
 
+Native gallery-dl workers now cooperate with the host's
+`stash_ingest.publication_lock.PublicationBarrier`, using the existing shared
+worker lock directories. The barrier waits for active file mutations and stops
+new ones at a gate. Acquire it across all inventoried worker roots before asking
+for Stash's database guard; release it once the immutable views are retained.
+Acquisition is bounded and fails on timeout. Source fetching outside a file may
+continue, but downloads, postprocessors, archive completion and filesystem
+callbacks share exclusion. The adapter holds a file's lock across its download,
+so long current downloads can delay capture. The protocol does not cover legacy
+workers, manual filesystem changes or dedupe; retain their existing exclusion
+and inventory requirements. Host snapshot orchestration is still outstanding.
+
 The server captures the native database, raw deletion recovery trees, main
 configuration, runtime overrides and configured TLS certificate/key assets.
 Settings and overrides remain separate, and private values appear only in the

@@ -1286,7 +1286,7 @@ or obtain access to these application-authenticated routes.
 
 Policies belong to a source collection, including an unsourced directory or
 manual batch. Definitions and their history live in the native database; there
-is no plugin settings JSON or parallel catalog writer. Migration creates no
+is no plugin settings JSON or parallel catalog writer. Schema promotion creates no
 policies and changes no selected metadata. Each field decision made by a policy
 references the exact policy revision, with capture provenance for source-backed
 mappings. Collection scope changes require reviewing a new policy revision.
@@ -1341,13 +1341,36 @@ must satisfy that field's type. Expressions share a 250 ms deadline and retain
 for retained source payload plus entity data; plugin limits remain unchanged.
 
 Mapping data contains `source` (the selected post/capture, normalized `metadata`,
-and reconstructed retained `payload`, or null), `entity` (UUID, kind and permitted
-native field values), and `context` (creation flag, filename and relative path).
+reconstructed retained `payload`, and shared post URLs, or null), `entity` (UUID,
+kind and permitted native field values), and `context` (creation flag, filename
+and relative path).
 It includes no plugin configuration, mapping definitions, settings, duplicate edit
 `input`, or field-name list. Expanded data is returned only with `include_data`;
 normal previews contain proposed changes and their status. Protected values and
 disabled rules can be inspected without applying them. HTTP previews select an
 existing entity; requests cannot impersonate a creation event.
+
+
+`source.urls` contains the selected post's distinct known URLs in lexical order.
+They come from shared post evidence, which may include observations recorded
+after the selected capture; they need not appear in its original raw payload.
+Only that post is read, through indexed pages. Repeated observations of one URL
+do not repeat it here. A later URL change is rechecked when applying a preview.
+
+The set is limited to 4,096 URLs and 1 MiB of encoded text. `urls_complete` is
+true for a complete set, including an empty array. If either limit is exceeded,
+`urls` is null and `urls_complete` is false, so a partial list cannot silently
+replace an entity's existing URLs. This mapping adds known post URLs while
+preserving links already selected from other posts:
+
+```jq
+.entity.urls as $existing
+| .source
+| select(.urls_complete)
+| ($existing + .urls | unique)
+| select(length > 0)
+```
+
 
 Only typed curated fields from `MetadataFields` are accepted. Identity, file
 fingerprints, jobs and raw source evidence are not mapping targets. Relationships

@@ -8947,3 +8947,35 @@ Schema 1000079 is the latest fully verified rehearsal. Historical rule conversio
 remaining cleanup intent, complete source coverage, broader UI/caller conversion,
 backup activation and reviewed production cutover remain open. Live services,
 workers, bucket policies and the frozen compatible release are unchanged.
+
+## Shared post URLs in metadata policies — 2026-10-05
+
+Native mapping data now exposes the selected post's complete distinct URL set as
+`source.urls`, with `source.urls_complete`. Indexed 100-row pages read only that
+post. URLs are sorted consistently and may include later observations than the
+selected capture. Duplicate observations neither duplicate links nor invalidate
+an otherwise unchanged preview; a newly observed URL is rechecked on apply.
+The mapping context still excludes internal plugin settings and duplicate edit
+input. The ingestion guide includes a mapping that preserves selected entity
+links while adding this post's URLs.
+
+A set exceeding 4,096 URLs or 1 MiB of encoded text returns `null` with an
+incomplete flag. It never supplies a partial replacement that could erase links.
+Other field mappings can still run. Pure and real SQLite tests cover pagination,
+empty and oversized sets, unrelated-post exclusion, replay, changed-preview
+rejection and restart preservation. The regression failed against the preceding
+implementation before the fix; focused actual-source tests and lint pass.
+
+The complete fork gate passed in 1,404 seconds: 612 UI tests, 526 producer tests,
+eight library tests, 108 archive tests, 262 backup tests, zero lint issues and
+every tagged Go package. SQLite took 1,238 seconds with the documented 30-minute
+package timeout override. All five frozen source hashes match the successful run.
+This increment changes no schema or UI assets; the independently verified
+schema-1000079 rehearsal remains the migration baseline.
+
+Separately, the browser CI for `354693922` reported one WebKit shared-video
+preview failure in shard 4: playback stayed at time zero. Build, lint and image
+publication passed. The same browser test passed twice in the local isolated
+runtime; investigation of the complete sharing suite and CI remains open.
+This local fork-gate result does not resolve that separate browser failure or
+the broader migration, caller conversion, backup and production cutover gates.

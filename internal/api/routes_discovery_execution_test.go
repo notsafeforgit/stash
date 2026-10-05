@@ -111,6 +111,7 @@ func TestPythonDiscoveryExecutionRecoversOwnedPagesWithoutRefetch(t *testing.T) 
 					"max_bytes": maxBytes, "pause_after_fetch": scenario == "paused_after_fetch", "mismatch": scenario == "profile_mismatch"}, f.token, !deliver)
 				var result executionResult
 				require.NoError(t, json.Unmarshal(body, &result))
+				verifyNativeArchiveJournals(t, f.database, directory, server.URL)
 				return result
 			}
 			fetch, expected, quota := "page", "delivery_pending", 512<<20

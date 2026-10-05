@@ -7375,3 +7375,36 @@ This verifies ingestion and admission receipts only. Enrichment/discovery journa
 acknowledgements, matching filesystem/config/download state, media manifests,
 remote publication and complete restore/cutover verification remain required.
 Production services and backup publication are unchanged.
+
+## Producer job journal backup verification — 2026-10-04
+
+The portable archive receipt check now includes enrichment, listing-page and
+detail-verification journals. It checks each immutable job definition, retained
+claim/attempt owner, checkpoint, publication/comparison and failure acknowledgement
+against native history. Native jobs may have advanced beyond an older producer
+snapshot; historical acknowledgements remain valid without renewing the old lease.
+Pending bodies retain their exact bytes and reservations, including review work.
+A matching native receipt after a lost reply is reported separately from a later
+worker's completion after the original attempt expired. Neither case changes
+producer state or discards unacknowledged source evidence.
+
+Listing acknowledgements require the retained native page. Metadata checkpoint
+acknowledgements require the current native checkpoint body or the published
+enrichment release receipt. The native database's schema validation still owns
+the release/capture provenance proof; receipt correspondence does not reconstruct
+a deliberately released transcript. The archive format and runtime used by the
+ongoing full-library rehearsal are unchanged.
+
+All 45 archive tests pass, including actual producer journal transitions, stale
+snapshot rejection, lost responses, retry receipts, terminal observations and
+changed payload/history rejection. The affected Go API package passes lint with
+zero issues. The verifier also runs between requests in the existing real
+producer/Go API tests for listing, enrichment and detail execution/publication;
+all affected scenarios pass in 259.1 seconds. Evidence is under
+`.local/native-discovery-client-20261004/native_archive_job_journal_final.json`,
+`native_archive_job_api_lint.json` and `native_archive_real_journal_host.json`.
+
+The receipt proof's coverage is `capture-file-run-and-job-receipts`. Coordinated
+producer/download/config/filesystem snapshots, a matching media manifest, remote
+publication, the full restore drill and production cutover remain outstanding.
+Production services and backup publication are unchanged.

@@ -298,7 +298,7 @@ func discoveryActivationScenario(t *testing.T, fresh, recovery, pythonDetails bo
 			require.Equal(t, review, enrichmentHTTPValue[models.DiscoveryMatchReview](t, request("GET", path+"/review", nil, http.StatusOK)))
 			request("POST", publicationPath, map[string]any{"expected_target_revision": 2}, http.StatusConflict)
 			if pythonDetails {
-				exercisePythonDiscoveryDetailHTTP(t, service, token, review, detailBody)
+				exercisePythonDiscoveryDetailHTTP(t, service, db.DatabasePath(), token, review, detailBody)
 			} else {
 				exerciseDiscoveryDetailHTTP(t, service, producerHandler, token, review, listing, detailBody)
 			}

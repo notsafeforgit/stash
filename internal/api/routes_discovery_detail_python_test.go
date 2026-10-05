@@ -21,7 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func exercisePythonDiscoveryDetailHTTP(t *testing.T, service *ingest.Service, token string, review models.DiscoveryMatchReview, body json.RawMessage) {
+func exercisePythonDiscoveryDetailHTTP(t *testing.T, service *ingest.Service, database, token string, review models.DiscoveryMatchReview, body json.RawMessage) {
 	t.Helper()
 	python, packagePath := nativeProducerRuntime(t)
 	credential, err := service.Authenticate(t.Context(), token)
@@ -101,6 +101,7 @@ func exercisePythonDiscoveryDetailHTTP(t *testing.T, service *ingest.Service, to
 		command.Stdin = bytes.NewReader(input)
 		output, err := command.CombinedOutput()
 		require.NoError(t, err, string(output))
+		verifyNativeArchiveJournals(t, database, directory, server.URL)
 		return enrichmentHTTPValue[result](t, output)
 	}
 	if review.Coverage.Complete {

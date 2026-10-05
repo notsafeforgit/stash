@@ -16,8 +16,8 @@ state, a matching media manifest, verified remote publication and the complete
 restore drill in the [transition plan](native-archive-transition-plan.md).
 Supplying several live database paths does not establish that shared boundary.
 
-The optional producer receipt check verifies capture/file events and source-run
-admissions after a complete verified restore:
+The optional producer receipt check verifies capture/file events, source-run
+admissions and scraper job journals after a complete verified restore:
 
 ```sh
 stash-archive verify /backups/native-archive --temp-parent /restore-work \
@@ -42,14 +42,35 @@ later run state does not rewrite an earlier admission. Unsubmitted windows,
 leased requests and requests awaiting review remain pending work. Admission
 does not certify scrape completion.
 
+The enrichment, listing and detail-verification journals retain their immutable
+job definitions, original claim/attempt owners and acknowledged checkpoints,
+publications, comparisons or failures. Verification compares these with native
+history, including timestamp precision. It allows an older acknowledgement when
+the native job has since advanced. It checks a pending page/checkpoint's original
+bytes and separately counts bodies already accepted before a response was lost;
+`accepted_pending_bodies` is not an execution-completion count. It never renews
+leases, resets retry deadlines or makes pending/review work complete.
+If another worker completed the job after the saved attempt expired or ended
+for retry, `superseded_pending_bodies` identifies that distinct case. Both the
+native result and the producer's unacknowledged bytes remain retained for review.
+
+Listing receipts require the matching retained native page. Metadata checkpoint
+receipts require the current retained checkpoint body or, for published enrichment,
+its native release receipt. Native schema validation remains responsible for
+the complete release/capture provenance proof; this receipt check does not
+reconstruct a deliberately released transcript. Completed local journal rows
+may have been pruned by the producer's normal retention policy; native history
+is retained independently.
+
 The returned proof identifies the archive, canonical manifest digest, exact
 library/outbox component hashes and bounded per-producer counts/digests. Its
-coverage is `capture-file-and-run-admission-receipts`. This does **not** certify
-enrichment/discovery journals, download archives, media or config.
-Those remain required parts of the coordinated production backup. The copied
+coverage is `capture-file-run-and-job-receipts`. This does **not** certify
+download archives, media, configuration or filesystem recovery. Those remain
+required parts of the coordinated production backup. The copied
 library used for the large restore rehearsal currently has no native producers;
 nonempty receipt checks use the real producer outbox, request queue and native
-receipt table definitions in SQLite regression fixtures. The backend and Python
+receipt table definitions in SQLite regression fixtures, plus real producer
+processes talking to the Go API. The backend and Python
 verifier also check the same source-request digest corpus, including offsets,
 fractional timestamps and year limits.
 

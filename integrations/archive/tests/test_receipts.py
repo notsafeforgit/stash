@@ -115,7 +115,7 @@ class ReceiptBoundaryTests(ReceiptFixture):
         self.box.enqueue(encode(self.event()))
         before = self.box.db.execute("SELECT * FROM events ORDER BY seq").fetchall()
         report = self.verify()
-        self.assertEqual(report["coverage"], "capture-file-and-run-admission-receipts")
+        self.assertEqual(report["coverage"], "capture-file-run-and-job-receipts")
         self.assertEqual(report["producers"][0]["counts"], {"acknowledged": 1, "pending": 2, "sending": 0,
                                                          "review": 0, "accepted_unacknowledged": 1})
         self.assertEqual(report, self.verify())

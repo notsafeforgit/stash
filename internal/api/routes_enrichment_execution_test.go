@@ -121,6 +121,7 @@ func TestPythonEnrichmentExecutionRestartsAndPreservesSourceEvidence(t *testing.
 				require.NotContains(t, stderr.String(), "fixture-private-site-token")
 				var result executionResult
 				require.NoError(t, json.Unmarshal(stdout.Bytes(), &result))
+				verifyNativeArchiveJournals(t, f.database, directory, server.URL)
 				return result
 			}
 			fetch, expected, quota := "complete", "delivery_pending", 512<<20

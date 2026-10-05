@@ -83,7 +83,7 @@ def main(argv=None):
     verify = commands.add_parser("verify")
     verify.add_argument("archive")
     verify.add_argument("--temp-parent")
-    verify.add_argument("--producer-origin", help="Also verify registered producers' ingestion and source admission receipts")
+    verify.add_argument("--producer-origin", help="Also verify registered producers' ingestion, source admission and job receipts")
     inspect = commands.add_parser("inspect")
     inspect.add_argument("archive")
     listing = commands.add_parser("list")

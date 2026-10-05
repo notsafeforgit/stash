@@ -1,7 +1,7 @@
 """Cross-snapshot proof for ingestion and source-run admission receipts.
 
-This is one part of backup coordination. It does not certify discovery or
-enrichment journals, download archives, media or configuration.
+This is one part of backup coordination. It does not certify download archives,
+media, filesystem recovery or configuration.
 The coordinator must bind this proof to the exact component hashes it publishes.
 Connections must already hold read transactions on the snapshots being checked.
 """
@@ -192,14 +192,16 @@ def verify_ingestion_receipts(library, outboxes, expected_origin):
             counts[row["state"]] += 1
             digest.update(json_bytes(dict(evidence, seq=row["seq"], event_uuid=row["event_uuid"], state=row["state"])))
         from .run_receipts import verify_run_admissions
+        from .job_receipts import verify_job_journals
         admissions = verify_run_admissions(library, queue, producer, queue.execute("PRAGMA user_version").fetchone()[0])
+        journals = verify_job_journals(library, queue, producer, queue.execute("PRAGMA user_version").fetchone()[0])
         reports.append({"producer_uuid": producer, "events": sum(counts[k] for k in ("acknowledged", "pending", "sending", "review")),
                         "maximum_sequence": maximum_sequence, "counts": counts, "boundary_sha256": digest.hexdigest(),
-                        "source_admissions": admissions})
+                        "source_admissions": admissions, "job_journals": journals})
     if any(row[0] not in producers for row in library.execute("SELECT uuid FROM ingest_producers")):
         raise InvalidArchive("A registered producer has no matching outbox snapshot")
     return {"format": FORMAT + ".ingestion-receipt-boundary", "version": 1,
-            "coverage": "capture-file-and-run-admission-receipts", "origin": expected_origin,
+            "coverage": "capture-file-run-and-job-receipts", "origin": expected_origin,
             "registered_producers_complete": True,
             "producers": sorted(reports, key=lambda report: report["producer_uuid"])}
 

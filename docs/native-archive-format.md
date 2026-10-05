@@ -16,6 +16,31 @@ state, a matching media manifest, verified remote publication and the complete
 restore drill in the [transition plan](native-archive-transition-plan.md).
 Supplying several live database paths does not establish that shared boundary.
 
+Export snapshots all declared download archives first, then every producer
+outbox, then the native library, regardless of their order in `--components`.
+It freezes these SQLite copies before compressing any library/artwork objects;
+later producer activity cannot move the saved queues ahead of the saved library.
+The native gallery-dl adapter commits a file-completion event before adding its
+download-archive entry, and a producer acknowledgement follows the native
+receipt commit. This ordering preserves those causal relationships without
+stopping downloads for the potentially long compression step.
+
+For producer-aware exports, require the corresponding receipt check before
+packing or publishing the archive manifest:
+
+```sh
+stash-archive export --database /srv/stash/native.sqlite \
+  --blobs /srv/stash/blobs --components /backup-work/components.json \
+  --producer-origin https://stash.example --output /backups/native-archive
+```
+
+Missing registered outboxes, a wrong origin or inconsistent acknowledgements
+abort the export before packing. The flag does not discover every download
+archive, certify third-party writers' ordering, freeze configuration or preserve
+the filesystem recovery/media boundary. Those remain coordinator requirements.
+The portable coverage stays `declared-components`. Verification after restore
+rechecks receipts and binds its proof to the final archive/library/outbox hashes.
+
 The optional producer receipt check verifies capture/file events, source-run
 admissions and scraper job journals after a complete verified restore:
 

@@ -105,7 +105,26 @@ def _blob_rows(connection):
             yield checksum
 
 
-def export_archive(database, destination, *, blob_paths=(), components=(), reserve=RESERVE_BYTES, progress=None):
+def export_archive(database, destination, *, blob_paths=(), components=(), reserve=RESERVE_BYTES,
+                   progress=None, producer_origin=None):
+    # Capture every download archive before any outbox, then the server last.
+    # The native adapter durably queues file completion before archive.add; an
+    # acknowledged queue row in turn follows the server's committed receipt.
+    # Snapshotting the library first can lose that causal prefix while packing
+    # many artwork objects. Transport still cannot certify media/config/journals.
+    components = list(components)
+    selected = set()
+    for component in components:
+        if not isinstance(component, dict) or set(component) != {"role", "name", "path"}:
+            raise InvalidArchive("Components require exactly role, name and path")
+        role, name = component["role"], component["name"]
+        if (not isinstance(role, str) or role not in ROLES or not isinstance(name, str)
+                or not NAME.fullmatch(name) or (role, name) in selected):
+            raise InvalidArchive("Unsupported or duplicate component role/name")
+        selected.add((role, name))
+    if producer_origin is not None:
+        from .receipts import origin
+        producer_origin = origin(producer_origin)
     destination = Path(destination)
     require_space(destination.parent, 0, reserve)
     destination.mkdir(mode=0o700)
@@ -137,8 +156,19 @@ def export_archive(database, destination, *, blob_paths=(), components=(), reser
                 progress({"stage": "export", "artifacts": count, "bytes": total})
             return entry
         with os.fdopen(inventory_fd, "wb") as inventory, tempfile.TemporaryDirectory(prefix=".snapshot-", dir=destination) as temp:
+            snapshots = {}
+            for role in ("download_archive", "producer_outbox"):
+                for index, component in enumerate(components):
+                    if component["role"] == role:
+                        path = Path(temp) / f"component-{index}.sqlite"
+                        meta = snapshot_database(component["path"], path, role, reserve)
+                        snapshots[index] = (path, meta)
             native = Path(temp) / "library.sqlite"
             metadata = snapshot_database(database, native, "library", reserve)
+            if producer_origin is not None:
+                from .receipts import verify_snapshot_receipts
+                verify_snapshot_receipts(native, [snapshots[index][0] for index, component in enumerate(components)
+                                                   if component["role"] == "producer_outbox"], producer_origin)
             add(native, "library", "library", metadata)
             with closing(connect_readonly(native)) as connection:
                 for checksum in _blob_rows(connection):
@@ -159,15 +189,8 @@ def export_archive(database, destination, *, blob_paths=(), components=(), reser
                     if digest.hexdigest() != checksum:
                         raise InvalidArchive("Original artwork checksum mismatch")
             for index, component in enumerate(components):
-                if not isinstance(component, dict) or set(component) != {"role", "name", "path"}:
-                    raise InvalidArchive("Components require exactly role, name and path")
                 role, name = component["role"], component["name"]
-                if not isinstance(role, str) or role not in ROLES or not isinstance(name, str):
-                    raise InvalidArchive("Unsupported component role or name")
-                path, meta = component["path"], None
-                if role in SQLITE_ROLES:
-                    path = Path(temp) / f"component-{index}.sqlite"
-                    meta = snapshot_database(component["path"], path, role, reserve)
+                path, meta = snapshots.get(index, (component["path"], None))
                 add(path, role, name, meta)
             inventory.flush()
             os.fsync(inventory.fileno())

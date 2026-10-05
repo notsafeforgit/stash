@@ -77,6 +77,7 @@ def main(argv=None):
     export.add_argument("--output", required=True)
     export.add_argument("--blobs", action="append", default=[])
     export.add_argument("--components", help="JSON array of explicit role/name/path objects")
+    export.add_argument("--producer-origin", help="Require matching native ingestion, source and job receipts before packing snapshots")
     restore = commands.add_parser("import")
     restore.add_argument("archive")
     restore.add_argument("--output", required=True)
@@ -104,7 +105,7 @@ def main(argv=None):
             if not isinstance(components, list):
                 raise InvalidArchive("Components must be a JSON array")
             export_archive(args.database, args.output, blob_paths=args.blobs,
-                           components=components, reserve=args.reserve_bytes)
+                           components=components, reserve=args.reserve_bytes, producer_origin=args.producer_origin)
             result = summary(args.output)
         elif args.command == "import":
             manifest = import_archive(args.archive, args.output, reserve=args.reserve_bytes)

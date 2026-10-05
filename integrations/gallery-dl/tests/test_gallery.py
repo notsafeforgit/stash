@@ -1,6 +1,7 @@
 """Real gallery-dl scheduling and postprocessing with local fixture downloads."""
 
 import copy
+from contextlib import closing
 from datetime import datetime
 import hashlib
 from pathlib import Path
@@ -11,6 +12,7 @@ from unittest.mock import Mock, patch
 from requests.exceptions import ConnectionError, Timeout
 
 from gallery_dl import config, exception
+from gallery_dl import archive as gdl_archive
 from gallery_dl import extractor as gdl_extractors
 from gallery_dl.extractor.common import Extractor, Message
 from gallery_dl.extractor.twitter import TwitterExtractor
@@ -298,6 +300,28 @@ class GalleryTests(unittest.TestCase):
         task = self.task()
         task.download = lambda _: self.fail("Existing file must be recovered")
         self.assertEqual(task.run(), 0)
+        self.assertEqual(self.archive_count(), 1)
+
+    def test_archive_add_follows_durable_capture_and_file_events(self):
+        original = gdl_archive.DownloadArchive.add
+        observed = []
+
+        def add(archive, keywords):
+            # The backup snapshots download archives before outboxes. Prove
+            # the adapter's prerequisite from an independent SQLite reader,
+            # so an uncommitted row on the producer connection is insufficient.
+            with closing(sqlite3.connect(self.box.path)) as reader:
+                rows = reader.execute('SELECT event_uuid,kind,body FROM events ORDER BY seq').fetchall()
+            self.assertEqual([row[1] for row in rows], ['source.capture', 'file.completed'])
+            event = decode(rows[-1][2])
+            self.assertEqual(event['source']['capture_event_uuid'], rows[0][0])
+            self.assertFalse(self.box.db.in_transaction)
+            observed.append(rows[-1][0])
+            return original(archive, keywords)
+
+        with patch.object(gdl_archive.DownloadArchive, 'add', add):
+            self.assertEqual(self.task().run(), 0)
+        self.assertEqual(len(observed), 1)
         self.assertEqual(self.archive_count(), 1)
 
     def test_lost_lease_finishes_current_file_and_stops_before_next_source_item(self):

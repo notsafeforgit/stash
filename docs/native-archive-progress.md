@@ -7470,3 +7470,37 @@ Evidence is under `.local/native-discovery-client-20261004/` with labels
 The full-library rehearsal continues on its frozen transport runtime. Coordinated
 download/configuration/filesystem/media snapshots, S3 publication and production
 cutover are still required; this commit changes no production services.
+
+## Producer-first backup checkpoints — 2026-10-04
+
+The export path now snapshots every declared download archive before any
+producer outbox, then snapshots the native library. All SQLite copies are
+captured before artwork/library compression starts. Previously, the library was
+captured first and producer queues were copied after artwork packing, allowing
+newer queue acknowledgements to refer to native receipts absent from the backup.
+Component-list order no longer controls this causal snapshot order.
+
+`stash-archive export --producer-origin ORIGIN` checks every registered
+producer's ingestion, source-admission and job receipts against those closed
+copies before packing or sealing a manifest. Missing queues, an incorrect origin
+or inconsistent acknowledged state abort the export and remove only its new
+output. This does not discover all worker download archives or establish the
+remaining config/filesystem/media boundary; coverage stays declared components.
+
+All 57 archive tests pass in 37.4 seconds. WAL-backed fixtures commit additional
+deliveries between archive, queue and library snapshots, then again during
+packing. The restored artifacts retain the correct older prefixes and their
+matching acknowledgements. Corrupt archives stop before queue/library snapshots;
+invalid receipt boundaries cannot reach packing or manifest publication. All 29
+gallery-dl lifecycle tests pass in 4.6 seconds, including an independent SQLite
+reader proving that capture/file events are committed before `archive.add`.
+The actual native command/portable verifier integration passes in 8.9 seconds.
+Evidence is under `.local/native-discovery-client-20261004/` with labels
+`native_archive_ordered_checkpoint`, `native_archive_download_order` and
+`native_archive_ordered_go`.
+
+The full-copy export on the separate frozen rehearsal runtime completed in
+8,744.2 seconds under concurrent validation and idle I/O priority: 238,575
+artifacts, 56,762,033,240 uncompressed bytes and 41,468,466,273 compressed object
+bytes. Restore and full semantic reconciliation are still running; export alone
+does not establish a successful round trip. Production remains unchanged.

@@ -9049,3 +9049,42 @@ that the old reader selected cached translations and combined file metadata with
 explicit folder defaults. Those behaviors and the replacement for its hidden
 cover completeness requirement still need explicit conversion before activating
 the seven retained policy drafts.
+
+
+## Retained translations in metadata policies — 2026-10-05
+
+Native jq mapping data now exposes compact translation choices for the selected
+post and the capture's exact original title/caption. Repeated observations and
+equal title/caption strings share one result body. Each choice retains language,
+provider and the latest known evidence reference; unknown observation times stay
+null, and known times normalize to UTC for chronological selection. Original
+source metadata remains unchanged. The ingestion guide includes an explicit
+English-selection rule with original-title and filename fallbacks.
+
+Indexed reads are limited to the selected post and exact original hashes. The
+complete set is bounded to 128 results, 4,096 evidence assertions and 1 MiB of
+encoded choices; overflow reports an incomplete set instead of returning a
+partial replacement. Changed selected values invalidate an earlier Apply digest.
+Explicit clears and preserved entity values retain their precedence. Translation
+completion alone does not edit existing media or activate a metadata policy.
+
+The regression reproduced the absent-translation behavior before implementation.
+Focused actual-source metadata, SQLite and API tests passed in 19 seconds, and
+lint reported zero issues. A read-only assessment independently reconstructed
+100 real post samples containing 112 distinct results and 139 matching evidence
+assertions. All 300 native helper calls matched those expectations, fetching
+shared result text once per request. Choice lookup work took 37 ms combined
+(p95 0.13 ms); opening the populated database took 147 seconds separately. These
+figures do not measure full source-payload loading, HTTP or browser latency.
+
+The complete fork gate passed in 1,413 seconds: 612 UI tests, 532 producer tests,
+eight library tests, 108 archive tests, 262 backup tests, zero lint issues and
+every tagged Go package. API and SQLite tests took 1,120 and 1,246 seconds with
+the documented 30-minute package timeout override. All five frozen source hashes
+match the successful run.
+
+This increment changes no schema or UI assets. Schema 1000080 remains the verified
+rehearsal baseline. Complete historical rule conversion, late-result refresh,
+remaining UI/caller work, backup activation and reviewed production cutover
+remain open. No production service, worker, bucket policy or imported policy
+activation changed.

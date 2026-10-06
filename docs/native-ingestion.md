@@ -1341,7 +1341,8 @@ must satisfy that field's type. Expressions share a 250 ms deadline and retain
 for retained source payload plus entity data; plugin limits remain unchanged.
 
 Mapping data contains `source` (the selected post/capture, normalized `metadata`,
-reconstructed retained `payload`, and shared post URLs, or null), `entity` (UUID,
+reconstructed retained `payload`, shared post URLs and compact translation choices,
+or null), `entity` (UUID,
 kind and permitted native field values), and `context` (creation flag, filename
 and relative path).
 It includes no plugin configuration, mapping definitions, settings, duplicate edit
@@ -1371,6 +1372,58 @@ preserving links already selected from other posts:
 | select(length > 0)
 ```
 
+
+`source.translations` contains distinct retained results for the selected post
+whose exact original text matches this capture's `title` or `original_text`.
+Each entry has its result `uuid`, applicable `source_fields`, `translated_text`,
+nullable `source_language`, `target_language` and `provider`, plus an
+`evidence_uuid` and `captured_at`. The latter identify the latest known observation
+of that result. Times are normalized to UTC with fixed nanosecond precision for
+chronological jq sorting; an unknown observation time stays null. Original
+timestamps and every assertion remain available through the
+[translation evidence API](native-schema.md#retained-source-translations).
+
+A result that serves both title and caption appears once with both source field
+names. Repeated assertions reuse that body. Original text and raw source payload
+are not copied into each choice. A different post, a changed original caption
+or an unknown original cannot supply a match. Language is never inferred:
+unknown-language evidence does not match an English selection.
+
+Indexed 100-row pages inspect only this post and at most two exact originals.
+The complete set is limited to 128 distinct results, 4,096 evidence assertions
+and 1 MiB of encoded choices. Exceeding any limit returns `translations: null`
+and `translations_complete: false`, never a partial candidate list. An empty
+complete list means no matching results are retained. Constructing these choices
+fetches and encodes shared text once per result, even when many observations
+reference it.
+
+This title mapping prefers the most recently observed English result and falls
+back to the original title when no nonempty translation is selected. An
+incomplete candidate set becomes a review error. A manual file without a source
+omits the mapping, allowing its ordinary filename fallback:
+
+```jq
+.source as $source
+| if $source == null then empty
+  elif $source.translations_complete != true then
+    error("Translation choices are incomplete")
+  else
+    ([ $source.translations[]
+       | select(.target_language == "en" and (.source_fields | index("title"))) ]
+     | sort_by(.captured_at, .evidence_uuid)
+     | last
+     | .translated_text
+     | select(type == "string" and length > 0))
+    // $source.metadata.title // empty
+  end
+```
+
+Use `original_text` and `source.metadata.original_text` for a details mapping.
+Reading these choices creates no translation jobs or metadata decisions. A new
+translation is considered when a policy next evaluates; a changed selected
+value invalidates an earlier Apply digest. Explicit and preserved entity values
+keep their precedence. Completing translation work alone does not apply this
+mapping to existing scenes/images.
 
 Only typed curated fields from `MetadataFields` are accepted. Identity, file
 fingerprints, jobs and raw source evidence are not mapping targets. Relationships

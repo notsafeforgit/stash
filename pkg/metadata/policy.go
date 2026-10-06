@@ -164,7 +164,12 @@ func (s Service) preview(ctx context.Context, input Input, inspectInactive bool,
 		if err != nil {
 			return nil, err
 		}
-		source = map[string]interface{}{"post_uuid": capture.PostUUID, "capture_uuid": capture.UUID, "metadata": capture.Metadata, "payload": payload, "urls": urls, "urls_complete": complete}
+		translations, translationsComplete, err := s.sourcePostTranslations(ctx, capture)
+		if err != nil {
+			return nil, err
+		}
+		source = map[string]interface{}{"post_uuid": capture.PostUUID, "capture_uuid": capture.UUID, "metadata": capture.Metadata, "payload": payload,
+			"urls": urls, "urls_complete": complete, "translations": translations, "translations_complete": translationsComplete}
 	}
 	ret.State = "ready"
 	if blocked != "" {

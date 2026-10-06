@@ -4,6 +4,7 @@ import { useIntl } from "react-intl";
 import { z } from "zod";
 import { useMsg } from "@/hooks/message";
 import type { Collection } from "@/core/native-archive/collection-api";
+import { policySourceKey } from "@/core/native-archive/metadata-policy-api";
 import type {
   MetadataPolicyAPI,
   PolicyDefinition,
@@ -342,8 +343,8 @@ function SelectedSample({
       ),
     },
     ...(sample?.sources.map((source) => ({
-      value: `${source.capture_uuid}:${source.attachment_uuid}`,
-      label: `${source.title || msg("metadata_policy.untitled", "Untitled")} · ${source.captured_at ? intl.formatDate(source.captured_at, { dateStyle: "medium", timeStyle: "short" }) : msg("metadata_policy.unknown_time", "Unknown observation time")} · ${source.capture_uuid.slice(0, 8)}/${source.attachment_uuid.slice(0, 8)}`,
+      value: policySourceKey(source),
+      label: `${source.title || msg("metadata_policy.untitled", "Untitled")} · ${source.captured_at ? intl.formatDate(source.captured_at, { dateStyle: "medium", timeStyle: "short" }) : msg("metadata_policy.unknown_time", "Unknown observation time")} · ${source.capture_uuid.slice(0, 8)}/${(source.attachment_uuid ?? source.post_media_decision_uuid ?? "").slice(0, 8)}`,
     })) ?? []),
   ];
   return (
@@ -480,9 +481,7 @@ function SelectedSample({
       <form.Subscribe selector={(state) => state.values}>
         {(values) => {
           const source = sample?.sources.find(
-            (source) =>
-              `${source.capture_uuid}:${source.attachment_uuid}` ===
-              values.source,
+            (source) => policySourceKey(source) === values.source,
           );
           const input: PolicyDraftInput | null =
             definition && sample && values.file
@@ -500,6 +499,8 @@ function SelectedSample({
                         source: {
                           capture_uuid: source.capture_uuid,
                           attachment_uuid: source.attachment_uuid,
+                          post_media_decision_uuid:
+                            source.post_media_decision_uuid,
                         },
                       }
                     : {}),

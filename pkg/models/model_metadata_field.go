@@ -44,18 +44,19 @@ func MetadataFields(kind ArchiveEntityKind) []MetadataFieldDefinition {
 }
 
 type MetadataFieldDecision struct {
-	UUID        string                  `json:"uuid"`
-	Sequence    int                     `json:"sequence"`
-	EntityUUID  string                  `json:"entity_uuid"`
-	Field       string                  `json:"field"`
-	Mode        string                  `json:"mode"`   // set, clear, inherit, preserved
-	Origin      string                  `json:"origin"` // library, review, migration, legacy, unattributed, source, policy, filename
-	Value       json.RawMessage         `json:"value"`
-	CaptureUUID *string                 `json:"capture_uuid,omitempty"`
-	Reason      string                  `json:"reason"`
-	CreatedAt   time.Time               `json:"created_at"`
-	Policy      *MetadataPolicyRef      `json:"policy,omitempty"`
-	FileEdit    *MetadataFileEditReview `json:"file_edit,omitempty"`
+	UUID                  string                  `json:"uuid"`
+	Sequence              int                     `json:"sequence"`
+	EntityUUID            string                  `json:"entity_uuid"`
+	Field                 string                  `json:"field"`
+	Mode                  string                  `json:"mode"`   // set, clear, inherit, preserved
+	Origin                string                  `json:"origin"` // library, review, migration, legacy, unattributed, source, policy, filename
+	Value                 json.RawMessage         `json:"value"`
+	CaptureUUID           *string                 `json:"capture_uuid,omitempty"`
+	PostMediaDecisionUUID string                  `json:"post_media_decision_uuid,omitempty"`
+	Reason                string                  `json:"reason"`
+	CreatedAt             time.Time               `json:"created_at"`
+	Policy                *MetadataPolicyRef      `json:"policy,omitempty"`
+	FileEdit              *MetadataFileEditReview `json:"file_edit,omitempty"`
 }
 
 type MetadataFieldState struct {
@@ -80,10 +81,11 @@ type MetadataFieldDecisionInput struct {
 	// Value is required for set. Clear uses the schema's empty value. Inherit
 	// accepts a value selected by the policy service, or its empty value when no
 	// candidate is selected. Returning to inheritance is an explicit review act.
-	Value       json.RawMessage
-	Origin      string // review or migration for Decide; source, policy or filename for ApplyAutomatic
-	CaptureUUID string
-	Reason      string
+	Value                 json.RawMessage
+	Origin                string // review or migration for Decide; source, policy or filename for ApplyAutomatic
+	CaptureUUID           string
+	PostMediaDecisionUUID string
+	Reason                string
 	// Every nonempty relationship choice must name the reviewed revision of
 	// each target. A redirected or deleted target needs a fresh review.
 	ReferenceRevisions map[string]int

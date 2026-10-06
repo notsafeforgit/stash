@@ -398,6 +398,13 @@ func (s *SourceAttachmentStore) DecideMedia(ctx context.Context, input models.At
 			return nil, models.ErrSourceAttachmentConflict
 		}
 		mediaUUID = &media.UUID
+		association, err := (&SourcePostMediaStore{}).Association(ctx, attachment.PostUUID, media.UUID)
+		if err != nil {
+			return nil, err
+		}
+		if association.Suppressed() {
+			return nil, models.ErrSourcePostMediaConflict
+		}
 	case "unlinked", "undecided":
 		if input.MediaUUID != "" || input.ExpectedMediaRevision != 0 {
 			return nil, errors.New("an unlinked or undecided attachment cannot select media")

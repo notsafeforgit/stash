@@ -63,6 +63,9 @@ func (r metadataFieldRow) resolve(ctx context.Context) (*models.MetadataFieldDec
 		return nil, err
 	}
 	var requestUUID string
+	if err := dbWrapper.Get(ctx, &ret.PostMediaDecisionUUID, "SELECT post_media_decision_uuid FROM metadata_decision_post_media WHERE decision_uuid=?", r.UUID); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
+	}
 	if err := dbWrapper.Get(ctx, &requestUUID, "SELECT request_uuid FROM metadata_file_edit_reviews WHERE decision_uuid=?", r.UUID); err == nil {
 		ret.FileEdit, err = (&MetadataFieldStore{}).FileEditReview(ctx, requestUUID)
 		if err != nil {
@@ -358,7 +361,7 @@ func (s *MetadataFieldStore) ApplyAutomatic(ctx context.Context, input models.Me
 }
 
 func (s *MetadataFieldStore) apply(ctx context.Context, input models.MetadataFieldDecisionInput, automatic, forceDecision bool) (*models.MetadataFieldState, error) {
-	if !automatic && input.Policy != nil {
+	if !automatic && (input.Policy != nil || input.PostMediaDecisionUUID != "") {
 		return nil, errors.New("reviewed field choices do not accept automatic policy provenance")
 	}
 	current, err := s.State(ctx, input.EntityUUID, input.Field)
@@ -424,8 +427,16 @@ WHERE c.uuid=? AND p.state='active')`, id); err != nil {
 	if input.Origin == "source" && capture == nil {
 		return nil, errors.New("source metadata requires capture provenance")
 	}
+	if input.PostMediaDecisionUUID != "" {
+		if input.Origin != "source" || input.Policy == nil || capture == nil {
+			return nil, models.ErrSourcePostMediaInvalid
+		}
+		if err := (&SourcePostMediaStore{}).ValidateCapture(ctx, input.PostMediaDecisionUUID, *capture, current.Entity.UUID); err != nil {
+			return nil, err
+		}
+	}
 	if d := current.Decision; !forceDecision && d != nil && d.Mode == input.Mode && d.Origin == input.Origin && d.Reason == input.Reason &&
-		bytes.Equal(d.Value, value) && equalMetadataCapture(d.CaptureUUID, capture) && reflect.DeepEqual(d.Policy, input.Policy) {
+		bytes.Equal(d.Value, value) && equalMetadataCapture(d.CaptureUUID, capture) && reflect.DeepEqual(d.Policy, input.Policy) && d.PostMediaDecisionUUID == input.PostMediaDecisionUUID {
 		return current, nil
 	}
 	var ret *models.MetadataFieldState
@@ -474,6 +485,10 @@ WHERE c.uuid=? AND p.state='active')`, id); err != nil {
 			_, err = dbWrapper.Exec(ctx, "INSERT INTO metadata_decision_policies(decision_uuid,collection_uuid,revision) VALUES(?,?,?)", ret.Decision.UUID, input.Policy.CollectionUUID, input.Policy.Revision)
 			ref := *input.Policy
 			ret.Decision.Policy = &ref
+		}
+		if err == nil && input.PostMediaDecisionUUID != "" {
+			_, err = dbWrapper.Exec(ctx, "INSERT INTO metadata_decision_post_media(decision_uuid,post_media_decision_uuid) VALUES(?,?)", ret.Decision.UUID, input.PostMediaDecisionUUID)
+			ret.Decision.PostMediaDecisionUUID = input.PostMediaDecisionUUID
 		}
 		return err
 	})

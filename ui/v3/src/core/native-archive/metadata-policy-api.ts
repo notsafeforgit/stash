@@ -89,9 +89,18 @@ export const metadataPolicySchema = z.object({
   reason: z.string(),
   created_at: z.string(),
 });
-const sourceSchema = z
-  .object({ capture_uuid: uuid, attachment_uuid: uuid })
-  .strict();
+const sourceShape = z.object({
+  capture_uuid: uuid,
+  attachment_uuid: uuid.optional(),
+  post_media_decision_uuid: uuid.optional(),
+});
+const oneSourceLink = (source: z.infer<typeof sourceShape>) =>
+  Boolean(source.attachment_uuid) !== Boolean(source.post_media_decision_uuid);
+const sourceSchema = sourceShape.strict().refine(oneSourceLink);
+
+export function policySourceKey(source: z.infer<typeof sourceShape>) {
+  return `${source.capture_uuid}:${source.attachment_uuid ?? source.post_media_decision_uuid ?? ""}`;
+}
 export const policyDraftInputSchema = z
   .object({
     collection_uuid: uuid,
@@ -152,6 +161,7 @@ const previewSchema = z
           value: z.unknown().optional(),
           origin: z.string().optional(),
           capture_uuid: uuid.optional(),
+          post_media_decision_uuid: uuid.optional(),
           used_fallback: z.boolean().optional(),
           reference_revisions: z.record(uuid, revision.positive()).optional(),
           message: z.string().optional(),
@@ -184,13 +194,15 @@ const sampleFileSchema = z.object({
   file_uuid: uuid,
   relative_path: z.string(),
 });
-const sampleSourceSchema = sourceSchema.extend({
-  post_uuid: uuid,
-  title: z.string(),
-  platform: z.string(),
-  origin: z.string(),
-  captured_at: z.string().nullable(),
-});
+const sampleSourceSchema = sourceShape
+  .extend({
+    post_uuid: uuid,
+    title: z.string(),
+    platform: z.string(),
+    origin: z.string(),
+    captured_at: z.string().nullable(),
+  })
+  .refine(oneSourceLink);
 export type PolicyKind = z.infer<typeof policyKindSchema>;
 export type PolicyMapping = z.infer<typeof policyMappingSchema>;
 export type PolicyRule = z.infer<typeof policyRuleSchema>;
@@ -387,7 +399,9 @@ export function createMetadataPolicyAPI(
         context.entity_uuid !== input.entity_uuid ||
         context.created !== (input.event === "create") ||
         context.source?.capture_uuid !== input.source?.capture_uuid ||
-        context.source?.attachment_uuid !== input.source?.attachment_uuid
+        context.source?.attachment_uuid !== input.source?.attachment_uuid ||
+        context.source?.post_media_decision_uuid !==
+          input.source?.post_media_decision_uuid
       )
         throw new NativeArchiveError(0, "preview_mismatch");
       return result;
@@ -430,7 +444,13 @@ export function createMetadataPolicyAPI(
       const cursor: Record<string, string> = after
         ? {
             after_capture: uuid.parse(after.capture_uuid),
-            after_attachment: uuid.parse(after.attachment_uuid),
+            ...(after.attachment_uuid
+              ? { after_attachment: uuid.parse(after.attachment_uuid) }
+              : {
+                  after_post_media_decision: uuid.parse(
+                    after.post_media_decision_uuid,
+                  ),
+                }),
           }
         : {};
       const rows = await request(
@@ -440,7 +460,7 @@ export function createMetadataPolicyAPI(
         signal,
       );
       const key = (row?: PolicySampleSource) =>
-        row ? `${row.capture_uuid}:${row.attachment_uuid}` : "";
+        row ? policySourceKey(row) : "";
       if (rows.some((row, i) => key(row) <= key(rows[i - 1] ?? after)))
         throw new NativeArchiveError(0, "sample_mismatch");
       return rows;

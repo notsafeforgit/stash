@@ -2,7 +2,6 @@ package sqlite
 
 import (
 	"context"
-	"fmt"
 	"path/filepath"
 
 	"github.com/stashapp/stash/pkg/archive"
@@ -95,59 +94,77 @@ func (s *MetadataPolicyStore) SampleSources(ctx context.Context, scope models.Me
 	cursor := models.MetadataPolicySourceCursor{}
 	if after != nil {
 		cursor = *after
-		if sourceFileIDs(&cursor.CaptureUUID, &cursor.AttachmentUUID) != nil {
+		link := cursor.AttachmentUUID
+		if link == "" {
+			link = cursor.PostMediaDecisionUUID
+		}
+		if (cursor.AttachmentUUID == "") == (cursor.PostMediaDecisionUUID == "") || sourceFileIDs(&cursor.CaptureUUID, &link) != nil {
 			return nil, models.ErrMetadataPolicyInvalid
 		}
 	}
 	// Retained choices can name a merged identity. Reverse redirects are
 	// indexed and bounded; never truncate them into a falsely complete result.
-	var identities []string
-	err = dbWrapper.Select(ctx, &identities, `WITH RECURSIVE identities(uuid) AS (
-SELECT ? UNION SELECT e.uuid FROM archive_entities e JOIN identities i ON e.redirect_to=i.uuid LIMIT 1025
-) SELECT uuid FROM identities`, entity.UUID)
+	identities, err := sourceMediaAliases(ctx, entity.UUID)
 	if err != nil {
 		return nil, err
-	}
-	if len(identities) > 1024 {
-		return nil, fmt.Errorf("%w: sample has more than 1024 merged identities", models.ErrMetadataPolicyInvalid)
 	}
 	args := make([]interface{}, 0, len(identities)+5)
 	for _, id := range identities {
 		args = append(args, id)
 	}
-	args = append(args, scope.CollectionUUID, scope.CollectionRevision, cursor.CaptureUUID, cursor.AttachmentUUID, limit)
+	linkCursor := cursor.AttachmentUUID
+	if linkCursor == "" {
+		linkCursor = cursor.PostMediaDecisionUUID
+	}
+	args = append(args, scope.CollectionUUID, scope.CollectionRevision, cursor.CaptureUUID, linkCursor, limit)
 	var rows []struct {
-		CaptureUUID    string        `db:"capture_uuid"`
-		AttachmentUUID string        `db:"attachment_uuid"`
-		PostUUID       string        `db:"post_uuid"`
-		Title          string        `db:"title"`
-		Platform       string        `db:"platform"`
-		Origin         string        `db:"origin"`
-		CapturedAt     NullTimestamp `db:"captured_at"`
+		CaptureUUID           string        `db:"capture_uuid"`
+		AttachmentUUID        string        `db:"attachment_uuid"`
+		PostMediaDecisionUUID string        `db:"post_media_decision_uuid"`
+		PostUUID              string        `db:"post_uuid"`
+		Title                 string        `db:"title"`
+		Platform              string        `db:"platform"`
+		Origin                string        `db:"origin"`
+		CapturedAt            NullTimestamp `db:"captured_at"`
 	}
 	// Read this collection's retained evidence through the reviewed revision.
 	// Its current definition and the attachment's current link still govern
 	// selection. DISTINCT collapses repeated slots and collection memberships
 	// without combining captures from different source times.
-	err = dbWrapper.Select(ctx, &rows, `SELECT DISTINCT c.uuid AS capture_uuid,d.attachment_uuid,c.post_uuid,
-COALESCE(json_extract(r.metadata,'$.title'),'') AS title,c.platform,c.origin,c.captured_at
+	err = dbWrapper.Select(ctx, &rows, `WITH identities AS (
+SELECT uuid FROM archive_entities WHERE uuid IN `+getInBinding(len(identities))+`
+), choices AS (
+SELECT d.* FROM post_media_links l JOIN post_media_decisions d ON d.uuid=l.decision_uuid
+WHERE l.media_uuid IN (SELECT uuid FROM identities)
+), links AS (
+SELECT m.capture_uuid,d.attachment_uuid,'' AS post_media_decision_uuid
 FROM attachment_media_decisions d
 JOIN attachment_media_links l ON l.attachment_uuid=d.attachment_uuid AND l.decision_uuid=d.uuid
+JOIN source_attachments a ON a.uuid=d.attachment_uuid
 JOIN source_attachment_entries e ON e.attachment_uuid=d.attachment_uuid
 JOIN source_capture_attachment_manifests m ON m.manifest_uuid=e.manifest_uuid
-JOIN source_captures c ON c.uuid=m.capture_uuid
+WHERE d.media_uuid IN (SELECT uuid FROM identities) AND d.state='linked'
+AND NOT EXISTS(SELECT 1 FROM choices WHERE post_uuid=a.post_uuid AND state!='undecided')
+UNION ALL
+SELECT c.uuid,'',p.decision_uuid FROM (
+SELECT post_uuid,min(uuid) AS decision_uuid FROM choices GROUP BY post_uuid HAVING min(state)='linked' AND max(state)='linked'
+) p JOIN source_captures c ON c.post_uuid=p.post_uuid
+)
+SELECT DISTINCT c.uuid AS capture_uuid,l.attachment_uuid,l.post_media_decision_uuid,c.post_uuid,
+COALESCE(json_extract(r.metadata,'$.title'),'') AS title,c.platform,c.origin,c.captured_at
+FROM links l JOIN source_captures c ON c.uuid=l.capture_uuid
 JOIN source_post_revisions r ON r.uuid=c.revision_uuid
 JOIN source_posts p ON p.uuid=c.post_uuid AND p.state='active'
 JOIN source_collection_captures cc ON cc.capture_uuid=c.uuid
-WHERE d.media_uuid IN `+getInBinding(len(identities))+` AND d.state='linked'
-AND cc.collection_uuid=? AND cc.collection_revision<=?
-AND (c.uuid,d.attachment_uuid)>(?,?) ORDER BY c.uuid,d.attachment_uuid LIMIT ?`, args...)
+WHERE cc.collection_uuid=? AND cc.collection_revision<=?
+AND (c.uuid,CASE WHEN l.attachment_uuid='' THEN l.post_media_decision_uuid ELSE l.attachment_uuid END)>(?,?)
+ORDER BY c.uuid,CASE WHEN l.attachment_uuid='' THEN l.post_media_decision_uuid ELSE l.attachment_uuid END LIMIT ?`, args...)
 	if err != nil {
 		return nil, err
 	}
 	ret := make([]models.MetadataPolicySampleSource, 0, len(rows))
 	for _, row := range rows {
-		ret = append(ret, models.MetadataPolicySampleSource{MetadataPolicySourceCursor: models.MetadataPolicySourceCursor{CaptureUUID: row.CaptureUUID, AttachmentUUID: row.AttachmentUUID},
+		ret = append(ret, models.MetadataPolicySampleSource{MetadataPolicySourceCursor: models.MetadataPolicySourceCursor{CaptureUUID: row.CaptureUUID, AttachmentUUID: row.AttachmentUUID, PostMediaDecisionUUID: row.PostMediaDecisionUUID},
 			PostUUID: row.PostUUID, Title: row.Title, Platform: row.Platform, Origin: row.Origin, CapturedAt: row.CapturedAt.TimePtr()})
 	}
 	return ret, nil

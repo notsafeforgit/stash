@@ -13,9 +13,10 @@ producer transport are substantial, and all 1,697 frozen catalog bodies have
 been imported and reconciled on isolated copies. This does not close catalog
 migration. All 1,697 source collections now have imported, disabled metadata
 policies, verified through API replay, restart and independent whole-row
-comparison. Historical post-to-media source selection, representative policy
-previews, operational reconciliation, review resolution and a complete cutover
-reconciliation are still required.
+comparison. Reviewed post-to-media associations now support source selection for
+captures without attachment manifests. Historical file-proof matching and its
+review UI, representative policy previews, operational reconciliation, review
+resolution and a complete cutover reconciliation are still required.
 
 Durable enrichment execution, queued-job dispatch, stale-job maintenance and
 shared download/enrichment service reservations are implemented, including linked
@@ -9269,3 +9270,50 @@ free, preserving the original compatible snapshot and current native copy.
 Private bindings, receipts and comparison reports remain under `.local/`.
 Production services, policy activation, bucket configuration and the frozen
 compatible release are unchanged.
+
+
+## Reviewed post-to-media source selection — 2026-10-05
+
+Schema 1000081 adds direct post-to-scene/image decisions independently of
+attachment identity and album order. Application APIs expose current choices,
+history and durable request receipts. New decisions require current post/media
+revisions and the complete reviewed decision set. A media merge that combines
+conflicting choices requires review; resolving it preserves original decisions
+and their replacement history. Exact request replay survives restart and later
+changes.
+
+A whole-post rejection suppresses attachment-derived metadata and automatic
+source-gallery membership. Existing gallery synchronization preserves manual
+members, cover and ordering; merged conflicts hold synchronization for review.
+Ingestion and historical album matching respect the same rejection. The current
+metadata-policy sample picker accepts a capture plus either an attachment or a
+reviewed post decision, retaining the direct choice in selected-field provenance.
+Rejecting a link keeps already selected metadata and its original provenance.
+No direct association invents an attachment, an album or depicted performers.
+
+The complete fork gate passed in 1,452 seconds after building real embedded
+assets: 615 UI tests, 533 producer tests, eight library tests, 108 archive tests,
+262 backup tests, zero lint issues and all tagged Go packages. API and SQLite
+tests took 1,149 and 1,276 seconds with the documented 30-minute timeout override.
+All 35 source and contract-document hashes match the validated run. Focused
+tests also cover NFO selection without manifests, field provenance, stale
+decisions, explicit unlinks, merge resolution, UUID adoption, migration failure,
+anonymisation and repeated ingestion. All 20 metadata-policy browser workflows
+passed in Chromium and WebKit; mobile and desktop screenshots were inspected.
+
+The full isolated library migrated from schema 1000080 and reopened successfully
+in 388 seconds. Ten real source scopes returned the same 104 sample choices as
+the independently queried baseline in 141 milliseconds, excluding opening and
+browser/HTTP time. Independent reconciliation checked all 282 original tables
+and 36,980,679 original rows, including value types. Only the declared schema
+version transition and new migration-history row changed. Integrity checking
+passed with zero foreign-key violations; comparison took 554 seconds. All four
+new tables remain empty, and all imported policies remain disabled.
+
+A separate read-only coverage assessment found post/media evidence for 410,090
+of the 414,561 retained NFO captures. Coverage does not establish current matching
+authority. Bounded historical matching must still validate retained file proofs,
+current ownership and explicit choices before selecting associations. That batch
+service, association review UI and representative populated-library policy
+previews remain required. No production service, worker, policy activation,
+bucket setting or frozen compatible release changed.

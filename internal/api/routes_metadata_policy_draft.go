@@ -66,8 +66,8 @@ func (rs *nativeArchiveRoutes) policySampleSources(w http.ResponseWriter, r *htt
 		return
 	}
 	var after *models.MetadataPolicySourceCursor
-	if capture, attachment := r.URL.Query().Get("after_capture"), r.URL.Query().Get("after_attachment"); capture != "" || attachment != "" {
-		after = &models.MetadataPolicySourceCursor{CaptureUUID: capture, AttachmentUUID: attachment}
+	if capture, attachment, decision := r.URL.Query().Get("after_capture"), r.URL.Query().Get("after_attachment"), r.URL.Query().Get("after_post_media_decision"); capture != "" || attachment != "" || decision != "" {
+		after = &models.MetadataPolicySourceCursor{CaptureUUID: capture, AttachmentUUID: attachment, PostMediaDecisionUUID: decision}
 	}
 	var result []models.MetadataPolicySampleSource
 	err = rs.repo.WithReadTxn(r.Context(), func(ctx context.Context) error {

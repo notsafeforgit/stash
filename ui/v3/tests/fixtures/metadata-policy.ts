@@ -13,6 +13,7 @@ export const policyIDs = {
   capture: "80000000-0000-4000-8000-000000000005",
   attachment: "80000000-0000-4000-8000-000000000006",
   post: "80000000-0000-4000-8000-000000000007",
+  postMediaDecision: "80000000-0000-4000-8000-000000000008",
 };
 export const policyFields: PolicyField[] = [
   { name: "title", type: "string", clear_value: "" },

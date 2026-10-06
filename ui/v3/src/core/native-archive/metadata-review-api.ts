@@ -89,6 +89,7 @@ const decisionProvenanceSchema = z.object({
   uuid,
   sequence: revision,
   capture_uuid: uuid.optional(),
+  post_media_decision_uuid: uuid.optional(),
   reason: z.string(),
   created_at: z.string(),
   file_edit: editReceiptSchema.optional(),

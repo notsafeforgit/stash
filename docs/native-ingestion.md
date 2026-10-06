@@ -1384,14 +1384,22 @@ existing entity; requests cannot impersonate a creation event.
 
 Editing a collection keeps its earlier captures available in the policy sample
 picker. A newly reviewed rule can use that collection's recorded capture history
-when the attachment still links to the selected scene/image and the selected
-file remains inside the current root and folder scope. The collection and policy
+when a reviewed post association or current attachment links to the selected
+scene/image and the selected file remains inside the current root and folder scope. The collection and policy
 revisions must still be current; changing a definition invalidates old previews.
 Repeated membership in several revisions produces one selectable capture, while
 distinct source observations remain separate. Reading or applying a rule never
 rewrites the original capture's collection revision. Producer intake continues
 to require membership under the exact revision recorded by its event.
 
+A source choice supplies `capture_uuid` and exactly one of `attachment_uuid` or
+`post_media_decision_uuid`. A direct post association allows retained NFO captures
+without inventing an attachment slot. The sample picker returns one direct choice
+per capture when a reviewed post link exists; it does not also repeat that capture
+for each attachment. Pagination uses `after_capture` with either
+`after_attachment` or `after_post_media_decision`. Source-derived field decisions
+retain the selected direct association UUID alongside capture and policy
+provenance. A changed or rejected association invalidates its old choice.
 
 `source.urls` contains the selected post's distinct known URLs in lexical order.
 They come from shared post evidence, which may include observations recorded
@@ -1570,6 +1578,41 @@ Scan conflicts currently appear in scan logs and repeatable previews; file jobs
 also retain their review summary in durable status. General API/scan edit hooks
 still use the existing after-commit delivery path; the ingestion worker retains
 its retryable notification checkpoint.
+
+### Reviewed post-to-media associations
+
+Application-authenticated routes under `/api/v3/archive` expose direct links:
+
+| Route | Behavior |
+| --- | --- |
+| `GET /posts/<post>/media/<entity>` | Current explicit decisions, canonical media UUID, post/media revisions and merge conflicts |
+| `PUT /posts/<post>/media/<entity>` | Record a guarded review decision with a durable request UUID |
+| `GET /posts/<post>/media/<entity>/history?after=<post-revision>&limit=N` | Original decisions across merged media identities, in revision order; limit 1–100 |
+| `GET /post-media-decisions/<request-uuid>` | Original committed decision for response-loss recovery |
+
+PUT takes `uuid`, `post_uuid`, `media_uuid`, `expected_post_revision`,
+`expected_media_revision`, `expected_decisions` (all current decision UUIDs),
+`state`, `origin:"review"` and `reason`. Obtain the current guards from GET and
+save the exact request before sending it. A retry returns its original decision;
+reusing its UUID for a different choice conflicts. The decision list guard detects
+choices brought together by a merge even if the surviving media fields did not
+change. Review resolves the current merged group and records which earlier
+decisions it replaces, preserving original history.
+
+`linked` explicitly associates the whole post with the media. `unlinked` rejects
+that pair, suppressing its attachment-based source metadata and automatic album
+membership too. `undecided` returns the pair to attachment evidence. Conflicting
+states after a media merge require review. Rejecting one attachment remains a
+slot-specific decision and does not erase a separately reviewed direct post link.
+
+A direct link creates no album or attachment order. Decisions update existing
+source-gallery membership through the usual service, preserving manual members,
+cover and ordering. A conflicting merged choice holds synchronization for review.
+Previously selected field values and their provenance remain when a source link
+is rejected; this is not a request to clear the user's metadata. Source publishers
+never become depicted performers through these operations. Observational evidence
+alone does not select a link. Bulk historical matching, association review UI and
+file-proof-driven proposals remain separate migration/review work.
 
 ### Historical metadata review API
 

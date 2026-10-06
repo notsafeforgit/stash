@@ -326,7 +326,7 @@ func fileFailure(err error) (string, bool) {
 		return "file_digest_mismatch", true
 	case errors.Is(err, archive.ErrMediaFileChanged), errors.Is(err, models.ErrFileGenerationConflict), errors.Is(err, models.ErrFilePathChanged), errors.Is(err, models.ErrFileContentConflict):
 		return "file_changed", true
-	case errors.Is(err, ErrAmbiguousMedia), errors.Is(err, ErrMediaKindConflict), errors.Is(err, models.ErrSourceAttachmentConflict), errors.Is(err, models.ErrArchiveIdentityConflict), errors.Is(err, models.ErrSourcePostForgotten):
+	case errors.Is(err, ErrAmbiguousMedia), errors.Is(err, ErrMediaKindConflict), errors.Is(err, models.ErrSourceAttachmentConflict), errors.Is(err, models.ErrSourcePostMediaConflict), errors.Is(err, models.ErrArchiveIdentityConflict), errors.Is(err, models.ErrSourcePostForgotten):
 		return "file_association_review", true
 	default:
 		return "file_processing_unavailable", false

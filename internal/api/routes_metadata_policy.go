@@ -42,6 +42,10 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Post("/account-consolidation/requests/{request}/check", rs.checkAccountConsolidation)
 	r.Get("/source-accounts/{account}/consolidation-history", rs.accountConsolidationHistory)
 	r.Get("/metadata-fields/{kind}", rs.fields)
+	r.Get("/posts/{post}/media/{entity}", rs.postMediaAssociation)
+	r.Put("/posts/{post}/media/{entity}", rs.decidePostMedia)
+	r.Get("/posts/{post}/media/{entity}/history", rs.postMediaHistory)
+	r.Get("/post-media-decisions/{decision}", rs.postMediaDecision)
 	r.Get("/entity-identities/{kind}/{localID}", rs.metadataEntity)
 	r.Get("/entities/{entity}/metadata-fields", rs.entityMetadataFields)
 	r.Get("/entities/{entity}/metadata-fields/{field}/history", rs.entityMetadataHistory)
@@ -248,6 +252,14 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 }
 
 func nativeArchiveError(w http.ResponseWriter, err error) {
+	if errors.Is(err, models.ErrSourcePostMediaInvalid) {
+		ingestJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_post_media", "message": "Invalid post-to-media association."})
+		return
+	}
+	if errors.Is(err, models.ErrSourcePostMediaConflict) || errors.Is(err, models.ErrSourcePostMediaReplay) {
+		ingestJSON(w, http.StatusConflict, map[string]string{"error": "post_media_conflict", "message": "The post, media or saved association changed; review it again."})
+		return
+	}
 	if errors.Is(err, models.ErrSourceDefinitionInvalid) || errors.Is(err, models.ErrMetadataFileReviewInvalid) || errors.Is(err, models.ErrAccountReviewInvalid) || errors.Is(err, models.ErrAccountConsolidationReviewInvalid) {
 		ingestError(w, ingest.ErrInvalid)
 		return

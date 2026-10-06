@@ -655,6 +655,11 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 				return err
 			}
 		}
+		if version >= NativeSchemaBaseline+81 {
+			if err := validatePostMediaDecisionSchema(conn); err != nil {
+				return err
+			}
+		}
 		if version >= NativeSchemaBaseline+78 {
 			if err := validateMetadataPolicyImportSchema(conn); err != nil {
 				return err

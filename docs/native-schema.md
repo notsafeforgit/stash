@@ -1902,6 +1902,30 @@ list and `/records/{ordinal}` detail. Native receipts are available at
 These are historical inspection/import routes. Queue/cooldown migration and
 reviewed activation are separate operations.
 
+## Reviewed post-to-media associations
+
+Schema 1000081 adds `post_media_decisions`, `post_media_links`,
+`post_media_supersessions` and `metadata_decision_post_media`. Immutable review
+decisions and replacement edges preserve explicit post links and unlinks without
+requiring attachment identity. Current heads are indexed by post and media;
+bounded reverse redirects expose conflicting choices after media merges. A fresh
+review replaces all reviewed heads in that merged group, retaining each original
+decision and the replacement relation. The request UUID and digest provide exact
+response-loss replay, including after restart or retirement.
+
+New decisions require the current post revision, current active scene/image
+revision and complete reviewed decision set. Capture selection validates that the
+chosen decision still governs that post/media pair. Selected field history keeps
+the direct association reference as well as capture and policy provenance. All
+references have foreign keys, immutable history guards and startup validation;
+UUID adoption cascades references without rewriting the recorded review.
+
+The migration creates empty association tables and preserves existing attachment
+choices and source evidence. It selects no historical links, adds no album and
+activates no policy. Ordinary snapshots include these records; anonymisation
+removes the association history and metadata references with other source data.
+See [the review API](native-ingestion.md#reviewed-post-to-media-associations).
+
 ## Historical metadata cleanup
 
 Schema 1000080 adds `source_cleanup_intents`, `catalog_cleanup_imports` and

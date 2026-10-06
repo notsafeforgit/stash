@@ -251,6 +251,10 @@ func (s *SourceGalleryStore) backfillMatches(ctx context.Context, post, policy s
 	if err != nil {
 		return nil, err
 	}
+	postStates, err := sourcePostMediaStates(ctx, post)
+	if err != nil {
+		return nil, err
+	}
 	ret := []models.SourceAlbumMatch{}
 	seen := make(map[string]bool)
 	cache := make(map[string]*sourceAlbumProofCheck)
@@ -302,7 +306,9 @@ func (s *SourceGalleryStore) backfillMatches(ctx context.Context, post, policy s
 		} else if len(item.Candidates) == 1 {
 			item.Status, item.Reason = "review", "no-current-file-proof"
 			candidate := item.Candidates[0]
-			if !sourceAlbumCandidateMatchesKind(candidate, selection.Entries, a.UUID) {
+			if state := postStates[candidate.MediaUUID]; state == "unlinked" || state == "conflict" {
+				item.Reason = "post-media-" + state
+			} else if !sourceAlbumCandidateMatchesKind(candidate, selection.Entries, a.UUID) {
 				item.Reason = "media-kind-conflict"
 			} else if slices.ContainsFunc(candidate.Proofs, func(p models.SourceAlbumProof) bool { return p.Status == "valid" }) {
 				item.Status, item.Reason = "matched", ""

@@ -16,6 +16,85 @@ import {
 } from "../../../tests/fixtures/collections";
 
 const endpoint = "https://example.test/stash/api/v3/archive/";
+
+it("paginates direct post captures and pins their reviewed association in previews", async () => {
+  const source = {
+    capture_uuid: collectionID,
+    post_media_decision_uuid: rootID,
+  };
+  const row = {
+    ...source,
+    post_uuid: rootID,
+    title: "Retained post",
+    platform: "reddit",
+    origin: "legacy-nfo",
+    captured_at: null,
+  };
+  const transport = vi.fn<typeof fetch>(async () => Response.json([row]));
+  const api = createMetadataPolicyAPI(endpoint, transport);
+  const rows = await api.sources(collectionID, 1, rootID);
+  expect(rows).toEqual([row]);
+  transport.mockResolvedValueOnce(Response.json([]));
+  await api.sources(collectionID, 1, rootID, rows[0]);
+  expect(String(transport.mock.calls[1]?.[0])).toContain(
+    `after_post_media_decision=${rootID}`,
+  );
+  expect(String(transport.mock.calls[1]?.[0])).not.toContain(
+    "after_attachment",
+  );
+  const draft: PolicyDraftInput = {
+    collection_uuid: collectionID,
+    expected_collection_revision: 1,
+    expected_policy_revision: 0,
+    definition: input().definition,
+    entity_uuid: rootID,
+    file_uuid: collectionID,
+    event: "existing",
+    include_data: true,
+    source,
+  };
+  expect(policyDraftInputSchema.safeParse(draft).success).toBe(true);
+  expect(
+    policyDraftInputSchema.safeParse({
+      ...draft,
+      source: { capture_uuid: collectionID },
+    }).success,
+  ).toBe(false);
+  expect(
+    policyDraftInputSchema.safeParse({
+      ...draft,
+      source: { ...source, attachment_uuid: rootID },
+    }).success,
+  ).toBe(false);
+  const preview = {
+    context: {
+      collection_uuid: collectionID,
+      collection_revision: 1,
+      policy_revision: 0,
+      entity_uuid: rootID,
+      expected_entity_revision: 1,
+      relative_path: "retained/file.mp4",
+      created: false,
+      source,
+    },
+    state: "ready",
+    changes: [],
+  };
+  transport.mockResolvedValueOnce(Response.json(preview));
+  expect((await api.draft(draft)).context.source).toEqual(source);
+  transport.mockResolvedValueOnce(
+    Response.json({
+      ...preview,
+      context: {
+        ...preview.context,
+        source: { ...source, post_media_decision_uuid: collectionID },
+      },
+    }),
+  );
+  await expect(api.draft(draft)).rejects.toMatchObject({
+    code: "preview_mismatch",
+  });
+});
 beforeEach(() => vi.stubGlobal("indexedDB", new IDBFactory()));
 afterEach(() => {
   vi.unstubAllGlobals();

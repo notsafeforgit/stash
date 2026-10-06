@@ -18,6 +18,7 @@ import (
 
 func removeCatalogCleanupSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removePostMediaDecisionSchema(t, raw)
 	_, err := raw.Exec(`DROP TRIGGER source_cleanup_intent_immutable; DROP TRIGGER source_cleanup_intent_scope;
  DROP TRIGGER catalog_cleanup_import_guard; DROP TRIGGER catalog_cleanup_record_immutable;
  DROP TABLE catalog_cleanup_records; DROP TABLE catalog_cleanup_imports; DROP TABLE source_cleanup_intents;

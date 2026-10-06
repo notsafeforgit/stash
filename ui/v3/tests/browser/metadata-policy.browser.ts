@@ -34,6 +34,7 @@ async function archive(
     invalid?: boolean;
     refreshFails?: boolean;
     history?: boolean;
+    directPost?: boolean;
   } = {},
 ) {
   let current = metadataPolicy();
@@ -164,11 +165,13 @@ async function archive(
         json: [
           {
             capture_uuid: policyIDs.capture,
-            attachment_uuid: policyIDs.attachment,
+            ...(options.directPost
+              ? { post_media_decision_uuid: policyIDs.postMediaDecision }
+              : { attachment_uuid: policyIDs.attachment }),
             post_uuid: policyIDs.post,
             title: "Source title",
             platform: "reddit",
-            origin: "gallery-dl",
+            origin: options.directPost ? "legacy-nfo" : "gallery-dl",
             captured_at: "2026-10-05T12:00:00Z",
           },
         ],
@@ -239,6 +242,55 @@ async function open(page: Page) {
   await expect(
     page.getByRole("button", { name: "Save metadata policy", exact: true }),
   ).toBeEnabled();
+}
+
+for (const width of [390, 1280]) {
+  test(`previews an attachment-free post capture at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 844 });
+    const remote = await archive(page, { directPost: true });
+    await open(page);
+    await page
+      .getByRole("button", { name: "Test with a scene or image", exact: true })
+      .click();
+    const search = page.getByRole("combobox", {
+      name: "Scene or image",
+      exact: true,
+    });
+    await search.fill("Sample");
+    await page
+      .getByRole("option", { name: "Sample video (#7)", exact: true })
+      .click();
+    await page.screenshot({
+      path: test.info().outputPath("before-source-selection.png"),
+      fullPage: true,
+    });
+    await page
+      .getByRole("combobox", { name: "Source capture", exact: true })
+      .click();
+    await page.getByRole("option", { name: /^Source title/ }).click();
+    await page
+      .getByRole("button", { name: "Test draft mappings", exact: true })
+      .click();
+    await expect(
+      page.getByText("Preview only — nothing was changed", { exact: true }),
+    ).toBeVisible();
+    expect(remote.previews[0]?.source).toEqual({
+      capture_uuid: policyIDs.capture,
+      post_media_decision_uuid: policyIDs.postMediaDecision,
+    });
+    expect(remote.writes).toEqual([]);
+    await expect
+      .poll(() =>
+        page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+      )
+      .toBe(true);
+    await page.screenshot({
+      path: test.info().outputPath("post-capture-preview.png"),
+      fullPage: true,
+    });
+  });
 }
 
 test("edits plain jq and tests selected scene and image data without mutations", async ({

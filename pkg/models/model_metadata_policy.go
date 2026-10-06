@@ -110,8 +110,9 @@ type MetadataPolicySampleFile struct {
 }
 
 type MetadataPolicySourceCursor struct {
-	CaptureUUID    string `json:"capture_uuid"`
-	AttachmentUUID string `json:"attachment_uuid"`
+	CaptureUUID           string `json:"capture_uuid"`
+	AttachmentUUID        string `json:"attachment_uuid,omitempty"`
+	PostMediaDecisionUUID string `json:"post_media_decision_uuid,omitempty"`
 }
 
 type MetadataPolicySampleSource struct {

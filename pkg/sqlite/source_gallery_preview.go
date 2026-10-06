@@ -292,11 +292,23 @@ func (s *SourceGalleryStore) previewWithMediaChoices(ctx context.Context, value 
 	for _, head := range heads {
 		requested[head.MediaUUID] = true
 	}
+	var postChoices []sourcePostMediaRow
+	if err := dbWrapper.Select(ctx, &postChoices, `SELECT d.* FROM post_media_links l
+JOIN post_media_decisions d ON d.uuid=l.decision_uuid WHERE l.post_uuid=? ORDER BY l.media_uuid LIMIT ?`, post.UUID, maxSourceGalleryMembers+1); err != nil {
+		return nil, err
+	}
+	if len(postChoices) > maxSourceGalleryMembers {
+		return nil, errors.New("source post exceeds the media association preview limit")
+	}
+	for _, choice := range postChoices {
+		requested[choice.MediaUUID] = true
+	}
 	resolved, err := sourceGalleryIdentities(ctx, requested)
 	if err != nil {
 		return nil, err
 	}
 	policies := sourceGalleryPolicies(heads, resolved)
+	postStates := resolvedPostMediaStates(postChoices, resolved)
 	present, desired := make(map[string]bool), make(map[string]bool)
 	for _, member := range members {
 		present[member.UUID] = true
@@ -316,6 +328,14 @@ func (s *SourceGalleryStore) previewWithMediaChoices(ctx context.Context, value 
 			item.Status = "deleted"
 			if media.State == models.ArchiveEntityActive {
 				item.Status = "linked"
+				if postStates[media.UUID] == "unlinked" || postStates[media.UUID] == "conflict" {
+					item.Status = "post_" + postStates[media.UUID]
+					if postStates[media.UUID] == "conflict" {
+						ret.Action = "review"
+					}
+					ret.Entries = append(ret.Entries, item)
+					continue
+				}
 				policy := policies[media.UUID]
 				if policy.library != nil && policy.library.State == "excluded" {
 					item.Status = "excluded"

@@ -17,8 +17,9 @@ import (
 )
 
 type Source struct {
-	CaptureUUID    string `json:"capture_uuid"`
-	AttachmentUUID string `json:"attachment_uuid"`
+	CaptureUUID           string `json:"capture_uuid"`
+	AttachmentUUID        string `json:"attachment_uuid,omitempty"`
+	PostMediaDecisionUUID string `json:"post_media_decision_uuid,omitempty"`
 }
 
 // Input is server-derived intake context. HTTP callers choose existing entities
@@ -49,16 +50,17 @@ type NameMatch struct {
 }
 
 type Change struct {
-	Field              string          `json:"field"`
-	Status             string          `json:"status"`
-	Current            json.RawMessage `json:"current"`
-	Value              json.RawMessage `json:"value,omitempty"`
-	Origin             string          `json:"origin,omitempty"`
-	CaptureUUID        string          `json:"capture_uuid,omitempty"`
-	UsedFallback       bool            `json:"used_fallback,omitempty"`
-	ReferenceRevisions map[string]int  `json:"reference_revisions,omitempty"`
-	Names              []NameMatch     `json:"names,omitempty"`
-	Message            string          `json:"message,omitempty"`
+	Field                 string          `json:"field"`
+	Status                string          `json:"status"`
+	Current               json.RawMessage `json:"current"`
+	Value                 json.RawMessage `json:"value,omitempty"`
+	Origin                string          `json:"origin,omitempty"`
+	CaptureUUID           string          `json:"capture_uuid,omitempty"`
+	PostMediaDecisionUUID string          `json:"post_media_decision_uuid,omitempty"`
+	UsedFallback          bool            `json:"used_fallback,omitempty"`
+	ReferenceRevisions    map[string]int  `json:"reference_revisions,omitempty"`
+	Names                 []NameMatch     `json:"names,omitempty"`
+	Message               string          `json:"message,omitempty"`
 }
 
 type Preview struct {
@@ -222,6 +224,7 @@ func (s Service) preview(ctx context.Context, input Input, inspectInactive bool,
 				}
 				if capture != nil {
 					origin, change.CaptureUUID = "source", capture.UUID
+					change.PostMediaDecisionUUID = input.Source.PostMediaDecisionUUID
 				}
 			}
 		}
@@ -334,6 +337,15 @@ func (s Service) capture(ctx context.Context, input Input, entity *models.Archiv
 	if provenance == nil {
 		return nil, models.ErrMetadataPolicyConflict
 	}
+	if (source.AttachmentUUID == "") == (source.PostMediaDecisionUUID == "") {
+		return nil, models.ErrMetadataPolicyInvalid
+	}
+	if source.PostMediaDecisionUUID != "" {
+		if err := s.Repo.SourcePostMedia.ValidateCapture(ctx, source.PostMediaDecisionUUID, source.CaptureUUID, entity.UUID); err != nil {
+			return nil, err
+		}
+		return s.Repo.SourceEvidence.FindCapture(ctx, source.CaptureUUID)
+	}
 	present, err := s.Repo.SourceAttachment.InCapture(ctx, source.CaptureUUID, source.AttachmentUUID)
 	if err != nil {
 		return nil, err
@@ -364,6 +376,13 @@ func (s Service) capture(ctx context.Context, input Input, entity *models.Archiv
 		return nil, err
 	}
 	if post == nil || post.State != "active" {
+		return nil, models.ErrMetadataPolicyConflict
+	}
+	association, err := s.Repo.SourcePostMedia.Association(ctx, post.UUID, entity.UUID)
+	if err != nil {
+		return nil, err
+	}
+	if association.Suppressed() {
 		return nil, models.ErrMetadataPolicyConflict
 	}
 	return capture, nil
@@ -419,7 +438,8 @@ func (s Service) Apply(ctx context.Context, input Input, expectedDigest string) 
 		_, err = s.Repo.MetadataField.ApplyAutomatic(ctx, models.MetadataFieldDecisionInput{
 			EntityUUID: input.EntityUUID, ExpectedEntityRevision: current.Entity.Revision, Field: change.Field, Mode: "inherit",
 			Value: change.Value, Origin: change.Origin, CaptureUUID: change.CaptureUUID, ReferenceRevisions: change.ReferenceRevisions,
-			Policy: &models.MetadataPolicyRef{CollectionUUID: input.CollectionUUID, Revision: input.PolicyRevision}, Reason: "Collection metadata policy",
+			PostMediaDecisionUUID: change.PostMediaDecisionUUID,
+			Policy:                &models.MetadataPolicyRef{CollectionUUID: input.CollectionUUID, Revision: input.PolicyRevision}, Reason: "Collection metadata policy",
 		})
 		if err != nil {
 			return nil, err

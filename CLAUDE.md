@@ -866,6 +866,18 @@ file evidence retains the full attachment/capture/file requirements. Recording
 evidence advances review revisions but never selects media, changes attribution
 or constructs galleries. `PostMediaEvidence` pages all associations for one post.
 
+Schema 1000081 adds reviewed `SourcePostMedia` associations independently of
+attachment slots. Decisions require current post/media revisions and the complete
+current decision set, retain immutable replacement history across media merges,
+and use a durable request UUID for exact replay. A whole-post rejection suppresses
+attachment-derived metadata and automatic gallery membership; conflicting merged
+choices require review. Preserve manual gallery membership and already selected
+metadata. Metadata policy source choices accept a capture and exactly one current
+attachment or reviewed post decision, retaining that decision in field provenance.
+This permits historical NFO captures without inventing albums. The migration
+selects no associations; historical file-proof matching and its review UI remain
+separate work. See [the association API](docs/native-ingestion.md#reviewed-post-to-media-associations).
+
 Schema 1000037 adds `SourceFile` records for shared source content claims,
 root-relative file observations and guarded matches to existing library files.
 Claims are unverified source evidence, including path-derived legacy asset IDs;

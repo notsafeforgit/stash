@@ -94,6 +94,20 @@ func (p *PreparedMedia) PublishIntake(ctx context.Context, repo models.Repositor
 			if selected == nil || selected.State != models.ArchiveEntityActive {
 				return nil, models.ErrSourceAttachmentConflict
 			}
+			attachment, err := repo.SourceAttachment.Find(ctx, input.Source.AttachmentUUID)
+			if err != nil {
+				return nil, err
+			}
+			if attachment == nil {
+				return nil, models.ErrSourceAttachmentConflict
+			}
+			association, err := repo.SourcePostMedia.Association(ctx, attachment.PostUUID, selected.UUID)
+			if err != nil {
+				return nil, err
+			}
+			if association.Suppressed() {
+				selected = nil
+			}
 		}
 	}
 	media, err := p.publishMedia(ctx, repo, input.Target, input.Kind, selected)
@@ -200,7 +214,15 @@ func publishIntakeSource(ctx context.Context, repo models.Repository, input Inta
 		return err
 	}
 	ret.Result.SourceMedia = "linked"
+	postChoice, err := repo.SourcePostMedia.Association(ctx, attachment.PostUUID, media.Media.UUID)
+	if err != nil {
+		return err
+	}
 	switch {
+	case postChoice.State == "unlinked":
+		ret.Result.SourceMedia = "unlinked"
+	case postChoice.State == "conflict":
+		ret.Result.SourceMedia = "review"
 	case choice != nil && choice.State == "unlinked":
 		ret.Result.SourceMedia = "unlinked"
 	case choice != nil && choice.State == "linked":
@@ -248,6 +270,16 @@ func publishIntakeSource(ctx context.Context, repo models.Repository, input Inta
 		}
 		if post == nil || post.State != "active" {
 			return models.ErrSourcePostForgotten
+		}
+		association, err := repo.SourcePostMedia.Association(ctx, attachment.PostUUID, media.Media.UUID)
+		if err != nil {
+			return err
+		}
+		if association.State != postChoice.State {
+			return models.ErrSourcePostMediaConflict
+		}
+		if association.Suppressed() {
+			return nil
 		}
 		if expectedStatus == "review" {
 			return nil

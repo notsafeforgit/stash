@@ -54,6 +54,7 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Get("/metadata-fields/{kind}", rs.fields)
 	r.Get("/posts", rs.browseSourcePosts)
 	r.Get("/posts/{post}", rs.sourcePost)
+	r.Get("/posts/{post}/comparison", rs.compareSourcePosts)
 	r.Get("/posts/{post}/identifiers", rs.sourcePostIdentifiers)
 	r.Get("/posts/{post}/publishers", rs.sourcePostPublishers)
 	r.Get("/posts/{post}/media", rs.sourcePostMedia)

@@ -119,6 +119,7 @@ var (
 )
 
 type SourceEvidenceReaderWriter interface {
+	ComparePosts(context.Context, string, string) (*SourcePostComparison, error)
 	// EnsurePost preserves a supplied portable UUID when creating a post. An
 	// existing identifier with a different supplied UUID needs explicit review.
 	EnsurePost(context.Context, SourcePostIdentifier, string) (*SourcePost, error)

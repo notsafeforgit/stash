@@ -406,6 +406,39 @@ writes require a managed transaction, including rollback when a caller ignores
 a late write error. Reads use bounded indexed UUID cursors. Startup checks the
 schema and relationship integrity; anonymised exports remove the evidence.
 
+## Comparing possible duplicate posts
+
+`GET /api/v3/archive/posts/{post}/comparison?other={post_uuid}` inspects two
+explicit native post UUIDs in one read transaction. It returns their identifiers,
+retained URLs, compact latest-capture summaries, current source lists, gallery
+choices, attachment decisions and explicit post-to-media choices. Media choices
+retain their original UUIDs alongside the current resolved identity, including
+deleted records without a live scene/image ID.
+
+The comparison reports qualified identifier disagreements, differing service
+namespaces, incompatible source order/counts, disabled versus enabled source
+lists, conflicting gallery choices and contradictory media links. It compares
+attachment references and resolved media identities, so independently allocated
+attachment UUIDs and already-merged media do not create false differences.
+Compatible partial source lists retain their gaps. Explicit unlinks and disabled
+choices remain visible.
+
+Shared URLs are supporting evidence only. For example, distinct Instagram
+stories can share a highlights URL. Matching content, titles or a shared URL
+does not establish that two records represent the same post. An empty conflict
+list likewise does not establish identity. This endpoint performs no merge,
+returns no Apply authorization, and does not rewrite captures or job receipts.
+It inspects current choices; original history, evidence and pending work remain
+under their existing post scopes. Reviewed consolidation is a separate release
+requirement.
+
+Each post is limited to 512 identifiers, 512 URLs, 8,192 retained attachment
+identities and 8,192 explicit media choices. Larger scopes return HTTP 422 with
+`post_comparison_limit`; the response never silently truncates choices. Source
+list loading also retains its existing manifest/entry limits. Queries start from
+the selected post indexes. Full post/profile payloads, plugin settings and
+library-wide searches are not included.
+
 ## Mapping catalog relationships
 
 Native schema 1000033 maps `accounts`, `handles`, `posts`, `post_urls` and

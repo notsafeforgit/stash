@@ -34,6 +34,12 @@ desktop/mobile navigation and direct scene/image links are now implemented,
 with 32 Chromium/WebKit browser checks and the integrated full fork gate passed.
 Broader archive management and cross-device import history remain unfinished.
 
+Read-only post comparison now reports identity, source-order, gallery and media
+choice conflicts without treating shared URLs as identity proof. Repository,
+query-plan and HTTP checks pass, along with 69 pairs inspected through the real
+repository on the read-only rehearsal. The comparison API is implemented;
+reviewed consolidation and its UI remain unfinished.
+
 Application local-file preview/admission now reuses native file verification and
 durable effects without creating a producer or source record. Focused real MP4/
 image, policy, restart, HTTP and portable-restore checks pass. Its integrated
@@ -10388,3 +10394,40 @@ Evidence is under `.local/native-manual-browser-20261006/` and the corresponding
 `native_manual_browser_` receipts. No schema copy is needed. Production and live
 workers remain unchanged; broader archive management and all remaining transition
 release gates remain open.
+
+## Read-only comparison before post consolidation — 2026-10-06
+
+The application API can now compare two explicit post UUIDs in one read
+transaction. It returns complete bounded identity/choice sets and compact source
+summaries. Qualified ID and namespace disagreements, source-list ordering/count
+conflicts, disabled selections, differing galleries, explicit media unlinks and
+attachment choices remain visible. Media redirects are resolved independently
+of the original decision UUIDs, including deleted media without stale local IDs.
+Comparison cannot authorize or perform a merge. Original captures, receipt
+history, pending work and metadata selections retain their existing scopes.
+
+This distinction matters in the populated archive: legacy/native Instagram
+records can share a post URL, while distinct native stories can share a highlights
+URL. Shared URLs and equal content therefore cannot trigger automatic identity
+consolidation. Duplicate-post mutation and the complete native review UI remain
+required under the full transition plan.
+
+Focused real SQLite and HTTP checks cover repeated reads/reopen, conflicting
+stable IDs, partial and reordered source lists, separate attachment UUIDs,
+explicit unlinks, conflicting galleries, merged/deleted media, invalid scopes
+and rejected oversized responses. Query plans begin at post-scoped indexes.
+All ten comparison tests passed, all Go integration callers compiled, and
+promoted Go lint reported zero issues. The lint tool
+could not inspect virtual added files in the initial Go overlay; its normal
+promoted-source invocation completed successfully.
+
+The read-only schema-87 probe inspected 69 pairs, returning 32 selected album
+rows, 121 attachment rows, 148 explicit media choices and 187 identifiers across
+those comparisons; a post can occur in more than one pair.
+Independent table counts and shared-URL joins matched the responses. Median
+comparison time was 0.554 ms and maximum time 4.813 ms for these samples;
+the database size and modification time were unchanged. These are selected
+comparison measurements, not a whole-library or concurrent-ingestion benchmark.
+Evidence is under `.local/native-post-consolidation-20261006/` and the
+`native_post_comparison_` receipts. No schema change or populated copy was needed.
+Production and live workers remain unchanged.

@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useIntl } from "react-intl";
 import { useMsg } from "@/hooks/message";
 import {
@@ -23,6 +23,17 @@ import { LibraryLink } from "../posts/library-link";
 import { useAlbumPages } from "./read";
 import { AlbumReview } from "./review";
 import { SelectionReview } from "./selection-review";
+import {
+  GalleryAssociationReview,
+  AttachmentMediaReview,
+} from "./association-review";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 export function AlbumReadError({
   error,
@@ -54,7 +65,13 @@ export function AlbumReadError({
   );
 }
 
-function Slot({ slot }: { slot: AlbumSlot }) {
+function Slot({
+  slot,
+  onReview,
+}: {
+  slot: AlbumSlot;
+  onReview: (attachment: string) => void;
+}) {
   const msg = useMsg();
   const intl = useIntl();
   const position =
@@ -177,14 +194,30 @@ function Slot({ slot }: { slot: AlbumSlot }) {
           </>
         )}
       </CardContent>
-      {media?.state === "active" && (
+      {(media?.state === "active" || slot.attachment) && (
         <CardFooter className="flex flex-wrap gap-2">
-          <LibraryLink item={media}>
-            {msg("source_albums.open_media", "Open media")}
-          </LibraryLink>
-          <LibraryLink item={media} sources>
-            {msg("source_posts.review_media", "Open Sources")}
-          </LibraryLink>
+          {media?.state === "active" && (
+            <>
+              <LibraryLink item={media}>
+                {msg("source_albums.open_media", "Open media")}
+              </LibraryLink>
+              <LibraryLink item={media} sources>
+                {msg("source_posts.review_media", "Open Sources")}
+              </LibraryLink>
+            </>
+          )}
+          {slot.attachment && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (slot.attachment) onReview(slot.attachment.uuid);
+              }}
+            >
+              {msg("association_review.edit_media", "Edit media link")}
+            </Button>
+          )}
         </CardFooter>
       )}
     </Card>
@@ -203,6 +236,9 @@ export function SourceAlbum({
   const msg = useMsg();
   const intl = useIntl();
   const api = useMemo(() => createSourceAlbumAPI(endpoint), [endpoint]);
+  const [editingAttachment, setEditingAttachment] = useState<string | null>(
+    null,
+  );
   const load = useCallback(
     async (after: number | undefined, signal: AbortSignal) => {
       const page = await api.album(post, after, signal);
@@ -240,6 +276,44 @@ export function SourceAlbum({
           onPublished={published}
         />
       </PostSection>
+      <PostSection
+        title={msg("association_review.edit_gallery", "Edit gallery link")}
+      >
+        <GalleryAssociationReview
+          key={`${api.endpoint}:${post}`}
+          post={post}
+          endpoint={api.endpoint}
+          onChanged={published}
+        />
+      </PostSection>
+      <Dialog
+        open={editingAttachment !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditingAttachment(null);
+        }}
+      >
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {msg("association_review.edit_media", "Edit media link")}
+            </DialogTitle>
+            <DialogDescription>
+              {msg(
+                "association_review.dialog_help",
+                "Choose the library item represented by this source attachment, or review its existing choice.",
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          {editingAttachment && (
+            <AttachmentMediaReview
+              key={`${api.endpoint}:${editingAttachment}`}
+              attachment={editingAttachment}
+              endpoint={api.endpoint}
+              onChanged={published}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
       <PostSection
         title={msg("attachment_selection.title", "Choose source list")}
       >
@@ -324,7 +398,11 @@ export function SourceAlbum({
               )}
             </p>
             {result.data?.items.map((slot) => (
-              <Slot key={slot.position} slot={slot} />
+              <Slot
+                key={slot.position}
+                slot={slot}
+                onReview={setEditingAttachment}
+              />
             ))}
             {!result.data?.items.length && (
               <PostEmpty

@@ -1,4 +1,4 @@
-import { MockedProvider } from "@apollo/client/testing/react";
+import { AssociationFixtureProvider } from "./association-provider";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { SourcePosts } from "@/components/archive/source-posts";
 import { BottomTabBar } from "@/components/layout/bottom-tab-bar";
@@ -8,7 +8,7 @@ export function SourcePostsFixture() {
   const { post, ...filter } = useSearch({ from: "/source-posts" });
   const navigate = useNavigate({ from: "/source-posts" });
   return (
-    <MockedProvider>
+    <AssociationFixtureProvider>
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="hidden justify-end p-2 md:flex">
           <UserMenu />
@@ -22,6 +22,6 @@ export function SourcePostsFixture() {
         />
         <BottomTabBar />
       </div>
-    </MockedProvider>
+    </AssociationFixtureProvider>
   );
 }

@@ -125,6 +125,10 @@ type DiscoveryCollectionCandidate struct {
 }
 
 type DiscoveryJobReaderWriter interface {
+	ScopeCandidates(context.Context, string, int, string, int) ([]DiscoveryScopeCandidate, error)
+	PreviewScope(context.Context, DiscoveryScopeInput) (*DiscoveryScopePlan, error)
+	ReviewScope(context.Context, DiscoveryScopeInput, string, time.Time) (*DiscoveryScopeReview, error)
+	ScopeReview(context.Context, string) (*DiscoveryScopeReview, error)
 	CreateListing(context.Context, DiscoveryListingInput, time.Time) (*DiscoveryListing, error)
 	Listing(context.Context, string) (*DiscoveryListing, error)
 	CheckListing(context.Context, string, time.Time) (*DiscoveryListing, error)

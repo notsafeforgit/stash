@@ -19,18 +19,28 @@ func discoveryDetailJobProof(get func(any, string, ...any) error, job *models.Ar
 	if err != nil {
 		return nil, err
 	}
+	var row discoveryListingRow
+	if err := get(&row, "SELECT * FROM discovery_listings WHERE uuid=?", work.ListingUUID); err != nil {
+		return nil, err
+	}
+	listing, err := resolveDiscoveryListing(get, row)
+	if err != nil {
+		return nil, err
+	}
+	if listing.Digest != work.DefinitionSHA256 || listing.CollectionUUID != work.CollectionUUID || listing.CollectionRevision != work.CollectionRevision || !reflect.DeepEqual(listing.RootUUID, work.RootUUID) {
+		return nil, models.ErrSourcePayloadCorrupt
+	}
 	var valid bool
 	err = get(&valid, `SELECT EXISTS(SELECT 1 FROM discovery_detail_jobs b JOIN discovery_match_targets t ON t.uuid=b.target_uuid
  JOIN discovery_match_candidates c ON c.id=b.candidate_sequence AND c.target_uuid=t.uuid
  JOIN discovery_match_evidence e ON e.target_uuid=t.uuid AND e.page_ordinal=? AND e.namespace=c.namespace AND e.value=c.value
  JOIN discovery_pages p ON p.listing_uuid=t.listing_uuid AND p.ordinal=e.page_ordinal
- JOIN discovery_listings d ON d.uuid=t.listing_uuid
  WHERE b.job_uuid=? AND b.target_uuid=? AND b.target_revision=? AND b.candidate_sequence=? AND b.generation=?
  AND t.revision>=b.target_revision AND b.target_revision>e.page_ordinal AND e.needs_detail=1
  AND t.source_sha256=? AND t.post_uuid=? AND t.post_revision=? AND c.namespace=? AND c.value=? AND e.url=?
- AND t.listing_uuid=? AND d.digest=? AND p.digest=? AND d.collection_uuid=? AND d.collection_revision=? AND d.root_uuid IS ?)`,
+ AND t.listing_uuid=? AND p.digest=?)`,
 		work.PageOrdinal, job.UUID, work.TargetUUID, work.TargetRevision, work.CandidateSequence, work.Generation, work.SourceSHA256, work.PostUUID, work.PostRevision,
-		work.Namespace, work.Value, work.URL, work.ListingUUID, work.DefinitionSHA256, work.PageSHA256, work.CollectionUUID, work.CollectionRevision, work.RootUUID)
+		work.Namespace, work.Value, work.URL, work.ListingUUID, work.PageSHA256)
 	if err != nil {
 		return nil, err
 	}

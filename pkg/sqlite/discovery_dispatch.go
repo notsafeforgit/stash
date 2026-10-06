@@ -91,7 +91,7 @@ func (s *DiscoveryJobStore) ReadyListings(ctx context.Context, collection, polic
 	}
 	for _, row := range rows {
 		ret.After = row.UUID
-		listing, err := row.resolve()
+		listing, err := resolveDiscoveryListing(func(out any, query string, args ...any) error { return dbWrapper.Get(ctx, out, query, args...) }, row)
 		if err != nil {
 			return nil, err
 		}

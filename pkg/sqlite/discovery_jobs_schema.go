@@ -50,7 +50,7 @@ func validateDiscoveryJobSchema(conn *sqlx.DB) error {
 		if err != nil {
 			return err
 		}
-		listing, err := row.resolve()
+		listing, err := resolveDiscoveryListing(conn.Get, row)
 		if err != nil {
 			return err
 		}
@@ -85,6 +85,10 @@ func validateDiscoveryJobSchema(conn *sqlx.DB) error {
 }
 
 func validateDiscoveryListingJobs(conn *sqlx.DB, listing *models.DiscoveryListing) error {
+	_, available, err := discoveryListingAtDigest(conn.Get, listing.UUID, listing.Digest)
+	if err != nil {
+		return err
+	}
 	expected := 1
 	expectedPage := 1
 	var previous *models.ArchiveJob
@@ -105,7 +109,7 @@ func validateDiscoveryListingJobs(conn *sqlx.DB, listing *models.DiscoveryListin
 		job := row.resolve()
 		work, err := archive.DecodeDiscoveryJob(job)
 		if err != nil || row.Generation != expected || work.Generation != expected || work.PageOrdinal != row.PageOrdinal || work.PageOrdinal != expectedPage || work.ListingUUID != listing.UUID || work.DefinitionSHA256 != listing.Digest ||
-			work.CollectionUUID != listing.CollectionUUID || job.CreatedAt.UnixMilli() < listing.CreatedAt.UnixMilli() || job.AvailableAt.Before(listing.NotBefore) {
+			work.CollectionUUID != listing.CollectionUUID || job.CreatedAt.UnixMilli() < available.UnixMilli() || job.AvailableAt.Before(listing.NotBefore) {
 			return models.ErrSourcePayloadCorrupt
 		}
 		if previous != nil {

@@ -68,7 +68,7 @@ func validateDiscoveryMatchTarget(conn *sqlx.DB, target models.DiscoveryMatchTar
 	if err := conn.Get(&row, "SELECT * FROM discovery_listings WHERE uuid=?", target.ListingUUID); err != nil {
 		return err
 	}
-	listing, err := row.resolve()
+	listing, err := resolveDiscoveryListing(conn.Get, row)
 	if err != nil {
 		return err
 	}

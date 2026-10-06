@@ -31,6 +31,9 @@ schema-83 migration and independent saved-plan comparison passed, and all
 receipt recovery and final whole-library comparison passed; the verified
 rehearsal is now schema 83. Six saved discovery searches still need reviewed
 collection bindings before future execution.
+The native review API, immutable binding history and saved-plan client for those
+unstarted searches are implemented with passing focused checks and the complete
+fork gate. The populated schema-84 rehearsal remains in progress.
 
 Durable enrichment execution, queued-job dispatch, stale-job maintenance and
 shared download/enrichment service reservations are implemented, including linked
@@ -9562,3 +9565,51 @@ two superseded originals retain 188 targets and their historical cursors. Those
 immutable definitions and recovery links require a separate reviewed binding
 operation before future execution. No production service, source job, root or
 metadata policy was activated by this rehearsal.
+
+## Reviewed collection bindings for discovery searches — 2026-10-06
+
+Schema 1000084 preserves original listing definitions and adds immutable
+collection-binding reviews with a derived effective definition. Only collection
+revision/root associations change; source identity, original creation time,
+extractor, policy, retry deadline, cursor, target UUIDs and recovery references
+remain intact. A prior worker job, even cancelled or failed, excludes a search
+from this path. Superseded originals cannot become active again. Source account,
+URL, namespace or kind changes require a different source review.
+
+The application API provides bounded candidates, read-only preview, exact-plan
+application and immutable receipt recovery. Worker grants, readiness, fetching,
+detail verification and capture publication use the approved definition.
+Original CreateListing requests and historical activation/recovery receipts can
+still resolve their recorded digest after a later review. Clearing a root remains
+an explicit null association. Disabled roots remain unable to fetch.
+
+`stash-review-discovery-collections` saves private, non-overwriting plans bound to
+the selected endpoint and a reviewed file digest. It verifies the previous and
+proposed definition hashes, rechecks the saved file before use, and recovers a
+committed receipt before attempting another Apply. Review does not admit jobs,
+change a worker credential or activate a root.
+
+Focused native/archive/API checks passed in 49.08 seconds, with SQLite at 46.79
+seconds and API at 33.05 seconds. Coverage includes source-change and stale-plan
+rejection, prior worker history, changed producer grants, disabled and cleared
+roots, ordinary and detail publication, both orders of scope/recovery review,
+historical receipt replay, chained reviews, backup restore and anonymisation.
+Migration fixtures preserve original searches and refuse unknown-object
+collisions. Startup refuses corrupted historical definitions or effective views
+before writing. The real Python/HTTP check saved three plans, recovered a lost
+committed response without repeating Apply, reopened the database, and recovered
+all receipts after subsequent worker admission and collection retirement.
+
+The complete fork gate passed in 1,528.89 seconds: 624 UI tests, 540 producer
+tests, eight library tests, 108 portable archive tests, 262 backup tests, zero
+lint issues and all Go packages. The API package passed in 1,201.54 seconds and
+SQLite in 1,316.47 seconds. All 34 changed source files retained the hashes
+recorded before the gate.
+
+An independent read-only audit of the populated schema-83 copy prepared six
+exact reviews covering 569 current targets. Only the collection root and path
+changed. Two superseded original searches retain another 188 targets and their
+saved cursors; neither is eligible for another scope review. Native HTTP plans,
+application, restart recovery and independent whole-row comparison on schema 84
+remain required. The canonical verified copy remains schema 1000083, and no
+production settings, services or source jobs have changed.

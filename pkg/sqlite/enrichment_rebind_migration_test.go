@@ -16,6 +16,7 @@ import (
 
 func removeEnrichmentRebindSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeDiscoveryScopeSchema(t, raw)
 	_, err := raw.Exec(`DROP TABLE enrichment_rebinding_targets; DROP TABLE enrichment_rebindings;
 DROP INDEX enrichment_targets_pending_scope; DELETE FROM native_migration_history WHERE version=1000083`)
 	require.NoError(t, err)

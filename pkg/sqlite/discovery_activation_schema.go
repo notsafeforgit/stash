@@ -55,7 +55,8 @@ func validateDiscoveryActivationBindings(get enrichmentGet, row discoveryActivat
 	if err != nil {
 		return err
 	}
-	if listing.Digest != plan.ListingSHA256 || listing.Account != plan.AccountSHA256 || row.CreatedAt.Before(listing.CreatedAt) {
+	_, available, err := discoveryListingAtDigest(get, row.ListingUUID, plan.ListingSHA256)
+	if err != nil || listing.Account != plan.AccountSHA256 || row.CreatedAt.Before(listing.CreatedAt) || row.CreatedAt.Before(available) {
 		return models.ErrSourcePayloadCorrupt
 	}
 	var count int

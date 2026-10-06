@@ -615,6 +615,11 @@ WHERE NOT EXISTS (SELECT 1 FROM performer_names WHERE performer_id = performers.
 			}
 		}
 		if version >= NativeSchemaBaseline+71 {
+			if version >= NativeSchemaBaseline+84 {
+				if err := validateDiscoveryScopeSchema(conn); err != nil {
+					return fmt.Errorf("invalid discovery collection bindings: %w", err)
+				}
+			}
 			if err := validateDiscoveryJobSchema(conn); err != nil {
 				return err
 			}

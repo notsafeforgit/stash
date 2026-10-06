@@ -49,7 +49,7 @@ func attachDetailFixture(t *testing.T, match *discoveryMatchFixture) *detailFixt
 			producer, err = f.repo.Ingest.CreateProducer(ctx, "Detail worker")
 			return err
 		}))
-		_, token, err := f.service.IssueCredential(t.Context(), producer.UUID, []models.IngestScope{{CollectionUUID: f.listing.CollectionUUID}}, nil)
+		_, token, err := f.service.IssueCredential(t.Context(), producer.UUID, []models.IngestScope{{CollectionUUID: f.listing.CollectionUUID, RootUUID: f.listing.RootUUID}}, nil)
 		require.NoError(t, err)
 		f.tokens = append(f.tokens, token)
 		f.producers = append(f.producers, producer.UUID)

@@ -71,7 +71,7 @@ func prepareDiscoveryPublication(get enrichmentGet, selectRows enrichmentSelect,
 		return nil, err
 	}
 	var err error
-	ret.listing, err = listing.resolve()
+	ret.listing, err = resolveDiscoveryListing(get, listing)
 	if err != nil {
 		return nil, err
 	}

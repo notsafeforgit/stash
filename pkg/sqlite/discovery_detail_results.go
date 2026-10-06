@@ -45,7 +45,7 @@ func compareDiscoveryDetail(get enrichmentGet, work *models.DiscoveryDetailJobAr
 	if err := get(&row, "SELECT * FROM discovery_listings WHERE uuid=?", work.ListingUUID); err != nil {
 		return nil, err
 	}
-	listing, err := row.resolve()
+	listing, err := resolveDiscoveryListing(get, row)
 	if err != nil {
 		return nil, err
 	}

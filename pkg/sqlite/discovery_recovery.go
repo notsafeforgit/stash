@@ -16,15 +16,11 @@ func discoveryRecoveryOriginal(get enrichmentGet, input models.DiscoveryListingI
 	if input.RecoveryOf == nil {
 		return nil, models.ErrDiscoveryInvalid
 	}
-	var row discoveryListingRow
-	if err := get(&row, "SELECT * FROM discovery_listings WHERE uuid=?", input.RecoveryOf.ListingUUID); err != nil {
+	original, _, err := discoveryListingAtDigest(get, input.RecoveryOf.ListingUUID, input.RecoveryOf.SHA256)
+	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, models.ErrDiscoveryConflict
 		}
-		return nil, err
-	}
-	original, err := row.resolve()
-	if err != nil {
 		return nil, err
 	}
 	if original.RecoveryOf != nil || original.Digest != input.RecoveryOf.SHA256 || original.UUID == input.UUID ||
@@ -52,6 +48,14 @@ func discoveryReplacement(get enrichmentGet, listing string) (string, error) {
 func discoveryFetchEligible(ctx context.Context, input models.DiscoveryListingInput, now time.Time) error {
 	if err := discoveryListingEligible(ctx, input, now); err != nil {
 		return err
+	}
+	var reviewedAt time.Time
+	err := dbWrapper.Get(ctx, &reviewedAt, "SELECT created_at FROM discovery_scope_reviews WHERE listing_uuid=? ORDER BY id DESC LIMIT 1", input.UUID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	if err == nil && now.Before(reviewedAt) {
+		return models.ErrDiscoveryConflict
 	}
 	replacement, err := discoveryReplacement(func(out any, q string, args ...any) error { return dbWrapper.Get(ctx, out, q, args...) }, input.UUID)
 	if err != nil {

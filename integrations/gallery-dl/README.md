@@ -2662,3 +2662,40 @@ pending body, claim, receipt, retry deadline and rotation cursor. Conflicting
 schema objects roll back the upgrade. Native archive schema 77 already contains
 the required jobs, evidence and indexes; automatic admission requires no new
 native migration. Production launcher conversion remains a cutover step.
+
+### Review a discovery search after a collection change
+
+`stash-review-discovery-collections` prepares an application review when a saved
+search's collection acquires a new root or directory association. It preserves
+the original definition, cursor, retry deadline, targets and recovery links.
+Searches with any native worker-job history or an existing replacement need their
+existing recovery workflow; this command does not transfer their running state.
+
+List bounded candidates using an application API key:
+
+```sh
+stash-review-discovery-collections candidates --endpoint "$STASH_ENDPOINT" \
+  --collection "$COLLECTION_UUID" --revision "$COLLECTION_REVISION"
+```
+
+Use `--after` with the returned UUID cursor to continue. Save the chosen
+`listing_uuid`, its current `expected_definition_sha256`, the new
+`collection_revision` and a `reason` in a JSON input file. An omitted operation
+`uuid` is generated once during preparation:
+
+```sh
+stash-review-discovery-collections prepare --endpoint "$STASH_ENDPOINT" \
+  --input selection.json --output reviewed-search.json
+stash-review-discovery-collections show --plan reviewed-search.json \
+  --expected-sha256 "$SAVED_PLAN_SHA256"
+stash-review-discovery-collections apply --endpoint "$STASH_ENDPOINT" \
+  --plan reviewed-search.json --expected-sha256 "$SAVED_PLAN_SHA256"
+```
+
+Use the file digest printed by `prepare` as `SAVED_PLAN_SHA256`. Plans are private,
+created without overwriting an existing file, pinned to the endpoint, and checked
+again immediately before use. `status` takes the same arguments as `apply` and
+reads only the receipt. After interruption, reuse the same file and digest;
+`apply` checks for a committed receipt before sending anything again. A 409
+requires review of the changed state. Successful review does not enable a root,
+issue credentials, admit a source job or claim that scraping completed.

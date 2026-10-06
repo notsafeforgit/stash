@@ -2129,6 +2129,45 @@ definition and absence of earlier worker bindings before writing. Backup/export
 includes both new tables; anonymisation removes them before activation history.
 The application client is `stash-review-enrichment-collections`.
 
+### Reviewing discovery collection bindings
+
+Schema 1000084 adds immutable `discovery_scope_reviews` and the derived
+`discovery_effective_listings` view. A review changes the collection revision and
+root of an unstarted search while retaining its UUID, source account and URL,
+extractor, policy, original creation time, retry deadline, saved cursor, legacy
+reference and recovery relationship. The original `discovery_listings` row is
+never rewritten. Historical activation and recovery receipts resolve the exact
+original or reviewed definition digest they recorded.
+
+`GET /api/v3/archive/collections/{collection}/discovery-scope-candidates` requires
+`collection_revision` and accepts a UUID `after` cursor and `limit` from 1–100.
+The limit bounds inspected definitions, including ineligible rows. Candidates
+report disabled/changed collections, changed source identity, superseded searches
+and any previous worker job. Cancelled or failed jobs still count as history.
+Changes to collection kind, namespace, target URL or account require a different
+source review; this operation approves directory/root associations and labels.
+
+`POST /api/v3/archive/discovery-scope-reviews/preview` accepts `uuid`,
+`listing_uuid`, `expected_definition_sha256`, `collection_revision` and `reason`.
+Its read-only plan includes the previous definition and review reference,
+destination collection, proposed definition digest and exact plan digest.
+`POST /api/v3/archive/discovery-scope-reviews` accepts
+`{input, expected_plan_sha256}` and records one atomic review. Reusing its UUID
+requires the same input and plan; replay recovers its receipt before checking
+current eligibility. `GET /api/v3/archive/discovery-scope-reviews/{review}`
+retrieves that immutable receipt after later work, edits or restart.
+
+Requests allow 16 KiB; saved native plans allow 128 KiB. An approved binding does
+not activate a root or admit a job. Worker authorization, readiness, fetching,
+detail verification and capture publication use the reviewed definition. A grant
+limited to the previous root cannot authorize a new root, and admission requires
+the reviewed definition digest. Read-only review retains
+its separate timing rules. Startup validates the review chain, historical
+collection definitions, plan/input/definition digests, effective projection and
+worker history. Anonymisation clears reviews with the discovery graph.
+
+The saved-plan application client is `stash-review-discovery-collections`.
+
 ### Imported enrichment staging
 
 Schema 1000060 converts saved `enrichment_jobs.staged_json` into native migration

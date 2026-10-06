@@ -23,6 +23,7 @@ import (
 )
 
 type enrichmentHTTPFixture struct {
+	db         *sqlite.Database
 	database   string
 	repo       models.Repository
 	service    *ingest.Service
@@ -48,7 +49,7 @@ func newEnrichmentHTTPFixtureForPost(t *testing.T, reference models.SourcePostId
 	db := sqlite.NewDatabase()
 	require.NoError(t, db.Open(filepath.Join(t.TempDir(), "enrichment.sqlite")))
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
-	f := &enrichmentHTTPFixture{repo: db.Repository(), database: db.DatabasePath(), now: time.Now().UTC().Truncate(time.Millisecond)}
+	f := &enrichmentHTTPFixture{db: db, repo: db.Repository(), database: db.DatabasePath(), now: time.Now().UTC().Truncate(time.Millisecond)}
 	f.service = ingest.New(f.repo)
 	f.worker = ingest.NewEnrichmentCoordinator(f.service)
 	f.worker.Now = func() time.Time { return f.now }

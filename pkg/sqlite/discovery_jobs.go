@@ -54,7 +54,7 @@ func (s *DiscoveryJobStore) Listing(ctx context.Context, id string) (*models.Dis
 	if err != nil {
 		return nil, err
 	}
-	return row.resolve()
+	return resolveDiscoveryListing(func(out any, query string, args ...any) error { return dbWrapper.Get(ctx, out, query, args...) }, row)
 }
 
 func discoveryAtomic(ctx context.Context) *bool {
@@ -132,10 +132,10 @@ func (s *DiscoveryJobStore) CreateListing(ctx context.Context, input models.Disc
 		return nil, err
 	}
 	if prior != nil {
-		if prior.Digest != digest {
-			return nil, models.ErrDiscoveryConflict
-		}
-		return prior, nil
+		// Original CreateListing requests remain replayable after a scope review;
+		// current reviewed definitions may also receive additional target batches.
+		existing, _, err := discoveryListingAtDigest(func(out any, query string, args ...any) error { return dbWrapper.Get(ctx, out, query, args...) }, input.UUID, digest)
+		return existing, err
 	}
 	// Definitions may retain a future retry deadline; creation grants no lease.
 	if err := discoveryListingEligible(ctx, input, maxTime(now, input.NotBefore)); err != nil {

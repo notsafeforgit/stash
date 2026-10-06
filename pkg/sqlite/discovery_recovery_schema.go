@@ -22,6 +22,10 @@ func validateDiscoveryRecovery(get enrichmentGet, id string) error {
 	if err != nil || listing.CreatedAt.Before(previous.CreatedAt) {
 		return models.ErrSourcePayloadCorrupt
 	}
+	_, available, err := discoveryListingAtDigest(get, previous.UUID, previous.Digest)
+	if err != nil || listing.CreatedAt.Before(available) {
+		return models.ErrSourcePayloadCorrupt
+	}
 	var bound bool
 	if err := get(&bound, `SELECT EXISTS(SELECT 1 FROM discovery_listing_recoveries
  WHERE listing_uuid=? AND previous_listing_uuid=? AND previous_sha256=?)`, id, previous.UUID, previous.Digest); err != nil {

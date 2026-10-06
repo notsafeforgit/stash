@@ -1,4 +1,5 @@
 import { NativeMetadataReview } from "@/components/detail/native-metadata-review";
+import { NativeSourceReview } from "@/components/detail/native-source-review";
 import { EntityActionButton } from "@/components/detail/entity-actions-menu";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -24,6 +25,7 @@ import {
   Layers,
   ListFilter,
   MapPin,
+  Link2,
 } from "lucide-react";
 import { Button } from "src/components/ui/button";
 import { cn } from "src/lib/utils";
@@ -433,6 +435,21 @@ function SceneDetailPage() {
               />
             </DetailEditorLayout>
           }
+        />
+      ),
+    },
+    {
+      id: "source-review",
+      icon: Link2,
+      label: intl.formatMessage({
+        id: "source_review.title",
+        defaultMessage: "Sources",
+      }),
+      content: (
+        <NativeSourceReview
+          key={`scene:${scene.id}`}
+          kind="scene"
+          localId={scene.id}
         />
       ),
     },

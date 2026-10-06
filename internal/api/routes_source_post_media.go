@@ -26,7 +26,7 @@ func (rs *nativeArchiveRoutes) postMediaAssociation(w http.ResponseWriter, r *ht
 
 func (rs *nativeArchiveRoutes) decidePostMedia(w http.ResponseWriter, r *http.Request) {
 	var request models.SourcePostMediaInput
-	if err := readIngestJSON(w, r, 8192, &request); err != nil {
+	if err := readIngestJSON(w, r, 65536, &request); err != nil {
 		ingestError(w, err)
 		return
 	}

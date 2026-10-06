@@ -1589,6 +1589,10 @@ Application-authenticated routes under `/api/v3/archive` expose direct links:
 | `PUT /posts/<post>/media/<entity>` | Record a guarded review decision with a durable request UUID |
 | `GET /posts/<post>/media/<entity>/history?after=<post-revision>&limit=N` | Original decisions across merged media identities, in revision order; limit 1–100 |
 | `GET /post-media-decisions/<request-uuid>` | Original committed decision for response-loss recovery |
+| `GET /entities/<entity>/source-posts?after=<post-uuid>&limit=N` | Targeted, unique post summaries from retained evidence, explicit choices and current attachment links across merged media identities; limit 1–100 |
+| `GET /posts/<post>/media/<entity>/review` | Refresh one post card with current guards, latest capture excerpt and independent evidence/link status |
+| `GET /posts/<post>/urls?after=<url-uuid>&limit=N` | Shared source URLs in UUID order; limit 1–100 |
+| `GET /posts/<post>/capture-summaries?limit=N` | Capture references and shared revision metadata, without raw payloads or profiles; limit 1–100 |
 
 PUT takes `uuid`, `post_uuid`, `media_uuid`, `expected_post_revision`,
 `expected_media_revision`, `expected_decisions` (all current decision UUIDs),
@@ -1598,6 +1602,12 @@ reusing its UUID for a different choice conflicts. The decision list guard detec
 choices brought together by a merge even if the surviving media fields did not
 change. Review resolves the current merged group and records which earlier
 decisions it replaces, preserving original history.
+
+The request body limit is 64 KiB, accommodating the bounded merged decision
+set and reason. A current-state rejection returns `409 post_media_conflict`.
+Reusing a request UUID with different contents returns
+`409 post_media_request_conflict`; clients must retain that unresolved request
+rather than treating it as a safe rejection of the original intent.
 
 `linked` explicitly associates the whole post with the media. `unlinked` rejects
 that pair, suppressing its attachment-based source metadata and automatic album
@@ -1612,7 +1622,28 @@ Previously selected field values and their provenance remain when a source link
 is rejected; this is not a request to clear the user's metadata. Source publishers
 never become depicted performers through these operations. Observational evidence
 alone does not select a link. The bounded matching service below can propose and
-apply historical file proofs; association review UI remains separate work.
+apply historical file proofs.
+
+Scene and image **Sources** sections expose these operations on desktop and
+mobile. They distinguish retained candidate evidence, explicit post choices and
+attachment links. Changing a link saves its exact request in deployment-scoped
+IndexedDB before sending, and refreshes the selected card after a verified
+receipt. A reload does not automatically send a mutation; explicit recovery
+checks the original receipt first. Definitively rejected guards require a new
+review, while uncertain transport failures and mismatched receipts remain saved.
+
+Post lists return a latest stored capture with a title excerpt of at most 512
+characters, at most three shared URLs and an explicit `more_urls` flag. They
+never fetch raw post/profile bodies. Expandable post text groups captures under
+their shared revision; link history loads separately. Capture pages sort by
+observation time, or by recorded time when the historical observation time is
+unknown, then capture UUID. Continue with `after_uuid`, `after_time` (RFC 3339
+with optional nanoseconds) and `after_clock` (`observed` or `recorded`). All
+three cursor fields are required together. Unknown observation time stays null
+and is labelled separately from the time retained evidence entered the archive.
+Capture summaries carry each revision's metadata once per page; the UI also
+deduplicates revisions across loaded pages. This does not select a caption,
+copy source account ownership into performers, or activate metadata policies.
 
 ### Historical post-to-media matching
 

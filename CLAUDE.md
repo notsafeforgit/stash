@@ -885,8 +885,19 @@ or unresolved attachment rejections for review. Batch decisions synchronize an
 existing gallery once per post; no attachment or album is fabricated. Revalidate
 proofs before commit, and replay original receipts before inspecting changed
 state. `stash-backfill-post-media` prepares immutable bounded plan parts and
-resumes through the application API. Populated matching, source-policy preview
-reconciliation and association review UI remain release work.
+resumes through the application API. Populated matching and source-policy preview
+reconciliation remain release gates recorded in the progress document.
+
+Scene/image Sources review uses targeted, indexed media-to-post lookups and
+compact capture summaries. Initial reads never reconstruct payloads or apply
+retained evidence. Expanded history groups shared post metadata by revision and
+distinguishes observation time from historical recording time. Link, unlink and
+attachment-default choices save exact requests in deployment-scoped IndexedDB
+before delivery; recover original receipts before retrying. A rejected revision
+guard permits fresh review, while UUID reuse or a mismatched receipt must retain
+the pending intent. Refresh the affected card after a successful change. Preserve
+both desktop tabs and mobile section navigation, and do not infer performers from
+the publishing account.
 
 Schema 1000037 adds `SourceFile` records for shared source content claims,
 root-relative file observations and guarded matches to existing library files.

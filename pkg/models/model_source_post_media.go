@@ -57,6 +57,8 @@ var (
 )
 
 type SourcePostMediaReaderWriter interface {
+	PostsForMedia(context.Context, string, string, int) ([]SourcePostMediaReview, error)
+	Review(context.Context, string, string) (*SourcePostMediaReview, error)
 	Association(context.Context, string, string) (*SourcePostMediaAssociation, error)
 	Decision(context.Context, string) (*SourcePostMediaDecision, error)
 	History(context.Context, string, string, int, int) ([]SourcePostMediaDecision, error)

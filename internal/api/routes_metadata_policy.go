@@ -43,6 +43,10 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Get("/source-accounts/{account}/consolidation-history", rs.accountConsolidationHistory)
 	r.Get("/metadata-fields/{kind}", rs.fields)
 	r.Get("/posts/{post}/media/{entity}", rs.postMediaAssociation)
+	r.Get("/posts/{post}/media/{entity}/review", rs.postMediaReview)
+	r.Get("/entities/{entity}/source-posts", rs.mediaSourcePosts)
+	r.Get("/posts/{post}/urls", rs.reviewPostURLs)
+	r.Get("/posts/{post}/capture-summaries", rs.reviewPostCaptures)
 	r.Put("/posts/{post}/media/{entity}", rs.decidePostMedia)
 	r.Get("/posts/{post}/media/{entity}/history", rs.postMediaHistory)
 	r.Get("/post-media-decisions/{decision}", rs.postMediaDecision)
@@ -265,7 +269,11 @@ func nativeArchiveError(w http.ResponseWriter, err error) {
 		ingestJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_post_media", "message": "Invalid post-to-media association."})
 		return
 	}
-	if errors.Is(err, models.ErrSourcePostMediaConflict) || errors.Is(err, models.ErrSourcePostMediaReplay) {
+	if errors.Is(err, models.ErrSourcePostMediaReplay) {
+		ingestJSON(w, http.StatusConflict, map[string]string{"error": "post_media_request_conflict", "message": "This request UUID already names a different post-to-media choice."})
+		return
+	}
+	if errors.Is(err, models.ErrSourcePostMediaConflict) {
 		ingestJSON(w, http.StatusConflict, map[string]string{"error": "post_media_conflict", "message": "The post, media or saved association changed; review it again."})
 		return
 	}

@@ -1,4 +1,5 @@
 import { MetadataReviewFixture } from "./metadata-review";
+import { SourceReviewFixture } from "./source-review";
 import { AccountReviewFixture } from "./account-review";
 import { CollectionsFixture } from "./collections";
 import { MediaRootsFixture } from "./media-roots";
@@ -385,6 +386,11 @@ const router = createRouter({
       getParentRoute: () => rootRoute,
       path: "/metadata-review",
       component: MetadataReviewFixture,
+    }),
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/source-review",
+      component: SourceReviewFixture,
     }),
     createRoute({
       getParentRoute: () => rootRoute,

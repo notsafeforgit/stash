@@ -1,4 +1,5 @@
 import { NativeMetadataReview } from "@/components/detail/native-metadata-review";
+import { NativeSourceReview } from "@/components/detail/native-source-review";
 import { ImageViewer } from "@/components/detail/image-viewer";
 import { EntityActionButton } from "@/components/detail/entity-actions-menu";
 
@@ -21,6 +22,7 @@ import {
   FileText,
   Info,
   History,
+  Link2,
 } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
 import { imageTitle } from "src/core/files";
@@ -284,6 +286,21 @@ function ImageDetailPage() {
               />
             </DetailEditorLayout>
           }
+        />
+      ),
+    },
+    {
+      id: "source-review",
+      icon: Link2,
+      label: intl.formatMessage({
+        id: "source_review.title",
+        defaultMessage: "Sources",
+      }),
+      content: (
+        <NativeSourceReview
+          key={`image:${image.id}`}
+          kind="image"
+          localId={image.id}
         />
       ),
     },

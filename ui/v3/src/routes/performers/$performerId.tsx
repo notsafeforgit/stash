@@ -28,9 +28,11 @@ import {
   GalleryHorizontalEnd,
   Images,
   Layers,
+  Link2,
 } from "lucide-react";
 import * as GQL from "src/core/generated-graphql";
 import { PerformerDetailsTab } from "src/components/detail/performer-detail-tabs";
+import { NativePerformerSources } from "@/components/detail/native-performer-sources";
 import { PerformerEditForm } from "src/components/detail/performer-edit-form";
 import { PerformerActionsMenu } from "src/components/detail/performer-actions-menu";
 import { DetailEditTransition } from "src/components/detail/detail-edit-transition";
@@ -267,6 +269,17 @@ function PerformerDetailPage() {
               },
             ]
           : []),
+        {
+          id: "source-accounts",
+          icon: Link2,
+          label: intl.formatMessage({
+            id: "performer_sources.title",
+            defaultMessage: "Source accounts",
+          }),
+          content: (
+            <NativePerformerSources key={performer.id} localId={performer.id} />
+          ),
+        },
       ]
     : [];
 

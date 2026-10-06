@@ -28,6 +28,8 @@ type nativeArchiveRoutes struct {
 func (rs *nativeArchiveRoutes) router() http.Handler {
 	r := chi.NewRouter()
 	r.Use(nativeAdminOrigin)
+	r.Get("/entities/{entity}/source-accounts", rs.performerSourceAccounts)
+	r.Get("/entities/{entity}/performer-identities", rs.performerSourceIdentities)
 	r.Get("/source-accounts", rs.reviewAccounts)
 	r.Get("/source-accounts/lookup", rs.lookupReviewAccounts)
 	r.Get("/source-accounts/{account}", rs.reviewAccount)
@@ -275,6 +277,10 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 }
 
 func nativeArchiveError(w http.ResponseWriter, err error) {
+	if errors.Is(err, models.ErrPerformerSourceLimit) {
+		ingestJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "performer_source_limit", "message": "Performer identity history exceeds the bounded review limit."})
+		return
+	}
 	if errors.Is(err, models.ErrSourcePostBrowseInvalid) {
 		ingestError(w, ingest.ErrInvalid)
 		return

@@ -94,6 +94,8 @@ type SourceAccountReaderWriter interface {
 	Ownership(context.Context, string) (*AccountOwnershipDecision, error)
 	OwnershipHistory(context.Context, string, int, int) ([]*AccountOwnershipDecision, error)
 	DecideOwnership(context.Context, AccountOwnershipInput) (*AccountOwnershipDecision, error)
+	PerformerAccounts(context.Context, string, string, int) (*PerformerSourceAccounts, error)
+	PerformerIdentities(context.Context, string, string, int) (*PerformerSourceIdentities, error)
 	ReviewAccounts(context.Context, AccountReviewFilter) ([]AccountReviewState, error)
 	ReviewAccount(context.Context, string) (*AccountReviewState, error)
 	ReviewOwnershipHistory(context.Context, string, int, int) ([]AccountReviewOwnership, error)

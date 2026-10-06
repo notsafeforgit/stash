@@ -1828,6 +1828,8 @@ different services remain separate while sharing a chosen performer UUID.
 | `GET /source-accounts/<uuid>/identifiers?after=<uuid>&limit=N` | All identifiers, including those retained from consolidated accounts |
 | `GET /source-account-identifiers/<uuid>/evidence?after=<key>&limit=N` | Retained evidence and observation interval for the selected claim |
 | `GET /source-accounts/<uuid>/ownership-history?after=<revision>&limit=N` | Previous explicit decisions, in ascending revision order |
+| `GET /entities/<performer-uuid>/source-accounts?after=<account-uuid>&limit=N` | Currently linked canonical accounts, following retained performer redirects; includes the requested and resolved performer identities |
+| `GET /entities/<performer-uuid>/performer-identities?after=<identity-uuid>&limit=N` | Current and redirected performer UUIDs with original local IDs and creation/retirement times |
 | `POST /account-ownership/preview` | Reviewed current/proposed owner and digest; no writes |
 | `POST /account-ownership/apply` | Atomic ownership decision and retry receipt |
 | `GET /account-ownership/requests/<request-uuid>` | Original committed receipt, or 404 |
@@ -1838,6 +1840,20 @@ UUID, evidence key or ownership revision is the next cursor. Account card
 substring of labels or identifier values; namespace scopes remain distinct.
 Performer names and local IDs are display/navigation values. Deleted owners
 retain their UUID and state without a reusable local ID.
+
+The performer-specific reads accept only native performer UUIDs. Their reverse
+redirect lookup is bounded to 1,024 identities; larger groups return
+`422 performer_source_limit` rather than hiding a partial ownership set. Current
+ownership heads are joined through the performer and account indexes. Unlinked,
+undecided and superseded ownership decisions do not add accounts to this list.
+Consolidated accounts appear once under their canonical identity. A retained
+original library ID is historical evidence, never a link to a reused record.
+
+Performer pages expose these reads in the Source accounts desktop tab and mobile
+section. Existing links offer Manage account link, which opens the selected
+account's review controls. Identity history expands independently. Empty source
+accounts are normal for directly scanned or purchased media; opening this view
+does not create accounts, source posts or depicted-performer assignments.
 
 A linking preview requires an explicit native performer identity:
 

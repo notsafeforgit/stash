@@ -192,6 +192,14 @@ independently. Shared post text is grouped by revision; rejected links and
 deleted library identities remain inspectable. This page makes no mutations;
 account/media links lead to their existing review workflows.
 
+Performer detail pages add a Source accounts tab/mobile section backed by
+`performer-source-api.ts`. It resolves the local performer once per account page
+to a native identity and follows recorded UUID redirects on the server. Existing
+links open their selected account review; no name-based ownership is inferred.
+Identity history loads separately on expansion and treats old local IDs as
+historical values. If the canonical performer changes between pages, the view
+requires a fresh read instead of combining incompatible results.
+
 The selected account also offers explicit consolidation of duplicate records on
 one service. `account-consolidation-api.ts` validates the reviewed components,
 resulting owner, stable-ID conflicts and exact event receipt. The picker scopes

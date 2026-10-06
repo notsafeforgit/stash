@@ -52,6 +52,7 @@ stash-import-automation-discovery = "stash_ingest.automation_discovery_import:ma
 stash-activate-automation-discovery = "stash_ingest.discovery_activation:main"
 stash-import-enrichment-checkpoints = "stash_ingest.automation_checkpoint_import:main"
 stash-import-catalog-enrichment = "stash_ingest.catalog_enrichment_import:main"
+stash-import-catalog-cleanup = "stash_ingest.catalog_cleanup_import:main"
 stash-import-catalog-documents = "stash_ingest.catalog_document_import:main"
 stash-backfill-source-albums = "stash_ingest.album_backfill:main"
 

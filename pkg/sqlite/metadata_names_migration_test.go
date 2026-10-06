@@ -13,6 +13,7 @@ import (
 
 func removeMetadataNameSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeCatalogCleanupSchema(t, raw)
 	_, err := raw.Exec(`DROP INDEX metadata_studio_names; DROP INDEX metadata_studio_aliases;
  DROP INDEX metadata_tag_names; DROP INDEX metadata_tag_aliases; DROP INDEX metadata_group_names;
  DELETE FROM native_migration_history WHERE version=1000079;`)

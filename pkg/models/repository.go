@@ -63,6 +63,8 @@ type Repository struct {
 	DiscoveryMatch              DiscoveryMatchReaderWriter
 	DiscoveryDetail             DiscoveryDetailReaderWriter
 	TranslationPolicy           TranslationPolicyReaderWriter
+	CatalogCleanupImport        CatalogCleanupImportReaderWriter
+	SourceCleanupIntent         SourceCleanupIntentReader
 	CatalogEnrichmentImport     CatalogEnrichmentImportReaderWriter
 	SourceEnrichmentReceipt     SourceEnrichmentReceiptReader
 	CatalogTranslationImport    CatalogTranslationImportReaderWriter

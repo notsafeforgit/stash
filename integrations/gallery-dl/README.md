@@ -1101,6 +1101,29 @@ attempt, or assert that all child metadata was retrieved. Queue/cooldown import
 and activation remain separate; `imported:false` still means the entire catalog
 migration is not complete. See [historical enrichment receipts](../../docs/native-schema.md#historical-enrichment-receipts).
 
+Retain historical metadata cleanup with native schema 1000080 after the evidence
+pass:
+
+```sh
+stash-import-catalog-cleanup --snapshot /migration/prepared/CATALOG_ID \
+  --expected-sha256 MANIFEST_SHA256 --endpoint STASH_ORIGIN
+```
+
+The command uses the application API key and resumes the last committed source
+ordinal. Exit 0 means all queue entries were retained as held intent, including
+an absent or empty queue; exit 2 means malformed entries need review; exit 1
+means failure or an unavailable response. Retry the same frozen snapshot and
+digest after an interruption or lost response. Inspect
+`/api/v3/archive/catalog-snapshots/SNAPSHOT_UUID/cleanup-import/records`, or
+append `/ORDINAL` for the original values and native intent reference.
+
+This old queue records unfinished background metadata cleanup following a catalog
+prune. Importing it preserves the original catalog scope and timestamp without
+deleting media, removing recreated posts or cancelling native work. The intents
+remain held; execution and reviewed disposition require separate native retention
+work. `imported:false` still means the whole catalog migration is incomplete.
+See [historical metadata cleanup](../../docs/native-schema.md#historical-metadata-cleanup).
+
 ## Frozen automation input
 
 Prepare the separate automation database from a consistent SQLite backup:

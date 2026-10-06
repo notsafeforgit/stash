@@ -787,6 +787,16 @@ not apply scene/image metadata or complete the whole catalog migration.
 Native document UI remains separate transition work.
 See [retained documents](docs/native-schema.md#retained-source-documents).
 
+`stash-import-catalog-cleanup` retains the optional `metadata_prune_queue` in
+schema 1000080 after snapshot receipt and evidence mapping. Preserve its source
+scope and timestamp as immutable held intent, with bounded atomic progress and
+raw review evidence for malformed rows. The legacy queue completed background
+metadata cleanup after a catalog prune; it must not delete media, forget a
+recreated post or cancel current native work during import. No execution/release
+route is supplied. Keep whole-catalog completion false until reconciliation and
+the remaining transition work pass. See
+[historical cleanup](docs/native-schema.md#historical-metadata-cleanup).
+
 `SourceTranslation` in schema 1000043 shares exact original/output text and
 nullable language/provider facts, with separate immutable post provenance.
 `stash-import-catalog-translations` imports frozen rows in bounded transactions

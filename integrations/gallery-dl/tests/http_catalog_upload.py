@@ -24,6 +24,7 @@ from stash_ingest.catalog_membership_import import CatalogMembershipClient, main
 from stash_ingest.catalog_document_import import CatalogDocumentClient, main as document_main
 from stash_ingest.catalog_translation_import import CatalogTranslationClient, main as translation_main
 from stash_ingest.catalog_enrichment_import import CatalogEnrichmentClient, main as enrichment_main
+from stash_ingest.catalog_cleanup_import import main as cleanup_main
 from stash_ingest.encoding import digest, encode
 from test_catalog_registry_import import registry_fixture
 from test_catalog_snapshot import CATALOG_ID, CAPTURED, catalog_fixture
@@ -87,6 +88,10 @@ def run():
         db.execute("CREATE TABLE enrichment_receipts(post_key TEXT NOT NULL,version INTEGER NOT NULL,completed_at TEXT NOT NULL,details_json TEXT NOT NULL,PRIMARY KEY(post_key,version))")
         db.execute("INSERT INTO enrichment_receipts VALUES('reddit:post:album',1,?,?)", (CAPTURED,
                    '{"attachment_links_enriched":3,"unresolved_children":2}'))
+        db.execute("CREATE TABLE metadata_prune_queue(post_key TEXT PRIMARY KEY,pruned_at TEXT NOT NULL)")
+        for index in range(55):
+            key = ["reddit:post:album", "reddit:post:local-alias"][index] if index < 2 else f"reddit:post:removed{index:02}"
+            db.execute("INSERT INTO metadata_prune_queue VALUES(?,?)", (key, CAPTURED))
     original = source.read_bytes()
     snapshot = directory / "snapshot"
     with patch("stash_ingest.catalog_snapshot.MAX_CHUNK_ROWS", 2):
@@ -105,6 +110,12 @@ def run():
     assert mapped["state"] == "mapped" and mapped["imported"] is False
     assert mapped["capture_mappings"] == 56 and mapped["profile_mappings"] == 2
     assert mapped["processed_records"] == mapped["source_records"] == 60
+    execute(cleanup_main, args, 1)  # Held evidence committed; response lost.
+    cleanup = execute(cleanup_main, args)
+    assert cleanup == execute(cleanup_main, args)
+    assert cleanup["state"] == "retained" and cleanup["imported"] is False
+    assert cleanup["processed_records"] == cleanup["source_records"] == cleanup["held_records"] == 55
+    assert cleanup["review_records"] == 0
     execute(relations_main, args, 1)  # The first relationship batch committed; response lost.
     relationships = execute(relations_main, args, 2)
     assert relationships == execute(relations_main, args, 2)

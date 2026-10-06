@@ -1902,6 +1902,46 @@ list and `/records/{ordinal}` detail. Native receipts are available at
 These are historical inspection/import routes. Queue/cooldown migration and
 reviewed activation are separate operations.
 
+## Historical metadata cleanup
+
+Schema 1000080 adds `source_cleanup_intents`, `catalog_cleanup_imports` and
+`catalog_cleanup_records`. The `catalog-cleanup-v1` pass retains the optional
+`metadata_prune_queue` family after snapshot receipt and post-evidence mapping.
+Each transaction processes at most 50 records or 16 MiB, with the held intent,
+source outcome and cursor committed together. Retry uses the original manifest
+digest and last source ordinal. Completed progress is read without another write.
+
+The old queue recorded a catalog metadata removal that still needed cleanup of
+background enrichment, discovery and translation targets in the separate
+automation database. Its consumer rechecked whether the post or an alias had
+been recreated before deleting those targets. An entry is historical evidence;
+it is not authorization to delete a media file or cancel current native work.
+
+Each valid entry becomes an immutable `held` intent of kind `background_targets`
+in the catalog's original collection revision 1. Its reference namespace includes
+the original registry source and catalog, and its value and timestamp preserve
+`post_key` and `pruned_at` exactly. Missing posts are expected; no native post is
+invented. Existing posts, captures, aliases, queued work and shared translation
+results remain untouched. Malformed entries retain their original source values
+and a review reason without creating an intent. Native retention execution and
+reviewed disposition remain separate work; these import routes cannot release
+or execute an intent.
+
+Progress ends as `retained` when every entry was held, including an absent or
+empty queue, or `review` when some rows need review. Both retain
+`imported:false`: this pass does not certify the whole catalog migration.
+Startup reconciles each intent with its immutable source record, original scope,
+timestamp and import counters. Ordinary archive backups include these tables;
+anonymisation removes their private values and migration receipts.
+
+Application-authenticated APIs expose GET/POST progress at
+`/api/v3/archive/catalog-snapshots/{snapshot}/cleanup-import`, bounded source
+summaries at `/records` and original values at `/records/{ordinal}`. Inspect a
+native intent through `/api/v3/archive/cleanup-intents/{intent}`, or list a
+collection's intents through
+`/api/v3/archive/collections/{collection}/cleanup-intents` using a UUID cursor and
+limit 1–100. These routes expose no delete, release or execution action.
+
 ## Frozen enrichment work
 
 Schema 1000058 adds `automation_enrichment_imports` and

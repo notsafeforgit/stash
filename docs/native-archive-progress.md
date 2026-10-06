@@ -11,7 +11,7 @@ review. Production has not been migrated.
 Implementation spans phases 1–6. The native schema, archive services and
 producer transport are substantial, and all 1,697 frozen catalog bodies have
 been imported and reconciled on isolated copies. This does not close catalog
-migration: historical policies, remaining operational families, review resolution
+migration: historical policies, operational reconciliation, review resolution
 and a complete cutover reconciliation are still required.
 
 Durable enrichment execution, queued-job dispatch, stale-job maintenance and
@@ -8973,9 +8973,59 @@ package timeout override. All five frozen source hashes match the successful run
 This increment changes no schema or UI assets; the independently verified
 schema-1000079 rehearsal remains the migration baseline.
 
-Separately, the browser CI for `354693922` reported one WebKit shared-video
-preview failure in shard 4: playback stayed at time zero. Build, lint and image
-publication passed. The same browser test passed twice in the local isolated
-runtime; investigation of the complete sharing suite and CI remains open.
-This local fork-gate result does not resolve that separate browser failure or
-the broader migration, caller conversion, backup and production cutover gates.
+Separately, the browser CI for `354693922` initially reported one WebKit
+shared-video preview failure in shard 4: playback stayed at time zero. The
+targeted test passed twice locally, all 11 local sharing workflows passed, and
+the failed-job CI rerun passed on attempt 2. No UI change was needed; the original
+failure's cause was not established. Build, lint and image publication also
+passed for `112a266fb`. Broader migration, caller conversion, backup and
+production cutover gates remain open.
+
+## Retained catalog cleanup and complete source coverage — 2026-10-05
+
+Schema 1000080 retains historical `metadata_prune_queue` entries as immutable,
+held native cleanup intents. Those original requests concern obsolete background
+metadata targets; they are not media-deletion commands. The importer preserves
+the original collection revision, namespaced post key and request time even
+when that post no longer exists. Malformed entries retain their original bytes
+with a review outcome. No current post, file, alias or background target is
+deleted or cancelled by this import.
+
+The bounded native API and standard-library client support resumed batches,
+inspection and lost-response recovery. Focused tests cover nonempty queues,
+malformed records, absent/empty queues, changed cursors and source hashes,
+transaction rollback, schema collisions, startup integrity and anonymisation.
+The complete fork gate passed in 1,603 seconds: 612 UI tests, 529 producer tests,
+eight library tests, 108 archive tests, 262 backup tests, zero lint issues and
+every tagged Go package. API and SQLite tests took 1,186 and 1,311 seconds with
+the documented 30-minute package timeout override. All 25 frozen source hashes
+match the successful run.
+
+The populated migration passed in 295 seconds. A real Python client imported
+cleanup progress for all 1,697 frozen catalogs through an isolated application
+API in 99 seconds after opening the database; a deliberately lost response
+recovered the same receipt. These snapshots contain no queued cleanup entries,
+so populated behavior for nonempty queues is established by the regression
+fixtures, not claimed from this archive. Independent comparison passed in
+745 seconds: all 36,972,108 typed rows in 277 pre-existing tables and every
+original schema object survived unchanged, with exactly the three new tables
+and their declared indexes/triggers. Integrity checks passed with no foreign-key
+violations. A fresh application reopen passed in 129 seconds, returning all
+1,697 cleanup receipts unchanged and preserving the seven disabled policy
+imports, eight discovery activation receipts, 757 bound targets and 188 recovery
+targets. Schema 1000080 is the latest fully verified rehearsal.
+
+A separate read-only audit compared all 1,697 original manifests, exact
+`catalog_info` values, staged record counts/bytes and required source ordinals
+against the eleven native import passes. All 22 retained record families and
+4,764,236 original rows have their expected outcomes, including explicit review
+and unavailable-evidence outcomes. There are no missing or extra outcomes and
+no inconsistent counters or source bindings. The audit took 69 seconds. This
+closes the frozen catalog source-coverage gap; it does not replace domain
+reconstruction checks, historical policy conversion, operational reconciliation
+or the fresh production cutover inventory.
+
+Historical policies remain disabled drafts. Cleanup execution/review disposition,
+remaining UI/caller conversion, backup activation and production cutover remain
+separate work. Live services, workers, bucket policies and the frozen compatible
+release are unchanged.

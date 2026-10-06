@@ -43,7 +43,7 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 	handler := http.StripPrefix("/api/v3/archive", router)
 	var lostBegin, lostChunk, lostEvidence, lostRelations, lostPublisher, lostAttachment atomic.Bool
 	var lostMediaBegin, lostMediaAdvance, lostMembership, lostDocument, lostTranslation, lostEnrichment atomic.Bool
-	var lostFileHistory atomic.Bool
+	var lostFileHistory, lostCleanup atomic.Bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("ApiKey") != "fixture-application-key" || r.Header.Get("Authorization") != "" {
 			w.WriteHeader(http.StatusUnauthorized)
@@ -63,9 +63,10 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/document-import") && !lostDocument.Swap(true)) ||
 			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/translation-import") && !lostTranslation.Swap(true)) ||
 			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/file-history-import") && !lostFileHistory.Swap(true)) ||
-			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/enrichment-import") && !lostEnrichment.Swap(true)))
+			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/enrichment-import") && !lostEnrichment.Swap(true)) ||
+			(r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/cleanup-import") && !lostCleanup.Swap(true)))
 		if drop {
-			if strings.HasSuffix(r.URL.Path, "/evidence-import") || strings.HasSuffix(r.URL.Path, "/relations-import") || strings.HasSuffix(r.URL.Path, "/publisher-import") || strings.HasSuffix(r.URL.Path, "/attachment-import") || strings.HasSuffix(r.URL.Path, "/media-import/advance") || strings.HasSuffix(r.URL.Path, "/membership-import") || strings.HasSuffix(r.URL.Path, "/document-import") || strings.HasSuffix(r.URL.Path, "/translation-import") || strings.HasSuffix(r.URL.Path, "/file-history-import") {
+			if strings.HasSuffix(r.URL.Path, "/evidence-import") || strings.HasSuffix(r.URL.Path, "/relations-import") || strings.HasSuffix(r.URL.Path, "/publisher-import") || strings.HasSuffix(r.URL.Path, "/attachment-import") || strings.HasSuffix(r.URL.Path, "/media-import/advance") || strings.HasSuffix(r.URL.Path, "/membership-import") || strings.HasSuffix(r.URL.Path, "/document-import") || strings.HasSuffix(r.URL.Path, "/translation-import") || strings.HasSuffix(r.URL.Path, "/file-history-import") || strings.HasSuffix(r.URL.Path, "/cleanup-import") {
 				var progress struct {
 					State     string `json:"state"`
 					Processed int    `json:"processed_records"`
@@ -113,11 +114,14 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 	require.True(t, lostTranslation.Load())
 	require.True(t, lostEnrichment.Load())
 	require.True(t, lostFileHistory.Load())
+	require.True(t, lostCleanup.Load())
 	var relationOrdinal, publisherOrdinal, attachmentOrdinal, mediaOrdinal, membershipOrdinal, documentOrdinal int64
 	var translation models.CatalogTranslationRecord
 	var enrichment models.CatalogEnrichmentRecord
 	var fileHistory models.CatalogFileHistoryRecord
 	var history *models.SourceFileHistory
+	var cleanup models.CatalogCleanupRecord
+	var intent *models.SourceCleanupIntent
 	var membershipCollection, membershipPost string
 	require.NoError(t, repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
 		receipt, err := repo.CatalogSnapshot.Find(ctx, snapshot)
@@ -159,6 +163,13 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, enrichments, 1)
 		enrichment = enrichments[0]
+		cleanupRows, err := repo.CatalogCleanupImport.Records(ctx, snapshot, 0, 1)
+		require.NoError(t, err)
+		require.Len(t, cleanupRows, 1)
+		cleanup = cleanupRows[0]
+		intent, err = repo.SourceCleanupIntent.Find(ctx, *cleanup.IntentUUID)
+		require.NoError(t, err)
+		require.Equal(t, "held", intent.State)
 		historyRows, err := repo.CatalogFileHistoryImport.Records(ctx, snapshot, 0, 1)
 		require.NoError(t, err)
 		require.Len(t, historyRows, 1)
@@ -174,6 +185,25 @@ func TestPythonCatalogSnapshotUploadResumesLostResponses(t *testing.T) {
 		method, path, contentType string
 		status                    int
 	}{
+		{"GET", "/catalog-snapshots/" + snapshot + "/cleanup-import", "", 200},
+		{"GET", "/catalog-snapshots/" + snapshot + "/cleanup-import/records?limit=1", "", 200},
+		{"GET", "/catalog-snapshots/" + snapshot + "/cleanup-import/records?limit=101", "", 400},
+		{"GET", "/catalog-snapshots/" + snapshot + "/cleanup-import/records?after=-1", "", 400},
+		{"GET", "/catalog-snapshots/" + snapshot + "/cleanup-import/records/" + strconv.FormatInt(cleanup.Ordinal, 10), "", 200},
+		{"GET", "/catalog-snapshots/" + snapshot + "/cleanup-import/records/0", "", 400},
+		{"GET", "/catalog-snapshots/" + snapshot + "/cleanup-import/records/999999", "", 404},
+		{"GET", "/catalog-snapshots/" + uuid.NewString() + "/cleanup-import", "", 404},
+		{"GET", "/catalog-snapshots/" + uuid.NewString() + "/cleanup-import/records", "", 404},
+		{"POST", "/catalog-snapshots/" + snapshot + "/cleanup-import", "application/json", 400},
+		{"POST", "/catalog-snapshots/" + snapshot + "/cleanup-import", "text/plain", 400},
+		{"GET", "/cleanup-intents/" + intent.UUID, "", 200},
+		{"GET", "/cleanup-intents/invalid", "", 400},
+		{"GET", "/cleanup-intents/" + uuid.NewString(), "", 404},
+		{"GET", "/collections/" + intent.CollectionUUID + "/cleanup-intents?limit=1", "", 200},
+		{"GET", "/collections/" + intent.CollectionUUID + "/cleanup-intents?limit=101", "", 400},
+		{"GET", "/collections/" + intent.CollectionUUID + "/cleanup-intents?after=invalid", "", 400},
+		{"GET", "/collections/" + uuid.NewString() + "/cleanup-intents", "", 404},
+		{"GET", "/collections/invalid/cleanup-intents", "", 400},
 		{"GET", "/catalog-snapshots/" + snapshot + "/file-history-import", "", 200},
 		{"GET", "/catalog-snapshots/" + snapshot + "/file-history-import/records?limit=1", "", 200},
 		{"GET", "/catalog-snapshots/" + snapshot + "/file-history-import/records?limit=101", "", 400},

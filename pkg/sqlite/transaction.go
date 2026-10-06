@@ -218,6 +218,8 @@ func (db *Database) Repository() models.Repository {
 		DiscoveryDetail:             &DiscoveryDetailStore{},
 		DiscoveryMatch:              &DiscoveryMatchStore{},
 		TranslationPolicy:           &TranslationPolicyStore{},
+		CatalogCleanupImport:        &CatalogCleanupImportStore{},
+		SourceCleanupIntent:         &SourceCleanupIntentStore{},
 		CatalogEnrichmentImport:     &CatalogEnrichmentImportStore{},
 		SourceEnrichmentReceipt:     &SourceEnrichmentReceiptStore{},
 		CatalogTranslationImport:    &CatalogTranslationImportStore{},

@@ -9115,3 +9115,33 @@ producer implementation or admission checks changed. The preceding translation
 commit passed the complete fork gate; this focused follow-up did not repeat the
 unchanged UI, producer, archive or backup suites. The schema-1000080 rehearsal
 remains current. Live services and imported policy activation are unchanged.
+
+
+## Strict UTC dates in native and plugin mappings — 2026-10-05
+
+The shared jq evaluator now provides `utc_date` for calendar dates and explicitly
+zoned RFC3339 timestamps, including fractional seconds. It converts an instant
+to UTC before selecting its day, retains date-only input, and reports invalid
+calendar values or timezone-less timestamps. Missing values return null so a
+rule can explicitly omit or clear them. Original source timestamps and date
+basis remain unchanged. Native and plugin documentation include an omission
+rule that preserves existing dates when the source provides none.
+
+Inspection reproduced two problems with a simple stock jq recipe: fractional
+seconds were rejected, and February 30 silently became March 2. The new filter
+rejects invalid dates and offsets, supports UTC day crossings and nanoseconds,
+and never reads the host timezone. Focused jq, plugin, metadata, SQLite and native
+HTTP tests passed in 22 seconds, including application provenance, invalid-date
+review and protection of an explicitly cleared date. Repository lint reports
+zero issues. All seven implementation and documentation hashes match validation.
+
+A read-only audit examined all 379,449 retained post revisions: 264,884 calendar
+dates, 29,078 whole-second timestamps, 78,333 fractional timestamps and 7,154
+missing dates. The actual jq evaluator matched independent Python projections
+for all 102,537 distinct values in 256-value batches. No invalid or timezone-less
+value occurs in this frozen input; rejection behavior is verified by fixtures.
+This comparison excludes full source loading and HTTP/browser latency.
+
+Schema 1000080 and the existing selected media metadata are unchanged. No policy
+was activated or applied to the rehearsal library. Full file/folder/source rule
+conversion and the remaining release gates continue separately.

@@ -45,6 +45,18 @@ func TestJQLimitsAndIsolation(t *testing.T) {
 	require.Equal(t, []interface{}{nil, false, []interface{}{}}, result)
 }
 
+func TestPluginMappingsUseStrictUTCDateFilter(t *testing.T) {
+	mapping := map[string]interface{}{"date": ".published_at | utc_date | select(. != null)"}
+	result, err := EvaluateMappings(context.Background(), mapping, map[string]interface{}{"published_at": "2026-09-29T22:37:08.123456789-07:00"})
+	require.NoError(t, err)
+	require.Equal(t, map[string]interface{}{"date": "2026-09-30"}, result)
+	result, err = EvaluateMappings(context.Background(), mapping, map[string]interface{}{})
+	require.NoError(t, err)
+	require.Empty(t, result)
+	_, err = EvaluateMappings(context.Background(), mapping, map[string]interface{}{"published_at": "2026-02-30"})
+	require.ErrorContains(t, err, "utc_date")
+}
+
 func TestSettingManifestAndValidation(t *testing.T) {
 	c, err := loadPluginFromYAML(strings.NewReader(`apiVersion: 3
 name: Fixture

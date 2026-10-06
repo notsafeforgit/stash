@@ -29,7 +29,7 @@ func Compile(expression string) (*gojq.Code, error) {
 		return nil, fmt.Errorf("invalid jq expression: %w", err)
 	}
 	// Deliberately omit module, environment and input loaders.
-	return gojq.Compile(query)
+	return gojq.Compile(query, gojq.WithFunction("utc_date", 0, 0, utcDate))
 }
 
 // normalizeJQ accepts GraphQL's JSON numbers as well as native Go values, without

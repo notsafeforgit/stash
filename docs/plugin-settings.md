@@ -213,6 +213,22 @@ Mappings share one deadline. These are execution and serialized-size limits,
 not a hard process memory limit. Integer precision is retained in the backend;
 browser JavaScript retains its usual JSON number precision limits.
 
+Stash also provides the pure `utc_date` filter. It accepts a calendar date
+(`YYYY-MM-DD`) or an RFC3339 timestamp with an explicit timezone, including
+fractional seconds, and returns the UTC calendar date. For example,
+`"2026-09-29T22:37:08.123456789-07:00" | utc_date` returns `"2026-09-30"`.
+Date-only input keeps its day. Surrounding whitespace is ignored; null, empty
+and whitespace-only input return null. Invalid dates, timezone-less timestamps,
+non-string values and dates outside years 0001–9999 produce an error. Input is
+limited to 64 bytes after trimming. No host timezone is assumed and an invalid
+date is never rolled forward into another month.
+
+Use `.published_at | utc_date | select(. != null)` to omit missing dates while
+reporting invalid ones. A direct `utc_date` result of null remains an explicit
+null value under the ordinary mapping rules. The same filter is available to
+native collection policies and plugin/browser jq callers; it does not modify
+the original input or load any external data.
+
 ## v3 browser host
 
 The host has additive APIs within version 1:

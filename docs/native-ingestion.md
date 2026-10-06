@@ -1435,6 +1435,21 @@ value invalidates an earlier Apply digest. Explicit and preserved entity values
 keep their precedence. Completing translation work alone does not apply this
 mapping to existing scenes/images.
 
+Use this date mapping to turn a known source timestamp into Stash's calendar
+date without losing timezone information before selecting its day:
+
+```jq
+.source.metadata.published_at | utc_date | select(. != null)
+```
+
+The [strict `utc_date` filter](plugin-settings.md#jq-api) accepts date-only values
+and RFC3339 timestamps, including fractional seconds and offsets. Missing values
+omit the mapping. Invalid calendar dates and timezone-less timestamps require
+review; they are not silently corrected or assigned the server's timezone.
+The capture's original `published_at` and `date_basis` remain unchanged. A
+historical producer's known UTC convention needs an explicit conversion rule
+if its retained timestamps lack offsets.
+
 Only typed curated fields from `MetadataFields` are accepted. Identity, file
 fingerprints, jobs and raw source evidence are not mapping targets. Relationships
 use native UUIDs; redirects resolve to the surviving identity and deleted targets

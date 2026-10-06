@@ -269,7 +269,8 @@ func (s *IngestStore) RecordReceipt(ctx context.Context, input models.IngestRece
 		}
 	}
 	validKind := input.Kind == "source.capture" && input.CaptureUUID != "" && input.JobUUID == "" ||
-		input.Kind == "file.completed" && input.JobUUID != "" && input.RootUUID != nil
+		input.Kind == "file.completed" && input.JobUUID != "" && input.RootUUID != nil ||
+		input.Kind == "attachment.download" && input.CaptureUUID != "" && input.JobUUID == "" && input.RootUUID != nil
 	if !validIngestDigest(input.Digest) || !validKind || (input.PostUUID == "") != (input.CaptureUUID == "") || input.CollectionRevision < 1 {
 		return nil, errors.New("invalid ingestion receipt")
 	}

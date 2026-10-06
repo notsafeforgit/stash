@@ -2841,3 +2841,28 @@ proof even after later edits; it never reruns a fetch or repeats capture effects
 Startup reconstructs both kinds of publication. Anonymisation deletes publication
 children before detail results. This migration does not release staged evidence,
 enable live scrapers or complete the broader catalog import.
+
+### Attachment download reports
+
+Migration 1000087 extends ingestion receipts with `attachment.download` and adds
+`source_attachment_downloads`. It preserves all prior receipts and adds no report
+for historical files. Each small immutable row binds a producer/event receipt to
+an existing download attempt, source capture and attachment. An optional final
+file event must belong to that exact attachment and capture, with matching run,
+collection revision and root; it retains its separate verification job.
+
+Unique indexes bound a transfer to one start and one terminal report. A durable
+producer sequence orders transfers within the original attempt independently of
+clock differences or delayed delivery. Foreign keys, insertion guards and a
+managed-transaction check prevent a report or receipt committing alone. Startup
+checks retained scope and transfer consistency. Anonymisation removes reports
+before receipts and source evidence; native backups and portable exports retain
+them. Original report and receipt contents survive restart and relocated restore.
+
+History uses an attachment/sequence index and pages at most 100 original reports.
+Its derived transfer state respects any retained terminal report, even when the
+start arrived later. An unfinished transfer is active only if its original
+producer/owner/fence still holds a live server lease. Neither a completed download
+report nor an old successful verification establishes current file availability.
+The read does not mutate run state or synthesize missing producer reports.
+See [the wire contract](native-ingestion.md#attachment-download-reports).

@@ -65,8 +65,9 @@ gate, populated migration/reopen and independent whole-row comparison also pass.
 The association editor passed staged client and browser checks and the integrated
 full fork gate, including 707 UI tests and the complete Go integration suite.
 Source-order mixed-media playback passed staged unit and browser checks and the
-integrated full fork gate, including 715 UI tests and complete Go integration. Per-attachment live download-state
-reporting still requires producer/server support.
+integrated full fork gate, including 715 UI tests and complete Go integration.
+Per-attachment download reporting now has a validated backend and reconciled
+schema-87 rehearsal. Producer lifecycle delivery and its UI remain in progress.
 
 Reviewed transfer of unstarted pending enrichment after collection edits now has
 an atomic API, saved-plan client and a passing full fork gate. Its populated
@@ -10206,3 +10207,41 @@ matched the passed gate before updating this validation record. This increment
 changes no schema or production state. Live attachment
 download reporting, manual intake, post consolidation, remaining caller and
 compatibility conversion, production backup proof and reviewed cutover remain open.
+
+## Attachment download reporting backend — 2026-10-06
+
+Schema 1000087 adds immutable download reports tied to exact source attachments,
+capture receipts and historical worker attempts. Reports distinguish started,
+downloaded, failed, excluded and skipped transfers. One start and one terminal
+report per transfer preserve original acknowledgements and delayed delivery.
+Downloaded reports require the exact attachment's file-verification receipt;
+they do not mark media imported or online. A bounded application history endpoint
+derives active/interrupted state from the current server lease and keeps file
+verification status separate. Reads leave metadata, associations and files intact.
+
+Focused service and SQLite checks pass for scoped ownership, late and reversed
+delivery, expiry, exact replay, conflicting phases/sequences, receipt failure
+rollback, missing-receipt commit rejection, restart, indexed history, anonymisation,
+startup corruption refusal and populated schema-86 receipt preservation. The real
+HTTP handler test and standalone export/relocated restore also pass. An HTTP
+fixture initially used a sub-millisecond source-window boundary, which the existing
+run contract rejects; correcting the fixture to millisecond precision passed.
+
+Sources and stage evidence are under `.local/native-attachment-download-20261006/`;
+validation receipts use `native_attachment_download_` in
+`.local/native-discovery-client-20261004/`. Existing ingestion/source-run and
+prior migration regression checks pass. Generation, embedded UI, 715 UI tests,
+540 producer tests, 8 library tests, 108 archive tests and 262 backup tests passed.
+The initial full command stopped on a test-only `sqlclosecheck` issue. Changing
+that query cleanup to `defer` was the only code edit before clean lint and the
+complete Go integration suite passed; both command results are retained in
+`combined-full-gate.json` rather than describing the initial command as successful.
+
+The full-copy schema-86 migration and fresh schema-87 reopen passed. Independent
+comparison verified all 40,255,446 original rows, preserving exact cell values,
+source evidence, metadata selections and disabled policies. Integrity passed with
+zero foreign-key violations. The only domain change is the empty download-report
+table and the receipt constraint expansion, with the expected migration history
+and version transition. Producer outbox and gallery-dl lifecycle delivery, album
+status UI and actual caller activation remain separate required work. Production
+remains unchanged.

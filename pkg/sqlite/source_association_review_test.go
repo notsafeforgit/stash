@@ -17,6 +17,7 @@ import (
 
 func removeSourceAssociationReviewSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeAttachmentDownloadSchema(t, raw)
 	_, err := raw.Exec("DROP TABLE attachment_media_reviews; DROP TABLE gallery_association_reviews; DELETE FROM native_migration_history WHERE version=1000086")
 	require.NoError(t, err)
 }

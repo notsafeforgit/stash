@@ -1066,6 +1066,55 @@ File event identities are qualified by producer. Replaying an event creates no
 new job; distinct file events retain separate provenance jobs and serialize on
 their destination. Source-run coalescing uses the separate traversal contract below.
 
+## Attachment download reports
+
+The server advertises `attachment_download_protocol: 1` and the
+`attachment.download` event kind. Each report is at most 16 KiB and uses the
+ordinary protocol/producer/event/run/collection/revision/root/observed-time
+envelope. It additionally supplies:
+
+| Field | Meaning |
+| --- | --- |
+| `owner_uuid`, `fence` | The original download run attempt's owner and fence |
+| `transfer_sequence` | Positive durable producer sequence, unique per transfer within this producer/run attempt; at most 2^53−1 |
+| `capture_event_uuid` | This producer's retained `source.capture` event in the same run, collection revision and root |
+| `attachment` | Qualified namespace/value identifying an attachment in that exact capture |
+| `state` | `started`, `downloaded`, `failed`, `excluded`, or `skipped` |
+| `file_event_uuid` | Required only for `downloaded`; the same attachment's acknowledged `file.completed` event |
+| `reason_code` | Required only for `failed`, `excluded`, or `skipped`; one of the values below |
+
+Failed reports accept `download_failed`, `postprocess_failed`, or `source_failure`.
+Exclusions accept `unsupported_media` or `filter`. Skips accept
+`archive_entry_without_file` or `existing_without_file`. Reports contain no raw
+error messages, credentials, source metadata, or local file paths.
+
+A transfer has at most one start and one terminal report. Reports retain separate
+event UUIDs and immutable receipts. An exact replay returns the original receipt;
+a second event for the same transfer phase conflicts. Terminal-before-start and
+late delivery after a finished or expired attempt are supported. The server
+checks the historical producer/owner/fence rather than treating late delivery as
+proof of a current lease. A transfer's capture, attachment, attempt and sequence
+cannot be reassigned.
+
+A successful item has status 200 and a `recorded` result with the attachment UUID,
+reported state and `media_ingested: false`. `downloaded` means the producer reports
+finished bytes and the exact file verification event has been accepted. Poll that
+**file event's** receipt status for verified registration and completed intake.
+The download-report receipt status acknowledges only retention of the report.
+
+The authenticated application exposes
+`GET /api/v3/archive/attachments/{attachment}/download-history?after=<sequence>&limit=<1..100>`.
+It returns bounded original reports in server receipt order, with their reported
+and recorded times, collection/root, and separately derived transfer state. An
+unfinished transfer is `downloading` only while its matching run attempt still
+owns a live lease; otherwise it is `interrupted`. A retained terminal report wins
+even if its start arrives later. Verification job/state remains separate. These
+rows describe individual transfers, not an attachment-wide assertion that media
+is online. Reading history changes no run, association, metadata, or files.
+
+Producer lifecycle delivery and album status controls are separate implementation
+work. Existing host/n8n scrapers have not been activated against this interface.
+
 ## Source-run coordination
 
 The server advertises `source_runs: true` and `source_run_protocol: 1`.

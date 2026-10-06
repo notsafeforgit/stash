@@ -98,6 +98,8 @@ var (
 )
 
 type SourceAttachmentReaderWriter interface {
+	RecordDownload(context.Context, AttachmentDownloadInput) error
+	DownloadHistory(context.Context, string, int64, int, time.Time) ([]AttachmentDownloadReport, error)
 	MediaReviewContext(context.Context, string) (*AttachmentMediaReviewContext, error)
 	MediaReviewHistory(context.Context, string, int, int) ([]AttachmentMediaReviewDecision, error)
 	PreviewMediaReview(context.Context, AttachmentMediaReviewInput) (*AttachmentMediaReviewPreview, error)

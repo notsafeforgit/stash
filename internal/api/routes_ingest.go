@@ -116,6 +116,10 @@ func ingestErrorCode(err error) (int, string) {
 		return http.StatusTooManyRequests, "queue_full"
 	case errors.Is(err, models.ErrSourceRunLease):
 		return http.StatusConflict, "lease_lost"
+	case errors.Is(err, models.ErrAttachmentDownloadConflict):
+		return http.StatusConflict, "conflict"
+	case errors.Is(err, models.ErrAttachmentDownloadInvalid):
+		return http.StatusBadRequest, "invalid_event"
 	case errors.Is(err, models.ErrBackfillIncomplete):
 		return http.StatusConflict, "backfill_incomplete"
 	case errors.Is(err, models.ErrSourceRunConflict), errors.Is(err, models.ErrBackfillConflict), errors.Is(err, models.ErrScanJournalConflict), errors.Is(err, models.ErrCatalogIdentityImportConflict), errors.Is(err, models.ErrCatalogRegistryImportConflict), errors.Is(err, models.ErrCatalogSnapshotConflict), errors.Is(err, models.ErrAutomationSnapshotConflict):
@@ -157,7 +161,7 @@ func (rs *ingestRoutes) capabilities(w http.ResponseWriter, r *http.Request) {
 		ingestError(w, err)
 		return
 	}
-	kinds := []string{"source.capture"}
+	kinds := []string{"source.capture", "attachment.download"}
 	if rs.fileIngestion {
 		kinds = append(kinds, "file.completed")
 	}
@@ -167,6 +171,7 @@ func (rs *ingestRoutes) capabilities(w http.ResponseWriter, r *http.Request) {
 		"kinds":      kinds, "post_namespaces": []string{"native:reddit", "native:twitter", "native:bluesky", "native:tiktok", "native:instagram", "native:patreon", "native:fansly"},
 		"post_namespace_prefixes": []string{"mirror:coomer:", "mirror:kemono:"},
 		"retention_policy":        archive.SourceRetentionVersion, "max_event_bytes": ingest.MaxEventBytes, "max_batch_bytes": ingest.MaxBatchBytes, "max_batch_events": ingest.MaxBatchEvents,
+		"attachment_download_protocol": 1, "max_attachment_download_bytes": ingest.MaxAttachmentDownloadBytes,
 		"max_file_event_bytes": ingest.MaxFileEventBytes, "file_ingestion": rs.fileIngestion,
 		"source_runs": true, "source_run_protocol": 1, "source_run_submission_receipts": true, "source_run_dispatch": true,
 		"source_run_recovery_protocol":          1,
@@ -189,7 +194,7 @@ func (rs *ingestRoutes) capabilities(w http.ResponseWriter, r *http.Request) {
 		"discovery_detail_admission_protocol":   1,
 		"max_discovery_detail_bytes":            archive.MaxEnrichmentTranscriptBytes,
 		"max_discovery_page_bytes":              archive.MaxDiscoveryPageBytes,
-		"receipt_semantics":                     "source.capture commits source evidence; file.completed queues verification; poll receipt status for media completion",
+		"receipt_semantics":                     "source.capture commits source evidence; attachment.download retains transfer reports; file.completed queues verification; poll file receipt status for media completion",
 	})
 }
 
@@ -294,6 +299,8 @@ func (rs *ingestRoutes) accept(r *http.Request, token string, item ingestBatchEv
 	switch kind {
 	case "source.capture":
 		return rs.service.Capture(r.Context(), token, item.Event, item.Digest)
+	case "attachment.download":
+		return rs.service.AttachmentDownload(r.Context(), token, item.Event, item.Digest)
 	case "file.completed":
 		if rs.fileIngestion {
 			return rs.service.FileCompleted(r.Context(), token, item.Event, item.Digest)

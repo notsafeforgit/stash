@@ -55,7 +55,7 @@ indexed scope checks and deterministic attachment representatives. Focused
 storage, migration, startup and portable-restore checks pass, as do the related
 HTTP checks and lint. The populated schema-89 migration, fresh reopen,
 independent whole-row reconciliation and complete integrated release gate now
-pass. The verified rehearsal is at schema 89. No application post-merge mutation
+pass. No application post-merge mutation
 is exposed; canonical media/gallery resolution and the complete merge workflow
 remain unfinished.
 
@@ -64,7 +64,10 @@ decisions retain their owners and explicit replacement proof; deleted media is
 not recreated. Gallery adoption retains existing galleries, manual members,
 covers and edited metadata. Focused history/retry, SQL guard, rollback, migration,
 startup, gallery regression and portable export/relocated-restore checks pass.
-The complete release gate and populated schema-90 migration remain pending.
+The complete release gate, populated schema-90 migration, fresh reopen and
+independent whole-row reconciliation now pass. The verified rehearsal is at
+schema 90; the superseded schema-89 database was retired after checking open
+handles, recovering 21.90 GB and retaining the original compatible snapshot.
 Equivalent attachment choices, canonical current readers and the complete
 reviewed merge API/UI still require integration before application use.
 
@@ -10611,6 +10614,18 @@ provenance regressions pass. Receipts and source hashes are under
 These are internal building blocks, without an application merge mutation route.
 Equivalent attachment choices, canonical current readers, the encompassing saved
 review/result, pending-publication guards and API/UI integration remain unfinished.
-The schema-90 full gate and populated migration/reconciliation remain pending;
-the authoritative populated rehearsal is still schema 89. Production, live workers
-and backup policies are unchanged.
+The complete release gate passed, including generation, embedded assets, 731 UI
+tests, the Python suites, clean Go lint and all Go integration tests. The actual
+populated migration took 149.44 seconds, with a fresh reopen in 146.41 seconds.
+Independent comparison checked all 40,512,439 original rows across 299 baseline
+tables: original application cells and column layouts remain unchanged. The
+schema marker advances once, one migration-history row is added, three scope
+guards change and the empty consolidation-proof table and its indexes/guards
+match their expected definitions. Integrity is `ok`, foreign-key violations are
+zero, and no merge, policy or source job was activated.
+
+The authoritative rehearsal now points to schema 90. After verifying no process
+held the superseded schema-89 files, those files were removed, recovering
+21.90 GB. The original compatible snapshot, current verified copy, comparison
+reports and source hashes remain. Production, live workers and backup policies
+are unchanged.

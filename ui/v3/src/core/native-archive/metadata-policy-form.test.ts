@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 import {
   policyDefinitionSchema,
+  policyMappingSchema,
   samePolicyDefinition,
 } from "./metadata-policy-api";
 import {
@@ -219,4 +220,76 @@ it("preserves previously saved native performer-name mappings until edited", () 
   ).toBe(true);
   values.scene.mappings[0]!.reference_names = true;
   expect(policyFormSchema(fields).safeParse(values).success).toBe(false);
+});
+
+it("round trips a name expression with an explicit performer default without treating the default as a name", () => {
+  const values = policyFormValues(null);
+  values.scene.mappings = [
+    {
+      id: "default",
+      target: "performers",
+      mode: "jq",
+      text: '.source.payload.actors | select(type == "array" and length > 0)',
+      reference_names: true,
+      performer_names: false,
+      fallback: '["10000000-0000-4000-8000-000000000001"]',
+    },
+  ];
+  const definition = policyDefinitionSchema.parse(
+    policyDefinitionFromForm(policyFormSchema(fields).parse(values)),
+  );
+  expect(definition.rules?.scene?.mappings?.performers).toEqual({
+    jq: values.scene.mappings[0]?.text,
+    reference_names: true,
+    fallback: ["10000000-0000-4000-8000-000000000001"],
+  });
+  const reloaded = policyFormValues({ definition });
+  expect(
+    samePolicyDefinition(definition, policyDefinitionFromForm(reloaded)),
+  ).toBe(true);
+  reloaded.scene.mappings[0]!.fallback = undefined;
+  expect(
+    policyDefinitionFromForm(reloaded).rules?.scene?.mappings?.performers,
+  ).not.toHaveProperty("fallback");
+});
+
+it("preserves explicit null and empty defaults and rejects defaults on fixed values", () => {
+  for (const fallback of [null, false, 0, "", [], { note: "default" }]) {
+    const mapping = policyMappingSchema.parse({ jq: "empty", fallback });
+    expect(mapping).toEqual({ jq: "empty", fallback });
+    const definition = policyDefinitionFromForm(policyFormValues(null));
+    if (definition.rules?.scene)
+      definition.rules.scene.mappings = { title: mapping };
+    expect(
+      samePolicyDefinition(
+        definition,
+        policyDefinitionFromForm(policyFormValues({ definition })),
+      ),
+    ).toBe(true);
+  }
+  const values = policyFormValues(null);
+  values.scene.mappings = [
+    {
+      id: "invalid",
+      target: "title",
+      mode: "jq",
+      text: "empty",
+      reference_names: false,
+      performer_names: false,
+      fallback: "not JSON",
+    },
+  ];
+  expect(policyFormSchema(fields).safeParse(values).success).toBe(false);
+  values.scene.mappings[0]!.fallback = '"Default"';
+  expect(policyFormSchema(fields).safeParse(values).success).toBe(true);
+  values.scene.mappings[0]!.mode = "value";
+  values.scene.mappings[0]!.text = '"Fixed"';
+  expect(policyFormSchema(fields).safeParse(values).success).toBe(false);
+  expect(
+    policyMappingSchema.safeParse({ value: "Fixed", fallback: "Default" })
+      .success,
+  ).toBe(false);
+  values.scene.enabled = false;
+  expect(policyFormSchema(fields).safeParse(values).success).toBe(true);
+  expect(policyDefinitionFromForm(values).rules).not.toHaveProperty("scene");
 });

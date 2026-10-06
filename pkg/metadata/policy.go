@@ -55,6 +55,7 @@ type Change struct {
 	Value              json.RawMessage `json:"value,omitempty"`
 	Origin             string          `json:"origin,omitempty"`
 	CaptureUUID        string          `json:"capture_uuid,omitempty"`
+	UsedFallback       bool            `json:"used_fallback,omitempty"`
 	ReferenceRevisions map[string]int  `json:"reference_revisions,omitempty"`
 	Names              []NameMatch     `json:"names,omitempty"`
 	Message            string          `json:"message,omitempty"`
@@ -193,6 +194,7 @@ func (s Service) preview(ctx context.Context, input Input, inspectInactive bool,
 		mapping, state := rule.Mappings[field], states[field]
 		change := Change{Field: field, Current: state.Value, Status: "protected"}
 		value, origin := mapping.Value, "policy"
+		names := mapping.UsesNames()
 		if mapping.JQ != "" {
 			if mappingErr != nil {
 				change.Status, change.Message = "review", mappingErr.Error()
@@ -203,7 +205,7 @@ func (s Service) preview(ctx context.Context, input Input, inspectInactive bool,
 				continue
 			}
 			output, exists := mapped[field]
-			if !exists {
+			if !exists && len(mapping.Fallback) == 0 {
 				change.Status = "omitted"
 				if state.Protected {
 					change.Status = "protected"
@@ -211,17 +213,21 @@ func (s Service) preview(ctx context.Context, input Input, inspectInactive bool,
 				ret.Changes = append(ret.Changes, change)
 				continue
 			}
-			value, err = json.Marshal(output)
-			if err != nil {
-				return nil, err
-			}
-			if capture != nil {
-				origin, change.CaptureUUID = "source", capture.UUID
+			if !exists {
+				value, names, change.UsedFallback = mapping.Fallback, false, true
+			} else {
+				value, err = json.Marshal(output)
+				if err != nil {
+					return nil, err
+				}
+				if capture != nil {
+					origin, change.CaptureUUID = "source", capture.UUID
+				}
 			}
 		}
 		change.Origin = origin
-		change.Value, change.ReferenceRevisions, change.Names, err = s.normalize(ctx, entity.Kind, field, value, mapping.UsesNames())
-		if err == nil && mapping.UsesNames() {
+		change.Value, change.ReferenceRevisions, change.Names, err = s.normalize(ctx, entity.Kind, field, value, names)
+		if err == nil && names {
 			unresolved := false
 			for _, name := range change.Names {
 				unresolved = unresolved || name.Status != "matched"

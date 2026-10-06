@@ -116,7 +116,7 @@ def canonical_binding(value):
         if mappings is not None and not isinstance(mappings, dict):
             raise InvalidData("Native mappings must be an object")
         for field, mapping in (mappings or {}).items():
-            if not isinstance(mapping, dict) or set(mapping) - {"jq", "value", "performer_names", "reference_names"}:
+            if not isinstance(mapping, dict) or set(mapping) - {"jq", "value", "performer_names", "reference_names", "fallback"}:
                 raise InvalidData("Unknown native mapping option")
             if mapping.get("jq") == "":
                 mapping.pop("jq")
@@ -132,6 +132,8 @@ def canonical_binding(value):
                 raise InvalidData("Name matching requires a relationship field")
             if ("jq" in mapping) == ("value" in mapping):
                 raise InvalidData("Mappings require exactly one expression or constant")
+            if "fallback" in mapping and "jq" not in mapping:
+                raise InvalidData("A fallback requires a jq expression")
     document = value["document"]
     if (not isinstance(document, dict) or set(document) != {"format", "version", "plugin_version", "captured_at", "source_files", "values"}
             or document["format"] != FORMAT or type(document["version"]) is not int or document["version"] != 1):

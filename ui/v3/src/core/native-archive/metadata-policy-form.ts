@@ -12,6 +12,7 @@ const mapping = z.object({
   target: z.string(),
   mode: z.enum(["jq", "value"]),
   text: z.string(),
+  fallback: z.string().optional(),
   performer_names: z.boolean(),
   reference_names: z.boolean(),
 });
@@ -56,6 +57,9 @@ export function policyFormValues(
           target,
           mode: "jq" in value ? "jq" : "value",
           text: "jq" in value ? value.jq : JSON.stringify(value.value, null, 2),
+          ...("jq" in value && value.fallback !== undefined
+            ? { fallback: JSON.stringify(value.fallback, null, 2) }
+            : {}),
           performer_names: value.performer_names ?? false,
           reference_names: value.reference_names ?? false,
         }),
@@ -86,7 +90,12 @@ export function policyDefinitionFromForm(
           row.target,
           {
             ...(row.mode === "jq"
-              ? { jq: row.text }
+              ? {
+                  jq: row.text,
+                  ...(row.fallback !== undefined
+                    ? { fallback: JSON.parse(row.fallback) }
+                    : {}),
+                }
               : { value: JSON.parse(row.text) }),
             ...(row.performer_names ? { performer_names: true } : {}),
             ...(row.reference_names ? { reference_names: true } : {}),
@@ -179,6 +188,15 @@ export function policyFormSchema(fields: PolicyFields) {
             }
           } catch {
             issue([...path, "text"], "invalid_value");
+          }
+        }
+        if (row.fallback !== undefined) {
+          if (row.mode !== "jq")
+            issue([...path, "fallback"], "invalid_fallback");
+          try {
+            JSON.parse(row.fallback);
+          } catch {
+            issue([...path, "fallback"], "invalid_value");
           }
         }
         if (row.target === "organized" && rules.mark_organized)

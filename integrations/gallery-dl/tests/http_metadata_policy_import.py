@@ -30,10 +30,15 @@ def run():
                               "enabled": False, "apply_to_scans": True, "rules": {"scene": {
                                   "on_create": True, "filename_title_fallback": True,
                                   "mappings": {
-                                      "title": {"jq": ".source.metadata.title // empty"},
+                                      "title": {"jq": ".source.metadata.title // empty", "fallback": "Default title"},
                                       "performers": {"value": ["Known alias"], "reference_names": True, "performer_names": False},
                                       "studio": {"value": "Studio alias", "reference_names": True},
-                                      "tags": {"jq": ".source.payload.tags // empty", "reference_names": True},
+                                      "tags": {"jq": ".source.payload.tags // empty", "reference_names": True, "fallback": []},
+                                      "date": {"jq": "empty", "fallback": None},
+                                      "rating100": {"jq": "empty", "fallback": 0},
+                                      "organized": {"jq": "empty", "fallback": False},
+                                      "details": {"jq": "empty", "fallback": ""},
+                                      "custom_fields": {"jq": "empty", "fallback": {"note": "default"}},
                                       "groups": {"value": [{"name": "Album", "scene_index": 3}], "reference_names": True}
                                   }}}}},
                "dispositions": {"python/set_organized_only_if": {"action": "review", "reason": "Artwork condition needs explicit conversion"},
@@ -47,6 +52,8 @@ def run():
     for field in ("performers", "studio", "tags", "groups"):
         assert mappings[field]["reference_names"] is True
     assert "performer_names" not in mappings["performers"]
+    for field in ("title", "tags", "date", "rating100", "organized", "details", "custom_fields"):
+        assert mappings[field]["fallback"] == binding["policy"]["definition"]["rules"]["scene"]["mappings"][field]["fallback"]
     frozen.write_bytes(encode(plan))
     reviewed = frozen.read_bytes()
     args += ["--apply", "--expected-sha256", plan["plan_sha256"]]

@@ -205,7 +205,10 @@ function ConstantValue({
   onChange,
 }: {
   api: MetadataPolicyAPI;
-  row: PolicyMappingValues;
+  row: Pick<
+    PolicyMappingValues,
+    "text" | "performer_names" | "reference_names"
+  >;
   field?: PolicyField;
   id: string;
   disabled: boolean;
@@ -405,6 +408,7 @@ export function PolicyMappingEditor({
                   target,
                   performer_names: false,
                   reference_names: false,
+                  fallback: undefined,
                   text:
                     row.mode === "jq"
                       ? "empty"
@@ -444,6 +448,7 @@ export function PolicyMappingEditor({
                 onChange({
                   ...row,
                   mode,
+                  fallback: undefined,
                   text:
                     mode === "jq"
                       ? "empty"
@@ -519,7 +524,7 @@ export function PolicyMappingEditor({
             <FieldDescription>
               {msg(
                 "metadata_policy.jq_help",
-                "Read .source, .entity and .context. Return empty to omit this field. Internal plugin settings are not included.",
+                "Read .source, .entity and .context. Return empty to use a default value if configured, or omit this field. Internal plugin settings are not included.",
               )}
             </FieldDescription>
           )}
@@ -541,6 +546,53 @@ export function PolicyMappingEditor({
                     "Use an array of names. For a fixed value, enter one name per line. An empty list clears the field.",
                   )}
           </FieldDescription>
+        )}
+        {row.mode === "jq" && (
+          <Field orientation="horizontal" data-disabled={disabled}>
+            <Checkbox
+              id={`${id}-use-fallback`}
+              checked={row.fallback !== undefined}
+              disabled={disabled}
+              onCheckedChange={(checked) =>
+                onChange({
+                  ...row,
+                  fallback: checked
+                    ? JSON.stringify(field?.clear_value ?? null)
+                    : undefined,
+                })
+              }
+            />
+            <FieldContent>
+              <FieldLabel htmlFor={`${id}-use-fallback`}>
+                {msg("metadata_policy.use_fallback", "Use a default value")}
+              </FieldLabel>
+              <FieldDescription>
+                {msg(
+                  "metadata_policy.fallback_help",
+                  "Used only when the expression returns empty. Explicit clears, expression errors and missing or ambiguous names do not use this default.",
+                )}
+              </FieldDescription>
+            </FieldContent>
+          </Field>
+        )}
+        {row.mode === "jq" && row.fallback !== undefined && (
+          <Field data-disabled={disabled}>
+            <FieldLabel htmlFor={`${id}-fallback`}>
+              {msg("metadata_policy.fallback_value", "Default value")}
+            </FieldLabel>
+            <ConstantValue
+              api={api}
+              id={`${id}-fallback`}
+              row={{
+                text: row.fallback,
+                performer_names: false,
+                reference_names: false,
+              }}
+              field={field}
+              disabled={disabled}
+              onChange={(fallback) => onChange({ ...row, fallback })}
+            />
+          </Field>
         )}
         <Button
           type="button"

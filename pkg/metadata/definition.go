@@ -48,6 +48,9 @@ func ValidateDefinition(def models.MetadataPolicyDefinition) error {
 			} else if !json.Valid(mapping.Value) {
 				return fmt.Errorf("mapping %q requires valid JSON", field)
 			}
+			if len(mapping.Fallback) != 0 && (mapping.JQ == "" || !json.Valid(mapping.Fallback)) {
+				return fmt.Errorf("mapping %q requires a jq expression and valid JSON for its fallback", field)
+			}
 			if mapping.PerformerNames && (field != "performers" || mapping.ReferenceNames) {
 				return errors.New("performer_names is only for performers and cannot be combined with reference_names")
 			}

@@ -9145,3 +9145,44 @@ This comparison excludes full source loading and HTTP/browser latency.
 Schema 1000080 and the existing selected media metadata are unchanged. No policy
 was activated or applied to the rehearsal library. Full file/folder/source rule
 conversion and the remaining release gates continue separately.
+
+
+## Typed defaults for native jq mappings — 2026-10-05
+
+Native jq mappings can now specify a destination-typed `fallback`. It is selected
+only when the expression returns an empty stream. Explicit null, false, zero,
+empty strings and empty arrays remain real results; expression errors and missing
+or ambiguous names still require review. Relationship defaults use native UUIDs,
+even when the expression resolves source names. This supports explicit performer
+or studio defaults for unsourced scans while retaining source metadata when it
+exists. Default decisions record policy provenance without inventing a capture.
+
+Save, draft-preview and migration-import paths validate every default and its
+references, including currently unused rules. Migration plans retain target
+revision guards and exact replay. Existing definitions omit the optional field,
+so their serialized bytes and digests remain stable. The producer migration
+client preserves null and empty values through actual API request hashing.
+
+The policy editor provides the existing typed value controls for defaults,
+including explicit relationship selection. It retains values across saves and
+reloads, clears incompatible defaults when changing the field or source mode,
+and explains when a preview uses a configured default. All 16 policy browser
+workflows passed in Chromium and WebKit; the final layout also passed the two
+focused workflows. Desktop/mobile before-and-after screenshots were reviewed.
+
+Focused native tests passed in 17 seconds, and real Python/API replay tests in
+14 seconds. They cover manual scans, source precedence, invalid defaults,
+ambiguous names, explicit clears, stale targets, redirects and restart. After
+building the real embedded UI, the complete fork gate passed in
+1463 seconds: 614 UI tests, 533 producer tests, eight library tests,
+108 archive tests, 262 backup tests, zero lint issues and every tagged Go package.
+API and SQLite tests took 1124 and 1281 seconds with the
+documented 30-minute package timeout override. All 20 source hashes match the
+successful run. An earlier invocation stopped on a missing final newline in a
+generated browser report; moving that report outside the UI source tree resolved
+the formatting failure without changing application code.
+
+Schema 1000080 remains the verified rehearsal baseline. The seven historical
+policies are still disabled; complete rule conversion and preview reconciliation
+remain open. Production services, workers, bucket settings and the frozen
+compatible release are unchanged.

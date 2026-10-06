@@ -33,6 +33,19 @@ class MetadataPolicyImportTests(unittest.TestCase):
         legacy = canonical_binding(self.binding({"performers": {"value": ["Alias"], "performer_names": True}}))
         self.assertTrue(legacy["policy"]["definition"]["rules"]["scene"]["mappings"]["performers"]["performer_names"])
 
+    def test_typed_fallbacks_preserve_empty_values_and_frozen_digests(self):
+        for value in (None, False, 0, "", [], {"note": "default"}, ["56c9895d-03c1-4a93-8c0d-fbd99d27de22"]):
+            with self.subTest(value=value):
+                mapping = {"jq": "empty", "fallback": value}
+                binding = canonical_binding(self.binding({"performers": mapping}))
+                self.assertEqual(mapping, binding["policy"]["definition"]["rules"]["scene"]["mappings"]["performers"])
+                self.assertEqual(binding, canonical_binding(binding))
+                without = canonical_binding(self.binding({"performers": {"jq": "empty"}}))
+                self.assertNotEqual(digest(native_json(without, 1 << 20)), digest(native_json(binding, 1 << 20)))
+        for mapping in ({"value": [], "fallback": []}, {"jq": "", "value": None, "fallback": None}):
+            with self.subTest(mapping=mapping), self.assertRaises(InvalidData):
+                canonical_binding(self.binding({"performers": mapping}))
+
     def test_invalid_name_switches_are_rejected_before_submission(self):
         for flag in ("reference_names", "performer_names"):
             for value in (None, 0, 1, "true", [], {}):

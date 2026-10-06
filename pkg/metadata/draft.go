@@ -27,10 +27,11 @@ func (s Service) PreviewDraft(ctx context.Context, input Input, definition model
 	// sample. Name collisions are review results, not malformed definitions.
 	for kind, rule := range definition.Rules {
 		for field, mapping := range rule.Mappings {
-			if len(mapping.Value) == 0 || mapping.UsesNames() {
+			value := mapping.TypedConstant()
+			if len(value) == 0 {
 				continue
 			}
-			if _, _, _, err := s.normalize(ctx, kind, field, mapping.Value, false); err != nil {
+			if _, _, _, err := s.normalize(ctx, kind, field, value, false); err != nil {
 				return nil, fmt.Errorf("%w: %s: %v", models.ErrMetadataPolicyInvalid, field, err)
 			}
 		}

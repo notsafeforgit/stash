@@ -14,11 +14,25 @@ type MetadataMapping struct {
 	Value          json.RawMessage `json:"value,omitempty"`
 	PerformerNames bool            `json:"performer_names,omitempty"`
 	ReferenceNames bool            `json:"reference_names,omitempty"`
+	Fallback       json.RawMessage `json:"fallback,omitempty"`
 }
 
 // PerformerNames remains readable in immutable native policy history. New
 // definitions can resolve any supported relationship with ReferenceNames.
 func (m MetadataMapping) UsesNames() bool { return m.PerformerNames || m.ReferenceNames }
+
+// TypedConstant returns the destination-typed value to validate and bind. A jq
+// fallback always uses native UUIDs, even when its expression resolves names.
+// An explicit JSON null remains distinct from an absent fallback.
+func (m MetadataMapping) TypedConstant() json.RawMessage {
+	if m.JQ != "" {
+		return m.Fallback
+	}
+	if m.UsesNames() {
+		return nil
+	}
+	return m.Value
+}
 
 type MetadataPolicyRule struct {
 	OnCreate              bool                       `json:"on_create"`

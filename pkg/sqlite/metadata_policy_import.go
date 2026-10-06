@@ -120,10 +120,10 @@ func (s *MetadataPolicyImportStore) Preview(ctx context.Context, input models.Me
 		FolderSources: input.FolderSources, ReviewKeys: review}
 	for kind, rule := range input.Policy.Definition.Rules {
 		for field, mapping := range rule.Mappings {
-			if len(mapping.Value) == 0 || mapping.UsesNames() {
+			value := mapping.TypedConstant()
+			if len(value) == 0 {
 				continue
 			}
-			value := mapping.Value
 			revisions := map[string]int{}
 			if metadataReferenceKind(field) != "" {
 				var targets []*models.ArchiveEntity

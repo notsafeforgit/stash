@@ -15,6 +15,7 @@ const mappingSchema = z
     z
       .object({
         jq: z.string().min(1).max(131072),
+        fallback: z.json().optional(),
         performer_names: z.boolean().optional(),
         reference_names: z.boolean().optional(),
       })
@@ -151,6 +152,7 @@ const previewSchema = z
           value: z.unknown().optional(),
           origin: z.string().optional(),
           capture_uuid: uuid.optional(),
+          used_fallback: z.boolean().optional(),
           reference_revisions: z.record(uuid, revision.positive()).optional(),
           message: z.string().optional(),
           names: z

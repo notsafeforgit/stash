@@ -178,6 +178,7 @@ async function archive(
         route.request().postDataJSON(),
       );
       previews.push(input);
+      const performers = input.definition.rules?.scene?.mappings?.performers;
       return route.fulfill({
         json: {
           context: {
@@ -207,6 +208,20 @@ async function archive(
               current: "",
               value: "Source title",
             },
+            ...(performers &&
+            "jq" in performers &&
+            performers.fallback !== undefined
+              ? [
+                  {
+                    field: "performers",
+                    status: "ready",
+                    current: [],
+                    value: performers.fallback,
+                    used_fallback: true,
+                    origin: "policy",
+                  },
+                ]
+              : []),
           ],
         },
       });
@@ -472,6 +487,131 @@ test("saves studio, tag and group name mappings with clear value controls", asyn
     studio.getByRole("textbox", { name: "Fixed value", exact: true }),
   ).toHaveValue("Studio alias");
   expect(remote.previews).toEqual([]);
+});
+
+test("uses a selected performer default with jq name matching, dry preview and durable save", async ({
+  page,
+}) => {
+  const remote = await archive(page, { loseResponse: true });
+  await open(page);
+  await page
+    .getByRole("button", { name: "Add field mapping", exact: true })
+    .click();
+  const performer = page.getByRole("group", {
+    name: "Performers",
+    exact: true,
+  });
+  await performer
+    .getByRole("textbox", { name: "jq expression", exact: true })
+    .fill('.source.payload.actors | select(type == "array" and length > 0)');
+  await performer
+    .getByRole("checkbox", { name: "Match names", exact: true })
+    .check();
+  await performer
+    .getByRole("checkbox", { name: "Use a default value", exact: true })
+    .check();
+  const picker = performer.getByRole("combobox", {
+    name: /Choose a library entry/,
+  });
+  await picker.click();
+  await picker.fill("River");
+  await page.getByRole("option", { name: "River (#10)", exact: true }).click();
+  await expect(
+    performer.getByText("River (#10)", { exact: true }),
+  ).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    )
+    .toBe(true);
+  // Capture the whole scrollable mapping at phone width.
+  await page.setViewportSize({ width: 390, height: 1300 });
+  await performer.screenshot({
+    path: test.info().outputPath("metadata-default-mobile.png"),
+    animations: "disabled",
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    )
+    .toBe(true);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await performer.screenshot({
+    path: test.info().outputPath("metadata-default-desktop.png"),
+    animations: "disabled",
+  });
+  await page
+    .getByRole("button", { name: "Test with a scene or image", exact: true })
+    .click();
+  const search = page.getByRole("combobox", {
+    name: "Scene or image",
+    exact: true,
+  });
+  await search.click();
+  await search.fill("Sample");
+  await page
+    .getByRole("option", { name: "Sample video (#7)", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Test draft mappings", exact: true })
+    .click();
+  await expect(
+    page.getByText(
+      "The expression returned empty; the proposed value uses the configured default.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  expect(remote.writes).toEqual([]);
+  expect(
+    remote.previews[0]?.definition.rules?.scene?.mappings?.performers,
+  ).toMatchObject({
+    fallback: [policyIDs.performer],
+    reference_names: true,
+  });
+  await page
+    .getByRole("button", { name: "Save metadata policy", exact: true })
+    .click();
+  await expect(
+    page.getByText("Could not complete this step", { exact: true }),
+  ).toBeVisible();
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Edit metadata rules", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Check and retry policy change", exact: true })
+    .click();
+  await expect(
+    page.getByText("Metadata policy saved", { exact: true }),
+  ).toBeVisible();
+  expect(remote.writes).toHaveLength(1);
+  await expect(
+    performer.getByRole("checkbox", {
+      name: "Use a default value",
+      exact: true,
+    }),
+  ).toBeChecked();
+  await expect(
+    performer.getByText("River (#10)", { exact: true }),
+  ).toBeVisible();
+  await performer
+    .getByRole("button", { name: "Fixed value", exact: true })
+    .click();
+  await expect(
+    performer.getByRole("checkbox", {
+      name: "Use a default value",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await performer
+    .getByRole("button", { name: "jq expression", exact: true })
+    .click();
+  await expect(
+    performer.getByRole("checkbox", {
+      name: "Use a default value",
+      exact: true,
+    }),
+  ).not.toBeChecked();
 });
 
 test("recovers a committed policy save after reload without sending another PUT", async ({

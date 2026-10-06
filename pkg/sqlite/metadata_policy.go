@@ -111,10 +111,10 @@ func (s *MetadataPolicyStore) Put(ctx context.Context, input models.MetadataPoli
 	}
 	for kind, rule := range input.Definition.Rules {
 		for field, mapping := range rule.Mappings {
-			if len(mapping.Value) == 0 || mapping.UsesNames() {
+			value := mapping.TypedConstant()
+			if len(value) == 0 {
 				continue
 			}
-			value := mapping.Value
 			revisions := make(map[string]int)
 			if metadataReferenceKind(field) != "" {
 				var targets []*models.ArchiveEntity

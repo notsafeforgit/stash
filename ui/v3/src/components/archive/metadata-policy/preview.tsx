@@ -117,6 +117,14 @@ function PreviewResult({ value }: { value: PolicyPreview }) {
               </pre>
             </>
           )}
+          {change.used_fallback && (
+            <FieldDescription>
+              {msg(
+                "metadata_policy.used_fallback",
+                "The expression returned empty; the proposed value uses the configured default.",
+              )}
+            </FieldDescription>
+          )}
           {change.message && <p className="text-sm">{change.message}</p>}
           {change.names?.map((name) => (
             <p key={name.name} className="text-sm">

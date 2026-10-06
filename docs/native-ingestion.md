@@ -1335,10 +1335,41 @@ initializes filenames and assigns an explicitly selected performer UUID:
 
 Each mapping has exactly one `value` or `jq`. The outer configuration is normal
 JSON; constant values are JSON values, not JSON serialized inside strings. Jq
-returns one value per field; `empty` omits it, while null is an actual value and
+returns one value per field; `empty` selects a configured `fallback` or omits the
+field, while null is an actual value and
 must satisfy that field's type. Expressions share a 250 ms deadline and retain
 1 MiB output, 16 KiB expression and one-result limits. Native input allows 12 MiB
 for retained source payload plus entity data; plugin limits remain unchanged.
+
+A jq mapping can add a destination-typed `fallback`. For example, a reviewed
+folder performer can be used when no performer names are present in source data:
+
+```json
+{
+  "performers": {
+    "jq": ".source.payload.actors | select(type == \"array\" and length > 0)",
+    "reference_names": true,
+    "fallback": ["56c9895d-03c1-4a93-8c0d-fbd99d27de22"]
+  }
+}
+```
+
+Only an empty jq result selects the default. Explicit null, false, zero, blank
+strings and empty arrays remain actual results. Expression errors and missing or
+ambiguous name matches require review; they never silently select the default.
+The expression above deliberately omits absent or empty actor lists. Use a
+different expression if an empty list should clear performers instead.
+
+Defaults always use the target field's ordinary typed shape, including explicit
+native UUIDs for relationships, regardless of the expression's name-matching
+option. Draft previews, saves and migration previews validate them even when the
+expression currently supplies a value. Migration previews bind their target
+revisions; application previews bind the references actually selected. Redirects
+resolve at application, while deleted
+targets require review. Defaults have policy provenance, with `used_fallback: true`
+in the preview, and do not claim a source capture. Existing field protection and
+source precedence still apply. The editor provides the same typed controls and
+library pickers used for fixed values. Removing the default restores omission.
 
 Mapping data contains `source` (the selected post/capture, normalized `metadata`,
 reconstructed retained `payload`, shared post URLs and compact translation choices,

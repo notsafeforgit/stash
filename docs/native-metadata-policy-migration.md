@@ -69,6 +69,16 @@ explicit names against canonical names and aliases; retain all ambiguous
 candidates for review. Fixed native mappings use selected portable UUIDs. A
 publisher account is not evidence that its owner is depicted in every file.
 
+A jq mapping can combine source name matching with a typed `fallback` for a
+reviewed folder default. The default uses explicit native UUIDs even when the
+expression has `reference_names: true`. It applies only when jq returns no value,
+never for an explicit clear, expression error or unresolved name. The migration
+client retains null and empty defaults when calculating input and plan digests.
+The server validates default types and binds their entity revisions even when
+the expression would currently select a value. Changed references require a new
+import preview. See the [mapping contract](native-ingestion.md#native-metadata-policies)
+for the full definition and editor behavior.
+
 An enabled imported policy requires a target collection with a root/folder scope.
 Register or review that scope separately. Importing a disabled policy can retain
 unfinished choices before a local root is bound. Current root registration and

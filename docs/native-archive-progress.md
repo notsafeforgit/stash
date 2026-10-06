@@ -11,8 +11,11 @@ review. Production has not been migrated.
 Implementation spans phases 1–6. The native schema, archive services and
 producer transport are substantial, and all 1,697 frozen catalog bodies have
 been imported and reconciled on isolated copies. This does not close catalog
-migration: historical policies, operational reconciliation, review resolution
-and a complete cutover reconciliation are still required.
+migration. All 1,697 source collections now have imported, disabled metadata
+policies, verified through API replay, restart and independent whole-row
+comparison. Historical post-to-media source selection, representative policy
+previews, operational reconciliation, review resolution and a complete cutover
+reconciliation are still required.
 
 Durable enrichment execution, queued-job dispatch, stale-job maintenance and
 shared download/enrichment service reservations are implemented, including linked
@@ -9216,3 +9219,53 @@ follow-up did not repeat unchanged UI, producer, archive or backup suites.
 Schema 1000080 remains current. Complete policy conversion, representative
 file/folder/source preview comparison and all remaining release gates continue.
 No production service, imported policy activation or bucket setting changed.
+
+
+## Complete disabled policy rehearsal — 2026-10-05
+
+All 1,697 frozen source collections now have explicit native policy bindings in
+the isolated schema-1000080 rehearsal. Import updated 1,694 collection scope
+revisions while preserving their existing active/disabled state. Only seven
+explicit folder scopes apply defaults to ordinary scans; three collections with
+no file observations remain unbound for review. The seven earlier folder-policy
+drafts and their receipts remain unchanged, giving 1,704 disabled policies in
+total. The logical media root remains disabled and unbound, and no source jobs
+were admitted.
+
+The bindings preserve legacy settings and rule provenance, including deliberate
+replacement or review dispositions. Rules cover retained original/translated
+captions, readable text, UTC dates, shared post URLs, explicit folder defaults,
+filename fallback and protection of existing selected metadata. The proposed
+organized rule uses six native field requirements and separates artwork; it
+still requires review before activation. The frozen input's file documents have
+no performer, studio, tag, genre or group metadata; five folder documents provide
+performers and one provides a studio. These archive-specific conversions do not
+claim to implement every possible future legacy configuration.
+
+Native definition validation and 205 independent rule comparisons passed,
+including 100 retained original-caption pairs, 100 translation samples, manual
+scan defaults and invalid/incomplete inputs. Actual HTTP import and scope updates
+took 55 seconds, recovered a deliberately lost response and verified every
+receipt again after reopening. A separate comparison checked all 282 tables and
+36,973,887 original rows, including SQLite value types. Only the 1,694 declared
+current collection revision pointers changed; selected metadata, original source
+evidence and jobs remained unchanged. New policies, scope revisions and receipts
+matched the frozen plans. Integrity checking passed with zero foreign-key
+violations; the comparison took 538 seconds.
+
+Source coverage remains a release blocker: all 414,561 retained NFO captures lack
+attachment manifests, while current metadata source selection requires an
+attachment-to-media decision. Their original post/file evidence and documents
+are retained, but these captures cannot yet be selected through that path. The
+next capability is reviewed post-to-scene/image associations independent of
+attachment identity or album order, followed by representative populated-library
+previews. This must preserve explicit unlinks and current file/entity guards
+without inventing album membership. The revised collection scopes also require
+reconciliation with saved discovery/enrichment handoffs before activation.
+
+The verified copy is now selected by `.local/native-rehearsal-current.json`.
+Removing the superseded closed rehearsal recovered 20.62 GB and left 146 GiB
+free, preserving the original compatible snapshot and current native copy.
+Private bindings, receipts and comparison reports remain under `.local/`.
+Production services, policy activation, bucket configuration and the frozen
+compatible release are unchanged.

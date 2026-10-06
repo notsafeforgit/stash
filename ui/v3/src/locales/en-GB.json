@@ -3557,5 +3557,22 @@
     "unchanged": "This association choice is already saved.",
     "undecided": "Automatic linking allowed",
     "unlinked": "Attachment link rejected"
-  }
+  },
+  "album_playback.unavailable": "This media is unavailable",
+  "album_playback.unavailable_help": "It may have been removed or its file may be offline. The source position is retained.",
+  "album_playback.open": "View album in source order",
+  "album_playback.gap": "The source has not described these positions yet.",
+  "album_playback.rejected": "This source link was explicitly rejected.",
+  "album_playback.conflict": "Resolve the conflicting source links before playing this position.",
+  "album_playback.excluded": "This media was manually excluded from the gallery.",
+  "album_playback.deleted": "The linked media was deleted from the library.",
+  "album_playback.unselected": "No library media is selected for this source attachment.",
+  "album_playback.no_files": "The selected media has no registered files.",
+  "album_playback.no_media": "No playable media at this position",
+  "album_playback.title": "Source album viewer",
+  "album_playback.order": "Images and videos follow the source order, including repeated and unavailable positions.",
+  "album_playback.changed_help": "Return to the album and reload its current order and links before continuing playback.",
+  "album_playback.return": "Return to album",
+  "album_playback.previous": "Previous position",
+  "album_playback.next": "Next position"
 }

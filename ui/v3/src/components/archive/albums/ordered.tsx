@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import { useIntl } from "react-intl";
 import { useMsg } from "@/hooks/message";
 import {
@@ -34,6 +34,10 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+
+const AlbumPlayback = lazy(() =>
+  import("./playback").then((module) => ({ default: module.AlbumPlayback })),
+);
 
 export function AlbumReadError({
   error,
@@ -239,6 +243,10 @@ export function SourceAlbum({
   const [editingAttachment, setEditingAttachment] = useState<string | null>(
     null,
   );
+  const [playback, setPlayback] = useState<{
+    position: number;
+    signature: string;
+  } | null>(null);
   const load = useCallback(
     async (after: number | undefined, signal: AbortSignal) => {
       const page = await api.album(post, after, signal);
@@ -267,6 +275,33 @@ export function SourceAlbum({
         <Spinner
           aria-label={msg("source_albums.loading", "Loading source album")}
         />
+      )}
+      {!!result.data?.items.length && (
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            if (result.data)
+              setPlayback({
+                position: result.data.items[0]!.position,
+                signature: result.data.signature,
+              });
+          }}
+        >
+          {msg("album_playback.open", "View album in source order")}
+        </Button>
+      )}
+      {playback && (
+        <Suspense fallback={<Spinner />}>
+          <AlbumPlayback
+            data={result.data}
+            {...playback}
+            busy={result.busy}
+            error={result.error}
+            onMore={result.more}
+            onClose={() => setPlayback(null)}
+          />
+        </Suspense>
       )}
       <PostSection title={msg("album_review.title", "Match existing media")}>
         <AlbumReview

@@ -49,8 +49,8 @@ including saved-request recovery, guarded retry/cancel, targeted job history and
 separate publication/notification status. Focused client checks and desktop/mobile
 browser flows pass. The complete fork gate passed, including generation, embedded
 assets, 669 UI tests, the Python suites, Go lint and the full Go integration suite.
-The source-list editor below passed the complete fork gate. Explicit
-gallery-association editing and live download-state inspection remain open.
+The source-list editor below passed the complete fork gate. Explicit gallery/attachment association editing has now passed its full gate.
+Live download-state inspection remains open.
 
 Source-list review APIs now provide unique-list discovery, read-only comparison,
 guarded selection, immutable history and exact request recovery. Focused SQLite,
@@ -64,6 +64,9 @@ HTTP, restart, anonymisation and portable restore checks. Their integrated full
 gate, populated migration/reopen and independent whole-row comparison also pass.
 The association editor passed staged client and browser checks and the integrated
 full fork gate, including 707 UI tests and the complete Go integration suite.
+Source-order mixed-media playback passed staged unit and browser checks and the
+integrated full fork gate, including 715 UI tests and complete Go integration. Per-attachment live download-state
+reporting still requires producer/server support.
 
 Reviewed transfer of unstarted pending enrichment after collection edits now has
 an atomic API, saved-plan client and a passing full fork gate. Its populated
@@ -10163,3 +10166,43 @@ real embedded assets, 707 UI tests, 540 producer tests, eight library tests,
 integration. All 18 frozen source hashes match the passed gate. Production is
 unchanged; live download states, remaining archive workflows, caller/compatibility conversion,
 production backup proof and reviewed cutover are still required.
+
+## Mixed-media source album playback — 2026-10-06
+
+Source-album views now open one image/video viewer in retained source order.
+Repeated attachments retain separate positions, and unknown ranges stay compact
+placeholders. Playback uses the selected library media kind, including images
+converted to videos. Explicitly rejected/conflicting links, manual exclusions,
+deleted media and attachments with no selected item or registered files remain
+visible without fetching media. Registered files permit a playback attempt; they
+do not prove that bytes are online or that a download is underway.
+
+The viewer reuses the existing image zoom and scene player. Mobile images zoom
+inside the album, adjacent videos retain one player, and closing releases
+playback. Exact selected IDs guard asynchronous media responses. Source pages
+load only when reached, retain position on retry and stop playback if a later
+page has a different source signature. The viewer changes no associations or
+metadata; ordinary configured scene activity tracking remains in the player.
+
+Eight focused tests passed, alongside staged TypeScript, browser types,
+React/data-contract checks, Biome and localization. All 18 new Chromium/WebKit
+cases passed across the final runs, covering phone/desktop playback, gaps,
+unavailable choices, deleted media, late responses, bounded paging and retry,
+changed lists, adjacent-video reuse, close cleanup and mobile zoom reset. An
+adjacent-video fixture initially referenced a nonexistent UUID constant; after
+correction both browser cases passed. The 42 existing association/album cases
+also passed. Four final image/video visual cases passed after arranging the
+mobile navigation buttons together; representative desktop and phone screenshots
+were inspected. These checks use synthetic media and fixture APIs.
+
+All ten promoted files match the checked stage under
+`.local/native-album-playback-20261006/`, excluding the private browser filesystem
+allowlist. Receipts use the `native_album_playback_` prefix in
+`.local/native-discovery-client-20261004/`. The integrated full fork gate passed
+in 1,562.9 seconds, including generation, real embedded assets, 715 UI tests,
+540 producer tests, eight library tests, 108 archive tests, 262 backup tests,
+zero Go lint findings and complete Go integration. All 11 frozen source hashes
+matched the passed gate before updating this validation record. This increment
+changes no schema or production state. Live attachment
+download reporting, manual intake, post consolidation, remaining caller and
+compatibility conversion, production backup proof and reviewed cutover remain open.

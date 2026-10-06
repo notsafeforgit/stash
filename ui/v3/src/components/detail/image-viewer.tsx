@@ -26,11 +26,14 @@ export function ImageViewer({
   image,
   actions = true,
   onOpenViewer,
+  inline = false,
 }: {
   image: ImageViewerData;
   actions?: boolean;
   /** A collection can supply its own lightbox to retain neighboring items. */
   onOpenViewer?: () => void;
+  /** An enclosing album viewer already owns the modal and its navigation. */
+  inline?: boolean;
 }) {
   const src = image.paths.image ?? image.paths.preview ?? undefined;
   const file = image.visual_files[0];
@@ -89,7 +92,7 @@ export function ImageViewer({
   // there fights page scroll once the image is zoomed (the controller
   // captures vertical pans), and the surrounding page is the scroll
   // container under `mobilePageScroll`.
-  if (isDesktop) {
+  if (isDesktop || inline) {
     return (
       <YARLightbox
         open

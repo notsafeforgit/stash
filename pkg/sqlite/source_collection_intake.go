@@ -56,6 +56,31 @@ WHERE collection_uuid=? AND capture_uuid=? AND collection_revision=?)`, input.Co
 	return found, err
 }
 
+func (s *SourceCollectionStore) CaptureProvenance(ctx context.Context, input models.CollectionCapture) (*models.CollectionCapture, error) {
+	for _, value := range []*string{&input.CollectionUUID, &input.CaptureUUID} {
+		id, err := archiveUUID(*value)
+		if err != nil {
+			return nil, err
+		}
+		*value = id
+	}
+	if input.CollectionRevision <= 0 {
+		return nil, errors.New("collection capture requires a revision")
+	}
+	var row collectionCaptureRow
+	err := dbWrapper.Get(ctx, &row, `SELECT * FROM source_collection_captures
+WHERE collection_uuid=? AND capture_uuid=? AND collection_revision<=?
+ORDER BY collection_revision DESC LIMIT 1`, input.CollectionUUID, input.CaptureUUID, input.CollectionRevision)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	ret := row.resolve()
+	return &ret, nil
+}
+
 func (s *SourceCollectionStore) Captures(ctx context.Context, value string, after *models.CollectionCaptureCursor, limit int) ([]models.CollectionCapture, error) {
 	id, err := archiveUUID(value)
 	if err != nil {

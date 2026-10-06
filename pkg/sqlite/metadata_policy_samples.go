@@ -125,9 +125,10 @@ SELECT ? UNION SELECT e.uuid FROM archive_entities e JOIN identities i ON e.redi
 		Origin         string        `db:"origin"`
 		CapturedAt     NullTimestamp `db:"captured_at"`
 	}
-	// Only current linked attachments, evidenced capture membership, and the
-	// reviewed collection revision are eligible. DISTINCT collapses repeated
-	// attachment slots without combining captures from different source times.
+	// Read this collection's retained evidence through the reviewed revision.
+	// Its current definition and the attachment's current link still govern
+	// selection. DISTINCT collapses repeated slots and collection memberships
+	// without combining captures from different source times.
 	err = dbWrapper.Select(ctx, &rows, `SELECT DISTINCT c.uuid AS capture_uuid,d.attachment_uuid,c.post_uuid,
 COALESCE(json_extract(r.metadata,'$.title'),'') AS title,c.platform,c.origin,c.captured_at
 FROM attachment_media_decisions d
@@ -139,7 +140,7 @@ JOIN source_post_revisions r ON r.uuid=c.revision_uuid
 JOIN source_posts p ON p.uuid=c.post_uuid AND p.state='active'
 JOIN source_collection_captures cc ON cc.capture_uuid=c.uuid
 WHERE d.media_uuid IN `+getInBinding(len(identities))+` AND d.state='linked'
-AND cc.collection_uuid=? AND cc.collection_revision=?
+AND cc.collection_uuid=? AND cc.collection_revision<=?
 AND (c.uuid,d.attachment_uuid)>(?,?) ORDER BY c.uuid,d.attachment_uuid LIMIT ?`, args...)
 	if err != nil {
 		return nil, err

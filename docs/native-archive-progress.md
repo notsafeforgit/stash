@@ -9088,3 +9088,30 @@ rehearsal baseline. Complete historical rule conversion, late-result refresh,
 remaining UI/caller work, backup activation and reviewed production cutover
 remain open. No production service, worker, bucket policy or imported policy
 activation changed.
+
+
+## Historical captures in metadata policy review — 2026-10-05
+
+Changing a collection definition no longer hides its earlier capture evidence
+from policy samples. A newly reviewed current policy can use those captures while
+retaining the current entity link, file scope and collection guards. Repeated
+collection memberships collapse to one selectable capture. Different source
+observations remain distinct, and neither preview nor apply rewrites the
+original capture's collection revision. Producer admission still requires the
+exact revision recorded by the source event.
+
+The regression reproduced both missing samples and rejected previews before the
+fix. Focused metadata, SQLite, ingestion and API tests passed against the isolated
+draft, covering stale previews, policy rebinding, original provenance, duplicate
+memberships, cross-collection exclusion, explicit unlinks and restart. A read-only
+assessment checked 100 real historical memberships against independently selected
+history rows; the lookup uses the existing collection/capture/revision index.
+This SQL assessment does not measure whole preview or browser latency.
+
+The applied source passed the collection, metadata-policy, ingestion and native
+HTTP regression selection in 65 seconds. Repository lint reports zero issues,
+and all seven applied file hashes match the tested draft. No schema, UI assets,
+producer implementation or admission checks changed. The preceding translation
+commit passed the complete fork gate; this focused follow-up did not repeat the
+unchanged UI, producer, archive or backup suites. The schema-1000080 rehearsal
+remains current. Live services and imported policy activation are unchanged.

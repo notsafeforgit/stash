@@ -321,14 +321,14 @@ func (s Service) capture(ctx context.Context, input Input, entity *models.Archiv
 		return nil, nil
 	}
 	source := input.Source
-	present, err := s.Repo.SourceCollection.HasCapture(ctx, models.CollectionCapture{CollectionUUID: input.CollectionUUID, CollectionRevision: input.CollectionRevision, CaptureUUID: source.CaptureUUID})
+	provenance, err := s.Repo.SourceCollection.CaptureProvenance(ctx, models.CollectionCapture{CollectionUUID: input.CollectionUUID, CollectionRevision: input.CollectionRevision, CaptureUUID: source.CaptureUUID})
 	if err != nil {
 		return nil, err
 	}
-	if !present {
+	if provenance == nil {
 		return nil, models.ErrMetadataPolicyConflict
 	}
-	present, err = s.Repo.SourceAttachment.InCapture(ctx, source.CaptureUUID, source.AttachmentUUID)
+	present, err := s.Repo.SourceAttachment.InCapture(ctx, source.CaptureUUID, source.AttachmentUUID)
 	if err != nil {
 		return nil, err
 	}

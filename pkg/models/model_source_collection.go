@@ -139,6 +139,10 @@ type SourceCollectionReaderWriter interface {
 	PostMemberships(context.Context, string, string, int) ([]CollectionPostMembership, error)
 	RecordCapture(context.Context, CollectionCapture) error
 	HasCapture(context.Context, CollectionCapture) (bool, error)
+	// CaptureProvenance reads the latest recorded membership at or before the
+	// given revision. Historical reading does not authorize producer admission;
+	// HasCapture requires the exact recorded revision for that purpose.
+	CaptureProvenance(context.Context, CollectionCapture) (*CollectionCapture, error)
 	Captures(context.Context, string, *CollectionCaptureCursor, int) ([]CollectionCapture, error)
 	RecordMediaIntake(context.Context, CollectionMediaIntake) (*CollectionMediaIntake, error)
 	MediaIntake(context.Context, string, string, int) ([]CollectionMediaIntake, error)

@@ -1351,6 +1351,16 @@ normal previews contain proposed changes and their status. Protected values and
 disabled rules can be inspected without applying them. HTTP previews select an
 existing entity; requests cannot impersonate a creation event.
 
+Editing a collection keeps its earlier captures available in the policy sample
+picker. A newly reviewed rule can use that collection's recorded capture history
+when the attachment still links to the selected scene/image and the selected
+file remains inside the current root and folder scope. The collection and policy
+revisions must still be current; changing a definition invalidates old previews.
+Repeated membership in several revisions produces one selectable capture, while
+distinct source observations remain separate. Reading or applying a rule never
+rewrites the original capture's collection revision. Producer intake continues
+to require membership under the exact revision recorded by its event.
+
 
 `source.urls` contains the selected post's distinct known URLs in lexical order.
 They come from shared post evidence, which may include observations recorded

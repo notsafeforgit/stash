@@ -412,6 +412,25 @@ association leaves the former gallery, its memberships, and its files intact.
 A deleted gallery suppresses recreation; a redirected gallery requires review.
 UUID adoption cascades into the association and its history.
 
+Migration 1000086 adds `gallery_association_reviews` and
+`attachment_media_reviews`. Each immutable receipt binds a canonical request to
+its original decision through scoped foreign keys and insertion guards. Preview
+and Apply share the ordinary association validators. Revisions, preview digests
+and managed-transaction completion guards prevent stale or partly committed
+choices. Startup validates original request bytes, signatures, previous decisions
+and their scopes. Existing successful requests survive later choices, deletion
+and identity adoption without rewriting their original input. Anonymisation
+removes receipts before source evidence; native backup/export retains them.
+The migration creates no choices or gallery memberships and changes no files.
+
+Gallery adoption now checks claims throughout the target's bounded reverse
+identity group, including historical UUIDs after merges. The original post can
+explicitly reassociate its own gallery; a different post cannot bypass a retained
+claim by choosing the survivor UUID. Explicitly disabling the original claim
+releases it. Attachment review respects post-wide rejection/conflict decisions,
+while allowing converted media to have a different library type from its source
+hint. See the [association review APIs](native-ingestion.md#reviewing-gallery-and-attachment-associations).
+
 `SourceGallery.Preview` computes changes for the selected post using bounded,
 indexed bulk lookups. It retains source order and repeated attachment slots,
 while deduplicating actual scene/image memberships. Attachment choices resolve

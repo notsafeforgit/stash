@@ -98,6 +98,11 @@ var (
 )
 
 type SourceAttachmentReaderWriter interface {
+	MediaReviewContext(context.Context, string) (*AttachmentMediaReviewContext, error)
+	MediaReviewHistory(context.Context, string, int, int) ([]AttachmentMediaReviewDecision, error)
+	PreviewMediaReview(context.Context, AttachmentMediaReviewInput) (*AttachmentMediaReviewPreview, error)
+	ApplyMediaReview(context.Context, AttachmentMediaReviewApplyInput) (*AttachmentMediaReview, bool, error)
+	MediaReview(context.Context, string) (*AttachmentMediaReview, error)
 	RecordManifest(context.Context, SourceAttachmentManifestInput) (*SourceAttachmentManifest, error)
 	FindManifest(context.Context, string) (*SourceAttachmentManifest, error)
 	ManifestForCapture(context.Context, string) (*SourceAttachmentManifest, error)

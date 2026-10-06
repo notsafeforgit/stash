@@ -1788,6 +1788,55 @@ explicit receipt recovery. Competing tabs cannot replace the first saved request
 A successful save refreshes only this post's source order, and a failed refresh
 is reported separately from a failed save.
 
+### Reviewing gallery and attachment associations
+
+`POST /gallery-association/preview` accepts `post_uuid`, `post_revision`, `state`
+and an optional `reason`. State `linked` also requires an active `gallery_uuid`
+and its current `gallery_revision`; `disabled` omits both. The target must be a
+manual/source gallery without a folder or ZIP. An association retained on an old
+UUID after a gallery merge still reserves the surviving gallery for its original
+post. Resolve the original association explicitly before assigning that gallery
+to another post. The bounded, indexed identity check includes up to 1,024 aliases
+and fails explicitly if the group exceeds that limit.
+
+`GET /attachments/<attachment>/review` returns the attachment reference/revision,
+its post/revision, the current media choice, resolved library media, post-wide
+link state and media-kind hints from the currently selected source list. It
+does not load post/profile payloads. Hints describe source evidence: an original
+image may legitimately link to a scene after animation conversion.
+
+`POST /attachment-media/preview` accepts `post_uuid`, `post_revision`,
+`attachment_uuid`, `attachment_revision`, `state` and an optional `reason`.
+State `linked` requires an active scene/image `media_uuid` and `media_revision`.
+States `unlinked` and `undecided` omit both. Unlinked records an explicit
+rejection; undecided permits later verified ingestion to choose media. Historical
+matching still preserves an explicit review. A post-wide unlink or unresolved
+post/media conflict prevents attachment linking until that post choice is
+reviewed separately. Preview cannot silently override it.
+
+Both previews return the current and proposed choice, `changed` and a `digest`.
+`POST /gallery-association/apply` and `POST /attachment-media/apply` add
+`request_uuid` and the preview digest to the corresponding input. Persist exact
+input before sending. Apply validates revisions and records the decision and
+original receipt in one transaction. Identical retries recover the original
+result before checking later state. `GET /gallery-association/requests/<uuid>`
+and `GET /attachment-media/requests/<uuid>` recover those receipts after restart,
+later choices, UUID adoption, deletion or portable restore. A different request
+under the same UUID returns `409 request_conflict`; a stale preview returns
+`409 preview_changed`. Bodies are limited to 16 KiB and reasons to 4,096 bytes.
+
+`GET /posts/<post>/gallery-association-history` and
+`GET /attachments/<attachment>/media-history` page immutable decisions using
+`after=<revision>&limit=N`, in increasing revision order, with limits 1–100 and
+a default of 25. Historical rows retain decision targets separately from current
+resolved identities. All routes use application authorization and same-origin
+checks. Producers cannot approve review decisions.
+
+Saving these associations leaves gallery members, manual exclusions, metadata
+and files intact. Use the separate Match existing media preview/application to
+review synchronization effects. The association editor UI remains transition
+work; these APIs do not perform downloads or prove file availability.
+
 ### Historical post-to-media matching
 
 The `catalog-files-v1` policy follows retained catalog appearance, file observation

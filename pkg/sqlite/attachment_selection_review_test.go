@@ -165,6 +165,7 @@ func TestAttachmentSelectionReviewLateFailureCannotCommitUnreceiptedChoice(t *te
 
 func removeAttachmentSelectionReviewSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeSourceAssociationReviewSchema(t, raw)
 	_, err := raw.Exec("DROP TABLE attachment_selection_reviews; DELETE FROM native_migration_history WHERE version=1000085")
 	require.NoError(t, err)
 }

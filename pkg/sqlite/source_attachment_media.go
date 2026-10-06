@@ -373,57 +373,69 @@ func uniqueIngestMediaCandidate(ctx context.Context, attachment, target string) 
 	return nil
 }
 
-func (s *SourceAttachmentStore) DecideMedia(ctx context.Context, input models.AttachmentMediaDecisionInput) (*models.AttachmentMediaDecision, error) {
+func (s *SourceAttachmentStore) prepareMediaChoice(ctx context.Context, input models.AttachmentMediaDecisionInput) (*models.SourceAttachment, *models.ArchiveEntity, error) {
 	attachment, err := s.Find(ctx, input.AttachmentUUID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if attachment == nil || attachment.Revision != input.ExpectedAttachmentRevision {
-		return nil, models.ErrSourceAttachmentConflict
+		return nil, nil, models.ErrSourceAttachmentConflict
 	}
 	if err := activeAttachmentPost(ctx, attachment); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if (input.Origin != "review" && input.Origin != "ingest" && input.Origin != "migration") || !validAccountText(input.Reason, 4096, true) {
-		return nil, errors.New("invalid attachment media decision origin or reason")
+		return nil, nil, errors.New("invalid attachment media decision origin or reason")
 	}
-	var mediaUUID *string
+	var media *models.ArchiveEntity
 	switch input.State {
 	case "linked":
-		media, err := (&ArchiveEntityStore{}).Find(ctx, input.MediaUUID)
+		media, err = (&ArchiveEntityStore{}).Find(ctx, input.MediaUUID)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if !archiveMedia(media) || media.State != models.ArchiveEntityActive || media.Revision != input.ExpectedMediaRevision {
-			return nil, models.ErrSourceAttachmentConflict
+			return nil, nil, models.ErrSourceAttachmentConflict
 		}
-		mediaUUID = &media.UUID
 		association, err := (&SourcePostMediaStore{}).Association(ctx, attachment.PostUUID, media.UUID)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if association.Suppressed() {
-			return nil, models.ErrSourcePostMediaConflict
+			return nil, nil, models.ErrSourcePostMediaConflict
 		}
 	case "unlinked", "undecided":
 		if input.MediaUUID != "" || input.ExpectedMediaRevision != 0 {
-			return nil, errors.New("an unlinked or undecided attachment cannot select media")
+			return nil, nil, errors.New("an unlinked or undecided attachment cannot select media")
 		}
 	default:
-		return nil, errors.New("invalid attachment media choice")
+		return nil, nil, errors.New("invalid attachment media choice")
 	}
 	if input.Origin == "ingest" {
 		current, err := s.MediaDecision(ctx, attachment.UUID)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		if mediaUUID == nil || (current != nil && current.State != "undecided") {
-			return nil, models.ErrSourceAttachmentConflict
+		if media == nil || (current != nil && current.State != "undecided") {
+			return nil, nil, models.ErrSourceAttachmentConflict
 		}
-		if err := uniqueIngestMediaCandidate(ctx, attachment.UUID, *mediaUUID); err != nil {
-			return nil, err
+		if err := uniqueIngestMediaCandidate(ctx, attachment.UUID, media.UUID); err != nil {
+			return nil, nil, err
 		}
 	}
+	return attachment, media, nil
+}
+
+func (s *SourceAttachmentStore) DecideMedia(ctx context.Context, input models.AttachmentMediaDecisionInput) (*models.AttachmentMediaDecision, error) {
+	attachment, media, err := s.prepareMediaChoice(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+	var mediaUUID *string
+	if media != nil {
+		mediaUUID = &media.UUID
+	}
+
 	result, err := dbWrapper.Exec(ctx, "UPDATE source_attachments SET revision = revision + 1 WHERE uuid = ? AND revision = ?", attachment.UUID, attachment.Revision)
 	if err != nil {
 		return nil, err

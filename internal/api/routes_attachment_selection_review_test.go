@@ -152,6 +152,11 @@ func TestAttachmentSelectionReviewHTTPUniqueListsPreviewRecoveryAndHistory(t *te
 
 func restoreAttachmentSelectionReview(t *testing.T, database string) string {
 	t.Helper()
+	return restoreSourceReview(t, database, "attachment_selection_review_check.py")
+}
+
+func restoreSourceReview(t *testing.T, database, scriptName string) string {
+	t.Helper()
 	python, producer := nativeProducerRuntime(t)
 	archive := filepath.Join(filepath.Dir(producer), "archive")
 	entries, err := os.ReadDir(filepath.Join(archive, "src", "stash_archive"))
@@ -162,7 +167,7 @@ func restoreAttachmentSelectionReview(t *testing.T, database string) string {
 			require.NoError(t, err)
 		}
 	}
-	script := filepath.Join(archive, "tests", "attachment_selection_review_check.py")
+	script := filepath.Join(archive, "tests", scriptName)
 	_, err = os.ReadFile(script)
 	require.NoError(t, err)
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)

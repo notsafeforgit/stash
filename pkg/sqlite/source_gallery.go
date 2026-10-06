@@ -89,52 +89,65 @@ func (s *SourceGalleryStore) DecideAssociation(ctx context.Context, input models
 	return s.decideAssociation(ctx, input, nil)
 }
 
-func (s *SourceGalleryStore) decideAssociation(ctx context.Context, input models.SourceGalleryChoiceInput, selection *string) (*models.SourceGalleryDecision, error) {
+func (s *SourceGalleryStore) prepareAssociationChoice(ctx context.Context, input models.SourceGalleryChoiceInput) (*models.SourcePost, *models.ArchiveEntity, error) {
 	post, err := (&SourceEvidenceStore{}).FindPost(ctx, input.PostUUID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if post == nil || post.Revision != input.ExpectedPostRevision {
-		return nil, models.ErrSourceGalleryConflict
+		return nil, nil, models.ErrSourceGalleryConflict
 	}
 	if post.State != "active" {
-		return nil, models.ErrSourcePostForgotten
+		return nil, nil, models.ErrSourcePostForgotten
 	}
 	if !validAccountText(input.Reason, 4096, true) {
-		return nil, errors.New("invalid source gallery decision reason")
+		return nil, nil, errors.New("invalid source gallery decision reason")
 	}
-	var galleryUUID *string
+	var gallery *models.ArchiveEntity
 	switch input.State {
 	case "linked":
 		identity, err := (&ArchiveEntityStore{}).Find(ctx, input.GalleryUUID)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if identity == nil || identity.Kind != models.ArchiveGallery || identity.State != models.ArchiveEntityActive || identity.Revision != input.ExpectedGalleryRevision {
-			return nil, models.ErrSourceGalleryConflict
+			return nil, nil, models.ErrSourceGalleryConflict
 		}
 		pathless, err := sourceGalleryPathless(ctx, *identity.LocalID)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if !pathless {
-			return nil, errors.New("source albums require a non-filesystem gallery without a folder or ZIP")
+			return nil, nil, errors.Join(models.ErrSourceAssociationReviewInvalid, errors.New("source albums require a non-filesystem gallery without a folder or ZIP"))
 		}
-		var claimed bool
-		if err := dbWrapper.Get(ctx, &claimed, "SELECT EXISTS(SELECT 1 FROM post_gallery_links WHERE gallery_uuid = ? AND post_uuid != ?)", identity.UUID, post.UUID); err != nil {
-			return nil, err
+		claimed, err := sourceGalleryAssociationClaimed(ctx, identity.UUID, post.UUID)
+		if err != nil {
+			return nil, nil, err
 		}
 		if claimed {
-			return nil, models.ErrSourceGalleryConflict
+			return nil, nil, models.ErrSourceGalleryConflict
 		}
-		galleryUUID = &identity.UUID
+		gallery = identity
 	case "disabled":
 		if input.GalleryUUID != "" || input.ExpectedGalleryRevision != 0 {
-			return nil, errors.New("disabled source gallery cannot select a gallery")
+			return nil, nil, errors.New("disabled source gallery cannot select a gallery")
 		}
 	default:
-		return nil, errors.New("invalid source gallery decision")
+		return nil, nil, errors.New("invalid source gallery decision")
 	}
+	return post, gallery, nil
+}
+
+func (s *SourceGalleryStore) decideAssociation(ctx context.Context, input models.SourceGalleryChoiceInput, selection *string) (*models.SourceGalleryDecision, error) {
+	post, gallery, err := s.prepareAssociationChoice(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+	var galleryUUID *string
+	if gallery != nil {
+		galleryUUID = &gallery.UUID
+	}
+
 	result, err := dbWrapper.Exec(ctx, "UPDATE source_posts SET revision = revision + 1 WHERE uuid = ? AND revision = ?", post.UUID, post.Revision)
 	if err != nil {
 		return nil, err
@@ -225,4 +238,31 @@ func withSourceGalleryWrite(ctx context.Context, gallery, post, selection string
 	err := fn()
 	_, cleanup := dbWrapper.Exec(ctx, "DELETE FROM source_gallery_write_context WHERE gallery_uuid = ?", gallery)
 	return errors.Join(err, cleanup)
+}
+
+// A merged gallery keeps its original post association until explicitly
+// reviewed. Its claim therefore belongs to the whole retained identity group,
+// including aliases which no longer have a live local gallery row.
+func sourceGalleryAssociationClaimed(ctx context.Context, gallery, post string) (bool, error) {
+	var ids []string
+	if err := dbWrapper.Select(ctx, &ids, sourceAlbumGalleryAliasesQuery, gallery); err != nil {
+		return false, err
+	}
+	if len(ids) > 1024 {
+		return false, models.ErrSourceAlbumLimit
+	}
+	query, args := sourceGalleryClaimQuery(ids, post)
+	var claimed bool
+	err := dbWrapper.Get(ctx, &claimed, query, args...)
+	return claimed, err
+}
+
+func sourceGalleryClaimQuery(ids []string, post string) (string, []interface{}) {
+	args := make([]interface{}, 0, len(ids)+1)
+	for _, id := range ids {
+		args = append(args, id)
+	}
+	args = append(args, post)
+	return `SELECT EXISTS(SELECT 1 FROM post_gallery_links INDEXED BY post_gallery_links_gallery
+ WHERE gallery_uuid IN ` + getInBinding(len(ids)) + ` AND post_uuid<>?)`, args
 }

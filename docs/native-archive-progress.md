@@ -59,7 +59,10 @@ and the review API passed the full fork gate, full-copy migration, fresh reopen,
 whole-row comparison and portable export/relocated restore checks. The isolated
 schema-85 copy preserves all original source evidence and choices. The source-list
 editor passed staged browser checks and the integrated full fork gate.
-Explicit gallery-association/attachment choices remain in progress.
+Gallery/attachment association review APIs now pass focused repository, migration,
+HTTP, restart, anonymisation and portable restore checks. Their integrated full
+gate, populated migration/reopen and independent whole-row comparison also pass.
+The editor UI remains in progress.
 
 Reviewed transfer of unstarted pending enrichment after collection edits now has
 an atomic API, saved-plan client and a passing full fork gate. Its populated
@@ -10073,3 +10076,48 @@ still match the checked stage. This increment changes no schema or production
 state. Explicit gallery/attachment associations, live download states, remaining
 archive workflows, caller conversion, production backup proof and cutover remain
 required.
+
+## Gallery and attachment association review APIs — 2026-10-06
+
+Typed, read-only previews now validate an explicit post-to-gallery or
+attachment-to-media choice. Apply saves the decision with its exact original
+request in schema 1000086; receipts and bounded history support recovery after
+lost responses, later choices, UUID adoption and restart. Choices preserve
+gallery membership, manual exclusions, metadata and files. Attachment review
+respects a post-wide rejection and accepts media converted from an image to a
+video. Separate matching/synchronization controls handle gallery effects.
+
+A reproduced gallery adoption bug checked only the supplied UUID and missed a
+retained claim on an older UUID after a merge. Adoption now checks the bounded,
+indexed reverse identity group. Another post cannot take a claimed survivor;
+the original owner can explicitly reassociate or disable its claim. Tests cover
+two-step merges, preserved members and the 1,024-alias limit.
+
+Focused SQLite and real HTTP checks pass, including current revision/kind/scope
+guards, post rejections, read-only previews, exact replay, separate request/stale
+conflicts, same-origin enforcement, late-error rollback, immutable history,
+deletion/forgetting, anonymisation and startup corruption rejection before writes.
+Portable export and relocated restore preserve both receipt families and their
+original decisions. The selected attachment-kind query uses scoped indexes on
+the populated rehearsal database. The complete fork gate passed in 1,843 seconds,
+including generation, embedded assets, 688 UI tests, 540 producer tests, eight
+library tests, 108 archive tests, 262 backup tests, zero Go lint findings and the
+complete Go integration suite.
+
+The schema-85 copy migrated to schema 1000086 and reopened successfully. Independent
+comparison verified all 40,255,445 original rows across 293 tables, including cell
+types and binary string values, with the separately verified schema-version
+change and one new migration-history row. Existing schema objects, selected
+metadata, source evidence, policy activation and SQLite sequences were unchanged;
+integrity and foreign-key checks passed. Both new receipt tables remain empty:
+the rehearsal applied no association choice and admitted no source job.
+
+Read-only repository checks covered 108 populated posts, 124 attachments and 522
+previews. Timed calls totaled 136 ms, with a 4.47 ms maximum. This measures backend
+queries, not browser latency; database size and modification time were unchanged.
+Sources and private evidence are under
+`.local/native-gallery-association-review-20261006/`, with test receipts under
+`.local/native-discovery-client-20261004/native_source_association_review_*`.
+Production remains unchanged. The association editor is staged separately, with
+client tests and type checks passed; its browser validation and the remaining
+transition gates are not complete.

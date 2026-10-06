@@ -46,6 +46,11 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Put("/posts/{post}/media/{entity}", rs.decidePostMedia)
 	r.Get("/posts/{post}/media/{entity}/history", rs.postMediaHistory)
 	r.Get("/post-media-decisions/{decision}", rs.postMediaDecision)
+	r.Get("/post-media-decisions/{decision}/evidence", rs.postMediaMatchedEvidence)
+	r.Get("/post-media-backfill-posts", rs.postMediaBackfillPosts)
+	r.Get("/posts/{post}/media-backfill-preview", rs.postMediaBackfillPreview)
+	r.Post("/posts/{post}/media-backfills", rs.applyPostMediaBackfill)
+	r.Get("/post-media-backfills/{request}", rs.postMediaBackfillResult)
 	r.Get("/entity-identities/{kind}/{localID}", rs.metadataEntity)
 	r.Get("/entities/{entity}/metadata-fields", rs.entityMetadataFields)
 	r.Get("/entities/{entity}/metadata-fields/{field}/history", rs.entityMetadataHistory)
@@ -252,6 +257,10 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 }
 
 func nativeArchiveError(w http.ResponseWriter, err error) {
+	if errors.Is(err, models.ErrSourceAlbumLimit) {
+		ingestJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "source_review_limit", "message": "Source matching exceeds the bounded review limit."})
+		return
+	}
 	if errors.Is(err, models.ErrSourcePostMediaInvalid) {
 		ingestJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_post_media", "message": "Invalid post-to-media association."})
 		return

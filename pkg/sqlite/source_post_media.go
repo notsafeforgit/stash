@@ -193,6 +193,10 @@ AND media_uuid IN `+getInBinding(len(ids))+` ORDER BY post_revision LIMIT ?`, ar
 }
 
 func (s *SourcePostMediaStore) Decide(ctx context.Context, input models.SourcePostMediaInput) (*models.SourcePostMediaDecision, error) {
+	return s.decide(ctx, input, true)
+}
+
+func (s *SourcePostMediaStore) decide(ctx context.Context, input models.SourcePostMediaInput, synchronize bool) (*models.SourcePostMediaDecision, error) {
 	if _, err := getTx(ctx); err != nil {
 		return nil, err
 	}
@@ -281,25 +285,34 @@ VALUES(?,?,?,?,?,?,?,?,?)`, input.UUID, post.UUID, media.UUID, post.Revision+1, 
 	if _, err := dbWrapper.Exec(ctx, "INSERT INTO post_media_links(post_uuid,media_uuid,decision_uuid) VALUES(?,?,?)", post.UUID, media.UUID, input.UUID); err != nil {
 		return nil, err
 	}
-	// Never create an album from a direct link. Existing source membership may
-	// need removal/restoration; Sync protects manual membership, order and cover.
-	gallery := &SourceGalleryStore{gallery: s.gallery}
-	association, err := gallery.Association(ctx, post.UUID)
-	if err != nil {
-		return nil, err
-	}
-	if association != nil && association.State == "linked" {
-		preview, err := gallery.Preview(ctx, post.UUID)
-		if err != nil {
+	if synchronize {
+		if err := s.syncGallery(ctx, post.UUID); err != nil {
 			return nil, err
-		}
-		if preview.Action == "sync" {
-			if _, err := gallery.Sync(ctx, post.UUID, preview.Signature); err != nil {
-				return nil, err
-			}
 		}
 	}
 	return s.Decision(ctx, input.UUID)
+}
+
+func (s *SourcePostMediaStore) syncGallery(ctx context.Context, post string) error {
+	// Never create an album from a direct link. Existing source membership may
+	// need removal/restoration; Sync protects manual membership, order and cover.
+	gallery := &SourceGalleryStore{gallery: s.gallery}
+	association, err := gallery.Association(ctx, post)
+	if err != nil {
+		return err
+	}
+	if association != nil && association.State == "linked" {
+		preview, err := gallery.Preview(ctx, post)
+		if err != nil {
+			return err
+		}
+		if preview.Action == "sync" {
+			if _, err := gallery.Sync(ctx, post, preview.Signature); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (s *SourcePostMediaStore) ValidateCapture(ctx context.Context, decisionID, captureID, mediaID string) error {

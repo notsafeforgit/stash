@@ -64,4 +64,9 @@ type SourcePostMediaReaderWriter interface {
 	// gallery through the same membership service, preserving manual choices.
 	Decide(context.Context, SourcePostMediaInput) (*SourcePostMediaDecision, error)
 	ValidateCapture(context.Context, string, string, string) error
+	BackfillPosts(context.Context, string, int) ([]string, error)
+	PreviewBackfill(context.Context, string) (*SourcePostMediaMatchPreview, error)
+	Backfill(context.Context, SourcePostMediaBackfillInput) (*SourcePostMediaBackfillResult, error)
+	BackfillResult(context.Context, string) (*SourcePostMediaBackfillResult, error)
+	MatchedEvidence(context.Context, string) ([]SourcePostMediaMatchedEvidence, error)
 }

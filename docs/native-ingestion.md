@@ -1611,8 +1611,62 @@ cover and ordering. A conflicting merged choice holds synchronization for review
 Previously selected field values and their provenance remain when a source link
 is rejected; this is not a request to clear the user's metadata. Source publishers
 never become depicted performers through these operations. Observational evidence
-alone does not select a link. Bulk historical matching, association review UI and
-file-proof-driven proposals remain separate migration/review work.
+alone does not select a link. The bounded matching service below can propose and
+apply historical file proofs; association review UI remains separate work.
+
+### Historical post-to-media matching
+
+The `catalog-files-v1` policy follows retained catalog appearance, file observation
+and file-match references. It reuses the native checks for current file/archive
+generations, exact or surviving paths, verified content where recorded, and unique
+current media ownership. A historical match does not perform new byte hashing.
+The service uses no filename inference, publisher attribution or attachment-order
+guessing. Several independently proven media can share a post; repeated evidence
+for the same resolved media produces one choice with retained proof references.
+Competing media for one observation, unavailable files and unproven claims stay in
+review. Every explicit post choice is preserved, including `undecided`. Unscoped
+attachment rejections also hold matching for review rather than being overridden.
+
+| Application route | Behavior |
+| --- | --- |
+| `GET /post-media-backfill-posts?after=<uuid>&limit=N` | Indexed discovery of posts with retained post-level media evidence; limit 1–100 |
+| `GET /posts/<post>/media-backfill-preview` | Read-only candidates, current guards, proof status and preview signature |
+| `POST /posts/<post>/media-backfills` | Apply eligible candidates from that exact preview with `uuid`, `post_uuid` and `signature` |
+| `GET /post-media-backfills/<request-uuid>` | Original durable outcome for exact retry and response-loss recovery |
+| `GET /post-media-decisions/<decision-uuid>/evidence` | Foreign-key-linked appearance and file-match proof references |
+
+These routes use application authentication, never producer-token authority.
+Apply revalidates the preview and current file/ownership proofs in a bounded
+transaction. Changed previews return 409; oversized per-post evidence returns
+422 without truncation. The service creates only reviewed post/media decisions
+and matching receipts, using the existing gallery service once per post. It does
+not create attachments or galleries, replace selected metadata, or enable rules.
+Request UUID reuse with different inputs conflicts. A committed request remains
+recoverable after restart or a later explicit unlink; replay does not relink it.
+
+The supported `stash-backfill-post-media` client first writes a private immutable
+plan. Bounded parts retain candidate/proof previews and request UUIDs without one
+filesystem object per post. It validates every part before any submission, checks
+part hashes again before use, and binds the plan to its original endpoint. Prepare
+supports up to one million discovered posts or an explicit `--posts-file` JSON
+array. Oversized posts remain visible as review items while other posts proceed.
+Use a new plan for stale previews, keeping prior requests and receipts intact.
+
+```sh
+stash-backfill-post-media prepare --endpoint STASH_ORIGIN --output /migration/post-media
+stash-backfill-post-media show --plan /migration/post-media --expected-sha256 PLAN_SHA256 --post POST_UUID
+stash-backfill-post-media apply --endpoint STASH_ORIGIN --plan /migration/post-media --expected-sha256 PLAN_SHA256
+stash-backfill-post-media status --endpoint STASH_ORIGIN --plan /migration/post-media --expected-sha256 PLAN_SHA256
+```
+
+Use the printed plan digest after inspecting its proposals. `STASH_API_KEY` is
+read at request time and never saved in the plan. Apply/status report original
+receipt outcomes separately from pending requests and review items. Their exit
+codes are 0 for processed work without review, 1 for an input/transport failure,
+2 when review is required, and 3 while requests remain unsubmitted. A saved receipt
+describes that matching operation, not a claim that later user edits were undone.
+Rehearse matching and independently reconcile selected metadata before production
+use; populated source coverage and the broader review UI are release gates.
 
 ### Historical metadata review API
 

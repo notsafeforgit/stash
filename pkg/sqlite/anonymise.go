@@ -1134,6 +1134,7 @@ func (db *Anonymiser) deleteSourceAccountEvidence(ctx context.Context) error {
 			"enrichment_checkpoints", "enrichment_checkpoint_records", "enrichment_checkpoint_receipts", "enrichment_job_attempts", "enrichment_job_targets",
 			"translation_job_targets", "archive_job_submissions", "archive_job_attempts", "archive_jobs",
 			"file_content_versions", "media_contents",
+			"post_media_decision_evidence", "post_media_backfill_decisions", "post_media_backfills",
 			"source_post_file_evidence", "source_file_matches", "source_file_observations", "source_content_claims",
 			"translation_target_history", "translation_targets", "translation_cache", "translation_requests",
 			"enrichment_target_history", "enrichment_completion_captures", "enrichment_completions", "enrichment_targets",

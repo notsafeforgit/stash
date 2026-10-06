@@ -875,8 +875,18 @@ choices require review. Preserve manual gallery membership and already selected
 metadata. Metadata policy source choices accept a capture and exactly one current
 attachment or reviewed post decision, retaining that decision in field provenance.
 This permits historical NFO captures without inventing albums. The migration
-selects no associations; historical file-proof matching and its review UI remain
-separate work. See [the association API](docs/native-ingestion.md#reviewed-post-to-media-associations).
+selects no associations. See [the association API](docs/native-ingestion.md#reviewed-post-to-media-associations).
+
+Schema 1000082 adds guarded historical post/file matching with durable request
+receipts and foreign-key-linked proof references. The `catalog-files-v1` policy
+uses current file/archive generations, retained path/content matches and unique
+media ownership. Preserve all explicit post choices and hold competing matches
+or unresolved attachment rejections for review. Batch decisions synchronize an
+existing gallery once per post; no attachment or album is fabricated. Revalidate
+proofs before commit, and replay original receipts before inspecting changed
+state. `stash-backfill-post-media` prepares immutable bounded plan parts and
+resumes through the application API. Populated matching, source-policy preview
+reconciliation and association review UI remain release work.
 
 Schema 1000037 adds `SourceFile` records for shared source content claims,
 root-relative file observations and guarded matches to existing library files.

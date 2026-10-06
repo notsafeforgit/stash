@@ -1521,6 +1521,43 @@ allow long URLs and escaped JSON without loading the entire library into memory.
 It uses `STASH_API_KEY` or `--api-key-env` and requires application authorization.
 See [activation API contracts](../../docs/native-schema.md#reviewed-enrichment-activation).
 
+## Historical post-to-media links
+
+`stash-backfill-post-media` connects retained post/file appearances to existing
+scenes and images even when an old NFO capture has no attachment manifest. It
+uses native file-generation, path/content and current ownership checks. It
+preserves explicit choices, leaves conflicting matches in review and creates
+no attachment order or album. Run it after catalog media evidence has been
+imported; source-album matching below remains a separate operation.
+
+```sh
+stash-backfill-post-media prepare --endpoint STASH_ORIGIN --output /migration/post-media
+stash-backfill-post-media show --plan /migration/post-media --expected-sha256 PLAN_SHA256 --post POST_UUID
+stash-backfill-post-media apply --endpoint STASH_ORIGIN --plan /migration/post-media --expected-sha256 PLAN_SHA256
+stash-backfill-post-media status --endpoint STASH_ORIGIN --plan /migration/post-media --expected-sha256 PLAN_SHA256
+```
+
+Preparation only reads the native API and saves a new private plan in bounded
+parts. Use its printed digest after inspecting the proposals. `--posts-file`
+can restrict preparation to a JSON array of UUIDs; otherwise the client pages
+all retained post-level evidence, up to one million posts. A per-post review
+limit remains an explicit item and does not hide other eligible posts. The plan
+is bound to its original endpoint and never contains `STASH_API_KEY` or the value
+of `--api-key-env`.
+
+Resume Apply with the same plan and digest after a network error or restart.
+The client reads durable receipts before submitting missing requests. A later
+unlink does not cause an earlier request to recreate the link. Stale previews
+require a new plan; completed request identities and history remain intact.
+Every part is validated before submission and checked again before use. Changed
+plan bytes, unexpected target identities and mismatched receipt counts fail.
+
+Exit codes are 0 for preparation/show or processed work without review, 1 for
+input/transport failures, 2 for review items/conflicts, and 3 for unsubmitted
+requests. `processed` concerns the saved matching pass; `needs_review` and the
+outcome counts retain unresolved candidates. Matching does not apply metadata
+policies or enable scrapers. See the [native contract](../../docs/native-ingestion.md#historical-post-to-media-matching).
+
 ## Historical source albums
 
 `stash-backfill-source-albums` uses the native application API to match imported

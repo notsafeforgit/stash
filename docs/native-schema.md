@@ -1926,6 +1926,28 @@ activates no policy. Ordinary snapshots include these records; anonymisation
 removes the association history and metadata references with other source data.
 See [the review API](native-ingestion.md#reviewed-post-to-media-associations).
 
+## Historical post-to-media matching receipts
+
+Schema 1000082 adds `post_media_backfills`, `post_media_backfill_decisions` and
+`post_media_decision_evidence`. A bounded matching request retains its UUID,
+reviewed post revision, policy, preview signature, input digest and outcome
+counts. Its selected migration decisions reference the original media evidence,
+post-file evidence and file-match records through foreign keys. No source payload
+or post body is copied into these records.
+
+Receipts and proof references are immutable. SQL guards enforce post/decision
+scope and the original appearance/file chain; startup also verifies decision
+counts, required proofs and all cross-record references. The shared service
+checks current file/archive generations and ownership before selection and again
+before commit, preserving explicit choices and merge conflicts. Exact request
+replay returns the original outcome without rerunning matching. Anonymisation
+removes these dependent references before their source records.
+
+The migration creates empty tables and schedules no matching work. Native SQLite
+snapshots include the records with the other archive data. See
+[historical matching](native-ingestion.md#historical-post-to-media-matching) for
+the application API and saved-plan client.
+
 ## Historical metadata cleanup
 
 Schema 1000080 adds `source_cleanup_intents`, `catalog_cleanup_imports` and

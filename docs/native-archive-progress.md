@@ -9317,3 +9317,58 @@ current ownership and explicit choices before selecting associations. That batch
 service, association review UI and representative populated-library policy
 previews remain required. No production service, worker, policy activation,
 bucket setting or frozen compatible release changed.
+
+
+## Historical post-to-media matching — 2026-10-05
+
+Schema 1000082 adds guarded matching of retained catalog post/file evidence to
+native scenes and images. Repeated evidence for one media identity produces one
+candidate; independently proven media can share a post. Matching checks current
+file and archive generations, retained path/content proofs and unique ownership.
+It preserves every explicit post choice, including undecided, and holds competing
+observations, merge conflicts and unresolved attachment rejections for review.
+These are checks of retained library evidence, not fresh hashes of media bytes.
+
+The application API provides indexed discovery, read-only previews, guarded
+apply, immutable request receipts and linked proof references. Selected proofs
+and entity revisions are checked again before commit. A retry recovers its
+original outcome even after restart or a later unlink. Existing gallery
+synchronization runs once per post and protects manual choices; no attachment,
+album, selected metadata or performer attribution is invented by a direct link.
+The installed `stash-backfill-post-media` client saves bounded immutable plan
+parts, verifies their complete contents before applying, and resumes from
+server receipts. Its plans retain neither application keys nor plugin settings.
+
+The full fork gate passed in 1,689 seconds: 615 UI tests, 540 producer tests,
+eight library tests, 108 archive tests, 262 backup tests, zero lint issues and all
+tagged Go packages. API and SQLite tests took 1,233 and 1,362 seconds with the
+documented 30-minute timeout override. Full-library discovery then exposed an
+optimizer choice that sorted the evidence set on every page. Selecting the
+existing post cursor index returned identical 100-post pages in 0.25–0.33 ms,
+compared with 0.44–0.50 seconds before, in local SQLite measurements. The isolated
+query change passed focused SQLite and actual Python/HTTP tests in 28 seconds
+and a subsequent lint run; its hashes are recorded separately from the full gate.
+
+The isolated library migrated from schema 1000081 and reopened in 461 seconds.
+Ten source scopes retained the same 104 existing metadata-source choices. An
+independent comparison checked all 286 original tables and 36,980,680 original
+rows, including SQLite value types. Only the schema transition and new migration
+history row changed; all three new tables were empty. Integrity passed with no
+foreign-key violations. That comparison took 1,041 seconds while other isolated
+validation jobs were also running.
+
+The actual native API and installed client prepared all 254,453 evidenced posts
+in 255 saved batches, taking 442 seconds after opening the library. Independent
+SQL joins and Python checks verified every saved preview: 411,690 candidates
+were supported by 415,028 valid retained file proofs, with no mismatches. The
+comparison took 288 seconds, including waits for later batches to be prepared.
+Fixture tests separately cover explicit choices, ambiguity, changed generations,
+merged media, interrupted writes, lost responses and restart.
+
+Full-library application has started against the candidate copy. Receipt
+recovery after reopening and reconciliation of the resulting associations remain
+to be checked. The verified rehearsal pointer remains at schema 1000081 until
+those checks pass.
+Association review UI and representative populated-library metadata-policy
+previews remain required. Production services, workers, policy activation,
+bucket settings and the frozen compatible release are unchanged.

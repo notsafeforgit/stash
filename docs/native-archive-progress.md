@@ -26,7 +26,11 @@ are still required.
 
 Reviewed transfer of unstarted pending enrichment after collection edits now has
 an atomic API, saved-plan client and a passing full fork gate. Its populated
-schema-83 rehearsal is in progress; the verified library copy remains schema 82.
+schema-83 migration and independent saved-plan comparison passed, and all
+227,443 pending targets have transferred on the isolated copy. Fresh-process
+receipt recovery and final whole-library comparison passed; the verified
+rehearsal is now schema 83. Six saved discovery searches still need reviewed
+collection bindings before future execution.
 
 Durable enrichment execution, queued-job dispatch, stale-job maintenance and
 shared download/enrichment service reservations are implemented, including linked
@@ -9513,7 +9517,48 @@ The full fork gate passed in 1,866 seconds against the frozen implementation:
 backup tests, zero lint issues and all tagged Go packages. API and SQLite tests
 took 1,302 and 1,415 seconds with the documented 30-minute timeout override.
 Fresh producer/backup installations were checked as part of this run. A
-consistent schema-82 candidate copy completed in 215 seconds; its migration,
-populated application and independent reconciliation are still in progress.
-The canonical rehearsal remains schema 1000082. Translation provenance and
-discovery scope reviews are separate and have not been rewritten.
+consistent schema-82 candidate copy completed in 215 seconds. The implementation
+was committed and pushed as `41626b899`; its lint, build and preview-image CI
+workflows passed.
+
+The schema-83 migration completed in 147 seconds and a fresh reopen in 122
+seconds. Independent comparison checked all 38,885,232 original rows across
+289 tables, preserving cell values and SQLite types; only the schema version
+and one migration-history row changed. Both new review tables were empty,
+integrity checking passed and no foreign-key violations were found. The total
+migration harness elapsed time includes an 825-second pause used to serialize
+disk-heavy checks; that pause is not migration processing time.
+
+The frozen native API then prepared all 2,768 plans in 103 seconds after opening
+the database. Independent verification reproduced the nested and outer plan
+digests, deterministic destination identities, exact source revisions and
+schedules, and current collection definitions against the untouched schema-82
+copy. All 227,443 destinations remained unique and unoccupied; no prior worker
+bindings existed. Application through the frozen API completed in 362 seconds,
+with exactly 2,768 Apply requests. A deliberately lost committed response was
+recovered through its receipt without a duplicate Apply.
+
+Fresh-process recovery reopened the database in 142 seconds and recovered all
+2,768 receipts with read-only GET requests in 71 seconds, with zero Apply
+requests. Independent receipt verification passed in 19 seconds, reproducing
+every input/plan digest, old-target hold and exclusion, replacement target,
+schedule and history record. It checked 682,329 added history rows and confirmed
+that no worker binding exists for either side of any transfer.
+
+Final reconciliation passed in 238 seconds. All 38,885,232 original rows across
+289 tables retain their identities, values and SQLite types except the exact
+reviewed changes to the old targets' state, revision, reason and update time,
+the schema version and one migration-history row. Selected metadata, source
+evidence, translation provenance, discovery state and previous receipts are
+unchanged. Integrity checking passed and foreign-key violations remain zero.
+Schema 1000083 is now the canonical rehearsal checkpoint. After proving that
+the superseded schema-82 database and search cache were closed, their removal
+recovered 19.88 GiB and left 137.76 GiB free. The original compatible snapshot,
+frozen import inputs and current verified database remain available.
+
+A separate read-only inspection confirms that the six current discovery searches
+contain 569 targets and no native jobs, pages, candidates or detail jobs. Their
+two superseded originals retain 188 targets and their historical cursors. Those
+immutable definitions and recovery links require a separate reviewed binding
+operation before future execution. No production service, source job, root or
+metadata policy was activated by this rehearsal.

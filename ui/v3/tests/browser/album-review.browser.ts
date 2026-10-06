@@ -1,3 +1,4 @@
+import { emptyDownloadStatus } from "../fixtures/downloads";
 import type { Page, Route } from "@playwright/test";
 import { test, expect, chooseSection } from "./test";
 import {
@@ -57,6 +58,14 @@ async function archive(page: Page, create = false) {
     return result;
   }
   async function handler(route: Route) {
+    if (
+      new URL(route.request().url()).pathname.endsWith(
+        "/attachments/download-status",
+      )
+    )
+      return route.fulfill({
+        json: emptyDownloadStatus(route.request().postDataJSON().attachments),
+      });
     const request = route.request(),
       url = new URL(request.url());
     requests.push(url);

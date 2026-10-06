@@ -5,8 +5,9 @@ post, with ordered image/video attachments and explicit membership choices.
 `pkg/archive.ExtractCapturedAlbum` derives the source list under
 `captured-attachments-v2`. Native intake and the application-authorized
 [historical album backfill](native-ingestion.md#historical-source-album-backfill)
-use the same gallery service. Production activation and the ordered gallery UI
-still need their integrations under the
+use the same gallery service. Ordered inspection, association review and mixed-
+media playback are available on source-post and gallery pages. Production
+activation remains governed by the
 [transition plan](native-archive-transition-plan.md#source-post-albums-and-galleries).
 
 ## Evidence accepted by the parser
@@ -83,3 +84,24 @@ duplicating membership. Native producer tests also verify association using
 captured CDN URLs/attachment IDs, including output numbers that differ from the
 source position. Single-media file ingestion links its source without creating
 a gallery. Other extractor and external-host associations remain unfinished.
+
+## Download reports in the application
+
+Each evidenced attachment offers Download history. Its card shows the latest
+recorded transfer separately from library associations and registered files.
+Download completion is a producer report; file checks have their own queued,
+running or terminal status. Neither claims that previously registered bytes are
+still online. Missing reports do not make older library media unavailable.
+
+History groups a transfer's original start and outcome in one entry, ordered by
+its first received report. Delayed delivery does not move that entry between
+pages. Source collection/root labels, observed start/finish times and receipt
+times are visible; report identifiers expand on request. Missing local files,
+excluded media, failures and attempts without a completion report have distinct
+labels. Older transfers load 25 at a time; refresh starts a new current read.
+
+Cards share batches of at most 25 distinct attachments. Visible groups refresh
+every 15 seconds without overlapping requests; hidden pages and offscreen groups
+suspend polling. A failed refresh keeps the last successful check with an error
+message. Navigation cancels obsolete reads. Viewing reports never changes links,
+metadata, source runs or files.

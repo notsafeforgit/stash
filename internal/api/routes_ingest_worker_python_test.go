@@ -158,6 +158,7 @@ func runPythonDownloadWorker(t *testing.T, adapter string) {
 	if adapter == "n8n-backfill" {
 		require.EqualValues(t, 2, backfillFinishes.Load())
 	}
+	var attachmentID string
 	require.NoError(t, service.Repo.WithReadTxn(t.Context(), func(ctx context.Context) error {
 		run, err := service.Repo.SourceRun.Find(ctx, result.RunUUID)
 		require.NoError(t, err)
@@ -174,6 +175,7 @@ func runPythonDownloadWorker(t *testing.T, adapter string) {
 		attachment, err := service.Repo.SourceAttachment.Lookup(ctx, capture.PostUUID, models.SourcePostIdentifier{Namespace: "native:reddit", Value: "abc123"})
 		require.NoError(t, err)
 		require.NotNil(t, attachment)
+		attachmentID = attachment.UUID
 		history, err := service.Repo.SourceAttachment.DownloadHistory(ctx, attachment.UUID, 0, 10, time.Now())
 		require.NoError(t, err)
 		require.Len(t, history, 2)
@@ -206,6 +208,7 @@ func runPythonDownloadWorker(t *testing.T, adapter string) {
 	require.NoError(t, err)
 	require.Equal(t, "queued", status.State)
 	require.FileExists(t, filepath.Join(mediaPath, result.Path))
+	verifyAttachmentDownloadTransferHTTP(t, service.Repo, attachmentID, result.Started, result.Downloaded, result.File)
 	require.Positive(t, reportResponses.Load(), "a committed report response was deliberately lost")
 	require.NoError(t, db.Close())
 	archivePath := filepath.Join(filepath.Dir(packagePath), "archive", "src")

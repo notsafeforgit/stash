@@ -1118,8 +1118,24 @@ work, records starts before bytes, and queues a downloaded report before updatin
 the download archive. Fallback URLs share a transfer. Existing files can report
 completion without a new start; unresolved archive skips and unsupported mirror
 files retain explicit outcomes. Backup receipt verification preserves these
-dependencies and original acknowledgements. Album status controls and actual
-host/n8n activation remain separate implementation work.
+dependencies and original acknowledgements. The application also exposes two
+read-only grouped views:
+
+- `GET /api/v3/archive/attachments/{attachment}/download-transfers?before=<sequence>&limit=<1..25>`
+  combines the original start and outcome into one transfer. Entries descend by
+  their first server receipt ID; `next_before` continues to older entries. A late
+  start or outcome updates that entry without changing its pagination anchor.
+- `POST /api/v3/archive/attachments/download-status` accepts
+  `{"attachments":["<uuid>"]}` for 1–25 distinct attachments. It returns the latest
+  recorded transfer or null for each requested attachment, in input order, and
+  a shared check time. Despite using a request body, this route changes no data.
+
+Both use application authentication and indexed attachment lookups. They retain
+collection/root labels, original producer/run/capture references and separate file
+verification status. Latest recorded transfer means first receipt order, not
+latest source-clock time, all active attempts, or current file availability.
+[Album cards and download history](native-source-albums.md#download-reports-in-the-application)
+use these views. Actual native host/n8n activation remains cutover work.
 
 ## Source-run coordination
 

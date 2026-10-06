@@ -6,6 +6,10 @@ import {
   type AlbumSlot,
 } from "@/core/native-archive/source-album-api";
 import { NativeArchiveError } from "@/core/native-archive/client";
+import {
+  createDownloadAPI,
+  type DownloadTransfer,
+} from "@/core/native-archive/download-api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
@@ -21,6 +25,7 @@ import {
 import { PostEmpty, PostReadError, PostSection } from "../posts/shared";
 import { LibraryLink } from "../posts/library-link";
 import { useAlbumPages } from "./read";
+import { DownloadHistory, DownloadSlots, DownloadSummary } from "./downloads";
 import { AlbumReview } from "./review";
 import { SelectionReview } from "./selection-review";
 import {
@@ -72,9 +77,13 @@ export function AlbumReadError({
 function Slot({
   slot,
   onReview,
+  transfer,
+  onHistory,
 }: {
   slot: AlbumSlot;
   onReview: (attachment: string) => void;
+  transfer: DownloadTransfer | null | undefined;
+  onHistory: (attachment: string) => void;
 }) {
   const msg = useMsg();
   const intl = useIntl();
@@ -195,6 +204,7 @@ function Slot({
               {slot.attachment.reference.namespace}:
               {slot.attachment.reference.value}
             </code>
+            <DownloadSummary transfer={transfer} />
           </>
         )}
       </CardContent>
@@ -211,16 +221,28 @@ function Slot({
             </>
           )}
           {slot.attachment && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                if (slot.attachment) onReview(slot.attachment.uuid);
-              }}
-            >
-              {msg("association_review.edit_media", "Edit media link")}
-            </Button>
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (slot.attachment) onReview(slot.attachment.uuid);
+                }}
+              >
+                {msg("association_review.edit_media", "Edit media link")}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (slot.attachment) onHistory(slot.attachment.uuid);
+                }}
+              >
+                {msg("downloads.history", "Download history")}
+              </Button>
+            </>
           )}
         </CardFooter>
       )}
@@ -240,6 +262,10 @@ export function SourceAlbum({
   const msg = useMsg();
   const intl = useIntl();
   const api = useMemo(() => createSourceAlbumAPI(endpoint), [endpoint]);
+  const downloads = useMemo(() => createDownloadAPI(endpoint), [endpoint]);
+  const [downloadAttachment, setDownloadAttachment] = useState<string | null>(
+    null,
+  );
   const [editingAttachment, setEditingAttachment] = useState<string | null>(
     null,
   );
@@ -268,6 +294,14 @@ export function SourceAlbum({
   const selection = page?.selection;
   return (
     <div className="flex flex-col gap-4">
+      {downloadAttachment && (
+        <DownloadHistory
+          key={`${downloads.endpoint}:${downloadAttachment}`}
+          api={downloads}
+          attachment={downloadAttachment}
+          onClose={() => setDownloadAttachment(null)}
+        />
+      )}
       {result.error !== undefined && (
         <AlbumReadError error={result.error} retry={result.reload} />
       )}
@@ -432,13 +466,17 @@ export function SourceAlbum({
                 "Source-list completeness is separate from file availability. Registered files may be offline; unselected items may need downloading or linking.",
               )}
             </p>
-            {result.data?.items.map((slot) => (
-              <Slot
-                key={slot.position}
-                slot={slot}
-                onReview={setEditingAttachment}
-              />
-            ))}
+            <DownloadSlots slots={result.data?.items ?? []} api={downloads}>
+              {(slot, transfer) => (
+                <Slot
+                  key={slot.position}
+                  slot={slot}
+                  onReview={setEditingAttachment}
+                  transfer={transfer}
+                  onHistory={setDownloadAttachment}
+                />
+              )}
+            </DownloadSlots>
             {!result.data?.items.length && (
               <PostEmpty
                 title={msg(

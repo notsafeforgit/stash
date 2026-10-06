@@ -50,7 +50,7 @@ separate publication/notification status. Focused client checks and desktop/mobi
 browser flows pass. The complete fork gate passed, including generation, embedded
 assets, 669 UI tests, the Python suites, Go lint and the full Go integration suite.
 The source-list editor below passed the complete fork gate. Explicit gallery/attachment association editing has now passed its full gate.
-Live download-state inspection remains open.
+Grouped download-state inspection has passed its integrated full fork gate.
 
 Source-list review APIs now provide unique-list discovery, read-only comparison,
 guarded selection, immutable history and exact request recovery. Focused SQLite,
@@ -69,7 +69,9 @@ integrated full fork gate, including 715 UI tests and complete Go integration.
 Per-attachment download reporting now has a validated backend and reconciled
 schema-87 rehearsal. Producer lifecycle delivery and backup receipt checks pass
 the full producer, archive, host backup and API integration suites, remaining
-Go/Python caller checks and clean lint. Its UI remains in progress.
+Go/Python caller checks and clean lint. Grouped read APIs and the album status/history
+UI now pass focused repository, HTTP and desktop/mobile browser checks and the
+integrated full fork gate, including 723 UI tests and complete Go integration.
 
 Reviewed transfer of unstarted pending enrichment after collection edits now has
 an atomic API, saved-plan client and a passing full fork gate. Its populated
@@ -10279,3 +10281,36 @@ checks. Validation receipts and the 23-file source manifest are retained under
 `.local/native-attachment-download-20261006/`. Native live worker activation,
 installed runtime/profile refresh, album status UI and the remaining transition
 gates remain open. No production configuration or bucket policy changed.
+
+## Grouped download status and history — 2026-10-06
+
+Attachment reports now have a grouped read API and a bounded batch summary for
+album cards. Each transfer keeps the first server receipt as its stable cursor;
+delayed start/outcome delivery updates one entry without moving it between pages.
+The production query uses attachment receipt ordering and the existing unique
+phase index, limiting scope/label joins to the selected page. Original immutable
+reports and receipts remain available. No schema change is required.
+
+Album cards share status reads for at most 25 distinct attachments. Visible groups
+refresh without overlapping requests, and offscreen/hidden groups stop polling.
+Download history uses the existing Base UI dialog and expandable sections, with
+source/root labels, outcome explanations, separate file-check status, received
+and reported times, and optional technical references. Older entries paginate
+on demand. Existing library links and playback remain independent of reports.
+
+Focused repository/history and production-query-plan tests passed, including
+terminal-before-start delivery, stable pagination and expired run ownership. The
+actual CLI/host/n8n HTTP fixture and portable restore passed with the new routes.
+Eight client/polling tests, application/browser types, lint and locales passed.
+All 106 affected Chromium/WebKit browser cases passed. Eight final history
+cases also passed after keeping the dialog title/close control visible during
+scrolling; the WebKit mobile screenshot was inspected. The integrated full fork
+gate passed: generation and embedded UI, 723 UI tests, 551 producer, eight library,
+113 archive and 262 host backup tests, clean Go lint and complete Go integration.
+The initial gate stopped on a Go parser style check; after an equivalent switch
+rewrite, the resumed Go gate passed in 1,383.7 seconds. Both receipts are retained.
+
+Evidence is under `.local/native-download-status-20261006/` and uses
+`native_download_status_` validation receipts. Native worker activation, manual
+intake/post consolidation, remaining caller and compatibility work, complete
+production backup/restore and cutover remain open. Production is unchanged.

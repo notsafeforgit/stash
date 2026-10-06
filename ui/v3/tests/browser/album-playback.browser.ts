@@ -1,3 +1,4 @@
+import { emptyDownloadStatus } from "../fixtures/downloads";
 import type { Page } from "@playwright/test";
 import { test, expect, chooseSection } from "./test";
 import { serveSceneMedia } from "./scene-media";
@@ -23,6 +24,14 @@ async function archive(
   let release: (() => void) | undefined;
   await serveSceneMedia(page);
   await page.route("**/api/v3/archive/**", async (route) => {
+    if (
+      new URL(route.request().url()).pathname.endsWith(
+        "/attachments/download-status",
+      )
+    )
+      return route.fulfill({
+        json: emptyDownloadStatus(route.request().postDataJSON().attachments),
+      });
     expect(route.request().method()).toBe("GET");
     const url = new URL(route.request().url());
     const path = url.pathname.split("/archive/")[1]!;

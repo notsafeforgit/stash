@@ -1,3 +1,4 @@
+import { emptyDownloadStatus } from "../fixtures/downloads";
 import type { Page } from "@playwright/test";
 import { test, expect, chooseSection } from "./test";
 import { albumPage, albumSlot, albumUUID } from "../fixtures/source-albums";
@@ -23,6 +24,14 @@ async function archive(
   let revision = "a";
   let failed = options.failed;
   await page.route("**/api/v3/archive/**", async (route) => {
+    if (
+      new URL(route.request().url()).pathname.endsWith(
+        "/attachments/download-status",
+      )
+    )
+      return route.fulfill({
+        json: emptyDownloadStatus(route.request().postDataJSON().attachments),
+      });
     const url = new URL(route.request().url());
     requests.push(url);
     if (route.request().method() !== "GET")

@@ -63,6 +63,8 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Get("/attachments/{attachment}/review", rs.attachmentMediaContext)
 	r.Get("/attachments/{attachment}/media-history", rs.attachmentMediaHistory)
 	r.Get("/attachments/{attachment}/download-history", rs.attachmentDownloadHistory)
+	r.Get("/attachments/{attachment}/download-transfers", rs.attachmentDownloadTransfers)
+	r.Post("/attachments/download-status", rs.attachmentDownloadStatus)
 	r.Post("/attachment-media/preview", rs.previewAttachmentMedia)
 	r.Post("/attachment-media/apply", rs.applyAttachmentMedia)
 	r.Get("/attachment-media/requests/{request}", rs.attachmentMediaReview)

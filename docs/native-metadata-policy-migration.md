@@ -27,6 +27,16 @@ Overridden values remain evidence. Unknown settings also remain present and must
 receive a disposition. No automatic rewrite of arbitrary legacy jq is attempted:
 native mappings use the documented source, entity and intake context.
 
+Reviewed relationship mappings can use `reference_names: true` for performer,
+studio, tag or group names, including supported aliases. The migration client
+preserves that option in constants and jq mappings, and omits false switches
+when computing the native input digest. Previously saved native `performer_names`
+rules remain readable; the two options cannot both be enabled. Invalid switch
+types and name matching on scalar fields are rejected before submission. The
+native policy service still validates the target schema and reports ambiguous
+or missing names when a rule is previewed or applied. Importing a rule does not
+resolve those future matches or create missing entities.
+
 Each disposition has an `action` and a nonempty `reason`:
 
 | Action | Meaning |

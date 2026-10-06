@@ -9029,3 +9029,23 @@ Historical policies remain disabled drafts. Cleanup execution/review disposition
 remaining UI/caller conversion, backup activation and production cutover remain
 separate work. Live services, workers, bucket policies and the frozen compatible
 release are unchanged.
+
+## Relationship names in policy migration clients — 2026-10-05
+
+The native backend already accepts `reference_names`, but the Python policy
+migration client still rejected that key. The client now retains relationship
+name options in constant and jq mappings, validates boolean switches and their
+allowed targets, and removes false switches consistently with native JSON
+hashing. Existing native performer-only definitions retain their representation.
+
+The regression reproduced the old rejection before the fix. All 532 producer
+tests pass in 46 seconds; the real native API test passes in six seconds with
+performer, studio, tag and group mappings, matching plan hashes, a deliberately
+lost response and exact receipt replay. The three applied Python files match
+their tested source hashes. This client-only change retains schema 1000080.
+
+Complete historical rule conversion remains open. Inspection also confirmed
+that the old reader selected cached translations and combined file metadata with
+explicit folder defaults. Those behaviors and the replacement for its hidden
+cover completeness requirement still need explicit conversion before activating
+the seven retained policy drafts.

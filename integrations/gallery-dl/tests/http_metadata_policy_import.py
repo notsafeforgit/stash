@@ -29,7 +29,13 @@ def run():
                           "origin": "migration", "reason": "Reviewed retained settings", "definition": {
                               "enabled": False, "apply_to_scans": True, "rules": {"scene": {
                                   "on_create": True, "filename_title_fallback": True,
-                                  "mappings": {"title": {"jq": ".source.metadata.title // empty"}}}}}},
+                                  "mappings": {
+                                      "title": {"jq": ".source.metadata.title // empty"},
+                                      "performers": {"value": ["Known alias"], "reference_names": True, "performer_names": False},
+                                      "studio": {"value": "Studio alias", "reference_names": True},
+                                      "tags": {"jq": ".source.payload.tags // empty", "reference_names": True},
+                                      "groups": {"value": [{"name": "Album", "scene_index": 3}], "reference_names": True}
+                                  }}}}},
                "dispositions": {"python/set_organized_only_if": {"action": "review", "reason": "Artwork condition needs explicit conversion"},
                                 "saved/private_notes": {"action": "retired", "reason": "Retained source note"}}}
     frozen = directory / "binding.json"
@@ -37,6 +43,10 @@ def run():
     args = ["--binding", str(frozen), "--endpoint", setup["endpoint"]]
     plan = execute(args)
     assert plan["action"] == "preview"
+    mappings = plan["definition"]["rules"]["scene"]["mappings"]
+    for field in ("performers", "studio", "tags", "groups"):
+        assert mappings[field]["reference_names"] is True
+    assert "performer_names" not in mappings["performers"]
     frozen.write_bytes(encode(plan))
     reviewed = frozen.read_bytes()
     args += ["--apply", "--expected-sha256", plan["plan_sha256"]]

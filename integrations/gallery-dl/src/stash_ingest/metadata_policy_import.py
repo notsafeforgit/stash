@@ -115,13 +115,21 @@ def canonical_binding(value):
         mappings = rule.setdefault("mappings", None)
         if mappings is not None and not isinstance(mappings, dict):
             raise InvalidData("Native mappings must be an object")
-        for mapping in (mappings or {}).values():
-            if not isinstance(mapping, dict) or set(mapping) - {"jq", "value", "performer_names"}:
+        for field, mapping in (mappings or {}).items():
+            if not isinstance(mapping, dict) or set(mapping) - {"jq", "value", "performer_names", "reference_names"}:
                 raise InvalidData("Unknown native mapping option")
             if mapping.get("jq") == "":
                 mapping.pop("jq")
-            if mapping.get("performer_names") is False:
-                mapping.pop("performer_names")
+            for flag in ("performer_names", "reference_names"):
+                if flag in mapping:
+                    if type(mapping[flag]) is not bool:
+                        raise InvalidData("Name matching switches must be booleans")
+                    if not mapping[flag]:
+                        mapping.pop(flag)
+            if mapping.get("performer_names") and (field != "performers" or mapping.get("reference_names")):
+                raise InvalidData("performer_names only supports performers and cannot combine with reference_names")
+            if mapping.get("reference_names") and field not in {"performers", "studio", "tags", "groups"}:
+                raise InvalidData("Name matching requires a relationship field")
             if ("jq" in mapping) == ("value" in mapping):
                 raise InvalidData("Mappings require exactly one expression or constant")
     document = value["document"]

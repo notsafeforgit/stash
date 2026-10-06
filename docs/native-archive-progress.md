@@ -53,9 +53,11 @@ and guards selected library revisions. Schema 89 permits source-list selections
 to use original captures/manifests across a consolidated post identity, with
 indexed scope checks and deterministic attachment representatives. Focused
 storage, migration, startup and portable-restore checks pass, as do the related
-HTTP checks and lint. The populated rehearsal remains at schema 88; schema-89
-full-copy reconciliation and the complete release gate remain pending. No
-application post-merge mutation is exposed.
+HTTP checks and lint. The populated schema-89 migration, fresh reopen,
+independent whole-row reconciliation and complete integrated release gate now
+pass. The verified rehearsal is at schema 89. No application post-merge mutation
+is exposed; canonical media/gallery resolution and the complete merge workflow
+remain unfinished.
 
 Application local-file preview/admission now reuses native file verification and
 durable effects without creating a producer or source record. Focused real MP4/
@@ -10534,9 +10536,28 @@ though storage/ingestion passed; the correct API package was run separately and
 passed. The corrected migration helper was rechecked, and lint reports no issues.
 These are focused integration checks, not a complete `validate-fork` run.
 
-The current full-library rehearsal remains the verified schema-88 copy. The
-schema-89 full-copy migration/reconciliation and complete integrated release gate
-remain pending; the focused checks above do not replace them. Canonical current
+The complete integrated gate subsequently passed in 1,762.8 seconds: generation,
+embedded assets, 731 UI tests, 551 producer tests, eight library tests, 113 archive
+tests, 262 host backup tests, clean Go lint and the complete Go integration suite.
+The SQLite integration package completed in 1,583.1 seconds. All 19 committed
+file hashes matched the validated source before this documentation update.
+
+The isolated schema-88 archive was copied with SQLite backup and migrated by the
+actual Go implementation. Fresh reopen and independent reconciliation passed.
+Comparison covered 40,512,438 original rows in 299 tables, preserving all original
+application values and column layouts. The schema version advanced and one
+migration-history record was added. Exactly two foreign-key definitions changed
+and two provenance guards were added; their definitions were independently
+checked. Integrity and foreign-key checks pass. No post consolidation, policy
+activation or job admission occurred. The copy took 31.6 seconds, migration
+267.4 seconds, fresh reopen 259.8 seconds and independent comparison 250.6 seconds.
+These concurrent rehearsal timings are not a production downtime estimate.
+
+The verified rehearsal pointer now selects schema 89, retaining the earlier
+catalog, policy and pending-work reconciliation references. After checking for
+open handles, the superseded schema-88 database and search files were removed,
+recovering 20.4 GiB and leaving 117.4 GiB free. The original compatible snapshot,
+current verified rehearsal and small evidence receipts are retained. Canonical current
 media/gallery resolution, equivalent-attachment decisions, pending-publication
 guards and the final post-merge API/UI remain unfinished. Production, live
-workers, backup policies and the rehearsal pointer are unchanged.
+workers and backup policies are unchanged.

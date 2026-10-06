@@ -27,6 +27,12 @@ GraphQL/native-API browser cases in Chromium and WebKit at 390 and 1280 pixels.
 Operational reconciliation, review resolution and complete cutover verification
 are still required.
 
+Standalone source-post browse/detail APIs now expose compact identity lookups,
+selected publishers, canonical media associations and current album choices.
+Focused SQLite/query-plan and real HTTP checks pass; the application page and
+desktop/mobile navigation are staged for verification. This does not complete the
+broader archive management or direct-file intake workflows.
+
 Reviewed transfer of unstarted pending enrichment after collection edits now has
 an atomic API, saved-plan client and a passing full fork gate. Its populated
 schema-83 migration and independent saved-plan comparison passed, and all
@@ -9703,3 +9709,57 @@ the evidence for its surrounding routes and drawer.
 
 The broader native UI, live caller conversion, backup/restore and production
 cutover gates remain open; production has not changed.
+
+## Standalone source-post inspection API — 2026-10-06
+
+The application can now browse source posts without starting from a scene or
+image. UUID pages and exact native UUID, qualified source-ID or retained-URL
+lookups return compact summaries. URL lookup retains multiple matching posts;
+it does not invent a consolidation decision. Summaries include at most three
+identifiers and URLs, with explicit continuation flags, plus a bounded latest
+capture excerpt. Unknown historical observation times remain distinct from
+recording times. No raw post/profile payloads are loaded for these pages.
+
+Separate targeted endpoints expose all qualified identifiers, selected capture
+publishers, media associations and the current album choice. Publisher accounts
+resolve consolidation and explicit unlink decisions without selecting depicted
+performers. Media rows deduplicate redirected identities before cursor paging,
+preserve conflicting or rejected choices and report attachment evidence
+separately. They do not repeat post captions/captures per media item. Deleted
+media/gallery identities retain their UUID and state without an active local ID.
+Album inspection preserves disabled choices and never creates a gallery.
+
+The media candidate query starts from the selected post's evidence, explicit
+choices and current attachment links. It resolves at most 8,192 retained media
+identities and reports an oversized review instead of hiding a partial set.
+Indexed reverse redirects preserve decisions made before a media merge. Existing
+scene/image source review shares the association inspection code.
+
+Focused SQLite and HTTP tests pass, covering URL ambiguity, qualified identity
+lookup, pagination, compact Unicode titles, unknown capture clocks, rejected
+links, merged conflicts, deleted identities, publisher consolidation/unlink and
+disabled gallery choices. Query-plan assertions verify indexed post/URL/identity
+entry points. The first focused attempt could not write the sandboxed Go cache;
+the first cache-enabled run exposed an invalid namespace in a new test fixture.
+Correcting that fixture required no domain-code workaround.
+
+Read-only checks on the populated schema-84 rehearsal also passed for 100 post
+samples and 603 timed statements, with independent candidate/URL comparisons
+and indexed query plans. The database's size and modification time were unchanged.
+This checks SQLite statements, not end-to-end API latency or a new full-library
+reconciliation. Private receipts are in `.local/native-post-browser-20261006/`.
+
+The full validation sequence passed across two runs. Generation and the real UI
+build, 624 UI tests, 540 producer tests, eight library tests, 108 archive tests
+and 262 backup tests passed before two staticcheck conversion findings stopped
+the initial gate. After replacing the two equivalent identifier struct literals
+with typed conversions, `validate-backend` passed with zero lint findings and the
+complete Go integration suite. The staged UI was kept separate from those inputs.
+Receipts are `native_post_browser_full_gate` and
+`native_post_browser_backend_gate` under
+`.local/native-discovery-client-20261004/`.
+
+This increment changes no schema or production data. The standalone page and
+desktop/mobile navigation, broader archive management/manual intake and all
+remaining caller conversion, compatibility removal, backup/restore and cutover
+gates remain open.

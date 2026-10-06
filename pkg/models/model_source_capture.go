@@ -124,6 +124,8 @@ type SourceEvidenceReaderWriter interface {
 	EnsurePost(context.Context, SourcePostIdentifier, string) (*SourcePost, error)
 	FindPost(context.Context, string) (*SourcePost, error)
 	FindPostByIdentifier(context.Context, SourcePostIdentifier) (*SourcePost, error)
+	BrowsePosts(context.Context, SourcePostFilter) ([]SourcePostSummary, error)
+	PostSummary(context.Context, string) (*SourcePostSummary, error)
 	AddPostIdentifier(context.Context, string, SourcePostIdentifier, int) error
 	PostIdentifiers(context.Context, string, *SourcePostIdentifier, int) ([]SourcePostIdentifier, error)
 	RecordCapture(context.Context, SourceCaptureInput) (*SourceCapture, error)

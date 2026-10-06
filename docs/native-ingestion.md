@@ -1581,6 +1581,39 @@ its retryable notification checkpoint.
 
 ### Reviewed post-to-media associations
 
+The application can browse posts independently of scene/image selection:
+
+| Read-only route | Behavior |
+| --- | --- |
+| `GET /posts?after=<post-uuid>&limit=N` | Compact post summaries in UUID order; limit 1–100 |
+| `GET /posts?uuid=<post-uuid>` | Exact archive identity lookup |
+| `GET /posts?namespace=<namespace>&value=<source-id>` | Exact qualified source identity lookup |
+| `GET /posts?url=<encoded-url>` | Exact retained URL lookup; returns every matching post without treating a shared URL as proof of identity |
+| `GET /posts/<post>` | One compact summary, including active/forgotten state and current revision |
+| `GET /posts/<post>/identifiers?limit=N` | Qualified identifiers; continue with both `after_namespace` and `after_value` |
+| `GET /posts/<post>/publishers?after=<account-uuid>&limit=N` | Canonical accounts selected by current capture-publisher decisions; retained claims alone do not select a publisher or depicted performer |
+| `GET /posts/<post>/media?after=<media-uuid>&limit=N` | Canonical scene/image identities with their explicit choices, retained-evidence flag and independent attachment-link count |
+| `GET /posts/<post>/album` | Current gallery choice, including disabled state and deleted/redirected gallery resolution; `null` when no choice exists |
+
+These routes use the `/api/v3/archive` application-authenticated boundary.
+The three exact lookup selectors are mutually exclusive. Source IDs require
+their namespace, and URL lookup does not normalize or guess alternate URLs.
+Summary pages include at most three identifiers and URLs with continuation flags,
+plus the latest stored capture excerpt; payloads and profile bodies are not loaded.
+Use the existing URL and shared capture-summary routes below for expansion.
+
+Media pages resolve merged identities before applying the cursor, so repeated
+evidence and aliases produce one row. Explicit unlinks and conflicting merged
+choices remain visible and suppress attachment-based association; a positive
+attachment count does not override them. Deleted entities retain their UUID
+and state with no current local ID. Post captions and captures are fetched
+separately, rather than repeated in each media row. Inspection does not select
+sources, create galleries, change membership or assign performers.
+The selected post is bounded to 8,192 retained media identities before redirect
+resolution; larger sets return `422 source_review_limit` rather than silently
+truncating evidence. These APIs provide the standalone browser foundation;
+its application page and navigation are separate implementation work.
+
 Application-authenticated routes under `/api/v3/archive` expose direct links:
 
 | Route | Behavior |

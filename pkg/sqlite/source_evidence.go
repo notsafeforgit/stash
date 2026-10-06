@@ -157,7 +157,7 @@ func (s *SourceEvidenceStore) PostIdentifiers(ctx context.Context, value string,
 	cursor := models.SourcePostIdentifier{}
 	if after != nil {
 		if err := validatePostIdentifier(*after); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%w: %s", models.ErrSourcePostBrowseInvalid, err)
 		}
 		cursor = *after
 	}

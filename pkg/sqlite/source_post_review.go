@@ -92,16 +92,10 @@ func (s *SourcePostMediaStore) review(ctx context.Context, postID string, media 
 	if post == nil {
 		return nil, models.ErrSourcePostMediaInvalid
 	}
-	choices, err := sourcePostMediaRows(ctx, postID, ids)
+	ret, err := sourcePostMediaReview(ctx, post, media, ids)
 	if err != nil {
 		return nil, err
 	}
-	a := &models.SourcePostMediaAssociation{PostUUID: postID, PostRevision: post.Revision, PostState: post.State,
-		MediaUUID: media.UUID, MediaRevision: media.Revision, MediaState: media.State, State: postMediaState(choices), Decisions: []models.SourcePostMediaDecision{}}
-	for _, choice := range choices {
-		a.Decisions = append(a.Decisions, *choice.resolve())
-	}
-	ret := &models.SourcePostMediaReview{Association: a}
 	ret.LatestCapture, err = sourceReviewLatestCapture(ctx, postID)
 	if err != nil {
 		return nil, err
@@ -113,6 +107,21 @@ func (s *SourcePostMediaStore) review(ctx context.Context, postID string, media 
 	if len(ret.URLs) > 3 {
 		ret.URLs, ret.MoreURLs = ret.URLs[:3], true
 	}
+	return ret, nil
+}
+
+func sourcePostMediaReview(ctx context.Context, post *models.SourcePost, media *models.ArchiveEntity, ids []string) (*models.SourcePostMediaReview, error) {
+	postID := post.UUID
+	choices, err := sourcePostMediaRows(ctx, postID, ids)
+	if err != nil {
+		return nil, err
+	}
+	a := &models.SourcePostMediaAssociation{PostUUID: postID, PostRevision: post.Revision, PostState: post.State,
+		MediaUUID: media.UUID, MediaRevision: media.Revision, MediaState: media.State, State: postMediaState(choices), Decisions: []models.SourcePostMediaDecision{}}
+	for _, choice := range choices {
+		a.Decisions = append(a.Decisions, *choice.resolve())
+	}
+	ret := &models.SourcePostMediaReview{Association: a}
 	args := []interface{}{postID}
 	for _, id := range ids {
 		args = append(args, id)

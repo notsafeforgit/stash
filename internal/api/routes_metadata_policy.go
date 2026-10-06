@@ -42,6 +42,12 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Post("/account-consolidation/requests/{request}/check", rs.checkAccountConsolidation)
 	r.Get("/source-accounts/{account}/consolidation-history", rs.accountConsolidationHistory)
 	r.Get("/metadata-fields/{kind}", rs.fields)
+	r.Get("/posts", rs.browseSourcePosts)
+	r.Get("/posts/{post}", rs.sourcePost)
+	r.Get("/posts/{post}/identifiers", rs.sourcePostIdentifiers)
+	r.Get("/posts/{post}/publishers", rs.sourcePostPublishers)
+	r.Get("/posts/{post}/media", rs.sourcePostMedia)
+	r.Get("/posts/{post}/album", rs.sourcePostAlbum)
 	r.Get("/posts/{post}/media/{entity}", rs.postMediaAssociation)
 	r.Get("/posts/{post}/media/{entity}/review", rs.postMediaReview)
 	r.Get("/entities/{entity}/source-posts", rs.mediaSourcePosts)
@@ -269,6 +275,10 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 }
 
 func nativeArchiveError(w http.ResponseWriter, err error) {
+	if errors.Is(err, models.ErrSourcePostBrowseInvalid) {
+		ingestError(w, ingest.ErrInvalid)
+		return
+	}
 	if errors.Is(err, models.ErrSourceAlbumLimit) {
 		ingestJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "source_review_limit", "message": "Source matching exceeds the bounded review limit."})
 		return

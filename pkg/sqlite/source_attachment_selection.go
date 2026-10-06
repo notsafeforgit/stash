@@ -101,12 +101,16 @@ func loadSelectionManifests(ctx context.Context, post string, ids []string) (map
 	if len(ids) > archive.MaxSelectionManifests+1 {
 		return nil, errors.New("too many attachment source lists")
 	}
-	args := make([]interface{}, 0, len(ids))
+	args := make([]interface{}, 0, len(ids)+1)
+	args = append(args, post)
 	for _, id := range ids {
 		args = append(args, id)
 	}
-	var headers []attachmentManifestRow
-	if err := dbWrapper.Select(ctx, &headers, "SELECT * FROM source_attachment_manifests WHERE uuid IN "+getInBinding(len(ids)), args...); err != nil {
+	var headers []struct {
+		attachmentManifestRow
+		InScope bool `db:"in_scope"`
+	}
+	if err := dbWrapper.Select(ctx, &headers, selectionManifestHeadersQuery+getInBinding(len(ids)), args...); err != nil {
 		return nil, err
 	}
 	if len(headers) != len(ids) {
@@ -114,7 +118,7 @@ func loadSelectionManifests(ctx context.Context, post string, ids []string) (map
 	}
 	total := 0
 	for _, row := range headers {
-		if row.PostUUID != post {
+		if !row.InScope {
 			return nil, models.ErrAttachmentSelectionConflict
 		}
 		total += row.EntryCount
@@ -131,7 +135,7 @@ func loadSelectionManifests(ctx context.Context, post string, ids []string) (map
 	query := `SELECT a.*, e.manifest_uuid, e.position, e.media_kind FROM source_attachment_entries e
 JOIN source_attachments a ON a.uuid = e.attachment_uuid AND a.post_uuid = e.post_uuid
 WHERE e.manifest_uuid IN ` + getInBinding(len(ids)) + ` ORDER BY e.manifest_uuid, e.position LIMIT ?`
-	args = append(args, archive.MaxSelectionSourceEntries+1)
+	args = append(args[1:], archive.MaxSelectionSourceEntries+1)
 	if err := dbWrapper.Select(ctx, &rows, query, args...); err != nil {
 		return nil, err
 	}
@@ -177,9 +181,16 @@ func selectionSignature(mode string, ids []string, input models.SourceAttachment
 
 func selectionFromMerge(decision models.AttachmentSelectionDecision, merged models.SourceAttachmentManifestInput, sources map[string]selectionManifest) *models.AttachmentSelection {
 	attachments := make(map[models.SourcePostIdentifier]models.SourceAttachment)
-	for _, source := range sources {
-		for _, entry := range source.entries {
-			attachments[entry.Attachment.Reference] = entry.Attachment
+	// A preview also loads candidate lists that may not contribute to this
+	// selection. They must not change the attachment behind an existing choice.
+	// Consolidated members can retain distinct UUIDs for the same qualified key;
+	// choose a stable representative using only the selected evidence.
+	for _, id := range decision.ManifestUUIDs {
+		for _, entry := range sources[id].entries {
+			previous, exists := attachments[entry.Attachment.Reference]
+			if !exists || entry.Attachment.UUID < previous.UUID {
+				attachments[entry.Attachment.Reference] = entry.Attachment
+			}
 		}
 	}
 	ret := &models.AttachmentSelection{Decision: decision, Complete: merged.Complete, DeclaredAlbum: merged.DeclaredAlbum, ExpectedCount: merged.ExpectedCount,
@@ -237,7 +248,7 @@ func selectionCapture(ctx context.Context, post, value string) (string, string, 
 		return "", "", err
 	}
 	var manifest string
-	if err := dbWrapper.Get(ctx, &manifest, "SELECT manifest_uuid FROM source_capture_attachment_manifests WHERE capture_uuid = ? AND post_uuid = ?", capture, post); err != nil {
+	if err := dbWrapper.Get(ctx, &manifest, selectionCaptureQuery, post, capture); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return "", "", models.ErrAttachmentSelectionConflict
 		}

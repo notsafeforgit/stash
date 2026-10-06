@@ -48,6 +48,15 @@ along with the complete integrated validation gate. This internal storage writer
 has no application mutation route; album/media choice resolution and the complete
 reviewed consolidation workflow remain unfinished.
 
+All-member consolidation choice review now retains conflicts on earlier aliases
+and guards selected library revisions. Schema 89 permits source-list selections
+to use original captures/manifests across a consolidated post identity, with
+indexed scope checks and deterministic attachment representatives. Focused
+storage, migration, startup and portable-restore checks pass, as do the related
+HTTP checks and lint. The populated rehearsal remains at schema 88; schema-89
+full-copy reconciliation and the complete release gate remain pending. No
+application post-merge mutation is exposed.
+
 Application local-file preview/admission now reuses native file verification and
 durable effects without creating a producer or source record. Focused real MP4/
 image, policy, restart, HTTP and portable-restore checks pass. Its integrated
@@ -10486,3 +10495,48 @@ integration package completed in 1,545.7 seconds. All 14 promoted source hashes
 were verified before the documentation was updated. Evidence is under
 `.local/native-post-identity-20261006/` and the `native_post_identity_` receipts.
 Production and live workers remain unchanged.
+
+
+## Consolidation choice review and shared source-list provenance — 2026-10-06
+
+The internal consolidation review now inspects every member of both canonical
+post groups. It retains gallery/media/attachment conflicts on earlier aliases,
+checks the total source-list budget before loading entries, and includes selected
+library revisions in its signature. Different original attachment UUIDs with the
+same qualified reference do not by themselves conflict. Oversized reviews fail
+explicitly rather than omitting decisions. This remains an internal review, not
+an application merge route or authorization to apply an incomplete plan.
+
+Schema 89 preserves all columns, row IDs and existing references in attachment
+selection decisions while allowing their capture/manifest foreign keys to point
+to original evidence from the same canonical post identity. Native insert guards
+and startup validation reject unrelated evidence. Original captures, manifests,
+entries, selection history and saved review receipts retain their original
+owners. Partial lists from different members can contribute to a new selection;
+pinned/disabled choices remain protected. Attachment representatives use only
+contributing manifests and are deterministic. New album metadata keeps the
+selected original capture as its provenance.
+
+Focused regressions cover chained identities, original capture replay, explicit
+exclusions, review receipt recovery after another merge/restart, unrelated source
+rejection in both repository and SQL writes, invalid stored provenance rejected
+before startup writes, indexed lookup plans, preserved migration rows (including
+forgotten posts), unknown-table collision rollback, and portable export/relocated
+restore with a nonempty cross-member selection and gallery metadata. The related
+HTTP checks and the repository's pinned lint check pass. Test command details
+and receipts are under `.local/native-post-selection-provenance-20261006/` and the
+`native_post_selection_provenance_` checks.
+
+The broader related storage checks passed in 255.2 seconds, ingestion checks in
+70.6 seconds and HTTP checks in 37.3 seconds. The initial combined invocation
+also named a nonexistent API package and therefore exited unsuccessfully even
+though storage/ingestion passed; the correct API package was run separately and
+passed. The corrected migration helper was rechecked, and lint reports no issues.
+These are focused integration checks, not a complete `validate-fork` run.
+
+The current full-library rehearsal remains the verified schema-88 copy. The
+schema-89 full-copy migration/reconciliation and complete integrated release gate
+remain pending; the focused checks above do not replace them. Canonical current
+media/gallery resolution, equivalent-attachment decisions, pending-publication
+guards and the final post-merge API/UI remain unfinished. Production, live
+workers, backup policies and the rehearsal pointer are unchanged.

@@ -279,7 +279,7 @@ func TestAttachmentSelectionRollbackScopeAndIntegrityGuards(t *testing.T) {
 	_, err = raw.Exec("UPDATE post_attachment_decisions SET reason='changed' WHERE uuid=?", disabled.Decision.UUID)
 	require.ErrorContains(t, err, "immutable")
 	_, err = raw.Exec("INSERT INTO post_attachment_decision_manifests(post_uuid, decision_uuid, manifest_uuid) SELECT ?, ?, manifest_uuid FROM source_capture_attachment_manifests WHERE capture_uuid=?", post.UUID, disabled.Decision.UUID, otherCapture.UUID)
-	require.ErrorContains(t, err, "FOREIGN KEY")
+	require.ErrorContains(t, err, "another post identity")
 	input.ExpectedPostRevision++
 	input.Mode, input.CaptureUUID = "pinned", capture.UUID
 	selected = applySelection(t, repo, input)

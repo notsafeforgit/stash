@@ -244,7 +244,14 @@ func (s *SourceGalleryStore) previewWithMediaChoices(ctx context.Context, value 
 		if err != nil {
 			return nil, err
 		}
-		if capture == nil || capture.PostUUID != post.UUID {
+		if capture == nil {
+			return nil, models.ErrSourcePayloadCorrupt
+		}
+		inScope, err := samePostIdentity(ctx, capture.PostUUID, post.UUID)
+		if err != nil {
+			return nil, err
+		}
+		if !inScope {
 			return nil, models.ErrSourcePayloadCorrupt
 		}
 		if capture.Metadata.Title != nil && *capture.Metadata.Title != "" {

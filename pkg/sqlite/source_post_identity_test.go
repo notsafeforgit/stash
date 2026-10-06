@@ -25,7 +25,7 @@ func postIdentityFixture(t *testing.T) (*Database, models.Repository) {
 	db := NewDatabase()
 	require.NoError(t, db.Open(filepath.Join(t.TempDir(), "post-identities.sqlite")))
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
-	require.Equal(t, NativeSchemaBaseline+88, GetRequiredSchemaVersion())
+	require.GreaterOrEqual(t, GetRequiredSchemaVersion(), NativeSchemaBaseline+88)
 	return db, db.Repository()
 }
 

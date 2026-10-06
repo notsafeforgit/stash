@@ -272,7 +272,9 @@ func readAttachmentSelectionReview(get enrichmentGet, id string) (*models.Attach
 		expected = 1
 		var selected bool
 		if err := get(&selected, `SELECT EXISTS(SELECT 1 FROM post_attachment_decision_manifests d
- JOIN source_capture_attachment_manifests c ON c.post_uuid=d.post_uuid AND c.manifest_uuid=d.manifest_uuid
+ JOIN source_capture_attachment_manifests c ON c.manifest_uuid=d.manifest_uuid
+ JOIN source_post_identities owner ON owner.post_uuid=c.post_uuid
+ JOIN source_post_identities selected ON selected.post_uuid=d.post_uuid AND selected.canonical_uuid=owner.canonical_uuid
  WHERE d.decision_uuid=? AND c.capture_uuid=?)`, decision.UUID, input.CaptureUUID); err != nil {
 			return nil, err
 		}

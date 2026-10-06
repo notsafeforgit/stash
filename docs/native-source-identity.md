@@ -460,6 +460,27 @@ shared URLs cannot override them. Updates require a managed transaction and
 matching publication context, including rollback when a caller catches a late
 write failure. Startup checks reject inconsistent identity/history relationships.
 
+The internal choice review inspects all members of both groups, including
+choices retained on earlier aliases. It reports incompatible source order,
+gallery choices, explicit media unlinks and differing attachment decisions.
+Its signature includes selected library revisions, so a scene/image edit also
+invalidates the review. Indexed preflight limits reject oversized evidence before
+loading it; an empty conflict list still does not establish post identity.
+
+Schema 89 lets an attachment selection reference original captures and manifests
+from any member of its post identity. Foreign keys retain the original evidence
+UUIDs; scope guards require matching canonical identities. Neither post payloads
+nor manifest entries are copied. The migration preserves existing decision rows,
+their row IDs, history and incoming review/gallery references. Startup validation
+rejects source evidence belonging to an unrelated post.
+
+Compatible partial lists can contribute to one selection across original post
+owners. Attachment representatives are deterministic and use only contributing
+manifests; an unused candidate cannot alter the existing selection in a preview.
+Pinned and disabled selections remain protected. A gallery created from such a
+selection retains the original capture as its metadata provenance. Original
+selection-history scopes and exact review receipts remain unchanged.
+
 The identity writer is internal and has no application mutation route. It does
 not settle conflicting source-list, gallery or media choices. Original capture
 and ingestion lookup methods deliberately retain their original UUID scopes so

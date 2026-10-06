@@ -1,5 +1,5 @@
 import { EntityActionButton } from "@/components/detail/entity-actions-menu";
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useSmartBack } from "src/hooks/use-smart-back";
 import { useQuery, useMutation } from "@apollo/client/react";
@@ -92,10 +92,13 @@ function GalleryDetailPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [coverLightboxOpen, setCoverLightboxOpen] = useState(false);
 
-  const { data, loading, error } = useQuery(GQL.FindGalleryDocument, {
+  const { data, loading, error, refetch } = useQuery(GQL.FindGalleryDocument, {
     variables: { id: galleryId },
     fetchPolicy: "cache-first",
   });
+  const refreshGallery = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
 
   const [updateGallery] = useMutation(GQL.GalleryUpdateDocument);
   function handleToggleOrganized() {
@@ -134,7 +137,11 @@ function GalleryDetailPage() {
             defaultMessage: "Source albums",
           }),
           content: (
-            <GallerySourceAlbums key={gallery.id} localId={gallery.id} />
+            <GallerySourceAlbums
+              key={gallery.id}
+              localId={gallery.id}
+              onPublished={refreshGallery}
+            />
           ),
         },
       ]

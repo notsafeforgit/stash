@@ -18,9 +18,10 @@ import {
   CardContent,
   CardFooter,
 } from "@/components/ui/card";
-import { PostEmpty, PostReadError } from "../posts/shared";
+import { PostEmpty, PostReadError, PostSection } from "../posts/shared";
 import { LibraryLink } from "../posts/library-link";
 import { useAlbumPages } from "./read";
+import { AlbumReview } from "./review";
 
 export function AlbumReadError({
   error,
@@ -192,9 +193,11 @@ function Slot({ slot }: { slot: AlbumSlot }) {
 export function SourceAlbum({
   post,
   endpoint,
+  onPublished,
 }: {
   post: string;
   endpoint?: string;
+  onPublished?: () => void | Promise<void>;
 }) {
   const msg = useMsg();
   const intl = useIntl();
@@ -212,6 +215,10 @@ export function SourceAlbum({
     [api, post],
   );
   const result = useAlbumPages(load);
+  const published = useCallback(async () => {
+    result.reload();
+    await onPublished?.();
+  }, [result.reload, onPublished]);
   const page = result.data?.header;
   const selection = page?.selection;
   return (
@@ -224,6 +231,14 @@ export function SourceAlbum({
           aria-label={msg("source_albums.loading", "Loading source album")}
         />
       )}
+      <PostSection title={msg("album_review.title", "Match existing media")}>
+        <AlbumReview
+          key={post}
+          post={post}
+          endpoint={api.endpoint}
+          onPublished={published}
+        />
+      </PostSection>
       {page &&
         (!selection ? (
           <PostEmpty

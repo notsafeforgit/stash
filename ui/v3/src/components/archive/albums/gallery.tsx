@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMsg } from "@/hooks/message";
+import { cn } from "@/lib/utils";
 import { createSourceAlbumAPI } from "@/core/native-archive/source-album-api";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -8,7 +9,13 @@ import { PostEmpty, PostSection } from "../posts/shared";
 import { AlbumReadError, SourceAlbum } from "./ordered";
 import { useAlbumPages } from "./read";
 
-export function GallerySourceAlbums({ localId }: { localId: string }) {
+export function GallerySourceAlbums({
+  localId,
+  onPublished,
+}: {
+  localId: string;
+  onPublished?: () => void | Promise<void>;
+}) {
   const msg = useMsg();
   const api = useMemo(() => createSourceAlbumAPI(), []);
   const load = useCallback(
@@ -66,10 +73,12 @@ export function GallerySourceAlbums({ localId }: { localId: string }) {
         >
           <div className="flex flex-col gap-4">
             <Link
-              className={buttonVariants({
-                variant: "outline",
-                className: "self-start",
-              })}
+              className={cn(
+                buttonVariants({
+                  variant: "outline",
+                  className: "self-start",
+                }),
+              )}
               to="/source-posts"
               search={{
                 post: post.uuid,
@@ -80,7 +89,11 @@ export function GallerySourceAlbums({ localId }: { localId: string }) {
             >
               {msg("source_albums.open_post", "Open source post")}
             </Link>
-            <SourceAlbum post={post.uuid} endpoint={api.endpoint} />
+            <SourceAlbum
+              post={post.uuid}
+              endpoint={api.endpoint}
+              onPublished={onPublished}
+            />
           </div>
         </PostSection>
       ))}

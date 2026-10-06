@@ -297,7 +297,27 @@ gallery creation, and dates retain their calendar precision. The API is availabl
 on the development branch. The supported
 [`stash-backfill-source-albums` command](../integrations/gallery-dl/README.md#historical-source-albums)
 prepares private immutable plans, applies them, inspects saved submissions and
-prepares explicit retries. Native review UI and production activation remain pending.
+prepares explicit retries. Native review controls are also available from
+Match existing media in a post's Source order or a gallery's Source albums
+section. Source-ID matching is the default; the Reddit filename policy is an
+explicit choice. Preview shows verified, preserved and unresolved attachment
+choices, file-proof details, new-gallery metadata and membership changes before
+Apply queues work. Opening the controls performs no writes or downloads.
+
+The browser saves the exact request before sending it. A lost response leaves an
+explicit recovery action that checks the original receipt before resending the
+same bytes. Competing tabs share one unresolved request per post and deployment.
+Only proven rejection can be cleared for a fresh review; an ambiguous UUID/job
+conflict remains pending. An admitted job can be inspected after reload without
+automatically submitting pending work. Cancellation recovery reads the original
+job state, since cancellation itself has no request receipt.
+
+Job status separates committed changes from notification delivery. Retry after
+publication retains its original event and never reapplies gallery edits.
+History and worker attempts load independently in bounded pages; visible active
+jobs are polled read-only. Publication refreshes the affected album order and
+gallery association without browsing the library again. These development
+controls do not activate production workers; production cutover remains pending.
 
 Discovery uses indexed UUID pagination over selected attachment lists. It includes
 disabled and forgotten posts for exclusion accounting, and returns no materialized
@@ -1715,7 +1735,8 @@ Manual, folder and ZIP galleries can have an empty source-post list.
 Post pages expose Source order on expansion. Gallery pages expose Source albums
 through their desktop tab and mobile section selector. Each slot links to the
 current image/video and its source review, with unavailable positions retained.
-Album association/selection editing, backfill controls and live download-state
+Match existing media exposes the guarded historical matching controls described
+above. Explicit album association/source-list editing and live download-state
 inspection remain separate transition work.
 
 ### Historical post-to-media matching

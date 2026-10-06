@@ -363,6 +363,11 @@ export function PostDetail({
   onBack: () => void;
 }) {
   const msg = useMsg();
+  const [albumVersion, setAlbumVersion] = useState(0);
+  const refreshAlbum = useCallback(
+    () => setAlbumVersion((value) => value + 1),
+    [],
+  );
   const load = useCallback(
     (signal: AbortSignal) => api.post(id, signal),
     [api, id],
@@ -428,10 +433,14 @@ export function PostDetail({
             <PostMediaList id={id} api={api} />
           </PostSection>
           <PostSection title={msg("source_albums.order", "Source order")}>
-            <SourceAlbum post={id} endpoint={api.endpoint} />
+            <SourceAlbum
+              post={id}
+              endpoint={api.endpoint}
+              onPublished={refreshAlbum}
+            />
           </PostSection>
           <PostSection title={msg("source_posts.album", "Album gallery")}>
-            <PostGallery id={id} api={api} />
+            <PostGallery key={`${id}:${albumVersion}`} id={id} api={api} />
           </PostSection>
           <PostSection title={msg("source_posts.identifiers", "Identifiers")}>
             <PostIdentifiers post={post} api={api} />

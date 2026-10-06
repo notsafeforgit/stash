@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { NativeArchiveError } from "@/core/native-archive/client";
 
 export type AlbumReadPage<T, C, H> = {
@@ -19,6 +19,7 @@ export function useAlbumPages<T, C, H>(
   const [busy, setBusy] = useState(true);
   const [version, setVersion] = useState(0);
   const pending = useRef<AbortController | null>(null);
+  const reload = useCallback(() => setVersion((value) => value + 1), []);
   // biome-ignore lint/correctness/useExhaustiveDependencies: A reload replaces all pages with one current read.
   useEffect(() => {
     const controller = new AbortController();
@@ -65,6 +66,6 @@ export function useAlbumPages<T, C, H>(
     busy,
     error,
     more,
-    reload: () => setVersion((value) => value + 1),
+    reload,
   };
 }

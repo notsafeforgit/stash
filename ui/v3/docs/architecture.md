@@ -189,8 +189,9 @@ ID or archive UUID lookup. It is available in the desktop utility menu, mobile
 drawer and scene/image source cards. Deep links load only the selected post.
 Captures, publishers, media associations, album choices and identifiers expand
 independently. Shared post text is grouped by revision; rejected links and
-deleted library identities remain inspectable. This page makes no mutations;
-account/media links lead to their existing review workflows.
+deleted library identities remain inspectable. Inspection is read-only;
+account/media links lead to their existing review workflows, while explicit
+album matching controls preview and queue reviewed changes.
 
 Source order on post pages and Source albums on gallery pages share
 `source-album-api.ts` and the components in `components/archive/albums`.
@@ -201,6 +202,18 @@ lookups follow retained redirects without combining source posts. Reads are
 lazy and paginated; a changed signature requires a reload. Deleted identities
 never link to reused local IDs. The shared `posts/library-link.tsx` renders
 ordinary route links with button styling.
+
+`album-review-api.ts` and `album-review-outbox.ts` expose the existing durable
+album matching service through `albums/review.tsx`. The policy form previews
+bounded candidates and member changes before Apply. Exact requests persist in
+IndexedDB before any mutation; reopening reads saved state, and recovery checks
+the original receipt explicitly. Cancellation uses current job state to recover
+an uncertain response. Unverified receipts and ambiguous conflicts cannot be
+discarded as rejected. Job status distinguishes committed gallery changes from
+pending plugin notifications, with guarded retry/cancel and independently loaded
+history/attempts. Only visible active jobs poll. A publication refreshes its
+source-order view and the enclosing post/gallery association without remounting
+the review controls or issuing a whole-library query.
 
 Performer detail pages add a Source accounts tab/mobile section backed by
 `performer-source-api.ts`. It resolves the local performer once per account page

@@ -28,12 +28,12 @@ Reviewed transfer of unstarted pending enrichment after collection edits now has
 an atomic API, saved-plan client and a passing full fork gate. Its populated
 schema-83 migration and independent saved-plan comparison passed, and all
 227,443 pending targets have transferred on the isolated copy. Fresh-process
-receipt recovery and final whole-library comparison passed; the verified
-rehearsal is now schema 83. Six saved discovery searches still need reviewed
-collection bindings before future execution.
-The native review API, immutable binding history and saved-plan client for those
-unstarted searches are implemented with passing focused checks and the complete
-fork gate. The populated schema-84 rehearsal remains in progress.
+receipt recovery and final whole-library comparison passed. Reviewed collection
+bindings for six unstarted discovery searches have also passed the complete fork
+gate, populated migration, independent saved-plan comparison, lost-response
+recovery and final whole-row comparison. The verified rehearsal is now schema
+84. Its six current searches retain 569 targets; two superseded originals retain
+another 188 targets and their historical cursors. No source job was started.
 
 Durable enrichment execution, queued-job dispatch, stale-job maintenance and
 shared download/enrichment service reservations are implemented, including linked
@@ -9609,7 +9609,33 @@ recorded before the gate.
 An independent read-only audit of the populated schema-83 copy prepared six
 exact reviews covering 569 current targets. Only the collection root and path
 changed. Two superseded original searches retain another 188 targets and their
-saved cursors; neither is eligible for another scope review. Native HTTP plans,
-application, restart recovery and independent whole-row comparison on schema 84
-remain required. The canonical verified copy remains schema 1000083, and no
-production settings, services or source jobs have changed.
+saved cursors; neither is eligible for another scope review.
+
+The consistent 21.83 GB database copy completed in 32.33 seconds. Native
+pre-migration validation took 273.42 seconds, migration 169.23 seconds and fresh
+reopen 154.79 seconds. The independent schema-only comparison then checked every
+original row identity, cell value and SQLite type across 291 tables and
+40,255,427 rows. Only the schema version/history bookkeeping changed; integrity
+and foreign-key checks passed.
+
+The frozen native HTTP harness prepared all six plans and independently checked
+their original/proposed definitions, collection inputs and serialized digests.
+Apply used six POSTs and seven receipt GETs: the first committed response was
+deliberately dropped, and retry recovered its receipt without another Apply.
+The six reviews took 49.55 milliseconds after opening the database. A fresh
+process then recovered all six receipts with six GETs and no POSTs, taking
+17.13 milliseconds after its 140.70-second database open. Separate SQL and
+byte-level JSON checks verified all review rows and all eight effective/original
+searches, retaining all eight historical activation receipts. No job was admitted.
+
+The final whole-row comparison passed in 195.62 seconds. All original cells
+remain unchanged apart from the verified migration bookkeeping; the only
+application data additions are the six immutable review rows. The verified
+rehearsal pointer now selects schema 1000084. After an open-handle check, removing
+the superseded schema-83 database, WAL/shared-memory files and rebuildable search
+cache recovered 20.33 GiB, leaving about 139.29 GiB free. The original compatible
+snapshot and all saved review/reconciliation evidence remain retained.
+
+The code checkpoint is `de9feaf7d`. Bound-root HTTP/browser policy verification,
+live worker conversion and the full plan's remaining release gates are still
+required. No production settings, services or source jobs have changed.

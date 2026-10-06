@@ -15,6 +15,7 @@ import (
 
 func removeDiscoveryScopeSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removeAttachmentSelectionReviewSchema(t, raw)
 	for _, trigger := range []string{"discovery_listing_job_scope", "discovery_detail_job_scope", "discovery_listing_recovery_scope"} {
 		var body string
 		require.NoError(t, raw.QueryRow("SELECT sql FROM sqlite_schema WHERE name=?", trigger).Scan(&body))

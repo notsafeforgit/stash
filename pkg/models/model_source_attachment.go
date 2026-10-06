@@ -116,6 +116,10 @@ type SourceAttachmentReaderWriter interface {
 	SelectionHistory(context.Context, string, int, int) ([]AttachmentSelectionDecision, error)
 	PreviewSelection(context.Context, string, string) (*AttachmentSelectionPreview, error)
 	DecideSelection(context.Context, AttachmentSelectionInput) (*AttachmentSelection, error)
+	PreviewSelectionReview(context.Context, AttachmentSelectionReviewInput) (*AttachmentSelectionReviewPreview, error)
+	ApplySelectionReview(context.Context, AttachmentSelectionReviewApplyInput) (*AttachmentSelectionReview, bool, error)
+	SelectionReview(context.Context, string) (*AttachmentSelectionReview, error)
+	ReviewSelectionManifests(context.Context, string, string, int) ([]AttachmentSelectionReviewManifest, error)
 }
 
 // SelectedSourcePost is a bounded discovery row, not a materialized manifest.

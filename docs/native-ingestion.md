@@ -1736,8 +1736,47 @@ Post pages expose Source order on expansion. Gallery pages expose Source albums
 through their desktop tab and mobile section selector. Each slot links to the
 current image/video and its source review, with unavailable positions retained.
 Match existing media exposes the guarded historical matching controls described
-above. Explicit album association/source-list editing and live download-state
-inspection remain separate transition work.
+above. Source-list selection has the guarded APIs below; its editor, explicit
+gallery-association editing and live download-state inspection remain transition
+work.
+
+### Reviewing source attachment lists
+
+`GET /posts/<post>/attachment-manifests?after=<manifest-uuid>&limit=N` lists each
+distinct retained attachment list once, even when many captures supplied it.
+Limits are 1–100, with a default of 25. Each row includes completeness, album
+declaration, expected and observed item counts, and one witness `capture_uuid`.
+These counts describe source evidence, independently of downloaded media. The
+lookup uses the selected post's manifest index and a bounded witness lookup;
+it does not load post/profile JSON or inspect other source accounts.
+
+`POST /attachment-selection/preview` accepts `post_uuid`, `post_revision`,
+`mode`, optional `capture_uuid` and `reason`. `pinned` selects the capture's exact
+list and protects it from automatic replacement. `automatic` selects that list
+as a new starting point and permits later compatible ingestion. Both require a
+capture belonging to this post. `disabled` requires no capture and suppresses
+automatic selection. A read-only preview shows the current and proposed lists,
+including repeated positions and missing ranges, whether the choice changes,
+and a `digest` binding the reviewed post revision and immutable source lists.
+
+`POST /attachment-selection/apply` adds `request_uuid` and that `digest` to the
+same input. Save the exact request before sending. Apply records the selection
+and original receipt atomically. Replaying identical input returns that receipt
+before checking current state, so later selections or source forgetting do not
+lose an earlier successful result. `GET /attachment-selection/requests/<uuid>`
+recovers it after restart. A changed preview returns `409 preview_changed`;
+reusing the UUID for different input returns `409 request_conflict`, which does
+not establish that the original request failed. The body limit is 16 KiB.
+
+`GET /posts/<post>/attachment-selection-history?after=<revision>&limit=N`
+returns immutable decisions in increasing revision order, with their original
+capture/manifest references and reason. It uses the same 1–100 limit bounds.
+
+Saving source order changes the selected evidence only. It does not synchronize
+gallery members, select different media, change metadata or download files.
+Review those gallery effects separately with Match existing media. All routes
+require application authorization and the shared same-origin checks; producer
+credentials cannot approve these choices.
 
 ### Historical post-to-media matching
 

@@ -52,6 +52,15 @@ assets, 669 UI tests, the Python suites, Go lint and the full Go integration sui
 Explicit source-list and gallery-association editing and live download-state
 inspection remain open.
 
+Source-list review APIs now provide unique-list discovery, read-only comparison,
+guarded selection, immutable history and exact request recovery. Focused SQLite,
+migration, restart, anonymisation, HTTP and indexed-query checks pass. Schema 85
+and the review API passed the full fork gate, full-copy migration, fresh reopen,
+whole-row comparison and portable export/relocated restore checks. The isolated
+schema-85 copy preserves all original source evidence and choices. The source-list
+editor passed staged browser checks; UI integration and the explicit
+gallery-association/attachment choices remain in progress.
+
 Reviewed transfer of unstarted pending enrichment after collection edits now has
 an atomic API, saved-plan client and a passing full fork gate. Its populated
 schema-83 migration and independent saved-plan comparison passed, and all
@@ -59,8 +68,8 @@ schema-83 migration and independent saved-plan comparison passed, and all
 receipt recovery and final whole-library comparison passed. Reviewed collection
 bindings for six unstarted discovery searches have also passed the complete fork
 gate, populated migration, independent saved-plan comparison, lost-response
-recovery and final whole-row comparison. The verified rehearsal is now schema
-84. Its six current searches retain 569 targets; two superseded originals retain
+recovery and final whole-row comparison. That schema-84 rehearsal
+preserved six current searches with 569 targets; two superseded originals retain
 another 188 targets and their historical cursors. No source job was started.
 
 Durable enrichment execution, queued-job dispatch, stale-job maintenance and
@@ -9977,3 +9986,49 @@ still match the browser-checked stage. This increment changes no schema or
 production state. Explicit album association/source-list editing, live download
 states, manual intake/post consolidation, remaining caller and compatibility
 conversion, backup/restore and reviewed production cutover remain required.
+
+
+## Source-list selection review API — 2026-10-06
+
+The application can now inspect each distinct retained attachment list once,
+compare an exact list with the current choice, and save a pinned, automatic or
+disabled selection. Repeated captures share one list row and a bounded witness
+lookup. Preview and Apply use the existing source-order validation; automatic
+selection starts with the chosen list and permits later compatible ingestion.
+Selection changes leave gallery membership, media associations, metadata and
+downloads to their separate reviewed operations.
+
+Schema 1000085 adds immutable `attachment_selection_reviews` with the exact
+request, original decision and integrity signature. Apply validates the current
+post revision and preview digest, commits choice and receipt together, and
+recovers an identical original request before checking later state. Reusing a
+request UUID for different input is a conflict; a changed preview has a distinct
+response. Startup and receipt reads validate original decision history and scope.
+Anonymisation removes receipts before source evidence. Original receipts survive
+later choices, source forgetting, restart and portable export/relocated restore.
+
+Focused repository and real HTTP checks cover guarded writes, immutable history,
+unique-list pagination, shared captures, sparse/repeated positions, transaction
+rollback, exact replay and cross-origin rejection. Query-plan checks verify
+scoped indexes. The complete fork gate passed in 1,715.8 seconds, including
+generation, real embedded assets, 669 UI tests, 540 producer tests, eight library
+tests, 108 archive tests, 262 backup tests, zero Go lint findings and the complete
+Go integration suite.
+
+The full schema-84 copy migrated and reopened successfully. An independent
+read-only comparison verified all 40,255,444 original rows across 292 tables,
+including cell types and binary string values, with the separately verified
+schema-version change and one new migration-history row. Existing schema objects,
+selected metadata, source evidence, policy activation and SQLite sequences were
+preserved; integrity and foreign-key checks passed. The new receipt table is
+empty on this copy: no source-list choice or job was activated.
+
+Read-only repository checks covered 110 populated posts, 110 unique lists
+representing 589 captures, 330 previews and 630 returned source entries. Their
+positions and identifiers matched independent SQL. Timed repository calls totaled
+58 ms, with a 2.73 ms maximum; this does not measure end-to-end browser latency.
+The database size/mtime remained unchanged. Private scripts and reports are under
+`.local/native-album-selection-review-20261006/`; validation receipts use the
+`native_album_selection_review_` prefix in `.local/native-discovery-client-20261004/`.
+The source-list editor has separately passed staged phone/desktop browser checks,
+but is not part of this backend increment. Production remains unchanged.

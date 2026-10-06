@@ -374,7 +374,27 @@ is immutable, and a head cannot move backward. Counts and a selection signature
 detect missing/changed evidence on current-selection reads. New selections are
 blocked for forgotten posts. Anonymised exports remove the new history and
 references. Source-to-gallery synchronization and durable membership intent are
-added below; API/UI exposure and general field decisions remain required.
+added below. Native review APIs are added in schema 1000085; their UI and general
+field-decision coverage remain separate transition work.
+
+Migration 1000085 adds `attachment_selection_reviews`, binding one immutable
+request to its original post attachment decision. Its composite foreign key and
+insertion guard require the same post, current decision/revision, review origin,
+mode, capture and reason. Apply checks an existing receipt before current guards,
+then recomputes the preview and records the decision and receipt in one managed
+transaction. A precommit guard rejects a partially completed operation even when
+a caller catches a late error. The shared read-only selection builder also serves
+ordinary ingestion; its compatible-list merge and protected/no-op behavior stay
+unchanged.
+
+Receipts preserve original input across subsequent choices. Startup verifies
+canonical request bytes, request/decision signatures, the original preceding
+decision, and capture-to-manifest scope. Anonymisation removes receipts before
+source evidence. The migration adds no choices and rewrites no existing media,
+source evidence or gallery memberships. Native SQLite backup/export retains the
+new table. See [source-list review APIs](native-ingestion.md#reviewing-source-attachment-lists)
+for the explicit separation between selecting source order and applying gallery
+membership changes.
 
 Migration 1000010 distinguishes manual, filesystem, and source origins on
 galleries. Existing rows are classified from their folder/file associations

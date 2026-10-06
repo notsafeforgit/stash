@@ -1094,6 +1094,7 @@ func (db *Anonymiser) deleteSourceAccountEvidence(ctx context.Context) error {
 			"discovery_match_evidence", "discovery_match_candidates", "discovery_match_pages", "discovery_match_targets",
 			"discovery_pages", "discovery_job_attempts", "discovery_listing_jobs", "discovery_listing_legacy", "discovery_listings",
 			"account_ownership_reviews",
+			"attachment_selection_reviews",
 			"enrichment_discovery_resolutions",
 			"metadata_file_edit_reviews",
 			"source_capture_contexts",

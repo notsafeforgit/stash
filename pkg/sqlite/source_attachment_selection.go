@@ -308,61 +308,73 @@ func (s *SourceAttachmentStore) PreviewSelection(ctx context.Context, postID, ca
 	return ret, nil
 }
 
-func (s *SourceAttachmentStore) DecideSelection(ctx context.Context, input models.AttachmentSelectionInput) (*models.AttachmentSelection, error) {
+func (s *SourceAttachmentStore) prepareSelectionChoice(ctx context.Context, input models.AttachmentSelectionInput) (*models.SourcePost, *models.AttachmentSelection, bool, error) {
 	if (input.Mode != "automatic" && input.Mode != "pinned" && input.Mode != "disabled") ||
 		(input.Origin != "ingest" && input.Origin != "review" && input.Origin != "migration") || !validAccountText(input.Reason, 4096, true) ||
 		(input.Origin == "ingest" && input.Mode != "automatic") {
-		return nil, errors.New("invalid attachment selection choice")
+		return nil, nil, false, errors.New("invalid attachment selection choice")
 	}
 	post, err := (&SourceEvidenceStore{}).FindPost(ctx, input.PostUUID)
 	if err != nil {
-		return nil, err
+		return nil, nil, false, err
 	}
 	if post == nil || post.Revision != input.ExpectedPostRevision {
-		return nil, models.ErrAttachmentSelectionConflict
+		return nil, nil, false, models.ErrAttachmentSelectionConflict
 	}
 	if post.State != "active" {
-		return nil, models.ErrSourcePostForgotten
+		return nil, nil, false, models.ErrSourcePostForgotten
 	}
 	var selected *models.AttachmentSelection
 	switch {
 	case input.Origin == "ingest" || (input.Origin == "migration" && input.Mode == "automatic"):
 		preview, err := s.PreviewSelection(ctx, post.UUID, input.CaptureUUID)
 		if err != nil {
-			return nil, err
+			return nil, nil, false, err
 		}
 		if preview.Protected {
-			return nil, models.ErrAttachmentSelectionProtected
+			return nil, nil, false, models.ErrAttachmentSelectionProtected
 		}
 		if len(preview.Conflicts) > 0 {
-			return nil, models.ErrAttachmentManifestConflict
+			return nil, nil, false, models.ErrAttachmentManifestConflict
 		}
 		if !preview.Changed {
-			return preview.Current, nil
+			return post, preview.Current, true, nil
 		}
 		selected = preview.Proposed
 	case input.Mode == "disabled":
 		if input.CaptureUUID != "" {
-			return nil, errors.New("disabled attachment selection cannot select a capture")
+			return nil, nil, false, errors.New("disabled attachment selection cannot select a capture")
 		}
 		selected = &models.AttachmentSelection{}
 	default:
 		capture, manifest, err := selectionCapture(ctx, post.UUID, input.CaptureUUID)
 		if err != nil {
-			return nil, err
+			return nil, nil, false, err
 		}
 		sources, err := loadSelectionManifests(ctx, post.UUID, []string{manifest})
 		if err != nil {
-			return nil, err
+			return nil, nil, false, err
 		}
 		selected = selectionFromMerge(models.AttachmentSelectionDecision{CaptureUUID: &capture, ManifestUUIDs: []string{manifest}}, sources[manifest].input, sources)
 	}
 	selected.Decision.PostUUID, selected.Decision.Mode, selected.Decision.Origin, selected.Decision.Reason = post.UUID, input.Mode, input.Origin, input.Reason
+	return post, selected, false, nil
+}
+
+func selectedAttachmentSignature(selected *models.AttachmentSelection) (string, error) {
 	merged := models.SourceAttachmentManifestInput{Complete: selected.Complete, DeclaredAlbum: selected.DeclaredAlbum, ExpectedCount: selected.ExpectedCount}
 	for _, entry := range selected.Entries {
 		merged.Entries = append(merged.Entries, models.SourceAttachmentEntry{Position: entry.Position, MediaKind: entry.MediaKind, Reference: entry.Attachment.Reference})
 	}
-	signature, err := selectionSignature(input.Mode, selected.Decision.ManifestUUIDs, merged)
+	return selectionSignature(selected.Decision.Mode, selected.Decision.ManifestUUIDs, merged)
+}
+
+func (s *SourceAttachmentStore) DecideSelection(ctx context.Context, input models.AttachmentSelectionInput) (*models.AttachmentSelection, error) {
+	post, selected, unchanged, err := s.prepareSelectionChoice(ctx, input)
+	if err != nil || unchanged {
+		return selected, err
+	}
+	signature, err := selectedAttachmentSignature(selected)
 	if err != nil {
 		return nil, err
 	}

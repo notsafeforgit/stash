@@ -51,6 +51,11 @@ func (rs *nativeArchiveRoutes) router() http.Handler {
 	r.Get("/posts/{post}/media", rs.sourcePostMedia)
 	r.Get("/posts/{post}/album", rs.sourcePostAlbum)
 	r.Get("/posts/{post}/album-media", rs.sourceAlbumMedia)
+	r.Get("/posts/{post}/attachment-manifests", rs.attachmentSelectionManifests)
+	r.Get("/posts/{post}/attachment-selection-history", rs.attachmentSelectionHistory)
+	r.Post("/attachment-selection/preview", rs.previewAttachmentSelection)
+	r.Post("/attachment-selection/apply", rs.applyAttachmentSelection)
+	r.Get("/attachment-selection/requests/{request}", rs.attachmentSelectionReview)
 	r.Get("/entities/{entity}/album-posts", rs.sourceGalleryPosts)
 	r.Get("/posts/{post}/media/{entity}", rs.postMediaAssociation)
 	r.Get("/posts/{post}/media/{entity}/review", rs.postMediaReview)
@@ -305,6 +310,18 @@ func nativeArchiveError(w http.ResponseWriter, err error) {
 	}
 	if errors.Is(err, models.ErrSourceDefinitionInvalid) || errors.Is(err, models.ErrMetadataFileReviewInvalid) || errors.Is(err, models.ErrAccountReviewInvalid) || errors.Is(err, models.ErrAccountConsolidationReviewInvalid) {
 		ingestError(w, ingest.ErrInvalid)
+		return
+	}
+	if errors.Is(err, models.ErrAttachmentSelectionReviewInvalid) {
+		ingestError(w, ingest.ErrInvalid)
+		return
+	}
+	if errors.Is(err, models.ErrAttachmentSelectionReviewReplay) {
+		ingestJSON(w, http.StatusConflict, map[string]string{"error": "request_conflict", "message": "This request UUID already names a different source-list choice."})
+		return
+	}
+	if errors.Is(err, models.ErrAttachmentSelectionConflict) || errors.Is(err, models.ErrSourcePostForgotten) {
+		ingestJSON(w, http.StatusConflict, map[string]string{"error": "preview_changed", "message": "The post or selected source list changed; load a fresh preview."})
 		return
 	}
 	if errors.Is(err, models.ErrAccountReviewReplay) {

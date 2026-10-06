@@ -7,15 +7,13 @@ import (
 	"errors"
 	"io"
 	"os/exec"
-	"regexp"
 	"strings"
 	"time"
-
-	"golang.org/x/net/html"
 
 	"github.com/stashapp/stash/pkg/archive"
 	stashexec "github.com/stashapp/stash/pkg/exec"
 	"github.com/stashapp/stash/pkg/models"
+	"github.com/stashapp/stash/pkg/utils"
 )
 
 var (
@@ -24,8 +22,6 @@ var (
 	ErrProviderTimeout  = errors.New("translation provider timed out")
 	ErrProviderFailure  = errors.New("translation provider failed")
 )
-
-var translationHTML = regexp.MustCompile(`(?i)</?(?:p|div|br|span|a|strong|em|ul|li)(?:\s|/?>)`)
 
 // BingTranslateShell uses a locally configured executable, never a command
 // supplied by a producer or API client. Configuration/init files are disabled.
@@ -49,31 +45,6 @@ func NewBingTranslateShell(path string) (*BingTranslateShell, error) {
 	return &BingTranslateShell{Executable: resolved, ChunkTimeout: 30 * time.Second, Timeout: 5 * time.Minute}, nil
 }
 
-func readableText(original string) string {
-	if !translationHTML.MatchString(original) {
-		return original
-	}
-	tokens := html.NewTokenizer(strings.NewReader(original))
-	var result strings.Builder
-	for {
-		kind := tokens.Next()
-		switch kind {
-		case html.ErrorToken:
-			return strings.TrimSpace(result.String())
-		case html.TextToken:
-			result.WriteString(tokens.Token().Data)
-		case html.StartTagToken, html.SelfClosingTagToken, html.EndTagToken:
-			tag := tokens.Token().Data
-			if tag == "p" || tag == "div" || tag == "li" || (tag == "br" && kind != html.EndTagToken) {
-				result.WriteByte('\n')
-			}
-			if kind == html.SelfClosingTagToken && (tag == "p" || tag == "div" || tag == "li") {
-				result.WriteByte('\n')
-			}
-		}
-	}
-}
-
 func languageBase(value string) string {
 	return strings.Split(strings.ReplaceAll(strings.ToLower(strings.TrimSpace(value)), "_", "-"), "-")[0]
 }
@@ -86,7 +57,7 @@ func (b *BingTranslateShell) Translate(ctx context.Context, request models.Trans
 	if err := ctx.Err(); err != nil {
 		return ret, err
 	}
-	source := readableText(request.OriginalText)
+	source := utils.ReadableText(request.OriginalText)
 	if strings.TrimSpace(source) == "" {
 		ret.Status = "no_text"
 		return ret, nil

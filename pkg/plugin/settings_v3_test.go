@@ -94,3 +94,11 @@ settings:
 	_, err = loadPluginFromYAML(strings.NewReader("apiVersion: 3\nname: Fixture\nsettings:\n  bad:\n    type: STRING\n    editor: JQ_MAP\n    default: 'null'\n"))
 	require.Error(t, err)
 }
+
+func TestPluginMappingsUseReadableTextFilter(t *testing.T) {
+	input := map[string]interface{}{"details": "<p>First &amp; second</p><p>Third</p>"}
+	result, err := EvaluateMappings(context.Background(), map[string]interface{}{"details": `.details | readable_text`}, input)
+	require.NoError(t, err)
+	require.Equal(t, map[string]interface{}{"details": "First & second\n\nThird"}, result)
+	require.Equal(t, "<p>First &amp; second</p><p>Third</p>", input["details"])
+}

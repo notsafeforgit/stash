@@ -229,6 +229,21 @@ null value under the ordinary mapping rules. The same filter is available to
 native collection policies and plugin/browser jq callers; it does not modify
 the original input or load any external data.
 
+`readable_text` projects common HTML captions into plain text, using the same
+conversion as native translation. Paragraphs, list items and line breaks retain
+text separators; markup is removed and HTML character references are decoded.
+Conversion recognizes `p`, `div`, `br`, `span`, `a`, `strong`, `em`, `ul` or `li`
+markup. Plain strings keep their exact whitespace and literal character references
+such as `&amp;`. Null stays null, and an empty string stays empty. Other JSON types
+or a string larger than 1 MiB report an error. The existing output and execution
+limits also apply.
+
+For example, `"<p>One &amp; two</p><p>Three</p>" | readable_text` returns
+`"One & two\n\nThree"`. Use `.details | readable_text | select(type == "string" and length > 0)`
+to omit absent or empty captions. Returning null or an empty string directly
+retains the ordinary explicit-clear semantics. This is a text projection for
+selected display fields; retained source text remains unchanged.
+
 ## v3 browser host
 
 The host has additive APIs within version 1:

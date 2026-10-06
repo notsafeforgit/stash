@@ -9186,3 +9186,33 @@ Schema 1000080 remains the verified rehearsal baseline. The seven historical
 policies are still disabled; complete rule conversion and preview reconciliation
 remain open. Production services, workers, bucket settings and the frozen
 compatible release are unchanged.
+
+
+## Shared readable caption mappings — 2026-10-05
+
+The native and plugin jq evaluator now provides `readable_text`, reusing the
+translation provider's existing text projection. Common caption markup becomes
+plain text with paragraph, list and line breaks; plain strings retain their exact
+whitespace and literal entities. Null and empty strings remain explicit results,
+so rules choose whether to omit them. Invalid JSON types and strings larger than
+1 MiB report errors without exposing the caption in the error message. Retained
+source text and stored translation results keep their original bytes.
+
+A read-only assessment of all 379,449 post revisions found 2,723 HTML captions
+with 2,304 distinct values. The actual jq evaluator matched the original catalog
+reader's projection for every distinct value in 72 bounded batches. Combined
+comparison work took 14 ms, excluding database opening, source loading and HTTP.
+The assessment creates no metadata decisions and activates no policy.
+
+The regression first reproduced the missing jq function. Focused actual-source
+utility, jq, translation, metadata, plugin, SQLite and API tests passed in
+17 seconds; repository lint reported zero issues. Coverage includes readable
+provider input with unchanged original output, native preview/apply/restart,
+explicit-clear protection, absent source values, type/size errors and preserved
+source evidence. All 11 applied source hashes match the tested draft. The
+preceding typed-default increment passed the full fork gate; this backend-only
+follow-up did not repeat unchanged UI, producer, archive or backup suites.
+
+Schema 1000080 remains current. Complete policy conversion, representative
+file/folder/source preview comparison and all remaining release gates continue.
+No production service, imported policy activation or bucket setting changed.

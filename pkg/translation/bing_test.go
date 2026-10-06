@@ -104,6 +104,11 @@ func TestBingProviderUnchangedKeepsExactOriginalAndNoTextSkipsProcess(t *testing
 	require.NoError(t, err)
 	require.Equal(t, "unchanged", result.Status)
 	require.Equal(t, original, *result.TranslatedText)
+	body, err := os.ReadFile(path)
+	require.NoError(t, err)
+	var args []string
+	require.NoError(t, json.Unmarshal(body, &args))
+	require.Equal(t, "Already & unchanged", args[len(args)-1], "the provider receives the shared readable projection while the unchanged result retains the original")
 	require.NoError(t, os.Remove(path))
 	result, err = provider.Translate(t.Context(), bingRequest("<p> <br/> </p>"))
 	require.NoError(t, err)
@@ -140,19 +145,6 @@ func TestBingProviderBoundsFailuresAndHonorsCancellation(t *testing.T) {
 	defer stop()
 	_, err := provider.Translate(ctx, bingRequest("Cancelled source text"))
 	require.ErrorIs(t, err, context.DeadlineExceeded)
-}
-
-func TestReadableTranslationTextPreservesPlainInputs(t *testing.T) {
-	for _, item := range []struct{ input, expected string }{
-		{"  Plain &amp; text  ", "  Plain &amp; text  "},
-		{"<p>One &amp; two</p><div>Three<br>four</div>", "One & two\n\nThree\nfour"},
-		{"<ul><li>First</li><li>Second</li></ul>", "First\n\nSecond"},
-		{"<p>Read <a href='https://example.invalid'>this</a> <strong>text</strong></p>", "Read this text"},
-		{"<p/>A<p/>B", "A\n\nB"},
-		{"<p><!--ignored-->Visible<script>literal &amp;</script></p>", "Visibleliteral &amp;"},
-	} {
-		require.Equal(t, item.expected, readableText(item.input))
-	}
 }
 
 func TestBingProviderOutputLimitCannotBeBypassedByCopy(t *testing.T) {

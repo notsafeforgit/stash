@@ -1466,6 +1466,21 @@ value invalidates an earlier Apply digest. Explicit and preserved entity values
 keep their precedence. Completing translation work alone does not apply this
 mapping to existing scenes/images.
 
+The shared [`readable_text` filter](plugin-settings.md#jq-api) preserves readable
+HTML captions when selecting a display field. For an untranslated source caption:
+
+```jq
+.source.metadata.original_text
+| readable_text
+| select(type == "string" and length > 0)
+```
+
+To display a selected translation, apply `readable_text` after choosing its result
+or the original text. Paragraph and line breaks are preserved, while plain input
+keeps its whitespace and literal entities. This conversion changes the proposed
+field value; the capture's original text and stored translation result keep their
+original bytes. Existing explicit clears and protected fields retain precedence.
+
 Use this date mapping to turn a known source timestamp into Stash's calendar
 date without losing timezone information before selecting its day:
 

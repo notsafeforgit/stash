@@ -40,6 +40,14 @@ query-plan and HTTP checks pass, along with 69 pairs inspected through the real
 repository on the read-only rehearsal. The comparison API is implemented;
 reviewed consolidation and its UI remain unfinished.
 
+Canonical post-identity storage preserves original capture and receipt
+owners, chained redirect history and exact retry. Focused migration, rollback,
+query-plan, restart and portable-restore tests pass. The populated schema-88
+migration, fresh reopen and independent whole-row reconciliation also pass,
+along with the complete integrated validation gate. This internal storage writer
+has no application mutation route; album/media choice resolution and the complete
+reviewed consolidation workflow remain unfinished.
+
 Application local-file preview/admission now reuses native file verification and
 durable effects without creating a producer or source record. Focused real MP4/
 image, policy, restart, HTTP and portable-restore checks pass. Its integrated
@@ -10430,4 +10438,51 @@ the database size and modification time were unchanged. These are selected
 comparison measurements, not a whole-library or concurrent-ingestion benchmark.
 Evidence is under `.local/native-post-consolidation-20261006/` and the
 `native_post_comparison_` receipts. No schema change or populated copy was needed.
+Production and live workers remain unchanged.
+
+## Canonical post-identity storage — 2026-10-06
+
+Schema 88 adds indexed canonical post membership and immutable consolidation
+receipts while retaining the original `source_posts` layout and every historical
+reference. Later consolidation flattens the current identity lookup while
+preserving the original direct redirects. Exact request replay survives further
+merges, restart and retained deletion. Forgetting a group member tombstones all
+members; replay does not recreate a forgotten post.
+
+The internal writer requires a managed transaction, complete bounded identity
+review and matching publication context. Its precommit guard rolls back a failed
+publication even if a caller catches the error. A group may contain at most 256
+original posts and 8,192 qualified identifiers. Different non-legacy upstream
+identifiers remain incompatible; shared URLs cannot authorize consolidation.
+Public repository methods inspect identity, paginated membership and direct
+history only. No application mutation route is exposed. Existing album/media
+choices, pending publication and the final merge UI still need integration.
+
+Focused tests cover chained merges, exact retries after later merges and reopen,
+original-capture replay, stale review, incompatible IDs, injected publication
+failure, tombstone propagation, anonymisation, review bounds and indexed reads.
+Migration tests retain original typed rows, reject unknown schema collisions
+atomically and refuse inconsistent stored identity before writing. The portable
+export/relocated-restore test preserves nonempty merge history, both original
+album selections and captures, then validates a fresh native open and recovers
+the original receipt.
+
+The isolated schema-87 archive was copied with SQLite backup and migrated by the
+actual Go database implementation. Schema-88 fresh reopen and independent
+reconciliation passed: all 40,255,447 original rows in 296 tables and all original
+table layouts/schema definitions remain unchanged. Exactly 256,990 self-root
+identity rows were added, along with one migration-history record. Consolidation
+and write-context tables are empty. Integrity and foreign-key checks pass; no
+jobs, policies, links or merges were activated. The copy took 116.3 seconds;
+migration took 448.0 seconds and fresh reopen 222.3 seconds while other integration
+work was running. These concurrent rehearsal measurements are not a production
+downtime estimate. Independent reconciliation took 502.0 seconds.
+
+The integrated gate passed generation, the embedded application, 731 UI tests,
+551 producer tests, eight library tests, 113 archive tests and 262 host backup
+tests. Two Go lint findings were corrected; the resumed backend gate passed with
+clean lint and the complete Go integration suite in 1,576.0 seconds. SQLite's
+integration package completed in 1,545.7 seconds. All 14 promoted source hashes
+were verified before the documentation was updated. Evidence is under
+`.local/native-post-identity-20261006/` and the `native_post_identity_` receipts.
 Production and live workers remain unchanged.

@@ -20,6 +20,7 @@ import (
 
 func removeAttachmentDownloadSchema(t *testing.T, raw *sql.DB) {
 	t.Helper()
+	removePostIdentitySchema(t, raw)
 	var exists bool
 	require.NoError(t, raw.QueryRow("SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name='source_attachment_downloads')").Scan(&exists))
 	if !exists {

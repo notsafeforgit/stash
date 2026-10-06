@@ -439,6 +439,34 @@ list loading also retains its existing manifest/entry limits. Queries start from
 the selected post indexes. Full post/profile payloads, plugin settings and
 library-wide searches are not included.
 
+## Canonical post identities and original evidence
+
+Schema 88 introduces `source_post_identities`. Each original post begins as its
+own canonical identity. A reviewed consolidation can group duplicate records
+under one surviving UUID while retaining every original post, identifier,
+capture, source list and receipt under its original owner. This native relation
+does not combine distinct posts that happen to share a caption, URL or media.
+
+Immutable consolidation receipts retain the direct source/destination UUIDs,
+reviewed revisions, signatures and reason. Canonical lookup is flattened after
+later merges, while the original redirect history remains available. An exact
+request retry recovers its original receipt even after another merge, restart
+or retained deletion. Forgetting a member tombstones its entire identity group.
+
+Identity reads use indexed lookups and paginated members/history. The storage
+primitive limits a reviewed group to 256 original posts and 8,192 qualified
+identifiers. Different non-legacy qualified upstream identifiers reject a merge;
+shared URLs cannot override them. Updates require a managed transaction and
+matching publication context, including rollback when a caller catches a late
+write failure. Startup checks reject inconsistent identity/history relationships.
+
+The identity writer is internal and has no application mutation route. It does
+not settle conflicting source-list, gallery or media choices. Original capture
+and ingestion lookup methods deliberately retain their original UUID scopes so
+saved requests remain replayable. Consolidated album/media readers, guarded
+choice resolution, pending-work publication and the complete review UI must be
+connected before users can apply a post merge.
+
 ## Mapping catalog relationships
 
 Native schema 1000033 maps `accounts`, `handles`, `posts`, `post_urls` and

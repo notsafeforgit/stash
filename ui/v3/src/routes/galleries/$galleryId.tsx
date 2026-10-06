@@ -26,6 +26,7 @@ import { GalleryDetailsTab } from "src/components/detail/gallery-detail-tabs";
 import { GalleryActionsMenu } from "src/components/detail/gallery-actions-menu";
 import { GalleryEditForm } from "src/components/detail/gallery-edit-form";
 import { Lightbox } from "src/components/lightbox";
+import { GallerySourceAlbums } from "@/components/archive/albums/gallery";
 import { GalleryImagesTab } from "src/components/detail/gallery-list-tabs";
 import { useDocumentTitle } from "src/hooks/title";
 
@@ -125,6 +126,17 @@ function GalleryDetailPage() {
               },
             ]
           : []),
+        {
+          id: "source-albums",
+          icon: Images,
+          label: intl.formatMessage({
+            id: "source_albums.title",
+            defaultMessage: "Source albums",
+          }),
+          content: (
+            <GallerySourceAlbums key={gallery.id} localId={gallery.id} />
+          ),
+        },
       ]
     : [];
 

@@ -132,40 +132,8 @@ func (rs *nativeArchiveRoutes) sourcePostAlbum(w http.ResponseWriter, r *http.Re
 		if found == nil {
 			return ingest.ErrNotFound
 		}
-		association, err := rs.repo.SourceGallery.Association(ctx, post)
-		if err != nil || association == nil {
-			return err
-		}
-		result = &models.SourcePostAlbum{PostUUID: post, DecisionUUID: association.UUID, Revision: association.Revision,
-			State: association.State, GalleryUUID: association.GalleryUUID, SelectionUUID: association.SelectionUUID,
-			Origin: association.Origin, Reason: association.Reason, CreatedAt: association.CreatedAt}
-		if association.GalleryUUID == nil {
-			return nil
-		}
-		entity, err := rs.repo.ArchiveEntity.Resolve(ctx, *association.GalleryUUID)
-		if err != nil {
-			return err
-		}
-		if entity == nil || entity.Kind != models.ArchiveGallery {
-			return models.ErrSourceGalleryConflict
-		}
-		result.Gallery = &models.SourcePostLibraryItem{UUID: entity.UUID, Kind: entity.Kind, State: entity.State,
-			Revision: entity.Revision, LocalID: entity.LocalID}
-		if entity.State == models.ArchiveEntityActive && entity.LocalID != nil {
-			gallery, err := rs.repo.Gallery.Find(ctx, *entity.LocalID)
-			if err != nil {
-				return err
-			}
-			if gallery == nil {
-				return models.ErrSourceGalleryConflict
-			}
-			title := []rune(gallery.Title)
-			if len(title) > 512 {
-				title, result.Gallery.TitleTruncated = title[:512], true
-			}
-			result.Gallery.Title = string(title)
-		}
-		return nil
+		result, err = rs.repo.SourceGallery.AssociationView(ctx, post)
+		return err
 	})
 	if err != nil {
 		nativeArchiveError(w, err)

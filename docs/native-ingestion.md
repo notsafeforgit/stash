@@ -1681,6 +1681,43 @@ Capture summaries carry each revision's metadata once per page; the UI also
 deduplicates revisions across loaded pages. This does not select a caption,
 copy source account ownership into performers, or activate metadata policies.
 
+### Ordered source album inspection
+
+`GET /posts/<post>/album-media?after=<position>&limit=N` returns the selected
+source list and current gallery association in one read transaction. Omit
+`after` for the first page; positions are zero-based, limits are 1–100, and
+`next_after` is the last returned inclusive `through` position. A missing source
+range is one row with a null attachment and an inclusive position/through pair.
+Repeated attachments retain every position while sharing their library identity.
+Unknown expected counts stay null. List completeness describes source evidence,
+not download completion.
+
+Each known slot separates the attachment choice, canonical scene/image,
+whole-post rejection/conflict and actual gallery membership. Manual exclusions
+remain explicit. `registered_files` counts library database associations without
+probing mounts or claiming files are online. An unselected slot is not evidence
+of an active download or a failed one. Deleted media keep their UUID without a
+local ID. Disabled gallery choices and forgotten posts retain inspectable lists;
+a disabled source selection has no currently selected positions.
+
+The response signature covers source selection and current association/membership
+state. Clients must reload instead of appending pages with a different signature.
+Titles and file counts are compact display projections. No raw post/profile
+payload is reconstructed, no gallery is created, and no metadata is applied.
+
+`GET /entities/<gallery-uuid>/album-posts?after=<post-uuid>&limit=N` resolves
+retained gallery redirects and lists the posts currently associated with that
+identity group. The lookup uses the gallery association index and bounds the
+reverse identity group to 1,024; oversized groups return `422 source_review_limit`.
+Merged galleries retain each post's separate order instead of merging post identity.
+Manual, folder and ZIP galleries can have an empty source-post list.
+
+Post pages expose Source order on expansion. Gallery pages expose Source albums
+through their desktop tab and mobile section selector. Each slot links to the
+current image/video and its source review, with unavailable positions retained.
+Album association/selection editing, backfill controls and live download-state
+inspection remain separate transition work.
+
 ### Historical post-to-media matching
 
 The `catalog-files-v1` policy follows retained catalog appearance, file observation

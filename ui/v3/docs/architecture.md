@@ -192,6 +192,16 @@ independently. Shared post text is grouped by revision; rejected links and
 deleted library identities remain inspectable. This page makes no mutations;
 account/media links lead to their existing review workflows.
 
+Source order on post pages and Source albums on gallery pages share
+`source-album-api.ts` and the components in `components/archive/albums`.
+Mixed images/videos retain source positions and repeated attachments; unknown
+ranges stay compact and visible. Attachment decisions, post-link suppression,
+gallery membership and registered file counts are separate facts. Gallery
+lookups follow retained redirects without combining source posts. Reads are
+lazy and paginated; a changed signature requires a reload. Deleted identities
+never link to reused local IDs. The shared `posts/library-link.tsx` renders
+ordinary route links with button styling.
+
 Performer detail pages add a Source accounts tab/mobile section backed by
 `performer-source-api.ts`. It resolves the local performer once per account page
 to a native identity and follows recorded UUID redirects on the server. Existing

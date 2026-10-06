@@ -1,3 +1,4 @@
+import { SourceAlbumsFixture } from "./source-albums";
 import { PerformerSourcesFixture } from "./performer-sources";
 import { SourcePostsFixture } from "./source-posts";
 import { postSearchSchema } from "@/core/native-archive/source-post-api";
@@ -408,6 +409,11 @@ const router = createRouter({
       path: "/media-roots",
       validateSearch: mediaRootSearchSchema,
       component: MediaRootsFixture,
+    }),
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/source-albums",
+      component: SourceAlbumsFixture,
     }),
     createRoute({
       getParentRoute: () => rootRoute,

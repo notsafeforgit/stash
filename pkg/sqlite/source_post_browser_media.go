@@ -99,6 +99,8 @@ func sourcePostLibraryItem(ctx context.Context, entity *models.ArchiveEntity) (*
 		table = "scenes"
 	case models.ArchiveImage:
 		table = "images"
+	case models.ArchiveGallery:
+		table = "galleries"
 	default:
 		return nil, models.ErrSourcePayloadCorrupt
 	}

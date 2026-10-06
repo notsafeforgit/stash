@@ -77,6 +77,9 @@ type GalleryMembershipEvent struct {
 var ErrSourceGalleryConflict = errors.New("source album or gallery changed; review a fresh preview")
 
 type SourceGalleryReaderWriter interface {
+	AssociationView(context.Context, string) (*SourcePostAlbum, error)
+	ReadAlbum(context.Context, string, int, int) (*SourceAlbumPage, error)
+	PostsForGallery(context.Context, string, string, int) (*SourceGalleryPosts, error)
 	Association(context.Context, string) (*SourceGalleryDecision, error)
 	AssociationHistory(context.Context, string, int, int) ([]SourceGalleryDecision, error)
 	DecideAssociation(context.Context, SourceGalleryChoiceInput) (*SourceGalleryDecision, error)

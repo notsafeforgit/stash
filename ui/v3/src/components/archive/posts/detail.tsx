@@ -1,11 +1,12 @@
-import { useCallback, useState, type ReactNode } from "react";
+import { SourceAlbum } from "../albums/ordered";
+import { LibraryLink } from "./library-link";
+import { useCallback, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMsg } from "@/hooks/message";
 import type {
   SourcePostAPI,
   PostSummary,
   PostMedia,
-  PostLibraryItem,
 } from "@/core/native-archive/source-post-api";
 import type { Account } from "@/core/native-archive/account-review-api";
 import { AccountName, AccountOwner, AccountService } from "../accounts/shared";
@@ -27,50 +28,6 @@ import {
 } from "@/components/ui/card";
 import { PostSection, PostReadError, PostEmpty, PostURL } from "./shared";
 import { PostRows, usePostRead } from "./read";
-
-function LibraryLink({
-  item,
-  children,
-  sources = false,
-}: {
-  item: PostLibraryItem;
-  children: ReactNode;
-  sources?: boolean;
-}) {
-  if (item.state !== "active" || item.local_id === null) return null;
-  const className = buttonVariants({ variant: "outline" });
-  if (item.kind === "scene")
-    return (
-      <Link
-        className={className}
-        to="/scenes/$sceneId"
-        params={{ sceneId: String(item.local_id) }}
-        search={sources ? { tab: "source-review" } : {}}
-      >
-        {children}
-      </Link>
-    );
-  if (item.kind === "image")
-    return (
-      <Link
-        className={className}
-        to="/images/$imageId"
-        params={{ imageId: String(item.local_id) }}
-        search={sources ? { tab: "source-review" } : {}}
-      >
-        {children}
-      </Link>
-    );
-  return (
-    <Link
-      className={className}
-      to="/galleries/$galleryId"
-      params={{ galleryId: String(item.local_id) }}
-    >
-      {children}
-    </Link>
-  );
-}
 
 function PostIdentifiers({
   post,
@@ -469,6 +426,9 @@ export function PostDetail({
           </PostSection>
           <PostSection title={msg("source_posts.media", "Media associations")}>
             <PostMediaList id={id} api={api} />
+          </PostSection>
+          <PostSection title={msg("source_albums.order", "Source order")}>
+            <SourceAlbum post={id} endpoint={api.endpoint} />
           </PostSection>
           <PostSection title={msg("source_posts.album", "Album gallery")}>
             <PostGallery id={id} api={api} />

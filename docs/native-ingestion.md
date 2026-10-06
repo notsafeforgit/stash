@@ -1736,9 +1736,9 @@ Post pages expose Source order on expansion. Gallery pages expose Source albums
 through their desktop tab and mobile section selector. Each slot links to the
 current image/video and its source review, with unavailable positions retained.
 Match existing media exposes the guarded historical matching controls described
-above. Source-list selection has the guarded APIs below; its editor, explicit
-gallery-association editing and live download-state inspection remain transition
-work.
+above. Choose source list exposes the guarded source-list editor described below.
+Explicit gallery-association editing and live download-state inspection remain
+transition work.
 
 ### Reviewing source attachment lists
 
@@ -1777,6 +1777,16 @@ gallery members, select different media, change metadata or download files.
 Review those gallery effects separately with Match existing media. All routes
 require application authorization and the shared same-origin checks; producer
 credentials cannot approve these choices.
+
+The source-list editor is available on both post and gallery source-order views.
+It pages distinct lists, compares current and proposed positions, and opens saved
+history independently. Keep this order pins the selected list; Allow compatible
+updates permits later compatible ingestion; Disable source selection keeps the
+retained evidence and existing gallery members. Saving first persists the exact
+request in the browser. Reopening performs reads only; an uncertain save requires
+explicit receipt recovery. Competing tabs cannot replace the first saved request.
+A successful save refreshes only this post's source order, and a failed refresh
+is reported separately from a failed save.
 
 ### Historical post-to-media matching
 

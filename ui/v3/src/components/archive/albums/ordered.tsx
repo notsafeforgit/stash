@@ -22,6 +22,7 @@ import { PostEmpty, PostReadError, PostSection } from "../posts/shared";
 import { LibraryLink } from "../posts/library-link";
 import { useAlbumPages } from "./read";
 import { AlbumReview } from "./review";
+import { SelectionReview } from "./selection-review";
 
 export function AlbumReadError({
   error,
@@ -237,6 +238,16 @@ export function SourceAlbum({
           post={post}
           endpoint={api.endpoint}
           onPublished={published}
+        />
+      </PostSection>
+      <PostSection
+        title={msg("attachment_selection.title", "Choose source list")}
+      >
+        <SelectionReview
+          key={`${api.endpoint}:${post}`}
+          post={post}
+          endpoint={api.endpoint}
+          onChanged={result.reload}
         />
       </PostSection>
       {page &&

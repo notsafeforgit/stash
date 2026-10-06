@@ -215,6 +215,23 @@ history/attempts. Only visible active jobs poll. A publication refreshes its
 source-order view and the enclosing post/gallery association without remounting
 the review controls or issuing a whole-library query.
 
+`attachment-selection-api.ts` and `attachment-selection-outbox.ts` provide
+source-list selection through `albums/selection-review.tsx`. Distinct immutable
+lists have bounded pages regardless of repeated captures. A typed form compares
+current and proposed source positions before selecting a pinned list, allowing
+compatible future updates, or disabling selection. Repeated positions and gaps
+remain visible; source evidence is separate from download state and gallery
+membership. Lists, history and large reference sets expand independently through
+the shared Base UI wrappers.
+
+The deployment-scoped IndexedDB journal saves the exact request before Apply and
+serializes competing tabs. Opening reads only; explicit recovery verifies the
+original receipt before replaying an absent request. Only a proven stale preview
+can be discarded for another review. A saved choice refreshes that post's source
+order without changing or reloading gallery associations. Refresh failure is
+reported separately from successful publication. Closing the panel cannot cancel
+a request already saved for delivery.
+
 Performer detail pages add a Source accounts tab/mobile section backed by
 `performer-source-api.ts`. It resolves the local performer once per account page
 to a native identity and follows recorded UUID redirects on the server. Existing

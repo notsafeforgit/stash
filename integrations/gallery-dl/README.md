@@ -64,9 +64,17 @@ rejected. Server source-identity and domain checks remain authoritative.
 
 A `file.completed` event requires the actual final relative path, positive size,
 SHA-256, and image/scene kind after transformations and filesystem flushes. Its
-source capture must already be queued for the same collection revision and root.
+source capture must already be queued for the same run, collection revision and root.
 Delivery waits for that capture's receipt. The queue never creates a filename or
 infers an attachment from a directory name; those are producer integration tasks.
+
+An `attachment.download` report retains the original source attempt, capture and
+attachment, with a stable transfer sequence taken from the capture's retained
+outbox row. Start, failure, exclusion and skip reports wait for the capture receipt;
+a downloaded report waits for its exact `file.completed` receipt. Each report is
+at most 16 KiB. Acknowledgements must match the original event and capture and
+must not claim verified media intake. Queue schema 16 admits these reports while
+preserving all older payloads, acknowledgements and request/job journals.
 
 SQLite transactions use WAL and `synchronous=FULL`. Independent drainers claim
 bounded batches with expiring, fenced delivery leases. Concurrent first opens
@@ -181,14 +189,23 @@ Unsupported or ambiguous attachments stop before download. A single attachment
 can be associated without creating a gallery.
 
 After synchronous postprocessing, the adapter flushes and hashes the actual
-final file, then queues its dependent file event before updating gallery-dl's
+final file, then queues its dependent file event and downloaded report before updating gallery-dl's
 archive. Metadata writes use atomic replacement. Failed processors, queue
 capacity or persistence failures leave the archive unacknowledged. Existing
 unarchived files retry metadata/exec processing; archived files can repair queued
-delivery without downloading again. Unresolved archive skips queue source
-evidence only. The existing GIF-to-MKV converter is recognized explicitly.
+delivery without downloading again. Unresolved archive skips retain the source
+evidence and an explicit skipped report without asserting that bytes are present.
+The existing GIF-to-MKV converter is recognized explicitly.
 Filename budgeting preserves source IDs and handles UTF-8 and downloader
 temporary suffixes without truncating the source metadata.
+
+A start report is durable before the downloader writes bytes. Fallback URLs use
+the same transfer, with failure recorded only when they are exhausted. Failed
+postprocessing, unsupported mirror files and unresolved skips retain distinct
+outcomes. A process interruption may leave only a start report; the server derives
+interruption from the source attempt rather than fabricating a completion. A
+current file can report its original attempt after lease loss. New worker claims
+require the backend's attachment-download capability before source access.
 
 Checkpoints retain the last completed source cursor during bounded replay. A
 missing saved cursor cannot report successful traversal. The worker entry point
@@ -472,8 +489,9 @@ adds durable discovery page delivery; schema 12 adds its dispatch cursors and
 backoff; schema 13 adds discovery collection rotation and separates discovery
 and enrichment delivery cursors in the shared worker. Schema 14 adds candidate
 detail execution, collection dispatch and an independent delivery cursor. Schema
-15 adds the cursor for automatic candidate inspection.
-Opening an outbox from schemas 1–14 promotes it
+15 adds the cursor for automatic candidate inspection. Schema 16 admits durable
+attachment-download reports and their capture/file dependencies.
+Opening an outbox from schemas 1–15 promotes it
 in one SQLite transaction, preserving event bytes, receipts, dependencies,
 active delivery/submission leases, frozen requests and caller tickets. Old tickets
 are linked to the first covering submissions from their original request sequence;
@@ -1912,8 +1930,8 @@ share the post body while retaining selected-file paths, URLs, types and exclusi
 in per-capture patches. Unmarked historical payloads keep their original partition.
 
 Audio, archives and other unsupported file extensions retain source captures with
-`native_file_exclusion: "unsupported_image_or_video_extension"`. They produce no
-download, file receipt or download-archive acknowledgement. Supported GIF conversion
+`native_file_exclusion: "unsupported_image_or_video_extension"` and an excluded
+download report. They produce no downloaded bytes, file receipt or download-archive acknowledgement. Supported GIF conversion
 still uses the reviewed host processor. Scan windows use the original `published`
 timestamp, preserving fractional precision; missing publication time fails rather
 than substituting the mirror's import timestamp.
@@ -2538,9 +2556,12 @@ responses, and checks replay after reopening, independent rejection, caller-tick
 deduplication, exact ticket completion and the submit/claim/renew/checkpoint/finish lease
 cycle. `TestPythonDownloadWorkerRecoversFinishAndDeliversFiles` runs the worker
 against the real API/SQLite from a persisted URL-list caller, drains a capture during downloading, recovers a lost
-attempt-completion response and admits a dependent file after reopening the
-outbox. It checks the ticket-status and call-status CLIs after restart and verifies that source
-success still leaves actual media intake queued.
+attempt-completion response and a committed download-report response, and admits
+dependent file/report events after reopening the outbox. It checks the ticket-status
+and call-status CLIs after restart and verifies that source success still leaves
+actual media intake queued. It exports/restores the library and real producer
+outbox together, compares receipt-boundary proofs and reopens the relocated native
+database to recover the original report receipt.
 The same real download fixture exercises the n8n adapter's stable record/inspect
 token, pending result, lost permanent-completion response and exact-proof replay
 after reopening the outbox. Source completion still leaves file intake queued.

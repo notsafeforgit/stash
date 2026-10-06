@@ -1,6 +1,6 @@
 """The ordered capture/file boundary used by the gallery-dl adapter."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 import uuid
 
@@ -17,6 +17,10 @@ class Prepared:
     event_uuid: str
     attachment: dict
     source: dict
+    transfer_sequence: int
+    owner_uuid: str
+    fence: int
+    _reports: dict = field(default_factory=dict, repr=False, compare=False)
 
 
 class Producer:
@@ -44,6 +48,10 @@ class Producer:
         self.context = {"protocol": 1, "producer_uuid": outbox.producer,
                         "run_uuid": identifier(run["uuid"]), "collection_uuid": identifier(run["collection_uuid"]),
                         "collection_revision": run["collection_revision"], "root_uuid": identifier(run["root_uuid"])}
+        self.owner_uuid = identifier(run.get("owner_uuid"))
+        self.fence = run.get("fence")
+        if self.owner_uuid != lease.owner or type(self.fence) is not int or not 1 <= self.fence <= 2**53 - 1:
+            raise InvalidData("Download reporting requires the owned source-run attempt")
         self.extractor_version = extractor_version
         self.items_seen = run["progress"]["items_seen"]
         self.files_completed = run["progress"]["files_completed"]
@@ -100,7 +108,35 @@ class Producer:
                  "post": post, "metadata": metadata, "source": kept}
         # Preserve evidence even when attachment matching requires a new adapter.
         self.outbox.enqueue(encode(event))
-        return Prepared(event_id, source.attachment(kept), kept)
+        # Outbox sequence numbers survive acknowledgement and restart. They
+        # order transfers without a per-process counter that can collide when
+        # several child extractors share one source attempt.
+        sequence = self.outbox.db.execute("SELECT seq FROM events WHERE event_uuid=?", (event_id,)).fetchone()[0]
+        if not 1 <= sequence <= 2**53 - 1:
+            raise InvalidData("Download transfer sequence is outside the supported range")
+        return Prepared(event_id, source.attachment(kept), kept, sequence, self.owner_uuid, self.fence)
+
+    def report_download(self, prepared, state, *, file_event_uuid=None, reason_code=None):
+        # Reporting a finished/failed current file does not require a live
+        # lease. The server validates its original historical run attempt.
+        phase = "started" if state == "started" else "terminal"
+        intent = {"state": state}
+        if file_event_uuid is not None:
+            intent["file_event_uuid"] = file_event_uuid
+        if reason_code is not None:
+            intent["reason_code"] = reason_code
+        previous = prepared._reports.get(phase)
+        if previous is None:
+            event = {**self.context, "event_uuid": str(uuid.uuid4()), "kind": "attachment.download",
+                     "observed_at": utc_now(), "owner_uuid": prepared.owner_uuid, "fence": prepared.fence,
+                     "transfer_sequence": prepared.transfer_sequence, "capture_event_uuid": prepared.event_uuid,
+                     "attachment": prepared.attachment, **intent}
+            previous = prepared._reports[phase] = (intent, encode(event))
+        elif previous[0] != intent:
+            raise InvalidData("A download transfer already has a different outcome")
+        # Preserve exact bytes if enqueue was interrupted, or a fallback URL
+        # asks to record the same start again.
+        return self.outbox.enqueue(previous[1])
 
     def complete(self, prepared, path):
         # This file may finish after ownership loss. Persist it first; the next
@@ -117,7 +153,9 @@ class Producer:
         event = {**self.context, "event_uuid": str(uuid.uuid4()), "kind": "file.completed", "observed_at": utc_now(),
                  "relative_path": relative, "size": size, "sha256": sha256, "media_kind": kind,
                  "source": {"capture_event_uuid": prepared.event_uuid, "attachment": prepared.attachment}}
-        return self.outbox.enqueue(encode(event))
+        event_id = self.outbox.enqueue(encode(event))
+        self.report_download(prepared, "downloaded", file_event_uuid=event_id)
+        return event_id
 
     @property
     def legacy_resume(self):

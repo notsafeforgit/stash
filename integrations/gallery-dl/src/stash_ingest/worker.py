@@ -77,6 +77,9 @@ def execute(box, client, configuration, run_uuid):
             or capabilities.get("source_run_recovery_protocol") != 1
             or capabilities.get("source_run_pacing_protocol") != 1
             or capabilities.get("source_run_fairness_protocol") != 1
+            or capabilities.get("attachment_download_protocol") != 1
+            or capabilities.get("max_attachment_download_bytes", 0) < 16384
+            or "attachment.download" not in capabilities.get("kinds", [])
             or capabilities.get("file_ingestion") is not True):
         raise Unavailable("native_download_worker_unavailable")
     current = client._request("GET", "/runs/" + run_uuid)

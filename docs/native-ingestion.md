@@ -1112,8 +1112,14 @@ even if its start arrives later. Verification job/state remains separate. These
 rows describe individual transfers, not an attachment-wide assertion that media
 is online. Reading history changes no run, association, metadata, or files.
 
-Producer lifecycle delivery and album status controls are separate implementation
-work. Existing host/n8n scrapers have not been activated against this interface.
+The gallery-dl producer now records these lifecycle reports through its durable
+schema-16 queue. It requires the advertised capability before claiming download
+work, records starts before bytes, and queues a downloaded report before updating
+the download archive. Fallback URLs share a transfer. Existing files can report
+completion without a new start; unresolved archive skips and unsupported mirror
+files retain explicit outcomes. Backup receipt verification preserves these
+dependencies and original acknowledgements. Album status controls and actual
+host/n8n activation remain separate implementation work.
 
 ## Source-run coordination
 

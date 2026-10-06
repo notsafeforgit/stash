@@ -32,7 +32,9 @@ class WorkerTests(unittest.TestCase):
         profile, _ = profile_fixture(self.directory)
         self.profile = Configuration(profile)
         self.client = Client("http://example.invalid", PRODUCER, timeout=1)
-        self.client.capabilities = Mock(return_value={"source_runs": True, "source_run_protocol": 1, "source_run_recovery_protocol": 1, "source_run_pacing_protocol": 1, "source_run_fairness_protocol": 1, "file_ingestion": True})
+        self.client.capabilities = Mock(return_value={"source_runs": True, "source_run_protocol": 1, "source_run_recovery_protocol": 1, "source_run_pacing_protocol": 1, "source_run_fairness_protocol": 1, "file_ingestion": True,
+                                                     "attachment_download_protocol": 1, "max_attachment_download_bytes": 16384,
+                                                     "kinds": ["source.capture", "file.completed", "attachment.download"]})
         self.lease = LeaseFixture()
         self.lease.client = self.client
         self.lease.run.update(policy_sha256=self.profile.policy_sha256, path_prefix="Account", fence=3)
@@ -102,6 +104,13 @@ class WorkerTests(unittest.TestCase):
             self.run_worker()
         self.claim.assert_not_called()
         self.client.capabilities.return_value["source_run_fairness_protocol"] = 1
+        for key, invalid in (("attachment_download_protocol", 0), ("max_attachment_download_bytes", 8192), ("kinds", ["source.capture", "file.completed"])):
+            original = self.client.capabilities.return_value[key]
+            self.client.capabilities.return_value[key] = invalid
+            with self.subTest(capability=key), self.assertRaises(Unavailable):
+                self.run_worker()
+            self.claim.assert_not_called()
+            self.client.capabilities.return_value[key] = original
         self.claim.return_value = None
         self.assertEqual(self.run_worker()["state"], "waiting")
         self.delivery.start.assert_not_called()
@@ -111,11 +120,11 @@ class WorkerTests(unittest.TestCase):
         result = self.run_worker()
         self.assertEqual(result["state"], "source_succeeded")
         self.assertEqual(result["intake_completion"], "inspect_native_receipts")
-        self.assertEqual(result["outbox"]["counts"]["pending"], 4)
+        self.assertEqual(result["outbox"]["counts"]["pending"], 8)
         self.lease.finish.assert_called_once_with("succeeded", error_code="")
         events = [decode(row[0]) for row in self.box.db.execute("SELECT body FROM events ORDER BY seq")]
-        self.assertEqual([e["kind"] for e in events], ["source.capture", "file.completed"] * 2)
-        for event in events[1::2]:
+        self.assertEqual([e["kind"] for e in events], ["source.capture", "attachment.download", "file.completed", "attachment.download"] * 2)
+        for event in events[2::4]:
             self.assertTrue((self.profile.root.path / event["relative_path"]).is_file())
         self.delivery.close.assert_called_once()
         self.lease.close.assert_called_once()
@@ -137,7 +146,7 @@ class WorkerTests(unittest.TestCase):
         result = self.run_worker()
         self.assertEqual(result["state"], "paused")
         self.assertEqual(len(self.downloaded), 1)
-        self.assertEqual(result["outbox"]["counts"]["pending"], 2)
+        self.assertEqual(result["outbox"]["counts"]["pending"], 4)
         self.lease.finish.assert_not_called()
         self.delivery.close.assert_called_once()
 
@@ -146,7 +155,7 @@ class WorkerTests(unittest.TestCase):
         result = self.run_worker()
         self.assertEqual(result["state"], "deferred")
         self.assertEqual(len(self.downloaded), 1)
-        self.assertEqual(result["outbox"]["counts"]["pending"], 2)
+        self.assertEqual(result["outbox"]["counts"]["pending"], 4)
         self.lease.finish.assert_called_once_with("deferred", error_code="worker_configuration_or_source")
 
     def test_download_access_storage_and_interruption_failures_are_not_success(self):
@@ -219,7 +228,7 @@ class WorkerTests(unittest.TestCase):
         result = self.run_worker()
         self.assertEqual(result["state"], "yielded")
         self.assertEqual(len(self.downloaded), 1)
-        self.assertEqual(result["outbox"]["counts"]["pending"], 2)
+        self.assertEqual(result["outbox"]["counts"]["pending"], 4)
         self.assertEqual(self.lease.checkpoints[-1][:2], (1, 1))
         self.lease.finish.assert_called_once_with("retry", error_code="source_turn_complete")
 

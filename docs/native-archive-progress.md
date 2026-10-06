@@ -67,7 +67,9 @@ full fork gate, including 707 UI tests and the complete Go integration suite.
 Source-order mixed-media playback passed staged unit and browser checks and the
 integrated full fork gate, including 715 UI tests and complete Go integration.
 Per-attachment download reporting now has a validated backend and reconciled
-schema-87 rehearsal. Producer lifecycle delivery and its UI remain in progress.
+schema-87 rehearsal. Producer lifecycle delivery and backup receipt checks pass
+the full producer, archive, host backup and API integration suites, remaining
+Go/Python caller checks and clean lint. Its UI remains in progress.
 
 Reviewed transfer of unstarted pending enrichment after collection edits now has
 an atomic API, saved-plan client and a passing full fork gate. Its populated
@@ -10245,3 +10247,35 @@ table and the receipt constraint expansion, with the expected migration history
 and version transition. Producer outbox and gallery-dl lifecycle delivery, album
 status UI and actual caller activation remain separate required work. Production
 remains unchanged.
+
+## Durable producer download reports and receipt backups — 2026-10-06
+
+The gallery-dl adapter now queues starts before bytes and terminal reports for
+downloaded, failed, excluded and unresolved skipped outputs. Fallback URLs retain
+one transfer. Capture row sequences survive acknowledgement and restart; reports
+keep the original source-attempt owner/fence even when the current file finishes
+after lease loss. Both the file event and downloaded report must be durable before
+gallery-dl updates its archive. Queue exhaustion leaves the archive unacknowledged
+and retains completed files for recovery. Worker execution requires the new
+backend capability before claiming download work.
+
+Outbox schema 16 preserves older event bytes, acknowledgements and every existing
+request/job journal. Delivery waits for exact capture/file dependencies and rejects
+an acknowledgement that claims media intake or names a different capture. The
+standalone archive verifier now supports those queues, checks retained report
+history and dependency scope, and preserves pending/lost-response bytes.
+
+All 551 producer tests and 113 standalone archive tests pass. The first private
+producer run found one configuration-migration assertion that still expected only
+capture/file events; the corrected assertion checks the downloaded report and
+file dependency, and the complete promoted suite passed. The real Go HTTP worker
+test passes for the CLI, host launcher and n8n fixture, including deliberately
+lost download-report and run-finish responses. Each fixture exports/restores the
+native library and producer queue, compares receipt-boundary proofs, validates
+the relocated schema and recovers the original download receipt after reopening.
+The complete API suite also passed in 574 seconds, along with clean Go lint,
+all 262 host backup tests and the remaining Go/Python snapshot and collector
+checks. Validation receipts and the 23-file source manifest are retained under
+`.local/native-attachment-download-20261006/`. Native live worker activation,
+installed runtime/profile refresh, album status UI and the remaining transition
+gates remain open. No production configuration or bucket policy changed.

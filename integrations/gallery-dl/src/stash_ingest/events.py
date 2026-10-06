@@ -7,6 +7,7 @@ from the local queue; it does not assert that a file has been imported.
 
 from datetime import datetime
 import re
+import unicodedata
 
 from .encoding import (InvalidData, MAX_EVENT_BYTES, MAX_FILE_EVENT_BYTES,
                        decode, encode, identifier)
@@ -17,6 +18,7 @@ COMMON = frozenset({"protocol", "producer_uuid", "event_uuid", "run_uuid",
                     "kind", "observed_at"})
 CAPTURE = frozenset({"extractor_version", "retention_policy", "post", "metadata", "source"})
 FILE = frozenset({"relative_path", "size", "sha256", "media_kind"})
+DOWNLOAD = frozenset({"owner_uuid", "fence", "transfer_sequence", "capture_event_uuid", "attachment", "state"})
 METADATA = frozenset({"title", "original_text", "published_at", "date_basis", "language"})
 
 
@@ -89,6 +91,32 @@ def validate(body):
                 raise InvalidData("Invalid file source reference")
             identifier(source["capture_event_uuid"])
             reference(source["attachment"])
+    elif kind == "attachment.download":
+        if (not COMMON | DOWNLOAD <= event.keys()
+                or not set(event) <= COMMON | DOWNLOAD | {"file_event_uuid", "reason_code"}
+                or len(body) > MAX_FILE_EVENT_BYTES or event["root_uuid"] is None):
+            raise InvalidData("Invalid attachment download envelope")
+        for key in ("owner_uuid", "capture_event_uuid"):
+            identifier(event[key])
+        for key in ("fence", "transfer_sequence"):
+            if type(event[key]) is not int or not 1 <= event[key] < 2**53:
+                raise InvalidData("Invalid attachment transfer attempt or sequence")
+        reference(event["attachment"])
+        if any(len(part.encode("utf-8")) > 1024
+               or any(unicodedata.category(c) == "Cc" for c in part)
+               for part in event["attachment"].values()):
+            raise InvalidData("Invalid attachment reference")
+        state, file_id, reason = event["state"], event.get("file_event_uuid", ""), event.get("reason_code", "")
+        allowed = {"started": {""}, "downloaded": {""},
+                   "failed": {"download_failed", "postprocess_failed", "source_failure"},
+                   "excluded": {"unsupported_media", "filter"},
+                   "skipped": {"archive_entry_without_file", "existing_without_file"}}
+        if (not isinstance(state, str) or state not in allowed or not isinstance(reason, str)
+                or reason not in allowed[state] or not isinstance(file_id, str)
+                or (state == "downloaded") != bool(file_id)):
+            raise InvalidData("Invalid attachment download state")
+        if file_id:
+            identifier(file_id)
     else:
         raise InvalidData("Unsupported event kind")
     if body != encode(event, MAX_EVENT_BYTES):

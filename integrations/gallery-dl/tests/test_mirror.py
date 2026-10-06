@@ -133,6 +133,11 @@ class MirrorGalleryTests(unittest.TestCase):
         captures = [e for e in self.events() if e['kind'] == 'source.capture']
         self.assertEqual(len(captures), 3)
         self.assertEqual(sum(bool(e['source'].get('native_file_exclusion')) for e in captures), 2)
+        reports = self.events(kinds=('attachment.download',))
+        excluded = [e for e in reports if e['state'] == 'excluded']
+        self.assertEqual(len(excluded), 2)
+        self.assertTrue(all(e['reason_code'] == 'unsupported_media' and 'file_event_uuid' not in e for e in excluded))
+        self.assertEqual(sum(e['state'] == 'downloaded' for e in reports), 1)
         self.assertEqual(self.archive_count(), 1)
         self.assertEqual((self.producer.items_seen, self.producer.files_completed), (3, 1))
 

@@ -253,7 +253,9 @@ class ConfigMigrationTests(unittest.TestCase):
                 task.download = lambda _: self.fail("Existing archive row caused a download")
                 self.assertEqual(task.run(), 0)
             events = [decode(row[0]) for row in box.db.execute("SELECT body FROM events ORDER BY seq")]
-            self.assertEqual([event["kind"] for event in events], ["source.capture", "file.completed"])
+            self.assertEqual([event["kind"] for event in events], ["source.capture", "file.completed", "attachment.download"])
+            self.assertEqual(events[-1]["state"], "downloaded")
+            self.assertEqual(events[-1]["file_event_uuid"], events[1]["event_uuid"])
             self.assertEqual(events[1]["relative_path"], "Account/postabc123_abc123.jpg")
         with closing(sqlite3.connect(archive)) as database:
             self.assertEqual(database.execute("SELECT entry FROM archive").fetchall(), [("redditpostabc123_abc123",)])

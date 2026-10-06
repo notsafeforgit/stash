@@ -130,7 +130,8 @@ class GalleryTests(unittest.TestCase):
 
         def download(url):
             # The source is durable before the first byte is written.
-            self.assertEqual(self.events()[-1]["kind"], "source.capture")
+            started = self.events(kinds=None)[-1]
+            self.assertEqual((started["kind"], started["state"]), ("attachment.download", "started"))
             pf = task.pathfmt
             pf.part_enable()
             with pf.open("wb") as output:
@@ -140,8 +141,11 @@ class GalleryTests(unittest.TestCase):
         task.download = download
         return task
 
-    def events(self):
-        return [decode(row[0]) for row in self.box.db.execute("SELECT body FROM events ORDER BY seq")]
+    def events(self, *, kinds=("source.capture", "file.completed")):
+        # Existing source/file assertions inspect those contracts; lifecycle
+        # assertions explicitly request the complete ordered event stream.
+        events = [decode(row[0]) for row in self.box.db.execute("SELECT body FROM events ORDER BY seq")]
+        return events if kinds is None else [e for e in events if e["kind"] in kinds]
 
     def archive_count(self):
         with sqlite3.connect(self.directory / "downloads.sqlite") as db:
@@ -313,6 +317,9 @@ class GalleryTests(unittest.TestCase):
         task.download = lambda _: self.fail("Archive skip attempted a download")
         self.assertEqual(task.run(), 0)
         self.assertEqual([e["kind"] for e in self.events()], ["source.capture", "file.completed", "source.capture"])
+        report = self.events(kinds=None)[-1]
+        self.assertEqual((report["state"], report["reason_code"]), ("skipped", "archive_entry_without_file"))
+        self.assertNotIn("file_event_uuid", report)
 
     def test_postprocessor_failure_does_not_ack_archive_and_retry_repairs_existing_file(self):
         config.set(("extractor",), "postprocessors", [{"name": "exec", "event": "after", "command": ["fixture", "{_path}"]}])
@@ -321,6 +328,9 @@ class GalleryTests(unittest.TestCase):
             self.assertNotEqual(task.run(), 0)
         self.assertEqual(self.archive_count(), 0)
         self.assertEqual(len(self.events()), 1)
+        reports = self.events(kinds=("attachment.download",))
+        self.assertEqual([e["state"] for e in reports], ["started", "failed"])
+        self.assertEqual(reports[-1]["reason_code"], "postprocess_failed")
         repaired = []
         with patch("gallery_dl.postprocessor.exec.ExecPP._exec", side_effect=lambda *args: repaired.append(args) or 0):
             task = self.task()
@@ -329,9 +339,65 @@ class GalleryTests(unittest.TestCase):
         self.assertEqual(len(repaired), 1)
         self.assertEqual(self.archive_count(), 1)
         self.assertEqual(self.events()[-1]["kind"], "file.completed")
+        self.assertEqual(self.events(kinds=None)[-1]["state"], "downloaded")
+
+    def test_terminal_report_capacity_prevents_archive_ack(self):
+        self.box.max_events = 3
+        self.assertNotEqual(self.task().run(), 0)
+        self.assertEqual(self.archive_count(), 0)
+        events = self.events(kinds=None)
+        self.assertEqual([e["kind"] for e in events], ["source.capture", "attachment.download", "file.completed"])
+        self.assertTrue((self.media / events[-1]["relative_path"]).is_file())
+        self.box.max_events = 10
+        task = self.task()
+        task.download = lambda _: self.fail("Existing completed file must be recovered")
+        self.assertEqual(task.run(), 0)
+        self.assertEqual(self.archive_count(), 1)
+        self.assertEqual(self.events(kinds=None)[-1]["state"], "downloaded")
+
+    def test_failed_download_reports_failure_without_claiming_a_file(self):
+        task = self.task()
+        task.download = lambda _: False
+        self.assertNotEqual(task.run(), 0)
+        events = self.events(kinds=None)
+        self.assertEqual([e["kind"] for e in events], ["source.capture", "attachment.download", "attachment.download"])
+        self.assertEqual([e["state"] for e in events[1:]], ["started", "failed"])
+        self.assertEqual(events[-1]["reason_code"], "download_failed")
+        self.assertEqual(self.archive_count(), 0)
+
+    def test_fallback_urls_share_one_transfer_and_do_not_record_early_failure(self):
+        config.set(("extractor",), "fallback", True)
+        task = self.task(reddit_data(_fallback=["https://fixture.invalid/fallback.jpg"]))
+        original = task.download
+        calls = []
+
+        def download(url):
+            calls.append(url)
+            return False if len(calls) == 1 else original(url)
+
+        task.download = download
+        self.assertEqual(task.run(), 0)
+        self.assertEqual(len(calls), 2)
+        reports = self.events(kinds=("attachment.download",))
+        self.assertEqual([e["state"] for e in reports], ["started", "downloaded"])
+        self.assertEqual(reports[0]["transfer_sequence"], reports[1]["transfer_sequence"])
+        self.assertEqual(reports[0]["capture_event_uuid"], reports[1]["capture_event_uuid"])
+
+    def test_interrupted_download_retains_start_without_a_terminal_claim(self):
+        task = self.task()
+
+        def interrupted(url):
+            raise KeyboardInterrupt()
+
+        task.download = interrupted
+        with self.assertRaises(KeyboardInterrupt):
+            task.run()
+        reports = self.events(kinds=("attachment.download",))
+        self.assertEqual([e["state"] for e in reports], ["started"])
+        self.assertEqual(self.archive_count(), 0)
 
     def test_outbox_exhaustion_preserves_file_without_archive_ack(self):
-        self.box.max_events = 1
+        self.box.max_events = 2
         task = self.task()
         self.assertNotEqual(task.run(), 0)
         self.assertEqual(self.archive_count(), 0)
@@ -352,9 +418,12 @@ class GalleryTests(unittest.TestCase):
             # so an uncommitted row on the producer connection is insufficient.
             with closing(sqlite3.connect(self.box.path)) as reader:
                 rows = reader.execute('SELECT event_uuid,kind,body FROM events ORDER BY seq').fetchall()
-            self.assertEqual([row[1] for row in rows], ['source.capture', 'file.completed'])
-            event = decode(rows[-1][2])
+            self.assertEqual([row[1] for row in rows], ['source.capture', 'attachment.download', 'file.completed', 'attachment.download'])
+            event = decode(rows[-2][2])
             self.assertEqual(event['source']['capture_event_uuid'], rows[0][0])
+            terminal = decode(rows[-1][2])
+            self.assertEqual(terminal['state'], 'downloaded')
+            self.assertEqual(terminal['file_event_uuid'], rows[-2][0])
             self.assertFalse(self.box.db.in_transaction)
             observed.append(rows[-1][0])
             return original(archive, keywords)

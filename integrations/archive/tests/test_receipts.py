@@ -36,7 +36,7 @@ class ReceiptFixture(unittest.TestCase):
             CREATE TABLE native_schema(singleton INTEGER PRIMARY KEY,lineage TEXT);
             CREATE TABLE ingest_producers(uuid TEXT PRIMARY KEY);
             CREATE TABLE schema_migrations(version INTEGER PRIMARY KEY,dirty INTEGER);
-            INSERT INTO schema_migrations VALUES(1000077,0);
+            INSERT INTO schema_migrations VALUES(1000087,0);
             CREATE TABLE blobs(checksum TEXT PRIMARY KEY,blob BLOB);
             CREATE TABLE media_roots(uuid TEXT PRIMARY KEY);
             CREATE TABLE ingest_credentials(producer_uuid TEXT,uuid TEXT,PRIMARY KEY(producer_uuid,uuid));
@@ -45,6 +45,8 @@ class ReceiptFixture(unittest.TestCase):
             CREATE TABLE source_posts(uuid TEXT PRIMARY KEY);
             CREATE TABLE source_captures(post_uuid TEXT,uuid TEXT UNIQUE,PRIMARY KEY(post_uuid,uuid));
             CREATE TABLE archive_jobs(uuid TEXT PRIMARY KEY);
+            CREATE TABLE source_attachments(uuid TEXT PRIMARY KEY);
+            CREATE TABLE source_run_attempts(run_uuid TEXT,fence INTEGER,PRIMARY KEY(run_uuid,fence));
         """)
         self.db.execute("INSERT INTO native_schema VALUES(1,?)", (FORMAT,))
         self.db.execute("INSERT INTO ingest_producers VALUES(?)", (PRODUCER,))
@@ -52,11 +54,14 @@ class ReceiptFixture(unittest.TestCase):
         self.db.execute("INSERT INTO ingest_credentials VALUES(?,?)", (PRODUCER,CREDENTIAL))
         self.db.execute("INSERT INTO source_collection_revisions VALUES(?,1)", (COLLECTION,))
         self.db.execute("INSERT INTO ingest_credential_scopes VALUES(?,?)", (CREDENTIAL,COLLECTION))
-        migration = (ROOT / 'pkg/sqlite/migrations/1000021_file_ingest_receipts.up.sql').read_text()
+        migration = (ROOT / 'pkg/sqlite/migrations/1000087_attachment_downloads.up.sql').read_text()
         receipt_table = migration.split('CREATE TABLE ingest_receipts_next (', 1)[1].split('\n);', 1)[0]
         # Use the actual receipt DDL; the supporting domain rows provide its
         # foreign-key targets. Normal native model behavior is tested in Go.
         self.db.executescript('CREATE TABLE ingest_receipts (' + receipt_table + '\n);')
+        download_table = migration.split('CREATE TABLE source_attachment_downloads (', 1)[1].split('\n);', 1)[0]
+        self.db.executescript('CREATE TABLE source_attachment_downloads (' + download_table + '\n);')
+        self.attachments = {}
         self.db.commit()
         self.outbox = self.root / "producer.sqlite"
         self.box = Outbox(self.outbox, ORIGIN, PRODUCER)
@@ -81,9 +86,27 @@ class ReceiptFixture(unittest.TestCase):
             receipt.update(post_uuid=str(uuid.uuid4()), capture_uuid=str(uuid.uuid4()), result={"status":"committed"})
             self.db.execute("INSERT INTO source_posts VALUES(?)", (receipt["post_uuid"],))
             self.db.execute("INSERT INTO source_captures VALUES(?,?)", (receipt["post_uuid"],receipt["capture_uuid"]))
+        elif event["kind"] == "attachment.download":
+            capture = self.box.receipt(event["capture_event_uuid"])
+            attachment = self.attachments.setdefault(json.dumps(event["attachment"], sort_keys=True), str(uuid.uuid4()))
+            self.db.execute("INSERT OR IGNORE INTO source_attachments VALUES(?)", (attachment,))
+            self.db.execute("INSERT OR IGNORE INTO source_run_attempts VALUES(?,?)", (event["run_uuid"], event["fence"]))
+            receipt.update(post_uuid=capture["post_uuid"], capture_uuid=capture["capture_uuid"],
+                           result={"status": "recorded", "reported_state": event["state"],
+                                   "attachment_uuid": attachment, "media_ingested": False})
+            self.db.execute("""INSERT INTO source_attachment_downloads(producer_uuid,event_uuid,run_uuid,
+                fence,owner_uuid,transfer_sequence,capture_event_uuid,attachment_uuid,state,phase,
+                file_event_uuid,reason_code,observed_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                tuple(event[key] for key in ("producer_uuid", "event_uuid", "run_uuid", "fence", "owner_uuid",
+                                            "transfer_sequence", "capture_event_uuid")) +
+                (attachment, event["state"], int(event["state"] != "started"), event.get("file_event_uuid"),
+                 event.get("reason_code", ""), event["observed_at"]))
         else:
             receipt["job_uuid"] = str(uuid.uuid4())
             self.db.execute("INSERT INTO archive_jobs VALUES(?)", (receipt["job_uuid"],))
+            if event.get("source"):
+                capture = self.box.receipt(event["source"]["capture_event_uuid"])
+                receipt.update(post_uuid=capture["post_uuid"], capture_uuid=capture["capture_uuid"])
         self.db.execute("""INSERT INTO ingest_receipts(producer_uuid,event_uuid,digest,credential_uuid,
             collection_uuid,collection_revision,root_uuid,run_uuid,kind,post_uuid,capture_uuid,job_uuid,result,committed_at)
             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", tuple(receipt.get(k) for k in
@@ -115,7 +138,7 @@ class ReceiptBoundaryTests(ReceiptFixture):
         self.box.enqueue(encode(self.event()))
         before = self.box.db.execute("SELECT * FROM events ORDER BY seq").fetchall()
         report = self.verify()
-        self.assertEqual(report["coverage"], "capture-file-run-and-job-receipts")
+        self.assertEqual(report["coverage"], "capture-file-download-run-and-job-receipts")
         self.assertEqual(report["producers"][0]["counts"], {"acknowledged": 1, "pending": 2, "sending": 0,
                                                          "review": 0, "accepted_unacknowledged": 1})
         self.assertEqual(report, self.verify())
@@ -177,7 +200,7 @@ class ReceiptBoundaryTests(ReceiptFixture):
         with self.assertRaisesRegex(InvalidArchive, "identity is missing"): self.verify()
 
     def test_future_outbox_version_and_writable_transaction_refused(self):
-        self.box.db.execute("PRAGMA user_version=16")
+        self.box.db.execute("PRAGMA user_version=17")
         with self.assertRaisesRegex(InvalidArchive, "Unsupported producer"): self.verify()
         self.db.execute("BEGIN")
         try:

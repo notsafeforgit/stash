@@ -169,6 +169,7 @@ class NativeDownloadJob(job.DownloadJob):
         self.lock_directory = Path(lock_directory if lock_directory is not None else parent.lock_directory).resolve(strict=True)
         self.producer.check()
         self._native_prepared, self._native_lock, self._native_url = None, None, None
+        self._native_phase = None
         self._native_initializing = False
         self._native_parent = parent
         self._native_source_date = None if parent is None else parent._native_queued_date
@@ -346,14 +347,25 @@ class NativeDownloadJob(job.DownloadJob):
 
                     pp._exec = strict
         self.hooks["prepare"].insert(0, self._prepare)
+        self.hooks["file"].insert(0, self._postprocess)
         self.hooks["file"].append(self._before_rename)
         self.hooks["after"].append(self._complete)
         self.hooks["skip"].insert(0, self._repair_skip)
         self.hooks["skip"].append(functools.partial(self._complete, skipped=True))
-        self.hooks["error"].append(lambda _: self._release())
+        self.hooks["error"].insert(0, self._download_error)
         for event, callbacks in self.hooks.items():
             self.hooks[event] = [publication_callback(self, callback) for callback in callbacks]
         filename.install(self)
+        original_download = self.download
+
+        def download(url):
+            if self._native_prepared is None:
+                raise InvalidData("Download has no durable source capture")
+            self.producer.report_download(self._native_prepared, "started")
+            self._native_phase = "download"
+            return original_download(url)
+
+        self.download = download
 
     def get_logger(self, name):
         logger = super().get_logger(name)
@@ -378,12 +390,14 @@ class NativeDownloadJob(job.DownloadJob):
     @publication_guard
     def handle_url(self, url, kwdict):
         self.producer.check()
+        self._native_prepared, self._native_phase = None, None
         if self.extractor.category in ("kemono", "coomer") and kwdict.get('extension', '').lower() not in mirror.VISUAL:
             # Keep non-playable source evidence, but do not download audio or
             # archives which cannot produce a supported native file receipt.
             kept = dict(kwdict, _url=url, source_extractor_url=self.extractor.url,
                         native_file_exclusion='unsupported_image_or_video_extension')
             prepared = self.producer.prepare(kept)
+            self.producer.report_download(prepared, "excluded", reason_code="unsupported_media")
             old_cursor = None
             if self.producer.legacy_resume:
                 candidate = copy.copy(self.pathfmt)
@@ -396,6 +410,19 @@ class NativeDownloadJob(job.DownloadJob):
         self._native_url = url
         try:
             return super().handle_url(url, kwdict)
+        except InvalidData:
+            if self._native_phase == "postprocess":
+                self.producer.report_download(self._native_prepared, "failed", reason_code="postprocess_failed")
+            raise
+        except SourceFailure:
+            if self._native_phase == "download":
+                self.producer.report_download(self._native_prepared, "failed", reason_code="source_failure")
+            raise
+        except (OSError, requests.exceptions.RequestException):
+            if self._native_phase in ("download", "postprocess"):
+                self.producer.report_download(self._native_prepared, "failed", reason_code=(
+                    "postprocess_failed" if self._native_phase == "postprocess" else "download_failed"))
+            raise
         finally:
             self._release()
 
@@ -461,11 +488,22 @@ class NativeDownloadJob(job.DownloadJob):
             finally:
                 os.close(fd)
 
+    def _postprocess(self, pathfmt):
+        self._native_phase = "postprocess"
+
+    def _download_error(self, pathfmt):
+        if self._native_prepared is None:
+            raise InvalidData("Failed download has no durable source capture")
+        self.producer.report_download(self._native_prepared, "failed", reason_code="download_failed")
+        self._native_phase = None
+        self._release()
+
     def _repair_skip(self, pathfmt):
         if self.archive is not None and self.archive.check(pathfmt.kwdict):
             return
         if not pathfmt.extension or not Path(pathfmt.realpath).is_file():
             return
+        self._postprocess(pathfmt)
         for event in ("file", "after"):
             for callback in list(self.hooks[event]):
                 if type(callback_owner(callback)).__name__ in {"MetadataPP", "ExecPP"}:
@@ -483,8 +521,14 @@ class NativeDownloadJob(job.DownloadJob):
             raise InvalidData("Successful download has no resolved final file; it remains unfinished")
         if completed:
             self.producer.complete(self._native_prepared, path)
+            self._native_phase = None
             if self.archive is not None:
                 self.archive.add(pathfmt.kwdict)
+        else:
+            archived = self.archive is not None and self.archive.check(pathfmt.kwdict)
+            self.producer.report_download(self._native_prepared, "skipped", reason_code=(
+                "archive_entry_without_file" if archived else "existing_without_file"))
+            self._native_phase = None
         self._release()
         try:
             self.producer.checkpoint(self._native_cursor, self._native_replay, completed)

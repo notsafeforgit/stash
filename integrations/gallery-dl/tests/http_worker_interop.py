@@ -129,13 +129,25 @@ def main():
         assert result["state"] == "source_succeeded", result
         assert result["finish_recovered"] is True, result
         rows = list(box.db.execute("SELECT event_uuid,kind FROM events ORDER BY seq"))
-        assert [row[1] for row in rows] == ["source.capture", "file.completed"], rows
-        capture_id, file_id = rows[0][0], rows[1][0]
+        assert [row[1] for row in rows] == ["source.capture", "attachment.download", "file.completed", "attachment.download"], rows
+        capture_id, start_id, file_id, end_id = [row[0] for row in rows]
     # File admission must survive closing/reopening the producer, independently
     # of source completion. Source and file receipts stay separate.
     with closing(Outbox(database, setup["endpoint"], setup["producer"])) as box:
-        drain_once(box, client)
-        assert box.status()["counts"] == {"pending": 0, "sending": 0, "review": 0, "acknowledged": 2}, box.status()
+        for attempt in range(8):
+            # Advance only local delivery backoff. Recover the server's exact
+            # receipt after its deliberately lost report response, then allow
+            # the file-dependent terminal report through the same real API.
+            box.clock = lambda attempt=attempt: time.time() + 120 * (attempt + 1)
+            drain_once(box, client)
+            if box.status()["counts"]["acknowledged"] == 4:
+                break
+        assert box.status()["counts"] == {"pending": 0, "sending": 0, "review": 0, "acknowledged": 4}, box.status()
+        for event_id, state in ((start_id, "started"), (end_id, "downloaded")):
+            report = box.receipt(event_id)
+            assert report["capture_uuid"] == box.receipt(capture_id)["capture_uuid"]
+            assert report["result"]["reported_state"] == state
+            assert report["result"]["media_ingested"] is False
         assert client.receipt_status(file_id)["state"] == "queued"
         output = io.StringIO()
         with redirect_stdout(output):
@@ -173,6 +185,7 @@ def main():
                                 "--inspect", recorded["token"], "--strict"])
         assert done_code == 0 and json.loads(output.getvalue()) == done, output.getvalue()
     print(json.dumps({"run_uuid": admitted["run_uuid"], "capture": capture_id, "file": file_id,
+                      "started": start_id, "downloaded": end_id,
                       "path": "Account/postabc123_abc123.jpg"}))
 
 

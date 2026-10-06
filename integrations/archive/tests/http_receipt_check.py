@@ -12,5 +12,5 @@ with closing(connect_readonly(request["library"])) as library, closing(connect_r
     library.execute("BEGIN")
     outbox.execute("BEGIN")
     proof = verify_ingestion_receipts(library, [outbox], request["origin"])
-assert proof["coverage"] == "capture-file-run-and-job-receipts"
+assert proof["coverage"] == "capture-file-download-run-and-job-receipts"
 print(json.dumps({"verified": True, "producers": len(proof["producers"])}))

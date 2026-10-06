@@ -16,9 +16,10 @@ from helpers import PRODUCER, COLLECTION, ROOT, RUN
 class LeaseFixture:
     def __init__(self):
         self.client = SimpleNamespace(producer=PRODUCER, endpoint="http://example.invalid")
+        self.owner = ROOT
         self.run = {"uuid": RUN, "collection_uuid": COLLECTION, "collection_revision": 1,
                     "target_url": "https://fixture.invalid/account", "path_prefix": ".",
-                    "root_uuid": ROOT, "operation": "download",
+                    "root_uuid": ROOT, "operation": "download", "owner_uuid": self.owner, "fence": 1,
                     "window": {"since": None, "until": "2027-01-01T00:00:00Z"},
                     "progress": {"items_seen": 0, "files_completed": 0, "cursor": ""}}
         self.active = True
@@ -71,7 +72,7 @@ class ProducerTests(unittest.TestCase):
         self.lease.active = False
         self.producer.complete(prepared, path)
         rows = [decode(r[0]) for r in self.box.db.execute("SELECT body FROM events ORDER BY seq")]
-        self.assertEqual([r["kind"] for r in rows], ["source.capture", "file.completed"])
+        self.assertEqual([r["kind"] for r in rows], ["source.capture", "file.completed", "attachment.download"])
         self.assertEqual(rows[1]["relative_path"], "transformed.mkv")
         self.assertEqual(rows[1]["sha256"], hashlib.sha256(path.read_bytes()).hexdigest())
         self.assertEqual(rows[1]["source"]["capture_event_uuid"], prepared.event_uuid)
@@ -91,6 +92,25 @@ class ProducerTests(unittest.TestCase):
         self.media.mkdir()
         with self.assertRaises(InvalidData):
             self.root.verify()
+
+    def test_transfer_sequence_survives_producer_restart_and_attempt_is_frozen(self):
+        first = self.producer.prepare(reddit_data("first"))
+        start = self.producer.report_download(first, "started")
+        self.assertEqual(self.producer.report_download(first, "started"), start)
+        restarted = Producer(self.box, self.lease, self.root, extractor_version="fixture")
+        second = restarted.prepare(reddit_data("second"))
+        self.assertGreater(second.transfer_sequence, first.transfer_sequence)
+        self.lease.run.update(fence=9, owner_uuid=PRODUCER)
+        self.lease.active = False
+        path = self.media / "finished.jpg"
+        path.write_bytes(b"fixture")
+        completed = self.producer.complete(first, path)
+        reports = [decode(r[0]) for r in self.box.db.execute("SELECT body FROM events WHERE kind='attachment.download' ORDER BY seq")]
+        self.assertEqual([r["state"] for r in reports], ["started", "downloaded"])
+        self.assertEqual({(r["fence"], r["owner_uuid"], r["transfer_sequence"]) for r in reports}, {(1, ROOT, first.transfer_sequence)})
+        self.assertEqual(reports[-1]["file_event_uuid"], completed)
+        with self.assertRaises(InvalidData):
+            self.producer.report_download(first, "failed", reason_code="download_failed")
 
     def test_expired_turn_allows_cursor_replay_and_one_new_checkpoint(self):
         prepared = self.producer.prepare(reddit_data("saved"))

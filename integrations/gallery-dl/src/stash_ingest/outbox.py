@@ -17,7 +17,7 @@ from .encoding import InvalidData, MAX_BATCH_BYTES, decode, digest, encode, iden
 from .endpoint import origin
 
 APPLICATION_ID = 0x5354494F  # STIO, not a Stash or gallery-dl archive database.
-SCHEMA = 15
+SCHEMA = 16
 
 
 class Conflict(InvalidData):
@@ -69,7 +69,7 @@ class Outbox:
                 tables = self.db.execute("SELECT name FROM sqlite_schema WHERE type='table'").fetchall()
             finally:
                 self.db.execute("ROLLBACK")
-            if not ((version in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, SCHEMA) and application == APPLICATION_ID)
+            if not ((version in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, SCHEMA) and application == APPLICATION_ID)
                     or (version == 0 and application == 0 and not tables)):
                 raise InvalidData("Unsupported or foreign outbox database")
             self.db.execute("PRAGMA foreign_keys=ON")
@@ -137,7 +137,7 @@ class Outbox:
         version = self.db.execute("PRAGMA user_version").fetchone()[0]
         if version == SCHEMA:
             return
-        if version not in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14):
+        if version not in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15):
             raise InvalidData("Unsupported outbox migration")
         if version == 1:
             self._migrate_runs()
@@ -178,8 +178,11 @@ class Outbox:
             migrate(self.db)
             from .discovery_detail_dispatch import migrate
             migrate(self.db)
-        from .discovery_detail_dispatch import migrate_candidates
-        migrate_candidates(self.db)
+        if version < 15:
+            from .discovery_detail_dispatch import migrate_candidates
+            migrate_candidates(self.db)
+        # Version 16 admits attachment lifecycle reports. Older binaries must
+        # reject the queue rather than silently leave the new event kind behind.
         self.db.execute(f"PRAGMA user_version={SCHEMA}")
 
     def _migrate_dispatch(self):
@@ -255,6 +258,9 @@ class Outbox:
         event_id, sha = event["event_uuid"], digest(body)
         source = event.get("source") if event["kind"] == "file.completed" else None
         parent_id = source["capture_event_uuid"] if source else None
+        download = event["kind"] == "attachment.download"
+        if download:
+            parent_id = event.get("file_event_uuid") or event["capture_event_uuid"]
         with self.transaction():
             previous = self.db.execute("SELECT sha256 FROM events WHERE event_uuid=?", (event_id,)).fetchone()
             if previous:
@@ -263,9 +269,12 @@ class Outbox:
                 return event_id
             if parent_id:
                 parent = self.db.execute("SELECT * FROM events WHERE event_uuid=?", (parent_id,)).fetchone()
-                if (not parent or parent["kind"] != "source.capture"
-                        or any(parent[k] != event[k] for k in ("collection_uuid", "collection_revision", "root_uuid"))):
-                    raise Conflict("File source must already be queued for the same collection and root")
+                expected_kind = "file.completed" if download and event["state"] == "downloaded" else "source.capture"
+                if (not parent or parent["kind"] != expected_kind
+                        or any(parent[k] != event[k] for k in ("collection_uuid", "collection_revision", "root_uuid", "run_uuid"))):
+                    raise Conflict("Event parent must already be queued for the same run, collection and root")
+                if download and expected_kind == "file.completed" and parent["parent_uuid"] != event["capture_event_uuid"]:
+                    raise Conflict("Completed download must retain its original capture")
             count, size = self.db.execute("SELECT count(*),coalesce(sum(length(body)),0) FROM events WHERE body IS NOT NULL").fetchone()
             size += self.metadata_reserved_bytes()
             if count >= self.max_events or size + len(body) > self.max_bytes:
@@ -283,8 +292,8 @@ class Outbox:
         if (type(seconds) is not int or not 5 <= seconds <= 900
                 or type(limit) is not int or not 1 <= limit <= 8 or max_bytes < 1024):
             raise InvalidData("Invalid delivery lease or batch limit")
-        kinds = tuple(kinds if kinds is not None else ("source.capture", "file.completed"))
-        if not kinds or not set(kinds) <= {"source.capture", "file.completed"}:
+        kinds = tuple(kinds if kinds is not None else ("source.capture", "file.completed", "attachment.download"))
+        if not kinds or not set(kinds) <= {"source.capture", "file.completed", "attachment.download"}:
             raise InvalidData("Invalid delivery kinds")
         max_bytes = min(max_bytes, MAX_BATCH_BYTES)
         result, size = [], 32
@@ -332,8 +341,21 @@ class Outbox:
             if row["kind"] == "source.capture":
                 identifier(receipt.get("capture_uuid"))
                 identifier(receipt.get("post_uuid"))
-            else:
+            elif row["kind"] == "file.completed":
                 identifier(receipt.get("job_uuid"))
+            else:
+                event = events.validate(row["body"])
+                identifier(receipt.get("capture_uuid"))
+                identifier(receipt.get("post_uuid"))
+                identifier(receipt["result"].get("attachment_uuid"))
+                capture = self.receipt(event["capture_event_uuid"])
+                if (capture is None or receipt.get("capture_uuid") != capture.get("capture_uuid")
+                        or receipt.get("post_uuid") != capture.get("post_uuid")
+                        or receipt.get("job_uuid") is not None
+                        or receipt["result"].get("status") != "recorded"
+                        or receipt["result"].get("reported_state") != event["state"]
+                        or receipt["result"].get("media_ingested") is not False):
+                    raise Conflict("Server receipt does not acknowledge this attachment report")
             self.db.execute("""UPDATE events SET state='acknowledged',receipt=?,body=NULL,
                 owner=NULL,lease_until=NULL,acknowledged_at=?,error_code=NULL WHERE event_uuid=?""",
                 (raw, self.clock(), delivery.event_uuid))

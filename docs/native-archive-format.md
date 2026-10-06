@@ -61,6 +61,13 @@ state. It also rejects newer outbox versions until their receipt contract is
 supported. Retired producers still need their retained outboxes until an explicit
 retirement/checkpoint protocol allows their removal.
 
+Producer snapshots through schema 16 include attachment-download reports. Their
+capture dependencies, and completed-file dependencies for downloaded outcomes,
+must survive in the same queue and source scope. Acknowledged reports require
+their original native report and matching capture receipt; pending reports keep
+their exact bytes even after a lost server response. These checks preserve
+reported transfer history without declaring files verified or available.
+
 Source requests retain their original template and window after admission.
 Verification reconstructs their submitted bytes and checks Stash's separately
 normalized request digest. Coalesced requests retain their own identities; a
@@ -90,7 +97,7 @@ is retained independently.
 
 The returned proof identifies the archive, canonical manifest digest, exact
 library/outbox component hashes and bounded per-producer counts/digests. Its
-coverage is `capture-file-run-and-job-receipts`. This does **not** certify
+coverage is `capture-file-download-run-and-job-receipts`. This does **not** certify
 download archives, media, configuration or filesystem recovery. Those remain
 required parts of the coordinated production backup. The copied
 library used for the large restore rehearsal currently has no native producers;

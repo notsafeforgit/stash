@@ -154,7 +154,7 @@ def drain_once(outbox, client, *, owner=None):
         return counts
     for delivery, result in zip(deliveries, results):
         status = result["status"]
-        expected = 200 if decode(delivery.body)["kind"] == "source.capture" else 202
+        expected = 202 if decode(delivery.body)["kind"] == "file.completed" else 200
         if status == expected and result.get("receipt") is not None:
             acknowledge(delivery, result["receipt"])
         elif status == 422 and expected == 202 and not capabilities["file_ingestion"]:

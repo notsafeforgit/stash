@@ -74,9 +74,25 @@ func runPythonDownloadWorker(t *testing.T, adapter string) {
 	require.NoError(t, err)
 	router := (&ingestRoutes{service: service, fileIngestion: true}).router()
 	var finishes, finishStatus atomic.Int32
+	var reportResponses atomic.Int32
 	var backfillFinishes atomic.Int32
 	var firstProof atomic.Value
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/batches") {
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			r.Body = io.NopCloser(bytes.NewReader(body))
+			if bytes.Contains(body, []byte(`"attachment.download"`)) && reportResponses.Add(1) == 1 {
+				committed := httptest.NewRecorder()
+				router.ServeHTTP(committed, r)
+				assert.Equal(t, http.StatusOK, committed.Code, committed.Body.String())
+				w.WriteHeader(http.StatusServiceUnavailable)
+				return
+			}
+		}
 		if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/backfills/complete") {
 			body, err := io.ReadAll(r.Body)
 			if err != nil {
@@ -129,10 +145,12 @@ func runPythonDownloadWorker(t *testing.T, adapter string) {
 	command.Stdout, command.Stderr = &stdout, &stderr
 	require.NoError(t, command.Run(), stderr.String())
 	var result struct {
-		RunUUID string `json:"run_uuid"`
-		Capture string `json:"capture"`
-		File    string `json:"file"`
-		Path    string `json:"path"`
+		RunUUID    string `json:"run_uuid"`
+		Capture    string `json:"capture"`
+		File       string `json:"file"`
+		Path       string `json:"path"`
+		Started    string `json:"started"`
+		Downloaded string `json:"downloaded"`
 	}
 	require.NoError(t, json.Unmarshal(stdout.Bytes(), &result))
 	require.EqualValues(t, http.StatusOK, finishStatus.Load())
@@ -153,6 +171,24 @@ func runPythonDownloadWorker(t *testing.T, adapter string) {
 		require.NotNil(t, file)
 		require.Equal(t, capture.CaptureUUID, file.CaptureUUID)
 		require.NotEmpty(t, file.JobUUID)
+		attachment, err := service.Repo.SourceAttachment.Lookup(ctx, capture.PostUUID, models.SourcePostIdentifier{Namespace: "native:reddit", Value: "abc123"})
+		require.NoError(t, err)
+		require.NotNil(t, attachment)
+		history, err := service.Repo.SourceAttachment.DownloadHistory(ctx, attachment.UUID, 0, 10, time.Now())
+		require.NoError(t, err)
+		require.Len(t, history, 2)
+		for _, report := range history {
+			require.Equal(t, "downloaded", report.TransferState)
+			require.Equal(t, "queued", report.VerificationState)
+		}
+		for event, state := range map[string]string{result.Started: "started", result.Downloaded: "downloaded"} {
+			receipt, err := service.Repo.Ingest.FindReceipt(ctx, producer.UUID, event)
+			require.NoError(t, err)
+			require.NotNil(t, receipt)
+			require.Equal(t, capture.CaptureUUID, receipt.CaptureUUID)
+			require.Empty(t, receipt.JobUUID)
+			require.JSONEq(t, `{"status":"recorded","attachment_uuid":"`+attachment.UUID+`","reported_state":"`+state+`","media_ingested":false}`, string(receipt.Result))
+		}
 		registered, err := service.Repo.File.FindByPath(ctx, filepath.Join(mediaPath, result.Path), true)
 		require.NoError(t, err)
 		require.Nil(t, registered, "source completion and file admission do not certify verified media intake")
@@ -170,4 +206,41 @@ func runPythonDownloadWorker(t *testing.T, adapter string) {
 	require.NoError(t, err)
 	require.Equal(t, "queued", status.State)
 	require.FileExists(t, filepath.Join(mediaPath, result.Path))
+	require.Positive(t, reportResponses.Load(), "a committed report response was deliberately lost")
+	require.NoError(t, db.Close())
+	archivePath := filepath.Join(filepath.Dir(packagePath), "archive", "src")
+	command = exec.CommandContext(ctx, python, "-c", pythonDownloadReceiptRestore, db.DatabasePath(), filepath.Join(directory, "producer.sqlite"), t.TempDir(), server.URL)
+	command.Env = append(os.Environ(), "PYTHONDONTWRITEBYTECODE=1", "PYTHONPATH="+archivePath)
+	output, err := command.CombinedOutput()
+	require.NoError(t, err, string(output))
+	var restored struct {
+		Path string `json:"path"`
+	}
+	require.NoError(t, json.Unmarshal(output, &restored))
+	_, err = sqlite.VerifyNativeSnapshot(t.Context(), restored.Path)
+	require.NoError(t, err)
+	require.NoError(t, db.Open(restored.Path))
+	replayed, err := service.Receipt(t.Context(), token, result.Downloaded)
+	require.NoError(t, err)
+	require.Equal(t, "attachment.download", replayed.Kind)
 }
+
+const pythonDownloadReceiptRestore = `
+from pathlib import Path
+import json, sys
+from stash_archive.bundle import export_archive, import_archive
+from stash_archive.receipts import verify_snapshot_receipts
+database, outbox, destination = map(Path, sys.argv[1:4])
+origin = sys.argv[4]
+before = verify_snapshot_receipts(database, [outbox], origin)
+assert before['producers'][0]['counts']['acknowledged'] == 4, before
+export_archive(database, destination / 'archive', reserve=0,
+               components=[{'role': 'producer_outbox', 'name': 'download.sqlite', 'path': outbox}])
+import_archive(destination / 'archive', destination / 'restored', reserve=0)
+restored = destination / 'restored' / 'library.sqlite'
+queues = list((destination / 'restored').rglob('download.sqlite'))
+assert len(queues) == 1, queues
+after = verify_snapshot_receipts(restored, queues, origin)
+assert before == after
+print(json.dumps({'path': str(restored)}))
+`

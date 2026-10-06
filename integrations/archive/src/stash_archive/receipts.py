@@ -124,7 +124,7 @@ def verify_ingestion_receipts(library, outboxes, expected_origin):
     reports, producers = [], set()
     for queue in outboxes:
         if (queue.execute("PRAGMA application_id").fetchone()[0] != 0x5354494F
-                or queue.execute("PRAGMA user_version").fetchone()[0] not in range(1, 16)):
+                or queue.execute("PRAGMA user_version").fetchone()[0] not in range(1, 17)):
             raise InvalidArchive("Unsupported producer snapshot for receipt verification")
         binding = queue.execute("SELECT endpoint,producer FROM binding").fetchall()
         if len(binding) != 1 or origin(binding[0][0]) != expected_origin:
@@ -155,7 +155,7 @@ def verify_ingestion_receipts(library, outboxes, expected_origin):
                 identifier(row["root_uuid"])
             if (not isinstance(row["sha256"], str) or not HEX.fullmatch(row["sha256"])
                     or type(row["collection_revision"]) is not int or row["collection_revision"] < 1
-                    or row["kind"] not in ("source.capture", "file.completed")
+                    or row["kind"] not in ("source.capture", "file.completed", "attachment.download")
                     or row["state"] not in ("acknowledged", "pending", "sending", "review")):
                 raise InvalidArchive("Invalid producer event identity or state")
             receipts = list(objects(library, "SELECT * FROM ingest_receipts WHERE producer_uuid=? AND event_uuid=?",
@@ -163,6 +163,7 @@ def verify_ingestion_receipts(library, outboxes, expected_origin):
             server = receipts[0] if len(receipts) == 1 else None
             if len(receipts) > 1:
                 raise InvalidArchive("Duplicate native event receipt")
+            event = None
             if row["state"] == "acknowledged":
                 if server is None:
                     raise InvalidArchive("Acknowledged producer event is missing from the native snapshot")
@@ -183,12 +184,17 @@ def verify_ingestion_receipts(library, outboxes, expected_origin):
                 if row["kind"] == "file.completed" and source is not None and not isinstance(source, dict):
                     raise InvalidArchive("Invalid pending file source association")
                 parent = source.get("capture_event_uuid") if row["kind"] == "file.completed" and source is not None else None
+                if row["kind"] == "attachment.download":
+                    parent = event.get("file_event_uuid") if event.get("state") == "downloaded" else event.get("capture_event_uuid")
                 if parent != row["parent_uuid"]:
                     raise InvalidArchive("Pending file lost its capture-event association")
                 if server is not None:
                     matching_receipt(row, producer, server)
                     counts["accepted_unacknowledged"] += 1
                 evidence = {"payload_sha256": row["sha256"]}
+            if row["kind"] == "attachment.download":
+                from .download_receipts import verify_download_report
+                verify_download_report(library, queue, producer, row, event, server)
             counts[row["state"]] += 1
             digest.update(json_bytes(dict(evidence, seq=row["seq"], event_uuid=row["event_uuid"], state=row["state"])))
         from .run_receipts import verify_run_admissions
@@ -201,7 +207,7 @@ def verify_ingestion_receipts(library, outboxes, expected_origin):
     if any(row[0] not in producers for row in library.execute("SELECT uuid FROM ingest_producers")):
         raise InvalidArchive("A registered producer has no matching outbox snapshot")
     return {"format": FORMAT + ".ingestion-receipt-boundary", "version": 1,
-            "coverage": "capture-file-run-and-job-receipts", "origin": expected_origin,
+            "coverage": "capture-file-download-run-and-job-receipts", "origin": expected_origin,
             "registered_producers_complete": True,
             "producers": sorted(reports, key=lambda report: report["producer_uuid"])}
 

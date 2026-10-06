@@ -31,6 +31,7 @@ import { ReviewError } from "@/components/detail/native-metadata/shared";
 import { CollectionForm } from "./form";
 import { CollectionHistory } from "./history";
 import { MetadataPolicyEditor } from "../metadata-policy/editor";
+import { ManualIntake } from "../manual-intake/editor";
 
 export function CollectionEditor({
   api,
@@ -308,6 +309,13 @@ export function CollectionEditor({
       {data?.current && (
         <MetadataPolicyEditor
           collections={api}
+          collection={data.current}
+          disabled={!ready || busy || !!saved}
+        />
+      )}
+      {data?.current && (
+        <ManualIntake
+          endpoint={api.endpoint}
           collection={data.current}
           disabled={!ready || busy || !!saved}
         />

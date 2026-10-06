@@ -50,14 +50,17 @@ type ManualFilePreview struct {
 // arguments. The archive job submission is its durable application receipt.
 // Producer file events cannot supply this variant of work.
 type ManualFileWork struct {
+	Resume       *ManualFileResume           `json:"resume,omitempty"`
 	Request      ManualFileRequest           `json:"request"`
 	RootRevision int                         `json:"root_revision"`
 	Inspection   archive.MediaFileInspection `json:"inspection"`
 }
 
 type ManualFileStatus struct {
-	RequestUUID string `json:"request_uuid"`
-	JobUUID     string `json:"job_uuid"`
+	ResumeFromJobUUID  string `json:"resume_from_job_uuid,omitempty"`
+	ResumeFromRevision int64  `json:"resume_from_revision,omitempty"`
+	RequestUUID        string `json:"request_uuid"`
+	JobUUID            string `json:"job_uuid"`
 	ManualFileInput
 	Signature             string                   `json:"signature"`
 	State                 string                   `json:"state"`
@@ -184,6 +187,9 @@ func validFileWork(work FileWork) bool {
 		(m.Inspection.SHA256 != "" && !archive.ValidSHA256(m.Inspection.SHA256)) || work.SHA256 != m.Inspection.SHA256 {
 		return false
 	}
+	if !validManualFileResume(m.Resume) {
+		return false
+	}
 	p := work.Publication
 	return p.Source == nil && p.UUID == manualIntakeUUID(m.Request.RequestUUID) && p.Kind == m.Request.MediaKind &&
 		p.CollectionUUID == m.Request.CollectionUUID && p.Target.RelativePath == m.Request.RelativePath
@@ -204,26 +210,29 @@ func decodeManualFileWork(current *models.ArchiveJob) (*FileWork, error) {
 	return &work, nil
 }
 
-func manualFileStatus(current *models.ArchiveJob) (*ManualFileStatus, error) {
+func manualFileStatus(current *models.ArchiveJob, request string) (*ManualFileStatus, error) {
 	work, err := decodeManualFileWork(current)
 	if err != nil {
 		return nil, err
 	}
-	var progress fileProgress
-	if err := StrictJSON(current.Progress, 16384, &progress); err != nil || (progress.Version != 0 && progress.Version != 1) ||
-		(progress.Version == 0 && progress.Publication != nil) || (progress.Version == 1 && progress.Publication == nil) {
-		return nil, ErrInvalid
+	progress, err := fileProgressForWork(current, *work)
+	if err != nil {
+		return nil, err
 	}
 	var completion fileCompletion
 	if err := StrictJSON(current.Result, 16384, &completion); err != nil || completion.MediaIngested != (current.State == "succeeded") ||
 		(completion.MediaIngested && (!completion.RegistrationCommitted || progress.Publication == nil || !reflect.DeepEqual(completion.Publication, progress.Publication))) {
 		return nil, ErrInvalid
 	}
-	return &ManualFileStatus{RequestUUID: work.Manual.Request.RequestUUID, JobUUID: current.UUID, ManualFileInput: work.Manual.Request.ManualFileInput,
+	result := &ManualFileStatus{RequestUUID: request, JobUUID: current.UUID, ManualFileInput: work.Manual.Request.ManualFileInput,
 		Signature: work.Manual.Request.Signature, State: current.State, Revision: current.Revision, Attempts: current.Fence,
 		MaxAttempts: current.MaxAttempts, AvailableAt: current.AvailableAt, RegistrationCommitted: progress.Publication != nil,
 		MediaIngested: completion.MediaIngested, Publication: progress.Publication, ErrorCode: current.ErrorCode,
-		CreatedAt: current.CreatedAt, UpdatedAt: current.UpdatedAt}, nil
+		CreatedAt: current.CreatedAt, UpdatedAt: current.UpdatedAt}
+	if work.Manual.Resume != nil {
+		result.ResumeFromJobUUID, result.ResumeFromRevision = work.Manual.Resume.FromJobUUID, work.Manual.Resume.FromRevision
+	}
+	return result, nil
 }
 
 // SubmitManualFile is for application-authenticated callers. The exact saved
@@ -286,7 +295,7 @@ func (s *Service) SubmitManualFile(ctx context.Context, input ManualFileRequest)
 	if err != nil {
 		return nil, err
 	}
-	return manualFileStatus(current)
+	return manualFileStatus(current, input.RequestUUID)
 }
 
 func (s *Service) ManualFileStatus(ctx context.Context, request string) (*ManualFileStatus, error) {
@@ -302,7 +311,7 @@ func (s *Service) ManualFileStatus(ctx context.Context, request string) (*Manual
 	if err != nil {
 		return nil, err
 	}
-	return manualFileStatus(current)
+	return manualFileStatus(current, request)
 }
 
 // CancelManualFile stops uncommitted work and remaining effects. A committed
@@ -327,7 +336,7 @@ func (s *Service) CancelManualFile(ctx context.Context, request string, revision
 	if err != nil {
 		return nil, err
 	}
-	return manualFileStatus(current)
+	return manualFileStatus(current, request)
 }
 
 // Before first publication, require precisely the reviewed collection, root and

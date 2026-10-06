@@ -92,13 +92,24 @@ func (w *FileWorker) process(ctx context.Context, claimed *models.ArchiveJob) er
 	if err := StrictJSON(claimed.Arguments, 262144, &work); err != nil || !validFileWork(work) {
 		return w.fail(ctx, claimed, ErrInvalid)
 	}
-	var progress fileProgress
-	if err := StrictJSON(claimed.Progress, 16384, &progress); err != nil || (progress.Version != 0 && progress.Version != 1) || (progress.Version == 0 && progress.Publication != nil) {
-		return w.fail(ctx, claimed, ErrInvalid)
+	progress, err := fileProgressForWork(claimed, work)
+	if err != nil {
+		return w.fail(ctx, claimed, err)
 	}
 	root, err := w.authorize(ctx, claimed, work)
 	if err != nil {
 		return w.fail(ctx, claimed, err)
+	}
+	if work.Manual != nil && work.Manual.Resume != nil && work.Manual.Resume.Publication != nil {
+		_, err := w.Durable.Checkpoint(ctx, claimed.Lease(), func(ctx context.Context, _ *models.ArchiveJob) (json.RawMessage, error) {
+			if err := w.Service.validateManualFileResume(ctx, work); err != nil {
+				return nil, err
+			}
+			return json.Marshal(progress)
+		})
+		if err != nil {
+			return w.fail(ctx, claimed, err)
+		}
 	}
 	if work.Manual != nil && progress.Publication == nil {
 		if err := w.Service.Repo.WithReadTxn(ctx, func(ctx context.Context) error {
@@ -230,8 +241,15 @@ func (w *FileWorker) authorizeInTxn(ctx context.Context, claimed *models.Archive
 		if err != nil {
 			return nil, err
 		}
-		if accepted == nil || accepted.UUID != claimed.UUID {
+		if accepted == nil {
 			return nil, ErrForbidden
+		}
+		if work.Manual.Resume == nil {
+			if accepted.UUID != claimed.UUID {
+				return nil, ErrForbidden
+			}
+		} else if err := w.Service.validateManualFileResume(ctx, work); err != nil {
+			return nil, err
 		}
 	} else if err := w.authorizeProducerFile(ctx, claimed, work); err != nil {
 		return nil, err
@@ -338,11 +356,16 @@ func (w *FileWorker) fail(ctx context.Context, claimed *models.ArchiveJob, cause
 		outcome.State, outcome.RetryAt = "retry", w.Durable.Now().Add(w.RetryDelay)
 	}
 	_, err := w.Durable.Publish(ctx, claimed.Lease(), func(_ context.Context, current *models.ArchiveJob) (models.ArchiveJobOutcome, error) {
-		var progress fileProgress
-		if err := StrictJSON(current.Progress, 16384, &progress); err != nil {
+		var work FileWork
+		if err := StrictJSON(current.Arguments, 262144, &work); err != nil || !validFileWork(work) {
+			// Invalid arguments still need a terminal failure. Only validated
+			// manual work may supply an inherited registration checkpoint.
+			work = FileWork{}
+		}
+		progress, err := fileProgressForWork(current, work)
+		if err != nil {
 			return models.ArchiveJobOutcome{}, err
 		}
-		var err error
 		outcome.Result, err = json.Marshal(fileCompletion{RegistrationCommitted: progress.Publication != nil, Publication: progress.Publication})
 		return outcome, err
 	})

@@ -13,6 +13,12 @@ import (
 
 func manualIntakeError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, archive.ErrMediaDirectoryInput):
+		ingestJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_directory_request"})
+	case errors.Is(err, archive.ErrMediaDirectoryChanged):
+		ingestJSON(w, http.StatusConflict, map[string]string{"error": "directory_changed"})
+	case errors.Is(err, archive.ErrMediaDirectoryLimit):
+		ingestJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "directory_review_limit"})
 	case errors.Is(err, ingest.ErrManualFileChanged), errors.Is(err, ingest.ErrDefinition), errors.Is(err, models.ErrMetadataPolicyConflict),
 		errors.Is(err, models.ErrFilePathChanged), errors.Is(err, models.ErrFileGenerationConflict), errors.Is(err, archive.ErrMediaFileChanged):
 		ingestJSON(w, http.StatusConflict, map[string]string{"error": "intake_preview_changed"})
@@ -62,7 +68,7 @@ func (rs *nativeArchiveRoutes) applyManualIntake(w http.ResponseWriter, r *http.
 			ingestJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "file_ingestion_unavailable"})
 			return
 		}
-		if err == nil && (result.ManualFileInput != input.ManualFileInput || result.Signature != input.Signature) {
+		if err == nil && (result.ResumeFromJobUUID != "" || result.ManualFileInput != input.ManualFileInput || result.Signature != input.Signature) {
 			err = models.ErrArchiveJobConflict
 		}
 	}
@@ -100,4 +106,49 @@ func (rs *nativeArchiveRoutes) cancelManualIntake(w http.ResponseWriter, r *http
 		return
 	}
 	ingestJSON(w, http.StatusOK, result)
+}
+
+func (rs *nativeArchiveRoutes) retryManualIntake(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		RequestUUID string `json:"request_uuid"`
+		Revision    int64  `json:"expected_revision"`
+	}
+	if err := readIngestJSON(w, r, 4096, &input); err != nil {
+		manualIntakeError(w, err)
+		return
+	}
+	service := ingest.New(rs.repo)
+	parentRequest := chi.URLParam(r, "request")
+	if !ingest.ValidUUID(parentRequest) || !ingest.ValidUUID(input.RequestUUID) || input.Revision < 1 || parentRequest == input.RequestUUID {
+		manualIntakeError(w, ingest.ErrInvalid)
+		return
+	}
+	var result *ingest.ManualFileStatus
+	var err error
+	if rs.fileIngestion {
+		result, err = service.RetryManualFile(r.Context(), parentRequest, input.Revision, input.RequestUUID)
+	} else {
+		result, err = service.ManualFileStatus(r.Context(), input.RequestUUID)
+		if errors.Is(err, ingest.ErrNotFound) {
+			ingestJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "file_ingestion_unavailable"})
+			return
+		}
+		if err == nil {
+			parent, parentErr := service.ManualFileStatus(r.Context(), parentRequest)
+			if parentErr != nil {
+				err = parentErr
+			} else if result.ResumeFromJobUUID != parent.JobUUID || result.ResumeFromRevision != input.Revision {
+				err = models.ErrArchiveJobConflict
+			}
+		}
+	}
+	if err != nil {
+		manualIntakeError(w, err)
+		return
+	}
+	code := http.StatusOK
+	if result.State == "queued" || result.State == "running" {
+		code = http.StatusAccepted
+	}
+	ingestJSON(w, code, result)
 }

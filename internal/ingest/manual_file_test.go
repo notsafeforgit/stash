@@ -379,7 +379,18 @@ func TestManualFilePortableRestoreKeepsMediaPolicyAndRequestRecovery(t *testing.
 	completed := f.status(t, request.RequestUUID)
 	require.True(t, completed.MediaIngested)
 	queuedRequest := f.request(t)
-	queued, err := f.service.SubmitManualFile(t.Context(), queuedRequest)
+	_, err = f.service.SubmitManualFile(t.Context(), queuedRequest)
+	require.NoError(t, err)
+	failedWorker := f.worker(t, func(context.Context, ingest.FileWork, ingest.IntakePublicationResult, ingest.FileEffectGuard) error {
+		return ingest.ErrInvalid
+	})
+	_, err = failedWorker.ProcessNext(t.Context())
+	require.NoError(t, err)
+	queued := f.status(t, queuedRequest.RequestUUID)
+	require.True(t, queued.RegistrationCommitted)
+	require.Equal(t, "failed", queued.State)
+	retryID := uuid.NewString()
+	retry, err := f.service.RetryManualFile(t.Context(), queuedRequest.RequestUUID, queued.Revision, retryID)
 	require.NoError(t, err)
 	directory := t.TempDir()
 	python := os.Getenv("PRODUCER_PYTHON")
@@ -415,6 +426,10 @@ func TestManualFilePortableRestoreKeepsMediaPolicyAndRequestRecovery(t *testing.
 		require.NoError(t, err)
 		require.Equal(t, pair.status, recovered)
 	}
+	recoveredRetry, err := service.RetryManualFile(t.Context(), queuedRequest.RequestUUID, queued.Revision, retryID)
+	require.NoError(t, err)
+	require.Equal(t, retry, recoveredRetry)
+	require.True(t, recoveredRetry.RegistrationCommitted)
 	require.Equal(t, "filename", intakeField(t, service.Repo, completed.Publication.MediaUUID, "title").Origin)
 }
 
@@ -437,5 +452,5 @@ with closing(connect_readonly(database)) as original, closing(connect_readonly(d
     assert restored.execute('PRAGMA foreign_key_check').fetchall() == []
     assert restored.execute('PRAGMA integrity_check').fetchone() == ('ok',)
     assert restored.execute('SELECT title FROM images').fetchall() == [('Purchased image',)]
-assert len(list_records(destination / 'restored', 'archive_jobs', limit=10)['rows']) == 2
+assert len(list_records(destination / 'restored', 'archive_jobs', limit=10)['rows']) == 3
 `
